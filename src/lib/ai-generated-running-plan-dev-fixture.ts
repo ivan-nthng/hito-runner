@@ -7,7 +7,7 @@ import {
   AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME,
   resolveAiAuthoredPlanFirstProviderHorizonWeeks,
 } from "@/lib/ai-authored-plan-first-provider-contract";
-import type { StructuredPlanAuthoringInput } from "@/lib/structured-plan-authoring";
+import type { StructuredPlanAuthoringInput } from "@/lib/structured-plan-authoring-schema";
 import { isLoopbackRuntimeUrl } from "@/lib/supabase/env";
 import { addDaysIso, diffDaysIso, startOfWeekIso } from "@/lib/training";
 import { WEEKDAY_NAMES, type WeekdayName } from "@/lib/weekday-rest-invariants";
@@ -16,12 +16,18 @@ export const AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV =
   "HITO_AI_GENERATED_PLAN_DEV_FIXTURE" as const;
 export const AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_DELAY_MS_ENV =
   "HITO_AI_GENERATED_PLAN_DEV_FIXTURE_DELAY_MS" as const;
+export const AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV =
+  "HITO_AI_GENERATED_PLAN_DEV_FIXTURE_SCENARIO" as const;
 export const AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL =
   "hito-local-qa-dev-ai-generated-plan-fixture" as const;
 
 const MAX_AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_DELAY_MS = 10 * 60 * 1000;
+const NON_REPEAT_TEMPO_FIXTURE_SCENARIO = "non_repeat_tempo" as const;
 
 type RuntimeEnv = Record<string, string | undefined>;
+type AiGeneratedRunningPlanDevFixtureScenario =
+  | "default"
+  | typeof NON_REPEAT_TEMPO_FIXTURE_SCENARIO;
 
 type AiGeneratedRunningPlanFixturePreviewOptions = Omit<
   GenerateAiFirstPlanDraftPreviewOptions,
@@ -38,12 +44,13 @@ export function buildAiGeneratedRunningPlanDevFixturePreviewOptions(input: {
   if (!isAiGeneratedRunningPlanDevFixtureEnabled(input.env)) {
     return null;
   }
+  const fixtureScenario = resolveAiGeneratedRunningPlanDevFixtureScenario(input.env);
 
   return {
     apiKey: "local-qa-dev-ai-generated-plan-fixture",
     model: AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
     today: input.today ?? input.authoringInput.schedule.startDate,
-    fetchImpl: buildAiGeneratedRunningPlanDevFixtureFetch(input, delayMs),
+    fetchImpl: buildAiGeneratedRunningPlanDevFixtureFetch(input, delayMs, fixtureScenario),
   };
 }
 
@@ -72,6 +79,7 @@ export function buildAiGeneratedRunningPlanDevFixtureOpenAiFetch(input: {
   return buildAiGeneratedRunningPlanDevFixtureFetch(
     input,
     resolveAiGeneratedRunningPlanDevFixtureDelayMs(input.env),
+    resolveAiGeneratedRunningPlanDevFixtureScenario(input.env),
   );
 }
 
@@ -109,15 +117,46 @@ export function resolveAiGeneratedRunningPlanDevFixtureDelayMs(env = readRuntime
   return delayMs;
 }
 
+function resolveAiGeneratedRunningPlanDevFixtureScenario(
+  env = readRuntimeEnv(),
+): AiGeneratedRunningPlanDevFixtureScenario {
+  const rawScenario = env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV]?.trim();
+
+  if (!rawScenario) {
+    return "default";
+  }
+
+  if (rawScenario !== NON_REPEAT_TEMPO_FIXTURE_SCENARIO) {
+    throw new Error(
+      `${AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV} must be ${NON_REPEAT_TEMPO_FIXTURE_SCENARIO}.`,
+    );
+  }
+
+  if (!isAiGeneratedRunningPlanDevFixtureEnabled(env)) {
+    throw new Error(
+      `${AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV} requires the local plan-first fixture to be enabled.`,
+    );
+  }
+
+  if (!isLoopbackRuntimeUrl(env.NEXT_PUBLIC_SUPABASE_URL)) {
+    throw new Error(
+      `${AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV} requires loopback NEXT_PUBLIC_SUPABASE_URL.`,
+    );
+  }
+
+  return NON_REPEAT_TEMPO_FIXTURE_SCENARIO;
+}
+
 function buildAiGeneratedRunningPlanDevFixtureFetch(
   input: {
     authoringInput: StructuredPlanAuthoringInput;
     today?: string | null;
   },
   delayMs: number,
+  fixtureScenario: AiGeneratedRunningPlanDevFixtureScenario,
 ): typeof fetch {
   const draft = buildAiAuthoredPlanFirstProviderDraft(
-    buildAiGeneratedRunningPlanDevFixtureFullPlanDraft(input.authoringInput),
+    buildAiGeneratedRunningPlanDevFixtureFullPlanDraft(input.authoringInput, fixtureScenario),
     {
       startDate: input.authoringInput.schedule.startDate,
       endDate: input.authoringInput.schedule.targetDate ?? undefined,
@@ -157,6 +196,7 @@ export function isAiGeneratedRunningPlanDevFixtureModel(model: string | null | u
 
 function buildAiGeneratedRunningPlanDevFixtureFullPlanDraft(
   authoringInput: StructuredPlanAuthoringInput,
+  fixtureScenario: AiGeneratedRunningPlanDevFixtureScenario,
 ): AiAuthoredPlanFirstDraft {
   const horizonWeeks = resolvePlanFirstFixtureHorizonWeeks(authoringInput);
 
@@ -185,6 +225,7 @@ function buildAiGeneratedRunningPlanDevFixtureFullPlanDraft(
         authoringInput,
         weekNumber: index + 1,
         horizonWeeks,
+        fixtureScenario,
       }),
     ),
   };
@@ -208,10 +249,12 @@ function buildPlanFirstFixtureWeek({
   authoringInput,
   weekNumber,
   horizonWeeks,
+  fixtureScenario,
 }: {
   authoringInput: StructuredPlanAuthoringInput;
   weekNumber: number;
   horizonWeeks: number;
+  fixtureScenario: AiGeneratedRunningPlanDevFixtureScenario;
 }): AiAuthoredPlanFirstDraft["weeks"][number] {
   const longRunDay = authoringInput.availability.preferredLongRunDay ?? "Sunday";
   const fixedRestDays = new Set(authoringInput.availability.unavailableDays);
@@ -300,7 +343,10 @@ function buildPlanFirstFixtureWeek({
       weekday === qualityDay &&
       weekNumber > Math.max(2, Math.round(horizonWeeks * 0.2))
     ) {
-      week[key] = buildRepeatRichQualityDay({ date, weekNumber });
+      week[key] =
+        fixtureScenario === NON_REPEAT_TEMPO_FIXTURE_SCENARIO && weekNumber % 2 === 0
+          ? buildContinuousTempoDay({ date })
+          : buildRepeatRichQualityDay({ date, weekNumber });
       continue;
     }
 
@@ -426,6 +472,28 @@ function buildLongRunDay({
   };
 }
 
+function buildContinuousTempoDay({
+  date,
+}: {
+  date: string;
+}): AiAuthoredPlanFirstDraft["weeks"][number]["monday"] {
+  return {
+    type: "Tempo",
+    date,
+    notes: "Continuous controlled threshold durability.",
+    steps: [
+      { phase: "Warm Up", duration_min: 15, target_hr: "Z1-Z2" },
+      {
+        phase: "Work",
+        duration_min: 20,
+        target_pace: "comfortably hard",
+        target_hr: "Z3",
+      },
+      { phase: "Cool Down", duration_min: 10, target_hr: "Z1" },
+    ],
+  };
+}
+
 function buildRepeatRichQualityDay({
   date,
   weekNumber,
@@ -450,7 +518,11 @@ function buildRepeatRichQualityDay({
             repeat: tempo ? 3 : 6,
             interval: tempo
               ? { duration_min: 8, target_pace: "comfortably hard", target_hr: "Z3" }
-              : { duration_min: 2, target_pace: "controlled interval rhythm", target_hr: "Z4" },
+              : {
+                  duration_min: 2,
+                  target_pace: "controlled interval rhythm",
+                  target_hr: "Z4",
+                },
             recovery: { duration_min: tempo ? 3 : 2, target_hr: "Z1" },
           },
         ],

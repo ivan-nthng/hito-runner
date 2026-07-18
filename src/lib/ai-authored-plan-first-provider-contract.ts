@@ -1,4 +1,5 @@
-import type { StructuredPlanAuthoringInput } from "@/lib/structured-plan-authoring";
+import { PLANNED_WORKOUT_REPEAT_CHILD_ROLE_VALUES } from "@/lib/planned-workout-block-contract";
+import type { StructuredPlanAuthoringInput } from "@/lib/structured-plan-authoring-schema";
 import { addDaysIso, diffDaysIso } from "@/lib/training";
 import { WEEKDAY_NAMES } from "@/lib/weekday-rest-invariants";
 
@@ -37,7 +38,7 @@ export function buildAiAuthoredPlanFirstOpenAiSchema() {
     ...unit,
     required: ["role", "label", ...unit.required],
     properties: {
-      role: { type: "string", enum: ["work", "recover"] },
+      role: { type: "string", enum: [...PLANNED_WORKOUT_REPEAT_CHILD_ROLE_VALUES] },
       label: { type: "string", minLength: 1, maxLength: 80 },
       ...unit.properties,
     },
@@ -60,7 +61,7 @@ export function buildAiAuthoredPlanFirstOpenAiSchema() {
               children: {
                 type: "array",
                 minItems: 1,
-                maxItems: 2,
+                maxItems: 12,
                 items: repeatChild,
               },
             },
@@ -149,7 +150,7 @@ export function buildAiAuthoredPlanFirstPrompt({
     "Each day is an authored running workout with an explicit date and displayable steps; omit rest-day rows because the backend fills empty calendar dates as rest.",
     "You own the coaching plan: workout mix, progression, long runs, repeats, paces, HR-zone labels, assumptions, and warnings.",
     "Use bounded integer duration_seconds and distance_meters values. Use null when a field does not apply; never emit tiny decimal placeholders.",
-    "A Repeat is structural-only: set parent prescription and target fields to null, then put the ordered work child and optional recovery child in repeat.children. Every child needs duration_seconds or distance_meters.",
+    `A Repeat is structural-only: set parent prescription and target fields to null, then put every authored child in repeat.children in exact order. Allowed child roles: ${PLANNED_WORKOUT_REPEAT_CHILD_ROLE_VALUES.join(", ")}. Recovery is optional and must never be invented. Every child needs duration_seconds or distance_meters.`,
     "Use pace strings and HR-zone labels only as coach guidance. Do not invent raw BPM targets or medical claims.",
     "When calendar.horizon_weeks is supplied, return exactly that many sequential weeks. Otherwise choose and author one complete 4-52 week horizon. Use only the supplied workout weekdays, respect rest weekdays, and place an exact selected-distance endpoint on target_date when provided.",
   ].join("\n");

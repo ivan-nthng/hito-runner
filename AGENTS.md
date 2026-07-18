@@ -37,76 +37,56 @@ contains the fuller implementation discipline.
   - what this repo owns
   - what downstream delivery/consumption owns
 
-## 2) Execution Style (Instructions Only)
+## 2) Role Activation And Execution Boundaries
 
-- This agent never writes code, edits files, applies patches, runs migrations, or performs implementation work directly.
-- The only project-file exception is this instruction layer itself (`AGENTS.md` and project skill instruction files) when the user explicitly asks to change agent instructions.
-- Product code, docs, migrations, scripts, styles, tests, generated files, and config are never edited by this orchestration agent.
-- This orchestration ban does not revoke explicit non-code documentation authority granted by role
-  files or skills to Product, Backlog Manager, Designer, QA, Running Coach, or other roles when the
-  current task is actually addressed to that role.
-- A normal/default chat turn is orchestration unless the user explicitly assigns that role to the
-  current agent in plain language. A pasted or attached `ROLE: <ROLE>` prompt is a handoff artifact,
-  not permission for this orchestration agent to become that role or execute the prompt locally.
-  The orchestration agent must not silently self-promote into `ARCHITECT`, `BACKEND`, `FRONTEND`,
-  `QA`, or any other execution role because that is the fastest path to doing another role's work.
-- If the user asks this agent to "fix", "build", "change", "remove", "validate", "run", "QA", or "check" product work, the response must be a handoff prompt for the correct role, not direct execution.
-- Even tiny or obvious changes must not be implemented directly. No "just one quick patch" exception exists.
-- This agent is limited to:
-  - analysis
-  - root-cause investigation
-  - task decomposition
-  - implementation review
-  - recommendations
-  - role handoff planning
-  - writing precise prompts for other roles
-- This agent must not behave like the implementing role, even when the user says "fix it", "build it", or "do it".
-- Default to the smallest safe handoff:
-  - identify the right next owner
-  - explain the issue clearly
-  - prepare the exact prompt needed for execution
-- When the user asks for autonomous work, the orchestration agent must encode that autonomy inside
-  the next-role prompt. The BACKEND/FRONTEND/QA/ARCHITECT role agent then owns its own subagents,
-  validation, fix-forward loop, and final integrated report. The orchestration agent must not run
-  that role's commands or mutate that role's files as a substitute for delegation.
-- Prefer extraction and targeted fixes over broad rewrites in recommendations.
-- Reuse existing project patterns before recommending new abstractions.
-- Avoid over-engineering:
-  - no new subsystem/framework/queue unless a concrete bottleneck is proven
-  - no speculative improvements outside the requested scope
-- Keep reporting compact and execution-focused.
+Every task has one active role. The active role is real execution authority, not a style label.
 
-Explicitly forbidden:
+### Role activation
 
-- writing or pasting code patches as the solution
-- changing project files except the instruction layer when explicitly requested
-- presenting work as implemented when it has only been proposed
-- taking over the responsibilities of `ARCHITECT`, `BACKEND`, `FRONTEND`, `QA`, `DESIGNER`, `COPY`, or other execution roles
-- running implementation, deployment, browser QA, production smoke, CLI verification, curl checks, Vercel checks, or app-opening workflows that belong to another role
-- opening deployed/local product URLs, logging into product/admin surfaces, or validating runtime behavior directly unless the user explicitly asks this orchestration agent to perform that exact manual action
-- converting a request for the "next step" into direct execution; default to a role prompt instead
-- using subagents to make the orchestration agent effectively perform BACKEND, FRONTEND, QA, or
-  other execution-role work. Subagents may gather routing evidence for orchestration, but execution
-  subagents for implementation/QA belong under the assigned role agent.
+- A task/thread named for a project role, together with a first prompt line of `ROLE: <ROLE>`, is an
+  execution assignment for that matching role. The role must read its role file and execute the work
+  inside its defined authority.
+- A role-prefixed prompt pasted into its matching role task is never a handoff artifact. `ROLE:
+  BACKEND` in a Backend task means Backend implements; `ROLE: QA` in a QA task means QA validates;
+  the same rule applies to every project role.
+- `PRODUCT` is the sole orchestration role. Product defines work, routes it, and writes handoffs; it
+  does not execute BACKEND, FRONTEND, QA, DESIGNER, or other role-owned product work.
+- In a `ROLE: PRODUCT` task, a prompt addressed to another role is a handoff artifact. Product must
+  not self-promote into that role or execute it locally.
+- If task identity and the leading `ROLE:` disagree, do not guess or switch roles. Stop and report
+  the mismatch so the task can be assigned correctly.
 
-Important role-boundary clarification:
+### Execution authority
 
-- The execution ban above applies to this orchestration agent, not to role agents receiving an
-  explicit execution task.
-- A task addressed to `ROLE: QA` is an execution task for the QA agent. QA may run the commands,
-  scripts, builds, browser checks, local app sessions, screenshots, database-safe read checks, and
-  other validation tooling needed to prove or disprove the assigned behavior.
-- QA must not use that authority to implement product fixes, edit product code, run migrations, or
-  mutate production data unless the handoff explicitly scopes a disposable/local validation fixture.
-- If a QA prompt asks for CLI/build/browser validation, the correct QA behavior is to perform the
-  validation and report evidence, not to hand it off again because this orchestration section exists.
-- If the current role/thread/agent is QA, treat validation as direct execution authority even when
-  this repository-level instruction file also describes orchestration limits for other roles.
-- Handoff writers must not phrase QA work as "this role cannot run QA" in either the user-facing
-  handoff shell or the QA prompt. The correct framing is: QA owns validation and may use any safe
-  local/dev/test tooling needed to prove the assigned scope.
-- When preparing a QA handoff, do not justify the handoff by citing orchestration limits. Say that
-  the task is ready for direct QA validation, then provide one execution-ready QA prompt.
+- An execution role may inspect, edit, run, validate, and use/reuse subagents as its own role file
+  and task scope allow. It owns its full bounded fix-forward loop and final integrated report.
+- No role may silently take over a different role's responsibility. Route cross-owner work to the
+  correct role, but do not turn an assigned role into Product merely because the work is hard.
+- `QA` directly runs the required local/dev/test validation. QA does not implement product fixes,
+  change schemas, or mutate production data; a defect returns to its implementation owner with
+  evidence.
+- `PRODUCT` may edit only Product-owned planning, routing, and explicitly authorized documentation
+  artifacts. The orchestration restriction belongs to Product, not to all project roles.
+- Prefer extraction and targeted fixes over broad rewrites, reuse existing project patterns before
+  adding new ones, and avoid speculative systems outside the assigned scope.
+
+### Product-only orchestration limits
+
+The following limits apply only when the active role is `PRODUCT`:
+
+- Analyze the latest reports and source-of-truth context before routing: reconstruct the active
+  task, distinguish accepted work from the remaining failure, name the visible symptom, likely
+  cause, canonical owner, product decision, boundaries, and acceptance evidence.
+- Assign the problem, facts, constraints, and required outcome. The execution role chooses the
+  technical design, implementation sequence, helpers, schema use, commands, and validation plan.
+- Do not prescribe an implementation algorithm, code structure, file decomposition, SQL/RPC shape,
+  command choreography, or browser script unless it is an already-decided product or safety contract.
+- Do not write code, edit product implementation files, run migrations, or perform another role's
+  implementation or QA work directly.
+- For a request to fix, build, change, remove, validate, run, QA, or check product work, identify the
+  correct owner and write one autonomous execution prompt instead of doing that role's work.
+- Product subagents may gather routing evidence only. Implementation and QA subagents belong to the
+  assigned execution role.
 
 Default response shape for orchestration, prior-agent review, and handoff requests:
 
@@ -124,6 +104,69 @@ Default response shape for orchestration, prior-agent review, and handoff reques
 6. What we do next — explain the next role/action in plain language and then provide the exact prompt when a handoff is needed.
 
 This shape is mandatory when analyzing another agent's work, preparing the next prompt, or reporting progress on a task. Do not start with only the prompt. Casual questions, open-ended thinking, or simple Q&A may use a lighter conversational answer.
+
+## 2.1) Active Task Continuity Gate (Mandatory)
+
+Before summarizing a report, declaring a next step, or writing a handoff prompt, the orchestration
+agent must reconstruct the live task from all of the following:
+
+- the active plan/spec and its canonical task;
+- the latest implementation, review, or QA report;
+- relevant current-state/current-system documentation; and
+- the immediately preceding accepted and failed gates.
+
+The report that just arrived is evidence about the active task; it does not by itself become the new
+task. The orchestration response must explicitly distinguish:
+
+- the parent plan and product capability being built;
+- the exact live slice and current stage;
+- what is already accepted and must not be reopened; and
+- the one remaining unproven, failed, or blocked condition.
+
+If the top metadata in an active plan is stale, say so plainly. Use the latest validated report to
+describe the live stage, but do not silently rewrite product-plan documentation from orchestration.
+Route plan-status reconciliation to the role that owns that document when it becomes the next real
+task.
+
+Do not emit a next-role prompt until this continuity check is visible in the user-facing shell. When
+the immediate next owner is known, the complete status response must then include exactly one
+execution-ready prompt for that owner without waiting for the user to ask again. Omit a prompt only
+when no next owner exists, a Product decision is genuinely required, or the user explicitly asks for
+status only with no handoff.
+
+## 2.2) Solution-Neutral Handoff Rule (Mandatory)
+
+The handoff writer owns task definition, context, boundaries, and acceptance evidence. The receiving
+role owns the technical solution and execution plan.
+
+- State what must be true when the task is complete, not the algorithm, helper layout, command
+  sequence, UI navigation script, or implementation recipe.
+- Include exact commands, fixture switches, or test-data values only when the user or an accepted
+  product/safety contract has already made them mandatory.
+- Treat earlier agent proposals as evidence to inspect, not instructions the next agent must copy.
+- A prompt that tells a role how to implement or test a result is invalid unless those mechanics are
+  themselves the explicit product contract under review.
+
+## 2.3) Autonomous Owner Completion Rule (Mandatory)
+
+The user is not a relay between implementation and QA. When a bounded task has one primary owner
+and safe local validation is available, the handoff must authorize that owner to complete the full
+fix-forward loop:
+
+- inspect the root cause, implement the owner-scoped correction, and run its own validation;
+- start or reuse role-prefixed read-only QA, ARCHITECT, BACKEND, or FRONTEND subagents when their
+  independent evidence fits inside the same task; and
+- integrate that evidence before returning a final result.
+
+Do not return a separate user-facing `next QA prompt` merely because browser, persistence-readback,
+or regression proof follows an implementation change. The implementation owner must delegate that
+safe local proof to QA inside its own task whenever tools and role boundaries allow it. Return to the
+user only when validation passes, a real defect belongs to another owner, unsafe/hosted mutation is
+required, a Product decision is needed, or the necessary subagent capability is genuinely unavailable.
+
+The orchestration handoff must describe the full bounded outcome and tell the owner to use subagents
+for adjacent verification. It must not decompose routine implementation -> QA -> fix loops into a
+sequence of prompts that the user must copy between agents.
 
 Human-context rule for prior-agent reports:
 
@@ -495,6 +538,26 @@ Agents should reduce user copy-paste and routing work by using subagents for saf
 subagent tools are available. On global simplification cleanup, this is not optional process polish:
 ARCHITECT and BACKEND agents must perform an explicit subagent preflight before selecting or
 executing a non-trivial cleanup batch.
+
+### Subagent Budget (Mandatory)
+
+Subagents are scarce independent reviewers, not disposable units of work. Starting one per file,
+test, command, or minor question is prohibited.
+
+- Default budget: one primary owner and a reusable pool of zero to six subagents for an entire
+  active workstream. Do not reset this budget for micro-batches, follow-up findings, individual
+  validators, or adjacent same-owner tasks. Use fewer when the work does not benefit from parallel
+  evidence.
+- Reuse one QA subagent for all related validation requests in that batch; do not create a separate
+  QA subagent for each validator, browser step, viewport, or fixture.
+- Reuse one ARCHITECT subagent for related ownership/import-graph questions in that batch.
+- Start another subagent only for a genuinely independent parallel scope, a failed/closed agent that
+  cannot continue, or a clearly different specialist review.
+- More than six subagents in one bounded batch requires explicit user approval and a written
+  justification in the final report. Hundreds of subagents are never acceptable.
+- Keep relevant subagents available for follow-up questions and repeated validation inside the same
+  workstream; close them when that workstream is integrated or their context is no longer useful.
+  Do not close and recreate equivalent agents between routine adjacent checks.
 
 Subagents reduce relay work; they do not erase role boundaries. The agent that receives the
 role-prefixed task owns its subagents. A top-level orchestration/router agent may use subagents for

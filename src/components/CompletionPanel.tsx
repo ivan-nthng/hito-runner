@@ -1113,8 +1113,8 @@ function getFeedbackUploadSummary({
       label: "Your run is ready to review",
       body: "The comparison is ready, and the next-step note is available.",
       detailLine: actualSnapshot
-        ? `${actualSnapshot} · comparison ready · next step ready.`
-        : `${assetLabel} processed · comparison ready · next step ready.`,
+        ? `${actualSnapshot} · Plan vs run and next step are ready.`
+        : `${assetLabel} processed · Plan vs run and next step are ready.`,
       pill: {
         label: "Ready",
         tone: "success" as const,
@@ -1128,10 +1128,10 @@ function getFeedbackUploadSummary({
       label: "Your run is ready to compare",
       body: "The comparison is ready below.",
       detailLine: actualSnapshot
-        ? `${actualSnapshot} · comparison ready · next step not ready yet.`
-        : `${assetLabel} processed · comparison ready.`,
+        ? `${actualSnapshot} · Plan vs run is ready; next step is still being prepared.`
+        : `${assetLabel} processed · Plan vs run is ready.`,
       pill: {
-        label: "Comparison ready",
+        label: "Plan vs run ready",
         tone: "success" as const,
       },
       tone: "success" as const,

@@ -5,14 +5,10 @@ import {
   FIRST_PLAN_GOAL_STYLE_VALUES,
   FIRST_PLAN_WATCH_ACCESS_VALUES,
 } from "@/lib/first-plan-authoring-utils";
-import {
-  normalizedPlanGoalIntentSchema,
-  type NormalizedPlanGoalIntent,
-} from "@/lib/plan-creation-engine/plan-goal-intent";
-import type { CanonicalExecutableMode, HrTargetSource } from "@/lib/rich-workout-model";
+import { normalizedPlanGoalIntentSchema } from "@/lib/plan-creation-engine/plan-goal-intent";
 import { diffDaysIso, todayIso } from "@/lib/training";
 
-export const weekdayValues = [
+const weekdayValues = [
   "Monday",
   "Tuesday",
   "Wednesday",
@@ -52,6 +48,7 @@ export const structuredPlanAuthoringInputSchema = z
   .object({
     goal: z.object({
       goalType: z.enum([
+        "distance_goal",
         "build_consistency",
         "distance_build",
         "5k",
@@ -192,45 +189,3 @@ export const structuredPlanAuthoringInputSchema = z
   });
 
 export type StructuredPlanAuthoringInput = z.infer<typeof structuredPlanAuthoringInputSchema>;
-
-export type StructuredWeekday = (typeof weekdayValues)[number];
-
-export interface NormalizedStructuredInput extends Omit<
-  StructuredPlanAuthoringInput,
-  "planGoalIntent"
-> {
-  planGoalIntent: NormalizedPlanGoalIntent;
-  schedule: StructuredPlanAuthoringInput["schedule"] & {
-    horizonWeeks: number;
-    endDate: string;
-  };
-  availability: StructuredPlanAuthoringInput["availability"] & {
-    runningDays: StructuredWeekday[];
-    longRunDay: StructuredWeekday;
-    qualityDay: StructuredWeekday | null;
-    steadyDay: StructuredWeekday | null;
-  };
-}
-
-export interface StructuredMetricMode {
-  executableSurfaceSupported: boolean;
-  executableMode: CanonicalExecutableMode;
-  paceTargetsAllowed: boolean;
-  heartRateTargetsAllowed: boolean;
-  heartRateTargetSource: HrTargetSource;
-  defaultEstimatedHrAvailable: boolean;
-  estimatedMaxHr: number | null;
-  recent5kPaceSecondsPerKm: number | null;
-}
-
-export type TrainingPhase = "Base" | "Build" | "Specific" | "Taper";
-
-export type EasySupportKind = "easy" | "recovery" | "cutback";
-
-export interface LongRunGoalPolicy {
-  floorKm: number;
-  peakKm: number;
-  ceilingKm: number;
-}
-
-export type DefaultEstimatedHrBand = "recovery" | "easy" | "longAerobic" | "steady" | "tempo";

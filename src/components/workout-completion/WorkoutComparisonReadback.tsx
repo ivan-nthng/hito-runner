@@ -30,27 +30,16 @@ export function DeterministicComparisonReadback({
   const supportReadback = buildSupportReadback(payload);
   const segmentGroups = buildSegmentSummaryItems(payload);
   const stepSummary = describeStepSummary(comparison);
-  const technicalNotes = buildComparisonTechnicalNotes(signals, stepSummary);
+  const technicalNotes = [
+    `Comparison coverage: ${humanizeComparisonStatus(comparison.comparisonStatus)}.`,
+    `Confidence: ${confidencePct}%.`,
+    `Checks available: ${comparedSignalCount} of ${signals.length}.`,
+    ...(signalSummary ? [comparisonChecksSummary(signalSummary)] : []),
+    ...buildComparisonTechnicalNotes(signals, stepSummary),
+  ];
 
   return (
     <div className="mt-4 space-y-4">
-      <div className="overflow-hidden rounded-xl bg-background/16 sm:grid sm:grid-cols-3 sm:divide-x sm:divide-hairline">
-        <ComparisonMetaItem
-          label="Evidence"
-          value={humanizeComparisonStatus(comparison.comparisonStatus)}
-        />
-        <ComparisonMetaItem
-          label="Confidence"
-          value={`${confidencePct}%`}
-          helpText="Confidence reflects how complete and internally consistent the factual comparison is."
-        />
-        <ComparisonMetaItem
-          label="Checks"
-          value={`${comparedSignalCount} of ${signals.length}`}
-          helpText="Checks count how many planned-vs-run comparisons were available for this workout."
-        />
-      </div>
-
       {sessionItems.length > 0 && (
         <div className="border-t border-hairline pt-4">
           <p className="hito-list-row-title">Run summary</p>
@@ -74,14 +63,6 @@ export function DeterministicComparisonReadback({
             ))}
           </div>
         </div>
-      )}
-
-      {signalSummary && (
-        <p className="hito-caption mt-3">
-          Checks: {signalSummary.matchedSignals} matched, {signalSummary.partialSignals} partial,{" "}
-          {signalSummary.mismatchSignals} off plan, {signalSummary.missingActualSignals} missing
-          actual, {signalSummary.notApplicableSignals} not comparable.
-        </p>
       )}
 
       {supportReadback && <ComparisonSupportReadback readback={supportReadback} />}
@@ -109,23 +90,6 @@ export function DeterministicComparisonReadback({
           </div>
         </details>
       ) : null}
-    </div>
-  );
-}
-
-function ComparisonMetaItem({
-  label,
-  value,
-  helpText,
-}: {
-  label: string;
-  value: string;
-  helpText?: string;
-}) {
-  return (
-    <div className="px-4 py-3" title={helpText}>
-      <p className="hito-technical-mono">{value}</p>
-      <p className="hito-caption mt-1">{label}</p>
     </div>
   );
 }
@@ -238,7 +202,7 @@ function describeComparisonSignal(signal: WorkoutComparisonSignal) {
 
   const plannedValue = formatComparisonValue(signal.plannedValue, signal.unit);
   const actualValue = formatComparisonValue(signal.actualValue, signal.unit);
-  const details = [`plan ${plannedValue}`, `actual ${actualValue}`];
+  const details = [`Planned ${plannedValue}`, `Run ${actualValue}`];
   const delta = formatSignalDelta(signal);
   const tolerance = formatSignalTolerance(signal);
 
@@ -284,17 +248,17 @@ function describeStepSummary(comparison: WorkoutComparisonSummary) {
   }
 
   if (stepSummary.mismatchStepCount > 0) {
-    parts.push(`${stepSummary.mismatchStepCount} mismatched`);
+    parts.push(`${stepSummary.mismatchStepCount} different`);
   }
 
   if (stepSummary.missingActualStepCount > 0) {
-    parts.push(`${stepSummary.missingActualStepCount} missing actual`);
+    parts.push(`${stepSummary.missingActualStepCount} with no run data`);
   }
 
   const firstMismatch = stepSummary.steps.find((step) => step.status !== "matched");
   if (firstMismatch) {
     parts.push(
-      `first off step ${firstMismatch.plannedSequence}: ${formatDurationMin(
+      `first different step ${firstMismatch.plannedSequence}: ${formatDurationMin(
         firstMismatch.plannedDurationMin,
       )} vs ${formatDurationMin(firstMismatch.actualDurationMin)}`,
     );
@@ -742,15 +706,15 @@ function formatSignalTolerance(signal: WorkoutComparisonSignal) {
 function humanizeSignalStatus(status: WorkoutComparisonSignal["status"]) {
   switch (status) {
     case "matched":
-      return "matched";
+      return "Matched plan";
     case "partial":
-      return "partially aligned";
+      return "Partly matched";
     case "mismatch":
-      return "off plan";
+      return "Different from plan";
     case "missing_actual":
-      return "missing actual";
+      return "No run data";
     default:
-      return "not applicable";
+      return "Not compared";
   }
 }
 
@@ -775,17 +739,27 @@ function humanizeComparisonStatus(status: WorkoutComparisonSummary["comparisonSt
 
 export function humanizePrimaryComparisonVerdict(comparison: WorkoutComparisonSummary) {
   if (comparison.completionState === "matched") {
-    return "Matched";
+    return "Matched plan";
   }
 
   const payload = getComparisonPayload(comparison);
   const summary = payload?.summary;
 
   if (summary && summary.mismatchSignals > 0 && summary.partialSignals === 0) {
-    return "Off plan";
+    return "Different from plan";
   }
 
-  return "Needs review";
+  return "Partly matched";
+}
+
+function comparisonChecksSummary(summary: WorkoutComparisonDifferencePayload["summary"]) {
+  return [
+    `${summary.matchedSignals} matched`,
+    `${summary.partialSignals} partly matched`,
+    `${summary.mismatchSignals} different from plan`,
+    `${summary.missingActualSignals} with no run data`,
+    `${summary.notApplicableSignals} not compared`,
+  ].join(" · ");
 }
 
 function buildComparisonTechnicalNotes(

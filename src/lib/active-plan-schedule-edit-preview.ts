@@ -198,7 +198,7 @@ export function buildActivePlanScheduleEditPreview({
       reason: "running_day_count_changed",
       message:
         "Changing weekly running frequency means Hito needs to regenerate future workouts instead of only moving dates.",
-      suggestedRefreshPrompt: buildSuggestedRefreshPrompt(normalizedInput),
+      suggestedRefreshPrompt: buildSuggestedPlanChangeContext(normalizedInput),
       firstMutableDate,
       preservedPastProtectedWorkoutCount: protectedWorkouts.length,
       movableFutureWorkoutCount: movableWorkouts.length,
@@ -247,7 +247,7 @@ export function buildActivePlanScheduleEditPreview({
       ok: false,
       reason: "protected_history_conflict",
       message:
-        "A protected workout is already on one of the proposed fixed rest days. Use plan refresh if you need to change protected history.",
+        "A protected workout is already on one of the proposed fixed rest days. Protected history cannot be changed from Edit schedule.",
       conflicts,
       blockedDates: fixedRestDayProof.blockedDates,
     };
@@ -259,7 +259,7 @@ export function buildActivePlanScheduleEditPreview({
       reason: "schedule_no_longer_fits",
       message:
         "This schedule no longer has enough safe open days for the future workouts, so Hito should regenerate the remaining plan.",
-      suggestedRefreshPrompt: buildSuggestedRefreshPrompt(normalizedInput),
+      suggestedRefreshPrompt: buildSuggestedPlanChangeContext(normalizedInput),
       firstMutableDate,
       preservedPastProtectedWorkoutCount: protectedWorkouts.length,
       movableFutureWorkoutCount: movableWorkouts.length,
@@ -1163,13 +1163,13 @@ function buildScheduleReflowReview(
   };
 }
 
-function buildSuggestedRefreshPrompt(input: NormalizedScheduleEditInput) {
+function buildSuggestedPlanChangeContext(input: NormalizedScheduleEditInput) {
   const fixedRestText = input.fixedRestDays.length ? input.fixedRestDays.join(", ") : "none";
   const longRunText = input.effectiveLongRunDay
     ? `prefer ${input.effectiveLongRunDay} for the long run`
     : "choose the safest available long-run day";
 
-  return `Change my active plan to ${input.runningDaysPerWeek} running days per week, keep fixed rest days on ${fixedRestText}, and ${longRunText}. Regenerate only future workouts and preserve completed, logged, and evidence-backed history.`;
+  return `Create a reviewed replacement plan with ${input.runningDaysPerWeek} running days per week, fixed rest days on ${fixedRestText}, and ${longRunText}. Preserve completed, logged, and evidence-backed history.`;
 }
 
 function buildPreviewToken(value: {

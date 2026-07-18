@@ -10,16 +10,18 @@ import {
   normalizeWorkoutIdentity,
   resolveCanonicalWorkoutModel,
   toCanonicalMetricModeJson,
-  type CalendarIconKey,
-  type CanonicalWorkoutFamily,
   type CanonicalWorkoutIdentity,
 } from "@/lib/rich-workout-model";
+import {
+  PLANNED_WORKOUT_REPEAT_CHILD_ROLE_VALUES,
+  type PlannedWorkoutRepeatChildRole,
+} from "@/lib/planned-workout-block-contract";
 import {
   SELECTED_DISTANCE_ENDPOINT_IDENTITY,
   SELECTED_DISTANCE_ENDPOINT_SOURCE_KIND,
 } from "@/lib/plan-creation-engine/selected-distance-endpoint";
 import { resolveAiAuthoredPlanFirstProviderHorizonWeeks } from "@/lib/ai-authored-plan-first-provider-contract";
-import type { StructuredPlanAuthoringInput } from "@/lib/structured-plan-authoring";
+import type { StructuredPlanAuthoringInput } from "@/lib/structured-plan-authoring-schema";
 import { addDaysIso, startOfWeekIso, weekdayLong } from "@/lib/training";
 import type { StepPrescription, StepTarget } from "@/lib/training";
 import { WEEKDAY_NAMES, type WeekdayName } from "@/lib/weekday-rest-invariants";
@@ -144,32 +146,17 @@ const aiAuthoredPlanFirstProviderUnitSchema = z
   .strict();
 
 const aiAuthoredPlanFirstProviderRepeatChildSchema = aiAuthoredPlanFirstProviderUnitSchema.extend({
-  role: z.enum(["work", "recover"]),
+  role: z.enum(PLANNED_WORKOUT_REPEAT_CHILD_ROLE_VALUES),
   label: z.string().trim().min(1).max(80),
 });
 
 const aiAuthoredPlanFirstProviderRepeatSchema = z
   .object({
     count: z.number().int().min(2).max(100),
-    children: z.array(aiAuthoredPlanFirstProviderRepeatChildSchema).min(1).max(2),
+    children: z.array(aiAuthoredPlanFirstProviderRepeatChildSchema).min(1).max(12),
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.children[0]?.role !== "work") {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["children", 0, "role"],
-        message: "Repeat children must begin with a work child.",
-      });
-    }
-    if (value.children[1] && value.children[1].role !== "recover") {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["children", 1, "role"],
-        message: "The second repeat child must be recovery.",
-      });
-    }
-
     value.children.forEach((child, index) => {
       if (child.duration_seconds == null && child.distance_meters == null) {
         context.addIssue({
@@ -318,22 +305,8 @@ export function compileAiAuthoredPlanFirstDraft({
     return normalized;
   }
 
-  const parsed = aiAuthoredPlanFirstSchema.safeParse(normalizeNullishDraftFields(normalized.draft));
-
-  if (!parsed.success) {
-    return {
-      ok: false,
-      reason: "ai_authored_plan_first_schema_invalid",
-      issues: parsed.error.issues.slice(0, 16).map((issue) => ({
-        code: issue.code,
-        path: issue.path.join(".") || "root",
-        message: issue.message,
-      })),
-    };
-  }
-
   const issues: NormalizationIssue[] = [...normalized.issues];
-  if (containsMedicalClaim(parsed.data)) {
+  if (containsMedicalClaim(normalized.draft)) {
     issues.push({
       code: "ai_authored_plan_first_medical_claim",
       path: "root",
@@ -341,7 +314,7 @@ export function compileAiAuthoredPlanFirstDraft({
     });
   }
   const compiled = compileParsedAiAuthoredPlanFirstDraft({
-    draft: parsed.data,
+    draft: normalized.draft,
     authoringInput,
     issues,
   });
@@ -360,7 +333,7 @@ export function compileAiAuthoredPlanFirstDraft({
     ok: true,
     canonicalPlan,
     validationIssues: issues.map((issue) => `${issue.code}: ${issue.message}`),
-    reviewAssumptions: buildReviewAssumptions(parsed.data, authoringInput, issues),
+    reviewAssumptions: buildReviewAssumptions(normalized.draft, authoringInput, issues),
   };
 }
 
@@ -416,16 +389,20 @@ function normalizeAiAuthoredPlanFirstProviderDraft({
   draft: unknown;
   authoringInput: StructuredAuthoringInput;
 }):
-  | { ok: true; draft: unknown; issues: NormalizationIssue[] }
+  | { ok: true; draft: AiAuthoredPlanFirstProviderDraft; issues: NormalizationIssue[] }
   | { ok: false; reason: string; issues: NormalizationIssue[] } {
-  const providerParsed = aiAuthoredPlanFirstProviderDraftSchema.safeParse(draft);
+  let providerParsed = aiAuthoredPlanFirstProviderDraftSchema.safeParse(draft);
 
   if (!providerParsed.success) {
     const specimenParsed = aiAuthoredPlanFirstSchema.safeParse(normalizeNullishDraftFields(draft));
     if (specimenParsed.success) {
-      return { ok: true, draft: specimenParsed.data, issues: [] };
+      providerParsed = aiAuthoredPlanFirstProviderDraftSchema.safeParse(
+        buildAiAuthoredPlanFirstProviderDraft(specimenParsed.data),
+      );
     }
+  }
 
+  if (!providerParsed.success) {
     return {
       ok: false,
       reason: "ai_authored_plan_first_provider_schema_invalid",
@@ -452,7 +429,7 @@ function normalizeAiAuthoredPlanFirstProviderDraft({
       message: `Expected ${expectedHorizonWeeks} complete calendar weeks, received ${authoredHorizonWeeks}.`,
     });
   }
-  const weeks = providerParsed.data.weeks.map((week, weekIndex) => {
+  providerParsed.data.weeks.forEach((week, weekIndex) => {
     const weekStart = addDaysIso(firstWeekStart, (week.week - 1) * 7);
     if (week.week !== weekIndex + 1) {
       issues.push({
@@ -461,18 +438,6 @@ function normalizeAiAuthoredPlanFirstProviderDraft({
         message: `Expected week ${weekIndex + 1}, received week ${week.week}.`,
       });
     }
-
-    const normalizedWeek: AiAuthoredPlanFirstDraft["weeks"][number] = {
-      week: week.week,
-      estimated_km: null,
-      monday: providerRestDay(addDaysIso(weekStart, 0)),
-      tuesday: providerRestDay(addDaysIso(weekStart, 1)),
-      wednesday: providerRestDay(addDaysIso(weekStart, 2)),
-      thursday: providerRestDay(addDaysIso(weekStart, 3)),
-      friday: providerRestDay(addDaysIso(weekStart, 4)),
-      saturday: providerRestDay(addDaysIso(weekStart, 5)),
-      sunday: providerRestDay(addDaysIso(weekStart, 6)),
-    };
 
     for (const day of week.days) {
       if (authoredDates.has(day.date)) {
@@ -498,36 +463,13 @@ function normalizeAiAuthoredPlanFirstProviderDraft({
           message: `${day.date} does not belong to authored week ${week.week}.`,
         });
       }
-
-      const weekdayKey = weekdayLong(day.date).toLowerCase() as (typeof WEEKDAY_KEYS)[number];
-      normalizedWeek[weekdayKey] = {
-        type: day.type,
-        date: day.date,
-        notes: day.notes,
-        steps: day.steps.map(buildSpecimenStepFromProvider),
-      };
     }
-
-    return normalizedWeek;
   });
 
   return {
     ok: true,
     issues,
-    draft: {
-      metadata: {
-        goal: providerParsed.data.metadata.goal,
-        target_date: providerParsed.data.metadata.target_date,
-        target_time: providerParsed.data.metadata.target_time,
-        athlete: null,
-        rest_days: [...authoringInput.availability.unavailableDays],
-        long_run_day: providerParsed.data.metadata.long_run_day,
-        note: providerParsed.data.metadata.note,
-        warnings: providerParsed.data.metadata.warnings,
-        assumptions: providerParsed.data.metadata.assumptions,
-      },
-      weeks,
-    } satisfies AiAuthoredPlanFirstDraft,
+    draft: providerParsed.data,
   };
 }
 
@@ -551,11 +493,13 @@ function buildProviderStepFromSpecimen(
           count: step.repeat!,
           children: [
             buildProviderRepeatChild("work", "Stride", step),
-            buildProviderRepeatChild("recover", "Recover", {
-              duration_sec: step.recovery_sec ?? 40,
-              target_hr: "Z1",
-              notes: "Easy walk or jog recovery.",
-            }),
+            ...(step.recovery_sec
+              ? [
+                  buildProviderRepeatChild("recover", "Recover", {
+                    duration_sec: step.recovery_sec,
+                  }),
+                ]
+              : []),
           ],
         }
       : null;
@@ -573,7 +517,7 @@ function buildProviderStepFromSpecimen(
 }
 
 function buildProviderRepeatChild(
-  role: "work" | "recover",
+  role: PlannedWorkoutRepeatChildRole,
   label: string,
   unit: z.infer<typeof aiAuthoredPlanFirstUnitSchema>,
 ) {
@@ -587,58 +531,6 @@ function buildProviderRepeatChild(
     effort: unit.effort ?? null,
     notes: unit.notes ?? null,
   };
-}
-
-function buildSpecimenStepFromProvider(
-  step: z.infer<typeof aiAuthoredPlanFirstProviderStepSchema>,
-): z.infer<typeof aiAuthoredPlanFirstStepSchema> {
-  const work = step.repeat?.children[0] ?? null;
-  const recovery = step.repeat?.children[1] ?? null;
-
-  return {
-    phase: step.phase,
-    duration_min: null,
-    duration_sec: step.repeat ? null : step.duration_seconds,
-    distance_km: step.repeat
-      ? null
-      : step.distance_meters == null
-        ? null
-        : step.distance_meters / 1000,
-    target_pace: step.repeat ? null : step.pace,
-    target_hr: step.repeat ? null : step.hr_zone,
-    repeat: null,
-    recovery_sec: null,
-    blocks:
-      step.repeat && work
-        ? [
-            {
-              repeat: step.repeat.count,
-              interval: buildSpecimenUnitFromProvider(work),
-              recovery: recovery ? buildSpecimenUnitFromProvider(recovery) : null,
-            },
-          ]
-        : null,
-    notes: step.notes,
-  };
-}
-
-function buildSpecimenUnitFromProvider(
-  unit: z.infer<typeof aiAuthoredPlanFirstProviderRepeatChildSchema>,
-): z.infer<typeof aiAuthoredPlanFirstUnitSchema> {
-  return {
-    duration_min: null,
-    duration_sec: unit.duration_seconds,
-    distance_km: unit.distance_meters == null ? null : unit.distance_meters / 1000,
-    target_pace: unit.pace,
-    target_hr: unit.hr_zone,
-    effort: unit.effort,
-    jog: unit.role === "recover" ? unit.effort : null,
-    notes: unit.notes,
-  };
-}
-
-function providerRestDay(date: string): z.infer<typeof aiAuthoredPlanFirstDaySchema> {
-  return { type: "Rest", date, notes: null, steps: [] };
 }
 
 function durationSeconds(value: { duration_min?: number | null; duration_sec?: number | null }) {
@@ -656,52 +548,46 @@ function compileParsedAiAuthoredPlanFirstDraft({
   authoringInput,
   issues,
 }: {
-  draft: AiAuthoredPlanFirstDraft;
+  draft: AiAuthoredPlanFirstProviderDraft;
   authoringInput: StructuredAuthoringInput;
   issues: NormalizationIssue[];
 }): TrainingPlanV2 {
-  const restDays = uniqueWeekdays([
-    ...draft.metadata.rest_days,
-    ...authoringInput.availability.unavailableDays,
-  ]);
+  const restDays = uniqueWeekdays(authoringInput.availability.unavailableDays);
   const weekOneStart = startOfWeekIso(authoringInput.schedule.startDate);
+  const endDate =
+    authoringInput.schedule.targetDate ??
+    draft.metadata.target_date ??
+    addDaysIso(authoringInput.schedule.startDate, draft.weeks.length * 7 - 1);
   const workouts: TrainingPlanV2["planned_workouts"] = [];
 
   for (const week of draft.weeks) {
+    const authoredDays = new Map(week.days.map((day) => [day.date, day]));
     for (const [weekdayIndex, weekdayKey] of WEEKDAY_KEYS.entries()) {
       const weekday = WEEKDAY_KEY_TO_NAME[weekdayKey];
-      const day = week[weekdayKey];
-      const date = day.date ?? addDaysIso(weekOneStart, (week.week - 1) * 7 + weekdayIndex);
+      const date = addDaysIso(weekOneStart, (week.week - 1) * 7 + weekdayIndex);
 
-      if (date < authoringInput.schedule.startDate) {
+      if (date < authoringInput.schedule.startDate || date > endDate) {
         continue;
       }
 
-      if (weekdayLong(date) !== weekday) {
-        issues.push({
-          code: "ai_authored_plan_first_date_weekday_mismatch",
-          path: `weeks.${week.week}.${weekdayKey}.date`,
-          message: `${date} is ${weekdayLong(date)}, not ${weekday}.`,
-        });
-      }
+      const day = authoredDays.get(date) ?? null;
 
-      if (restDays.includes(weekday) && !isRestDay(day)) {
+      if (restDays.includes(weekday) && day) {
         issues.push({
           code: "ai_authored_plan_first_fixed_rest_day_violation",
-          path: `weeks.${week.week}.${weekdayKey}`,
+          path: `weeks.${week.week}.days.${date}`,
           message: `${weekday} is a fixed rest day but the AI-authored draft scheduled ${day.type}.`,
         });
       }
 
       workouts.push(
-        isRestDay(day)
+        day == null
           ? buildRestWorkout({ date, weekday, weekNumber: week.week, authoringInput })
           : buildWorkout({
               day,
               date,
               weekday,
               weekNumber: week.week,
-              totalWeeks: draft.weeks.length,
               authoringInput,
               issues,
             }),
@@ -732,20 +618,7 @@ function compileParsedAiAuthoredPlanFirstDraft({
       goal_type: "distance_goal",
       goal_label: authoringInput.goal.goalLabel,
       ...buildDistanceGoalFields(authoringInput),
-      authored_outcome_target: {
-        source: authoringInput.planGoalIntent?.targetFinishTime
-          ? "runner_entered_target"
-          : "ai_estimated_target",
-        label:
-          authoringInput.goal.targetTime ??
-          draft.metadata.target_time ??
-          `${authoringInput.goal.goalLabel} completion guidance`,
-        finish_time_window: authoringInput.goal.targetTime ?? draft.metadata.target_time,
-        rationale:
-          "AI authored the full plan draft; outcome targets are review guidance, not backend-certified executable workout pace.",
-        confidence: authoringInput.goal.targetTime ? "medium" : "low",
-        assumptions: buildReviewAssumptions(draft, authoringInput, issues).slice(0, 6),
-      },
+      ...buildAuthoredOutcomeTarget(draft, authoringInput, issues),
       authored_horizon: {
         source: authoringInput.schedule.targetDate ? "runner_target_date" : "ai_proposed_horizon",
         weeks: draft.weeks.length,
@@ -809,15 +682,13 @@ function buildWorkout({
   date,
   weekday,
   weekNumber,
-  totalWeeks,
   authoringInput,
   issues,
 }: {
-  day: z.infer<typeof aiAuthoredPlanFirstDaySchema>;
+  day: z.infer<typeof aiAuthoredPlanFirstProviderDaySchema>;
   date: string;
   weekday: string;
   weekNumber: number;
-  totalWeeks: number;
   authoringInput: StructuredAuthoringInput;
   issues: NormalizationIssue[];
 }): TrainingPlanV2["planned_workouts"][number] {
@@ -838,25 +709,36 @@ function buildWorkout({
       issues,
     }),
   );
-  const model = resolveWorkoutIdentity(day.type, weekNumber, totalWeeks);
+  const authoredIdentity = normalizeWorkoutIdentity(day.type);
   const isEndpoint = workoutPrescribesSelectedDistance({ segments, authoringInput });
-  const workoutIdentity = isEndpoint ? SELECTED_DISTANCE_ENDPOINT_IDENTITY : model.identity;
-  const workoutFamily: CanonicalWorkoutFamily = isEndpoint ? "race" : model.family;
-  const calendarIconKey: CalendarIconKey = isEndpoint ? "race" : model.icon;
-  const legacyType = canonicalFamilyToLegacyWorkoutType(workoutFamily, workoutIdentity);
+  if (!authoredIdentity && !isEndpoint) {
+    issues.push({
+      code: "ai_authored_plan_first_unknown_workout_identity",
+      path: `${date}.type`,
+      message: `AI-authored workout type "${day.type}" has no canonical Hito workout identity.`,
+    });
+  }
+  const workoutIdentity = isEndpoint ? SELECTED_DISTANCE_ENDPOINT_IDENTITY : authoredIdentity;
+  const workoutFamily = isEndpoint
+    ? "race"
+    : authoredIdentity
+      ? familyForIdentity(authoredIdentity)
+      : null;
+  const legacyType = workoutFamily
+    ? canonicalFamilyToLegacyWorkoutType(workoutFamily, workoutIdentity)
+    : "quality";
   const metricMode = toCanonicalMetricModeJson(deriveCanonicalMetricMode(segments));
 
   return {
-    workout_id: `ai-plan-first-${slugify(workoutIdentity)}-${date}`,
+    workout_id: `ai-plan-first-${slugify(workoutIdentity ?? day.type)}-${date}`,
     date,
     weekday,
     week_number: weekNumber,
-    phase: phaseForWeek(weekNumber, totalWeeks),
+    phase: "AI authored",
     workout_type: legacyType,
-    source_workout_type: isEndpoint ? SELECTED_DISTANCE_ENDPOINT_SOURCE_KIND : workoutIdentity,
-    workout_family: workoutFamily,
-    workout_identity: workoutIdentity,
-    calendar_icon_key: calendarIconKey,
+    source_workout_type: isEndpoint ? SELECTED_DISTANCE_ENDPOINT_SOURCE_KIND : day.type,
+    ...(workoutFamily ? { workout_family: workoutFamily, calendar_icon_key: workoutFamily } : {}),
+    ...(workoutIdentity ? { workout_identity: workoutIdentity } : {}),
     goal_context: buildGoalContext(authoringInput),
     metric_mode: {
       ...metricMode,
@@ -866,10 +748,7 @@ function buildWorkout({
           : metricMode.reason,
     },
     title: day.type,
-    summary: day.notes ?? summarizeWorkout(day.type, segments.length),
-    planned_rpe: plannedRpeForWorkoutType(day.type),
-    estimated_fatigue: estimatedFatigueForWorkoutType(day.type),
-    recovery_priority: recoveryPriorityForWorkoutType(day.type),
+    summary: day.notes ?? day.type,
     segments,
   };
 }
@@ -881,89 +760,33 @@ function buildSegment({
   sequence,
   issues,
 }: {
-  step: z.infer<typeof aiAuthoredPlanFirstStepSchema>;
+  step: z.infer<typeof aiAuthoredPlanFirstProviderStepSchema>;
   workoutType: string;
   date: string;
   sequence: number;
   issues: NormalizationIssue[];
 }): TrainingPlanV2["planned_workouts"][number]["segments"][number] {
-  const repeatBlock = step.blocks?.at(0) ?? null;
-  const segmentType = resolveSegmentType(step, workoutType, Boolean(repeatBlock));
+  const segmentType = resolveSegmentType(step, workoutType);
   const target = buildTarget(step, `${date}.steps.${sequence}`, issues);
 
-  if (repeatBlock) {
+  if (step.repeat) {
     return {
       segment_id: `ai-plan-first-${date}-segment-${sequence}`,
       segment_type: segmentType === "strides" ? "strides" : "interval_block",
       label: step.phase,
       sequence,
-      guidance: step.notes ?? `${step.phase} as authored by the AI coach plan.`,
+      ...(step.notes ? { guidance: step.notes } : {}),
       prescription: {
         mode: "repeats",
-        repeat_count: repeatBlock.repeat,
-        children: [
+        repeat_count: step.repeat.count,
+        children: step.repeat.children.map((child, childIndex) =>
           buildRepeatChild({
-            role: "work",
-            label: "Work",
-            unit: repeatBlock.interval,
-            sequence: 1,
-            path: `${date}.steps.${sequence}.blocks.0.interval`,
+            child,
+            sequence: childIndex + 1,
+            path: `${date}.steps.${sequence}.repeat.children.${childIndex}`,
             issues,
           }),
-          ...(repeatBlock.recovery
-            ? [
-                buildRepeatChild({
-                  role: "recover" as const,
-                  label: "Recover",
-                  unit: repeatBlock.recovery,
-                  sequence: 2,
-                  path: `${date}.steps.${sequence}.blocks.0.recovery`,
-                  issues,
-                }),
-              ]
-            : []),
-        ],
-      },
-    };
-  }
-
-  if (step.repeat && step.duration_sec) {
-    return {
-      segment_id: `ai-plan-first-${date}-segment-${sequence}`,
-      segment_type: "strides",
-      label: step.phase,
-      sequence,
-      guidance: step.notes ?? "Repeat the authored stride block with relaxed form.",
-      prescription: {
-        mode: "repeats",
-        repeat_count: step.repeat,
-        children: [
-          {
-            role: "work",
-            label: "Stride",
-            sequence: 1,
-            guidance: "Fast relaxed stride.",
-            prescription: { mode: "time", duration_min: roundMinutes(step.duration_sec / 60) },
-            ...(target ? { target } : {}),
-          },
-          {
-            role: "recover",
-            label: "Recover",
-            sequence: 2,
-            guidance: "Walk or jog easily until fully relaxed.",
-            prescription: {
-              mode: "time",
-              duration_min: roundMinutes((step.recovery_sec ?? 40) / 60),
-            },
-            target: {
-              target_source: "ai_authored_plan_guidance",
-              hr_target_source: "effort_only",
-              cue: "Recover by easy effort.",
-              source_note:
-                "AI-authored coach guidance from the reviewed plan; not backend-inferred executable pace or personal HR truth.",
-            },
-          },
-        ],
+        ),
       },
     };
   }
@@ -983,76 +806,61 @@ function buildSegment({
     segment_type: segmentType,
     label: step.phase,
     sequence,
-    guidance: step.notes ?? `${step.phase} as authored by the AI coach plan.`,
+    ...(step.notes ? { guidance: step.notes } : {}),
     ...(prescription ? { prescription } : {}),
     ...(target ? { target } : {}),
   };
 }
 
 function buildRepeatChild({
-  role,
-  label,
-  unit,
+  child,
   sequence,
   path,
   issues,
 }: {
-  role: "work" | "recover";
-  label: string;
-  unit: z.infer<typeof aiAuthoredPlanFirstUnitSchema>;
+  child: z.infer<typeof aiAuthoredPlanFirstProviderRepeatChildSchema>;
   sequence: number;
   path: string;
   issues: NormalizationIssue[];
 }): NonNullable<StepPrescription["children"]>[number] {
-  const prescription = buildUnitPrescription(unit);
-  const target = buildTarget(unit, path, issues);
-  const guidance =
-    unit.notes ??
-    ("effort" in unit && unit.effort
-      ? unit.effort
-      : "jog" in unit && unit.jog
-        ? unit.jog
-        : `${label} block as authored by the AI coach plan.`);
+  const prescription = buildUnitPrescription(child);
+  const target = buildTarget(child, path, issues);
 
-  if (!prescription && !target) {
+  if (!prescription) {
     issues.push({
       code: "ai_authored_plan_first_unconvertible_repeat_child",
       path,
-      message: `${label} repeat child has no duration or distance prescription.`,
+      message: `${child.label} repeat child has no duration or distance prescription.`,
     });
   }
 
   return {
-    role,
-    label,
+    role: child.role,
+    label: child.label,
     sequence,
-    guidance,
+    ...(child.notes ? { guidance: child.notes } : {}),
     prescription: prescription ?? { mode: "none" },
     ...(target ? { target } : {}),
   };
 }
 
 function buildPrescription(
-  step: z.infer<typeof aiAuthoredPlanFirstStepSchema>,
+  step: z.infer<typeof aiAuthoredPlanFirstProviderStepSchema>,
 ): StepPrescription | null {
   return buildUnitPrescription(step);
 }
 
 function buildUnitPrescription(
   unit:
-    | z.infer<typeof aiAuthoredPlanFirstStepSchema>
-    | z.infer<typeof aiAuthoredPlanFirstUnitSchema>,
+    | z.infer<typeof aiAuthoredPlanFirstProviderStepSchema>
+    | z.infer<typeof aiAuthoredPlanFirstProviderUnitSchema>,
 ): { mode: "time"; duration_min: number } | { mode: "distance"; distance_km: number } | null {
-  if (unit.distance_km) {
-    return { mode: "distance", distance_km: roundKm(unit.distance_km) };
+  if (unit.distance_meters) {
+    return { mode: "distance", distance_km: roundKm(unit.distance_meters / 1000) };
   }
 
-  if (unit.duration_min) {
-    return { mode: "time", duration_min: roundMinutes(unit.duration_min) };
-  }
-
-  if (unit.duration_sec) {
-    return { mode: "time", duration_min: roundMinutes(unit.duration_sec / 60) };
+  if (unit.duration_seconds) {
+    return { mode: "time", duration_min: roundMinutes(unit.duration_seconds / 60) };
   }
 
   return null;
@@ -1060,13 +868,15 @@ function buildUnitPrescription(
 
 function buildTarget(
   value:
-    | z.infer<typeof aiAuthoredPlanFirstStepSchema>
-    | z.infer<typeof aiAuthoredPlanFirstUnitSchema>,
+    | z.infer<typeof aiAuthoredPlanFirstProviderStepSchema>
+    | z.infer<typeof aiAuthoredPlanFirstProviderUnitSchema>,
   path: string,
   issues: NormalizationIssue[],
 ): StepTarget | undefined {
-  const cues: string[] = [];
-  const hints: string[] = [];
+  if (!value.pace && !value.hr_zone && !value.effort) {
+    return undefined;
+  }
+
   const target: StepTarget = {
     target_source: "ai_authored_plan_guidance",
     hr_target_source: "effort_only",
@@ -1074,42 +884,27 @@ function buildTarget(
       "AI-authored coach guidance from the reviewed plan; not backend-inferred executable pace or personal HR truth.",
   };
 
-  if (value.target_pace) {
-    cues.push(`Pace guidance: ${value.target_pace}`);
-    target.intensity = "AI-authored pace guidance";
+  if (value.pace) {
+    target.pace = value.pace;
+    target.cue = value.pace;
   }
 
-  if (value.target_hr) {
-    if (looksLikeRawBpmClaim(value.target_hr)) {
+  if (value.hr_zone) {
+    if (looksLikeRawBpmClaim(value.hr_zone)) {
       issues.push({
         code: "ai_authored_plan_first_raw_bpm_claim",
         path,
-        message: `Unsupported raw BPM heart-rate claim: ${value.target_hr}.`,
+        message: `Unsupported raw BPM heart-rate claim: ${value.hr_zone}.`,
       });
     } else {
-      hints.push(`HR-zone guidance: ${value.target_hr}`);
-      target.intensity = target.intensity ?? "AI-authored HR-zone guidance";
+      target.label = value.hr_zone;
+      target.hint = value.hr_zone;
+      target.extra = { hr_zone: value.hr_zone };
     }
   }
 
-  if ("effort" in value && value.effort) {
-    target.intensity = target.intensity ?? value.effort;
-    cues.push(`Effort: ${value.effort}`);
-  }
-
-  if ("jog" in value && value.jog) {
-    hints.push(`Recovery cue: ${value.jog}`);
-  }
-
-  if (cues.length === 0 && hints.length === 0) {
-    cues.push("Execute by reviewed AI-authored coach guidance.");
-  }
-
-  if (cues.length > 0) {
-    target.cue = cues.join(" ");
-  }
-  if (hints.length > 0) {
-    target.hint = hints.join(" ");
+  if (value.effort) {
+    target.intensity = value.effort;
   }
 
   return target;
@@ -1200,6 +995,7 @@ function isHardRejectIssue(code: string) {
     code.includes("missing_workouts") ||
     code.includes("missing_workout_steps") ||
     code.includes("unconvertible") ||
+    code.includes("unknown_workout_identity") ||
     code.includes("raw_bpm") ||
     code.includes("medical_claim")
   );
@@ -1211,9 +1007,8 @@ function isRealIsoDate(value: string) {
 }
 
 function resolveSegmentType(
-  step: z.infer<typeof aiAuthoredPlanFirstStepSchema>,
+  step: z.infer<typeof aiAuthoredPlanFirstProviderStepSchema>,
   workoutType: string,
-  hasRepeatBlock: boolean,
 ): TrainingPlanV2["planned_workouts"][number]["segments"][number]["segment_type"] {
   const phase = step.phase.toLowerCase();
   const workout = workoutType.toLowerCase();
@@ -1221,42 +1016,13 @@ function resolveSegmentType(
   if (phase.includes("warm")) return "warmup";
   if (phase.includes("cool")) return "cooldown";
   if (phase.includes("stride")) return "strides";
-  if (hasRepeatBlock || workout.includes("interval") || workout.includes("tempo")) {
-    return "interval_block";
-  }
   if (phase.includes("recover")) return "recovery";
-  if (workout.includes("tempo")) return "tempo_block";
+  if (step.repeat) return "interval_block";
+  if (phase.includes("tempo") || workout.includes("tempo")) return "tempo_block";
   return "main";
 }
 
-function resolveWorkoutIdentity(
-  workoutType: string,
-  weekNumber: number,
-  totalWeeks: number,
-): {
-  family: CanonicalWorkoutFamily;
-  identity: CanonicalWorkoutIdentity;
-  icon: CalendarIconKey;
-} {
-  const text = workoutType.toLowerCase();
-  let identity: CanonicalWorkoutIdentity =
-    normalizeWorkoutIdentity(workoutType) ?? "easy_aerobic_run";
-
-  if (text.includes("marathon pace")) identity = "marathon_steady_specificity";
-  else if (text.includes("medium long")) identity = "long_aerobic_run";
-  else if (text.includes("long")) {
-    identity = weekNumber >= totalWeeks - 1 ? "taper_long_run" : "long_aerobic_run";
-  } else if (text.includes("tempo")) identity = "controlled_tempo_session";
-  else if (text.includes("interval")) identity = "time_intervals";
-  else if (text.includes("stride")) identity = "easy_run_with_strides";
-  else if (text.includes("progression")) identity = "progression_run";
-  else if (text.includes("hill")) identity = "uphill_repeats";
-
-  const family = familyForIdentity(identity);
-  return { family, identity, icon: family };
-}
-
-function familyForIdentity(identity: CanonicalWorkoutIdentity): CanonicalWorkoutFamily {
+function familyForIdentity(identity: CanonicalWorkoutIdentity) {
   return resolveCanonicalWorkoutModel({
     workoutType: "quality",
     workoutIdentity: identity,
@@ -1321,7 +1087,40 @@ function buildDistanceGoalFields(authoringInput: StructuredAuthoringInput) {
     : {};
 }
 
-function buildPlanName(draft: AiAuthoredPlanFirstDraft, authoringInput: StructuredAuthoringInput) {
+function buildAuthoredOutcomeTarget(
+  draft: AiAuthoredPlanFirstProviderDraft,
+  authoringInput: StructuredAuthoringInput,
+  issues: readonly NormalizationIssue[],
+) {
+  const runnerTarget =
+    authoringInput.goal.targetTime ??
+    authoringInput.planGoalIntent?.targetFinishTime?.label ??
+    null;
+  const aiTarget = draft.metadata.target_time ?? null;
+  const label = runnerTarget ?? aiTarget;
+
+  if (!label) {
+    return {};
+  }
+
+  return {
+    authored_outcome_target: {
+      source: runnerTarget ? ("runner_entered_target" as const) : ("ai_authored_target" as const),
+      label,
+      finish_time_window: label,
+      rationale: runnerTarget
+        ? "Runner-authored outcome target carried into the reviewed AI-authored plan."
+        : "AI-authored outcome target carried from the reviewed full-plan draft.",
+      confidence: "medium" as const,
+      assumptions: buildReviewAssumptions(draft, authoringInput, issues).slice(0, 6),
+    },
+  };
+}
+
+function buildPlanName(
+  draft: AiAuthoredPlanFirstProviderDraft,
+  authoringInput: StructuredAuthoringInput,
+) {
   const targetTime = authoringInput.goal.targetTime ?? draft.metadata.target_time;
   return targetTime
     ? `${authoringInput.goal.goalLabel} plan (${targetTime})`
@@ -1329,7 +1128,7 @@ function buildPlanName(draft: AiAuthoredPlanFirstDraft, authoringInput: Structur
 }
 
 function buildReviewAssumptions(
-  draft: AiAuthoredPlanFirstDraft,
+  draft: AiAuthoredPlanFirstProviderDraft,
   authoringInput: StructuredAuthoringInput,
   issues: readonly NormalizationIssue[],
 ) {
@@ -1347,49 +1146,12 @@ function buildReviewAssumptions(
     .slice(0, 12);
 }
 
-function summarizeWorkout(workoutType: string, segmentCount: number) {
-  return `${workoutType} authored with ${segmentCount} displayable Hito section${segmentCount === 1 ? "" : "s"}.`;
-}
-
-function plannedRpeForWorkoutType(value: string) {
-  const text = value.toLowerCase();
-  if (text.includes("interval")) return 8;
-  if (text.includes("tempo") || text.includes("marathon pace")) return 7;
-  if (text.includes("long")) return 5;
-  if (text.includes("stride")) return 4;
-  return 3;
-}
-
-function estimatedFatigueForWorkoutType(value: string) {
-  const text = value.toLowerCase();
-  if (text.includes("interval") || text.includes("tempo") || text.includes("marathon pace")) {
-    return "medium_high";
-  }
-  if (text.includes("long")) return "medium";
-  return "low";
-}
-
-function recoveryPriorityForWorkoutType(value: string) {
-  const text = value.toLowerCase();
-  if (text.includes("interval") || text.includes("tempo") || text.includes("long")) {
-    return "medium";
-  }
-  return "low";
-}
-
-function phaseForWeek(weekNumber: number, totalWeeks: number) {
-  if (weekNumber > totalWeeks - 2) return "Taper";
-  if (weekNumber > Math.round(totalWeeks * 0.68)) return "Specific";
-  if (weekNumber > Math.round(totalWeeks * 0.35)) return "Build";
-  return "Base";
-}
-
 function looksLikeRawBpmClaim(value: string) {
   const withoutZoneLabels = value.replace(/\bZ[1-5]\b/gi, "");
   return /\bbpm\b/i.test(withoutZoneLabels) || /\b\d{2,3}\b/.test(withoutZoneLabels);
 }
 
-function containsMedicalClaim(draft: AiAuthoredPlanFirstDraft) {
+function containsMedicalClaim(draft: AiAuthoredPlanFirstProviderDraft) {
   return /\b(diagnos(?:e|is)|treat(?:ment)?|prescri(?:be|ption)|medical advice|doctor clearance)\b/i.test(
     JSON.stringify(draft),
   );

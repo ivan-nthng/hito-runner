@@ -8,8 +8,9 @@ import type {
   RunningPlanPreviewDraft,
   RunningPlanReviewedPreviewDraft,
 } from "../../src/lib/running-plan-engine-review";
+import { applyAtomicReviewedPlanPersistence } from "../../src/lib/active-plan-lifecycle-persistence";
 import { createAdminSupabaseClient } from "../../src/lib/supabase/server";
-import type { Database } from "../../src/lib/supabase/database";
+import type { Database, Json } from "../../src/lib/supabase/database";
 import { validateNoClientRowsTrusted, validateNoFakePaceOrPersonalHr } from "./assertions";
 import {
   cleanupDisposableSupabaseUser,
@@ -201,11 +202,133 @@ export async function validatePersistenceContract(
       });
     }
   }
+  const creationFailureAtomic = await validateReviewedPlanCreationFailureAtomicity(supabase);
 
   return {
     mode: preflight.mode,
     target: preflight.target,
     persistedDistanceGoals,
+    creationFailureAtomic,
+  };
+}
+
+async function validateReviewedPlanCreationFailureAtomicity(
+  supabase: ReturnType<typeof createAdminSupabaseClient>,
+) {
+  const disposableUser = await createDisposableSupabaseUser({
+    supabase,
+    emailPrefix: "running-plan-atomic-create",
+    label: "forced-failure",
+    creationErrorMessage: "Disposable atomic plan-creation user creation failed.",
+  });
+  const planId = crypto.randomUUID();
+  const firstWorkoutId = crypto.randomUUID();
+
+  try {
+    await assert.rejects(
+      applyAtomicReviewedPlanPersistence({
+        userId: disposableUser.userId,
+        profile: {
+          goal_type: "distance_build",
+          goal_label: "Atomic 10K proof",
+          baseline_sessions_per_week: 3,
+          baseline_long_run_km: 6,
+          baseline_notes: null,
+        },
+        plan: {
+          id: planId,
+          title: "Atomic creation failure proof",
+          goal_summary: "10K",
+          source_template: "atomic_creation_failure_proof",
+          schema_version: "training-plan-v2",
+          source_kind: "ai_authored_plan_first_v1",
+          start_date: "2026-07-20",
+          end_date: "2026-07-27",
+          target_date: null,
+          goal_metadata: {},
+          plan_preferences: {},
+        },
+        workouts: [
+          buildAtomicCreationWorkout(firstWorkoutId, planId, disposableUser.userId, "easy"),
+          buildAtomicCreationWorkout(
+            crypto.randomUUID(),
+            planId,
+            disposableUser.userId,
+            "invalid_workout_type",
+          ),
+        ] as unknown as Json,
+        expectedActivePlanId: null,
+        expectedActivePlanUpdatedAt: null,
+        expectedHistory: {
+          workout_ids: [],
+          log_ids: [],
+          asset_ids: [],
+          metric_ids: [],
+          comparison_ids: [],
+          insight_ids: [],
+        },
+        archiveGoalMetadata: null,
+        logs: [],
+        evidenceRelinks: [],
+      }),
+    );
+
+    const [profile, plans, workouts] = await Promise.all([
+      supabase
+        .from("runner_profiles")
+        .select("user_id", { count: "exact", head: true })
+        .eq("user_id", disposableUser.userId),
+      supabase
+        .from("plan_cycles")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", disposableUser.userId),
+      supabase
+        .from("planned_workouts")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", disposableUser.userId),
+    ]);
+    assert.equal(profile.error, null);
+    assert.equal(plans.error, null);
+    assert.equal(workouts.error, null);
+    assert.equal(profile.count, 0, "Failed plan creation must roll back the profile upsert.");
+    assert.equal(plans.count, 0, "Failed plan creation must roll back the plan cycle.");
+    assert.equal(workouts.count, 0, "Failed plan creation must roll back every workout row.");
+  } finally {
+    await cleanupDisposableUser(supabase, disposableUser.userId);
+  }
+
+  return true as const;
+}
+
+function buildAtomicCreationWorkout(
+  id: string,
+  planId: string,
+  userId: string,
+  workoutType: string,
+) {
+  return {
+    id,
+    plan_cycle_id: planId,
+    user_id: userId,
+    workout_date: "2026-07-20",
+    weekday: "Monday",
+    week_number: 1,
+    phase: "Base",
+    workout_type: workoutType,
+    source_workout_id: `atomic-${id}`,
+    source_workout_type: "Easy",
+    workout_family: "easy",
+    workout_identity: "easy_aerobic_run",
+    calendar_icon_key: "easy",
+    goal_context: {},
+    metric_mode: {},
+    title: "Atomic proof workout",
+    notes: null,
+    planned_rpe: 3,
+    estimated_fatigue: "low",
+    recovery_priority: "normal",
+    steps: [],
+    display_order: 0,
   };
 }
 

@@ -13,23 +13,22 @@ import {
   HR_TARGET_SOURCE_VALUES,
   resolveCanonicalWorkoutModel,
   toCanonicalMetricModeJson,
-  type CalendarIconKey,
   type CanonicalGoalContext,
-  type CanonicalMetricModeJson,
-  type CanonicalWorkoutFamily,
-  type CanonicalWorkoutIdentity,
 } from "@/lib/rich-workout-model";
-import type {
-  RunnerProfileSummary,
-  Step,
-  StepPrescription,
-  StepRepeatChildPrescription,
-  StepTarget,
-  StepUnitPrescription,
-  WorkoutType,
-} from "@/lib/training";
+import type { RunnerProfileSummary } from "@/lib/training";
 import type { Json } from "@/lib/supabase/database";
 import { reduceRepeatChildrenToChildFirst } from "@/lib/planned-workout-block-contract";
+import {
+  normalizeWorkoutDocumentTarget,
+  workoutDocumentRepeatChildren,
+  type WorkoutDocument,
+  type WorkoutDocumentPrescription,
+  type WorkoutDocumentRepeatChildPrescription,
+  type WorkoutDocumentSection,
+  type WorkoutDocumentTarget,
+  type WorkoutDocumentType,
+  type WorkoutDocumentUnitPrescription,
+} from "@/lib/workout-document";
 
 export const FUTURE_TEMPLATE_VERSION = "training-plan-v2";
 export const FUTURE_TEMPLATE_DOWNLOAD_PATH = "/templates/hito-training-plan-v2-template.json";
@@ -156,7 +155,7 @@ const v2GoalSchema = z
     distance_meters: z.number().int().positive().optional(),
     authored_outcome_target: z
       .object({
-        source: z.enum(["runner_entered_target", "ai_estimated_target"]),
+        source: z.enum(["runner_entered_target", "ai_authored_target"]),
         label: z.string().trim().min(1).max(160),
         finish_time_window: z.string().trim().min(1).max(160).nullable(),
         rationale: z.string().trim().min(1).max(360),
@@ -526,28 +525,9 @@ export const importedPlanSchema = trainingPlanV2Schema;
 
 export type TrainingPlanV2 = z.infer<typeof trainingPlanV2Schema>;
 export type ImportedPlan = TrainingPlanV2;
+export const TRAINING_PLAN_V2_IMPORT_SOURCE_KIND = "training_plan_v2_import" as const;
 
-export interface ImportedWorkoutSeed {
-  workoutDate: string;
-  weekday: string;
-  weekNumber: number;
-  phase: string;
-  workoutType: WorkoutType;
-  sourceWorkoutId: string;
-  sourceWorkoutType: string;
-  workoutFamily: CanonicalWorkoutFamily;
-  workoutIdentity: CanonicalWorkoutIdentity;
-  calendarIconKey: CalendarIconKey;
-  goalContext: CanonicalGoalContext | null;
-  metricMode: CanonicalMetricModeJson;
-  title: string;
-  notes: string | null;
-  plannedRpe: number | null;
-  estimatedFatigue: string | null;
-  recoveryPriority: string | null;
-  steps: Step[];
-  displayOrder: number;
-}
+export type ImportedWorkoutSeed = WorkoutDocument;
 
 export interface ImportedPlanSeed {
   profile: RunnerProfileSummary;
@@ -665,13 +645,36 @@ function buildTrainingPlanV2Seed(plan: TrainingPlanV2): ImportedPlanSeed {
     goalSummary: buildV2GoalSummary(plan),
     sourceTemplate: FUTURE_TEMPLATE_VERSION,
     schemaVersion: plan.schema_version,
-    sourceKind: plan.source_kind?.trim() || "training_plan_v2_import",
+    sourceKind: plan.source_kind?.trim() || TRAINING_PLAN_V2_IMPORT_SOURCE_KIND,
     startDate: plan.start_date,
     endDate: workouts.at(-1)?.workoutDate ?? plan.start_date,
     targetDate: deriveTargetDate(plan),
     goalMetadata: buildGoalMetadata(plan),
     planPreferences: buildPersistedPlanPreferences(plan),
     workouts,
+  };
+}
+
+export function normalizeConfirmedExternalImportSeed(
+  plan: ImportedPlan,
+  seed: ImportedPlanSeed,
+): ImportedPlanSeed {
+  const root = asJsonRecord(seed.goalMetadata);
+  const existingImportProvenance = asJsonRecord(root[TRAINING_PLAN_V2_IMPORT_SOURCE_KIND]);
+  const originSourceKind = plan.source_kind?.trim() || null;
+  const originSourceStatus = plan.source_status?.trim() || null;
+
+  return {
+    ...seed,
+    sourceKind: TRAINING_PLAN_V2_IMPORT_SOURCE_KIND,
+    goalMetadata: {
+      ...root,
+      [TRAINING_PLAN_V2_IMPORT_SOURCE_KIND]: {
+        ...existingImportProvenance,
+        ...(originSourceKind ? { origin_source_kind: originSourceKind } : {}),
+        ...(originSourceStatus ? { origin_source_status: originSourceStatus } : {}),
+      },
+    } satisfies Json,
   };
 }
 
@@ -696,6 +699,14 @@ function buildImportedProfile(
     baselineLongRunKm,
     baselineNotes: buildImportedProfileNotes(generatedFor, trainingPlan),
   };
+}
+
+function asJsonRecord(value: Json | null | undefined): Record<string, Json> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+
+  return value as Record<string, Json>;
 }
 
 function buildV2GoalSummary(plan: TrainingPlanV2) {
@@ -941,7 +952,7 @@ function buildPersistedPlanPreferences(plan: TrainingPlanV2): Json | null {
 
 function normalizeV2WorkoutType(
   workoutType: TrainingPlanV2["planned_workouts"][number]["workout_type"],
-): WorkoutType {
+): WorkoutDocumentType {
   switch (workoutType) {
     case "rest":
       return "rest";
@@ -973,7 +984,7 @@ function buildV2Notes(workout: TrainingPlanV2["planned_workouts"][number]) {
 
 function normalizeV2Segments(
   segments: TrainingPlanV2["planned_workouts"][number]["segments"],
-): Step[] {
+): WorkoutDocumentSection[] {
   const normalizedSegments = segments.flatMap((segment, index) => {
     if (segment.segment_type === "rest") {
       return [];
@@ -988,8 +999,8 @@ function normalizeV2Segments(
 function normalizeV2Segment(
   segment: TrainingPlanV2["planned_workouts"][number]["segments"][number],
   sequence: number,
-): Step {
-  const target = normalizeSegmentTarget(segment.target);
+): WorkoutDocumentSection {
+  const target = normalizeWorkoutDocumentTarget(segment.target);
   const guidance = extractSegmentGuidance(segment);
   const guidanceText = guidance.guidance;
   const segmentId = segment.segment_id ?? `segment-${sequence}`;
@@ -1031,73 +1042,26 @@ function normalizeV2Segment(
   };
 }
 
-function buildRepeatChildrenFromPrescription(prescription: StepPrescription): Step[] {
-  return (prescription.children ?? []).map((child, index) => {
-    const unit = child.prescription;
-
-    return {
-      type: repeatChildRoleToStepType(child.role),
-      segment_type: child.role,
-      sequence: child.sequence ?? index + 1,
-      label: child.label ?? repeatChildRoleLabel(child.role),
-      ...(child.guidance ? { guidance: child.guidance } : {}),
-      prescription: unit,
-      ...(unit.duration_min ? { duration_min: unit.duration_min } : {}),
-      ...(unit.distance_km ? { distance_km: unit.distance_km } : {}),
-      ...(child.target ? { target: child.target } : {}),
-    };
+function buildRepeatChildrenFromPrescription(
+  prescription: WorkoutDocumentPrescription,
+): WorkoutDocumentSection[] {
+  return workoutDocumentRepeatChildren({
+    type: "repeat",
+    prescription,
   });
 }
 
 function normalizeRepeatChildrenFromPrescription(input: {
-  children?: StepRepeatChildPrescription[];
-}): StepRepeatChildPrescription[] {
-  return reduceRepeatChildrenToChildFirst<StepTarget>({
+  children?: WorkoutDocumentRepeatChildPrescription[];
+}): WorkoutDocumentRepeatChildPrescription[] {
+  return reduceRepeatChildrenToChildFirst<WorkoutDocumentTarget>({
     children: input.children,
   }).children;
 }
 
-function repeatChildRoleToStepType(role: StepRepeatChildPrescription["role"]) {
-  switch (role) {
-    case "warm_up":
-      return "warmup";
-    case "walk":
-      return "walk";
-    case "work":
-      return "work";
-    case "recover":
-      return "recovery";
-    case "finish":
-      return "finish";
-    case "cooldown":
-      return "cooldown";
-    case "run":
-      return "run";
-  }
-}
-
-function repeatChildRoleLabel(role: StepRepeatChildPrescription["role"]) {
-  switch (role) {
-    case "warm_up":
-      return "Warm-up";
-    case "run":
-      return "Run";
-    case "walk":
-      return "Walk";
-    case "work":
-      return "Work";
-    case "recover":
-      return "Recover";
-    case "finish":
-      return "Finish";
-    case "cooldown":
-      return "Cooldown";
-  }
-}
-
 function buildSegmentPrescription(
   segment: TrainingPlanV2["planned_workouts"][number]["segments"][number],
-): StepPrescription {
+): WorkoutDocumentPrescription {
   if (segment.prescription) {
     return {
       mode: segment.prescription.mode,
@@ -1120,7 +1084,7 @@ function buildSegmentPrescription(
               ...(child.sequence ? { sequence: child.sequence } : {}),
               ...(child.guidance ? { guidance: child.guidance } : {}),
               prescription: normalizeUnitPrescription(child.prescription),
-              ...(child.target ? { target: normalizeSegmentTarget(child.target) } : {}),
+              ...(child.target ? { target: normalizeWorkoutDocumentTarget(child.target) } : {}),
             })),
           }
         : {}),
@@ -1147,8 +1111,8 @@ function buildSegmentPrescription(
 }
 
 function normalizeUnitPrescription(
-  unit: StepUnitPrescription | null | undefined,
-): StepUnitPrescription {
+  unit: WorkoutDocumentUnitPrescription | null | undefined,
+): WorkoutDocumentUnitPrescription {
   if (!unit) {
     return {
       mode: "none",
@@ -1159,118 +1123,6 @@ function normalizeUnitPrescription(
     mode: unit.mode,
     ...(unit.duration_min ? { duration_min: unit.duration_min } : {}),
     ...(unit.distance_km ? { distance_km: unit.distance_km } : {}),
-  };
-}
-
-function normalizeSegmentTarget(
-  target: TrainingPlanV2["planned_workouts"][number]["segments"][number]["target"] | undefined,
-): StepTarget | undefined {
-  if (!target) {
-    return undefined;
-  }
-
-  const extra: Record<string, string | number> = {};
-
-  for (const [key, value] of Object.entries(target.extra ?? {})) {
-    if (
-      key === "target_source" ||
-      key === "hr_bpm" ||
-      key === "hr_bpm_range" ||
-      key === "hr_bpm_cap" ||
-      key === "hr_bpm_min" ||
-      key === "hr_bpm_max" ||
-      key === "hr_target_source" ||
-      key === "label" ||
-      key === "source_note" ||
-      key === "pace_range_min_km" ||
-      key === "pace_min_per_km_range" ||
-      key === "pace_seconds_per_km" ||
-      key === "pace_min_seconds_per_km" ||
-      key === "pace_max_seconds_per_km"
-    ) {
-      continue;
-    }
-
-    extra[key] = value;
-  }
-
-  for (const [key, value] of Object.entries(target)) {
-    if (
-      key === "target_source" ||
-      key === "intensity" ||
-      key === "hr_bpm_range" ||
-      key === "hr_bpm" ||
-      key === "hr_bpm_cap" ||
-      key === "hr_bpm_min" ||
-      key === "hr_bpm_max" ||
-      key === "hr_target_source" ||
-      key === "label" ||
-      key === "source_note" ||
-      key === "pace_min_per_km_range" ||
-      key === "pace_range_min_km" ||
-      key === "pace" ||
-      key === "pace_seconds_per_km" ||
-      key === "pace_min_seconds_per_km" ||
-      key === "pace_max_seconds_per_km" ||
-      key === "rpe" ||
-      key === "cadence_spm_range" ||
-      key === "cue" ||
-      key === "hint" ||
-      key === "extra"
-    ) {
-      continue;
-    }
-
-    extra[key] = value;
-  }
-
-  const hrRange =
-    typeof target.hr_bpm_range === "string"
-      ? target.hr_bpm_range
-      : typeof target.hr_bpm === "string"
-        ? target.hr_bpm
-        : undefined;
-  const paceRange =
-    typeof target.pace_min_per_km_range === "string"
-      ? target.pace_min_per_km_range
-      : typeof target.pace_range_min_km === "string"
-        ? target.pace_range_min_km
-        : undefined;
-
-  return {
-    ...(typeof target.target_source === "string" ? { target_source: target.target_source } : {}),
-    ...(typeof target.intensity === "string" ? { intensity: target.intensity } : {}),
-    ...(typeof target.hr_bpm_range === "string" ? { hr_bpm_range: target.hr_bpm_range } : {}),
-    ...(typeof target.hr_bpm === "string" ? { hr_bpm: target.hr_bpm } : {}),
-    ...(typeof target.hr_bpm_cap === "number" ? { hr_bpm_cap: target.hr_bpm_cap } : {}),
-    ...(typeof target.hr_bpm_min === "number" ? { hr_bpm_min: target.hr_bpm_min } : {}),
-    ...(typeof target.hr_bpm_max === "number" ? { hr_bpm_max: target.hr_bpm_max } : {}),
-    ...(!target.hr_bpm_range && !target.hr_bpm && hrRange ? { hr_bpm_range: hrRange } : {}),
-    ...(typeof target.hr_target_source === "string"
-      ? { hr_target_source: target.hr_target_source }
-      : {}),
-    ...(typeof target.label === "string" ? { label: target.label } : {}),
-    ...(typeof target.source_note === "string" ? { source_note: target.source_note } : {}),
-    ...(paceRange ? { pace_min_per_km_range: paceRange } : {}),
-    ...(typeof target.pace === "string" ? { pace: target.pace } : {}),
-    ...(typeof target.pace_seconds_per_km === "number"
-      ? { pace_seconds_per_km: target.pace_seconds_per_km }
-      : {}),
-    ...(typeof target.pace_min_seconds_per_km === "number"
-      ? { pace_min_seconds_per_km: target.pace_min_seconds_per_km }
-      : {}),
-    ...(typeof target.pace_max_seconds_per_km === "number"
-      ? { pace_max_seconds_per_km: target.pace_max_seconds_per_km }
-      : {}),
-    ...(typeof target.rpe === "string" || typeof target.rpe === "number"
-      ? { rpe: target.rpe }
-      : {}),
-    ...(typeof target.cadence_spm_range === "string"
-      ? { cadence_spm_range: target.cadence_spm_range }
-      : {}),
-    ...(typeof target.cue === "string" ? { cue: target.cue } : {}),
-    ...(typeof target.hint === "string" ? { hint: target.hint } : {}),
-    ...(Object.keys(extra).length > 0 ? { extra } : {}),
   };
 }
 
@@ -1348,7 +1200,7 @@ function buildDefaultSegmentLabel(segmentType: string, sequence: number) {
   }
 }
 
-function estimateDistanceKm(steps: Step[], workoutType: WorkoutType) {
+function estimateDistanceKm(steps: WorkoutDocumentSection[], workoutType: WorkoutDocumentType) {
   let totalDistanceKm = 0;
 
   for (const step of steps) {
@@ -1378,7 +1230,7 @@ function estimateDistanceKm(steps: Step[], workoutType: WorkoutType) {
   return Number((totalDurationMin / pace).toFixed(1));
 }
 
-function estimateDurationFromDistanceKm(distanceKm: number, workoutType: WorkoutType) {
+function estimateDurationFromDistanceKm(distanceKm: number, workoutType: WorkoutDocumentType) {
   if (!distanceKm) {
     return 0;
   }
@@ -1392,8 +1244,8 @@ function estimateDurationFromDistanceKm(distanceKm: number, workoutType: Workout
   return Math.round(distanceKm * pace);
 }
 
-function paceMinutesPerKm(workoutType: WorkoutType) {
-  const paceMap: Record<WorkoutType, number> = {
+function paceMinutesPerKm(workoutType: WorkoutDocumentType) {
+  const paceMap: Record<WorkoutDocumentType, number> = {
     easy: 7.0,
     steady_or_easy: 6.6,
     long_run: 6.8,

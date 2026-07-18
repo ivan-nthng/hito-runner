@@ -8,7 +8,7 @@ import {
 import { CompletionPanel, WorkoutFeedbackPanel } from "@/components/CompletionPanel";
 import { ManualWorkoutPersistedEditDialog } from "@/components/manual-workout/ManualWorkoutPersistedEditControls";
 import { ManualWorkoutDocumentPreview } from "@/components/manual-workout/ManualWorkoutDocumentPreview";
-import { manualWorkoutStepsToReadbackEntries } from "@/components/manual-workout/ManualWorkoutTrainingBlockGrammar.model";
+import { workoutDocumentSectionsToManualReadbackEntries } from "@/components/manual-workout/ManualWorkoutTrainingBlockGrammar.model";
 import {
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
   MANUAL_WORKOUT_TEMPLATE_KEY_VALUES,
@@ -141,7 +141,6 @@ function WorkoutPage() {
         structureDuration > 0
           ? { label: "Duration", value: formatDurationMin(structureDuration) }
           : null,
-        structureDuration > 0 ? { label: "Load", value: loadFor(workout) } : null,
       ].filter((metric): metric is { label: string; value: string; unit?: string } =>
         Boolean(metric),
       );
@@ -678,7 +677,7 @@ function CompletionActionPanel({
 function Overview({ snapshot, workout }: { snapshot: TrainingSnapshot; workout: Workout }) {
   const restAssignment = restAssignmentFor(workout);
   const timelineItems = workoutStructureTimelineItems(workout);
-  const documentNotes = workoutDocumentNotesForSteps(workout.steps);
+  const documentNotes = workoutDocumentNotesForSteps(workout.steps, workout.notes);
 
   if (workout.type === "rest") {
     return (
@@ -723,7 +722,7 @@ function Overview({ snapshot, workout }: { snapshot: TrainingSnapshot; workout: 
         })}
         iconTone={meta.color}
         notes={documentNotes}
-        readbackEntries={manualWorkoutStepsToReadbackEntries(workout.steps)}
+        readbackEntries={workoutDocumentSectionsToManualReadbackEntries(workout.steps)}
         timelineItems={timelineItems}
         timelineSummary={workoutStructureTimelineSummary(timelineItems)}
         title={workout.title}
@@ -856,18 +855,6 @@ function NavCard({
   );
 }
 
-function loadFor(workout: Workout) {
-  const duration = workoutStructureDuration(workout);
-  const multiplier: Record<string, number> = {
-    easy: 1.0,
-    steady_or_easy: 1.1,
-    long_run: 1.4,
-    quality: 1.8,
-    rest: 0,
-  };
-  return Math.min(95, Math.round(duration * (multiplier[workout.type] ?? 1) * 0.6)).toString();
-}
-
 function workoutIdentityRows(workout: Workout): Array<{ label: string; value: string }> {
   const language = workoutPlannedLanguage(workout);
 
@@ -877,12 +864,20 @@ function workoutIdentityRows(workout: Workout): Array<{ label: string; value: st
 function workoutSidebarExecutionRows(workout: Workout) {
   const language = workoutPlannedLanguage(workout);
   const blockSummary = formatPlannedWorkoutBlockSummary(language.runnerFacingBlocks);
-  const structureRows = displayWorkoutStructureEntries(workout)
-    .filter((entry) => ["Duration", "Distance", "Repeats"].includes(entry.label))
-    .slice(0, 3);
+  const duration = workoutStructureDuration(workout);
+  const distance = workoutDistanceKm(workout);
+  const repeatRows = displayWorkoutStructureEntries(workout).filter(
+    (entry) => entry.label === "Repeats",
+  );
 
   return [
-    ...structureRows,
+    duration > 0
+      ? { key: "duration", label: "Duration", value: formatDurationMin(duration) }
+      : null,
+    distance != null
+      ? { key: "distance", label: "Distance", value: `${formatDistanceKm(distance)} km` }
+      : null,
+    ...repeatRows,
     blockSummary ? { key: "blocks", label: "Blocks", value: blockSummary } : null,
   ].filter((row): row is { key: string; label: string; value: string } => row != null);
 }
@@ -939,7 +934,7 @@ function weekProgressFor(workouts: Workout[], currentDate: string) {
 function resultMetaForStatus(status: Workout["status"]) {
   if (status === "completed") {
     return {
-      label: "Completed well",
+      label: "Completed",
       icon: "check",
       tone: "success" as const,
     };

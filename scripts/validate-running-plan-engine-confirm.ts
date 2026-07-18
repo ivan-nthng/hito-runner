@@ -66,7 +66,6 @@ const scenarios = [
     name: "10K distance goal",
     input: {
       ...baseInput,
-      distanceFamily: "10K",
       planGoalIntent: { distance: { kind: "preset", preset: "10K" } },
     },
     expectedEndpointMeters: 10_000,
@@ -79,7 +78,6 @@ const scenarios = [
       heightCm: 178,
       weightKg: 72,
       runnerLevel: "sometimes_runs",
-      distanceFamily: "10K",
       daysPerWeek: 5,
       fixedRestDays: [],
       preferredLongRunDay: null,
@@ -97,7 +95,6 @@ const scenarios = [
     name: "21.1K distance goal",
     input: {
       ...baseInput,
-      distanceFamily: "Half Marathon",
       planGoalIntent: { distance: { kind: "preset", preset: "Half Marathon" } },
     },
     expectedEndpointMeters: 21_100,
@@ -106,7 +103,6 @@ const scenarios = [
     name: "42.195K distance goal",
     input: {
       ...baseInput,
-      distanceFamily: "Marathon Completion",
       planGoalIntent: {
         distance: { kind: "preset", preset: "Marathon" },
         targetDate: "2026-11-01",
@@ -119,7 +115,6 @@ const scenarios = [
     name: "Custom 15K distance goal",
     input: {
       ...baseInput,
-      distanceFamily: "10K",
       planGoalIntent: {
         distance: { kind: "custom", distanceKm: 15, label: "City 15K" },
         targetDate: "2026-09-13",
@@ -220,7 +215,7 @@ async function validateAiGeneratedDistanceGoalScenario(scenario: (typeof scenari
   assert.doesNotThrow(() => buildReviewedFirstPlanImportedSeed(canonicalPlan));
   validateNoFakePaceOrPersonalHr(canonicalPlan.planned_workouts);
   validateNoPersonalHrTargets(canonicalPlan.planned_workouts);
-  validateCanonicalRowsAreNumeric(canonicalPlan.planned_workouts);
+  validateCanonicalRowsAreNumeric(canonicalPlan.planned_workouts, { expectedMode: "mixed" });
   validateRunnerFacingTargetReadbackContract(canonicalPlan, scenario.name);
 
   const exactness = await validateRunningPlanReviewExactness({
@@ -286,6 +281,16 @@ async function validateFailureBoundaries(
   assert.equal(invalidTokenExactness.ok, false);
   if (!invalidTokenExactness.ok) {
     assert.equal(invalidTokenExactness.reason, "invalid_review");
+  }
+
+  const staleChecksumExactness = await validateRunningPlanReviewExactness({
+    draft: reviewedDraft,
+    reviewToken: reviewedDraft.reviewToken,
+    reviewChecksum: tamperReviewToken(reviewedDraft.reviewChecksum),
+  });
+  assert.equal(staleChecksumExactness.ok, false);
+  if (!staleChecksumExactness.ok) {
+    assert.equal(staleChecksumExactness.reason, "stale_review");
   }
 
   await validateFlatLongRunProgressionReviewDoesNotInvalidatePlanFirst(longRunRichnessDraft);
@@ -457,7 +462,7 @@ async function validateActiveManualPlanTransitionContract(
     activePlanId: "manual-plan-1",
     candidate: buildConfirmInputFromDraft(reviewedDraft),
   };
-  const context = buildManualActivePlanContext();
+  let context = buildManualActivePlanContext();
   let persistCalls = 0;
   let persistedRows: PersistedWorkoutRow[] = [];
   const dependencies: Partial<ActivePlanTransitionDependencies> = {
@@ -514,6 +519,94 @@ async function validateActiveManualPlanTransitionContract(
   assert.equal(review.metricHonesty.fakePaceAllowed, false);
   assert.equal(review.metricHonesty.fakePersonalHrAllowed, false);
 
+  const endpointInvalidPlan = buildRunningPlanCanonicalPlan(reviewedDraft);
+  const endpointInvalidDraft = await addRunningPlanReviewProof({
+    ...stripReviewProof(reviewedDraft),
+    canonicalPlan: {
+      ...endpointInvalidPlan,
+      planned_workouts: endpointInvalidPlan.planned_workouts.map((workout) =>
+        workout.source_workout_type === "final_selected_distance_day"
+          ? {
+              ...workout,
+              segments: workout.segments.map((segment) => ({
+                ...segment,
+                prescription: {
+                  mode: "time" as const,
+                  duration_min: 5,
+                },
+              })),
+            }
+          : workout,
+      ),
+    },
+  });
+  const endpointInvalidTransitionReview = await reviewActivePlanTransitionForUser(
+    userId,
+    {
+      ...reviewInput,
+      candidate: buildConfirmInputFromDraft(endpointInvalidDraft),
+    },
+    dependencies,
+  );
+  assert.equal(
+    endpointInvalidTransitionReview.ok,
+    false,
+    "Transition must apply the same endpoint exactness gate as first-plan confirm.",
+  );
+  if (!endpointInvalidTransitionReview.ok) {
+    assert.equal(endpointInvalidTransitionReview.reason, "invalid_review");
+  }
+  assert.equal(persistCalls, 0, "Endpoint-invalid transition candidate must not persist.");
+
+  const invalidTokenConfirm = await confirmActivePlanTransitionForUser(
+    userId,
+    {
+      reviewInput,
+      transitionReviewToken: tamperReviewToken(review.transitionReviewToken),
+      transitionReviewChecksum: review.transitionReviewChecksum,
+    },
+    dependencies,
+  );
+  assert.equal(invalidTokenConfirm.ok, false);
+  if (!invalidTokenConfirm.ok) {
+    assert.equal(invalidTokenConfirm.reason, "invalid_review");
+  }
+  assert.equal(persistCalls, 0, "Invalid transition token must not persist.");
+
+  const staleChecksumConfirm = await confirmActivePlanTransitionForUser(
+    userId,
+    {
+      reviewInput,
+      transitionReviewToken: review.transitionReviewToken,
+      transitionReviewChecksum: tamperReviewToken(review.transitionReviewChecksum),
+    },
+    dependencies,
+  );
+  assert.equal(staleChecksumConfirm.ok, false);
+  if (!staleChecksumConfirm.ok) {
+    assert.equal(staleChecksumConfirm.reason, "stale_review");
+  }
+  assert.equal(persistCalls, 0, "Stale transition checksum must not persist.");
+
+  context = buildManualActivePlanContext({
+    plan: { updated_at: "2026-06-07T10:01:00Z" },
+  });
+  const staleActivePlanConfirm = await confirmActivePlanTransitionForUser(
+    userId,
+    {
+      reviewInput,
+      transitionReviewToken: review.transitionReviewToken,
+      transitionReviewChecksum: review.transitionReviewChecksum,
+    },
+    dependencies,
+  );
+  assert.equal(staleActivePlanConfirm.ok, false);
+  if (!staleActivePlanConfirm.ok) {
+    assert.equal(staleActivePlanConfirm.reason, "stale_review");
+  }
+  assert.equal(persistCalls, 0, "Changed active-plan revision must not persist.");
+
+  context = buildManualActivePlanContext();
   const confirm = await confirmActivePlanTransitionForUser(
     userId,
     {

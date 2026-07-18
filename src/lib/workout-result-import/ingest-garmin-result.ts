@@ -1,6 +1,6 @@
 import "@tanstack/react-start/server-only";
 import { parseBodyNotesValue } from "@/lib/body-notes";
-import type { Database } from "@/lib/supabase/database";
+import type { Database, Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import {
   deriveWeekStatus,
@@ -13,7 +13,9 @@ import {
   type Workout,
   type WorkoutLog,
 } from "@/lib/training";
+import { readWorkoutDocumentSections } from "@/lib/workout-document";
 import { buildDeterministicWorkoutComparison } from "@/lib/workout-result-import/compare-workout-result";
+import { buildWorkoutResultEvidenceBundle } from "@/lib/workout-result-import/evidence-bundle";
 import {
   buildWorkoutAiBodyNoteContext,
   clampWorkoutAiInsight,
@@ -23,7 +25,6 @@ import {
 import {
   actualMetricsRowToSummary,
   comparisonRowToSummary,
-  deriveWorkoutFeedbackMarker,
   getLatestWorkoutResultFeedback,
   resultAssetRowToSummary,
   workoutAiInsightRowToSummary,
@@ -32,7 +33,6 @@ import {
   type ExtractedGarminFitFile,
   MAX_WORKOUT_RESULT_UPLOAD_BYTES,
   WORKOUT_RESULT_STORAGE_BUCKET,
-  type WorkoutComparisonDifferencePayload,
   type WorkoutResultAssetKind,
   WorkoutResultImportError,
 } from "@/lib/workout-result-import/types";
@@ -208,7 +208,7 @@ export async function ingestGarminWorkoutResult(params: {
         actual_metrics_id: metricsInsert.data.id,
         comparison_status: comparison.comparisonStatus,
         completion_state: comparison.completionState,
-        difference_payload: comparison.differencePayload,
+        difference_payload: comparison.differencePayload as unknown as Json,
         comparison_confidence: comparison.comparisonConfidence,
       })
       .select("*")
@@ -218,17 +218,12 @@ export async function ingestGarminWorkoutResult(params: {
       throw new WorkoutResultImportError("persistence_failed", comparisonInsert.error.message, 500);
     }
 
-    const supersedeExisting = await supabase
-      .from("workout_actual_metrics")
-      .update({ status: "superseded" })
-      .eq("planned_workout_id", plannedWorkoutId)
-      .neq("id", metricsInsert.data.id)
-      .neq("status", "superseded");
+    const latestComparison = comparisonRowToSummary(comparisonInsert.data);
 
-    if (supersedeExisting.error) {
+    if (!latestComparison) {
       throw new WorkoutResultImportError(
         "persistence_failed",
-        supersedeExisting.error.message,
+        "The generated comparison payload failed canonical readback validation.",
         500,
       );
     }
@@ -249,6 +244,21 @@ export async function ingestGarminWorkoutResult(params: {
       throw new WorkoutResultImportError("persistence_failed", assetUpdate.error.message, 500);
     }
 
+    const supersedeExisting = await supabase
+      .from("workout_actual_metrics")
+      .update({ status: "superseded" })
+      .eq("planned_workout_id", plannedWorkoutId)
+      .neq("id", metricsInsert.data.id)
+      .neq("status", "superseded");
+
+    if (supersedeExisting.error) {
+      throw new WorkoutResultImportError(
+        "persistence_failed",
+        supersedeExisting.error.message,
+        500,
+      );
+    }
+
     const latestAiInsight = await tryPersistWorkoutAiInsight({
       userId,
       plannedWorkout,
@@ -257,8 +267,7 @@ export async function ingestGarminWorkoutResult(params: {
     });
     const latestAsset = resultAssetRowToSummary(assetUpdate.data);
     const latestActualMetrics = actualMetricsRowToSummary(metricsInsert.data);
-    const latestComparison = comparisonRowToSummary(comparisonInsert.data);
-    const marker = deriveWorkoutFeedbackMarker({
+    const feedback = buildWorkoutResultEvidenceBundle({
       latestAsset,
       latestActualMetrics,
       latestComparison,
@@ -272,11 +281,7 @@ export async function ingestGarminWorkoutResult(params: {
         workoutDate: plannedWorkout.workout_date,
         workoutType: plannedWorkout.workout_type,
       },
-      marker,
-      latestAsset,
-      latestActualMetrics,
-      latestComparison,
-      latestAiInsight,
+      ...feedback,
     };
   } catch (error) {
     const message =
@@ -754,8 +759,13 @@ async function buildWorkoutAiPromptInput(args: {
       (workout.date > plannedWorkout.workout_date ||
         (workout.date === plannedWorkout.workout_date && workout.id !== plannedWorkout.id)),
   );
-  const comparisonPayload =
-    comparison.difference_payload as WorkoutComparisonDifferencePayload | null;
+  const comparisonSummary = comparisonRowToSummary(comparison);
+
+  if (!comparisonSummary) {
+    throw new Error("Workout comparison payload is unavailable for AI insight.");
+  }
+
+  const comparisonPayload = comparisonSummary.differencePayload;
   const bodyNoteContext = buildWorkoutAiBodyNoteContext(currentWorkout.log?.bodyNotes ?? []);
 
   return {
@@ -786,18 +796,13 @@ async function buildWorkoutAiPromptInput(args: {
       activityLocalDate: actualMetrics.activity_local_date,
       actualDurationMin: actualMetrics.actual_duration_min,
       actualDistanceKm: actualMetrics.actual_distance_km,
-      actualAvgHr: actualMetrics.actual_avg_hr,
-      actualMaxHr: actualMetrics.actual_max_hr,
-      actualAvgPower: actualMetrics.actual_avg_power,
-      actualAvgCadence: actualMetrics.actual_avg_cadence,
       actualIntervalCount: actualMetrics.actual_interval_count,
     },
     comparison: {
-      comparisonStatus: comparison.comparison_status,
-      completionState: comparison.completion_state,
-      comparisonConfidence: comparison.comparison_confidence,
-      differencePayload:
-        comparison.difference_payload as unknown as WorkoutComparisonDifferencePayload,
+      comparisonStatus: comparisonSummary.comparisonStatus,
+      completionState: comparisonSummary.completionState,
+      comparisonConfidence: comparisonSummary.comparisonConfidence,
+      differencePayload: comparisonPayload,
     },
     currentWeekContext: {
       weekNumber: currentWorkout.week,
@@ -832,7 +837,7 @@ function persistedWorkoutRowToView(
   currentDate: string,
 ): Workout {
   const mappedLog = log ? persistedWorkoutLogToView(log) : null;
-  const steps = Array.isArray(workout.steps) ? (workout.steps as Step[]) : [];
+  const steps = readWorkoutDocumentSections(workout.steps);
 
   return {
     id: workout.id,

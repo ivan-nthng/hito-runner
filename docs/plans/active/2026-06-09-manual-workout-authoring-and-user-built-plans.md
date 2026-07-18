@@ -248,13 +248,19 @@ Do not reopen in this plan unless fresh source proof contradicts accepted behavi
 Still future-only or separate lanes:
 
 - recurrence;
-- runner-facing `Edit training`;
 - Restore/Put back/Redo UI;
 - PDF/watch export;
 - QR/share/import-from-share;
 - coach/organization authoring;
 - provider/FIT comparison enhancements beyond accepted planned-vs-actual input compatibility;
 - frontend UI changes for template visibility unless backend first exposes the safe contract.
+
+Confirmed-workout ownership is shared product truth, not a future manual-only lane: eligible future
+canonical manual/generated/imported/refresh workouts can enter the reviewed persisted content-edit
+flow, while rest, today/past content edit, logs, evidence, unsafe reconstruction, and protected
+history stay blocked. Confirmed external imports use canonical `training_plan_v2_import` capability
+identity while retaining claimed origin as provenance; reviewed content and original-provenance
+audit persist atomically after the edit becomes runner-authored.
 
 ## Compression Note
 

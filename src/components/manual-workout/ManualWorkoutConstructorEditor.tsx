@@ -42,13 +42,21 @@ import { WorkoutGlyph } from "@/components/WorkoutGlyph";
 import {
   type ManualWorkoutBlockInput,
   type ManualWorkoutBlockKey,
+  type ManualWorkoutCanonicalDraft,
   type ManualWorkoutConstructorEntryInput,
   type ManualWorkoutRepeatGroupInput,
   type ManualWorkoutTargetTruthMode,
 } from "@/lib/manual-workout-authoring/schema";
+import { manualWorkoutDocumentSectionsFromEntries } from "@/lib/manual-workout-authoring/normalize";
 import { getManualWorkoutRepeatGroupChildren } from "@/lib/manual-workout-authoring/repeat-groups";
 import type { ManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
-import { formatDistanceMeters, formatDurationMin } from "@/lib/training";
+import {
+  formatDistanceMeters,
+  formatDurationMin,
+  stepPlannedDistanceKm,
+  stepPlannedDurationMin,
+  type Step,
+} from "@/lib/training";
 import type { WorkoutGlyphKind } from "@/lib/workout-glyph";
 import {
   cloneManualWorkoutEntries,
@@ -90,12 +98,10 @@ import {
   blockLabel,
   blockShortLabel,
   blockSummary,
-  entryDistanceMeters,
-  entryDurationSeconds,
   isNoteBlock,
-  manualConstructorEntriesToReadbackEntries,
-  timelineItemsForEntry,
+  workoutDocumentSectionsToManualReadbackEntries,
 } from "@/components/manual-workout/ManualWorkoutTrainingBlockGrammar.model";
+import { workoutDocumentTimelineItems } from "@/components/workout-structure/workout-structure-timeline-items";
 
 export type ManualWorkoutConstructorSource = "template" | "scratch" | "saved_template";
 
@@ -130,6 +136,7 @@ export function ManualWorkoutConstructorEditor({
   onTargetTruthModeChange,
   onTitleChange,
   readbackMode = false,
+  reviewedDocument = null,
   reviewDisabledReason,
   selectedTemplateKey,
   source,
@@ -151,6 +158,7 @@ export function ManualWorkoutConstructorEditor({
   onTargetTruthModeChange?: (value: ManualWorkoutTargetTruthMode) => void;
   onTitleChange: (value: string) => void;
   readbackMode?: boolean;
+  reviewedDocument?: ManualWorkoutCanonicalDraft | null;
   reviewDisabledReason?: string | null;
   selectedTemplateKey?: ManualWorkoutTemplate["templateKey"] | null;
   source: ManualWorkoutConstructorSource;
@@ -163,6 +171,16 @@ export function ManualWorkoutConstructorEditor({
   const selectedTemplate = templateOptions.find(
     (template) => template.templateKey === selectedTemplateKey,
   );
+  const documentSteps =
+    reviewedDocument?.steps ??
+    (isRestDraft
+      ? []
+      : manualWorkoutDocumentSectionsFromEntries({
+          entries,
+          targetTruthMode,
+        }));
+  const documentTitle = reviewedDocument?.title ?? title;
+  const documentNotes = reviewedDocument?.notes ?? notes;
   const hasRepeatGroup = entries.some((entry) => entry.kind === "repeat_group");
   const rowRefs = useRef<Array<HTMLElement | null>>([]);
   const pendingFocusIndexRef = useRef<number | null>(null);
@@ -366,7 +384,7 @@ export function ManualWorkoutConstructorEditor({
               className="hito-manual-workout-title-control"
               readOnly={readbackMode}
               size="sm"
-              value={title}
+              value={documentTitle}
               onChange={onTitleChange}
               placeholder={selectedTemplate?.defaultTitle ?? "Name this workout"}
               variant="header"
@@ -390,9 +408,12 @@ export function ManualWorkoutConstructorEditor({
       </ManualWorkoutDocumentLead>
 
       <ManualWorkoutDraftStructureTimeline
-        entries={entries}
+        document={reviewedDocument}
         isRestDraft={isRestDraft}
         reviewDisabledReason={reviewDisabledReason}
+        selectedTemplate={selectedTemplate}
+        steps={documentSteps}
+        title={documentTitle}
       />
 
       <section
@@ -413,7 +434,7 @@ export function ManualWorkoutConstructorEditor({
         {entries.length ? (
           <div className="hito-manual-workout-entry-stack">
             {structureReadback ? (
-              <ManualWorkoutReadbackRows entries={entries} />
+              <ManualWorkoutReadbackRows steps={documentSteps} />
             ) : (
               entries.map((entry, index) => (
                 <div key={`${entry.kind}-${index}`}>
@@ -496,7 +517,7 @@ export function ManualWorkoutConstructorEditor({
           className="hito-field hito-field-primary hito-textarea-md resize-none"
           readOnly={readbackMode}
           rows={3}
-          value={notes}
+          value={documentNotes}
           onChange={(event) => onNotesChange(event.target.value)}
           placeholder="Optional note for this manual workout."
         />
@@ -511,9 +532,9 @@ export function ManualWorkoutConstructorEditor({
   );
 }
 
-function ManualWorkoutReadbackRows({ entries }: { entries: ManualWorkoutConstructorEntryInput[] }) {
+function ManualWorkoutReadbackRows({ steps }: { steps: Step[] }) {
   return (
-    <ManualWorkoutReadbackStack entries={manualConstructorEntriesToReadbackEntries(entries)} />
+    <ManualWorkoutReadbackStack entries={workoutDocumentSectionsToManualReadbackEntries(steps)} />
   );
 }
 
@@ -528,21 +549,46 @@ function ManualWorkoutInsertionSlot({ active }: { active: boolean }) {
 }
 
 function ManualWorkoutDraftStructureTimeline({
-  entries,
+  document,
   isRestDraft,
   reviewDisabledReason,
+  selectedTemplate,
+  steps,
+  title,
 }: {
-  entries: ManualWorkoutConstructorEntryInput[];
+  document: ManualWorkoutCanonicalDraft | null;
   isRestDraft: boolean;
   reviewDisabledReason?: string | null;
+  selectedTemplate: ManualWorkoutTemplate | undefined;
+  steps: Step[];
+  title: string;
 }) {
-  const items = entries.flatMap((entry, index) => timelineItemsForEntry(entry, index));
-  const totalSeconds = entries.reduce((sum, entry) => sum + entryDurationSeconds(entry), 0);
-  const totalDistanceMeters = entries.reduce((sum, entry) => sum + entryDistanceMeters(entry), 0);
+  const workoutType = document?.workoutType ?? selectedTemplate?.workoutType;
+  const items = document
+    ? workoutDocumentTimelineItems(document)
+    : selectedTemplate
+      ? workoutDocumentTimelineItems({
+          workoutType: selectedTemplate.workoutType,
+          sourceWorkoutType: selectedTemplate.templateKey,
+          workoutFamily: selectedTemplate.workoutFamily,
+          workoutIdentity: selectedTemplate.workoutIdentity,
+          calendarIconKey: selectedTemplate.calendarIconKey,
+          title,
+          steps,
+        })
+      : [];
+  const totalDurationMin =
+    document?.totalDurationMin ??
+    (workoutType
+      ? steps.reduce((sum, step) => sum + stepPlannedDurationMin(step, workoutType), 0)
+      : 0);
+  const totalDistanceMeters =
+    (document?.totalDistanceKm ??
+      steps.reduce((sum, step) => sum + stepPlannedDistanceKm(step), 0)) * 1000;
   const structureParts = [
-    totalSeconds > 0 ? formatDurationMin(totalSeconds / 60) : null,
+    totalDurationMin > 0 ? formatDurationMin(totalDurationMin) : null,
     totalDistanceMeters > 0 ? formatDistanceMeters(totalDistanceMeters) : null,
-    entries.length ? `${entries.length} block${entries.length === 1 ? "" : "s"}` : null,
+    steps.length ? `${steps.length} block${steps.length === 1 ? "" : "s"}` : null,
   ].filter(Boolean);
   const meta = structureParts.length ? structureParts.join(" · ") : "0 min · 0 blocks";
 
@@ -1279,7 +1325,7 @@ function ManualBlockIdentityFields({
 }) {
   return (
     <label className="hito-manual-workout-label-field grid gap-2">
-      <span className="hito-form-label">Visible label</span>
+      <span className="hito-form-label">Section name</span>
       <input
         className="hito-field hito-field-secondary hito-field-sm"
         disabled={disabled}

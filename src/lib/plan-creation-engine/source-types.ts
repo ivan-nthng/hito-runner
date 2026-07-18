@@ -1,12 +1,5 @@
 import type { PlannedWorkoutRepeatChildRole } from "@/lib/planned-workout-block-contract";
-
-export const RUNNING_PLAN_DISTANCE_FAMILY_VALUES = [
-  "10K",
-  "Half Marathon",
-  "Marathon Completion",
-] as const;
-
-export type RunningPlanDistanceFamily = (typeof RUNNING_PLAN_DISTANCE_FAMILY_VALUES)[number];
+import type { StepTarget } from "@/lib/training";
 
 export const RUNNING_PLAN_RUNNER_LEVEL_VALUES = [
   "beginner_new_runner",
@@ -122,6 +115,7 @@ export interface RunningPlanRepeatChildPrescription {
   guidance?: string;
   prescription: RunningPlanRepeatChildUnitPrescription;
   intensityLabel: string;
+  target?: StepTarget;
 }
 
 export interface RunningPlanWatchExecutableSegmentTemplate {
@@ -139,4 +133,5 @@ export interface RunningPlanWatchExecutableSegmentTemplate {
   primaryPrescription: RunningPlanSegmentPrescription;
   targetTruthMode: RunningPlanTargetTruthMode;
   secondaryCue: string;
+  target?: StepTarget;
 }

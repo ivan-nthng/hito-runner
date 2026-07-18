@@ -23,12 +23,12 @@ const baseInput = {
   heightCm: 178,
   weightKg: 74,
   runnerLevel: "runs_a_lot",
-  distanceFamily: "10K",
   daysPerWeek: 5,
   fixedRestDays: ["Wednesday", "Saturday"],
   preferredLongRunDay: "Sunday",
   startDate: "2026-06-08",
   benchmark: { kind: "unknown" },
+  planGoalIntent: { distance: { kind: "preset", preset: "10K" } },
 } satisfies RunningPlanPreviewActionInput;
 
 async function main() {
@@ -65,12 +65,11 @@ function validateActionSchemaBoundary() {
 function validatePlanGoalIntentNormalizer() {
   const omitted = mustNormalize({
     rawIntent: null,
-    distanceFamily: "10K",
     startDate: "2026-07-06",
     horizonWeeks: 10,
   });
   assert.equal(omitted.contractVersion, PLAN_GOAL_INTENT_CONTRACT_VERSION);
-  assert.equal(omitted.distance?.label, "10K");
+  assert.equal(omitted.distance, null);
   assert.deepEqual(omitted.supplied, {
     distance: false,
     targetDate: false,
@@ -82,7 +81,6 @@ function validatePlanGoalIntentNormalizer() {
 
   const halfPreset = mustNormalize({
     rawIntent: { distance: { kind: "preset", preset: "Half Marathon" } },
-    distanceFamily: "Half Marathon",
     startDate: "2026-07-06",
     horizonWeeks: 16,
   });
@@ -90,7 +88,6 @@ function validatePlanGoalIntentNormalizer() {
 
   const marathonPreset = mustNormalize({
     rawIntent: { distance: { kind: "preset", preset: "Marathon" } },
-    distanceFamily: "Marathon Completion",
     startDate: "2026-07-06",
     horizonWeeks: 20,
   });
@@ -98,20 +95,18 @@ function validatePlanGoalIntentNormalizer() {
 
   const customDistance = mustNormalize({
     rawIntent: { distance: { kind: "custom", distanceKm: 12.5, label: "City 12.5K" } },
-    distanceFamily: "10K",
     startDate: "2026-07-06",
     horizonWeeks: 10,
   });
   assert.equal(customDistance.distance?.kind, "custom");
   assert.equal(customDistance.distance?.distanceMeters, 12_500);
-  assert.equal(customDistance.feasibility.status, "supported_with_assumptions");
+  assert.equal(customDistance.feasibility.status, "supported");
 
   const finishTime = mustNormalize({
     rawIntent: {
       distance: { kind: "preset", preset: "10K" },
       targetFinishTime: "45:00",
     },
-    distanceFamily: "10K",
     startDate: "2026-07-06",
     horizonWeeks: 10,
   });
@@ -125,7 +120,6 @@ function validatePlanGoalIntentNormalizer() {
       distance: { kind: "preset", preset: "10K" },
       targetOutcomePace: "4:20/km",
     },
-    distanceFamily: "10K",
     startDate: "2026-07-06",
     horizonWeeks: 10,
   });
@@ -134,7 +128,6 @@ function validatePlanGoalIntentNormalizer() {
 
   const targetDateOnly = mustNormalize({
     rawIntent: { targetDate: "2026-10-04" },
-    distanceFamily: "Half Marathon",
     startDate: "2026-07-06",
     horizonWeeks: 16,
   });
@@ -146,7 +139,6 @@ function validatePlanGoalIntentNormalizer() {
       distance: { kind: "preset", preset: "10K" },
       targetFinishTime: "25:00",
     },
-    distanceFamily: "10K",
     startDate: "2026-07-06",
     horizonWeeks: 10,
   });
@@ -157,7 +149,6 @@ function validatePlanGoalIntentNormalizer() {
       distance: { kind: "preset", preset: "Marathon" },
       targetDate: "2026-07-12",
     },
-    distanceFamily: "Marathon Completion",
     startDate: "2026-07-06",
     horizonWeeks: 20,
   });
@@ -169,7 +160,6 @@ function validatePlanGoalIntentNormalizer() {
 
   const invalid = normalizePlanGoalIntent({
     rawIntent: { targetDate: "2026-02-31" },
-    distanceFamily: "10K",
   });
   assert.equal(invalid.ok, false);
 }
@@ -182,6 +172,7 @@ async function validateSelectedPlanReviewAndReadback() {
   const withIntent = await buildReviewedAiFixture({
     ...baseInput,
     planGoalIntent: {
+      ...baseInput.planGoalIntent,
       targetFinishTime: "45:00",
       targetOutcomePace: "4:25/km",
       targetDate: "2026-09-13",
@@ -239,8 +230,23 @@ function assertSelectedPlanGoalIntentReadback(plan: TrainingPlanV2) {
 function assertNoExecutablePaceOrPersonalHr(plan: TrainingPlanV2) {
   const text = JSON.stringify(plan.planned_workouts);
 
-  assert.doesNotMatch(text, /pace_min_per_km_range|pace_range_min_km|pace_seconds_per_km/);
+  assert.doesNotMatch(text, /pace_seconds_per_km|pace_min_seconds_per_km|pace_max_seconds_per_km/);
   assert.doesNotMatch(text, /personal_hr|personal_hr_zone|measured_threshold/i);
+  assertAiAuthoredPaceProvenance(plan.planned_workouts);
+}
+
+function assertAiAuthoredPaceProvenance(value: unknown) {
+  if (Array.isArray(value)) {
+    value.forEach(assertAiAuthoredPaceProvenance);
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+
+  const record = value as Record<string, unknown>;
+  if (typeof record.pace === "string") {
+    assert.equal(record.target_source, "ai_authored_plan_guidance");
+  }
+  Object.values(record).forEach(assertAiAuthoredPaceProvenance);
 }
 
 async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {

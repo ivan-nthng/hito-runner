@@ -1,4 +1,5 @@
 import type { PersistedPlanCycleRow } from "@/lib/active-plan-persistence";
+import { TRAINING_PLAN_V2_IMPORT_SOURCE_KIND } from "@/lib/imported-plan";
 
 export const ACTIVE_PLAN_USER_EDIT_SOURCE_KIND = "active_plan_user_edit_v1" as const;
 
@@ -51,6 +52,10 @@ export interface ActivePlanUserEditMetadataInput {
   mutationPayloadVersion?: string | null;
   mutationChecksum?: string | null;
   trustedClientRows?: boolean | null;
+  originalWorkoutSourceId?: string | null;
+  originalWorkoutSourceType?: string | null;
+  originalWorkoutFamily?: string | null;
+  originalWorkoutIdentity?: string | null;
 }
 
 export interface ActivePlanUserEditMetadata {
@@ -58,6 +63,12 @@ export interface ActivePlanUserEditMetadata {
   mutation_kind: ActivePlanUserEditMutationKind;
   original_plan_source_kind: string;
   original_plan_source_status: string | null;
+  original_plan_origin_source_kind?: string;
+  original_plan_origin_source_status?: string;
+  original_workout_source_id?: string | null;
+  original_workout_source_type?: string | null;
+  original_workout_family?: string | null;
+  original_workout_identity?: string | null;
   workout_authoring_source_kind?: string;
   planned_workout_id?: string;
   previous_workout_date?: string;
@@ -77,10 +88,8 @@ export interface ActivePlanUserEditMetadata {
 
 const EXPLICIT_EDITABLE_ACTIVE_PLAN_SOURCE_KINDS = new Set([
   "manual_user_built_plan_v1",
-  "structured_authoring_v1",
   "ai_authored_plan_first_v1",
-  "training_plan_v2_import",
-  "active_plan_refresh_v1",
+  TRAINING_PLAN_V2_IMPORT_SOURCE_KIND,
 ]);
 
 const MANUAL_CONTENT_COPY_ACTIVE_PLAN_SOURCE_KINDS = new Set(["manual_user_built_plan_v1"]);
@@ -114,7 +123,7 @@ export function resolveActivePlanWorkoutEditability(
     };
   }
 
-  if (!isSupportedActivePlanWorkoutEditOperation(sourceKind, activePlan, operation)) {
+  if (!isSupportedActivePlanWorkoutEditOperation(sourceKind, operation)) {
     return {
       ok: false,
       reason: "unsupported_active_plan_source",
@@ -135,24 +144,11 @@ export function resolveActivePlanWorkoutEditability(
   };
 }
 
-export function isEditableActivePlanSourceKind(
-  sourceKind: string | null | undefined,
-  activePlan?: PersistedPlanCycleRow | null,
-) {
+export function isEditableActivePlanSourceKind(sourceKind: string | null | undefined) {
   const normalizedSourceKind = sourceKind?.trim();
 
-  if (!normalizedSourceKind) {
-    return false;
-  }
-
-  if (EXPLICIT_EDITABLE_ACTIVE_PLAN_SOURCE_KINDS.has(normalizedSourceKind)) {
-    return true;
-  }
-
-  return (
-    normalizedSourceKind.endsWith("_import") &&
-    activePlan?.schema_version === "training-plan-v2" &&
-    activePlan.source_template === "training-plan-v2"
+  return Boolean(
+    normalizedSourceKind && EXPLICIT_EDITABLE_ACTIVE_PLAN_SOURCE_KINDS.has(normalizedSourceKind),
   );
 }
 
@@ -166,14 +162,12 @@ export function isManualContentEditableActivePlanSourceKind(sourceKind: string |
 
 export function isActivePlanWorkoutContentEditableSourceKind(
   sourceKind: string | null | undefined,
-  activePlan?: PersistedPlanCycleRow | null,
 ) {
-  return isEditableActivePlanSourceKind(sourceKind, activePlan);
+  return isEditableActivePlanSourceKind(sourceKind);
 }
 
 function isSupportedActivePlanWorkoutEditOperation(
   sourceKind: string,
-  activePlan: PersistedPlanCycleRow,
   operation: ActivePlanWorkoutEditOperation,
 ) {
   if (operation === "copy_workout") {
@@ -181,10 +175,10 @@ function isSupportedActivePlanWorkoutEditOperation(
   }
 
   if (operation === "edit_workout") {
-    return isActivePlanWorkoutContentEditableSourceKind(sourceKind, activePlan);
+    return isActivePlanWorkoutContentEditableSourceKind(sourceKind);
   }
 
-  return isEditableActivePlanSourceKind(sourceKind, activePlan);
+  return isEditableActivePlanSourceKind(sourceKind);
 }
 
 export function resolveActivePlanSourceStatus(activePlan: PersistedPlanCycleRow) {
@@ -195,12 +189,7 @@ export function resolveActivePlanSourceStatus(activePlan: PersistedPlanCycleRow)
     return directStatus;
   }
 
-  for (const key of [
-    "manual_user_built_plan",
-    "selected_plan_engine",
-    "active_plan_refresh",
-    "ai_authored_plan_first",
-  ]) {
+  for (const key of ["manual_user_built_plan", "selected_plan_engine", "ai_authored_plan_first"]) {
     const nestedStatus = readString(asRecord(root[key]).source_status);
 
     if (nestedStatus) {
@@ -229,6 +218,10 @@ export function buildActivePlanUserEditMetadata({
   title,
   trustedClientRows,
   workoutAuthoringSourceKind,
+  originalWorkoutSourceId,
+  originalWorkoutSourceType,
+  originalWorkoutFamily,
+  originalWorkoutIdentity,
 }: ActivePlanUserEditMetadataInput): ActivePlanUserEditMetadata {
   const sourceKind = activePlan.source_kind?.trim();
 
@@ -236,11 +229,19 @@ export function buildActivePlanUserEditMetadata({
     throw new Error("Active plan user edit metadata requires an original source kind.");
   }
 
+  const importOrigin = resolveConfirmedImportOrigin(activePlan);
+
   return omitUndefined({
     mutation_source: ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
     mutation_kind: mutationKind,
     original_plan_source_kind: sourceKind,
     original_plan_source_status: resolveActivePlanSourceStatus(activePlan),
+    original_plan_origin_source_kind: importOrigin.sourceKind ?? undefined,
+    original_plan_origin_source_status: importOrigin.sourceStatus ?? undefined,
+    original_workout_source_id: originalWorkoutSourceId,
+    original_workout_source_type: originalWorkoutSourceType,
+    original_workout_family: originalWorkoutFamily,
+    original_workout_identity: originalWorkoutIdentity,
     workout_authoring_source_kind: workoutAuthoringSourceKind?.trim() || undefined,
     planned_workout_id: plannedWorkoutId?.trim() || undefined,
     previous_workout_date: previousWorkoutDate?.trim() || undefined,
@@ -259,10 +260,20 @@ export function buildActivePlanUserEditMetadata({
   });
 }
 
+function resolveConfirmedImportOrigin(activePlan: PersistedPlanCycleRow) {
+  const root = asRecord(activePlan.goal_metadata);
+  const provenance = asRecord(root[TRAINING_PLAN_V2_IMPORT_SOURCE_KIND]);
+
+  return {
+    sourceKind: readString(provenance.origin_source_kind),
+    sourceStatus: readString(provenance.origin_source_status),
+  };
+}
+
 export function appendActivePlanUserEditMetadataToRecord(
   root: Record<string, unknown>,
   editMetadata: ActivePlanUserEditMetadata,
-) {
+): Record<string, unknown> {
   const history = Array.isArray(root.active_plan_user_edits) ? root.active_plan_user_edits : [];
 
   return {

@@ -216,6 +216,13 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
       confirm.sourceMetadata.originalPlanSourceStatus,
       MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
     );
+    assert.equal(confirm.sourceMetadata.originalWorkoutSourceId, sourceWorkout.source_workout_id);
+    assert.equal(
+      confirm.sourceMetadata.originalWorkoutSourceType,
+      sourceWorkout.source_workout_type,
+    );
+    assert.equal(confirm.sourceMetadata.originalWorkoutFamily, sourceWorkout.workout_family);
+    assert.equal(confirm.sourceMetadata.originalWorkoutIdentity, sourceWorkout.workout_identity);
     assert.equal(confirm.sourceMetadata.trustedClientRows, false);
     assert.equal(confirm.safety.requiresExplicitConfirm, true);
     assert.equal(confirm.safety.updatedExactlyOneRow, true);
@@ -280,6 +287,34 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
     }),
   );
   assertPersistedEditConfirmBlocked(staleSource, "stale_review", "persisted edit stale source");
+
+  const stalePlan = await confirmManualWorkoutPersistedEditForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: sourceWorkout.id,
+      workoutDate: sourceWorkout.workout_date,
+      draftInput: editedDraftInput,
+      ...(editReview.ok
+        ? {
+            reviewToken: editReview.review.reviewToken,
+            reviewChecksum: editReview.review.reviewChecksum,
+          }
+        : {}),
+    },
+    buildFakeEditDependencies({
+      activePlan: {
+        ...activePlan,
+        updated_at: "2026-06-16T12:00:00.000Z",
+      },
+      workouts: [sourceWorkout, keptWorkout],
+    }),
+  );
+  assertPersistedEditConfirmBlocked(
+    stalePlan,
+    "stale_review",
+    "persisted edit stale active-plan version",
+  );
 
   const staleSourceDate = await confirmManualWorkoutPersistedEditForUser(
     userId,
@@ -520,6 +555,22 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
       "ai_authored_plan_first_v1",
     );
     assert.equal(generatedConfirm.sourceMetadata.originalPlanSourceStatus, null);
+    assert.equal(
+      generatedConfirm.sourceMetadata.originalWorkoutSourceId,
+      generatedSourceWorkout.source_workout_id,
+    );
+    assert.equal(
+      generatedConfirm.sourceMetadata.originalWorkoutSourceType,
+      generatedSourceWorkout.source_workout_type,
+    );
+    assert.equal(
+      generatedConfirm.sourceMetadata.originalWorkoutFamily,
+      generatedSourceWorkout.workout_family,
+    );
+    assert.equal(
+      generatedConfirm.sourceMetadata.originalWorkoutIdentity,
+      generatedSourceWorkout.workout_identity,
+    );
     assert.equal(generatedConfirm.sourceMetadata.trustedClientRows, false);
     assert.equal(generatedConfirm.safety.updatedExactlyOneRow, true);
     assert.equal(generatedConfirm.safety.serverRebuiltReview, true);
@@ -580,6 +631,46 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
     "persisted edit unsafe metric source",
   );
 
+  for (const persistenceRejection of [
+    {
+      reason: "stale_review",
+      message: "The active plan changed before the workout edit was saved.",
+    },
+    {
+      reason: "protected_day",
+      message: "Logged or evidence-backed workouts cannot be edited.",
+    },
+  ] as const) {
+    const transactionRejection = await confirmManualWorkoutPersistedEditForUser(
+      userId,
+      {
+        activePlanId: activePlan.id,
+        plannedWorkoutId: sourceWorkout.id,
+        workoutDate: sourceWorkout.workout_date,
+        draftInput: editedDraftInput,
+        ...(editReview.ok
+          ? {
+              reviewToken: editReview.review.reviewToken,
+              reviewChecksum: editReview.review.reviewChecksum,
+            }
+          : {}),
+      },
+      buildFakeEditDependencies({
+        activePlan,
+        workouts: [sourceWorkout, keptWorkout],
+        persistRejection: {
+          ok: false,
+          ...persistenceRejection,
+        },
+      }),
+    );
+    assertPersistedEditConfirmBlocked(
+      transactionRejection,
+      persistenceRejection.reason,
+      `persisted edit transaction ${persistenceRejection.reason}`,
+    );
+  }
+
   const persistenceFailure = await confirmManualWorkoutPersistedEditForUser(
     userId,
     {
@@ -617,6 +708,11 @@ function buildFakeEditDependencies(input: {
   logsByWorkoutId?: Map<string, PersistedWorkoutLogRow>;
   evidenceWorkoutIds?: Set<string>;
   persistError?: Error;
+  persistRejection?: {
+    ok: false;
+    reason: "stale_review" | "protected_day";
+    message: string;
+  };
   onPersist?: (record: Parameters<NonNullable<EditDependencies["persistWorkoutEdit"]>>[0]) => void;
 }): EditDependencies {
   return {
@@ -626,9 +722,14 @@ function buildFakeEditDependencies(input: {
         throw input.persistError;
       }
 
+      if (input.persistRejection) {
+        return input.persistRejection;
+      }
+
       input.onPersist?.(record);
 
       return {
+        ok: true,
         editedWorkout: {
           ...record.sourceWorkout,
           title: record.draftReview.draft.title,

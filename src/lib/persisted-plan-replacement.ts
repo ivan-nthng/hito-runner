@@ -6,7 +6,9 @@ import {
 } from "@/lib/rich-workout-model";
 import type { Json } from "@/lib/supabase/database";
 import type { Database } from "@/lib/supabase/database";
-import { normalizeExecutableStepInstructions, type Step } from "@/lib/training";
+import { stableJsonStringify } from "@/lib/review-token-signing";
+import { normalizeExecutableStepInstructions } from "@/lib/training";
+import { readWorkoutDocumentSections } from "@/lib/workout-document";
 
 export type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
 export type PersistedWorkoutLogRow = Database["public"]["Tables"]["workout_logs"]["Row"];
@@ -49,7 +51,7 @@ export function persistedWorkoutRowToImportedSeed(
     normalizeSteps?: boolean;
   } = {},
 ): ImportedPlanSeed["workouts"][number] {
-  const rawSteps = ((workout.steps as Step[] | null) ?? []).map((step) => ({ ...step }));
+  const rawSteps = readWorkoutDocumentSections(workout.steps).map((step) => ({ ...step }));
   const steps =
     options.normalizeSteps === false ? rawSteps : normalizeExecutableStepInstructions(rawSteps);
   const richWorkout = resolveCanonicalWorkoutModel({
@@ -142,24 +144,4 @@ function isSameImportedWorkout(
     (existingWorkout.notes ?? null) === (importedWorkout.notes ?? null) &&
     stableJsonStringify(existingWorkout.steps ?? []) === stableJsonStringify(importedWorkout.steps)
   );
-}
-
-function stableJsonStringify(value: unknown): string {
-  return JSON.stringify(sortJsonValue(value));
-}
-
-function sortJsonValue(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map((entry) => sortJsonValue(entry));
-  }
-
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
-        .map(([key, nestedValue]) => [key, sortJsonValue(nestedValue)]),
-    );
-  }
-
-  return value;
 }

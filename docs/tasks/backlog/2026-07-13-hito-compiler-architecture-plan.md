@@ -2,7 +2,7 @@
 
 ## Status
 
-backlog
+completed
 
 ## Type
 
@@ -14,113 +14,20 @@ high
 
 ## Next Recommended Role
 
-backend
+product
 
 ## Task
 
-Implement the simplified AI-authored plan-first Hito compiler v1.
+Signed reviewed WorkoutDocument adoption accepted.
 
 ## Stage
 
-BACKEND implementation / AI-authored plan draft parser, atomizer, review, and confirm.
+closed
 
 ## Exact Handoff Prompt
 
-```md
-ROLE: BACKEND
-
-Task:
-Implement the simplified AI-authored plan-first Hito compiler v1.
-
-Stage:
-BACKEND implementation / AI-authored full-plan draft parser, atomizer, calendar review, and confirm.
-
-Plan:
-`/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/2026-07-13-hito-compiler-architecture-plan.md`
-
-Reference specimen:
-`/tmp/codex-remote-attachments/019f6114-ae28-7023-8534-09e8709ad15a/3DD0DD37-D6C8-4A60-A10E-505E69A25C4D/1-marathon_plan_22_weeks.json`
-
-Context:
-Product corrected the v1 gate. Hito still uses structured Hito atoms and a backend compiler, but v1 must not block useful AI-authored plans by requiring a perfect strict internal atom document before the runner can see a calendar draft. The first gate is: runner facts -> one AI-authored full plan draft shaped like the specimen -> backend parse/atomize/compile -> calendar preview -> review/confirm -> persistence/readback.
-
-Root cause and architecture fit:
-Visible symptom: live provider work timed out and failed before a runner could review a useful plan.
-Wrong fix: make backend author the training plan deterministically, or make backend reject coach-authored pace/HR/workout choices just because they are not perfect Atom DSL.
-Likely underlying cause: backend validation was acting like a coaching permission system instead of a parser/compiler/review safety boundary.
-Canonical owner split: AI owns the coach-authored full plan draft, including workout mix, paces, HR-zone labels, progression, long runs, intervals, tempo, hills, strides, and control workouts. Backend owns parsing, atomization, structural validation, calendar/date integrity, review token/checksum, confirm exactness, persistence, and readback. Frontend renders backend-shaped review/readback only.
-
-Current product truth to preserve:
-- Quick setup generated plan preview/create/readback for 10K, 21.1K, 42.195K, and Custom 15K.
-- Manual workout authoring and persisted edit behavior.
-- Saved calendar and workout detail/readback/logging.
-- Review/confirm exactness: confirm must persist the reviewed canonical draft and must not call AI or trust client rows.
-- Child-first repeat `children[]`, structural-only Repeat parents, no `repeat_unit` / `recovery_unit`.
-- AI-authored pace targets are allowed, including short interval targets such as `2 min @ 5:15-5:30/km`, when they are presented as coach-authored plan guidance and the runner context can plausibly support them.
-- AI-authored HR zone labels such as `Z1`, `Z2`, `Z5`, or `Z1-Z2` are allowed as Garmin/user-zone guidance. Unsupported raw personal BPM claims remain blocked unless personal HR-zone truth exists.
-- Backend must not rewrite the draft into a different training plan because it thinks a pace, workout identity, or training mix is suboptimal.
-- Import/export/provider comparison seams remain preservation boundaries unless explicitly touched.
-
-Scope:
-1. Read AGENTS.md, agents/backend.agent.md, skills/hito-backend-supabase-contract/SKILL.md, skills/hito-architecture-audit/SKILL.md, this backlog plan, the running-plan rebuild plan, current product/system/state/functional-map docs, and relevant source seams.
-2. Reuse existing plan-creation seams first:
-   - `src/lib/ai-generated-running-plan.ts`
-   - `src/lib/plan-creation-engine/*`
-   - `src/lib/ai-first-plan-draft-service.ts`
-   - `src/lib/ai-authored-plan-first-compiler.ts`
-   - `src/lib/running-plan-engine-actions.ts`
-   - `src/lib/running-plan-engine-review.ts`
-   - `src/lib/imported-plan.ts`
-   - `src/lib/plan-export.ts`
-   - `src/lib/workout-result-import/compare-workout-result.ts`
-3. Build the smallest backend-owned v1 seam:
-   `runner facts -> one AI-authored full plan draft -> backend parser/atomizer/compiler -> calendar preview -> review/confirm -> persistence/readback`.
-4. Accept a specimen-shaped AI draft for v1. It can include metadata, weeks, weekday objects, workout types, steps, blocks, repeat intervals, recoveries, pace strings, HR-zone strings, distances, durations, notes, warnings, and assumptions. Do not require the provider to emit the final strict Hito Atom JSON shape in the first gate.
-5. Preserve Hito atoms by atomizing the AI draft into backend-owned plan, week, day, workout, section/block, repeat, target/value, note/cue, warning, and assumption atoms before review/persistence.
-6. Compile the atomized draft into current Hito calendar/workout structures and a reviewable calendar draft. Confirm must persist exactly the reviewed draft and must not call AI again.
-7. Hard-reject only safety/display/persistence failures:
-   - malformed JSON;
-   - missing weeks/days/workout steps;
-   - impossible or contradictory calendar/date structure;
-   - fixed rest days not respected;
-   - broken Repeat/step structure that cannot be displayed or converted;
-   - unsupported raw personal BPM claims when no HR-zone truth exists;
-   - medical claims;
-   - wildly impossible load/progression;
-   - review/confirm/persistence safety failures.
-8. Warn or annotate instead of rejecting when the issue is coaching quality/suboptimality, rough workout identity naming, or coach-authored target guidance that can still be displayed safely.
-9. Keep stricter atom-level validation as future hardening for import/export/Garmin/readback quality. Do not make strict atom purity the blocker for the first live-provider reviewable plan.
-10. Delete or collapse stale generated-plan compatibility when the simplified parser/atomizer/compiler replaces it and no current product/safety/audit/recovery/import/export/provider/validator consumer remains.
-11. Preserve import/export/provider comparison boundaries unless the compiler work directly changes their planned-workout input shape.
-12. Use or reuse subagents for read-only source audit, Running Coach doctrine review, and QA/validator inventory where useful. Close them and integrate findings yourself; do not return micro-prompts to Product for routine same-lane checks.
-
-Validation:
-- `node --import tsx ./scripts/validate-plan-goal-intent-contract.ts`
-- `node --import tsx ./scripts/validate-ai-generated-running-plan-creation.ts`
-- `node --import tsx ./scripts/validate-running-plan-engine-confirm.ts`
-- `node --import tsx ./scripts/validate-planned-workout-language.ts`
-- `node --import tsx ./scripts/validate-plan-authoring-doctrine.ts`
-- `npm run validate-manual-workout-authoring`
-- Targeted ESLint for touched backend/script files.
-- `npm run build` if public imports/runtime contracts change.
-- `git diff --check -- <touched files>`
-- Use the attached specimen and mock/local-fixture AI probes first. Do not call live OpenAI unless a later explicit Product-approved task scopes that.
-
-Stop conditions:
-- Stop if the work would require Supabase schema/data mutation, live OpenAI/provider calls, browser QA as part of backend implementation, or frontend UI changes in the same slice.
-- Stop if preserving current Quick setup, manual authoring, calendar, workout detail/logging, import/export, provider comparison, or review/confirm safety would require a Product breaking-change decision.
-- Stop if the implementation starts creating a second workout language, second plan persistence model, backend-authored flat fallback plan, backend-authored target/horizon product truth, frontend-owned feasibility/target truth, or a strict atom-purity gate that blocks useful specimen-shaped plans before review.
-- Stop if Running Coach doctrine cannot decide whether a scenario should warn, block, or proceed safely.
-
-Required final report:
-- Explain the new AI/backend split in plain language: AI authors the coach plan; backend parses, atomizes, compiles, validates hard safety boundaries, reviews, confirms, and persists.
-- List files changed.
-- Name existing seams reused.
-- Name deleted/collapsed stale values or explain why they were kept.
-- Report validation commands and results.
-- Report subagents used/reused/closed.
-- State whether a QA/browser follow-up is required.
-```
+None. The compiler architecture rebuild and final signed WorkoutDocument consumer reconciliation
+are accepted and closed.
 
 ## Issue Category
 
@@ -132,11 +39,11 @@ high
 
 ## Human Priority
 
-next
+none
 
 ## Human Status
 
-triaged
+completed
 
 ## Owner
 
@@ -207,7 +114,8 @@ proof scripts.
 - Workout detail readback and workout logging.
 - JSON import/export as the current advanced fallback.
 - Garmin/FIT/provider evidence stays actual-evidence input, not planned-workout truth.
-- Generated rows remain read-only unless backend explicitly accepts editability.
+- Generated preview stays non-mutating; eligible confirmed future generated rows use the shared
+  backend-reviewed content-edit lifecycle.
 - AI-authored pace targets and HR-zone labels can be displayed as coach-authored plan guidance when
   they are structurally safe and labeled as plan guidance.
 - No backend-invented training plan, no unsupported raw personal BPM truth, no second workout
@@ -219,7 +127,7 @@ proof scripts.
 
 | Kernel | Owns | Current source roots to map first |
 | --- | --- | --- |
-| `PlanCreation` | first plan, selected distance-goal, import, replacement, review/confirm | `first-plan-actions`, `running-plan-engine-actions`, `running-plan-engine-review`, `plan-replacement-actions`, `active-plan-transition-actions` |
+| `PlanCreation` | first plan, selected distance-goal, import, replacement, review/confirm | `running-plan-engine-actions`, `running-plan-engine-review`, `plan-replacement-actions`, `active-plan-transition-actions` |
 | `WorkoutAuthoring` | manual constructor, templates, target inputs, copy/paste reconstruction, persisted edit drafts | `manual-workout-authoring/*`, manual workout components, manual validators |
 | `PlanLifecycle` | active plan archive/replace/clear schedule/schedule edit/add plan | `active-plan-*`, `Calendar.tsx`, plan-management components |
 | `WorkoutDocument` | canonical block/target/note/readback document for manual/generated/imported workouts | `planned-workout-block-contract`, `planned-workout-language`, `training`, `workout-structure/*`, manual grammar |
@@ -325,7 +233,7 @@ Hard failures for v1:
 - broken Repeat/step structure that cannot be displayed or converted;
 - unsupported raw personal BPM claims when no HR-zone truth exists;
 - medical claims;
-- wildly impossible load/progression;
+- accepted impossible goal-horizon or marathon race-week safety violations;
 - review/confirm/persistence safety failures.
 
 Backend must not become a deterministic flat-plan author, deterministic target/horizon author, or
@@ -428,8 +336,9 @@ Backend parser/compiler responsibilities:
 - parse and atomize the AI draft into Hito atoms before review/persistence;
 - validate structural/calendar/display/persistence safety;
 - reject hard failures such as malformed JSON, missing weeks/days/steps, impossible calendar
-  structure, broken repeats, unsupported raw personal BPM claims, medical claims, wildly impossible
-  load/progression, parent Repeat targets, or review/confirm safety failures;
+  structure, broken repeats, unsupported raw personal BPM claims, medical claims, accepted
+  impossible goal-horizon or marathon race-week safety violations, parent Repeat targets, or
+  review/confirm safety failures;
 - warn or annotate coaching suboptimality instead of rejecting merely because backend disagrees with
   the AI's pace, workout identity, or mix;
 - normalize names, icons, readback labels, canonical identities, source metadata, and
@@ -442,7 +351,7 @@ Preservation matrix:
 
 | Flow | Preserve in first engine gate |
 | --- | --- |
-| Quick setup generated plan | 10K, 21.1K, 42.195K, Custom 15K preview/create/readback; generated rows read-only. |
+| Quick setup generated plan | 10K, 21.1K, 42.195K, Custom 15K preview/create/readback; signed preview is non-mutating, while eligible confirmed future canonical workouts follow the shared reviewed edit lifecycle. |
 | Review/confirm | Confirm persists the reviewed canonical draft, calls no AI, trusts no client rows, and keeps token/checksum exactness. |
 | Manual authoring | Manual constructor/review, target inputs, templates, Add/Clear/Move/Copy/Edit, and manual validators remain untouched except as validation smoke. |
 | Calendar/workout detail/logging | Saved calendar, workout detail readback, and logging remain behavior-preservation targets. |
@@ -478,8 +387,8 @@ Current product decisions:
 - Marathon Completion may use an exact `42195m` endpoint but must not imply target-time readiness
   when support is weak;
 - aggressive, low-support, or no-benchmark goals should warn when a safe honest plan is possible
-  and block/unavailable only when calendar/display/persistence safety, endpoint honesty, or wildly
-  impossible load/progression cannot be met.
+  and block/unavailable only when calendar/display/persistence safety, endpoint honesty, the
+  accepted impossible goal-horizon gate, or the bounded marathon race-week safety contract fails.
 
 First BACKEND gate:
 
@@ -499,8 +408,8 @@ Minimum validation corpus:
   aggressive but not structurally impossible progression, AI assumptions about horizon/outcome;
 - hard-failure scenarios: malformed JSON, missing weeks/days/steps, wrong or contradictory dates,
   fixed rest day violation, unconvertible Repeat/step structure, unsupported raw personal BPM
-  claims, medical claims, wildly impossible load/progression, review/confirm checksum drift,
-  confirm calling AI again, and persistence/readback shape loss.
+  claims, medical claims, accepted impossible goal-horizon or marathon race-week safety violations,
+  review/confirm checksum drift, confirm calling AI again, and persistence/readback shape loss.
 
 ## Implementation Phases
 
@@ -518,6 +427,8 @@ Deliverables:
 - no runtime code changes.
 
 ### Phase 1 - AI-Authored Plan-First Compiler V1
+
+Status: accepted and closed.
 
 Likely owner: BACKEND, with RUNNING COACH doctrine review and QA corpus validation.
 
@@ -542,8 +453,8 @@ Expected work:
   steps/blocks/targets into Hito atoms;
 - compile the atomized draft into reviewable calendar/workout documents;
 - require backend validation to check hard safety boundaries, calendar integrity, displayability,
-  repeat/step convertibility, unsupported raw BPM claims, medical claims, wildly impossible load,
-  and review/confirm exactness;
+  repeat/step convertibility, unsupported raw BPM claims, medical claims, accepted goal-horizon and
+  marathon race-week safety bounds, and review/confirm exactness;
 - allow AI-authored pace targets and HR-zone labels as plan guidance when structurally safe;
 - turn softer coaching-quality doubts into warnings/annotations instead of blocking review;
 - remove backend deterministic plan-shape, target, or horizon authoring when it becomes duplicate
@@ -574,6 +485,8 @@ Validation:
 
 ### Phase 2 - WorkoutDocument Kernel Contract
 
+Status: accepted and closed.
+
 Likely owner: BACKEND, with RUNNING COACH doctrine review.
 
 Goal: make `CompiledWorkoutDocument` the single canonical internal/readback artifact across manual,
@@ -599,6 +512,8 @@ Validation:
 - build.
 
 ### Phase 3 - Reusable Review/Confirm Lifecycle
+
+Status: accepted and closed.
 
 Likely owner: BACKEND.
 
@@ -629,6 +544,8 @@ Validation:
 
 ### Phase 4 - Calendar Projection Kernel
 
+Status: accepted and closed.
+
 Likely owner: FRONTEND first, then BACKEND only if capability readback is insufficient.
 
 Goal: calendar renders one backend-shaped projection instead of owning manual action logic locally.
@@ -650,18 +567,28 @@ Validation:
 
 ### Phase 5 - PlanCreation Entry-Point Consolidation
 
+Status: accepted and closed.
+
 Likely owner: BACKEND with RUNNING COACH and QA.
 
-Goal: generated/manual/import/text/selected plan creation entrypoints converge around one
+Goal: generated/manual/import/selected plan creation entrypoints converge around one
 compile/apply model without losing product-specific entrypoints. This phase is after the engine
 kernel rebuild; it is about entrypoint cleanup, not the first coaching-engine fix.
 
+Implemented result:
+
+- `training-plan-v2` validation plus `buildImportedPlanSeed` is the shared compiled-plan boundary;
+- `active-plan-persistence.ts` owns common plan-cycle/workout replacement, carry-forward, archive,
+  activation, rollback, and readback persistence mechanics;
+- AI first-plan confirm, manual empty-plan plus reviewed Add, active-plan transition, and JSON import
+  retain their distinct review and safety policies;
+- no-caller text replacement, direct manual first-workout confirm, duplicate ops apply, and
+  deterministic ops authoring paths are retired.
+
 Expected work:
 
-- map selected distance-goal, structured Quick setup, free-text replacement, JSON import, and manual
-  first-plan creation;
+- map selected distance-goal Quick setup, JSON import, and manual first-plan creation;
 - keep separate UI entrypoints but converge review/persistence artifacts;
-- delete stale `PlanPreset` source names only after current distance-goal semantics are preserved;
 - avoid resurrecting deterministic product builders or voice-to-plan.
 
 Validation:
@@ -673,10 +600,25 @@ Validation:
 
 ### Phase 6 - EvidenceComparison Kernel
 
+Status: accepted and closed.
+
 Likely owner: BACKEND / QA.
 
 Goal: provider upload and comparison become a compiled actual-evidence document compared against
 compiled workout expectation.
+
+Implemented result:
+
+- `WorkoutDocument` remains planned expectation while parsed FIT metrics remain separately
+  provenance-linked actual evidence;
+- one deterministic comparison owner consumes those two inputs and persists a runtime-validated
+  comparison document;
+- readback and runner-coach context select asset, metrics, comparison, and insight as one linked
+  evidence generation instead of independently choosing latest rows;
+- provider sport, local date, and explicit workout-step indexes gate supported comparisons; pace,
+  heart rate, power, cadence, and RPE remain unsupported until normalized actual evidence exists;
+- active-plan replacement and refresh reuse one evidence relink owner, including the embedded
+  planned-workout identity inside persisted comparison payloads.
 
 Expected work:
 
@@ -691,22 +633,70 @@ Validation:
 
 ### Phase 7 - UI Design And Product Language Projection
 
+Status: accepted and closed.
+
 Likely owner: DESIGNER / FRONTEND.
 
 Goal: UI becomes read-model rendering: plan creation, workout detail, calendar, progress, and
 manual editor use the same product language and DS primitives.
 
+Implemented result:
+
+- selected-plan preview and saved calendar share canonical planned-workout identity and color
+  projection while exact `WorkoutDocument` structure, ordered Repeat children, targets, notes, and
+  provenance remain the review truth;
+- manual editor/readback, progress, workout detail, and calendar status copy use shared canonical
+  workout labels without route-local target fallbacks or invented completion/load language;
+- evidence feedback keeps planned, actual, and comparison truth distinct while moving confidence,
+  coverage, and check diagnostics into the existing details disclosure;
+- existing Hito DS dialog, timeline, row, status, disclosure, and responsive recipes are reused;
+  no new visual system, capability rule, or frontend read model was added;
+- targeted validators, build/integrity checks, and local browser proof passed on desktop and exact
+  375px; disposable QA data was removed after validation.
+
 Expected work:
 
 - unify readback names and copy;
-- keep generated rows read-only;
-- keep manual edit affordances scoped;
+- keep preview/passive readback non-inline-editable;
+- keep post-confirm edit affordances backend capability-scoped;
 - avoid route-local one-off UI grammar.
 
 Validation:
 
 - browser proof on desktop and exact 375px for touched flows;
 - no raw backend/debug labels in runner-facing UI.
+
+## Final Closeout Audit - 2026-07-17
+
+Verdict: accepted and closed.
+
+Accepted and not to be reopened:
+
+- AI/local fixture authors the dated plan; backend compiles it and confirm persists the signed
+  reviewed canonical plan without another AI call;
+- normal Tempo, arbitrary ordered child-first Repeat, optional recovery, target guidance, endpoint
+  exactness, calendar/detail/manual readback, review-token tamper protection, and deterministic
+  EvidenceComparison have validator and QA evidence;
+- deterministic first-plan builders, Plan Preset backend programs, voice-to-plan, and the old
+  text-authoring path are not current PlanCreation truth;
+- phases 3 through 6 remain accepted.
+
+Final reconciliation completed:
+
+1. BACKEND made reviewed `workoutDocuments` checksum-protected canonical truth and removed the
+   proof-only structured first-plan result path.
+2. FRONTEND now renders `draft.workoutDocuments` directly, removed browser reconstruction, and
+   removed the eight-note readback cap without adding a fallback read model.
+3. Focused QA proved Tempo and ordered Repeat review -> confirm -> saved-detail parity on desktop
+   and exact 375px, `stale_review` tamper safety, clean browser counters, and disposable-data cleanup.
+   Evidence:
+   `qa-artifacts/screenshots/2026-07-17/reviewed-workout-document-adoption/final-proof.json`.
+
+Separate release/ops debt, not a compiler-phase blocker:
+
+- accepted paid OpenAI end-to-end proof after the earlier timeout;
+- completed evidence-attached browser readback; source and deterministic validator coverage already
+  exist.
 
 ## Safety Strategy
 
@@ -734,39 +724,6 @@ Use one gate at a time:
 | RUNNING COACH | Approve coaching doctrine, plan specificity, target realism, workout identity, and progression safety. |
 | DESIGNER | Shape runner-facing language and UI around compiled read-models, not backend/debug implementation truth. |
 | DEVTOOLS | Keep validators, metrics, artifact hygiene, local QA runtime, and source-size governance small and useful. |
-
-## First Recommended Gate
-
-ARCHITECT selected the first implementation gate after the product correction.
-
-Current likely first implementation candidates:
-
-1. `AI-authored Plan-First Compiler V1`: selected first implementation gate. Backend accepts a
-   useful AI-authored full-plan draft shaped like the specimen, parses/atomizes it into Hito
-   structures, shows a reviewable calendar draft, and persists exactly the reviewed draft on
-   confirm.
-2. `WorkoutDocument` backend/read-model consolidation: next only if engine quality is
-   blocked by duplicated workout-document adapters.
-3. `CalendarProjection` frontend cleanup: defer unless source proof says UI projection complexity is
-   the first blocker after engine contract work.
-
-## Engine Transition Rule
-
-The project moves to engine implementation now. The engine work begins with a narrow v1 gate:
-AI-authored full-plan draft -> backend parser/atomizer/compiler -> calendar review -> confirm
-persistence.
-
-The first gate must answer these questions:
-
-- Can the attached specimen-style draft be parsed and atomized into Hito structures?
-- Which legacy/generated-plan values are unused and safe to delete?
-- Which accepted flows must remain green during the rebuild?
-- Which hard failures block review, and which softer coaching doubts become warnings?
-- Which validation corpus proves the plan is reviewable, persistable, and readback-safe?
-
-The next owner is BACKEND for `AI-authored Plan-First Compiler V1`. Strict Atom hardening,
-provider/Garmin precision, and broader plan-quality gates follow only after this reviewable-plan
-path works.
 
 ## What Not To Touch
 
@@ -806,5 +763,15 @@ accepted until these current flows still pass:
 
 ## Blockers
 
-None for backlog capture. The next implementation gate is selected: BACKEND `AI-authored Plan-First
-Compiler V1`.
+None for this compiler architecture plan.
+
+Paid live OpenAI end-to-end acceptance and completed evidence-attached browser readback remain
+separate release/ops proof gates. A universal load/progression veto remains out of scope until
+Product and Running Coach define it explicitly.
+
+Post-confirm workout ownership is tracked in
+`docs/plans/active/2026-06-08-running-plan-creation-engine-rebuild.md`: signed PlanCreation review
+remains non-mutating, while eligible confirmed future workouts from canonical plan sources use the
+shared backend-reviewed content-edit lifecycle. Imported-origin normalization, atomic edit
+provenance persistence, and original plan/workout provenance retention are accepted and closed in
+that plan.

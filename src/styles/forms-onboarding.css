@@ -256,46 +256,6 @@
     gap: 0.25rem;
   }
 
-  .hito-selected-plan-calendar [data-preview-tone="easy"] {
-    --hito-selected-plan-calendar-tone: var(--hito-workout-type-easy-base);
-  }
-
-  .hito-selected-plan-calendar [data-preview-tone="steady"] {
-    --hito-selected-plan-calendar-tone: var(--hito-workout-type-steady-base);
-  }
-
-  .hito-selected-plan-calendar [data-preview-tone="long"] {
-    --hito-selected-plan-calendar-tone: var(--hito-workout-type-long-run-base);
-  }
-
-  .hito-selected-plan-calendar [data-preview-tone="strides"] {
-    --hito-selected-plan-calendar-tone: var(--hito-workout-type-easy-base);
-  }
-
-  .hito-selected-plan-calendar [data-preview-tone="progression"] {
-    --hito-selected-plan-calendar-tone: var(--hito-workout-type-progression-base);
-  }
-
-  .hito-selected-plan-calendar [data-preview-tone="tempo"] {
-    --hito-selected-plan-calendar-tone: var(--hito-workout-type-tempo-base);
-  }
-
-  .hito-selected-plan-calendar [data-preview-tone="intervals"] {
-    --hito-selected-plan-calendar-tone: var(--hito-workout-type-intervals-base);
-  }
-
-  .hito-selected-plan-calendar [data-preview-tone="hills"] {
-    --hito-selected-plan-calendar-tone: var(--hito-workout-type-hills-base);
-  }
-
-  .hito-selected-plan-calendar [data-preview-tone="rest"] {
-    --hito-selected-plan-calendar-tone: var(--hito-workout-type-rest-base);
-  }
-
-  .hito-selected-plan-calendar [data-preview-tone="final"] {
-    --hito-selected-plan-calendar-tone: var(--hito-workout-type-long-run-base);
-  }
-
   .hito-manual-workout-dialog-header {
     gap: var(--space-1);
     padding: var(--space-5) calc(var(--space-10) + var(--space-6)) var(--space-5) var(--space-6);
@@ -398,21 +358,13 @@
       var(--color-background) 66%,
       var(--color-muted) 34%
     );
-    --hito-manual-workout-field-edge: color-mix(
-      in oklch,
-      var(--color-foreground) 7%,
-      transparent
-    );
+    --hito-manual-workout-field-edge: color-mix(in oklch, var(--color-foreground) 7%, transparent);
     --hito-manual-workout-surface-edge: color-mix(
       in oklch,
       var(--color-foreground) 8%,
       transparent
     );
-    --hito-manual-workout-inner-edge: color-mix(
-      in oklch,
-      var(--color-foreground) 5%,
-      transparent
-    );
+    --hito-manual-workout-inner-edge: color-mix(in oklch, var(--color-foreground) 5%, transparent);
     min-width: 0;
   }
 
@@ -445,11 +397,7 @@
       var(--color-muted) 56%,
       var(--color-surface-elevated) 44%
     );
-    --hito-manual-workout-row-hover-edge: color-mix(
-      in oklch,
-      var(--color-border) 72%,
-      transparent
-    );
+    --hito-manual-workout-row-hover-edge: color-mix(in oklch, var(--color-border) 72%, transparent);
     --hito-manual-workout-repeat-background: var(--hito-manual-workout-canvas-background);
     --hito-manual-workout-repeat-hover-edge: color-mix(
       in oklch,
@@ -481,21 +429,9 @@
       var(--color-input) 76%,
       var(--color-surface-elevated) 24%
     );
-    --hito-manual-workout-field-edge: color-mix(
-      in oklch,
-      var(--color-border) 72%,
-      transparent
-    );
-    --hito-manual-workout-surface-edge: color-mix(
-      in oklch,
-      var(--color-border) 78%,
-      transparent
-    );
-    --hito-manual-workout-inner-edge: color-mix(
-      in oklch,
-      var(--color-border) 54%,
-      transparent
-    );
+    --hito-manual-workout-field-edge: color-mix(in oklch, var(--color-border) 72%, transparent);
+    --hito-manual-workout-surface-edge: color-mix(in oklch, var(--color-border) 78%, transparent);
+    --hito-manual-workout-inner-edge: color-mix(in oklch, var(--color-border) 54%, transparent);
   }
 
   .hito-manual-workout-editor,
@@ -831,8 +767,7 @@
     opacity: 0.62;
   }
 
-  .hito-manual-workout-structure-editor[data-drag-active="true"]
-    .hito-manual-workout-add-step,
+  .hito-manual-workout-structure-editor[data-drag-active="true"] .hito-manual-workout-add-step,
   .hito-manual-workout-structure-editor:has(
       .hito-manual-workout-repeat-stack[data-drag-active="true"]
     )
@@ -1073,8 +1008,7 @@
     align-items: center;
   }
 
-  .hito-manual-workout-add-step[data-insertion-active="true"]
-    > .hito-manual-workout-insertion-line,
+  .hito-manual-workout-add-step[data-insertion-active="true"] > .hito-manual-workout-insertion-line,
   .hito-manual-workout-insertion-slot[data-insertion-active="true"]::before {
     content: "";
     position: absolute;
@@ -1145,10 +1079,8 @@
 
   .hito-manual-workout-add-step-repeat-bottom .hito-manual-workout-add-section-button:hover,
   .hito-manual-workout-add-step-repeat-child .hito-manual-workout-add-section-button:hover,
-  .hito-manual-workout-add-step-repeat-bottom
-    .hito-manual-workout-add-section-button:focus-visible,
-  .hito-manual-workout-add-step-repeat-child
-    .hito-manual-workout-add-section-button:focus-visible {
+  .hito-manual-workout-add-step-repeat-bottom .hito-manual-workout-add-section-button:focus-visible,
+  .hito-manual-workout-add-step-repeat-child .hito-manual-workout-add-section-button:focus-visible {
     background: var(--hito-manual-workout-add-strip-hover-background);
   }
 

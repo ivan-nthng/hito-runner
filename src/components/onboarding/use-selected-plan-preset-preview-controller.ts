@@ -1,13 +1,9 @@
 import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import type { PlanPresetUiStatus } from "@/components/onboarding/PlanPresetPanel";
 import type { StructuredConstructorState } from "@/components/onboarding/onboarding-form-model";
 import {
-  buildPlanPresetCardInput,
-  buildPlanPresetCardInputKey,
   buildRunningPlanPreviewInput,
   planGoalChoiceLabel,
-  type PlanPresetCardsActionResult,
   type PlanGoalSelectionId,
 } from "@/components/onboarding/selected-running-plan-flow-utils";
 import { hitoToast } from "@/components/ui/hito-toast";
@@ -19,8 +15,7 @@ import {
 
 interface SelectedPlanPresetPreviewControllerOptions {
   state: StructuredConstructorState;
-  autoLoadEnabled: boolean;
-  isPresetDiscoveryReady: boolean;
+  hasRequiredPlanBasics: boolean;
   toastId: string;
   previewReadyDescription: string;
   autoRefreshOpenPreview?: boolean;
@@ -29,9 +24,8 @@ interface SelectedPlanPresetPreviewControllerOptions {
 }
 
 export function useSelectedPlanPresetPreviewController({
-  autoLoadEnabled,
   autoRefreshOpenPreview = false,
-  isPresetDiscoveryReady,
+  hasRequiredPlanBasics,
   onResetExternalState,
   previewReadyDescription,
   resetOnInputChange = false,
@@ -39,35 +33,36 @@ export function useSelectedPlanPresetPreviewController({
   toastId,
 }: SelectedPlanPresetPreviewControllerOptions) {
   const previewRunningPlanDraftFn = useServerFn(previewRunningPlanDraft);
-  const presetAutoLoadKeyRef = useRef<string | null>(null);
   const runningPlanPreviewInputKeyRef = useRef<string | null>(null);
-  const [status, setStatus] = useState<PlanPresetUiStatus>("idle");
-  const [cardsResult, setCardsResult] = useState<PlanPresetCardsActionResult | null>(null);
+  const [status, setStatus] = useState<"idle" | "previewing_plan">("idle");
   const [selectedGoalId, setSelectedGoalId] = useState<PlanGoalSelectionId | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewResult, setPreviewResult] = useState<RunningPlanPreviewActionResult | null>(null);
   const [previewInput, setPreviewInput] = useState<RunningPlanPreviewActionInput | null>(null);
 
-  const presetCardInput = useMemo(() => buildPlanPresetCardInput(state), [state]);
-  const presetDiscoveryKey = useMemo(
-    () => buildPlanPresetCardInputKey(presetCardInput),
-    [presetCardInput],
-  );
-  const previousPresetDiscoveryKeyRef = useRef(presetDiscoveryKey);
+  const previewInputFingerprint = useMemo(() => {
+    if (!state.planGoalChoice) {
+      return "no_goal";
+    }
+
+    const inputResult = buildRunningPlanPreviewInput(state, state.planGoalChoice);
+    return inputResult.ok
+      ? JSON.stringify(inputResult.input)
+      : `invalid:${state.planGoalChoice}:${inputResult.error}`;
+  }, [state]);
+  const previousPreviewInputFingerprintRef = useRef(previewInputFingerprint);
   const resetExternalState = useEffectEvent(() => {
     onResetExternalState?.();
   });
 
   const resetPreviewState = useCallback(() => {
     setStatus("idle");
-    setCardsResult(null);
     setSelectedGoalId(null);
     setError(null);
     setPreviewOpen(false);
     setPreviewResult(null);
     setPreviewInput(null);
-    presetAutoLoadKeyRef.current = null;
     runningPlanPreviewInputKeyRef.current = null;
   }, []);
 
@@ -81,32 +76,12 @@ export function useSelectedPlanPresetPreviewController({
     resetExternalState();
   }, [resetExternalState]);
 
-  const requiredBasicsMessage =
-    "Add Age, Height, and Weight before loading or selecting a guided plan.";
-
-  async function loadCards() {
-    setError(null);
-    setSelectedGoalId(null);
-    setPreviewResult(null);
-    setPreviewInput(null);
-    runningPlanPreviewInputKeyRef.current = null;
-    resetExternalState();
-
-    if (!isPresetDiscoveryReady) {
-      setStatus("idle");
-      setCardsResult(null);
-      setError(requiredBasicsMessage);
-      return;
-    }
-
-    setStatus("idle");
-    setCardsResult(null);
-  }
+  const requiredBasicsMessage = "Add Age, Height, and Weight before previewing a generated plan.";
 
   async function refreshPreview(goalIdOverride?: PlanGoalSelectionId) {
     const goalId = goalIdOverride ?? selectedGoalId;
 
-    if (!isPresetDiscoveryReady) {
+    if (!hasRequiredPlanBasics) {
       setStatus("idle");
       setPreviewOpen(false);
       setPreviewResult(null);
@@ -177,7 +152,7 @@ export function useSelectedPlanPresetPreviewController({
   }
 
   function selectPlanPreview(goalId: PlanGoalSelectionId) {
-    if (!isPresetDiscoveryReady) {
+    if (!hasRequiredPlanBasics) {
       setStatus("idle");
       setSelectedGoalId(null);
       setPreviewOpen(false);
@@ -208,29 +183,22 @@ export function useSelectedPlanPresetPreviewController({
     void refreshPreview(goalId);
   }
 
-  const autoLoadPlanPresetCards = useEffectEvent(() => {
-    void loadCards();
-  });
-
   useEffect(() => {
-    if (!autoLoadEnabled || !isPresetDiscoveryReady || status !== "idle" || cardsResult) {
+    if (!resetOnInputChange) {
       return;
     }
 
-    if (presetAutoLoadKeyRef.current === presetDiscoveryKey) {
+    if (previousPreviewInputFingerprintRef.current === previewInputFingerprint) {
       return;
     }
 
-    presetAutoLoadKeyRef.current = presetDiscoveryKey;
-    autoLoadPlanPresetCards();
-  }, [
-    autoLoadEnabled,
-    autoLoadPlanPresetCards,
-    cardsResult,
-    isPresetDiscoveryReady,
-    presetDiscoveryKey,
-    status,
-  ]);
+    previousPreviewInputFingerprintRef.current = previewInputFingerprint;
+    runningPlanPreviewInputKeyRef.current = null;
+    setPreviewResult(null);
+    setPreviewInput(null);
+    setError(null);
+    resetExternalState();
+  }, [previewInputFingerprint, resetExternalState, resetOnInputChange]);
 
   const refreshRunningPlanPreviewEffect = useEffectEvent(() => {
     void refreshPreview();
@@ -259,35 +227,10 @@ export function useSelectedPlanPresetPreviewController({
     status,
   ]);
 
-  useEffect(() => {
-    if (!resetOnInputChange) {
-      return;
-    }
-
-    if (previousPresetDiscoveryKeyRef.current === presetDiscoveryKey) {
-      return;
-    }
-
-    previousPresetDiscoveryKeyRef.current = presetDiscoveryKey;
-
-    presetAutoLoadKeyRef.current = null;
-    runningPlanPreviewInputKeyRef.current = null;
-    setPreviewResult(null);
-    setPreviewInput(null);
-    setError(null);
-    resetExternalState();
-
-    if (!selectedGoalId && !previewOpen) {
-      setCardsResult(null);
-    }
-  }, [presetDiscoveryKey, previewOpen, resetExternalState, resetOnInputChange, selectedGoalId]);
-
   return {
-    cardsResult,
     clearSelectedPreview,
     error,
     isBusy: status !== "idle",
-    loadCards,
     previewInput,
     previewOpen,
     previewResult,

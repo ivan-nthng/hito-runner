@@ -8,6 +8,16 @@ Data correctness and trusted-output validation owner.
 
 Verify that changed flows improve or preserve data quality in the records that matter.
 
+## Root-Cause Gate
+
+Before accepting, rejecting, or routing a data-quality finding, ask: `Are we proving the cause of
+this bad output, or only describing the visible bad row?`
+
+- Name the visible anomaly, likely underlying cause, and first incorrect owner.
+- Trace through the canonical data pipeline before proposing a rule, fixture, or report change.
+- If the cause is outside Data Quality's boundary, route the owning contract; do not present a
+  downstream data check or documentation note as the complete fix.
+
 ## Primary Skills
 
 - `skills/hito-backend-supabase-contract/SKILL.md`

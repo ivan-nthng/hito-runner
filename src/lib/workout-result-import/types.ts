@@ -17,11 +17,12 @@ export type WorkoutComparisonFactStatus =
   | "missing_actual"
   | "not_applicable";
 export type WorkoutComparisonSignalKey =
+  | "activity_type"
   | "date_alignment"
   | "duration"
   | "distance"
   | "structured_step_count";
-export type WorkoutComparisonSignalUnit = "date" | "min" | "km" | "count";
+export type WorkoutComparisonSignalUnit = "kind" | "date" | "min" | "km" | "count";
 export type WorkoutComparisonSupportStatus =
   | "compared"
   | "missing_actual"
@@ -32,7 +33,8 @@ export type WorkoutComparisonSupportSignalKey =
   | "step_duration"
   | "segment_group_duration"
   | "pace"
-  | "heart_rate";
+  | "heart_rate"
+  | "rpe";
 export type WorkoutComparisonSegmentGroupKey =
   | "warmup"
   | "main"
@@ -129,6 +131,7 @@ export interface ParsedGarminWorkout {
 
 export interface WorkoutResultAssetSummary {
   id: string;
+  plannedWorkoutId: string;
   assetKind: WorkoutResultAssetKind;
   originalFileName: string;
   parseStatus: WorkoutResultParseStatus;
@@ -140,6 +143,8 @@ export interface WorkoutResultAssetSummary {
 
 export interface WorkoutActualMetricsSummary {
   id: string;
+  plannedWorkoutId: string;
+  resultAssetId: string;
   sourceKind: "garmin_fit";
   activityStartedAt: string | null;
   activityLocalDate: string | null;
@@ -159,6 +164,8 @@ export interface WorkoutActualMetricsSummary {
 
 export interface WorkoutComparisonSummary {
   id: string;
+  plannedWorkoutId: string;
+  actualMetricsId: string;
   comparisonStatus: WorkoutComparisonStatus;
   completionState: WorkoutComparisonCompletionState;
   comparisonConfidence: number;
@@ -268,6 +275,7 @@ export interface WorkoutComparisonDifferencePayload {
   actualMetrics: {
     actualMetricsId: string;
     sourceKind: string;
+    activityType: string | null;
     activityLocalDate: string | null;
     actualDurationMin: number | null;
     actualDistanceKm: number | null;
@@ -275,6 +283,7 @@ export interface WorkoutComparisonDifferencePayload {
   };
   signals: WorkoutComparisonSignal[];
   facts: {
+    activityType: WorkoutComparisonSignal;
     dateAlignment: WorkoutComparisonSignal;
     duration: WorkoutComparisonSignal;
     distance: WorkoutComparisonSignal;

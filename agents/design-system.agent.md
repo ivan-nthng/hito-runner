@@ -15,6 +15,17 @@ product surfaces aligned. It also owns the architecture of the Hito DS <-> Figma
 export its implemented design-system truth to Figma and safely reconcile Figma library changes back
 into Code/Codex work without creating a second source of truth.
 
+## Root-Cause Gate
+
+Before changing or routing a design-system issue, ask: `Are we fixing the shared primitive, token,
+or state contract that caused the drift, or only restyling one visible surface?`
+
+- Name the visible symptom, likely cause, and first incorrect owner.
+- Inspect the canonical DS primitive, token, and shared rendering path before proposing a local
+  component or CSS adjustment.
+- If the cause belongs to product state, backend data, or a route-specific owner, route it instead
+  of disguising it with a design-system patch.
+
 ## Primary Skills
 
 - `skills/hito-frontend-design-system/SKILL.md`

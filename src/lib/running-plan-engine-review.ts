@@ -99,10 +99,52 @@ export async function validateRunningPlanReviewExactness(input: {
     return selfContainedReview;
   }
 
+  return validateRunningPlanReviewExactnessAgainstVerifiedToken({
+    draft: input.draft,
+    reviewChecksum: input.reviewChecksum,
+    selfContainedReview,
+  });
+}
+
+export async function validateSelfContainedRunningPlanReviewExactness(input: {
+  reviewToken: string;
+  reviewChecksum: string;
+}) {
+  const selfContainedReview = await validateSelfContainedRunningPlanReviewToken(input);
+
+  if (!selfContainedReview.ok) {
+    return selfContainedReview;
+  }
+
+  const exactness = await validateRunningPlanReviewExactnessAgainstVerifiedToken({
+    draft: selfContainedReview.draft,
+    reviewChecksum: input.reviewChecksum,
+    selfContainedReview,
+  });
+
+  return exactness.ok
+    ? {
+        ...exactness,
+        draft: selfContainedReview.draft,
+      }
+    : exactness;
+}
+
+async function validateRunningPlanReviewExactnessAgainstVerifiedToken(input: {
+  draft: RunningPlanPreviewDraft;
+  reviewChecksum: string;
+  selfContainedReview: {
+    draft: AiGeneratedRunningPlanPreviewDraft;
+    canonicalPlan: TrainingPlanV2;
+    reviewPayload: ReturnType<typeof buildRunningPlanReviewPayload>;
+  };
+}) {
+  const { draft, reviewChecksum, selfContainedReview } = input;
+
   if (
     !sameJson(
       stripRunningPlanReviewProof(selfContainedReview.draft),
-      stripRunningPlanReviewProof(input.draft),
+      stripRunningPlanReviewProof(draft),
     )
   ) {
     return {
@@ -113,8 +155,18 @@ export async function validateRunningPlanReviewExactness(input: {
     };
   }
 
-  const canonicalPlan = buildRunningPlanCanonicalPlan(input.draft);
-  const endpointIssues = collectDistanceGoalEndpointExactnessIssues(input.draft, canonicalPlan);
+  const canonicalPlan = buildRunningPlanCanonicalPlan(draft);
+  const distanceMeters =
+    draft.normalizedInputSummary.planGoalIntent.distance?.distanceMeters ?? null;
+  if (distanceMeters == null) {
+    return {
+      ok: false,
+      reason: "invalid_review",
+      message:
+        "This selected-plan review no longer contains the reviewed distance goal. Refresh the preview before creating a plan.",
+    };
+  }
+  const endpointIssues = collectDistanceGoalEndpointExactnessIssues(draft, canonicalPlan);
   if (endpointIssues.length > 0) {
     return {
       ok: false,
@@ -125,10 +177,7 @@ export async function validateRunningPlanReviewExactness(input: {
   }
 
   const richnessIssues = collectRunnerFacingCanonicalRichnessIssues({
-    distanceMeters:
-      input.draft.normalizedInputSummary.planGoalIntent.distance?.distanceMeters ??
-      input.draft.endpointProof.endpointDistanceMeters ??
-      null,
+    distanceMeters,
     rows: canonicalPlan.planned_workouts,
   });
 
@@ -142,10 +191,10 @@ export async function validateRunningPlanReviewExactness(input: {
     };
   }
 
-  const reviewPayload = buildRunningPlanReviewPayload(input.draft, canonicalPlan);
+  const reviewPayload = buildRunningPlanReviewPayload(draft, canonicalPlan);
   const expectedChecksum = await digestSha256Hex(stableJsonStringify(reviewPayload));
 
-  if (input.reviewChecksum !== expectedChecksum) {
+  if (reviewChecksum !== expectedChecksum) {
     return {
       ok: false,
       reason: "stale_review",
@@ -311,6 +360,7 @@ function buildRunningPlanReviewPayload(
     normalizedInputSummary: draft.normalizedInputSummary,
     endpointProof: draft.endpointProof,
     validation: draft.validation,
+    workoutDocuments: draft.workoutDocuments,
     canonicalPlan: canonicalPlanStablePayload(canonicalPlan),
   };
 }
@@ -520,9 +570,7 @@ function collectDistanceGoalEndpointExactnessIssues(
   canonicalPlan: TrainingPlanV2,
 ) {
   const distanceMeters =
-    draft.normalizedInputSummary.planGoalIntent.distance?.distanceMeters ??
-    draft.endpointProof.endpointDistanceMeters ??
-    null;
+    draft.normalizedInputSummary.planGoalIntent.distance?.distanceMeters ?? null;
 
   return collectSelectedDistanceEndpointIssues({
     rows: canonicalPlan.planned_workouts.map((workout) => ({

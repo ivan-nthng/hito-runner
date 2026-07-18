@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { allowsDefaultEstimatedHrTarget } from "../src/lib/default-estimated-hr-target-policy";
 import { buildImportedPlanSeed } from "../src/lib/imported-plan";
-import type { RunningPlanDistanceFamily } from "../src/lib/plan-creation-engine";
 import type { buildRunningPlanCanonicalPlan } from "../src/lib/running-plan-engine-review";
 import {
   displayExecutableTargetEntries,
@@ -181,17 +180,6 @@ export function validateRunnerFacingTargetReadbackContract(
         `${label}: ${workout.workoutDate} effort intensity must not be treated as executable target truth.`,
       );
     }
-  }
-}
-
-export function benchmarkPaceUsefulWorkoutKinds(family: RunningPlanDistanceFamily) {
-  switch (family) {
-    case "10K":
-      return new Set(["tempo", "intervals"]);
-    case "Half Marathon":
-      return new Set(["tempo", "threshold", "progression"]);
-    case "Marathon Completion":
-      return new Set(["steady_aerobic_run", "progression", "tempo"]);
   }
 }
 

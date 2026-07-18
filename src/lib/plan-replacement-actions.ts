@@ -2,9 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { applyImportedPlanForUser } from "@/lib/active-plan-persistence";
 import { importedPlanSchema } from "@/lib/imported-plan";
-import { generateCanonicalPlanFromText } from "@/lib/openai-plan-authoring";
-import { buildPlanScopedStructuredAuthoringMetadata } from "@/lib/plan-authoring-snapshot";
-import { type FirstDayResolution, type PlanApplyResult } from "@/lib/plan-apply-policy";
+import { type FirstDayResolution } from "@/lib/plan-apply-policy";
 import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
 import { requireAuthenticatedUser } from "@/lib/backend/auth";
 
@@ -20,11 +18,7 @@ const onboardingInputSchema = z.object({
   importedPlan: importedPlanSchema,
   firstDayResolution: firstDayResolutionSchema.optional().nullable(),
   requestedStartDate: requestedStartDateSchema.optional().nullable(),
-});
-
-const textAuthoringInputSchema = z.object({
-  authoringText: z.string().trim().min(20).max(4000),
-  firstDayResolution: firstDayResolutionSchema.optional().nullable(),
+  clearBeforeImport: z.boolean().optional(),
 });
 
 export const completeOnboarding = createServerFn({ method: "POST" })
@@ -34,58 +28,16 @@ export const completeOnboarding = createServerFn({ method: "POST" })
       data.importedPlan,
       data.firstDayResolution ?? null,
       data.requestedStartDate ?? null,
+      data.clearBeforeImport ?? false,
     );
-  });
-
-export const completeTextOnboarding = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => textAuthoringInputSchema.parse(value))
-  .handler(async ({ data }) => {
-    const generatedPlan = await generateCanonicalPlanFromText(data.authoringText, {
-      enableRichWorkoutDraft: true,
-    });
-    const applyResult = await persistImportedPlanForCurrentRequest(
-      generatedPlan.canonicalPlan,
-      data.firstDayResolution ?? null,
-      null,
-      buildPlanScopedStructuredAuthoringMetadata({
-        source: "text_authoring",
-        authoringInput: generatedPlan.authoringInput,
-        reviewAssumptions: generatedPlan.richDraftMetadata.reviewAssumptions,
-      }),
-    );
-
-    return applyResult.ok
-      ? {
-          ...applyResult,
-          schemaVersion: generatedPlan.canonicalPlan.schema_version,
-          sourceKind: generatedPlan.canonicalPlan.source_kind,
-          workoutCount: generatedPlan.canonicalPlan.planned_workouts.length,
-          model: generatedPlan.model,
-          responseId: generatedPlan.responseId,
-          richDraftStatus: generatedPlan.richDraftMetadata.status,
-          richDraftFallbackReason: generatedPlan.richDraftMetadata.fallbackReason,
-          richDraftResponseId: generatedPlan.richDraftResponseId,
-        }
-      : {
-          ...applyResult,
-          schemaVersion: generatedPlan.canonicalPlan.schema_version,
-          sourceKind: generatedPlan.canonicalPlan.source_kind,
-          workoutCount: generatedPlan.canonicalPlan.planned_workouts.length,
-          model: generatedPlan.model,
-          responseId: generatedPlan.responseId,
-          richDraftStatus: generatedPlan.richDraftMetadata.status,
-          richDraftFallbackReason: generatedPlan.richDraftMetadata.fallbackReason,
-          richDraftResponseId: generatedPlan.richDraftResponseId,
-          importedPlan: generatedPlan.canonicalPlan,
-        };
   });
 
 async function persistImportedPlanForCurrentRequest(
   importedPlan: ImportedPlanInput,
   firstDayResolution: FirstDayResolution | null,
   requestedStartDate: string | null = null,
-  planMetadata: Parameters<typeof applyImportedPlanForUser>[5] = null,
-): Promise<PlanApplyResult> {
+  clearBeforeImport = false,
+) {
   const auth = requireAuthenticatedUser();
   const persistedUserId = await getPersistedUserIdForAuthContext(auth);
 
@@ -99,6 +51,7 @@ async function persistImportedPlanForCurrentRequest(
     firstDayResolution,
     requestedStartDate,
     null,
-    planMetadata,
+    null,
+    { clearBeforeImport },
   );
 }

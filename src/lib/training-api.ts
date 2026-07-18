@@ -5,14 +5,6 @@ import {
   loginInputSchema,
   requestMagicLinkForCurrentRequest,
 } from "@/lib/auth-actions";
-import {
-  activePlanRefreshApplyInputSchema,
-  activePlanRefreshProposalInputSchema,
-  type ActivePlanRefreshApplyPayload,
-  type ActivePlanRefreshProposalInput,
-  type ApplyActivePlanRefreshProposalResult,
-  type ProposeActivePlanRefreshResult,
-} from "@/lib/active-plan-refresh-contract";
 import type {
   ActivePlanScheduleEditInput,
   ActivePlanScheduleEditPreview,
@@ -31,10 +23,7 @@ import {
   getResolvedPlanWorkoutsWithLogs,
   type PersistedPlanCycleRow,
 } from "@/lib/active-plan-persistence";
-import {
-  archiveActivePlanForUser as archiveActivePlanForUserWithSnapshot,
-  clearUpcomingScheduleForUser as clearUpcomingScheduleForUserWithSnapshot,
-} from "@/lib/active-plan-lifecycle-actions";
+import { clearUpcomingScheduleForUser as clearUpcomingScheduleForUserWithSnapshot } from "@/lib/active-plan-lifecycle-actions";
 import { loadSettingsRouteData } from "@/lib/user-settings-actions";
 import {
   getPersistedUserIdForAuthContext,
@@ -70,6 +59,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { RUNNER_TRAINING_WEEKDAYS } from "@/lib/runner-training-preferences";
 import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "@/lib/manual-workout-authoring";
 import { fetchManualWorkoutEvidenceWorkoutIds } from "@/lib/manual-workout-authoring/active-plan-add";
+import { readWorkoutDocumentSections } from "@/lib/workout-document";
 
 export interface ViewerSummary {
   name: string | null;
@@ -128,31 +118,12 @@ export const requestMagicLink = createServerFn({ method: "POST" })
     return requestMagicLinkForCurrentRequest(data);
   });
 
-export const deleteActivePlan = createServerFn({ method: "POST" }).handler(async () => {
-  return archiveActivePlanForUserWithSnapshot(
-    await requirePersistedUserIdForCurrentRequest(),
-    getPersistedSnapshot,
-  );
-});
-
 export const clearUpcomingSchedule = createServerFn({ method: "POST" }).handler(async () => {
   return clearUpcomingScheduleForUserWithSnapshot(
     await requirePersistedUserIdForCurrentRequest(),
     getPersistedSnapshot,
   );
 });
-
-export const proposeActivePlanRefresh = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => activePlanRefreshProposalInputSchema.parse(value))
-  .handler(async ({ data }): Promise<ProposeActivePlanRefreshResult> => {
-    return proposeActivePlanRefreshForCurrentRequestServer(data);
-  });
-
-export const applyActivePlanRefreshProposal = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => activePlanRefreshApplyInputSchema.parse(value))
-  .handler(async ({ data }): Promise<ApplyActivePlanRefreshProposalResult> => {
-    return applyActivePlanRefreshProposalForCurrentRequestServer(data.proposal);
-  });
 
 export const previewActivePlanScheduleEdit = createServerFn({ method: "POST" })
   .inputValidator(parseActivePlanScheduleEditInput)
@@ -171,26 +142,6 @@ export const saveWorkoutLog = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     return saveWorkoutLogForUser(await requirePersistedUserIdForCurrentRequest(), data);
   });
-
-const proposeActivePlanRefreshForCurrentRequestServer = createServerOnlyFn(
-  async (data: ActivePlanRefreshProposalInput): Promise<ProposeActivePlanRefreshResult> => {
-    const { proposeActivePlanRefreshForCurrentRequest } =
-      await import("@/lib/active-plan-refresh-actions");
-
-    return proposeActivePlanRefreshForCurrentRequest(data);
-  },
-);
-
-const applyActivePlanRefreshProposalForCurrentRequestServer = createServerOnlyFn(
-  async (
-    proposal: ActivePlanRefreshApplyPayload,
-  ): Promise<ApplyActivePlanRefreshProposalResult> => {
-    const { applyActivePlanRefreshProposalForCurrentRequest } =
-      await import("@/lib/active-plan-refresh-actions");
-
-    return applyActivePlanRefreshProposalForCurrentRequest(proposal, getPersistedSnapshot);
-  },
-);
 
 const previewActivePlanScheduleEditForCurrentRequestServer = createServerOnlyFn(
   async (data: ActivePlanScheduleEditInput): Promise<ActivePlanScheduleEditPreview> => {
@@ -547,7 +498,7 @@ function dbWorkoutToView(
   sourceEditing: Workout["sourceEditing"],
 ): Workout {
   const mappedLog = log ? logRowToView(log) : null;
-  const steps = normalizeExecutableStepInstructions((workout.steps as Step[] | null) ?? []);
+  const steps = normalizeExecutableStepInstructions(readWorkoutDocumentSections(workout.steps));
 
   return {
     id: workout.id,

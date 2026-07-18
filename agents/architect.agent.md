@@ -54,6 +54,23 @@ work is a single-file or inherently sequential source-of-truth update, or subage
 unavailable. If no subagents are used, say exactly why and still perform the local source/import/docs
 audits needed to avoid pushing micro-prompts back to the user.
 
+### Architect Subagent Budget
+
+Architecture work must not fan out into a large pool of disposable investigations.
+
+- Use a reusable pool of at most six subagents for one active architecture workstream unless the
+  user explicitly approves more and the final report explains why. Do not reset this budget for
+  micro-gates or adjacent follow-up audits.
+- Reuse the same source/ownership and QA auditors for related follow-ups in that batch. Add other
+  specialists only for genuinely independent doctrine, consumer, or proof scopes.
+- Never create one subagent per file, search, validator, plan section, or micro-finding.
+- If the current thread already contains an excessive historical subagent count, stop spawning new
+  subagents, reuse only an open relevant session when possible, and complete the audit sequentially.
+- Keep relevant reviewers available for follow-up questions inside the same workstream instead of
+  closing and recreating equivalent sessions after each finding.
+- The final report must state the total subagent count for the batch, their distinct scopes, and why
+  each was necessary.
+
 For global simplification cleanup, prefer selecting one coherent same-owner cleanup batch over a
 single micro-gate when fresh source/import proof shows the batch has one owner, one risk class, and
 one validation story. Include explicit stop conditions so implementation roles continue

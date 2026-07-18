@@ -4,8 +4,8 @@ import { createClient } from "@supabase/supabase-js";
 import { tsImport } from "tsx/esm/api";
 
 const { buildImportedPlanSeed } = await tsImport("../src/lib/imported-plan.ts", import.meta.url);
-const { applyImportedSeedAsActivePlanForOps } = await tsImport(
-  "./lib/ops-plan-apply.ts",
+const { applyImportedPlanForUser } = await tsImport(
+  "../src/lib/active-plan-persistence.ts",
   import.meta.url,
 );
 
@@ -111,13 +111,13 @@ async function main() {
     username: localAccount.username,
   });
 
-  const appliedPlan = await applyImportedSeedAsActivePlanForOps({
-    supabase,
-    userId: supabaseUserId,
-    importedSeed,
-    planSelect: "id, title, start_date, end_date",
-    workoutSelect: "id",
-  });
+  const applyResult = await applyImportedPlanForUser(supabaseUserId, plan, null);
+
+  if (!applyResult.ok) {
+    throw new Error("The canonical import policy requires an unresolved apply decision.");
+  }
+
+  const appliedPlan = await readActivePlanSummary(supabase, supabaseUserId);
 
   console.log(
     JSON.stringify(
@@ -139,6 +139,35 @@ async function main() {
       2,
     ),
   );
+}
+
+async function readActivePlanSummary(supabase, userId) {
+  const activePlan = await supabase
+    .from("plan_cycles")
+    .select("id, title, start_date, end_date")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (activePlan.error) {
+    throw new Error(activePlan.error.message);
+  }
+
+  const workouts = await supabase
+    .from("planned_workouts")
+    .select("id", { count: "exact", head: true })
+    .eq("plan_cycle_id", activePlan.data.id);
+
+  if (workouts.error) {
+    throw new Error(workouts.error.message);
+  }
+
+  return {
+    planCycle: activePlan.data,
+    workoutCount: workouts.count ?? 0,
+  };
 }
 
 function parseCliArgs(args) {

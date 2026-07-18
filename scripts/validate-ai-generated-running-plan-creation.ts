@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_DELAY_MS_ENV,
   AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
+  AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV,
   buildAiGeneratedRunningPlanDevFixtureOpenAiFetch,
   buildAiGeneratedRunningPlanDevFixturePreviewOptions,
   isAiGeneratedRunningPlanDevFixtureEnabled,
@@ -11,7 +12,9 @@ import {
 import { generateAiFirstPlanDraftPreview } from "../src/lib/ai-first-plan-draft-service";
 import {
   AI_AUTHORED_PLAN_FIRST_SOURCE_KIND,
+  compileAiAuthoredPlanFirstDraft,
   type AiAuthoredPlanFirstDraft,
+  type AiAuthoredPlanFirstProviderDraft,
 } from "../src/lib/ai-authored-plan-first-compiler";
 import {
   AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME,
@@ -25,6 +28,7 @@ import { buildImportedPlanSeed } from "../src/lib/imported-plan";
 import { buildReviewedFirstPlanImportedSeed } from "../src/lib/active-plan-persistence";
 import {
   buildReviewedAiGeneratedRunningPlanPreview,
+  runningPlanPreviewInputSchema,
   type RunningPlanPreviewActionInput,
 } from "../src/lib/running-plan-engine-actions";
 import {
@@ -44,7 +48,7 @@ const baseInput = {
   preferredLongRunDay: "Sunday",
   startDate: "2026-06-08",
   benchmark: { kind: "unknown" },
-} satisfies Omit<RunningPlanPreviewActionInput, "distanceFamily">;
+} as const;
 
 const scenarios = [
   {
@@ -52,7 +56,6 @@ const scenarios = [
     input: {
       ...baseInput,
       runnerLevel: "sometimes_runs",
-      distanceFamily: "10K",
       planGoalIntent: { distance: { kind: "preset", preset: "10K" } },
     },
     expectedEndpointMeters: 10_000,
@@ -61,7 +64,6 @@ const scenarios = [
     name: "Half Marathon target time",
     input: {
       ...baseInput,
-      distanceFamily: "Half Marathon",
       startDate: "2026-07-02",
       planGoalIntent: {
         distance: { kind: "preset", preset: "Half Marathon" },
@@ -71,12 +73,12 @@ const scenarios = [
     },
     expectedEndpointMeters: 21_100,
     expectedFinalDate: "2026-11-26",
+    expectedNonRepeatTempo: true,
   },
   {
     name: "Marathon target time",
     input: {
       ...baseInput,
-      distanceFamily: "Marathon Completion",
       startDate: "2026-07-20",
       fixedRestDays: ["Tuesday", "Saturday"],
       preferredLongRunDay: "Sunday",
@@ -93,7 +95,6 @@ const scenarios = [
     name: "Custom 15K target time",
     input: {
       ...baseInput,
-      distanceFamily: null,
       startDate: "2026-07-06",
       planGoalIntent: {
         distance: { kind: "custom", distanceKm: 15, label: "15K" },
@@ -109,10 +110,13 @@ const scenarios = [
   input: RunningPlanPreviewActionInput;
   expectedEndpointMeters: number;
   expectedFinalDate?: string;
+  expectedNonRepeatTempo?: boolean;
 }>;
 
 await validatePlanFirstPreviewScenarios();
 await validateProviderContractBoundary();
+validateFaithfulPlanFirstAtomization();
+validateDistanceFirstInputTruth();
 await validateFirstPlanGenerationLifecycle();
 await validateInvalidProviderOutputFailsBeforeReview();
 await validatePathologicalProviderNumberFailsBeforeReview();
@@ -129,7 +133,9 @@ console.log("AI-generated plan-first creation contract checks passed.", {
 async function validatePlanFirstPreviewScenarios() {
   for (const scenario of scenarios) {
     const result = await buildReviewedAiGeneratedRunningPlanPreview(scenario.input, {
-      aiPreview: buildScenarioAiPreviewOptions(scenario.input),
+      aiPreview: buildScenarioAiPreviewOptions(scenario.input, {
+        nonRepeatTempo: "expectedNonRepeatTempo" in scenario,
+      }),
     });
 
     assert.equal(
@@ -160,6 +166,25 @@ async function validatePlanFirstPreviewScenarios() {
       scenarioName: scenario.name,
       canonicalPlan,
     });
+    assertPreviewTargetTruth({
+      scenarioName: scenario.name,
+      canonicalPlan,
+      calendarRows: result.draft.calendarRows,
+    });
+    assert.deepEqual(
+      result.draft.workoutDocuments,
+      buildImportedPlanSeed(canonicalPlan).workouts,
+      `${scenario.name} reviewed preview must return the canonical backend WorkoutDocument read model.`,
+    );
+    if ("expectedNonRepeatTempo" in scenario && scenario.expectedNonRepeatTempo) {
+      assert.equal(result.draft.aiGeneration.generationTrace?.provider.kind, "local_dev_fixture");
+      assert.equal(result.draft.aiGeneration.generationTrace?.provider.paidProviderCall, false);
+      assertNonRepeatTempoFixtureReviewTruth({
+        scenarioName: scenario.name,
+        canonicalPlan,
+        calendarRows: result.draft.calendarRows,
+      });
+    }
     assertNoLegacyOrDebugReadback({
       scenarioName: scenario.name,
       value: {
@@ -170,6 +195,269 @@ async function validatePlanFirstPreviewScenarios() {
       },
     });
   }
+}
+
+function validateFaithfulPlanFirstAtomization() {
+  const resolved = buildAiGeneratedRunningPlanAuthoringInput(scenarios[0]!.input);
+  assert.equal(resolved.ok, true, resolved.ok ? "" : resolved.message);
+  if (!resolved.ok) throw new Error(resolved.message);
+
+  const authoringInput = {
+    ...resolved.authoringInput,
+    schedule: {
+      ...resolved.authoringInput.schedule,
+      preparationHorizonWeeks: 1,
+    },
+  };
+  const unit = (input: {
+    durationSeconds?: number;
+    distanceMeters?: number;
+    pace?: string;
+    hrZone?: string;
+    effort?: string;
+    notes?: string;
+  }) => ({
+    duration_seconds: input.durationSeconds ?? null,
+    distance_meters: input.distanceMeters ?? null,
+    pace: input.pace ?? null,
+    hr_zone: input.hrZone ?? null,
+    effort: input.effort ?? null,
+    notes: input.notes ?? null,
+  });
+  const draft = {
+    metadata: {
+      goal: "10K",
+      target_date: null,
+      target_time: null,
+      long_run_day: "Sunday",
+      note: null,
+      warnings: [],
+      assumptions: [],
+    },
+    weeks: [
+      {
+        week: 1,
+        days: [
+          {
+            date: "2026-06-09",
+            type: "Tempo",
+            notes: "Continuous authored tempo.",
+            steps: [
+              {
+                phase: "Tempo",
+                ...unit({
+                  durationSeconds: 1_200,
+                  pace: "5:00-5:10/km",
+                  hrZone: "Z3",
+                  effort: "Controlled",
+                }),
+                repeat: null,
+              },
+            ],
+          },
+          {
+            date: "2026-06-11",
+            type: "Intervals",
+            notes: null,
+            steps: [
+              {
+                phase: "Ordered set",
+                ...unit({}),
+                repeat: {
+                  count: 3,
+                  children: [
+                    { role: "run", label: "Settle", ...unit({ durationSeconds: 60 }) },
+                    {
+                      role: "work",
+                      label: "Work",
+                      ...unit({ durationSeconds: 120, pace: "4:50/km", hrZone: "Z4" }),
+                    },
+                    {
+                      role: "recover",
+                      label: "Float",
+                      ...unit({ durationSeconds: 60, effort: "Easy float" }),
+                    },
+                    { role: "finish", label: "Finish", ...unit({ durationSeconds: 30 }) },
+                  ],
+                },
+              },
+              {
+                phase: "Strides",
+                ...unit({}),
+                repeat: {
+                  count: 4,
+                  children: [{ role: "work", label: "Stride", ...unit({ durationSeconds: 20 }) }],
+                },
+              },
+            ],
+          },
+          {
+            date: "2026-06-12",
+            type: "Long Run",
+            notes: null,
+            steps: [
+              {
+                phase: "Main",
+                ...unit({ durationSeconds: 3_600, hrZone: "Z2" }),
+                repeat: null,
+              },
+            ],
+          },
+          {
+            date: "2026-06-14",
+            type: "Race",
+            notes: null,
+            steps: [
+              {
+                phase: "Main",
+                ...unit({ distanceMeters: 10_000, effort: "Reviewed race effort" }),
+                repeat: null,
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  } satisfies AiAuthoredPlanFirstProviderDraft;
+
+  const compiled = compileAiAuthoredPlanFirstDraft({ draft, authoringInput });
+  assert.equal(compiled.ok, true, compiled.ok ? "" : JSON.stringify(compiled.issues));
+  if (!compiled.ok) throw new Error(JSON.stringify(compiled.issues));
+  assert.equal(
+    compiled.canonicalPlan.goal?.authored_outcome_target,
+    undefined,
+    "Targetless runner and provider input must not produce synthetic outcome-target metadata.",
+  );
+
+  const tempo = compiled.canonicalPlan.planned_workouts.find(
+    (workout) => workout.source_workout_type === "Tempo",
+  );
+  assert.ok(tempo);
+  assert.equal(tempo.segments[0]?.segment_type, "tempo_block");
+  assert.equal(tempo.segments[0]?.prescription?.mode, "time");
+  assert.equal(tempo.segments[0]?.target?.pace, "5:00-5:10/km");
+  assert.equal(tempo.segments[0]?.target?.extra?.hr_zone, "Z3");
+
+  const intervals = compiled.canonicalPlan.planned_workouts.find(
+    (workout) => workout.source_workout_type === "Intervals",
+  );
+  assert.ok(intervals);
+  assert.equal(intervals.workout_identity, "distance_intervals");
+  assert.equal(intervals.phase, "AI authored");
+  assert.equal(intervals.planned_rpe, undefined);
+  assert.equal(intervals.estimated_fatigue, undefined);
+  assert.equal(intervals.recovery_priority, undefined);
+  const orderedRepeat = intervals.segments[0]?.prescription;
+  assert.equal(orderedRepeat?.mode, "repeats");
+  if (orderedRepeat?.mode !== "repeats") throw new Error("Missing ordered Repeat proof.");
+  assert.deepEqual(
+    orderedRepeat.children?.map((child) => child.role),
+    ["run", "work", "recover", "finish"],
+  );
+  assert.equal(orderedRepeat.children?.[1]?.target?.pace, "4:50/km");
+  assert.equal(orderedRepeat.children?.[1]?.target?.extra?.hr_zone, "Z4");
+  const noRecoveryRepeat = intervals.segments[1]?.prescription;
+  assert.equal(noRecoveryRepeat?.mode, "repeats");
+  if (noRecoveryRepeat?.mode !== "repeats") throw new Error("Missing one-child Repeat proof.");
+  assert.deepEqual(
+    noRecoveryRepeat.children?.map((child) => child.role),
+    ["work"],
+  );
+  assert.equal(
+    noRecoveryRepeat.children?.[0]?.target,
+    undefined,
+    "A targetless authored Repeat child must remain targetless after compilation.",
+  );
+  const readbackRepeat = buildImportedPlanSeed(compiled.canonicalPlan)
+    .workouts.find((workout) => workout.sourceWorkoutId === intervals.workout_id)
+    ?.steps.find((step) => step.prescription?.mode === "repeats");
+  assert.deepEqual(
+    readbackRepeat?.children?.map((child) => child.type),
+    ["run", "work", "recovery", "finish"],
+    "WorkoutDocument readback must preserve the canonical run child and ordered Repeat roles.",
+  );
+
+  const longRun = compiled.canonicalPlan.planned_workouts.find(
+    (workout) => workout.source_workout_type === "Long Run",
+  );
+  assert.equal(longRun?.workout_identity, "long_aerobic_run");
+  assert.notEqual(longRun?.workout_identity, "taper_long_run");
+
+  const unknownDraft = structuredClone(draft);
+  unknownDraft.weeks[0]!.days[1]!.type = "Coach Surprise Session";
+  const unknownResult = compileAiAuthoredPlanFirstDraft({
+    draft: unknownDraft,
+    authoringInput,
+  });
+  assert.equal(unknownResult.ok, false, "Unknown workout identity must fail before review.");
+  if (unknownResult.ok) throw new Error("Unknown workout identity unexpectedly compiled.");
+  assert.match(JSON.stringify(unknownResult.issues), /unknown_workout_identity/);
+
+  const aiTargetDraft = structuredClone(draft);
+  aiTargetDraft.metadata.target_time = "1:08:00";
+  const aiTargetResult = compileAiAuthoredPlanFirstDraft({
+    draft: aiTargetDraft,
+    authoringInput,
+  });
+  assert.equal(aiTargetResult.ok, true);
+  if (!aiTargetResult.ok) throw new Error(JSON.stringify(aiTargetResult.issues));
+  assert.deepEqual(aiTargetResult.canonicalPlan.goal?.authored_outcome_target, {
+    source: "ai_authored_target",
+    label: "1:08:00",
+    finish_time_window: "1:08:00",
+    rationale: "AI-authored outcome target carried from the reviewed full-plan draft.",
+    confidence: "medium",
+    assumptions: aiTargetResult.canonicalPlan.goal?.authored_outcome_target?.assumptions ?? [],
+  });
+
+  const runnerTargetResolved = buildAiGeneratedRunningPlanAuthoringInput({
+    ...scenarios[0]!.input,
+    planGoalIntent: {
+      distance: { kind: "preset", preset: "10K" },
+      targetFinishTime: "1:10:00",
+    },
+  });
+  assert.equal(runnerTargetResolved.ok, true);
+  if (!runnerTargetResolved.ok) throw new Error(runnerTargetResolved.message);
+  const runnerTargetResult = compileAiAuthoredPlanFirstDraft({
+    draft,
+    authoringInput: {
+      ...runnerTargetResolved.authoringInput,
+      schedule: {
+        ...runnerTargetResolved.authoringInput.schedule,
+        preparationHorizonWeeks: 1,
+      },
+    },
+  });
+  assert.equal(runnerTargetResult.ok, true);
+  if (!runnerTargetResult.ok) throw new Error(JSON.stringify(runnerTargetResult.issues));
+  assert.equal(
+    runnerTargetResult.canonicalPlan.goal?.authored_outcome_target?.source,
+    "runner_entered_target",
+  );
+  assert.equal(runnerTargetResult.canonicalPlan.goal?.authored_outcome_target?.label, "1:10:00");
+}
+
+function validateDistanceFirstInputTruth() {
+  const missingDistance = runningPlanPreviewInputSchema.safeParse({
+    ...baseInput,
+    planGoalIntent: { targetDate: "2026-10-04" },
+  });
+  assert.equal(
+    missingDistance.success,
+    false,
+    "Generated-plan input must reject a missing planGoalIntent.distance before provider work.",
+  );
+
+  const exactDistance = buildAiGeneratedRunningPlanAuthoringInput({
+    ...baseInput,
+    planGoalIntent: {
+      distance: { kind: "custom", distanceKm: 15, label: "Custom 15K" },
+    },
+  });
+  assert.equal(exactDistance.ok, true, exactDistance.ok ? "" : exactDistance.message);
+  if (!exactDistance.ok) throw new Error(exactDistance.message);
+  assert.equal(exactDistance.planGoalIntent.distance?.distanceMeters, 15_000);
 }
 
 async function validateProviderContractBoundary() {
@@ -271,6 +559,15 @@ async function validateProviderContractBoundary() {
   assert.equal(result.metadata.debug.responseSchemaMode, "responses_json_schema_plan_first_strict");
   assert.equal(result.metadata.generationTrace?.request.contractMode, "plan_first");
   assert.equal(result.canonicalPlan.source_kind, AI_AUTHORED_PLAN_FIRST_SOURCE_KIND);
+  const defaultTempo = result.canonicalPlan.planned_workouts.find(
+    (workout) => workout.source_workout_type === "Tempo",
+  );
+  assert.ok(defaultTempo, "Default local fixture must retain its representative Tempo workout.");
+  assert.equal(
+    defaultTempo?.segments.some((segment) => segment.prescription?.mode === "repeats"),
+    true,
+    "Default local fixture Tempo behavior must remain repeat-based.",
+  );
 }
 
 async function validateFirstPlanGenerationLifecycle() {
@@ -702,12 +999,32 @@ async function validateLocalDevFixtureAvailabilityGating() {
     buildScenarioAiPreviewOptions(scenarios[0]!.input).model,
     AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
   );
+  const nonRepeatTempoInput = buildAiGeneratedRunningPlanAuthoringInput(scenarios[1]!.input);
+  assert.equal(
+    nonRepeatTempoInput.ok,
+    true,
+    nonRepeatTempoInput.ok ? "" : nonRepeatTempoInput.message,
+  );
+  if (!nonRepeatTempoInput.ok) throw new Error(nonRepeatTempoInput.message);
+  assert.throws(
+    () =>
+      buildAiGeneratedRunningPlanDevFixturePreviewOptions({
+        authoringInput: nonRepeatTempoInput.authoringInput,
+        env: {
+          ...localDevFixtureEnv,
+          NEXT_PUBLIC_SUPABASE_URL: "https://hosted.example.supabase.co",
+          [AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV]: "non_repeat_tempo",
+        },
+      }),
+    /requires loopback NEXT_PUBLIC_SUPABASE_URL/,
+  );
 
   const envKeys = [
     "LOCAL_AUTH_BYPASS_ENABLED",
     "LOCAL_AUTH_BYPASS_ACCOUNTS_FILE",
     "HITO_AI_GENERATED_PLAN_DEV_FIXTURE",
     AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_DELAY_MS_ENV,
+    AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV,
     "NEXT_PUBLIC_SUPABASE_URL",
     "VERCEL",
     "CI",
@@ -719,6 +1036,7 @@ async function validateLocalDevFixtureAvailabilityGating() {
     process.env.HITO_AI_GENERATED_PLAN_DEV_FIXTURE = "true";
     process.env.NEXT_PUBLIC_SUPABASE_URL = "http://127.0.0.1:54321";
     delete process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_DELAY_MS_ENV];
+    delete process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV];
     delete process.env.VERCEL;
     delete process.env.CI;
 
@@ -757,7 +1075,6 @@ function validateNoLegacyGeneratedPlanAuthoringSourceImports() {
     "src/lib/ai-first-plan-draft-service.ts",
     "src/lib/ai-generated-running-plan.ts",
     "src/lib/ai-generated-running-plan-dev-fixture.ts",
-    "src/lib/first-plan-actions.ts",
     "scripts/author-ai-first-plan-draft.ts",
   ];
 
@@ -771,7 +1088,10 @@ function validateNoLegacyGeneratedPlanAuthoringSourceImports() {
   }
 }
 
-function buildScenarioAiPreviewOptions(input: RunningPlanPreviewActionInput) {
+function buildScenarioAiPreviewOptions(
+  input: RunningPlanPreviewActionInput,
+  config: { nonRepeatTempo?: boolean } = {},
+) {
   const resolved = buildAiGeneratedRunningPlanAuthoringInput(input);
   assert.equal(resolved.ok, true, resolved.ok ? "" : resolved.message);
   if (!resolved.ok) throw new Error(resolved.message);
@@ -782,6 +1102,12 @@ function buildScenarioAiPreviewOptions(input: RunningPlanPreviewActionInput) {
     env: {
       LOCAL_AUTH_BYPASS_ENABLED: "true",
       LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: "/tmp/hito-local-auth.json",
+      ...(config.nonRepeatTempo
+        ? {
+            NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+            [AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV]: "non_repeat_tempo",
+          }
+        : {}),
     },
   });
 
@@ -873,6 +1199,33 @@ async function assertReviewedDraftExactness({
   );
   if (!decoded.ok) throw new Error(`${scenarioName} decoded token failed.`);
   assert.deepEqual(decoded.draft.calendarRows, draft.calendarRows);
+  assert.deepEqual(decoded.draft.workoutDocuments, draft.workoutDocuments);
+
+  const tamperedReadModelDraft = {
+    ...draft,
+    workoutDocuments: draft.workoutDocuments.map((document, index) =>
+      index === 0
+        ? {
+            ...document,
+            title: `${document.title} (tampered)`,
+          }
+        : document,
+    ),
+  };
+  const tamperedReadModelExactness = await validateRunningPlanReviewExactness({
+    draft: tamperedReadModelDraft,
+    reviewToken: draft.reviewToken,
+    reviewChecksum: draft.reviewChecksum,
+  });
+  assert.equal(
+    tamperedReadModelExactness.ok,
+    false,
+    `${scenarioName} must reject a WorkoutDocument-only review payload substitution.`,
+  );
+  if (tamperedReadModelExactness.ok) {
+    throw new Error(`${scenarioName} accepted a tampered WorkoutDocument read model.`);
+  }
+  assert.equal(tamperedReadModelExactness.reason, "stale_review");
 
   return canonicalPlan;
 }
@@ -919,6 +1272,100 @@ function assertPlanFirstGuidanceAndRepeatShape({
     /ai_authored_effort_guidance|ai_authored_plan_guidance|HR-zone guidance|Pace guidance/i,
     `${scenarioName} must preserve AI-authored plan guidance as compiled target/readback metadata.`,
   );
+}
+
+function assertPreviewTargetTruth({
+  scenarioName,
+  canonicalPlan,
+  calendarRows,
+}: {
+  scenarioName: string;
+  canonicalPlan: ReturnType<typeof buildRunningPlanCanonicalPlan>;
+  calendarRows: Extract<
+    Awaited<ReturnType<typeof buildReviewedAiGeneratedRunningPlanPreview>>,
+    { ok: true }
+  >["draft"]["calendarRows"];
+}) {
+  let targetCount = 0;
+
+  for (const workout of canonicalPlan.planned_workouts) {
+    const row = calendarRows.find((candidate) => candidate.rowId === workout.workout_id);
+    assert.ok(row, `${scenarioName} review rows must include ${workout.workout_id}.`);
+    if (!row) continue;
+    if (row.isRestDay) continue;
+
+    workout.segments.forEach((segment, segmentIndex) => {
+      const previewSegment = row.segments[segmentIndex];
+      assert.ok(previewSegment, `${scenarioName} review must preserve segment order.`);
+      if (!previewSegment) return;
+
+      if (segment.target) {
+        targetCount += 1;
+        assert.deepEqual(previewSegment.target, segment.target);
+      }
+
+      if (segment.prescription?.mode !== "repeats") return;
+      const previewPrescription = previewSegment.primaryPrescription;
+      assert.equal(previewPrescription.mode, "repeat");
+      if (previewPrescription.mode !== "repeat") return;
+      (segment.prescription.children ?? []).forEach((child, childIndex) => {
+        if (!child.target) return;
+        targetCount += 1;
+        assert.deepEqual(previewPrescription.children[childIndex]?.target, child.target);
+      });
+    });
+  }
+
+  assert.ok(targetCount > 0, `${scenarioName} must prove runner-visible target truth.`);
+}
+
+function assertNonRepeatTempoFixtureReviewTruth({
+  scenarioName,
+  canonicalPlan,
+  calendarRows,
+}: {
+  scenarioName: string;
+  canonicalPlan: ReturnType<typeof buildRunningPlanCanonicalPlan>;
+  calendarRows: Extract<
+    Awaited<ReturnType<typeof buildReviewedAiGeneratedRunningPlanPreview>>,
+    { ok: true }
+  >["draft"]["calendarRows"];
+}) {
+  const tempo = canonicalPlan.planned_workouts.find(
+    (workout) =>
+      workout.source_workout_type === "Tempo" &&
+      workout.segments.some(
+        (segment) =>
+          segment.label === "Work" &&
+          segment.segment_type === "tempo_block" &&
+          segment.prescription?.mode === "time",
+      ),
+  );
+  assert.ok(tempo, `${scenarioName} fixture must author a continuous Tempo workout.`);
+  if (!tempo) return;
+  assert.equal(
+    tempo.segments.some((segment) => segment.prescription?.mode === "repeats"),
+    false,
+    `${scenarioName} continuous Tempo must not contain a Repeat block.`,
+  );
+
+  const work = tempo.segments.find((segment) => segment.label === "Work");
+  assert.ok(work, `${scenarioName} continuous Tempo must include an authored Work segment.`);
+  if (!work) return;
+  assert.equal(work.prescription?.mode, "time");
+  assert.equal(work.target?.pace, "comfortably hard");
+  assert.equal(work.target?.extra?.hr_zone, "Z3");
+
+  const reviewRow = calendarRows.find((row) => row.rowId === tempo.workout_id);
+  const reviewWork = reviewRow?.segments.find((segment) => segment.id === work.segment_id);
+  assert.ok(reviewWork, `${scenarioName} signed review must retain the Tempo Work segment.`);
+  assert.equal(
+    reviewWork?.segmentRole,
+    "work",
+    `${scenarioName} review projection must preserve the canonical Tempo Work role.`,
+  );
+  assert.equal(reviewWork?.primaryPrescription.mode, "time");
+  assert.deepEqual(reviewWork?.target, work.target);
 }
 
 function assertNoLegacyOrDebugReadback({

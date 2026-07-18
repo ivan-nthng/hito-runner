@@ -8,7 +8,7 @@ import {
   buildImportedLogCarryForwardPlan,
   persistedWorkoutRowToImportedSeed as persistedWorkoutRowToImportedSeedBase,
 } from "@/lib/persisted-plan-replacement";
-import { todayIso, weekdayLong, type WorkoutType } from "@/lib/training";
+import { todayIso, weekdayLong } from "@/lib/training";
 import type { Database } from "@/lib/supabase/database";
 import {
   assertStartDateAllowedByWeekdayRestInvariant,
@@ -23,27 +23,10 @@ type ImportedPlanInput = z.infer<typeof importedPlanSchema>;
 
 export type FirstDayResolution = "replace_first_day" | "ignore_first_day";
 
-interface PlanApplyWorkoutSummary {
-  date: string;
-  title: string;
-  workoutType: WorkoutType;
-}
-
 interface FirstDayConflictResolutionOption {
   resolution: FirstDayResolution;
   status: "available" | "blocked";
   blockedReason: string | null;
-}
-
-export interface PlanApplyFirstDayConflict {
-  code: "first_day_conflict";
-  effectiveStartDate: string;
-  existingTodayWorkout: PlanApplyWorkoutSummary;
-  incomingFirstDay: PlanApplyWorkoutSummary & {
-    declaredDate: string;
-    effectiveDate: string;
-  };
-  resolutions: FirstDayConflictResolutionOption[];
 }
 
 export interface PlanApplySuccessResult {
@@ -55,19 +38,6 @@ export interface PlanApplySuccessResult {
   firstDayResolution: FirstDayResolution | null;
   workoutCount: number;
 }
-
-export interface PlanApplyDecisionRequiredResult {
-  ok: false;
-  status: "decision_required";
-  reason: "first_day_conflict";
-  effectiveStartDate: string;
-  appliedStartDate: null;
-  normalizedFromStartDate: string | null;
-  conflict: PlanApplyFirstDayConflict;
-  importedPlan: ImportedPlanInput;
-}
-
-export type PlanApplyResult = PlanApplySuccessResult | PlanApplyDecisionRequiredResult;
 
 export interface ExistingPlanWorkoutsContext {
   workouts: PersistedPlannedWorkoutRow[];

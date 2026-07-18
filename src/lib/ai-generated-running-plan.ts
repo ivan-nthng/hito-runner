@@ -19,16 +19,12 @@ import {
   collectRunnerFacingCanonicalRichnessIssues,
   isHardRunnerFacingRichnessIssue,
 } from "@/lib/plan-creation-engine";
-import type { TrainingPlanV2 } from "@/lib/imported-plan";
+import { buildImportedPlanSeed, type TrainingPlanV2 } from "@/lib/imported-plan";
 import {
   normalizePlanGoalIntent,
-  type PlanGoalIntentInput,
   type NormalizedPlanGoalIntent,
 } from "@/lib/plan-creation-engine/plan-goal-intent";
-import {
-  collectSelectedDistanceEndpointIssues,
-  resolveSelectedDistanceQualityFamily,
-} from "@/lib/plan-creation-engine/selected-distance-endpoint";
+import { collectSelectedDistanceEndpointIssues } from "@/lib/plan-creation-engine/selected-distance-endpoint";
 import type {
   BuildRunningPlanPreviewInput,
   RunningPlanPreviewCalendarRow,
@@ -38,7 +34,6 @@ import { RUNNING_PLAN_PREVIEW_REST_DAY_KIND } from "@/lib/plan-creation-engine/p
 import {
   RUNNING_PLAN_WORKOUT_DAY_KIND_VALUES,
   type RunningPlanBenchmarkPaceTruth,
-  type RunningPlanDistanceFamily,
   type RunningPlanRunnerLevel,
   type RunningPlanSegmentPrescription,
   type RunningPlanWatchExecutableSegmentTemplate,
@@ -52,9 +47,10 @@ import {
 import {
   structuredPlanAuthoringInputSchema,
   type StructuredPlanAuthoringInput,
-} from "@/lib/structured-plan-authoring";
+} from "@/lib/structured-plan-authoring-schema";
 import { todayIso, weekdayLong } from "@/lib/training";
 import { WEEKDAY_NAMES, type WeekdayName } from "@/lib/weekday-rest-invariants";
+import type { WorkoutDocument } from "@/lib/workout-document";
 
 export const AI_GENERATED_RUNNING_PLAN_SOURCE_KIND = AI_AUTHORED_PLAN_FIRST_SOURCE_KIND;
 export const AI_GENERATED_RUNNING_PLAN_PREVIEW_VERSION = "ai_generated_running_plan_v1" as const;
@@ -98,6 +94,7 @@ export interface AiGeneratedRunningPlanPreviewDraft {
   previewInput: BuildRunningPlanPreviewInput;
   normalizedInputSummary: RunningPlanPreviewNormalizedInputSummary;
   calendarRows: readonly RunningPlanPreviewCalendarRow[];
+  workoutDocuments: readonly WorkoutDocument[];
   endpointProof: {
     finalRowId: string;
     finalDate: string;
@@ -252,6 +249,7 @@ export async function buildAiGeneratedRunningPlanPreview(
     canonicalPlan,
     planGoalIntent: authoring.planGoalIntent,
   });
+  const workoutDocuments = buildImportedPlanSeed(canonicalPlan).workouts;
   const endpointProof = buildEndpointProof(calendarRows, authoring.planGoalIntent);
   const endpointIssues = collectPreviewEndpointProofIssues({
     rows: calendarRows,
@@ -317,6 +315,7 @@ export async function buildAiGeneratedRunningPlanPreview(
       previewInput: toStablePreviewInput(input),
       normalizedInputSummary: authoring.normalizedInputSummary,
       calendarRows,
+      workoutDocuments,
       endpointProof,
       validation: {
         ok: true,
@@ -336,7 +335,8 @@ export function isAiGeneratedRunningPlanPreviewDraft(
     Boolean(value) &&
     typeof value === "object" &&
     isAiGeneratedRunningPlanPreviewSourceKind((value as { sourceKind?: unknown }).sourceKind) &&
-    (value as { canonicalPlan?: unknown }).canonicalPlan != null
+    (value as { canonicalPlan?: unknown }).canonicalPlan != null &&
+    Array.isArray((value as { workoutDocuments?: unknown }).workoutDocuments)
   );
 }
 
@@ -359,10 +359,8 @@ export function buildAiGeneratedRunningPlanAuthoringInput(input: BuildRunningPla
       message: string;
     } {
   const startDate = normalizeStartDate(input.startDate);
-  const rawGoalIntent = resolveGoalIntentInput(input);
   const normalizedIntent = normalizePlanGoalIntent({
-    rawIntent: rawGoalIntent,
-    distanceFamily: null,
+    rawIntent: input.planGoalIntent,
     startDate,
     horizonWeeks: null,
   });
@@ -407,12 +405,10 @@ export function buildAiGeneratedRunningPlanAuthoringInput(input: BuildRunningPla
     Math.min(daysPerWeek, availableWeekdays.length),
   );
   const allowBackToBackDays = runningWeekdaysRequireBackToBackDays(preferredRunningDays);
-  const legacyStructuredGoalType = "distance_build";
   const targetFinishTime = planGoalIntent.targetFinishTime?.label ?? null;
   const authoringInput = structuredPlanAuthoringInputSchema.safeParse({
     goal: {
-      // Structured authoring still requires a legacy goalType adapter. Generated-plan truth is planGoalIntent.distance.
-      goalType: legacyStructuredGoalType,
+      goalType: "distance_goal",
       goalLabel: buildGoalLabel(planGoalIntent),
       goalStyle: targetFinishTime ? "target_time" : "balanced",
       targetTime: targetFinishTime,
@@ -503,10 +499,6 @@ export function buildAiGeneratedRunningPlanAuthoringInput(input: BuildRunningPla
       heightCm: input.heightCm,
       weightKg: input.weightKg,
       runnerLevel: input.runnerLevel,
-      distanceFamily: resolveSelectedDistanceQualityFamily({
-        distanceMeters: planGoalIntent.distance.distanceMeters,
-        fallbackFamily: input.distanceFamily ?? null,
-      }),
       daysPerWeek,
       fixedRestDays,
       preferredLongRunDay,
@@ -521,34 +513,6 @@ export function buildAiGeneratedRunningPlanAuthoringInput(input: BuildRunningPla
       loadContext,
     },
   };
-}
-
-function resolveGoalIntentInput(input: BuildRunningPlanPreviewInput): PlanGoalIntentInput {
-  if (input.planGoalIntent?.distance) {
-    return input.planGoalIntent;
-  }
-
-  return {
-    ...(input.planGoalIntent ?? {}),
-    distance: distanceInputForFamily(input.distanceFamily ?? null),
-  };
-}
-
-function distanceInputForFamily(
-  family: RunningPlanDistanceFamily | null,
-): PlanGoalIntentInput["distance"] {
-  if (!family) {
-    return null;
-  }
-
-  switch (family) {
-    case "10K":
-      return { kind: "preset", preset: "10K" };
-    case "Half Marathon":
-      return { kind: "preset", preset: "Half Marathon" };
-    case "Marathon Completion":
-      return { kind: "preset", preset: "Marathon" };
-  }
 }
 
 function buildGoalLabel(intent: NormalizedPlanGoalIntent) {
@@ -655,6 +619,7 @@ function projectCanonicalPlanToPreviewRows({
             sourceWorkoutType: workout.source_workout_type,
             workoutFamily: workout.workout_family,
             workoutIdentity: workout.workout_identity,
+            segments: workout.segments,
           });
 
       return {
@@ -714,6 +679,7 @@ function projectCanonicalSegmentToPreviewTemplate(
       ? "editable_default_hr"
       : "structure_only",
     secondaryCue: segment.guidance ?? segment.target?.cue ?? "Follow the reviewed plan structure.",
+    ...(segment.target ? { target: cloneStepTarget(segment.target) } : {}),
   };
 }
 
@@ -743,8 +709,8 @@ function projectCanonicalPrescription(
       },
       children: (prescription.children ?? []).map((child) => ({
         role: child.role,
-        label: child.label,
-        guidance: child.guidance,
+        ...(child.label ? { label: child.label } : {}),
+        ...(child.guidance ? { guidance: child.guidance } : {}),
         prescription:
           child.prescription.mode === "distance"
             ? {
@@ -756,6 +722,7 @@ function projectCanonicalPrescription(
                 durationSeconds: minutesValueToSecondsRange(child.prescription.duration_min),
               },
         intensityLabel: child.target?.intensity ?? "reviewed_repeat_child",
+        ...(child.target ? { target: cloneStepTarget(child.target) } : {}),
       })),
     };
   }
@@ -865,10 +832,12 @@ function normalizeWorkoutDayKind({
   sourceWorkoutType,
   workoutFamily,
   workoutIdentity,
+  segments,
 }: {
   sourceWorkoutType: string | null | undefined;
   workoutFamily: string | null | undefined;
   workoutIdentity: string | null | undefined;
+  segments: TrainingPlanV2["planned_workouts"][number]["segments"];
 }): RunningPlanWorkoutDayKind {
   if (
     typeof sourceWorkoutType === "string" &&
@@ -879,6 +848,9 @@ function normalizeWorkoutDayKind({
 
   if (workoutIdentity === "easy_run_with_strides") return "strides";
   if (workoutIdentity === "cutback_long_run") return "cutback_long_run";
+  if (segments.some((segment) => segment.segment_type === "strides")) return "strides";
+  if (segments.some((segment) => segment.segment_type === "tempo_block")) return "tempo";
+  if (segments.some((segment) => segment.segment_type === "interval_block")) return "intervals";
 
   switch (workoutFamily) {
     case "recovery":
@@ -902,8 +874,19 @@ function normalizeWorkoutDayKind({
   }
 
   throw new Error(
-    `AI-authored canonical workout reached preview projection with unsupported workout model: ${String(sourceWorkoutType)} / ${String(workoutFamily)} / ${String(workoutIdentity)}.`,
+    `AI-authored workout identity could not be projected without semantic substitution: ${
+      workoutIdentity ?? sourceWorkoutType ?? workoutFamily ?? "unknown"
+    }.`,
   );
+}
+
+function cloneStepTarget(
+  target: NonNullable<TrainingPlanV2["planned_workouts"][number]["segments"][number]["target"]>,
+) {
+  return {
+    ...target,
+    ...(target.extra ? { extra: { ...target.extra } } : {}),
+  };
 }
 
 function normalizeSegmentRole(
@@ -916,6 +899,7 @@ function normalizeSegmentRole(
       return "cooldown";
     case "recovery":
       return "recovery";
+    case "tempo_block":
     case "work":
       return "work";
     default:

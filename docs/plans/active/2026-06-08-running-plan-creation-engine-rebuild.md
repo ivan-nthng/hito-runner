@@ -2,7 +2,7 @@
 
 ## Status
 
-in_progress
+completed
 
 ## Type
 
@@ -14,93 +14,20 @@ high
 
 ## Next Recommended Role
 
-backend
+product
 
 ## Task
 
-Align active-plan workout content-editability readback before the next design batch.
+Close the running-plan creation engine rebuild after accepted post-confirm workout ownership durability.
 
 ## Stage
 
-BACKEND implementation / active-plan content-edit capability correction.
+ARCHITECT source-of-truth reconciliation / completed.
 
 ## Exact Handoff Prompt
 
-```text
-ROLE: BACKEND
-
-Task:
-Align active-plan workout content-editability readback before the next design batch.
-
-Stage:
-BACKEND implementation / active-plan content-edit capability correction.
-
-Plan:
-/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-08-running-plan-creation-engine-rebuild.md
-
-Context:
-Generated-plan creation, generated workout-document readback, and the shared Hito inline editable
-text pattern are accepted at the design/frontend implementation boundary. Frontend replaced the
-route-local editable-heading pilot with shared `InlineEditableText` and `InlineReadOnlyText`,
-documented the local inspector task-target behavior on `/hitoDS/patterns#inline-editable-text`, and
-kept generated workout readback itself read-only.
-
-Architecture closeout found a separate active-plan editability leak before the next design polish
-batch: workout detail can advertise `Edit training` from broad active-plan editability metadata even
-though the persisted edit action accepts only manual user-built active plans. Backend still blocks
-unsupported non-manual edits, so this is not fake persistence, but the read model can teach the
-frontend the wrong capability.
-
-Root cause:
-Visible symptom: future generated/imported/refresh workout rows may expose `Edit training` before
-the backend edit action rejects them.
-Underlying cause: active-plan editability/readback treats `edit_workout` too much like Add/Clear/Move
-row-state capability instead of manual content-edit capability.
-Canonical owner: backend active-plan editability/source-capability read model first; frontend should
-only render backend-shaped capability truth.
-
-Scope:
-1. Read AGENTS.md, agents/backend.agent.md, skills/hito-backend-supabase-contract/SKILL.md, this plan,
-   docs/current-product.md, docs/current-system.md, docs/current-functional-map.md, and the inline
-   editable text spec:
-   /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/frontend-specs/2026-07-07-hito-inline-editable-text-pattern-contract.md
-2. Inspect these source seams:
-   src/lib/active-plan-workout-editing/policy.ts,
-   src/lib/active-plan-workout-editing/source-capabilities.ts,
-   src/lib/training-api.ts,
-   src/lib/manual-workout-authoring/edit-workout.ts,
-   src/routes/workout.$date.tsx.
-3. Align the backend editability/readback contract so `edit_workout` / content edit is allowed only
-   for backend-supported persisted manual edit contexts. Preserve Add/Clear/Move direct row-state
-   capabilities for accepted non-manual rows.
-4. Ensure row-level `sourceEditing.canEditContent` and `editContentReason` are false/explicit for
-   generated, imported, refresh, unsupported, unsafe-reconstruction, logged, evidence-backed, rest,
-   and protected rows.
-5. Ensure plan-level `workoutEditing.editWorkout` does not imply generated/imported/refresh content
-   editing if the persisted edit action will reject those sources.
-6. If the frontend must additionally consume an existing row-level capability such as
-   `sourceEditing.canEditContent` to hide `Edit training`, stop after the backend/readback fix and
-   return one exact FRONTEND follow-up prompt. Do not silently broaden this backend slice into a
-   frontend implementation.
-
-Validation:
-- Run targeted lint/type checks for touched backend files.
-- Run `npm run validate-manual-workout-authoring`.
-- Run the active-plan editability/source-capability validator if one exists; if not, add/adjust the
-  smallest existing backend proof that covers manual edit allowed and generated/imported content edit
-  blocked.
-- Run `npm run build` if runtime exports/types changed.
-- Run `git diff --check`.
-- Do not run browser QA unless backend changes expose a frontend route behavior that needs proof.
-
-Stop conditions:
-- Stop if the fix would weaken Add/Clear/Move, drag/drop, protected history, logged/evidence-backed
-  row protection, or manual persisted edit review/confirm.
-- Stop if generated/imported/refresh content editing is actually intended; that requires Product and
-  Running Coach/Backend acceptance before UI exposure.
-- Stop if this requires Supabase schema/data mutation, live OpenAI/provider calls, or broad active-plan
-  lifecycle redesign.
-```
+None. This rebuild is complete; independent provider, evidence, release, or product work must be
+selected outside this plan.
 
 ## Current Source Of Truth
 
@@ -115,6 +42,27 @@ Backend owns goal normalization, safety/feasibility warnings, AI prompt/response
 normalization, review tokens, confirm exactness, persistence, import/export compatibility, and metric
 truth. Frontend collects input and renders backend-shaped preview/readback; it must not invent pace,
 HR, feasibility, or plan-generation truth locally.
+
+After explicit plan confirm, persisted planned workouts are runner-owned schedule content regardless
+of whether the plan was manual, generated, imported, or refreshed. Backend capability/readback keeps
+plan/schedule operations separate from workout-content editing:
+
+- Add, Clear, Move, Copy, and Edit are distinct operations with row-level capabilities.
+- Copy remains limited to the proved manual path; eligible confirmed workouts from accepted plan
+  sources may be moved or cleared, and eligible future rows may enter the reviewed content-edit flow.
+- Rest, today/past content edit, logged rows, evidence-backed rows, stale review, unsupported source
+  metadata, unsafe metric truth, and unsafe reconstruction remain blocked.
+- Passive preview/detail text stays non-inline-editable. Editing is an explicit review/confirm action,
+  not direct mutation of generated readback.
+- A confirmed edit marks the mutation as runner-authored through `active_plan_user_edit_v1`,
+  `user_edited_workout`, and manual-workout authoring metadata while preserving the original plan
+  `source_kind`, source status, workout id/date, and edit history as provenance.
+
+Current implementation verdict: accepted. Confirmed external imports use
+`training_plan_v2_import` as their capability identity while the claimed external source kind and
+status remain provenance. Reviewed workout content and runner-edit audit commit through one atomic
+backend mutation; stale or protected results stay exact, and original plan plus workout source
+id/type/family/identity remain auditable after the edited workout becomes runner-authored.
 
 Accepted runner-facing workout language:
 
@@ -189,7 +137,8 @@ FRONTEND and QA accepted the first real-user generated-plan UX polish on 2026-07
   stripes, child rows, and quiet notes/cues;
 - proof/debug copy such as endpoint proof, backend fallback/default wording, source-kind labels, and
   no-fake proof labels no longer dominates runner-facing readback;
-- generated rows remain read-only and backend generated-plan truth is unchanged;
+- generated workout documents remain passive/read-only presentation until an eligible confirmed
+  future row enters the explicit reviewed content-edit flow;
 - manual editable heading was validated only in editable manual constructor context;
 - Today generated-row lifecycle CTA still shows `Mark as done` and opens completion;
 - desktop and exact 375px overflow, console/pageerror/bad HTTP, impossible-state zero-persistence,
@@ -211,12 +160,8 @@ FRONTEND implemented and QA accepted the Hito inline editable text pattern on 20
   non-mutating local inspector task-target example;
 - local inspector task targeting is local-only in v1 and does not create Admin Capture rows, backend
   schema, or fake persisted tasks;
-- generated preview/detail/readback surfaces remain read-only.
-
-Architecture closeout found a separate active-plan capability leak: workout detail currently gates
-`Edit training` from broad active-plan editability metadata, while the persisted edit action supports
-manual user-built active plans only. The next gate is therefore backend editability/readback
-correction before selecting another design polish batch.
+- generated preview/detail/readback remains non-inline-editable; the shared explicit edit flow is
+  capability-gated separately after confirm.
 
 ## OpenAI-Authored Dated Acceptance
 
@@ -244,16 +189,15 @@ Historical caution:
 `openai-authored-dated-final-browser-acceptance-qa` is a pre-rerun failed artifact and must not be
 used as acceptance evidence.
 
-## Current Gate
+## Closeout
 
-Generated-plan backend/product readiness, generated-plan workout-document readback polish, and the
-Hito DS inline editable text pattern are accepted. The current blocker before the next design polish
-batch is active-plan content-editability readback: backend must align `edit_workout` capability with
-the persisted manual edit contract so generated/imported/refresh rows do not appear editable before
-the backend rejects them. Do not reopen backend generation semantics.
+The running-plan creation engine rebuild and its post-confirm workout ownership gate are accepted
+and closed. Eligible future canonical manual, generated, imported, and refreshed workouts use one
+backend-reviewed content-edit lifecycle without weakening rest, today/past, logged, evidence-backed,
+unsafe-reconstruction, stale-review, or exact-confirm safeguards.
 
-Provider upload/import and provider comparison from actual evidence remain explicitly unaccepted by
-the generated-plan QA gates.
+Provider upload/comparison, completed-evidence browser proof, paid live-provider acceptance, and
+future product work are independent tracks. They are not remaining conditions of this rebuild.
 
 ## Boundaries
 
@@ -268,7 +212,7 @@ Current product truth:
 - `training-plan-v2`, persisted `planned_workouts.steps`, export/import, and provider comparison
   input remain canonical compatibility surfaces.
 
-Out of scope for this hold:
+Independent tracks outside this completed plan:
 
 - new frontend polish without a product-readiness blocker;
 - provider/FIT upload acceptance;
@@ -279,8 +223,8 @@ Out of scope for this hold:
 
 ## Compression Note
 
-This active plan was compressed on 2026-07-02 under the source-size deletion-first rule. Removed
+This plan was compressed on 2026-07-02 under the source-size deletion-first rule. Removed
 content was superseded implementation prompts, closeout transcripts, stale deterministic-builder
-handoffs, and repeated validation detail. The current accepted generated-plan truth and hold boundary
+handoffs, and repeated validation detail. The current accepted generated-plan truth and closeout boundary
 are preserved here; no runtime behavior, product code, QA evidence, scripts, schemas, Supabase data,
 or generated output changed.

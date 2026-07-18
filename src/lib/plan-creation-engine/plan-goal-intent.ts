@@ -4,7 +4,6 @@ import {
   parseDurationSeconds,
   parsePaceSecondsPerKm,
 } from "@/lib/first-plan-authoring-utils";
-import type { RunningPlanDistanceFamily } from "@/lib/plan-creation-engine/source-types";
 import { diffDaysIso } from "@/lib/training";
 
 export const PLAN_GOAL_INTENT_CONTRACT_VERSION = "plan_goal_intent_v1" as const;
@@ -66,7 +65,7 @@ export const normalizedPlanGoalIntentSchema = z
         distanceKm: z.number().positive(),
         distanceMeters: z.number().int().positive(),
         preset: z.enum(PLAN_GOAL_INTENT_PRESET_DISTANCE_VALUES).nullable(),
-        source: z.enum(["selected_distance_family", "runner_selected_preset", "runner_custom"]),
+        source: z.enum(["runner_selected_preset", "runner_custom"]),
       })
       .strict()
       .nullable(),
@@ -138,7 +137,6 @@ export type NormalizePlanGoalIntentResult =
 
 export function normalizePlanGoalIntent(input: {
   rawIntent?: PlanGoalIntentInput | null | undefined;
-  distanceFamily?: RunningPlanDistanceFamily | null;
   startDate?: string | null;
   horizonWeeks?: number | null;
 }): NormalizePlanGoalIntentResult {
@@ -153,7 +151,7 @@ export function normalizePlanGoalIntent(input: {
   }
 
   const raw = parsed.data;
-  const distance = normalizeDistance(raw.distance ?? null, input.distanceFamily ?? null);
+  const distance = normalizeDistance(raw.distance ?? null);
   const targetDate = normalizeOptionalDate(raw.targetDate ?? null);
 
   if (targetDate && !targetDate.ok) {
@@ -197,7 +195,6 @@ export function normalizePlanGoalIntent(input: {
   ).filter((field) => !supplied[field]);
   const feasibility = resolveFeasibility({
     distance,
-    distanceFamily: input.distanceFamily ?? null,
     horizonDays,
     supplied,
     targetOutcomePace,
@@ -246,21 +243,6 @@ export function buildStructuredPlanGoalIntentInput(input: {
   };
 }
 
-export function distanceFamilyForStructuredGoalType(
-  goalType: string,
-): RunningPlanDistanceFamily | null {
-  switch (goalType) {
-    case "10k":
-      return "10K";
-    case "half_marathon":
-      return "Half Marathon";
-    case "marathon":
-      return "Marathon Completion";
-    default:
-      return null;
-  }
-}
-
 function distanceInputForStructuredGoalType(goalType: string): PlanGoalIntentInput["distance"] {
   switch (goalType) {
     case "5k":
@@ -278,7 +260,6 @@ function distanceInputForStructuredGoalType(goalType: string): PlanGoalIntentInp
 
 function normalizeDistance(
   distanceInput: PlanGoalIntentInput["distance"] | null,
-  distanceFamily: RunningPlanDistanceFamily | null,
 ): NormalizedPlanGoalIntent["distance"] {
   if (distanceInput?.kind === "preset") {
     const distance = presetDistance(distanceInput.preset);
@@ -306,21 +287,7 @@ function normalizeDistance(
     };
   }
 
-  if (!distanceFamily) {
-    return null;
-  }
-
-  const preset = presetDistanceForFamily(distanceFamily);
-  const distance = presetDistance(preset);
-
-  return {
-    kind: "preset",
-    label: preset,
-    distanceKm: distance.km,
-    distanceMeters: distance.meters,
-    preset,
-    source: "selected_distance_family",
-  };
+  return null;
 }
 
 function normalizeOptionalDate(
@@ -422,20 +389,12 @@ function resolveHorizonDays(input: {
 
 function resolveFeasibility(input: {
   distance: NormalizedPlanGoalIntent["distance"];
-  distanceFamily: RunningPlanDistanceFamily | null;
   horizonDays: number | null;
   supplied: NormalizedPlanGoalIntent["supplied"];
   targetOutcomePace: NormalizedPlanGoalIntent["targetOutcomePace"];
 }): NormalizedPlanGoalIntent["feasibility"] {
   const reasons: string[] = [];
   let status: PlanGoalIntentFeasibilityStatus = "supported";
-
-  if (input.distance?.kind === "custom" && input.distanceFamily) {
-    status = maxFeasibility(status, "supported_with_assumptions");
-    reasons.push(
-      "Custom distance is supported by the unified AI-authored generated-plan path; the selected distance family is routing context only.",
-    );
-  }
 
   if (input.horizonDays != null && input.horizonDays <= 0) {
     status = "impossible_goal";
@@ -492,17 +451,6 @@ function buildPlanGoalIntentAssumptions(input: {
   }
 
   return Array.from(new Set(assumptions));
-}
-
-function presetDistanceForFamily(family: RunningPlanDistanceFamily): PlanGoalIntentPresetDistance {
-  switch (family) {
-    case "10K":
-      return "10K";
-    case "Half Marathon":
-      return "Half Marathon";
-    case "Marathon Completion":
-      return "Marathon";
-  }
 }
 
 function presetDistance(preset: PlanGoalIntentPresetDistance) {

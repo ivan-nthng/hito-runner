@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,24 +11,20 @@ import {
   HitoCalendarDayCell,
   type HitoCalendarWorkoutIdentity,
 } from "@/components/ui/hito-calendar-day";
+import { buildCalendarWorkoutIdentity } from "@/components/calendar/calendar-projection";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { WorkoutDocumentReadback } from "@/components/workout-structure/WorkoutDocumentReadback";
+import { workoutDocumentNotesForSteps } from "@/components/workout-structure/workout-document-notes";
 import {
-  WorkoutDocumentReadback,
-  type WorkoutDocumentNote,
-} from "@/components/workout-structure/WorkoutDocumentReadback";
-import { dedupeWorkoutDocumentNotes } from "@/components/workout-structure/workout-document-notes";
-import type { WorkoutStructureTimelineItem } from "@/components/workout-structure/WorkoutStructureTimeline";
-import type { WorkoutGlyphKind } from "@/lib/workout-glyph";
-import type {
-  RunningPlanRange,
-  RunningPlanSegmentPrescription,
-  RunningPlanWorkoutDayKind,
-} from "@/lib/plan-creation-engine";
+  workoutDocumentTimelineItems,
+  workoutStructureTimelineSummary,
+} from "@/components/workout-structure/workout-structure-timeline-items";
 import type {
   RunningPlanConfirmActionResult,
   RunningPlanPreviewActionResult,
 } from "@/lib/running-plan-engine-actions";
-import { workoutTypeColorVar } from "@/lib/workout-color-tokens";
+import { formatDistanceMeters } from "@/lib/training";
+import type { WorkoutDocument } from "@/lib/workout-document";
 
 type SelectedRunningPlanPreviewResult = RunningPlanPreviewActionResult;
 type SelectedRunningPlanPreviewDraft = Extract<
@@ -40,28 +36,11 @@ type SelectedRunningPlanPreviewUnavailable = Extract<
   { ok: false }
 >["unavailable"];
 type SelectedRunningPlanCalendarRow = SelectedRunningPlanPreviewDraft["calendarRows"][number];
-type SelectedRunningPlanPreviewStatus = "idle" | "loading_cards" | "previewing_plan";
+type SelectedRunningPlanPreviewStatus = "idle" | "previewing_plan";
 type RunningPlanCreateStatus = "idle" | "creating";
-type PreviewCalendarTone =
-  | "easy"
-  | "steady"
-  | "long"
-  | "progression"
-  | "tempo"
-  | "intervals"
-  | "hills"
-  | "rest"
-  | "final";
 
-function previewGoalLabel(
-  draft: SelectedRunningPlanPreviewDraft | null,
-  unavailable: SelectedRunningPlanPreviewUnavailable | null,
-) {
-  return (
-    draft?.normalizedInputSummary.planGoalIntent.distance?.label ??
-    unavailable?.debug.previewActionTrace.planGoalIntentSummary.distanceLabel ??
-    "Selected"
-  );
+function previewGoalLabel(draft: SelectedRunningPlanPreviewDraft | null) {
+  return draft?.normalizedInputSummary.planGoalIntent.distance?.label ?? "Selected";
 }
 
 interface SelectedRunningPlanPreviewDialogProps {
@@ -88,7 +67,7 @@ export function SelectedRunningPlanPreviewDialog({
   onOpenChange,
   onRefresh,
   open,
-  description = "AI-authored generated-plan preview. Create confirms this reviewed preview server-side before anything is saved.",
+  description = "Review the AI-authored plan before creating it. Nothing is saved until you confirm.",
   primaryActionLabel = "Create plan",
   primaryActionPendingLabel = "Creating plan...",
   extraNotice,
@@ -113,7 +92,7 @@ export function SelectedRunningPlanPreviewDialog({
               Selected plan
             </p>
             <DialogTitle className="hito-modal-title mt-2">
-              {previewGoalLabel(draft, unavailable)} plan preview
+              {previewGoalLabel(draft)} plan preview
             </DialogTitle>
             <DialogDescription className="hito-body max-w-2xl">{description}</DialogDescription>
           </div>
@@ -122,9 +101,9 @@ export function SelectedRunningPlanPreviewDialog({
         <div className="hito-product-dialog-body-scroll-fill">
           {loading && !draft ? (
             <div className="hito-surface-wash" data-tone="signal">
-              <p className="hito-list-row-title">Building preview</p>
+              <p className="hito-list-row-title">Preparing plan preview</p>
               <p className="hito-list-row-copy">
-                Hito is building the calendar rows, goal day, and workout structure for review.
+                Hito is preparing the calendar and workout structure for review.
               </p>
             </div>
           ) : null}
@@ -220,7 +199,7 @@ function createBlockedView(result: Extract<RunningPlanConfirmActionResult, { ok:
       return {
         title: "Active plan already exists",
         copy: "Selected plans can create a new plan only when there is no active plan.",
-        helper: "Use Add plan from the calendar to start a reviewed plan change.",
+        helper: "Use Current Plan from the calendar to start a reviewed plan change.",
         openPlan: true,
         tone: "signal",
       };
@@ -255,10 +234,8 @@ function PreviewUnavailableState({ result }: { result: SelectedRunningPlanPrevie
   return (
     <div className="grid gap-4">
       <div className="hito-surface-wash" data-tone="destructive">
-        <p className="hito-list-row-title">
-          {previewGoalLabel(null, result)} preview needs adjustment
-        </p>
-        <p className="hito-list-row-copy">{previewUnavailableCopy(result.error.message)}</p>
+        <p className="hito-list-row-title">Plan preview needs adjustment</p>
+        <p className="hito-list-row-copy">{previewUnavailableCopy(result)}</p>
       </div>
       <div className="hito-row-group">
         <div className="hito-list-row items-start">
@@ -270,25 +247,36 @@ function PreviewUnavailableState({ result }: { result: SelectedRunningPlanPrevie
   );
 }
 
-function previewUnavailableCopy(message: string) {
-  const normalized = message.toLowerCase();
-
-  if (
-    normalized.includes("invalid_plan_goal_intent") ||
-    normalized.includes("source_kind") ||
-    normalized.includes("target finish time") ||
-    normalized.includes("target outcome pace") ||
-    normalized.includes("target date") ||
-    normalized.includes("cannot promise a race date")
-  ) {
-    return "This setup cannot be previewed yet. Adjust the goal details.";
+function previewUnavailableCopy(result: SelectedRunningPlanPreviewUnavailable) {
+  switch (result.error.code) {
+    case "impossible_plan_goal":
+      return "This goal cannot produce a safe reviewable plan yet. Adjust the goal details.";
+    case "ai_generated_plan_unavailable":
+      return "Hito could not prepare the plan preview right now. Try again.";
+    case "invalid_plan_goal_intent":
+    case "structured_input_invalid":
+      return "This setup cannot be previewed yet. Adjust the goal details.";
   }
-
-  return message;
 }
 
 function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft }) {
   const rowsByWeek = groupRowsByWeek(draft.calendarRows);
+  const workoutDocumentsById = useMemo(
+    () =>
+      new Map(
+        draft.workoutDocuments.map((document) => [document.sourceWorkoutId, document] as const),
+      ),
+    [draft.workoutDocuments],
+  );
+  const calendarLegend = useMemo(
+    () =>
+      uniqueCalendarWorkoutIdentities(
+        draft.workoutDocuments.map((document) => previewCalendarWorkoutIdentity(document)),
+      ),
+    [draft.workoutDocuments],
+  );
+  const missingWorkoutDocumentRow =
+    draft.calendarRows.find((row) => !workoutDocumentsById.has(row.rowId)) ?? null;
   const nonRestRows = draft.calendarRows.filter((row) => !row.isRestDay);
   const endpointRow =
     draft.calendarRows.find((row) => row.rowId === draft.endpointProof.finalRowId) ??
@@ -312,22 +300,39 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
     sampleRow ??
     draft.calendarRows[0] ??
     null;
+  const activeWorkoutDocument =
+    (activeCalendarRow ? workoutDocumentsById.get(activeCalendarRow.rowId) : null) ?? null;
+  const activeCalendarIdentity = activeWorkoutDocument
+    ? previewCalendarWorkoutIdentity(activeWorkoutDocument)
+    : null;
+
+  if (missingWorkoutDocumentRow) {
+    return (
+      <div className="hito-surface-wash" data-tone="destructive">
+        <p className="hito-list-row-title">Workout preview unavailable</p>
+        <p className="hito-list-row-copy">
+          The reviewed workout document for {missingWorkoutDocumentRow.date} is unavailable. Refresh
+          this preview before creating the plan.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-6">
       <section className="hito-row-group">
         <div className="hito-list-row items-start">
           <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <PreviewFact label="Goal" value={previewGoalLabel(draft, null)} />
+            <PreviewFact label="Goal" value={previewGoalLabel(draft)} />
             <PreviewFact
-              label="Duration"
-              value={`${rowsByWeek.length} weeks · ${draft.calendarRows.length} rows`}
+              label="Plan length"
+              value={`${rowsByWeek.length} weeks · ${nonRestRows.length} workouts`}
             />
             <PreviewFact
               label="Rhythm"
               value={`${draft.normalizedInputSummary.daysPerWeek} runs/week`}
             />
-            <PreviewFact label="Metric truth" value={metricTruthReadback(draft)} />
+            <PreviewFact label="Workout guidance" value={metricTruthReadback(draft)} />
             <PreviewFact label="Start date" value={draft.normalizedInputSummary.startDate} />
             <PreviewFact
               label="Fixed rest"
@@ -345,7 +350,10 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
               label="Training weekdays"
               value={draft.normalizedInputSummary.trainingWeekdays.join(", ")}
             />
-            <PreviewFact label="Load context" value={draft.normalizedInputSummary.loadContext} />
+            <PreviewFact
+              label="Plan approach"
+              value={loadContextLabel(draft.normalizedInputSummary.loadContext)}
+            />
           </div>
         </div>
       </section>
@@ -357,8 +365,7 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
           <div>
             <p className="hito-label">{rowsByWeek.length}-week calendar preview</p>
             <p className="hito-list-row-copy">
-              See how Hito places rest days, long runs, quality touches, and the final{" "}
-              {previewGoalLabel(draft, null)} day before create is available.
+              Review the planned workout rhythm and select any day to inspect its exact structure.
             </p>
           </div>
           <span className="hito-status-pill" data-tone="signal">
@@ -368,41 +375,37 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
 
         <div className="hito-selected-plan-calendar grid gap-2">
           <div className="hito-selected-plan-calendar-legend" aria-label="Calendar legend">
-            <PreviewLegendItem tone="easy" label="Easy" />
-            <PreviewLegendItem tone="steady" label="Steady" />
-            <PreviewLegendItem tone="long" label="Long Run" />
-            <PreviewLegendItem tone="progression" label="Progression" />
-            <PreviewLegendItem tone="tempo" label="Tempo" />
-            <PreviewLegendItem tone="intervals" label="Intervals" />
-            <PreviewLegendItem tone="hills" label="Hills" />
-            <PreviewLegendItem tone="rest" label="Rest" />
-            <PreviewLegendItem tone="final" label="Endpoint" />
+            {calendarLegend.map((identity) => (
+              <PreviewLegendItem key={identity.label} identity={identity} />
+            ))}
           </div>
 
           <TooltipProvider delayDuration={120}>
             <div
               className="hito-selected-plan-calendar-weeks"
-              aria-label={`${previewGoalLabel(draft, null)} preview calendar`}
+              aria-label={`${previewGoalLabel(draft)} preview calendar`}
             >
               {rowsByWeek.map(([weekNumber, rows]) => (
                 <div key={weekNumber} className="hito-selected-plan-calendar-week">
                   <p className="hito-label">Week {weekNumber}</p>
                   <div className="hito-selected-plan-calendar-week-grid">
                     {rows.map((row) => {
-                      const meta = workoutKindMeta(row.workoutDayKind);
-                      const tone = calendarTone(row);
+                      const document = workoutDocumentsById.get(row.rowId);
+                      if (!document) return null;
+
+                      const identity = previewCalendarWorkoutIdentity(document);
                       const endpoint = calendarEndpointReadback(row);
                       const day = formatCalendarDayNumber(row.date);
                       const selected = row.rowId === activeCalendarRowId;
                       const ariaLabel = [
                         `${row.date} ${row.weekday}`,
-                        meta.label,
+                        identity.label,
                         row.title,
                         endpoint,
                       ]
                         .filter(Boolean)
                         .join(". ");
-                      const presentation = buildPreviewCalendarDayPresentation(row);
+                      const presentation = buildPreviewCalendarDayPresentation(row, document);
 
                       return (
                         <Tooltip key={row.rowId}>
@@ -410,7 +413,6 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
                             <button
                               type="button"
                               className="block aspect-square min-w-0 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal/30"
-                              data-preview-tone={tone}
                               aria-label={ariaLabel}
                               aria-pressed={selected}
                               onClick={() => setActiveCalendarRowId(row.rowId)}
@@ -429,7 +431,7 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
                           </TooltipTrigger>
                           <TooltipContent className="max-w-80" sideOffset={8}>
                             <span className="hito-tooltip-meta block">
-                              {row.date} · {row.weekday} · {meta.label}
+                              {row.date} · {row.weekday} · {identity.label}
                             </span>
                             <span className="hito-tooltip-title mt-1 block">{row.title}</span>
                             {endpoint ? (
@@ -445,7 +447,9 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
             </div>
           </TooltipProvider>
 
-          {activeCalendarRow ? <PreviewCalendarDetail row={activeCalendarRow} /> : null}
+          {activeCalendarRow && activeCalendarIdentity ? (
+            <PreviewCalendarDetail identity={activeCalendarIdentity} row={activeCalendarRow} />
+          ) : null}
         </div>
       </section>
 
@@ -453,13 +457,18 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
         <div>
           <p className="hito-label">Workout document</p>
           <p className="hito-list-row-copy">
-            Review the selected day structure before creating this plan.
+            Select a calendar day to review the exact structure and target guidance before creating
+            this plan.
           </p>
         </div>
-        <div className="grid gap-3 lg:grid-cols-2">
-          {endpointRow ? <PreviewWorkoutDocument label="Goal day" row={endpointRow} /> : null}
-          {sampleRow ? <PreviewWorkoutDocument label="Sample workout day" row={sampleRow} /> : null}
-        </div>
+        {activeWorkoutDocument?.workoutType === "rest" ? (
+          <div className="hito-surface-wash">
+            <p className="hito-list-row-title">Rest day</p>
+            <p className="hito-list-row-copy">This selected day has no workout target guidance.</p>
+          </div>
+        ) : activeWorkoutDocument ? (
+          <PreviewWorkoutDocument document={activeWorkoutDocument} label="Selected workout day" />
+        ) : null}
       </section>
     </div>
   );
@@ -593,245 +602,23 @@ function goalIntentTone(
   }
 }
 
-function PreviewWorkoutDocument({
-  label,
-  row,
-}: {
-  label: string;
-  row: SelectedRunningPlanCalendarRow;
-}) {
-  const items = previewWorkoutTimelineItems(row);
-  const notes = previewWorkoutDocumentNotes(row);
+function PreviewWorkoutDocument({ document, label }: { document: WorkoutDocument; label: string }) {
+  const items = workoutDocumentTimelineItems(document);
 
   return (
     <article className="hito-surface-wash min-w-0">
       <WorkoutDocumentReadback
         heading={{
           eyebrow: label,
-          title: row.title,
-          copy: `${row.date} · ${workoutKindMeta(row.workoutDayKind).label}`,
+          title: document.title,
+          copy: `${document.workoutDate} · ${document.phase}`,
         }}
         items={items}
-        notes={notes}
-        summary={previewWorkoutDocumentSummary(row, items)}
+        notes={workoutDocumentNotesForSteps(document.steps, document.notes)}
+        summary={workoutStructureTimelineSummary(items)}
       />
     </article>
   );
-}
-
-function previewWorkoutTimelineItems(
-  row: SelectedRunningPlanCalendarRow,
-): WorkoutStructureTimelineItem[] {
-  return row.segments.flatMap((segment) => {
-    const prescription = segment.primaryPrescription;
-
-    if (prescription.mode === "repeat") {
-      const repeatCount = Math.max(1, Math.round(prescription.repeatCount.max));
-
-      return Array.from({ length: repeatCount }).flatMap((_, roundIndex) =>
-        prescription.children.map((child, childIndex) => {
-          const role = child.label ?? previewSegmentRoleLabel(child.role);
-          const metric = previewRepeatChildMetric(child.prescription);
-
-          return {
-            id: `${segment.id}-repeat-${roundIndex}-${childIndex}`,
-            kindLabel: role,
-            detailLabel: `${roundIndex + 1}/${repeatCount} · ${metric}`,
-            barLabel: previewRepeatChildBarLabel(child.prescription),
-            metric,
-            title: `${role} ${roundIndex + 1}/${repeatCount}`,
-            semanticKind: `${child.role} ${child.label ?? ""}`,
-            weight: previewRepeatChildWeight(child.prescription),
-            readbackEntries: [{ key: "intensity", label: "Cue", value: child.intensityLabel }],
-            tooltipReadbackEntries: child.guidance
-              ? [{ key: "guidance", label: "Cue", value: child.guidance }]
-              : [{ key: "intensity", label: "Cue", value: child.intensityLabel }],
-          } satisfies WorkoutStructureTimelineItem;
-        }),
-      );
-    }
-
-    const metric = previewPrescriptionMetric(prescription);
-    const role = previewSegmentRoleLabel(segment.segmentRole);
-
-    return [
-      {
-        id: segment.id,
-        kindLabel: role,
-        detailLabel: segment.secondaryCue,
-        barLabel: previewPrescriptionBarLabel(prescription),
-        metric,
-        title: role,
-        semanticKind: `${segment.segmentRole} ${row.workoutDayKind}`,
-        weight: previewPrescriptionWeight(prescription),
-        readbackEntries: [
-          { key: "intensity", label: "Cue", value: previewPrescriptionCue(prescription) },
-        ],
-        tooltipReadbackEntries: [{ key: "cue", label: "Cue", value: segment.secondaryCue }],
-      },
-    ];
-  });
-}
-
-function previewWorkoutDocumentNotes(row: SelectedRunningPlanCalendarRow): WorkoutDocumentNote[] {
-  const notes = row.segments.flatMap((segment) => {
-    const prescription = segment.primaryPrescription;
-    const ownNote = segment.secondaryCue
-      ? [
-          {
-            key: `${segment.id}-cue`,
-            label: previewSegmentRoleLabel(segment.segmentRole),
-            value: segment.secondaryCue,
-          },
-        ]
-      : [];
-
-    if (prescription.mode !== "repeat") {
-      return ownNote;
-    }
-
-    return [
-      ...ownNote,
-      ...prescription.children
-        .filter((child) => child.guidance)
-        .map((child, index) => ({
-          key: `${segment.id}-child-${index}-cue`,
-          label: child.label ?? previewSegmentRoleLabel(child.role),
-          value: child.guidance ?? "",
-        })),
-    ];
-  });
-
-  return dedupeWorkoutDocumentNotes(notes).slice(0, 6);
-}
-
-function previewWorkoutDocumentSummary(
-  row: SelectedRunningPlanCalendarRow,
-  items: WorkoutStructureTimelineItem[],
-) {
-  const parts = [
-    row.watchExecutable ? "Executable structure" : null,
-    `${items.length} ${items.length === 1 ? "block" : "blocks"}`,
-  ].filter(Boolean);
-
-  return parts.join(" · ");
-}
-
-function previewPrescriptionMetric(prescription: RunningPlanSegmentPrescription) {
-  switch (prescription.mode) {
-    case "distance":
-    case "distance_with_default_hr_cap":
-      return formatMetersRange(prescription.distanceMeters);
-    case "recovery_distance":
-      return formatMetersRange(prescription.recoveryDistanceMeters);
-    case "time":
-    case "open_warmup":
-    case "open_cooldown":
-    case "time_with_default_hr_cap":
-      return formatSecondsRange(prescription.durationSeconds);
-    case "recovery_time":
-      return formatSecondsRange(prescription.recoveryDurationSeconds);
-    case "free_run_with_cap":
-      return formatNumberRange(prescription.durationSecondsOrDistanceMeters);
-    case "repeat":
-      return `${formatNumberRange(prescription.repeatCount)} x`;
-  }
-}
-
-function previewPrescriptionBarLabel(prescription: RunningPlanSegmentPrescription) {
-  switch (prescription.mode) {
-    case "distance":
-    case "distance_with_default_hr_cap":
-      return compactMetersRange(prescription.distanceMeters);
-    case "recovery_distance":
-      return compactMetersRange(prescription.recoveryDistanceMeters);
-    case "time":
-    case "open_warmup":
-    case "open_cooldown":
-    case "time_with_default_hr_cap":
-      return compactSecondsRange(prescription.durationSeconds);
-    case "recovery_time":
-      return compactSecondsRange(prescription.recoveryDurationSeconds);
-    case "free_run_with_cap":
-      return formatNumberRange(prescription.durationSecondsOrDistanceMeters);
-    case "repeat":
-      return `${formatNumberRange(prescription.repeatCount)}x`;
-  }
-}
-
-function previewPrescriptionWeight(prescription: RunningPlanSegmentPrescription) {
-  switch (prescription.mode) {
-    case "distance":
-    case "distance_with_default_hr_cap":
-      return Math.max(1, prescription.distanceMeters.max / 100);
-    case "recovery_distance":
-      return Math.max(1, prescription.recoveryDistanceMeters.max / 100);
-    case "time":
-    case "open_warmup":
-    case "open_cooldown":
-    case "time_with_default_hr_cap":
-      return Math.max(1, prescription.durationSeconds.max / 60);
-    case "recovery_time":
-      return Math.max(1, prescription.recoveryDurationSeconds.max / 60);
-    case "free_run_with_cap":
-      return Math.max(1, prescription.durationSecondsOrDistanceMeters.max / 60);
-    case "repeat":
-      return Math.max(1, prescription.repeatCount.max);
-  }
-}
-
-function previewRepeatChildMetric(
-  prescription: Extract<
-    RunningPlanSegmentPrescription,
-    { mode: "repeat" }
-  >["children"][number]["prescription"],
-) {
-  return prescription.mode === "distance"
-    ? formatMetersRange(prescription.distanceMeters)
-    : formatSecondsRange(prescription.durationSeconds);
-}
-
-function previewRepeatChildBarLabel(
-  prescription: Extract<
-    RunningPlanSegmentPrescription,
-    { mode: "repeat" }
-  >["children"][number]["prescription"],
-) {
-  return prescription.mode === "distance"
-    ? compactMetersRange(prescription.distanceMeters)
-    : compactSecondsRange(prescription.durationSeconds);
-}
-
-function previewRepeatChildWeight(
-  prescription: Extract<
-    RunningPlanSegmentPrescription,
-    { mode: "repeat" }
-  >["children"][number]["prescription"],
-) {
-  return prescription.mode === "distance"
-    ? Math.max(1, prescription.distanceMeters.max / 100)
-    : Math.max(1, prescription.durationSeconds.max / 60);
-}
-
-function previewPrescriptionCue(prescription: RunningPlanSegmentPrescription) {
-  if ("intensityLabel" in prescription) {
-    return prescription.intensityLabel;
-  }
-
-  return "Ordered repeat";
-}
-
-function previewSegmentRoleLabel(role: string) {
-  if (role === "warmup" || role === "warm_up") return "Warm-up";
-  if (role === "cooldown" || role === "cool_down") return "Cooldown";
-  if (role === "main") return "Run";
-  if (role === "recovery") return "Recover";
-
-  return role
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function PreviewFact({ label, value }: { label: string; value: string }) {
@@ -850,10 +637,14 @@ function metricTruthReadback(draft: SelectedRunningPlanPreviewDraft) {
   );
 
   return benchmarkPaceTruth
-    ? `${benchmarkPaceTruth.label} · personal HR targets blocked`
+    ? `${benchmarkPaceTruth.label} benchmark pace`
     : hasEditableDefaultHrGuidance
-      ? "No benchmark pace supplied · estimated HR guidance where allowed"
-      : "No benchmark pace supplied · structure-only targets";
+      ? "Estimated heart-rate guidance"
+      : "Workout structure only";
+}
+
+function loadContextLabel(value: string) {
+  return value === "conservative" ? "Conservative" : "Standard";
 }
 
 function groupRowsByWeek(rows: readonly SelectedRunningPlanCalendarRow[]) {
@@ -868,82 +659,32 @@ function groupRowsByWeek(rows: readonly SelectedRunningPlanCalendarRow[]) {
   return [...grouped.entries()].sort(([a], [b]) => a - b);
 }
 
-function workoutKindMeta(kind: SelectedRunningPlanCalendarRow["workoutDayKind"]): {
-  label: string;
-  short: string;
-  glyph: WorkoutGlyphKind;
-} {
-  const meta: Record<
-    RunningPlanWorkoutDayKind,
-    { label: string; short: string; glyph: WorkoutGlyphKind }
-  > = {
-    recovery: {
-      label: "Recovery",
-      short: "Recovery",
-      glyph: "recovery",
-    },
-    easy: { label: "Easy", short: "Easy", glyph: "easy" },
-    long_run: { label: "Long Run", short: "Long Run", glyph: "long" },
-    cutback_long_run: {
-      label: "Long Run",
-      short: "Long Run",
-      glyph: "long",
-    },
-    strides: { label: "Easy", short: "Easy", glyph: "easy" },
-    steady_aerobic_run: {
-      label: "Steady",
-      short: "Steady",
-      glyph: "steady",
-    },
-    progression: {
-      label: "Progression",
-      short: "Progression",
-      glyph: "progression",
-    },
-    tempo: { label: "Tempo", short: "Tempo", glyph: "tempo" },
-    threshold: {
-      label: "Tempo",
-      short: "Tempo",
-      glyph: "tempo",
-    },
-    intervals: {
-      label: "Intervals",
-      short: "Intervals",
-      glyph: "intervals",
-    },
-    hills: { label: "Hills", short: "Hills", glyph: "hills" },
-    final_selected_distance_day: {
-      label: "Long Run",
-      short: "Long Run",
-      glyph: "long",
-    },
-  };
-
-  if (kind === "rest") {
-    return { label: "Rest", short: "Rest", glyph: "rest" };
-  }
-
-  return meta[kind];
-}
-
-function PreviewLegendItem({ label, tone }: { label: string; tone: PreviewCalendarTone }) {
+function PreviewLegendItem({ identity }: { identity: HitoCalendarWorkoutIdentity }) {
   return (
     <span className="hito-selected-plan-calendar-legend-item">
-      <span className="hito-selected-plan-calendar-legend-swatch" data-preview-tone={tone} />
-      {label}
+      <span
+        className="hito-selected-plan-calendar-legend-swatch"
+        style={{ background: identity.color }}
+      />
+      {identity.label}
     </span>
   );
 }
 
-function PreviewCalendarDetail({ row }: { row: SelectedRunningPlanCalendarRow }) {
-  const meta = workoutKindMeta(row.workoutDayKind);
+function PreviewCalendarDetail({
+  identity,
+  row,
+}: {
+  identity: HitoCalendarWorkoutIdentity;
+  row: SelectedRunningPlanCalendarRow;
+}) {
   const endpoint = calendarEndpointReadback(row);
 
   return (
     <div className="hito-selected-plan-calendar-detail" aria-live="polite">
       <div className="min-w-0">
         <p className="hito-body-small">
-          {row.date} · {row.weekday} · {meta.label}
+          {row.date} · {row.weekday} · {identity.label}
         </p>
         <p className="hito-list-row-title mt-1">{row.title}</p>
       </div>
@@ -956,7 +697,10 @@ function PreviewCalendarDetail({ row }: { row: SelectedRunningPlanCalendarRow })
   );
 }
 
-function buildPreviewCalendarDayPresentation(row: SelectedRunningPlanCalendarRow): {
+function buildPreviewCalendarDayPresentation(
+  row: SelectedRunningPlanCalendarRow,
+  document: WorkoutDocument,
+): {
   result: "none" | "planned";
   state: "workout" | "rest";
   supportingText?: string | null;
@@ -968,132 +712,26 @@ function buildPreviewCalendarDayPresentation(row: SelectedRunningPlanCalendarRow
     state: row.isRestDay ? "rest" : "workout",
     supportingText: calendarEndpointReadback(row),
     title: row.isRestDay ? undefined : row.title,
-    workout: previewCalendarWorkoutIdentity(row),
+    workout: previewCalendarWorkoutIdentity(document),
   };
 }
 
-function previewCalendarWorkoutIdentity(
-  row: SelectedRunningPlanCalendarRow,
-): HitoCalendarWorkoutIdentity {
-  const meta = workoutKindMeta(row.workoutDayKind);
-  const tone = calendarTone(row);
-
-  return {
-    color: previewCalendarToneColor(tone),
-    glyph: meta.glyph,
-    label: meta.label,
-    short: meta.short,
-  };
-}
-
-function previewCalendarToneColor(tone: PreviewCalendarTone) {
-  const colors: Record<PreviewCalendarTone, string> = {
-    easy: workoutTypeColorVar("easy"),
-    final: workoutTypeColorVar("long_run"),
-    hills: workoutTypeColorVar("hills"),
-    intervals: workoutTypeColorVar("intervals"),
-    long: workoutTypeColorVar("long_run"),
-    progression: workoutTypeColorVar("progression"),
-    rest: workoutTypeColorVar("rest"),
-    steady: workoutTypeColorVar("steady"),
-    tempo: workoutTypeColorVar("tempo"),
-  };
-
-  return colors[tone];
+function previewCalendarWorkoutIdentity(document: WorkoutDocument): HitoCalendarWorkoutIdentity {
+  return buildCalendarWorkoutIdentity(document);
 }
 
 function formatCalendarDayNumber(date: string) {
   return date.slice(8).replace(/^0/, "");
 }
 
-function calendarTone(row: SelectedRunningPlanCalendarRow): PreviewCalendarTone {
-  if (row.endpointDistanceMeters || row.workoutDayKind === "final_selected_distance_day") {
-    return "final";
-  }
-
-  if (row.isRestDay) {
-    return "rest";
-  }
-
-  if (row.workoutDayKind === "long_run" || row.workoutDayKind === "cutback_long_run") {
-    return "long";
-  }
-
-  if (row.workoutDayKind === "easy" || row.workoutDayKind === "recovery") {
-    return "easy";
-  }
-
-  if (row.workoutDayKind === "strides") {
-    return "easy";
-  }
-
-  if (row.workoutDayKind === "steady_aerobic_run") {
-    return "steady";
-  }
-
-  if (row.workoutDayKind === "progression") {
-    return "progression";
-  }
-
-  if (row.workoutDayKind === "tempo" || row.workoutDayKind === "threshold") {
-    return "tempo";
-  }
-
-  if (row.workoutDayKind === "intervals") {
-    return "intervals";
-  }
-
-  if (row.workoutDayKind === "hills") {
-    return "hills";
-  }
-
-  return "tempo";
+function uniqueCalendarWorkoutIdentities(
+  identities: readonly HitoCalendarWorkoutIdentity[],
+): HitoCalendarWorkoutIdentity[] {
+  return [...new Map(identities.map((identity) => [identity.label, identity])).values()];
 }
 
 function calendarEndpointReadback(row: SelectedRunningPlanCalendarRow) {
-  return row.endpointDistanceMeters ? `${row.endpointDistanceMeters}m goal distance` : null;
-}
-
-function formatSecondsRange(range: RunningPlanRange) {
-  return `${formatSeconds(range.min)}${range.min === range.max ? "" : `-${formatSeconds(range.max)}`}`;
-}
-
-function formatSeconds(seconds: number) {
-  if (seconds % 60 === 0) {
-    return `${seconds / 60} min`;
-  }
-
-  return `${seconds}s`;
-}
-
-function formatMetersRange(range: RunningPlanRange) {
-  return `${formatMeters(range.min)}${range.min === range.max ? "" : `-${formatMeters(range.max)}`}`;
-}
-
-function formatMeters(meters: number) {
-  return `${meters}m`;
-}
-
-function formatNumberRange(range: RunningPlanRange) {
-  return `${range.min}${range.min === range.max ? "" : `-${range.max}`}`;
-}
-
-function compactSecondsRange(range: RunningPlanRange) {
-  return `${compactSeconds(range.min)}${
-    range.min === range.max ? "" : `-${compactSeconds(range.max)}`
-  }`;
-}
-
-function compactSeconds(seconds: number) {
-  if (seconds % 60 === 0) {
-    return `${seconds / 60}m`;
-  }
-
-  return `${seconds}s`;
-}
-
-function compactMetersRange(range: RunningPlanRange) {
-  return `${formatMeters(range.min)}${
-    range.min === range.max ? "" : `-${formatMeters(range.max)}`
-  }`;
+  return row.endpointDistanceMeters
+    ? `Goal · ${formatDistanceMeters(row.endpointDistanceMeters)}`
+    : null;
 }

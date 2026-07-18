@@ -11,7 +11,6 @@ import {
   buildAiGeneratedRunningPlanDevFixtureOpenAiFetch,
 } from "../../src/lib/ai-generated-running-plan-dev-fixture";
 import { AI_AUTHORED_PLAN_FIRST_SOURCE_KIND } from "../../src/lib/ai-authored-plan-first-compiler";
-import { generateStructuredFirstPlanDraftForUser } from "../../src/lib/first-plan-actions";
 import type { TrainingPlanV2 } from "../../src/lib/imported-plan";
 
 export async function assertFirstPlanReleaseGateContracts() {
@@ -57,53 +56,8 @@ export async function assertFirstPlanReleaseGateContracts() {
     "Plan-first service output must not expose deleted generated-plan legacy vocabulary.",
   );
 
-  const structuredDraft = await generateStructuredFirstPlanDraftForUser(
-    "doctrine-plan-first-user",
-    request,
-    {
-      aiPreview: {
-        today: authoringInput.schedule.startDate,
-        apiKey: "structured-plan-first-release-gate",
-        model: AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
-        fetchImpl: fixtureFetch,
-        timeoutMs: 1_000,
-        maxOutputTokens: 12_000,
-      },
-    },
-  );
-
-  assert.equal(
-    structuredDraft.ok,
-    true,
-    structuredDraft.ok
-      ? "Structured first-plan draft should return review-ready plan-first output."
-      : structuredDraft.message,
-  );
-  assert.equal(structuredDraft.status, "draft_ready");
-  if (!structuredDraft.ok || structuredDraft.status !== "draft_ready") {
-    throw new Error("Structured first-plan draft did not return review-ready output.");
-  }
-
-  assert.equal(structuredDraft.sourceKind, AI_AUTHORED_PLAN_FIRST_SOURCE_KIND);
-  assert.equal(structuredDraft.generation.sourceStatus, "ai_authored");
-  assertPlanFirstCanonicalResult(
-    structuredDraft.draft.canonicalPlan,
-    "structured first-plan draft",
-  );
-  assert.equal(structuredDraft.safety.doesNotMutatePlan, true);
-  assert.equal(structuredDraft.safety.requiresExplicitApply, true);
-  assert.equal(structuredDraft.draft.draftToken.includes(":"), true);
-  assert.doesNotMatch(
-    JSON.stringify(structuredDraft),
-    /repeat_unit|recovery_unit/,
-    "Structured first-plan review payload must be plan-first only.",
-  );
-
-  const importedSeed = buildReviewedFirstPlanImportedSeed(structuredDraft.draft.canonicalPlan);
-  assert.equal(
-    importedSeed.workouts.length,
-    structuredDraft.draft.canonicalPlan.planned_workouts.length,
-  );
+  const importedSeed = buildReviewedFirstPlanImportedSeed(serviceResult.canonicalPlan);
+  assert.equal(importedSeed.workouts.length, serviceResult.canonicalPlan.planned_workouts.length);
 
   const invalidResult = await generateAiFirstPlanDraftPreview({
     input: authoringInput,

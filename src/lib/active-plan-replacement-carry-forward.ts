@@ -4,7 +4,7 @@ import {
   type PersistedPlannedWorkoutRow,
   type PersistedWorkoutLogRow,
 } from "@/lib/persisted-plan-replacement";
-import type { Database } from "@/lib/supabase/database";
+import type { Database, Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 
 type SupabaseAdminClient = ReturnType<typeof createAdminSupabaseClient>;
@@ -26,6 +26,7 @@ type EvidenceRow =
       table: "workout_comparisons";
       id: string;
       plannedWorkoutId: string;
+      differencePayload: Database["public"]["Tables"]["workout_comparisons"]["Row"]["difference_payload"];
     }
   | {
       table: "workout_ai_insights";
@@ -42,6 +43,8 @@ export type ActivePlanCarryForwardResult = {
   importedSeed: ImportedPlanSeed;
   preservedWorkouts: PreservedWorkoutCarryForwardLink[];
 };
+
+export type ActivePlanHistoryDisposition = "carry_forward" | "archive_only";
 
 export async function buildActivePlanReplacementCarryForward(input: {
   userId: string;
@@ -98,19 +101,41 @@ export async function buildActivePlanReplacementCarryForward(input: {
   };
 }
 
-export async function copyCarryForwardLogs(input: {
+export async function prepareActivePlanReplacementPersistence(input: {
   supabase: SupabaseAdminClient;
   userId: string;
-  insertedWorkouts: PersistedPlannedWorkoutRow[];
+  insertedWorkouts: Array<{ id: string; workout_date: string }>;
+  currentWorkoutIds: string[];
   sourceLogsByWorkoutId: Map<string, PersistedWorkoutLogRow>;
   preservedWorkouts: PreservedWorkoutCarryForwardLink[];
+  historyDisposition: ActivePlanHistoryDisposition;
 }) {
+  const evidenceRows = await loadEvidenceRows(
+    input.supabase,
+    input.userId,
+    input.currentWorkoutIds,
+  );
+  const expectedHistory = buildExpectedHistorySnapshot(input, evidenceRows);
+
+  if (input.historyDisposition === "archive_only") {
+    return {
+      logRows: [] as unknown as Json,
+      evidenceRelinks: [] as unknown as Json,
+      expectedHistory,
+    };
+  }
+
   const insertedWorkoutsByDate = new Map(
     input.insertedWorkouts.map((workout) => [workout.workout_date, workout]),
   );
   const nextWorkoutIdBySourceWorkoutId = new Map<string, string>();
   const nextLogIdBySourceLogId = new Map<string, string>();
-  const logRows: Database["public"]["Tables"]["workout_logs"]["Insert"][] = [];
+  const logRows: Array<{
+    id: string;
+    planned_workout_id: string;
+    source_log_id: string;
+    source_workout_id: string;
+  }> = [];
 
   for (const preserved of input.preservedWorkouts) {
     const nextWorkout = insertedWorkoutsByDate.get(preserved.workoutDate);
@@ -133,107 +158,90 @@ export async function copyCarryForwardLogs(input: {
     logRows.push({
       id: nextLogId,
       planned_workout_id: nextWorkout.id,
-      user_id: input.userId,
-      outcome: sourceLog.outcome,
-      actual_distance_km: sourceLog.actual_distance_km,
-      actual_duration_min: sourceLog.actual_duration_min,
-      rpe: sourceLog.rpe,
-      notes: sourceLog.notes,
-      intervals_completed: sourceLog.intervals_completed,
-      body_notes: sourceLog.body_notes,
-      logged_at: sourceLog.logged_at,
-      updated_at: sourceLog.updated_at,
+      source_log_id: sourceLog.id,
+      source_workout_id: preserved.sourceWorkoutId,
     });
   }
 
-  if (logRows.length > 0) {
-    const insert = await input.supabase.from("workout_logs").insert(logRows);
+  const evidenceRelinks = evidenceRows.map((row) => {
+    const targetWorkoutId = nextWorkoutIdBySourceWorkoutId.get(row.plannedWorkoutId);
 
-    if (insert.error) {
-      throw new Error(insert.error.message);
+    if (!targetWorkoutId) {
+      throw new Error(
+        `Active-plan replacement lost evidence-backed workout ${row.plannedWorkoutId}. Current plan is unchanged.`,
+      );
     }
-  }
+
+    if (row.table === "workout_comparisons") {
+      return {
+        table: row.table,
+        id: row.id,
+        source_workout_id: row.plannedWorkoutId,
+        target_workout_id: targetWorkoutId,
+        source_difference_payload: row.differencePayload,
+        target_difference_payload: relinkComparisonPlannedWorkoutIdentity(
+          row.differencePayload,
+          row.plannedWorkoutId,
+          targetWorkoutId,
+        ),
+      };
+    }
+
+    if (row.table === "workout_result_assets" || row.table === "workout_actual_metrics") {
+      return {
+        table: row.table,
+        id: row.id,
+        source_workout_id: row.plannedWorkoutId,
+        target_workout_id: targetWorkoutId,
+        source_workout_log_id: row.workoutLogId,
+        target_workout_log_id: row.workoutLogId
+          ? (nextLogIdBySourceLogId.get(row.workoutLogId) ?? null)
+          : null,
+      };
+    }
+
+    return {
+      table: row.table,
+      id: row.id,
+      source_workout_id: row.plannedWorkoutId,
+      target_workout_id: targetWorkoutId,
+    };
+  });
 
   return {
-    nextWorkoutIdBySourceWorkoutId,
-    nextLogIdBySourceLogId,
+    logRows: logRows as unknown as Json,
+    evidenceRelinks: evidenceRelinks as unknown as Json,
+    expectedHistory,
   };
 }
 
-export async function relinkCarryForwardEvidence(input: {
-  supabase: SupabaseAdminClient;
-  userId: string;
-  sourceWorkoutIds: string[];
-  nextWorkoutIdBySourceWorkoutId: Map<string, string>;
-  nextLogIdBySourceLogId: Map<string, string>;
-}) {
-  if (input.sourceWorkoutIds.length === 0) {
-    return async () => {};
-  }
-
-  const rows = await loadEvidenceRows(input.supabase, input.userId, input.sourceWorkoutIds);
-  const applied: EvidenceRow[] = [];
-
-  try {
-    for (const row of rows) {
-      const nextWorkoutId = input.nextWorkoutIdBySourceWorkoutId.get(row.plannedWorkoutId);
-
-      if (!nextWorkoutId) {
-        continue;
-      }
-
-      if (row.table === "workout_result_assets") {
-        const update = await input.supabase
-          .from("workout_result_assets")
-          .update({
-            planned_workout_id: nextWorkoutId,
-            workout_log_id: row.workoutLogId
-              ? (input.nextLogIdBySourceLogId.get(row.workoutLogId) ?? null)
-              : null,
-          })
-          .eq("id", row.id)
-          .eq("user_id", input.userId);
-
-        if (update.error) throw new Error(update.error.message);
-      } else if (row.table === "workout_actual_metrics") {
-        const update = await input.supabase
-          .from("workout_actual_metrics")
-          .update({
-            planned_workout_id: nextWorkoutId,
-            workout_log_id: row.workoutLogId
-              ? (input.nextLogIdBySourceLogId.get(row.workoutLogId) ?? null)
-              : null,
-          })
-          .eq("id", row.id)
-          .eq("user_id", input.userId);
-
-        if (update.error) throw new Error(update.error.message);
-      } else if (row.table === "workout_comparisons") {
-        const update = await input.supabase
-          .from("workout_comparisons")
-          .update({ planned_workout_id: nextWorkoutId })
-          .eq("id", row.id)
-          .eq("user_id", input.userId);
-
-        if (update.error) throw new Error(update.error.message);
-      } else {
-        const update = await input.supabase
-          .from("workout_ai_insights")
-          .update({ planned_workout_id: nextWorkoutId })
-          .eq("id", row.id)
-          .eq("user_id", input.userId);
-
-        if (update.error) throw new Error(update.error.message);
-      }
-
-      applied.push(row);
-    }
-  } catch (error) {
-    await rollbackEvidenceRelinks(input.supabase, applied);
-    throw error;
-  }
-
-  return () => rollbackEvidenceRelinks(input.supabase, applied);
+function buildExpectedHistorySnapshot(
+  input: {
+    currentWorkoutIds: string[];
+    sourceLogsByWorkoutId: Map<string, PersistedWorkoutLogRow>;
+  },
+  evidenceRows: EvidenceRow[],
+) {
+  return {
+    workout_ids: input.currentWorkoutIds.slice().sort(),
+    log_ids: [...input.sourceLogsByWorkoutId.values()].map((log) => log.id).sort(),
+    asset_ids: evidenceRows
+      .filter((row) => row.table === "workout_result_assets")
+      .map((row) => row.id)
+      .sort(),
+    metric_ids: evidenceRows
+      .filter((row) => row.table === "workout_actual_metrics")
+      .map((row) => row.id)
+      .sort(),
+    comparison_ids: evidenceRows
+      .filter((row) => row.table === "workout_comparisons")
+      .map((row) => row.id)
+      .sort(),
+    insight_ids: evidenceRows
+      .filter((row) => row.table === "workout_ai_insights")
+      .map((row) => row.id)
+      .sort(),
+  } as Json;
 }
 
 async function fetchReplacementEvidenceWorkoutIds(userId: string, workoutIds: string[]) {
@@ -264,7 +272,7 @@ async function loadEvidenceRows(
       .in("planned_workout_id", workoutIds),
     supabase
       .from("workout_comparisons")
-      .select("id, planned_workout_id")
+      .select("id, planned_workout_id, difference_payload")
       .eq("user_id", userId)
       .in("planned_workout_id", workoutIds),
     supabase
@@ -296,6 +304,7 @@ async function loadEvidenceRows(
       table: "workout_comparisons" as const,
       id: row.id,
       plannedWorkoutId: row.planned_workout_id,
+      differencePayload: row.difference_payload,
     })),
     ...(insights.data ?? []).map((row) => ({
       table: "workout_ai_insights" as const,
@@ -305,44 +314,35 @@ async function loadEvidenceRows(
   ];
 }
 
-async function rollbackEvidenceRelinks(supabase: SupabaseAdminClient, rows: EvidenceRow[]) {
-  for (const row of rows.slice().reverse()) {
-    if (row.table === "workout_result_assets") {
-      const rollback = await supabase
-        .from("workout_result_assets")
-        .update({
-          planned_workout_id: row.plannedWorkoutId,
-          workout_log_id: row.workoutLogId,
-        })
-        .eq("id", row.id);
-
-      if (rollback.error) throw new Error(rollback.error.message);
-    } else if (row.table === "workout_actual_metrics") {
-      const rollback = await supabase
-        .from("workout_actual_metrics")
-        .update({
-          planned_workout_id: row.plannedWorkoutId,
-          workout_log_id: row.workoutLogId,
-        })
-        .eq("id", row.id);
-
-      if (rollback.error) throw new Error(rollback.error.message);
-    } else if (row.table === "workout_comparisons") {
-      const rollback = await supabase
-        .from("workout_comparisons")
-        .update({ planned_workout_id: row.plannedWorkoutId })
-        .eq("id", row.id);
-
-      if (rollback.error) throw new Error(rollback.error.message);
-    } else {
-      const rollback = await supabase
-        .from("workout_ai_insights")
-        .update({ planned_workout_id: row.plannedWorkoutId })
-        .eq("id", row.id);
-
-      if (rollback.error) throw new Error(rollback.error.message);
-    }
+export function relinkComparisonPlannedWorkoutIdentity(
+  value: Database["public"]["Tables"]["workout_comparisons"]["Row"]["difference_payload"],
+  sourceWorkoutId: string,
+  nextWorkoutId: string,
+) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("Comparison evidence payload is malformed and cannot be carried forward.");
   }
+
+  const plannedWorkout = value.plannedWorkout;
+
+  if (
+    !plannedWorkout ||
+    typeof plannedWorkout !== "object" ||
+    Array.isArray(plannedWorkout) ||
+    plannedWorkout.plannedWorkoutId !== sourceWorkoutId
+  ) {
+    throw new Error(
+      "Comparison evidence payload does not match its source workout and cannot be carried forward.",
+    );
+  }
+
+  return {
+    ...value,
+    plannedWorkout: {
+      ...plannedWorkout,
+      plannedWorkoutId: nextWorkoutId,
+    },
+  };
 }
 
 function normalizeReplacementWorkoutOrder(workouts: ImportedPlanSeed["workouts"]) {

@@ -18,11 +18,11 @@ architect
 
 ## Task
 
-Run a domain-based deletion-first cleanup audit and select one implementation batch.
+Hold source-size cleanup after accepted `Delete active plan` retirement.
 
 ## Stage
 
-ARCHITECT audit / service-domain cleanup ranking.
+ARCHITECT holding / evidence-gated cleanup pause.
 
 ## Exact Handoff Prompt
 
@@ -30,61 +30,98 @@ ARCHITECT audit / service-domain cleanup ranking.
 ROLE: ARCHITECT
 
 Task:
-Run a domain-based deletion-first cleanup audit and select one implementation batch.
+Resume source-size cleanup only when fresh source evidence proves one meaningful deletion, reuse,
+consolidation, or safety batch.
 
 Stage:
-ARCHITECT audit / service-domain cleanup ranking.
+ARCHITECT checkpoint / evidence-gated cleanup reselection.
 
 Plan:
 /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-30-hito-source-size-governance-and-cleanup-plan.md
 
 Context:
-Hito has one canonical service-domain ownership map in:
-/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/current-functional-map.md
-
-Product wants one larger cleanup pass, but not another chain of isolated microfixes. The next cleanup
-must start from service domains, not recent files or raw hotspots.
+The deterministic-authoring, selected-plan discovery, and unreachable delete-plan cleanup batches
+are accepted. The remaining nearby lifecycle, preview/confirm, manual, import/export, schedule,
+and evidence owners have live consumers. The cleanup track is deliberately on hold rather than
+selecting cosmetic or file-size-driven work.
 
 Root cause:
-Visible symptom: cleanup keeps following recent hotspots or single-file pressure.
-Likely underlying cause: agents need an explicit domain-to-owner map before ranking deletion/reuse
-candidates.
-Canonical owner: ARCHITECT source-of-truth and cleanup selection first; implementation begins only
-after one owner/risk/validation batch is selected.
+Visible symptom: cleanup momentum can create speculative micro-batches after the proved dead paths
+are exhausted.
+Underlying cause: a new batch is not justified until reachability evidence identifies a real
+duplicate, dead capability, or unsafe parallel truth.
+Canonical owner: ARCHITECT evidence-based cleanup selection.
 
 Scope:
-1. Read AGENTS.md, agents/architect.agent.md, hito-architecture-audit, hito-plan-writing-and-closeout,
-   this plan, docs/current-product.md, docs/current-functional-map.md, docs/current-system.md, and
-   docs/current-state.md.
-2. Use read-only subagents for independent domain scans:
-   - BACKEND/source ownership and duplicate/seam audit;
-   - FRONTEND/Hito DS route/component/local-devtool ownership audit;
-   - QA/DEVTOOLS validators/scripts/artifact hygiene audit;
-   - PRODUCT/docs source-of-truth drift audit.
-3. Rank service domains from the current-functional-map table by deletion/reuse/consolidation
-   opportunity, source-size impact, product risk, owner clarity, and validation story.
-4. Select exactly one cleanup implementation batch, or hold if no domain has a safe net-reduction
-   batch.
-5. The selected batch must name owner, files/roots, expected net LOC or source-truth reduction,
-   validation, and stop conditions.
-6. Do not implement cleanup code in this ARCHITECT audit.
+1. Use current source/import evidence, not old hotspot notes or line count alone.
+2. Select at most one batch with one owner, one root cause, meaningful deletion/reuse/safety value,
+   and one focused validation story; otherwise keep the track on hold.
+3. Route one autonomous owner task that includes implementation, internal subagent validation, and
+   same-owner fix-forward so Product is not a relay.
+4. Preserve all accepted product contracts unless fresh source evidence proves a regression.
+5. Ask Product before changing runner-visible lifecycle semantics, data-retention/destructive
+   behavior, coaching/business rules, schema/migration policy, or paid/live-provider behavior.
 
 Validation:
-- Use read-only source/import/docs scans.
-- Run `git status --short`.
-- Do not run browser QA.
-- Do not run `npm run metrics:lines` unless the audit explicitly needs a new ledger snapshot; if run,
-  report that it mutates the ledger.
-- If docs are edited, run scoped `git diff --check`.
+- Read-only source/import/current-doc scans first.
+- Use the smallest validation set matching the selected owner and risk; require browser or
+  persistence proof only when behavior changes.
+- Keep hosted mutation, migrations, and paid provider calls behind explicit approval.
 
 Stop conditions:
-- Stop if a candidate requires product behavior decisions, Supabase/schema/data mutation, live
-  OpenAI/provider calls, destructive QA artifact cleanup, or broad cross-domain rewrite.
-- Stop if cleanup would weaken accepted local inspector boundaries: local-only, no live UI mutation,
-  no backend/Admin/Supabase/Work Items persistence.
-- Stop if the best available change is only cosmetic file splitting without deletion/reuse/
-  consolidation value.
+- Hold when the only candidate is cosmetic naming, a single unused import, file splitting, or
+  speculative future flexibility.
+- Stop and ask Product one concrete question when the proposed cleanup changes what a runner can do
+  or what data/history Hito preserves.
 ```
+
+## Hold Decision - 2026-07-18
+
+- Accepted removal of the unreachable `deleteActivePlan` server function, its delete-only helper,
+  and result contract; current source and scripts contain zero references.
+- `Clear upcoming schedule` remains the sole runner-facing lifecycle path in this area, with explicit
+  confirmation, internal archive behavior, and preserved history. Atomic clear-before-import,
+  replacement, review/confirm, manual lifecycle, schedule reflow, and evidence paths remain live.
+- No adjacent candidate meets the cleanup bar. A single unused type import and historical internal
+  naming are not sufficient architecture or safety value for another batch.
+- Resume only from fresh reachability evidence. The selected implementation owner must complete its
+  own validation and safe subagent loop; Product is consulted only for runner-visible behavior,
+  retention/destructive semantics, coaching rules, schema/migration policy, or paid/provider use.
+- This hold does not block product work. It prevents cleanup momentum from reopening accepted
+  contracts without a concrete root cause.
+
+## Accepted Frontend Batch - 2026-07-18
+
+- Removed the unreachable selected-plan discovery DTOs, no-op card-loading wiring, impossible
+  loading/blocked states, and discovery-only copy.
+- Static 10K, Half Marathon, Marathon, and Custom shortcuts remain the only current UI entry and
+  still call canonical backend preview plus signed review/confirm; active-plan replacement review
+  and required-basics gating remain intact.
+- Input changes now invalidate stale preview state through the canonical preview-input fingerprint
+  rather than a retired discovery key.
+- Source review found zero remaining discovery symbols. Existing desktop and exact 375px browser QA
+  remains the acceptance evidence; no additional browser run was required for this checkpoint.
+- Adjacent historical component names remain live owners and are not cleanup targets without
+  deletion value.
+
+## Accepted Backend Batch - 2026-07-18
+
+- Removed the 4,807-line deterministic structured-plan runtime island, 2,170 lines of proof-only
+  doctrine modules, 1,017 obsolete lines from the doctrine entrypoint, and 46 generator-only schema
+  lines: exact scoped maintained-source reduction `-8,040` lines.
+- Canonical plan-first/local-fixture validators now own generated-plan acceptance; planned-workout
+  language coverage uses the same compiled plan-first output instead of a synthetic second planner.
+- Retained `structured-plan-authoring-schema.ts` and `structured-first-plan-onboarding.ts` because
+  the provider contract, compiler, fixture, CLI, persistence profile patch, and onboarding form use
+  them as input/context truth.
+- Confirmed the atomic lifecycle TypeScript owner and two append-only lifecycle migrations are
+  direct runtime/proof dependencies. The staged set contains exactly these three intentional
+  additions; none is an unresolved untracked-source dependency.
+- Plan-first, goal-intent, confirm, language, doctrine, manual-authoring, lint, build, and build
+  integrity validation passed.
+- Post-batch source review found no live imports of the deleted deterministic authoring contour.
+  Retained provider schema and onboarding context modules remain reachable from the provider,
+  compiler, fixture, CLI, persistence profile patch, and onboarding flow.
 
 ## Domain-Based Cleanup Anchor - 2026-07-09
 

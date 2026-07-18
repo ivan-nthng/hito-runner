@@ -190,7 +190,7 @@ export function ActivePlanCreatePlanDialog({
     [constructorState, goalDistance, terrainFocus],
   );
   const hasActivePlan = Boolean(snapshot?.planMeta?.id);
-  const isPresetDiscoveryReady = isPresetPrimarySetupReady(constructorState);
+  const hasRequiredPlanBasics = isPresetPrimarySetupReady(constructorState);
   const selectedGoalId = planGoalChoice || null;
   const planGoalDraftState: PlanGoalIntentDraftState = {
     planGoalChoice,
@@ -205,9 +205,8 @@ export function ActivePlanCreatePlanDialog({
   );
   const selectedPlanPreview = useSelectedPlanPresetPreviewController({
     state: effectiveConstructorState,
-    autoLoadEnabled: open && createMode === "quick",
     autoRefreshOpenPreview: true,
-    isPresetDiscoveryReady,
+    hasRequiredPlanBasics,
     resetOnInputChange: true,
     toastId: ACTIVE_PLAN_CREATE_TOAST_ID,
     previewReadyDescription: "Review the candidate plan before reviewing the active-plan change.",
@@ -225,7 +224,7 @@ export function ActivePlanCreatePlanDialog({
     createMode,
     error: selectedPlanPreview.error,
     hasActivePlan,
-    isPresetDiscoveryReady,
+    hasRequiredPlanBasics,
     planGoalChoice,
     previewGate: selectedPlanGoalPreviewGate,
     previewIsOpen: selectedPlanPreview.previewOpen,
@@ -236,7 +235,7 @@ export function ActivePlanCreatePlanDialog({
     isBusy ||
     createMode !== "quick" ||
     !hasActivePlan ||
-    !isPresetDiscoveryReady ||
+    !hasRequiredPlanBasics ||
     !selectedGoalId ||
     !selectedPlanGoalPreviewGate.ok ||
     (selectedPlanPreview.previewOpen && selectedPreviewIsReady);
@@ -392,7 +391,7 @@ export function ActivePlanCreatePlanDialog({
       return;
     }
 
-    if (!isPresetDiscoveryReady) {
+    if (!hasRequiredPlanBasics) {
       selectedPlanPreview.setError("Add age, height, and weight before creating a plan.");
       return;
     }
@@ -568,25 +567,20 @@ export function ActivePlanCreatePlanDialog({
                     setComment,
                   }}
                   constructorStatus="idle"
-                  draftResult={null}
                   constructorError={null}
                   isBusy={isBusy || !hasActivePlan}
-                  isConstructorReady={isPresetDiscoveryReady}
+                  isConstructorReady={hasRequiredPlanBasics}
                   onSubmit={() => {
                     selectedPlanPreview.setError("Choose a goal before reviewing the plan change.");
                   }}
-                  onConfirmDraft={() => undefined}
-                  onBackToEdit={() => undefined}
                   planPresetPanel={
                     <PlanPresetPanel
-                      cardsResult={selectedPlanPreview.cardsResult}
                       confirmResult={null}
                       previewResult={selectedPlanPreview.previewResult}
                       createStatus={transitionStatus === "reviewing" ? "creating" : "idle"}
                       error={selectedPlanPreview.error}
                       status={selectedPlanPreview.status}
-                      isBusy={isBusy || !hasActivePlan}
-                      isPresetDiscoveryReady={isPresetDiscoveryReady}
+                      hasRequiredPlanBasics={hasRequiredPlanBasics}
                       previewOpen={selectedPlanPreview.previewOpen}
                       planGoalChoice={planGoalChoice}
                       planGoalCustomDistanceKm={planGoalCustomDistanceKm}
@@ -682,7 +676,7 @@ function activePlanCreateFooterHint({
   createMode,
   error,
   hasActivePlan,
-  isPresetDiscoveryReady,
+  hasRequiredPlanBasics,
   planGoalChoice,
   previewGate,
   previewIsOpen,
@@ -692,7 +686,7 @@ function activePlanCreateFooterHint({
   createMode: CreateMode;
   error: string | null;
   hasActivePlan: boolean;
-  isPresetDiscoveryReady: boolean;
+  hasRequiredPlanBasics: boolean;
   planGoalChoice: StructuredConstructorState["planGoalChoice"];
   previewGate: ReturnType<typeof resolveSelectedPlanGoalPreviewGate>;
   previewIsOpen: boolean;
@@ -717,7 +711,7 @@ function activePlanCreateFooterHint({
     };
   }
 
-  if (!isPresetDiscoveryReady) {
+  if (!hasRequiredPlanBasics) {
     return {
       message: "Add age, height, and weight before creating a plan.",
       tone: "muted",

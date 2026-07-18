@@ -4,36 +4,12 @@ import { todayIso, type TrainingSnapshot } from "@/lib/training";
 
 type PersistedSnapshotLoader = (userId: string) => Promise<TrainingSnapshot>;
 
-export interface DeleteActivePlanResult {
-  ok: true;
-  status: "archived";
-  archivedPlanId: string;
-  snapshot: TrainingSnapshot;
-}
-
 export interface ClearUpcomingScheduleResult {
   ok: true;
   status: "cleared";
   clearedFromDate: string;
   archivedPlanId: string;
   snapshot: TrainingSnapshot;
-}
-
-export async function archiveActivePlanForUser(
-  userId: string,
-  loadSnapshot: PersistedSnapshotLoader,
-): Promise<DeleteActivePlanResult> {
-  const archivedPlanId = await archiveCurrentActivePlanForUser(
-    userId,
-    "There is no active plan to delete.",
-  );
-
-  return {
-    ok: true,
-    status: "archived",
-    archivedPlanId,
-    snapshot: await loadSnapshot(userId),
-  };
 }
 
 export async function clearUpcomingScheduleForUser(

@@ -6,12 +6,16 @@ import {
 } from "@/lib/training";
 import type { WorkoutDocumentNote } from "@/components/workout-structure/WorkoutDocumentReadback";
 
-export function workoutDocumentNotesForSteps(steps: Step[], limit = 8): WorkoutDocumentNote[] {
-  const notes = steps.flatMap((step, stepIndex) =>
-    workoutDocumentNotesForStep(step, `${stepIndex}`),
-  );
+export function workoutDocumentNotesForSteps(
+  steps: Step[],
+  workoutNotes?: string | null,
+): WorkoutDocumentNote[] {
+  const notes = [
+    readGuidanceEntry("Notes", workoutNotes),
+    ...steps.flatMap((step, stepIndex) => workoutDocumentNotesForStep(step, `${stepIndex}`)),
+  ].filter((entry): entry is WorkoutDocumentNote => entry != null);
 
-  return dedupeWorkoutDocumentNotes(notes).slice(0, limit);
+  return dedupeWorkoutDocumentNotes(notes);
 }
 
 export function dedupeWorkoutDocumentNotes(notes: WorkoutDocumentNote[]) {

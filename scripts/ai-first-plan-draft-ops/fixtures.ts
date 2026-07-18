@@ -1,4 +1,5 @@
 import type { StructuredFirstPlanAuthoringInput } from "../../src/lib/structured-first-plan-onboarding";
+import { normalizePlanGoalIntent } from "../../src/lib/plan-creation-engine/plan-goal-intent";
 import type { FixtureKind } from "./cli";
 
 export function buildDefaultAuthoringInput(
@@ -8,9 +9,21 @@ export function buildDefaultAuthoringInput(
     throw new Error(`Unsupported plan-first fixture: ${fixtureKind}`);
   }
 
+  const planGoalIntent = normalizePlanGoalIntent({
+    rawIntent: {
+      distance: { kind: "preset", preset: "10K" },
+    },
+    startDate: "2026-07-06",
+    horizonWeeks: 4,
+  });
+
+  if (!planGoalIntent.ok) {
+    throw new Error(planGoalIntent.message);
+  }
+
   return {
     goal: {
-      goalType: "10k",
+      goalType: "distance_goal",
       goalLabel: "10K · Representative plan-first proof",
       goalStyle: "balanced",
       targetTime: null,
@@ -59,5 +72,6 @@ export function buildDefaultAuthoringInput(
       watchAccess: "watch_or_app",
       guidancePreference: "mixed",
     },
+    planGoalIntent: planGoalIntent.intent,
   };
 }

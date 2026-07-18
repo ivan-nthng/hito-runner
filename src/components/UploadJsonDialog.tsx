@@ -8,7 +8,6 @@ import {
 } from "@/lib/imported-plan";
 import type { FirstDayResolution } from "@/lib/plan-apply-policy";
 import { completeOnboarding } from "@/lib/plan-replacement-actions";
-import { clearUpcomingSchedule } from "@/lib/training-api";
 import {
   Dialog,
   DialogContent,
@@ -31,7 +30,6 @@ export function UploadJsonDialog({
   hasActivePlan?: boolean;
 }) {
   const completeOnboardingFn = useServerFn(completeOnboarding);
-  const clearUpcomingScheduleFn = useServerFn(clearUpcomingSchedule);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const resolvedDefaultStartDate = defaultStartDate ?? todayLocalIso();
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
@@ -78,12 +76,9 @@ export function UploadJsonDialog({
     setError(null);
 
     try {
-      if (clearBeforeImport && canOfferClearBeforeImport) {
-        await clearUpcomingScheduleFn();
-      }
-
       const result = await completeOnboardingFn({
         data: {
+          clearBeforeImport: clearBeforeImport && canOfferClearBeforeImport,
           importedPlan,
           firstDayResolution,
           requestedStartDate,

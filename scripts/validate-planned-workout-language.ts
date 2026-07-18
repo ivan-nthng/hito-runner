@@ -38,15 +38,6 @@ import {
   type RunningPlanPreviewActionInput,
 } from "../src/lib/running-plan-engine-actions";
 import { buildRunningPlanCanonicalPlan } from "../src/lib/running-plan-engine-review";
-import {
-  RICH_WORKOUT_DRAFT_SCHEMA_VERSION,
-  normalizeRichWorkoutDraftToTrainingPlan,
-  type RichWorkoutDraft,
-} from "../src/lib/rich-workout-draft-authoring";
-import {
-  buildStructuredAuthoringPlan,
-  type StructuredPlanAuthoringInput,
-} from "../src/lib/structured-plan-authoring";
 import { buildDeterministicWorkoutComparison } from "../src/lib/workout-result-import/compare-workout-result";
 import type { Database } from "../src/lib/supabase/database";
 import type { Step, StepTarget } from "../src/lib/training";
@@ -153,7 +144,6 @@ async function validateGeneratedAndAiPlansUseUnifiedBlockContract() {
     heightCm: 178,
     weightKg: 74,
     runnerLevel: "runs_a_lot",
-    distanceFamily: "10K",
     daysPerWeek: 5,
     fixedRestDays: ["Wednesday", "Saturday"],
     preferredLongRunDay: "Sunday",
@@ -175,36 +165,12 @@ async function validateGeneratedAndAiPlansUseUnifiedBlockContract() {
     "selected-plan generated canonical plan",
   );
 
-  const structuredPlan = buildStructuredAuthoringPlan(buildStructuredAuthoringRepeatInput());
-  assertGeneratedPlanUsesUnifiedBlockContract(
-    structuredPlan,
-    "structured first-plan authoring canonical plan",
-  );
-
   const arbitraryRepeatPlan = buildArbitraryRepeatChildrenTrainingPlan(selectedPlan);
   assertGeneratedPlanUsesUnifiedBlockContract(
     arbitraryRepeatPlan,
     "generated/AI arbitrary repeat-children fixture",
   );
   assertArbitraryRepeatChildrenRoundtrip(arbitraryRepeatPlan);
-
-  const aiNormalized = normalizeRichWorkoutDraftToTrainingPlan({
-    canonicalPlan: selectedPlan,
-    draft: buildAiLikeRepeatRichWorkoutDraft(selectedPlan),
-  });
-
-  if (!aiNormalized.ok) {
-    throw new Error(
-      `AI-like rich workout draft rejected unexpectedly: ${aiNormalized.reason}: ${aiNormalized.issues.join(" | ")}`,
-    );
-  }
-
-  assert.equal(aiNormalized.ok, true, "AI-like rich workout draft should normalize.");
-
-  assertGeneratedPlanUsesUnifiedBlockContract(
-    aiNormalized.canonicalPlan,
-    "AI-like rich workout draft normalized plan",
-  );
 }
 
 async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {
@@ -341,6 +307,21 @@ function validateUnifiedRepeatReducerOwnsChildFirstCompatibility() {
   );
   assert.deepEqual(retiredLegacyPair.children, []);
 
+  const unknownRole = reduceRepeatChildrenToChildFirst({
+    children: [
+      {
+        role: "unknown_role",
+        label: "Unknown",
+        prescription: { mode: "time", duration_min: 1 },
+      },
+    ],
+  });
+  assert.deepEqual(
+    unknownRole.children,
+    [],
+    "unrecognized Repeat child roles must not be silently rewritten to run",
+  );
+
   validateRetiredRepeatUnitImportAdapter();
   validateFlatSegmentRepeatFieldsStayRetired();
 }
@@ -440,60 +421,6 @@ function buildLanguageForTrainingPlanWorkout(
     title: workout.title,
     steps: workout.segments,
   });
-}
-
-function buildStructuredAuthoringRepeatInput(): StructuredPlanAuthoringInput {
-  return {
-    goal: {
-      goalType: "distance_build",
-      goalLabel: "Build durable distance",
-      goalStyle: "balanced",
-      targetTime: null,
-      targetEventName: null,
-    },
-    schedule: {
-      startDate: "2026-06-23",
-      targetDate: null,
-      preparationHorizonWeeks: 12,
-    },
-    runnerProfile: {
-      experienceLevel: "consistent_runner",
-      baselineSessionsPerWeek: 5,
-      baselineLongRunKm: 12,
-      age: 36,
-      recentInjuryRecoveryContext: null,
-      preferredEffortLanguage: "mixed",
-    },
-    currentLevel: {
-      recentResultSummary: null,
-      recentRaceResults: [],
-      recent5kPaceSecondsPerKm: null,
-      currentEasyPaceRange: null,
-      currentTrainingLoadSummary: "Comfortable running five days per week.",
-    },
-    availability: {
-      preferredRunningDays: ["Monday", "Tuesday", "Thursday", "Friday", "Sunday"],
-      unavailableDays: ["Wednesday", "Saturday"],
-      maxRunningDaysPerWeek: 5,
-      allowBackToBackDays: true,
-      preferredLongRunDay: "Sunday",
-    },
-    constraints: {
-      injuryConstraints: [],
-      hardConstraints: [],
-    },
-    preferences: {
-      preferredWorkoutMix: "balanced",
-      terrainFocus: "standard",
-      strengthOrMobilityInterest: "none",
-      indoorTreadmillOk: false,
-      notes: null,
-    },
-    execution: {
-      watchAccess: "watch_or_app",
-      guidancePreference: "mixed",
-    },
-  };
 }
 
 function buildArbitraryRepeatChildrenTrainingPlan(basePlan: TrainingPlanV2): TrainingPlanV2 {
@@ -843,218 +770,6 @@ function repeatChildRoleToPersistedStepType(role: TrainingPlanRepeatChild["role"
   }
 }
 
-function buildAiLikeRepeatRichWorkoutDraft(plan: TrainingPlanV2): RichWorkoutDraft {
-  return {
-    schemaVersion: RICH_WORKOUT_DRAFT_SCHEMA_VERSION,
-    assumptions: ["Fixture keeps Hito's deterministic metric and repeat-structure gates."],
-    workouts: plan.planned_workouts.map((workout) => {
-      const repeatSegment = workout.segments.find(
-        (segment) => segment.prescription?.mode === "repeats",
-      );
-
-      if (workout.workout_type === "rest") {
-        return buildAiLikeRestWorkoutDraft(workout);
-      }
-
-      return {
-        workoutId: workout.workout_id,
-        date: workout.date,
-        workoutFamily: workout.workout_family ?? "easy",
-        workoutIdentity: workout.workout_identity ?? "easy_aerobic_run",
-        calendarIconKey: workout.calendar_icon_key ?? "easy",
-        title: `AI-shaped ${workout.title}`,
-        summary: `AI-shaped ${workout.summary}`,
-        goalContext: toRichDraftGoalContext(workout),
-        metricMode: toRichDraftMetricMode(workout),
-        segments: repeatSegment
-          ? [
-              buildAiLikeTimeSegment(workout, "warmup", 1, "Warm up", 8),
-              buildAiLikeRepeatSegment(workout, repeatSegment, 2),
-              buildAiLikeTimeSegment(workout, "cooldown", 3, "Cool down", 6),
-            ]
-          : [
-              buildAiLikeTimeSegment(workout, "warmup", 1, "Warm up", 8),
-              buildAiLikeTimeSegment(workout, "main", 2, "Steady run", 24),
-              buildAiLikeTimeSegment(workout, "cooldown", 3, "Cool down", 6),
-            ],
-      };
-    }),
-  };
-}
-
-function buildAiLikeRestWorkoutDraft(
-  workout: TrainingPlanWorkout,
-): RichWorkoutDraft["workouts"][number] {
-  return {
-    workoutId: workout.workout_id,
-    date: workout.date,
-    workoutFamily: "rest",
-    workoutIdentity: "rest_and_recovery",
-    calendarIconKey: "rest",
-    title: workout.title,
-    summary: workout.summary,
-    goalContext: toRichDraftGoalContext(workout),
-    metricMode: toRichDraftMetricMode(workout),
-    segments: [
-      {
-        segmentId: `${workout.workout_id}_ai_rest`,
-        segmentType: "rest",
-        label: "Rest",
-        sequence: 1,
-        prescription: emptyRichDraftPrescription("none"),
-        guidance: "No running scheduled.",
-        target: emptyRichDraftTarget(),
-      },
-    ],
-  };
-}
-
-function buildAiLikeTimeSegment(
-  workout: TrainingPlanWorkout,
-  segmentType: "warmup" | "main" | "cooldown",
-  sequence: number,
-  label: string,
-  durationMin: number,
-): RichWorkoutDraft["workouts"][number]["segments"][number] {
-  return {
-    segmentId: `${workout.workout_id}_ai_${sequence}`,
-    segmentType,
-    label,
-    sequence,
-    prescription: {
-      mode: "time",
-      durationMin,
-      distanceKm: null,
-      repeatCount: null,
-    },
-    guidance: `${label} with clear effort control and no invented metric targets.`,
-    target: {
-      ...emptyRichDraftTarget(),
-      intensity: segmentType === "main" ? "controlled_effort" : "easy",
-      cue: segmentType === "main" ? "Keep this smooth." : "Keep it relaxed.",
-    },
-  };
-}
-
-function buildAiLikeRepeatSegment(
-  workout: TrainingPlanWorkout,
-  segment: TrainingPlanSegment,
-  sequence: number,
-): RichWorkoutDraft["workouts"][number]["segments"][number] {
-  const prescription = segment.prescription;
-
-  assert.equal(
-    prescription?.mode,
-    "repeats",
-    "AI-like repeat fixture must be built from a canonical repeat segment.",
-  );
-  assert.ok(prescription.children?.length, "AI-like repeat fixture needs ordered repeat children.");
-
-  const children = prescription.children.map((child, index) => ({
-    role: child.role,
-    label: child.label ?? repeatChildRoleToPersistedStepType(child.role),
-    sequence: child.sequence ?? index + 1,
-    guidance: child.guidance ?? "Keep this repeat child controlled and repeatable.",
-    prescription: toRichDraftUnitPrescription(child.prescription),
-    target: {
-      ...toRichDraftTarget(child.target),
-      intensity: child.role === "recover" || child.role === "walk" ? "easy" : "controlled_effort",
-      cue:
-        child.role === "recover" || child.role === "walk"
-          ? "Recover before the next repeat."
-          : "Hold effort without chasing pace or HR.",
-    },
-  }));
-
-  return {
-    segmentId: `${workout.workout_id}_ai_repeat`,
-    segmentType: segment.segment_type === "strides" ? "strides" : "interval_block",
-    label: segment.label ?? "Repeat set",
-    sequence,
-    prescription: {
-      mode: "repeats",
-      durationMin: null,
-      distanceKm: null,
-      repeatCount: prescription.repeat_count ?? 1,
-      children,
-    },
-    guidance: "Keep the work controlled and let the recovery stay honest.",
-    target: {
-      ...emptyRichDraftTarget(),
-      intensity: "controlled_effort",
-      cue: "Run the repeat rhythm without chasing invented pace or HR.",
-    },
-  };
-}
-
-function toRichDraftUnitPrescription(unit: TrainingPlanRepeatChild["prescription"]) {
-  return {
-    mode: unit.mode,
-    durationMin: unit.mode === "time" ? (unit.duration_min ?? null) : null,
-    distanceKm: unit.mode === "distance" ? (unit.distance_km ?? null) : null,
-  };
-}
-
-function toRichDraftGoalContext(workout: TrainingPlanWorkout) {
-  return {
-    goalType: workout.goal_context?.goal_type ?? "build_consistency",
-    goalStyle: workout.goal_context?.goal_style ?? null,
-    terrainFocus: workout.goal_context?.terrain_focus ?? "standard",
-    targetDate: workout.goal_context?.target_date ?? null,
-    targetTime: workout.goal_context?.target_time ?? null,
-  };
-}
-
-function toRichDraftMetricMode(workout: TrainingPlanWorkout) {
-  return {
-    guidance: workout.metric_mode?.guidance ?? "effort",
-    paceTargetsAllowed: workout.metric_mode?.pace_targets_allowed ?? false,
-    hrTargetsAllowed: workout.metric_mode?.hr_targets_allowed ?? false,
-    reason: workout.metric_mode?.reason ?? "Fixture mirrors deterministic metric truth.",
-  };
-}
-
-function emptyRichDraftPrescription(mode: "none") {
-  return {
-    mode,
-    durationMin: null,
-    distanceKm: null,
-    repeatCount: null,
-  };
-}
-
-function emptyRichDraftTarget() {
-  return {
-    intensity: null,
-    rpe: null,
-    cue: null,
-    hint: null,
-    paceMinPerKmRange: null,
-    pace: null,
-    hrBpmRange: null,
-    hrBpm: null,
-  };
-}
-
-function toRichDraftTarget(target: Record<string, unknown> | undefined) {
-  return {
-    ...emptyRichDraftTarget(),
-    intensity: stringTargetValue(target, "intensity"),
-    rpe: stringTargetValue(target, "rpe"),
-    cue: stringTargetValue(target, "cue"),
-    hint: stringTargetValue(target, "hint") ?? stringTargetValue(target, "source_note"),
-    paceMinPerKmRange: stringTargetValue(target, "pace_min_per_km_range"),
-    pace: stringTargetValue(target, "pace"),
-    hrBpmRange: stringTargetValue(target, "hr_bpm_range"),
-    hrBpm: stringTargetValue(target, "hr_bpm"),
-  };
-}
-
-function stringTargetValue(target: Record<string, unknown> | undefined, key: string) {
-  const value = target?.[key];
-  return typeof value === "string" || typeof value === "number" ? String(value) : null;
-}
-
 function validateSourceKindIsProvenanceOnly() {
   const base = languageForManualTemplate("uphill_repeats");
   const alternate = buildPlannedWorkoutLanguage({
@@ -1177,6 +892,7 @@ function validateComparisonUsesCanonicalPlannedTruthOnly() {
       actual_distance_km: null,
       actual_interval_count: 3,
       actual_step_payload: null,
+      summary_payload: { session: { sport: "running" } },
     },
   });
   const plannedWorkout = comparison.differencePayload.plannedWorkout as Record<string, unknown>;
@@ -1293,6 +1009,7 @@ function validateManualBlockContractRoundtripKeepsTargetSource() {
       actual_distance_km: null,
       actual_interval_count: null,
       actual_step_payload: null,
+      summary_payload: { session: { sport: "running" } },
     },
   });
   const comparedSignalKeys = comparison.differencePayload.summary.comparedSignalKeys;
@@ -1320,7 +1037,7 @@ function validateManualBlockContractRoundtripKeepsTargetSource() {
   );
   assert.doesNotMatch(
     JSON.stringify(comparison.differencePayload),
-    /pace_seconds_per_km|hr_bpm_cap|hr_bpm_min|hr_bpm_max|"rpe"/,
+    /pace_seconds_per_km|hr_bpm_cap|hr_bpm_min|hr_bpm_max|"rpe"\s*:/,
     "provider comparison input must not treat target-only pace, HR, or RPE as compared actual evidence.",
   );
 }

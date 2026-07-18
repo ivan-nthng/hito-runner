@@ -13,6 +13,10 @@ import {
   type PersistedWorkoutLogRow,
 } from "@/lib/active-plan-persistence";
 import {
+  ActivePlanPersistenceRejection,
+  applyAtomicActivePlanWorkoutMutation,
+} from "@/lib/active-plan-lifecycle-persistence";
+import {
   buildImportedPlanSeed,
   type ImportedPlanSeed,
   type TrainingPlanV2,
@@ -65,7 +69,10 @@ interface ManualWorkoutAuthoringReviewMetadata {
   metric_truth_mode: ManualWorkoutTargetTruthMode;
   mapping_gaps: string[];
   warnings: string[];
-  user_edit_mutation_kind?: ActivePlanUserEditMutationKind;
+  user_edit_mutation_kind?: Extract<
+    ActivePlanUserEditMutationKind,
+    "user_added_workout" | "user_copied_workout"
+  >;
   user_edit_mutation_mode?: "direct_manual_edit";
   user_edit_mutation_payload_version?: string;
   user_edit_mutation_checksum?: string;
@@ -75,7 +82,10 @@ interface ManualWorkoutAuthoringReviewMetadata {
 }
 
 interface ManualWorkoutActivePlanUserEditAuditInput {
-  mutationKind?: ActivePlanUserEditMutationKind;
+  mutationKind?: Extract<
+    ActivePlanUserEditMutationKind,
+    "user_added_workout" | "user_copied_workout"
+  >;
   mutationMode?: "direct_manual_edit";
   mutationPayloadVersion?: string;
   mutationChecksum?: string;
@@ -256,7 +266,17 @@ export async function addReviewedManualWorkoutToActivePlanForUser(
         callsOpenAi: false,
       },
     };
-  } catch {
+  } catch (error) {
+    if (error instanceof ActivePlanPersistenceRejection) {
+      return buildManualWorkoutAddFailure({
+        reason:
+          error.reason === "stale_review" || error.reason === "protected_day"
+            ? error.reason
+            : "persistence_failed",
+        message: error.message,
+      });
+    }
+
     return buildManualWorkoutAddFailure({
       reason: "persistence_failed",
       message: "The workout could not be added. The active manual plan is unchanged.",
@@ -271,18 +291,17 @@ export async function persistManualWorkoutActivePlanAdd({
   workoutSeed,
   reviewMetadata,
 }: PersistManualWorkoutActivePlanAddInput) {
-  const supabase = createAdminSupabaseClient();
   const [insertRow] = buildPersistedWorkoutInsertRows(activePlan.id, userId, [workoutSeed]);
 
   if (!insertRow) {
     throw new Error("Manual workout add did not prepare a planned workout row.");
   }
 
-  const insert = await supabase.from("planned_workouts").insert(insertRow).select("*").single();
-
-  if (insert.error || !insert.data) {
-    throw new Error(insert.error?.message ?? "Manual workout add insert failed.");
-  }
+  const plannedWorkoutId = crypto.randomUUID();
+  const workoutInsert = {
+    ...insertRow,
+    id: plannedWorkoutId,
+  };
 
   const nextEndDate =
     workoutSeed.workoutDate > activePlan.end_date ? workoutSeed.workoutDate : activePlan.end_date;
@@ -290,39 +309,41 @@ export async function persistManualWorkoutActivePlanAdd({
     activePlan,
     existingGoalMetadata: activePlan.goal_metadata,
     existingWorkouts,
-    plannedWorkoutId: insert.data.id,
+    plannedWorkoutId,
     reviewMetadata,
     addedWorkoutType: workoutSeed.workoutType,
   });
   const nextPlanPreferences = buildManualWorkoutAddPlanPreferences({
     activePlan,
     existingPlanPreferences: activePlan.plan_preferences,
-    plannedWorkoutId: insert.data.id,
+    plannedWorkoutId,
     reviewMetadata,
   });
 
-  const update = await supabase
-    .from("plan_cycles")
-    .update({
+  const persisted = await applyAtomicActivePlanWorkoutMutation({
+    userId,
+    planId: activePlan.id,
+    expectedPlanUpdatedAt: activePlan.updated_at,
+    currentDate: todayIso(),
+    mutationKind: "add",
+    expectedSourceWorkout: null,
+    expectedTargetWorkout: null,
+    workoutInsert: workoutInsert as unknown as Json,
+    workoutUpdate: null,
+    planUpdate: {
       end_date: nextEndDate,
       goal_metadata: nextGoalMetadata,
       plan_preferences: nextPlanPreferences,
-    })
-    .eq("id", activePlan.id)
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .eq("source_kind", activePlan.source_kind)
-    .select("*")
-    .single();
+    },
+  });
 
-  if (update.error || !update.data) {
-    await supabase.from("planned_workouts").delete().eq("id", insert.data.id);
-    throw new Error(update.error?.message ?? "Manual workout add metadata update failed.");
+  if (!persisted.mutatedWorkout) {
+    throw new Error("Atomic manual workout add did not return the inserted workout.");
   }
 
   return {
-    plannedWorkout: insert.data,
-    planCycle: update.data,
+    plannedWorkout: persisted.mutatedWorkout,
+    planCycle: persisted.planCycle,
   };
 }
 

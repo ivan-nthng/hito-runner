@@ -5,7 +5,6 @@ import { SelectedRunningPlanPreviewDialog } from "@/components/onboarding/Select
 import {
   derivePlanGoalPaceReadback,
   type PlanGoalIntentDraftState,
-  type PlanPresetCardsActionResult,
   parsePlanGoalCustomDistanceKm,
   resolveSelectedPlanGoalPreviewGate,
 } from "@/components/onboarding/selected-running-plan-flow-utils";
@@ -15,7 +14,6 @@ import type {
 } from "@/lib/running-plan-engine-actions";
 import { cn } from "@/lib/utils";
 
-export type PlanPresetUiStatus = "idle" | "loading_cards" | "previewing_plan";
 type RunningPlanCreateStatus = "idle" | "creating";
 
 const PLAN_GOAL_CHOICES: {
@@ -51,14 +49,12 @@ const PLAN_GOAL_CHOICES: {
 ];
 
 interface PlanPresetPanelProps {
-  cardsResult: PlanPresetCardsActionResult | null;
   confirmResult: RunningPlanConfirmActionResult | null;
   previewResult: RunningPlanPreviewActionResult | null;
   createStatus: RunningPlanCreateStatus;
   error: string | null;
-  status: PlanPresetUiStatus;
-  isBusy: boolean;
-  isPresetDiscoveryReady: boolean;
+  status: "idle" | "previewing_plan";
+  hasRequiredPlanBasics: boolean;
   previewOpen: boolean;
   onPreviewOpenChange: (open: boolean) => void;
   onRefreshPreview: () => void;
@@ -94,12 +90,10 @@ function finishTimePlaceholder(goalChoice: PlanGoalChoice) {
 }
 
 export function PlanPresetPanel({
-  cardsResult,
   confirmResult,
   createStatus,
   error,
-  isBusy,
-  isPresetDiscoveryReady,
+  hasRequiredPlanBasics,
   onCreatePlan,
   onPreviewOpenChange,
   onRefreshPreview,
@@ -121,9 +115,6 @@ export function PlanPresetPanel({
   onPlanGoalTargetDateChange,
   status,
 }: PlanPresetPanelProps) {
-  const blockedMessage = cardsResult && !cardsResult.ok ? cardsResult.message : null;
-  const loadingCards = status === "loading_cards";
-
   return (
     <section className="hito-plan-preset-stage hito-section-divider pt-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -152,27 +143,16 @@ export function PlanPresetPanel({
           onTargetDateChange={onPlanGoalTargetDateChange}
         />
 
-        {!isPresetDiscoveryReady ? (
+        {!hasRequiredPlanBasics ? (
           <div className="hito-surface-wash">
-            <p className="hito-list-row-title">Add a few basics to see plan options</p>
+            <p className="hito-list-row-title">Add a few basics before previewing</p>
             <p className="hito-list-row-copy">
-              Age, height, and weight help Hito show better starting plans.
+              Age, height, and weight are required before Hito can prepare a reviewed plan.
             </p>
           </div>
         ) : null}
 
-        {loadingCards ? (
-          <div className="hito-surface-wash" data-tone="signal">
-            <p className="hito-list-row-title">Checking plan support</p>
-            <p className="hito-list-row-copy">
-              Hito is checking which guided previews fit your setup.
-            </p>
-          </div>
-        ) : null}
-
-        {error || blockedMessage ? (
-          <p className="hito-field-error">{error ?? blockedMessage}</p>
-        ) : null}
+        {error ? <p className="hito-field-error">{error}</p> : null}
       </div>
 
       <SelectedRunningPlanPreviewDialog

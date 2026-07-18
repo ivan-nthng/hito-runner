@@ -1,4 +1,9 @@
-import type { PlannedWorkoutLanguageBlock } from "@/lib/planned-workout-language";
+import type {
+  PlannedWorkoutLanguageBlock,
+  PlannedWorkoutLanguageInput,
+} from "@/lib/planned-workout-language";
+import { buildPlannedWorkoutLanguage } from "@/lib/planned-workout-language";
+import { resolveCanonicalWorkoutModel } from "@/lib/rich-workout-model";
 import {
   displayStepStructureEntries,
   displayStepTargetReadbackEntries,
@@ -10,13 +15,69 @@ import {
   type Workout,
   workoutPlannedLanguage,
 } from "@/lib/training";
+import type { WorkoutDocumentSection, WorkoutDocumentType } from "@/lib/workout-document";
 import type { WorkoutStructureTimelineItem } from "@/components/workout-structure/WorkoutStructureTimeline";
 
 export function workoutStructureTimelineItems(workout: Workout): WorkoutStructureTimelineItem[] {
-  const out: WorkoutStructureTimelineItem[] = [];
-  const languageBlocks = workoutPlannedLanguage(workout).runnerFacingBlocks;
+  return buildWorkoutStructureTimelineItems({
+    languageBlocks: workoutPlannedLanguage(workout).runnerFacingBlocks,
+    metricMode: workout.metricMode,
+    steps: workout.steps,
+    workoutType: workout.type,
+  });
+}
 
-  for (const [stepIndex, s] of workout.steps.entries()) {
+export function workoutDocumentTimelineItems(
+  document: WorkoutDocumentTimelineSource,
+): WorkoutStructureTimelineItem[] {
+  const canonical = resolveCanonicalWorkoutModel({
+    workoutType: document.workoutType,
+    sourceWorkoutType: document.sourceWorkoutType,
+    workoutFamily: document.workoutFamily,
+    workoutIdentity: document.workoutIdentity,
+    calendarIconKey: document.calendarIconKey,
+    metricMode: document.metricMode,
+    title: document.title,
+    steps: document.steps,
+  });
+  const language = buildPlannedWorkoutLanguage({
+    workoutType: document.workoutType,
+    sourceWorkoutType: document.sourceWorkoutType,
+    workoutFamily: canonical.workoutFamily,
+    workoutIdentity: canonical.workoutIdentity,
+    calendarIconKey: canonical.calendarIconKey,
+    metricMode: canonical.metricMode,
+    title: document.title,
+    steps: document.steps,
+  });
+
+  return buildWorkoutStructureTimelineItems({
+    languageBlocks: language.runnerFacingBlocks,
+    metricMode: canonical.metricMode,
+    steps: document.steps,
+    workoutType: document.workoutType,
+  });
+}
+
+type WorkoutDocumentTimelineSource = Omit<PlannedWorkoutLanguageInput, "steps" | "workoutType"> & {
+  steps: WorkoutDocumentSection[];
+  workoutType: WorkoutDocumentType;
+};
+
+function buildWorkoutStructureTimelineItems({
+  languageBlocks,
+  metricMode,
+  steps,
+  workoutType,
+}: {
+  languageBlocks: PlannedWorkoutLanguageBlock[];
+  metricMode: Workout["metricMode"];
+  steps: Workout["steps"];
+  workoutType: Workout["type"];
+}) {
+  const out: WorkoutStructureTimelineItem[] = [];
+
+  for (const [stepIndex, s] of steps.entries()) {
     const languageBlock = languageBlocks[stepIndex];
     const repeatCount = repeatCountForStep(s);
     const repeatChildren = repeatChildSteps(s);
@@ -33,17 +94,17 @@ export function workoutStructureTimelineItems(workout: Workout): WorkoutStructur
             id: `repeat-${stepIndex}-${i}-${childIndex}`,
             kindLabel,
             semanticKind: `${language?.type ?? kind} ${child.label ?? ""}`,
-            weight: stepStructureDurationMin(child, workout.type) || 1,
+            weight: stepStructureDurationMin(child, workoutType) || 1,
             title: `${kindLabel} ${i + 1}/${repeatCount}`,
             detailLabel: repeatChildBlockLabel(child, i + 1, repeatCount),
             barLabel: compactStructureBarLabel(child),
             metric,
             target: child.target,
-            readbackEntries: displayStepTargetReadbackEntries(child, workout.metricMode, {
+            readbackEntries: displayStepTargetReadbackEntries(child, metricMode, {
               limit: 2,
               omitStructureLabels: visibleMetricStructureLabels(child),
             }),
-            tooltipReadbackEntries: displayStepTargetReadbackEntries(child, workout.metricMode, {
+            tooltipReadbackEntries: displayStepTargetReadbackEntries(child, metricMode, {
               limit: 3,
               omitStructureLabels: visibleMetricStructureLabels(child),
               supportFallbackLimit: 1,
@@ -59,17 +120,17 @@ export function workoutStructureTimelineItems(workout: Workout): WorkoutStructur
         id: `step-${stepIndex}`,
         kindLabel,
         semanticKind: `${kind} ${s.label ?? ""}`,
-        weight: stepStructureDurationMin(s, workout.type) || 1,
+        weight: stepStructureDurationMin(s, workoutType) || 1,
         title: kindLabel,
         detailLabel: describeStepMetric(s),
         barLabel: compactStructureBarLabel(s),
         metric: describeStepMetric(s),
         target: s.target,
-        readbackEntries: displayStepTargetReadbackEntries(s, workout.metricMode, {
+        readbackEntries: displayStepTargetReadbackEntries(s, metricMode, {
           limit: 2,
           omitStructureLabels: visibleMetricStructureLabels(s),
         }),
-        tooltipReadbackEntries: displayStepTargetReadbackEntries(s, workout.metricMode, {
+        tooltipReadbackEntries: displayStepTargetReadbackEntries(s, metricMode, {
           limit: 3,
           omitStructureLabels: visibleMetricStructureLabels(s),
           supportFallbackLimit: 1,

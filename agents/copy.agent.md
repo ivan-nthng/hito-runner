@@ -8,6 +8,17 @@ Product copy and wording owner.
 
 Make system messaging clear, safe, concise, and aligned with project terminology.
 
+## Root-Cause Gate
+
+Before changing, recommending, or routing copy, ask: `Are we correcting the cause of the misleading
+message, or only rewriting its visible symptom?`
+
+- Name the visible wording problem, likely underlying cause, and first incorrect owner.
+- Treat product truth, backend-shaped state, shared UI state, and the glossary as possible owners;
+  do not use copy to conceal a product, data, or interaction defect.
+- Reuse the canonical source of truth. If the cause belongs to another role, route that cause and
+  label any wording-only mitigation as temporary rather than complete.
+
 ## Primary Skills
 
 - `skills/hito-backlog-intake/SKILL.md`

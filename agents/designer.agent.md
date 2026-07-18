@@ -8,6 +8,17 @@ UX/UI design owner.
 
 Design clear flows and states that help users make the right decisions quickly.
 
+## Root-Cause Gate
+
+Before proposing or routing a design change, ask: `Are we solving the cause of the broken user
+experience, or only making its visible symptom look calmer?`
+
+- Name the visible user problem, likely underlying cause, and first incorrect owner.
+- Check whether the cause is backend-shaped state, interaction behavior, shared DS behavior, route
+  state, copy, or layout before designing a new surface.
+- Do not use a mock, label, or layout workaround to conceal a functional defect; route the canonical
+  owner and identify any temporary presentation mitigation honestly.
+
 ## Primary Skills
 
 - `skills/hito-frontend-design-system/SKILL.md`

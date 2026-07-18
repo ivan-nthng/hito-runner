@@ -14,7 +14,7 @@ import {
   isManualContentEditableActivePlanSourceKind,
   resolveActivePlanWorkoutEditability,
 } from "../src/lib/active-plan-workout-editing/policy";
-import type { Step } from "../src/lib/training";
+import { addDaysIso, todayIso, type Step } from "../src/lib/training";
 import { formatReadableDate } from "../src/components/manual-workout/manual-workout-authoring-utils";
 import {
   buildSkippedManualPersistenceResult,
@@ -30,7 +30,6 @@ import { validateManualCopyPasteContract } from "./manual-workout-authoring/copy
 import { validateManualDeleteClearContract } from "./manual-workout-authoring/delete-clear-proof";
 import { validateManualEmptyActivePlanCreationContract } from "./manual-workout-authoring/empty-plan-proof";
 import { validateManualActivePlanExportContract } from "./manual-workout-authoring/export-proof";
-import { validateManualFirstCreateConfirmPersistenceContract } from "./manual-workout-authoring/confirm-persistence-proof";
 import { validateManualMoveWorkoutContract } from "./manual-workout-authoring/move-proof";
 import {
   assertNoFakePaceOrHr,
@@ -62,7 +61,6 @@ async function main() {
   validateManualSourceEditingCapabilityReadback();
   await validateManualSavedTemplateContract();
   await validateManualEmptyActivePlanCreationContract();
-  await validateManualFirstCreateConfirmPersistenceContract();
   await validateManualActivePlanAddWorkoutContract();
   await validateManualCopyPasteContract();
   await validateManualDeleteClearContract();
@@ -72,7 +70,7 @@ async function main() {
 
   const persistenceInput: ManualWorkoutDraftInput = {
     templateKey: "easy_aerobic_run",
-    workoutDate: "2026-06-16",
+    workoutDate: addDaysIso(todayIso(), 1),
     notes: "Keep it easy.",
   };
   const persistenceReview = assertReady("manual disposable persistence review", persistenceInput);
@@ -107,10 +105,8 @@ function validateActivePlanLifecycleAndContentEditabilityPolicy() {
   const userId = "00000000-0000-4000-8000-000000000010";
   const lifecycleEditableSources = [
     MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-    "structured_authoring_v1",
     "ai_authored_plan_first_v1",
     "training_plan_v2_import",
-    "active_plan_refresh_v1",
   ];
 
   for (const sourceKind of lifecycleEditableSources) {
@@ -123,7 +119,7 @@ function validateActivePlanLifecycleAndContentEditabilityPolicy() {
     });
 
     assert.equal(
-      isEditableActivePlanSourceKind(sourceKind, activePlan),
+      isEditableActivePlanSourceKind(sourceKind),
       true,
       `${sourceKind} should be an editable active-plan source`,
     );
@@ -140,7 +136,7 @@ function validateActivePlanLifecycleAndContentEditabilityPolicy() {
     const copyEditability = resolveActivePlanWorkoutEditability(activePlan, "copy_workout");
     const contentEditability = resolveActivePlanWorkoutEditability(activePlan, "edit_workout");
     const shouldAllowCopy = isManualContentEditableActivePlanSourceKind(sourceKind);
-    const shouldAllowContent = isActivePlanWorkoutContentEditableSourceKind(sourceKind, activePlan);
+    const shouldAllowContent = isActivePlanWorkoutContentEditableSourceKind(sourceKind);
 
     assert.equal(
       copyEditability.ok,
@@ -153,6 +149,12 @@ function validateActivePlanLifecycleAndContentEditabilityPolicy() {
       `${sourceKind} edit_workout editability should follow reconstructable active-plan source scope.`,
     );
   }
+
+  assert.equal(
+    isEditableActivePlanSourceKind("external_partner_import"),
+    false,
+    "arbitrary import-origin labels must not become active-plan capability identities",
+  );
 
   const unknownPlan = buildFakePlanCycle({
     userId,
@@ -363,10 +365,9 @@ function validateManualUserEnteredTargetFixtures() {
   assert.equal(paceExact.draft.metricMode.pace_targets_allowed, true);
   assertManualUserEnteredTarget(paceExact.draft.steps, "pace", "runner-entered exact pace");
   assert.equal(
-    paceExact.constructorContract.timeline[0]?.kind === "segment"
-      ? paceExact.constructorContract.timeline[0].target.kind
-      : null,
-    "pace",
+    paceExact.draft.steps.find((step) => step.target?.pace)?.target?.pace,
+    "5:20/km",
+    "canonical reviewed draft should preserve exact runner-entered pace",
   );
 
   const paceRange = assertReady("runner-entered pace range", {

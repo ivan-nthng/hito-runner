@@ -1,26 +1,23 @@
 import { type DragEvent, useEffect, useRef, useState } from "react";
 import type { ManualCopiedWorkoutSource } from "@/components/manual-workout/ManualWorkoutSourceActionMenu";
 import type { ManualWorkoutMoveRequest } from "@/components/manual-workout/ManualWorkoutMoveControls";
+import {
+  resolveCalendarMoveTargetDayKind,
+  type CalendarMoveUndoAffordance,
+  type CalendarOptimisticMoveDisplay,
+  type CalendarWorkoutActionContext,
+} from "@/components/calendar/calendar-projection";
 import type {
   ManualWorkoutDirectMoveResult,
   ManualWorkoutMoveReviewResult,
-  ManualWorkoutMoveTargetDayKind,
 } from "@/lib/manual-workout-authoring";
-import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "@/lib/manual-workout-authoring/schema";
-import {
-  findWorkout,
-  formatDate,
-  weekdayLong,
-  workoutTypeMeta,
-  type TrainingSnapshot,
-  type Workout,
-} from "@/lib/training";
+import { type TrainingSnapshot, type Workout } from "@/lib/training";
 
 export type ManualCalendarActionState = {
   copiedWorkoutSource: ManualCopiedWorkoutSource | null;
-  lastMoveUndo: ManualMoveUndoAffordance | null;
+  lastMoveUndo: CalendarMoveUndoAffordance | null;
   movePending: boolean;
-  optimisticMove: ManualOptimisticMoveDisplay | null;
+  optimisticMove: CalendarOptimisticMoveDisplay | null;
   undoSecondsRemaining: number;
   moveHoverDate: string | null;
   moveWorkoutSource: ManualCopiedWorkoutSource | null;
@@ -31,30 +28,7 @@ export type ManualCalendarActionState = {
   onManualPlanChanged: () => Promise<void>;
   onMoveTargetSelected: (targetDate: string, source?: ManualCopiedWorkoutSource | null) => void;
   onMoveWorkout: (source: ManualCopiedWorkoutSource) => void;
-  onUndoLastMove: (undo: ManualMoveUndoAffordance) => void;
-};
-export type ManualWorkoutCalendarActionContext = ManualCopiedWorkoutSource & {
-  canDirectCopy: boolean;
-  canDirectMove: boolean;
-  canDragInitiate: boolean;
-  canRequestClearReview: boolean;
-};
-type ManualOptimisticMoveDisplay = {
-  requestId: string;
-  sourceWorkoutDate: string;
-  sourceWorkoutId: string;
-  targetDate: string;
-  workout: Workout;
-};
-type ManualMoveUndoAffordance = {
-  activePlanId: string;
-  displayDate: string;
-  expiresAt: number;
-  id: string;
-  sourceWorkoutDate: string;
-  sourceWorkoutId: string;
-  targetDate: string;
-  title: string;
+  onUndoLastMove: (undo: CalendarMoveUndoAffordance) => void;
 };
 
 type ManualWorkoutDirectMoveSuccess = Extract<ManualWorkoutDirectMoveResult, { ok: true }>;
@@ -63,7 +37,7 @@ const MANUAL_MOVE_UNDO_WINDOW_MS = 7000;
 const MANUAL_MOVE_UNDO_REFRESH_GRACE_MS = 30000;
 const MANUAL_MOVE_UNDO_STORAGE_KEY = "hito.manual-calendar.last-move-undo.v1";
 
-let cachedLastMoveUndo: ManualMoveUndoAffordance | null = null;
+let cachedLastMoveUndo: CalendarMoveUndoAffordance | null = null;
 
 function getCachedLastMoveUndo(activePlanId: string | undefined) {
   if (!cachedLastMoveUndo) {
@@ -104,7 +78,7 @@ function refreshLastMoveUndoWindow() {
   return { now, undo: refreshedUndo };
 }
 
-function refreshManualMoveUndoCandidate(undo: ManualMoveUndoAffordance | null) {
+function refreshManualMoveUndoCandidate(undo: CalendarMoveUndoAffordance | null) {
   if (!undo) return null;
 
   const now = Date.now();
@@ -117,7 +91,7 @@ function refreshManualMoveUndoCandidate(undo: ManualMoveUndoAffordance | null) {
   return { now, undo: refreshedUndo };
 }
 
-function storeLastMoveUndo(undo: ManualMoveUndoAffordance) {
+function storeLastMoveUndo(undo: CalendarMoveUndoAffordance) {
   cachedLastMoveUndo = undo;
   if (typeof window === "undefined") return;
 
@@ -141,10 +115,10 @@ function readStoredLastMoveUndo() {
   return null;
 }
 
-function isManualMoveUndoAffordance(value: unknown): value is ManualMoveUndoAffordance {
+function isManualMoveUndoAffordance(value: unknown): value is CalendarMoveUndoAffordance {
   if (!value || typeof value !== "object") return false;
 
-  const undo = value as Partial<ManualMoveUndoAffordance>;
+  const undo = value as Partial<CalendarMoveUndoAffordance>;
   return (
     typeof undo.activePlanId === "string" &&
     typeof undo.displayDate === "string" &&
@@ -171,7 +145,7 @@ function buildManualMoveUndoCandidate({
   sourceWorkoutId: string;
   targetDate: string;
   title: string;
-}): ManualMoveUndoAffordance {
+}): CalendarMoveUndoAffordance {
   return {
     activePlanId,
     displayDate: sourceWorkoutDate,
@@ -196,9 +170,9 @@ export function useManualCalendarActions(
   const [manualMoveRequest, setManualMoveRequest] = useState<ManualWorkoutMoveRequest | null>(null);
   const [manualMoveHoverDate, setManualMoveHoverDate] = useState<string | null>(null);
   const [manualOptimisticMove, setManualOptimisticMove] =
-    useState<ManualOptimisticMoveDisplay | null>(null);
-  const manualMoveUndoCandidateRef = useRef<ManualMoveUndoAffordance | null>(null);
-  const [lastMoveUndo, setLastMoveUndo] = useState<ManualMoveUndoAffordance | null>(() =>
+    useState<CalendarOptimisticMoveDisplay | null>(null);
+  const manualMoveUndoCandidateRef = useRef<CalendarMoveUndoAffordance | null>(null);
+  const [lastMoveUndo, setLastMoveUndo] = useState<CalendarMoveUndoAffordance | null>(() =>
     getCachedLastMoveUndo(snapshot.planMeta?.id),
   );
   const [lastMoveUndoNow, setLastMoveUndoNow] = useState(() => Date.now());
@@ -298,7 +272,7 @@ export function useManualCalendarActions(
     sourceWorkoutId,
     targetDate,
   }: Pick<
-    ManualOptimisticMoveDisplay,
+    CalendarOptimisticMoveDisplay,
     "requestId" | "sourceWorkoutDate" | "sourceWorkoutId" | "targetDate"
   >) {
     const sourceWorkout = findManualMoveSourceWorkout(
@@ -340,7 +314,11 @@ export function useManualCalendarActions(
     if (!sourceWorkout) return;
 
     const requestId = `${moveSource.sourceWorkoutId}:${targetDate}:${Date.now()}`;
-    const targetDayKind = resolveManualMoveTargetDayKind(snapshot.workouts, targetDate, moveSource);
+    const targetDayKind = resolveCalendarMoveTargetDayKind(
+      snapshot.workouts,
+      targetDate,
+      moveSource,
+    );
 
     clearLastMoveUndoCache();
     setLastMoveUndo(null);
@@ -373,7 +351,7 @@ export function useManualCalendarActions(
     setManualMoveHoverDate(null);
   }
 
-  function undoLastManualMove(undo: ManualMoveUndoAffordance) {
+  function undoLastManualMove(undo: CalendarMoveUndoAffordance) {
     if (manualMoveRequest) return;
 
     clearLastMoveUndoCache();
@@ -442,44 +420,9 @@ export function useManualCalendarActions(
   };
 }
 
-export function resolveManualMoveDateRender(
-  workouts: Workout[],
-  iso: string,
-  optimisticMove: ManualOptimisticMoveDisplay | null,
-): ManualMoveDateRender {
-  if (!optimisticMove) {
-    return {
-      isPendingMoveSource: false,
-      isPendingMoveTarget: false,
-      workout: findWorkout(workouts, iso),
-    };
-  }
-
-  if (iso === optimisticMove.sourceWorkoutDate) {
-    const persistedSource = findWorkout(workouts, iso);
-    return {
-      isPendingMoveSource: persistedSource?.id === optimisticMove.sourceWorkoutId,
-      isPendingMoveTarget: false,
-      workout: persistedSource?.id === optimisticMove.sourceWorkoutId ? undefined : persistedSource,
-    };
-  }
-
-  return iso === optimisticMove.targetDate
-    ? {
-        isPendingMoveSource: false,
-        isPendingMoveTarget: true,
-        workout: buildManualOptimisticWorkout(optimisticMove.workout, optimisticMove.targetDate),
-      }
-    : {
-        isPendingMoveSource: false,
-        isPendingMoveTarget: false,
-        workout: findWorkout(workouts, iso),
-      };
-}
-
 function snapshotReflectsManualMove(
   workouts: Workout[],
-  optimisticMove: ManualOptimisticMoveDisplay,
+  optimisticMove: CalendarOptimisticMoveDisplay,
 ) {
   const sourceStillHasMovedWorkout = workouts.some(
     (workout) =>
@@ -494,56 +437,10 @@ function snapshotReflectsManualMove(
   return !sourceStillHasMovedWorkout && targetHasMovedWorkout;
 }
 
-export function resolveManualMoveUndoForDate(
-  snapshot: TrainingSnapshot,
-  iso: string,
-  manualCalendarActionState: ManualCalendarActionState,
-) {
-  const {
-    lastMoveUndo: undo,
-    movePending,
-    optimisticMove,
-    undoSecondsRemaining,
-  } = manualCalendarActionState;
-  if (!undo || movePending || undoSecondsRemaining <= 0 || undo.displayDate !== iso) return null;
-
-  const movedWorkout =
-    snapshot.workouts.find(
-      (workout) => workout.id === undo.sourceWorkoutId && workout.date === undo.sourceWorkoutDate,
-    ) ??
-    (optimisticMove?.sourceWorkoutId === undo.sourceWorkoutId &&
-    optimisticMove.targetDate === undo.sourceWorkoutDate
-      ? buildManualOptimisticWorkout(optimisticMove.workout, optimisticMove.targetDate)
-      : null);
-  const undoTargetWorkout = findWorkout(snapshot.workouts, undo.targetDate);
-  const undoMoveSource = {
-    activePlanId: undo.activePlanId,
-    sourceWorkoutDate: undo.sourceWorkoutDate,
-    sourceWorkoutId: undo.sourceWorkoutId,
-    title: undo.title,
-  };
-
-  if (
-    !movedWorkout ||
-    movedWorkout.type === "rest" ||
-    !movedWorkout.sourceEditing?.canDirectMove ||
-    undo.targetDate < snapshot.currentDate ||
-    (undo.targetDate === snapshot.currentDate &&
-      !canExposeTodayAsManualMoveTarget(snapshot, undo.targetDate, undoMoveSource)) ||
-    (undoTargetWorkout &&
-      undoTargetWorkout.id !== undo.sourceWorkoutId &&
-      undoTargetWorkout.type !== "rest")
-  ) {
-    return null;
-  }
-
-  return undo;
-}
-
 function findManualMoveSourceWorkout(
   workouts: Workout[],
   moveSource: Pick<ManualCopiedWorkoutSource, "sourceWorkoutDate" | "sourceWorkoutId">,
-  optimisticMove: ManualOptimisticMoveDisplay | null,
+  optimisticMove: CalendarOptimisticMoveDisplay | null,
 ) {
   const persistedWorkout = workouts.find(
     (workout) =>
@@ -555,234 +452,14 @@ function findManualMoveSourceWorkout(
     optimisticMove?.sourceWorkoutId === moveSource.sourceWorkoutId &&
     optimisticMove.targetDate === moveSource.sourceWorkoutDate
   ) {
-    return buildManualOptimisticWorkout(optimisticMove.workout, optimisticMove.targetDate);
+    return optimisticMove.workout;
   }
 
   return null;
 }
 
-function buildManualOptimisticWorkout(workout: Workout, targetDate: string): Workout {
-  return {
-    ...workout,
-    date: targetDate,
-    weekday: weekdayLong(targetDate),
-    status: "upcoming",
-  };
-}
-
-export function getManualAddContext(
-  snapshot: TrainingSnapshot,
-  iso: string,
-  workout: Workout | undefined,
-  moveSource: ManualCopiedWorkoutSource | null,
-): {
-  activePlanId: string;
-  activePlanSourceKind: string;
-  canAcceptMoveTarget: boolean;
-  moveTargetDayKind: ManualWorkoutMoveTargetDayKind;
-  moveOnly: boolean;
-} | null {
-  const planMeta = snapshot.planMeta;
-
-  const addCapability = planMeta?.workoutEditing?.addWorkout;
-  const moveCapability = planMeta?.workoutEditing?.moveWorkout;
-  const moveTargetHint = resolveManualMoveTargetHint(snapshot, iso, workout, moveSource);
-  const canAddWorkout =
-    Boolean(addCapability?.allowed) &&
-    (!workout || workout.type === "rest") &&
-    iso >= snapshot.currentDate &&
-    !isBeforePlanStart(iso, snapshot);
-  const canAcceptMoveTarget =
-    Boolean(moveCapability?.allowed) && moveTargetHint.canAcceptMoveTarget;
-
-  if (!planMeta?.id || (!canAddWorkout && !canAcceptMoveTarget)) {
-    return null;
-  }
-
-  return {
-    activePlanId: planMeta.id,
-    activePlanSourceKind:
-      addCapability?.allowed === true
-        ? addCapability.sourceKind
-        : moveCapability?.allowed === true
-          ? moveCapability.sourceKind
-          : MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-    canAcceptMoveTarget,
-    moveTargetDayKind: moveTargetHint.dayKind,
-    moveOnly: !canAddWorkout,
-  };
-}
-
-function resolveManualMoveTargetHint(
-  snapshot: TrainingSnapshot,
-  iso: string,
-  workout: Workout | undefined,
-  moveSource: ManualCopiedWorkoutSource | null,
-) {
-  const dayKind = resolveManualMoveTargetDayKindFromWorkout(workout);
-
-  if (!moveSource || isBeforePlanStart(iso, snapshot) || moveSource.sourceWorkoutDate === iso) {
-    return { canAcceptMoveTarget: false, dayKind };
-  }
-
-  if (!workout) {
-    return {
-      canAcceptMoveTarget:
-        iso > snapshot.currentDate || canExposeTodayAsManualMoveTarget(snapshot, iso, moveSource),
-      dayKind,
-    };
-  }
-
-  if (iso <= snapshot.currentDate) {
-    return { canAcceptMoveTarget: false, dayKind };
-  }
-
-  if (workout.type === "rest") {
-    return { canAcceptMoveTarget: true, dayKind };
-  }
-
-  return {
-    canAcceptMoveTarget: Boolean(workout.sourceEditing?.canClear),
-    dayKind,
-  };
-}
-
-function resolveManualMoveTargetDayKindFromWorkout(
-  workout: Workout | undefined,
-): ManualWorkoutMoveTargetDayKind {
-  if (!workout || workout.type === "rest") return "rest_day";
-  return "workout_day";
-}
-
-function resolveManualMoveTargetDayKind(
-  workouts: Workout[],
-  targetDate: string,
-  moveSource: ManualCopiedWorkoutSource,
-): ManualWorkoutMoveTargetDayKind {
-  return resolveManualMoveTargetDayKindFromWorkout(
-    workouts.find(
-      (workout) => workout.date === targetDate && workout.id !== moveSource.sourceWorkoutId,
-    ),
-  );
-}
-
-export function getManualCopyContext(
-  snapshot: TrainingSnapshot,
-  iso: string,
-  workout: Workout | undefined,
-): ManualWorkoutCalendarActionContext | null {
-  const planMeta = snapshot.planMeta;
-
-  if (!planMeta?.id || !workout || workout.type === "rest") {
-    return null;
-  }
-
-  const sourceEditing = workout.sourceEditing;
-  const canDirectCopy = Boolean(sourceEditing?.canDirectCopy);
-  const canDirectMove = Boolean(sourceEditing?.canDirectMove);
-  const canDragInitiate = Boolean(sourceEditing?.canDragInitiate);
-  const canRequestClearReview = Boolean(
-    planMeta.workoutEditing?.clearWorkout.allowed && (sourceEditing?.canClear ?? canDirectMove),
-  );
-
-  if (!canDirectCopy && !canRequestClearReview && !canDirectMove && !canDragInitiate) {
-    return null;
-  }
-
-  return {
-    activePlanId: planMeta.id,
-    canDirectCopy,
-    canDirectMove,
-    canDragInitiate,
-    canRequestClearReview,
-    sourceWorkoutDate: iso,
-    sourceWorkoutId: workout.id,
-    title: workout.title || workoutTypeMeta(workout).label,
-  };
-}
-
-function canExposeTodayAsManualMoveTarget(
-  snapshot: TrainingSnapshot,
-  targetDate: string,
-  moveSource: ManualCopiedWorkoutSource | null,
-) {
-  if (targetDate !== snapshot.currentDate || !moveSource) return false;
-
-  const sourceWorkout = snapshot.workouts.find(
-    (workout) =>
-      workout.id === moveSource.sourceWorkoutId && workout.date === moveSource.sourceWorkoutDate,
-  );
-
-  const sourceEditing = sourceWorkout?.sourceEditing;
-
-  return Boolean(
-    sourceEditing?.canDirectMove && sourceEditing.eligibility === "eligible_past_unlogged",
-  );
-}
-
-export function calendarMoveTargetAction(dayKind: ManualWorkoutMoveTargetDayKind) {
-  if (dayKind === "workout_day") {
-    return {
-      label: "Replace",
-      icon: "arrow-right" as const,
-      tone: "warning" as const,
-      ariaLabel: "Review replacement for selected workout",
-    };
-  }
-
-  return {
-    label: "Move",
-    icon: "arrow-right" as const,
-    tone: "signal" as const,
-    ariaLabel: "Move selected workout to rest day",
-  };
-}
-
-export function calendarMoveUndoAction(secondsRemaining: number) {
-  return {
-    label: `Undo ${secondsRemaining}`,
-    icon: "refresh" as const,
-    tone: "signal" as const,
-    visual: "button" as const,
-    visualButton: "ghost" as const,
-    alwaysVisible: true,
-    showCompactLabel: true,
-    ariaLabel: `Undo move. ${secondsRemaining} seconds remaining.`,
-  };
-}
-
-export function manualTargetButtonAriaLabel(
-  iso: string,
-  canMoveHere: boolean,
-  dayKind: ManualWorkoutMoveTargetDayKind,
-) {
-  const dateLabel = formatDate(iso, {
-    month: "short",
-    day: "numeric",
-    weekday: "short",
-  });
-
-  if (!canMoveHere) return `${dateLabel}. Add workout.`;
-  if (dayKind === "workout_day") {
-    return `${dateLabel}. Review replacement for selected workout.`;
-  }
-  return `${dateLabel}. Move selected workout to rest day.`;
-}
-
-export function canMoveToManualTarget(
-  manualCalendarActionState: ManualCalendarActionState,
-  activePlanId: string,
-  targetDate: string,
-) {
-  const source = manualCalendarActionState.moveWorkoutSource;
-
-  return Boolean(
-    source && source.activePlanId === activePlanId && source.sourceWorkoutDate !== targetDate,
-  );
-}
-
 export function manualMoveSourceDragProps(
-  context: ManualWorkoutCalendarActionContext | null,
+  context: CalendarWorkoutActionContext | null,
   manualCalendarActionState: ManualCalendarActionState,
 ) {
   return {
@@ -838,7 +515,7 @@ export function manualMoveTargetDragProps(
 
 function setManualMoveDragImage(
   event: DragEvent<HTMLElement>,
-  context: ManualWorkoutCalendarActionContext,
+  context: CalendarWorkoutActionContext,
 ) {
   if (typeof document === "undefined" || typeof window === "undefined") return;
 
@@ -863,9 +540,4 @@ function setManualMoveDragImage(
   document.body.appendChild(dragImage);
   event.dataTransfer.setDragImage(dragImage, 24, 18);
   window.setTimeout(() => dragImage.remove(), 0);
-}
-
-export function isBeforePlanStart(iso: string, snapshot: TrainingSnapshot) {
-  const planStartDate = snapshot.planMeta?.startDate;
-  return Boolean(planStartDate && iso < planStartDate);
 }

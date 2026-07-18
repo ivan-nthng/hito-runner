@@ -20,11 +20,11 @@ import {
   markAiPlanGenerationPersisted,
   markAiPlanGenerationReviewedDraftSigned,
 } from "@/lib/ai-plan-generation-ledger";
-import { planGoalIntentInputSchema } from "@/lib/plan-creation-engine";
 import {
-  RUNNING_PLAN_DISTANCE_FAMILY_VALUES,
-  RUNNING_PLAN_RUNNER_LEVEL_VALUES,
-} from "@/lib/plan-creation-engine/source-types";
+  planGoalIntentDistanceInputSchema,
+  planGoalIntentInputSchema,
+} from "@/lib/plan-creation-engine";
+import { RUNNING_PLAN_RUNNER_LEVEL_VALUES } from "@/lib/plan-creation-engine/source-types";
 import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
 import {
   RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
@@ -32,9 +32,10 @@ import {
   buildRunningPlanPersistenceMetadata,
   buildRunningPlanProfilePatch,
   validateRunningPlanReviewExactness,
-  validateSelfContainedRunningPlanReviewToken,
+  validateSelfContainedRunningPlanReviewExactness,
   type RunningPlanReviewedPreviewDraft,
 } from "@/lib/running-plan-engine-review";
+import { stableJsonEqual } from "@/lib/review-token-signing";
 import { WEEKDAY_NAMES } from "@/lib/weekday-rest-invariants";
 
 const weekdayNameSchema = z.enum(WEEKDAY_NAMES);
@@ -64,13 +65,14 @@ export const runningPlanPreviewInputSchema = z
     heightCm: z.number().finite().positive(),
     weightKg: z.number().finite().positive(),
     runnerLevel: z.enum(RUNNING_PLAN_RUNNER_LEVEL_VALUES),
-    distanceFamily: z.enum(RUNNING_PLAN_DISTANCE_FAMILY_VALUES).optional().nullable(),
     daysPerWeek: z.number().int().min(1).max(7).optional().nullable(),
     fixedRestDays: z.array(weekdayNameSchema).optional().nullable(),
     preferredLongRunDay: weekdayNameSchema.optional().nullable(),
     startDate: z.string().trim().optional().nullable(),
     benchmark: runningPlanBenchmarkSchema.optional().nullable(),
-    planGoalIntent: planGoalIntentInputSchema.optional().nullable(),
+    planGoalIntent: planGoalIntentInputSchema.extend({
+      distance: planGoalIntentDistanceInputSchema,
+    }),
   })
   .strict();
 
@@ -220,21 +222,7 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
   userId: string,
   request: RunningPlanConfirmActionInput,
 ): Promise<RunningPlanConfirmActionResult> {
-  const decoded = await validateSelfContainedRunningPlanReviewToken({
-    reviewToken: request.reviewToken,
-    reviewChecksum: request.reviewChecksum,
-  });
-
-  if (!decoded.ok) {
-    return buildConfirmFailure({
-      reason: decoded.reason,
-      message: decoded.message,
-      sourceKind: request.sourceKind,
-    });
-  }
-
-  const exactness = await validateRunningPlanReviewExactness({
-    draft: decoded.draft,
+  const exactness = await validateSelfContainedRunningPlanReviewExactness({
     reviewToken: request.reviewToken,
     reviewChecksum: request.reviewChecksum,
   });
@@ -248,8 +236,8 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
   }
 
   if (
-    !isAiGeneratedRunningPlanPreviewDraft(decoded.draft) ||
-    decoded.draft.sourceKind !== request.sourceKind
+    !isAiGeneratedRunningPlanPreviewDraft(exactness.draft) ||
+    exactness.draft.sourceKind !== request.sourceKind
   ) {
     return buildConfirmFailure({
       reason: "input_mismatch",
@@ -259,7 +247,7 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
     });
   }
 
-  if (!sameJson(request.previewInput, decoded.draft.previewInput)) {
+  if (!sameJson(request.previewInput, exactness.draft.previewInput)) {
     return buildConfirmFailure({
       reason: "stale_review",
       message:
@@ -272,15 +260,15 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
     const applyResult = await createFirstPlanFromReviewedCanonicalPlanForUser(
       userId,
       exactness.canonicalPlan,
-      buildRunningPlanProfilePatch(decoded.draft),
+      buildRunningPlanProfilePatch(exactness.draft),
       buildRunningPlanPersistenceMetadata({
-        draft: decoded.draft,
+        draft: exactness.draft,
         canonicalPlan: exactness.canonicalPlan,
         reviewChecksum: exactness.reviewChecksum,
       }),
     );
     await markAiPlanGenerationPersisted({
-      trace: decoded.draft.aiGeneration.generationTrace,
+      trace: exactness.draft.aiGeneration.generationTrace,
     });
 
     return {
@@ -386,23 +374,4 @@ function buildConfirmFailure(input: {
   };
 }
 
-function sameJson(left: unknown, right: unknown) {
-  return JSON.stringify(sortJsonValue(left)) === JSON.stringify(sortJsonValue(right));
-}
-
-function sortJsonValue(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map((entry) => sortJsonValue(entry));
-  }
-
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value)
-        .filter(([, nestedValue]) => nestedValue !== undefined)
-        .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
-        .map(([key, nestedValue]) => [key, sortJsonValue(nestedValue)]),
-    );
-  }
-
-  return value;
-}
+const sameJson = stableJsonEqual;

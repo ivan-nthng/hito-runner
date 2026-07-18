@@ -42,10 +42,7 @@ export function validateCanonicalRowsAreNumeric(
 }
 
 export function validateNoFakePaceOrPersonalHr(rows: readonly unknown[]) {
-  const serialized = JSON.stringify(rows);
-
-  assert.doesNotMatch(serialized, /"pace_min_per_km_range"|"pace_range_min_km"|"pace"/i);
-  assert.doesNotMatch(serialized, /race_pace_session/i);
+  validateAiAuthoredPaceTargets(rows);
   validateNoPersonalHrTargets(rows);
 }
 
@@ -91,7 +88,28 @@ export function assertSelectedDistanceEndpointProof(input: {
 }
 
 export function rowHasPaceTargets(row: CanonicalRunningPlanRow) {
-  return JSON.stringify(row.segments).includes("pace_min_per_km_range");
+  return /"pace_min_per_km_range"|"pace_range_min_km"|"pace"/i.test(JSON.stringify(row.segments));
+}
+
+function validateAiAuthoredPaceTargets(value: unknown) {
+  if (Array.isArray(value)) {
+    value.forEach(validateAiAuthoredPaceTargets);
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+
+  const record = value as Record<string, unknown>;
+  if (typeof record.pace === "string") {
+    assert.equal(
+      record.target_source,
+      "ai_authored_plan_guidance",
+      "Pace guidance must preserve AI-authored provenance.",
+    );
+  }
+  assert.equal(record.pace_seconds_per_km, undefined);
+  assert.equal(record.pace_min_seconds_per_km, undefined);
+  assert.equal(record.pace_max_seconds_per_km, undefined);
+  Object.values(record).forEach(validateAiAuthoredPaceTargets);
 }
 
 export function validateNoClientRowsTrusted(rows: readonly PersistedWorkoutRow[]) {

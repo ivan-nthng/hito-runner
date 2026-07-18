@@ -95,8 +95,7 @@ export function ManualWorkoutPersistedEditDialog({
   const applyPersistedEditReconstructResult = useCallback(
     (result: ManualWorkoutPersistedEditReconstructResult | null | undefined) => {
       if (!result?.ok) {
-        const nextMessage =
-          result?.message ?? "This manual workout cannot be opened for editing yet.";
+        const nextMessage = result?.message ?? "This workout cannot be opened for editing yet.";
         setStatus("idle");
         setLoadedSourceKey(sourceKey);
         setMessage(nextMessage);
@@ -181,9 +180,7 @@ export function ManualWorkoutPersistedEditDialog({
           reconstructRequestRef.current = null;
         }
         const nextMessage =
-          error instanceof Error
-            ? error.message
-            : "This manual workout could not be opened for editing.";
+          error instanceof Error ? error.message : "This workout could not be opened for editing.";
         setStatus("idle");
         setLoadedSourceKey(sourceKey);
         setMessage(nextMessage);
@@ -272,7 +269,7 @@ export function ManualWorkoutPersistedEditDialog({
       });
     } catch (error) {
       const nextMessage =
-        error instanceof Error ? error.message : "This manual workout edit could not be reviewed.";
+        error instanceof Error ? error.message : "This workout edit could not be reviewed.";
       setStatus("idle");
       setMessage(nextMessage);
       hitoToast.error({
@@ -382,6 +379,7 @@ export function ManualWorkoutPersistedEditDialog({
                 onTargetTruthModeChange={(targetTruthMode) => updateDraftState({ targetTruthMode })}
                 onTitleChange={(nextTitle) => updateDraftState({ title: nextTitle })}
                 readbackMode={Boolean(readyReview)}
+                reviewedDocument={readyReview?.draftReview.draft ?? null}
                 reviewDisabledReason={blockedMessage}
                 selectedTemplateKey={template.templateKey}
                 source="template"

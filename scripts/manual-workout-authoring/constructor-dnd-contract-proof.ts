@@ -17,6 +17,7 @@ import {
   type ManualWorkoutDraftInput,
   type ManualWorkoutRepeatGroupInput,
 } from "../../src/lib/manual-workout-authoring";
+import { repeatChildSteps, repeatCountForStep } from "../../src/lib/training";
 import { assertReady } from "./move-proof-fixtures";
 
 export function validateManualConstructorDndContract() {
@@ -141,13 +142,11 @@ function assertRepeatChildReorder() {
     templateKey: "time_intervals",
     workoutDate: "2026-07-16",
   });
-  const repeatReadback = review.constructorContract.timeline.find(
-    (entryValue) => entryValue.kind === "repeat",
-  );
+  const repeatReadback = review.draft.steps.find((step) => repeatCountForStep(step) != null);
 
   assert.ok(repeatReadback, "review readback should include the repeat group");
   assert.deepEqual(
-    repeatReadback.children.map((child) => child.label),
+    repeatChildSteps(repeatReadback).map((child) => child.label),
     ["Work", "Easy steady", "Recover"],
     "review readback should preserve reordered repeat child labels",
   );

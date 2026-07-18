@@ -6,7 +6,6 @@ import type {
   RunningPlanBenchmarkInput,
   RunningPlanBenchmarkPaceTruth,
   RunningPlanDaysPerWeek,
-  RunningPlanDistanceFamily,
   RunningPlanRunnerLevel,
   RunningPlanTargetTruthMode,
   RunningPlanWatchExecutableSegmentTemplate,
@@ -26,13 +25,14 @@ export interface BuildRunningPlanPreviewInput {
   heightCm: number;
   weightKg: number;
   runnerLevel: RunningPlanRunnerLevel;
-  distanceFamily?: RunningPlanDistanceFamily | null;
   daysPerWeek?: RunningPlanDaysPerWeek | null;
   fixedRestDays?: readonly WeekdayName[] | null;
   preferredLongRunDay?: WeekdayName | null;
   startDate?: string | null;
   benchmark?: RunningPlanBenchmarkInput | null;
-  planGoalIntent?: PlanGoalIntentInput | null;
+  planGoalIntent: PlanGoalIntentInput & {
+    distance: NonNullable<PlanGoalIntentInput["distance"]>;
+  };
 }
 
 export interface RunningPlanPreviewCalendarRow {
@@ -60,7 +60,6 @@ export interface RunningPlanPreviewNormalizedInputSummary {
   heightCm: number;
   weightKg: number;
   runnerLevel: RunningPlanRunnerLevel;
-  distanceFamily: RunningPlanDistanceFamily;
   daysPerWeek: RunningPlanDaysPerWeek;
   fixedRestDays: WeekdayName[];
   preferredLongRunDay: WeekdayName | null;

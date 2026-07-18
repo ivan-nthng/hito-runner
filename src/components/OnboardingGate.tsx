@@ -151,12 +151,11 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     }),
     [constructorState, goalDistance, terrainFocus],
   );
-  const isPresetDiscoveryReady = isPresetPrimarySetupReady(constructorState);
+  const hasRequiredPlanBasics = isPresetPrimarySetupReady(constructorState);
   const isManualSetupReady = isManualProfileReady(constructorState);
   const selectedPlanPreview = useSelectedPlanPresetPreviewController({
     state: effectiveConstructorState,
-    autoLoadEnabled: advancedSettingsOpen,
-    isPresetDiscoveryReady,
+    hasRequiredPlanBasics,
     toastId: STRUCTURED_REVIEW_TOAST_ID,
     previewReadyDescription: "Review the backend-shaped calendar before creating the plan.",
     autoRefreshOpenPreview: true,
@@ -182,7 +181,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     selectedPreviewMatchesGoal && selectedPlanPreview.previewResult?.ok === true;
   const generatedCreateDisabled =
     isBusy ||
-    !isPresetDiscoveryReady ||
+    !hasRequiredPlanBasics ||
     !selectedGoalId ||
     !selectedPlanGoalPreviewGate.ok ||
     (selectedPlanPreview.previewOpen && selectedPreviewIsReady);
@@ -192,7 +191,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const footerHint = advancedSettingsOpen
     ? generatedCreateFooterHint({
         error: selectedPlanPreview.error,
-        isPresetDiscoveryReady,
+        hasRequiredPlanBasics,
         planGoalChoice,
         previewGate: selectedPlanGoalPreviewGate,
         previewIsOpen: selectedPlanPreview.previewOpen,
@@ -470,15 +469,12 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
                 setComment,
               }}
               constructorStatus="idle"
-              draftResult={null}
               constructorError={null}
               isBusy={isBusy}
-              isConstructorReady={isPresetDiscoveryReady}
+              isConstructorReady={hasRequiredPlanBasics}
               onSubmit={() => {
                 selectedPlanPreview.setError("Choose a goal before building a generated preview.");
               }}
-              onConfirmDraft={() => undefined}
-              onBackToEdit={() => undefined}
               quickSetupSections={{
                 includeBaseline: false,
                 includeRunningLevel: false,
@@ -489,14 +485,12 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
               }}
               planPresetPanel={
                 <PlanPresetPanel
-                  cardsResult={selectedPlanPreview.cardsResult}
                   confirmResult={runningPlanConfirmResult}
                   previewResult={selectedPlanPreview.previewResult}
                   createStatus={runningPlanCreateStatus}
                   error={selectedPlanPreview.error}
                   status={selectedPlanPreview.status}
-                  isBusy={isBusy}
-                  isPresetDiscoveryReady={isPresetDiscoveryReady}
+                  hasRequiredPlanBasics={hasRequiredPlanBasics}
                   previewOpen={selectedPlanPreview.previewOpen}
                   onPreviewOpenChange={selectedPlanPreview.setPreviewOpen}
                   planGoalChoice={planGoalChoice}
@@ -579,7 +573,7 @@ function manualCreateFooterHint({
 
 function generatedCreateFooterHint({
   error,
-  isPresetDiscoveryReady,
+  hasRequiredPlanBasics,
   planGoalChoice,
   previewGate,
   previewIsOpen,
@@ -587,7 +581,7 @@ function generatedCreateFooterHint({
   status,
 }: {
   error: string | null;
-  isPresetDiscoveryReady: boolean;
+  hasRequiredPlanBasics: boolean;
   planGoalChoice: StructuredConstructorState["planGoalChoice"];
   previewGate: ReturnType<typeof resolveSelectedPlanGoalPreviewGate>;
   previewIsOpen: boolean;
@@ -598,7 +592,7 @@ function generatedCreateFooterHint({
     return { message: error, tone: "error" };
   }
 
-  if (!isPresetDiscoveryReady) {
+  if (!hasRequiredPlanBasics) {
     return {
       message: "Add age, height, and weight before creating a plan.",
       tone: "neutral",

@@ -766,6 +766,66 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      apply_active_plan_workout_mutation: {
+        Args: {
+          p_current_date: string;
+          p_expected_plan_updated_at: string;
+          p_expected_source_workout: Json;
+          p_expected_target_workout: Json;
+          p_mutation_kind: string;
+          p_plan_id: string;
+          p_plan_update: Json;
+          p_user_id: string;
+          p_workout_insert: Json;
+          p_workout_update: Json;
+        };
+        Returns: Json;
+      };
+      apply_active_plan_workout_content_edit: {
+        Args: {
+          p_current_date: string;
+          p_expected_plan_updated_at: string;
+          p_expected_workout: Json;
+          p_plan_goal_metadata: Json;
+          p_plan_id: string;
+          p_plan_preferences: Json;
+          p_user_id: string;
+          p_workout_id: string;
+          p_workout_update: Json;
+        };
+        Returns: Json;
+      };
+      apply_reviewed_plan_persistence: {
+        Args: {
+          p_archive_goal_metadata: Json;
+          p_evidence_relinks: Json;
+          p_expected_active_plan_id: string | null;
+          p_expected_active_plan_updated_at: string | null;
+          p_expected_history: Json;
+          p_logs: Json;
+          p_plan: Json;
+          p_profile: Json;
+          p_user_id: string;
+          p_workouts: Json;
+        };
+        Returns: Json;
+      };
+      apply_reviewed_import_persistence: {
+        Args: {
+          p_archive_goal_metadata: Json;
+          p_clear_before_import: boolean;
+          p_evidence_relinks: Json;
+          p_expected_active_plan_id: string;
+          p_expected_active_plan_updated_at: string;
+          p_expected_history: Json;
+          p_logs: Json;
+          p_plan: Json;
+          p_profile: Json;
+          p_user_id: string;
+          p_workouts: Json;
+        };
+        Returns: Json;
+      };
       apply_active_plan_schedule_reflow: {
         Args: {
           p_applied_at: string;

@@ -24,11 +24,11 @@ import {
 import { reviewManualWorkoutDraft } from "@/lib/manual-workout-authoring/actions";
 import { buildManualWorkoutDraftInputFromPersistedWorkout } from "@/lib/manual-workout-authoring/copy-paste-reconstruction";
 import {
-  buildExpectedPersistedEditReviewToken,
   buildManualWorkoutEditMetadata,
   buildPersistedEditReview,
+  buildSourceWorkoutFingerprint,
   MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION,
-  safeManualWorkoutEditReviewTokenEqual,
+  validatePersistedEditReviewProof,
   type ManualWorkoutPersistedEditReview,
 } from "@/lib/manual-workout-authoring/edit-workout-review-token";
 import { persistedManualWorkoutHasUnsafeMetricTruth } from "@/lib/manual-workout-authoring/persisted-workout-safety";
@@ -191,6 +191,12 @@ export type ManualWorkoutPersistedEditConfirmResult =
         draftReviewChecksum: string;
         originalPlanSourceKind: string;
         originalPlanSourceStatus: string | null;
+        originalPlanOriginSourceKind: string | null;
+        originalPlanOriginSourceStatus: string | null;
+        originalWorkoutSourceId: string | null;
+        originalWorkoutSourceType: string | null;
+        originalWorkoutFamily: string | null;
+        originalWorkoutIdentity: string | null;
         trustedClientRows: false;
       };
       safety: {
@@ -238,6 +244,18 @@ type PersistManualWorkoutEditInput = {
   draftReview: Extract<ManualWorkoutDraftReviewResult, { ok: true }>;
   review: ManualWorkoutPersistedEditReview;
 };
+
+type PersistManualWorkoutEditResult =
+  | {
+      ok: true;
+      editedWorkout: PersistedPlannedWorkoutRow;
+      planCycle: PersistedPlanCycleRow;
+    }
+  | {
+      ok: false;
+      reason: "stale_review" | "protected_day";
+      message: string;
+    };
 
 export const reconstructManualWorkoutPersistedEditDraft = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => value)
@@ -473,15 +491,20 @@ export async function confirmManualWorkoutPersistedEditForUser(
     draftReview,
   });
 
-  if (parsed.data.reviewChecksum !== review.reviewChecksum) {
+  const reviewProof = validatePersistedEditReviewProof({
+    expectedChecksum: review.reviewChecksum,
+    reviewChecksum: parsed.data.reviewChecksum,
+    reviewToken: parsed.data.reviewToken,
+  });
+
+  if (!reviewProof.ok && reviewProof.reason === "stale_review") {
     return buildEditBlocked({
       reason: "stale_review",
       message: "This manual workout edit review no longer matches the current workout.",
     });
   }
 
-  const expectedToken = buildExpectedPersistedEditReviewToken(review.reviewChecksum);
-  if (!safeManualWorkoutEditReviewTokenEqual(parsed.data.reviewToken, expectedToken)) {
+  if (!reviewProof.ok) {
     return buildEditBlocked({
       reason: "invalid_review",
       message: "This manual workout edit review token is invalid. Refresh the review.",
@@ -491,7 +514,7 @@ export async function confirmManualWorkoutPersistedEditForUser(
   const persistEdit = dependencies.persistWorkoutEdit ?? persistManualWorkoutPersistedEdit;
 
   try {
-    await persistEdit({
+    const persistence = await persistEdit({
       userId,
       activePlan: target.activePlan,
       sourceWorkout: target.sourceWorkout,
@@ -500,6 +523,15 @@ export async function confirmManualWorkoutPersistedEditForUser(
       review,
     });
 
+    if (!persistence.ok) {
+      return buildEditBlocked(persistence);
+    }
+
+    const auditMetadata = buildManualWorkoutActivePlanEditMetadata({
+      activePlan: target.activePlan,
+      sourceWorkout: target.sourceWorkout,
+      review,
+    });
     const calendarRowCount = target.otherWorkouts.length + 1;
     const nonRestWorkoutCount =
       target.otherWorkouts.filter((workout) => workout.workout_type !== "rest").length + 1;
@@ -535,6 +567,12 @@ export async function confirmManualWorkoutPersistedEditForUser(
         draftReviewChecksum: draftReview.reviewChecksum,
         originalPlanSourceKind: target.activePlan.source_kind!,
         originalPlanSourceStatus: resolveActivePlanSourceStatus(target.activePlan),
+        originalPlanOriginSourceKind: auditMetadata.original_plan_origin_source_kind ?? null,
+        originalPlanOriginSourceStatus: auditMetadata.original_plan_origin_source_status ?? null,
+        originalWorkoutSourceId: auditMetadata.original_workout_source_id ?? null,
+        originalWorkoutSourceType: auditMetadata.original_workout_source_type ?? null,
+        originalWorkoutFamily: auditMetadata.original_workout_family ?? null,
+        originalWorkoutIdentity: auditMetadata.original_workout_identity ?? null,
         trustedClientRows: false,
       },
       safety: {
@@ -566,7 +604,7 @@ export async function persistManualWorkoutPersistedEdit({
   otherWorkouts,
   draftReview,
   review,
-}: PersistManualWorkoutEditInput) {
+}: PersistManualWorkoutEditInput): Promise<PersistManualWorkoutEditResult> {
   const supabase = createAdminSupabaseClient();
   const updateRow = buildPersistedWorkoutEditUpdateRow({
     userId,
@@ -575,19 +613,6 @@ export async function persistManualWorkoutPersistedEdit({
     draftReview,
   });
 
-  const updated = await supabase
-    .from("planned_workouts")
-    .update(updateRow)
-    .eq("id", sourceWorkout.id)
-    .eq("user_id", userId)
-    .eq("plan_cycle_id", activePlan.id)
-    .select("*")
-    .single();
-
-  if (updated.error || !updated.data) {
-    throw new Error(updated.error?.message ?? "Manual workout edit update failed.");
-  }
-
   const editedWorkouts = [
     ...otherWorkouts,
     {
@@ -595,41 +620,60 @@ export async function persistManualWorkoutPersistedEdit({
       ...updateRow,
     },
   ];
-  const planUpdate = await supabase
-    .from("plan_cycles")
-    .update({
-      goal_metadata: buildManualWorkoutEditGoalMetadata({
-        activePlan,
-        existingGoalMetadata: activePlan.goal_metadata,
-        editedWorkouts,
-        review,
-      }),
-      plan_preferences: buildManualWorkoutEditPlanPreferences({
-        activePlan,
-        existingPlanPreferences: activePlan.plan_preferences,
-        review,
-      }),
-    })
-    .eq("id", activePlan.id)
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .eq("source_kind", activePlan.source_kind)
-    .select("*")
-    .single();
+  const mutation = await supabase.rpc("apply_active_plan_workout_content_edit", {
+    p_current_date: todayIso(),
+    p_expected_plan_updated_at: activePlan.updated_at,
+    p_expected_workout: toJson(buildSourceWorkoutFingerprint(sourceWorkout)),
+    p_plan_goal_metadata: buildManualWorkoutEditGoalMetadata({
+      activePlan,
+      sourceWorkout,
+      existingGoalMetadata: activePlan.goal_metadata,
+      editedWorkouts,
+      review,
+    }),
+    p_plan_id: activePlan.id,
+    p_plan_preferences: buildManualWorkoutEditPlanPreferences({
+      activePlan,
+      sourceWorkout,
+      existingPlanPreferences: activePlan.plan_preferences,
+      review,
+    }),
+    p_user_id: userId,
+    p_workout_id: sourceWorkout.id,
+    p_workout_update: toJson(updateRow),
+  });
 
-  if (planUpdate.error || !planUpdate.data) {
-    await supabase
-      .from("planned_workouts")
-      .update(buildPersistedWorkoutRollbackRow(sourceWorkout))
-      .eq("id", sourceWorkout.id)
-      .eq("user_id", userId)
-      .eq("plan_cycle_id", activePlan.id);
-    throw new Error(planUpdate.error?.message ?? "Manual workout edit metadata update failed.");
+  if (mutation.error) {
+    throw new Error(mutation.error.message);
+  }
+
+  const result = asJsonRecord(mutation.data);
+  if (result.ok !== true) {
+    if (result.reason === "stale_review" || result.reason === "protected_day") {
+      return {
+        ok: false,
+        reason: result.reason,
+        message:
+          typeof result.message === "string"
+            ? result.message
+            : "The reviewed workout edit is no longer safe to apply.",
+      } satisfies PersistManualWorkoutEditResult;
+    }
+
+    throw new Error(
+      typeof result.message === "string"
+        ? result.message
+        : "Manual workout edit transaction was rejected.",
+    );
   }
 
   return {
-    editedWorkout: updated.data,
-    planCycle: planUpdate.data,
+    ok: true,
+    editedWorkout: readPersistedRpcRow<PersistedPlannedWorkoutRow>(
+      result.edited_workout,
+      sourceWorkout.id,
+    ),
+    planCycle: readPersistedRpcRow<PersistedPlanCycleRow>(result.plan_cycle, activePlan.id),
   };
 }
 
@@ -808,50 +852,14 @@ function buildPersistedWorkoutEditUpdateRow(input: {
   };
 }
 
-function buildPersistedWorkoutRollbackRow(sourceWorkout: PersistedPlannedWorkoutRow) {
-  return {
-    phase: sourceWorkout.phase,
-    workout_type: sourceWorkout.workout_type,
-    source_workout_id: sourceWorkout.source_workout_id,
-    source_workout_type: sourceWorkout.source_workout_type,
-    workout_family: sourceWorkout.workout_family,
-    workout_identity: sourceWorkout.workout_identity,
-    calendar_icon_key: sourceWorkout.calendar_icon_key,
-    goal_context: sourceWorkout.goal_context,
-    metric_mode: sourceWorkout.metric_mode,
-    title: sourceWorkout.title,
-    notes: sourceWorkout.notes,
-    planned_rpe: sourceWorkout.planned_rpe,
-    estimated_fatigue: sourceWorkout.estimated_fatigue,
-    recovery_priority: sourceWorkout.recovery_priority,
-    steps: sourceWorkout.steps,
-    display_order: sourceWorkout.display_order,
-  };
-}
-
 function buildManualWorkoutEditGoalMetadata(input: {
   activePlan: PersistedPlanCycleRow;
+  sourceWorkout: PersistedPlannedWorkoutRow;
   existingGoalMetadata: Json | null;
   editedWorkouts: readonly PersistedPlannedWorkoutRow[];
   review: ManualWorkoutPersistedEditReview;
 }): Json {
-  const editMetadata = buildActivePlanUserEditMetadata({
-    activePlan: input.activePlan,
-    mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.editWorkout,
-    mutationMode: "direct_manual_edit",
-    mutationPayloadVersion: MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION,
-    mutationChecksum: input.review.mutationChecksum,
-    plannedWorkoutId: input.review.plannedWorkoutId,
-    previousWorkoutDate: input.review.workoutDate,
-    targetWorkoutId: input.review.plannedWorkoutId,
-    reviewChecksum: input.review.reviewChecksum,
-    reviewPayloadVersion: MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION,
-    targetDate: input.review.workoutDate,
-    templateKey: input.review.templateKey,
-    title: input.review.title,
-    trustedClientRows: false,
-    workoutAuthoringSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
-  });
+  const editMetadata = buildManualWorkoutActivePlanEditMetadata(input);
   const root = appendActivePlanUserEditMetadataToRecord(
     asJsonRecord(input.existingGoalMetadata),
     editMetadata,
@@ -881,26 +889,11 @@ function buildManualWorkoutEditGoalMetadata(input: {
 
 function buildManualWorkoutEditPlanPreferences(input: {
   activePlan: PersistedPlanCycleRow;
+  sourceWorkout: PersistedPlannedWorkoutRow;
   existingPlanPreferences: Json | null;
   review: ManualWorkoutPersistedEditReview;
 }): Json {
-  const editMetadata = buildActivePlanUserEditMetadata({
-    activePlan: input.activePlan,
-    mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.editWorkout,
-    mutationMode: "direct_manual_edit",
-    mutationPayloadVersion: MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION,
-    mutationChecksum: input.review.mutationChecksum,
-    plannedWorkoutId: input.review.plannedWorkoutId,
-    previousWorkoutDate: input.review.workoutDate,
-    targetWorkoutId: input.review.plannedWorkoutId,
-    reviewChecksum: input.review.reviewChecksum,
-    reviewPayloadVersion: MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION,
-    targetDate: input.review.workoutDate,
-    templateKey: input.review.templateKey,
-    title: input.review.title,
-    trustedClientRows: false,
-    workoutAuthoringSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
-  });
+  const editMetadata = buildManualWorkoutActivePlanEditMetadata(input);
   const root = appendActivePlanUserEditMetadataToRecord(
     asJsonRecord(input.existingPlanPreferences),
     editMetadata,
@@ -918,6 +911,34 @@ function buildManualWorkoutEditPlanPreferences(input: {
     ...root,
     manual_workout_authoring_edit: editMetadataRecord,
     manual_workout_authoring_edits: [...editHistory, editMetadataRecord],
+  });
+}
+
+function buildManualWorkoutActivePlanEditMetadata(input: {
+  activePlan: PersistedPlanCycleRow;
+  sourceWorkout: PersistedPlannedWorkoutRow;
+  review: ManualWorkoutPersistedEditReview;
+}) {
+  return buildActivePlanUserEditMetadata({
+    activePlan: input.activePlan,
+    mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.editWorkout,
+    mutationMode: "direct_manual_edit",
+    mutationPayloadVersion: MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION,
+    mutationChecksum: input.review.mutationChecksum,
+    plannedWorkoutId: input.review.plannedWorkoutId,
+    previousWorkoutDate: input.review.workoutDate,
+    targetWorkoutId: input.review.plannedWorkoutId,
+    reviewChecksum: input.review.reviewChecksum,
+    reviewPayloadVersion: MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION,
+    targetDate: input.review.workoutDate,
+    templateKey: input.review.templateKey,
+    title: input.review.title,
+    trustedClientRows: false,
+    workoutAuthoringSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+    originalWorkoutSourceId: input.sourceWorkout.source_workout_id,
+    originalWorkoutSourceType: input.sourceWorkout.source_workout_type,
+    originalWorkoutFamily: input.sourceWorkout.workout_family,
+    originalWorkoutIdentity: input.sourceWorkout.workout_identity,
   });
 }
 
@@ -980,4 +1001,14 @@ function asJsonRecord(value: unknown): Record<string, unknown> {
 
 function toJson(value: unknown): Json {
   return JSON.parse(JSON.stringify(value)) as Json;
+}
+
+function readPersistedRpcRow<T extends { id: string }>(value: unknown, expectedId: string): T {
+  const row = asJsonRecord(value);
+
+  if (row.id !== expectedId) {
+    throw new Error("Manual workout edit transaction returned an unexpected persisted row.");
+  }
+
+  return row as T;
 }

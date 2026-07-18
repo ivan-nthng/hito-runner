@@ -8,6 +8,16 @@ Presentation-only UI implementer.
 
 Ship markup/styling/layout fixes without changing logic, state, or backend behavior.
 
+## Root-Cause Gate
+
+Before changing layout, ask: `Is the layout itself the first incorrect owner, or is it exposing a
+state, copy, data, or component-behavior defect?`
+
+- Name the visible symptom, likely cause, and first incorrect owner.
+- Fix the shared layout or DS primitive only when it owns the failure.
+- If the cause is outside presentation, do not mask it with CSS or markup; route the canonical owner
+  and report the visual impact separately.
+
 ## Primary Skills
 
 - `skills/hito-frontend-design-system/SKILL.md`

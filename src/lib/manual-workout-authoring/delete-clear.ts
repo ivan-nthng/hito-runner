@@ -13,7 +13,12 @@ import {
   type ExistingPlanContext,
   type PersistedPlanCycleRow,
   type PersistedPlannedWorkoutRow,
+  type PersistedWorkoutLogRow,
 } from "@/lib/active-plan-persistence";
+import {
+  ActivePlanPersistenceRejection,
+  applyAtomicActivePlanWorkoutMutation,
+} from "@/lib/active-plan-lifecycle-persistence";
 import {
   fetchManualWorkoutEvidenceWorkoutIds,
   type ManualWorkoutActivePlanAddDependencies,
@@ -29,11 +34,15 @@ import {
   type ManualWorkoutDraftReviewResult,
 } from "@/lib/manual-workout-authoring/schema";
 import { persistedManualWorkoutHasUnsafeMetricTruth } from "@/lib/manual-workout-authoring/persisted-workout-safety";
-import { stableManualWorkoutChecksum64Hex } from "@/lib/manual-workout-authoring/review-exactness";
+import { buildSourceWorkoutFingerprint } from "@/lib/manual-workout-authoring/edit-workout-review-token";
+import {
+  buildManualWorkoutReviewToken,
+  stableManualWorkoutChecksum64Hex,
+  validateManualWorkoutReviewProof,
+} from "@/lib/manual-workout-authoring/review-exactness";
 import { getCurrentManualWorkoutAuthoringUserId } from "@/lib/manual-workout-authoring/request-auth";
-import { safeTokenEqual } from "@/lib/review-token-signing";
 import type { Json } from "@/lib/supabase/database";
-import { createAdminSupabaseClient } from "@/lib/supabase/server";
+import { todayIso } from "@/lib/training";
 
 const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const MANUAL_WORKOUT_DELETE_REVIEW_PAYLOAD_VERSION =
@@ -334,15 +343,21 @@ export async function confirmManualWorkoutDeleteClearForUser(
     return buildDeleteClearBlocked(target);
   }
 
-  if (parsed.data.reviewChecksum !== target.review.reviewChecksum) {
+  const reviewProof = validateManualWorkoutReviewProof({
+    expectedChecksum: target.review.reviewChecksum,
+    reviewChecksum: parsed.data.reviewChecksum,
+    reviewToken: parsed.data.reviewToken,
+    tokenPrefix: MANUAL_WORKOUT_DELETE_REVIEW_TOKEN_PREFIX,
+  });
+
+  if (!reviewProof.ok && reviewProof.reason === "stale_review") {
     return buildDeleteClearBlocked({
       reason: "stale_review",
       message: "This manual workout delete review no longer matches the active plan.",
     });
   }
 
-  const expectedToken = `${MANUAL_WORKOUT_DELETE_REVIEW_TOKEN_PREFIX}${target.review.reviewChecksum}`;
-  if (!safeTokenEqual(parsed.data.reviewToken, expectedToken)) {
+  if (!reviewProof.ok) {
     return buildDeleteClearBlocked({
       reason: "invalid_review",
       message: "This manual workout delete review token is invalid. Refresh the review.",
@@ -391,7 +406,17 @@ export async function confirmManualWorkoutDeleteClearForUser(
         callsOpenAi: false,
       },
     };
-  } catch {
+  } catch (error) {
+    if (error instanceof ActivePlanPersistenceRejection) {
+      return buildDeleteClearBlocked({
+        reason:
+          error.reason === "stale_review" || error.reason === "protected_day"
+            ? error.reason
+            : "persistence_failed",
+        message: error.message,
+      });
+    }
+
     return buildDeleteClearBlocked({
       reason: "persistence_failed",
       message: "The manual workout could not be deleted. The active plan is unchanged.",
@@ -406,23 +431,17 @@ export async function persistManualWorkoutDeleteClear({
   remainingWorkouts,
   review,
 }: PersistManualWorkoutDeleteClearInput) {
-  const supabase = createAdminSupabaseClient();
-  const deleted = await supabase
-    .from("planned_workouts")
-    .delete()
-    .eq("id", targetWorkout.id)
-    .eq("user_id", userId)
-    .eq("plan_cycle_id", activePlan.id)
-    .select("*")
-    .single();
-
-  if (deleted.error || !deleted.data) {
-    throw new Error(deleted.error?.message ?? "Manual workout delete failed.");
-  }
-
-  const update = await supabase
-    .from("plan_cycles")
-    .update({
+  const persisted = await applyAtomicActivePlanWorkoutMutation({
+    userId,
+    planId: activePlan.id,
+    expectedPlanUpdatedAt: activePlan.updated_at,
+    currentDate: todayIso(),
+    mutationKind: "clear",
+    expectedSourceWorkout: buildSourceWorkoutFingerprint(targetWorkout) as unknown as Json,
+    expectedTargetWorkout: null,
+    workoutInsert: null,
+    workoutUpdate: null,
+    planUpdate: {
       end_date: resolveManualPlanEndDateAfterDelete(activePlan, remainingWorkouts),
       goal_metadata: buildManualWorkoutDeleteGoalMetadata({
         activePlan,
@@ -435,22 +454,16 @@ export async function persistManualWorkoutDeleteClear({
         existingPlanPreferences: activePlan.plan_preferences,
         review,
       }),
-    })
-    .eq("id", activePlan.id)
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .eq("source_kind", activePlan.source_kind)
-    .select("*")
-    .single();
+    },
+  });
 
-  if (update.error || !update.data) {
-    await supabase.from("planned_workouts").insert(deleted.data);
-    throw new Error(update.error?.message ?? "Manual workout delete metadata update failed.");
+  if (!persisted.deletedWorkout) {
+    throw new Error("Atomic manual workout delete did not return the deleted workout.");
   }
 
   return {
-    deletedWorkout: deleted.data,
-    planCycle: update.data,
+    deletedWorkout: persisted.deletedWorkout,
+    planCycle: persisted.planCycle,
   };
 }
 
@@ -706,7 +719,10 @@ function buildDeleteClearReview(input: {
     workoutDate: input.targetWorkout.workout_date,
     title: input.targetWorkout.title,
     templateKey: input.templateKey,
-    reviewToken: `${MANUAL_WORKOUT_DELETE_REVIEW_TOKEN_PREFIX}${reviewChecksum}`,
+    reviewToken: buildManualWorkoutReviewToken(
+      MANUAL_WORKOUT_DELETE_REVIEW_TOKEN_PREFIX,
+      reviewChecksum,
+    ),
     reviewChecksum,
     exactnessPayloadVersion: MANUAL_WORKOUT_DELETE_REVIEW_PAYLOAD_VERSION,
   };

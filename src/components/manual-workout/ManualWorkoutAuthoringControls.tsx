@@ -54,6 +54,7 @@ import {
   type ManualWorkoutConstructorEntryInput,
 } from "@/lib/manual-workout-authoring/schema";
 import { getManualWorkoutRepeatGroupChildren } from "@/lib/manual-workout-authoring/repeat-groups";
+import { repeatChildSteps, repeatCountForStep } from "@/lib/training";
 import type { WorkoutGlyphKind } from "@/lib/workout-glyph";
 import {
   buildManualDraftInput,
@@ -924,6 +925,7 @@ export function ManualWorkoutConstructorDialog({
                 }
                 onTitleChange={onTitleChange}
                 readbackMode={Boolean(readyReview)}
+                reviewedDocument={readyReview?.draft ?? null}
                 reviewDisabledReason={!canReview ? reviewDisabledReason : null}
                 selectedTemplateKey={selectedTemplate?.templateKey ?? null}
                 source={source}
@@ -1160,13 +1162,11 @@ export function ManualReviewResultNotice({ result }: { result: ManualWorkoutDraf
 }
 
 function manualReviewReadyInlineSummary(result: ManualReviewReady) {
-  const segmentCount = result.constructorContract.timeline.reduce(
-    (count, entry) => count + (entry.kind === "repeat" ? entry.children.length : 1),
+  const segmentCount = result.draft.steps.reduce(
+    (count, step) => count + (repeatChildSteps(step).length || 1),
     0,
   );
-  const repeatCount = result.constructorContract.timeline.filter(
-    (entry) => entry.kind === "repeat",
-  ).length;
+  const repeatCount = result.draft.steps.filter((step) => repeatCountForStep(step)).length;
   const segmentCopy = segmentCount === 1 ? "1 part" : `${segmentCount} parts`;
 
   return repeatCount > 0

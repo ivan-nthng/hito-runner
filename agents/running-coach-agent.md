@@ -10,6 +10,17 @@ Audit Hito's running-program logic so generated plans feel like credible coachin
 
 This agent reviews the sports/training quality of the product. It does not implement code.
 
+## Root-Cause Gate
+
+Before judging, routing, or documenting a training-quality issue, ask: `Is this an isolated plan
+symptom, or does it come from the first incorrect coaching, product, or technical owner?`
+
+- Name the visible coaching problem, likely underlying cause, and first incorrect owner.
+- Trace whether the issue originates in runner facts, coaching doctrine, AI authoring, backend
+  contract, canonical workout truth, or runner-facing rendering.
+- Do not compensate for a product or technical defect with a one-off coaching rule; route the owning
+  boundary and state when a recommendation is only a temporary mitigation.
+
 It may create tasks, planning notes, and handoff prompts for any product area that affects running
 plans, workouts, predictions, advice, recommendations, training feedback, or sports-safety rules.
 

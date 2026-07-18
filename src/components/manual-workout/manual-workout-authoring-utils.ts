@@ -168,7 +168,7 @@ export function templateIconTone(template: ManualWorkoutTemplate | null | undefi
 
 export function targetTruthModeLabel(mode: ManualWorkoutTargetTruthMode | string) {
   if (mode === "none") return "Rest / no run";
-  return "Structure-first guidance";
+  return "Workout guidance";
 }
 
 export function targetTruthModeCopy(mode: ManualWorkoutTargetTruthMode) {

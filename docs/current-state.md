@@ -6,7 +6,7 @@ Active
 
 ## Last Updated
 
-2026-07-13
+2026-07-18
 
 ## Where We Are Now
 
@@ -16,11 +16,18 @@ Active
   calendar Move now has immediate optimistic readback plus clearer Undo; Today/workout-detail shell
   chrome and mobile `Current Plan` actions have been tightened around Hito DS primitives; and local
   inspector/screen tooling remains local-only prompt metadata tooling, not backend/Admin persistence.
-- The next strategic implementation lane is the compiler-style generated-plan engine rebuild:
-  [Hito Compiler Architecture Rebuild Plan](./tasks/backlog/2026-07-13-hito-compiler-architecture-plan.md)
-  has completed Phase 0 routing and points next to BACKEND `PlanCreation Engine Kernel Rebuild`.
-  This is not shipped engine behavior yet; it is the active gate for making generated plans compose
-  from accepted training atoms instead of relying on AI/local fixtures to own progression.
+- The compiler-style generated-plan rebuild is accepted and closed:
+  AI/local fixture authors the dated plan, backend compiles it into canonical workout documents,
+  signed review/confirm persists the reviewed plan without another AI call, and calendar, detail,
+  manual readback, and evidence comparison use the new kernels. Final source and browser proof
+  accepted backend-shaped reviewed workout documents, authored outcome provenance, semantic
+  identity rejection, ordered Repeat `run` roundtrip, uncapped notes/cues, and review-to-saved
+  parity. Post-confirm workout ownership is accepted: eligible confirmed future canonical
+  manual/generated/imported rows can enter the same reviewed edit lifecycle while protected
+  history remains intact. Confirmed external imports use `training_plan_v2_import` for capability
+  identity and keep their claimed origin as provenance; reviewed workout content and runner-edit
+  audit commit atomically while retaining original plan and workout provenance. Paid OpenAI
+  end-to-end and completed evidence-attached browser proof remain separate release/ops debt.
 - The changelog/hub gap exposed a process failure, so history is now split:
   [changelog](./history/changelog.md) owns curated public highlights, while
   [technical log](./history/technical-log.md) owns the complete internal accepted-slice ledger.
@@ -128,18 +135,16 @@ Active
   21.1K, 42.195K, and Custom 15K creation through saved calendar and workout detail with W1-W4
   conservative adaptation, exact selected-distance endpoints, child-first repeats, no fake pace/HR,
   no legacy repeat truth, and disposable cleanup to zero.
-- Universal active-plan Add/Clear/Move editability is accepted in the proved scope:
+- Universal active-plan Add/Clear/Move and future-row content editability are accepted in the proved scope:
   saved calendars now use backend-shaped capability metadata and
   `active_plan_user_edit_v1` audit metadata for eligible today-or-future Add plus row-state Clear
   and direct Move actions across accepted active-plan sources, while preserving the original plan
-  `source_kind` as provenance. Manual Copy/Paste remains a direct backend-owned mutation in the
-  proved manual path; universal Copy/Paste, recurrence, runner-facing `Edit training`, Restore UI,
-  active-plan replacement semantics expansion, and generated-row content editing remain future-only
-  until their own backend/QA/frontend gates accept them.
-- The plan-authoring quality backend refinement has been hardened beyond the original slice 3:
-  structured authoring accepts generation-only execution mode, uses an executable-mode resolver so numeric pace targets require execution support plus usable recent 5K truth, personal HR zones remain the only executable HR target truth, target time alone does not create pace targets, age-estimated HR remains advisory/readback-only, allowed non-pace/non-HR workouts use `structure_only_executable` numeric duration/distance/repeat/recovery anatomy instead of vague effort-only happy-path output, emits exact generated workout identity plus cutback/long-run steady-finish structure inside valid `training-plan-v2` workout data, and now adds goal-family long-run floors/peaks/ceilings, taper reductions aligned to the `Taper` phase boundary, Base/Build/Specific/Taper workout selection, runner-fit safety adjustments, target-time honesty assumptions for weak or aggressive benchmark support, long-distance review assumptions for low-support marathon/ultra/mountain contexts, mountain/trail-specific technical terrain/controlled descent/hike-run/time-on-feet doctrine without exact elevation prescriptions, sharper 5K/10K/half/marathon/ultra workout identities without changing hard-day frequency, a beginner/low-support `build_consistency` cap that keeps those plans out of tempo, interval, and race-like tune-up identities, richer opener/main/finish support-run structure for normal longer easy/steady/cutback/taper/long days, safe recovery/cutback identity variation for conservative low-support balanced plans, bounded plan-scoped authoring snapshots so refresh can preserve target-time, benchmark, execution-mode, rest-day, and metric-policy truth instead of degrading to legacy reconstruction, and rich canonical workout fields/mapping plus additive saved-mode persistence, import/export/template roundtrip, calendar/glyph rendering adoption, and workout/readback helpers that foreground backend-shaped executable target entries while keeping cues, focus, RPE, source copy, default/age-estimated HR, and legacy effort/cue-only rows secondary or legacy-readable.
-- The first OpenAI rich-workout draft backend slice is implemented behind text authoring only:
-  after the existing OpenAI structured-intent extraction validates, the saved-mode text replacement action can explicitly request a separate rich workout draft, but `src/lib/rich-workout-draft-authoring.ts` must normalize it back into canonical `training-plan-v2` by validating taxonomy values, fixed rest/rest-day boundaries, warmup/main/cooldown structure, and metric gates; default `generateCanonicalPlanFromText` usage stays deterministic, the old voice-to-plan seam is retired, and malformed or unavailable rich drafts fall back to the deterministic structured generator with bounded fallback metadata instead of persisting raw AI output.
+  `source_kind` as provenance. Eligible future canonical manual/generated/imported rows also use one
+  review/confirm content-edit path; the mutation is runner-authored and unsafe reconstruction,
+  rest, today/past content edits, logs, evidence, and protected history remain blocked. Manual
+  Copy/Paste remains a direct backend-owned mutation in the proved manual path; universal
+  Copy/Paste, recurrence, Restore UI, and active-plan replacement semantics expansion remain
+  future-only.
 - AI-authored first-plan creation is now plan-first:
   `src/lib/ai-first-plan-draft-service.ts` and `npm run author-ai-first-plan-draft` can run the non-mutating `hito_ai_authored_full_plan_draft` path in mock, invalid, timeout, or live modes. Success returns bounded `ai_authored` canonical `training-plan-v2` output with `source_kind: ai_authored_plan_first_v1`; invalid, unsafe, unavailable, or timed-out output fails before review and persists nothing.
 - The plan-first compiler is the current backend boundary:
@@ -152,8 +157,6 @@ Active
   compact-only legacy rows without explicit rich fields now infer stronger tempo, distance/time interval, race-rhythm, taper tune-up, hill, progression, and stride identities from bounded title and segment semantics before falling back to generic quality. A disposable import of `/Users/ivan/Downloads/ivan_half_marathon_training_plan_v2_full_2026-05-05.json` validated in about 21ms, applied in about 1.6s, and persisted tempo, distance-interval, race-pace, taper tune-up, recovery, long, easy, and rest identity variety with rich fields and segment detail.
 - Structured first-plan confirmation now persists exact reviewed plan truth:
   `confirmRunningPlanDraft` verifies the signed reviewed-plan token, blocks if an active plan already exists, validates fixed rest days without rewriting, and persists the reviewed canonical `training-plan-v2` calendar rows without calling OpenAI or regenerating.
-- Active-plan refresh proposals now have proposal-time rich draft normalization:
-  refresh first asks for bounded proposal copy with an abortable timeout, falls back to deterministic proposal copy when the live proposal step stalls, creates the exact deterministic future-draft payload, then can enrich mutable future workouts through the rich workout draft seam, re-signing the reviewed draft with bounded rich-draft metadata; if proposal or rich OpenAI work is unavailable, malformed, or timed out, the deterministic draft is kept with detectable fallback metadata, while apply still persists only the exact reviewed draft and never calls OpenAI.
 - The first active-plan schedule edit preview backend contract is implemented:
   `src/lib/active-plan-schedule-edit-preview.ts` validates proposed fixed rest days, running-day count, optional explicit running weekdays, and preferred long-run day through shared training-preference rules, then returns a non-mutating `schedule_reflow` preview for same-frequency date moves or `requires_regeneration` for weekly frequency changes; protected past/today, logged, Garmin/evidence-backed, comparison-backed, and AI-insight-backed workouts stay out of proposed moves, and no OpenAI call, profile/default update, or plan mutation occurs in preview.
 - Active-plan schedule reflow apply Slice 2B is implemented:
@@ -163,8 +166,6 @@ Active
   available, reuses Hito weekday/running-day controls, calls the backend preview, renders
   `schedule_reflow` review details, and applies only with the reviewed preview token without
   changing runner Settings defaults.
-- The text-authoring ops smoke path is now TS-backed:
-  `npm run author-plan-from-text` calls the real `src/lib/openai-plan-authoring.ts` seam, defaults to deterministic no-rich-draft output, accepts `--rich-draft` for the rich workout draft seam, accepts `--dry-run` and `--mock-openai` for bounded non-persistent validation, and reports bounded rich-draft status/fallback plus sample rich workout metadata. The former legacy MJS text-authoring fallback has been removed and is no longer a validation path.
 - The structured review-before-create backend slice is now implemented:
   `previewRunningPlanDraft` produces a non-mutating canonical review without creating plan or workout rows, while `confirmRunningPlanDraft` verifies the reviewed draft and creates the first active plan only after explicit confirmation.
 - The temporary local saved-mode path now persists `completed`, `partial`, and `skipped` workout outcomes truthfully through the workout logging UI, including overwrite from an existing completed result.
@@ -183,8 +184,8 @@ Active
 - The bounded Garmin AI interpretation slice is now implemented:
   saved-mode workout detail now persists one `workout_ai_insights` row linked to the latest deterministic comparison, generated only from planned workout truth, normalized Garmin actual metrics, deterministic comparison payload, current week context, next-workout summary, and optional workout-scoped body-note context; the dedicated `Feedback` surface now reads that bounded AI interpretation back separately from the deterministic facts.
 - The first Basic/Pro entitlement backend foundation slice is now implemented:
-  additive `runner_entitlements` and `runner_capability_usage` tables exist for backend-owned tier and metered usage truth, missing entitlement rows resolve to effective `Pro`, explicit Basic can enforce one lifetime included `ai_plan_update`, `garmin_ai_interpretation` remains a Pro-only capability key, and the old `voice_to_plan` capability key is retired from current product truth.
-  `proposeActivePlanRefresh` now checks and records `ai_plan_update` usage only after successful proposal generation, apply does not increment usage, and Garmin upload/parse/deterministic comparison remain available when only AI interpretation is locked.
+  additive `runner_entitlements` and `runner_capability_usage` tables exist for backend-owned tier and metered usage truth, missing entitlement rows resolve to effective `Pro`, `garmin_ai_interpretation` remains the only current Pro-only capability key, and retired plan-update/voice capability keys are not current product truth.
+  Garmin upload/parse/deterministic comparison remain available when only AI interpretation is locked.
   The linked Supabase project has now received the entitlement migration, and local generated database types are aligned with that linked schema.
 - Dictate-to-Plan / voice-to-plan is retired from current product truth:
   the old `DictateToPlanPanel` UI residue, `src/lib/voice-to-plan-authoring.ts`,
@@ -209,10 +210,9 @@ Active
   `/api/auth/confirm` imports `exchangeCodeForSession` directly from `src/lib/auth-actions.ts`, and
   `training-api.ts` no longer keeps the auth callback exchange compatibility re-export.
 - The former plan-management type-contract facade narrowing slice is implemented:
-  plan-management refresh and schedule-edit components import refresh/reflow contract types directly
-  from `src/lib/active-plan-refresh-contract.ts` and
-  `src/lib/active-plan-schedule-edit-preview.ts`, while `training-api.ts` keeps only the runtime
-  server-function wrappers for those flows.
+  plan-management schedule-edit components import reflow contract types directly from
+  `src/lib/active-plan-schedule-edit-preview.ts`, while `training-api.ts` keeps only the live
+  schedule-edit runtime server-function wrappers.
 - The bundled type-only `training-api.ts` facade narrowing slice is now implemented:
   settings, structured first-plan, selected running-plan, first-plan confirm, selected-plan confirm
   input, and active-plan lifecycle result types now import from canonical owner modules or no longer
@@ -222,7 +222,7 @@ Active
   now import from `src/lib/manual-workout-authoring/*`; `training-api.ts` no longer owns manual
   authoring runtime wrappers.
 - The previous `PlanManagementDialog` decomposition work remains useful implementation history:
-  export, refresh, import, lifecycle, text replacement, and summary/header UI were isolated into
+  export, import, lifecycle, text replacement, and summary/header UI were isolated into
   `src/components/plan-management/*`; current runner-facing IA should expose only `Add plan` plus
   overflow utilities (`Export JSON`, `Edit schedule`, `Clear upcoming schedule`) and should not
   teach `Open plan`, visible `Update plan`, or `Delete active plan` as current product concepts.
@@ -276,10 +276,11 @@ Active
   `workout_logs` row tied to the same planned workout id, desktop/mobile clean console, and
   disposable cleanup to zero. The 2026-07-07 workout-document readback polish and Hito inline
   editable text pattern are also accepted: generated preview/detail surfaces now use compact
-  structure-strip/row readback and demote proof/debug language, generated rows remain read-only, the
-  manual constructor title uses shared inline editable text, `/hitoDS/patterns` documents read-only
-  and local inspector task-target examples, and change-task targeting remains non-mutating local
-  devtool behavior in v1.
+  structure-strip/row readback and demote proof/debug language; passive readback remains
+  non-inline-editable, while eligible confirmed future rows can enter the explicit reviewed edit
+  action. The manual constructor title uses shared inline editable text, `/hitoDS/patterns`
+  documents read-only and local inspector task-target examples, and change-task targeting remains
+  non-mutating local devtool behavior in v1.
   Garmin/FIT provider upload/comparison remains a separate later QA gate.
 - The second Hito DS foundations cleanup slice is now implemented:
   workout-detail route chrome now uses existing Hito surface, row-group, hairline, tab-badge, micro-label, body-small, and technical-mono primitives instead of local radial/linear gradients, white-alpha borders, bespoke radius values, and tiny text recipes in `src/routes/workout.$date.tsx` and the Garmin upload/interval controls in `CompletionPanel`.
@@ -297,13 +298,11 @@ Active
   `src/styles.css` owns checkbox, radio, and toggle-radio recipes for `sm` and `md` controls, `/hitoDS#selection-controls` documents default, selected, disabled, invalid, and destructive-confirmation examples, and the saved-mode plan/import confirmation checkboxes now use signal-selected Hito styling without changing their existing gating behavior.
 - The active-plan lifecycle action extraction and G7B helper-export narrowing slices are now
   implemented:
-  `src/lib/active-plan-lifecycle-actions.ts` owns delete/archive and clear-upcoming action behavior,
-  while `training-api.ts` binds the live top-level `deleteActivePlan` and `clearUpcomingSchedule`
-  server-action wrappers to the existing persisted snapshot loader. The no-caller user-scoped
-  `archiveActivePlanForUser` and `clearUpcomingScheduleForUser` compatibility exports were removed
-  from `training-api.ts`; canonical helper ownership remains in `active-plan-lifecycle-actions.ts`.
+  `src/lib/active-plan-lifecycle-actions.ts` owns Clear Upcoming Schedule behavior and the internal
+  archive operation it requires, while `training-api.ts` binds the sole live top-level
+  `clearUpcomingSchedule` server-action wrapper to the existing persisted snapshot loader.
 - The active-plan lifecycle auth integration fix is now implemented:
-  `deleteActivePlan` and `clearUpcomingSchedule` are top-level `training-api.ts` server-action wrappers again, resolving the current persisted user through the same request-auth seam as other working saved-mode mutations before delegating to `active-plan-lifecycle-actions.ts`.
+  `clearUpcomingSchedule` resolves the current persisted user through the same request-auth seam as other working saved-mode mutations before delegating to `active-plan-lifecycle-actions.ts`.
 - The user-settings action extraction and G7A import-map narrowing slices are now implemented:
   `src/lib/user-settings-actions.ts` owns `/settings` route data, bounded profile readback, profile-settings save behavior, `saveUserSettings`, and `UserSettingsSummary`; `training-api.ts` still binds the existing snapshot/viewer loaders for the public `getSettingsRouteData` route wrapper, while the settings route imports the save action directly from `user-settings-actions.ts`.
 - The runner training-preferences backend storage slice is now implemented:
@@ -321,22 +320,12 @@ Active
   `src/lib/auth-actions.ts` owns login route data shaping, Magic Link validation/request behavior, auth callback exchange, and local-vs-public auth availability helpers, while `training-api.ts` keeps the same public `getLoginRouteData` and `requestMagicLink` wrappers for current callers; `/api/auth/confirm` now imports the auth callback exchange owner directly.
 - The route-data loader extraction slice is now implemented:
   `src/lib/route-data-actions.ts` owns home, shell, workout-detail, and progress route data shaping behind injected snapshot/viewer/feedback loaders, while `training-api.ts` keeps the same public `getHomeRouteData`, `getShellRouteData`, `getWorkoutRouteData`, and `getProgressRouteData` server-function wrappers.
-- The active-plan refresh action extraction and G7B helper-export narrowing slices are now
-  implemented:
-  `src/lib/active-plan-refresh-actions.ts` owns refresh proposal entitlement/usage behavior, exact
-  proposal-time draft attachment, stale fingerprint/checksum checks, weekday rest-day validation,
-  mutable-workout guard checks, and archive/replace persistence for approved updates, while
-  `training-api.ts` keeps the live public `proposeActivePlanRefresh` and
-  `applyActivePlanRefreshProposal` server-action wrappers. The no-caller
-  `applyActivePlanRefreshProposalForUser` compatibility export was removed from `training-api.ts`;
-  canonical user-scoped refresh apply ownership remains in `active-plan-refresh-actions.ts`.
 - The plan-replacement action extraction and saved-mode import-map narrowing slices are now
   implemented:
-  `src/lib/plan-replacement-actions.ts` owns advanced JSON/imported-plan replacement, saved-mode
-  text replacement action behavior, and the internal `persistImportedPlanForCurrentRequest` helper.
-  `PlanManagementDialog` and `UploadJsonDialog` import `completeOnboarding` /
-  `completeTextOnboarding` from that canonical owner directly, and `training-api.ts` no longer keeps
-  those plan-replacement compatibility names.
+  `src/lib/plan-replacement-actions.ts` owns advanced JSON/imported-plan replacement and delegates
+  canonical compile/apply persistence to `active-plan-persistence`; `UploadJsonDialog` imports
+  `completeOnboarding` from that owner directly. The no-caller text replacement action and its
+  deterministic authoring helpers have been retired.
 - The old backend voice-to-plan review-assumption follow-up is historical only:
   that transcript-specific draft/confirm seam was retired with the non-visible voice-to-plan backend
   cleanup. Current visible setup uses structured/OpenAI-authored plan creation and backend-shaped
@@ -360,7 +349,7 @@ Active
 - Saved-mode shell navigation back to `/` now uses a fresh home request, and the `Tomorrow` summary no longer falls through to broken `nullkm · 0′` placeholders for interval-style workouts.
 - The profile/sidebar area now shows the runner name plus active plan title, removes duplicate top-level sign-out, and owns a lightweight saved-mode advanced import entry path.
 - The first saved-mode plan-management backend slice is now implemented:
-  a canonical delete-plan action archives the active `plan_cycle` without deleting planned workouts or logs, leaving the runner in authenticated no-plan/setup-ready state, and the JSON import apply seam can now accept a `requestedStartDate` that becomes the effective schedule authority for saved-mode import.
+  the JSON import apply seam accepts a `requestedStartDate` that becomes the effective schedule authority for saved-mode import.
 - The first saved-mode plan-management frontend slice is now implemented:
   Current one-calendar IA does not expose an `Open plan` hub or `Delete active plan`; active-plan
   creation starts from `Add plan`, while safe utilities live in the adjacent overflow.
@@ -403,12 +392,6 @@ Active
   saved workout-scoped body notes now feed the existing bounded Garmin recommendation seam as optional caution context only, while deterministic comparison remains primary and the prompt explicitly forbids diagnosis, medical advice, injury certainty, treatment instructions, or silent plan mutation.
 - The workout AI-output hygiene fix is now implemented:
   the backend now rejects malformed runner-facing AI text such as dangling fragments, ampersand continuations, replacement glyphs, or non-English character artifacts, and persists stable deterministic fallback sentences instead while preserving body-note caution and severity softening behavior.
-- The first longitudinal AI plan-refresh backend foundation is now implemented:
-  saved mode now has one canonical `RunnerCoachContext` builder over persisted runner/profile/plan/log/Garmin/body-note truth, plus one proposal-only active-plan refresh seam that consumes that bounded context and an explicit runner prompt while targeting only the remaining active schedule; final apply flow and silent plan mutation remain absent.
-- The AI-assisted plan-refresh proposal/apply seam remains backend-owned future capability:
-  visible `Update plan` is not part of the current accepted calendar header/overflow IA.
-- The first runner-facing active-plan refresh confirm/apply slice is now implemented:
-  proposal review now exposes `Apply update` and `Keep current plan`; keeping the current plan dismisses the proposal without mutation, applying calls the backend seam with stale/off-day revalidation, successful apply returns to the updated active-plan view, and stale proposals show a specific fresh-proposal recovery path.
 - The first Hito design-system toast slice is now implemented:
   `/hitoDS` now documents and exercises the reusable info, working, success, and error toast
   primitive; working toasts use dismiss-only indeterminate progress with Safari-stable visible state,
@@ -445,15 +428,8 @@ Active
   ghost hierarchy classes; destructive product actions in onboarding and JSON import use the
   canonical error tone instead of local red override classes, and AppShell’s repeated tiny uppercase
   chrome labels use the shared `hito-micro-label` role.
-- The active-plan refresh apply hardening slice is now implemented:
-  refresh proposal generation now derives one schedule authority from the current remaining active schedule, preserves the original target date only when it is still valid at least seven days after the refresh start, resolves stored or reconstructed authoring truth, builds and signs the exact future draft before review, clamps replacement workouts to the original remaining-schedule window, and returns bounded stale/blocked results instead of leaking low-level authoring validation text.
-- The active-plan refresh proposal-output hygiene pass is now implemented:
-  the backend now returns a dedicated review-safe proposal shape without raw workout ids or internal prompt field names, rejects malformed fragments such as dangling clauses or bare abbreviations, guarantees fixed-truth review content, and keeps targeted count consistent with the proposed changes shown in the review so review copy no longer mislabels targeted changes as the whole remaining plan.
-- The first explicit active-plan refresh apply backend foundation is now implemented:
-  proposal output carries a backend fingerprint, apply must be explicitly called, stale proposal context is blocked before generation or mutation, and successful apply creates a new `active_plan_refresh_v1` active plan while archiving the previous active plan and preserving fixed workout/log truth.
 - The first weekday rest-day invariant backend slice is now implemented:
   saved-mode JSON import/apply now resolves blocked weekday truth from active plan preferences before imported metadata, rejects chosen starts on blocked weekdays, and maps incoming non-rest workouts in sequence across allowed weekdays instead of blindly replaying every source date offset.
-  `RunnerCoachContext` and active-plan refresh proposal/apply now carry the same resolved invariant, include it in stale-check fingerprints and fixed-truth review copy, and block refresh apply output that schedules non-rest workouts on fixed rest days.
 - The saved-mode calendar-cell semantics correction is now implemented:
   month cells restore one broad-family workout-type glyph, one short type label, restrained type color, and a quiet feedback/evidence corner marker while keeping distance, duration, targets, and dashboard-style metric stacks out of month cells.
 - The Calendar viewport/mobile layout fix is now implemented:
@@ -512,24 +488,13 @@ Active
   and explicit visualization geometry exceptions.
 - The current `training-plan-v2` runtime still keeps `plan_cycles` plus `planned_workouts` as the only canonical storage model, writes richer segment structure into `planned_workouts.steps jsonb`, and still deliberately defers import-batch provenance plus editability-oriented schema expansion to a later phase.
 - The current Phase 3 cleanup slice is now implemented:
-  persisted plan truth now preserves `schema_version`, `source_kind`, `target_date`, goal metadata, plan preferences, source workout identity, source workout type, planned RPE, estimated fatigue, and recovery priority through the same canonical Supabase rows used by JSON import, structured authoring, and OpenAI text authoring.
+  persisted plan truth now preserves `schema_version`, `source_kind`, `target_date`, goal metadata, plan preferences, source workout identity, source workout type, planned RPE, estimated fatigue, and recovery priority through the same canonical Supabase rows used by JSON import and AI/local-fixture plan-first authoring.
   New writes now persist canonical target keys only, while legacy target aliases remain read-compatible for older rows instead of being written again.
 - The first post-Phase-3 correction pass is now implemented:
   richer `training-plan-v2` normalization now accepts the live fuller segment DSL used by the richer reference files, workout-detail target shaping no longer leaks opaque structured metadata into `[object Object]`, and richer imported interval workouts no longer collapse into misleading visible easy-run identity.
 - The workout segment instruction-completeness contract is now implemented:
-  imported, generated, preview, and persisted readback steps are normalized so every visible non-rest segment and expanded repeat work/recovery row has target or guidance text; missing work/recovery instructions receive bounded cue/hint fallbacks instead of fake pace or heart-rate values.
-- The structured segment target personalization follow-up is now implemented:
-  recent 5K time or pace supplied through structured first-plan onboarding now becomes internal authoring pace truth, generated running segments receive broad `pace_min_per_km_range` targets for warmup, easy, long, steady, tempo, interval work, recovery, cooldown, and hill-oriented work where appropriate, target time alone stays goal context rather than pace truth, and executable HR targets require personal HR-zone truth rather than age-estimated defaults.
-- The first plan-authoring quality refinement backend slice is now implemented:
-  structured first-plan onboarding and the shared structured authoring input now accept bounded execution-mode context (`watchAccess` plus `guidancePreference`), treat missing/no/unknown execution support as bounded correction for primary structured generation, and preserve the same persistence and rest-day invariants without a separate voice draft/confirm boundary.
-- The second plan-authoring quality refinement backend slice is now implemented:
-  generated structured plans now use one executable-mode resolver before emitting numeric workout targets: pace ranges require execution support plus usable recent 5K benchmark truth; no-watch and unknown execution support correct before normal primary generation; allowed support workouts without pace/HR truth use `structure_only_executable` numeric anatomy; and heart-rate targets require `personal_hr_zone` truth while age-only HR remains advisory/readback-only.
-- The first structured plan-authoring backend slice is now implemented:
-  the service accepts one bounded structured input contract, normalizes it server-side, generates canonical `training-plan-v2` plan data, and persists that plan through the same Supabase `plan_cycles` plus `planned_workouts` seam already used by JSON import.
-  That bounded contract remains a backend and ops asset behind the visible structured onboarding UI, and Backend plus ops can still validate and persist generated structured plans through `npm run author-structured-plan -- --email <tester-email> --input-file <absolute-json-path>`.
-- The first OpenAI-backed text-to-plan backend slice is now implemented:
-  the service accepts one bounded free-text request, asks OpenAI for structured authoring input, validates that model output deterministically, then the saved-mode text replacement action explicitly opts into a rich workout draft that is accepted only after backend normalization into canonical `training-plan-v2`; the same Supabase seam used by JSON import and structured authoring remains the only persistence path.
-  Saved-mode text replacement can use this path; no-plan onboarding currently uses Manual setup, structured draft/confirm, and selected-plan preview/confirm rather than a visible free-text or voice setup panel.
+  imported, generated, preview, and persisted readback steps are normalized so every visible non-rest segment and ordered Repeat child has target or guidance text; missing display instructions receive bounded cue/hint fallbacks instead of fake pace or heart-rate values.
+- Structured first-plan onboarding remains the bounded runner-context mapper for the AI/local-fixture plan-first service. The former deterministic structured-plan builder and its coach-policy proof island are removed; current validators exercise the canonical provider fixture, compiler, review, import/export, WorkoutDocument, and persistence owners instead.
 - The original direct structured plan-authoring backend action surface is superseded for visible onboarding:
   current no-plan generated-plan callers use `previewRunningPlanDraft` followed by `confirmRunningPlanDraft`; the backend still validates bounded profile, benchmark, target-time, terrain, and rest-day inputs before review and persists only the confirmed `ai_authored_plan_first_v1` draft.
 - The Phase 4 frontend cleanup slice has been superseded by the structured first-plan constructor:
@@ -597,7 +562,7 @@ The current cleanup checkpoint is after accepted G23 business-process short-path
 2. Keep the archived Hito Stack Simplification Strike as completed cleanup evidence; do not reopen it
    unless source proof shows a missed closeout issue.
 3. Use backlog-only follow-ups for additional Plan Preset families, preset-based active-plan
-   replacement/refresh, recurrence, Restore UI, universal Copy/Paste, QR/share/import, and broader
+   replacement, recurrence, Restore UI, universal Copy/Paste, QR/share/import, and broader
    persisted workout editing beyond the proved manual scope.
 4. Keep future UI changes inside shared Hito primitives or documented geometry exceptions, and use
    `/hitoDS` as the inspection surface before shipping new visual patterns.

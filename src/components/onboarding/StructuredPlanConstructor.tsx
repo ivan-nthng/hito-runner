@@ -13,14 +13,6 @@ import {
   HitoMaskedTimeField,
 } from "@/components/ui/hito-date-time-input";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { TrainingPreferenceFields } from "./TrainingPreferenceFields";
 import { QuickSetupPlanSetupSections } from "./QuickSetupPlanSetupSections";
@@ -33,7 +25,6 @@ import {
   PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS,
   STRENGTH_OPTIONS,
   TERRAIN_OPTIONS,
-  formatTerrainFocus,
   normalizePresetPrimaryFitnessLevel,
   type GuidancePreference,
   type GoalDistance,
@@ -43,19 +34,10 @@ import {
   type TerrainFocus,
   type WeekdayName,
 } from "./onboarding-form-model";
-import type { StructuredFirstPlanDraftResult } from "@/lib/first-plan-actions";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 
 type ConstructorStatus = "idle" | "reviewing" | "creating" | "finishing";
 type ProfileBasicEditableKey = "age" | "heightCm" | "weightKg";
-type StructuredDraftReady = Extract<
-  StructuredFirstPlanDraftResult,
-  { ok: true; status: "draft_ready" }
->;
-type StructuredCorrectionRequired = Extract<
-  StructuredFirstPlanDraftResult,
-  { ok: true; status: "correction_required" }
->;
 
 interface StructuredPlanConstructorProps {
   formRef: RefObject<HTMLFormElement | null>;
@@ -83,13 +65,10 @@ interface StructuredPlanConstructorProps {
     setComment: (value: string) => void;
   };
   constructorStatus: ConstructorStatus;
-  draftResult: StructuredFirstPlanDraftResult | null;
   constructorError: string | null;
   isBusy: boolean;
   isConstructorReady: boolean;
   onSubmit: () => void;
-  onConfirmDraft: () => void;
-  onBackToEdit: () => void;
   planPresetPanel?: ReactNode | ((actions: { openAdvancedCustom: () => void }) => ReactNode);
   onUseAdvancedSetup?: () => void;
   onUseQuickSetup?: () => void;
@@ -109,13 +88,10 @@ export function StructuredPlanConstructor({
   state,
   setState,
   constructorStatus,
-  draftResult,
   constructorError,
   isBusy,
   isConstructorReady,
   onSubmit,
-  onConfirmDraft,
-  onBackToEdit,
   planPresetPanel,
   onUseAdvancedSetup,
   onUseQuickSetup,
@@ -128,9 +104,6 @@ export function StructuredPlanConstructor({
   const impliedMountainTerrain = state.goalDistance === "mountain_running";
   const [activeEditableKey, setActiveEditableKey] = useState<ProfileBasicEditableKey | null>(null);
   const primaryFitnessLevel = normalizePresetPrimaryFitnessLevel(state.fitnessLevel);
-  const isDraftReady = draftResult?.ok === true && draftResult.status === "draft_ready";
-  const isCorrectionRequired =
-    draftResult?.ok === true && draftResult.status === "correction_required";
   const openAdvancedCustom = () => {
     onUseAdvancedSetup?.();
   };
@@ -142,7 +115,7 @@ export function StructuredPlanConstructor({
       className={cn("mt-6 grid pb-28", isAdvancedMode ? "gap-6" : "gap-8")}
       onSubmit={(event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        if (!isConstructorReady || isBusy || isDraftReady) {
+        if (!isConstructorReady || isBusy) {
           return;
         }
 
@@ -482,9 +455,6 @@ export function StructuredPlanConstructor({
               </label>
             </ConstructorSection>
 
-            {isCorrectionRequired ? <StructuredCorrectionNotice result={draftResult} /> : null}
-            {draftResult && !draftResult.ok ? <StructuredReviewError result={draftResult} /> : null}
-
             <div className="hito-onboarding-submit-footer">
               <div className="hito-onboarding-submit-footer-inner">
                 <div className="min-w-0">
@@ -512,15 +482,6 @@ export function StructuredPlanConstructor({
               </div>
             </div>
           </section>
-        ) : null}
-        {isDraftReady ? (
-          <StructuredDraftReadyReviewModal
-            result={draftResult}
-            status={constructorStatus}
-            isBusy={isBusy}
-            onConfirmDraft={onConfirmDraft}
-            onCancel={onBackToEdit}
-          />
         ) : null}
       </>
     </form>
@@ -566,216 +527,6 @@ export function Field({
       <span className="hito-form-label">{label}</span>
       {children}
       {helper ? <span className="hito-field-helper">{helper}</span> : null}
-    </div>
-  );
-}
-
-function StructuredDraftReadyReviewModal({
-  result,
-  status,
-  isBusy,
-  onConfirmDraft,
-  onCancel,
-}: {
-  result: StructuredDraftReady;
-  status: ConstructorStatus;
-  isBusy: boolean;
-  onConfirmDraft: () => void;
-  onCancel: () => void;
-}) {
-  const review = result.review;
-  const summary = result.draft.summary;
-  const durationLabel = summary.targetDate ? "Plan range" : "Plan length";
-
-  return (
-    <Dialog
-      open
-      onOpenChange={(open) => {
-        if (!open && !isBusy) {
-          onCancel();
-        }
-      }}
-    >
-      <DialogContent
-        className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-workflow hito-dialog-height-workflow"
-        overlayClassName="hito-dialog-overlay-stable"
-      >
-        <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-modal-title">Review your plan</DialogTitle>
-          <DialogDescription className="hito-body max-w-2xl">
-            Nothing has been created yet. Review the full plan below, then confirm to create it.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="hito-product-dialog-body-scroll-fill">
-          <div className="hito-row-group">
-            <div className="hito-list-row items-start">
-              <div className="min-w-0">
-                <p className="hito-list-row-title">Plan ready</p>
-                <p className="hito-list-row-copy">
-                  AI authored the complete draft. Hito compiled and reviewed it. Confirm to create
-                  the reviewed plan.
-                </p>
-              </div>
-              <span className="hito-status-pill" data-tone="success">
-                Review
-              </span>
-            </div>
-
-            <div className="hito-list-row items-start">
-              <div className="grid gap-3">
-                <p className="hito-form-label">What Hito understood</p>
-                <StructuredReviewLine label="Runner" value={review.runnerUnderstanding.profile} />
-                <StructuredReviewLine
-                  label="Benchmark"
-                  value={review.runnerUnderstanding.benchmark}
-                />
-                <StructuredReviewLine label="Goal" value={review.runnerUnderstanding.goal} />
-                <StructuredReviewLine
-                  label="Availability"
-                  value={review.runnerUnderstanding.availability}
-                />
-                <StructuredReviewLine
-                  label="Workout guidance"
-                  value={review.runnerUnderstanding.execution}
-                />
-              </div>
-            </div>
-
-            <div className="hito-list-row items-start">
-              <div className="grid gap-3">
-                <p className="hito-form-label">Plan setup summary</p>
-                <StructuredReviewLine label="Plan" value={review.displayTitle} />
-                <StructuredReviewLine
-                  label={durationLabel}
-                  value={review.planShape.durationLabel}
-                />
-                <StructuredReviewLine
-                  label="Days per week"
-                  value={`${review.planShape.runningDaysPerWeek}`}
-                />
-                <StructuredReviewLine
-                  label="Rest days"
-                  value={
-                    review.planShape.fixedRestDays.length
-                      ? review.planShape.fixedRestDays.join(", ")
-                      : "No fixed rest days"
-                  }
-                />
-                <StructuredReviewLine
-                  label="Workouts"
-                  value={`${review.planShape.workoutCount} planned workouts`}
-                />
-                <StructuredReviewLine
-                  label="Long run"
-                  value={review.planShape.longRunDay ?? "No fixed long-run day"}
-                />
-                <StructuredReviewLine
-                  label="Quality rhythm"
-                  value={review.planShape.qualityRhythm}
-                />
-                <StructuredReviewLine label="Metric policy" value={review.planShape.metricPolicy} />
-                <StructuredReviewLine
-                  label="Terrain"
-                  value={formatTerrainFocus(review.planShape.terrainFocus)}
-                />
-                {review.planShape.activityMix.length > 0 ? (
-                  <div>
-                    <p className="hito-label">Workout mix</p>
-                    <p className="hito-body-small text-muted-foreground">
-                      {review.planShape.activityMix.join(", ")}
-                    </p>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="hito-list-row items-start">
-              <div>
-                <p className="hito-form-label">Assumptions and safety</p>
-                <ul className="mt-2 grid gap-1">
-                  {[...review.assumptions, ...review.safetyNotes].map((note) => (
-                    <li key={note} className="hito-body-small text-muted-foreground">
-                      {note}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
-          <button
-            type="button"
-            disabled={isBusy}
-            onClick={onCancel}
-            className="hito-button hito-button-secondary hito-button-md"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={isBusy}
-            onClick={onConfirmDraft}
-            className="hito-button hito-button-primary hito-button-md"
-          >
-            {status === "creating" ? "Creating plan..." : "Yes, create plan"}
-          </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function StructuredCorrectionNotice({ result }: { result: StructuredCorrectionRequired }) {
-  return (
-    <div className="hito-row-group">
-      <div className="hito-list-row items-start">
-        <div className="min-w-0">
-          <p className="hito-list-row-title">Review needs one correction</p>
-          <p className="hito-list-row-copy">{result.correction.message}</p>
-          {result.correction.fields.length > 0 ? (
-            <p className="hito-field-helper mt-2">Check: {result.correction.fields.join(", ")}</p>
-          ) : null}
-          <p className="hito-field-helper mt-2">
-            No plan was created. Adjust the setup and review again.
-          </p>
-        </div>
-        <span className="hito-status-pill" data-tone="warning">
-          Correct
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function StructuredReviewError({
-  result,
-}: {
-  result: Extract<StructuredFirstPlanDraftResult, { ok: false }>;
-}) {
-  return (
-    <div className="hito-row-group">
-      <div className="hito-list-row items-start">
-        <div>
-          <p className="hito-list-row-title">Review failed</p>
-          <p className="hito-list-row-copy">{result.message}</p>
-          <p className="hito-field-helper mt-2">No plan was created.</p>
-        </div>
-        <span className="hito-status-pill" data-tone="error">
-          Error
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function StructuredReviewLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="hito-label">{label}</p>
-      <p className="hito-body-small text-muted-foreground">{value}</p>
     </div>
   );
 }

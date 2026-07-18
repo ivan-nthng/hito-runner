@@ -20,8 +20,15 @@ import {
   RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
   buildRunningPlanPersistenceMetadata,
   buildRunningPlanProfilePatch,
-  validateSelfContainedRunningPlanReviewToken,
+  validateSelfContainedRunningPlanReviewExactness,
 } from "@/lib/running-plan-engine-review";
+import {
+  digestSha256Hex,
+  safeTokenEqual,
+  signStableJsonPayload,
+  stableJsonEqual,
+  stableJsonStringify,
+} from "@/lib/review-token-signing";
 import type { Json } from "@/lib/supabase/database";
 import { serverEnv } from "@/lib/supabase/env";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
@@ -595,7 +602,7 @@ async function buildActivePlanTransitionReview(
 }
 
 async function resolveAiGeneratedTransitionCandidate(candidate: RunningPlanConfirmActionInput) {
-  const exactness = await validateSelfContainedRunningPlanReviewToken({
+  const exactness = await validateSelfContainedRunningPlanReviewExactness({
     reviewToken: candidate.reviewToken,
     reviewChecksum: candidate.reviewChecksum,
   });
@@ -792,72 +799,11 @@ async function loadTransitionEvidenceSummary(
 }
 
 async function signTransitionReviewPayload(payload: ActivePlanTransitionReviewPayload) {
-  const serializedPayload = stableJsonStringify(payload);
-  const secret = serverEnv.supabaseServiceRoleKey;
-
-  if (!secret) {
-    return `sha256:${await digestSha256Hex(serializedPayload)}`;
-  }
-
-  return `hmac-sha256:${await hmacSha256Hex(secret, serializedPayload)}`;
-}
-
-function safeTokenEqual(left: string, right: string) {
-  if (left.length !== right.length) return false;
-
-  let mismatch = 0;
-  for (let index = 0; index < left.length; index += 1) {
-    mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
-  }
-
-  return mismatch === 0;
-}
-
-async function digestSha256Hex(payload: string) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload));
-
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-async function hmacSha256Hex(secret: string, payload: string) {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
-
-  return Array.from(new Uint8Array(signature))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-function stableJsonStringify(value: unknown): string {
-  return JSON.stringify(sortJsonValue(value));
+  return signStableJsonPayload(payload, serverEnv.supabaseServiceRoleKey);
 }
 
 function sameJson(left: unknown, right: unknown) {
-  return stableJsonStringify(left) === stableJsonStringify(right);
-}
-
-function sortJsonValue(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map((entry) => sortJsonValue(entry));
-  }
-
-  if (isRecord(value)) {
-    return Object.fromEntries(
-      Object.entries(value)
-        .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
-        .map(([key, entry]) => [key, sortJsonValue(entry)]),
-    );
-  }
-
-  return value;
+  return stableJsonEqual(left, right);
 }
 
 function isRecord(value: unknown): value is Record<string, Json> {

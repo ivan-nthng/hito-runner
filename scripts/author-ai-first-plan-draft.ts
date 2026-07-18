@@ -14,10 +14,9 @@ import {
   parseStructuredFirstPlanOnboardingInput,
 } from "../src/lib/structured-first-plan-onboarding";
 import {
-  normalizeStructuredPlanAuthoringInput,
   structuredPlanAuthoringInputSchema,
   type StructuredPlanAuthoringInput,
-} from "../src/lib/structured-plan-authoring";
+} from "../src/lib/structured-plan-authoring-schema";
 import {
   hasFlag,
   parseArgs,
@@ -152,8 +151,7 @@ function resolveAuthoringInput(
     return buildStructuredFirstPlanAuthoringInput(parseStructuredFirstPlanOnboardingInput(input));
   }
 
-  const parsed = structuredPlanAuthoringInputSchema.parse(input);
-  return normalizeStructuredPlanAuthoringInput(parsed);
+  return structuredPlanAuthoringInputSchema.parse(input);
 }
 
 function buildMockOpenAiFetch(

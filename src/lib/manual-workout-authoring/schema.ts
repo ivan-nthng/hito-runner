@@ -1,11 +1,9 @@
 import { z } from "zod";
+import type { CanonicalMetricModeJson } from "@/lib/rich-workout-model";
 import type {
-  CalendarIconKey,
-  CanonicalMetricModeJson,
-  CanonicalWorkoutFamily,
-  CanonicalWorkoutIdentity,
-} from "@/lib/rich-workout-model";
-import type { Step, WorkoutType } from "@/lib/training";
+  WorkoutDocumentContent,
+  WorkoutDocumentType as WorkoutType,
+} from "@/lib/workout-document";
 
 export const MANUAL_WORKOUT_AUTHORING_SOURCE_KIND = "manual_workout_authoring_v1" as const;
 export const MANUAL_WORKOUT_AUTHORING_SOURCE_STATUS = "manual_draft_reviewed" as const;
@@ -13,8 +11,6 @@ export const MANUAL_USER_BUILT_PLAN_SOURCE_KIND = "manual_user_built_plan_v1" as
 export const MANUAL_USER_BUILT_PLAN_SOURCE_STATUS = "manual_user_built_plan_created" as const;
 export const MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION = "manual_workout_review_payload_v1" as const;
 export const MANUAL_EMPTY_PLAN_SETUP_PAYLOAD_VERSION = "manual_empty_plan_setup_v1" as const;
-export const MANUAL_WORKOUT_CONSTRUCTOR_CONTRACT_VERSION =
-  "manual_workout_constructor_contract_v1" as const;
 
 export const MANUAL_SETUP_RUNNING_LEVEL_VALUES = [
   "new_to_running",
@@ -271,16 +267,6 @@ export const manualWorkoutDraftInputSchema = z
 export type ManualWorkoutDraftInput = z.input<typeof manualWorkoutDraftInputSchema>;
 export type ParsedManualWorkoutDraftInput = z.output<typeof manualWorkoutDraftInputSchema>;
 
-export const manualWorkoutConfirmInputSchema = z
-  .object({
-    draftInput: z.unknown(),
-    reviewToken: z.string().trim().min(16),
-    reviewChecksum: z.string().trim().length(64),
-  })
-  .strict();
-
-export type ManualWorkoutConfirmInput = z.output<typeof manualWorkoutConfirmInputSchema>;
-
 export const manualWorkoutAddToActivePlanInputSchema = z
   .object({
     activePlanId: z.string().uuid().optional(),
@@ -326,103 +312,10 @@ export interface ManualWorkoutReviewSummary {
   warnings: string[];
 }
 
-export type ManualWorkoutConstructorSegmentRole =
-  | "warm_up"
-  | "run"
-  | "work"
-  | "recover"
-  | "finish"
-  | "cooldown";
-
-export type ManualWorkoutConstructorSegmentStructure =
-  | {
-      kind: "duration";
-      seconds: number;
-    }
-  | {
-      kind: "distance";
-      meters: number;
-    }
-  | {
-      kind: "duration_and_distance";
-      seconds: number;
-      meters: number;
-    };
-
-export type ManualWorkoutConstructorSegmentTarget =
-  | {
-      kind: "none";
-    }
-  | {
-      kind: "effort_rpe";
-      source: "user_entered";
-      label?: string;
-      cue?: string;
-      rpe?: number;
-      sourceNote?: string;
-    }
-  | {
-      kind: "pace";
-      source: "user_entered";
-      label?: string;
-      pace?: string;
-      paceSecondsPerKm?: number;
-      paceMinPerKmRange?: string;
-      paceRangeSecondsPerKm?: {
-        min: number;
-        max: number;
-      };
-      sourceNote?: string;
-    }
-  | {
-      kind: "heart_rate";
-      source: "user_entered";
-      label?: string;
-      hrBpmCap?: number;
-      hrBpmRange?: string;
-      hrBpmRangeValues?: {
-        min: number;
-        max: number;
-      };
-      sourceNote?: string;
-    };
-
-export interface ManualWorkoutConstructorSegment {
-  kind: "segment";
-  role: ManualWorkoutConstructorSegmentRole;
-  label: string;
-  structure: ManualWorkoutConstructorSegmentStructure;
-  target: ManualWorkoutConstructorSegmentTarget;
-  guidance: string | null;
-}
-
-export interface ManualWorkoutConstructorRepeatGroup {
-  kind: "repeat";
-  label: string;
-  repeatCount: number;
-  children: ManualWorkoutConstructorSegment[];
-}
-
-export type ManualWorkoutConstructorTimelineEntry =
-  | ManualWorkoutConstructorSegment
-  | ManualWorkoutConstructorRepeatGroup;
-
-export interface ManualWorkoutConstructorMetadataNote {
-  label: string;
-  text: string;
-}
-
-export interface ManualWorkoutConstructorContract {
-  version: typeof MANUAL_WORKOUT_CONSTRUCTOR_CONTRACT_VERSION;
-  templateKey: ManualWorkoutTemplateKey;
-  workoutDate: string;
-  title: string;
-  workoutType: WorkoutType;
-  timeline: ManualWorkoutConstructorTimelineEntry[];
-  metadataNotes: ManualWorkoutConstructorMetadataNote[];
-}
-
-export interface ManualWorkoutCanonicalDraft {
+export interface ManualWorkoutCanonicalDraft extends WorkoutDocumentContent<
+  CanonicalMetricModeJson,
+  string
+> {
   sourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
   sourceStatus: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_STATUS;
   source_kind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
@@ -430,15 +323,6 @@ export interface ManualWorkoutCanonicalDraft {
   templateKey: ManualWorkoutTemplateKey;
   workoutDate: string;
   weekday: string;
-  title: string;
-  notes: string | null;
-  workoutType: WorkoutType;
-  sourceWorkoutType: string;
-  workoutFamily: CanonicalWorkoutFamily;
-  workoutIdentity: CanonicalWorkoutIdentity;
-  calendarIconKey: CalendarIconKey;
-  metricMode: CanonicalMetricModeJson;
-  steps: Step[];
   plannedRpe: number | null;
   estimatedFatigue: string | null;
   recoveryPriority: string | null;
@@ -452,7 +336,6 @@ export type ManualWorkoutDraftReviewResult =
       ok: true;
       status: "draft_ready";
       draft: ManualWorkoutCanonicalDraft;
-      constructorContract: ManualWorkoutConstructorContract;
       review: ManualWorkoutReviewSummary;
       reviewToken: string;
       reviewChecksum: string;
@@ -476,9 +359,7 @@ export type ManualWorkoutDraftReviewResult =
       persisted: false;
     };
 
-export type ManualWorkoutConfirmFailureReason =
-  | "unauthenticated"
-  | "active_plan_exists"
+export type ManualWorkoutReviewExactnessFailureReason =
   | "manual_workout_required"
   | "invalid_review"
   | "stale_review"
@@ -488,8 +369,7 @@ export type ManualWorkoutConfirmFailureReason =
   | "unsafe_block_structure"
   | "unsafe_metric_truth"
   | "protected_date_conflict"
-  | "active_plan_conflict"
-  | "persistence_failed";
+  | "active_plan_conflict";
 
 export type ManualWorkoutAddToActivePlanFailureReason =
   | "unauthenticated"
@@ -554,61 +434,13 @@ export type ManualEmptyPlanCreateResult =
       sourceKind?: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
     };
 
-export type ManualWorkoutConfirmResult =
+export type ManualWorkoutAddToActivePlanResult =
   | {
       ok: true;
       status: "created";
       persisted: true;
       sourceKind: string;
       sourceStatus: string | null;
-      workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
-      workoutSourceStatus: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_STATUS;
-      schemaVersion: "training-plan-v2";
-      effectiveStartDate: string;
-      appliedStartDate: string;
-      workoutCount: number;
-      calendarRowCount: number;
-      nonRestWorkoutCount: number;
-      workoutDate: string;
-      templateKey: ManualWorkoutTemplateKey;
-      reviewChecksum: string;
-      exactnessPayloadVersion: typeof MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION;
-      sourceMetadata: {
-        editSourceKind: "active_plan_user_edit_v1";
-        mutationKind: "user_added_workout";
-        originalPlanSourceKind: string;
-        originalPlanSourceStatus: string | null;
-        templateKey: ManualWorkoutTemplateKey;
-        workoutDate: string;
-        rowCount: number;
-        reviewChecksum: string;
-        metricTruthMode: ManualWorkoutTargetTruthMode;
-        mappingGaps: string[];
-      };
-      safety: {
-        requiresExplicitConfirm: true;
-        trustedClientRows: false;
-        serverRebuiltReview: true;
-        callsOpenAi: false;
-      };
-    }
-  | {
-      ok: false;
-      status: "blocked";
-      persisted: false;
-      reason: ManualWorkoutConfirmFailureReason;
-      message: string;
-      sourceKind?: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
-      workoutSourceKind?: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
-    };
-
-export type ManualWorkoutAddToActivePlanResult =
-  | {
-      ok: true;
-      status: "created";
-      persisted: true;
-      sourceKind: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
-      sourceStatus: typeof MANUAL_USER_BUILT_PLAN_SOURCE_STATUS;
       workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
       workoutSourceStatus: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_STATUS;
       activePlanId: string;

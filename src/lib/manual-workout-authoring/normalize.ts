@@ -44,13 +44,10 @@ export function normalizeManualWorkoutDraft(input: {
   entries: ManualWorkoutConstructorEntryInput[];
 }): NormalizedManualWorkoutDraftResult {
   const { parsedInput, template, targetTruthMode, entries } = input;
-  const rawSteps =
+  const steps =
     template.workoutType === "rest"
       ? []
-      : entries.flatMap((entryValue, index) =>
-          entryToSteps(entryValue, targetTruthMode, index + 1),
-        );
-  const steps = normalizeExecutableStepInstructions(rawSteps);
+      : manualWorkoutDocumentSectionsFromEntries({ entries, targetTruthMode });
   const metricMode = buildManualWorkoutMetricMode(template, targetTruthMode, steps);
   const richWorkout = resolveCanonicalWorkoutModel({
     workoutType: template.workoutType,
@@ -97,6 +94,18 @@ export function normalizeManualWorkoutDraft(input: {
     },
     reviewWarnings: template.mappingGaps,
   };
+}
+
+export function manualWorkoutDocumentSectionsFromEntries({
+  entries,
+  targetTruthMode,
+}: {
+  entries: ManualWorkoutConstructorEntryInput[];
+  targetTruthMode: ManualWorkoutTargetTruthMode;
+}): Step[] {
+  return normalizeExecutableStepInstructions(
+    entries.flatMap((entryValue, index) => entryToSteps(entryValue, targetTruthMode, index + 1)),
+  );
 }
 
 function entryToSteps(

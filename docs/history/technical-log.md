@@ -1,7 +1,7 @@
 # Hito Technical Log
 
 Status: active internal ledger
-Last Updated: 2026-07-14
+Last Updated: 2026-07-18
 Owner: PRODUCT
 
 ## Purpose And Source Boundary
@@ -29,6 +29,52 @@ Entry format:
 
 Every accepted implementation, QA acceptance gate, source-cleanup batch, or durable process repair
 must either add an entry here or explicitly state why it is not technical-log material.
+
+## 2026-07-18
+
+- BACKEND / unreachable delete-plan capability retirement — removed the no-consumer
+  `deleteActivePlan` server function, its delete-only helper, and result contract while retaining
+  confirmed `Clear upcoming schedule`, its internal archive operation, and preserved plan history.
+  Evidence: `src/lib/training-api.ts`, `src/lib/active-plan-lifecycle-actions.ts`,
+  `src/components/PlanManagementDialog.tsx`, and zero-reference source scans. Boundary: no
+  clear-upcoming semantics, atomic import/replacement, review/confirm, manual lifecycle, schedule
+  reflow, evidence, schema/data, or frontend behavior change.
+- FRONTEND / selected-plan preview state cleanup — removed the unreachable preset-discovery DTOs,
+  no-op card-loading state/effects, impossible loading/blocked rendering, and discovery-only copy
+  while retaining static distance shortcuts, required-basics gating, canonical backend preview,
+  signed review/confirm, active-plan replacement review, and preview-input invalidation. Evidence:
+  `src/components/onboarding/PlanPresetPanel.tsx`,
+  `src/components/onboarding/use-selected-plan-preset-preview-controller.ts`,
+  `src/components/onboarding/selected-running-plan-flow-utils.ts`, `src/components/OnboardingGate.tsx`,
+  and `src/components/plan-management/ActivePlanCreatePlanDialog.tsx`. Boundary: no backend,
+  persistence, plan-generation, migration, or product-flow change.
+- BACKEND / atomic lifecycle source hygiene and deterministic authoring deletion — retained the
+  transaction-backed Add/Clear/Move/plan-apply/clear-before-import source boundary, removed the
+  proof-only deterministic structured-plan runtime and doctrine island, and moved doctrine/language
+  validation to the canonical AI/local-fixture plan-first path. Evidence:
+  `src/lib/active-plan-lifecycle-persistence.ts`,
+  `supabase/migrations/20260718131305_atomic_plan_lifecycle_persistence.sql`,
+  `supabase/migrations/20260718142639_atomic_clear_before_import.sql`, and
+  `scripts/plan-authoring-doctrine/first-plan-release-gates.ts`. Boundary: no frontend, hosted
+  Supabase, OpenAI, manual-authoring semantics, import/export, schedule-reflow, or evidence change.
+- BACKEND / post-confirm workout ownership durability — normalized confirmed external imports to
+  canonical `training_plan_v2_import` capability identity while retaining claimed external origin
+  as provenance, and made reviewed workout content plus runner-edit audit one atomic persistence
+  mutation with exact stale/protected outcomes and retained original plan/workout provenance.
+  Evidence: `src/lib/imported-plan.ts`, `src/lib/manual-workout-authoring/edit-workout.ts`,
+  `supabase/migrations/20260718030000_atomic_active_plan_workout_content_edit.sql`, and
+  `scripts/manual-workout-authoring/persistence-proof.ts`. Boundary: no frontend, generated-plan
+  authorship, hosted Supabase data, provider, or OpenAI behavior change.
+
+## 2026-07-17
+
+- FRONTEND / signed reviewed WorkoutDocument adoption — changed PlanCreation review to render the
+  checksum-protected backend `draft.workoutDocuments` directly, removed browser-side workout
+  reconstruction and the eight-note readback cap, and proved exact Tempo and ordered Repeat parity
+  through confirm and saved workout detail at desktop and 375px. Evidence:
+  `qa-artifacts/screenshots/2026-07-17/reviewed-workout-document-adoption/final-proof.json`.
+  Boundary: no backend contract, review signing, persistence, schema/data, fixture, provider, or
+  OpenAI behavior change.
 
 ## 2026-07-14
 

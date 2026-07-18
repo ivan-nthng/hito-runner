@@ -7,8 +7,6 @@ import {
   WorkoutResultImportError,
 } from "@/lib/workout-result-import/types";
 
-type FitValue = number | string | null | undefined | { value?: number | string | null };
-
 export async function parseGarminFitActivity(fileBuffer: Buffer): Promise<ParsedGarminWorkout> {
   const parser = new FitParser({
     force: true,
@@ -22,7 +20,10 @@ export async function parseGarminFitActivity(fileBuffer: Buffer): Promise<Parsed
   let parsed: Record<string, unknown>;
 
   try {
-    parsed = (await parser.parseAsync(fileBuffer)) as Record<string, unknown>;
+    parsed = (await parser.parseAsync(Uint8Array.from(fileBuffer).buffer)) as unknown as Record<
+      string,
+      unknown
+    >;
   } catch (error) {
     throw new WorkoutResultImportError(
       "fit_parse_failed",
@@ -51,6 +52,8 @@ export async function parseGarminFitActivity(fileBuffer: Buffer): Promise<Parsed
   const normalizedLaps = laps.map((lap, index) => normalizeLap(lap, index));
   const normalizedSteps = buildActualSteps(normalizedLaps);
   const activityMetricsSummary = activityMetrics[0] ?? null;
+  const providerLocalTimestamp =
+    dateTimeOrNull(activity?.local_timestamp) ?? dateTimeOrNull(firstSession.local_timestamp);
 
   return {
     sourceKind: "garmin_fit",
@@ -58,11 +61,7 @@ export async function parseGarminFitActivity(fileBuffer: Buffer): Promise<Parsed
       dateTimeOrNull(firstSession.start_time) ??
       dateTimeOrNull(activity?.timestamp) ??
       dateTimeOrNull(firstSession.timestamp),
-    activityLocalDate: toIsoDate(
-      dateTimeOrNull(activity?.local_timestamp) ??
-        dateTimeOrNull(firstSession.start_time) ??
-        dateTimeOrNull(activity?.timestamp),
-    ),
+    activityLocalDate: toIsoDate(providerLocalTimestamp),
     totalDistanceKm: roundNumber(numberOrNull(firstSession.total_distance), 2),
     totalDurationMin: secondsToRoundedMinutes(
       numberOrNull(firstSession.total_timer_time) ?? numberOrNull(firstSession.total_elapsed_time),
@@ -88,12 +87,13 @@ export async function parseGarminFitActivity(fileBuffer: Buffer): Promise<Parsed
     lapCount: normalizedLaps.length,
     workoutName: stringOrNull(workout?.wkt_name),
     actualIntervalCount: countDistinctWorkoutStepIndexes(normalizedLaps),
-    actualStepPayload: normalizedSteps as Json,
-    lapPayload: normalizedLaps as Json,
+    actualStepPayload: normalizedSteps as unknown as Json,
+    lapPayload: normalizedLaps as unknown as Json,
     summaryPayload: buildSummaryPayload({
       parsed,
       firstSession,
       workout,
+      providerLocalTimestamp,
       normalizedLaps,
       normalizedSteps,
       records,
@@ -184,16 +184,25 @@ function buildSummaryPayload(args: {
   parsed: Record<string, unknown>;
   firstSession: Record<string, unknown>;
   workout: Record<string, unknown> | null;
+  providerLocalTimestamp: string | null;
   normalizedLaps: ParsedActualWorkoutLap[];
   normalizedSteps: ParsedActualWorkoutStep[];
   records: Record<string, unknown>[];
 }): Json {
-  const { parsed, firstSession, workout, normalizedLaps, normalizedSteps, records } = args;
+  const {
+    parsed,
+    firstSession,
+    workout,
+    providerLocalTimestamp,
+    normalizedLaps,
+    normalizedSteps,
+    records,
+  } = args;
 
   return {
     parser: {
-      protocolVersion: numberOrNull(parsed.protocolVersion as FitValue),
-      profileVersion: numberOrNull(parsed.profileVersion as FitValue),
+      protocolVersion: numberOrNull(parsed.protocolVersion),
+      profileVersion: numberOrNull(parsed.profileVersion),
       recordCount: records.length,
       lapCount: normalizedLaps.length,
       stepCount: normalizedSteps.length,
@@ -209,9 +218,8 @@ function buildSummaryPayload(args: {
       sport: stringOrNull(firstSession.sport),
       subSport: stringOrNull(firstSession.sub_sport),
       startTime: dateTimeOrNull(firstSession.start_time),
-      localStartTime:
-        dateTimeOrNull(asRecord(parsed.activity)?.local_timestamp) ??
-        dateTimeOrNull(firstSession.start_time),
+      localStartTime: providerLocalTimestamp,
+      localDateSource: providerLocalTimestamp ? "provider_local_timestamp" : null,
       totalDistanceKm: roundNumber(numberOrNull(firstSession.total_distance), 2),
       totalDurationMin: secondsToRoundedMinutes(
         numberOrNull(firstSession.total_timer_time) ??
@@ -239,20 +247,20 @@ function asRecord(value: unknown) {
   return value as Record<string, unknown>;
 }
 
-function numberOrNull(value: FitValue) {
+function numberOrNull(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
   }
 
   if (value && typeof value === "object" && "value" in value) {
-    const nested = value.value;
+    const nested = (value as { value?: unknown }).value;
     return typeof nested === "number" && Number.isFinite(nested) ? nested : null;
   }
 
   return null;
 }
 
-function integerOrNull(value: FitValue) {
+function integerOrNull(value: unknown) {
   const numeric = numberOrNull(value);
   return numeric == null ? null : Math.round(numeric);
 }
@@ -291,12 +299,12 @@ function roundNumber(value: number | null, digits: number) {
 }
 
 function sumRounded(values: Array<number | null>) {
-  const total = values.reduce((sum, value) => sum + (value ?? 0), 0);
+  const total = values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
   return total > 0 ? roundNumber(total, 2) : null;
 }
 
 function sumIntegers(values: Array<number | null>) {
-  const total = values.reduce((sum, value) => sum + (value ?? 0), 0);
+  const total = values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
   return total > 0 ? Math.round(total) : null;
 }
 

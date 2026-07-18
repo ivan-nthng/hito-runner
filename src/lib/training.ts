@@ -7,7 +7,7 @@ import {
   type PlannedWorkoutLanguageReadModel,
   type RunnerFacingWorkoutType,
 } from "@/lib/planned-workout-language";
-import { reduceRepeatChildrenToChildFirst } from "@/lib/planned-workout-block-contract";
+import { plannedWorkoutRepeatChildLabel } from "@/lib/planned-workout-block-contract";
 import {
   workoutSectionColorVar,
   workoutTypeColorVar,
@@ -23,37 +23,26 @@ import {
   type CanonicalWorkoutIdentity,
 } from "@/lib/rich-workout-model";
 import type { WorkoutFeedbackMarkerSummary } from "@/lib/workout-result-import/types";
+import {
+  workoutDocumentRepeatChildRoleForSection,
+  workoutDocumentRepeatChildren,
+  workoutDocumentRepeatCount,
+  type WorkoutDocumentPrescription,
+  type WorkoutDocumentRepeatChildPrescription,
+  type WorkoutDocumentSection,
+  type WorkoutDocumentTarget,
+  type WorkoutDocumentType,
+  type WorkoutDocumentUnitPrescription,
+} from "@/lib/workout-document";
 
-export type WorkoutType = "easy" | "steady_or_easy" | "rest" | "long_run" | "quality";
+export type WorkoutType = WorkoutDocumentType;
 type VisibleWorkoutType = CanonicalWorkoutFamily | "quality";
 export type Status = "completed" | "partial" | "skipped" | "today" | "upcoming" | "rest";
 type WeekStatus = "on_track" | "partially_off_track" | "needs_reset";
 type TrainingMode = "preview" | "onboarding" | "authenticated";
 type WorkoutOutcome = Extract<Status, "completed" | "partial" | "skipped">;
 
-export interface StepTarget {
-  target_source?: string;
-  intensity?: string;
-  hr_bpm_range?: string;
-  hr_bpm?: string;
-  hr_bpm_cap?: number;
-  hr_bpm_min?: number;
-  hr_bpm_max?: number;
-  hr_target_source?: string;
-  label?: string;
-  source_note?: string;
-  pace_min_per_km_range?: string;
-  pace_seconds_per_km?: number;
-  pace_min_seconds_per_km?: number;
-  pace_max_seconds_per_km?: number;
-  pace_range_min_km?: string;
-  pace?: string;
-  rpe?: string | number;
-  cadence_spm_range?: string;
-  cue?: string;
-  hint?: string;
-  extra?: Record<string, string | number>;
-}
+export type StepTarget = WorkoutDocumentTarget;
 
 type SegmentTone = "warmup" | "run" | "walk" | "work" | "recovery" | "finish" | "cooldown";
 
@@ -67,45 +56,10 @@ interface SegmentColorMeta {
   glow: string;
 }
 
-export interface StepUnitPrescription {
-  mode: "time" | "distance" | "none";
-  duration_min?: number;
-  distance_km?: number;
-}
-
-type StepRepeatChildRole = "warm_up" | "run" | "walk" | "work" | "recover" | "finish" | "cooldown";
-
-export interface StepRepeatChildPrescription {
-  role: StepRepeatChildRole;
-  label?: string;
-  sequence?: number;
-  guidance?: string;
-  prescription: StepUnitPrescription;
-  target?: StepTarget;
-}
-
-export interface StepPrescription {
-  mode: "time" | "distance" | "repeats" | "none";
-  duration_min?: number;
-  distance_km?: number;
-  repeat_count?: number;
-  children?: StepRepeatChildPrescription[];
-}
-
-export interface Step {
-  type: string;
-  segment_id?: string;
-  segment_type?: string;
-  label?: string | null;
-  sequence?: number;
-  prescription?: StepPrescription;
-  guidance?: string | null;
-  duration_min?: number;
-  distance_km?: number;
-  repeats?: number;
-  children?: Step[];
-  target?: StepTarget;
-}
+export type StepUnitPrescription = WorkoutDocumentUnitPrescription;
+export type StepRepeatChildPrescription = WorkoutDocumentRepeatChildPrescription;
+export type StepPrescription = WorkoutDocumentPrescription;
+export type Step = WorkoutDocumentSection;
 
 export interface WorkoutLog {
   id?: string;
@@ -248,7 +202,7 @@ interface TemplatePlan {
   schedule: TemplateWorkout[];
 }
 
-export const TYPE_META: Record<
+const TYPE_META: Record<
   WorkoutType,
   { label: string; short: string; color: string; ring: string }
 > = {
@@ -403,6 +357,23 @@ export function workoutTypeMeta(workout: WorkoutVisibleInput): {
     ring: workoutTypeColorVar(language.runnerFacingWorkoutType, "ring"),
     short: language.runnerFacingWorkoutTypeLabel,
   };
+}
+
+export function workoutStatusLabel(status: Status) {
+  switch (status) {
+    case "completed":
+      return "Completed";
+    case "partial":
+      return "Partial";
+    case "skipped":
+      return "Skipped";
+    case "today":
+      return "Today";
+    case "upcoming":
+      return "Planned";
+    case "rest":
+      return "Rest";
+  }
 }
 
 function resolveWorkoutVisibleType(workout: WorkoutVisibleInput): VisibleWorkoutType | null {
@@ -820,9 +791,7 @@ export function segmentColorMeta(kind: string, target?: StepTarget): SegmentColo
 }
 
 export function repeatCountForStep(step: Step): number | null {
-  const repeatCount = step.repeats ?? step.prescription?.repeat_count;
-
-  return isPositiveNumber(repeatCount) ? repeatCount : null;
+  return workoutDocumentRepeatCount(step);
 }
 
 export function repeatChildSteps(step: Step): Step[] {
@@ -830,24 +799,7 @@ export function repeatChildSteps(step: Step): Step[] {
     return [];
   }
 
-  if (step.children?.length) {
-    return step.children;
-  }
-
-  const prescription = step.prescription;
-
-  if (prescription?.mode === "repeats") {
-    const reduced = reduceRepeatChildrenToChildFirst<StepTarget>({
-      children: prescription.children,
-      normalizeTarget: normalizeRepeatChildTarget,
-    });
-
-    if (reduced.children.length > 0) {
-      return reduced.children.map(repeatChildPrescriptionToStep);
-    }
-  }
-
-  return [];
+  return workoutDocumentRepeatChildren(step);
 }
 
 export function primaryWorkoutTarget(workout: Pick<Workout, "steps">): StepTarget | undefined {
@@ -1041,9 +993,13 @@ export function displayStepStructureEntries(
 
   if (repeatCountForStep(step)) {
     for (const [index, child] of repeatChildSteps(step).entries()) {
+      const childRole = workoutDocumentRepeatChildRoleForSection(child);
       push(
         `repeat_child_${index + 1}`,
-        child.label ?? repeatChildRoleLabel(stepRepeatChildRoleForStep(child)),
+        child.label ??
+          (childRole
+            ? plannedWorkoutRepeatChildLabel(childRole)
+            : (child.segment_type ?? child.type)),
         describeStepStructureUnit(child),
       );
     }
@@ -1176,28 +1132,6 @@ function childStepsForReadback(step: Step) {
   return isRepeatStructureStep(step) ? repeatChildSteps(step) : (step.children ?? []);
 }
 
-function repeatChildPrescriptionToStep(child: StepRepeatChildPrescription): Step {
-  const prescription = { ...child.prescription };
-
-  return {
-    type: stepTypeForRepeatChildRole(child.role),
-    segment_type: child.role,
-    label: child.label ?? repeatChildRoleLabel(child.role),
-    sequence: child.sequence,
-    prescription,
-    ...(child.guidance ? { guidance: child.guidance } : {}),
-    ...(prescription.mode === "time" ? { duration_min: prescription.duration_min } : {}),
-    ...(prescription.mode === "distance" ? { distance_km: prescription.distance_km } : {}),
-    ...(child.target ? { target: { ...child.target } } : {}),
-  };
-}
-
-function normalizeRepeatChildTarget(target: unknown): StepTarget | undefined {
-  return target && typeof target === "object" && !Array.isArray(target)
-    ? { ...(target as StepTarget) }
-    : undefined;
-}
-
 function describeDurationStructure(durationMin: number | null | undefined) {
   return isPositiveNumber(durationMin) ? formatDurationMin(durationMin, "segment") : null;
 }
@@ -1222,7 +1156,7 @@ export function normalizeExecutableStepInstructions(steps: Step[]): Step[] {
   return steps.map((step) => normalizeExecutableStepInstruction(step));
 }
 
-function normalizeExecutableStepInstruction(step: Step, role?: "work" | "recovery"): Step {
+function normalizeExecutableStepInstruction(step: Step): Step {
   const children = isRepeatStructureStep(step) ? repeatChildSteps(step) : (step.children ?? []);
   const normalized: Step = {
     ...step,
@@ -1239,114 +1173,11 @@ function normalizeExecutableStepInstruction(step: Step, role?: "work" | "recover
     return structuralRepeat;
   }
 
-  if (!isExecutableStep(normalized)) {
-    return normalized;
-  }
-
-  const guidance = readStepGuidance(normalized);
-
-  if (hasStepInstruction(normalized)) {
-    if (!hasTargetInstruction(normalized.target) && guidance) {
-      return {
-        ...normalized,
-        guidance,
-        target: addHintTarget(normalized.target, guidance),
-      };
-    }
-
-    return normalized;
-  }
-
-  const fallbackInstruction = fallbackInstructionForStep(normalized, role);
-
-  return {
-    ...normalized,
-    guidance: guidance ?? fallbackInstruction,
-    target: addHintTarget(normalized.target, fallbackInstruction),
-  };
+  return normalized;
 }
 
 function isRepeatStructureStep(step: Step) {
   return Boolean(step.repeats) || step.prescription?.mode === "repeats";
-}
-
-function isExecutableStep(step: Step) {
-  const kind = `${step.segment_type ?? ""} ${step.type ?? ""}`.toLowerCase();
-
-  if (/\b(rest|fueling)\b/.test(kind)) {
-    return false;
-  }
-
-  if (
-    /\brecovery\b/.test(kind) &&
-    step.prescription?.mode === "none" &&
-    !step.duration_min &&
-    !step.distance_km
-  ) {
-    return false;
-  }
-
-  return true;
-}
-
-function hasStepInstruction(step: Step) {
-  return hasTargetInstruction(step.target) || Boolean(readStepGuidance(step));
-}
-
-function hasTargetInstruction(target: StepTarget | undefined) {
-  if (!target) {
-    return false;
-  }
-
-  return displayTargetEntries(target).length > 0;
-}
-
-function addHintTarget(target: StepTarget | undefined, hint: string): StepTarget {
-  const trimmedHint = hint.trim();
-
-  return {
-    ...(target ?? {}),
-    hint: target?.hint?.trim() ? target.hint : trimmedHint,
-  };
-}
-
-function readStepGuidance(step: Step) {
-  const guidance = (step as { guidance?: unknown }).guidance;
-
-  if (typeof guidance === "string") {
-    const trimmed = guidance.trim();
-    return trimmed || null;
-  }
-
-  return null;
-}
-
-function fallbackInstructionForStep(step: Step, role?: "work" | "recovery") {
-  const kind = `${role ?? ""} ${step.segment_type ?? ""} ${step.type ?? ""} ${step.label ?? ""}`
-    .toLowerCase()
-    .trim();
-
-  if (/\bwarm\s*up\b|\bwarmup\b/.test(kind)) {
-    return "Easy and controlled.";
-  }
-
-  if (/\bcool\s*down\b|\bcooldown\b/.test(kind)) {
-    return "Easy jog or walk before stopping.";
-  }
-
-  if (/\brecovery\b/.test(kind)) {
-    return "Very easy jog or walk; let breathing settle.";
-  }
-
-  if (/\bmobility\b|\bstrength\b|\bactivation\b|\bdrills\b/.test(kind)) {
-    return "Move smoothly; keep this supportive, not maximal.";
-  }
-
-  if (/\bwork\b|\binterval\b|\btempo\b|\bstride\b|\bhill\b|\bquality\b/.test(kind)) {
-    return "Controlled hard effort; stay repeatable.";
-  }
-
-  return "Easy and controlled.";
 }
 
 export function stepPlannedDistanceKm(step: Step) {
@@ -1402,53 +1233,6 @@ export function stepStructureDurationMin(step: Step, workoutType: WorkoutType) {
   }
 
   return Math.round(step.distance_km * pace);
-}
-
-function repeatChildRoleLabel(role: StepRepeatChildRole) {
-  switch (role) {
-    case "warm_up":
-      return "Warm-up";
-    case "run":
-      return "Run";
-    case "walk":
-      return "Walk";
-    case "work":
-      return "Work";
-    case "recover":
-      return "Recover";
-    case "finish":
-      return "Finish";
-    case "cooldown":
-      return "Cooldown";
-  }
-}
-
-function stepRepeatChildRoleForStep(step: Step): StepRepeatChildRole {
-  const role = (step.segment_type ?? step.type).trim().toLowerCase();
-
-  switch (role) {
-    case "warm_up":
-    case "warmup":
-      return "warm_up";
-    case "walk":
-      return "walk";
-    case "work":
-      return "work";
-    case "recover":
-    case "recovery":
-      return "recover";
-    case "finish":
-      return "finish";
-    case "cooldown":
-    case "cool_down":
-      return "cooldown";
-    default:
-      return "run";
-  }
-}
-
-function stepTypeForRepeatChildRole(role: StepRepeatChildRole) {
-  return role;
 }
 
 function roundDistanceKm(distanceKm: number) {

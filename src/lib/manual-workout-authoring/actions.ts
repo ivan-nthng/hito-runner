@@ -1,20 +1,18 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { isEditableActivePlanSourceKind } from "@/lib/active-plan-workout-editing/policy";
-import {
-  createEmptyActivePlanForUser,
-  createFirstPlanFromReviewedCanonicalPlanForUser,
-  getActivePlan,
-} from "@/lib/active-plan-persistence";
+import { createEmptyActivePlanForUser, getActivePlan } from "@/lib/active-plan-persistence";
 import { type TrainingPlanV2 } from "@/lib/imported-plan";
 import {
   buildManualEmptyActivePlanCreationInput,
-  buildManualWorkoutPersistenceMetadata,
   buildManualWorkoutUserBuiltTrainingPlan,
   deriveManualTargetTruthMode,
 } from "@/lib/manual-workout-authoring/persistence";
-import { buildManualWorkoutConstructorContract } from "@/lib/manual-workout-authoring/constructor-contract";
-import { stableManualWorkoutChecksum64Hex } from "@/lib/manual-workout-authoring/review-exactness";
+import {
+  buildManualWorkoutReviewToken,
+  stableManualWorkoutChecksum64Hex,
+  validateManualWorkoutReviewProof,
+} from "@/lib/manual-workout-authoring/review-exactness";
 import {
   addReviewedManualWorkoutToActivePlanForUser,
   type ManualWorkoutActivePlanAddDependencies,
@@ -23,7 +21,6 @@ import {
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
   MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
   manualWorkoutDraftInputSchema,
-  manualWorkoutConfirmInputSchema,
   manualWorkoutAddToActivePlanInputSchema,
   manualEmptyPlanSetupInputSchema,
   MANUAL_EMPTY_PLAN_SETUP_PAYLOAD_VERSION,
@@ -34,19 +31,16 @@ import {
   type ManualWorkoutCanonicalDraft,
   type ManualEmptyPlanCreateFailureReason,
   type ManualEmptyPlanCreateResult,
-  type ManualWorkoutConfirmFailureReason,
-  type ManualWorkoutConfirmResult,
   type ManualWorkoutDraftConflict,
   type ManualWorkoutDraftIssue,
   type ManualWorkoutDraftReviewResult,
+  type ManualWorkoutReviewExactnessFailureReason,
   type ManualWorkoutTargetTruthMode,
   type ParsedManualWorkoutDraftInput,
 } from "@/lib/manual-workout-authoring/schema";
 import { resolveCurrentManualWorkoutAuthoringUser } from "@/lib/manual-workout-authoring/request-auth";
 import { normalizeManualWorkoutDraft } from "@/lib/manual-workout-authoring/normalize";
 import { validateManualWorkoutDraft } from "@/lib/manual-workout-authoring/validator";
-import type { AdditionalPlanPersistenceMetadata } from "@/lib/plan-authoring-snapshot";
-import { safeTokenEqual } from "@/lib/review-token-signing";
 import { todayIso } from "@/lib/training";
 
 type ManualWorkoutDraftRejectionReason = Extract<
@@ -55,11 +49,6 @@ type ManualWorkoutDraftRejectionReason = Extract<
 >["reason"];
 
 const MANUAL_WORKOUT_REVIEW_TOKEN_PREFIX = "manual-workout-review-v1.";
-
-type ManualWorkoutConfirmDependencies = {
-  getActivePlanForUser?: typeof getActivePlan;
-  createFirstPlanForUser?: typeof createFirstPlanFromReviewedCanonicalPlanForUser;
-};
 
 type ManualEmptyPlanCreateDependencies = {
   getActivePlanForUser?: typeof getActivePlan;
@@ -77,11 +66,10 @@ type ManualWorkoutReviewExactnessResult =
       reviewChecksum: string;
       targetTruthMode: ManualWorkoutTargetTruthMode;
       reviewWarnings: string[];
-      persistenceMetadata: AdditionalPlanPersistenceMetadata;
     }
   | {
       ok: false;
-      reason: ManualWorkoutConfirmFailureReason;
+      reason: ManualWorkoutReviewExactnessFailureReason;
       message: string;
     };
 
@@ -137,12 +125,6 @@ export function reviewManualWorkoutDraft(input: unknown): ManualWorkoutDraftRevi
     targetTruthMode: validation.targetTruthMode,
     entries: validation.entries,
   });
-  const constructorContract = buildManualWorkoutConstructorContract({
-    parsedInput: parsed.data,
-    template: validation.template,
-    targetTruthMode: validation.targetTruthMode,
-    entries: validation.entries,
-  });
   const exactnessPayload = buildManualWorkoutReviewExactnessPayload(normalized.draft);
   const reviewChecksum = stableManualWorkoutChecksum64Hex(exactnessPayload);
 
@@ -150,7 +132,6 @@ export function reviewManualWorkoutDraft(input: unknown): ManualWorkoutDraftRevi
     ok: true,
     status: "draft_ready",
     draft: normalized.draft,
-    constructorContract,
     review: {
       headline: `${normalized.draft.title} is ready for review.`,
       bullets: [
@@ -162,7 +143,7 @@ export function reviewManualWorkoutDraft(input: unknown): ManualWorkoutDraftRevi
       ],
       warnings: normalized.reviewWarnings,
     },
-    reviewToken: `${MANUAL_WORKOUT_REVIEW_TOKEN_PREFIX}${reviewChecksum}`,
+    reviewToken: buildManualWorkoutReviewToken(MANUAL_WORKOUT_REVIEW_TOKEN_PREFIX, reviewChecksum),
     reviewChecksum,
     exactnessPayloadVersion: MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION,
     conflicts: [],
@@ -173,24 +154,6 @@ export const reviewManualWorkoutDraftAction = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutDraftReviewResult> => {
     return reviewManualWorkoutDraft(data);
-  });
-
-export const confirmManualWorkoutDraft = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
-  .handler(async ({ data }): Promise<ManualWorkoutConfirmResult> => {
-    const user = await resolveCurrentManualWorkoutAuthoringUser();
-
-    if (!user.ok) {
-      return buildManualWorkoutConfirmFailure({
-        reason: "unauthenticated",
-        message:
-          user.reason === "missing_auth"
-            ? "Sign in before creating a manual user-built plan."
-            : "This session cannot create a persisted manual plan yet.",
-      });
-    }
-
-    return confirmManualWorkoutDraftForUser(user.userId, data);
   });
 
 export const createEmptyManualActivePlan = createServerFn({ method: "POST" })
@@ -228,116 +191,6 @@ export const addManualWorkoutToActivePlan = createServerFn({ method: "POST" })
 
     return addManualWorkoutToActivePlanForUser(user.userId, data);
   });
-
-export async function confirmManualWorkoutDraftForUser(
-  userId: string,
-  input: unknown,
-  dependencies: ManualWorkoutConfirmDependencies = {},
-): Promise<ManualWorkoutConfirmResult> {
-  const parsed = manualWorkoutConfirmInputSchema.safeParse(input);
-
-  if (!parsed.success) {
-    return buildManualWorkoutConfirmFailure({
-      reason: "invalid_review",
-      message: "The manual workout confirmation payload is invalid. Refresh the review.",
-    });
-  }
-
-  const request = parsed.data;
-  const getActivePlanForUser = dependencies.getActivePlanForUser ?? getActivePlan;
-  const createFirstPlanForUser =
-    dependencies.createFirstPlanForUser ?? createFirstPlanFromReviewedCanonicalPlanForUser;
-
-  let activePlan: Awaited<ReturnType<typeof getActivePlan>> | null = null;
-  try {
-    activePlan = await getActivePlanForUser(userId);
-  } catch {
-    return buildManualWorkoutConfirmFailure({
-      reason: "persistence_failed",
-      message:
-        "The manual plan could not verify the current active-plan state. Try again before creating a plan.",
-    });
-  }
-
-  if (activePlan) {
-    return buildManualWorkoutConfirmFailure({
-      reason: "active_plan_exists",
-      message:
-        "Manual user-built plans can be created only when there is no active plan. Use Add plan from the calendar to start a reviewed plan change.",
-    });
-  }
-
-  const exactness = validateManualWorkoutReviewExactness({
-    draftInput: request.draftInput,
-    reviewToken: request.reviewToken,
-    reviewChecksum: request.reviewChecksum,
-  });
-
-  if (!exactness.ok) {
-    return buildManualWorkoutConfirmFailure({
-      reason: exactness.reason,
-      message: exactness.message,
-    });
-  }
-
-  try {
-    const applyResult = await createFirstPlanForUser(
-      userId,
-      exactness.canonicalPlan,
-      null,
-      exactness.persistenceMetadata,
-    );
-
-    return {
-      ok: true,
-      status: "created",
-      persisted: true,
-      sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-      sourceStatus: MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
-      workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
-      workoutSourceStatus: MANUAL_WORKOUT_AUTHORING_SOURCE_STATUS,
-      schemaVersion: exactness.canonicalPlan.schema_version,
-      effectiveStartDate: applyResult.effectiveStartDate,
-      appliedStartDate: applyResult.appliedStartDate,
-      workoutCount: applyResult.workoutCount,
-      calendarRowCount: exactness.canonicalPlan.planned_workouts.length,
-      nonRestWorkoutCount: exactness.canonicalPlan.planned_workouts.filter(
-        (workout) => workout.workout_type !== "rest",
-      ).length,
-      workoutDate: exactness.draft.workoutDate,
-      templateKey: exactness.draft.templateKey,
-      reviewChecksum: exactness.reviewChecksum,
-      exactnessPayloadVersion: MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION,
-      sourceMetadata: {
-        templateKey: exactness.draft.templateKey,
-        workoutDate: exactness.draft.workoutDate,
-        rowCount: exactness.canonicalPlan.planned_workouts.length,
-        reviewChecksum: exactness.reviewChecksum,
-        metricTruthMode: exactness.targetTruthMode,
-        mappingGaps: exactness.draft.mappingGaps,
-      },
-      safety: {
-        requiresExplicitConfirm: true,
-        trustedClientRows: false,
-        serverRebuiltReview: true,
-        callsOpenAi: false,
-      },
-    };
-  } catch (error) {
-    if (error instanceof Error && /active plan/i.test(error.message)) {
-      return buildManualWorkoutConfirmFailure({
-        reason: "active_plan_exists",
-        message:
-          "Manual user-built plans can be created only when there is no active plan. Use Add plan from the calendar to start a reviewed plan change.",
-      });
-    }
-
-    return buildManualWorkoutConfirmFailure({
-      reason: "persistence_failed",
-      message: "The manual user-built plan could not be created. The current plan is unchanged.",
-    });
-  }
-}
 
 export async function createEmptyManualActivePlanForUser(
   userId: string,
@@ -489,7 +342,14 @@ export function validateManualWorkoutReviewExactness(input: {
     };
   }
 
-  if (input.reviewChecksum !== review.reviewChecksum) {
+  const reviewProof = validateManualWorkoutReviewProof({
+    expectedChecksum: review.reviewChecksum,
+    reviewChecksum: input.reviewChecksum,
+    reviewToken: input.reviewToken,
+    tokenPrefix: MANUAL_WORKOUT_REVIEW_TOKEN_PREFIX,
+  });
+
+  if (!reviewProof.ok && reviewProof.reason === "stale_review") {
     return {
       ok: false,
       reason: "stale_review",
@@ -498,8 +358,7 @@ export function validateManualWorkoutReviewExactness(input: {
     };
   }
 
-  const expectedToken = `${MANUAL_WORKOUT_REVIEW_TOKEN_PREFIX}${review.reviewChecksum}`;
-  if (!safeTokenEqual(input.reviewToken, expectedToken)) {
+  if (!reviewProof.ok) {
     return {
       ok: false,
       reason: "invalid_review",
@@ -517,12 +376,6 @@ export function validateManualWorkoutReviewExactness(input: {
     reviewChecksum: review.reviewChecksum,
     targetTruthMode: deriveManualTargetTruthMode(review.draft),
     reviewWarnings: review.review.warnings,
-    persistenceMetadata: buildManualWorkoutPersistenceMetadata({
-      draft: review.draft,
-      canonicalPlan,
-      reviewChecksum: review.reviewChecksum,
-      warnings: review.review.warnings,
-    }),
   };
 }
 
@@ -549,21 +402,6 @@ export function buildManualWorkoutReviewExactnessPayload(draft: ManualWorkoutCan
     recoveryPriority: draft.recoveryPriority,
     totalDurationMin: draft.totalDurationMin,
     totalDistanceKm: draft.totalDistanceKm,
-  };
-}
-
-function buildManualWorkoutConfirmFailure(input: {
-  reason: ManualWorkoutConfirmFailureReason;
-  message: string;
-}): Extract<ManualWorkoutConfirmResult, { ok: false }> {
-  return {
-    ok: false,
-    status: "blocked",
-    persisted: false,
-    reason: input.reason,
-    message: input.message,
-    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-    workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   };
 }
 
@@ -634,14 +472,9 @@ function buildLifecycleConflict(
 }
 
 function mapExactnessFailureToAddWorkoutFailure(
-  reason: ManualWorkoutConfirmFailureReason,
+  reason: ManualWorkoutReviewExactnessFailureReason,
 ): Extract<ManualWorkoutAddToActivePlanResult, { ok: false }>["reason"] {
-  switch (reason) {
-    case "active_plan_exists":
-      return "active_plan_conflict";
-    default:
-      return reason;
-  }
+  return reason;
 }
 
 function rejectManualWorkoutDraft(input: {

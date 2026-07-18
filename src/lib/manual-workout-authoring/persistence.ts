@@ -4,13 +4,11 @@ import {
   MANUAL_EMPTY_PLAN_SETUP_PAYLOAD_VERSION,
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
   MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
-  MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION,
   type ManualWorkoutCanonicalDraft,
   type ManualEmptyPlanSetupInput,
   type ManualSetupRunningLevel,
   type ManualWorkoutTargetTruthMode,
 } from "@/lib/manual-workout-authoring/schema";
-import type { AdditionalPlanPersistenceMetadata } from "@/lib/plan-authoring-snapshot";
 import type { Json } from "@/lib/supabase/database";
 import type {
   Step,
@@ -283,53 +281,6 @@ function normalizeManualSegmentType(
     default:
       return prescription.mode === "repeats" ? "interval_block" : "main";
   }
-}
-
-export function buildManualWorkoutPersistenceMetadata(input: {
-  draft: ManualWorkoutCanonicalDraft;
-  canonicalPlan: TrainingPlanV2;
-  reviewChecksum: string;
-  warnings: string[];
-}): AdditionalPlanPersistenceMetadata {
-  const targetTruthMode = deriveManualTargetTruthMode(input.draft);
-
-  return {
-    goalMetadata: toJson({
-      source_status: MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
-      manual_user_built_plan: {
-        source_kind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-        source_status: MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
-        workout_authoring_source_kind: input.draft.sourceKind,
-        workout_authoring_source_status: input.draft.sourceStatus,
-        template_key: input.draft.templateKey,
-        template_version: "manual_workout_template_registry_v1",
-        workout_date: input.draft.workoutDate,
-        row_count: input.canonicalPlan.planned_workouts.length,
-        non_rest_row_count: input.canonicalPlan.planned_workouts.filter(
-          (workout) => workout.workout_type !== "rest",
-        ).length,
-        review_payload_version: MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION,
-        review_checksum: input.reviewChecksum,
-        mapping_gaps: input.draft.mappingGaps,
-        metric_truth_mode: targetTruthMode,
-        warnings: input.warnings,
-      },
-    }),
-    planPreferences: toJson({
-      manual_workout_authoring_review: {
-        source_kind: input.draft.sourceKind,
-        source_status: input.draft.sourceStatus,
-        template_key: input.draft.templateKey,
-        template_version: "manual_workout_template_registry_v1",
-        workout_date: input.draft.workoutDate,
-        review_payload_version: MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION,
-        review_checksum: input.reviewChecksum,
-        row_count: input.canonicalPlan.planned_workouts.length,
-        metric_truth_mode: targetTruthMode,
-        mapping_gaps: input.draft.mappingGaps,
-      },
-    }),
-  };
 }
 
 export function deriveManualTargetTruthMode(

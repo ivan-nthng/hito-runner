@@ -15,16 +15,16 @@ import {
   type StepTarget,
   type WorkoutType,
 } from "@/lib/training";
-import type {
-  CalendarIconKey,
-  CanonicalGoalContext,
-  CanonicalMetricMode,
-  CanonicalWorkoutFamily,
-  CanonicalWorkoutIdentity,
-} from "@/lib/rich-workout-model";
+import type { CanonicalGoalContext, CanonicalMetricMode } from "@/lib/rich-workout-model";
 import type { PlannedWorkoutLanguageReadModel } from "@/lib/planned-workout-language";
 import { reduceRepeatChildrenToChildFirst } from "@/lib/planned-workout-block-contract";
 import { resolveActivePlanSourceStatus } from "@/lib/active-plan-workout-editing/policy";
+import {
+  readWorkoutDocumentSections,
+  workoutDocumentRepeatChildRoleForSection,
+  workoutDocumentTargetToWire,
+  type WorkoutDocumentContent,
+} from "@/lib/workout-document";
 
 type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
 type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
@@ -53,23 +53,17 @@ export interface ActivePlanExportPayload {
   workouts: ActivePlanExportWorkout[];
 }
 
-export interface ActivePlanExportWorkout {
+export interface ActivePlanExportWorkout extends WorkoutDocumentContent<CanonicalMetricMode> {
   workoutId: string;
   date: string;
   weekday: string;
   weekNumber: number;
   phase: string;
-  workoutType: WorkoutType;
-  sourceWorkoutType: string | null;
-  workoutFamily: CanonicalWorkoutFamily;
-  workoutIdentity: CanonicalWorkoutIdentity;
-  calendarIconKey: CalendarIconKey;
   goalContext: CanonicalGoalContext | null;
-  metricMode: CanonicalMetricMode;
   plannedWorkoutLanguage: PlannedWorkoutLanguageReadModel;
-  title: string;
-  notes: string | null;
-  steps: Step[];
+  plannedRpe: number | null;
+  estimatedFatigue: string | null;
+  recoveryPriority: string | null;
   displayDistanceKm: number | null;
   displayDurationMin: number | null;
   primaryTarget: Array<{ key: string; label: string; value: string }>;
@@ -261,7 +255,10 @@ export function activePlanExportToTrainingPlanV2(payload: ActivePlanExportPayloa
       ...(workout.goalContext ? { goal_context: toExportGoalContext(workout.goalContext) } : {}),
       metric_mode: toExportMetricMode(workout.metricMode),
       title: workout.title,
-      summary: buildWorkoutSummary(workout),
+      summary: workout.notes ?? buildWorkoutSummary(workout),
+      ...(workout.plannedRpe ? { planned_rpe: workout.plannedRpe } : {}),
+      ...(workout.estimatedFatigue ? { estimated_fatigue: workout.estimatedFatigue } : {}),
+      ...(workout.recoveryPriority ? { recovery_priority: workout.recoveryPriority } : {}),
       segments: workoutToTrainingPlanV2Segments(workout),
     })),
   };
@@ -299,7 +296,7 @@ function workoutRowToExportWorkout(
   row: PersistedPlannedWorkoutRow,
   sourceKind: string | null,
 ): ActivePlanExportWorkout {
-  const steps = Array.isArray(row.steps) ? (row.steps as unknown as Step[]) : [];
+  const steps = readWorkoutDocumentSections(row.steps);
   const workout = {
     steps,
     type: row.workout_type,
@@ -335,6 +332,9 @@ function workoutRowToExportWorkout(
     title: row.title,
     notes: row.notes,
     steps,
+    plannedRpe: row.planned_rpe,
+    estimatedFatigue: row.estimated_fatigue,
+    recoveryPriority: row.recovery_priority,
     displayDistanceKm: row.workout_type === "rest" ? null : explicitWorkoutDistanceKm(steps),
     displayDurationMin: row.workout_type === "rest" ? null : workoutDuration(workout),
     primaryTarget: displayExecutableTargetEntries(primaryTarget, richWorkout.metricMode),
@@ -422,7 +422,7 @@ function stepToTrainingPlanV2Segment(step: Step, index: number) {
   const prescription = buildStepExportPrescription(step);
   const isRepeatSegment = prescription?.mode === "repeats";
   const usesRepeatChildren = isRepeatSegment && Boolean(prescription.children?.length);
-  const target = usesRepeatChildren ? null : exportTarget(step.target);
+  const target = usesRepeatChildren ? null : workoutDocumentTargetToWire(step.target);
   const segmentType = toExportSegmentType(step.segment_type ?? step.type, Boolean(prescription));
   const segment = {
     segment_id: step.segment_id ?? `segment-${index + 1}`,
@@ -489,12 +489,13 @@ function stepToRepeatChildPrescription(
   index: number,
 ): StepRepeatChildPrescription | null {
   const prescription = stepToUnitPrescription(step);
-  if (!prescription) {
+  const role = stepToRepeatChildRole(step);
+  if (!prescription || !role) {
     return null;
   }
 
   return {
-    role: stepToRepeatChildRole(step),
+    role,
     ...(stringValue(step.label) ? { label: stringValue(step.label) } : {}),
     sequence: step.sequence ?? index + 1,
     ...(stringValue(step.guidance) ? { guidance: stringValue(step.guidance) } : {}),
@@ -503,16 +504,8 @@ function stepToRepeatChildPrescription(
   };
 }
 
-function stepToRepeatChildRole(step: Step): StepRepeatChildPrescription["role"] {
-  const type = `${step.segment_type ?? ""} ${step.type ?? ""} ${step.label ?? ""}`.toLowerCase();
-
-  if (/warm/.test(type)) return "warm_up";
-  if (/\bwalk\b/.test(type)) return "walk";
-  if (/recover|recovery/.test(type)) return "recover";
-  if (/finish|closing/.test(type)) return "finish";
-  if (/cool/.test(type)) return "cooldown";
-  if (/work|interval|tempo|hill|stride/.test(type)) return "work";
-  return "run";
+function stepToRepeatChildRole(step: Step): StepRepeatChildPrescription["role"] | null {
+  return workoutDocumentRepeatChildRoleForSection(step);
 }
 
 function stepToUnitPrescription(step: Step): StepUnitPrescription | null {
@@ -545,47 +538,6 @@ function stepToUnitPrescription(step: Step): StepUnitPrescription | null {
   }
 
   return null;
-}
-
-function exportTarget(target: StepTarget | undefined) {
-  if (!target) {
-    return null;
-  }
-
-  const output: Record<string, string | number> = {};
-  const push = (key: string, value: string | number | undefined) => {
-    if (typeof value === "number" && Number.isFinite(value)) {
-      output[key] = value;
-    } else if (typeof value === "string" && value.trim()) {
-      output[key] = value.trim();
-    }
-  };
-
-  push("target_source", target.target_source);
-  push("intensity", target.intensity);
-  push("hr_bpm_range", target.hr_bpm_range);
-  push("hr_bpm", target.hr_bpm);
-  push("hr_bpm_cap", target.hr_bpm_cap);
-  push("hr_bpm_min", target.hr_bpm_min);
-  push("hr_bpm_max", target.hr_bpm_max);
-  push("hr_target_source", target.hr_target_source);
-  push("label", target.label);
-  push("source_note", target.source_note);
-  push("pace_min_per_km_range", target.pace_min_per_km_range ?? target.pace_range_min_km);
-  push("pace", target.pace);
-  push("pace_seconds_per_km", target.pace_seconds_per_km);
-  push("pace_min_seconds_per_km", target.pace_min_seconds_per_km);
-  push("pace_max_seconds_per_km", target.pace_max_seconds_per_km);
-  push("rpe", target.rpe);
-  push("cadence_spm_range", target.cadence_spm_range);
-  push("cue", target.cue);
-  push("hint", target.hint);
-
-  for (const [key, value] of Object.entries(target.extra ?? {})) {
-    push(key, value);
-  }
-
-  return Object.keys(output).length > 0 ? output : null;
 }
 
 function findPrimaryGuidance(steps: Step[]) {

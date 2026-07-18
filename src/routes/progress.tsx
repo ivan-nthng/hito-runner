@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
-import { TYPE_META, weeklyMileage, statsTotals } from "@/lib/training";
+import { weeklyMileage, statsTotals, workoutTypeMeta } from "@/lib/training";
 import { APP_NAME } from "@/lib/app-config";
 import { getProgressRouteData } from "@/lib/training-api";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -184,7 +184,7 @@ function Progress() {
               <>
                 <div className="flex gap-1.5">
                   {recentTypes.map((workout) => {
-                    const meta = TYPE_META[workout.type];
+                    const meta = workoutTypeMeta(workout);
                     return (
                       <div key={workout.date} className="group flex-1">
                         <div

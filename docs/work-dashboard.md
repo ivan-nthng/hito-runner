@@ -1,6 +1,6 @@
 # Hito Work Dashboard
 
-Generated: 2026-07-09T18:24:33.997Z
+Generated: 2026-07-18T19:17:32.657Z
 Mode: dashboard-only
 
 Keep this file open in a side pane. Re-run one command below whenever you want the Admin work-item
@@ -82,22 +82,22 @@ Current Truth
 
 <sub><code>STATUS</code></sub>
 
-<code>in_progress</code>
+<code>completed</code>
 
 #### Task
-Align active-plan workout content-editability readback before the next design batch.
+Close the running-plan creation engine rebuild after accepted post-confirm workout ownership durability.
 
 <sub><code>STAGE</code></sub>
 
-<code>BACKEND implementation / active-plan content-edit capability correction.</code>
+<code>ARCHITECT source-of-truth reconciliation / completed.</code>
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
-Current Source Of Truth: Workout types: Rest, Recovery, Easy, Steady, Long Run, Progression, Tempo, Intervals, Hills,
+Current Source Of Truth: Add, Clear, Move, Copy, and Edit are distinct operations with row-level capabilities.
 
 <sub><code>NEXT ROLE</code></sub>
 
-<code>backend</code>
+<code>product</code>
 
 ---
 
@@ -200,15 +200,15 @@ Context: which Hito primitives are stable enough to reuse;
 <code>in_progress</code>
 
 #### Task
-Run a domain-based deletion-first cleanup audit and select one implementation batch.
+Hold source-size cleanup after accepted `Delete active plan` retirement.
 
 <sub><code>STAGE</code></sub>
 
-<code>ARCHITECT audit / service-domain cleanup ranking.</code>
+<code>ARCHITECT holding / evidence-gated cleanup pause.</code>
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
-Domain-Based Cleanup Anchor - 2026-07-09
+Hold Decision - 2026-07-18: Accepted removal of the unreachable `deleteActivePlan` server function, its delete-only helper,
 
 <sub><code>NEXT ROLE</code></sub>
 

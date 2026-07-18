@@ -20,9 +20,9 @@ import {
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
   MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   type ManualWorkoutAddToActivePlanResult,
-  type ManualWorkoutConfirmFailureReason,
   type ManualWorkoutDraftInput,
   type ManualWorkoutDraftReviewResult,
+  type ManualWorkoutReviewExactnessFailureReason,
 } from "@/lib/manual-workout-authoring/schema";
 import { stableManualWorkoutChecksum64Hex } from "@/lib/manual-workout-authoring/review-exactness";
 import { getCurrentManualWorkoutAuthoringUserId } from "@/lib/manual-workout-authoring/request-auth";
@@ -493,9 +493,9 @@ function buildCopyPasteBlocked(input: {
 }
 
 function mapAddFailureReason(
-  reason: ManualWorkoutConfirmFailureReason,
+  reason: ManualWorkoutReviewExactnessFailureReason,
 ): ManualWorkoutCopyPasteFailureReason {
-  return reason === "active_plan_exists" ? "active_plan_conflict" : reason;
+  return reason;
 }
 
 function buildDirectCopyMutationChecksum(input: {

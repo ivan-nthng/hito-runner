@@ -22,12 +22,8 @@ import {
 } from "@/lib/manual-workout-authoring/schema";
 import { isManualWorkoutRepeatRecoveryBlock } from "@/lib/manual-workout-authoring/repeat-groups";
 import { getManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
-import {
-  todayIso,
-  type Step,
-  type StepRepeatChildPrescription,
-  type StepTarget,
-} from "@/lib/training";
+import { todayIso, type Step, type StepTarget } from "@/lib/training";
+import { readWorkoutDocumentSections, workoutDocumentRepeatChildren } from "@/lib/workout-document";
 
 const MANUAL_DRAFT_TITLE_MAX_LENGTH = 120;
 const MANUAL_DRAFT_NOTES_MAX_LENGTH = 1_000;
@@ -363,69 +359,7 @@ function persistedStepToEntry(
 }
 
 function repeatChildStepsForPersistedStep(step: Step): Step[] {
-  if (step.children?.length) {
-    return step.children;
-  }
-
-  if (step.prescription?.children?.length) {
-    return step.prescription.children.map(repeatChildPrescriptionToStep);
-  }
-
-  return [];
-}
-
-function repeatChildPrescriptionToStep(child: StepRepeatChildPrescription): Step {
-  const unit = child.prescription;
-
-  return {
-    type: repeatChildStepType(child.role),
-    segment_type: child.role,
-    label: child.label ?? repeatChildLabel(child.role),
-    sequence: child.sequence,
-    guidance: child.guidance,
-    prescription: unit,
-    ...(unit.duration_min ? { duration_min: unit.duration_min } : {}),
-    ...(unit.distance_km ? { distance_km: unit.distance_km } : {}),
-    ...(child.target ? { target: child.target } : {}),
-  };
-}
-
-function repeatChildStepType(role: StepRepeatChildPrescription["role"]) {
-  switch (role) {
-    case "warm_up":
-      return "warmup";
-    case "run":
-      return "run";
-    case "walk":
-      return "walk";
-    case "work":
-      return "work";
-    case "recover":
-      return "recovery";
-    case "finish":
-      return "finish";
-    case "cooldown":
-      return "cooldown";
-  }
-}
-
-function repeatChildLabel(role: StepRepeatChildPrescription["role"]) {
-  switch (role) {
-    case "warm_up":
-      return "Warm-up";
-    case "run":
-      return "Run";
-    case "walk":
-      return "Walk";
-    case "work":
-      return "Work";
-    case "recover":
-      return "Recover";
-    case "finish":
-      return "Finish";
-    case "cooldown":
-      return "Cooldown";
-  }
+  return workoutDocumentRepeatChildren(step);
 }
 
 function repeatChildReconstructionRole(step: Step): "work" | "recovery" {
@@ -615,15 +549,7 @@ function sanitizeStepTarget(target: StepTarget | undefined): ManualWorkoutBlockI
 }
 
 function readPersistedSteps(value: unknown): Step[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.filter(isStepLike) as Step[];
-}
-
-function isStepLike(value: unknown): value is Step {
-  return Boolean(value && typeof value === "object" && "type" in value);
+  return readWorkoutDocumentSections(value);
 }
 
 function deriveTargetTruthMode(workout: PersistedPlannedWorkoutRow): ManualWorkoutTargetTruthMode {

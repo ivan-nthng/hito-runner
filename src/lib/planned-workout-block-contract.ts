@@ -139,6 +139,9 @@ function normalizeRepeatChild<TTarget>(
   }
 
   const role = normalizeRepeatChildRole(record.role);
+  if (!role) {
+    return null;
+  }
   const target = normalizeTarget(record.target);
 
   return {
@@ -151,26 +154,14 @@ function normalizeRepeatChild<TTarget>(
   };
 }
 
-function normalizeRepeatChildRole(value: unknown): PlannedWorkoutRepeatChildRole {
+function normalizeRepeatChildRole(value: unknown): PlannedWorkoutRepeatChildRole | null {
   const token = readString(value);
 
   if (token && repeatChildRoleValues.has(token)) {
     return token as PlannedWorkoutRepeatChildRole;
   }
 
-  if (token === "warmup") {
-    return "warm_up";
-  }
-
-  if (token === "recovery") {
-    return "recover";
-  }
-
-  if (token === "cool_down") {
-    return "cooldown";
-  }
-
-  return "run";
+  return null;
 }
 
 function normalizeUnitPrescription(value: unknown): PlannedWorkoutUnitPrescription | null {

@@ -7,12 +7,15 @@ import type {
   PersistedPlannedWorkoutRow,
 } from "@/lib/active-plan-persistence";
 import { buildManualWorkoutReviewExactnessPayload } from "@/lib/manual-workout-authoring/actions";
-import { stableManualWorkoutChecksum64Hex } from "@/lib/manual-workout-authoring/review-exactness";
+import {
+  buildManualWorkoutReviewToken,
+  stableManualWorkoutChecksum64Hex,
+  validateManualWorkoutReviewProof,
+} from "@/lib/manual-workout-authoring/review-exactness";
 import type {
   ManualWorkoutDraftReviewResult,
   ManualWorkoutTemplateKey,
 } from "@/lib/manual-workout-authoring/schema";
-import { safeTokenEqual } from "@/lib/review-token-signing";
 
 export const MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION =
   "manual_workout_persisted_edit_review_v1" as const;
@@ -59,10 +62,19 @@ export function buildPersistedEditReview(input: {
 }
 
 export function buildExpectedPersistedEditReviewToken(reviewChecksum: string) {
-  return `${MANUAL_WORKOUT_EDIT_REVIEW_TOKEN_PREFIX}${reviewChecksum}`;
+  return buildManualWorkoutReviewToken(MANUAL_WORKOUT_EDIT_REVIEW_TOKEN_PREFIX, reviewChecksum);
 }
 
-export const safeManualWorkoutEditReviewTokenEqual = safeTokenEqual;
+export function validatePersistedEditReviewProof(input: {
+  expectedChecksum: string;
+  reviewChecksum: string;
+  reviewToken: string;
+}) {
+  return validateManualWorkoutReviewProof({
+    ...input,
+    tokenPrefix: MANUAL_WORKOUT_EDIT_REVIEW_TOKEN_PREFIX,
+  });
+}
 
 export function buildManualWorkoutEditMetadata(review: ManualWorkoutPersistedEditReview) {
   return {
@@ -93,6 +105,7 @@ function buildPersistedEditExactnessPayload(input: {
     mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.editWorkout,
     activePlanId: input.activePlan.id,
     activePlanSourceKind: input.activePlan.source_kind,
+    activePlanUpdatedAt: input.activePlan.updated_at,
     plannedWorkoutId: input.sourceWorkout.id,
     workoutDate: input.sourceWorkout.workout_date,
     sourceFingerprint: buildSourceWorkoutFingerprint(input.sourceWorkout),
@@ -107,7 +120,7 @@ function buildPersistedEditExactnessPayload(input: {
   };
 }
 
-function buildSourceWorkoutFingerprint(workout: PersistedPlannedWorkoutRow) {
+export function buildSourceWorkoutFingerprint(workout: PersistedPlannedWorkoutRow) {
   return {
     id: workout.id,
     workoutDate: workout.workout_date,

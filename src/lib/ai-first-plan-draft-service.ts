@@ -24,7 +24,7 @@ import {
   parseStructuredFirstPlanOnboardingInput,
   type StructuredFirstPlanAuthoringInput,
 } from "@/lib/structured-first-plan-onboarding";
-import { structuredPlanAuthoringInputSchema } from "@/lib/structured-plan-authoring";
+import { structuredPlanAuthoringInputSchema } from "@/lib/structured-plan-authoring-schema";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_OPENAI_PLAN_MODEL = "gpt-5";

@@ -1,5 +1,3 @@
-import type { RunningPlanDistanceFamily } from "@/lib/plan-creation-engine/source-types";
-
 export const SELECTED_DISTANCE_ENDPOINT_SOURCE_KIND = "final_selected_distance_day" as const;
 export const SELECTED_DISTANCE_ENDPOINT_IDENTITY =
   "selected_distance_completion_or_checkpoint" as const;
@@ -116,21 +114,6 @@ function distanceKmForPrescription(
   }, 0);
 
   return childDistanceKm * (prescription.repeat_count ?? 1);
-}
-
-export function resolveSelectedDistanceQualityFamily(input: {
-  distanceMeters: number | null | undefined;
-  fallbackFamily?: RunningPlanDistanceFamily | null;
-}): RunningPlanDistanceFamily {
-  const meters = input.distanceMeters ?? null;
-
-  if (meters != null) {
-    if (meters <= 10_000) return "10K";
-    if (meters <= 21_100) return "Half Marathon";
-    return "Marathon Completion";
-  }
-
-  return input.fallbackFamily ?? "10K";
 }
 
 export function collectSelectedDistanceEndpointIssues(input: {

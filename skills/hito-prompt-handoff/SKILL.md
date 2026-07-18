@@ -53,6 +53,39 @@ role to evaluate, not a mandated implementation.
 Before finalizing a prompt, ask: `Does this tell the agent what must become true, or does it try to
 tell the agent how to code it?` Keep the former and remove the latter.
 
+## Active Task Continuity Gate
+
+Before a handoff or progress response, reconstruct the live task from the active plan, relevant
+current documentation, the latest report, and the preceding acceptance/failure gates. The most recent
+report is evidence about the active task, not a replacement for the task itself.
+
+The user-facing shell must make four things explicit before any prompt:
+
+- the parent plan and product capability;
+- the exact live slice and current stage;
+- what has already passed and must not be reopened; and
+- the one remaining gate or blocker.
+
+When the active plan header is stale, say so plainly and use the latest validated evidence for the
+live stage. Do not silently edit product-plan documentation from routing work; route that source-of-
+truth update only when it is the next actual task.
+
+If the user asks where the work stands and the immediate next owner is known, answer with this
+continuity context and include exactly one execution-ready prompt for that owner. Omit a prompt only
+when there is no next owner, a real Product decision is required, or the user explicitly asks for
+status only with no handoff.
+
+## Solution-Neutral Prompt Check
+
+Assign the outcome and evidence; leave the execution design to the receiving role.
+
+- Do not prescribe implementation algorithms, file decomposition, helper shapes, command sequences,
+  browser click paths, or test-data choreography.
+- State product decisions, safety boundaries, observed evidence, non-goals, and acceptance criteria.
+- Include a specific command, fixture value, or navigation detail only when it is an already-decided
+  product contract or a necessary safety boundary, not merely the handoff writer's preferred method.
+- Treat a previous agent's suggested fix as evidence for investigation, not as a mandatory solution.
+
 ## Required Reading
 
 1. `docs/context.md`
@@ -94,6 +127,31 @@ one micro-step.
   work.
 - Do not satisfy this rule by having the handoff writer run the implementation or QA itself. The
   assigned role agent owns its own subagents and final integrated result.
+
+## Autonomous Completion, Not User Relay
+
+Write one bounded owner task that includes the implementation, validation, and fix-forward loop when
+those activities share one primary owner and safe local evidence is available. The user must not be
+asked to copy a routine implementation result into a separate QA prompt and then copy the QA result
+back to the implementing role.
+
+- Tell the assigned BACKEND or FRONTEND owner to start/reuse a role-prefixed QA subagent for browser,
+  persistence-readback, fixture, or regression proof that is adjacent to its own change.
+- The owner integrates the QA result and fixes any same-owner defect before returning.
+- Return to the user only with a final verdict, a genuine cross-owner defect, an unsafe mutation
+  boundary, a missing tool capability, or a Product decision.
+- Do not turn a known required browser check into a later user-facing handoff when the owner can
+  safely delegate it inside the same task.
+
+## Subagent Budget
+
+Prompts must ask the receiving owner to reuse a small set of subagents across the whole active
+workstream, not to open one per test or file. The default is a reusable pool of zero to six
+subagents: for example
+source/ownership audit, QA/browser validation, domain doctrine, focused test/proof, and one bounded
+consumer audit when those scopes are genuinely independent. More than six requires explicit user
+approval. Do not close and recreate equivalent agents between routine adjacent checks. Do not write
+prompts that encourage broad fan-out, per-command delegation, or large pools of parallel agents.
 
 ## Product-Owned Direct Handoff
 

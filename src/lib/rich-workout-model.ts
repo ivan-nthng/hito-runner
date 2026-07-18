@@ -215,10 +215,13 @@ const sourceIdentityAliases: Record<string, CanonicalWorkoutIdentity> = {
   cutback: "cutback_aerobic_run",
   cutback_aerobic_run: "cutback_aerobic_run",
   strides: "easy_run_with_strides",
+  easy_strides: "easy_run_with_strides",
+  "easy_+_strides": "easy_run_with_strides",
   aerobic_strides: "easy_run_with_strides",
   easy_run_with_strides: "easy_run_with_strides",
   long: "long_aerobic_run",
   long_run: "long_aerobic_run",
+  medium_long: "long_aerobic_run",
   long_aerobic_run: "long_aerobic_run",
   long_run_with_steady_finish: "long_run_with_steady_finish",
   cutback_long_run: "cutback_long_run",
@@ -568,7 +571,7 @@ function deriveHrTargetMetadata(segments: WorkoutSegmentLike[]) {
   }
 
   return {
-    source: "personal_hr_zone" as const,
+    source: "effort_only" as const,
     label: null,
     sourceNote: null,
   };

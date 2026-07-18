@@ -6,7 +6,6 @@ export {
 } from "@/lib/plan-creation-engine/runner-facing-richness";
 export {
   collectSelectedDistanceEndpointIssues,
-  resolveSelectedDistanceQualityFamily,
   selectedDistanceEndpointMainDistanceMeters,
   SELECTED_DISTANCE_ENDPOINT_IDENTITY,
   SELECTED_DISTANCE_ENDPOINT_SOURCE_KIND,
@@ -17,9 +16,9 @@ export {
 } from "@/lib/plan-creation-engine/selected-distance-endpoint";
 export {
   buildStructuredPlanGoalIntentInput,
-  distanceFamilyForStructuredGoalType,
   normalizePlanGoalIntent,
   normalizedPlanGoalIntentSchema,
+  planGoalIntentDistanceInputSchema,
   planGoalIntentInputSchema,
   PLAN_GOAL_INTENT_CONTRACT_VERSION,
   PLAN_GOAL_INTENT_PRESET_DISTANCE_VALUES,

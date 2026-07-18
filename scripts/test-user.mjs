@@ -4,9 +4,8 @@ import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { tsImport } from "tsx/esm/api";
 
-const { buildImportedPlanSeed } = await tsImport("../src/lib/imported-plan.ts", import.meta.url);
-const { applyImportedSeedAsActivePlanForOps } = await tsImport(
-  "./lib/ops-plan-apply.ts",
+const { createFirstPlanFromReviewedCanonicalPlanForUser } = await tsImport(
+  "../src/lib/active-plan-persistence.ts",
   import.meta.url,
 );
 const { isLoopbackRuntimeUrl } = await tsImport("../src/lib/supabase/env.ts", import.meta.url);
@@ -87,7 +86,7 @@ async function handleCreate() {
 
   if (options.plan) {
     await resetPersistedUserData(authUser.id);
-    importedPlan = await importPlanForUser(authUser.id, email, options.plan);
+    importedPlan = await importPlanForUser(authUser.id, options.plan);
   }
 
   const afterCounts = await getUserDataCounts(authUser.id);
@@ -128,7 +127,7 @@ async function handleReset() {
   let importedPlan = null;
 
   if (options.plan) {
-    importedPlan = await importPlanForUser(authUser.id, email, options.plan);
+    importedPlan = await importPlanForUser(authUser.id, options.plan);
   }
 
   const afterCounts = await getUserDataCounts(authUser.id);
@@ -383,20 +382,12 @@ async function resetPersistedUserData(userId) {
   }
 }
 
-async function importPlanForUser(userId, email, planPath) {
+async function importPlanForUser(userId, planPath) {
   const rawPlan = await readFile(path.resolve(process.cwd(), planPath), "utf8");
   const plan = JSON.parse(rawPlan);
-  const importedSeed = buildImportedPlanSeed(plan);
 
-  const appliedPlan = await applyImportedSeedAsActivePlanForOps({
-    supabase,
-    userId,
-    importedSeed,
-    profileBaselineNotes: importedSeed.profile.baselineNotes ?? `Imported from JSON for ${email}.`,
-    planSelect: "id, title, start_date, end_date",
-    workoutSelect:
-      "id, workout_date, title, source_workout_type, workout_family, workout_identity, calendar_icon_key, goal_context, metric_mode",
-  });
+  await createFirstPlanFromReviewedCanonicalPlanForUser(userId, plan);
+  const appliedPlan = await readImportedPlanForUser(userId);
 
   const richWorkoutCount = appliedPlan.workouts.filter(
     (workout) =>
@@ -433,6 +424,39 @@ async function importPlanForUser(userId, email, planPath) {
       hasGoalContext: Boolean(workout.goal_context),
       hasMetricMode: Boolean(workout.metric_mode),
     })),
+  };
+}
+
+async function readImportedPlanForUser(userId) {
+  const planCycle = await supabase
+    .from("plan_cycles")
+    .select("id, title, start_date, end_date")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (planCycle.error) {
+    throw new Error(planCycle.error.message);
+  }
+
+  const workouts = await supabase
+    .from("planned_workouts")
+    .select(
+      "id, workout_date, title, source_workout_type, workout_family, workout_identity, calendar_icon_key, goal_context, metric_mode",
+    )
+    .eq("plan_cycle_id", planCycle.data.id)
+    .order("workout_date", { ascending: true });
+
+  if (workouts.error) {
+    throw new Error(workouts.error.message);
+  }
+
+  return {
+    planCycle: planCycle.data,
+    workoutCount: workouts.data.length,
+    workouts: workouts.data,
   };
 }
 

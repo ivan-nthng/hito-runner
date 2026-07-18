@@ -61,10 +61,6 @@ export interface WorkoutAiPromptInput {
     activityLocalDate: string | null;
     actualDurationMin: number | null;
     actualDistanceKm: number | null;
-    actualAvgHr: number | null;
-    actualMaxHr: number | null;
-    actualAvgPower: number | null;
-    actualAvgCadence: number | null;
     actualIntervalCount: number | null;
   };
   comparison: {
@@ -278,6 +274,7 @@ function buildSystemPrompt() {
     "You receive only canonical backend truth: planned workout summary, normalized actual metrics, deterministic comparison, current week context, and the next workout summary.",
     "You may also receive saved workout-scoped body notes; use them only as caution context for this workout result.",
     "You must not invent raw metrics, comparison facts, diagnosis, medical advice, treatment instructions, injury certainty, or plan mutations.",
+    "Pace, heart rate, power, cadence, and RPE are outside this interpretation contract unless they appear as supported deterministic comparison facts; do not mention numeric values for them.",
     "Keep output concise, factual, and conservative.",
     "Write in plain English only. Use complete sentences. Do not output dangling fragments, bullets, ampersands, markdown, emoji, or non-English characters.",
     "If the deterministic comparison is partial, mismatched, or unclear, say so plainly and avoid overconfident coaching.",
@@ -354,7 +351,11 @@ export function applyWorkoutAiTextQualityGate(
 function sanitizeRunnerFacingAiText(text: string, minLength: number, maxLength: number) {
   const trimmed = text.normalize("NFKC").replace(/\s+/g, " ").trim();
 
-  if (!trimmed || containsUnsupportedCharacters(trimmed)) {
+  if (
+    !trimmed ||
+    containsUnsupportedCharacters(trimmed) ||
+    containsUnsupportedActualMetricClaim(trimmed)
+  ) {
     return null;
   }
 
@@ -369,6 +370,15 @@ function sanitizeRunnerFacingAiText(text: string, minLength: number, maxLength: 
   }
 
   return withTerminalPunctuation;
+}
+
+function containsUnsupportedActualMetricClaim(text: string) {
+  return (
+    /\b\d+(?:\.\d+)?\s*(?:bpm|watts?|w|rpm)\b/i.test(text) ||
+    /\brpe\s*(?:of\s*)?\d+(?:\.\d+)?\b/i.test(text) ||
+    /\b\d{1,2}:\d{2}\s*(?:\/|per\s+)?km\b/i.test(text) ||
+    /\b\d+(?:\.\d+)?\s*(?:min(?:ute)?s?)\s*(?:\/|per\s+)km\b/i.test(text)
+  );
 }
 
 function containsUnsupportedCharacters(text: string) {

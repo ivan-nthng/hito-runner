@@ -5,11 +5,7 @@ import {
   type StructuredConstructorState,
 } from "@/components/onboarding/onboarding-form-model";
 import { isRealIsoDate, parseDurationSeconds } from "@/lib/first-plan-authoring-utils";
-import type {
-  PlanGoalIntentInput,
-  RunningPlanDistanceFamily,
-  RunningPlanRunnerLevel,
-} from "@/lib/plan-creation-engine";
+import type { PlanGoalIntentInput, RunningPlanRunnerLevel } from "@/lib/plan-creation-engine";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 import type {
   RunningPlanConfirmActionInput,
@@ -26,111 +22,6 @@ export type PlanGoalIntentDraftState = Pick<
   | "planGoalTargetDate"
 >;
 export type PlanGoalSelectionId = Exclude<PlanGoalChoice, "">;
-export type PlanGoalShortcutDiscoveryInput = {
-  profile: {
-    age: number | null;
-    weightKg: number | null;
-    heightCm: number | null;
-  };
-  benchmark: {
-    fitnessLevel: StructuredConstructorState["fitnessLevel"];
-    recent5kTime: string | null;
-  };
-  availability: {
-    runningDaysPerWeek: number | null;
-    fixedRestDays: StructuredConstructorState["fixedRestDays"] | null;
-    preferredLongRunDay: StructuredConstructorState["preferredLongRunDay"] | null;
-  };
-  goal: {
-    goalDistance: StructuredConstructorState["goalDistance"];
-    goalStyle: StructuredConstructorState["goalStyle"];
-    terrainFocus: StructuredConstructorState["terrainFocus"];
-    targetTime: string | null;
-    targetDate: string | null;
-  };
-  execution: {
-    watchAccess: StructuredConstructorState["watchAccess"];
-    guidancePreference: StructuredConstructorState["guidancePreference"];
-  };
-  strength: {
-    preference: StructuredConstructorState["strengthPreference"];
-  };
-  schedule: {
-    startDate: string | null;
-    targetDate: string | null;
-  };
-  comment: string | null;
-};
-export type PlanPresetCardsActionResult =
-  | {
-      ok: true;
-      sourceKind: "plan_goal_shortcuts_v1";
-      persisted: false;
-    }
-  | {
-      ok: false;
-      status: "blocked";
-      reason: "preset_discovery_unavailable";
-      message: string;
-    };
-
-export function buildPlanPresetCardInput(
-  state: StructuredConstructorState,
-): PlanGoalShortcutDiscoveryInput {
-  const age = optionalPlanPresetNumber(state.age, { min: 13, max: 100, integer: true });
-  const weightKg = optionalPlanPresetNumber(state.weightKg, { min: 30, max: 250 });
-  const heightCm = optionalPlanPresetNumber(state.heightCm, { min: 120, max: 230, integer: true });
-  const runningDaysPerWeek = optionalPlanPresetNumber(state.maxRunningDaysPerWeek, {
-    min: 1,
-    max: 7,
-    integer: true,
-  });
-  const recent5kTime = state.recent5kTime.trim();
-  const targetTime = state.targetTime.trim();
-  const targetDate = state.targetDate.trim();
-  const startDate = state.startDate.trim();
-  const comment = state.comment.trim();
-
-  return {
-    profile: {
-      age,
-      weightKg,
-      heightCm,
-    },
-    benchmark: {
-      fitnessLevel: state.fitnessLevel,
-      recent5kTime: recent5kTime || null,
-    },
-    availability: {
-      runningDaysPerWeek,
-      fixedRestDays: state.restDaysAnswered ? state.fixedRestDays : null,
-      preferredLongRunDay: state.preferredLongRunDay || null,
-    },
-    goal: {
-      goalDistance: state.goalDistance,
-      goalStyle: state.goalStyle,
-      terrainFocus: state.terrainFocus,
-      targetTime: targetTime || null,
-      targetDate: targetDate || null,
-    },
-    execution: {
-      watchAccess: state.watchAccess,
-      guidancePreference: state.guidancePreference,
-    },
-    strength: {
-      preference: state.strengthPreference,
-    },
-    schedule: {
-      startDate: startDate || null,
-      targetDate: targetDate || null,
-    },
-    comment: comment || null,
-  };
-}
-
-export function buildPlanPresetCardInputKey(input: PlanGoalShortcutDiscoveryInput) {
-  return JSON.stringify(input);
-}
 
 export function buildRunningPlanPreviewInput(
   state: StructuredConstructorState,
@@ -194,7 +85,6 @@ export function buildRunningPlanPreviewInput(
       heightCm: heightCm.value,
       weightKg: weightKg.value,
       runnerLevel: mapRunnerLevelToPlanEngine(state.fitnessLevel),
-      distanceFamily: distanceFamilyForGoalSelection(state, goalSelection),
       daysPerWeek,
       fixedRestDays: state.restDaysAnswered ? state.fixedRestDays : null,
       preferredLongRunDay: state.preferredLongRunDay || null,
@@ -403,33 +293,6 @@ function buildRunningPlanBenchmarkInput(state: StructuredConstructorState):
       kind: "unknown",
     },
   };
-}
-
-function distanceFamilyForGoalSelection(
-  state: StructuredConstructorState,
-  goalSelection: PlanGoalSelectionId,
-): RunningPlanDistanceFamily {
-  switch (goalSelection) {
-    case "10k":
-      return "10K";
-    case "half_marathon":
-      return "Half Marathon";
-    case "marathon":
-      return "Marathon Completion";
-    case "custom": {
-      const distanceKm = parsePlanGoalCustomDistanceKm(state.planGoalCustomDistanceKm);
-
-      if (distanceKm == null || distanceKm <= 10) {
-        return "10K";
-      }
-
-      if (distanceKm <= 21.1) {
-        return "Half Marathon";
-      }
-
-      return "Marathon Completion";
-    }
-  }
 }
 
 function buildSelectedPlanGoalIntentInput(

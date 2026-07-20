@@ -10,7 +10,7 @@ Designer
 
 ## Last Updated
 
-2026-07-09
+2026-07-19
 
 ## Type
 
@@ -54,15 +54,17 @@ Hito has one shared inline text interaction pattern:
 - `InlineEditableText` is for true editable contexts, currently the manual workout constructor title
   and future surfaces only when their owner already supports the edit.
 - `InlineReadOnlyText` is for generated, imported, provider, proof, or other backend-owned truth that
-  must not imply runner mutation.
-- Generated workout preview/detail/readback remains read-only.
+  must not imply inline mutation.
+- Generated workout preview/detail/readback remains non-inline-editable. A confirmed non-rest workout
+  on today or a future date still has the separate reviewed content-edit action defined in
+  `docs/current-product.md`, regardless of source, logs, completion, or evidence.
 - `/hitoDS/patterns#inline-editable-text` is the reference specimen for direct edit, read-only text,
   and the local-only inspector task-target example.
 
 The root-cause boundary is unchanged: Frontend owns the shared interaction primitive and Hito DS
 specimen; Backend/Admin Capture would own any future persisted work-item creation. This spec does
-not authorize generated workout editing, fake persistence, schema changes, or production-visible
-inspector tooling.
+not authorize inline mutation of passive readback, fake persistence, schema changes, or
+production-visible inspector tooling.
 
 ## Local Inspector Supersession
 
@@ -87,15 +89,16 @@ FRONTEND implemented and QA accepted the v1 pattern on 2026-07-07:
 
 - the route-local `editable-heading` pilot was replaced by shared Hito DS primitives;
 - manual workout constructor title now uses the shared editable primitive;
-- generated workout preview/detail/readback stays read-only;
+- generated workout preview/detail/readback stays non-inline-editable while today/future confirmed
+  rows retain a separate reviewed edit action;
 - the DS reference page documents the pattern and local-only inspector example;
 - no fake Admin Capture rows, backend schema, Supabase persistence, or live product mutation were
   added.
 
 ## Preserved Boundaries
 
-- Do not add edit affordances to generated workout readback unless backend capability metadata later
-  accepts that product behavior.
+- Do not turn generated workout readback text into inline controls; use the separate reviewed edit
+  action defined by `docs/current-product.md`.
 - Do not treat the local inspector as an issue tracker, backlog writer, or Admin Work Items client.
 - Do not add product runtime persistence from this frontend pattern.
 - Do not fork a second local inline editor family.
@@ -103,37 +106,5 @@ FRONTEND implemented and QA accepted the v1 pattern on 2026-07-07:
 
 ## Exact Handoff Prompt
 
-```text
-ROLE: FRONTEND
-
-Task:
-Use the accepted shared Hito inline editable/read-only text primitive for any future inline text UI,
-and keep local inspector task targeting local-only unless Product/Backend explicitly selects a
-persisted Admin Capture slice.
-
-Stage:
-FRONTEND implementation guardrail / Hito DS inline text pattern reuse.
-
-Context:
-The inline editable text pattern is implemented and QA accepted. `InlineEditableText` is for true
-editable contexts such as the manual workout constructor title. `InlineReadOnlyText` is for
-generated/read-only truth. The local inspector is now a local-only DS audit and prompt-generation
-tool, not a backlog persistence tool.
-
-Rules:
-- Reuse `src/components/ui/inline-editable-text.tsx` before adding route-local inline text editors.
-- Keep generated workout preview/detail/readback read-only unless backend capability metadata
-  explicitly accepts content editing.
-- Do not add backend/Admin/Supabase/Work Items persistence from the local inspector.
-- Do not resurrect `Send to backlog`, `Save to backlog`, or `Quick bugs` as current inspector UI.
-- Document any new reusable pattern on `/hitoDS` in the same slice.
-
-Validation:
-- Run targeted lint/build checks for touched UI files.
-- Use browser QA when a runner-facing or `/hitoDS` visible surface changes.
-- Run scoped `git diff --check`.
-
-Stop conditions:
-- Stop if a requested change needs persisted Admin Capture task creation, generated workout editing,
-  backend schema changes, or production-visible inspector tooling.
-```
+None. The pattern is implemented; future consumers should read this contract and
+`docs/current-product.md` rather than reuse an old execution prompt.

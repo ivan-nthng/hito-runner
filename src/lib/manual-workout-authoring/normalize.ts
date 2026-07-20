@@ -20,6 +20,7 @@ import {
   type ManualWorkoutBlockInput,
   type ManualWorkoutCanonicalDraft,
   type ManualWorkoutConstructorEntryInput,
+  type ManualWorkoutDraftProcessingOptions,
   type ManualWorkoutRepeatGroupInput,
   type ManualWorkoutTargetTruthMode,
   type ParsedManualWorkoutDraftInput,
@@ -42,12 +43,13 @@ export function normalizeManualWorkoutDraft(input: {
   template: ManualWorkoutTemplate;
   targetTruthMode: ManualWorkoutTargetTruthMode;
   entries: ManualWorkoutConstructorEntryInput[];
+  targetOptions?: ManualWorkoutDraftProcessingOptions;
 }): NormalizedManualWorkoutDraftResult {
-  const { parsedInput, template, targetTruthMode, entries } = input;
+  const { parsedInput, template, targetTruthMode, entries, targetOptions = {} } = input;
   const steps =
     template.workoutType === "rest"
       ? []
-      : manualWorkoutDocumentSectionsFromEntries({ entries, targetTruthMode });
+      : manualWorkoutDocumentSectionsFromEntries({ entries, targetTruthMode, targetOptions });
   const metricMode = buildManualWorkoutMetricMode(template, targetTruthMode, steps);
   const richWorkout = resolveCanonicalWorkoutModel({
     workoutType: template.workoutType,
@@ -99,12 +101,16 @@ export function normalizeManualWorkoutDraft(input: {
 export function manualWorkoutDocumentSectionsFromEntries({
   entries,
   targetTruthMode,
+  targetOptions = {},
 }: {
   entries: ManualWorkoutConstructorEntryInput[];
   targetTruthMode: ManualWorkoutTargetTruthMode;
+  targetOptions?: ManualWorkoutDraftProcessingOptions;
 }): Step[] {
   return normalizeExecutableStepInstructions(
-    entries.flatMap((entryValue, index) => entryToSteps(entryValue, targetTruthMode, index + 1)),
+    entries.flatMap((entryValue, index) =>
+      entryToSteps(entryValue, targetTruthMode, index + 1, targetOptions),
+    ),
   );
 }
 
@@ -112,26 +118,28 @@ function entryToSteps(
   entryValue: ManualWorkoutConstructorEntryInput,
   targetTruthMode: ManualWorkoutTargetTruthMode,
   sequence: number,
+  targetOptions: ManualWorkoutDraftProcessingOptions,
 ): Step[] {
   if (entryValue.kind === "block") {
-    const step = blockToStep(entryValue.block, targetTruthMode, sequence);
+    const step = blockToStep(entryValue.block, targetTruthMode, sequence, targetOptions);
     return step ? [step] : [];
   }
 
-  return [repeatGroupToStep(entryValue.group, targetTruthMode, sequence)];
+  return [repeatGroupToStep(entryValue.group, targetTruthMode, sequence, targetOptions)];
 }
 
 function blockToStep(
   block: ManualWorkoutBlockInput,
   targetTruthMode: ManualWorkoutTargetTruthMode,
   sequence: number,
+  targetOptions: ManualWorkoutDraftProcessingOptions,
 ): Step | null {
   if (isManualWorkoutNoteOnlyBlock(block.blockKey)) {
     return null;
   }
 
   const prescription = blockToUnitPrescription(block);
-  const target = buildTarget(block, targetTruthMode, defaultGuidanceForBlock(block));
+  const target = buildTarget(block, targetTruthMode, defaultGuidanceForBlock(block), targetOptions);
 
   return {
     type: stepTypeForBlock(block.blockKey),
@@ -151,11 +159,17 @@ function repeatGroupToStep(
   group: ManualWorkoutRepeatGroupInput,
   targetTruthMode: ManualWorkoutTargetTruthMode,
   sequence: number,
+  targetOptions: ManualWorkoutDraftProcessingOptions,
 ): Step {
   const children: StepRepeatChildPrescription[] = getManualWorkoutRepeatGroupChildren(group).map(
     (block, childIndex) => {
       const prescription = blockToUnitPrescription(block);
-      const target = buildTarget(block, targetTruthMode, defaultGuidanceForBlock(block));
+      const target = buildTarget(
+        block,
+        targetTruthMode,
+        defaultGuidanceForBlock(block),
+        targetOptions,
+      );
 
       return {
         role: repeatRoleForBlock(block.blockKey),
@@ -268,8 +282,9 @@ function buildTarget(
   block: ManualWorkoutBlockInput,
   targetTruthMode: ManualWorkoutTargetTruthMode,
   fallbackHint: string,
+  options: ManualWorkoutDraftProcessingOptions,
 ): StepTarget {
-  const resolved = resolveManualWorkoutTargetInput(block, targetTruthMode);
+  const resolved = resolveManualWorkoutTargetInput(block, targetTruthMode, options);
 
   if (!resolved.ok) {
     return { hint: fallbackHint };

@@ -8,6 +8,7 @@ import {
   openSync,
   readdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -53,6 +54,10 @@ const recoverableGeneratedConflictRoots = [
 ];
 const serveCommandLabel = "npm run serve:local";
 const staleBuildGraceMs = 1000;
+const transportLogMaxBytes = 5 * 1024 * 1024;
+const transportLogArchiveDir = resolve(logsDir, "transport-log-archive");
+const structuredEventsRoot = resolve(rootDir, "logs/local-runtime-observability");
+const providerMode = resolveProviderMode(process.argv.slice(3));
 
 const command = process.argv[2] ?? "status";
 
@@ -105,7 +110,11 @@ async function startCommand() {
   }
 
   const status = await resolveServerStatus();
-  if (status.healthy && status.serverStatus === "current") {
+  if (
+    status.healthy &&
+    status.serverStatus === "current" &&
+    status.state?.providerMode === providerMode
+  ) {
     persistState({
       launcherPid: status.state?.launcherPid ?? null,
       serverPid: status.serverPid,
@@ -116,13 +125,23 @@ async function startCommand() {
       port,
       buildFingerprint: currentBuild,
       runtimeRoot: finalizedOutputDir,
+      providerMode,
     });
     console.log(`[qa-local-server] Reusing current built QA server on ${healthUrl}`);
     printStatus(await resolveServerStatus());
     return;
   }
 
-  if (
+  if (status.serverPid && status.compatibleServer && status.state?.providerMode !== providerMode) {
+    console.log(
+      `[qa-local-server] Restarting ${status.state?.providerMode ?? "unknown"} provider runtime as ${providerMode}.`,
+    );
+    await stopServerPid({
+      launcherPid: status.state?.launcherPid ?? null,
+      serverPid: status.serverPid,
+      removeState: true,
+    });
+  } else if (
     status.serverPid &&
     ["stale", "unsafe_bind"].includes(status.serverStatus) &&
     status.compatibleServer
@@ -141,6 +160,7 @@ async function startCommand() {
     );
   }
 
+  rotateTransportLogIfOversized();
   const launcher = spawn("npm", ["run", "serve:local"], {
     cwd: rootDir,
     detached: true,
@@ -151,6 +171,16 @@ async function startCommand() {
       NITRO_HOST: host,
       PORT: String(port),
       NITRO_PORT: String(port),
+      HITO_AI_GENERATED_PLAN_PROVIDER_MODE: providerMode,
+      HITO_AI_GENERATED_PLAN_DEV_FIXTURE: providerMode === "qa_fixture" ? "true" : "false",
+      HITO_AI_GENERATED_PLAN_DEV_FIXTURE_DELAY_MS:
+        providerMode === "qa_fixture"
+          ? (process.env.HITO_AI_GENERATED_PLAN_DEV_FIXTURE_DELAY_MS ?? "")
+          : "",
+      HITO_AI_GENERATED_PLAN_DEV_FIXTURE_SCENARIO:
+        providerMode === "qa_fixture"
+          ? (process.env.HITO_AI_GENERATED_PLAN_DEV_FIXTURE_SCENARIO ?? "")
+          : "",
     },
   });
 
@@ -167,6 +197,7 @@ async function startCommand() {
     port,
     buildFingerprint: currentBuild,
     runtimeRoot: finalizedOutputDir,
+    providerMode,
   });
 
   console.log(`[qa-local-server] Started canonical built QA server on ${healthUrl}`);
@@ -573,6 +604,10 @@ function readState() {
           ? parsed.buildFingerprint
           : null,
       runtimeRoot: typeof parsed.runtimeRoot === "string" ? parsed.runtimeRoot : null,
+      providerMode:
+        parsed.providerMode === "qa_fixture" || parsed.providerMode === "real"
+          ? parsed.providerMode
+          : null,
     };
   } catch {
     return null;
@@ -619,6 +654,16 @@ function ensureLogsDir() {
   closeSync(fd);
 }
 
+function rotateTransportLogIfOversized() {
+  if (!existsSync(logPath) || statSync(logPath).size < transportLogMaxBytes) {
+    return;
+  }
+
+  mkdirSync(transportLogArchiveDir, { recursive: true });
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  renameSync(logPath, resolve(transportLogArchiveDir, `qa-local-server-${timestamp}.log`));
+}
+
 function printStatus(status) {
   const lines = [
     `[qa-local-server] ${status.serverStatus}`,
@@ -631,6 +676,9 @@ function printStatus(status) {
     `build: ${status.buildStatus}`,
     `runtime: ${finalizedOutputDir}`,
     `log: ${logPath}`,
+    `events: ${structuredEventsRoot}`,
+    `providerMode: ${status.state?.providerMode ?? "unknown"}`,
+    "query: npm run local:logs -- --limit 50",
   ];
 
   if (status.buildIntegrity?.error) {
@@ -645,12 +693,12 @@ function printStatus(status) {
 }
 
 function printHelp() {
-  console.log(`Usage: node ./scripts/qa-local-server.mjs <status|start|restart|stop>
+  console.log(`Usage: node ./scripts/qa-local-server.mjs <status|start|restart|stop> [--provider-mode <real|qa_fixture>]
 
 Commands:
   status   Show whether the canonical built QA server is running on ${healthUrl}
-  start    Reuse the current built server, or start npm run serve:local in the background
-  restart  Stop the canonical built server and start it again
+  start    Reuse or start the built server (provider mode defaults to real)
+  restart  Stop and start the built server in the requested provider mode
   stop     Stop only the managed/compatible built QA server
 
 Local state:
@@ -667,4 +715,15 @@ function delay(ms) {
 
 function formatError(error) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function resolveProviderMode(args) {
+  const index = args.indexOf("--provider-mode");
+  const value = index >= 0 ? args[index + 1] : "real";
+
+  if (value !== "real" && value !== "qa_fixture") {
+    throw new Error("--provider-mode must be real or qa_fixture.");
+  }
+
+  return value;
 }

@@ -10,7 +10,7 @@ Designer
 
 ## Last Updated
 
-2026-07-07
+2026-07-19
 
 ## Type
 
@@ -45,7 +45,7 @@ Implemented and QA-accepted on 2026-07-07 as:
 - shared generated-plan workout-document readback for preview/detail;
 - compact structure strip, semantic stripes, child rows, and secondary notes/cues;
 - proof/debug copy demoted out of normal runner-facing hierarchy;
-- generated rows kept read-only;
+- generated preview and passive row text kept non-inline-editable;
 - safe editable heading validated only in editable manual constructor context;
 - Today generated-row lifecycle CTA still opens completion;
 - desktop and exact 375px overflow, console/pageerror/bad HTTP, and disposable cleanup proof passed.
@@ -53,6 +53,10 @@ Implemented and QA-accepted on 2026-07-07 as:
 This spec is now historical implementation guidance plus accepted product/DS boundary. The next
 design gap is the broader Hito inline editable text/editor pattern, not another generated-plan
 readback polish pass.
+
+Current editability clarification: a confirmed generated non-rest workout on today or a future date
+has the same separate reviewed edit action as every other confirmed workout. Source, logs,
+completion, or evidence do not make its passive text inline-editable and do not deny that action.
 
 ## Root-Cause Check
 
@@ -181,8 +185,8 @@ This batch implemented:
 - Add the Hito DS `editable heading/value` pattern only where a heading or label is truly editable.
 - Keep manual constructor Add block/insertion behavior aligned with the user reference only in
   editable manual contexts.
-- Keep generated-plan preview and generated saved detail read-only unless current backend capability
-  metadata explicitly allows editing that source row.
+- Keep generated-plan preview and saved-detail text non-inline-editable; confirmed non-rest
+  today/future rows still expose the separate reviewed edit action.
 
 This is not a full onboarding redesign, not a generation semantics change, and not provider/FIT
 work.
@@ -581,7 +585,9 @@ Mobile 375px:
 
 ## Resolved Implementation Questions
 
-- Generated selected-plan rows remain read-only in the accepted UI proof.
+- Generated selected-plan row text remained non-inline-editable in the accepted UI proof; the
+  canonical current product contract separately grants today/future confirmed rows a reviewed edit
+  action.
 - Frontend introduced shared workout-document readback presentation for generated preview/detail.
 - The safe editable-heading pilot was validated only in editable manual constructor context. A broader
   Hito inline editable text/editor design-system contract remains the next design gate.

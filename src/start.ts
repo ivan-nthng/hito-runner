@@ -7,6 +7,45 @@ import { resolveLocalAuthSession } from "@/lib/local-auth";
 import { resolveRuntimeAppBaseUrl } from "@/lib/supabase/env";
 import { createRequestSupabaseClient, mergeResponseHeaders } from "@/lib/supabase/server";
 import { hasSupabaseBrowserEnv } from "@/lib/supabase/env";
+import {
+  createLocalRuntimeRequestContext,
+  recordLocalRuntimeActionFailure,
+  recordLocalRuntimeActionOutcome,
+  recordLocalRuntimeRequestFailure,
+  recordLocalRuntimeRequestOutcome,
+} from "@/lib/local-runtime-observability";
+
+const localRuntimeObservabilityMiddleware = createMiddleware().server(
+  async ({ next, pathname, request, serverFnMeta }) => {
+    const startedAtMs = Date.now();
+    const localRuntimeObservability = createLocalRuntimeRequestContext({
+      request,
+      pathname,
+      serverFunctionId: serverFnMeta?.id ?? null,
+    });
+
+    try {
+      const result = await next({
+        context: {
+          localRuntimeObservability,
+        },
+      });
+      await recordLocalRuntimeRequestOutcome({
+        context: localRuntimeObservability,
+        response: result.response,
+        startedAtMs,
+      }).catch(() => undefined);
+      return result;
+    } catch (error) {
+      await recordLocalRuntimeRequestFailure({
+        context: localRuntimeObservability,
+        startedAtMs,
+        error,
+      }).catch(() => undefined);
+      throw error;
+    }
+  },
+);
 
 const authMiddleware = createMiddleware().server(
   async ({ next, pathname, request, serverFnMeta }) => {
@@ -99,6 +138,32 @@ const authMiddleware = createMiddleware().server(
   },
 );
 
+const localRuntimeActionObservabilityMiddleware = createMiddleware({
+  type: "function",
+}).server(async ({ next, method, serverFnMeta }) => {
+  const startedAtMs = Date.now();
+
+  try {
+    const result = await next();
+    await recordLocalRuntimeActionOutcome({
+      result: (result as unknown as { result?: unknown }).result,
+      method,
+      serverFunctionId: serverFnMeta.id,
+      startedAtMs,
+    }).catch(() => undefined);
+    return result;
+  } catch (error) {
+    await recordLocalRuntimeActionFailure({
+      method,
+      serverFunctionId: serverFnMeta.id,
+      startedAtMs,
+      error,
+    }).catch(() => undefined);
+    throw error;
+  }
+});
+
 export const startInstance = createStart(() => ({
-  requestMiddleware: [authMiddleware],
+  requestMiddleware: [localRuntimeObservabilityMiddleware, authMiddleware],
+  functionMiddleware: [localRuntimeActionObservabilityMiddleware],
 }));

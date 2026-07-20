@@ -1,7 +1,7 @@
 # Hito Technical Log
 
 Status: active internal ledger
-Last Updated: 2026-07-18
+Last Updated: 2026-07-19
 Owner: PRODUCT
 
 ## Purpose And Source Boundary
@@ -30,8 +30,28 @@ Entry format:
 Every accepted implementation, QA acceptance gate, source-cleanup batch, or durable process repair
 must either add an entry here or explicitly state why it is not technical-log material.
 
+## 2026-07-19
+
+- BACKEND / plan-first provider representation closure — replaced the non-isomorphic weekly
+  provider draft with one compact flat workout/endpoint grammar shared by prompt, strict schema,
+  parser, compiler, signed review, active-plan export, and readback; removed provider-authored
+  generic plan narrative, Repeat-parent executable truth, ambiguous identities, and backend
+  semantic repair/relabeling. Evidence:
+  `src/lib/ai-authored-plan-first-provider-contract.ts`,
+  `src/lib/ai-authored-plan-first-compiler.ts`, and
+  `scripts/plan-first-provider-representation-proof.ts`. Boundary: no live OpenAI call, Supabase
+  mutation, frontend change, fallback planner, or partial-plan acceptance.
+
 ## 2026-07-18
 
+- FRONTEND / Hito DS reference-truth closure — replaced copied Avatar, editable-chip, and admin
+  table anatomy with real shared owners; added live native-select, metadata-tag, and editable-select
+  specimens; completed the loading/empty/success/error reference matrix; and reconciled the workout
+  appendix to 32 of 32 canonical identities with compile-time and module-load parity guards.
+  Evidence:
+  `qa-artifacts/screenshots/2026-07-18/hito-ds-reference-truth-closure/proof.json`.
+  Boundary: no product runtime contract, token, theme, workout taxonomy, backend, persistence,
+  provider, calendar, or manual-editor behavior changed.
 - BACKEND / unreachable delete-plan capability retirement — removed the no-consumer
   `deleteActivePlan` server function, its delete-only helper, and result contract while retaining
   confirmed `Clear upcoming schedule`, its internal archive operation, and preserved plan history.

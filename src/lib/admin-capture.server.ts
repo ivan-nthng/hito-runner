@@ -11,13 +11,11 @@ import {
   type AdminCaptureItemView,
   type AdminCaptureListInput,
   type AdminCaptureNoteAppendInput,
-  type AdminCaptureNoteUpdateInput,
   type AdminCapturePriority,
   type AdminCaptureResult,
   type AdminCaptureStatus,
   type AdminCaptureTargetRole,
   type AdminCaptureTriageUpdateInput,
-  type AdminDebugCaptureCapabilityView,
 } from "@/lib/admin-capture";
 import type { AdminAccessContext, AdminAccessResult } from "@/lib/admin-access.server";
 import { requireAdminAccessForCurrentRequest } from "@/lib/admin-access.server";
@@ -70,45 +68,10 @@ export interface AdminCaptureDependencies {
   now?: () => Date;
 }
 
-export async function getAdminCaptureAvailabilityForCurrentRequest(): Promise<
-  AdminCaptureResult<{ enabled: true }>
-> {
-  const dependencies = await buildCurrentDependencies();
-  const adminAccess = await dependencies.adminAccess();
-
-  if (!adminAccess.ok) {
-    return failure(adminAccess.reason, adminAccess.message);
-  }
-
-  if (!dependencies.repository) {
-    return failure(
-      "supabase_admin_unavailable",
-      "Supabase admin access is required before capture backlog can load.",
-    );
-  }
-
-  return {
-    ok: true,
-    enabled: true,
-  };
-}
-
-export async function getAdminDebugCaptureCapabilityForCurrentRequest(): Promise<
-  AdminCaptureResult<{ probe: AdminDebugCaptureCapabilityView }>
-> {
-  return getAdminDebugCaptureCapabilityForDependencies(await buildCurrentDependencies());
-}
-
 export async function listAdminCaptureBacklogForCurrentRequest(
   input: AdminCaptureListInput,
 ): Promise<AdminCaptureResult<{ view: AdminCaptureBacklogView }>> {
   return listAdminCaptureBacklogForDependencies(await buildCurrentDependencies(), input);
-}
-
-export async function getAdminCaptureItemForCurrentRequest(
-  input: AdminCaptureItemIdInput,
-): Promise<AdminCaptureResult<{ item: AdminCaptureItemView }>> {
-  return getAdminCaptureItemForDependencies(await buildCurrentDependencies(), input);
 }
 
 export async function createAdminCaptureItemForCurrentRequest(
@@ -121,12 +84,6 @@ export async function updateAdminCaptureItemTriageForCurrentRequest(
   input: AdminCaptureTriageUpdateInput,
 ): Promise<AdminCaptureResult<{ item: AdminCaptureItemView }>> {
   return updateAdminCaptureItemTriageForDependencies(await buildCurrentDependencies(), input);
-}
-
-export async function updateAdminCaptureItemNoteForCurrentRequest(
-  input: AdminCaptureNoteUpdateInput,
-): Promise<AdminCaptureResult<{ item: AdminCaptureItemView }>> {
-  return updateAdminCaptureItemNoteForDependencies(await buildCurrentDependencies(), input);
 }
 
 export async function appendAdminCaptureItemNoteForCurrentRequest(
@@ -145,41 +102,6 @@ export async function getAdminCaptureCopyPromptForCurrentRequest(
   input: AdminCaptureItemIdInput,
 ): Promise<AdminCaptureResult<{ prompt: AdminCaptureCopyPromptView }>> {
   return getAdminCaptureCopyPromptForDependencies(await buildCurrentDependencies(), input);
-}
-
-export async function getAdminDebugCaptureCapabilityForDependencies(
-  dependencies: AdminCaptureDependencies,
-): Promise<AdminCaptureResult<{ probe: AdminDebugCaptureCapabilityView }>> {
-  const accessResult = await requireCaptureAdmin(dependencies);
-
-  if (!accessResult.ok) {
-    return accessResult;
-  }
-
-  return {
-    ok: true,
-    probe: {
-      generatedAt: dependencies.now?.().toISOString() ?? new Date().toISOString(),
-      capability: "admin_debug_capture",
-      enabled: true,
-      capabilities: {
-        adminCapture: accessResult.admin.capabilities.adminCapture,
-        adminDebugCapture: accessResult.admin.capabilities.adminDebugCapture,
-      },
-      authority: {
-        owner: "admin",
-        provider: accessResult.admin.provider,
-        sessionSource: accessResult.admin.sessionSource,
-        runtimeClass: accessResult.admin.runtimeClass,
-      },
-      identityBoundary: {
-        runnerAuthIgnored: true,
-        testerAuthIgnored: true,
-        productEntitlementsIgnored: true,
-        productRouteStateIgnored: true,
-      },
-    },
-  };
 }
 
 export async function listAdminCaptureBacklogForDependencies(
@@ -381,26 +303,58 @@ export async function updateAdminCaptureItemTriageForDependencies(
   }
 }
 
-export async function updateAdminCaptureItemNoteForDependencies(
-  dependencies: AdminCaptureDependencies,
-  input: AdminCaptureNoteUpdateInput,
-): Promise<AdminCaptureResult<{ item: AdminCaptureItemView }>> {
-  return mutateAdminCaptureNote(dependencies, {
-    id: input.id,
-    note: input.note,
-    mode: "update",
-  });
-}
-
 export async function appendAdminCaptureItemNoteForDependencies(
   dependencies: AdminCaptureDependencies,
   input: AdminCaptureNoteAppendInput,
 ): Promise<AdminCaptureResult<{ item: AdminCaptureItemView }>> {
-  return mutateAdminCaptureNote(dependencies, {
-    id: input.id,
-    note: input.note,
-    mode: "append",
-  });
+  const accessResult = await requireCaptureAdmin(dependencies);
+
+  if (!accessResult.ok) {
+    return accessResult;
+  }
+
+  if (!dependencies.repository) {
+    return failure(
+      "supabase_admin_unavailable",
+      "Supabase admin access is required before capture backlog can update.",
+    );
+  }
+
+  try {
+    const existing = await dependencies.repository.getItem(input.id);
+
+    if (!existing) {
+      return failure("capture_not_found", "Capture item was not found.");
+    }
+
+    if (isRepoDerivedRow(existing)) {
+      return repoDerivedReadOnlyFailure();
+    }
+
+    const now = dependencies.now?.() ?? new Date();
+    const note = `${existing.note}\n\n${input.note}`.trim().slice(0, 4000);
+    const metadata = buildMetadataWithNoteHistory(existing.metadata, {
+      action: "append_note",
+      admin: accessResult.admin,
+      at: now,
+      note: input.note,
+    });
+    const row = await dependencies.repository.updateItem(input.id, {
+      note,
+      metadata,
+    });
+
+    if (!row) {
+      return failure("capture_not_found", "Capture item was not found.");
+    }
+
+    return {
+      ok: true,
+      item: mapItemView(row),
+    };
+  } catch {
+    return failure("capture_update_failed", "Capture item note could not be updated.");
+  }
 }
 
 export async function getAdminCaptureCopyPromptForDependencies(
@@ -555,67 +509,6 @@ export function buildAdminCaptureCopyPrompt(
     prompt,
     contextSummary,
   };
-}
-
-async function mutateAdminCaptureNote(
-  dependencies: AdminCaptureDependencies,
-  input: {
-    id: string;
-    note: string;
-    mode: "append" | "update";
-  },
-): Promise<AdminCaptureResult<{ item: AdminCaptureItemView }>> {
-  const accessResult = await requireCaptureAdmin(dependencies);
-
-  if (!accessResult.ok) {
-    return accessResult;
-  }
-
-  if (!dependencies.repository) {
-    return failure(
-      "supabase_admin_unavailable",
-      "Supabase admin access is required before capture backlog can update.",
-    );
-  }
-
-  try {
-    const existing = await dependencies.repository.getItem(input.id);
-
-    if (!existing) {
-      return failure("capture_not_found", "Capture item was not found.");
-    }
-
-    if (isRepoDerivedRow(existing)) {
-      return repoDerivedReadOnlyFailure();
-    }
-
-    const now = dependencies.now?.() ?? new Date();
-    const note =
-      input.mode === "append"
-        ? `${existing.note}\n\n${input.note}`.trim().slice(0, 4000)
-        : input.note;
-    const metadata = buildMetadataWithNoteHistory(existing.metadata, {
-      action: input.mode === "append" ? "append_note" : "update_note",
-      admin: accessResult.admin,
-      at: now,
-      note: input.note,
-    });
-    const row = await dependencies.repository.updateItem(input.id, {
-      note,
-      metadata,
-    });
-
-    if (!row) {
-      return failure("capture_not_found", "Capture item was not found.");
-    }
-
-    return {
-      ok: true,
-      item: mapItemView(row),
-    };
-  } catch {
-    return failure("capture_update_failed", "Capture item note could not be updated.");
-  }
 }
 
 async function buildCurrentDependencies(): Promise<AdminCaptureDependencies> {

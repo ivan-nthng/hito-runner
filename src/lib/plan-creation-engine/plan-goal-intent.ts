@@ -47,13 +47,6 @@ export type PlanGoalIntentOutcomePaceSource =
   | "derived_from_finish_time"
   | "runner_entered_outcome_pace";
 
-export type PlanGoalIntentFeasibilityStatus =
-  | "supported"
-  | "supported_with_assumptions"
-  | "aggressive_or_short_horizon"
-  | "impossible_goal"
-  | "unsupported_for_current_builder";
-
 export const normalizedPlanGoalIntentSchema = z
   .object({
     contractVersion: z.literal(PLAN_GOAL_INTENT_CONTRACT_VERSION),
@@ -105,19 +98,6 @@ export const normalizedPlanGoalIntentSchema = z
       })
       .strict(),
     omitted: z.array(z.enum(["distance", "targetDate", "targetFinishTime", "targetOutcomePace"])),
-    feasibility: z
-      .object({
-        status: z.enum([
-          "supported",
-          "supported_with_assumptions",
-          "aggressive_or_short_horizon",
-          "impossible_goal",
-          "unsupported_for_current_builder",
-        ]),
-        reasons: z.array(z.string().trim().min(1)),
-        horizonDays: z.number().int().nullable(),
-      })
-      .strict(),
     assumptions: z.array(z.string().trim().min(1)),
     metricTruthPolicy: z
       .object({
@@ -138,7 +118,6 @@ export type NormalizePlanGoalIntentResult =
 export function normalizePlanGoalIntent(input: {
   rawIntent?: PlanGoalIntentInput | null | undefined;
   startDate?: string | null;
-  horizonWeeks?: number | null;
 }): NormalizePlanGoalIntentResult {
   const parsed = planGoalIntentInputSchema.safeParse(input.rawIntent ?? {});
 
@@ -152,10 +131,25 @@ export function normalizePlanGoalIntent(input: {
 
   const raw = parsed.data;
   const distance = normalizeDistance(raw.distance ?? null);
+  const startDate = input.startDate?.trim() || null;
   const targetDate = normalizeOptionalDate(raw.targetDate ?? null);
 
   if (targetDate && !targetDate.ok) {
     return targetDate;
+  }
+  if (startDate && !isRealIsoDate(startDate)) {
+    return {
+      ok: false,
+      reason: "invalid_plan_goal_intent",
+      message: "Plan start date must be a real YYYY-MM-DD date.",
+    };
+  }
+  if (startDate && targetDate?.value && diffDaysIso(targetDate.value, startDate) <= 0) {
+    return {
+      ok: false,
+      reason: "invalid_plan_goal_intent",
+      message: "Target date must be after the plan start date.",
+    };
   }
 
   const targetFinishTime = normalizeTargetFinishTime(raw.targetFinishTime ?? null);
@@ -179,11 +173,6 @@ export function normalizePlanGoalIntent(input: {
         }
       : null;
   const targetOutcomePace = runnerOutcomePace?.value ?? derivedOutcomePace;
-  const horizonDays = resolveHorizonDays({
-    startDate: input.startDate ?? null,
-    targetDate: targetDate?.value ?? null,
-    horizonWeeks: input.horizonWeeks ?? null,
-  });
   const supplied = {
     distance: Boolean(raw.distance),
     targetDate: Boolean(targetDate?.value),
@@ -193,16 +182,6 @@ export function normalizePlanGoalIntent(input: {
   const omitted = (
     ["distance", "targetDate", "targetFinishTime", "targetOutcomePace"] as const
   ).filter((field) => !supplied[field]);
-  const feasibility = resolveFeasibility({
-    distance,
-    horizonDays,
-    supplied,
-    targetOutcomePace,
-  });
-  const assumptions = buildPlanGoalIntentAssumptions({
-    feasibilityReasons: feasibility.reasons,
-    targetOutcomePace,
-  });
 
   return {
     ok: true,
@@ -216,8 +195,7 @@ export function normalizePlanGoalIntent(input: {
       derivedOutcomePace,
       supplied,
       omitted,
-      feasibility,
-      assumptions,
+      assumptions: [],
       metricTruthPolicy: {
         outcomePaceIsExecutableWorkoutTarget: false,
         segmentPaceTargetsAllowedFromGoal: false,
@@ -225,37 +203,6 @@ export function normalizePlanGoalIntent(input: {
       },
     }),
   };
-}
-
-export function buildStructuredPlanGoalIntentInput(input: {
-  goal: {
-    goalType: string;
-    targetTime?: string | null;
-  };
-  schedule: {
-    targetDate?: string | null;
-  };
-}): PlanGoalIntentInput {
-  return {
-    distance: distanceInputForStructuredGoalType(input.goal.goalType),
-    targetFinishTime: input.goal.targetTime ?? null,
-    targetDate: input.schedule.targetDate ?? null,
-  };
-}
-
-function distanceInputForStructuredGoalType(goalType: string): PlanGoalIntentInput["distance"] {
-  switch (goalType) {
-    case "5k":
-      return { kind: "custom", distanceKm: 5, label: "5K" };
-    case "10k":
-      return { kind: "preset", preset: "10K" };
-    case "half_marathon":
-      return { kind: "preset", preset: "Half Marathon" };
-    case "marathon":
-      return { kind: "preset", preset: "Marathon" };
-    default:
-      return null;
-  }
 }
 
 function normalizeDistance(
@@ -323,11 +270,11 @@ function normalizeTargetFinishTime(
 
   const seconds = parseDurationSeconds(trimmed);
 
-  if (seconds == null || seconds < 5 * 60 || seconds > 48 * 60 * 60) {
+  if (seconds == null || seconds <= 0) {
     return {
       ok: false,
       reason: "invalid_plan_goal_intent",
-      message: "Target finish time must be between 5:00 and 48:00:00.",
+      message: "Target finish time must be a positive duration.",
     };
   }
 
@@ -353,11 +300,11 @@ function normalizeRunnerOutcomePace(
 
   const secondsPerKm = parsePaceSecondsPerKm(trimmed);
 
-  if (secondsPerKm == null || secondsPerKm < 2 * 60 || secondsPerKm > 25 * 60) {
+  if (secondsPerKm == null || secondsPerKm <= 0) {
     return {
       ok: false,
       reason: "invalid_plan_goal_intent",
-      message: "Target outcome pace must be between 2:00/km and 25:00/km.",
+      message: "Target outcome pace must be a positive pace per kilometer.",
     };
   }
 
@@ -369,88 +316,6 @@ function normalizeRunnerOutcomePace(
       source: "runner_entered_outcome_pace",
     },
   };
-}
-
-function resolveHorizonDays(input: {
-  startDate: string | null;
-  targetDate: string | null;
-  horizonWeeks: number | null;
-}) {
-  if (input.startDate && input.targetDate) {
-    return diffDaysIso(input.targetDate, input.startDate) + 1;
-  }
-
-  if (typeof input.horizonWeeks === "number" && Number.isFinite(input.horizonWeeks)) {
-    return Math.max(1, Math.round(input.horizonWeeks * 7));
-  }
-
-  return null;
-}
-
-function resolveFeasibility(input: {
-  distance: NormalizedPlanGoalIntent["distance"];
-  horizonDays: number | null;
-  supplied: NormalizedPlanGoalIntent["supplied"];
-  targetOutcomePace: NormalizedPlanGoalIntent["targetOutcomePace"];
-}): NormalizedPlanGoalIntent["feasibility"] {
-  const reasons: string[] = [];
-  let status: PlanGoalIntentFeasibilityStatus = "supported";
-
-  if (input.horizonDays != null && input.horizonDays <= 0) {
-    status = "impossible_goal";
-    reasons.push("Target date must be after the plan start date.");
-  }
-
-  if (
-    status !== "impossible_goal" &&
-    input.horizonDays != null &&
-    input.distance?.distanceMeters != null &&
-    input.distance.distanceMeters >= 42_195 &&
-    input.horizonDays < 14
-  ) {
-    status = "impossible_goal";
-    reasons.push("A marathon in less than two weeks is not enough time to prepare safely.");
-  }
-
-  if (input.horizonDays != null && input.horizonDays < 28) {
-    status = maxFeasibility(status, "aggressive_or_short_horizon");
-    reasons.push("Target date creates a short horizon; backend keeps plan load conservative.");
-  }
-
-  if (input.targetOutcomePace && input.targetOutcomePace.secondsPerKm < 180) {
-    status = maxFeasibility(status, "aggressive_or_short_horizon");
-    reasons.push(
-      "Target outcome pace is very aggressive and not promiseable; it is stored as intent, not executable workout pace.",
-    );
-  }
-
-  if (reasons.length === 0) {
-    reasons.push("Goal intent is representable by the current backend plan-intent contract.");
-  }
-
-  return {
-    status,
-    reasons,
-    horizonDays: input.horizonDays,
-  };
-}
-
-function buildPlanGoalIntentAssumptions(input: {
-  feasibilityReasons: readonly string[];
-  targetOutcomePace: NormalizedPlanGoalIntent["targetOutcomePace"];
-}) {
-  const assumptions = [
-    "Plan goal intent is review/readback context and does not create executable workout pace or HR targets.",
-    ...input.feasibilityReasons,
-  ];
-
-  if (input.targetOutcomePace) {
-    assumptions.push(
-      "Outcome pace may summarize the desired result, but workout segment pace still requires benchmark-backed or user-entered target truth.",
-    );
-  }
-
-  return Array.from(new Set(assumptions));
 }
 
 function presetDistance(preset: PlanGoalIntentPresetDistance) {
@@ -486,19 +351,4 @@ function formatPaceSecondsPerKm(secondsPerKm: number) {
 
 function pad2(value: number) {
   return value.toString().padStart(2, "0");
-}
-
-function maxFeasibility(
-  current: PlanGoalIntentFeasibilityStatus,
-  next: PlanGoalIntentFeasibilityStatus,
-): PlanGoalIntentFeasibilityStatus {
-  const order: PlanGoalIntentFeasibilityStatus[] = [
-    "supported",
-    "supported_with_assumptions",
-    "aggressive_or_short_horizon",
-    "unsupported_for_current_builder",
-    "impossible_goal",
-  ];
-
-  return order.indexOf(next) > order.indexOf(current) ? next : current;
 }

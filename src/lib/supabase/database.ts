@@ -350,6 +350,7 @@ export type Database = {
           first_name: string | null;
           goal_label: string;
           goal_type: Database["public"]["Enums"]["runner_goal_type"];
+          heart_rate_profile: Json | null;
           height_cm: number | null;
           last_name: string | null;
           setup_completed_at: string;
@@ -371,6 +372,7 @@ export type Database = {
           first_name?: string | null;
           goal_label: string;
           goal_type: Database["public"]["Enums"]["runner_goal_type"];
+          heart_rate_profile?: Json | null;
           height_cm?: number | null;
           last_name?: string | null;
           setup_completed_at?: string;
@@ -392,6 +394,7 @@ export type Database = {
           first_name?: string | null;
           goal_label?: string;
           goal_type?: Database["public"]["Enums"]["runner_goal_type"];
+          heart_rate_profile?: Json | null;
           height_cm?: number | null;
           last_name?: string | null;
           setup_completed_at?: string;

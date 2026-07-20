@@ -23,7 +23,11 @@ import {
 import { isManualWorkoutRepeatRecoveryBlock } from "@/lib/manual-workout-authoring/repeat-groups";
 import { getManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
 import { todayIso, type Step, type StepTarget } from "@/lib/training";
-import { readWorkoutDocumentSections, workoutDocumentRepeatChildren } from "@/lib/workout-document";
+import {
+  AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
+  readWorkoutDocumentSections,
+  workoutDocumentRepeatChildren,
+} from "@/lib/workout-document";
 
 const MANUAL_DRAFT_TITLE_MAX_LENGTH = 120;
 const MANUAL_DRAFT_NOTES_MAX_LENGTH = 1_000;
@@ -503,6 +507,8 @@ function sanitizeStepTarget(target: StepTarget | undefined): ManualWorkoutBlockI
 
   const isUserEnteredTarget =
     target.target_source === "user_entered" || target.target_source === "runner_entered";
+  const isAiAuthoredTarget = target.target_source === AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE;
+  const isEditableTarget = isUserEnteredTarget || isAiAuthoredTarget;
   const paceRange = normalizeManualDraftText(
     target.pace_min_per_km_range ?? target.pace_range_min_km,
     MANUAL_DRAFT_TARGET_TEXT_MAX_LENGTH,
@@ -513,8 +519,15 @@ function sanitizeStepTarget(target: StepTarget | undefined): ManualWorkoutBlockI
     MANUAL_DRAFT_TARGET_TEXT_MAX_LENGTH,
   );
   const hrBpmCap = normalizeHrBpmCap(target.hr_bpm_cap ?? target.hr_bpm);
+  const hrZone =
+    typeof target.extra?.hr_zone === "string"
+      ? normalizeManualDraftText(target.extra.hr_zone, MANUAL_DRAFT_TARGET_TEXT_MAX_LENGTH)
+      : null;
+  const targetSource = isAiAuthoredTarget
+    ? AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE
+    : "user_entered";
   const sanitized: ManualWorkoutBlockInput["target"] = {
-    ...(isUserEnteredTarget ? { targetSource: "user_entered" } : {}),
+    ...(isEditableTarget ? { targetSource } : {}),
     ...optionalStringField(
       "intensity",
       normalizeManualDraftText(target.intensity, MANUAL_DRAFT_TARGET_LABEL_MAX_LENGTH),
@@ -536,8 +549,25 @@ function sanitizeStepTarget(target: StepTarget | undefined): ManualWorkoutBlockI
       normalizeManualDraftText(target.hint, MANUAL_DRAFT_TARGET_TEXT_MAX_LENGTH),
     ),
     ...(normalizeManualDraftRpe(target.rpe) ? { rpe: normalizeManualDraftRpe(target.rpe) } : {}),
-    ...(isUserEnteredTarget && pace ? { pace } : {}),
-    ...(isUserEnteredTarget && paceRange ? { paceMinPerKmRange: paceRange } : {}),
+    ...(isEditableTarget && pace
+      ? {
+          pace,
+          paceTargetSource: targetSource,
+        }
+      : {}),
+    ...(isEditableTarget && paceRange
+      ? {
+          paceMinPerKmRange: paceRange,
+          paceTargetSource: targetSource,
+        }
+      : {}),
+    ...(isAiAuthoredTarget && hrZone ? { hrZone } : {}),
+    ...(isAiAuthoredTarget &&
+    (target.hr_target_source === "personal_hr_zone" ||
+      target.hr_target_source === "default_estimated_hr")
+      ? { hrTargetSource: target.hr_target_source }
+      : {}),
+    ...(isAiAuthoredTarget && hrBpmRange ? { hrBpmRange } : {}),
     ...(isUserEnteredTarget && (target.hr_target_source === "user_entered" || hrBpmCap)
       ? { hrTargetSource: "user_entered" }
       : {}),

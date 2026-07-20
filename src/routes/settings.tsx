@@ -6,13 +6,15 @@ import { AppShell } from "@/components/AppShell";
 import { TrainingPreferenceFields } from "@/components/onboarding/TrainingPreferenceFields";
 import { ThemePreferenceSection } from "@/components/settings/ThemePreferenceSection";
 import {
-  isRecent5kTimeInAcceptedRange,
+  isPositiveRecent5kTime,
   type WeekdayName,
 } from "@/components/onboarding/onboarding-form-model";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EditableValueChip } from "@/components/ui/editable-value-chip";
 import { Icon } from "@/components/ui/icon";
+import { HeartRateProfileSection } from "@/components/settings/HeartRateProfileSection";
 import { APP_NAME } from "@/lib/app-config";
+import type { PersonalHeartRateProfileInput } from "@/lib/heart-rate-zones";
 import { type RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 import { saveUserSettings, type UserSettingsSummary } from "@/lib/user-settings-actions";
 import { getSettingsRouteData } from "@/lib/training-api";
@@ -97,6 +99,33 @@ function SettingsPage() {
     }
   };
 
+  const saveHeartRateProfile = async (heartRateProfile: PersonalHeartRateProfileInput) => {
+    setIsSaving(true);
+    setError(null);
+    setMessage(null);
+
+    try {
+      await saveUserSettingsFn({
+        data: {
+          ...buildPersonalDataPayload(buildSettingsFormState(settings)),
+          heartRateProfile,
+        },
+      });
+      await router.invalidate();
+      setMessage("Personal heart-rate ranges saved.");
+      return true;
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Personal heart-rate ranges could not be saved.",
+      );
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const saveTrainingPreferences = async () => {
     if (!form.restDaysAnswered) {
       setError("Choose fixed rest days or No fixed rest days.");
@@ -110,8 +139,8 @@ function SettingsPage() {
       return;
     }
 
-    if (form.fitnessLevel === "custom" && !isRecent5kTimeInAcceptedRange(form.recent5kTime)) {
-      setError("Use a recent 5K time between 18:00 and 55:00.");
+    if (form.fitnessLevel === "custom" && !isPositiveRecent5kTime(form.recent5kTime)) {
+      setError("Use a positive recent 5K time such as 25:00.");
       setMessage(null);
       return;
     }
@@ -204,7 +233,7 @@ function SettingsPage() {
         </header>
 
         <div
-          className="hito-surface-flat p-4"
+          className="hito-state-surface p-4"
           data-tone={error ? "destructive" : message ? "success" : undefined}
         >
           <div className="hito-label">
@@ -400,7 +429,11 @@ function SettingsPage() {
                 </div>
               </section>
 
-              <HeartRateZonesPanel summary={settings.heartRateZones} />
+              <HeartRateProfileSection
+                isSaving={isSaving}
+                summary={settings.heartRateZones}
+                onSave={saveHeartRateProfile}
+              />
 
               <div className="hito-settings-actions">
                 <button
@@ -538,67 +571,6 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
         className="hito-field hito-field-md"
       />
     </label>
-  );
-}
-
-function HeartRateZonesPanel({ summary }: { summary: UserSettingsSummary["heartRateZones"] }) {
-  const isDefaultEstimated = summary.source === "default_estimated";
-  const isPersonal = summary.source === "personal";
-
-  return (
-    <section className="hito-settings-section">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="hito-section-title">
-              {isPersonal ? "Personal/manual zones" : summary.title}
-            </h2>
-            {isDefaultEstimated ? (
-              <span className="hito-status-pill" data-tone="signal">
-                Default
-              </span>
-            ) : null}
-            {isPersonal ? (
-              <span className="hito-status-pill" data-tone="success">
-                Personal
-              </span>
-            ) : null}
-          </div>
-          <p className="hito-support-copy mt-3 max-w-2xl">{summary.description}</p>
-          {summary.sourceNote ? <p className="hito-caption mt-2">{summary.sourceNote}</p> : null}
-        </div>
-        <button
-          type="button"
-          className="hito-button hito-button-secondary hito-button-sm"
-          disabled
-          aria-disabled="true"
-          title="Manual personal zones are not saved in settings yet."
-        >
-          <Icon name="edit" size="sm" />
-          Edit zones
-        </button>
-      </div>
-
-      {summary.zones.length > 0 ? (
-        <div className="hito-row-group mt-4">
-          {summary.zones.map((zone) => (
-            <div key={zone.label} className="hito-list-row items-start">
-              <div className="min-w-0">
-                <p className="hito-list-row-title">{zone.label}</p>
-                <p className="hito-list-row-copy">{zone.description}</p>
-              </div>
-              <span className="hito-metric-value whitespace-nowrap">{zone.rangeBpm}</span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="hito-surface-flat mt-4 p-4">
-          <p className="hito-body-small">
-            Hito will show broad default estimated ranges here once profile data supports them.
-          </p>
-        </div>
-      )}
-    </section>
   );
 }
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-backlog
+closed
 
 ## Type
 
@@ -14,51 +14,28 @@ medium
 
 ## Next Recommended Role
 
-architect
+product
 
 ## Task
 
-Plan the next voice-to-plan authoring slice when Product is ready to resume real audio dictation.
+Preserve voice-to-plan as retired product/runtime history.
 
 ## Stage
 
-ARCHITECT plan / future raw-audio transport and transcript review boundary.
+ARCHITECT documentation closeout / retired current product path.
 
 ## Exact Handoff Prompt
 
-```text
-ROLE: ARCHITECT
-
-Task:
-Plan the next voice-to-plan authoring slice when Product is ready to resume real audio dictation.
-
-Stage:
-ARCHITECT plan / future raw-audio transport and transcript review boundary.
-
-Context:
-This backlog item is repo-derived Admin Backlog source truth. Voice-to-plan is not the current
-visible onboarding owner. Existing backend voice/text authoring truth is preserved, but raw audio
-capture/transcription and runner-facing voice UI remain future work.
-
-Scope:
-Define the smallest safe raw-audio transport slice that can feed the existing transcript/text
-authoring path without creating a second plan-generation architecture.
-
-Do not:
-- build realtime voice;
-- send raw audio directly into plan generation;
-- add extra summarization calls;
-- persist transcripts or audio without a separate privacy/storage decision;
-- bypass review/confirm or backend validation.
-```
+None. Product retired the non-visible voice-to-plan runtime seam; restarting voice is not a current
+backlog task and would require a new Product decision.
 
 ## Owner
 
-Backend / Frontend / QA, after Product re-prioritizes real audio dictation.
+PRODUCT, only if a new voice product decision is made.
 
 ## Last Updated
 
-2026-06-20
+2026-07-19
 
 ## Compression Note
 
@@ -68,19 +45,16 @@ blocks, and obsolete prompt chains.
 
 ## Current Source Boundary
 
-Voice-to-plan is backlog/future work. The current product should not expose a visible voice setup
-surface unless a new plan reopens it.
+Voice-to-plan is retired current product/runtime history. The product must not expose a visible voice
+setup surface or retain voice-specific backend seams unless a new Product decision creates a new
+plan.
 
 Current preserved truth:
 
-- Hito already has backend text/transcript authoring seams for non-default voice/text plan creation
-  work.
-- Voice must remain an input modality in front of the existing authoring pipeline, not a second plan
-  engine.
-- Backend validation, plan-authoring doctrine, review/confirm, active-plan existence checks, and
-  no-fake-metric guardrails remain canonical.
-- Raw audio transport, capture/upload UI, transcription, storage/privacy policy, and end-to-end
-  browser QA remain unimplemented future scope.
+- No voice-specific UI, backend action, entitlement, transcript helper, or authoring path is current
+  product truth.
+- If Product ever reopens voice, it must feed the canonical plan-first review/confirm pipeline rather
+  than revive the deleted contour.
 
 Current stale historical truth explicitly demoted:
 

@@ -35,6 +35,23 @@ export const FUTURE_TEMPLATE_DOWNLOAD_PATH = "/templates/hito-training-plan-v2-t
 export const ML_AGENT_TEMPLATE_META_KEY = "_ml_agent_template";
 export const REMOVED_LEGACY_IMPORT_NOTICE =
   "Legacy week_1_preview[] JSON is no longer supported. Convert this file to training-plan-v2 before importing.";
+export const TRAINING_PLAN_V2_SEGMENT_TYPE_VALUES = [
+  "warmup",
+  "main",
+  "cooldown",
+  "recovery",
+  "rest",
+  "mobility",
+  "mobility_optional",
+  "strength",
+  "activation",
+  "drills",
+  "strides",
+  "recovery_jog",
+  "fueling",
+  "tempo_block",
+  "interval_block",
+] as const;
 
 export const V2_IMPORT_ROOT_KEYS = [
   "schema_version",
@@ -153,26 +170,6 @@ const v2GoalSchema = z
     goal_label: z.string().trim().min(1),
     distance_km: z.number().positive().optional(),
     distance_meters: z.number().int().positive().optional(),
-    authored_outcome_target: z
-      .object({
-        source: z.enum(["runner_entered_target", "ai_authored_target"]),
-        label: z.string().trim().min(1).max(160),
-        finish_time_window: z.string().trim().min(1).max(160).nullable(),
-        rationale: z.string().trim().min(1).max(360),
-        confidence: z.enum(["low", "medium", "high"]),
-        assumptions: z.array(z.string().trim().min(1).max(220)).max(6),
-      })
-      .strict()
-      .optional(),
-    authored_horizon: z
-      .object({
-        source: z.enum(["runner_target_date", "ai_proposed_horizon"]),
-        weeks: z.number().int().min(1).max(52),
-        rationale: z.string().trim().min(1).max(360),
-        assumptions: z.array(z.string().trim().min(1).max(220)).max(6),
-      })
-      .strict()
-      .optional(),
     target_event: z
       .object({
         label: z.string().trim().min(1).optional(),
@@ -360,23 +357,7 @@ const v2SegmentPrescriptionSchema = z
 const v2SegmentSchema = z
   .object({
     segment_id: z.string().trim().min(1).optional(),
-    segment_type: z.enum([
-      "warmup",
-      "main",
-      "cooldown",
-      "recovery",
-      "rest",
-      "mobility",
-      "mobility_optional",
-      "strength",
-      "activation",
-      "drills",
-      "strides",
-      "recovery_jog",
-      "fueling",
-      "tempo_block",
-      "interval_block",
-    ]),
+    segment_type: z.enum(TRAINING_PLAN_V2_SEGMENT_TYPE_VALUES),
     label: z.string().trim().min(1).optional(),
     sequence: z.number().int().min(1).optional(),
     guidance: z.string().trim().min(1).optional(),

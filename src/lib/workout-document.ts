@@ -13,6 +13,8 @@ import type {
   CanonicalWorkoutIdentity,
 } from "@/lib/rich-workout-model";
 
+export const AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE = "ai_authored_plan_guidance" as const;
+
 export type WorkoutDocumentType = "easy" | "steady_or_easy" | "rest" | "long_run" | "quality";
 
 export interface WorkoutDocumentTarget {

@@ -2,7 +2,7 @@
 
 ## Status
 
-backlog
+closed
 
 ## Type
 
@@ -14,75 +14,26 @@ medium
 
 ## Next Recommended Role
 
-ARCHITECT
+product
 
 ## Task
 
-Create a separate architecture plan only if Hito decides to evaluate `ai-first-plan-envelope-v1` beyond internal non-default use.
+Preserve the retired AI first-plan envelope experiment as history.
 
 ## Stage
 
-ARCHITECT backlog / future envelope rollout gate
+ARCHITECT documentation closeout / superseded authoring path.
 
 ## Exact Handoff Prompt
 
-```text
-ROLE: ARCHITECT
-
-TASK:
-Create a separate architecture plan for evaluating `ai-first-plan-envelope-v1` beyond internal non-default use.
-
-STAGE:
-ARCHITECT plan / envelope selected rollout or production-default switch gate
-
-CONTEXT:
-- Source backlog item: docs/tasks/backlog/2026-06-04-ai-first-plan-envelope-production-default-switch-gate.md
-- Archived completed plan: docs/plans/archive/2026-06-01-ai-first-plan-envelope-production-adoption-and-prompt-simplification.md
-- The completed plan proved an internal/server-owned non-default envelope structured-draft option.
-- QA proved no mutation before confirm and exact reviewed-plan persistence after explicit confirm on disposable local persistence seams.
-- Production first-plan generation remains `ai-first-plan-blueprint-v1`.
-- No runner-facing envelope option, frontend change, DB/schema change, active-plan refresh change, or default switch has been approved.
-
-GOAL:
-Decide whether Hito should evaluate envelope beyond internal/backend use, and if yes define one bounded rollout plan with explicit gates.
-
-SCOPE TO ASSESS:
-- selected low-risk internal pilot
-- controlled non-default production/internal flag
-- production default switch readiness
-- rollback to blueprint
-- QA gates
-- Running Coach gates
-- debug/trace requirements
-- source metadata and persistence boundaries
-
-WHAT NOT TO DO:
-- Do not implement code in this architecture pass.
-- Do not make envelope the production default.
-- Do not expose a runner-facing option.
-- Do not change frontend, DB/schema, active-plan refresh, or public onboarding.
-- Do not delete or weaken `ai-first-plan-blueprint-v1`.
-- Do not persist raw prompts or full AI payloads.
-- Do not reintroduce `structured_authoring_v1` as successful first-plan truth.
-
-OUTPUT:
-1. Task
-2. Stage
-3. Current envelope status
-4. Decision options
-5. Recommendation
-6. Scope approved, if any
-7. Rollout and rollback gates
-8. QA gate
-9. Running Coach gate
-10. Blockers
-```
+None. The envelope/blueprint experiment was superseded by the accepted plan-first provider to
+compiler pipeline; there is no current rollout decision to make.
 
 ## User Report
 
-The completed envelope adoption plan intentionally stopped after proving an internal non-default
-structured-draft option with review/confirm exactness. Any future production/default switch is a
-different risk class and should not be smuggled into that completed plan.
+The completed envelope adoption plan remains historical evidence. Current product truth is the
+AI-authored full-plan draft to compiler to signed review/confirm pipeline, with no envelope or
+blueprint rollback path.
 
 ## Evidence
 

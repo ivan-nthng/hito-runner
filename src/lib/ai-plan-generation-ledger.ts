@@ -1,4 +1,17 @@
-export type AiPlanGenerationProviderKind = "openai_responses_api" | "local_dev_fixture";
+import {
+  resolveLocalRuntimeArtifactRelativePath,
+  resolveLocalRuntimeArchiveAfter,
+  writeLocalRuntimeArtifact,
+  writeLocalRuntimeEvent,
+  type LocalRuntimeEventPhase,
+  type LocalRuntimeEventStatus,
+  type LocalRuntimeObservabilityOptions,
+} from "@/lib/local-runtime-observability";
+
+export type AiPlanGenerationProviderKind =
+  | "openai_responses_api"
+  | "local_dev_fixture"
+  | "not_started";
 
 export type AiPlanGenerationFinalOutcome =
   | "request_created"
@@ -28,6 +41,7 @@ export interface AiPlanGenerationLedgerOptions {
   disabled?: boolean;
   forceArtifactWrite?: boolean;
   artifactRoot?: string | null;
+  runtimeUrl?: string | null;
 }
 
 export interface AiPlanGenerationLedgerTrace {
@@ -72,7 +86,7 @@ export interface AiPlanGenerationLedgerTrace {
   pipeline: {
     parseStatus: AiPlanGenerationParseStatus;
     normalizationStatus: AiPlanGenerationNormalizationStatus;
-    validationIssues: readonly string[];
+    issueCodes: readonly string[];
     canonicalRowCount: number | null;
     runningWorkoutCount: number | null;
     finalOutcome: AiPlanGenerationFinalOutcome;
@@ -81,9 +95,22 @@ export interface AiPlanGenerationLedgerTrace {
   artifacts: {
     written: boolean;
     path: string | null;
+    expiresAt: string | null;
     writeError: string | null;
   };
 }
+
+type AiPlanGenerationLedgerTracePatch = Omit<
+  Partial<AiPlanGenerationLedgerTrace>,
+  "provider" | "request" | "usage" | "output" | "pipeline" | "artifacts"
+> & {
+  provider?: Partial<AiPlanGenerationLedgerTrace["provider"]>;
+  request?: Partial<AiPlanGenerationLedgerTrace["request"]>;
+  usage?: Partial<AiPlanGenerationLedgerTrace["usage"]>;
+  output?: Partial<AiPlanGenerationLedgerTrace["output"]>;
+  pipeline?: Partial<AiPlanGenerationLedgerTrace["pipeline"]>;
+  artifacts?: Partial<AiPlanGenerationLedgerTrace["artifacts"]>;
+};
 
 export async function createAiPlanGenerationLedgerTrace(input: {
   providerKind: AiPlanGenerationProviderKind;
@@ -148,7 +175,7 @@ export async function createAiPlanGenerationLedgerTrace(input: {
     pipeline: {
       parseStatus: "not_started",
       normalizationStatus: "not_started",
-      validationIssues: [],
+      issueCodes: [],
       canonicalRowCount: null,
       runningWorkoutCount: null,
       finalOutcome: "request_created",
@@ -157,14 +184,45 @@ export async function createAiPlanGenerationLedgerTrace(input: {
     artifacts: {
       written: false,
       path: null,
+      expiresAt: null,
       writeError: null,
     },
   };
 }
 
+export async function recordAiPlanGenerationPreflightFailure(input: {
+  reason: string;
+  options?: AiPlanGenerationLedgerOptions;
+}) {
+  const trace = await createAiPlanGenerationLedgerTrace({
+    providerKind: "not_started",
+    model: "not_started",
+    contractMode: "plan_first",
+    responseSchemaMode: "not_started",
+    systemPrompt: "",
+    userPrompt: "",
+    responseSchema: {},
+    timeoutMs: 0,
+    maxOutputTokens: 0,
+  });
+
+  return updateAiPlanGenerationLedgerTrace(
+    trace,
+    {
+      pipeline: {
+        ...trace.pipeline,
+        issueCodes: [input.reason],
+        finalOutcome: "rejected",
+        unavailableReason: input.reason,
+      },
+    },
+    input.options,
+  );
+}
+
 export async function updateAiPlanGenerationLedgerTrace(
   trace: AiPlanGenerationLedgerTrace | null,
-  patch: Partial<AiPlanGenerationLedgerTrace>,
+  patch: AiPlanGenerationLedgerTracePatch,
   options?: AiPlanGenerationLedgerOptions,
 ): Promise<AiPlanGenerationLedgerTrace | null> {
   if (!trace) {
@@ -252,6 +310,24 @@ export async function markAiPlanGenerationReviewedDraftSigned(input: {
   );
 }
 
+export async function markAiPlanGenerationReviewRefused(input: {
+  trace: AiPlanGenerationLedgerTrace | null;
+  options?: AiPlanGenerationLedgerOptions;
+}) {
+  return updateAiPlanGenerationLedgerTrace(
+    input.trace,
+    {
+      pipeline: {
+        ...input.trace?.pipeline,
+        issueCodes: ["running_plan_review_refused"],
+        finalOutcome: "rejected",
+        unavailableReason: "running_plan_review_refused",
+      },
+    },
+    input.options,
+  );
+}
+
 export async function markAiPlanGenerationPersisted(input: {
   trace: AiPlanGenerationLedgerTrace | null;
   options?: AiPlanGenerationLedgerOptions;
@@ -262,6 +338,25 @@ export async function markAiPlanGenerationPersisted(input: {
       pipeline: {
         ...input.trace?.pipeline,
         finalOutcome: "persisted_plan_created",
+      },
+    },
+    input.options,
+  );
+}
+
+export async function markAiPlanGenerationPersistenceFailed(input: {
+  trace: AiPlanGenerationLedgerTrace | null;
+  reason: string;
+  options?: AiPlanGenerationLedgerOptions;
+}) {
+  return updateAiPlanGenerationLedgerTrace(
+    input.trace,
+    {
+      pipeline: {
+        ...input.trace?.pipeline,
+        issueCodes: [input.reason],
+        finalOutcome: "rejected",
+        unavailableReason: input.reason,
       },
     },
     input.options,
@@ -285,23 +380,8 @@ export function summarizeAiPlanGenerationOutput(value: unknown): Record<string, 
 
   return {
     valueKind: "object",
-    topLevelKeys: Object.keys(record).sort(),
-    schemaVersion: typeof record.schemaVersion === "string" ? record.schemaVersion : null,
-    startDate: typeof record.startDate === "string" ? record.startDate : null,
-    targetDate: typeof record.targetDate === "string" ? record.targetDate : null,
-    preparationHorizonWeeks:
-      typeof record.preparationHorizonWeeks === "number" ? record.preparationHorizonWeeks : null,
     weekCount: weeks.length,
     plannedWorkoutCount: plannedWorkouts.length,
-    workoutIdentityCount: new Set(
-      plannedWorkouts
-        .map((workout) =>
-          workout && typeof workout === "object"
-            ? (workout as { workoutIdentity?: unknown }).workoutIdentity
-            : null,
-        )
-        .filter((identity): identity is string => typeof identity === "string"),
-    ).size,
   };
 }
 
@@ -309,36 +389,55 @@ async function writeAiPlanGenerationLedgerTrace(
   trace: AiPlanGenerationLedgerTrace,
   options?: AiPlanGenerationLedgerOptions,
 ): Promise<AiPlanGenerationLedgerTrace> {
-  if (!shouldWriteAiPlanGenerationLedgerTrace(trace, options)) {
-    return trace;
-  }
-
   try {
-    const fsModule = "node:fs/promises";
-    const pathModule = "node:path";
-    const { mkdir, writeFile } = (await import(
-      /* @vite-ignore */ fsModule
-    )) as typeof import("node:fs/promises");
-    const { join } = (await import(/* @vite-ignore */ pathModule)) as typeof import("node:path");
-    const processLike = getProcessLike();
-    const artifactRoot =
-      options?.artifactRoot?.trim() || join(processLike?.cwd?.() ?? ".", "qa-artifacts", "debug");
-    const date = trace.createdAt.slice(0, 10);
-    const artifactDir = join(artifactRoot, date, "ai-plan-generation-ledger");
+    const filename = `${trace.createdAt.replace(/[:.]/g, "-")}-${trace.generationId}.json`;
     const artifactPath =
       trace.artifacts.path ??
-      join(artifactDir, `${trace.createdAt.replace(/[:.]/g, "-")}-${trace.generationId}.json`);
-    const artifact: AiPlanGenerationLedgerTrace = {
+      resolveLocalRuntimeArtifactRelativePath({
+        category: "ai-plan-generation",
+        filename,
+        timestamp: trace.createdAt,
+      });
+    const artifact = sanitizeAiPlanGenerationLedgerTrace({
       ...trace,
       artifacts: {
         written: true,
         path: artifactPath,
+        expiresAt: resolveLocalRuntimeArchiveAfter(trace.createdAt),
         writeError: null,
       },
-    };
+    });
+    const localOptions = toLocalRuntimeObservabilityOptions(options);
+    const artifactWrite = await writeLocalRuntimeArtifact({
+      category: "ai-plan-generation",
+      filename,
+      timestamp: trace.createdAt,
+      payload: `${JSON.stringify(artifact, null, 2)}\n`,
+      existingRelativePath: artifactPath,
+      options: localOptions,
+    });
 
-    await mkdir(artifactDir, { recursive: true });
-    await writeFile(artifactPath, `${JSON.stringify(artifact, null, 2)}\n`, "utf8");
+    if (!artifactWrite.written) {
+      return trace;
+    }
+
+    await writeLocalRuntimeEvent(
+      {
+        category: "plan_generation",
+        event: `plan_generation_${artifact.pipeline.finalOutcome}`,
+        status: resolveLocalRuntimePlanGenerationStatus(artifact),
+        phase: resolveLocalRuntimePlanGenerationPhase(artifact),
+        outcomeCode: resolveLocalRuntimePlanGenerationOutcomeCode(artifact),
+        generationId: artifact.generationId,
+        providerKind: artifact.provider.kind,
+        providerResponseId: artifact.provider.responseId,
+        parseStatus: artifact.pipeline.parseStatus,
+        normalizationStatus: artifact.pipeline.normalizationStatus,
+        diagnosticCodes: artifact.pipeline.issueCodes,
+        canonicalRowCount: artifact.pipeline.canonicalRowCount,
+      },
+      localOptions,
+    );
 
     return artifact;
   } catch (error) {
@@ -347,32 +446,127 @@ async function writeAiPlanGenerationLedgerTrace(
       artifacts: {
         ...trace.artifacts,
         written: false,
-        writeError: error instanceof Error ? error.message.slice(0, 300) : "unknown_write_error",
+        writeError: safeArtifactWriteError(error),
       },
     };
   }
 }
 
-function shouldWriteAiPlanGenerationLedgerTrace(
+function sanitizeAiPlanGenerationLedgerTrace(
   trace: AiPlanGenerationLedgerTrace,
+): AiPlanGenerationLedgerTrace {
+  return {
+    ...trace,
+    provider: {
+      ...trace.provider,
+      model: sanitizeDiagnosticValue(trace.provider.model),
+      responseId: sanitizeNullableDiagnosticValue(trace.provider.responseId),
+      responseStatus: sanitizeNullableDiagnosticValue(trace.provider.responseStatus),
+      responseIncompleteReason: sanitizeNullableDiagnosticValue(
+        trace.provider.responseIncompleteReason,
+      ),
+    },
+    pipeline: {
+      ...trace.pipeline,
+      issueCodes: trace.pipeline.issueCodes.map(sanitizeDiagnosticValue),
+      unavailableReason: sanitizeNullableDiagnosticValue(trace.pipeline.unavailableReason),
+    },
+    artifacts: {
+      ...trace.artifacts,
+      writeError: sanitizeNullableDiagnosticValue(trace.artifacts.writeError),
+    },
+  };
+}
+
+function sanitizeNullableDiagnosticValue(value: string | null) {
+  return value == null ? null : sanitizeDiagnosticValue(value);
+}
+
+function sanitizeDiagnosticValue(value: string) {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "_");
+  return normalized.slice(0, 120) || "unknown";
+}
+
+function toLocalRuntimeObservabilityOptions(
   options?: AiPlanGenerationLedgerOptions,
-) {
-  if (options?.disabled) {
-    return false;
+): LocalRuntimeObservabilityOptions {
+  return {
+    disabled: options?.disabled,
+    forceWrite: options?.forceArtifactWrite,
+    root: options?.artifactRoot,
+    runtimeUrl: options?.runtimeUrl,
+  };
+}
+
+function resolveLocalRuntimePlanGenerationPhase(
+  trace: AiPlanGenerationLedgerTrace,
+): LocalRuntimeEventPhase {
+  if (
+    trace.pipeline.finalOutcome === "persisted_plan_created" ||
+    trace.pipeline.unavailableReason === "persistence_failed" ||
+    trace.pipeline.unavailableReason === "active_plan_exists"
+  ) {
+    return "persistence";
   }
-
-  const processLike = getProcessLike();
-  const env = processLike?.env ?? {};
-
-  if (env.HITO_AI_PLAN_GENERATION_LEDGER === "0") {
-    return false;
+  if (
+    trace.pipeline.finalOutcome === "reviewed_draft_signed" ||
+    trace.pipeline.unavailableReason === "running_plan_review_refused"
+  ) {
+    return "review";
   }
+  if (trace.pipeline.unavailableReason === "ai_authored_plan_first_provider_schema_invalid") {
+    return "schema";
+  }
+  if (
+    trace.pipeline.normalizationStatus !== "not_started" ||
+    trace.pipeline.finalOutcome === "canonical_draft_ready"
+  ) {
+    return "compiler";
+  }
+  if (trace.pipeline.parseStatus !== "not_started") return "parse";
+  return "provider";
+}
 
-  return (
-    options?.forceArtifactWrite === true ||
-    env.HITO_AI_PLAN_GENERATION_LEDGER === "1" ||
-    trace.provider.paidProviderCall
-  );
+function resolveLocalRuntimePlanGenerationStatus(
+  trace: AiPlanGenerationLedgerTrace,
+): LocalRuntimeEventStatus {
+  if (trace.pipeline.finalOutcome === "request_created") return "started";
+  if (
+    [
+      "response_received",
+      "canonical_draft_ready",
+      "reviewed_draft_signed",
+      "persisted_plan_created",
+    ].includes(trace.pipeline.finalOutcome)
+  ) {
+    return "success";
+  }
+  return trace.pipeline.finalOutcome === "cancelled" ? "blocked" : "failure";
+}
+
+function resolveLocalRuntimePlanGenerationOutcomeCode(trace: AiPlanGenerationLedgerTrace) {
+  if (trace.pipeline.unavailableReason === "ai_authored_plan_first_rejected_before_review") {
+    return "compiler_rejection";
+  }
+  if (trace.pipeline.unavailableReason === "running_plan_review_refused") {
+    return "review_refusal";
+  }
+  return trace.pipeline.unavailableReason ?? trace.pipeline.finalOutcome;
+}
+
+function safeArtifactWriteError(error: unknown) {
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    typeof (error as { code?: unknown }).code === "string"
+  ) {
+    return sanitizeDiagnosticValue(`artifact_write_${(error as { code: string }).code}`);
+  }
+  return "artifact_write_failed";
 }
 
 async function digestSha256Hex(payload: string) {
@@ -418,13 +612,4 @@ function createGenerationId() {
     globalThis.crypto?.randomUUID?.() ??
     `ai-plan-${Date.now()}-${Math.random().toString(16).slice(2)}`
   );
-}
-
-function getProcessLike():
-  | {
-      cwd?: () => string;
-      env?: Record<string, string | undefined>;
-    }
-  | undefined {
-  return typeof process === "undefined" ? undefined : process;
 }

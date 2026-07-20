@@ -11,6 +11,8 @@
 - local QA on `127.0.0.1:3000` uses the finalized local build snapshot through `npm run serve:local` after `npm run build`; the server refuses non-loopback Supabase configuration or a non-loopback bind, while `npm run qa:server:start|status|restart|stop` manages that canonical built server lifecycle and keeps executable runtime, PID/log state, build-output staging, Vite cache, and build-output locks under the non-iCloud local cache family resolved from `HITO_QA_RUNTIME_ROOT` or `~/Library/Caches/hito-running/<workspace-hash>/`
 - for this iCloud workspace, the default managed QA runtime resolves to `/Users/ivan/Library/Caches/hito-running/hito-running-4c6fe31a228f/qa-runtime`; `logs/build-output-finalized` is not the served managed QA runtime source, and generated conflict siblings such as `server 2`, `public 2`, or `index 2.mjs` are build-output lifecycle red flags rather than product UI failures
 - managed QA runtime proof commands are `npm run qa:server:status`, `node scripts/validate-build-output-integrity.mjs`, and `curl -I http://127.0.0.1:3000/`
+- the managed loopback launcher supplies the canonical runtime URL to the server, which enables one ignored local observability owner at `logs/local-runtime-observability/`; request, server-action, and AI plan-generation outcomes share redacted correlation fields and safe reason codes, the latest three calendar days remain under `active/`, older days move to `archive/` without deletion, and `npm run local:logs -- --request-id <id>|--generation-id <id>|--route <path>|--outcome <code>` searches only the active window unless `--include-archive` is explicit
+- managed-server stdout is transport evidence rather than lifecycle truth; it is capped and archived separately by the QA server manager, while structured local records never include request bodies, query values, cookies, credentials, raw prompts, provider payloads, database rows, runner free text, or error messages and are disabled outside a loopback runtime
 - local artifact hygiene uses `npm run artifact:hygiene` as a non-mutating dry-run reporter for `logs/`, build-output residues, and generated `test-results/`; `qa-artifacts/` remains protected evidence and is counted only with explicit `--include-qa-artifacts` as non-disposable
 - the canonical deployment runtime is now Nitro for Vercel:
   `npm run build` emits local Nitro/Vite staging under the non-iCloud cache root and publishes the managed local QA runtime from there; repo-local `.output/` should not be regenerated during normal local QA build flow
@@ -85,9 +87,9 @@
   login route data shaping, loopback local-login availability, safe Magic Link availability, Magic Link request validation and Supabase OTP request behavior, and `/api/auth/confirm` code or token-hash callback exchange now live there; `training-api.ts` keeps only the public login route data and Magic Link request server-function wrappers for current route/component callers
 - `src/lib/admin-auth-actions.ts`
   owns the dedicated admin-login contract for `/admin/login` UI:
-  it exposes the admin-only redirect sanitizer and route data contract, while `src/lib/admin-auth-actions.server.ts` verifies local/dev fixture credentials only on loopback local runtimes, verifies the deployed owner admin against server-only `HITO_ADMIN_PASSWORD_HASH` plus `HITO_ADMIN_SESSION_SECRET` outside local fixtures, rejects tester credentials without creating a session, and sets only signed admin-only session truth after admin verification; `src/lib/admin-access.server.ts` is the shared admin resolver/facade for route/server-function eligibility, signed admin session resolution, Supabase app-metadata compatibility, and `AdminAccessContext` capabilities for capture, debug/capture probing, analytics, and local Test Accounts; ordinary tester/product accounts are never accepted by `/admin/login`
+  it exposes the admin-only redirect sanitizer and route data contract, while `src/lib/admin-auth-actions.server.ts` verifies local/dev fixture credentials only on loopback local runtimes, verifies the deployed owner admin against server-only `HITO_ADMIN_PASSWORD_HASH` plus `HITO_ADMIN_SESSION_SECRET` outside local fixtures, rejects tester credentials without creating a session, and sets only signed admin-only session truth after admin verification; `src/lib/admin-access.server.ts` is the shared admin resolver/facade for route/server-function eligibility, signed admin session resolution, Supabase app-metadata compatibility, and `AdminAccessContext` capabilities for capture, analytics, and local Test Accounts; ordinary tester/product accounts are never accepted by `/admin/login`
 - `src/lib/admin-capture.ts` owns the backend contract for the future `/admin/capture` backlog:
-  it exposes admin-only server functions for capture availability, bounded debug/capture capability probing, backlog list, item detail, text-only item create, triage updates, quick note update/append, quick-note-only deletion, and deterministic copy-prompt generation while keeping UI capture, screenshot upload, and automatic Codex dispatch out of this slice; `src/lib/admin-capture.server.ts` verifies the existing admin session boundary before every operation, reads/writes only through the service/admin Supabase seam, caps captured text and metadata, redacts secret-like metadata keys/values before prompt output, stores quick-note history in bounded item metadata, rejects title/body/status/type/priority/target-role mutation attempts for repo-derived imported rows with `repo_derived_read_only`, keeps the debug/capture probe independent from runner/tester/product auth, and returns frontend-ready view models rather than local mock state
+  it exposes only the admin server functions used by the current backlog route: backlog list, text-only quick-note create, triage updates, note append, quick-note-only deletion, and deterministic copy-prompt generation; `src/lib/admin-capture.server.ts` verifies the existing admin session boundary before every operation, reads/writes only through the service/admin Supabase seam, keeps item lookup internal to prompt/readback shaping, caps captured text and metadata, redacts secret-like metadata keys/values before prompt output, stores quick-note history in bounded item metadata, rejects title/body/status/type/priority/target-role mutation attempts for repo-derived imported rows with `repo_derived_read_only`, and returns frontend-ready view models rather than local mock state; route-spanning UI capture, screenshot upload, and automatic Codex dispatch are not implemented
 - `scripts/import-repo-work-items-to-admin-backlog.ts`
   owns the explicit repo-work mirror into the admin Backlog:
   it scans markdown only from `docs/tasks/backlog`, `docs/tasks/product-briefs`, `docs/tasks/frontend-specs`, `docs/plans/active`, and `docs/plans/archive`; skips README policy docs; parses canonical markdown sections for `Status`, `Type`, `Priority`, `Next Recommended Role`, `Task`, `Stage`, and `Exact Handoff Prompt`; uses the first meaningful `Task` line as the primary Backlog title; mirrors valid markdown truth into `admin_capture_items` fields plus `metadata.markdown_status`, `metadata.markdown_type`, `metadata.markdown_priority`, `metadata.markdown_next_role`, `metadata.work_item_status`, `metadata.source_path`, and `metadata.source_type`; marks old archive docs with `metadata.missing_required_fields` / `metadata.invalid_required_fields`; never maps repo-derived rows to `in_review`; upserts by source path/type without touching admin-created quick notes or capture rows; reports stale active repo-derived mirrors whose `metadata.source_path` no longer exists in approved repo import sources; archives those stale mirrors only through the explicit `--archive-stale` flag; and keeps markdown as canonical for repo-authored work while normal admin mutation seams treat imported rows as read-only mirrors
@@ -124,13 +126,13 @@
   owns pure `/changelog` markdown parsing, date/month/year grouping, source-derived shipped-change count and last-updated helpers, highlight classification, and milestone title derivation while the public route keeps shell, tabs, timeline rendering, and the existing `docs/history/changelog.md?raw` source import
 - `src/lib/user-settings-actions.ts`
   owns the user-settings route/action layer:
-  it resolves settings route data through the same persisted-user mapping as saved mode, reads and updates bounded `runner_profiles` settings fields, delegates runner-level `training_preferences` validation to the shared runner training-preference contract, adds a backend-shaped default estimated heart-rate zone readback from profile age when available, accepts the existing snapshot/viewer loaders from `training-api.ts` so the `/settings` route data shape stays backward-safe, and owns `UserSettingsSummary` for direct type imports
+  it resolves settings route data through the same persisted-user mapping as saved mode, reads and updates bounded `runner_profiles` settings fields, delegates runner-level `training_preferences` validation to the shared runner training-preference contract, persists optional personal heart-rate ranges, resolves saved personal ranges over age-estimated defaults, accepts the existing snapshot/viewer loaders from `training-api.ts` so the `/settings` route data shape stays backward-safe, and owns `UserSettingsSummary` for direct type imports
 - `src/lib/heart-rate-zones.ts`
-  owns the bounded settings readback for default estimated heart-rate zones:
-  it mirrors the current age-estimated starting-range policy, labels the source as default estimated rather than personalized, and returns an unavailable state instead of asking the frontend route to invent HR truth when profile age is missing
+  owns the effective personal heart-rate profile contract:
+  saved runner ranges are explicit personal truth; otherwise the existing age-estimated ranges are editable default guidance. Stable zone references remain internal provenance, while review/readback resolves them to snapshot BPM ranges with `personal` or `default_estimated` source truth.
 - `src/lib/runner-training-preferences.ts`
   owns the shared pure runner training-preference contract used by settings and structured first-plan setup:
-  it maps product-facing `fixedRestDays`, `defaultRunningDaysPerWeek`, and `preferredLongRunDay` into the stored `blocked_days`, `max_running_days_per_week`, and `preferred_long_run_day` shape; validates that fixed rest days leave at least one trainable weekday, default running days fit the available weekdays, and long-run day is not blocked; derives the Sunday/Saturday/latest-available long-run fallback for generation/review without storing that fallback as an explicit runner choice; and exposes bounded fitness-level mapping where only `custom` plus a direct recent 5K time produces numeric benchmark truth
+  it maps product-facing `fixedRestDays`, `defaultRunningDaysPerWeek`, and `preferredLongRunDay` into the stored `blocked_days`, `max_running_days_per_week`, and `preferred_long_run_day` shape; validates that fixed rest days leave at least one trainable weekday, default running days fit the available weekdays, and an explicitly preferred long-run day is not blocked; and exposes bounded fitness-level mapping where only a direct recent 5K time or pace produces numeric benchmark truth
 - `src/lib/rich-workout-model.ts`
   owns the first backend-only rich workout taxonomy contract:
   it defines allowed canonical `workout_family`, `workout_identity`, `calendar_icon_key`, and `metric_mode` values; maps current legacy `workout_type`, `source_workout_type`, title, and segment target truth into rich compatibility fields; for compact-only old rows without `source_workout_type`, it infers tempo, threshold, interval, progression, race/tune-up, hill, or generic quality identity from title/step semantics before falling back to `quality_session`; maps rich family/identity back to the legacy DB `workout_type` family for old paths; and derives metric mode from actual emitted target keys without inventing pace or HR truth, with rest days marked as having no execution metric targets
@@ -145,17 +147,19 @@
   `workout_logs`; Garmin/FIT provider evidence remains owned by the separate feedback upload seam
 - `src/lib/first-plan-authoring-utils.ts`
   owns the small shared first-plan authoring helper layer used by structured onboarding:
-  bounded goal distance/style/terrain/execution values, safe execution defaults, guidance-preference-to-effort-language mapping, weekday de-duplication and long-run/day spreading helpers, goal label formatting, and duration/pace parsing live there instead of being duplicated across first-plan modules
+  bounded visible form values, weekday de-duplication, real-date validation, and duration/pace parsing live there instead of being duplicated across first-plan modules; it no longer owns execution defaults, long-run selection, day spreading, or goal coaching helpers
 - `src/lib/structured-first-plan-onboarding.ts`
-  owns validation and normalization of the visible first-plan setup facts: required profile basics,
-  optional 5K benchmark, availability/rest days, distance goal, terrain/execution preferences,
-  strength preference, and supporting comment. It translates those facts into the bounded provider
-  authoring input; current review/confirm truth belongs to the running-plan engine review/actions
-  seams, not to a second structured review model.
+  owns the visible first-plan form type contract still consumed by frontend constructor code. The
+  live generated-plan serializer is
+  `buildAiGeneratedRunningPlanAuthoringInput`, which sends only explicit runner facts, exact goal
+  intent, and declared calendar constraints to the provider; current review/confirm truth belongs
+  to the running-plan engine review/actions seams, not to a second structured review model.
 - `src/lib/structured-plan-authoring-schema.ts`
-  owns the bounded provider-context input schema shared by structured onboarding, plan-first
-  generation, the local provider fixture, and compiler validation. The retired deterministic
-  structured plan generator and its coaching-policy modules are no longer runtime or proof owners.
+  owns the bounded plan-first provider-context schema: exact goal intent, explicit runner facts,
+  declared availability, fixed rest days, and the effective runner heart-rate profile. It does not
+  derive runner archetypes, baseline load, horizon, workout density, progression, or other coaching
+  decisions; HR references are resolved deterministically from profile truth rather than interpreted
+  as backend coaching.
 - `src/lib/imported-plan.ts`
   owns the canonical `training-plan-v2` import contract, JSON validation helpers, the runtime-noise exclusions for v2, the bounded canonical target and prescription normalization rules, the accepted-but-ignored `_ml_agent_template` instruction block, optional exact `source_workout_type` identity, additive rich workout fields (`workout_family`, `workout_identity`, `calendar_icon_key`, `goal_context`, `metric_mode`), compatibility derivation for older compact-only v2 files missing those rich fields, and the mapping from accepted import shapes into the canonical saved workout shape
 - The historical strict nested, compact weekly, and internal generated-plan draft variants are no
@@ -163,9 +167,24 @@
   `src/lib/ai-first-plan-draft-service.ts`, `src/lib/ai-authored-plan-first-compiler.ts`,
   `src/lib/ai-generated-running-plan.ts`, and the running-plan review/confirm seams.
 - `src/lib/ai-first-plan-draft-service.ts`
-  owns the non-mutating AI-authored plan-first ops service used by QA: it accepts validated structured authoring context or structured onboarding input, requests one `hito_ai_authored_full_plan_draft` response from OpenAI or the local QA/dev fixture, parses and compiles the specimen-shaped full plan through the backend plan-first compiler into canonical `training-plan-v2`, and returns either `ai_authored` canonical output or a bounded unavailable result before review. It does not save plans, does not call AI at confirm, and no longer exposes alternate generated-plan authoring modes.
+  owns the non-mutating AI-authored plan-first service: it accepts the canonical runner-facts and
+  calendar-constraints input, requests one `hito_ai_authored_full_plan_draft` response from OpenAI
+  or the loopback-only provider fixture, and accepts one compact closed response containing a flat
+  non-rest `workouts[]` list plus one exact endpoint. Provider output uses canonical workout and
+  segment enums, structural-only Repeat parents, ordered child truth, bounded numeric prescriptions,
+  exact min/km pace, and effective-profile HR references; it has no plan-level narrative metadata,
+  duplicate goal presentation, week wrappers, or alternate authoring grammar. The service compiles
+  that response into canonical `training-plan-v2` and returns either `ai_authored` output or a
+  bounded unavailable result before review. It does not save plans, call AI at confirm, or expose
+  alternate generated-plan authoring modes.
 - `src/lib/ai-authored-plan-first-compiler.ts`
-  owns the backend parser/atomizer/compiler boundary for AI-authored full plan drafts: AI owns the coach-authored plan content, while backend owns structural parsing, date/rest-day integrity, repeat/target conversion, raw-BPM blocking, source metadata, canonical `training-plan-v2` output, and review/readback-safe fields.
+  owns the backend parser/atomizer/compiler boundary for that same closed provider contract: every
+  provider-valid field has one lossless canonical projection, while malformed transport or
+  contract-invalid structure fails before review. AI owns titles, phases, identities, sections,
+  numeric `M:SS/km` or `M:SS-M:SS/km` pace guidance, supplied HR references, effort, and cues;
+  backend owns date/rest-day integrity, structural Repeat conversion, deterministic
+  reference-to-BPM resolution from the effective profile, canonical `training-plan-v2` output, and
+  exact review/readback fields without semantic fallback or coaching substitution.
 - `src/lib/entitlements/*`
   owns the first backend-only Basic/Pro entitlement foundation:
   one canonical capability registry for `garmin_ai_interpretation`;
@@ -240,13 +259,14 @@
   token/checksum exactness, first manual plan confirm, and adding one reviewed workout into an
   active plan; the manual Add mutation accepts eligible Rest/no-workout targets on today or future dates
   while keeping past, occupied, logged/evidence-backed, and protected targets blocked.
-  `src/lib/active-plan-workout-editing/policy.ts` now owns the shared active-plan
-  workout editability policy for Add/Clear/Move/Edit: accepted active-plan sources are no longer blocked
-  solely because they are not `manual_user_built_plan_v1`, while backend protection can still block
-  specific sources, rows, dates, logged/evidence-backed workouts, occupied targets, stale reviews,
-  or unsafe metadata. `Calendar.tsx` renders backend-shaped capability metadata for eligible
-  Add/Clear/Move/Edit actions, then uses shared manual authoring controls for runner-authored workout
-  content and review/confirm interactions. Runner-facing Add date labels use the shared date-only
+  `src/lib/active-plan-workout-editing/policy.ts` owns the shared active-plan operation policy, while
+  `source-capabilities.ts` projects row capabilities. Add/Clear/Move/Copy remain separate operation
+  contracts. The accepted workout-content edit rule is broader: every confirmed non-rest workout on
+  today or a future date must be able to enter reviewed editing regardless of source, logs,
+  completion, or evidence. The current implementation is only partial: policy still uses a source
+  allowlist; capability projection, persisted-edit reconstruction, the atomic edit RPC, and workout
+  detail still deny today/logged/evidence-backed or unsupported-source rows. `Calendar.tsx` and
+  workout detail consume those backend-shaped capabilities. Runner-facing Add date labels use the shared date-only
   helper and final confirmation repeats the selected date/weekday; backend persistence remains the
   source for `workout_date`, weekday readback, source kind, row counts, edit metadata, and
   metric-truth metadata.
@@ -274,14 +294,13 @@
   also support personal-template picker reuse, direct backend-owned manual Copy/Paste, Delete/Clear
   review/confirm, and direct backend-owned Move Workout. Move updates the same persisted
   `planned_workouts` row date/weekday/week truth; frontend renders the menu, drag/drop affordance,
-  and refresh from persisted state without owning schedule mutation truth. Confirmed manual,
-  generated and canonical imported plans share the backend-owned future-row content-edit lifecycle:
-  row capabilities require safe reconstruction, review/confirm persists the reviewed workout into
-  the same row, runner-edit metadata is appended, and original plan provenance remains intact.
-  Confirmed external imports use `training_plan_v2_import` as capability identity while their
-  claimed external source kind/status remains provenance. Workout content and plan-level runner-edit
-  provenance commit through one atomic backend RPC, preserving original plan and workout
-  source id/type/family/identity with exact stale/protected outcomes.
+  and refresh from persisted state without owning schedule mutation truth. The persisted edit
+  lifecycle already supplies server review/confirm, stale protection, atomic workout-plus-edit-audit
+  persistence, and source provenance. It does not yet satisfy the canonical today/future rule:
+  source/date/log/evidence gates still block valid entry, and the same-row RPC does not preserve a
+  full immutable pre-edit WorkoutDocument for history already attached to that workout. Runtime
+  reconciliation must retain logs, evidence, completion truth, and original planned truth instead
+  of merely deleting the current guards.
   Universal Copy/Paste, recurrence, Restore/Put back/Redo UI, active-plan replacement semantics
   expansion, QR/share/import, PDF/watch export, and coach/organization templates are not implemented.
 - visible onboarding on `/` is now split between manual setup and quick setup:
@@ -304,12 +323,11 @@
   form model live in focused `src/components/onboarding/*` modules so those paths share option
   registries and request-building helpers instead of maintaining separate local truth
 - current generated-plan onboarding uses `previewRunningPlanDraft` followed by
-  `confirmRunningPlanDraft`; the backend still validates required profile basics, impossible
-  running-day/rest-day combinations, supported goal distance, benchmark or bounded fitness-level
-  context, execution preference, target-time, target-date, and terrain formats, and persists only
-  after an explicit confirmed `ai_authored_plan_first_v1` review
-  benchmark, terrain focus, target-time/date details, and the optional comment remain generation/plan context rather than long-lived runner profile truth; omitted terrain defaults to `standard` for normal goals, `mountain_running` normalizes to `mountain`, and non-target-time target fields are ignored after valid parsing
-  recent 5K time or pace is provider context, not a backend workout-authoring algorithm; the AI/local fixture authors the complete plan, while the compiler preserves structurally safe authored pace and HR-zone guidance, rejects unsupported raw personal BPM claims, and never falls back to a deterministic plan
+  `confirmRunningPlanDraft`; the backend validates required explicit runner facts, impossible
+  running-day/rest-day combinations, exact selected distance, optional benchmark, target time, and
+  target date, and persists only after an explicit confirmed `ai_authored_plan_first_v1` review
+  benchmark and target-time/date details remain generation/plan context rather than long-lived runner profile truth
+  recent 5K time or pace is provider context, not a backend workout-authoring algorithm; the AI/local fixture authors the complete plan and watch-ready numeric pace ranges, while the compiler preserves pace and supplemental effort, resolves authored HR references to effective profile BPM without coaching interpretation, rejects unsupported raw BPM claims, and never falls back to a deterministic plan
 - the visible constructor now starts from saved runner profile defaults when available:
   age, weight, height, fixed rest days, default running-days/week, and preferred long-run day prefill from `runner_profiles`, remain editable in the constructor, and the confirmed first plan persists the edited values back to runner-level profile defaults without mutating any existing active plan
 - settings and structured onboarding share the same frontend primitives for those profile defaults:
@@ -395,7 +413,7 @@
   while one bounded interval DSL supports both distance-based and time-based repeat units
   older persisted rows may still carry legacy target aliases, but new writes now persist only the canonical target keys
 - executable workout steps are now normalized with runner-facing instruction truth before workout detail readback:
-  non-rest segments and ordered Repeat children must carry executable target anatomy or display-safe authored guidance; plan-first generation preserves AI-authored pace and HR-zone guidance as reviewed plan truth, rejects unsupported raw personal BPM claims, and never invents fallback pace, HR, Repeat recovery, or deterministic workout content
+  non-rest segments and ordered Repeat children carry executable structure plus exact AI-authored target guidance; plan-first pace fields accept only numeric min/km values, preserve supplemental effort, resolve supplied HR references to snapshot BPM guidance with profile provenance, reject unsupported raw BPM claims, and never invent fallback pace, HR, Repeat recovery, or deterministic workout content
 - workout detail now renders those executable step instructions directly:
   the route surfaces backend-shaped executable target entries separately from segment `guidance`, target `cue`, target `hint`, focus/RPE/source copy, default/age-estimated HR, and backend family/identity/icon/metric/goal readbacks; old compact-only or legacy effort/cue-only rows remain readable without producing preferred executable target entries, while Today/calendar readback, interval visualization, first-plan review copy, and plan export use the same display-safe target helpers instead of computing metric truth locally
 - plan-first generated workouts carry the AI-authored exact session identity without changing the broad calendar family:

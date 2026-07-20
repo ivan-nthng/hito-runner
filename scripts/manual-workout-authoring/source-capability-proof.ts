@@ -84,6 +84,7 @@ export function validateManualSourceEditingCapabilityReadback() {
     }),
     "skipped_logged_workout",
     "persisted skipped results should block direct source affordances",
+    true,
   );
 
   assertSourceEditingBlocked(
@@ -96,6 +97,7 @@ export function validateManualSourceEditingCapabilityReadback() {
     }),
     "logged_workout",
     "completed logged results should block direct source affordances",
+    true,
   );
 
   assertSourceEditingBlocked(
@@ -108,6 +110,7 @@ export function validateManualSourceEditingCapabilityReadback() {
     }),
     "evidence_backed_workout",
     "provider/comparison/AI evidence should block direct source affordances",
+    true,
   );
 
   const unsafeMetricWorkout = {
@@ -299,14 +302,39 @@ export function validateManualSourceEditingCapabilityReadback() {
       canMove: true,
       canClear: true,
       canCopy: true,
-      canEditContent: false,
+      canEditContent: true,
       canDirectCopy: true,
       canDirectMove: true,
       canDragInitiate: true,
       eligibility: "eligible_current_unlogged",
       reason: null,
     },
-    "today unlogged manual source rows should expose copy/move/drag but not persisted content edit",
+    "today unlogged manual source rows should expose reviewed content edit",
+  );
+
+  assertSourceEditingBlocked(
+    resolveActivePlanWorkoutSourceEditingCapabilities({
+      activePlan,
+      workout: todayWorkout,
+      log: buildFakeWorkoutLog({ userId, plannedWorkoutId: todayWorkout.id }),
+      evidenceWorkoutIds: new Set(),
+      currentDate,
+    }),
+    "logged_workout",
+    "today logged rows should preserve lifecycle protection while exposing content edit",
+    true,
+  );
+  assertSourceEditingBlocked(
+    resolveActivePlanWorkoutSourceEditingCapabilities({
+      activePlan,
+      workout: todayWorkout,
+      log: null,
+      evidenceWorkoutIds: new Set([todayWorkout.id]),
+      currentDate,
+    }),
+    "evidence_backed_workout",
+    "today evidence-backed rows should preserve lifecycle protection while exposing content edit",
+    true,
   );
 
   const presetPlan = buildFakePlanCycle({
@@ -319,6 +347,55 @@ export function validateManualSourceEditingCapabilityReadback() {
   const presetWorkout = {
     ...futureWorkout,
     plan_cycle_id: presetPlan.id,
+    title: "AI-authored tempo repeats",
+    source_workout_type: "controlled_tempo_session",
+    workout_family: "tempo",
+    workout_identity: "controlled_tempo_session",
+    calendar_icon_key: "tempo",
+    steps: [
+      {
+        type: "warmup",
+        segment_type: "warmup",
+        label: "Warm up",
+        prescription: { mode: "time", duration_min: 10 },
+      },
+      {
+        type: "intervals",
+        segment_type: "interval_block",
+        label: "3 x tempo",
+        prescription: {
+          mode: "repeats",
+          repeat_count: 3,
+          children: [
+            {
+              role: "work",
+              label: "Tempo work",
+              sequence: 1,
+              prescription: { mode: "time", duration_min: 8 },
+              target: {
+                target_source: "ai_authored_plan_guidance",
+                pace: "4:50-5:00/km",
+                intensity: "Controlled tempo effort",
+                hr_target_source: "effort_only",
+                extra: { hr_zone: "Z3" },
+              },
+            },
+            {
+              role: "recover",
+              label: "Easy jog",
+              sequence: 2,
+              prescription: { mode: "time", duration_min: 2 },
+            },
+          ],
+        },
+      },
+      {
+        type: "cooldown",
+        segment_type: "cooldown",
+        label: "Cool down",
+        prescription: { mode: "time", duration_min: 10 },
+      },
+    ] as PersistedPlannedWorkoutRow["steps"],
   } satisfies PersistedPlannedWorkoutRow;
   assertSourceEditingAllowed(
     resolveActivePlanWorkoutSourceEditingCapabilities({
@@ -415,6 +492,30 @@ export function validateManualSourceEditingCapabilityReadback() {
     "training-plan-v2 import rows should expose content edit when workout_identity reconstructs safely",
   );
 
+  const arbitraryOriginPlan = buildFakePlanCycle({
+    userId,
+    id: "00000000-0000-4000-8000-000000000035",
+    sourceKind: "external_partner_confirmed_v4",
+    startDate: "2026-06-01",
+    endDate: "2026-06-30",
+  });
+  assertSourceEditingBlocked(
+    resolveActivePlanWorkoutSourceEditingCapabilities({
+      activePlan: arbitraryOriginPlan,
+      workout: {
+        ...importedWorkout,
+        id: "00000000-0000-4000-8000-000000000036",
+        plan_cycle_id: arbitraryOriginPlan.id,
+      },
+      log: null,
+      evidenceWorkoutIds: new Set(),
+      currentDate,
+    }),
+    "unsupported_active_plan_source",
+    "plan origin should not grant lifecycle actions or deny date-based content edit",
+    true,
+  );
+
   const unsupportedGeneratedWorkout = {
     ...selectedWorkout,
     id: "00000000-0000-4000-8000-000000000034",
@@ -446,6 +547,7 @@ function assertSourceEditingBlocked(
     ReturnType<typeof resolveActivePlanWorkoutSourceEditingCapabilities>["reason"]
   >,
   label: string,
+  canEditContent = false,
 ) {
   assert.equal(result.canDirectCopy, false, `${label}: direct copy should be blocked`);
   assert.equal(result.canDirectMove, false, `${label}: direct move should be blocked`);
@@ -453,6 +555,16 @@ function assertSourceEditingBlocked(
   assert.equal(result.eligibility, "blocked", `${label}: eligibility should be blocked`);
   assert.equal(result.reason, reason, `${label}: blocked reason should be ${reason}`);
   assert.equal(typeof result.message, "string", `${label}: blocked message should be present`);
+  assert.equal(
+    result.canEditContent,
+    canEditContent,
+    `${label}: content edit should follow its date-based contract`,
+  );
+  assert.equal(
+    result.editContentReason,
+    canEditContent ? null : reason,
+    `${label}: content edit reason should be independent from lifecycle protection`,
+  );
 }
 
 function assertSourceEditingAllowed(

@@ -15,6 +15,7 @@ if (!existsSync(serverEntry)) {
 const runtimeArgs = withDefaultHostAndPort(process.argv.slice(2));
 const host = readOption(runtimeArgs, "--host");
 const port = readOption(runtimeArgs, "--port");
+const providerMode = resolveProviderMode(process.env.HITO_AI_GENERATED_PLAN_PROVIDER_MODE);
 
 if (!host || !LOOPBACK_HOSTNAMES.has(host.toLowerCase())) {
   throw new Error(`Local QA runtime host must be loopback; received ${host ?? "none"}.`);
@@ -34,6 +35,14 @@ process.env.NITRO_HOST = host;
 process.env.HOST = host;
 process.env.NITRO_PORT = port;
 process.env.PORT = port;
+process.env.HITO_LOCAL_RUNTIME_URL = `http://${formatUrlHost(host)}:${port}`;
+process.env.HITO_LOCAL_RUNTIME_OBSERVABILITY = "1";
+process.env.HITO_AI_GENERATED_PLAN_PROVIDER_MODE = providerMode;
+process.env.HITO_AI_GENERATED_PLAN_DEV_FIXTURE = providerMode === "qa_fixture" ? "true" : "false";
+if (providerMode === "real") {
+  delete process.env.HITO_AI_GENERATED_PLAN_DEV_FIXTURE_DELAY_MS;
+  delete process.env.HITO_AI_GENERATED_PLAN_DEV_FIXTURE_SCENARIO;
+}
 process.argv = [process.execPath, serverEntry, ...runtimeArgs];
 
 await import(pathToFileURL(serverEntry).href);
@@ -68,4 +77,19 @@ function isLoopbackUrl(value) {
   } catch {
     return false;
   }
+}
+
+function formatUrlHost(host) {
+  return host.includes(":") && !host.startsWith("[") ? `[${host}]` : host;
+}
+
+function resolveProviderMode(value) {
+  if (!value || value === "real") {
+    return "real";
+  }
+  if (value === "qa_fixture") {
+    return "qa_fixture";
+  }
+
+  throw new Error("HITO_AI_GENERATED_PLAN_PROVIDER_MODE must be real or qa_fixture.");
 }

@@ -207,7 +207,11 @@ const sourceIdentityAliases: Record<string, CanonicalWorkoutIdentity> = {
   rest_and_recovery: "rest_and_recovery",
   recovery: "recovery_jog",
   recovery_jog: "recovery_jog",
+  "run/walk": "recovery_jog",
+  run_walk: "recovery_jog",
+  run_walk_adaptation: "recovery_jog",
   easy: "easy_aerobic_run",
+  easy_run: "easy_aerobic_run",
   easy_aerobic_run: "easy_aerobic_run",
   steady: "steady_aerobic_run",
   steady_or_easy: "steady_aerobic_run",
@@ -335,9 +339,7 @@ export function normalizeCanonicalMetricMode(value: unknown): CanonicalMetricMod
   const hrTargetSource =
     normalizeHrTargetSource(record.hrTargetSource ?? record.hr_target_source) ??
     (rawHrTargetsAllowed ? "personal_hr_zone" : "effort_only");
-  const hrTargetsAllowed =
-    rawHrTargetsAllowed &&
-    (hrTargetSource === "personal_hr_zone" || hrTargetSource === "user_entered");
+  const hrTargetsAllowed = rawHrTargetsAllowed && isExecutableHrTargetSource(hrTargetSource);
   const executableMode =
     normalizeExecutableMode(record.executableMode ?? record.executable_mode) ??
     inferExecutableModeFromMetricTruth({
@@ -445,9 +447,11 @@ export function deriveCanonicalMetricMode(segments: WorkoutSegmentLike[]): Canon
   const hrMetadata = hasHr ? deriveHrTargetMetadata(segments) : null;
   const hasPersonalHr = hasHr && hrMetadata?.source === "personal_hr_zone";
   const hasUserEnteredHr = hasHr && hrMetadata?.source === "user_entered";
+  const hasDefaultEstimatedHr = hasHr && hrMetadata?.source === "default_estimated_hr";
+  const hasEffectiveHr = hasPersonalHr || hasUserEnteredHr || hasDefaultEstimatedHr;
   const fallbackExecutableMode = deriveExecutableModeFromSegments(segments);
 
-  if (hasPace && (hasPersonalHr || hasUserEnteredHr)) {
+  if (hasPace && hasEffectiveHr) {
     return {
       guidance: "mixed",
       executableMode: "mixed_metric_executable",
@@ -459,7 +463,9 @@ export function deriveCanonicalMetricMode(segments: WorkoutSegmentLike[]): Canon
       reason:
         hrMetadata.source === "user_entered"
           ? "Workout includes explicit pace targets and runner-entered heart-rate bpm targets."
-          : "Workout includes explicit pace targets and personal heart-rate zone targets.",
+          : hrMetadata.source === "personal_hr_zone"
+            ? "Workout includes explicit pace targets and personal heart-rate profile targets."
+            : "Workout includes explicit pace targets and default estimated heart-rate profile guidance.",
     };
   }
 
@@ -480,7 +486,7 @@ export function deriveCanonicalMetricMode(segments: WorkoutSegmentLike[]): Canon
     };
   }
 
-  if (hasPersonalHr || hasUserEnteredHr) {
+  if (hasEffectiveHr) {
     return {
       guidance: "heart_rate",
       executableMode: "hr_executable",
@@ -492,7 +498,9 @@ export function deriveCanonicalMetricMode(segments: WorkoutSegmentLike[]): Canon
       reason:
         hrMetadata.source === "user_entered"
           ? "Workout includes explicit runner-entered heart-rate bpm targets."
-          : "Workout includes explicit personal heart-rate zone targets.",
+          : hrMetadata.source === "personal_hr_zone"
+            ? "Workout includes explicit personal heart-rate profile targets."
+            : "Workout includes default estimated heart-rate profile guidance.",
     };
   }
 
@@ -535,13 +543,11 @@ export function deriveExecutableModeFromSegments(
 }
 
 function deriveHrTargetMetadata(segments: WorkoutSegmentLike[]) {
-  const targets = segments.flatMap((segment) =>
-    [segment.target, segment.recovery_target].filter(
-      (target): target is Record<string, unknown> =>
-        Boolean(target) &&
-        (typeof target.hr_bpm_range === "string" || typeof target.hr_bpm === "string"),
-    ),
-  );
+  const targets = segments
+    .flatMap(collectSegmentTargets)
+    .filter(
+      (target) => typeof target.hr_bpm_range === "string" || typeof target.hr_bpm === "string",
+    );
   const sources = targets
     .map((target) => normalizeHrTargetSource(target.hr_target_source))
     .filter((source): source is HrTargetSource => Boolean(source));
@@ -570,11 +576,40 @@ function deriveHrTargetMetadata(segments: WorkoutSegmentLike[]) {
     };
   }
 
+  if (sources.length > 0 && sources.every((source) => source === "personal_hr_zone")) {
+    const metadataTarget = targets.find(
+      (target) => normalizeHrTargetSource(target.hr_target_source) === "personal_hr_zone",
+    );
+
+    return {
+      source: "personal_hr_zone" as const,
+      label: readString(metadataTarget?.label) ?? null,
+      sourceNote: readString(metadataTarget?.source_note) ?? null,
+    };
+  }
+
   return {
     source: "effort_only" as const,
     label: null,
     sourceNote: null,
   };
+}
+
+function collectSegmentTargets(segment: WorkoutSegmentLike): Record<string, unknown>[] {
+  const prescriptionChildren = Array.isArray(segment.prescription?.children)
+    ? (segment.prescription.children as WorkoutSegmentLike[])
+    : [];
+  const children = [
+    ...(Array.isArray(segment.children) ? segment.children : []),
+    ...prescriptionChildren,
+  ];
+
+  return [
+    ...[segment.target, segment.recovery_target].filter(
+      (target): target is Record<string, unknown> => Boolean(target),
+    ),
+    ...children.flatMap(collectSegmentTargets),
+  ];
 }
 
 function inferWorkoutIdentity(
@@ -715,11 +750,7 @@ function inferExecutableModeFromMetricTruth({
   hrTargetSource: HrTargetSource;
   guidance: CanonicalMetricGuidance;
 }): CanonicalExecutableMode {
-  if (
-    paceTargetsAllowed &&
-    hrTargetsAllowed &&
-    (hrTargetSource === "personal_hr_zone" || hrTargetSource === "user_entered")
-  ) {
+  if (paceTargetsAllowed && hrTargetsAllowed && isExecutableHrTargetSource(hrTargetSource)) {
     return "mixed_metric_executable";
   }
 
@@ -727,14 +758,17 @@ function inferExecutableModeFromMetricTruth({
     return "pace_executable";
   }
 
-  if (
-    hrTargetsAllowed &&
-    (hrTargetSource === "personal_hr_zone" || hrTargetSource === "user_entered")
-  ) {
+  if (hrTargetsAllowed && isExecutableHrTargetSource(hrTargetSource)) {
     return "hr_executable";
   }
 
   return guidance === "effort" ? "effort_only" : "unknown";
+}
+
+function isExecutableHrTargetSource(source: HrTargetSource) {
+  return (
+    source === "personal_hr_zone" || source === "user_entered" || source === "default_estimated_hr"
+  );
 }
 
 function flattenWorkoutSegments(segments: WorkoutSegmentLike[]): WorkoutSegmentLike[] {
@@ -877,10 +911,14 @@ function normalizeExecutableMode(value: unknown): CanonicalExecutableMode | null
 }
 
 function segmentContainsTargetKeys(segment: WorkoutSegmentLike, keys: string[]): boolean {
+  const prescriptionChildren = Array.isArray(segment.prescription?.children)
+    ? (segment.prescription.children as WorkoutSegmentLike[])
+    : [];
   const targets = [
     segment.target,
     segment.recovery_target,
     ...(Array.isArray(segment.children) ? segment.children.map((child) => child.target) : []),
+    ...prescriptionChildren.map((child) => child.target),
   ];
 
   if (
@@ -895,9 +933,9 @@ function segmentContainsTargetKeys(segment: WorkoutSegmentLike, keys: string[]):
     return true;
   }
 
-  return Array.isArray(segment.children)
-    ? segment.children.some((child) => segmentContainsTargetKeys(child, keys))
-    : false;
+  return [...(segment.children ?? []), ...prescriptionChildren].some((child) =>
+    segmentContainsTargetKeys(child, keys),
+  );
 }
 
 function normalizeHrTargetSource(value: unknown): HrTargetSource | null {

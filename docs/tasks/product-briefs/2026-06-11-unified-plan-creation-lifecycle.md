@@ -2,7 +2,7 @@
 
 ## Status
 
-in_progress
+completed
 
 ## Type
 
@@ -14,60 +14,30 @@ high
 
 ## Next Recommended Role
 
-backend
+product
 
 ## Task
 
-Implement persisted future workout editing for eligible manual planned rows before `Edit training`
-is exposed on workout detail.
+Record the canonical date-based post-confirm workout editability contract.
 
 ## Stage
 
-BACKEND implementation / persisted workout-content editing boundary.
+PRODUCT contract / accepted; runtime reconciliation pending outside this brief.
 
 ## Exact Handoff Prompt
 
-```text
-ROLE: BACKEND
+None. The initial manual/future-only rollout prompt is obsolete.
 
-Task:
-Implement persisted future workout editing for eligible manual planned rows before `Edit training`
-is exposed on workout detail.
+## Current Editability Contract
 
-Stage:
-BACKEND implementation / persisted workout-content editing boundary.
+The detailed rollout record below is preserved as implementation history. Its source-limited,
+future-only, and logged/evidence-blocked availability rules are superseded by
+`docs/current-product.md`: every confirmed non-rest workout on today or a future date can enter the
+reviewed content-edit lifecycle regardless of source, logs, completion, or evidence; past workouts
+are not editable. Review/confirm, stale protection, auth, provenance, and durable history remain
+mandatory.
 
-Context:
-The unified active-plan lifecycle now has an accepted future workout-detail action contract:
-desktop top actions, narrow-screen `...` overflow, `Copy training`, `Delete training`, and
-`Edit training`, with no `Move training` on the workout-detail surface. `Edit training` must remain
-blocked until backend owns persisted workout-content editing for already-planned rows.
-
-Root cause and architecture fit:
-The visible symptom is missing `Edit training` on future workout detail. The underlying cause is not
-a frontend button gap; persisted workout-content editing lacks a backend-owned review/confirm seam.
-Reuse active-plan editability policy, protected-history checks, persisted workout reconstruction,
-manual workout draft review, and active-plan user-edit metadata before adding anything new.
-
-Scope:
-- Eligible future planned manual workout rows only.
-- Reconstruct the persisted row into the existing manual workout draft/constructor shape.
-- Review edited draft input server-side and issue token/checksum.
-- Confirm by rebuilding server-side and updating exactly the same `planned_workouts` row.
-- Persist `active_plan_user_edit_v1` metadata with `user_edited_workout` and
-  `trusted_client_rows: false`.
-- Keep frontend action-bar wiring, generated/selected/preset/imported edit expansion, recurrence,
-  Restore UI, active-plan replacement, fake pace, fake personal HR, and OpenAI mutation out of
-  scope.
-
-Validation:
-- Targeted ESLint for changed backend files.
-- Manual authoring validator with edit coverage.
-- Scoped `git diff --check`.
-- `npm run build` if runtime source changed.
-```
-
-## Product Direction Status
+## Historical Rollout Record
 
 Product direction / universal Add-Clear-Move editability accepted in proved scope; direct manual
 Copy/Paste and Move implemented and QA-passed in the manual scope; missed-unlogged manual
@@ -76,7 +46,7 @@ action/editing contract accepted
 
 Date: 2026-06-11
 
-Last Updated: 2026-06-15
+Last Updated: 2026-07-19
 
 Owner: PRODUCT
 

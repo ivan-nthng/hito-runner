@@ -27,6 +27,11 @@ import {
   applyAtomicReviewedPlanPersistence,
 } from "../../src/lib/active-plan-lifecycle-persistence";
 import { AI_AUTHORED_PLAN_FIRST_SOURCE_KIND } from "../../src/lib/ai-authored-plan-first-compiler";
+import {
+  AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV,
+  buildAiGeneratedRunningPlanDevFixturePreviewOptions,
+} from "../../src/lib/ai-generated-running-plan-dev-fixture";
+import { buildAiGeneratedRunningPlanAuthoringInput } from "../../src/lib/ai-generated-running-plan";
 import { buildSourceWorkoutFingerprint } from "../../src/lib/manual-workout-authoring/edit-workout-review-token";
 import {
   TRAINING_PLAN_V2_IMPORT_SOURCE_KIND,
@@ -35,6 +40,12 @@ import {
 import type { Database, Json } from "../../src/lib/supabase/database";
 import { createAdminSupabaseClient } from "../../src/lib/supabase/server";
 import { addDaysIso, todayIso, weekdayLong } from "../../src/lib/training";
+import { buildReviewedAiGeneratedRunningPlanPreview } from "../../src/lib/running-plan-engine-actions";
+import { buildRunningPlanCanonicalPlan } from "../../src/lib/running-plan-engine-review";
+import {
+  AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
+  readWorkoutDocumentSections,
+} from "../../src/lib/workout-document";
 import {
   cleanupDisposableSupabaseUser,
   createDisposableSupabaseUser,
@@ -266,6 +277,11 @@ export async function validateManualWorkoutDisposablePersistenceProof({
       originalWorkoutFamily: manualEdit.sourceWorkout.workout_family,
       originalWorkoutIdentity: manualEdit.sourceWorkout.workout_identity,
     });
+    assert.deepEqual(
+      readLatestUserEditPreviousWorkout(manualEdit.edited.plan),
+      manualEdit.sourceWorkout,
+      "Manual edit history must retain the complete pre-edit planned workout.",
+    );
 
     const duplicate = await addManualWorkoutToActivePlanForUser(disposableUser.userId, {
       activePlanId: emptyPlan.activePlanId,
@@ -525,6 +541,9 @@ async function validateImportedWorkoutEditAtomicPersistence(input: {
     originalWorkoutIdentity: string | null;
     failureAtomic: true;
     replacementFailureAtomic: true;
+    todayUnloggedEditable: true;
+    todayHistoryBackedEditable: true;
+    historyPreserved: true;
   } | null = null;
   let cleanup: ManualDisposableCleanupProof | null = null;
 
@@ -540,19 +559,94 @@ async function validateImportedWorkoutEditAtomicPersistence(input: {
     await applyImportedPlanForUser(disposableUser.userId, externalPlan, null);
 
     const imported = await loadPersistedManualPlanForUser(input.supabase, disposableUser.userId);
-    const sourceWorkout = imported.workouts[0];
-    assert.ok(sourceWorkout, "Imported edit proof requires one persisted workout.");
+    const importedSourceWorkout = imported.workouts[0];
+    assert.ok(importedSourceWorkout, "Imported edit proof requires one persisted workout.");
     assert.equal(imported.plan.source_kind, TRAINING_PLAN_V2_IMPORT_SOURCE_KIND);
     assert.deepEqual(readImportOrigin(imported.plan), {
       sourceKind: "external_coach_export_v7",
       sourceStatus: "confirmed_external_plan",
     });
 
+    const today = todayIso();
+    const dateUpdate = await input.supabase
+      .from("planned_workouts")
+      .update({
+        workout_date: today,
+        weekday: weekdayLong(today),
+      })
+      .eq("id", importedSourceWorkout.id)
+      .eq("user_id", disposableUser.userId);
+    if (dateUpdate.error) throw new Error(dateUpdate.error.message);
+    const importedToday = await loadPersistedManualPlanForUser(
+      input.supabase,
+      disposableUser.userId,
+    );
+    const sourceWorkout = importedToday.workouts.find(
+      (workout) => workout.id === importedSourceWorkout.id,
+    );
+    assert.ok(sourceWorkout, "Today import edit proof requires the persisted source workout.");
+
+    const todayUnloggedEdit = await reviewConfirmAndReadPersistedWorkoutEdit({
+      supabase: input.supabase,
+      userId: disposableUser.userId,
+      persisted: importedToday,
+      title: "Runner-owned imported workout edit today",
+    });
+    assert.deepEqual(
+      readLatestUserEditPreviousWorkout(todayUnloggedEdit.edited.plan),
+      sourceWorkout,
+      "Today edit must retain the complete pre-edit planned workout.",
+    );
+
+    const logId = crypto.randomUUID();
+    const log = await input.supabase
+      .from("workout_logs")
+      .insert({
+        id: logId,
+        planned_workout_id: todayUnloggedEdit.editedWorkout.id,
+        user_id: disposableUser.userId,
+        outcome: "completed",
+        actual_distance_km: 5,
+        actual_duration_min: 35,
+        rpe: 5,
+        notes: "History-backed edit proof",
+        intervals_completed: null,
+        body_notes: [],
+      })
+      .select("*")
+      .single();
+    if (log.error || !log.data) {
+      throw new Error(log.error?.message ?? "History-backed edit log setup failed.");
+    }
+    const assetId = crypto.randomUUID();
+    const asset = await input.supabase
+      .from("workout_result_assets")
+      .insert({
+        id: assetId,
+        user_id: disposableUser.userId,
+        planned_workout_id: todayUnloggedEdit.editedWorkout.id,
+        workout_log_id: logId,
+        asset_kind: "garmin_fit",
+        storage_bucket: "workout-result-assets",
+        storage_path: `history-backed-edit/${assetId}.fit`,
+        original_file_name: "history-backed-edit.fit",
+        mime_type: "application/octet-stream",
+        file_size_bytes: 1,
+        parse_status: "uploaded",
+        primary_file_kind: "fit",
+        primary_file_name: "history-backed-edit.fit",
+      })
+      .select("*")
+      .single();
+    if (asset.error || !asset.data) {
+      throw new Error(asset.error?.message ?? "History-backed edit asset setup failed.");
+    }
+
     const edit = await reviewConfirmAndReadPersistedWorkoutEdit({
       supabase: input.supabase,
       userId: disposableUser.userId,
-      persisted: imported,
-      title: "Runner-owned imported workout edit",
+      persisted: todayUnloggedEdit.edited,
+      title: "Runner-owned imported workout edit with history",
     });
     const { confirm, edited, editedDraftInput, editedWorkout } = edit;
 
@@ -562,13 +656,22 @@ async function validateImportedWorkoutEditAtomicPersistence(input: {
     );
     assert.equal(confirm.sourceMetadata.originalPlanOriginSourceKind, "external_coach_export_v7");
     assert.equal(confirm.sourceMetadata.originalPlanOriginSourceStatus, "confirmed_external_plan");
-    assert.equal(confirm.sourceMetadata.originalWorkoutSourceId, sourceWorkout.source_workout_id);
+    assert.equal(
+      confirm.sourceMetadata.originalWorkoutSourceId,
+      todayUnloggedEdit.editedWorkout.source_workout_id,
+    );
     assert.equal(
       confirm.sourceMetadata.originalWorkoutSourceType,
-      sourceWorkout.source_workout_type,
+      todayUnloggedEdit.editedWorkout.source_workout_type,
     );
-    assert.equal(confirm.sourceMetadata.originalWorkoutFamily, sourceWorkout.workout_family);
-    assert.equal(confirm.sourceMetadata.originalWorkoutIdentity, sourceWorkout.workout_identity);
+    assert.equal(
+      confirm.sourceMetadata.originalWorkoutFamily,
+      todayUnloggedEdit.editedWorkout.workout_family,
+    );
+    assert.equal(
+      confirm.sourceMetadata.originalWorkoutIdentity,
+      todayUnloggedEdit.editedWorkout.workout_identity,
+    );
 
     assert.equal(editedWorkout.id, sourceWorkout.id);
     assert.equal(editedWorkout.title, editedDraftInput.title);
@@ -580,11 +683,35 @@ async function validateImportedWorkoutEditAtomicPersistence(input: {
       originalPlanSourceKind: TRAINING_PLAN_V2_IMPORT_SOURCE_KIND,
       originalPlanOriginSourceKind: "external_coach_export_v7",
       originalPlanOriginSourceStatus: "confirmed_external_plan",
-      originalWorkoutSourceId: sourceWorkout.source_workout_id,
-      originalWorkoutSourceType: sourceWorkout.source_workout_type,
-      originalWorkoutFamily: sourceWorkout.workout_family,
-      originalWorkoutIdentity: sourceWorkout.workout_identity,
+      originalWorkoutSourceId: todayUnloggedEdit.editedWorkout.source_workout_id,
+      originalWorkoutSourceType: todayUnloggedEdit.editedWorkout.source_workout_type,
+      originalWorkoutFamily: todayUnloggedEdit.editedWorkout.workout_family,
+      originalWorkoutIdentity: todayUnloggedEdit.editedWorkout.workout_identity,
     });
+    assert.deepEqual(
+      readLatestUserEditPreviousWorkout(edited.plan),
+      todayUnloggedEdit.editedWorkout,
+      "History-backed edit must retain the immediately preceding planned workout truth.",
+    );
+    assert.equal(
+      readUserEditHistory(edited.plan).length,
+      2,
+      "Repeated edits must append rather than replace prior planned truth.",
+    );
+    const persistedLog = await input.supabase
+      .from("workout_logs")
+      .select("*")
+      .eq("id", logId)
+      .single();
+    const persistedAsset = await input.supabase
+      .from("workout_result_assets")
+      .select("*")
+      .eq("id", assetId)
+      .single();
+    assert.equal(persistedLog.error, null);
+    assert.equal(persistedAsset.error, null);
+    assert.deepEqual(persistedLog.data, log.data);
+    assert.deepEqual(persistedAsset.data, asset.data);
 
     const forcedFailure = await input.supabase.rpc("apply_active_plan_workout_content_edit", {
       p_current_date: todayIso(),
@@ -625,6 +752,20 @@ async function validateImportedWorkoutEditAtomicPersistence(input: {
     );
     assert.deepEqual(afterFailure.plan, edited.plan);
     assert.deepEqual(afterFailure.workouts, edited.workouts);
+    const afterFailureLog = await input.supabase
+      .from("workout_logs")
+      .select("*")
+      .eq("id", logId)
+      .single();
+    const afterFailureAsset = await input.supabase
+      .from("workout_result_assets")
+      .select("*")
+      .eq("id", assetId)
+      .single();
+    assert.equal(afterFailureLog.error, null);
+    assert.equal(afterFailureAsset.error, null);
+    assert.deepEqual(afterFailureLog.data, log.data);
+    assert.deepEqual(afterFailureAsset.data, asset.data);
     const replacementFailureAtomic = await validatePlanReplacementFailureAtomicity({
       supabase: input.supabase,
       userId: disposableUser.userId,
@@ -636,12 +777,15 @@ async function validateImportedWorkoutEditAtomicPersistence(input: {
       originSourceKind: "external_coach_export_v7",
       originSourceStatus: "confirmed_external_plan",
       plannedWorkoutId: sourceWorkout.id,
-      originalWorkoutSourceId: sourceWorkout.source_workout_id,
-      originalWorkoutSourceType: sourceWorkout.source_workout_type,
-      originalWorkoutFamily: sourceWorkout.workout_family,
-      originalWorkoutIdentity: sourceWorkout.workout_identity,
+      originalWorkoutSourceId: todayUnloggedEdit.editedWorkout.source_workout_id,
+      originalWorkoutSourceType: todayUnloggedEdit.editedWorkout.source_workout_type,
+      originalWorkoutFamily: todayUnloggedEdit.editedWorkout.workout_family,
+      originalWorkoutIdentity: todayUnloggedEdit.editedWorkout.workout_identity,
       failureAtomic: true,
       replacementFailureAtomic,
+      todayUnloggedEditable: true,
+      todayHistoryBackedEditable: true,
+      historyPreserved: true,
     };
   } finally {
     cleanup = await cleanupDisposableManualWorkoutUser(input.supabase, disposableUser.userId);
@@ -1243,9 +1387,59 @@ async function validateCanonicalOriginWorkoutEditPersistence(input: {
     let cleanup: ManualDisposableCleanupProof | null = null;
 
     try {
-      const authoredPlan = buildManualWorkoutUserBuiltTrainingPlan(input.review.draft);
+      const previewInput = {
+        age: 36,
+        heightCm: 178,
+        weightKg: 74,
+        runnerLevel: "sometimes_runs" as const,
+        daysPerWeek: 4,
+        fixedRestDays: ["Tuesday", "Saturday"] as const,
+        preferredLongRunDay: "Sunday" as const,
+        startDate: addDaysIso(todayIso(), 1),
+        benchmark: { kind: "unknown" as const },
+        planGoalIntent: {
+          distance: { kind: "preset" as const, preset: "10K" as const },
+        },
+      };
+      const authoring = buildAiGeneratedRunningPlanAuthoringInput(previewInput);
+      assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);
+      if (!authoring.ok) throw new Error(authoring.message);
+      const fixtureOptions = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
+        authoringInput: authoring.authoringInput,
+        qaFixtureAuthorized: true,
+        today: previewInput.startDate,
+        env: {
+          LOCAL_AUTH_BYPASS_ENABLED: "true",
+          LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: "/tmp/hito-local-auth.json",
+          NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+          HITO_AI_GENERATED_PLAN_DEV_FIXTURE: "true",
+          HITO_AI_GENERATED_PLAN_PROVIDER_MODE: "qa_fixture",
+          [AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV]: "non_repeat_tempo",
+        },
+      });
+      assert.ok(fixtureOptions, "Local AI plan fixture must be available for persistence proof.");
+      const previousFixtureScenario =
+        process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV];
+      process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV] = "non_repeat_tempo";
+      let reviewed: Awaited<ReturnType<typeof buildReviewedAiGeneratedRunningPlanPreview>>;
+      try {
+        reviewed = await buildReviewedAiGeneratedRunningPlanPreview(previewInput, {
+          aiPreview: {
+            ...fixtureOptions,
+            generationLedger: { disabled: true },
+          },
+        });
+      } finally {
+        if (previousFixtureScenario === undefined) {
+          delete process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV];
+        } else {
+          process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV] = previousFixtureScenario;
+        }
+      }
+      assert.equal(reviewed.ok, true, reviewed.ok ? "" : reviewed.unavailable.error.message);
+      if (!reviewed.ok) throw new Error(reviewed.unavailable.error.message);
       const reviewedPlan = {
-        ...authoredPlan,
+        ...buildRunningPlanCanonicalPlan(reviewed.draft),
         plan_name: `${origin.label} runner-owned edit proof`,
         source_kind: origin.sourceKind,
         source_status: origin.sourceStatus,
@@ -1260,6 +1454,8 @@ async function validateCanonicalOriginWorkoutEditPersistence(input: {
         userId: disposableUser.userId,
         persisted,
         title: `Runner-owned ${origin.label} workout edit`,
+        workoutIdentity: "controlled_tempo_session",
+        workoutPace: "4:50-5:00/km",
       });
 
       assert.equal(edit.confirm.sourceMetadata.originalPlanSourceKind, origin.sourceKind);
@@ -1267,6 +1463,11 @@ async function validateCanonicalOriginWorkoutEditPersistence(input: {
       assert.equal(edit.confirm.sourceMetadata.originalPlanOriginSourceStatus, null);
       assert.equal(edit.editedWorkout.id, edit.sourceWorkout.id);
       assert.equal(edit.editedWorkout.title, edit.editedDraftInput.title);
+      assert.deepEqual(
+        findAiAuthoredPaceTarget(edit.editedWorkout.steps),
+        findAiAuthoredPaceTarget(edit.sourceWorkout.steps),
+      );
+      assert.equal(findAiAuthoredPaceTarget(edit.editedWorkout.steps)?.pace, "4:50-5:00/km");
       assert.deepEqual(readLatestUserEditProvenance(edit.edited.plan), {
         originalPlanSourceKind: origin.sourceKind,
         originalPlanOriginSourceKind: null,
@@ -1276,6 +1477,11 @@ async function validateCanonicalOriginWorkoutEditPersistence(input: {
         originalWorkoutFamily: edit.sourceWorkout.workout_family,
         originalWorkoutIdentity: edit.sourceWorkout.workout_identity,
       });
+      assert.deepEqual(
+        readLatestUserEditPreviousWorkout(edit.edited.plan),
+        edit.sourceWorkout,
+        `${origin.label} edit history must retain complete pre-edit planned truth.`,
+      );
 
       proof = {
         label: origin.label,
@@ -1306,8 +1512,14 @@ async function reviewConfirmAndReadPersistedWorkoutEdit(input: {
   userId: string;
   persisted: PersistedManualPlanReadback;
   title: string;
+  workoutIdentity?: string;
+  workoutPace?: string;
 }) {
-  const sourceWorkout = input.persisted.workouts[0];
+  const sourceWorkout = input.persisted.workouts.find(
+    (workout) =>
+      (!input.workoutIdentity || workout.workout_identity === input.workoutIdentity) &&
+      (!input.workoutPace || findAiAuthoredPaceTarget(workout.steps)?.pace === input.workoutPace),
+  );
   assert.ok(sourceWorkout, "Persisted edit proof requires one planned workout.");
 
   const reconstructed = await reconstructManualWorkoutPersistedEditDraftForUser(input.userId, {
@@ -1350,7 +1562,7 @@ async function reviewConfirmAndReadPersistedWorkoutEdit(input: {
   }
 
   const edited = await loadPersistedManualPlanForUser(input.supabase, input.userId);
-  const editedWorkout = edited.workouts[0];
+  const editedWorkout = edited.workouts.find((workout) => workout.id === sourceWorkout.id);
   assert.ok(editedWorkout, "Persisted edit must retain the original workout row.");
 
   return {
@@ -1360,6 +1572,28 @@ async function reviewConfirmAndReadPersistedWorkoutEdit(input: {
     edited,
     editedWorkout,
   };
+}
+
+function findAiAuthoredPaceTarget(value: unknown) {
+  for (const section of readWorkoutDocumentSections(value)) {
+    if (
+      section.target?.target_source === AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE &&
+      section.target.pace
+    ) {
+      return section.target;
+    }
+
+    for (const child of section.prescription?.children ?? []) {
+      if (
+        child.target?.target_source === AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE &&
+        child.target.pace
+      ) {
+        return child.target;
+      }
+    }
+  }
+
+  return null;
 }
 
 async function loadPersistedManualPlanForUser(
@@ -1428,6 +1662,16 @@ function readLatestUserEditProvenance(plan: PersistedPlanCycleRow) {
     originalWorkoutFamily: edit.original_workout_family ?? null,
     originalWorkoutIdentity: edit.original_workout_identity ?? null,
   };
+}
+
+function readLatestUserEditPreviousWorkout(plan: PersistedPlanCycleRow) {
+  const edit = asJsonObject(asJsonObject(plan.goal_metadata).active_plan_user_edit);
+  return asJsonObject(edit.previous_workout);
+}
+
+function readUserEditHistory(plan: PersistedPlanCycleRow) {
+  const history = asJsonObject(plan.goal_metadata).active_plan_user_edits;
+  return Array.isArray(history) ? history : [];
 }
 
 function asJsonObject(value: unknown): Record<string, Json> {

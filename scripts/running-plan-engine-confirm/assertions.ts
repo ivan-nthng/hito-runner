@@ -25,10 +25,14 @@ export function validateCanonicalRowsAreNumeric(
     assert.ok(row.segments.length > 0, `${row.workout_id} must have segments.`);
     assert.ok(row.metric_mode, `${row.workout_id} must have metric mode.`);
     if (options.expectedMode === "structure_only" || !rowHasPaceTargets(row)) {
-      assert.equal(row.metric_mode?.executable_mode, "structure_only_executable");
+      assert.ok(
+        ["structure_only_executable", "hr_executable"].includes(
+          row.metric_mode?.executable_mode ?? "",
+        ),
+      );
       assert.equal(row.metric_mode?.pace_targets_allowed, false);
     }
-    assert.equal(row.metric_mode?.hr_targets_allowed, false);
+    assert.equal(row.metric_mode?.hr_targets_allowed, rowHasHeartRateTargets(row));
 
     for (const segment of row.segments) {
       assert.ok(segment.prescription, `${row.workout_id}.${segment.segment_type} lacks structure.`);
@@ -41,18 +45,34 @@ export function validateCanonicalRowsAreNumeric(
   }
 }
 
-export function validateNoFakePaceOrPersonalHr(rows: readonly unknown[]) {
+export function validateAiAuthoredPaceAndEffectiveHrGuidance(rows: readonly unknown[]) {
   validateAiAuthoredPaceTargets(rows);
-  validateNoPersonalHrTargets(rows);
+  validateEffectiveHeartRateTargets(rows);
 }
 
-export function validateNoPersonalHrTargets(rows: readonly unknown[]) {
-  const serialized = JSON.stringify(rows);
+export function validateEffectiveHeartRateTargets(rows: readonly unknown[]) {
+  let targetCount = 0;
 
-  assert.doesNotMatch(
-    serialized,
-    /personal_hr|personalized_hr|hr_zone_truth|"hr_targets_allowed":true/i,
-  );
+  visitRecords(rows, (record) => {
+    if (typeof record.hr_bpm_range !== "string") {
+      return;
+    }
+
+    targetCount += 1;
+    assert.match(record.hr_bpm_range, /^\d{2,3}-\d{2,3} bpm$/);
+    assert.ok(
+      record.hr_target_source === "default_estimated_hr" ||
+        record.hr_target_source === "personal_hr_zone",
+      "Generated HR guidance must identify its effective profile source.",
+    );
+    assert.equal(
+      record.target_source,
+      "ai_authored_plan_guidance",
+      "Generated HR guidance must retain AI-authored provenance.",
+    );
+  });
+
+  assert.ok(targetCount > 0, "Generated plan proof must include effective BPM guidance.");
 }
 
 export function assertSelectedDistanceEndpointProof(input: {
@@ -91,6 +111,10 @@ export function rowHasPaceTargets(row: CanonicalRunningPlanRow) {
   return /"pace_min_per_km_range"|"pace_range_min_km"|"pace"/i.test(JSON.stringify(row.segments));
 }
 
+function rowHasHeartRateTargets(row: CanonicalRunningPlanRow) {
+  return /"hr_bpm_range"/i.test(JSON.stringify(row.segments));
+}
+
 function validateAiAuthoredPaceTargets(value: unknown) {
   if (Array.isArray(value)) {
     value.forEach(validateAiAuthoredPaceTargets);
@@ -110,6 +134,18 @@ function validateAiAuthoredPaceTargets(value: unknown) {
   assert.equal(record.pace_min_seconds_per_km, undefined);
   assert.equal(record.pace_max_seconds_per_km, undefined);
   Object.values(record).forEach(validateAiAuthoredPaceTargets);
+}
+
+function visitRecords(value: unknown, visitor: (record: Record<string, unknown>) => void) {
+  if (Array.isArray(value)) {
+    value.forEach((entry) => visitRecords(entry, visitor));
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+
+  const record = value as Record<string, unknown>;
+  visitor(record);
+  Object.values(record).forEach((entry) => visitRecords(entry, visitor));
 }
 
 export function validateNoClientRowsTrusted(rows: readonly PersistedWorkoutRow[]) {

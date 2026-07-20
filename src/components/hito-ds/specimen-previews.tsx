@@ -1,3 +1,9 @@
+import { useEffect, useState } from "react";
+import {
+  AdminDataTableColumnHeader,
+  AdminDataTableStaticHeader,
+  AdminDataTableToolbar,
+} from "@/components/admin/AdminOperationalComponents";
 import {
   Dialog,
   DialogContent,
@@ -7,14 +13,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +30,7 @@ type ModalBodyMode = "content-fit" | "scroll-fill";
 type ModalHeaderMode = "compact" | "large";
 type ModalFooterMode = "none" | "actions" | "note-actions";
 type DataTableSortDirection = "asc" | "desc";
+type DataTableSpecimenSortKey = "preview" | "none";
 
 export function DataTableSpecimenPreview({
   sortable,
@@ -49,39 +48,62 @@ export function DataTableSpecimenPreview({
   showUtilityRow: boolean;
 }) {
   const previewIsStatic = staticMode || !sortable;
-  const activeSortDirection: DataTableSortDirection | null =
-    !previewIsStatic && activeSort ? sortDirection : null;
+  const [query, setQuery] = useState("runner@hito.test");
+  const [selectedFilter, setSelectedFilter] = useState(filtered ? "active" : "all");
+  const [activeSortState, setActiveSortState] = useState<{
+    key: DataTableSpecimenSortKey;
+    direction: DataTableSortDirection;
+  }>({
+    key: !previewIsStatic && activeSort ? "preview" : "none",
+    direction: sortDirection,
+  });
+
+  useEffect(() => {
+    setSelectedFilter(filtered ? "active" : "all");
+  }, [filtered]);
+
+  useEffect(() => {
+    setActiveSortState({
+      key: !previewIsStatic && activeSort ? "preview" : "none",
+      direction: sortDirection,
+    });
+  }, [activeSort, previewIsStatic, sortDirection]);
+
+  const activeFilters =
+    selectedFilter === "active"
+      ? [
+          {
+            id: "status",
+            label: "Status",
+            value: "Active",
+            onRemove: () => setSelectedFilter("all"),
+          },
+        ]
+      : [];
 
   return (
     <div className="grid gap-4">
       {showUtilityRow && (
-        <div className="hito-data-table-utility-row">
-          <label className="hito-field hito-field-sm hito-data-table-search">
-            <Icon name="search" size="xs" className="text-muted-foreground" />
-            <input
-              aria-label="Search data table specimen"
-              className="hito-data-table-search-input"
-              readOnly
-              value="runner@hito.test"
-            />
-            <button
-              type="button"
-              className="hito-button hito-button-ghost hito-button-xs hito-data-table-search-clear"
-              aria-label="Clear search"
-            >
-              <Icon name="close" size="xs" />
-            </button>
-          </label>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="hito-button hito-button-secondary hito-button-sm hito-data-table-filter-summary"
-            >
-              Filters · {filtered ? "1" : "0"}
-            </button>
-            <span className="hito-caption">3 rows</span>
-          </div>
-        </div>
+        <AdminDataTableToolbar
+          activeFilters={activeFilters}
+          clearAllFilters={() => setSelectedFilter("all")}
+          filterSections={[
+            {
+              currentValue: selectedFilter,
+              label: "Status",
+              onSelect: setSelectedFilter,
+              options: [
+                { value: "all", label: "All states" },
+                { value: "active", label: "Active" },
+              ],
+            },
+          ]}
+          onQueryChange={setQuery}
+          query={query}
+          rowCountLabel="3 rows"
+          searchLabel="Search data table specimen"
+          searchPlaceholder="Search runners"
+        />
       )}
 
       <div className="hito-data-table-scroll">
@@ -89,37 +111,30 @@ export function DataTableSpecimenPreview({
           <caption className="sr-only">Hito data-table specimen preview.</caption>
           <thead>
             <tr>
-              <th
-                scope="col"
-                aria-sort={previewIsStatic ? undefined : sortDirectionToAria(activeSortDirection)}
-                className="whitespace-nowrap px-2 py-2 font-medium"
-              >
-                {previewIsStatic ? (
-                  <DataTableStaticHeader label="Preview column" />
-                ) : (
-                  <DataTableHeaderButton
-                    label="Preview column"
-                    activeSortDirection={activeSortDirection}
-                    filtered={filtered}
-                  />
-                )}
-              </th>
-              <th scope="col" aria-sort="none" className="whitespace-nowrap px-2 py-2 font-medium">
-                <DataTableHeaderButton label="Hover state" hover />
-              </th>
-              <th
-                scope="col"
-                aria-sort={sortDirectionToAria(sortDirection)}
-                className="whitespace-nowrap px-2 py-2 font-medium"
-              >
-                <DataTableHeaderButton label="Active sort" activeSortDirection={sortDirection} />
-              </th>
-              <th scope="col" aria-sort="none" className="whitespace-nowrap px-2 py-2 font-medium">
-                <DataTableHeaderButton label="Filtered" filtered />
-              </th>
-              <th scope="col" className="whitespace-nowrap px-2 py-2 font-medium">
-                <DataTableStaticHeader label="Static header" />
-              </th>
+              {previewIsStatic ? (
+                <AdminDataTableStaticHeader label="Preview column" />
+              ) : (
+                <AdminDataTableColumnHeader
+                  activeSort={activeSortState}
+                  column="preview"
+                  filterActive={selectedFilter !== "all"}
+                  filterOptions={[
+                    { value: "all", label: "All states" },
+                    { value: "active", label: "Active" },
+                  ]}
+                  label="Preview column"
+                  menuLabel="Sort and filter preview column"
+                  onFilterChange={setSelectedFilter}
+                  onSort={(key, direction) => setActiveSortState({ key, direction })}
+                  selectedFilter={selectedFilter}
+                  sortOptions={[
+                    { key: "preview", direction: "asc", label: "Sort ascending" },
+                    { key: "preview", direction: "desc", label: "Sort descending" },
+                  ]}
+                />
+              )}
+              <AdminDataTableStaticHeader label="Runtime behavior" />
+              <AdminDataTableStaticHeader label="Contract" />
             </tr>
           </thead>
           <tbody>
@@ -127,11 +142,9 @@ export function DataTableSpecimenPreview({
               <td className="hito-data-table-cell hito-data-table-cell-start">
                 {previewIsStatic ? "Non-interactive label" : "Header menu affordance"}
               </td>
-              <td className="hito-data-table-cell">Subtle Hito wash</td>
-              <td className="hito-data-table-cell">Signal arrow active</td>
-              <td className="hito-data-table-cell">Circular filter dot</td>
+              <td className="hito-data-table-cell">Search, sort, and filter remain interactive</td>
               <td className="hito-data-table-cell hito-data-table-cell-end">
-                Same typography, no click
+                Shared admin operational owner
               </td>
             </tr>
             <tr>
@@ -141,9 +154,9 @@ export function DataTableSpecimenPreview({
                 </code>
               </td>
               <td className="hito-data-table-cell">Keyboard reachable</td>
-              <td className="hito-data-table-cell">aria-sort on th</td>
-              <td className="hito-data-table-cell">Filter stays contextual</td>
-              <td className="hito-data-table-cell hito-data-table-cell-end">Password</td>
+              <td className="hito-data-table-cell hito-data-table-cell-end">
+                aria-sort stays on the table header
+              </td>
             </tr>
           </tbody>
         </table>
@@ -153,101 +166,6 @@ export function DataTableSpecimenPreview({
         The scroll container owns horizontal overflow; the page canvas should not.
       </p>
     </div>
-  );
-}
-
-function DataTableHeaderButton({
-  label,
-  activeSortDirection = null,
-  filtered = false,
-  hover = false,
-}: {
-  label: string;
-  activeSortDirection?: DataTableSortDirection | null;
-  filtered?: boolean;
-  hover?: boolean;
-}) {
-  const isSorted = activeSortDirection != null;
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className="hito-button hito-button-ghost hito-button-xs hito-data-table-header-button"
-          data-active={isSorted || filtered ? "true" : undefined}
-          data-demo-state={hover ? "hover" : undefined}
-          aria-label={`Sort and filter ${label}`}
-        >
-          <span>{label}</span>
-          {filtered ? <span className="hito-data-table-filter-dot" /> : null}
-          <Icon
-            aria-hidden="true"
-            name={activeSortDirection === "asc" ? "chevron-up" : "chevron-down"}
-            size="xs"
-            className="hito-data-table-sort-indicator"
-            data-active={isSorted ? "true" : undefined}
-          />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        className="hito-shell-menu hito-data-table-column-menu hito-data-table-menu-width-standard"
-      >
-        <DropdownMenuLabel className="hito-micro-label">Sort</DropdownMenuLabel>
-        {DATA_TABLE_SORT_OPTIONS.map((option) => {
-          const optionActive = activeSortDirection === option.direction;
-
-          return (
-            <DropdownMenuItem
-              key={option.direction}
-              className="hito-shell-menu-item hito-data-table-menu-item"
-              aria-current={optionActive ? "true" : undefined}
-            >
-              <Icon
-                name={optionActive ? "check" : "chevron-right"}
-                size="xs"
-                className={optionActive ? "text-signal" : "text-muted-foreground"}
-              />
-              {option.label}
-            </DropdownMenuItem>
-          );
-        })}
-        {filtered ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="hito-micro-label">Filter</DropdownMenuLabel>
-            <DropdownMenuItem className="hito-shell-menu-item hito-data-table-menu-item">
-              <Icon name="check" size="xs" className="text-signal" />
-              Active filter
-            </DropdownMenuItem>
-            <DropdownMenuItem className="hito-shell-menu-item hito-data-table-menu-item">
-              <Icon name="x-circle" size="xs" />
-              Clear filter
-            </DropdownMenuItem>
-          </>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-const DATA_TABLE_SORT_OPTIONS = [
-  { direction: "asc", label: "Sort ascending" },
-  { direction: "desc", label: "Sort descending" },
-] satisfies Array<{ direction: DataTableSortDirection; label: string }>;
-
-function sortDirectionToAria(direction: DataTableSortDirection | null) {
-  if (direction === "asc") return "ascending";
-  if (direction === "desc") return "descending";
-  return "none";
-}
-
-function DataTableStaticHeader({ label }: { label: string }) {
-  return (
-    <span className="hito-data-table-header hito-data-table-header-static" data-disabled="true">
-      {label}
-    </span>
   );
 }
 

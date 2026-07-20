@@ -212,8 +212,11 @@ local wrapper.
 ## Known Hito Frontend Traps
 
 - Do not infer lifecycle/editability from `sourceKind`; source kind is provenance/audit context.
-- Prefer backend editability/capability fields such as `canMove`, `canClear`, `canCopy`,
-  `canEditContent`, `eligible_past_unlogged`, and `restore_requires_editor_support` when present.
+- Read the canonical confirmed-workout editability rule in `docs/current-product.md`. Do not infer
+  content-edit denial from source, logs, evidence, or completion; report a backend capability that
+  contradicts the canonical date rule instead of adding a frontend heuristic.
+- Prefer operation-specific backend capability fields such as `canMove`, `canClear`, `canCopy`, and
+  `canEditContent` when present, but do not treat one operation's protection as another's policy.
 - `resolveActivePlanWorkoutEditability(...)` is the backend-owned Add/Delete/Clear/Move policy seam.
 - `src/components/Calendar.tsx` should consume backend-shaped capability flags instead of
   future-only heuristics.
@@ -226,9 +229,11 @@ local wrapper.
 - Treat `src/styles.css` Hito DS class families as canonical owners before inventing React wrappers.
 - For modal work, normalize the existing `hito-product-dialog` and related overlay/body/footer
   classes before proposing a new framework.
-- For saved-calendar QA expectations, eligible rows should expose draggable behavior, ellipsis
-  controls must not become drag sources, protected/logged rows should expose no action button and no
-  draggable source, and final QA reports need `Browser Path Preflight` plus `Verdict`.
+- For saved-calendar QA expectations, eligible move rows should expose draggable behavior, ellipsis
+  controls must not become drag sources, and operation-specific protected rows must not expose unsafe
+  Move/Clear/Copy actions. Logged/evidence-backed today/future workouts still retain the separate
+  reviewed content-edit entry defined by `docs/current-product.md`. Final QA reports need
+  `Browser Path Preflight` plus `Verdict`.
 
 ## Subagent Safety Boundaries
 

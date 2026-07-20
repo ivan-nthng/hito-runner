@@ -15,12 +15,7 @@ import {
   type PersistedPlannedWorkoutRow,
 } from "@/lib/active-plan-persistence";
 import { buildImportedPlanSeed } from "@/lib/imported-plan";
-import {
-  fetchManualWorkoutEvidenceWorkoutIds,
-  isProtectedManualWorkoutTarget,
-  type ManualWorkoutActivePlanAddDependencies,
-  type ManualWorkoutEvidenceFetcher,
-} from "@/lib/manual-workout-authoring/active-plan-add";
+import type { ManualWorkoutActivePlanAddDependencies } from "@/lib/manual-workout-authoring/active-plan-add";
 import { reviewManualWorkoutDraft } from "@/lib/manual-workout-authoring/actions";
 import { buildManualWorkoutDraftInputFromPersistedWorkout } from "@/lib/manual-workout-authoring/copy-paste-reconstruction";
 import {
@@ -31,7 +26,10 @@ import {
   validatePersistedEditReviewProof,
   type ManualWorkoutPersistedEditReview,
 } from "@/lib/manual-workout-authoring/edit-workout-review-token";
-import { persistedManualWorkoutHasUnsafeMetricTruth } from "@/lib/manual-workout-authoring/persisted-workout-safety";
+import {
+  persistedManualWorkoutHasUnsafeMetricTruth,
+  validatePreservedAiAuthoredTargetTruth,
+} from "@/lib/manual-workout-authoring/persisted-workout-safety";
 import { buildManualWorkoutUserBuiltTrainingPlan } from "@/lib/manual-workout-authoring/persistence";
 import {
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
@@ -126,7 +124,7 @@ export type ManualWorkoutPersistedEditReconstructResult =
       safety: {
         sourceWorkoutVerified: true;
         reconstructedFromPersistedWorkout: true;
-        protectedHistoryChecked: true;
+        historyPreservationRequired: true;
         trustedClientRows: false;
         callsOpenAi: false;
       };
@@ -151,7 +149,7 @@ export type ManualWorkoutPersistedEditReviewResult =
         sourceWorkoutVerified: true;
         reconstructedFromPersistedWorkout: true;
         activePlanSourceVerified: true;
-        protectedHistoryChecked: true;
+        historyPreservationRequired: true;
         updatesSamePlannedWorkoutRow: true;
         trustedClientRows: false;
         callsOpenAi: false;
@@ -204,7 +202,8 @@ export type ManualWorkoutPersistedEditConfirmResult =
         sourceWorkoutVerified: true;
         reconstructedFromPersistedWorkout: true;
         activePlanSourceVerified: true;
-        protectedHistoryChecked: true;
+        preEditPlannedTruthPreserved: true;
+        historicalRecordsPreserved: true;
         updatedExactlyOneRow: true;
         updatesSamePlannedWorkoutRow: true;
         activePlanRemainsActive: true;
@@ -219,7 +218,6 @@ export type ManualWorkoutPersistedEditDependencies = Pick<
   ManualWorkoutActivePlanAddDependencies,
   "getExistingPlanContextForUser" | "currentDate"
 > & {
-  fetchEvidenceWorkoutIds?: ManualWorkoutEvidenceFetcher;
   persistWorkoutEdit?: typeof persistManualWorkoutPersistedEdit;
 };
 
@@ -228,6 +226,7 @@ type ManualWorkoutPersistedEditTarget =
       ok: true;
       activePlan: PersistedPlanCycleRow;
       sourceWorkout: PersistedPlannedWorkoutRow;
+      sourceDraftInput: ManualWorkoutDraftInput;
       otherWorkouts: PersistedPlannedWorkoutRow[];
     }
   | {
@@ -324,22 +323,6 @@ export async function reconstructManualWorkoutPersistedEditDraftForUser(
     return buildEditBlocked(target);
   }
 
-  const reconstructed = buildManualWorkoutDraftInputFromPersistedWorkout(
-    target.sourceWorkout,
-    target.sourceWorkout.workout_date,
-    {
-      activePlanId: target.activePlan.id,
-      activePlanSourceKind: target.activePlan.source_kind,
-    },
-  );
-
-  if (!reconstructed.ok) {
-    return buildEditBlocked({
-      reason: mapDraftFailureReason(reconstructed.reason),
-      message: reconstructed.message,
-    });
-  }
-
   return {
     ok: true,
     status: "draft_reconstructed",
@@ -349,11 +332,11 @@ export async function reconstructManualWorkoutPersistedEditDraftForUser(
     activePlanId: target.activePlan.id,
     plannedWorkoutId: target.sourceWorkout.id,
     workoutDate: target.sourceWorkout.workout_date,
-    draftInput: reconstructed.draftInput,
+    draftInput: target.sourceDraftInput,
     safety: {
       sourceWorkoutVerified: true,
       reconstructedFromPersistedWorkout: true,
-      protectedHistoryChecked: true,
+      historyPreservationRequired: true,
       trustedClientRows: false,
       callsOpenAi: false,
     },
@@ -382,7 +365,21 @@ export async function reviewManualWorkoutPersistedEditDraftForUser(
     return buildEditBlocked(target);
   }
 
-  const draftReview = reviewManualWorkoutDraft(parsed.data.draftInput);
+  const targetTruth = validatePreservedAiAuthoredTargetTruth(
+    parsed.data.draftInput,
+    target.sourceDraftInput,
+  );
+  if (!targetTruth.ok) {
+    return buildEditBlocked({
+      reason: "client_payload_rejected",
+      message: targetTruth.message,
+    });
+  }
+
+  const draftReview = reviewManualWorkoutDraft(parsed.data.draftInput, {
+    allowPreservedAiAuthoredTargets: true,
+    allowPersistedTemplateShape: true,
+  });
   if (!draftReview.ok) {
     return buildEditBlocked({
       reason: mapDraftReviewFailureReason(draftReview.reason),
@@ -430,7 +427,7 @@ export async function reviewManualWorkoutPersistedEditDraftForUser(
       sourceWorkoutVerified: true,
       reconstructedFromPersistedWorkout: true,
       activePlanSourceVerified: true,
-      protectedHistoryChecked: true,
+      historyPreservationRequired: true,
       updatesSamePlannedWorkoutRow: true,
       trustedClientRows: false,
       callsOpenAi: false,
@@ -460,7 +457,21 @@ export async function confirmManualWorkoutPersistedEditForUser(
     return buildEditBlocked(target);
   }
 
-  const draftReview = reviewManualWorkoutDraft(parsed.data.draftInput);
+  const targetTruth = validatePreservedAiAuthoredTargetTruth(
+    parsed.data.draftInput,
+    target.sourceDraftInput,
+  );
+  if (!targetTruth.ok) {
+    return buildEditBlocked({
+      reason: "client_payload_rejected",
+      message: targetTruth.message,
+    });
+  }
+
+  const draftReview = reviewManualWorkoutDraft(parsed.data.draftInput, {
+    allowPreservedAiAuthoredTargets: true,
+    allowPersistedTemplateShape: true,
+  });
   if (!draftReview.ok) {
     return buildEditBlocked({
       reason: mapDraftReviewFailureReason(draftReview.reason),
@@ -580,7 +591,8 @@ export async function confirmManualWorkoutPersistedEditForUser(
         sourceWorkoutVerified: true,
         reconstructedFromPersistedWorkout: true,
         activePlanSourceVerified: true,
-        protectedHistoryChecked: true,
+        preEditPlannedTruthPreserved: true,
+        historicalRecordsPreserved: true,
         updatedExactlyOneRow: true,
         updatesSamePlannedWorkoutRow: true,
         activePlanRemainsActive: true,
@@ -683,8 +695,6 @@ async function resolveManualWorkoutPersistedEditTarget(
   dependencies: ManualWorkoutPersistedEditDependencies,
 ): Promise<ManualWorkoutPersistedEditTarget> {
   const getContext = dependencies.getExistingPlanContextForUser ?? getExistingPlanContext;
-  const fetchEvidence =
-    dependencies.fetchEvidenceWorkoutIds ?? fetchManualWorkoutEvidenceWorkoutIds;
   const currentDate = dependencies.currentDate ?? todayIso();
 
   let planContext: ExistingPlanContext;
@@ -755,27 +765,11 @@ async function resolveManualWorkoutPersistedEditTarget(
     };
   }
 
-  if (sourceWorkout.workout_date <= currentDate) {
+  if (sourceWorkout.workout_date < currentDate) {
     return {
       ok: false,
       reason: "protected_day",
-      message: "Workout detail editing is available only for future planned workouts.",
-    };
-  }
-
-  const evidenceWorkoutIds = await fetchEvidence(userId, [sourceWorkout.id]);
-  if (
-    isProtectedManualWorkoutTarget(
-      sourceWorkout,
-      currentDate,
-      planContext.existingWorkouts.logsByWorkoutId,
-      evidenceWorkoutIds,
-    )
-  ) {
-    return {
-      ok: false,
-      reason: "protected_day",
-      message: "This workout has protected history or evidence and cannot be edited here.",
+      message: "Workout detail editing is not available for past planned workouts.",
     };
   }
 
@@ -808,6 +802,7 @@ async function resolveManualWorkoutPersistedEditTarget(
     ok: true,
     activePlan,
     sourceWorkout,
+    sourceDraftInput: reconstructed.draftInput,
     otherWorkouts: planContext.existingWorkouts.workouts.filter(
       (workout) => workout.id !== sourceWorkout.id,
     ),
@@ -939,6 +934,7 @@ function buildManualWorkoutActivePlanEditMetadata(input: {
     originalWorkoutSourceType: input.sourceWorkout.source_workout_type,
     originalWorkoutFamily: input.sourceWorkout.workout_family,
     originalWorkoutIdentity: input.sourceWorkout.workout_identity,
+    previousWorkout: input.sourceWorkout,
   });
 }
 

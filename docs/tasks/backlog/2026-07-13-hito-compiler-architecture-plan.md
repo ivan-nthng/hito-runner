@@ -29,6 +29,23 @@ closed
 None. The compiler architecture rebuild and final signed WorkoutDocument consumer reconciliation
 are accepted and closed.
 
+## Current Canonical Provider Contract
+
+PlanCreation uses one compact closed provider grammar: exact runner/goal facts in, then a flat
+non-rest `workouts[]` list plus one selected-distance endpoint out. Provider output uses canonical
+workout and segment identities, structural-only Repeat parents with ordered children, bounded
+duration/distance prescriptions, exact min/km pace, effective-profile HR references, effort, and
+short execution cues. It has no week wrappers, duplicate goal fields, plan-level narrative,
+compatibility repair, or semantic fallback. Backend compiles that exact truth into the signed
+reviewed `training-plan-v2` document.
+
+## Historical Record Boundary
+
+The remaining sections below preserve the decisions and migration sequence that led to the closed
+architecture. Earlier specimen, warning/assumption, medical-language, weekly-wrapper, or permissive
+workout-type descriptions are historical evidence and do not describe the current provider
+contract.
+
 ## Issue Category
 
 improvement
@@ -108,14 +125,14 @@ proof scripts.
 ## Current Accepted Behavior To Preserve
 
 - Quick setup generated plan creation and readback.
-- Manual workout authoring, templates, target inputs, persisted future-row edit, Add/Clear/Move,
+- Manual workout authoring, templates, target inputs, reviewed today/future content edit, Add/Clear/Move,
   manual Copy/Paste, and backend review/confirm safety.
 - Saved calendar readback and row-state capabilities.
 - Workout detail readback and workout logging.
 - JSON import/export as the current advanced fallback.
 - Garmin/FIT/provider evidence stays actual-evidence input, not planned-workout truth.
-- Generated preview stays non-mutating; eligible confirmed future generated rows use the shared
-  backend-reviewed content-edit lifecycle.
+- Generated preview stays non-mutating; every confirmed non-rest generated workout on today or a
+  future date uses the shared backend-reviewed content-edit lifecycle.
 - AI-authored pace targets and HR-zone labels can be displayed as coach-authored plan guidance when
   they are structurally safe and labeled as plan guidance.
 - No backend-invented training plan, no unsupported raw personal BPM truth, no second workout
@@ -233,7 +250,6 @@ Hard failures for v1:
 - broken Repeat/step structure that cannot be displayed or converted;
 - unsupported raw personal BPM claims when no HR-zone truth exists;
 - medical claims;
-- accepted impossible goal-horizon or marathon race-week safety violations;
 - review/confirm/persistence safety failures.
 
 Backend must not become a deterministic flat-plan author, deterministic target/horizon author, or
@@ -284,8 +300,8 @@ Accepted atom/value inventory for the engine:
   runner-entered finish time, optional runner-entered outcome pace, AI-estimated outcome target,
   AI-proposed horizon, runner level, age/height/weight, current base, running days, fixed rest days,
   preferred long-run day, benchmark truth, execution preference/metric policy;
-- process atoms: horizon, feasibility, adaptation/base/build/specific/cutback/taper/endpoint,
-  weekly rhythm, long-run role, one quality touch max, hard-day spacing, warning/impossible outcome;
+- process atoms: AI-authored horizon, adaptation/base/build/specific/cutback/taper/endpoint,
+  weekly rhythm, warnings, and assumptions;
 - workout atoms: Rest, Recovery, Easy, Steady, Long Run, Progression, Tempo, Intervals, Hills,
   Run/Walk, plus internal exact identities only as backend secondary truth;
 - block atoms: Warm-up, Run, Walk, Work, Recover, Finish, Cooldown, structural-only Repeat set;
@@ -336,9 +352,8 @@ Backend parser/compiler responsibilities:
 - parse and atomize the AI draft into Hito atoms before review/persistence;
 - validate structural/calendar/display/persistence safety;
 - reject hard failures such as malformed JSON, missing weeks/days/steps, impossible calendar
-  structure, broken repeats, unsupported raw personal BPM claims, medical claims, accepted
-  impossible goal-horizon or marathon race-week safety violations, parent Repeat targets, or
-  review/confirm safety failures;
+  structure, broken repeats, unsupported raw personal BPM claims, medical claims, parent Repeat
+  targets, or review/confirm safety failures;
 - warn or annotate coaching suboptimality instead of rejecting merely because backend disagrees with
   the AI's pace, workout identity, or mix;
 - normalize names, icons, readback labels, canonical identities, source metadata, and
@@ -351,7 +366,7 @@ Preservation matrix:
 
 | Flow | Preserve in first engine gate |
 | --- | --- |
-| Quick setup generated plan | 10K, 21.1K, 42.195K, Custom 15K preview/create/readback; signed preview is non-mutating, while eligible confirmed future canonical workouts follow the shared reviewed edit lifecycle. |
+| Quick setup generated plan | 10K, 21.1K, 42.195K, Custom 15K preview/create/readback; signed preview is non-mutating, while confirmed non-rest workouts on today or a future date follow the shared reviewed edit lifecycle regardless of source, logs, completion, or evidence. |
 | Review/confirm | Confirm persists the reviewed canonical draft, calls no AI, trusts no client rows, and keeps token/checksum exactness. |
 | Manual authoring | Manual constructor/review, target inputs, templates, Add/Clear/Move/Copy/Edit, and manual validators remain untouched except as validation smoke. |
 | Calendar/workout detail/logging | Saved calendar, workout detail readback, and logging remain behavior-preservation targets. |
@@ -386,9 +401,8 @@ Current product decisions:
 - normal v1 may keep the current watch/app execution assumption unless Product changes setup later;
 - Marathon Completion may use an exact `42195m` endpoint but must not imply target-time readiness
   when support is weak;
-- aggressive, low-support, or no-benchmark goals should warn when a safe honest plan is possible
-  and block/unavailable only when calendar/display/persistence safety, endpoint honesty, the
-  accepted impossible goal-horizon gate, or the bounded marathon race-week safety contract fails.
+- aggressive, low-support, or no-benchmark goals remain AI coaching input and may produce warnings;
+  backend blocks only technical calendar/display/persistence, endpoint, metric, or review failures.
 
 First BACKEND gate:
 
@@ -405,11 +419,11 @@ Minimum validation corpus:
   targets, AI HR-zone guidance, fixed rest days, long-run day placement, structural repeats, tempo,
   intervals, hills, strides, and endpoint week;
 - warning scenarios: suboptimal workout identity, rough target guidance, weak benchmark context,
-  aggressive but not structurally impossible progression, AI assumptions about horizon/outcome;
+  ambitious progression, AI assumptions about horizon/outcome;
 - hard-failure scenarios: malformed JSON, missing weeks/days/steps, wrong or contradictory dates,
   fixed rest day violation, unconvertible Repeat/step structure, unsupported raw personal BPM
-  claims, medical claims, accepted impossible goal-horizon or marathon race-week safety violations,
-  review/confirm checksum drift, confirm calling AI again, and persistence/readback shape loss.
+  claims, medical claims, review/confirm checksum drift, confirm calling AI again, and
+  persistence/readback shape loss.
 
 ## Implementation Phases
 
@@ -453,8 +467,8 @@ Expected work:
   steps/blocks/targets into Hito atoms;
 - compile the atomized draft into reviewable calendar/workout documents;
 - require backend validation to check hard safety boundaries, calendar integrity, displayability,
-  repeat/step convertibility, unsupported raw BPM claims, medical claims, accepted goal-horizon and
-  marathon race-week safety bounds, and review/confirm exactness;
+  repeat/step convertibility, unsupported raw BPM claims, medical claims, endpoint truth, and
+  review/confirm exactness;
 - allow AI-authored pace targets and HR-zone labels as plan guidance when structurally safe;
 - turn softer coaching-quality doubts into warnings/annotations instead of blocking review;
 - remove backend deterministic plan-shape, target, or horizon authoring when it becomes duplicate
@@ -769,9 +783,8 @@ Paid live OpenAI end-to-end acceptance and completed evidence-attached browser r
 separate release/ops proof gates. A universal load/progression veto remains out of scope until
 Product and Running Coach define it explicitly.
 
-Post-confirm workout ownership is tracked in
-`docs/plans/active/2026-06-08-running-plan-creation-engine-rebuild.md`: signed PlanCreation review
-remains non-mutating, while eligible confirmed future workouts from canonical plan sources use the
-shared backend-reviewed content-edit lifecycle. Imported-origin normalization, atomic edit
-provenance persistence, and original plan/workout provenance retention are accepted and closed in
-that plan.
+Post-confirm workout ownership is canonical in `docs/current-product.md`: signed PlanCreation review
+remains non-mutating, while every confirmed non-rest workout on today or a future date uses the
+shared backend-reviewed content-edit lifecycle regardless of source, logs, completion, or evidence.
+Past workouts remain non-editable. Runtime reconciliation of this rule is independent of the closed
+compiler architecture plan.

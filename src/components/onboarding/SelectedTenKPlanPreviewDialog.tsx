@@ -231,33 +231,70 @@ function createBlockedView(result: Extract<RunningPlanConfirmActionResult, { ok:
 }
 
 function PreviewUnavailableState({ result }: { result: SelectedRunningPlanPreviewUnavailable }) {
+  const view = PREVIEW_UNAVAILABLE_VIEWS[result.previewOutcome];
+
   return (
     <div className="grid gap-4">
-      <div className="hito-surface-wash" data-tone="destructive">
-        <p className="hito-list-row-title">Plan preview needs adjustment</p>
-        <p className="hito-list-row-copy">{previewUnavailableCopy(result)}</p>
+      <div className="hito-surface-wash" data-tone={view.tone}>
+        <p className="hito-list-row-title">{view.title}</p>
+        <p className="hito-list-row-copy">{view.copy}</p>
       </div>
       <div className="hito-row-group">
         <div className="hito-list-row items-start">
-          <PreviewFact label="Next step" value="Adjust the goal details." />
-          <PreviewFact label="Saved plan" value="Nothing has been created." />
+          <PreviewFact label="Next step" value={view.nextStep} />
+          <PreviewFact label="Saved plan" value="Nothing was created or saved." />
         </div>
       </div>
     </div>
   );
 }
 
-function previewUnavailableCopy(result: SelectedRunningPlanPreviewUnavailable) {
-  switch (result.error.code) {
-    case "impossible_plan_goal":
-      return "This goal cannot produce a safe reviewable plan yet. Adjust the goal details.";
-    case "ai_generated_plan_unavailable":
-      return "Hito could not prepare the plan preview right now. Try again.";
-    case "invalid_plan_goal_intent":
-    case "structured_input_invalid":
-      return "This setup cannot be previewed yet. Adjust the goal details.";
+const PREVIEW_UNAVAILABLE_VIEWS = {
+  invalid_structural_input: {
+    title: "Check the plan details",
+    copy: "Some required plan details are missing or invalid, so Hito could not start authoring this plan.",
+    nextStep: "Review the plan details and try again.",
+    tone: "destructive",
+  },
+  provider_runtime_failure: {
+    title: "Plan authoring is unavailable",
+    copy: "Hito could not reach the plan authoring service right now. Your goal details do not need to change.",
+    nextStep: "Try again in a moment.",
+    tone: "signal",
+  },
+  provider_incomplete_output: {
+    title: "The plan draft was incomplete",
+    copy: "The authoring service returned only part of the plan, so Hito could not prepare a complete review. Your goal details do not need to change.",
+    nextStep: "Try authoring the plan again.",
+    tone: "signal",
+  },
+  malformed_provider_output: {
+    title: "The plan draft could not be read",
+    copy: "The authoring service returned a plan Hito could not safely interpret, so no review was created. Your goal details do not need to change.",
+    nextStep: "Try authoring the plan again.",
+    tone: "signal",
+  },
+  compiler_rejection: {
+    title: "The plan draft could not be compiled",
+    copy: "Hito could not safely compile the authored draft into a reviewable plan. Your goal details do not need to change.",
+    nextStep: "Try authoring a new draft.",
+    tone: "signal",
+  },
+  review_refusal: {
+    title: "The plan review could not be verified",
+    copy: "Hito could not verify this authored draft for confirmation, so it was not made available for review. Your goal details do not need to change.",
+    nextStep: "Refresh and create a new preview.",
+    tone: "signal",
+  },
+} as const satisfies Record<
+  SelectedRunningPlanPreviewUnavailable["previewOutcome"],
+  {
+    title: string;
+    copy: string;
+    nextStep: string;
+    tone: "destructive" | "signal";
   }
-}
+>;
 
 function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft }) {
   const rowsByWeek = groupRowsByWeek(draft.calendarRows);
@@ -493,18 +530,13 @@ function PlanGoalIntentReadback({
     <section className="hito-row-group">
       <div className="hito-list-row items-start">
         <div className="grid flex-1 gap-3">
-          <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="hito-label">Goal readback</p>
-              <p className="hito-list-row-title">{distanceLabel}</p>
-              <p className="hito-list-row-copy">
-                Race/result context. Any pace shown here is goal readback, not your workout pace
-                target.
-              </p>
-            </div>
-            <span className="hito-status-pill" data-tone={goalIntentTone(intent)}>
-              {goalIntentStatusLabel(intent.feasibility.status)}
-            </span>
+          <div className="min-w-0">
+            <p className="hito-label">Goal readback</p>
+            <p className="hito-list-row-title">{distanceLabel}</p>
+            <p className="hito-list-row-copy">
+              Race/result context. Any pace shown here is goal readback, not your workout pace
+              target.
+            </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -567,38 +599,6 @@ function goalIntentPaceSourceLabel(
       return "derived from finish time";
     case "runner_entered_outcome_pace":
       return "goal readback";
-  }
-}
-
-function goalIntentStatusLabel(
-  status: SelectedRunningPlanPreviewDraft["normalizedInputSummary"]["planGoalIntent"]["feasibility"]["status"],
-) {
-  switch (status) {
-    case "supported":
-      return "Supported";
-    case "supported_with_assumptions":
-      return "Assumptions";
-    case "aggressive_or_short_horizon":
-      return "Aggressive";
-    case "impossible_goal":
-      return "Not ready";
-    case "unsupported_for_current_builder":
-      return "Needs review";
-  }
-}
-
-function goalIntentTone(
-  intent: SelectedRunningPlanPreviewDraft["normalizedInputSummary"]["planGoalIntent"],
-): "success" | "warning" | "muted" {
-  switch (intent.feasibility.status) {
-    case "supported":
-      return "success";
-    case "supported_with_assumptions":
-      return "muted";
-    case "aggressive_or_short_horizon":
-    case "impossible_goal":
-    case "unsupported_for_current_builder":
-      return "warning";
   }
 }
 

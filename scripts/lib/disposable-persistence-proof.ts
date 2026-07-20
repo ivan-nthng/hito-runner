@@ -157,6 +157,7 @@ export async function createDisposableSupabaseUser(input: {
   emailPrefix: string;
   label?: string;
   validationKind?: string;
+  password?: string;
   creationErrorMessage: string;
 }) {
   const runId = [
@@ -179,6 +180,7 @@ export async function createDisposableSupabaseUser(input: {
   const created = await input.supabase.auth.admin.createUser({
     email,
     email_confirm: true,
+    ...(input.password ? { password: input.password } : {}),
     app_metadata: metadata,
     user_metadata: metadata,
   });

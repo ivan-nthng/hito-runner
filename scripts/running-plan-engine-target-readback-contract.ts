@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { allowsDefaultEstimatedHrTarget } from "../src/lib/default-estimated-hr-target-policy";
+import { AI_AUTHORED_PLAN_FIRST_PACE_MIN_PER_KM_PATTERN } from "../src/lib/ai-authored-plan-first-provider-contract";
 import { buildImportedPlanSeed } from "../src/lib/imported-plan";
 import type { buildRunningPlanCanonicalPlan } from "../src/lib/running-plan-engine-review";
 import {
@@ -7,10 +7,9 @@ import {
   displayWorkoutTargetReadbackEntries,
   primaryWorkoutTarget,
 } from "../src/lib/training";
+import { workoutDocumentTargetToWire } from "../src/lib/workout-document";
 
 type RunningPlanCanonicalPlan = ReturnType<typeof buildRunningPlanCanonicalPlan>;
-type CanonicalWorkout = RunningPlanCanonicalPlan["planned_workouts"][number];
-type CanonicalSegment = CanonicalWorkout["segments"][number];
 
 export function validateRunnerFacingTargetReadbackContract(
   canonicalPlan: RunningPlanCanonicalPlan,
@@ -19,8 +18,6 @@ export function validateRunnerFacingTargetReadbackContract(
   const importedSeed = buildImportedPlanSeed(canonicalPlan);
 
   for (const row of canonicalPlan.planned_workouts) {
-    const rowHasPace = rowHasPaceTargets(row);
-
     for (const segment of row.segments) {
       for (const target of [segment.target, segment.recovery_target]) {
         if (!target || typeof target !== "object") {
@@ -49,61 +46,24 @@ export function validateRunnerFacingTargetReadbackContract(
             `${label}: ${row.workout_id}.${segment.segment_type} generated RPE must stay within 1-10.`,
           );
         }
-      }
 
-      if (row.workout_type !== "rest" && !rowHasPace) {
-        for (const [targetKind, targetRecord] of [
-          ["target", segment.target],
-          ["recovery_target", segment.recovery_target],
-        ] as const) {
-          const hasDefaultEstimatedHr =
-            targetRecord?.hr_target_source === "default_estimated_hr" ||
-            typeof targetRecord?.hr_bpm_range === "string";
-
-          if (!hasDefaultEstimatedHr) {
-            continue;
-          }
-
-          assert.equal(
-            canonicalSegmentAllowsDefaultEstimatedHr(row, segment, targetKind),
-            true,
-            `${label}: ${row.workout_id}.${segment.segment_type}.${targetKind} default estimated HR is allowed only on aerobic support main rows.`,
-          );
-          assert.equal(
-            targetRecord?.hr_target_source,
-            "default_estimated_hr",
-            `${label}: ${row.workout_id}.${segment.segment_type}.${targetKind} estimated HR must preserve default source.`,
-          );
+        if (typeof targetRecord.hr_bpm_range === "string") {
           assert.match(
-            String(targetRecord?.hr_bpm_range ?? ""),
-            /^\d+-\d+ bpm$/,
-            `${label}: ${row.workout_id}.${segment.segment_type}.${targetKind} estimated HR should expose a bpm range.`,
+            targetRecord.hr_bpm_range,
+            /^\d{2,3}-\d{2,3} bpm$/,
+            `${label}: ${row.workout_id}.${segment.segment_type} must expose effective BPM guidance.`,
           );
-        }
-
-        const targetRecord = segment.target as Record<string, unknown> | undefined;
-        if (!canonicalSegmentAllowsDefaultEstimatedHr(row, segment, "target")) {
-          assert.notEqual(
-            targetRecord?.hr_target_source,
-            "default_estimated_hr",
-            `${label}: ${row.workout_id}.${segment.segment_type} hard or non-aerobic no-benchmark segment must not use default estimated HR as executable target.`,
+          assert.ok(
+            targetRecord.hr_target_source === "default_estimated_hr" ||
+              targetRecord.hr_target_source === "personal_hr_zone",
+            `${label}: ${row.workout_id}.${segment.segment_type} must preserve HR profile source.`,
           );
           assert.equal(
-            typeof targetRecord?.hr_bpm_range,
-            "undefined",
-            `${label}: ${row.workout_id}.${segment.segment_type} hard or non-aerobic no-benchmark segment must not expose estimated HR range.`,
+            targetRecord.target_source,
+            "ai_authored_plan_guidance",
+            `${label}: ${row.workout_id}.${segment.segment_type} must preserve AI-authored HR provenance.`,
           );
         }
-        assert.notEqual(
-          segment.recovery_target?.hr_target_source,
-          "default_estimated_hr",
-          `${label}: ${row.workout_id}.${segment.segment_type} recovery_target must not use default estimated HR as executable target.`,
-        );
-        assert.equal(
-          typeof segment.recovery_target?.hr_bpm_range,
-          "undefined",
-          `${label}: ${row.workout_id}.${segment.segment_type} recovery_target must not expose estimated HR range.`,
-        );
       }
     }
   }
@@ -117,6 +77,9 @@ export function validateRunnerFacingTargetReadbackContract(
     const executableEntries = displayExecutableTargetEntries(primaryTarget, workout.metricMode);
     const readbackEntries = displayWorkoutTargetReadbackEntries(workout, { limit: 3 });
     const hasPaceTruth = workout.metricMode.paceTargetsAllowed === true;
+    const hasHrTruth = executableEntries.some(
+      (entry) => entry.key === "hr_bpm_range" || entry.key === "hr_bpm",
+    );
 
     for (const entry of [...executableEntries, ...readbackEntries]) {
       assert.notEqual(
@@ -124,7 +87,7 @@ export function validateRunnerFacingTargetReadbackContract(
         "rpe",
         `${label}: ${workout.workoutDate} must not expose RPE as an executable target entry.`,
       );
-      if (!hasPaceTruth) {
+      if (!hasPaceTruth && !hasHrTruth) {
         assert.doesNotMatch(
           `${entry.label}: ${entry.value}`,
           /\b\d{2,3}\s*-\s*\d{2,3}\s*bpm|pace|\/km/i,
@@ -133,44 +96,58 @@ export function validateRunnerFacingTargetReadbackContract(
       }
     }
 
-    if (hasPaceTruth) {
-      assert.ok(
-        executableEntries.some(
-          (entry) => entry.key === "pace_min_per_km_range" || entry.key === "pace",
-        ),
-        `${label}: ${workout.workoutDate} benchmark-backed workout should expose pace target readback.`,
+    if (hasHrTruth) {
+      const hrEntries = executableEntries.filter(
+        (entry) => entry.key === "hr_bpm_range" || entry.key === "hr_bpm",
       );
-    } else if (workout.metricMode.executableMode === "structure_only_executable") {
+      assert.ok(
+        hrEntries.length > 0,
+        `${label}: ${workout.workoutDate} effective HR workout should expose BPM readback.`,
+      );
+      for (const entry of hrEntries) {
+        assert.match(entry.value, /^\d{2,3}-\d{2,3} bpm$/);
+      }
+      assert.doesNotMatch(
+        [...executableEntries, ...readbackEntries]
+          .map((entry) => `${entry.label}: ${entry.value}`)
+          .join("\n"),
+        /\bZ[1-5](?:-Z[1-5])?\b/,
+        `${label}: ${workout.workoutDate} runner-facing readback must not expose raw zone jargon.`,
+      );
+    }
+
+    if (hasPaceTruth) {
+      const paceEntries = executableEntries.filter(
+        (entry) => entry.key === "pace_min_per_km_range" || entry.key === "pace",
+      );
+      assert.ok(
+        paceEntries.length > 0,
+        `${label}: ${workout.workoutDate} AI-authored pace workout should expose pace target readback.`,
+      );
+      for (const entry of paceEntries) {
+        assert.match(
+          entry.value,
+          new RegExp(AI_AUTHORED_PLAN_FIRST_PACE_MIN_PER_KM_PATTERN),
+          `${label}: ${workout.workoutDate} pace readback must stay machine-parseable min/km guidance.`,
+        );
+      }
+      const exportedTarget = workoutDocumentTargetToWire(primaryTarget);
+      const primaryPace = paceEntries[0]!;
+      assert.equal(
+        exportedTarget?.[primaryPace.key],
+        primaryPace.value,
+        `${label}: ${workout.workoutDate} export wire target must preserve AI-authored pace exactly.`,
+      );
+    } else if (workout.metricMode.executableMode === "structure_only_executable" && !hasHrTruth) {
       assert.ok(
         readbackEntries.length > 0,
         `${label}: ${workout.workoutDate} structure-only workout must keep numeric readback.`,
       );
-      if (importedWorkoutAllowsDefaultEstimatedHr(workout.sourceWorkoutType)) {
-        if (executableEntries.some((entry) => entry.key === "hr_bpm_range")) {
-          assert.ok(
-            executableEntries.some(
-              (entry) => entry.key === "hr_bpm_range" && entry.label === "Estimated HR",
-            ),
-            `${label}: ${workout.workoutDate} default HR readback should be labelled Estimated HR.`,
-          );
-          assert.equal(
-            workout.metricMode.hrTargetsAllowed,
-            false,
-            `${label}: ${workout.workoutDate} Estimated HR fallback must not enable personal HR targets.`,
-          );
-          assert.equal(
-            workout.metricMode.hrTargetSource,
-            "default_estimated_hr",
-            `${label}: ${workout.workoutDate} Estimated HR fallback should preserve default HR source metadata.`,
-          );
-        }
-      } else {
-        assert.equal(
-          executableEntries.some((entry) => entry.key === "hr_bpm_range"),
-          false,
-          `${label}: ${workout.workoutDate} hard/no-benchmark workout must not expose default estimated HR target readback.`,
-        );
-      }
+      assert.equal(
+        executableEntries.some((entry) => entry.key === "hr_bpm_range" || entry.key === "hr_bpm"),
+        false,
+        `${label}: ${workout.workoutDate} structure-only generated readback must not expose backend-estimated HR.`,
+      );
     }
 
     for (const entry of executableEntries) {
@@ -181,29 +158,4 @@ export function validateRunnerFacingTargetReadbackContract(
       );
     }
   }
-}
-
-function rowHasPaceTargets(row: CanonicalWorkout) {
-  return JSON.stringify(row.segments).includes("pace_min_per_km_range");
-}
-
-function canonicalSegmentAllowsDefaultEstimatedHr(
-  row: CanonicalWorkout,
-  segment: CanonicalSegment,
-  targetKind: "target" | "recovery_target" = "target",
-) {
-  return allowsDefaultEstimatedHrTarget({
-    sourceWorkoutType: row.source_workout_type,
-    workoutType: row.workout_type,
-    segmentType: segment.segment_type,
-    segmentId: segment.segment_id,
-    targetKind,
-  });
-}
-
-function importedWorkoutAllowsDefaultEstimatedHr(sourceWorkoutType: string | null | undefined) {
-  return allowsDefaultEstimatedHrTarget({
-    sourceWorkoutType,
-    segmentType: "main",
-  });
 }

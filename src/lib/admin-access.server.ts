@@ -15,19 +15,7 @@ const ADMIN_SERVER_FUNCTIONS = [
   },
   {
     sourceFile: "src/lib/admin-capture.ts",
-    functionName: "getAdminCaptureAvailability_createServerFn_handler",
-  },
-  {
-    sourceFile: "src/lib/admin-capture.ts",
-    functionName: "getAdminDebugCaptureCapability_createServerFn_handler",
-  },
-  {
-    sourceFile: "src/lib/admin-capture.ts",
     functionName: "listAdminCaptureBacklog_createServerFn_handler",
-  },
-  {
-    sourceFile: "src/lib/admin-capture.ts",
-    functionName: "getAdminCaptureItem_createServerFn_handler",
   },
   {
     sourceFile: "src/lib/admin-capture.ts",
@@ -36,10 +24,6 @@ const ADMIN_SERVER_FUNCTIONS = [
   {
     sourceFile: "src/lib/admin-capture.ts",
     functionName: "updateAdminCaptureItemTriage_createServerFn_handler",
-  },
-  {
-    sourceFile: "src/lib/admin-capture.ts",
-    functionName: "updateAdminCaptureItemNote_createServerFn_handler",
   },
   {
     sourceFile: "src/lib/admin-capture.ts",
@@ -85,7 +69,6 @@ type SupabaseAuthUser = {
 export interface AdminAccessCapabilities {
   adminAnalytics: true;
   adminCapture: true;
-  adminDebugCapture: true;
   localTestAccounts: boolean;
 }
 
@@ -312,7 +295,6 @@ function buildCapabilities(input: {
   return {
     adminAnalytics: true,
     adminCapture: true,
-    adminDebugCapture: true,
     localTestAccounts:
       input.sessionSource === "local_fixture" &&
       input.localAuthBypassEnabled &&

@@ -23,6 +23,8 @@ export const RUNNING_PLAN_WORKOUT_DAY_KIND_VALUES = [
   "threshold",
   "intervals",
   "hills",
+  "trail",
+  "race",
   "final_selected_distance_day",
 ] as const;
 
@@ -56,7 +58,7 @@ export interface RunningPlanBenchmarkPaceTruth {
 
 export type RunningPlanSegmentPrescription =
   | {
-      mode: "time" | "open_warmup" | "open_cooldown";
+      mode: "time";
       durationSeconds: RunningPlanRange;
       intensityLabel: string;
     }
@@ -66,37 +68,9 @@ export type RunningPlanSegmentPrescription =
       intensityLabel: string;
     }
   | {
-      mode: "time_with_default_hr_cap";
-      durationSeconds: RunningPlanRange;
-      defaultHrZoneLabelOrCap: string;
-      intensityLabel: string;
-    }
-  | {
-      mode: "distance_with_default_hr_cap";
-      distanceMeters: RunningPlanRange;
-      defaultHrZoneLabelOrCap: string;
-      intensityLabel: string;
-    }
-  | {
       mode: "repeat";
       repeatCount: RunningPlanRange;
       children: readonly RunningPlanRepeatChildPrescription[];
-    }
-  | {
-      mode: "recovery_time";
-      recoveryDurationSeconds: RunningPlanRange;
-      intensityLabel: string;
-    }
-  | {
-      mode: "recovery_distance";
-      recoveryDistanceMeters: RunningPlanRange;
-      intensityLabel: string;
-    }
-  | {
-      mode: "free_run_with_cap";
-      durationSecondsOrDistanceMeters: RunningPlanRange;
-      explicitCap: string;
-      intensityLabel: string;
     };
 
 export type RunningPlanRepeatChildUnitPrescription =

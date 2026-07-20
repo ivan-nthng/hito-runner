@@ -3,8 +3,8 @@ import { cn } from "@/lib/utils";
 import {
   FITNESS_LEVEL_OPTIONS,
   WEEKDAY_OPTIONS,
-  isRecent5kPaceInAcceptedRange,
-  isRecent5kTimeInAcceptedRange,
+  isPositiveRecent5kPace,
+  isPositiveRecent5kTime,
   type WeekdayName,
 } from "./onboarding-form-model";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
@@ -309,17 +309,17 @@ export function RecentFiveKBenchmarkFields({
   const trimmedPace = recent5kPace.trim();
   const hasTime = trimmedTime.length > 0;
   const hasPace = trimmedPace.length > 0;
-  const timeInvalid = hasTime && !isRecent5kTimeInAcceptedRange(trimmedTime);
-  const paceInvalid = hasPace && !isRecent5kPaceInAcceptedRange(trimmedPace);
+  const timeInvalid = hasTime && !isPositiveRecent5kTime(trimmedTime);
+  const paceInvalid = hasPace && !isPositiveRecent5kPace(trimmedPace);
   const missingRequiredBenchmark = required && !hasTime && !hasPace;
   const helperTone =
     timeInvalid || paceInvalid || missingRequiredBenchmark
       ? "hito-field-error"
       : "hito-field-helper";
   const helperText = timeInvalid
-    ? "Use a recent 5K time between 10:00 and 2:00:00."
+    ? "Use a positive recent 5K time such as 25:00."
     : paceInvalid
-      ? "Use a recent 5K pace between 2:00/km and 15:00/km."
+      ? "Use a positive recent 5K pace such as 5:00/km."
       : missingRequiredBenchmark
         ? "Use a recent 5K time or pace."
         : "Optional. Add either value; Hito uses it only when backend benchmark truth supports pace targets.";

@@ -54,6 +54,7 @@ export type SelectedDistanceEndpointProof = {
 export function selectedDistanceEndpointMainDistanceMeters(input: {
   endpointKind: string | null | undefined;
   segments: readonly {
+    segment_type?: string | null;
     prescription?: {
       mode?: string;
       distance_km?: number | null;
@@ -70,10 +71,9 @@ export function selectedDistanceEndpointMainDistanceMeters(input: {
     return null;
   }
 
-  const mainDistanceKm = input.segments.reduce(
-    (total, segment) => total + distanceKmForPrescription(segment.prescription),
-    0,
-  );
+  const mainDistanceKm = input.segments
+    .filter((segment) => segment.segment_type === "main")
+    .reduce((total, segment) => total + distanceKmForPrescription(segment.prescription), 0);
 
   return mainDistanceKm > 0 ? Math.round(mainDistanceKm * 1000) : null;
 }

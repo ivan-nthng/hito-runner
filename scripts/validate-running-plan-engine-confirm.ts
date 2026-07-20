@@ -27,13 +27,11 @@ import {
   type RunningPlanPreviewDraft,
   type RunningPlanReviewedPreviewDraft,
 } from "../src/lib/running-plan-engine-review";
-import { startOfWeekIso } from "../src/lib/training";
 import {
   assertSelectedDistanceEndpointProof,
   tamperReviewToken,
+  validateAiAuthoredPaceAndEffectiveHrGuidance,
   validateCanonicalRowsAreNumeric,
-  validateNoFakePaceOrPersonalHr,
-  validateNoPersonalHrTargets,
 } from "./running-plan-engine-confirm/assertions";
 import {
   buildManualActivePlanContext,
@@ -137,31 +135,18 @@ async function main() {
   for (const scenario of scenarios) {
     reviewedDrafts.push(await validateAiGeneratedDistanceGoalScenario(scenario));
   }
-
-  const longRunRichnessDraft = reviewedDrafts.find(
+  const nonTenKDraft = reviewedDrafts.find(
     (draft) => draft.endpointProof.endpointDistanceMeters === 21_100,
   );
-  const marathonDraft = reviewedDrafts.find(
-    (draft) => draft.endpointProof.endpointDistanceMeters === 42_195,
-  );
   assert.notEqual(
-    longRunRichnessDraft,
+    nonTenKDraft,
     undefined,
-    "Confirm validator must include a non-10K draft for runner-facing richness mutation proof.",
+    "Confirm validator must include a non-10K draft for endpoint mutation proof.",
   );
-  if (!longRunRichnessDraft) {
-    throw new Error("Missing non-10K draft for runner-facing richness mutation proof.");
+  if (!nonTenKDraft) {
+    throw new Error("Missing non-10K draft for endpoint mutation proof.");
   }
-  assert.notEqual(
-    marathonDraft,
-    undefined,
-    "Confirm validator must include a marathon draft for race-week load mutation proof.",
-  );
-  if (!marathonDraft) {
-    throw new Error("Missing marathon draft for race-week load mutation proof.");
-  }
-
-  await validateFailureBoundaries(reviewedDrafts[0], longRunRichnessDraft, marathonDraft);
+  await validateFailureBoundaries(reviewedDrafts[0], nonTenKDraft);
   const activeManualTransitionProof = await validateActiveManualPlanTransitionContract(
     reviewedDrafts[0],
   );
@@ -213,8 +198,7 @@ async function validateAiGeneratedDistanceGoalScenario(scenario: (typeof scenari
   assert.equal(importedSeed.workouts.length, canonicalPlan.planned_workouts.length);
   assert.doesNotMatch(JSON.stringify(canonicalPlan), /repeat_unit|recovery_unit/);
   assert.doesNotThrow(() => buildReviewedFirstPlanImportedSeed(canonicalPlan));
-  validateNoFakePaceOrPersonalHr(canonicalPlan.planned_workouts);
-  validateNoPersonalHrTargets(canonicalPlan.planned_workouts);
+  validateAiAuthoredPaceAndEffectiveHrGuidance(canonicalPlan.planned_workouts);
   validateCanonicalRowsAreNumeric(canonicalPlan.planned_workouts, { expectedMode: "mixed" });
   validateRunnerFacingTargetReadbackContract(canonicalPlan, scenario.name);
 
@@ -237,6 +221,7 @@ async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {
 
   const fixturePreviewOptions = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
     authoringInput: authoring.authoringInput,
+    qaFixtureAuthorized: true,
     today: input.startDate ?? authoring.authoringInput.schedule.startDate,
     env: localAiGeneratedFixtureEnv(),
   });
@@ -257,7 +242,6 @@ async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {
 async function validateFailureBoundaries(
   reviewedDraft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
   longRunRichnessDraft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
-  marathonDraft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
 ) {
   const changedStartDraft = await buildReviewedAiFixture({
     ...reviewedDraft.previewInput,
@@ -294,7 +278,6 @@ async function validateFailureBoundaries(
   }
 
   await validateFlatLongRunProgressionReviewDoesNotInvalidatePlanFirst(longRunRichnessDraft);
-  await validateMarathonRaceWeekLoadReviewIsRejected(marathonDraft);
 
   const legacySourceKindPayload = await confirmRunningPlanDraftForUser("dry-run-user", {
     previewInput: reviewedDraft.previewInput,
@@ -317,77 +300,6 @@ async function validateFailureBoundaries(
   assert.equal(clientRowsPayload.ok, false);
   if (!clientRowsPayload.ok) {
     assert.equal(clientRowsPayload.reason, "invalid_review");
-  }
-}
-
-async function validateMarathonRaceWeekLoadReviewIsRejected(
-  reviewedDraft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
-) {
-  const canonicalPlan = buildRunningPlanCanonicalPlan(reviewedDraft);
-  const endpoint = canonicalPlan.planned_workouts.find(
-    (workout) => workout.source_workout_type === "final_selected_distance_day",
-  );
-  assert.notEqual(endpoint, undefined, "Marathon exactness proof must include endpoint row.");
-  if (!endpoint) {
-    throw new Error("Missing marathon endpoint row.");
-  }
-
-  const raceWeekStart = startOfWeekIso(endpoint.date);
-  const raceWeekRows = canonicalPlan.planned_workouts
-    .filter(
-      (workout) =>
-        workout !== endpoint && workout.date >= raceWeekStart && workout.date < endpoint.date,
-    )
-    .slice(0, 3);
-  assert.ok(
-    raceWeekRows.length >= 3,
-    "Marathon race-week load exactness proof needs enough pre-endpoint calendar rows to overload.",
-  );
-
-  const overloadedPlan = {
-    ...canonicalPlan,
-    planned_workouts: canonicalPlan.planned_workouts.map((workout) =>
-      raceWeekRows.includes(workout)
-        ? {
-            ...workout,
-            workout_type: "easy" as const,
-            source_workout_type: "steady_aerobic_run",
-            title: "Injected race-week overload run",
-            summary: "Validation-only overload row for confirm hard-safety proof.",
-            segments: [
-              {
-                segment_id: `${workout.workout_id}-race-week-overload`,
-                segment_type: "main" as const,
-                label: "Race-week overload",
-                sequence: 1,
-                prescription: {
-                  mode: "time" as const,
-                  duration_min: 22,
-                },
-              },
-            ],
-          }
-        : workout,
-    ),
-  };
-  const overloadedDraft = await addRunningPlanReviewProof({
-    ...stripReviewProof(reviewedDraft),
-    canonicalPlan: overloadedPlan,
-  });
-  const exactness = await validateRunningPlanReviewExactness({
-    draft: overloadedDraft,
-    reviewToken: overloadedDraft.reviewToken,
-    reviewChecksum: overloadedDraft.reviewChecksum,
-  });
-
-  assert.equal(
-    exactness.ok,
-    false,
-    "A signed generated-plan review with overloaded marathon race week must not validate.",
-  );
-  if (!exactness.ok) {
-    assert.equal(exactness.reason, "invalid_review");
-    assert.match(exactness.message, /marathon_race_week_load|runner-facing richness/i);
   }
 }
 
@@ -630,7 +542,7 @@ async function validateActiveManualPlanTransitionContract(
   assert.doesNotMatch(
     JSON.stringify(persistedRows),
     /pace_min_per_km_range|pace_range_min_km|pace_seconds_per_km/i,
-    "No generated fixture should introduce fake executable pace targets.",
+    "The manual transition fixture must not invent numeric pace fields.",
   );
 
   return {
@@ -669,6 +581,9 @@ function localAiGeneratedFixtureEnv() {
   return {
     LOCAL_AUTH_BYPASS_ENABLED: "true",
     LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: "scripts/fixtures/local-auth-users.json",
+    NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+    HITO_AI_GENERATED_PLAN_DEV_FIXTURE: "true",
+    HITO_AI_GENERATED_PLAN_PROVIDER_MODE: "qa_fixture",
   };
 }
 

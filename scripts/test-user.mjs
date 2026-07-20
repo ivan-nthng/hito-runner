@@ -77,6 +77,7 @@ async function handleCreate() {
     password,
     email,
     role: "tester",
+    qaFixtureAccess: true,
     displayName,
   });
 
@@ -266,6 +267,7 @@ function normalizeAccount(account) {
     email,
     userId: account.userId ?? deriveUserId(username),
     role: account.role === "admin" ? "admin" : "tester",
+    qaFixtureAccess: account.qaFixtureAccess === true,
     displayName: account.displayName?.trim() || humanizeUsername(username),
   };
 }

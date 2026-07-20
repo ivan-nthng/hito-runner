@@ -10,7 +10,6 @@ import { buildManualWorkoutDraftInputFromPersistedWorkout } from "../src/lib/man
 import type { PersistedPlannedWorkoutRow } from "../src/lib/active-plan-persistence";
 import {
   isEditableActivePlanSourceKind,
-  isActivePlanWorkoutContentEditableSourceKind,
   isManualContentEditableActivePlanSourceKind,
   resolveActivePlanWorkoutEditability,
 } from "../src/lib/active-plan-workout-editing/policy";
@@ -37,7 +36,7 @@ import {
   formatJsonResult,
   readStepsForAssertion,
 } from "./manual-workout-authoring/move-proof-assertions";
-import { validateManualPersistedFutureWorkoutEditContract } from "./manual-workout-authoring/persisted-edit-proof";
+import { validateManualPersistedTodayAndFutureWorkoutEditContract } from "./manual-workout-authoring/persisted-edit-proof";
 import { validateManualSavedTemplateContract } from "./manual-workout-authoring/saved-template-proof";
 import { validateManualSourceEditingCapabilityReadback } from "./manual-workout-authoring/source-capability-proof";
 import { validateManualTemplateDefaultSkeletons } from "./manual-workout-authoring/template-defaults-proof";
@@ -65,7 +64,7 @@ async function main() {
   await validateManualCopyPasteContract();
   await validateManualDeleteClearContract();
   await validateManualMoveWorkoutContract();
-  await validateManualPersistedFutureWorkoutEditContract();
+  await validateManualPersistedTodayAndFutureWorkoutEditContract();
   validateManualActivePlanExportContract();
 
   const persistenceInput: ManualWorkoutDraftInput = {
@@ -136,7 +135,6 @@ function validateActivePlanLifecycleAndContentEditabilityPolicy() {
     const copyEditability = resolveActivePlanWorkoutEditability(activePlan, "copy_workout");
     const contentEditability = resolveActivePlanWorkoutEditability(activePlan, "edit_workout");
     const shouldAllowCopy = isManualContentEditableActivePlanSourceKind(sourceKind);
-    const shouldAllowContent = isActivePlanWorkoutContentEditableSourceKind(sourceKind);
 
     assert.equal(
       copyEditability.ok,
@@ -145,8 +143,8 @@ function validateActivePlanLifecycleAndContentEditabilityPolicy() {
     );
     assert.equal(
       contentEditability.ok,
-      shouldAllowContent,
-      `${sourceKind} edit_workout editability should follow reconstructable active-plan source scope.`,
+      true,
+      `${sourceKind} edit_workout editability should not depend on plan origin.`,
     );
   }
 
@@ -168,6 +166,11 @@ function validateActivePlanLifecycleAndContentEditabilityPolicy() {
   if (!unknown.ok) {
     assert.equal(unknown.reason, "unsupported_active_plan_source");
   }
+  assert.equal(
+    resolveActivePlanWorkoutEditability(unknownPlan, "edit_workout").ok,
+    true,
+    "confirmed workout content editing should not inherit lifecycle source allowlists",
+  );
 
   const missingSource = resolveActivePlanWorkoutEditability(
     buildFakePlanCycle({

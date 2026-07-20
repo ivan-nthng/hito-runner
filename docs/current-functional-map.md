@@ -1,7 +1,7 @@
 # Current Functional Map
 
 Status: canonical freeze-readiness map
-Last Updated: 2026-07-10
+Last Updated: 2026-07-19
 Owner: ARCHITECT
 
 ## Purpose
@@ -73,9 +73,10 @@ stays in `docs/current-product.md`; implementation ownership and deletion safety
 ## Current Business Model
 
 Hito is one calendar, not separate manual/generated/imported/preset products. A plan is bulk
-scheduled workout creation on that calendar. After a row is scheduled, source kind is provenance and
-safety metadata; runner actions are driven by row state, backend capabilities, history/evidence
-protection, and explicit review/confirm boundaries.
+scheduled workout creation on that calendar. After confirm, source kind is provenance rather than
+workout-content edit permission. Every confirmed non-rest workout on today or a future date uses one
+reviewed content-edit lifecycle; past workouts are not editable. Add/Clear/Move/Copy and schedule
+operations retain separate capability and history rules.
 
 Current plan/workout creation families:
 
@@ -105,8 +106,8 @@ The current runtime should keep one canonical calendar pipeline:
 | --- | --- | --- | --- |
 | First plan creation | Manual setup, structured Quick setup, selected-distance review, advanced JSON import | `runner_profiles`, `plan_cycles`, `planned_workouts`, review tokens/checksums, `source_kind`/`source_status` | Multiple entrypoints are product choices, but persistence converges; do not add another storage path. |
 | Active `Add plan` / replacement | Calendar `Add plan`, selected generated transition, advanced import fallback | old/new `plan_cycles`, archive/supersession metadata, transition checksum/revision | Preserve review/confirm and history; no silent replace or clear-then-create shortcut. |
-| Calendar Add/Clear/Move/Edit | Calendar row menus, drag/drop, workout detail edit | `planned_workouts`, capability metadata, `active_plan_user_edit_v1`, `targetDayKind` | Source kind is provenance; row state and backend policy decide affordances. |
-| Manual authoring/templates/copy | Manual constructor, saved templates, copy/paste, persisted future edit | `runner_manual_workout_templates`, reviewed draft metadata, manual reconstruction metadata | Keep manual reconstruction semantics; do not raw-clone rows or invent route-local constructor truth. |
+| Calendar Add/Clear/Move/Edit | Calendar row menus, drag/drop, workout detail edit | `planned_workouts`, capability metadata, `active_plan_user_edit_v1`, `targetDayKind` | Content edit follows the today/future date rule; other actions keep operation-specific capabilities. |
+| Manual authoring/templates/copy | Manual constructor, saved templates, copy/paste, persisted reviewed edit | `runner_manual_workout_templates`, reviewed draft metadata, manual reconstruction metadata | Keep manual reconstruction semantics; do not raw-clone rows or invent route-local constructor truth. |
 | Workout detail/completion/FIT | Log result, Garmin/FIT/ZIP upload, comparison, AI insight | `workout_logs`, `workout_result_assets`, `workout_actual_metrics`, `workout_comparisons`, `workout_ai_insights` | FIT upload is actual evidence, not plan creation or planned-workout truth. |
 | Generated plan engine | AI-authored plan-first Quick setup and selected-plan transition | rich workout fields, `plan_preferences`, plan-first review metadata, source status | Keep one provider/local-fixture -> compiler -> review -> confirm path; no deterministic replacement planner. |
 | Admin/backlog import | Admin capture and repo-derived work items | `admin_capture_items`, markdown source path/type/status metadata | Repo markdown remains canonical for repo-derived rows; cleanup only through importer-safe Admin slices. |
@@ -124,10 +125,12 @@ The current runtime should keep one canonical calendar pipeline:
 
 - The saved calendar is the shared active-plan viewing surface for manual, selected/generated,
   imported, and AI-assisted active plans.
-- Viewing is shared; Add/Clear/Move mutation eligibility is backend-shaped and capability-driven.
+- Viewing is shared; Add/Clear/Move/Copy eligibility is backend-shaped and operation-specific.
+- Workout-content edit availability is date-based: every confirmed non-rest today/future workout can
+  enter reviewed editing regardless of source, logs, completion, or evidence; past rows cannot.
 - [active-plan workout editing policy](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/active-plan-workout-editing/policy.ts)
-  owns the accepted active-plan source list, supported edit operations, and
-  `active_plan_user_edit_v1` metadata shape for user-added, user-cleared, and user-moved workouts.
+  owns operation-specific Add/Clear/Move/Copy rules and the `active_plan_user_edit_v1` metadata
+  shape; it must not use plan source as workout-content edit permission.
 - Manual workout authoring owns workout-content construction, personal templates, and proved
   Copy/Paste reconstruction; it does not own whether the original active-plan source is editable for
   Add/Clear/Move.
@@ -167,8 +170,8 @@ The current runtime should keep one canonical calendar pipeline:
 | Manual Copy/Paste | Runner copies a manual workout and pastes it onto an eligible target day. | `copy-paste`, `copy-paste-reconstruction`, `active-plan-add`; calendar occupied-day/Add menus. | No raw row duplication, recurrence, or universal Copy/Paste across non-manual plans. |
 | Active-plan Delete/Clear | Runner clears eligible unlogged planned workouts after backend-shaped review. | `active-plan-workout-editing/*`, `manual-workout-authoring/delete-clear`, `review-exactness`, `persistence`. | No Restore UI; logged/evidence-backed/protected/occupied/rest rows remain blocked. |
 | Active-plan Move Workout | Runner moves eligible unlogged rows while preserving source provenance. | `active-plan-workout-editing/*`, `manual-workout-authoring/move-workout`, calendar/move controls. | No swap, batch move, recurrence, frontend copy+delete, or local schedule truth. |
-| Persisted workout content edit | Eligible confirmed future canonical manual/generated/imported rows enter one reviewed edit lifecycle; the edit is runner-authored while original plan/workout provenance remains. | `manual-workout-authoring/edit-workout`, `edit-workout-review-token`, `active-plan-workout-editing/policy`, import normalization, atomic persistence RPC, source capabilities; workout detail edit UI. | No inline mutation and no rest/today/past/logged/evidence-backed/unsafe-reconstruction content edits; claimed external origin is provenance, not capability identity. |
-| Active plan viewing | Runner sees shared calendar, workout detail, progress, and result state for any active plan source. | `training`, `route-data-actions`, `workout-log-actions`, feedback/import modules; Calendar/workout/progress surfaces. | Viewing all sources does not imply all sources are manually editable; `/hitoDS` specimens are not product behavior. |
+| Persisted workout content edit | Every confirmed non-rest workout on today or a future date enters one reviewed edit lifecycle regardless of source, logs, completion, or evidence; past rows remain non-editable. | Product rule: `docs/current-product.md`; implementation owners: `manual-workout-authoring/edit-workout`, edit review token, `active-plan-workout-editing/policy`, atomic persistence/history contract, source capabilities, workout detail UI. | No inline mutation or Rest editing. Review/confirm, auth, stale protection, provenance, and durable pre-edit history remain mandatory; current runtime still implements the older future-unlogged/source-limited subset. |
+| Active plan viewing | Runner sees shared calendar, workout detail, progress, and result state for any active plan source. | `training`, `route-data-actions`, `workout-log-actions`, feedback/import modules; Calendar/workout/progress surfaces. | `/hitoDS` specimens are not product behavior; source provenance does not deny today/future content editing. |
 | Hito inline editable text pattern | Shared inline editable/read-only primitive plus non-mutating local inspector task targeting. | `inline-editable-text`, devtool target utilities, manual constructor title, `/hitoDS/patterns`. | This primitive does not mutate passive generated readback or imply fake Admin Capture persistence; post-confirm workout editing is a separate reviewed action. |
 | Calendar plan actions | Header uses `Add plan` plus overflow utilities. | Lifecycle/export/schedule-edit/transition backend seams; calendar/header controls and plan-management modules. | No `Open plan`, visible `Update plan`, or `Delete active plan` header IA. |
 | Clear upcoming schedule | Runner clears upcoming mutable schedule while history stays preserved. | `active-plan-lifecycle-actions`; overflow clear-upcoming control. | No half-active truncated plan state and no hard deletion of history. |
@@ -211,7 +214,7 @@ Do not use these future ideas to justify keeping or adding runtime code as shipp
 - organization or coach authoring
 - recurrence/batch expansion
 - Restore/Put back/Redo UI
-- inline mutation that bypasses the accepted reviewed future-row content-edit path
+- inline mutation that bypasses the accepted reviewed today/future content-edit path
 - universal Copy/Paste across generated, selected, imported, or AI active plans
 - broader source/row mutation matrices beyond QA-proved Add/Clear/Move slices
 - AI continuation blocks inside an existing manual plan

@@ -255,12 +255,13 @@ Still future-only or separate lanes:
 - provider/FIT comparison enhancements beyond accepted planned-vs-actual input compatibility;
 - frontend UI changes for template visibility unless backend first exposes the safe contract.
 
-Confirmed-workout ownership is shared product truth, not a future manual-only lane: eligible future
-canonical manual/generated/imported/refresh workouts can enter the reviewed persisted content-edit
-flow, while rest, today/past content edit, logs, evidence, unsafe reconstruction, and protected
-history stay blocked. Confirmed external imports use canonical `training_plan_v2_import` capability
-identity while retaining claimed origin as provenance; reviewed content and original-provenance
-audit persist atomically after the edit becomes runner-authored.
+Confirmed-workout ownership is shared product truth, not a future manual-only lane: every confirmed
+non-rest workout on today or a future date can enter the reviewed persisted content-edit flow
+regardless of manual/generated/imported/replacement origin, logs, completion, or evidence. Past
+workouts are not editable. Review/confirm, auth, stale protection, atomic persistence, original
+provenance, and durable pre-edit history remain mandatory. Current runtime still implements the
+older source-limited future-unlogged subset; that reconciliation is separate from the manual
+template gate in this plan.
 
 ## Compression Note
 

@@ -17,6 +17,11 @@ import {
   isAiGeneratedRunningPlanPreviewDraft,
 } from "@/lib/ai-generated-running-plan";
 import {
+  markAiPlanGenerationPersisted,
+  markAiPlanGenerationPersistenceFailed,
+  type AiPlanGenerationLedgerTrace,
+} from "@/lib/ai-plan-generation-ledger";
+import {
   RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
   buildRunningPlanPersistenceMetadata,
   buildRunningPlanProfilePatch,
@@ -228,6 +233,7 @@ type BuildTransitionReviewOk = Extract<ActivePlanTransitionReviewResult, { ok: t
   persistenceMetadata: AdditionalPlanPersistenceMetadata;
   currentPlanContext: ExistingPlanContext;
   payload: ActivePlanTransitionReviewPayload;
+  generationTrace: AiPlanGenerationLedgerTrace | null;
 };
 
 type ActivePlanTransitionDistanceGoalSummary = {
@@ -304,6 +310,7 @@ export async function reviewActivePlanTransitionForUser(
     persistenceMetadata: _persistenceMetadata,
     currentPlanContext: _context,
     payload: _payload,
+    generationTrace: _generationTrace,
     ...review
   } = built;
 
@@ -372,6 +379,9 @@ export async function confirmActivePlanTransitionForUser(
         previousPlanSourceKind: review.currentPlan.sourceKind,
       }),
     });
+    await markAiPlanGenerationPersisted({
+      trace: review.generationTrace,
+    });
 
     return {
       ok: true,
@@ -399,6 +409,10 @@ export async function confirmActivePlanTransitionForUser(
       },
     };
   } catch {
+    await markAiPlanGenerationPersistenceFailed({
+      trace: review.generationTrace,
+      reason: "active_plan_transition_persistence_failed",
+    });
     return buildTransitionFailure({
       reason: "persistence_failed",
       message:
@@ -582,6 +596,7 @@ async function buildActivePlanTransitionReview(
         "Personal manual workout templates are user-library records and are not changed by this transition.",
     },
     metricHonesty,
+    generationTrace: draft.aiGeneration.generationTrace,
     safety: {
       requiresExplicitConfirm: true,
       trustedClientRows: false,

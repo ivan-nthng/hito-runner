@@ -31,7 +31,7 @@ ARCHITECT / DESIGNER spec / portable debugger overlay, API boundary, and Hito DS
 ## Current Truth
 
 Hito already has the admin backlog/review queue, backend admin capture contract, repo-work-item import
-mirror, admin auth/session resolver, and a bounded `adminDebugCapture` capability probe. The remaining
+mirror, and admin auth/session resolver. The remaining
 active work is not another backlog route. It is the local/dev-only inline debugger overlay that can
 capture element-level UI feedback from any accessible Hito route and save a normalized capture item for
 manual review in `/admin/capture`.
@@ -60,7 +60,8 @@ client capability, even for admins.
   UI records are not normal delete targets.
 - Admin auth/session is consolidated through `AdminAccessContext`; local admin sessions are signed,
   test accounts are separate, and normal testers/runners are rejected by admin routes.
-- `adminDebugCapture` exists only as a future capability probe for the local/dev debugger overlay.
+- No dormant overlay capability or server action is kept before the local/dev debugger overlay has a
+  concrete accepted consumer.
 
 ## Product Contract
 
@@ -166,15 +167,12 @@ docs/plans/active/2026-05-25-admin-ui-capture-and-backlog-plan.md
 
 CONTEXT:
 - Backend admin auth/session consolidation is implemented and QA-passed.
-- `AdminAccessContext.capabilities` includes `adminDebugCapture: true`.
-- `getAdminDebugCaptureCapability` is a bounded admin-owned capability probe for future
-  route-spanning capture overlay work.
+- Current admin access and capture actions support the implemented backlog only; add a debugger
+  capability boundary only when the overlay has an accepted consumer.
 - `/admin/capture` remains the backlog/review queue; the inline capture layer itself should work
   across accessible Hito product/admin/public/internal routes after admin verification only in
   local/dev runtime.
-- The probe is independent from backlog storage and must be used only to decide whether the
-  overlay/launcher may appear in local/dev; production/deployed builds must not show the inline
-  debugger even for verified admins.
+- Production/deployed builds must not show the inline debugger even for verified admins.
 
 GOAL:
 Create a concrete interaction spec for the local/dev admin floating launcher, element-selection mode,

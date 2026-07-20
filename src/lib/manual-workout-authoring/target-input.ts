@@ -1,10 +1,12 @@
 import type {
   ManualWorkoutBlockInput,
   ManualWorkoutDraftIssue,
+  ManualWorkoutDraftProcessingOptions,
   ManualWorkoutTargetSource,
   ManualWorkoutTargetTruthMode,
 } from "@/lib/manual-workout-authoring/schema";
 import type { StepTarget } from "@/lib/training";
+import { AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE } from "@/lib/workout-document";
 
 const USER_ENTERED_TARGET_SOURCE = "user_entered" as const;
 const USER_ENTERED_SOURCE_ALIASES = new Set<ManualWorkoutTargetSource>([
@@ -21,6 +23,10 @@ type ManualTargetIssue = Omit<ManualWorkoutDraftIssue, "path"> & {
   path: Array<string | number>;
 };
 
+type ResolvedManualWorkoutTargetSource =
+  | typeof USER_ENTERED_TARGET_SOURCE
+  | typeof AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE;
+
 export type ResolvedManualWorkoutTarget =
   | {
       kind: "none";
@@ -31,20 +37,29 @@ export type ResolvedManualWorkoutTarget =
     }
   | {
       kind: "effort_rpe";
-      source: typeof USER_ENTERED_TARGET_SOURCE;
+      source: ResolvedManualWorkoutTargetSource;
       intensity?: string;
       label?: string;
       cue?: string;
       hint?: string;
+      hrZone?: string;
+      hrBpmRange?: string;
+      hrBpmRangeValues?: { min: number; max: number };
+      hrTargetSource?: "personal_hr_zone" | "default_estimated_hr";
       rpe?: number;
       sourceNote?: string;
     }
   | {
       kind: "pace";
-      source: typeof USER_ENTERED_TARGET_SOURCE;
+      source: ResolvedManualWorkoutTargetSource;
+      intensity?: string;
       label?: string;
       cue?: string;
       hint?: string;
+      hrZone?: string;
+      hrBpmRange?: string;
+      hrBpmRangeValues?: { min: number; max: number };
+      hrTargetSource?: "personal_hr_zone" | "default_estimated_hr";
       sourceNote?: string;
       pace?: string;
       paceSecondsPerKm?: number;
@@ -82,6 +97,7 @@ type ResolvedManualWorkoutTargetResult =
 export function resolveManualWorkoutTargetInput(
   block: ManualWorkoutBlockInput,
   targetTruthMode: ManualWorkoutTargetTruthMode,
+  options: ManualWorkoutDraftProcessingOptions = {},
 ): ResolvedManualWorkoutTargetResult {
   const target = block.target;
 
@@ -98,15 +114,58 @@ export function resolveManualWorkoutTargetInput(
   const hasEffort = rpe !== undefined || hasText(target.intensity);
   const hasPace = hasPaceExact || hasPaceRange;
   const hasHr = hasHrCap || hasHrRange;
+  const targetSource = canonicalTargetSource(target.targetSource) ?? USER_ENTERED_TARGET_SOURCE;
+  const paceTargetSource =
+    canonicalTargetSource(target.paceTargetSource ?? target.targetSource) ??
+    USER_ENTERED_TARGET_SOURCE;
+  const hrTargetSource =
+    canonicalTargetSource(target.hrTargetSource ?? target.targetSource) ??
+    USER_ENTERED_TARGET_SOURCE;
+  const preservesAiAuthoredTarget =
+    targetSource === AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE &&
+    options.allowPreservedAiAuthoredTargets === true;
 
-  validateSource(target.targetSource, ["targetSource"], issues);
+  validateSource(target.targetSource, ["targetSource"], issues, options);
 
   if (hasPace) {
-    validateSource(target.paceTargetSource ?? target.targetSource, ["paceTargetSource"], issues);
+    validateSource(
+      target.paceTargetSource ?? target.targetSource,
+      ["paceTargetSource"],
+      issues,
+      options,
+    );
+
+    if (paceTargetSource !== targetSource) {
+      issues.push({
+        code: "unsafe_metric_truth",
+        message: "Pace target provenance must match the target provenance.",
+        path: ["paceTargetSource"],
+      });
+    }
   }
 
   if (hasHr || target.hrTargetSource) {
-    validateSource(target.hrTargetSource ?? target.targetSource, ["hrTargetSource"], issues);
+    const preservesEffectiveAiHr =
+      preservesAiAuthoredTarget &&
+      (target.hrTargetSource === "personal_hr_zone" ||
+        target.hrTargetSource === "default_estimated_hr");
+
+    if (!preservesEffectiveAiHr) {
+      validateSource(
+        target.hrTargetSource ?? target.targetSource,
+        ["hrTargetSource"],
+        issues,
+        options,
+      );
+    }
+
+    if (hrTargetSource !== USER_ENTERED_TARGET_SOURCE && !preservesEffectiveAiHr) {
+      issues.push({
+        code: "unsafe_metric_truth",
+        message: "Executable manual heart-rate targets must be runner-entered.",
+        path: ["hrTargetSource"],
+      });
+    }
   }
 
   if (hasPaceExact && hasPaceRange) {
@@ -126,7 +185,7 @@ export function resolveManualWorkoutTargetInput(
   }
 
   const targetFamilies = [hasPace, hasHr, hasEffort].filter(Boolean).length;
-  if (targetFamilies > 1) {
+  if (targetFamilies > 1 && !preservesAiAuthoredTarget) {
     issues.push({
       code: "unsafe_metric_truth",
       message: "Manual workout v1 supports one target family per segment.",
@@ -136,6 +195,61 @@ export function resolveManualWorkoutTargetInput(
 
   if (issues.length > 0) {
     return { ok: false, issues };
+  }
+
+  if (preservesAiAuthoredTarget) {
+    const hrRange =
+      hasHrRange && target.hrBpmRange
+        ? parseHrBpmRange(target.hrBpmRange, ["hrBpmRange"], issues)
+        : null;
+    if (issues.length > 0) {
+      return { ok: false, issues };
+    }
+    const shared = {
+      ...sharedTargetFields(target),
+      ...(target.intensity ? { intensity: target.intensity } : {}),
+      ...(target.hrZone ? { hrZone: target.hrZone } : {}),
+      ...(target.hrBpmRange ? { hrBpmRange: target.hrBpmRange } : {}),
+      ...(hrRange ? { hrBpmRangeValues: hrRange } : {}),
+      ...(target.hrTargetSource === "personal_hr_zone" ||
+      target.hrTargetSource === "default_estimated_hr"
+        ? { hrTargetSource: target.hrTargetSource }
+        : {}),
+    };
+
+    if (hasPaceExact && target.pace) {
+      return {
+        ok: true,
+        target: {
+          kind: "pace",
+          source: AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
+          ...shared,
+          pace: target.pace,
+        },
+      };
+    }
+
+    if (hasPaceRange && target.paceMinPerKmRange) {
+      return {
+        ok: true,
+        target: {
+          kind: "pace",
+          source: AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
+          ...shared,
+          paceMinPerKmRange: target.paceMinPerKmRange,
+        },
+      };
+    }
+
+    return {
+      ok: true,
+      target: {
+        kind: "effort_rpe",
+        source: AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
+        ...shared,
+        ...(rpe !== undefined ? { rpe } : {}),
+      },
+    };
   }
 
   if (hasPaceExact && target.pace) {
@@ -227,8 +341,9 @@ export function validateManualWorkoutTargetInput(
   block: ManualWorkoutBlockInput,
   targetTruthMode: ManualWorkoutTargetTruthMode,
   path: Array<string | number>,
+  options: ManualWorkoutDraftProcessingOptions = {},
 ): ManualWorkoutDraftIssue[] {
-  const result = resolveManualWorkoutTargetInput(block, targetTruthMode);
+  const result = resolveManualWorkoutTargetInput(block, targetTruthMode, options);
 
   if (result.ok) {
     return [];
@@ -244,28 +359,57 @@ export function manualWorkoutTargetToStepTarget(
   resolved: ResolvedManualWorkoutTarget,
   fallbackHint: string,
 ): StepTarget {
-  const hint = resolved.kind === "none" ? fallbackHint : (resolved.hint ?? fallbackHint);
-
   if (resolved.kind === "none") {
     return {
-      hint,
+      hint: fallbackHint,
       ...(resolved.label ? { label: resolved.label } : {}),
       ...(resolved.sourceNote ? { source_note: resolved.sourceNote } : {}),
       ...(resolved.cue ? { cue: resolved.cue } : {}),
     };
   }
 
+  const hint =
+    resolved.hint ?? (resolved.source === USER_ENTERED_TARGET_SOURCE ? fallbackHint : undefined);
   const base: StepTarget = {
     target_source: resolved.source,
-    hint,
+    ...(hint ? { hint } : {}),
     ...(resolved.label ? { label: resolved.label } : {}),
     ...(resolved.sourceNote ? { source_note: resolved.sourceNote } : {}),
     ...(resolved.cue ? { cue: resolved.cue } : {}),
+    ...("hrZone" in resolved && resolved.hrZone
+      ? {
+          extra: {
+            hr_zone: resolved.hrZone,
+            hr_zone_reference: resolved.hrZone,
+            ...("hrTargetSource" in resolved && resolved.hrTargetSource
+              ? {
+                  hr_profile_source:
+                    resolved.hrTargetSource === "personal_hr_zone"
+                      ? "personal"
+                      : "default_estimated",
+                }
+              : {}),
+          },
+        }
+      : {}),
+    ...("hrTargetSource" in resolved && resolved.hrTargetSource
+      ? { hr_target_source: resolved.hrTargetSource }
+      : {}),
+    ...("hrBpmRange" in resolved && resolved.hrBpmRange
+      ? { hr_bpm_range: resolved.hrBpmRange }
+      : {}),
+    ...("hrBpmRangeValues" in resolved && resolved.hrBpmRangeValues
+      ? {
+          hr_bpm_min: resolved.hrBpmRangeValues.min,
+          hr_bpm_max: resolved.hrBpmRangeValues.max,
+        }
+      : {}),
   };
 
   if (resolved.kind === "pace") {
     return {
       ...base,
+      ...(resolved.intensity ? { intensity: resolved.intensity } : {}),
       ...(resolved.pace ? { pace: resolved.pace } : {}),
       ...(resolved.paceSecondsPerKm ? { pace_seconds_per_km: resolved.paceSecondsPerKm } : {}),
       ...(resolved.paceMinPerKmRange ? { pace_min_per_km_range: resolved.paceMinPerKmRange } : {}),
@@ -314,8 +458,16 @@ function validateSource(
   source: ManualWorkoutTargetSource | undefined,
   path: Array<string | number>,
   issues: ManualTargetIssue[],
+  options: ManualWorkoutDraftProcessingOptions,
 ) {
   if (!source || USER_ENTERED_SOURCE_ALIASES.has(source)) {
+    return;
+  }
+
+  if (
+    source === AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE &&
+    options.allowPreservedAiAuthoredTargets
+  ) {
     return;
   }
 
@@ -325,6 +477,12 @@ function validateSource(
       "Manual target inputs must be runner-entered; generated, inferred, default, template, benchmark, target-time, and personal-zone targets are not supported in v1.",
     path,
   });
+}
+
+function canonicalTargetSource(
+  source: ManualWorkoutTargetSource | undefined,
+): ManualWorkoutTargetSource | undefined {
+  return source === "runner_entered" ? USER_ENTERED_TARGET_SOURCE : source;
 }
 
 function sharedTargetFields(target: NonNullable<ManualWorkoutBlockInput["target"]>) {

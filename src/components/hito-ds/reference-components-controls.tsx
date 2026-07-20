@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { AdminMetadataMenu } from "@/components/admin/AdminOperationalComponents";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { EditableSelectValueChip, EditableValueChip } from "@/components/ui/editable-value-chip";
 import {
   HitoDateField,
   HitoEditableDateChip,
@@ -6,6 +9,8 @@ import {
 } from "@/components/ui/hito-date-time-input";
 import { Icon } from "@/components/ui/icon";
 import { InlineEditableText } from "@/components/ui/inline-editable-text";
+import { HitoMetadataTag } from "@/components/ui/metadata-tag";
+import { HitoNativeSelectField } from "@/components/ui/native-select-field";
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
 import { ProductLinks, ReferenceListRow } from "@/components/hito-ds/reference";
 import {
@@ -52,6 +57,8 @@ type StatusTone = (typeof STATUS_TONES)[number];
 type DataTableSortDirection = (typeof DATA_TABLE_SORT_DIRECTIONS)[number];
 
 type FieldSize = (typeof FIELD_SIZES)[number];
+type ReferenceScalarField = "age" | "height" | "weight";
+type ReferenceEditableField = ReferenceScalarField | "terrain";
 
 export function HitoDsComponentControls() {
   const [variant, setVariant] = useState<ButtonVariant>("primary");
@@ -71,6 +78,16 @@ export function HitoDsComponentControls() {
   const [editableDateDemo, setEditableDateDemo] = useState("");
   const [boundedDateDemo, setBoundedDateDemo] = useState("2026-05-29");
   const [timeFieldDemo, setTimeFieldDemo] = useState("3:50:00");
+  const [nativeSelectDemo, setNativeSelectDemo] = useState("easy");
+  const [activeEditableField, setActiveEditableField] = useState<ReferenceEditableField | null>(
+    null,
+  );
+  const [editableValues, setEditableValues] = useState<Record<ReferenceScalarField, string>>({
+    age: "36",
+    height: "",
+    weight: "72",
+  });
+  const [editableTerrain, setEditableTerrain] = useState("road");
   const [tabStyle, setTabStyle] = useState<TabStyle>("simple");
   const [tabIcon, setTabIcon] = useState(true);
   const [tabBadge, setTabBadge] = useState(true);
@@ -78,6 +95,7 @@ export function HitoDsComponentControls() {
   const [tabDisabled, setTabDisabled] = useState(true);
   const [statusTone, setStatusTone] = useState<StatusTone>("signal");
   const [statusLongLabel, setStatusLongLabel] = useState(false);
+  const [metadataState, setMetadataState] = useState("reviewed");
   const [selectionKind, setSelectionKind] = useState<SelectionControlKind>("toggle");
   const [selectionSize, setSelectionSize] = useState<ChoiceToggleSize>("md");
   const [selectionSelected, setSelectionSelected] = useState(true);
@@ -692,6 +710,26 @@ export function HitoDsComponentControls() {
               <div className="hito-reference-list">
                 <article className="hito-reference-row items-start">
                   <div>
+                    <p className="hito-list-row-title">Native select field</p>
+                    <p className="hito-caption mt-2">
+                      Native option behavior with the shared Hito field, label, and helper anatomy.
+                    </p>
+                  </div>
+                  <HitoNativeSelectField
+                    id="ds-native-select-field"
+                    label="Workout type"
+                    value={nativeSelectDemo}
+                    onValueChange={setNativeSelectDemo}
+                    helper="Use when native selection behavior is the right interaction."
+                    options={[
+                      { value: "easy", label: "Easy run" },
+                      { value: "tempo", label: "Tempo" },
+                      { value: "intervals", label: "Intervals" },
+                    ]}
+                  />
+                </article>
+                <article className="hito-reference-row items-start">
+                  <div>
                     <p className="hito-list-row-title">Date picker field</p>
                     <p className="hito-caption mt-2">
                       Use for required or visible dates such as target race day.
@@ -785,9 +823,9 @@ export function HitoDsComponentControls() {
                     </p>
                   </div>
                   <div className="hito-avatar-stack">
-                    <span className="hito-avatar-tile hito-profile-avatar h-28 w-28">
-                      <span className="hito-profile-avatar-fallback">IR</span>
-                    </span>
+                    <Avatar className="hito-avatar-tile hito-profile-avatar">
+                      <AvatarFallback className="hito-profile-avatar-fallback">IR</AvatarFallback>
+                    </Avatar>
                     <button
                       type="button"
                       className="hito-avatar-action hito-button hito-button-secondary hito-button-sm"
@@ -805,11 +843,11 @@ export function HitoDsComponentControls() {
                     </p>
                   </div>
                   <div className="hito-avatar-stack">
-                    <span className="hito-avatar-tile hito-profile-avatar h-28 w-28">
-                      <span className="grid h-full w-full place-items-center bg-[var(--stone-800)] text-signal">
+                    <Avatar className="hito-avatar-tile hito-profile-avatar">
+                      <AvatarFallback className="hito-profile-avatar-fallback">
                         <Icon name="user" size="lg" />
-                      </span>
-                    </span>
+                      </AvatarFallback>
+                    </Avatar>
                     <button
                       type="button"
                       className="hito-avatar-action hito-button hito-button-secondary hito-button-sm"
@@ -831,89 +869,52 @@ export function HitoDsComponentControls() {
               <div className="hito-reference-list mt-4">
                 <article className="hito-reference-row">
                   <div>
-                    <p className="hito-list-row-title">Empty chip</p>
+                    <p className="hito-list-row-title">Interactive scalar and select chips</p>
                     <p className="hito-caption mt-2">
-                      Borderless by default, with a clear hover/focus backdrop.
+                      These are the runtime owners. Click any empty or saved chip to enter its real
+                      editing state.
                     </p>
                   </div>
                   <div className="hito-editable-value-chip-group">
-                    {["Age", "Height", "Weight"].map((label) => (
-                      <button
-                        key={label}
-                        type="button"
-                        className="hito-editable-value-chip"
-                        data-state="empty"
-                      >
-                        <Icon name="plus" size="sm" className="hito-editable-value-chip-icon" />
-                        <span className="hito-editable-value-chip-content">{label}</span>
-                      </button>
+                    {(
+                      [
+                        ["age", "Age", "36", 12, 110, 1, "numeric", undefined],
+                        ["height", "Height", "175", 80, 250, 1, "numeric", "cm"],
+                        ["weight", "Weight", "72", 25, 350, 0.1, "decimal", "kg"],
+                      ] as const
+                    ).map(([fieldKey, label, placeholder, min, max, step, inputMode, unit]) => (
+                      <EditableValueChip
+                        key={fieldKey}
+                        fieldKey={fieldKey}
+                        label={label}
+                        value={editableValues[fieldKey]}
+                        setValue={(value) =>
+                          setEditableValues((current) => ({ ...current, [fieldKey]: value }))
+                        }
+                        activeEditableKey={activeEditableField}
+                        setActiveEditableKey={setActiveEditableField}
+                        placeholder={placeholder}
+                        min={min}
+                        max={max}
+                        step={step}
+                        inputMode={inputMode}
+                        unit={unit}
+                      />
                     ))}
-                  </div>
-                </article>
-                <article className="hito-reference-row">
-                  <div>
-                    <p className="hito-list-row-title">Editing chip</p>
-                    <p className="hito-caption mt-2">
-                      The input stays the same height and focuses in place.
-                    </p>
-                  </div>
-                  <div className="hito-editable-value-chip-frame" data-state="editing">
-                    <div className="hito-editable-value-chip-input-shell">
-                      <input
-                        id="ds-editable-weight"
-                        value="72"
-                        readOnly
-                        className="hito-editable-value-chip-input"
-                        aria-label="Weight"
-                      />
-                      <button
-                        type="button"
-                        className="hito-editable-value-chip-clear"
-                        aria-label="Clear weight"
-                      >
-                        <Icon name="close" size="xs" />
-                      </button>
-                    </div>
-                    <button
-                      type="button"
-                      className="hito-editable-value-chip-action"
-                      data-action="save"
-                      aria-label="Save weight"
-                    >
-                      <Icon name="check" size="sm" />
-                    </button>
-                  </div>
-                </article>
-                <article className="hito-reference-row">
-                  <div>
-                    <p className="hito-list-row-title">Saved chip</p>
-                    <p className="hito-caption mt-2">
-                      Compact label plus value. Pencil stays subtle and appears on hover/focus.
-                    </p>
-                  </div>
-                  <div className="hito-editable-value-chip-group">
-                    <button type="button" className="hito-editable-value-chip" data-state="saved">
-                      <span className="hito-editable-value-chip-content">
-                        <span className="hito-editable-value-chip-label">Age</span>
-                        <span className="hito-editable-value-chip-text">36</span>
-                      </span>
-                      <Icon
-                        name="edit"
-                        size="sm"
-                        className="hito-editable-value-chip-icon hito-editable-value-chip-edit-icon"
-                      />
-                    </button>
-                    <button type="button" className="hito-editable-value-chip" data-state="saved">
-                      <span className="hito-editable-value-chip-content">
-                        <span className="hito-editable-value-chip-label">Weight</span>
-                        <span className="hito-editable-value-chip-text">72 kg</span>
-                      </span>
-                      <Icon
-                        name="edit"
-                        size="sm"
-                        className="hito-editable-value-chip-icon hito-editable-value-chip-edit-icon"
-                      />
-                    </button>
+                    <EditableSelectValueChip
+                      activeEditableKey={activeEditableField}
+                      emptyLabel="Add terrain"
+                      fieldKey="terrain"
+                      label="Terrain"
+                      options={[
+                        { value: "road", label: "Road" },
+                        { value: "trail", label: "Trail" },
+                        { value: "mixed", label: "Mixed" },
+                      ]}
+                      setActiveEditableKey={setActiveEditableField}
+                      setValue={setEditableTerrain}
+                      value={editableTerrain}
+                    />
                   </div>
                 </article>
               </div>
@@ -1083,6 +1084,35 @@ export function HitoDsComponentControls() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div className="border-t border-hairline pt-5">
+              <p className="hito-label">Metadata tags and menu</p>
+              <p className="hito-caption mt-1">
+                Read-only metadata and interactive operational metadata share the runtime tag owner.
+              </p>
+              <div className="mt-4 flex min-w-0 flex-wrap items-center gap-3">
+                <HitoMetadataTag
+                  tone="success"
+                  tooltip="The backend-reviewed draft is ready to confirm."
+                >
+                  Reviewed
+                </HitoMetadataTag>
+                <HitoMetadataTag tooltip="Canonical generated-plan contract.">
+                  Plan first
+                </HitoMetadataTag>
+                <AdminMetadataMenu
+                  displayValue={metadataState === "reviewed" ? "Reviewed" : "Draft"}
+                  label="Review state"
+                  onSelect={setMetadataState}
+                  options={[
+                    { value: "draft", label: "Draft" },
+                    { value: "reviewed", label: "Reviewed" },
+                  ]}
+                  tone={metadataState === "reviewed" ? "success" : "signal"}
+                  value={metadataState}
+                />
               </div>
             </div>
 

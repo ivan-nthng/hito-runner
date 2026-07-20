@@ -1,8 +1,9 @@
 import { z } from "zod";
 import type { CanonicalMetricModeJson } from "@/lib/rich-workout-model";
-import type {
-  WorkoutDocumentContent,
-  WorkoutDocumentType as WorkoutType,
+import {
+  AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
+  type WorkoutDocumentContent,
+  type WorkoutDocumentType as WorkoutType,
 } from "@/lib/workout-document";
 
 export const MANUAL_WORKOUT_AUTHORING_SOURCE_KIND = "manual_workout_authoring_v1" as const;
@@ -41,9 +42,15 @@ export const MANUAL_WORKOUT_TARGET_SOURCE_VALUES = [
   "personal_hr_zone",
   "default_estimated_hr",
   "age_estimated",
+  AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
 ] as const;
 
 export type ManualWorkoutTargetSource = (typeof MANUAL_WORKOUT_TARGET_SOURCE_VALUES)[number];
+
+export interface ManualWorkoutDraftProcessingOptions {
+  allowPreservedAiAuthoredTargets?: boolean;
+  allowPersistedTemplateShape?: boolean;
+}
 
 export const MANUAL_WORKOUT_TEMPLATE_KEY_VALUES = [
   "rest_day",
@@ -145,6 +152,7 @@ const manualWorkoutTargetInputSchema = z
     hrBpmCap: z.union([z.number().int(), z.string().trim().min(1).max(16)]).optional(),
     hrBpmRange: z.string().trim().min(1).max(80).optional(),
     hrTargetSource: z.enum(MANUAL_WORKOUT_TARGET_SOURCE_VALUES).optional(),
+    hrZone: z.string().trim().min(1).max(80).optional(),
   })
   .strict();
 

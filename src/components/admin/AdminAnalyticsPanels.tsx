@@ -138,7 +138,7 @@ export function PipelineStep({ label, value }: { label: string; value: number })
 
 export function EmptyPanel({ title, description }: { title: string; description: string }) {
   return (
-    <div className="hito-surface-flat p-6" data-tone="signal">
+    <div className="hito-state-surface p-6" data-tone="signal">
       <div className="flex items-start gap-3">
         <Icon name="user" size="md" className="mt-0.5 text-muted-foreground" />
         <div>

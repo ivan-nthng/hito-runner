@@ -1,5 +1,3 @@
-import type { AiFirstPlanDraftServiceInputKind } from "../../src/lib/ai-first-plan-draft-service";
-
 export type ParsedArgs = Record<string, string | true>;
 export type ScriptMode = "mock" | "mock_invalid" | "mock_timeout" | "live";
 export type FixtureKind = "representative_10k";
@@ -18,20 +16,6 @@ export function resolveMode(options: ParsedArgs): ScriptMode {
   }
 
   return "mock";
-}
-
-export function parseInputKind(value: string | true | undefined): AiFirstPlanDraftServiceInputKind {
-  const normalized = stringOption(value);
-
-  if (normalized === "structured_onboarding" || normalized === "structured_authoring") {
-    return normalized;
-  }
-
-  if (normalized) {
-    throw new Error("--input-kind must be structured_authoring or structured_onboarding.");
-  }
-
-  return "structured_authoring";
 }
 
 export function parseFixtureKind(value: string | true | undefined): FixtureKind {
@@ -113,11 +97,10 @@ export function printHelp() {
       "",
       "Options:",
       "  --live                         Use the real OpenAI Responses API.",
-      "  --mock-openai                  Use deterministic mock OpenAI output. This is the default.",
+      "  --mock-openai                  Use the loopback provider-shaped fixture. This is the default.",
       "  --mock-invalid                 Use invalid plan-first output and verify unavailable failure.",
       "  --mock-timeout                 Simulate a hung OpenAI request and verify unavailable failure.",
-      "  --input-file <path>            JSON structured authoring input or onboarding input.",
-      "  --input-kind <kind>            structured_authoring or structured_onboarding.",
+      "  --input-file <path>            JSON structured authoring input.",
       "  --fixture <kind>               representative-10k when no input file is supplied.",
       "  --timeout-ms <number>          Bounded OpenAI timeout. Default: 45000.",
       "  --max-output-tokens <number>   Bounded OpenAI output limit. Default: 32000.",

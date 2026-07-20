@@ -25,6 +25,7 @@ import {
   RESULT_STATE_OPTIONS,
   TARGET_TRUTH_MODE_COPY,
   VIEW_MODE_OPTIONS,
+  WORKOUT_LIBRARY_CANONICAL_IDENTITY_COUNT,
   WORKOUT_LIBRARY_IDENTITY_COUNT,
   WORKOUT_LIBRARY_SPECIMENS,
   type WorkoutLibraryOption,
@@ -66,8 +67,8 @@ export function WorkoutLibraryPlayground() {
       id="workout-library-playground"
       label="Workout taxonomy appendix"
       title="Canonical workout identities on shared primitives."
-      body="Static Running Coach matrix for every canonical workout identity. Calendar ownership stays with the shared calendar primitive specimen above."
-      status={`${WORKOUT_LIBRARY_IDENTITY_COUNT} identities`}
+      body="One static Running Coach specimen per canonical workout identity. Coverage is checked against the shared canonical identity list; calendar ownership stays with the shared calendar primitive specimen above."
+      status={`${WORKOUT_LIBRARY_IDENTITY_COUNT} of ${WORKOUT_LIBRARY_CANONICAL_IDENTITY_COUNT} canonical identities`}
       statusTone="neutral"
       controls={<ControlsBody state={state} setField={setField} />}
       preview={

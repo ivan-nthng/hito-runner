@@ -10,8 +10,6 @@ export interface AiFirstPlanDraftMetadata {
   status: "ai_authored" | "plan_first_unavailable";
   source: "openai_ai_authored_full_plan_draft";
   validationIssues: string[];
-  reviewAssumptions: string[];
-  metricPolicySummary: string;
 }
 
 export type AiFirstPlanDraftNormalizationResult =

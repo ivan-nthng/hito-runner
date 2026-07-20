@@ -101,28 +101,6 @@ export interface AdminCaptureCopyPromptView {
   contextSummary: string;
 }
 
-export interface AdminDebugCaptureCapabilityView {
-  generatedAt: string;
-  capability: "admin_debug_capture";
-  enabled: true;
-  capabilities: {
-    adminCapture: true;
-    adminDebugCapture: true;
-  };
-  authority: {
-    owner: "admin";
-    provider: "admin" | "supabase";
-    sessionSource: "deployed_password" | "local_fixture" | "supabase_app_metadata";
-    runtimeClass: "deployed" | "loopback";
-  };
-  identityBoundary: {
-    runnerAuthIgnored: true;
-    testerAuthIgnored: true;
-    productEntitlementsIgnored: true;
-    productRouteStateIgnored: true;
-  };
-}
-
 export type AdminCaptureResult<T> =
   | ({ ok: true } & T)
   | {
@@ -230,13 +208,6 @@ export const adminCaptureTriageUpdateInputSchema = z
   })
   .strict();
 
-export const adminCaptureNoteUpdateInputSchema = z
-  .object({
-    id: z.string().uuid(),
-    note: z.string().trim().min(1).max(4000),
-  })
-  .strict();
-
 export const adminCaptureNoteAppendInputSchema = z
   .object({
     id: z.string().uuid(),
@@ -248,31 +219,12 @@ export type AdminCaptureCreateInput = z.output<typeof adminCaptureCreateInputSch
 export type AdminCaptureListInput = z.output<typeof adminCaptureListInputSchema>;
 export type AdminCaptureItemIdInput = z.output<typeof adminCaptureItemIdInputSchema>;
 export type AdminCaptureTriageUpdateInput = z.output<typeof adminCaptureTriageUpdateInputSchema>;
-export type AdminCaptureNoteUpdateInput = z.output<typeof adminCaptureNoteUpdateInputSchema>;
 export type AdminCaptureNoteAppendInput = z.output<typeof adminCaptureNoteAppendInputSchema>;
-
-export const getAdminCaptureAvailability = createServerFn({ method: "GET" }).handler(
-  async (): Promise<AdminCaptureResult<{ enabled: true }>> => {
-    return getAdminCaptureAvailabilityServer();
-  },
-);
-
-export const getAdminDebugCaptureCapability = createServerFn({ method: "GET" }).handler(
-  async (): Promise<AdminCaptureResult<{ probe: AdminDebugCaptureCapabilityView }>> => {
-    return getAdminDebugCaptureCapabilityServer();
-  },
-);
 
 export const listAdminCaptureBacklog = createServerFn({ method: "GET" })
   .inputValidator((value: unknown) => adminCaptureListInputSchema.parse(value))
   .handler(async ({ data }): Promise<AdminCaptureResult<{ view: AdminCaptureBacklogView }>> => {
     return listAdminCaptureBacklogServer(data);
-  });
-
-export const getAdminCaptureItem = createServerFn({ method: "GET" })
-  .inputValidator((value: unknown) => adminCaptureItemIdInputSchema.parse(value))
-  .handler(async ({ data }): Promise<AdminCaptureResult<{ item: AdminCaptureItemView }>> => {
-    return getAdminCaptureItemServer(data);
   });
 
 export const createAdminCaptureItem = createServerFn({ method: "POST" })
@@ -285,12 +237,6 @@ export const updateAdminCaptureItemTriage = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => adminCaptureTriageUpdateInputSchema.parse(value))
   .handler(async ({ data }): Promise<AdminCaptureResult<{ item: AdminCaptureItemView }>> => {
     return updateAdminCaptureItemTriageServer(data);
-  });
-
-export const updateAdminCaptureItemNote = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => adminCaptureNoteUpdateInputSchema.parse(value))
-  .handler(async ({ data }): Promise<AdminCaptureResult<{ item: AdminCaptureItemView }>> => {
-    return updateAdminCaptureItemNoteServer(data);
   });
 
 export const appendAdminCaptureItemNote = createServerFn({ method: "POST" })
@@ -313,30 +259,10 @@ export const getAdminCaptureCopyPrompt = createServerFn({ method: "GET" })
     },
   );
 
-const getAdminCaptureAvailabilityServer = createServerOnlyFn(async () => {
-  const { getAdminCaptureAvailabilityForCurrentRequest } =
-    await import("@/lib/admin-capture.server");
-
-  return getAdminCaptureAvailabilityForCurrentRequest();
-});
-
-const getAdminDebugCaptureCapabilityServer = createServerOnlyFn(async () => {
-  const { getAdminDebugCaptureCapabilityForCurrentRequest } =
-    await import("@/lib/admin-capture.server");
-
-  return getAdminDebugCaptureCapabilityForCurrentRequest();
-});
-
 const listAdminCaptureBacklogServer = createServerOnlyFn(async (input: AdminCaptureListInput) => {
   const { listAdminCaptureBacklogForCurrentRequest } = await import("@/lib/admin-capture.server");
 
   return listAdminCaptureBacklogForCurrentRequest(input);
-});
-
-const getAdminCaptureItemServer = createServerOnlyFn(async (input: AdminCaptureItemIdInput) => {
-  const { getAdminCaptureItemForCurrentRequest } = await import("@/lib/admin-capture.server");
-
-  return getAdminCaptureItemForCurrentRequest(input);
 });
 
 const createAdminCaptureItemServer = createServerOnlyFn(async (input: AdminCaptureCreateInput) => {
@@ -351,15 +277,6 @@ const updateAdminCaptureItemTriageServer = createServerOnlyFn(
       await import("@/lib/admin-capture.server");
 
     return updateAdminCaptureItemTriageForCurrentRequest(input);
-  },
-);
-
-const updateAdminCaptureItemNoteServer = createServerOnlyFn(
-  async (input: AdminCaptureNoteUpdateInput) => {
-    const { updateAdminCaptureItemNoteForCurrentRequest } =
-      await import("@/lib/admin-capture.server");
-
-    return updateAdminCaptureItemNoteForCurrentRequest(input);
   },
 );
 

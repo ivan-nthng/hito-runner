@@ -609,11 +609,11 @@ function formatTargetLine(entries: ActivePlanExportWorkout["primaryTarget"]) {
 function formatExecutionLine(metricMode: CanonicalMetricMode) {
   switch (metricMode.executableMode) {
     case "pace_executable":
-      return "Pace-executable targets supplied by Hito.";
+      return "AI-authored pace guidance.";
     case "hr_executable":
-      return "Personal heart-rate targets supplied by Hito.";
+      return "AI-authored personal heart-rate guidance.";
     case "mixed_metric_executable":
-      return "Pace and personal heart-rate targets supplied by Hito.";
+      return "AI-authored pace and personal heart-rate guidance.";
     case "structure_only_executable":
       return "Executable duration, distance, repeat, work, or recovery structure; no pace or personal HR target.";
     case "correction_required":

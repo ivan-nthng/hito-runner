@@ -1,11 +1,7 @@
 import { z } from "zod";
-import {
-  DEFAULT_FIRST_PLAN_EXECUTION_MODE,
-  FIRST_PLAN_GUIDANCE_PREFERENCE_VALUES,
-  FIRST_PLAN_GOAL_STYLE_VALUES,
-  FIRST_PLAN_WATCH_ACCESS_VALUES,
-} from "@/lib/first-plan-authoring-utils";
+import { effectivePersonalHeartRateProfileSchema } from "@/lib/heart-rate-zones";
 import { normalizedPlanGoalIntentSchema } from "@/lib/plan-creation-engine/plan-goal-intent";
+import { RUNNING_PLAN_RUNNER_LEVEL_VALUES } from "@/lib/plan-creation-engine/source-types";
 import { diffDaysIso, todayIso } from "@/lib/training";
 
 const weekdayValues = [
@@ -20,169 +16,73 @@ const weekdayValues = [
 
 const weekdaySchema = z.enum(weekdayValues);
 
-const watchAccessSchema = z.enum(FIRST_PLAN_WATCH_ACCESS_VALUES);
-
-const guidancePreferenceSchema = z.enum(FIRST_PLAN_GUIDANCE_PREFERENCE_VALUES);
-
-const executionModeSchema = z.preprocess(
-  (value) => value ?? DEFAULT_FIRST_PLAN_EXECUTION_MODE,
-  z
-    .object({
-      watchAccess: watchAccessSchema.default(DEFAULT_FIRST_PLAN_EXECUTION_MODE.watchAccess),
-      guidancePreference: guidancePreferenceSchema.default(
-        DEFAULT_FIRST_PLAN_EXECUTION_MODE.guidancePreference,
-      ),
-    })
-    .strict(),
-);
-
 const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
-const recentRaceResultSchema = z.object({
-  distance: z.string().trim().min(1),
-  resultTime: z.string().trim().min(1),
-  resultDate: isoDateSchema.optional().nullable(),
-});
+const benchmarkSchema = z
+  .object({
+    kind: z.literal("recent_5k"),
+    source: z.enum(["recent_5k_time", "recent_5k_pace"]),
+    paceSecondsPerKm: z.number().int().positive(),
+    label: z.string().trim().min(1).max(120),
+  })
+  .strict()
+  .nullable();
 
 export const structuredPlanAuthoringInputSchema = z
   .object({
-    goal: z.object({
-      goalType: z.enum([
-        "distance_goal",
-        "build_consistency",
-        "distance_build",
-        "5k",
-        "10k",
-        "half_marathon",
-        "marathon",
-        "ultra_marathon",
-        "mountain_running",
-      ]),
-      goalLabel: z.string().trim().min(1).max(160),
-      goalStyle: z.enum(FIRST_PLAN_GOAL_STYLE_VALUES).optional().nullable(),
-      targetTime: z.string().trim().min(1).max(32).optional().nullable(),
-      targetEventName: z.string().trim().max(160).optional().nullable(),
-    }),
-    schedule: z.object({
-      startDate: isoDateSchema.default(todayIso()),
-      targetDate: isoDateSchema.optional().nullable(),
-      preparationHorizonWeeks: z.number().int().min(1).max(40).optional().nullable(),
-    }),
-    runnerProfile: z.object({
-      experienceLevel: z.enum([
-        "new_runner",
-        "returning_runner",
-        "consistent_runner",
-        "experienced_runner",
-      ]),
-      baselineSessionsPerWeek: z.number().int().min(1).max(7),
-      baselineLongRunKm: z.number().positive().max(80).optional().nullable(),
-      baselineLongRunDurationMin: z.number().int().min(20).max(300).optional().nullable(),
-      age: z.number().int().min(13).max(100).optional().nullable(),
-      recentInjuryRecoveryContext: z.string().trim().max(500).optional().nullable(),
-      preferredEffortLanguage: z.enum(["pace", "heart_rate", "rpe", "mixed"]).optional().nullable(),
-    }),
-    currentLevel: z
+    schedule: z
       .object({
-        recentResultSummary: z.string().trim().max(500).optional().nullable(),
-        recentRaceResults: z.array(recentRaceResultSchema).max(5).default([]),
-        recent5kPaceSecondsPerKm: z
-          .number()
-          .positive()
-          .max(20 * 60)
-          .optional()
-          .nullable(),
-        currentEasyPaceRange: z.string().trim().max(120).optional().nullable(),
-        currentTrainingLoadSummary: z.string().trim().max(500).optional().nullable(),
+        startDate: isoDateSchema.default(todayIso()),
       })
-      .default({
-        recentRaceResults: [],
-      }),
+      .strict(),
+    runnerFacts: z
+      .object({
+        age: z.number().int().min(13).max(100),
+        heightCm: z.number().min(120).max(230),
+        weightKg: z.number().min(30).max(250),
+        selfReportedLevel: z.enum(RUNNING_PLAN_RUNNER_LEVEL_VALUES),
+        benchmark: benchmarkSchema,
+        heartRateProfile: effectivePersonalHeartRateProfileSchema.nullable().optional(),
+      })
+      .strict(),
     availability: z
       .object({
-        preferredRunningDays: z.array(weekdaySchema).min(1).max(7),
-        unavailableDays: z.array(weekdaySchema).max(7).default([]),
+        fixedRestDays: z.array(weekdaySchema).max(6).default([]),
         maxRunningDaysPerWeek: z.number().int().min(1).max(7),
-        allowBackToBackDays: z.boolean().default(false),
         preferredLongRunDay: weekdaySchema.optional().nullable(),
       })
       .superRefine((value, context) => {
-        const overlap = value.preferredRunningDays.filter((day) =>
-          value.unavailableDays.includes(day),
-        );
-
-        if (overlap.length > 0) {
+        if (value.preferredLongRunDay && value.fixedRestDays.includes(value.preferredLongRunDay)) {
           context.addIssue({
             code: z.ZodIssueCode.custom,
-            path: ["preferredRunningDays"],
-            message: `Preferred and unavailable days overlap: ${overlap.join(", ")}.`,
+            path: ["preferredLongRunDay"],
+            message: "Preferred long-run day cannot also be a fixed rest day.",
+          });
+        }
+        const availableDayCount = weekdayValues.length - new Set(value.fixedRestDays).size;
+        if (value.maxRunningDaysPerWeek > availableDayCount) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["maxRunningDaysPerWeek"],
+            message: "Running days per week must fit the weekdays that are not fixed rest days.",
           });
         }
       }),
-    constraints: z
-      .object({
-        injuryConstraints: z.array(z.string().trim().min(1).max(200)).max(10).default([]),
-        hardConstraints: z.array(z.string().trim().min(1).max(200)).max(10).default([]),
-      })
-      .default({
-        injuryConstraints: [],
-        hardConstraints: [],
-      }),
-    preferences: z
-      .object({
-        preferredWorkoutMix: z
-          .enum(["balanced", "easy_heavy", "quality_light", "long_run_focus"])
-          .optional()
-          .nullable(),
-        terrainFocus: z.enum(["standard", "rolling", "mountain"]).default("standard"),
-        strengthOrMobilityInterest: z
-          .enum(["none", "mobility", "strength", "both"])
-          .optional()
-          .nullable(),
-        indoorTreadmillOk: z.boolean().default(false),
-        notes: z.string().trim().max(500).optional().nullable(),
-      })
-      .default({
-        indoorTreadmillOk: false,
-      }),
-    execution: executionModeSchema,
-    planGoalIntent: normalizedPlanGoalIntentSchema.optional().nullable(),
+    planGoalIntent: normalizedPlanGoalIntentSchema.refine((intent) => intent.distance != null, {
+      message: "Choose a training distance before creating a generated plan.",
+      path: ["distance"],
+    }),
   })
+  .strict()
   .superRefine((value, context) => {
-    const planFirstDistanceGoal = Boolean(value.planGoalIntent?.distance);
+    if (value.planGoalIntent.targetDate) {
+      const diffDays = diffDaysIso(value.planGoalIntent.targetDate, value.schedule.startDate);
 
-    if (
-      !planFirstDistanceGoal &&
-      !value.runnerProfile.baselineLongRunKm &&
-      !value.runnerProfile.baselineLongRunDurationMin
-    ) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["runnerProfile", "baselineLongRunKm"],
-        message: "Provide baselineLongRunKm or baselineLongRunDurationMin.",
-      });
-    }
-
-    if (
-      !planFirstDistanceGoal &&
-      !value.schedule.targetDate &&
-      !value.schedule.preparationHorizonWeeks
-    ) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["schedule", "targetDate"],
-        message: "Provide targetDate or preparationHorizonWeeks.",
-      });
-    }
-
-    if (value.schedule.targetDate) {
-      const diffDays = diffDaysIso(value.schedule.targetDate, value.schedule.startDate);
-
-      if (diffDays < 6) {
+      if (diffDays <= 0) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
-          path: ["schedule", "targetDate"],
-          message: "targetDate must be at least 7 days after startDate.",
+          path: ["planGoalIntent", "targetDate"],
+          message: "Target date must be after start date.",
         });
       }
     }

@@ -182,6 +182,7 @@ async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {
 
   const aiPreview = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
     authoringInput: authoring.authoringInput,
+    qaFixtureAuthorized: true,
     today: input.startDate ?? authoring.authoringInput.schedule.startDate,
     env: localAiGeneratedFixtureEnv(),
   });
@@ -1199,6 +1200,9 @@ function localAiGeneratedFixtureEnv() {
     OPENAI_MODEL: "hito-local-qa-dev-ai-generated-plan-fixture",
     LOCAL_AUTH_BYPASS_ENABLED: "true",
     LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: "/tmp/hito-local-auth.json",
+    NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+    HITO_AI_GENERATED_PLAN_DEV_FIXTURE: "true",
+    HITO_AI_GENERATED_PLAN_PROVIDER_MODE: "qa_fixture",
   };
 }
 

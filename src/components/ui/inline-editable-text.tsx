@@ -17,7 +17,7 @@ type InlineEditableTextVariant = "default" | "header";
 type InlineEditableHeaderSize = "sm" | "md" | "lg";
 
 const INLINE_EDITABLE_ACTION_CLASSES =
-  "group inline-flex min-h-11 min-w-0 max-w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-white/[0.06] focus-visible:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/30 data-[demo-state=hover]:bg-white/[0.06] data-[demo-state=focus]:bg-white/[0.08] data-[readonly=true]:cursor-default data-[readonly=true]:hover:bg-transparent data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-60";
+  "group inline-flex min-h-11 min-w-0 max-w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-foreground/[0.06] focus-visible:bg-foreground/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/30 data-[demo-state=hover]:bg-foreground/[0.06] data-[demo-state=focus]:bg-foreground/[0.08] data-[readonly=true]:cursor-default data-[readonly=true]:hover:bg-transparent data-[disabled=true]:cursor-not-allowed data-[disabled=true]:opacity-60";
 
 export function InlineEditableText({
   "aria-label": ariaLabel,

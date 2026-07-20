@@ -12,7 +12,6 @@ import {
   logoutAdminForRequest,
   type AdminLoginDependencies,
 } from "@/lib/admin-auth-actions.server";
-import { getAdminDebugCaptureCapabilityForDependencies } from "@/lib/admin-capture.server";
 import type { RequestAuthContext } from "@/lib/backend/auth";
 import { clearLocalAuthSessionCookie } from "@/lib/local-auth";
 import type { Database } from "@/lib/supabase/database";
@@ -73,7 +72,6 @@ async function run() {
 
   await assertSignedCookieAcceptedForDirectAdminRoute(adminCookie);
   await assertSignedCookieAcceptedForAdminServerFn(adminCookie);
-  await assertAdminDebugCaptureProbeContract(adminCookie);
   await assertSignedCookieRejectedOutsideAdmin(adminCookie);
   await assertInvalidAndExpiredCookiesRejected(adminCookie);
   await assertLocalTesterDenied();
@@ -85,7 +83,7 @@ async function run() {
     [
       "Admin auth/session validation passed:",
       "- signed admin cookie accepted for admin route and admin server function",
-      "- admin debug/capture probe authorizes only canonical admin capability",
+      "- mixed runner/admin cookies preserve admin authority only on admin surfaces",
       "- signed admin cookie rejected for non-admin route and non-admin server function",
       "- invalid and expired cookies rejected",
       "- local fixture admin login issues signed admin session only",
@@ -154,87 +152,24 @@ async function assertSignedCookieAcceptedForAdminServerFn(adminCookie: string) {
       adminCookie,
     ),
   );
-  const productionDebugCaptureSession = await resolveAdminAuthSession(
+  const productionCaptureSession = await resolveAdminAuthSession(
     request(
       `http://localhost:3000${productionServerFnPath(
         "src/lib/admin-capture.ts",
-        "getAdminDebugCaptureCapability_createServerFn_handler",
+        "listAdminCaptureBacklog_createServerFn_handler",
       )}`,
       adminCookie,
     ),
-  );
-
-  assert.ok(session, "admin serverFn should accept signed admin cookie");
-  assert.ok(
-    productionSession,
-    "production hashed admin serverFn should accept signed admin cookie",
-  );
-  assert.ok(
-    productionDebugCaptureSession,
-    "production hashed admin debug/capture probe should accept signed admin cookie",
-  );
-}
-
-async function assertAdminDebugCaptureProbeContract(adminCookie: string) {
-  const adminSession = await resolveAdminAuthSession(
-    request(
-      `http://localhost:3000${productionServerFnPath(
-        "src/lib/admin-capture.ts",
-        "getAdminDebugCaptureCapability_createServerFn_handler",
-      )}`,
-      adminCookie,
-    ),
-  );
-
-  assert.ok(adminSession, "admin debug/capture probe route should resolve signed admin session");
-
-  const adminProbe = await debugCaptureProbeForAuth(authFromSession(adminSession));
-  const signedOutProbe = await debugCaptureProbeForAuth({
-    userId: null,
-    email: null,
-    appBaseUrl: "http://localhost:3000",
-    provider: "preview",
-  });
-  const localTesterProbe = await debugCaptureProbeForAuth({
-    userId: TESTER_USER_ID,
-    email: localTesterAccount.email,
-    appBaseUrl: "http://localhost:3000",
-    provider: "local",
-  });
-  const runnerProbe = await debugCaptureProbeForAuth(
-    {
-      userId: "runner-user",
-      email: "runner@example.test",
-      appBaseUrl: "https://hito.example",
-      provider: "supabase",
-    },
-    mockSupabaseAuthUser({
-      id: "runner-user",
-      email: "runner@example.test",
-      app_metadata: {},
-      user_metadata: { hito_admin: true },
-    }),
-    "https://hito.example",
-  );
-  const supabaseAdminProbe = await debugCaptureProbeForAuth(
-    supabaseAuthContext("supabase-admin-probe"),
-    mockSupabaseAuthUser({
-      id: "supabase-admin-probe",
-      email: "admin-probe@example.test",
-      app_metadata: { hito_role: "admin" },
-      user_metadata: {},
-    }),
-    "https://hito.example",
   );
   const mixedCookie = `${adminCookie}; hito_local_auth_session=runner-session-placeholder`;
   const mixedProductRouteSession = await resolveAdminAuthSession(
     request("http://localhost:3000/", mixedCookie),
   );
-  const mixedProbeSession = await resolveAdminAuthSession(
+  const mixedCaptureSession = await resolveAdminAuthSession(
     request(
       `http://localhost:3000${productionServerFnPath(
         "src/lib/admin-capture.ts",
-        "getAdminDebugCaptureCapability_createServerFn_handler",
+        "listAdminCaptureBacklog_createServerFn_handler",
       )}`,
       mixedCookie,
     ),
@@ -245,54 +180,29 @@ async function assertAdminDebugCaptureProbeContract(adminCookie: string) {
     runnerLogoutHeaders,
     request("http://localhost:3000/api/auth/logout", mixedCookie),
   );
-
-  const runnerLogoutCookies = getSetCookieHeaders(runnerLogoutHeaders);
-  const runnerLogoutAdminClear = runnerLogoutCookies.find((value) =>
+  const runnerLogoutAdminClear = getSetCookieHeaders(runnerLogoutHeaders).find((value) =>
     value.startsWith(`${ADMIN_SESSION_COOKIE}=`),
   );
 
-  assert.equal(adminProbe.ok, true);
-  assert.equal(signedOutProbe.ok, false);
-  assert.equal(localTesterProbe.ok, false);
-  assert.equal(runnerProbe.ok, false);
-  assert.equal(supabaseAdminProbe.ok, true);
+  assert.ok(session, "admin serverFn should accept signed admin cookie");
+  assert.ok(
+    productionSession,
+    "production hashed admin serverFn should accept signed admin cookie",
+  );
+  assert.ok(
+    productionCaptureSession,
+    "production hashed admin capture serverFn should accept signed admin cookie",
+  );
   assert.equal(mixedProductRouteSession, null);
-  assert.ok(mixedProbeSession, "admin probe serverFn should keep admin authority in mixed browser");
+  assert.ok(
+    mixedCaptureSession,
+    "admin capture serverFn should keep admin authority in mixed browser",
+  );
   assert.equal(
     runnerLogoutAdminClear,
     undefined,
-    "runner logout must not own or clear signed admin debug/capture capability",
+    "runner logout must not own or clear signed admin capability",
   );
-
-  if (adminProbe.ok) {
-    assert.equal(adminProbe.probe.capability, "admin_debug_capture");
-    assert.equal(adminProbe.probe.enabled, true);
-    assert.equal(adminProbe.probe.capabilities.adminCapture, true);
-    assert.equal(adminProbe.probe.capabilities.adminDebugCapture, true);
-    assert.equal(adminProbe.probe.authority.owner, "admin");
-    assert.equal(adminProbe.probe.authority.provider, "admin");
-    assert.equal(adminProbe.probe.identityBoundary.runnerAuthIgnored, true);
-    assert.equal(adminProbe.probe.identityBoundary.testerAuthIgnored, true);
-    assert.equal(adminProbe.probe.identityBoundary.productEntitlementsIgnored, true);
-    assert.equal(adminProbe.probe.identityBoundary.productRouteStateIgnored, true);
-    assert.equal(
-      Object.hasOwn(adminProbe.probe, "adminUserId"),
-      false,
-      "probe must not expose raw admin user id",
-    );
-  }
-
-  if (!signedOutProbe.ok) {
-    assert.equal(signedOutProbe.reason, "authentication_required");
-  }
-
-  if (!localTesterProbe.ok) {
-    assert.equal(localTesterProbe.reason, "admin_required");
-  }
-
-  if (!runnerProbe.ok) {
-    assert.equal(runnerProbe.reason, "admin_required");
-  }
 }
 
 async function assertSignedCookieRejectedOutsideAdmin(adminCookie: string) {
@@ -447,24 +357,6 @@ async function postAdminLogin(input: { identifier: string; password: string; nex
 function request(url: string, cookie?: string) {
   return new Request(url, {
     headers: cookie ? { cookie } : undefined,
-  });
-}
-
-function debugCaptureProbeForAuth(
-  auth: RequestAuthContext,
-  supabase: Pick<SupabaseClient<Database>, "auth"> | null = null,
-  runtimeUrl = auth.appBaseUrl,
-) {
-  return getAdminDebugCaptureCapabilityForDependencies({
-    adminAccess: () =>
-      requireAdminAccessForDependencies({
-        auth,
-        runtimeUrl,
-        localAuthBypassEnabled: true,
-        supabase,
-      }),
-    repository: null,
-    now: () => new Date("2026-06-03T12:00:00.000Z"),
   });
 }
 

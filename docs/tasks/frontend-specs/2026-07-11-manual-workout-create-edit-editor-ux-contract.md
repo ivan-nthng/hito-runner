@@ -10,7 +10,7 @@ DESIGNER / Hito DS
 
 ## Last Updated
 
-2026-07-11
+2026-07-19
 
 ## Type
 
@@ -51,6 +51,14 @@ high
   again blocked by file permissions, so the comparison is grounded in source inspection plus the
   user's screenshots and stated direction.
 
+## Current Editability Override
+
+The source/manual-only/future-only availability statements in the detailed design record below are
+superseded by `docs/current-product.md`. The same editor grammar must support every confirmed
+non-rest workout on today or a future date regardless of source, logs, completion, or evidence;
+past workouts remain non-editable. Passive readback stays non-inline-editable, and save remains a
+reviewed server mutation that preserves history.
+
 ## Root Cause
 
 Visible symptom:
@@ -76,8 +84,7 @@ Use one shared manual workout editor pattern for:
 
 - creating a manual workout from scratch, a built-in structural template, or a personal saved
   template;
-- editing an eligible future persisted manual workout when backend capability metadata and
-  reconstruction allow it.
+- editing any confirmed non-rest workout on today or a future date through backend review/confirm.
 
 The editor should feel like one workout document that can be in draft, review, or save states. It
 must not become two separate products named "create workout" and "edit workout."
@@ -188,8 +195,8 @@ Target preview behavior:
   user enters an allowed edit mode.
 - Editable manual previews may reveal Add Section, row ellipsis, and drag/reorder affordances on
   hover/focus.
-- Protected/generated/imported/past/logged/evidence-backed previews stay read-only and must not
-  display fake edit affordances.
+- Past workout and Rest-placeholder previews stay read-only. Generated/imported origin, logs,
+  completion, or evidence do not deny the separate reviewed edit action for today/future workouts.
 
 Design decision:
 
@@ -206,7 +213,7 @@ Design decision:
 In scope:
 
 - create a manual workout for an eligible active-plan date;
-- edit an eligible future manual planned workout that backend can reconstruct into the manual draft
+- edit any confirmed non-rest planned workout on today or a future date through the shared draft
   shape;
 - edit title, visible labels, durations/distances, target mode/values, notes, repeat count, repeat
   child rows, and row order;
@@ -651,7 +658,7 @@ Persistence behavior:
 
 ## Edit Flow
 
-1. User opens `Edit training` only from backend-capability-approved eligible future manual workout.
+1. User opens `Edit training` from any confirmed non-rest workout on today or a future date.
 2. Editor opens in loading/reconstructing state.
 3. Backend reconstructs the persisted row into manual draft input.
 4. User edits through the same editor controls used by create.
@@ -820,8 +827,8 @@ Spec:
 /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/frontend-specs/2026-07-11-manual-workout-create-edit-editor-ux-contract.md
 
 Context:
-Designer has defined one shared editor UX for creating a manual workout and editing an eligible
-future persisted manual workout. Product wants the editor to follow the provided Figma-style sketch:
+Designer has defined one shared editor UX for creating a manual workout and editing confirmed
+non-rest workouts on today or a future date. Product wants the editor to follow the provided Figma-style sketch:
 dialog-style editor, date/title/status header, workout structure preview, editable segment and
 repeat cards, visible label/duration/target/notes fields, Add Section insertion controls, Close,
 Save Workout, and row actions. This must extend Hito DS primitives, not create a separate editor UI
@@ -909,7 +916,8 @@ Scope:
    - reuse the document lead and structure preview;
    - show compact segment/repeat rows under the timeline;
    - keep repeat count in the left gutter;
-   - keep protected/generated/imported/past/logged/evidence-backed states read-only;
+   - keep past workouts and Rest placeholders read-only; preserve a separate reviewed edit action
+     for generated/imported/logged/evidence-backed today/future workouts;
    - do not replace the compact rows with only the generic timeline+notes readback.
 6. Implement Add Section insertion controls before, between, and after rows:
    - below the structure preview;
@@ -957,7 +965,8 @@ Validation:
   - drag/drop active state;
   - mobile Add Section/reorder fallback.
 - verify no horizontal overflow at `375px`.
-- verify generated/selected/imported/read-only workouts do not gain edit affordances.
+- verify generated/selected/imported today/future workouts receive the reviewed edit action without
+  turning passive document text into inline controls.
 - verify the screenshot-critical hierarchy is present:
   - no bordered lead icon button;
   - no structure preview below rows;
@@ -983,11 +992,12 @@ Validation:
   - preview uses the same compact document readback stack as the filled editor;
   - structure timeline is present but not the only readback content;
   - repeat gutter appears for repeat groups;
-  - edit/add/reorder affordances are hidden for protected/generated/imported/past/logged states.
+  - edit/add/reorder inline affordances stay hidden in passive readback; past/Rest remain unavailable,
+    while today/future content editing opens through the reviewed action.
 
 Stop conditions:
-- Stop if the implementation requires generated, selected, imported, today, past, logged,
-  evidence-backed, comparison-backed, rest, protected, or unsupported workout content editing.
+- Stop if the implementation would enable past workout or Rest-placeholder editing, bypass
+  review/confirm, or discard logs, evidence, completion, provenance, or prior planned truth.
 - Stop if backend editability metadata, reconstruction, review, or confirm semantics are missing for
   the requested edit path.
 - Stop if the design would require a new visual system instead of Hito DS primitives.
@@ -1000,5 +1010,5 @@ blockers.
 
 ## Blockers
 
-None for a bounded FRONTEND implementation pass on shared manual create/edit editor UX. Broader
-generated/imported workout content editing remains blocked by Product/Backend scope.
+The shared editor design is not blocked. Runtime availability still depends on backend reconciliation
+of the canonical today/future cross-origin contract and durable pre-edit history.

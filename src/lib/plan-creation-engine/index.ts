@@ -1,10 +1,4 @@
 export {
-  collectRunnerFacingCanonicalRichnessIssues,
-  isHardRunnerFacingRichnessIssue,
-  type RunnerFacingRichnessCanonicalRow,
-  type RunnerFacingRichnessInput,
-} from "@/lib/plan-creation-engine/runner-facing-richness";
-export {
   collectSelectedDistanceEndpointIssues,
   selectedDistanceEndpointMainDistanceMeters,
   SELECTED_DISTANCE_ENDPOINT_IDENTITY,
@@ -15,7 +9,6 @@ export {
   type SelectedDistanceEndpointRow,
 } from "@/lib/plan-creation-engine/selected-distance-endpoint";
 export {
-  buildStructuredPlanGoalIntentInput,
   normalizePlanGoalIntent,
   normalizedPlanGoalIntentSchema,
   planGoalIntentDistanceInputSchema,

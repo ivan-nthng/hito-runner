@@ -146,12 +146,18 @@ function WorkoutPage() {
       );
   const lifecycle = workoutDetailLifecycleFor(workout, snapshot, feedback);
   const surfaceModel = workoutDetailSurfaceModelFor(lifecycle, tab);
+  const canEditWorkout = Boolean(
+    snapshot.source === "persisted" &&
+    workout.type !== "rest" &&
+    snapshot.planMeta?.workoutEditing?.editWorkout.allowed &&
+    workout.sourceEditing?.canEditContent,
+  );
 
   return (
     <AppShell snapshot={snapshot} viewer={viewer}>
       <div className="hito-route-gutter relative max-w-6xl pb-8 pt-2">
         <WorkoutDetailTopBar
-          canEdit={canEditWorkoutFromDetail(workout, snapshot)}
+          canEdit={canEditWorkout}
           onPlanChanged={() => router.invalidate()}
           snapshot={snapshot}
           workout={workout}
@@ -619,17 +625,6 @@ function WorkoutDetailTopBar({
         />
       ) : null}
     </div>
-  );
-}
-
-function canEditWorkoutFromDetail(workout: Workout, snapshot: TrainingSnapshot) {
-  return Boolean(
-    snapshot.source === "persisted" &&
-    snapshot.planMeta?.workoutEditing?.editWorkout.allowed &&
-    workout.sourceEditing?.canEditContent &&
-    workout.sourceEditing?.eligibility === "eligible_future_unlogged" &&
-    workout.type !== "rest" &&
-    !workout.log,
   );
 }
 

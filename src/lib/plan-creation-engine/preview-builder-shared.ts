@@ -15,7 +15,7 @@ import type { WeekdayName } from "@/lib/weekday-rest-invariants";
 
 export const RUNNING_PLAN_PREVIEW_REST_DAY_KIND = "rest" as const;
 
-export type RunningPlanPreviewLoadContext = "standard" | "conservative";
+export type RunningPlanPreviewLoadContext = "ai_authored";
 export type RunningPlanPreviewCalendarWorkoutDayKind =
   | RunningPlanWorkoutDayKind
   | typeof RUNNING_PLAN_PREVIEW_REST_DAY_KIND;
@@ -66,7 +66,7 @@ export interface RunningPlanPreviewNormalizedInputSummary {
   startDate: string;
   benchmarkPaceTruth: RunningPlanBenchmarkPaceTruth | null;
   planGoalIntent: NormalizedPlanGoalIntent;
-  longRunDaySource: "runner_preference" | "backend_default";
+  longRunDaySource: "runner_preference" | "ai_authored" | "not_supplied";
   trainingWeekdays: readonly WeekdayName[];
   loadContext: RunningPlanPreviewLoadContext;
 }

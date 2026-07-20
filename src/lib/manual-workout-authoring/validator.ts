@@ -2,6 +2,7 @@ import {
   type ManualWorkoutBlockInput,
   type ManualWorkoutConstructorEntryInput,
   type ManualWorkoutDraftIssue,
+  type ManualWorkoutDraftProcessingOptions,
   type ManualWorkoutRepeatGroupInput,
   type ManualWorkoutTargetTruthMode,
   type ParsedManualWorkoutDraftInput,
@@ -48,11 +49,12 @@ const SUBSTANTIVE_WORK_BLOCKS = new Set<ManualWorkoutBlockInput["blockKey"]>([
 
 export function validateManualWorkoutDraft(
   input: ParsedManualWorkoutDraftInput,
+  options: ManualWorkoutDraftProcessingOptions = {},
 ): ManualWorkoutDraftValidationResult {
   const template = getManualWorkoutTemplate(input.templateKey);
   const targetTruthMode = input.targetTruthMode ?? template.defaultTargetTruthMode;
   const entries = input.entries?.length ? input.entries : template.defaultEntries;
-  const issues = validateManualWorkoutEntries(template, targetTruthMode, entries);
+  const issues = validateManualWorkoutEntries(template, targetTruthMode, entries, options);
 
   if (issues.length > 0) {
     return {
@@ -77,6 +79,7 @@ function validateManualWorkoutEntries(
   template: ManualWorkoutTemplate,
   targetTruthMode: ManualWorkoutTargetTruthMode,
   entries: ManualWorkoutConstructorEntryInput[],
+  options: ManualWorkoutDraftProcessingOptions,
 ): ManualWorkoutDraftIssue[] {
   const issues: ManualWorkoutDraftIssue[] = [];
 
@@ -110,11 +113,12 @@ function validateManualWorkoutEntries(
   }
 
   for (const [index, entryValue] of entries.entries()) {
-    validateEntry(entryValue, issues, ["entries", index]);
+    validateEntry(entryValue, issues, ["entries", index], options);
   }
 
   if (
     template.requiresRepeatGroup &&
+    !options.allowPersistedTemplateShape &&
     !entries.some((entryValue) => entryValue.kind === "repeat_group")
   ) {
     issues.push({
@@ -163,19 +167,21 @@ function validateEntry(
   entryValue: ManualWorkoutConstructorEntryInput,
   issues: ManualWorkoutDraftIssue[],
   path: Array<string | number>,
+  options: ManualWorkoutDraftProcessingOptions,
 ) {
   if (entryValue.kind === "block") {
-    validateBlock(entryValue.block, issues, [...path, "block"]);
+    validateBlock(entryValue.block, issues, [...path, "block"], options);
     return;
   }
 
-  validateRepeatGroup(entryValue.group, issues, [...path, "group"]);
+  validateRepeatGroup(entryValue.group, issues, [...path, "group"], options);
 }
 
 function validateBlock(
   block: ManualWorkoutBlockInput,
   issues: ManualWorkoutDraftIssue[],
   path: Array<string | number>,
+  options: ManualWorkoutDraftProcessingOptions,
 ) {
   if (block.nestedRepeatGroup !== undefined) {
     issues.push({
@@ -185,7 +191,7 @@ function validateBlock(
     });
   }
 
-  issues.push(...validateManualWorkoutTargetInput(block, "structure_only", path));
+  issues.push(...validateManualWorkoutTargetInput(block, "structure_only", path, options));
 
   if (NOTE_ONLY_BLOCKS.has(block.blockKey)) {
     if (!block.noteText?.trim()) {
@@ -212,6 +218,7 @@ function validateRepeatGroup(
   group: ManualWorkoutRepeatGroupInput,
   issues: ManualWorkoutDraftIssue[],
   path: Array<string | number>,
+  options: ManualWorkoutDraftProcessingOptions,
 ) {
   const children = getManualWorkoutRepeatGroupChildren(group);
 
@@ -232,7 +239,7 @@ function validateRepeatGroup(
   }
 
   for (const [childIndex, child] of children.entries()) {
-    validateBlock(child, issues, [...path, "children", childIndex]);
+    validateBlock(child, issues, [...path, "children", childIndex], options);
 
     if (NOTE_ONLY_BLOCKS.has(child.blockKey)) {
       issues.push({

@@ -13,7 +13,6 @@ import {
   getAdminCaptureCopyPromptForDependencies,
   getAdminCaptureItemForDependencies,
   listAdminCaptureBacklogForDependencies,
-  updateAdminCaptureItemNoteForDependencies,
   type AdminCaptureDependencies,
   type AdminCaptureRepository,
   type AdminCaptureRow,
@@ -155,7 +154,6 @@ const adminDependencies = (repository: AdminCaptureRepository): AdminCaptureDepe
       capabilities: {
         adminAnalytics: true,
         adminCapture: true,
-        adminDebugCapture: true,
         localTestAccounts: false,
       },
     },
@@ -427,12 +425,6 @@ async function runDeterministicHarness() {
     appendAdminCaptureItemNoteForDependencies(admin, {
       id: repoDerivedRow.id,
       note: "Should not append.",
-    }),
-  );
-  await mustRejectRepoDerivedMutation(
-    updateAdminCaptureItemNoteForDependencies(admin, {
-      id: repoDerivedRow.id,
-      note: "Should not replace.",
     }),
   );
   await mustRejectRepoDerivedMutation(
@@ -780,10 +772,6 @@ async function runLiveSupabaseProbe() {
       id: repoDerivedItemId,
       note: "Should not append.",
     });
-    const repoUpdateNoteBlocked = await updateAdminCaptureItemNoteForDependencies(admin, {
-      id: repoDerivedItemId,
-      note: "Should not replace.",
-    });
     const repoDeleteBlocked = await deleteAdminCaptureQuickNoteForDependencies(admin, {
       id: repoDerivedItemId,
     });
@@ -793,7 +781,6 @@ async function runLiveSupabaseProbe() {
       ok:
         isRepoReadOnlyRejection(repoTriageBlocked) &&
         isRepoReadOnlyRejection(repoAppendBlocked) &&
-        isRepoReadOnlyRejection(repoUpdateNoteBlocked) &&
         isRepoReadOnlyRejection(repoDeleteBlocked) &&
         repoAfterRejectedMutations?.status === "ready_for_codex" &&
         repoAfterRejectedMutations?.target_role === "backend" &&

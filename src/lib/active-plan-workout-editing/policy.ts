@@ -1,4 +1,7 @@
-import type { PersistedPlanCycleRow } from "@/lib/active-plan-persistence";
+import type {
+  PersistedPlanCycleRow,
+  PersistedPlannedWorkoutRow,
+} from "@/lib/active-plan-persistence";
 import { TRAINING_PLAN_V2_IMPORT_SOURCE_KIND } from "@/lib/imported-plan";
 
 export const ACTIVE_PLAN_USER_EDIT_SOURCE_KIND = "active_plan_user_edit_v1" as const;
@@ -56,6 +59,7 @@ export interface ActivePlanUserEditMetadataInput {
   originalWorkoutSourceType?: string | null;
   originalWorkoutFamily?: string | null;
   originalWorkoutIdentity?: string | null;
+  previousWorkout?: PersistedPlannedWorkoutRow | null;
 }
 
 export interface ActivePlanUserEditMetadata {
@@ -69,6 +73,7 @@ export interface ActivePlanUserEditMetadata {
   original_workout_source_type?: string | null;
   original_workout_family?: string | null;
   original_workout_identity?: string | null;
+  previous_workout?: PersistedPlannedWorkoutRow;
   workout_authoring_source_kind?: string;
   planned_workout_id?: string;
   previous_workout_date?: string;
@@ -130,9 +135,7 @@ export function resolveActivePlanWorkoutEditability(
       message:
         operation === "copy_workout"
           ? "Workout copying is available only for manual user-built active plans."
-          : operation === "edit_workout"
-            ? "Workout content editing requires a supported active plan source."
-            : "This active plan source is not supported for workout editing yet.",
+          : "This active plan source is not supported for workout editing yet.",
     };
   }
 
@@ -160,12 +163,6 @@ export function isManualContentEditableActivePlanSourceKind(sourceKind: string |
   );
 }
 
-export function isActivePlanWorkoutContentEditableSourceKind(
-  sourceKind: string | null | undefined,
-) {
-  return isEditableActivePlanSourceKind(sourceKind);
-}
-
 function isSupportedActivePlanWorkoutEditOperation(
   sourceKind: string,
   operation: ActivePlanWorkoutEditOperation,
@@ -175,7 +172,7 @@ function isSupportedActivePlanWorkoutEditOperation(
   }
 
   if (operation === "edit_workout") {
-    return isActivePlanWorkoutContentEditableSourceKind(sourceKind);
+    return true;
   }
 
   return isEditableActivePlanSourceKind(sourceKind);
@@ -222,6 +219,7 @@ export function buildActivePlanUserEditMetadata({
   originalWorkoutSourceType,
   originalWorkoutFamily,
   originalWorkoutIdentity,
+  previousWorkout,
 }: ActivePlanUserEditMetadataInput): ActivePlanUserEditMetadata {
   const sourceKind = activePlan.source_kind?.trim();
 
@@ -242,6 +240,7 @@ export function buildActivePlanUserEditMetadata({
     original_workout_source_type: originalWorkoutSourceType,
     original_workout_family: originalWorkoutFamily,
     original_workout_identity: originalWorkoutIdentity,
+    previous_workout: previousWorkout ?? undefined,
     workout_authoring_source_kind: workoutAuthoringSourceKind?.trim() || undefined,
     planned_workout_id: plannedWorkoutId?.trim() || undefined,
     previous_workout_date: previousWorkoutDate?.trim() || undefined,

@@ -214,7 +214,7 @@ function AnalyticsUnavailableState({
         : "Admin analytics are unavailable.";
 
   return (
-    <section className="hito-surface-flat p-6" data-tone={tone}>
+    <section className="hito-state-surface p-6" data-tone={tone}>
       <div className="flex items-start gap-3">
         <Icon
           name={tone === "warning" ? "warning" : "shield-alert"}
@@ -580,7 +580,7 @@ function TestAccountsSection({
 
   if (rows.length === 0) {
     return (
-      <div className="hito-surface-flat p-6" data-tone="signal">
+      <div className="hito-state-surface p-6" data-tone="signal">
         <div className="flex items-start gap-3">
           <Icon name="user" size="md" className="mt-0.5 text-muted-foreground" />
           <div>
@@ -613,7 +613,7 @@ function UnavailableState({
           : "Test accounts could not be loaded.";
 
   return (
-    <div className="hito-surface-flat p-6" data-tone={tone}>
+    <div className="hito-state-surface p-6" data-tone={tone}>
       <div className="flex items-start gap-3">
         <Icon
           name={tone === "warning" ? "warning" : "shield-alert"}

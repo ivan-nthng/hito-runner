@@ -90,6 +90,7 @@
   --font-sans: "Poppins", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Fraunces", "Times New Roman", serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --shadow-soft: var(--hito-shadow-soft);
 }
 
 :root {
@@ -921,6 +922,7 @@
   --warn: var(--orange-500);
   --success: var(--green-500);
   --success-foreground: var(--stone-950);
+  --hito-shadow-soft: 0 14px 38px oklch(0 0 0 / 32%);
   --chart-1: var(--signal);
   --chart-2: var(--easy);
   --chart-3: var(--quality);
@@ -1006,6 +1008,7 @@
   --destructive-foreground: oklch(0.988 0.006 82);
   --info: oklch(0.46 0.095 205);
   --info-foreground: oklch(0.988 0.006 82);
+  --hito-shadow-soft: 0 12px 34px oklch(0 0 0 / 14%);
   --sidebar: oklch(0.982 0.008 80);
   --sidebar-foreground: oklch(0.22 0.012 62);
   --sidebar-primary: var(--signal);

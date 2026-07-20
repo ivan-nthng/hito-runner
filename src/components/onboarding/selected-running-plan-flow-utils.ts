@@ -1,6 +1,6 @@
 import {
-  isRecent5kPaceInAcceptedRange,
-  isRecent5kTimeInAcceptedRange,
+  isPositiveRecent5kPace,
+  isPositiveRecent5kTime,
   type PlanGoalChoice,
   type StructuredConstructorState,
 } from "@/components/onboarding/onboarding-form-model";
@@ -142,11 +142,11 @@ export function resolveSelectedPlanGoalPreviewGate(
   if (targetFinishTime) {
     const seconds = parseDurationSeconds(targetFinishTime);
 
-    if (seconds == null || seconds < 5 * 60 || seconds > 48 * 60 * 60) {
+    if (seconds == null || seconds <= 0) {
       return {
         ok: false,
         field: "finishTime",
-        error: "Finish time should be between 5 minutes and 48 hours.",
+        error: "Use a positive finish time such as 45:00 or 3:50:00.",
       };
     }
   }
@@ -259,12 +259,12 @@ function buildRunningPlanBenchmarkInput(state: StructuredConstructorState):
   const hasRecent5kTime = recent5kTime.length > 0;
   const hasRecent5kPace = recent5kPace.length > 0;
 
-  if (hasRecent5kTime && !isRecent5kTimeInAcceptedRange(recent5kTime)) {
-    return { ok: false, error: "Use a recent 5K time between 10:00 and 2:00:00." };
+  if (hasRecent5kTime && !isPositiveRecent5kTime(recent5kTime)) {
+    return { ok: false, error: "Use a positive recent 5K time such as 25:00." };
   }
 
-  if (hasRecent5kPace && !isRecent5kPaceInAcceptedRange(recent5kPace)) {
-    return { ok: false, error: "Use a recent 5K pace between 2:00/km and 15:00/km." };
+  if (hasRecent5kPace && !isPositiveRecent5kPace(recent5kPace)) {
+    return { ok: false, error: "Use a positive recent 5K pace such as 5:00/km." };
   }
 
   if (hasRecent5kTime) {

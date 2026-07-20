@@ -18,11 +18,12 @@ product
 
 ## Task
 
-Close the running-plan creation engine rebuild after accepted post-confirm workout ownership durability.
+Keep the accepted running-plan creation engine closed while deferring the superseding post-confirm
+editability contract to its own runtime reconciliation.
 
 ## Stage
 
-ARCHITECT source-of-truth reconciliation / completed.
+ARCHITECT source-of-truth reconciliation / engine completed; editability reconciliation external.
 
 ## Exact Handoff Prompt
 
@@ -48,21 +49,22 @@ of whether the plan was manual, generated, imported, or refreshed. Backend capab
 plan/schedule operations separate from workout-content editing:
 
 - Add, Clear, Move, Copy, and Edit are distinct operations with row-level capabilities.
-- Copy remains limited to the proved manual path; eligible confirmed workouts from accepted plan
-  sources may be moved or cleared, and eligible future rows may enter the reviewed content-edit flow.
-- Rest, today/past content edit, logged rows, evidence-backed rows, stale review, unsupported source
-  metadata, unsafe metric truth, and unsafe reconstruction remain blocked.
+- Copy remains limited to the proved manual path, while Move/Clear retain their own row-history rules.
+- Every confirmed non-rest workout on today or a future date can enter reviewed content editing
+  regardless of plan source, generation method, logs, completion, or evidence; past workouts are not
+  editable.
 - Passive preview/detail text stays non-inline-editable. Editing is an explicit review/confirm action,
   not direct mutation of generated readback.
 - A confirmed edit marks the mutation as runner-authored through `active_plan_user_edit_v1`,
   `user_edited_workout`, and manual-workout authoring metadata while preserving the original plan
-  `source_kind`, source status, workout id/date, and edit history as provenance.
+  `source_kind`, source status, workout id/date, prior planned truth, logs, evidence, completion, and
+  edit history as durable provenance.
 
-Current implementation verdict: accepted. Confirmed external imports use
-`training_plan_v2_import` as their capability identity while the claimed external source kind and
-status remain provenance. Reviewed workout content and runner-edit audit commit through one atomic
-backend mutation; stale or protected results stay exact, and original plan plus workout source
-id/type/family/identity remain auditable after the edited workout becomes runner-authored.
+Current implementation verdict: partial. Review/confirm, stale protection, atomic edit-audit
+persistence, and provenance exist, but source allowlists, today/log/evidence capability gates,
+persisted-edit reconstruction, the atomic RPC, and workout-detail UI still implement the superseded
+future-unlogged subset. The engine rebuild remains closed; this cross-origin date-based editability
+reconciliation is a separate product/runtime contract and must not be claimed as accepted here.
 
 Accepted runner-facing workout language:
 
@@ -137,8 +139,8 @@ FRONTEND and QA accepted the first real-user generated-plan UX polish on 2026-07
   stripes, child rows, and quiet notes/cues;
 - proof/debug copy such as endpoint proof, backend fallback/default wording, source-kind labels, and
   no-fake proof labels no longer dominates runner-facing readback;
-- generated workout documents remain passive/read-only presentation until an eligible confirmed
-  future row enters the explicit reviewed content-edit flow;
+- generated workout documents remain passive/read-only presentation, while confirmed non-rest rows
+  on today or a future date use the separate explicit reviewed content-edit flow;
 - manual editable heading was validated only in editable manual constructor context;
 - Today generated-row lifecycle CTA still shows `Mark as done` and opens completion;
 - desktop and exact 375px overflow, console/pageerror/bad HTTP, impossible-state zero-persistence,
@@ -191,10 +193,11 @@ used as acceptance evidence.
 
 ## Closeout
 
-The running-plan creation engine rebuild and its post-confirm workout ownership gate are accepted
-and closed. Eligible future canonical manual, generated, imported, and refreshed workouts use one
-backend-reviewed content-edit lifecycle without weakening rest, today/past, logged, evidence-backed,
-unsafe-reconstruction, stale-review, or exact-confirm safeguards.
+The running-plan creation engine rebuild is accepted and closed. Its former future-unlogged
+post-confirm editability statement is superseded by the canonical current-product rule: every
+confirmed non-rest workout on today or a future date is editable through reviewed server mutation
+regardless of source, logs, completion, or evidence; past workouts are not editable. Runtime
+reconciliation of that rule is independent work and does not reopen plan creation.
 
 Provider upload/comparison, completed-evidence browser proof, paid live-provider acceptance, and
 future product work are independent tracks. They are not remaining conditions of this rebuild.

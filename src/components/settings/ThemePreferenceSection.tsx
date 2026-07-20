@@ -30,7 +30,7 @@ export function ThemePreferenceSection({
         </section>
 
         <section
-          className="hito-surface-flat p-4"
+          className="hito-state-surface p-4"
           data-tone={resolvedTheme === "light" ? "signal" : undefined}
         >
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -56,5 +56,3 @@ export function ThemePreferenceSection({
     </section>
   );
 }
-
-export { THEME_OPTION_COPY };

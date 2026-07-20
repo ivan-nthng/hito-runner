@@ -179,25 +179,27 @@ export function AppShell({
         <div className="mt-auto flex flex-col gap-4 p-4">
           {showShellPlanNote && (
             <div className="hito-row-group">
-              <div className="hito-list-row items-start">
-                <div className="relative min-w-0 flex-1 pr-8">
-                  <div className="hito-label flex items-center gap-2">
-                    <Icon name="plan-note" size="xs" className="text-signal" />
-                    Plan note
+              <div className="hito-list-row items-start p-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="hito-label flex items-center gap-2">
+                      <Icon name="plan-note" size="xs" className="text-signal" />
+                      Plan note
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowShellPlanNote(false)}
+                      className="hito-button hito-button-ghost hito-button-xs aspect-square shrink-0 p-0 text-muted-foreground hover:text-foreground"
+                      aria-label="Dismiss plan note"
+                    >
+                      <Icon name="close" size="xs" />
+                    </button>
                   </div>
                   <p className="hito-list-row-copy">
                     {shellSnapshot.source === "persisted"
                       ? "Your saved plan and workout results show up here. Current Plan keeps reviewed plan changes, export, and future-schedule tools together."
                       : "You can browse the preview here until you sign in and save a plan."}
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => setShowShellPlanNote(false)}
-                    className="hito-button hito-button-ghost hito-button-xs absolute right-0 top-0 aspect-square shrink-0 p-0 text-muted-foreground hover:text-foreground"
-                    aria-label="Dismiss plan note"
-                  >
-                    <Icon name="close" size="xs" />
-                  </button>
                 </div>
               </div>
             </div>

@@ -331,11 +331,9 @@ function PlanGoalCard({
       type="button"
       role="radio"
       aria-checked={active}
+      data-selected={active ? "true" : undefined}
       onClick={onClick}
-      className={cn(
-        "hito-button hito-button-md min-h-32 w-full flex-col items-start justify-between whitespace-normal p-4 text-left",
-        active ? "hito-button-primary" : "hito-button-secondary",
-      )}
+      className="hito-choice-toggle hito-choice-toggle-card min-h-32 w-full flex-col justify-between text-left"
     >
       <span className="flex w-full min-w-0 items-start justify-between gap-3">
         <span

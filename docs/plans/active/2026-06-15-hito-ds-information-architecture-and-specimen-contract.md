@@ -2,7 +2,7 @@
 
 ## Status
 
-in_progress
+completed
 
 ## Type
 
@@ -14,73 +14,21 @@ high
 
 ## Next Recommended Role
 
-architect
+product
 
 ## Task
 
-Hold Hito DS after accepted workout slice visual/runtime proof.
+Close the Hito DS information architecture and conformance work after accepted reference-truth
+parity.
 
 ## Stage
 
-ARCHITECT holding / post-workout-slice visual/runtime closeout.
+FRONTEND reference-truth implementation and integrated QA / completed.
 
 ## Exact Handoff Prompt
 
-```text
-ROLE: ARCHITECT
-
-Task:
-Reassess Hito DS only when a new source-proved DS drift appears.
-
-Stage:
-ARCHITECT holding / Hito DS source-of-truth reassessment.
-
-Context:
-The workout color-token DS implementation, manual constructor timeline adoption, and 2026-06-28
-workout-slice browser proof over the relocated local QA runtime are accepted. Frontend consumes
-backend-owned `constructorContract.timeline`; Repeat set remains structural-only with no standalone
-color token. No immediate Hito DS implementation gate remains from this chain.
-
-Canonical owner:
-Hito DS remains the shared component/token/specimen owner. Manual target-input policy belongs to
-manual authoring Product/Architecture and Backend, not to this DS plan.
-
-Required reading:
-1. AGENTS.md
-2. agents/architect.agent.md
-3. skills/hito-architecture-audit/SKILL.md
-4. docs/current-product.md
-5. docs/current-system.md
-6. docs/plans/active/2026-06-15-hito-ds-information-architecture-and-specimen-contract.md
-7. docs/plans/active/2026-06-09-manual-workout-authoring-and-user-built-plans.md
-8. src/styles.css
-9. src/routes/hitoDS.tsx
-10. relevant source for the newly reported DS drift, if any
-
-Scope:
-1. Treat workout color-token and manual constructor timeline adoption as closed unless fresh source
-   proof shows a regression.
-2. Select a new Hito DS gate only if it has one owner, one risk class, one validation story, and a
-   source-proved shared component/token/specimen gap.
-3. Keep manual target-input policy in the manual authoring plan unless it creates a new DS display
-   contract after Product/Backend acceptance.
-
-What must not be touched:
-- Do not reopen workout color-token implementation, manual constructor timeline adoption,
-  primitive-token cleanup, or `/test-calendar` without fresh regression proof.
-- Do not route manual target-input policy through Hito DS.
-
-Validation:
-- Source audit only unless a future DS implementation gate is selected.
-- Scoped `git diff --check` if docs change.
-
-Stop conditions:
-- Stop if the candidate belongs to Product, Backend, QA, runtime behavior, or manual target truth
-  rather than shared Hito DS ownership.
-
-Expected output:
-Use the standard role handoff format already used in this repo.
-```
+None. The bounded conformance sequence is complete; future product or DS work requires a new
+source-proved task outside this plan.
 
 ## Owner
 
@@ -88,28 +36,78 @@ ARCHITECT / DESIGNER / FRONTEND / QA
 
 ## Last Updated
 
-2026-07-08
+2026-07-18
 
 ## Root Cause
 
 Visible symptom:
 
-- Workout color roles, manual constructor timeline adoption, and the cache-runtime workout-slice
-  browser proof are accepted.
-- No immediate DS implementation gate remains from that accepted chain.
+- Hito DS is visibly established, but current product consumers and the reference surface do not yet
+  conform to one shared owner in every material case.
+- The strongest fresh failures are local selection/field recipes, incomplete semantic
+  state/elevation ownership, mobile onboarding content occlusion, and bounded specimen parity drift.
 
 Underlying cause:
 
-- The previous DS blocker was stale route-local rendering around workout/section color and manual
-  constructor timeline readback. That blocker has been closed and visually accepted on the relocated
-  local QA runtime; future DS work needs fresh source proof of a shared component/token/specimen
-  ownership gap.
+- The DS foundations and specimen rollout were accepted in slices while runtime consumer migration
+  continued separately.
+- Shared CSS ownership is stronger than React/shared-component adoption in a few families, and some
+  `/hitoDS` examples no longer prove the live runtime owner.
 
 Canonical owner:
 
-- Hito DS remains the owner for shared component/token/specimen contracts.
-- Manual target-input policy belongs to Product/Architecture and Backend manual authoring contracts,
-  not to this DS plan.
+- Hito DS owns shared component, semantic token, and specimen contracts.
+- FRONTEND owns route/product consumers that bypass existing Hito primitives.
+- Rendering-view-model and compile defects remain separate from DS remediation.
+
+## Conformance Closeout — 2026-07-18
+
+Accepted result:
+
+- Consumer control convergence and mobile onboarding clearance are accepted.
+- Semantic state, soft elevation, and inline-edit interaction ownership are accepted across dark and
+  light themes.
+- `/hitoDS` now renders the real Avatar, editable value chip, native select, metadata tag, and admin
+  operational table owners where their normal behavior is being demonstrated.
+- Forced loading, empty, success, and error examples remain static because the reference is
+  intentionally presenting visual states rather than a product async lifecycle.
+- The workout appendix covers all 32 canonical workout identities, including
+  `selected_distance_completion_or_checkpoint`; compile-time and module-load parity checks prevent a
+  future exhaustive claim from silently drifting.
+- No shared public contract, product route behavior, token, workout taxonomy, or backend truth
+  changed in the reference-truth closure.
+
+Decision:
+
+- Complete this plan. Future DS work requires fresh source proof and a new bounded task.
+
+## Service-Wide Conformance Audit — 2026-07-18
+
+Canonical audit:
+
+- [Service-Wide Hito DS Conformance Audit](../../tasks/frontend-specs/2026-07-18-service-wide-hito-ds-conformance-audit.md)
+
+Decision:
+
+- Select FRONTEND consumer control convergence as the first remediation batch: Quick setup goal
+  cards and shared onboarding choices, Completion outcome/interval/RPE/actual-metric controls, and
+  the narrow onboarding action clearance share one presentation/interaction risk and one
+  browser/accessibility validation story.
+- Existing choice-card, scale, field, mobile-nav, and safe-area contracts are sufficient. This batch
+  does not justify a new shared primitive or Hito DS foundation change.
+- `ThemePreferenceSection` currently prevents a clean build/browser gate. It is a mandatory
+  same-owner precondition inside the FRONTEND fix-forward loop, not a separate DS redesign or a
+  reason to defer the consumer batch.
+- The audit's original `data-mode="quick"` diagnosis is superseded: current `OnboardingGate` does
+  not mount that attribute. The visible 375px occlusion remains valid, but implementation must
+  identify the actual computed-layout owner and delete the dead selector if it has no consumer.
+- Preserve the accepted workout-color, calendar-day, manual-editor geometry, and `/test-calendar`
+  boundaries.
+
+Residual findings outside this conformance closeout:
+
+- Calendar Button compatibility, metric/title composition, root 404, admin mobile-title
+  reproduction, motion, and technical prompt-block cleanup remain unselected audit findings.
 
 ## Architecture Decision
 

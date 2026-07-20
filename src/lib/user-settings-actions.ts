@@ -1,7 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getRequestAuthContext } from "@/lib/backend/auth";
-import { buildHeartRateZonesSummary, type HeartRateZonesSummary } from "@/lib/heart-rate-zones";
+import {
+  buildEffectivePersonalHeartRateProfile,
+  buildHeartRateZonesSummary,
+  normalizePersonalHeartRateProfileForStorage,
+  personalHeartRateProfileInputSchema,
+  type EffectivePersonalHeartRateProfile,
+  type HeartRateZonesSummary,
+} from "@/lib/heart-rate-zones";
 import {
   getPersistedUserIdForAuthContext,
   requirePersistedUserIdForCurrentRequest,
@@ -49,6 +56,7 @@ const userSettingsInputSchema = z.object({
   age: z.number().int().min(0).max(120).nullable(),
   weightKg: z.number().min(0).max(500).nullable(),
   heightCm: z.number().min(0).max(300).nullable(),
+  heartRateProfile: personalHeartRateProfileInputSchema.nullable().optional(),
   trainingPreferences: runnerTrainingPreferencesSaveInputSchema.nullable().optional(),
 });
 
@@ -73,6 +81,9 @@ export const saveUserSettings = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const auth = getRequestAuthContext();
     const userId = await requirePersistedUserIdForCurrentRequest();
+    if (!userId) {
+      throw new Error("This session cannot update persisted runner settings.");
+    }
     const settings = await updateUserSettingsForUserId(userId, data, auth.email);
 
     return {
@@ -101,7 +112,7 @@ export async function getUserSettingsForUserId(
     weightKg: profile.weight_kg,
     heightCm: profile.height_cm,
     trainingPreferences: parseStoredRunnerTrainingPreferences(profile.training_preferences),
-    heartRateZones: buildHeartRateZonesSummary(profile.age),
+    heartRateZones: buildHeartRateZonesSummary(profile.age, profile.heart_rate_profile),
   };
 }
 
@@ -118,6 +129,7 @@ export async function updateUserSettingsForUserId(
   }
 
   const trainingPreferences = normalizeTrainingPreferencesForStorage(data.trainingPreferences);
+  const heartRateProfile = normalizeHeartRateProfileForStorage(data.heartRateProfile);
   const updatePayload: {
     first_name: string | null;
     last_name: string | null;
@@ -125,6 +137,7 @@ export async function updateUserSettingsForUserId(
     age: number | null;
     weight_kg: number | null;
     height_cm: number | null;
+    heart_rate_profile?: Json | null;
     training_preferences?: Json | null;
   } = {
     first_name: data.firstName || null,
@@ -137,6 +150,9 @@ export async function updateUserSettingsForUserId(
 
   if (trainingPreferences !== undefined) {
     updatePayload.training_preferences = trainingPreferences;
+  }
+  if (heartRateProfile !== undefined) {
+    updatePayload.heart_rate_profile = heartRateProfile;
   }
 
   const updatedProfile = await supabase
@@ -162,8 +178,23 @@ export async function updateUserSettingsForUserId(
     trainingPreferences: parseStoredRunnerTrainingPreferences(
       updatedProfile.data.training_preferences,
     ),
-    heartRateZones: buildHeartRateZonesSummary(updatedProfile.data.age),
+    heartRateZones: buildHeartRateZonesSummary(
+      updatedProfile.data.age,
+      updatedProfile.data.heart_rate_profile,
+    ),
   };
+}
+
+export async function getEffectivePersonalHeartRateProfileForUserId(
+  userId: string | null,
+  fallbackAge: number,
+): Promise<EffectivePersonalHeartRateProfile | null> {
+  const profile = userId ? await getSettingsProfileRow(userId) : null;
+
+  return buildEffectivePersonalHeartRateProfile({
+    age: profile?.age ?? fallbackAge,
+    storedProfile: profile?.heart_rate_profile,
+  });
 }
 
 function normalizeTrainingPreferencesForStorage(
@@ -178,6 +209,19 @@ function normalizeTrainingPreferencesForStorage(
   }
 
   return normalizeRunnerTrainingPreferencesForSave(value) as unknown as Json;
+}
+
+function normalizeHeartRateProfileForStorage(
+  value: UserSettingsInput["heartRateProfile"],
+): Json | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+
+  return normalizePersonalHeartRateProfileForStorage(value) as unknown as Json;
 }
 
 async function getSettingsProfileRow(userId: string) {

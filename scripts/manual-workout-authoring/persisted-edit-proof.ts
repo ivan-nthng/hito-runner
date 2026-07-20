@@ -7,6 +7,7 @@ import type {
 import {
   confirmManualWorkoutPersistedEditForUser,
   reconstructManualWorkoutPersistedEditDraftForUser,
+  reviewManualWorkoutDraft,
   reviewManualWorkoutPersistedEditDraftForUser,
   type ManualWorkoutDraftInput,
   type ManualWorkoutPersistedEditConfirmResult,
@@ -32,7 +33,7 @@ import {
   buildFakeWorkoutLog,
 } from "./move-proof-fixtures";
 
-export async function validateManualPersistedFutureWorkoutEditContract() {
+export async function validateManualPersistedTodayAndFutureWorkoutEditContract() {
   const userId = "00000000-0000-4000-8000-000000000801";
   const activePlan = buildFakePlanCycle({
     userId,
@@ -413,52 +414,74 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
     "protected_day",
     "persisted edit protected past source",
   );
-
-  const loggedSource = await reconstructManualWorkoutPersistedEditDraftForUser(
+  const protectedPastReview = await reviewManualWorkoutPersistedEditDraftForUser(
     userId,
     {
       activePlanId: activePlan.id,
-      plannedWorkoutId: sourceWorkout.id,
-      workoutDate: sourceWorkout.workout_date,
+      plannedWorkoutId: protectedPastSource.id,
+      workoutDate: protectedPastSource.workout_date,
+      draftInput: editedDraftInput,
     },
-    buildFakeEditDependencies({
-      activePlan,
-      workouts: [sourceWorkout, keptWorkout],
-      logsByWorkoutId: new Map([
-        [
-          sourceWorkout.id,
-          buildFakeWorkoutLog({
-            userId,
-            plannedWorkoutId: sourceWorkout.id,
-          }),
-        ],
-      ]),
-    }),
+    buildFakeEditDependencies({ activePlan, workouts: [protectedPastSource, keptWorkout] }),
   );
-  assertPersistedEditReconstructBlocked(
-    loggedSource,
+  assertPersistedEditReviewBlocked(
+    protectedPastReview,
     "protected_day",
-    "persisted edit logged source",
+    "persisted edit protected past review",
   );
 
-  const evidenceSource = await reconstructManualWorkoutPersistedEditDraftForUser(
-    userId,
+  const todayWorkout = {
+    ...sourceWorkout,
+    id: "99999999-9999-4999-8999-000000000805",
+    workout_date: "2026-06-10",
+    weekday: "Wednesday",
+  } satisfies PersistedPlannedWorkoutRow;
+  const todayScenarios = [
     {
-      activePlanId: activePlan.id,
-      plannedWorkoutId: sourceWorkout.id,
-      workoutDate: sourceWorkout.workout_date,
+      label: "today unlogged",
+      dependencies: buildFakeEditDependencies({
+        activePlan,
+        workouts: [todayWorkout, keptWorkout],
+      }),
     },
-    buildFakeEditDependencies({
-      activePlan,
-      workouts: [sourceWorkout, keptWorkout],
-      evidenceWorkoutIds: new Set([sourceWorkout.id]),
-    }),
-  );
-  assertPersistedEditReconstructBlocked(
-    evidenceSource,
-    "protected_day",
-    "persisted edit evidence source",
-  );
+    {
+      label: "today logged",
+      dependencies: buildFakeEditDependencies({
+        activePlan,
+        workouts: [todayWorkout, keptWorkout],
+        logsByWorkoutId: new Map([
+          [
+            todayWorkout.id,
+            buildFakeWorkoutLog({
+              userId,
+              plannedWorkoutId: todayWorkout.id,
+            }),
+          ],
+        ]),
+      }),
+    },
+    {
+      label: "today evidence-backed",
+      dependencies: buildFakeEditDependencies({
+        activePlan,
+        workouts: [todayWorkout, keptWorkout],
+        evidenceWorkoutIds: new Set([todayWorkout.id]),
+      }),
+    },
+  ] as const;
+
+  for (const scenario of todayScenarios) {
+    const reconstructed = await reconstructManualWorkoutPersistedEditDraftForUser(
+      userId,
+      {
+        activePlanId: activePlan.id,
+        plannedWorkoutId: todayWorkout.id,
+        workoutDate: todayWorkout.workout_date,
+      },
+      scenario.dependencies,
+    );
+    assert.equal(reconstructed.ok, true, `${scenario.label}: ${formatJsonResult(reconstructed)}`);
+  }
 
   const generatedPlan = buildFakePlanCycle({
     userId,
@@ -469,8 +492,47 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
   });
   const generatedSourceWorkout = {
     ...sourceWorkout,
-    source_workout_type: "generated_easy_run",
-    workout_identity: "easy_aerobic_run",
+    title: "AI-authored tempo repeats",
+    notes: "Keep the authored progression controlled.",
+    source_workout_type: "controlled_tempo_session",
+    workout_family: "tempo",
+    workout_identity: "controlled_tempo_session",
+    calendar_icon_key: "tempo",
+    steps: [
+      {
+        type: "warmup",
+        segment_type: "warmup",
+        label: "Warm up",
+        prescription: { mode: "time", duration_min: 10 },
+      },
+      {
+        type: "work",
+        segment_type: "tempo_block",
+        label: "Tempo work",
+        prescription: { mode: "time", duration_min: 20 },
+        target: {
+          target_source: "ai_authored_plan_guidance",
+          pace: "4:50-5:00/km",
+          intensity: "Controlled tempo effort",
+          hr_target_source: "personal_hr_zone",
+          hr_bpm_range: "136-150 bpm",
+          hr_bpm_min: 136,
+          hr_bpm_max: 150,
+          source_note: "AI-authored guidance.",
+          extra: {
+            hr_zone: "Z3",
+            hr_zone_reference: "Z3",
+            hr_profile_source: "personal",
+          },
+        },
+      },
+      {
+        type: "cooldown",
+        segment_type: "cooldown",
+        label: "Cool down",
+        prescription: { mode: "time", duration_min: 10 },
+      },
+    ] as PersistedPlannedWorkoutRow["steps"],
   } satisfies PersistedPlannedWorkoutRow;
   const generatedReconstruct = await reconstructManualWorkoutPersistedEditDraftForUser(
     userId,
@@ -485,11 +547,36 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
     }),
   );
   assert.equal(generatedReconstruct.ok, true, formatJsonResult(generatedReconstruct));
-  if (generatedReconstruct.ok) {
-    assert.equal(generatedReconstruct.sourceKind, "ai_authored_plan_first_v1");
-    assert.equal(generatedReconstruct.draftInput.templateKey, "easy_aerobic_run");
-    assert.equal(generatedReconstruct.safety.reconstructedFromPersistedWorkout, true);
-    assert.equal(generatedReconstruct.safety.trustedClientRows, false);
+  if (!generatedReconstruct.ok) {
+    throw new Error(formatJsonResult(generatedReconstruct));
+  }
+  assert.equal(generatedReconstruct.sourceKind, "ai_authored_plan_first_v1");
+  assert.equal(generatedReconstruct.draftInput.templateKey, "controlled_tempo_session");
+  assert.equal(generatedReconstruct.safety.reconstructedFromPersistedWorkout, true);
+  assert.equal(generatedReconstruct.safety.trustedClientRows, false);
+  const generatedTarget =
+    generatedReconstruct.draftInput.entries?.[1]?.kind === "block"
+      ? generatedReconstruct.draftInput.entries[1].block.target
+      : undefined;
+  assert.deepEqual(generatedTarget, {
+    targetSource: "ai_authored_plan_guidance",
+    intensity: "Controlled tempo effort",
+    sourceNote: "AI-authored guidance.",
+    pace: "4:50-5:00/km",
+    paceTargetSource: "ai_authored_plan_guidance",
+    hrZone: "Z3",
+    hrTargetSource: "personal_hr_zone",
+    hrBpmRange: "136-150 bpm",
+  });
+  const generatedEditedDraftInput: ManualWorkoutDraftInput = {
+    ...generatedReconstruct.draftInput,
+    title: "Runner-edited AI tempo",
+    notes: "Runner changed notes only; authored structure stays exact.",
+  };
+  const publicAiProvenanceReview = reviewManualWorkoutDraft(generatedEditedDraftInput);
+  assert.equal(publicAiProvenanceReview.ok, false);
+  if (!publicAiProvenanceReview.ok) {
+    assert.equal(publicAiProvenanceReview.reason, "unsafe_metric_truth");
   }
 
   const generatedReview = await reviewManualWorkoutPersistedEditDraftForUser(
@@ -498,7 +585,7 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
       activePlanId: generatedPlan.id,
       plannedWorkoutId: generatedSourceWorkout.id,
       workoutDate: generatedSourceWorkout.workout_date,
-      draftInput: editedDraftInput,
+      draftInput: generatedEditedDraftInput,
     },
     buildFakeEditDependencies({
       activePlan: generatedPlan,
@@ -511,12 +598,55 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
     assert.equal(generatedReview.review.trustedClientRows, false);
     assert.equal(generatedReview.safety.activePlanSourceVerified, true);
     assert.equal(generatedReview.safety.trustedClientRows, false);
+    assert.deepEqual(generatedReview.draftReview.draft.steps[1]?.target, {
+      target_source: "ai_authored_plan_guidance",
+      intensity: "Controlled tempo effort",
+      source_note: "AI-authored guidance.",
+      pace: "4:50-5:00/km",
+      hr_target_source: "personal_hr_zone",
+      hr_bpm_range: "136-150 bpm",
+      hr_bpm_min: 136,
+      hr_bpm_max: 150,
+      extra: {
+        hr_zone: "Z3",
+        hr_zone_reference: "Z3",
+        hr_profile_source: "personal",
+      },
+    });
   }
+
+  const tamperedGeneratedTargetInput = structuredClone(generatedEditedDraftInput);
+  const tamperedTarget =
+    tamperedGeneratedTargetInput.entries?.[1]?.kind === "block"
+      ? tamperedGeneratedTargetInput.entries[1].block.target
+      : undefined;
+  assert.ok(tamperedTarget);
+  tamperedTarget.pace = "4:20-4:30/km";
+  const tamperedGeneratedReview = await reviewManualWorkoutPersistedEditDraftForUser(
+    userId,
+    {
+      activePlanId: generatedPlan.id,
+      plannedWorkoutId: generatedSourceWorkout.id,
+      workoutDate: generatedSourceWorkout.workout_date,
+      draftInput: tamperedGeneratedTargetInput,
+    },
+    buildFakeEditDependencies({
+      activePlan: generatedPlan,
+      workouts: [generatedSourceWorkout, keptWorkout],
+    }),
+  );
+  assertPersistedEditReviewBlocked(
+    tamperedGeneratedReview,
+    "client_payload_rejected",
+    "AI target mutation retaining AI provenance",
+  );
 
   const generatedPersists: Array<{
     sourceKind: string | null;
     sourceWorkoutId: string;
     editedTemplateKey: string;
+    editedTitle: string;
+    target: unknown;
   }> = [];
   const generatedConfirm = await confirmManualWorkoutPersistedEditForUser(
     userId,
@@ -524,7 +654,7 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
       activePlanId: generatedPlan.id,
       plannedWorkoutId: generatedSourceWorkout.id,
       workoutDate: generatedSourceWorkout.workout_date,
-      draftInput: editedDraftInput,
+      draftInput: generatedEditedDraftInput,
       ...(generatedReview.ok
         ? {
             reviewToken: generatedReview.review.reviewToken,
@@ -540,6 +670,8 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
           sourceKind: persistedPlan.source_kind,
           sourceWorkoutId: persistedSource.id,
           editedTemplateKey: draftReview.draft.templateKey,
+          editedTitle: draftReview.draft.title,
+          target: draftReview.draft.steps[1]?.target,
         });
       },
     }),
@@ -579,7 +711,23 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
     {
       sourceKind: "ai_authored_plan_first_v1",
       sourceWorkoutId: generatedSourceWorkout.id,
-      editedTemplateKey: "steady_aerobic_run",
+      editedTemplateKey: "controlled_tempo_session",
+      editedTitle: "Runner-edited AI tempo",
+      target: {
+        target_source: "ai_authored_plan_guidance",
+        intensity: "Controlled tempo effort",
+        source_note: "AI-authored guidance.",
+        pace: "4:50-5:00/km",
+        hr_target_source: "personal_hr_zone",
+        hr_bpm_range: "136-150 bpm",
+        hr_bpm_min: 136,
+        hr_bpm_max: 150,
+        extra: {
+          hr_zone: "Z3",
+          hr_zone_reference: "Z3",
+          hr_profile_source: "personal",
+        },
+      },
     },
   ]);
 
@@ -638,7 +786,7 @@ export async function validateManualPersistedFutureWorkoutEditContract() {
     },
     {
       reason: "protected_day",
-      message: "Logged or evidence-backed workouts cannot be edited.",
+      message: "Past planned workouts and Rest days cannot be edited.",
     },
   ] as const) {
     const transactionRejection = await confirmManualWorkoutPersistedEditForUser(

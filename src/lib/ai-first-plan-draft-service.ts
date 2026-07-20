@@ -20,11 +20,9 @@ import {
 import { type TrainingPlanV2 } from "@/lib/imported-plan";
 import { serverEnv } from "@/lib/supabase/env";
 import {
-  buildStructuredFirstPlanAuthoringInput,
-  parseStructuredFirstPlanOnboardingInput,
-  type StructuredFirstPlanAuthoringInput,
-} from "@/lib/structured-first-plan-onboarding";
-import { structuredPlanAuthoringInputSchema } from "@/lib/structured-plan-authoring-schema";
+  structuredPlanAuthoringInputSchema,
+  type StructuredPlanAuthoringInput,
+} from "@/lib/structured-plan-authoring-schema";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_OPENAI_PLAN_MODEL = "gpt-5";
@@ -55,11 +53,8 @@ type OpenAiResponseBody = {
   };
 };
 
-export type AiFirstPlanDraftServiceInputKind = "structured_authoring" | "structured_onboarding";
-
 export interface GenerateAiFirstPlanDraftPreviewOptions {
   input: unknown;
-  inputKind?: AiFirstPlanDraftServiceInputKind;
   today?: string;
   timeoutMs?: number;
   maxOutputTokens?: number;
@@ -125,7 +120,7 @@ export interface AiFirstPlanDraftUnavailableMetadata {
 export type AiFirstPlanDraftPreviewResult =
   | {
       ok: true;
-      authoringInput: StructuredFirstPlanAuthoringInput;
+      authoringInput: StructuredPlanAuthoringInput;
       canonicalPlan: TrainingPlanV2;
       metadata: AiFirstPlanDraftPreviewMetadata;
     }
@@ -134,7 +129,7 @@ export type AiFirstPlanDraftPreviewResult =
       reason: "ai_authored_plan_first_unavailable";
       message: string;
       issues: string[];
-      authoringInput: StructuredFirstPlanAuthoringInput;
+      authoringInput: StructuredPlanAuthoringInput;
       metadata: AiFirstPlanDraftUnavailableMetadata;
     }
   | {
@@ -146,7 +141,7 @@ export type AiFirstPlanDraftPreviewResult =
 type StructuredAuthoringInputResolution =
   | {
       ok: true;
-      authoringInput: StructuredFirstPlanAuthoringInput;
+      authoringInput: StructuredPlanAuthoringInput;
     }
   | {
       ok: false;
@@ -156,7 +151,6 @@ type StructuredAuthoringInputResolution =
 
 export async function generateAiFirstPlanDraftPreview({
   input,
-  inputKind = "structured_authoring",
   today,
   timeoutMs = DEFAULT_AI_FIRST_PLAN_TIMEOUT_MS,
   maxOutputTokens = DEFAULT_AI_FIRST_PLAN_MAX_OUTPUT_TOKENS,
@@ -166,7 +160,7 @@ export async function generateAiFirstPlanDraftPreview({
   signal,
   generationLedger,
 }: GenerateAiFirstPlanDraftPreviewOptions): Promise<AiFirstPlanDraftPreviewResult> {
-  const authoringInputResult = resolveStructuredAuthoringInput(input, inputKind);
+  const authoringInputResult = resolveStructuredAuthoringInput(input);
 
   if (!authoringInputResult.ok) {
     return authoringInputResult;
@@ -174,36 +168,65 @@ export async function generateAiFirstPlanDraftPreview({
 
   const authoringInput = authoringInputResult.authoringInput;
   const startedAt = Date.now();
-  let latestGenerationTrace: AiPlanGenerationLedgerTrace | null = null;
+  const resolvedModel = model ?? DEFAULT_OPENAI_PLAN_MODEL;
+  const prompt = buildOpenAiFirstPlanContractPrompt({
+    authoringInput,
+    today,
+  });
+  let latestGenerationTrace: AiPlanGenerationLedgerTrace | null =
+    await createAiPlanGenerationLedgerTrace({
+      providerKind: resolveAiPlanGenerationProviderKind({ apiKey, model: resolvedModel }),
+      model: resolvedModel,
+      contractMode: AI_FIRST_PLAN_CONTRACT_MODE,
+      responseSchemaMode: AI_FIRST_PLAN_RESPONSE_SCHEMA_MODE,
+      systemPrompt: prompt.systemPrompt,
+      userPrompt: prompt.userPrompt,
+      responseSchema: prompt.responseSchema,
+      timeoutMs,
+      maxOutputTokens,
+    });
+  latestGenerationTrace = await updateAiPlanGenerationLedgerTrace(
+    latestGenerationTrace,
+    {},
+    generationLedger,
+  );
 
   if (!apiKey) {
+    latestGenerationTrace = await recordAiPlanGenerationUnavailable({
+      trace: latestGenerationTrace,
+      reason: "openai_not_configured",
+      issues: ["openai_not_configured"],
+      parseStatus: "not_started",
+      normalizationStatus: "not_started",
+      options: generationLedger,
+    });
     return unavailableAiFirstPlanDraft({
       authoringInput,
       reason: "openai_not_configured",
       issues: ["OpenAI is not configured for AI-authored first-plan drafting."],
-      model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
+      model: resolvedModel,
       responseId: null,
       startedAt,
       debug: buildNotStartedDebug({
         timeoutMs,
         maxOutputTokens,
-        model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
+        model: resolvedModel,
       }),
-      generationTrace: null,
+      generationTrace: latestGenerationTrace,
     });
   }
 
   try {
     const response = await requestOpenAiFirstPlanDraft({
       apiKey,
-      model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
-      authoringInput,
-      today,
+      model: resolvedModel,
       timeoutMs,
       maxOutputTokens,
       fetchImpl,
       signal,
       generationLedger,
+      prompt,
+      generationTrace: latestGenerationTrace,
     });
     latestGenerationTrace = response.generationTrace;
     const rawOutput = extractStructuredOutputText(response.body, response.debug);
@@ -233,7 +256,7 @@ export async function generateAiFirstPlanDraftPreview({
         authoringInput,
         reason: "ai_first_plan_draft_non_json_output",
         issues: ["OpenAI returned a non-JSON AI first-plan draft payload."],
-        model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
+        model: resolvedModel,
         responseId: latestGenerationTrace?.provider.responseId ?? response.body.id ?? null,
         startedAt,
         debug: { ...responseDebug, requestPhase: "rejected_after_validation" },
@@ -260,7 +283,7 @@ export async function generateAiFirstPlanDraftPreview({
         authoringInput,
         reason: normalized.reason,
         issues: normalized.issues.map((issue) => `${issue.code}: ${issue.message}`).slice(0, 12),
-        model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
+        model: resolvedModel,
         responseId: latestGenerationTrace?.provider.responseId ?? response.body.id ?? null,
         startedAt,
         debug: { ...responseDebug, requestPhase: "rejected_after_validation" },
@@ -276,7 +299,7 @@ export async function generateAiFirstPlanDraftPreview({
         pipeline: {
           parseStatus: "parsed_json",
           normalizationStatus: "normalized",
-          validationIssues: finalized.metadata.validationIssues,
+          issueCodes: diagnosticCodesFromIssues(finalized.metadata.validationIssues),
           canonicalRowCount: finalized.canonicalPlan.planned_workouts.length,
           runningWorkoutCount: finalized.canonicalPlan.planned_workouts.filter(
             (workout) => workout.workout_type !== "rest",
@@ -294,7 +317,7 @@ export async function generateAiFirstPlanDraftPreview({
       canonicalPlan: finalized.canonicalPlan,
       metadata: {
         ...finalized.metadata,
-        model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
+        model: resolvedModel,
         responseId: response.body.id ?? null,
         elapsedMs: Date.now() - startedAt,
         validationIssueCount: finalized.metadata.validationIssues.length,
@@ -323,7 +346,9 @@ export async function generateAiFirstPlanDraftPreview({
     latestGenerationTrace = await recordAiPlanGenerationUnavailable({
       trace: errorGenerationTrace,
       reason: unavailableReason,
-      issues: [boundedErrorMessage(error, unavailableReason)],
+      issues: [
+        `${unavailableReason}: ${boundedErrorMessage(error, "Provider request failed safely.")}`,
+      ],
       parseStatus:
         errorGenerationTrace?.pipeline.parseStatus &&
         errorGenerationTrace.pipeline.parseStatus !== "not_started"
@@ -342,7 +367,7 @@ export async function generateAiFirstPlanDraftPreview({
       authoringInput,
       reason: unavailableReason,
       issues: [boundedErrorMessage(error, unavailableReason)],
-      model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
+      model: resolvedModel,
       responseId: latestGenerationTrace?.provider.responseId ?? null,
       startedAt,
       debug:
@@ -351,27 +376,15 @@ export async function generateAiFirstPlanDraftPreview({
           : buildNotStartedDebug({
               timeoutMs,
               maxOutputTokens,
-              model: model ?? DEFAULT_OPENAI_PLAN_MODEL,
+              model: resolvedModel,
             }),
       generationTrace: latestGenerationTrace,
     });
   }
 }
 
-function resolveStructuredAuthoringInput(
-  input: unknown,
-  inputKind: AiFirstPlanDraftServiceInputKind,
-): StructuredAuthoringInputResolution {
+function resolveStructuredAuthoringInput(input: unknown): StructuredAuthoringInputResolution {
   try {
-    if (inputKind === "structured_onboarding") {
-      const onboardingInput = parseStructuredFirstPlanOnboardingInput(input);
-
-      return {
-        ok: true,
-        authoringInput: buildStructuredFirstPlanAuthoringInput(onboardingInput),
-      };
-    }
-
     const parsed = structuredPlanAuthoringInputSchema.safeParse(input);
 
     if (!parsed.success) {
@@ -402,7 +415,7 @@ function normalizeOpenAiFirstPlanContractOutput({
   authoringInput,
 }: {
   parsedOutput: unknown;
-  authoringInput: StructuredFirstPlanAuthoringInput;
+  authoringInput: StructuredPlanAuthoringInput;
 }): AiFirstPlanDraftNormalizationResult {
   const compiled = compileAiAuthoredPlanFirstDraft({
     draft: parsedOutput,
@@ -424,9 +437,6 @@ function normalizeOpenAiFirstPlanContractOutput({
       status: "ai_authored",
       source: "openai_ai_authored_full_plan_draft",
       validationIssues: compiled.validationIssues,
-      reviewAssumptions: compiled.reviewAssumptions,
-      metricPolicySummary:
-        "Backend parsed and atomized the AI-authored full plan draft into Hito training-plan-v2 without authoring or substituting the coach plan.",
     },
   };
 }
@@ -434,28 +444,24 @@ function normalizeOpenAiFirstPlanContractOutput({
 async function requestOpenAiFirstPlanDraft({
   apiKey,
   model,
-  authoringInput,
-  today,
   timeoutMs,
   maxOutputTokens,
   fetchImpl,
   signal,
   generationLedger,
+  prompt,
+  generationTrace: initialGenerationTrace,
 }: {
   apiKey: string;
   model: string;
-  authoringInput: StructuredFirstPlanAuthoringInput;
-  today: string | undefined;
   timeoutMs: number;
   maxOutputTokens: number;
   fetchImpl: typeof fetch;
   signal?: AbortSignal;
   generationLedger?: AiPlanGenerationLedgerOptions;
+  prompt: ReturnType<typeof buildOpenAiFirstPlanContractPrompt>;
+  generationTrace: AiPlanGenerationLedgerTrace | null;
 }) {
-  const prompt = buildOpenAiFirstPlanContractPrompt({
-    authoringInput,
-    today,
-  });
   const controller = new AbortController();
   const requestStartedAt = Date.now();
   let abortFired = false;
@@ -471,20 +477,7 @@ async function requestOpenAiFirstPlanDraft({
     abortFired: false,
     openAiElapsedMs: null,
   });
-  let generationTrace = await createAiPlanGenerationLedgerTrace({
-    providerKind: resolveAiPlanGenerationProviderKind({ apiKey, model }),
-    model,
-    contractMode: AI_FIRST_PLAN_CONTRACT_MODE,
-    responseSchemaMode: AI_FIRST_PLAN_RESPONSE_SCHEMA_MODE,
-    systemPrompt: prompt.systemPrompt,
-    userPrompt: prompt.userPrompt,
-    responseSchema: prompt.responseSchema,
-    timeoutMs,
-    maxOutputTokens,
-  });
-  generationTrace =
-    (await updateAiPlanGenerationLedgerTrace(generationTrace, {}, generationLedger)) ??
-    generationTrace;
+  let generationTrace = initialGenerationTrace;
   const cancelRequest = () => {
     if (abortReason) {
       return;
@@ -603,10 +596,9 @@ async function requestOpenAiFirstPlanDraft({
             generationTrace,
             {
               pipeline: {
-                ...generationTrace.pipeline,
                 finalOutcome: "provider_error",
                 unavailableReason: "ai_authored_plan_first_request_failed",
-                validationIssues: [extractOpenAiError(body)],
+                issueCodes: ["ai_authored_plan_first_request_failed"],
               },
             },
             generationLedger,
@@ -646,10 +638,9 @@ async function requestOpenAiFirstPlanDraft({
             generationTrace,
             {
               pipeline: {
-                ...generationTrace.pipeline,
                 finalOutcome: cancelled ? "cancelled" : failed ? "provider_error" : "unavailable",
                 unavailableReason: reason,
-                validationIssues: issues,
+                issueCodes: [reason],
               },
             },
             generationLedger,
@@ -722,7 +713,7 @@ function buildOpenAiFirstPlanContractPrompt({
   authoringInput,
   today,
 }: {
-  authoringInput: StructuredFirstPlanAuthoringInput;
+  authoringInput: StructuredPlanAuthoringInput;
   today: string | undefined;
 }) {
   return buildAiAuthoredPlanFirstPrompt({
@@ -815,7 +806,17 @@ function supportsReasoningEffort(model: string) {
   return normalized.startsWith("gpt-5") || normalized.startsWith("o");
 }
 
-function resolveAiPlanGenerationProviderKind({ apiKey, model }: { apiKey: string; model: string }) {
+function resolveAiPlanGenerationProviderKind({
+  apiKey,
+  model,
+}: {
+  apiKey: string | null;
+  model: string;
+}) {
+  if (!apiKey) {
+    return "not_started";
+  }
+
   return apiKey === "local-qa-dev-ai-generated-plan-fixture" ||
     model === "hito-local-qa-dev-ai-generated-plan-fixture"
     ? "local_dev_fixture"
@@ -839,13 +840,25 @@ async function recordAiPlanGenerationUnavailable({
   finalOutcome?: AiPlanGenerationLedgerTrace["pipeline"]["finalOutcome"];
   options?: AiPlanGenerationLedgerOptions;
 }) {
+  const issueCodes = diagnosticCodesFromIssues(issues, reason);
+  if (
+    trace?.pipeline.finalOutcome === finalOutcome &&
+    trace.pipeline.unavailableReason === reason &&
+    trace.pipeline.parseStatus === parseStatus &&
+    trace.pipeline.normalizationStatus === normalizationStatus &&
+    trace.pipeline.issueCodes.length === issueCodes.length &&
+    trace.pipeline.issueCodes.every((code, index) => code === issueCodes[index])
+  ) {
+    return trace;
+  }
+
   return updateAiPlanGenerationLedgerTrace(
     trace,
     {
       pipeline: {
         parseStatus,
         normalizationStatus,
-        validationIssues: issues,
+        issueCodes,
         canonicalRowCount: null,
         runningWorkoutCount: null,
         finalOutcome,
@@ -860,6 +873,19 @@ function generationTraceFromError(error: unknown) {
   return error instanceof AiFirstPlanDraftServiceError ? error.generationTrace : null;
 }
 
+function diagnosticCodesFromIssues(issues: readonly string[], fallback?: string) {
+  const codes = issues
+    .map((issue) => issue.split(":", 1)[0]?.trim() ?? "")
+    .filter((code) => /^[a-z0-9_]+$/i.test(code))
+    .slice(0, 12);
+
+  if (codes.length > 0) {
+    return Array.from(new Set(codes));
+  }
+
+  return fallback ? [fallback] : [];
+}
+
 function unavailableAiFirstPlanDraft({
   authoringInput,
   reason,
@@ -870,7 +896,7 @@ function unavailableAiFirstPlanDraft({
   debug,
   generationTrace,
 }: {
-  authoringInput: StructuredFirstPlanAuthoringInput;
+  authoringInput: StructuredPlanAuthoringInput;
   reason: string;
   issues: string[];
   model: string;
@@ -971,6 +997,13 @@ function extractOpenAiError(response: OpenAiResponseBody) {
 }
 
 function safeParseJson(raw: string) {
+  const numberTokens =
+    raw.match(/(?<![A-Za-z0-9_"])-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?(?![A-Za-z0-9_"])/g) ??
+    [];
+  if (numberTokens.some((token) => token.length > 48)) {
+    return null;
+  }
+
   try {
     return JSON.parse(raw) as unknown;
   } catch {

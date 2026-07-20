@@ -2,7 +2,7 @@
 
 ## Status
 
-in_progress
+completed
 
 ## Type
 
@@ -14,86 +14,29 @@ high
 
 ## Next Recommended Role
 
-backend
+product
 
 ## Task
 
-Implement the backend-owned persisted future workout edit seam before `Edit training` becomes a live
-workout-detail action.
+Preserve the accepted workout-detail lifecycle IA while deferring edit availability to the canonical
+current product contract.
 
 ## Stage
 
-BACKEND implementation / persisted future workout editing review-confirm seam
+FRONTEND specification closeout / rollout scope superseded.
 
 ## Exact Handoff Prompt
 
-```text
-ROLE: BACKEND
+None. The initial manual/future-only backend handoff is obsolete.
 
-Task:
-Implement the backend-owned persisted future workout edit seam for eligible future planned manual
-workouts.
+## Current Editability Contract
 
-Stage:
-BACKEND implementation / persisted workout-content editing boundary.
-
-Context:
-Workout detail IA is already lifecycle-driven, but `Edit training` must stay blocked until backend
-owns editing of an already-persisted planned workout row. Product direction now wants future workout
-detail actions at the top of the page, with `Copy training`, `Delete training`, and `Edit training`.
-This backend slice enables only the edit seam; Frontend action-bar wiring is a later slice.
-
-Root cause and architecture fit:
-The visible symptom is that workout detail lacks `Edit training`. The underlying cause is not a
-missing button; persisted workout-content editing does not yet have a backend-owned review/confirm
-contract. Reuse existing active-plan editability policy, protected-history checks, manual workout
-draft review, persisted workout reconstruction, and active-plan persistence metadata before adding
-anything new. Do not create a frontend-owned editor or a second workout-constructor model.
-
-Required reading:
-1. /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/AGENTS.md
-2. /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/agents/backend.agent.md
-3. /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/skills/hito-backend-supabase-contract/SKILL.md
-4. /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/frontend-specs/2026-06-15-workout-detail-lifecycle-ia-spec.md
-5. /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-09-manual-workout-authoring-and-user-built-plans.md
-6. /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/product-briefs/2026-06-11-unified-plan-creation-lifecycle.md
-7. /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/active-plan-workout-editing/
-8. /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/manual-workout-authoring/
-9. /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/active-plan-persistence.ts
-10. /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/training-api.ts
-
-Scope:
-- Add a backend persisted-workout edit review/confirm boundary for eligible future planned manual
-  workouts only.
-- Reconstruct the persisted planned workout into existing manual workout draft/constructor input
-  through the current persisted-workout reconstruction seam.
-- Review edited draft input server-side and issue a backend token/checksum before persistence.
-- Confirm by rebuilding the reviewed edit server-side, verifying the source row still matches the
-  planned workout id/date/active plan, and updating exactly the same `planned_workouts` row.
-- Preserve original active-plan source kind/status and write `active_plan_user_edit_v1` metadata with
-  `user_edited_workout`, planned workout id, previous/target date, checksum, payload version, and
-  `trusted_client_rows: false`.
-- Block logged, skipped-with-log, completed, partial, provider-evidence-backed, comparison-backed,
-  protected-history, unsafe-metric, rest, inactive, archived, foreign-user, unreadable, or unsupported
-  source rows.
-- Keep date-only truth canonical; this edit seam does not move the workout date.
-
-Out of scope:
-- Frontend action-bar wiring.
-- Editing generated/selected/preset/imported rows unless Backend proves the existing reconstruction
-  seam safely supports them and Architect explicitly expands scope later.
-- Move, Copy/Paste, Delete/Clear behavior changes.
-- Completed/today/past result editing.
-- Recurrence, Restore UI, active-plan replacement, migrations, OpenAI, fake pace, or fake personal HR.
-
-Validation:
-- Run targeted ESLint for changed backend files and the manual authoring validator.
-- Add/extend source validation for successful edit, stale source row/date, invalid token/checksum,
-  client row payload rejection, protected/logged/evidence-backed source rejection, same-row update,
-  no fake pace, no fake personal HR, and metadata readback.
-- Run scoped `git diff --check`.
-- Run `npm run build` if runtime source changed.
-```
+The detailed IA and rollout record below remains historical design context. Its manual-only,
+future-only, and logged/evidence-blocked availability rules are superseded by
+`docs/current-product.md`: every confirmed non-rest workout on today or a future date can enter the
+reviewed content-edit lifecycle regardless of source, logs, completion, or evidence; past workouts
+are not editable. Passive content remains non-inline-editable, and the mutation remains
+server-reviewed.
 
 ## Owner
 
@@ -101,12 +44,12 @@ ARCHITECT
 
 ## Last Updated
 
-2026-06-15
+2026-07-19
 
 ## Spec Status
 
-The lifecycle IA is QA-passed. The future planned workout action contract is reopened for persisted
-workout editing.
+The lifecycle IA is QA-passed. The original rollout scope below is historical and superseded for
+content-edit availability by the current contract above.
 
 ## Future Workout Detail Action Contract Update — 2026-06-15
 

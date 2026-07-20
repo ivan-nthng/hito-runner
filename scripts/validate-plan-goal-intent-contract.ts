@@ -66,7 +66,6 @@ function validatePlanGoalIntentNormalizer() {
   const omitted = mustNormalize({
     rawIntent: null,
     startDate: "2026-07-06",
-    horizonWeeks: 10,
   });
   assert.equal(omitted.contractVersion, PLAN_GOAL_INTENT_CONTRACT_VERSION);
   assert.equal(omitted.distance, null);
@@ -82,25 +81,21 @@ function validatePlanGoalIntentNormalizer() {
   const halfPreset = mustNormalize({
     rawIntent: { distance: { kind: "preset", preset: "Half Marathon" } },
     startDate: "2026-07-06",
-    horizonWeeks: 16,
   });
   assert.equal(halfPreset.distance?.distanceMeters, 21_100);
 
   const marathonPreset = mustNormalize({
     rawIntent: { distance: { kind: "preset", preset: "Marathon" } },
     startDate: "2026-07-06",
-    horizonWeeks: 20,
   });
   assert.equal(marathonPreset.distance?.distanceMeters, 42_195);
 
   const customDistance = mustNormalize({
     rawIntent: { distance: { kind: "custom", distanceKm: 12.5, label: "City 12.5K" } },
     startDate: "2026-07-06",
-    horizonWeeks: 10,
   });
   assert.equal(customDistance.distance?.kind, "custom");
   assert.equal(customDistance.distance?.distanceMeters, 12_500);
-  assert.equal(customDistance.feasibility.status, "supported");
 
   const finishTime = mustNormalize({
     rawIntent: {
@@ -108,7 +103,6 @@ function validatePlanGoalIntentNormalizer() {
       targetFinishTime: "45:00",
     },
     startDate: "2026-07-06",
-    horizonWeeks: 10,
   });
   assert.equal(finishTime.targetFinishTime?.seconds, 2700);
   assert.equal(finishTime.targetOutcomePace?.source, "derived_from_finish_time");
@@ -121,7 +115,6 @@ function validatePlanGoalIntentNormalizer() {
       targetOutcomePace: "4:20/km",
     },
     startDate: "2026-07-06",
-    horizonWeeks: 10,
   });
   assert.equal(runnerOutcomePace.targetOutcomePace?.source, "runner_entered_outcome_pace");
   assert.equal(runnerOutcomePace.targetOutcomePace?.secondsPerKm, 260);
@@ -129,39 +122,42 @@ function validatePlanGoalIntentNormalizer() {
   const targetDateOnly = mustNormalize({
     rawIntent: { targetDate: "2026-10-04" },
     startDate: "2026-07-06",
-    horizonWeeks: 16,
   });
   assert.equal(targetDateOnly.targetDate, "2026-10-04");
   assert.equal(targetDateOnly.supplied.targetDate, true);
 
-  const aggressive = mustNormalize({
+  const ambitious = mustNormalize({
     rawIntent: {
       distance: { kind: "preset", preset: "10K" },
       targetFinishTime: "25:00",
+      targetOutcomePace: "1:45/km",
     },
     startDate: "2026-07-06",
-    horizonWeeks: 10,
   });
-  assert.equal(aggressive.feasibility.status, "aggressive_or_short_horizon");
+  assert.equal(ambitious.targetOutcomePace?.secondsPerKm, 105);
 
-  const impossibleMarathon = mustNormalize({
+  const shortHorizonMarathon = mustNormalize({
     rawIntent: {
       distance: { kind: "preset", preset: "Marathon" },
       targetDate: "2026-07-12",
     },
     startDate: "2026-07-06",
-    horizonWeeks: 20,
   });
-  assert.equal(impossibleMarathon.feasibility.status, "impossible_goal");
-  assert.match(
-    JSON.stringify(impossibleMarathon.feasibility.reasons),
-    /marathon.*not enough time/i,
-  );
+  assert.equal(shortHorizonMarathon.targetDate, "2026-07-12");
 
   const invalid = normalizePlanGoalIntent({
     rawIntent: { targetDate: "2026-02-31" },
   });
   assert.equal(invalid.ok, false);
+
+  const nonFuture = normalizePlanGoalIntent({
+    rawIntent: { targetDate: "2026-07-06" },
+    startDate: "2026-07-06",
+  });
+  assert.equal(nonFuture.ok, false);
+  if (!nonFuture.ok) {
+    assert.match(nonFuture.message, /after the plan start date/i);
+  }
 }
 
 async function validateSelectedPlanReviewAndReadback() {
@@ -258,6 +254,7 @@ async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {
 
   const aiPreview = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
     authoringInput: authoring.authoringInput,
+    qaFixtureAuthorized: true,
     today: input.startDate ?? authoring.authoringInput.schedule.startDate,
     env: localAiGeneratedFixtureEnv(),
   });
@@ -274,6 +271,9 @@ function localAiGeneratedFixtureEnv() {
     OPENAI_MODEL: "hito-local-qa-dev-ai-generated-plan-fixture",
     LOCAL_AUTH_BYPASS_ENABLED: "true",
     LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: "/tmp/hito-local-auth.json",
+    NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+    HITO_AI_GENERATED_PLAN_DEV_FIXTURE: "true",
+    HITO_AI_GENERATED_PLAN_PROVIDER_MODE: "qa_fixture",
   };
 }
 

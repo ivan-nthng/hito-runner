@@ -4,9 +4,7 @@ import {
   type AiGeneratedRunningPlanPreviewDraft,
 } from "@/lib/ai-generated-running-plan";
 import {
-  collectRunnerFacingCanonicalRichnessIssues,
   collectSelectedDistanceEndpointIssues,
-  isHardRunnerFacingRichnessIssue,
   selectedDistanceEndpointMainDistanceMeters,
   type RunningPlanPreviewCalendarRow,
 } from "@/lib/plan-creation-engine";
@@ -31,7 +29,7 @@ const SELF_CONTAINED_RUNNING_PLAN_REVIEW_TOKEN_PREFIX = "running-plan-review-v1"
 type SelfContainedRunningPlanReviewEnvelope = {
   draft: AiGeneratedRunningPlanPreviewDraft;
   canonicalPlan: TrainingPlanV2;
-  payload: ReturnType<typeof buildRunningPlanReviewPayload>;
+  reviewPayload: ReturnType<typeof buildRunningPlanReviewPayload>;
   reviewChecksum: string;
 };
 
@@ -138,7 +136,19 @@ async function validateRunningPlanReviewExactnessAgainstVerifiedToken(input: {
     canonicalPlan: TrainingPlanV2;
     reviewPayload: ReturnType<typeof buildRunningPlanReviewPayload>;
   };
-}) {
+}): Promise<
+  | {
+      ok: true;
+      canonicalPlan: TrainingPlanV2;
+      reviewPayload: ReturnType<typeof buildRunningPlanReviewPayload>;
+      reviewChecksum: string;
+    }
+  | {
+      ok: false;
+      reason: "invalid_review" | "stale_review";
+      message: string;
+    }
+> {
   const { draft, reviewChecksum, selfContainedReview } = input;
 
   if (
@@ -173,21 +183,6 @@ async function validateRunningPlanReviewExactnessAgainstVerifiedToken(input: {
       reason: "invalid_review",
       message:
         "This selected-plan review no longer satisfies Hito's selected-distance endpoint contract. Refresh the preview before creating a plan.",
-    };
-  }
-
-  const richnessIssues = collectRunnerFacingCanonicalRichnessIssues({
-    distanceMeters,
-    rows: canonicalPlan.planned_workouts,
-  });
-
-  const hardRichnessIssues = richnessIssues.filter(isHardRunnerFacingRichnessIssue);
-
-  if (hardRichnessIssues.length > 0) {
-    return {
-      ok: false,
-      reason: "invalid_review",
-      message: `This selected-plan review no longer satisfies Hito's runner-facing richness gates: ${hardRichnessIssues[0]} Refresh the preview before creating a plan.`,
     };
   }
 
@@ -256,7 +251,7 @@ export function buildRunningPlanPersistenceMetadata(input: {
 }): AdditionalPlanPersistenceMetadata {
   const { draft, canonicalPlan, reviewChecksum } = input;
   const nonRestRows = draft.calendarRows.filter((row) => !row.isRestDay);
-  const metricPolicy = summarizeMetricPolicy(draft.calendarRows);
+  const metricPolicy = summarizeMetricPolicy(canonicalPlan);
   const planGoalIntent = draft.normalizedInputSummary.planGoalIntent;
 
   return {
@@ -270,9 +265,7 @@ export function buildRunningPlanPersistenceMetadata(input: {
         preview_source_status: draft.sourceStatus,
         goal_model: "distance_goal",
         distance_goal: buildDistanceGoalMetadata(planGoalIntent),
-        ai_authored_goal_assumptions: buildAiAuthoredGoalAssumptionMetadata(canonicalPlan),
         runner_level: draft.normalizedInputSummary.runnerLevel,
-        load_context: draft.normalizedInputSummary.loadContext,
         start_date: canonicalPlan.start_date,
         end_date: canonicalPlan.planned_workouts.at(-1)?.date ?? canonicalPlan.start_date,
         row_count: canonicalPlan.planned_workouts.length,
@@ -288,18 +281,10 @@ export function buildRunningPlanPersistenceMetadata(input: {
         review_contract_version: RUNNING_PLAN_REVIEW_CONTRACT_VERSION,
         review_checksum: reviewChecksum,
         normalized_input: buildDistanceFirstNormalizedInputMetadata(draft),
-        ai_authored_goal_assumptions: buildAiAuthoredGoalAssumptionMetadata(canonicalPlan),
         plan_goal_intent: planGoalIntent,
         validation: draft.validation,
       },
     }),
-  };
-}
-
-function buildAiAuthoredGoalAssumptionMetadata(canonicalPlan: TrainingPlanV2) {
-  return {
-    authored_outcome_target: canonicalPlan.goal?.authored_outcome_target ?? null,
-    authored_horizon: canonicalPlan.goal?.authored_horizon ?? null,
   };
 }
 
@@ -343,7 +328,6 @@ function buildDistanceFirstNormalizedInputMetadata(draft: RunningPlanPreviewDraf
     trainingWeekdays: normalizedInput.trainingWeekdays,
     startDate: normalizedInput.startDate,
     benchmarkPaceTruth: normalizedInput.benchmarkPaceTruth,
-    loadContext: normalizedInput.loadContext,
     distanceGoal: buildDistanceGoalMetadata(intent),
     planGoalIntent: intent,
   };
@@ -551,17 +535,28 @@ function stripRunningPlanReviewProof(draft: RunningPlanPreviewDraft): RunningPla
   };
 }
 
-function summarizeMetricPolicy(rows: readonly RunningPlanPreviewCalendarRow[]) {
+function summarizeMetricPolicy(canonicalPlan: TrainingPlanV2) {
+  const metricModes = canonicalPlan.planned_workouts
+    .filter((workout) => workout.workout_type !== "rest")
+    .map((workout) => workout.metric_mode)
+    .filter((mode): mode is NonNullable<typeof mode> => mode != null);
+  const paceTargetsAllowed = metricModes.some((mode) => mode.pace_targets_allowed === true);
+  const heartRateTargetsAllowed = metricModes.some((mode) => mode.hr_targets_allowed === true);
+
   return {
-    executableMode: "structure_only_executable",
-    paceTargetsAllowed: false,
-    personalHrTargetsAllowed: false,
-    defaultHrGuidanceRows: rows.filter((row) =>
-      row.targetTruthModes.includes("editable_default_hr"),
+    executableMode:
+      paceTargetsAllowed && heartRateTargetsAllowed
+        ? "mixed_metric_executable"
+        : paceTargetsAllowed
+          ? "pace_executable"
+          : heartRateTargetsAllowed
+            ? "hr_executable"
+            : "structure_only_executable",
+    paceTargetsAllowed,
+    heartRateTargetsAllowed,
+    defaultHrGuidanceRows: metricModes.filter(
+      (mode) => mode.hr_target_source === "default_estimated_hr",
     ).length,
-    fakePaceOrPersonalHrOutput: /pace_min|pace_target|personal_hr|race_pace/i.test(
-      JSON.stringify(rows),
-    ),
   };
 }
 
@@ -585,7 +580,7 @@ function collectDistanceGoalEndpointExactnessIssues(
       }),
     })),
     expectedDistanceMeters: distanceMeters,
-    targetDate: draft.normalizedInputSummary.planGoalIntent.targetDate,
+    targetDate: canonicalPlan.target_date ?? null,
     proof: draft.endpointProof,
   }).map((issue) => issue.code);
 }

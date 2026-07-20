@@ -9,6 +9,7 @@ import type {
   CanonicalWorkoutIdentity,
   LegacyWorkoutType,
 } from "@/lib/rich-workout-model";
+import { CANONICAL_WORKOUT_IDENTITY_VALUES } from "@/lib/rich-workout-model";
 import { workoutTypeColorVar } from "@/lib/workout-color-tokens";
 
 export type WorkoutLibraryProviderState =
@@ -752,6 +753,27 @@ const rows = [
     workout: identity("race"),
   },
   {
+    identity: "selected_distance_completion_or_checkpoint",
+    family: "race",
+    displayLabel: "Selected-distance endpoint",
+    detailTitle: "Selected-distance completion or checkpoint",
+    purpose: "Canonical endpoint for the runner's selected distance.",
+    sequence: "WU -> END -> FIN -> CD",
+    segments: [
+      segment("WU", "Warmup", "10-15 min", "Prepare calmly for the selected distance."),
+      segment("END", "Endpoint", "Selected distance", "Complete the authored distance honestly."),
+      segment("FIN", "Finish", "3-5 min easy settle", "Keep the finish controlled."),
+      segment("CD", "Cooldown", "5-10 min", "Close safely."),
+    ],
+    targetTruthMode: "structure_only",
+    editableDefaultHrNote: null,
+    allowedProviderStates: ALL_PROVIDER_STATES,
+    resultStates: ENDPOINT_RESULT_STATES,
+    proves: "The generic selected-distance endpoint has an explicit canonical specimen.",
+    mustNotImply: "A target-time promise, fixed 10K distance, or real completion evidence.",
+    workout: identity("race"),
+  },
+  {
     identity: "uphill_repeats",
     family: "hills",
     displayLabel: "Uphill repeats",
@@ -913,8 +935,33 @@ const rows = [
   workout: Pick<HitoCalendarWorkoutIdentity, "glyph">;
 })[];
 
-export const WORKOUT_LIBRARY_SPECIMENS: readonly WorkoutLibrarySpecimen[] = rows.map(
-  (row, index) => {
+type WorkoutLibraryCoveredIdentity = (typeof rows)[number]["identity"];
+const WORKOUT_LIBRARY_HAS_EVERY_CANONICAL_IDENTITY: Exclude<
+  CanonicalWorkoutIdentity,
+  WorkoutLibraryCoveredIdentity
+> extends never
+  ? true
+  : never = true;
+const workoutLibrarySeedByIdentity = new Map(rows.map((row) => [row.identity, row]));
+
+if (
+  !WORKOUT_LIBRARY_HAS_EVERY_CANONICAL_IDENTITY ||
+  workoutLibrarySeedByIdentity.size !== CANONICAL_WORKOUT_IDENTITY_VALUES.length ||
+  !CANONICAL_WORKOUT_IDENTITY_VALUES.every((identity) => workoutLibrarySeedByIdentity.has(identity))
+) {
+  throw new Error(
+    "Hito DS workout library must contain exactly one specimen per canonical identity.",
+  );
+}
+
+export const WORKOUT_LIBRARY_SPECIMENS: readonly WorkoutLibrarySpecimen[] =
+  CANONICAL_WORKOUT_IDENTITY_VALUES.map((workoutIdentity, index) => {
+    const row = workoutLibrarySeedByIdentity.get(workoutIdentity);
+
+    if (!row) {
+      throw new Error(`Missing Hito DS workout specimen for ${workoutIdentity}.`);
+    }
+
     const language = buildPlannedWorkoutLanguage({
       workoutType: legacyWorkoutTypeForFamily(row.family),
       workoutFamily: row.family,
@@ -935,10 +982,10 @@ export const WORKOUT_LIBRARY_SPECIMENS: readonly WorkoutLibrarySpecimen[] = rows
         short: runnerFacingLabel,
       },
     };
-  },
-);
+  });
 
 export const WORKOUT_LIBRARY_IDENTITY_COUNT = WORKOUT_LIBRARY_SPECIMENS.length;
+export const WORKOUT_LIBRARY_CANONICAL_IDENTITY_COUNT = CANONICAL_WORKOUT_IDENTITY_VALUES.length;
 
 function legacyWorkoutTypeForFamily(family: CanonicalWorkoutFamily): LegacyWorkoutType {
   if (family === "rest") return "rest";

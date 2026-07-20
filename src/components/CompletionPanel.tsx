@@ -198,16 +198,8 @@ export function CompletionPanel({
   return (
     <div className="space-y-8">
       <div
-        className={cn(
-          "hito-surface-flat p-4",
-          error
-            ? "border-destructive/30 bg-destructive/10"
-            : message
-              ? "border-success/30 bg-success/10"
-              : hasSavedLog
-                ? "border-success/20 bg-background/35"
-                : "",
-        )}
+        className="hito-state-surface p-4"
+        data-tone={error ? "destructive" : message || hasSavedLog ? "success" : undefined}
       >
         <div className="hito-label">
           {isSaving
@@ -262,7 +254,7 @@ export function CompletionPanel({
 
       <div>
         <Label>How did it go?</Label>
-        <div className="mt-3 grid grid-cols-3 gap-2">
+        <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Workout outcome">
           {(
             [
               {
@@ -290,16 +282,16 @@ export function CompletionPanel({
               <button
                 key={option.v}
                 type="button"
+                role="radio"
+                aria-checked={active}
+                data-selected={active ? "true" : undefined}
                 onClick={() =>
                   updateForm((current) => ({
                     ...current,
                     outcome: option.v,
                   }))
                 }
-                className={cn(
-                  "hito-surface-flat flex flex-col items-start gap-2 p-4 text-left transition-all",
-                  active ? "border-foreground/30 bg-accent/40" : "hover:bg-accent/30",
-                )}
+                className="hito-choice-toggle hito-choice-toggle-card w-full flex-col justify-start gap-2 text-left"
               >
                 <Icon
                   name={option.icon}
@@ -345,23 +337,25 @@ export function CompletionPanel({
             {plannedRepeats > 0 && (
               <div className="hito-surface-flat mt-4 p-3">
                 <div className="hito-label mb-2">Intervals completed</div>
-                <div className="flex gap-1.5">
+                <div
+                  className="hito-choice-toggle-group flex-nowrap"
+                  role="radiogroup"
+                  aria-label="Intervals completed"
+                >
                   {Array.from({ length: plannedRepeats }).map((_, index) => (
                     <button
                       key={index}
                       type="button"
+                      role="radio"
+                      aria-checked={form.intervalsCompleted === index + 1}
+                      data-selected={form.intervalsCompleted === index + 1 ? "true" : undefined}
                       onClick={() =>
                         updateForm((current) => ({
                           ...current,
                           intervalsCompleted: index + 1,
                         }))
                       }
-                      className={cn(
-                        "hito-technical-mono h-8 flex-1 rounded-md border",
-                        index < form.intervalsCompleted
-                          ? "bg-quality/30 border-quality/40 text-foreground"
-                          : "border-hairline text-muted-foreground",
-                      )}
+                      className="hito-choice-toggle hito-choice-toggle-sm min-w-0 flex-1 font-mono-num"
                     >
                       {index + 1}
                     </button>
@@ -373,7 +367,7 @@ export function CompletionPanel({
           </div>
 
           <div className="grid gap-5 sm:grid-cols-1">
-            <Slider
+            <ScaleControl
               label="Effort (RPE)"
               value={form.rpe}
               max={10}
@@ -1280,24 +1274,32 @@ function NumField({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="hito-surface-flat p-3">
+    <label className="hito-surface-flat grid gap-2 p-3">
       <div className="flex items-center justify-between gap-3">
         <span className="hito-form-label">{label}</span>
         <span className="hito-caption font-mono-num">plan {planned}</span>
       </div>
-      <div className="mt-1 flex items-baseline gap-2">
+      <span className="relative block">
         <input
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="hito-panel-title w-full bg-transparent focus:outline-none"
+          className="hito-field hito-field-primary hito-field-md pr-12 font-mono-num"
         />
-        <span className="hito-caption">{suffix}</span>
-      </div>
-    </div>
+        <span
+          className="hito-caption pointer-events-none absolute inset-y-0 right-3 flex items-center"
+          aria-hidden="true"
+        >
+          {suffix}
+        </span>
+      </span>
+    </label>
   );
 }
 
-function Slider({
+function ScaleControl({
   label,
   value,
   max,
@@ -1316,17 +1318,21 @@ function Slider({
         <span>{label}</span>
         <span className="text-foreground/80">{hint}</span>
       </div>
-      <div className="mt-2 flex gap-1">
+      <div className="hito-scale-control mt-3" role="radiogroup" aria-label={label}>
         {Array.from({ length: max }).map((_, index) => (
           <button
             key={index}
             type="button"
+            role="radio"
+            aria-checked={value === index + 1}
+            aria-label={`${index + 1} of ${max}`}
+            data-active={index < value ? "true" : undefined}
+            data-level={Math.ceil((index + 1) / Math.max(1, max / 5))}
             onClick={() => onChange(index + 1)}
-            className={cn(
-              "h-2 flex-1 rounded-full transition-colors",
-              index < value ? "bg-foreground" : "bg-hairline",
-            )}
-          />
+            className="hito-scale-button"
+          >
+            {index + 1}
+          </button>
         ))}
       </div>
     </div>

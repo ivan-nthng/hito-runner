@@ -896,7 +896,11 @@ export function displayTargetEntries(target: StepTarget | undefined) {
   pushEntry(
     "hr_bpm_range",
     target.hr_bpm_range ?? target.hr_bpm,
-    target.hr_target_source === "default_estimated_hr" ? "Estimated HR" : undefined,
+    target.hr_target_source === "default_estimated_hr"
+      ? "Estimated HR"
+      : target.hr_target_source === "personal_hr_zone"
+        ? "Personal HR"
+        : undefined,
   );
   pushEntry("pace_min_per_km_range", target.pace_min_per_km_range ?? target.pace_range_min_km);
   pushEntry("pace", target.pace);
@@ -907,13 +911,22 @@ export function displayTargetEntries(target: StepTarget | undefined) {
   pushEntry("source_note", target.source_note);
 
   for (const [key, value] of Object.entries(target.extra ?? {})) {
-    if (typeof value === "string" || typeof value === "number") {
+    if (
+      !INTERNAL_TARGET_PROVENANCE_KEYS.has(key) &&
+      (typeof value === "string" || typeof value === "number")
+    ) {
       pushEntry(key, value);
     }
   }
 
   return entries;
 }
+
+const INTERNAL_TARGET_PROVENANCE_KEYS = new Set([
+  "hr_zone",
+  "hr_zone_reference",
+  "hr_profile_source",
+]);
 
 const EXECUTABLE_TARGET_ENTRY_KEYS = new Set([
   "hr_bpm_range",

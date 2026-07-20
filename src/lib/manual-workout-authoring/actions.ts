@@ -33,6 +33,7 @@ import {
   type ManualEmptyPlanCreateResult,
   type ManualWorkoutDraftConflict,
   type ManualWorkoutDraftIssue,
+  type ManualWorkoutDraftProcessingOptions,
   type ManualWorkoutDraftReviewResult,
   type ManualWorkoutReviewExactnessFailureReason,
   type ManualWorkoutTargetTruthMode,
@@ -73,7 +74,10 @@ type ManualWorkoutReviewExactnessResult =
       message: string;
     };
 
-export function reviewManualWorkoutDraft(input: unknown): ManualWorkoutDraftReviewResult {
+export function reviewManualWorkoutDraft(
+  input: unknown,
+  options: ManualWorkoutDraftProcessingOptions = {},
+): ManualWorkoutDraftReviewResult {
   const parsed = manualWorkoutDraftInputSchema.safeParse(input);
 
   if (!parsed.success) {
@@ -108,7 +112,7 @@ export function reviewManualWorkoutDraft(input: unknown): ManualWorkoutDraftRevi
     });
   }
 
-  const validation = validateManualWorkoutDraft(parsed.data);
+  const validation = validateManualWorkoutDraft(parsed.data, options);
 
   if (!validation.ok) {
     return rejectManualWorkoutDraft({
@@ -124,6 +128,7 @@ export function reviewManualWorkoutDraft(input: unknown): ManualWorkoutDraftRevi
     template: validation.template,
     targetTruthMode: validation.targetTruthMode,
     entries: validation.entries,
+    targetOptions: options,
   });
   const exactnessPayload = buildManualWorkoutReviewExactnessPayload(normalized.draft);
   const reviewChecksum = stableManualWorkoutChecksum64Hex(exactnessPayload);

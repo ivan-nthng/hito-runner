@@ -140,14 +140,13 @@ export function useSelectedPlanPresetPreviewController({
         title: `${planGoalChoiceLabel(goalId)} preview ready`,
         description: previewReadyDescription,
       });
-    } catch (submitError) {
-      const message = runnerSafePreviewErrorMessage(
-        submitError instanceof Error ? submitError.message : null,
-      );
+    } catch {
       setPreviewResult(null);
       setPreviewInput(null);
       setStatus("idle");
-      setError(message);
+      setError(
+        "Hito could not start plan authoring right now. Nothing was created or saved. Try again.",
+      );
     }
   }
 
@@ -242,24 +241,4 @@ export function useSelectedPlanPresetPreviewController({
     setPreviewOpen,
     status,
   };
-}
-
-function runnerSafePreviewErrorMessage(message: string | null) {
-  if (!message) {
-    return "This setup cannot be previewed yet. Adjust the goal details.";
-  }
-
-  const normalized = message.toLowerCase();
-
-  if (
-    normalized.includes("invalid_plan_goal_intent") ||
-    normalized.includes("source_kind") ||
-    normalized.includes("target finish time") ||
-    normalized.includes("target outcome pace") ||
-    normalized.includes("target date")
-  ) {
-    return "This setup cannot be previewed yet. Adjust the goal details.";
-  }
-
-  return message;
 }

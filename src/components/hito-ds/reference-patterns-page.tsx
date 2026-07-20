@@ -191,8 +191,8 @@ export function HitoDsPatternsPage() {
       <section id="states" className="ds-section">
         <SectionIntro
           label="States"
-          title="Markers, state surfaces, tooltips, and severity."
-          body="Use compact markers for status truth, one state-surface family for routes, one tooltip shell for chart-adjacent hints, and one scale pattern for body-note severity."
+          title="Markers, route states, tooltips, and severity."
+          body="Use compact markers for status truth, one state-surface family for loading, empty, success, and error routes, one tooltip shell for chart-adjacent hints, and one scale pattern for body-note severity."
         />
         <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
           <div className="hito-row-group self-start">
@@ -206,8 +206,18 @@ export function HitoDsPatternsPage() {
             ))}
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
+            <article className="hito-state-surface" aria-busy="true">
+              <p className="hito-label">Loading</p>
+              <h3 className="hito-section-title mt-3 flex items-center gap-2">
+                <Icon name="loader" size="sm" className="animate-spin text-muted-foreground" />
+                Loading your plan.
+              </h3>
+              <p className="hito-support-copy mt-3">
+                Loading is neutral and does not imply success or failure before truth arrives.
+              </p>
+            </article>
             <article className="hito-state-surface" data-tone="signal">
-              <p className="hito-label hito-label-signal">Setup state</p>
+              <p className="hito-label hito-label-signal">Empty</p>
               <h3 className="hito-section-title mt-3">Create a first plan.</h3>
               <p className="hito-support-copy mt-3">
                 State surfaces keep route-level setup and empty states consistent.
@@ -216,8 +226,20 @@ export function HitoDsPatternsPage() {
                 <button className="hito-button hito-button-primary hito-button-md">Continue</button>
               </div>
             </article>
+            <article className="hito-state-surface" data-tone="success">
+              <p className="hito-label text-success">Success</p>
+              <h3 className="hito-section-title mt-3">Plan saved.</h3>
+              <p className="hito-support-copy mt-3">
+                Success confirms a completed operation without becoming another card family.
+              </p>
+              <div className="hito-state-actions">
+                <button className="hito-button hito-button-secondary hito-button-md">
+                  View calendar
+                </button>
+              </div>
+            </article>
             <article className="hito-state-surface" data-tone="destructive">
-              <p className="hito-label text-destructive">Error state</p>
+              <p className="hito-label text-destructive">Error</p>
               <h3 className="hito-section-title mt-3">Try again.</h3>
               <p className="hito-support-copy mt-3">
                 Error tone is reserved for real load or save failures, not normal previews.

@@ -1,18 +1,11 @@
 import { readFile } from "node:fs/promises";
-import {
-  generateAiFirstPlanDraftPreview,
-  type AiFirstPlanDraftServiceInputKind,
-} from "../src/lib/ai-first-plan-draft-service";
+import { generateAiFirstPlanDraftPreview } from "../src/lib/ai-first-plan-draft-service";
 import {
   AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
   buildAiGeneratedRunningPlanDevFixtureOpenAiFetch,
 } from "../src/lib/ai-generated-running-plan-dev-fixture";
 import { AI_AUTHORED_PLAN_FIRST_SOURCE_KIND } from "../src/lib/ai-authored-plan-first-compiler";
 import { selectedDistanceEndpointMainDistanceMeters } from "../src/lib/plan-creation-engine";
-import {
-  buildStructuredFirstPlanAuthoringInput,
-  parseStructuredFirstPlanOnboardingInput,
-} from "../src/lib/structured-first-plan-onboarding";
 import {
   structuredPlanAuthoringInputSchema,
   type StructuredPlanAuthoringInput,
@@ -21,7 +14,6 @@ import {
   hasFlag,
   parseArgs,
   parseFixtureKind,
-  parseInputKind,
   parsePositiveIntegerOption,
   printHelp,
   resolveMode,
@@ -39,13 +31,12 @@ if (hasFlag(options, "help")) {
 }
 
 const mode = resolveMode(options);
-const inputKind = parseInputKind(options["input-kind"]);
 const fixtureKind = parseFixtureKind(options.fixture);
 const inputFile = stringOption(options["input-file"]);
 const inputSource = inputFile ? "input_file" : "fixture";
 const fixtureLabel = inputFile ? null : fixtureKind;
-const input = await readInput(options, inputKind, fixtureKind);
-const authoringInput = resolveAuthoringInput(input, inputKind);
+const input = await readInput(options, fixtureKind);
+const authoringInput = structuredPlanAuthoringInputSchema.parse(input);
 const timeoutMs = parsePositiveIntegerOption(options["timeout-ms"]) ?? 45_000;
 const maxOutputTokens = parsePositiveIntegerOption(options["max-output-tokens"]) ?? 32_000;
 const requirePlanFirstProof = hasFlag(options, "require-plan-first-proof");
@@ -53,7 +44,6 @@ const fetchImpl = mode === "live" ? undefined : buildMockOpenAiFetch(mode, autho
 
 const result = await generateAiFirstPlanDraftPreview({
   input,
-  inputKind,
   timeoutMs,
   maxOutputTokens,
   apiKey: mode === "live" ? undefined : "mock-openai-key",
@@ -68,7 +58,6 @@ if (!result.ok) {
         ok: false,
         mode,
         contractMode: "plan_first",
-        inputKind,
         inputSource,
         fixture: fixtureLabel,
         reason: result.reason,
@@ -99,7 +88,6 @@ if (!result.ok) {
         ok: proofOk,
         mode,
         contractMode: "plan_first",
-        inputKind,
         inputSource,
         fixture: fixtureLabel,
         persisted: false,
@@ -129,7 +117,6 @@ if (!result.ok) {
 
 async function readInput(
   parsedOptions: Record<string, string | true>,
-  parsedInputKind: AiFirstPlanDraftServiceInputKind,
   parsedFixtureKind: FixtureKind,
 ) {
   const inputFile = stringOption(parsedOptions["input-file"]);
@@ -137,21 +124,7 @@ async function readInput(
     return JSON.parse(await readFile(inputFile, "utf8")) as unknown;
   }
 
-  const authoringInput = buildDefaultAuthoringInput(parsedFixtureKind);
-  return parsedInputKind === "structured_onboarding"
-    ? authoringInputToOnboarding(authoringInput)
-    : authoringInput;
-}
-
-function resolveAuthoringInput(
-  input: unknown,
-  parsedInputKind: AiFirstPlanDraftServiceInputKind,
-): StructuredPlanAuthoringInput {
-  if (parsedInputKind === "structured_onboarding") {
-    return buildStructuredFirstPlanAuthoringInput(parseStructuredFirstPlanOnboardingInput(input));
-  }
-
-  return structuredPlanAuthoringInputSchema.parse(input);
+  return buildDefaultAuthoringInput(parsedFixtureKind);
 }
 
 function buildMockOpenAiFetch(
@@ -175,18 +148,8 @@ function buildMockOpenAiFetch(
           id: "mock-invalid-plan-first",
           status: "completed",
           output_text: JSON.stringify({
-            metadata: {
-              goal: "Invalid plan-first draft",
-              target_date: null,
-              target_time: null,
-              athlete: null,
-              rest_days: [],
-              long_run_day: null,
-              note: null,
-              warnings: [],
-              assumptions: [],
-            },
-            weeks: [],
+            workouts: [],
+            endpoint: null,
           }),
           usage: { input_tokens: 100, output_tokens: 50, total_tokens: 150 },
         }),
@@ -283,32 +246,4 @@ function buildSampleWeeks(plan: {
           title: workout.title,
         })),
     }));
-}
-
-function authoringInputToOnboarding(input: StructuredPlanAuthoringInput) {
-  return {
-    profile: {
-      age: input.runnerProfile.age,
-      weightKg: null,
-      heightCm: null,
-    },
-    benchmark: input.currentLevel.recent5kPaceSecondsPerKm
-      ? { kind: "recent_5k_time" as const, recent5kTime: "25:00" }
-      : { kind: "unknown" as const },
-    availability: {
-      runningDaysPerWeek: input.availability.maxRunningDaysPerWeek,
-      fixedRestDays: input.availability.unavailableDays,
-      preferredLongRunDay: input.availability.preferredLongRunDay,
-    },
-    goal: {
-      goalDistance: input.goal.goalType,
-      goalStyle: input.goal.goalStyle,
-      terrainFocus: input.preferences.terrainFocus,
-      targetTime: input.goal.targetTime,
-      targetDate: input.schedule.targetDate,
-    },
-    strength: { preference: input.preferences.strengthOrMobilityInterest },
-    execution: input.execution,
-    comment: input.preferences.notes,
-  };
 }

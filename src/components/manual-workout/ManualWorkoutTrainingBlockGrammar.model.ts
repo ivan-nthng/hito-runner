@@ -4,6 +4,7 @@ import type {
 } from "@/lib/manual-workout-authoring/schema";
 import { RUNNER_FACING_BLOCK_TYPE_LABELS } from "@/lib/planned-workout-language";
 import {
+  displayExecutableTargetEntries,
   displayTargetEntries,
   formatDistanceMeters,
   formatDurationMin,
@@ -189,7 +190,13 @@ function stepToReadbackSegment(
 }
 
 function stepTargetSummary(step: Step) {
-  const entries = displayTargetEntries(step.target).slice(0, 2);
+  const allEntries = displayTargetEntries(step.target);
+  const executableEntries = displayExecutableTargetEntries(step.target);
+  const executableKeys = new Set(executableEntries.map((entry) => entry.key));
+  const entries = [
+    ...executableEntries,
+    ...allEntries.filter((entry) => !executableKeys.has(entry.key)),
+  ].slice(0, 2);
 
   if (entries.length === 0) return "No target";
 

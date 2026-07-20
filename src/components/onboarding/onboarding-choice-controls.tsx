@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
-import { cn } from "@/lib/utils";
 
 export function OptionGrid({ children, label }: { children: ReactNode; label: string }) {
   return (
@@ -28,20 +27,18 @@ export function OptionButton({
       type="button"
       role="radio"
       aria-checked={active}
+      data-selected={active ? "true" : undefined}
       onClick={onClick}
-      className={cn(
-        "hito-button hito-button-sm hito-onboarding-option-button",
-        active ? "hito-button-primary" : "hito-button-secondary",
-      )}
+      className="hito-choice-toggle hito-choice-toggle-lg w-full justify-start whitespace-normal text-left"
     >
       {icon ? (
-        <span className="hito-onboarding-option-icon" aria-hidden="true">
+        <span className="shrink-0" aria-hidden="true">
           <Icon name={icon} size="sm" />
         </span>
       ) : null}
       <span className="min-w-0">
-        <span className="hito-onboarding-option-title block">{label}</span>
-        {copy ? <span className="hito-onboarding-option-copy mt-1 block">{copy}</span> : null}
+        <span className="block font-semibold leading-tight">{label}</span>
+        {copy ? <span className="mt-1 block text-current/70">{copy}</span> : null}
       </span>
     </button>
   );

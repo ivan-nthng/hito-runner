@@ -17,7 +17,13 @@ import {
   type BuildAiGeneratedRunningPlanPreviewOptions,
 } from "@/lib/ai-generated-running-plan";
 import {
+  isAiGeneratedRunningPlanDevFixtureEnabled,
+  isAiGeneratedRunningPlanDevFixtureModel,
+} from "@/lib/ai-generated-running-plan-dev-fixture";
+import {
+  markAiPlanGenerationPersistenceFailed,
   markAiPlanGenerationPersisted,
+  markAiPlanGenerationReviewRefused,
   markAiPlanGenerationReviewedDraftSigned,
 } from "@/lib/ai-plan-generation-ledger";
 import {
@@ -25,6 +31,7 @@ import {
   planGoalIntentInputSchema,
 } from "@/lib/plan-creation-engine";
 import { RUNNING_PLAN_RUNNER_LEVEL_VALUES } from "@/lib/plan-creation-engine/source-types";
+import { findLocalAuthAccountByUserId } from "@/lib/local-auth";
 import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
 import {
   RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
@@ -36,6 +43,7 @@ import {
   type RunningPlanReviewedPreviewDraft,
 } from "@/lib/running-plan-engine-review";
 import { stableJsonEqual } from "@/lib/review-token-signing";
+import { getEffectivePersonalHeartRateProfileForUserId } from "@/lib/user-settings-actions";
 import { WEEKDAY_NAMES } from "@/lib/weekday-rest-invariants";
 
 const weekdayNameSchema = z.enum(WEEKDAY_NAMES);
@@ -44,15 +52,15 @@ const recent5kTimeSchema = z
   .trim()
   .refine((value) => {
     const seconds = parseDurationSeconds(value);
-    return seconds != null && seconds >= 10 * 60 && seconds <= 2 * 60 * 60;
-  }, "Use a recent 5K time between 10:00 and 2:00:00.");
+    return seconds != null && seconds > 0;
+  }, "Use a positive recent 5K duration.");
 const recent5kPaceSchema = z
   .string()
   .trim()
   .refine((value) => {
     const seconds = parsePaceSecondsPerKm(value);
-    return seconds != null && seconds >= 2 * 60 && seconds <= 15 * 60;
-  }, "Use a recent 5K pace between 2:00/km and 15:00/km.");
+    return seconds != null && seconds > 0;
+  }, "Use a positive recent 5K pace.");
 const runningPlanBenchmarkSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("recent_5k_time"), recent5kTime: recent5kTimeSchema }).strict(),
   z.object({ kind: z.literal("recent_5k_pace"), recent5kPace: recent5kPaceSchema }).strict(),
@@ -101,6 +109,7 @@ export type RunningPlanConfirmActionInput = z.output<typeof runningPlanConfirmIn
 export type RunningPlanConfirmFailureReason =
   | "unauthenticated"
   | "active_plan_exists"
+  | "fixture_not_authorized"
   | "preview_unavailable"
   | "stale_review"
   | "invalid_review"
@@ -140,8 +149,18 @@ export type RunningPlanConfirmActionResult =
 export const previewRunningPlanDraft = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => runningPlanPreviewInputSchema.parse(value))
   .handler(async ({ data }): Promise<RunningPlanPreviewActionResult> => {
-    return buildReviewedAiGeneratedRunningPlanPreview(data, {
+    const auth = getRequestAuthContext();
+    let persistedUserId: string | null = null;
+
+    try {
+      persistedUserId = auth.userId ? await getPersistedUserIdForAuthContext(auth) : null;
+    } catch {
+      persistedUserId = null;
+    }
+
+    return buildReviewedAiGeneratedRunningPlanPreviewForUser(persistedUserId, data, {
       aiPreview: { signal: getRequest().signal },
+      qaFixtureAuthorized: await isLocalQaFixtureAuthorized(auth),
     });
   });
 
@@ -176,12 +195,15 @@ export const confirmRunningPlanDraft = createServerFn({ method: "POST" })
       });
     }
 
-    return confirmRunningPlanDraftForUser(userId, data);
+    return confirmRunningPlanDraftForUser(userId, data, {
+      allowLocalQaFixture: await isLocalQaFixtureAuthorized(auth),
+    });
   });
 
 export async function confirmRunningPlanDraftForUser(
   userId: string,
   input: unknown,
+  options: { allowLocalQaFixture?: boolean } = {},
 ): Promise<RunningPlanConfirmActionResult> {
   const parsed = runningPlanConfirmInputSchema.safeParse(input);
 
@@ -194,33 +216,13 @@ export async function confirmRunningPlanDraftForUser(
 
   const request = parsed.data;
 
-  let activePlan: Awaited<ReturnType<typeof getActivePlan>> | null = null;
-  try {
-    activePlan = await getActivePlan(userId);
-  } catch {
-    return buildConfirmFailure({
-      reason: "persistence_failed",
-      message:
-        "The selected running plan could not verify the current active-plan state. Try again before creating a plan.",
-      sourceKind: request.sourceKind,
-    });
-  }
-
-  if (activePlan) {
-    return buildConfirmFailure({
-      reason: "active_plan_exists",
-      message:
-        "Selected plans can create a new plan only when there is no active plan. Use Add plan from the calendar to start a reviewed plan change.",
-      sourceKind: request.sourceKind,
-    });
-  }
-
-  return confirmReviewedAiGeneratedRunningPlanDraftForUser(userId, request);
+  return confirmReviewedAiGeneratedRunningPlanDraftForUser(userId, request, options);
 }
 
 async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
   userId: string,
   request: RunningPlanConfirmActionInput,
+  options: { allowLocalQaFixture?: boolean },
 ): Promise<RunningPlanConfirmActionResult> {
   const exactness = await validateSelfContainedRunningPlanReviewExactness({
     reviewToken: request.reviewToken,
@@ -247,11 +249,45 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
     });
   }
 
+  if (isLocalQaFixtureReviewedDraft(exactness.draft) && options.allowLocalQaFixture !== true) {
+    await markAiPlanGenerationPersistenceFailed({
+      trace: exactness.draft.aiGeneration.generationTrace,
+      reason: "local_qa_fixture_not_authorized",
+    });
+    return buildConfirmFailure({
+      reason: "fixture_not_authorized",
+      message:
+        "This reviewed plan belongs to an isolated QA fixture session and cannot be persisted for this account.",
+      sourceKind: request.sourceKind,
+    });
+  }
+
   if (!sameJson(request.previewInput, exactness.draft.previewInput)) {
     return buildConfirmFailure({
       reason: "stale_review",
       message:
         "The AI-authored generated-plan setup answers no longer match the reviewed preview. Refresh before creating a plan.",
+      sourceKind: request.sourceKind,
+    });
+  }
+
+  let activePlan: Awaited<ReturnType<typeof getActivePlan>> | null = null;
+  try {
+    activePlan = await getActivePlan(userId);
+  } catch {
+    return buildConfirmFailure({
+      reason: "persistence_failed",
+      message:
+        "The selected running plan could not verify the current active-plan state. Try again before creating a plan.",
+      sourceKind: request.sourceKind,
+    });
+  }
+
+  if (activePlan) {
+    return buildConfirmFailure({
+      reason: "active_plan_exists",
+      message:
+        "Selected plans can create a new plan only when there is no active plan. Use Add plan from the calendar to start a reviewed plan change.",
       sourceKind: request.sourceKind,
     });
   }
@@ -295,6 +331,10 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
     };
   } catch (error) {
     if (error instanceof Error && /active plan/i.test(error.message)) {
+      await markAiPlanGenerationPersistenceFailed({
+        trace: exactness.draft.aiGeneration.generationTrace,
+        reason: "active_plan_exists",
+      });
       return buildConfirmFailure({
         reason: "active_plan_exists",
         message:
@@ -303,6 +343,10 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
       });
     }
 
+    await markAiPlanGenerationPersistenceFailed({
+      trace: exactness.draft.aiGeneration.generationTrace,
+      reason: "persistence_failed",
+    });
     return buildConfirmFailure({
       reason: "persistence_failed",
       message: "The generated running plan could not be created. The current plan is unchanged.",
@@ -329,15 +373,21 @@ export async function buildReviewedAiGeneratedRunningPlanPreview(
   });
 
   if (!exactness.ok) {
+    const generationTrace = await markAiPlanGenerationReviewRefused({
+      trace: reviewedDraft.aiGeneration.generationTrace,
+      options: options.aiPreview?.generationLedger,
+    });
+
     return {
       ok: false,
       unavailable: buildAiGeneratedRunningPlanPreviewUnavailable({
         code: "ai_generated_plan_unavailable",
         message: exactness.message,
         issues: [exactness.message],
-        generationTrace: reviewedDraft.aiGeneration.generationTrace,
+        generationTrace,
         input: data,
         normalizedInputSummary: reviewedDraft.normalizedInputSummary,
+        previewOutcome: "review_refusal",
       }),
     };
   }
@@ -359,6 +409,22 @@ export async function buildReviewedAiGeneratedRunningPlanPreview(
   } as RunningPlanPreviewActionResult;
 }
 
+export async function buildReviewedAiGeneratedRunningPlanPreviewForUser(
+  userId: string | null,
+  data: RunningPlanPreviewActionInput,
+  options: BuildAiGeneratedRunningPlanPreviewOptions = {},
+): Promise<RunningPlanPreviewActionResult> {
+  const effectiveHeartRateProfile = await getEffectivePersonalHeartRateProfileForUserId(
+    userId,
+    data.age,
+  );
+
+  return buildReviewedAiGeneratedRunningPlanPreview(data, {
+    ...options,
+    ...(effectiveHeartRateProfile ? { effectiveHeartRateProfile } : {}),
+  });
+}
+
 function buildConfirmFailure(input: {
   reason: RunningPlanConfirmFailureReason;
   message: string;
@@ -372,6 +438,22 @@ function buildConfirmFailure(input: {
     message: input.message,
     ...(input.sourceKind ? { sourceKind: input.sourceKind } : {}),
   };
+}
+
+async function isLocalQaFixtureAuthorized(auth: ReturnType<typeof getRequestAuthContext>) {
+  if (auth.provider !== "local" || !auth.userId || !isAiGeneratedRunningPlanDevFixtureEnabled()) {
+    return false;
+  }
+
+  const account = await findLocalAuthAccountByUserId(auth.userId);
+  return account?.role === "tester" && account.qaFixtureAccess === true;
+}
+
+function isLocalQaFixtureReviewedDraft(draft: AiGeneratedRunningPlanPreviewDraft) {
+  return (
+    draft.aiGeneration.generationTrace?.provider.kind === "local_dev_fixture" ||
+    isAiGeneratedRunningPlanDevFixtureModel(draft.aiGeneration.model)
+  );
 }
 
 const sameJson = stableJsonEqual;

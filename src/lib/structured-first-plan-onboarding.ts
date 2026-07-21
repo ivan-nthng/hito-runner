@@ -15,7 +15,6 @@ import {
   normalizeRunnerFitnessBenchmark,
   runnerFitnessBenchmarkInputSchema,
 } from "@/lib/runner-training-preferences";
-import type { Json } from "@/lib/supabase/database";
 import { diffDaysIso, todayIso } from "@/lib/training";
 import { WEEKDAY_NAMES } from "@/lib/weekday-rest-invariants";
 
@@ -212,11 +211,3 @@ const structuredFirstPlanOnboardingInputSchema = z
 export type StructuredFirstPlanOnboardingInput = z.output<
   typeof structuredFirstPlanOnboardingInputSchema
 >;
-
-export interface StructuredFirstPlanProfilePatch {
-  age: number;
-  weightKg: number;
-  heightCm: number;
-  baselineNotes: string | null;
-  trainingPreferences?: Json;
-}

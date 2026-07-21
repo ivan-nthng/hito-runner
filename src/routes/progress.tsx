@@ -229,12 +229,12 @@ function ProgressPendingState() {
     <AppShell>
       <div className="hito-route-gutter max-w-5xl space-y-10 py-10">
         <div>
-          <Skeleton className="h-4 w-28 bg-background/30" />
-          <Skeleton className="mt-4 h-14 w-80 bg-background/40" />
-          <Skeleton className="mt-4 h-5 w-full max-w-xl bg-background/30" />
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="mt-4 h-14 w-80" />
+          <Skeleton className="mt-4 h-5 w-full max-w-xl" />
         </div>
-        <Skeleton className="h-32 rounded-2xl bg-background/20" />
-        <Skeleton className="h-48 rounded-2xl bg-background/20" />
+        <Skeleton className="h-32 rounded-2xl" />
+        <Skeleton className="h-48 rounded-2xl" />
       </div>
     </AppShell>
   );

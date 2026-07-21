@@ -1,21 +1,17 @@
-import { getRequestAuthContext, requireAuthenticatedUser } from "@/lib/backend/auth";
+import { requireAuthenticatedUser } from "@/lib/backend/auth";
 import type { RequestAuthContext } from "@/lib/backend/auth";
 import { findLocalAuthAccountByUserId } from "@/lib/local-auth";
 import { ensureLocalAuthSupabaseUserId } from "@/lib/local-auth-supabase";
 
-export async function requirePersistedUserIdForCurrentRequest() {
+export async function requirePersistedUserIdForCurrentRequest(): Promise<string> {
   const auth = requireAuthenticatedUser();
-  return await getPersistedUserIdForAuth(auth);
-}
+  const persistedUserId = await getPersistedUserIdForAuth(auth);
 
-export async function getPersistedUserIdForRequestAuthContext() {
-  const auth = getRequestAuthContext();
-
-  if (!auth.userId) {
-    return null;
+  if (!persistedUserId) {
+    throw new Error("Authentication is required for this action.");
   }
 
-  return await getPersistedUserIdForAuth(auth);
+  return persistedUserId;
 }
 
 export async function getPersistedUserIdForAuthContext(auth: RequestAuthContext) {

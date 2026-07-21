@@ -1,6 +1,6 @@
 # Hito Work Dashboard
 
-Generated: 2026-07-19T14:28:38.191Z
+Generated: 2026-07-21T23:16:19.411Z
 Mode: dashboard-only
 
 Keep this file open in a side pane. Re-run one command below whenever you want the Admin work-item
@@ -85,11 +85,11 @@ Current Truth
 <code>completed</code>
 
 #### Task
-Keep the accepted running-plan creation engine closed while deferring the superseding post-confirm editability contract to its own runtime reconciliation.
+Keep the accepted running-plan creation engine and completed post-confirm workout-ownership reconciliation closed while future release or product work proceeds separately.
 
 <sub><code>STAGE</code></sub>
 
-<code>ARCHITECT source-of-truth reconciliation / engine completed; editability reconciliation external.</code>
+<code>ARCHITECT source-of-truth closeout / engine and post-confirm ownership accepted.</code>
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
@@ -105,22 +105,22 @@ Current Source Of Truth: Add, Clear, Move, Copy, and Edit are distinct operation
 
 <sub><code>STATUS</code></sub>
 
-<code>in_progress</code>
+<code>completed</code>
 
 #### Task
-Repair manual workout template behavior around editable structure defaults, user targets, saved templates, and per-user built-in template visibility.
+Keep the accepted backend-owned manual-template catalog and full AI/manual editor parity closed.
 
 <sub><code>STAGE</code></sub>
 
-<code>BACKEND implementation / manual template contract correction.</code>
+<code>FRONTEND implementation and QA / completed.</code>
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
-Current Source Of Truth: Backend owns manual workout registry truth, review/confirm, validation, persistence, saved
+Completed Backend Prompt: warm-up;
 
 <sub><code>NEXT ROLE</code></sub>
 
-<code>backend</code>
+<code>product</code>
 
 ---
 
@@ -170,26 +170,26 @@ Current Source Of Truth: Local gitignored `qa-artifacts/` is disposable by defau
 
 ---
 
-### 6. [Hito DS External Reuse And Theme Contract](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-29-hito-ds-external-reuse-and-theme-contract.md>)
+### 6. [Hito DS Discoverability, Agent Contract, And Safe Reuse Plan](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-29-hito-ds-external-reuse-and-theme-contract.md>)
 
 <sub><code>STATUS</code></sub>
 
 <code>backlog</code>
 
 #### Task
-Define and implement a safe external reuse layer for Hito DS so other projects can use Hito primitives and tokens without destabilizing the Hito product.
+Select the next bounded Hito DS discoverability, agent-contract, or external-reuse gate after the Local Inspector child task's accepted owner-level closeout.
 
 <sub><code>STAGE</code></sub>
 
-<code>ARCHITECT plan / external reusable themeable Hito DS contract.</code>
+<code>Inspector child closed / broader discoverability remains Product-selected backlog.</code>
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
-Context: which Hito primitives are stable enough to reuse;
+Next Gate
 
 <sub><code>NEXT ROLE</code></sub>
 
-<code>architect</code>
+<code>product</code>
 
 ---
 
@@ -200,19 +200,65 @@ Context: which Hito primitives are stable enough to reuse;
 <code>in_progress</code>
 
 #### Task
-Hold source-size cleanup after accepted `Delete active plan` retirement.
+Hold source-size cleanup after the pre-commit simplification and release-bundle checkpoint.
 
 <sub><code>STAGE</code></sub>
 
-<code>ARCHITECT holding / evidence-gated cleanup pause.</code>
+<code>ARCHITECT holding / clean source-control boundary established.</code>
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
-Hold Decision - 2026-07-18: Accepted removal of the unreachable `deleteActivePlan` server function, its delete-only helper,
+Pre-Commit Release Bundle Checkpoint - 2026-07-21: Classified the accumulated dirty tree by canonical owner instead of treating it as one new
 
 <sub><code>NEXT ROLE</code></sub>
 
 <code>architect</code>
+
+---
+
+### 8. [Runner Core Freeze And Design Polish Plan](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-07-20-runner-core-freeze-and-design-polish-plan.md>)
+
+<sub><code>STATUS</code></sub>
+
+<code>completed</code>
+
+#### Task
+Close the frozen Runner Core and its first bounded design-polish batch.
+
+<sub><code>STAGE</code></sub>
+
+<code>Completed / Runner Core freeze and first design-polish closure.</code>
+
+<sub><code>LAST VISIBLE NOTE</code></sub>
+
+Decision
+
+<sub><code>NEXT ROLE</code></sub>
+
+<code>product</code>
+
+---
+
+### 9. [Hito Branded Auth Email Delivery](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-07-21-hito-branded-auth-email-delivery.md>)
+
+<sub><code>STATUS</code></sub>
+
+<code>in_progress</code>
+
+#### Task
+Create the Hito-branded Supabase passwordless sign-in email template now, then apply and prove hosted delivery once approved SMTP credentials and sender identity are available.
+
+<sub><code>STAGE</code></sub>
+
+<code>DESIGNER template direction and versioned email source / hosted delivery prerequisites pending.</code>
+
+<sub><code>LAST VISIBLE NOTE</code></sub>
+
+Problem Definition
+
+<sub><code>NEXT ROLE</code></sub>
+
+<code>designer</code>
 
 ## Safety Notes
 

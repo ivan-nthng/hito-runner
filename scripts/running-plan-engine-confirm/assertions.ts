@@ -45,34 +45,39 @@ export function validateCanonicalRowsAreNumeric(
   }
 }
 
-export function validateAiAuthoredPaceAndEffectiveHrGuidance(rows: readonly unknown[]) {
-  validateAiAuthoredPaceTargets(rows);
-  validateEffectiveHeartRateTargets(rows);
-}
-
-export function validateEffectiveHeartRateTargets(rows: readonly unknown[]) {
+export function validateAiAuthoredPrimaryExecutionGuidance(rows: readonly unknown[]) {
   let targetCount = 0;
 
   visitRecords(rows, (record) => {
-    if (typeof record.hr_bpm_range !== "string") {
-      return;
-    }
-
+    const mode = record.primary_execution_mode;
+    if (!["pace", "heart_rate", "effort", "run_walk"].includes(String(mode))) return;
     targetCount += 1;
-    assert.match(record.hr_bpm_range, /^\d{2,3}-\d{2,3} bpm$/);
-    assert.ok(
-      record.hr_target_source === "default_estimated_hr" ||
-        record.hr_target_source === "personal_hr_zone",
-      "Generated HR guidance must identify its effective profile source.",
-    );
     assert.equal(
       record.target_source,
       "ai_authored_plan_guidance",
-      "Generated HR guidance must retain AI-authored provenance.",
+      "Generated execution guidance must retain AI-authored provenance.",
     );
+    const hasPace = typeof record.pace === "string";
+    const hasHeartRate = typeof record.hr_bpm_range === "string";
+    assert.equal(hasPace && hasHeartRate, false, "One leaf cannot command pace and HR together.");
+
+    if (mode === "pace") assert.equal(hasPace, true);
+    if (mode === "heart_rate") {
+      assert.equal(hasHeartRate, true);
+      assert.match(String(record.hr_bpm_range), /^\d{2,3}-\d{2,3} bpm$/);
+      assert.ok(
+        record.hr_target_source === "personal_hr_zone" ||
+          record.hr_target_source === "default_estimated_hr",
+        "HR-primary execution must retain accepted profile provenance.",
+      );
+    }
+    if (mode === "effort" || mode === "run_walk") {
+      assert.equal(hasPace || hasHeartRate, false);
+      assert.equal(typeof record.intensity, "string");
+    }
   });
 
-  assert.ok(targetCount > 0, "Generated plan proof must include effective BPM guidance.");
+  assert.ok(targetCount > 0, "Generated plan proof must include primary execution guidance.");
 }
 
 export function assertSelectedDistanceEndpointProof(input: {
@@ -113,27 +118,6 @@ export function rowHasPaceTargets(row: CanonicalRunningPlanRow) {
 
 function rowHasHeartRateTargets(row: CanonicalRunningPlanRow) {
   return /"hr_bpm_range"/i.test(JSON.stringify(row.segments));
-}
-
-function validateAiAuthoredPaceTargets(value: unknown) {
-  if (Array.isArray(value)) {
-    value.forEach(validateAiAuthoredPaceTargets);
-    return;
-  }
-  if (!value || typeof value !== "object") return;
-
-  const record = value as Record<string, unknown>;
-  if (typeof record.pace === "string") {
-    assert.equal(
-      record.target_source,
-      "ai_authored_plan_guidance",
-      "Pace guidance must preserve AI-authored provenance.",
-    );
-  }
-  assert.equal(record.pace_seconds_per_km, undefined);
-  assert.equal(record.pace_min_seconds_per_km, undefined);
-  assert.equal(record.pace_max_seconds_per_km, undefined);
-  Object.values(record).forEach(validateAiAuthoredPaceTargets);
 }
 
 function visitRecords(value: unknown, visitor: (record: Record<string, unknown>) => void) {

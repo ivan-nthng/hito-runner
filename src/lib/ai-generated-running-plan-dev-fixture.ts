@@ -232,6 +232,8 @@ function buildProviderFixtureDraft(
     fixedRestDays: authoringInput.availability.fixedRestDays,
     fixtureScenario,
     adaptationRequired: adaptationContext.adaptation.required,
+    paceTruthAvailable: Boolean(authoringInput.runnerFacts.benchmark),
+    acceptedHeartRateAvailable: authoringInput.runnerFacts.heartRateProfile.accepted,
   });
 
   return {
@@ -248,6 +250,8 @@ function buildFixtureWorkoutDays(input: {
   fixedRestDays: readonly WeekdayName[];
   fixtureScenario: AiGeneratedRunningPlanDevFixtureScenario;
   adaptationRequired: boolean;
+  paceTruthAvailable: boolean;
+  acceptedHeartRateAvailable: boolean;
 }): AiAuthoredPlanFirstProviderDraft["workouts"] {
   const days = new Map<string, AiAuthoredPlanFirstProviderDraft["workouts"][number]>();
   if (input.adaptationRequired) {
@@ -284,7 +288,10 @@ function buildFixtureWorkoutDays(input: {
         "Local plan-first fixture could not author the first post-adaptation long run.",
       );
     }
-    days.set(firstLongRunDate, buildAdaptationLongRunFixtureDay(firstLongRunDate));
+    days.set(
+      firstLongRunDate,
+      buildAdaptationLongRunFixtureDay(firstLongRunDate, input.acceptedHeartRateAvailable),
+    );
 
     const qualityDate = findSchedulableFixtureDate({
       candidate: addDaysIso(firstLongRunDate, 4),
@@ -296,22 +303,30 @@ function buildFixtureWorkoutDays(input: {
         input.fixtureScenario === NON_REPEAT_TEMPO_FIXTURE_SCENARIO
           ? buildTempoFixtureDay
           : buildRepeatFixtureDay;
-      days.set(qualityDate, buildQuality(qualityDate));
+      days.set(qualityDate, buildQuality(qualityDate, input.paceTruthAvailable));
     }
   } else {
     const candidates = [
       { offset: 0, build: buildEasyFixtureDay },
       {
         offset: 2,
-        build:
+        build: (date: string) =>
           input.fixtureScenario === NON_REPEAT_TEMPO_FIXTURE_SCENARIO
-            ? buildTempoFixtureDay
-            : buildRepeatFixtureDay,
+            ? buildTempoFixtureDay(date, input.paceTruthAvailable)
+            : buildRepeatFixtureDay(date, input.paceTruthAvailable),
       },
-      { offset: 6, build: buildLongRunFixtureDay },
+      {
+        offset: 6,
+        build: (date: string) => buildLongRunFixtureDay(date, input.acceptedHeartRateAvailable),
+      },
       { offset: 9, build: buildEasyFixtureDay },
       ...(input.fixtureScenario === NON_REPEAT_TEMPO_FIXTURE_SCENARIO
-        ? [{ offset: 16, build: buildRepeatFixtureDay }]
+        ? [
+            {
+              offset: 16,
+              build: (date: string) => buildRepeatFixtureDay(date, input.paceTruthAvailable),
+            },
+          ]
         : []),
     ];
 
@@ -382,9 +397,9 @@ function findSchedulableFixtureDate(input: {
 
 function buildEasyFixtureDay(date: string) {
   return workoutDay(date, "easy_aerobic_run", "Easy Run", [
-    unitSection("warmup", "Warm Up", timePrescription(5), target(null, "Z1", null)),
-    unitSection("main", "Work", timePrescription(25), target(null, "Z2", null)),
-    unitSection("cooldown", "Cool Down", timePrescription(5), target(null, "Z1", null)),
+    unitSection("warmup", "Warm Up", timePrescription(5), effortTarget("Easy gradual movement")),
+    unitSection("main", "Work", timePrescription(25), effortTarget("Conversational easy effort")),
+    unitSection("cooldown", "Cool Down", timePrescription(5), effortTarget("Easy downshift")),
   ]);
 }
 
@@ -398,7 +413,7 @@ function buildProgressedRunWalkFixtureDay(date: string) {
 
 function buildRunWalkAdaptationFixtureDay(date: string, repeatCount: number) {
   return workoutDay(date, "recovery_jog", "Run/Walk", [
-    unitSection("warmup", "Warm Up Walk", timePrescription(5), target(null, null, "Easy walk")),
+    unitSection("warmup", "Warm Up Walk", timePrescription(5), effortTarget("Easy walk")),
     {
       kind: "repeat",
       segment_type: "interval_block",
@@ -410,70 +425,67 @@ function buildRunWalkAdaptationFixtureDay(date: string, repeatCount: number) {
           "run",
           "Easy Jog",
           timePrescription(2),
-          target(null, null, "Conversational easy jog"),
+          runWalkTarget("Conversational easy jog"),
         ),
-        repeatChild("walk", "Walk", timePrescription(1), target(null, null, "Relaxed walk")),
+        repeatChild("walk", "Walk", timePrescription(1), runWalkTarget("Relaxed walk")),
       ],
     },
-    unitSection("cooldown", "Cool Down Walk", timePrescription(5), target(null, null, "Easy walk")),
+    unitSection("cooldown", "Cool Down Walk", timePrescription(5), effortTarget("Easy walk")),
   ]);
 }
 
 function buildAdaptationEasyFixtureDay(date: string) {
   return workoutDay(date, "easy_aerobic_run", "Easy", [
-    unitSection("warmup", "Warm Up Walk", timePrescription(5), target(null, null, "Easy walk")),
-    unitSection(
-      "main",
-      "Work",
-      timePrescription(15),
-      target(null, null, "Conversational easy effort"),
-    ),
-    unitSection("cooldown", "Cool Down Walk", timePrescription(5), target(null, null, "Easy walk")),
+    unitSection("warmup", "Warm Up Walk", timePrescription(5), effortTarget("Easy walk")),
+    unitSection("main", "Work", timePrescription(15), effortTarget("Conversational easy effort")),
+    unitSection("cooldown", "Cool Down Walk", timePrescription(5), effortTarget("Easy walk")),
   ]);
 }
 
 function buildRecoveryFixtureDay(date: string) {
   return workoutDay(date, "recovery_jog", "Recovery", [
-    unitSection("warmup", "Warm Up Walk", timePrescription(5), target(null, null, "Easy walk")),
+    unitSection("warmup", "Warm Up Walk", timePrescription(5), effortTarget("Easy walk")),
     unitSection(
       "recovery_jog",
       "Work",
       timePrescription(12),
-      target(null, null, "Relaxed recovery effort"),
+      effortTarget("Relaxed recovery effort"),
     ),
-    unitSection("cooldown", "Cool Down Walk", timePrescription(5), target(null, null, "Easy walk")),
+    unitSection("cooldown", "Cool Down Walk", timePrescription(5), effortTarget("Easy walk")),
   ]);
 }
 
-function buildAdaptationLongRunFixtureDay(date: string) {
+function buildAdaptationLongRunFixtureDay(date: string, acceptedHeartRateAvailable: boolean) {
   return workoutDay(date, "long_aerobic_run", "Long Run", [
-    unitSection("warmup", "Warm Up Walk", timePrescription(5), target(null, null, "Easy walk")),
+    unitSection("warmup", "Warm Up Walk", timePrescription(5), effortTarget("Easy walk")),
     unitSection(
       "main",
       "Work",
       timePrescription(30),
-      target(null, null, "Conversational easy effort"),
+      acceptedHeartRateAvailable
+        ? heartRateTarget("Z2")
+        : effortTarget("Conversational easy effort"),
     ),
-    unitSection("cooldown", "Cool Down Walk", timePrescription(5), target(null, null, "Easy walk")),
+    unitSection("cooldown", "Cool Down Walk", timePrescription(5), effortTarget("Easy walk")),
   ]);
 }
 
-function buildTempoFixtureDay(date: string) {
+function buildTempoFixtureDay(date: string, paceTruthAvailable: boolean) {
   return workoutDay(date, "controlled_tempo_session", "Tempo", [
-    unitSection("warmup", "Warm Up", timePrescription(10), target(null, "Z1-Z2", null)),
+    unitSection("warmup", "Warm Up", timePrescription(10), effortTarget("Easy gradual movement")),
     unitSection(
       "tempo_block",
       "Work",
       timePrescription(20),
-      target("4:50-5:00/km", "Z3", "Controlled tempo effort"),
+      paceTruthAvailable ? paceTarget("4:50-5:00/km") : effortTarget("Controlled tempo effort"),
     ),
-    unitSection("cooldown", "Cool Down", timePrescription(10), target(null, "Z1", null)),
+    unitSection("cooldown", "Cool Down", timePrescription(10), effortTarget("Easy downshift")),
   ]);
 }
 
-function buildRepeatFixtureDay(date: string) {
+function buildRepeatFixtureDay(date: string, paceTruthAvailable: boolean) {
   return workoutDay(date, "controlled_tempo_session", "Tempo", [
-    unitSection("warmup", "Warm Up", timePrescription(10), target(null, "Z1-Z2", null)),
+    unitSection("warmup", "Warm Up", timePrescription(10), effortTarget("Easy gradual movement")),
     {
       kind: "repeat",
       segment_type: "interval_block",
@@ -485,20 +497,27 @@ function buildRepeatFixtureDay(date: string) {
           "work",
           "Work",
           timePrescription(2),
-          target("4:45-4:55/km", "Z4", "Controlled hard"),
+          paceTruthAvailable ? paceTarget("4:45-4:55/km") : effortTarget("Controlled hard"),
         ),
-        repeatChild("recover", "Recovery", timePrescription(1.5), target(null, "Z1-Z2", "Easy")),
+        repeatChild("recover", "Recovery", timePrescription(1.5), effortTarget("Easy")),
       ],
     },
-    unitSection("cooldown", "Cool Down", timePrescription(10), target(null, "Z1", null)),
+    unitSection("cooldown", "Cool Down", timePrescription(10), effortTarget("Easy downshift")),
   ]);
 }
 
-function buildLongRunFixtureDay(date: string) {
+function buildLongRunFixtureDay(date: string, acceptedHeartRateAvailable: boolean) {
   return workoutDay(date, "long_aerobic_run", "Long Run", [
-    unitSection("warmup", "Warm Up", timePrescription(10), target(null, "Z1", null)),
-    unitSection("main", "Work", timePrescription(40), target(null, "Z2", null)),
-    unitSection("cooldown", "Cool Down", timePrescription(5), target(null, "Z1", null)),
+    unitSection("warmup", "Warm Up", timePrescription(10), effortTarget("Easy gradual movement")),
+    unitSection(
+      "main",
+      "Work",
+      timePrescription(40),
+      acceptedHeartRateAvailable
+        ? heartRateTarget("Z2")
+        : effortTarget("Conversational aerobic effort"),
+    ),
+    unitSection("cooldown", "Cool Down", timePrescription(5), effortTarget("Easy downshift")),
   ]);
 }
 
@@ -514,7 +533,7 @@ function buildEndpointFixtureDay(date: string, distanceMeters: number) {
         "main",
         "Work",
         distancePrescription(distanceMeters / 1000),
-        target(null, null, "Selected-distance effort"),
+        effortTarget("Selected-distance effort"),
       ),
     ],
   };
@@ -540,7 +559,7 @@ function unitSection(
   segmentType: Extract<ProviderFixtureSection, { kind: "unit" }>["segment_type"],
   label: string,
   prescription: { mode: "time"; duration_min: number } | { mode: "distance"; distance_km: number },
-  sectionTarget: ReturnType<typeof target>,
+  sectionTarget: ProviderFixtureTarget,
 ) {
   return {
     kind: "unit" as const,
@@ -556,7 +575,7 @@ function repeatChild(
   role: ProviderFixtureRepeatChild["role"],
   label: string,
   prescription: { mode: "time"; duration_min: number } | { mode: "distance"; distance_km: number },
-  childTarget: ReturnType<typeof target>,
+  childTarget: ProviderFixtureTarget,
 ): ProviderFixtureRepeatChild {
   return {
     role,
@@ -567,12 +586,34 @@ function repeatChild(
   };
 }
 
-function target(
-  pace: string | null,
-  hrZone: ProviderFixtureTarget["hr_zone"],
-  effort: string | null,
+function paceTarget(pace: string): ProviderFixtureTarget {
+  return {
+    primary_execution_mode: "pace",
+    command: pace,
+  };
+}
+
+function effortTarget(effort: string): ProviderFixtureTarget {
+  return {
+    primary_execution_mode: "effort",
+    command: effort,
+  };
+}
+
+function heartRateTarget(
+  reference: Extract<ProviderFixtureTarget, { primary_execution_mode: "heart_rate" }>["command"],
 ): ProviderFixtureTarget {
-  return { pace, hr_zone: hrZone, effort };
+  return {
+    primary_execution_mode: "heart_rate",
+    command: reference,
+  };
+}
+
+function runWalkTarget(effort: string): ProviderFixtureTarget {
+  return {
+    primary_execution_mode: "run_walk",
+    command: effort,
+  };
 }
 
 function timePrescription(durationMin: number) {

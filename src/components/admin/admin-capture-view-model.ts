@@ -1,10 +1,10 @@
 import type { HitoIconName } from "@/components/ui/icon";
 import {
+  adminCaptureActiveStatuses,
   adminCaptureItemTypes,
   adminCapturePriorities,
   adminCaptureStatuses,
   adminCaptureTargetRoles,
-  type AdminCaptureBacklogView,
   type AdminCaptureItemType,
   type AdminCaptureItemView,
   type AdminCapturePriority,
@@ -74,12 +74,6 @@ export const STATUS_FILTERS: Array<{ value: CaptureStatusFilter; label: string }
   { value: "archived", label: "Archived" },
 ];
 
-export const ACTIVE_CAPTURE_STATUSES: AdminCaptureStatus[] = [
-  "new",
-  "in_review",
-  "ready_for_codex",
-];
-
 export const EDITABLE_CAPTURE_STATUS_OPTIONS: Array<{
   value: AdminCaptureStatus;
   label: string;
@@ -129,30 +123,15 @@ export function buildCaptureHref(search: CaptureSearch, patch: Partial<CaptureSe
   return `/admin/capture?${params.toString()}`;
 }
 
-export function filterBacklogViewForStatus(
-  view: AdminCaptureBacklogView,
-  status: CaptureStatusFilter,
-): AdminCaptureBacklogView {
-  if (status !== "all") {
-    return view;
-  }
-
-  const items = view.items.filter((item) => ACTIVE_CAPTURE_STATUSES.includes(item.status));
-
-  return {
-    ...view,
-    total: items.length,
-    shown: items.length,
-    items,
-  };
-}
-
 export function countForStatusFilter(
   status: CaptureStatusFilter,
   counts: Record<AdminCaptureStatus, number>,
 ) {
   if (status === "all") {
-    return ACTIVE_CAPTURE_STATUSES.reduce((total, activeStatus) => total + counts[activeStatus], 0);
+    return adminCaptureActiveStatuses.reduce(
+      (total, activeStatus) => total + counts[activeStatus],
+      0,
+    );
   }
 
   return counts[status];

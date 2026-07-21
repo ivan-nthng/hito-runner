@@ -43,6 +43,7 @@ import { resolveCurrentManualWorkoutAuthoringUser } from "@/lib/manual-workout-a
 import { normalizeManualWorkoutDraft } from "@/lib/manual-workout-authoring/normalize";
 import { validateManualWorkoutDraft } from "@/lib/manual-workout-authoring/validator";
 import { todayIso } from "@/lib/training";
+import { saveRunnerBaselineForUserId } from "@/lib/user-settings-actions";
 
 type ManualWorkoutDraftRejectionReason = Extract<
   ManualWorkoutDraftReviewResult,
@@ -54,6 +55,7 @@ const MANUAL_WORKOUT_REVIEW_TOKEN_PREFIX = "manual-workout-review-v1.";
 type ManualEmptyPlanCreateDependencies = {
   getActivePlanForUser?: typeof getActivePlan;
   createEmptyPlanForUser?: typeof createEmptyActivePlanForUser;
+  saveBaselineForUser?: typeof saveRunnerBaselineForUserId;
   currentDate?: string;
 };
 
@@ -214,6 +216,7 @@ export async function createEmptyManualActivePlanForUser(
   const getActivePlanForUser = dependencies.getActivePlanForUser ?? getActivePlan;
   const createEmptyPlanForUser =
     dependencies.createEmptyPlanForUser ?? createEmptyActivePlanForUser;
+  const saveBaselineForUser = dependencies.saveBaselineForUser ?? saveRunnerBaselineForUserId;
   const currentDate = dependencies.currentDate ?? todayIso();
 
   let activePlan: Awaited<ReturnType<typeof getActivePlan>> | null = null;
@@ -241,6 +244,12 @@ export async function createEmptyManualActivePlanForUser(
   });
 
   try {
+    await saveBaselineForUser(userId, {
+      age: parsed.data.age,
+      heightCm: parsed.data.heightCm,
+      weightKg: parsed.data.weightKg,
+      fitnessLevel: parsed.data.runningLevel,
+    });
     const applyResult = await createEmptyPlanForUser(userId, creationInput);
 
     return {

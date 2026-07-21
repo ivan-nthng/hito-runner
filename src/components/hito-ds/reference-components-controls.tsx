@@ -11,6 +11,8 @@ import { Icon } from "@/components/ui/icon";
 import { InlineEditableText } from "@/components/ui/inline-editable-text";
 import { HitoMetadataTag } from "@/components/ui/metadata-tag";
 import { HitoNativeSelectField } from "@/components/ui/native-select-field";
+import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
+import { useHitoTabs } from "@/components/ui/hito-tabs";
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
 import { ProductLinks, ReferenceListRow } from "@/components/hito-ds/reference";
 import {
@@ -59,6 +61,7 @@ type DataTableSortDirection = (typeof DATA_TABLE_SORT_DIRECTIONS)[number];
 type FieldSize = (typeof FIELD_SIZES)[number];
 type ReferenceScalarField = "age" | "height" | "weight";
 type ReferenceEditableField = ReferenceScalarField | "terrain";
+type TabDemoValue = "plan" | "progress" | "updates" | "archived";
 
 export function HitoDsComponentControls() {
   const [variant, setVariant] = useState<ButtonVariant>("primary");
@@ -93,6 +96,16 @@ export function HitoDsComponentControls() {
   const [tabBadge, setTabBadge] = useState(true);
   const [tabDot, setTabDot] = useState(true);
   const [tabDisabled, setTabDisabled] = useState(true);
+  const [tabDemoValue, setTabDemoValue] = useState<TabDemoValue>("plan");
+  const tabDemo = useHitoTabs({
+    items: [
+      { value: "plan" },
+      { value: "progress" },
+      { value: "updates" },
+      { value: "archived", disabled: tabDisabled },
+    ],
+    value: tabDemoValue,
+  });
   const [statusTone, setStatusTone] = useState<StatusTone>("signal");
   const [statusLongLabel, setStatusLongLabel] = useState(false);
   const [metadataState, setMetadataState] = useState("reviewed");
@@ -103,6 +116,16 @@ export function HitoDsComponentControls() {
   const [selectionInvalid, setSelectionInvalid] = useState(false);
   const [selectionFocusDemo, setSelectionFocusDemo] = useState(false);
   const [selectionCardMode, setSelectionCardMode] = useState(false);
+  const [choiceScaleValue, setChoiceScaleValue] = useState<ChoiceToggleSize>("md");
+  const [choiceCardValue, setChoiceCardValue] = useState<"half" | "consistency">("half");
+  const choiceScaleGroup = useHitoRadioGroup({
+    items: CHOICE_TOGGLE_SIZES.map((value) => ({ value })),
+    value: choiceScaleValue,
+  });
+  const choiceCardGroup = useHitoRadioGroup({
+    items: [{ value: "half" }, { value: "consistency" }],
+    value: choiceCardValue,
+  });
   const [dataTableSortable, setDataTableSortable] = useState(true);
   const [dataTableActiveSort, setDataTableActiveSort] = useState(true);
   const [dataTableSortDirection, setDataTableSortDirection] =
@@ -287,14 +310,26 @@ export function HitoDsComponentControls() {
                 "hito-tabs",
                 tabStyle === "simple" ? "hito-tabs-simple" : "hito-tabs-enclosed",
               )}
-              role="tablist"
+              {...tabDemo.tabListProps}
               aria-label="Configurable tab example"
             >
-              <button type="button" className="hito-tab" data-active="true" aria-selected="true">
+              <button
+                type="button"
+                {...tabDemo.getTabProps("plan")}
+                className="hito-tab"
+                data-active={tabDemoValue === "plan" ? "true" : undefined}
+                onClick={() => setTabDemoValue("plan")}
+              >
                 {tabIcon && <Icon name="calendar" size="sm" className="hito-tab-icon" />}
                 Plan
               </button>
-              <button type="button" className="hito-tab" aria-selected="false">
+              <button
+                type="button"
+                {...tabDemo.getTabProps("progress")}
+                className="hito-tab"
+                data-active={tabDemoValue === "progress" ? "true" : undefined}
+                onClick={() => setTabDemoValue("progress")}
+              >
                 {tabIcon && <Icon name="progress" size="sm" className="hito-tab-icon" />}
                 Progress
                 {tabBadge && (
@@ -303,16 +338,34 @@ export function HitoDsComponentControls() {
                   </span>
                 )}
               </button>
-              <button type="button" className="hito-tab" aria-selected="false">
+              <button
+                type="button"
+                {...tabDemo.getTabProps("updates")}
+                className="hito-tab"
+                data-active={tabDemoValue === "updates" ? "true" : undefined}
+                onClick={() => setTabDemoValue("updates")}
+              >
                 Updates
                 {tabDot && <span className="hito-tab-dot" aria-hidden="true" />}
               </button>
               {tabDisabled && (
-                <button type="button" className="hito-tab" disabled aria-selected="false">
+                <button
+                  type="button"
+                  {...tabDemo.getTabProps("archived")}
+                  className="hito-tab"
+                  disabled
+                >
                   Archived
                 </button>
               )}
             </div>
+            <p className="hito-caption mt-3" {...tabDemo.getPanelProps(tabDemoValue)}>
+              {tabDemoValue === "plan"
+                ? "Plan view"
+                : tabDemoValue === "progress"
+                  ? "Progress view"
+                  : "Updates view"}
+            </p>
           </div>
         }
         variants={
@@ -326,39 +379,26 @@ export function HitoDsComponentControls() {
                     "hito-tabs mt-4 w-full flex-wrap",
                     tabStyle === "simple" ? "hito-tabs-simple" : "hito-tabs-enclosed",
                   )}
-                  role="tablist"
-                  aria-label="Tab states example"
                 >
-                  <button type="button" className="hito-tab" aria-selected="false">
-                    Default
-                  </button>
-                  <button
-                    type="button"
-                    className="hito-tab"
+                  <span className="hito-tab pointer-events-none cursor-default">Default</span>
+                  <span
+                    className="hito-tab pointer-events-none cursor-default"
                     data-demo-state="hover"
-                    aria-selected="false"
                   >
                     Hover
-                  </button>
-                  <button
-                    type="button"
-                    className="hito-tab"
-                    data-active="true"
-                    aria-selected="true"
-                  >
+                  </span>
+                  <span className="hito-tab pointer-events-none cursor-default" data-active="true">
                     Active
-                  </button>
-                  <button
-                    type="button"
-                    className="hito-tab"
+                  </span>
+                  <span
+                    className="hito-tab pointer-events-none cursor-default"
                     data-demo-state="focus"
-                    aria-selected="false"
                   >
                     Focus
-                  </button>
-                  <button type="button" className="hito-tab" disabled aria-selected="false">
+                  </span>
+                  <span className="hito-tab pointer-events-none cursor-default opacity-[0.45]">
                     Disabled
-                  </button>
+                  </span>
                 </div>
               </div>
             </div>
@@ -872,7 +912,7 @@ export function HitoDsComponentControls() {
                     <p className="hito-list-row-title">Interactive scalar and select chips</p>
                     <p className="hito-caption mt-2">
                       These are the runtime owners. Click any empty or saved chip to enter its real
-                      editing state.
+                      editing state. Height holds the deterministic hover specimen.
                     </p>
                   </div>
                   <div className="hito-editable-value-chip-group">
@@ -899,6 +939,7 @@ export function HitoDsComponentControls() {
                         step={step}
                         inputMode={inputMode}
                         unit={unit}
+                        demoState={fieldKey === "height" ? "hover" : undefined}
                       />
                     ))}
                     <EditableSelectValueChip
@@ -1197,49 +1238,47 @@ export function HitoDsComponentControls() {
             <div className="border-t border-hairline pt-5">
               <p className="hito-label">Required states</p>
               <div className="mt-4 grid gap-3">
-                <label className="hito-control-label hito-control-label-sm">
-                  <input type="checkbox" className="hito-checkbox hito-checkbox-sm" />
-                  <span>Default checkbox</span>
-                </label>
-                <label className="hito-control-label hito-control-label-sm">
-                  <input
-                    type="checkbox"
-                    className="hito-checkbox hito-checkbox-sm"
-                    defaultChecked
-                    data-state="checked"
+                <div className="hito-control-label hito-control-label-sm cursor-default">
+                  <span
+                    className="hito-checkbox hito-checkbox-sm pointer-events-none cursor-default"
+                    aria-hidden="true"
                   />
+                  <span>Default checkbox</span>
+                </div>
+                <div className="hito-control-label hito-control-label-sm cursor-default">
+                  <span
+                    className="hito-checkbox hito-checkbox-sm pointer-events-none cursor-default"
+                    data-state="checked"
+                    aria-hidden="true"
+                  >
+                    <Icon name="check" size="xs" />
+                  </span>
                   <span>Signal-selected checkbox</span>
-                </label>
-                <label className="hito-control-label hito-control-label-sm">
-                  <input
-                    type="radio"
-                    className="hito-radio hito-radio-sm"
+                </div>
+                <div className="hito-control-label hito-control-label-sm cursor-default">
+                  <span
+                    className="hito-radio hito-radio-sm pointer-events-none cursor-default"
                     data-demo-state="focus"
+                    aria-hidden="true"
                   />
                   <span>Focus-visible radio</span>
-                </label>
+                </div>
                 <div className="hito-choice-toggle-group">
-                  <button
-                    type="button"
-                    className="hito-choice-toggle hito-choice-toggle-sm"
+                  <span
+                    className="hito-choice-toggle hito-choice-toggle-sm pointer-events-none cursor-default"
                     data-demo-state="focus"
                   >
                     Focus
-                  </button>
-                  <button
-                    type="button"
-                    className="hito-choice-toggle hito-choice-toggle-sm"
-                    aria-invalid="true"
+                  </span>
+                  <span
+                    className="hito-choice-toggle hito-choice-toggle-sm pointer-events-none cursor-default"
+                    data-invalid="true"
                   >
                     Invalid
-                  </button>
-                  <button
-                    type="button"
-                    className="hito-choice-toggle hito-choice-toggle-sm"
-                    disabled
-                  >
+                  </span>
+                  <span className="hito-choice-toggle hito-choice-toggle-sm pointer-events-none cursor-default opacity-50">
                     Disabled
-                  </button>
+                  </span>
                 </div>
               </div>
             </div>
@@ -1276,16 +1315,17 @@ export function HitoDsComponentControls() {
                 </p>
                 <div
                   className="hito-choice-toggle-group mt-4 items-center"
-                  role="radiogroup"
+                  {...choiceScaleGroup.groupProps}
                   aria-label="Toggle radio size scale"
                 >
                   {CHOICE_TOGGLE_SIZES.map((item) => (
                     <button
                       key={item}
                       type="button"
+                      {...choiceScaleGroup.getRadioProps(item)}
                       className={cn("hito-choice-toggle uppercase", `hito-choice-toggle-${item}`)}
-                      role="radio"
-                      aria-checked={item === "md"}
+                      data-selected={choiceScaleValue === item ? "true" : undefined}
+                      onClick={() => setChoiceScaleValue(item)}
                     >
                       {item}
                     </button>
@@ -1332,14 +1372,15 @@ export function HitoDsComponentControls() {
                 </p>
                 <div
                   className="hito-choice-toggle-group mt-4"
-                  role="radiogroup"
+                  {...choiceCardGroup.groupProps}
                   aria-label="Card toggle radio example"
                 >
                   <button
                     type="button"
+                    {...choiceCardGroup.getRadioProps("half")}
                     className="hito-choice-toggle hito-choice-toggle-card"
-                    role="radio"
-                    aria-checked="true"
+                    data-selected={choiceCardValue === "half" ? "true" : undefined}
+                    onClick={() => setChoiceCardValue("half")}
                   >
                     <span>
                       <span className="block">Half marathon</span>
@@ -1348,9 +1389,10 @@ export function HitoDsComponentControls() {
                   </button>
                   <button
                     type="button"
+                    {...choiceCardGroup.getRadioProps("consistency")}
                     className="hito-choice-toggle hito-choice-toggle-card"
-                    role="radio"
-                    aria-checked="false"
+                    data-selected={choiceCardValue === "consistency" ? "true" : undefined}
+                    onClick={() => setChoiceCardValue("consistency")}
                   >
                     <span>
                       <span className="block">Build consistency</span>

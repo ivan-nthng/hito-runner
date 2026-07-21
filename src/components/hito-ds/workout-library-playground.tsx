@@ -8,6 +8,7 @@ import {
   type HitoCalendarDayBaseState,
 } from "@/components/ui/hito-calendar-day";
 import { Icon } from "@/components/ui/icon";
+import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
 import {
   Select,
   SelectContent,
@@ -507,18 +508,22 @@ function ChoiceControl<T extends string>({
   value: T;
   onChange: (value: T) => void;
 }) {
+  const choiceGroup = useHitoRadioGroup({
+    items: options.map((option) => ({ value: option.value })),
+    value,
+  });
+
   return (
     <div className="grid min-w-0 gap-2">
       <p className="hito-form-label">{label}</p>
-      <div className="hito-choice-toggle-group" role="radiogroup" aria-label={label}>
+      <div className="hito-choice-toggle-group" {...choiceGroup.groupProps} aria-label={label}>
         {options.map((option) => (
           <button
             key={option.value}
             type="button"
+            {...choiceGroup.getRadioProps(option.value)}
             className="hito-choice-toggle hito-choice-toggle-xs"
-            aria-checked={value === option.value}
             data-selected={value === option.value}
-            role="radio"
             onClick={() => onChange(option.value)}
           >
             {option.label}

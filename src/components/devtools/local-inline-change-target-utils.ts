@@ -77,9 +77,11 @@ export type InlineChangeTokenControlInput = {
   currentToken: string | null;
   currentValueLabel: string;
   currentValuePx: number;
+  evidenceState: "applied_token_confirmed" | "value_matches_token" | "nearest_token" | "no_mapping";
   id: InlineChangeTokenControlId;
   kind: InlineChangeTokenControlKind;
   label: string;
+  matchingToken: string | null;
   nearestToken: string | null;
   nearestValuePx: number | null;
   options: InlineChangeTokenControlOption[];
@@ -213,12 +215,12 @@ const INLINE_CHANGE_SCOPE_ENTRIES: Array<[InlineChangeFixScope, string, string]>
   ],
   [
     "component",
-    "All cards like this",
-    "Find the reused component or pattern that renders similar elements and apply the change there when appropriate.",
+    "All similar instances",
+    "Find the reused source owner for matching instances and apply the requested change there when appropriate.",
   ],
   [
     "hito_ds",
-    "Design system",
+    "Design system level",
     "Inspect or update the Hito DS primitive, token, or variant; this may affect every usage of that system owner.",
   ],
 ];
@@ -231,7 +233,7 @@ export const INLINE_CHANGE_ACTIONS: InlineChangeAction[] = [
   ["comment", "Comment", "UI Note", "frontend"],
   ["remove_border", "Remove border", "Surface / Chrome", "frontend"],
   ["remove_card_chrome", "Card chrome", "Surface / Chrome", "frontend"],
-  ["remove_component", "Remove component", "Component / Structure", "frontend"],
+  ["remove_component", "Remove object", "Component / Structure", "frontend"],
   ["reduce_padding", "Reduce padding", "Spacing / Layout", "frontend"],
   ["reduce_gap", "Reduce gap", "Spacing / Layout", "frontend"],
   ["reduce_radius", "Reduce radius", "Surface / Chrome", "frontend"],
@@ -355,100 +357,6 @@ export function buildInlineChangePayload({
   };
 }
 
-export function buildInlineChangePrompt(payload: InlineChangeTargetPayload) {
-  const proposedText =
-    payload.action.type === "edit_text"
-      ? `- Proposed text: ${payload.target.proposedText ?? "Not provided"}`
-      : null;
-  const observedEvidence =
-    payload.target.evidence.length > 0
-      ? payload.target.evidence.map((line) => `- ${line}`)
-      : ["- No extra target evidence captured."];
-  const tokenControlEvidence =
-    payload.target.tokenControls.length > 0
-      ? payload.target.tokenControls.map(formatTokenControlPromptLine)
-      : [];
-  const chromeRemovalEvidence = payload.target.chromeRemoval
-    ? [formatChromeRemovalPromptLine(payload.target.chromeRemoval)]
-    : [];
-  const typographyEvidence = payload.target.typographyRoleSelection?.desiredRole
-    ? [formatTypographyPromptLine(payload.target.typographyRoleSelection)]
-    : [];
-  const promptActionEvidence = payload.target.promptAction
-    ? [formatPromptActionLine(payload.target.promptAction, payload.fixScope)]
-    : [];
-  const selectedChanges =
-    chromeRemovalEvidence.length > 0 ||
-    tokenControlEvidence.length > 0 ||
-    typographyEvidence.length > 0 ||
-    promptActionEvidence.length > 0
-      ? [
-          ...chromeRemovalEvidence,
-          ...tokenControlEvidence,
-          ...typographyEvidence,
-          ...promptActionEvidence,
-        ]
-      : ["- No explicit property change selected."];
-  const dsInspection =
-    payload.fixScope.id === "hito_ds"
-      ? "- Because scope is Design system, inspect /hitoDS, src/components/ui/*, src/components/hito-ds/*, and src/styles.css before changing product surfaces. This is the broadest scope and may affect every usage of the relevant primitive, token, or variant."
-      : null;
-
-  return [
-    "ROLE: PRODUCT",
-    "",
-    "Task:",
-    "Interpret and route local inspector UI request",
-    "",
-    "Stage:",
-    "PRODUCT routing / local inspector generated prompt",
-    "",
-    "Product routing instructions:",
-    "- Interpret the user comment and inspector evidence before assigning implementation.",
-    "- Explain the likely issue in plain language.",
-    "- Identify the correct next owner: FRONTEND, DESIGNER, QA, ARCHITECT, BACKEND, or PRODUCT.",
-    "- Preserve exact route, target, selector, component, scope, and token evidence in the routed prompt.",
-    "- Remove emotional, ambiguous, or unclear wording before writing the final next-role prompt.",
-    "- Ask clarification only if the request cannot be safely interpreted from the evidence below.",
-    "- Produce exactly one next-role prompt.",
-    "- Do not implement the UI change in this PRODUCT routing pass.",
-    "",
-    "Context:",
-    `- Route: ${payload.route.path}`,
-    `- Target: ${payload.target.label ?? "Selected UI element"}`,
-    `- Target type: ${formatTargetKind(payload.target.kind)}`,
-    `- Visible text: ${payload.target.visibleText ?? "Not captured"}`,
-    proposedText,
-    `- Component/pattern: ${payload.target.componentId ?? "Not captured"}`,
-    `- Scope of fix: ${payload.fixScope.label} — ${payload.fixScope.description}`,
-    `- Classification: ${payload.target.classificationReason ?? "Best-effort classification was uncertain."}`,
-    `- Element: ${payload.target.elementTag ?? "Not captured"}${
-      payload.target.elementRole ? ` role=${payload.target.elementRole}` : ""
-    }`,
-    `- Viewport: ${payload.viewport.width}x${payload.viewport.height}`,
-    `- Category: ${payload.action.category}`,
-    `- Requested action: ${payload.action.label}`,
-    `- Inspector-suggested owner: ${payload.target.suggestedOwner}`,
-    `- Comment: ${payload.comment || "No comment provided."}`,
-    "",
-    "Observed evidence:",
-    ...observedEvidence,
-    "",
-    "Selected DS audit changes:",
-    ...selectedChanges,
-    "",
-    "Constraints:",
-    "- Inspect source before changing UI.",
-    "- Reuse existing Hito DS primitives/classes.",
-    dsInspection,
-    "- Do not mutate product data or generated/readback truth from this local generated prompt.",
-    "- Do not add persistence or product-data mutation unless the assigned task explicitly owns that contract.",
-    "- Keep the fix scoped to the referenced UI target unless source proof shows a shared owner.",
-  ]
-    .filter((line): line is string => line !== null)
-    .join("\n");
-}
-
 function normalizeTargetValue(value: string | null | undefined) {
   const nextValue = value?.trim();
   return nextValue ? nextValue.slice(0, 500) : null;
@@ -468,7 +376,7 @@ function normalizePromptActionSelection(
 
   return {
     id: "remove_component",
-    label: "Remove component",
+    label: "Remove object",
   };
 }
 
@@ -566,44 +474,6 @@ function normalizeChromeRemovalSelection(
   };
 }
 
-function formatTokenControlPromptLine(control: InlineChangeTokenControlSelection) {
-  const currentToken = control.currentToken
-    ? control.currentToken
-    : control.nearestToken
-      ? `custom value; nearest ${control.nearestToken}`
-      : "custom value; no nearest token";
-  const desired = control.desiredToken
-    ? `${control.desiredToken} (${control.desiredValueLabel ?? "unknown"}px)`
-    : "not selected";
-
-  return `- ${control.label}: current ${control.currentValueLabel}px (${currentToken}); desired ${desired}.`;
-}
-
-function formatChromeRemovalPromptLine(selection: InlineChangeChromeRemovalSelection) {
-  if (selection.kind === "border") {
-    const border = selection.border
-      ? formatBorderEvidence(selection.border)
-      : "the observed border";
-    return `- Remove the border currently ${border} from this selected target. Padding, radius, margin, and content stay unchanged.`;
-  }
-
-  const parts = [
-    selection.border ? `border ${formatBorderEvidence(selection.border)}` : null,
-    selection.radiusControls.length > 0
-      ? `radius ${formatObservedControlSet(selection.radiusControls)}`
-      : null,
-    selection.paddingControls.length > 0
-      ? `padding ${formatObservedControlSet(selection.paddingControls)}`
-      : null,
-  ].filter(Boolean);
-
-  return `- Remove card chrome from this selected target: remove ${parts.join(", ")} where present. Do not delete content, remove margin, or add shadow controls in this slice.`;
-}
-
-function formatBorderEvidence(border: InlineChangeBorderEvidence) {
-  return border.summary || formatBorderSides(border.sides);
-}
-
 function formatBorderSides(sides: InlineChangeBorderSideEvidence[]) {
   const [first] = sides;
   const allSame =
@@ -625,17 +495,6 @@ function formatBorderSides(sides: InlineChangeBorderSideEvidence[]) {
         `${side.side} ${side.widthLabel}px ${side.style}${side.color ? ` ${side.color}` : ""}`,
     )
     .join("; ");
-}
-
-function formatObservedControlSet(controls: InlineChangeTokenControlInput[]) {
-  const values = controls.map(
-    (control) => `${formatControlPartLabel(control.label)} ${control.currentValueLabel}px`,
-  );
-  return values.join(", ");
-}
-
-function formatControlPartLabel(label: string) {
-  return label.replace(/\s+(padding|radius)$/i, "").toLowerCase();
 }
 
 function normalizeTypographyEvidence(
@@ -685,50 +544,4 @@ function normalizeTypographyRole(
     label: value.label,
     technicalDetails: value.technicalDetails,
   };
-}
-
-function formatTypographyPromptLine(selection: InlineChangeTypographySelection) {
-  const currentRole = selection.currentRole
-    ? formatTypographyRoleForPrompt(selection.currentRole)
-    : `Custom${selection.currentDetails ? ` (${selection.currentDetails})` : ""}`;
-  const desiredRole = selection.desiredRole
-    ? formatTypographyRoleForPrompt(selection.desiredRole)
-    : "not selected";
-
-  return `- Typography: current ${currentRole}; desired ${desiredRole}.`;
-}
-
-function formatTypographyRoleForPrompt(role: InlineChangeTypographyRoleOption) {
-  return `${role.label} (${[role.technicalDetails, role.className].filter(Boolean).join(" · ")})`;
-}
-
-function formatPromptActionLine(
-  selection: InlineChangePromptActionSelection,
-  scope: InlineChangeTargetPayload["fixScope"],
-) {
-  if (selection.id === "remove_component") {
-    return `- Remove component: prompt-only request to remove the selected UI component or element from the selected scope (${scope.label}). Do not delete user data, backend data, generated/readback truth, or unrelated content.`;
-  }
-
-  return `- ${selection.label}: prompt-only selected UI action.`;
-}
-
-function formatTargetKind(kind: InlineChangeTargetKind) {
-  switch (kind) {
-    case "text":
-      return "Text";
-    case "container":
-      return "Container / layout";
-    case "surface":
-      return "Card / surface";
-    case "control":
-      return "Interactive control";
-    case "hierarchy":
-      return "Visual hierarchy";
-    case "behavior":
-      return "Behavior / bug";
-    case "unknown":
-    default:
-      return "Unknown";
-  }
 }

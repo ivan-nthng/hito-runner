@@ -33,6 +33,7 @@ type QuickSetupPlanSetupSectionsProps = {
   includeRunningLevel?: boolean;
   includeTrainingSetup?: boolean;
   includeScheduleRhythm?: boolean;
+  heartRateProfile?: ReactNode;
   firstSectionNumber?: number;
   firstSectionHasDivider?: boolean;
 };
@@ -63,6 +64,7 @@ export function QuickSetupPlanSetupSections({
   includeRunningLevel = true,
   includeTrainingSetup = true,
   includeScheduleRhythm = true,
+  heartRateProfile,
   firstSectionNumber = 1,
   firstSectionHasDivider = false,
 }: QuickSetupPlanSetupSectionsProps) {
@@ -142,11 +144,16 @@ export function QuickSetupPlanSetupSections({
           body="Choose the closest current rhythm."
         >
           <div className="grid gap-3">
-            <OptionGrid label="Running level">
+            <OptionGrid
+              label="Running level"
+              items={PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS}
+              value={primaryFitnessLevel}
+            >
               {PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS.map((option) => (
                 <OptionButton
                   key={option.value}
                   active={primaryFitnessLevel === option.value}
+                  value={option.value}
                   label={option.label}
                   onClick={() => {
                     setState.setFitnessLevel(option.value);
@@ -156,6 +163,16 @@ export function QuickSetupPlanSetupSections({
             </OptionGrid>
             <p className="hito-field-helper">{RUNNING_LEVEL_HELPER[primaryFitnessLevel]}</p>
           </div>
+        </QuickSetupSection>
+      ) : null}
+
+      {heartRateProfile ? (
+        <QuickSetupSection
+          {...nextSectionMeta()}
+          title="Heart-rate guidance"
+          body="Review the BPM ranges Hito can use when a workout calls for heart-rate guidance."
+        >
+          {heartRateProfile}
         </QuickSetupSection>
       ) : null}
 

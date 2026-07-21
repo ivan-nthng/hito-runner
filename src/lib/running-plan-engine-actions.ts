@@ -5,6 +5,7 @@ import {
   createFirstPlanFromReviewedCanonicalPlanForUser,
   getActivePlan,
 } from "@/lib/active-plan-persistence";
+import { ActivePlanPersistenceRejection } from "@/lib/active-plan-lifecycle-persistence";
 import { getRequestAuthContext } from "@/lib/backend/auth";
 import { parseDurationSeconds, parsePaceSecondsPerKm } from "@/lib/first-plan-authoring-utils";
 import {
@@ -37,13 +38,12 @@ import {
   RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
   addRunningPlanReviewProof,
   buildRunningPlanPersistenceMetadata,
-  buildRunningPlanProfilePatch,
   validateRunningPlanReviewExactness,
   validateSelfContainedRunningPlanReviewExactness,
   type RunningPlanReviewedPreviewDraft,
 } from "@/lib/running-plan-engine-review";
 import { stableJsonEqual } from "@/lib/review-token-signing";
-import { getEffectivePersonalHeartRateProfileForUserId } from "@/lib/user-settings-actions";
+import { getRunnerPlanAuthoringProfileSnapshotForUserId } from "@/lib/user-settings-actions";
 import { WEEKDAY_NAMES } from "@/lib/weekday-rest-invariants";
 
 const weekdayNameSchema = z.enum(WEEKDAY_NAMES);
@@ -73,7 +73,18 @@ export const runningPlanPreviewInputSchema = z
     heightCm: z.number().finite().positive(),
     weightKg: z.number().finite().positive(),
     runnerLevel: z.enum(RUNNING_PLAN_RUNNER_LEVEL_VALUES),
-    daysPerWeek: z.number().int().min(1).max(7).optional().nullable(),
+    daysPerWeek: z
+      .union([
+        z.literal(1),
+        z.literal(2),
+        z.literal(3),
+        z.literal(4),
+        z.literal(5),
+        z.literal(6),
+        z.literal(7),
+      ])
+      .optional()
+      .nullable(),
     fixedRestDays: z.array(weekdayNameSchema).optional().nullable(),
     preferredLongRunDay: weekdayNameSchema.optional().nullable(),
     startDate: z.string().trim().optional().nullable(),
@@ -271,6 +282,30 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
     });
   }
 
+  let currentProfileSnapshot: Awaited<
+    ReturnType<typeof getRunnerPlanAuthoringProfileSnapshotForUserId>
+  >;
+  try {
+    currentProfileSnapshot = await getRunnerPlanAuthoringProfileSnapshotForUserId(userId);
+  } catch {
+    return buildConfirmFailure({
+      reason: "persistence_failed",
+      message: "The runner baseline could not be verified before confirmation.",
+      sourceKind: request.sourceKind,
+    });
+  }
+
+  if (
+    !currentProfileSnapshot ||
+    !sameJson(currentProfileSnapshot, exactness.draft.normalizedInputSummary.runnerProfileSnapshot)
+  ) {
+    return buildConfirmFailure({
+      reason: "stale_review",
+      message: "The runner baseline changed after review. Refresh the plan before confirming.",
+      sourceKind: request.sourceKind,
+    });
+  }
+
   let activePlan: Awaited<ReturnType<typeof getActivePlan>> | null = null;
   try {
     activePlan = await getActivePlan(userId);
@@ -296,12 +331,12 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
     const applyResult = await createFirstPlanFromReviewedCanonicalPlanForUser(
       userId,
       exactness.canonicalPlan,
-      buildRunningPlanProfilePatch(exactness.draft),
       buildRunningPlanPersistenceMetadata({
         draft: exactness.draft,
         canonicalPlan: exactness.canonicalPlan,
         reviewChecksum: exactness.reviewChecksum,
       }),
+      { expectedProfileRevision: currentProfileSnapshot.profileRevision },
     );
     await markAiPlanGenerationPersisted({
       trace: exactness.draft.aiGeneration.generationTrace,
@@ -330,6 +365,18 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
       },
     };
   } catch (error) {
+    if (error instanceof ActivePlanPersistenceRejection && error.reason === "stale_review") {
+      await markAiPlanGenerationPersistenceFailed({
+        trace: exactness.draft.aiGeneration.generationTrace,
+        reason: "stale_review",
+      });
+      return buildConfirmFailure({
+        reason: "stale_review",
+        message: error.message,
+        sourceKind: request.sourceKind,
+      });
+    }
+
     if (error instanceof Error && /active plan/i.test(error.message)) {
       await markAiPlanGenerationPersistenceFailed({
         trace: exactness.draft.aiGeneration.generationTrace,
@@ -414,14 +461,20 @@ export async function buildReviewedAiGeneratedRunningPlanPreviewForUser(
   data: RunningPlanPreviewActionInput,
   options: BuildAiGeneratedRunningPlanPreviewOptions = {},
 ): Promise<RunningPlanPreviewActionResult> {
-  const effectiveHeartRateProfile = await getEffectivePersonalHeartRateProfileForUserId(
-    userId,
-    data.age,
-  );
+  let runnerProfileSnapshot: Awaited<
+    ReturnType<typeof getRunnerPlanAuthoringProfileSnapshotForUserId>
+  > = null;
+  try {
+    runnerProfileSnapshot = userId
+      ? await getRunnerPlanAuthoringProfileSnapshotForUserId(userId)
+      : null;
+  } catch {
+    runnerProfileSnapshot = null;
+  }
 
   return buildReviewedAiGeneratedRunningPlanPreview(data, {
     ...options,
-    ...(effectiveHeartRateProfile ? { effectiveHeartRateProfile } : {}),
+    ...(runnerProfileSnapshot ? { runnerProfileSnapshot } : {}),
   });
 }
 

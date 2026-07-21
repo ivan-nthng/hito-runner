@@ -17,6 +17,7 @@ import {
   type NormalizedPlanGoalIntent,
 } from "../src/lib/plan-creation-engine/plan-goal-intent";
 import type { TrainingPlanV2 } from "../src/lib/imported-plan";
+import { buildProofRunnerProfileSnapshot } from "./runner-profile-snapshot-proof-helpers";
 
 const baseInput = {
   age: 36,
@@ -246,7 +247,8 @@ function assertAiAuthoredPaceProvenance(value: unknown) {
 }
 
 async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {
-  const authoring = buildAiGeneratedRunningPlanAuthoringInput(input);
+  const runnerProfileSnapshot = buildProofRunnerProfileSnapshot(input);
+  const authoring = buildAiGeneratedRunningPlanAuthoringInput(input, runnerProfileSnapshot);
   assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);
   if (!authoring.ok) {
     throw new Error(authoring.message);
@@ -262,6 +264,7 @@ async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {
 
   return buildReviewedAiGeneratedRunningPlanPreview(input, {
     aiPreview: aiPreview ?? undefined,
+    runnerProfileSnapshot,
   });
 }
 

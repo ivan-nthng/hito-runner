@@ -2,7 +2,7 @@
 
 ## Status
 
-in_progress
+completed
 
 ## Type
 
@@ -14,18 +14,33 @@ high
 
 ## Next Recommended Role
 
-backend
+product
 
 ## Task
 
-Repair manual workout template behavior around editable structure defaults, user targets, saved
-templates, and per-user built-in template visibility.
+Keep the accepted backend-owned manual-template catalog and full AI/manual editor parity closed.
 
 ## Stage
 
-BACKEND implementation / manual template contract correction.
+FRONTEND implementation and QA / completed.
 
 ## Exact Handoff Prompt
+
+```text
+ROLE: PRODUCT
+
+Task:
+Select the next product track without reopening accepted manual-template behavior.
+
+Stage:
+PRODUCT selection / manual authoring plan completed.
+
+The backend-owned catalog, personal-template reuse/delete, built-in hide/restore, full reviewed
+AI/manual editor parity, persisted readback, past/Rest denial, responsive browser proof, and cleanup
+are accepted. Treat independent future capabilities as new product work.
+```
+
+## Completed Backend Prompt
 
 ```text
 ROLE: BACKEND
@@ -97,24 +112,33 @@ Scope:
    - add safe additional blocks/sections;
    - remove optional blocks where still valid;
    - review before saving.
-4. Preserve user-entered target support:
+4. Treat every confirmed AI-authored workout on today or a future date as fully editable through
+   that same constructor, not as a passive AI readback. For every supported canonical AI workout
+   shape, the runner must be able to edit title, notes, block identity, duration or distance,
+   repeat count, ordered Repeat children, pace, BPM, effort/RPE, and cues; add, remove, duplicate,
+   and reorder ordinary blocks and Repeat children; then complete the same review/confirm flow as
+   manual authoring. Unchanged AI target truth remains AI provenance; a runner-changed target becomes
+   runner-entered truth. Original source/provenance and pre-edit workout history remain durable.
+   Past workouts and Rest remain non-editable, and structural validation remains shared with manual
+   authoring. Do not introduce an AI-specific reduced editor or source-based edit denial.
+5. Preserve user-entered target support:
    - exact/range pace;
    - HR bpm cap/range;
    - RPE 0-10;
    - target source must remain `user_entered`.
-5. Confirm or implement user-owned saved template behavior:
+6. Confirm or implement user-owned saved template behavior:
    - user can save a reviewed workout as a personal template with a custom name;
    - saved personal templates preserve reviewed structure and any user-entered targets;
    - user can delete their own saved templates.
-6. Add or repair per-user built-in template visibility behavior:
+7. Add or repair per-user built-in template visibility behavior:
    - user can hide built-in Hito templates from their picker;
    - built-in templates are not globally deleted from the registry;
    - if the user hides all built-ins, picker can show only personal templates;
    - provide a backend-owned restore/reset built-in templates path if needed.
-7. Do not create frontend-local template truth. Frontend may call backend actions and render
+8. Do not create frontend-local template truth. Frontend may call backend actions and render
    backend-shaped template lists, but backend owns registry, saved templates, validation, and
    visibility.
-8. Keep built-in template labels runner-facing and simple:
+9. Keep built-in template labels runner-facing and simple:
    - Rest;
    - Recovery;
    - Easy;
@@ -147,6 +171,11 @@ Validation:
   - fake/non-user-entered targets still fail.
 - Validate saved-template save/read/delete behavior if touched.
 - Validate built-in hide/restore behavior if implemented.
+- Prove AI/manual editor equivalence for the closed canonical AI identity set at source level and
+  with representative persisted browser flows: edit an AI workout's pace or BPM/effort, duration or
+  distance, Repeat count/child, added block, and removed optional block; review, confirm, reload,
+  and verify runner-entered changes plus original AI provenance/history. Also prove past and Rest
+  remain non-editable.
 - Run:
   - `node --import tsx ./scripts/manual-workout-authoring/template-defaults-proof.ts`
   - `node --import tsx ./scripts/manual-workout-authoring/constructor-contract-proof.ts`
@@ -198,17 +227,18 @@ Implemented and accepted product behavior:
 - JSON/Markdown export for persisted manual active plans is available through the calendar header
   overflow via the canonical active-plan export seam.
 
-## Active Gate
+## Accepted Closeout
 
-Manual Template Contract Correction is the active gate.
+The backend Manual Template Contract Correction and frontend catalog adoption are complete.
 
 Root cause:
 
-- Visible symptom: Choose template feels weak or confusing.
-- Underlying cause: backend/manual template truth has not fully separated built-in structural
-  templates, runner-entered targets, personal saved templates, and per-user built-in visibility.
-- Canonical owner: BACKEND manual workout authoring registry, validator, saved-template actions,
-  review contract, and template visibility state.
+- Backend now separates built-in structural templates, runner-entered targets, personal saved
+  templates, ownership/deletion, and per-user built-in visibility.
+- Persisted manual and AI-authored workouts reconstruct through the same full constructor without
+  losing ordered Repeat children, primary target mode, target provenance, notes, or cues.
+- The picker renders the backend-owned catalog and calls the existing personal delete and per-runner
+  built-in hide/restore actions; the static built-in list no longer owns picker behavior.
 
 Current decision:
 
@@ -218,6 +248,8 @@ Current decision:
 - Built-ins must not seed pace, HR, or RPE.
 - Personal saved templates should preserve reviewed structure and any user-entered targets.
 - Hiding a built-in from the picker is per-user visibility, not global registry deletion.
+- Runner-edited RPE is a valid single effort command in reviewed and saved readback; unchanged
+  AI-authored target values keep AI provenance.
 
 ## Accepted Chain Ledger
 
@@ -259,9 +291,9 @@ Confirmed-workout ownership is shared product truth, not a future manual-only la
 non-rest workout on today or a future date can enter the reviewed persisted content-edit flow
 regardless of manual/generated/imported/replacement origin, logs, completion, or evidence. Past
 workouts are not editable. Review/confirm, auth, stale protection, atomic persistence, original
-provenance, and durable pre-edit history remain mandatory. Current runtime still implements the
-older source-limited future-unlogged subset; that reconciliation is separate from the manual
-template gate in this plan.
+provenance, and durable pre-edit history remain mandatory. Current policy, capability projection,
+reconstruction, atomic persistence, and workout-detail UI implement that rule; the active manual
+template gate in this plan does not reopen it.
 
 ## Compression Note
 

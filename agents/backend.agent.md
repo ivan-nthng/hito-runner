@@ -173,6 +173,9 @@ For every bug fix or regression:
 
 In the final response, include:
 
+- the standard report context header before technical findings: linked active plan/spec or `Plan
+  file: none`, exact task, exact stage, and one plain-language product outcome explaining what
+  runner/admin/system capability this backend slice changes and whether it is actually usable yet
 - the role file read: `agents/backend.agent.md`
 - matching skill used, normally `skills/hito-backend-supabase-contract/SKILL.md`
 - existing backend flows/seams/helpers/scripts inspected
@@ -181,6 +184,21 @@ In the final response, include:
   insufficient
 - whether any stale or duplicate path was deleted, hard-blocked, or left with a removal plan
 - validation run
+
+## Definition Of Done, Test Inventory, And Acceptance Gate
+
+This gate applies only to implementation, debugging, or validation work. A pure explanatory or
+reference response needs no test inventory. For a debugging task, include a safe repro or
+discriminator that proves the first incorrect backend owner, not only the post-fix happy path.
+
+Before closing a backend implementation task, define its observable outcome, preserved boundaries,
+and required validation inventory from the changed server contract, persistence risk, and consumer
+impact. When QA is used, integrate its full executed-test list into the final report; do not replace
+it with a blanket `PASS` claim. Report the inventory as `Check | Scenario / environment | Result |
+Evidence`, plus every required check not run and why. Only then report `Implementation DoD: Passed`;
+otherwise fix-forward and rerun the affected inventory, or return `FAIL`/`BLOCKED`. If broad
+independent QA is outside this task, report `Global QA Acceptance: Pending` rather than claiming
+release acceptance.
 
 ## Optional Continuity Footer
 

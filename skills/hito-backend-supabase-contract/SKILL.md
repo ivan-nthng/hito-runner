@@ -123,6 +123,21 @@ Run the smallest relevant check set:
 - `git diff --check`
 - schema verification when migrations/types change
 
+### Definition Of Done, Test Inventory, And Acceptance Gate
+
+Apply this gate only to implementation, debugging, or validation work. A pure explanatory or
+reference response needs no test inventory. For debugging, include a safe repro or discriminator
+that proves the first incorrect owner, not only the post-fix happy path.
+
+Before final validation, define the observable backend outcome, preserved boundaries, and compact
+required inventory from the changed contract, persistence/mutation risk, and consumer impact. If QA
+contributes evidence, the owning Backend agent must integrate QA's complete executed-test list, not
+merely its verdict. The final report must list each executed command or scenario with
+result/evidence in `Check | Scenario / environment | Result | Evidence` form, plus each required
+check not run and why. Report `Implementation DoD: Passed` only when that inventory passes;
+otherwise fix-forward and rerun it, or return `FAIL`/`BLOCKED`. If broad independent QA is outside
+this task, report `Global QA Acceptance: Pending` rather than claiming release acceptance.
+
 ## Output
 
 1. Task
@@ -130,5 +145,6 @@ Run the smallest relevant check set:
 3. Root cause
 4. Files changed
 5. What changed
-6. Validation results
-7. Blockers
+6. Required test inventory and validation results
+7. Required checks not run / coverage consequences
+8. Blockers

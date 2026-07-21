@@ -222,8 +222,8 @@ local wrapper.
   future-only heuristics.
 - Direct move should update the same `planned_workouts` row and preserve provenance; do not hide move
   behind copy+delete semantics.
-- Keep `exportActivePlan` UI thin: consume returned `body`, `filename`, and `contentType`, then
-  trigger a download. Do not reshape export data in the browser.
+- Keep plan-export UI thin: call the canonical `/api/plan/export` route, then trigger a download.
+  Do not reshape export data in the browser.
 - Keep the Open plan export entry compact and calm; do not add multiple loud export actions.
 - Do not fake export availability when there is no active plan.
 - Treat `src/styles.css` Hito DS class families as canonical owners before inventing React wrappers.
@@ -267,6 +267,9 @@ acceptance without the required evidence.
 
 Use the standard Implementation Report in `AGENTS.md` for changed files. Include:
 
+- the standard report context header before technical findings: linked active plan/spec or `Plan
+  file: none`, exact task, exact stage, and one plain-language product outcome explaining what
+  runner/admin/system capability this frontend slice changes and whether it is actually usable yet
 - role file read: `agents/frontend.agent.md`
 - matching skills used, normally `skills/hito-frontend-design-system/SKILL.md` for UI work
 - active plan/spec used, or `none`
@@ -280,6 +283,21 @@ Use the standard Implementation Report in `AGENTS.md` for changed files. Include
 - subagents used/reused/closed, or why none were used
 - next recommended role
 - blockers
+
+## Definition Of Done, Test Inventory, And Acceptance Gate
+
+This gate applies only to implementation, debugging, or validation work. A pure explanatory or
+reference response needs no test inventory. For a debugging task, include a safe repro or
+discriminator that proves the first incorrect frontend owner, not only the post-fix happy path.
+
+Before closing a frontend implementation task, define its observable outcome, preserved boundaries,
+and required validation inventory from the changed interaction, responsive/layout risk, state
+transitions, persistence/readback impact, and accessibility surface. When QA is used, integrate its
+full executed-test list into the final report; do not replace it with a blanket `PASS` claim. List
+every executed command/scenario/viewport as `Check | Scenario / environment | Result | Evidence`,
+plus every required check not run and why. Only then report `Implementation DoD: Passed`; otherwise
+fix-forward and rerun the affected inventory, or return `FAIL`/`BLOCKED`. If broad independent QA is
+outside this task, report `Global QA Acceptance: Pending` rather than claiming release acceptance.
 
 ## Prior-Result Response Shape
 

@@ -1,7 +1,7 @@
 # Hito Technical Log
 
 Status: active internal ledger
-Last Updated: 2026-07-19
+Last Updated: 2026-07-21
 Owner: PRODUCT
 
 ## Purpose And Source Boundary
@@ -29,6 +29,133 @@ Entry format:
 
 Every accepted implementation, QA acceptance gate, source-cleanup batch, or durable process repair
 must either add an entry here or explicitly state why it is not technical-log material.
+
+## 2026-07-21
+
+- ARCHITECT + FRONTEND/BACKEND/QA read-only reviewers / pre-commit stack simplification — classified
+  the accumulated release bundle by live owner, removed all nine tracked `supabase/.temp/` CLI-state
+  files, retained only directly consumed runtime/migrations/proofs, and compressed the accepted
+  Inspector and onboarding-chip task records from 769 to 204 lines. Evidence:
+  `docs/plans/active/2026-06-30-hito-source-size-governance-and-cleanup-plan.md`. Boundary: no
+  Runner Core, provider, review/confirm, persistence, schema, hosted service, or browser behavior
+  changed; accepted owner evidence was preserved and the exact source boundary passed fresh
+  changed-source lint, build/integrity, and contract validators.
+- BACKEND + FRONTEND + RUNNING COACH + QA + ARCHITECT / runner baseline and heart-rate truth —
+  accepted one plan-independent age/height/weight/fitness baseline, explicit estimated/personal BPM
+  provenance, shared setup/Settings editing, profile-revision review invalidation, optional AI use of
+  accepted HR versus effort, numeric one-command workout snapshots, and confirmed-plan immutability
+  after later Settings changes. Desktop/exact-375px browser evidence, local persistence/RLS proofs,
+  build/validators, and disposable cleanup passed. Evidence:
+  `docs/plans/archive/2026-07-21-runner-baseline-and-heart-rate-zone-truth-remediation.md` and
+  `qa-artifacts/screenshots/2026-07-21/runner-baseline-heart-rate-gate-2/fix-forward-proof.json`.
+  Boundary: no paid-provider rerun, hosted migration, medical/fitness authority, automatic HR choice,
+  pace derivation, or existing-plan rewrite was accepted.
+- BACKEND + ARCHITECT + QA / Backend Business-Process Canonicalization And Performance Program —
+  accepted the current backend process map, reduced the manual history evidence guard from four
+  measured REST reads to one canonical result-asset read, removed unreachable export/request-user/
+  reviewed-copy wrappers, made required persisted-user resolution non-null or throwing, and closed
+  Admin Capture on one canonical selected-page-plus-complete-counts read contract. The route-level
+  server-function boundary changed from two reads to one; repository work remains one page read plus
+  five parallel exact counts. Evidence:
+  `docs/plans/archive/2026-07-21-hito-backend-business-process-and-performance-program.md` and
+  `qa-artifacts/screenshots/2026-07-21/admin-capture-read-contract/`. Boundary: no database-query
+  reduction, schema, Runner Core behavior, hosted service, or paid-provider claim; broader release
+  QA remains separate.
+- PRODUCT / validation inventory and closure policy — made the required test inventory explicit for
+  implementation owners and QA: every executed check, required skipped check, result, and evidence
+  must be reported in a compact table; any failed, blocked, flaky, unavailable, or unreported
+  required check prevents Definition-of-Done completion until fix-forward and revalidation. The
+  policy applies only to implementation, debugging, and validation; debugging inventory must also
+  distinguish the root cause from the visible symptom. It now distinguishes `Implementation DoD:
+  Passed` from later independent `Global QA Acceptance`, so an owner cannot mistake bounded proof for
+  release readiness. The shared rule lives in `AGENTS.md`, the coding role files, and
+  handoff/backend/frontend/QA skills. Boundary: no product behavior, test infrastructure, or runtime
+  validation command changed.
+- FRONTEND + QA / onboarding footer containment — corrected the shared tablet layout boundary so the
+  fixed Quick/Advanced setup action footer stays inside the AppShell main content area rather than
+  covering the visible sidebar profile. iPad-class 1280px, desktop, and exact 375px browser proof
+  passed with reachable content, no overlap, overflow, or browser errors. Evidence:
+  `qa-artifacts/screenshots/2026-07-21/onboarding-footer-containment/post-fix-proof.json`.
+  Boundary: no plan-creation, backend, persistence, or provider behavior changed.
+- FRONTEND + QA / editable onboarding baseline chips — accepted the shared Age/Height/Weight chip
+  correction: empty values are discoverable in both themes, valid pointer/Tab focus-away commits,
+  explicit clear restores required-basics gating, and invalid drafts remain visible instead of
+  disappearing. Quick and Advanced setup, Safari fallback, desktop, and exact 375px passed.
+  Evidence: `docs/tasks/backlog/2026-07-21-onboarding-editable-baseline-chip-commit-and-contrast.md`
+  and `qa-artifacts/screenshots/2026-07-21/onboarding-editable-baseline-chip-qa-final/`. Boundary: no
+  validation range, plan-creation rule, or pre-confirm profile persistence changed.
+- FRONTEND + QA + ARCHITECT / local Inspector DS evidence and batch drafts — accepted the bounded
+  loopback-only eight-item in-memory composer, one numbered Product prompt, truthful token and
+  component evidence, request-specific scope, prompt-only add-to-DS/object-removal actions, and
+  desktop/exact-375px surfaces. Evidence:
+  `docs/tasks/backlog/2026-07-21-local-inspector-ds-evidence-and-batch-drafts.md` and
+  `qa-artifacts/screenshots/2026-07-21/local-inspector-component-actions-closeout/closeout-proof.json`.
+  Boundary: no backend, Admin, Supabase, Work Items, product persistence, live UI mutation, or
+  production visibility was added.
+
+## 2026-07-20
+
+- DESIGNER + FRONTEND + QA / Hito service-wide visual-conformance closure — classified all eight
+  planned surface groups, removed route-local Skeleton tone overrides, introduced shared keyboard
+  and ARIA ownership for tabs and radio-style choices, migrated live consumers, corrected stale
+  interactive `/hitoDS` specimens, added stable shared-Skeleton reference coverage, and preserved
+  Admin Capture tab focus through client-side route search. Desktop and exact 375px dark/light
+  evidence, keyboard/focus behavior, build integrity,
+  overflow, and zero-console-error checks passed. Evidence:
+  `docs/plans/archive/2026-07-20-hito-service-wide-visual-conformance-program.md` and
+  `qa-artifacts/screenshots/2026-07-20/service-wide-visual-conformance-qa/`. Boundary: no Runner
+  Core lifecycle, auth, persistence, provider, review/confirm, editability, or continuous `Rest`
+  semantics changed; the separate plan-ended hero wording conflict remains outside DS ownership.
+- DESIGNER + FRONTEND + QA / Runner Shell current-location polish — accepted one shared AppShell
+  route-to-navigation rule so Calendar remains current for calendar and workout-detail routes,
+  Progress is current only in its route family, and the active link exposes `aria-current="page"`.
+  Desktop/mobile, dark/light, keyboard focus, and exact 375px browser proof passed. Evidence:
+  `qa-artifacts/screenshots/2026-07-20/runner-core-shell-current-location-qa/`. Boundary: no
+  navigation destination, Runner Core lifecycle, or persisted truth changed.
+- DESIGNER + FRONTEND + QA / Runner Core first post-freeze polish — accepted the shared
+  `WorkoutStructureTimeline` light-theme correction through existing semantic foreground tokens;
+  generated and manual readback retained one coherent active row and segment boundary on desktop and
+  exact 375px. The product decision also keeps post-plan active-schedule dates in existing `Rest`
+  grammar rather than adding an outside-plan state. Evidence:
+  `docs/plans/active/2026-07-20-runner-core-freeze-and-design-polish-plan.md`. Boundary: no Runner
+  Core lifecycle, calendar mutation, provider, or persistence contract changed.
+- ARCHITECT + BACKEND/DEVTOOLS + QA / formal Runner Core code freeze — accepted source, migration,
+  build/integrity, cleanup, responsive browser, paid-provider, and healthy real-provider runtime
+  evidence after retiring the final unconsumed direct personal-template list server wrapper and
+  retaining the catalog-owned per-user list function. Evidence:
+  `docs/plans/active/2026-07-20-runner-core-freeze-and-design-polish-plan.md`. Boundary: Runner Core
+  contracts are frozen for local self-use and controlled local testing; hosted auth, migration/RLS
+  parity, privacy/retention, provider operations, and deployment recovery remain separate release
+  work.
+- BACKEND + FRONTEND + QA / manual-template Runner Core acceptance — accepted the backend-owned
+  catalog of metric-free built-in structures, runner-owned personal template reuse/delete, per-user
+  built-in hide/restore, and the same full reviewed constructor for AI and manual workouts; desktop
+  and exact 375px readback passed with past/Rest denial, zero browser errors, and disposable cleanup
+  to zero. Evidence:
+  `qa-artifacts/screenshots/2026-07-20/manual-template-catalog-runner-core-freeze/proof.json`.
+  Boundary: the accepted behavior remains local Runner Core evidence; public release and hosted
+  tester readiness are separate gates.
+- BACKEND + RUNNING COACH + QA / primary watch-execution acceptance — accepted real-provider 10K,
+  Half Marathon, Marathon, and Custom 15K plans with one AI-authored execution mode per runnable
+  leaf through compiler, signed review, one confirm, persistence, export/re-import, and desktop/375px
+  readback; Repeat parents stayed targetless and disposable data returned to zero. Evidence:
+  `qa-artifacts/screenshots/2026-07-20/watch-execution-live-acceptance/proof.json` and
+  `docs/tasks/running-coach/2026-07-20-watch-execution-primary-target-doctrine.md`. Boundary: the
+  failed July 19 provider matrix is superseded evidence, not a current blocker; no fallback planner
+  or fixture authored the accepted plans.
+- BACKEND + FRONTEND + QA / runner profile and reviewed workout ownership acceptance — accepted
+  saved personal HR ranges with stable workout snapshots and the universal today/future non-rest
+  content-edit path, including logged and Garmin-evidence-backed rows with preserved history; past
+  and Rest rows remain unavailable. Evidence:
+  `qa-artifacts/screenshots/2026-07-19/personal-heart-rate-profile-settings/proof.json` and
+  `qa-artifacts/screenshots/2026-07-19/workout-detail-backend-capability-editing/proof.json`.
+  Boundary: lifecycle Move/Clear/Copy rules remain separate from content editing.
+- BACKEND/DEVTOOLS / private loopback provider observability — correlated local request,
+  generation, provider response, compiler, review, and persistence outcomes while keeping raw
+  provider request/response sidecars in an owner-only local cache and disabling the store outside
+  loopback runtime. Evidence: `src/lib/local-runtime-observability.ts`,
+  `scripts/validate-local-runtime-observability.ts`, and `docs/process/logging-conventions.md`.
+  Boundary: the sidecars are not a cache, fallback, Git artifact, or hosted product store.
 
 ## 2026-07-19
 

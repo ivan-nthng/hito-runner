@@ -82,11 +82,6 @@ export function validateRunnerFacingTargetReadbackContract(
     );
 
     for (const entry of [...executableEntries, ...readbackEntries]) {
-      assert.notEqual(
-        entry.key,
-        "rpe",
-        `${label}: ${workout.workoutDate} must not expose RPE as an executable target entry.`,
-      );
       if (!hasPaceTruth && !hasHrTruth) {
         assert.doesNotMatch(
           `${entry.label}: ${entry.value}`,
@@ -150,11 +145,23 @@ export function validateRunnerFacingTargetReadbackContract(
       );
     }
 
-    for (const entry of executableEntries) {
-      assert.notEqual(
-        entry.key,
-        "intensity",
-        `${label}: ${workout.workoutDate} effort intensity must not be treated as executable target truth.`,
+    if (primaryTarget?.primary_execution_mode === "effort") {
+      assert.deepEqual(
+        executableEntries.map((entry) => entry.key),
+        primaryTarget.rpe == null ? ["intensity"] : ["rpe"],
+        `${label}: ${workout.workoutDate} effort primary mode must expose exactly one authored effort command.`,
+      );
+    } else if (primaryTarget?.primary_execution_mode === "run_walk") {
+      assert.deepEqual(
+        executableEntries.map((entry) => entry.key),
+        ["intensity"],
+        `${label}: ${workout.workoutDate} run-walk primary mode must expose one command.`,
+      );
+    } else {
+      assert.equal(
+        executableEntries.some((entry) => entry.key === "intensity"),
+        false,
+        `${label}: ${workout.workoutDate} non-primary effort context must not compete with the watch command.`,
       );
     }
   }

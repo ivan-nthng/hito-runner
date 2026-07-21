@@ -5,6 +5,19 @@ export const LOCAL_RUNTIME_OBSERVABILITY_ROOT_ENV = "HITO_LOCAL_RUNTIME_OBSERVAB
 export const LOCAL_RUNTIME_URL_ENV = "HITO_LOCAL_RUNTIME_URL";
 export const LOCAL_RUNTIME_OBSERVABILITY_ENABLED_ENV = "HITO_LOCAL_RUNTIME_OBSERVABILITY";
 export const LOCAL_RUNTIME_ACTIVE_CALENDAR_DAYS = 3;
+export const LOCAL_PROVIDER_TRANSCRIPT_CATEGORY = "provider-transcripts";
+
+export type LocalProviderTranscriptOutcome =
+  | "completed"
+  | "incomplete"
+  | "failed"
+  | "cancelled"
+  | "provider_not_completed"
+  | "http_error"
+  | "malformed_response"
+  | "response_read_failed"
+  | "transport_error"
+  | "timeout";
 
 export type LocalRuntimeEventCategory = "request" | "action" | "plan_generation";
 export type LocalRuntimeEventStatus = "started" | "success" | "failure" | "blocked";
@@ -46,6 +59,7 @@ export interface LocalRuntimeEventInput {
   normalizationStatus?: string | null;
   diagnosticCodes?: readonly string[];
   canonicalRowCount?: number | null;
+  rawArtifactPath?: string | null;
 }
 
 export interface LocalRuntimeEvent {
@@ -69,6 +83,7 @@ export interface LocalRuntimeEvent {
   normalizationStatus: string | null;
   diagnosticCodes: readonly string[];
   canonicalRowCount: number | null;
+  rawArtifactPath: string | null;
 }
 
 export interface LocalRuntimeObservabilityOptions {
@@ -86,9 +101,25 @@ export interface LocalRuntimeEventQuery {
   until?: string | null;
   requestId?: string | null;
   generationId?: string | null;
+  providerResponseId?: string | null;
   route?: string | null;
   outcomeCode?: string | null;
   limit?: number;
+}
+
+export interface LocalProviderTranscriptInput {
+  requestId?: string | null;
+  generationId: string;
+  providerResponseId?: string | null;
+  model: string;
+  outcome: LocalProviderTranscriptOutcome;
+  providerStatus?: string | null;
+  httpStatus?: number | null;
+  responseContentType?: string | null;
+  requestStartedAt: string;
+  responseReceivedAt?: string | null;
+  requestBody: string;
+  responseBody?: string | null;
 }
 
 export function createLocalRuntimeRequestContext(input: {
@@ -232,8 +263,8 @@ export async function writeLocalRuntimeEvent(
     return { event, written: false, relativePath: null };
   }
 
-  const { appendFile, mkdir } = await importNodeFsPromises();
-  const { join } = await importNodePath();
+  const { appendFile, chmod, mkdir } = await importNodeFsPromises();
+  const { dirname, join } = await importNodePath();
   await prepareLocalRuntimeRoot({
     root: resolved.root,
     now: resolved.now,
@@ -243,10 +274,12 @@ export async function writeLocalRuntimeEvent(
   const relativePath = join("active", dateKey, "events.jsonl");
   const absolutePath = join(resolved.root, relativePath);
   await mkdir(join(resolved.root, "active", dateKey), { recursive: true, mode: 0o700 });
+  await chmod(dirname(absolutePath), 0o700);
   await appendFile(absolutePath, `${JSON.stringify(event)}\n`, {
     encoding: "utf8",
     mode: 0o600,
   });
+  await chmod(absolutePath, 0o600);
 
   return { event, written: true, relativePath };
 }
@@ -275,7 +308,7 @@ export async function writeLocalRuntimeArtifact(input: {
     return { written: false, relativePath: null, archiveAfter: null };
   }
 
-  const { mkdir, rename, writeFile } = await importNodeFsPromises();
+  const { chmod, mkdir, rename, writeFile } = await importNodeFsPromises();
   const { dirname, resolve } = await importNodePath();
   await prepareLocalRuntimeRoot({
     root: resolved.root,
@@ -298,14 +331,179 @@ export async function writeLocalRuntimeArtifact(input: {
 
   const temporaryPath = `${absolutePath}.${createCorrelationId()}.tmp`;
   await mkdir(dirname(absolutePath), { recursive: true, mode: 0o700 });
+  await Promise.all([
+    chmod(dirname(absolutePath), 0o700),
+    chmod(dirname(dirname(absolutePath)), 0o700),
+  ]);
   await writeFile(temporaryPath, input.payload, { encoding: "utf8", mode: 0o600 });
   await rename(temporaryPath, absolutePath);
+  await chmod(absolutePath, 0o600);
 
   return {
     written: true,
     relativePath,
     archiveAfter: archiveAfterTimestamp(new Date(input.timestamp)),
   };
+}
+
+export async function recordLocalProviderTranscript(
+  input: LocalProviderTranscriptInput,
+  options?: LocalRuntimeObservabilityOptions,
+): Promise<{ written: boolean; rawArtifactPath: string | null }> {
+  const requestContext = getCurrentLocalRuntimeRequestContext();
+  const processLike = getProcessLike();
+  const runtimeUrl =
+    options?.runtimeUrl?.trim() ||
+    requestContext?.runtimeUrl ||
+    processLike?.env?.[LOCAL_RUNTIME_URL_ENV]?.trim();
+  if (options?.disabled || !isLoopbackRuntimeUrl(runtimeUrl)) {
+    return { written: false, rawArtifactPath: null };
+  }
+
+  const root = resolveLocalRuntimeRoot(options?.root);
+  if (!(await isPrivateLocalArtifactRoot(root))) {
+    return { written: false, rawArtifactPath: null };
+  }
+
+  const generationId = sanitizeCode(input.generationId, 120);
+  const requestStartedAt = safeTimestamp(input.requestStartedAt);
+  const filename = `${requestStartedAt.replace(/[:.]/g, "-")}-${generationId}.json`;
+  const localOptions: LocalRuntimeObservabilityOptions = {
+    ...options,
+    forceWrite: true,
+    root,
+    runtimeUrl,
+  };
+  let transcriptRelativePath: string | null = null;
+
+  try {
+    const transcriptWrite = await writeLocalRuntimeArtifact({
+      category: LOCAL_PROVIDER_TRANSCRIPT_CATEGORY,
+      filename,
+      timestamp: requestStartedAt,
+      payload: `${JSON.stringify(
+        {
+          artifactKind: "hito_local_provider_transcript_v1",
+          requestId: sanitizeNullableCode(input.requestId ?? requestContext?.requestId, 120),
+          generationId,
+          providerResponseId: sanitizeNullableCode(input.providerResponseId, 160),
+          providerKind: "openai_responses_api",
+          model: sanitizeCode(input.model, 120),
+          outcome: input.outcome,
+          providerStatus: sanitizeNullableCode(input.providerStatus, 80),
+          httpStatus: boundedInteger(input.httpStatus, 100, 599),
+          requestStartedAt,
+          responseReceivedAt:
+            input.responseReceivedAt == null ? null : safeTimestamp(input.responseReceivedAt),
+          recordedAt: new Date().toISOString(),
+          request: {
+            method: "POST",
+            url: "https://api.openai.com/v1/responses",
+            contentType: "application/json",
+            body: input.requestBody,
+          },
+          response: {
+            contentType: sanitizeNullableCode(input.responseContentType, 120),
+            body: input.responseBody ?? null,
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      options: localOptions,
+    });
+    if (!transcriptWrite.written) {
+      return { written: false, rawArtifactPath: null };
+    }
+    transcriptRelativePath = transcriptWrite.relativePath;
+
+    const rawArtifactPath = toArtifactLocator(transcriptWrite.relativePath);
+    const eventWrite = await writeLocalRuntimeEvent(
+      {
+        category: "plan_generation",
+        event: "provider_transcript_recorded",
+        status: input.outcome === "completed" ? "success" : "failure",
+        phase: "provider",
+        outcomeCode: `provider_transcript_${input.outcome}`,
+        timestamp: requestStartedAt,
+        requestId: input.requestId ?? requestContext?.requestId,
+        generationId,
+        providerKind: "openai_responses_api",
+        providerResponseId: input.providerResponseId,
+        httpStatus: input.httpStatus,
+        rawArtifactPath,
+      },
+      localOptions,
+    );
+    if (!eventWrite.written) {
+      throw new Error("provider_transcript_metadata_write_failed");
+    }
+    return {
+      written: true,
+      rawArtifactPath,
+    };
+  } catch {
+    if (transcriptRelativePath) {
+      await removeLocalRuntimeArtifact(root, transcriptRelativePath).catch(() => undefined);
+    }
+    await writeLocalRuntimeEvent(
+      {
+        category: "plan_generation",
+        event: "provider_transcript_write_failed",
+        status: "failure",
+        phase: "provider",
+        outcomeCode: "provider_transcript_write_failed",
+        timestamp: requestStartedAt,
+        requestId: input.requestId ?? requestContext?.requestId,
+        generationId,
+        providerKind: "openai_responses_api",
+        providerResponseId: input.providerResponseId,
+      },
+      localOptions,
+    ).catch(() => undefined);
+    return { written: false, rawArtifactPath: null };
+  }
+}
+
+export async function readLocalRuntimeArtifact(input: {
+  rawArtifactPath: string;
+  root?: string | null;
+}): Promise<{ absolutePath: string; contents: string }> {
+  if (!isSafeArtifactLocator(input.rawArtifactPath)) {
+    throw new Error("local_runtime_artifact_path_invalid");
+  }
+
+  const root = resolveLocalRuntimeRoot(input.root);
+  const { readFile, readdir } = await importNodeFsPromises();
+  const { join, resolve } = await importNodePath();
+  const [dateKey, ...artifactSegments] = input.rawArtifactPath.split("/");
+  const archiveDates = (await readDirectories(join(root, "archive"), readdir)).filter(
+    (entry) => entry === dateKey || entry.startsWith(`${dateKey}-`),
+  );
+  const candidates = [
+    join(root, "active", dateKey!, ...artifactSegments),
+    ...archiveDates.map((entry) => join(root, "archive", entry, ...artifactSegments)),
+  ];
+  const normalizedRoot = withTrailingSeparator(resolve(root));
+
+  for (const candidate of candidates) {
+    const absolutePath = resolve(candidate);
+    if (!withTrailingSeparator(absolutePath).startsWith(normalizedRoot)) {
+      continue;
+    }
+    try {
+      return {
+        absolutePath,
+        contents: await readFile(absolutePath, "utf8"),
+      };
+    } catch (error) {
+      if (!isNodeErrorCode(error, "ENOENT")) {
+        throw error;
+      }
+    }
+  }
+
+  throw new Error("local_runtime_artifact_not_found");
 }
 
 export async function queryLocalRuntimeEvents(
@@ -357,7 +555,8 @@ export function resolveLocalRuntimeRoot(configuredRoot?: string | null) {
     return configured;
   }
 
-  return `${processLike?.cwd?.() ?? "."}/logs/local-runtime-observability`;
+  const home = processLike?.env?.HOME?.trim() || "/tmp";
+  return `${home}/Library/Caches/hito-running/local-runtime-observability`;
 }
 
 export function resolveLocalRuntimeArchiveAfter(timestamp: string | Date) {
@@ -379,12 +578,18 @@ export function resolveLocalRuntimeArtifactRelativePath(input: {
 }
 
 async function prepareLocalRuntimeRoot(input: { root: string; now: Date }) {
-  const { mkdir, readdir, rename } = await importNodeFsPromises();
+  const { chmod, mkdir, readdir, rename } = await importNodeFsPromises();
   const { join } = await importNodePath();
   const activeRoot = join(input.root, "active");
   const archiveRoot = join(input.root, "archive");
+  await mkdir(input.root, { recursive: true, mode: 0o700 });
   await mkdir(activeRoot, { recursive: true, mode: 0o700 });
   await mkdir(archiveRoot, { recursive: true, mode: 0o700 });
+  await Promise.all([
+    chmod(input.root, 0o700),
+    chmod(activeRoot, 0o700),
+    chmod(archiveRoot, 0o700),
+  ]);
 
   const retainedDates = activeCalendarDateKeys(input.now);
   const activeDates = await readDirectories(activeRoot, readdir);
@@ -427,10 +632,6 @@ function resolveLocalRuntimeWrite(
     return null;
   }
 
-  if (options?.forceWrite !== true && !isLoopbackRuntimeUrl(env[LOCAL_RUNTIME_URL_ENV]?.trim())) {
-    return null;
-  }
-
   return {
     root: resolveLocalRuntimeRoot(options?.root),
     now: options?.now ?? new Date(),
@@ -469,6 +670,7 @@ function sanitizeLocalRuntimeEvent(input: LocalRuntimeEventInput): LocalRuntimeE
       .slice(0, 16)
       .map((value) => sanitizeCode(value, 120)),
     canonicalRowCount: boundedInteger(input.canonicalRowCount, 0, 100_000),
+    rawArtifactPath: isSafeArtifactLocator(input.rawArtifactPath) ? input.rawArtifactPath! : null,
   };
 }
 
@@ -553,9 +755,15 @@ function sanitizeRoute(value: string) {
 function parseLocalRuntimeEvent(line: string): LocalRuntimeEvent | null {
   try {
     const parsed = JSON.parse(line) as Partial<LocalRuntimeEvent>;
-    return parsed.artifactKind === "hito_local_runtime_event_v1"
-      ? (parsed as LocalRuntimeEvent)
-      : null;
+    if (parsed.artifactKind !== "hito_local_runtime_event_v1") {
+      return null;
+    }
+    return {
+      ...(parsed as LocalRuntimeEvent),
+      rawArtifactPath: isSafeArtifactLocator(parsed.rawArtifactPath)
+        ? parsed.rawArtifactPath!
+        : null,
+    };
   } catch {
     return null;
   }
@@ -566,6 +774,9 @@ function localRuntimeEventMatches(event: LocalRuntimeEvent, query: LocalRuntimeE
   if (query.until && event.timestamp > query.until) return false;
   if (query.requestId && event.requestId !== query.requestId) return false;
   if (query.generationId && event.generationId !== query.generationId) return false;
+  if (query.providerResponseId && event.providerResponseId !== query.providerResponseId) {
+    return false;
+  }
   if (query.route && event.route !== sanitizeRoute(query.route)) return false;
   if (query.outcomeCode && event.outcomeCode !== sanitizeCode(query.outcomeCode, 120)) return false;
   return true;
@@ -663,6 +874,45 @@ function isSafeRelativeArtifactPath(value: string | null | undefined) {
   return Boolean(
     value && !value.startsWith("/") && !value.includes("..") && value.startsWith("active/"),
   );
+}
+
+function toArtifactLocator(relativePath: string) {
+  return relativePath.replace(/^(?:active|archive)\//, "");
+}
+
+function isSafeArtifactLocator(value: string | null | undefined) {
+  return Boolean(
+    value &&
+    !value.startsWith("/") &&
+    !value.includes("..") &&
+    /^\d{4}-\d{2}-\d{2}\/[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(value),
+  );
+}
+
+async function isPrivateLocalArtifactRoot(root: string) {
+  const { resolve } = await importNodePath();
+  const normalizedRoot = withTrailingSeparator(resolve(root)).replaceAll("\\", "/");
+  const workspaceRoot = withTrailingSeparator(resolve(getProcessLike()?.cwd?.() ?? ".")).replaceAll(
+    "\\",
+    "/",
+  );
+  return (
+    !normalizedRoot.startsWith(workspaceRoot) &&
+    !normalizedRoot.includes("/Library/Mobile Documents/")
+  );
+}
+
+async function removeLocalRuntimeArtifact(root: string, relativePath: string) {
+  if (!isSafeRelativeArtifactPath(relativePath)) {
+    return;
+  }
+  const { rm } = await importNodeFsPromises();
+  const { resolve } = await importNodePath();
+  const absoluteRoot = withTrailingSeparator(resolve(root));
+  const absolutePath = resolve(root, relativePath);
+  if (withTrailingSeparator(absolutePath).startsWith(absoluteRoot)) {
+    await rm(absolutePath, { force: true });
+  }
 }
 
 function withTrailingSeparator(value: string) {

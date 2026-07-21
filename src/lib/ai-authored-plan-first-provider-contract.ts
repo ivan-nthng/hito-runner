@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { buildEffectivePersonalHeartRateProfile } from "@/lib/heart-rate-zones";
 import { TRAINING_PLAN_V2_SEGMENT_TYPE_VALUES } from "@/lib/imported-plan";
 import { PLANNED_WORKOUT_REPEAT_CHILD_ROLE_VALUES } from "@/lib/planned-workout-block-contract";
 import {
@@ -50,6 +49,13 @@ export const AI_AUTHORED_PLAN_FIRST_HR_ZONE_REFERENCE_VALUES = [
   "Z4-Z5",
 ] as const;
 
+export const AI_AUTHORED_PLAN_FIRST_PRIMARY_EXECUTION_MODE_VALUES = [
+  "pace",
+  "heart_rate",
+  "effort",
+  "run_walk",
+] as const;
+
 export const AI_AUTHORED_PLAN_FIRST_UNIT_SECTION_TYPE_VALUES =
   TRAINING_PLAN_V2_SEGMENT_TYPE_VALUES.filter(
     (type) =>
@@ -68,18 +74,37 @@ export type AiAuthoredPlanFirstSelectedFitnessLevel =
 const providerTextSchema = (maxLength: number) =>
   z.string().min(1).max(maxLength).regex(new RegExp(AI_AUTHORED_PLAN_FIRST_TEXT_PATTERN));
 const providerNullableTextSchema = (maxLength: number) => providerTextSchema(maxLength).nullable();
-const providerTargetSchema = z
-  .object({
-    pace: z
-      .string()
-      .regex(new RegExp(AI_AUTHORED_PLAN_FIRST_PACE_MIN_PER_KM_PATTERN))
-      .max(24)
-      .nullable(),
-    hr_zone: z.enum(AI_AUTHORED_PLAN_FIRST_HR_ZONE_REFERENCE_VALUES).nullable(),
-    effort: providerNullableTextSchema(160),
-  })
-  .strict()
-  .nullable();
+const providerPaceSchema = z
+  .string()
+  .regex(new RegExp(AI_AUTHORED_PLAN_FIRST_PACE_MIN_PER_KM_PATTERN))
+  .max(24);
+const providerHrZoneSchema = z.enum(AI_AUTHORED_PLAN_FIRST_HR_ZONE_REFERENCE_VALUES);
+const providerTargetSchema = z.discriminatedUnion("primary_execution_mode", [
+  z
+    .object({
+      primary_execution_mode: z.literal("pace"),
+      command: providerPaceSchema,
+    })
+    .strict(),
+  z
+    .object({
+      primary_execution_mode: z.literal("heart_rate"),
+      command: providerHrZoneSchema,
+    })
+    .strict(),
+  z
+    .object({
+      primary_execution_mode: z.literal("effort"),
+      command: providerTextSchema(160),
+    })
+    .strict(),
+  z
+    .object({
+      primary_execution_mode: z.literal("run_walk"),
+      command: providerTextSchema(160),
+    })
+    .strict(),
+]);
 const providerTimePrescriptionSchema = z
   .object({
     mode: z.literal("time"),
@@ -215,36 +240,55 @@ export function buildAiAuthoredPlanFirstOpenAiSchema(authoringInput: StructuredP
     ({
       anyOf: [text(maxLength), { type: "null" }],
     }) as const;
-  const target = {
+  const targetBase = {
     type: "object",
     additionalProperties: false,
-    required: ["pace", "hr_zone", "effort"],
+    required: ["primary_execution_mode", "command"],
+  } as const;
+  const paceTarget = {
+    ...targetBase,
     properties: {
-      pace: {
-        anyOf: [
-          {
-            type: "string",
-            minLength: 7,
-            maxLength: 24,
-            pattern: AI_AUTHORED_PLAN_FIRST_PACE_MIN_PER_KM_PATTERN,
-          },
-          { type: "null" },
-        ],
+      primary_execution_mode: { type: "string", const: "pace" },
+      command: {
+        type: "string",
+        minLength: 7,
+        maxLength: 24,
+        pattern: AI_AUTHORED_PLAN_FIRST_PACE_MIN_PER_KM_PATTERN,
       },
-      hr_zone: {
-        anyOf: [
-          {
-            type: "string",
-            enum: [...AI_AUTHORED_PLAN_FIRST_HR_ZONE_REFERENCE_VALUES],
-          },
-          { type: "null" },
-        ],
-      },
-      effort: nullableText(160),
     },
   } as const;
-  const nullableTarget = {
-    anyOf: [target, { type: "null" }],
+  const heartRateTarget = {
+    ...targetBase,
+    properties: {
+      primary_execution_mode: { type: "string", const: "heart_rate" },
+      command: {
+        type: "string",
+        enum: [...AI_AUTHORED_PLAN_FIRST_HR_ZONE_REFERENCE_VALUES],
+      },
+    },
+  } as const;
+  const effortTarget = {
+    ...targetBase,
+    properties: {
+      primary_execution_mode: { type: "string", const: "effort" },
+      command: text(160),
+    },
+  } as const;
+  const runWalkTarget = {
+    ...targetBase,
+    properties: {
+      primary_execution_mode: { type: "string", const: "run_walk" },
+      command: text(160),
+    },
+  } as const;
+  const targetVariants = [
+    ...(authoringInput.runnerFacts.benchmark ? [paceTarget] : []),
+    heartRateTarget,
+    effortTarget,
+    runWalkTarget,
+  ];
+  const target = {
+    anyOf: targetVariants,
   } as const;
   const prescription = {
     anyOf: [
@@ -277,7 +321,7 @@ export function buildAiAuthoredPlanFirstOpenAiSchema(authoringInput: StructuredP
       label: text(80),
       cue: nullableText(160),
       prescription,
-      target: nullableTarget,
+      target,
     },
   } as const;
   const unitStep = {
@@ -290,7 +334,7 @@ export function buildAiAuthoredPlanFirstOpenAiSchema(authoringInput: StructuredP
       label: text(120),
       cue: nullableText(160),
       prescription,
-      target: nullableTarget,
+      target,
     },
   } as const;
   const repeatStep = {
@@ -389,10 +433,13 @@ export function buildAiAuthoredPlanFirstPrompt({
     `Repeat parents are structural-only. rounds is the number of times the complete ordered children[] round executes; it is never a distance, duration, or total quantity. Put every child of one round in execution order; parent targets and prescriptions do not exist. Allowed child roles: ${PLANNED_WORKOUT_REPEAT_CHILD_ROLE_VALUES.join(", ")}. Recovery is optional and must never be invented.`,
     "Use kind=repeat only when that same complete ordered children[] sequence executes more than once. If children already enumerate a one-off ladder or progression, author those steps as kind=unit sections instead of repeating the whole ladder.",
     "A one-off section is always kind=unit. For 2x4km followed by one final 2km, author one repeat with rounds=2 and a 4km child, then one 2km unit; never encode the final 2km as rounds=10.",
-    "When pace guidance is authored, use exactly M:SS/km or M:SS-M:SS/km. Put supplemental qualitative guidance in effort or cue.",
-    "When target_finish_time is supplied and you author selected-distance race-pace guidance, include the exact target-finish pace inside the authored pace value or range.",
-    "When HR guidance is authored, use one supplied heart_rate_profile reference such as Z2 or Z1-Z2. Hito resolves it to the supplied BPM range.",
-    "Prefer Z1-Z5 references only in target.hr_zone. If a concise title, label, cue, or effort also names one supplied zone reference, Hito deterministically resolves that reference to the supplied BPM range without changing the authored training instruction.",
+    "Every unit section and every ordered Repeat child is a runnable leaf and must author exactly one target.primary_execution_mode: pace, heart_rate, effort, or run_walk. Repeat parents remain structural and never own a target or primary mode.",
+    "Each target has exactly one command. Leaf cue is separate non-command context. For primary_execution_mode=pace, command is exactly one M:SS/km or M:SS-M:SS/km pace command. Pace mode is available only when runner.benchmark supplies validated pace truth; target_finish_time alone is not pace truth.",
+    "For primary_execution_mode=heart_rate, command is one supplied accepted heart_rate_profile reference such as Z2 or Z1-Z2. Hito resolves the authored reference to the exact reviewed BPM snapshot before review. Estimated source remains explicitly estimated, not measured or personal truth.",
+    "For primary_execution_mode=effort, command is one concrete effort, RPE, or talk-test execution cue.",
+    "For primary_execution_mode=run_walk, command is the easy conversational Run/Walk execution cue; the prescription and Repeat structure own the timed run/walk units.",
+    "Choose the primary mode as the coach from workout purpose and supplied truth: ordinary easy/long aerobic control may use accepted heart_rate or effort; tempo/threshold and intervals may use benchmark-backed pace or effort; warm-up, cooldown, recovery, strides, and hills normally use effort; opening adaptation Run/Walk uses run_walk or effort with no pace/HR. Heart-rate availability never forces its use. Never put pace and heart rate on the same leaf.",
+    "Use Z1-Z5 references only as target.command for heart_rate-primary leaves. Never put raw zone references in title, label, or cue.",
     "Use title, label, and cue only for concise runner execution content.",
     "Do not include medical, injury, diagnostic, disclaimer, hydration, or professional-advice narrative in any text field.",
     "runner.selected_fitness_level is explicit runner input. Do not infer it from other facts.",
@@ -428,9 +475,7 @@ export function buildAiAuthoredPlanFirstProviderContext(
   const restWeekdays = WEEKDAY_NAMES.filter((day) =>
     authoringInput.availability.fixedRestDays.includes(day),
   );
-  const heartRateProfile =
-    authoringInput.runnerFacts.heartRateProfile ??
-    buildEffectivePersonalHeartRateProfile({ age: authoringInput.runnerFacts.age });
+  const heartRateProfile = authoringInput.runnerFacts.heartRateProfile;
   const adaptationContext = buildAiAuthoredFirstSessionAdaptationContext(authoringInput);
 
   return {
@@ -454,22 +499,22 @@ export function buildAiAuthoredPlanFirstProviderContext(
       selected_fitness_level: adaptationContext.selectedFitnessLevel,
       first_session_adaptation: adaptationContext.adaptation,
       benchmark: authoringInput.runnerFacts.benchmark,
-      heart_rate_profile: heartRateProfile
-        ? {
-            source: heartRateProfile.source,
-            zones: heartRateProfile.zones.map((zone) => ({
-              reference: zone.reference,
-              min_bpm: zone.minBpm,
-              max_bpm: zone.maxBpm,
-            })),
-          }
-        : null,
+      heart_rate_profile: {
+        source: heartRateProfile.source,
+        accepted: heartRateProfile.accepted,
+        primary_command_eligible: true,
+        zones: heartRateProfile.zones.map((zone) => ({
+          reference: zone.reference,
+          min_bpm: zone.minBpm,
+          max_bpm: zone.maxBpm,
+        })),
+      },
     },
   };
 }
 
 function buildAllowedWorkoutDatePattern(authoringInput: StructuredPlanAuthoringInput) {
-  const restDays = new Set(authoringInput.availability.fixedRestDays);
+  const restDays = new Set<string>(authoringInput.availability.fixedRestDays);
   const dates: string[] = [];
 
   for (let offset = 0; offset < 364; offset += 1) {

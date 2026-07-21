@@ -30,7 +30,7 @@ import {
 import {
   assertSelectedDistanceEndpointProof,
   tamperReviewToken,
-  validateAiAuthoredPaceAndEffectiveHrGuidance,
+  validateAiAuthoredPrimaryExecutionGuidance,
   validateCanonicalRowsAreNumeric,
 } from "./running-plan-engine-confirm/assertions";
 import {
@@ -46,6 +46,7 @@ import {
   validatePersistenceContract,
 } from "./running-plan-engine-confirm/persistence-proof";
 import { validateRunnerFacingTargetReadbackContract } from "./running-plan-engine-target-readback-contract";
+import { buildProofRunnerProfileSnapshot } from "./runner-profile-snapshot-proof-helpers";
 
 const baseInput = {
   age: 36,
@@ -198,7 +199,7 @@ async function validateAiGeneratedDistanceGoalScenario(scenario: (typeof scenari
   assert.equal(importedSeed.workouts.length, canonicalPlan.planned_workouts.length);
   assert.doesNotMatch(JSON.stringify(canonicalPlan), /repeat_unit|recovery_unit/);
   assert.doesNotThrow(() => buildReviewedFirstPlanImportedSeed(canonicalPlan));
-  validateAiAuthoredPaceAndEffectiveHrGuidance(canonicalPlan.planned_workouts);
+  validateAiAuthoredPrimaryExecutionGuidance(canonicalPlan.planned_workouts);
   validateCanonicalRowsAreNumeric(canonicalPlan.planned_workouts, { expectedMode: "mixed" });
   validateRunnerFacingTargetReadbackContract(canonicalPlan, scenario.name);
 
@@ -213,7 +214,8 @@ async function validateAiGeneratedDistanceGoalScenario(scenario: (typeof scenari
 }
 
 async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {
-  const authoring = buildAiGeneratedRunningPlanAuthoringInput(input);
+  const runnerProfileSnapshot = buildProofRunnerProfileSnapshot(input);
+  const authoring = buildAiGeneratedRunningPlanAuthoringInput(input, runnerProfileSnapshot);
   assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);
   if (!authoring.ok) {
     throw new Error(authoring.message);
@@ -229,6 +231,7 @@ async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {
 
   const result = await buildReviewedAiGeneratedRunningPlanPreview(input, {
     aiPreview: fixturePreviewOptions ?? undefined,
+    runnerProfileSnapshot,
   });
   assert.equal(result.ok, true, result.ok ? "" : result.unavailable.error.message);
   if (!result.ok) {

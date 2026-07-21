@@ -92,7 +92,7 @@ export function WorkoutStructureTimeline({
                       flexBasis: 0,
                       background: colors.color,
                       boxShadow: isActive
-                        ? `${colors.glow}, inset 0 0 0 1px color-mix(in oklch, ${colors.border} 72%, white 16%)`
+                        ? `${colors.glow}, inset 0 0 0 1px color-mix(in oklch, ${colors.border} 72%, var(--color-foreground) 16%)`
                         : undefined,
                       opacity: hasActive && !isActive ? 0.34 : 1,
                     }}
@@ -132,7 +132,7 @@ export function WorkoutStructureTimeline({
                   key={item.id}
                   className={cn(
                     "hito-list-row justify-start gap-4 transition-colors",
-                    isActive && "bg-white/[0.085]",
+                    isActive && "bg-foreground/[0.085]",
                   )}
                 >
                   <span className="hito-caption w-6 text-right font-mono-num">

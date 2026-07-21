@@ -18,11 +18,11 @@ architect
 
 ## Task
 
-Hold source-size cleanup after accepted `Delete active plan` retirement.
+Hold source-size cleanup after the pre-commit simplification and release-bundle checkpoint.
 
 ## Stage
 
-ARCHITECT holding / evidence-gated cleanup pause.
+ARCHITECT holding / clean source-control boundary established.
 
 ## Exact Handoff Prompt
 
@@ -75,6 +75,28 @@ Stop conditions:
   or what data/history Hito preserves.
 ```
 
+## Pre-Commit Release Bundle Checkpoint - 2026-07-21
+
+- Classified the accumulated dirty tree by canonical owner instead of treating it as one new
+  feature diff. Accepted runtime, migrations, validators, role/process policy, current docs, and
+  one referenced backlog screenshot are intentional maintained source.
+- Removed the complete tracked `supabase/.temp/` CLI-state family and added its root to
+  `.gitignore`; these files had no repository consumer and were generated machine state, not a
+  migration or runtime contract.
+- Preserved the already-proved deletions of obsolete export, personal-template list, manual
+  copy/paste review, persisted-user lookup, old HR profile, and Inspector action-control paths.
+  Independent frontend/backend reachability audits found no additional zero-consumer runtime seam
+  that met the deletion bar.
+- Required new onboarding/HR/DS modules, manual-template and runner-profile proof helpers, two
+  append-only migrations, archived closeout plans, and the active auth-email/backlog artifacts are
+  directly imported or linked from current source truth and belong in the release bundle.
+- Browser, persistence, migration-reset, provider, DS, Inspector, and Admin evidence remain the
+  accepted owner proofs for their unchanged slices. The final bundle gate is one fresh integrated
+  lint/build/integrity/validator pass plus staged source-control hygiene; no paid-provider or hosted
+  mutation is part of this checkpoint.
+- After the clean bundle, cleanup returns to evidence-gated hold. File size or general cleanup
+  momentum alone is not a reason to reopen frozen Runner Core contracts.
+
 ## Hold Decision - 2026-07-18
 
 - Accepted removal of the unreachable `deleteActivePlan` server function, its delete-only helper,
@@ -89,6 +111,20 @@ Stop conditions:
   retention/destructive semantics, coaching rules, schema/migration policy, or paid/provider use.
 - This hold does not block product work. It prevents cleanup momentum from reopening accepted
   contracts without a concrete root cause.
+
+## Runner Core Release-Hygiene Checkpoint - 2026-07-20
+
+- The final bounded pre-freeze cleanup is accepted: the unconsumed direct
+  `listManualWorkoutSavedTemplates` server wrapper and public re-export are removed, while the live
+  `listManualWorkoutSavedTemplatesForUser` owner remains required by the canonical catalog.
+- No fallback planner, duplicate persistence owner, or executable legacy repeat/import path remains
+  in current Runner Core source.
+- Retained local plan fixtures are loopback-only validation infrastructure; removed import formats
+  are rejected rather than normalized; the compact legacy workout-family projection remains a live
+  storage/import bridge and is not a parallel coaching or plan-authoring truth.
+- Runner Core is formally code-frozen and source-size cleanup stays on hold. Any future removal of
+  the storage/import bridge belongs to a separate schema/data-contract audit, not post-freeze
+  cosmetic cleanup.
 
 ## Accepted Frontend Batch - 2026-07-18
 

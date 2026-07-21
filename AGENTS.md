@@ -168,6 +168,72 @@ The orchestration handoff must describe the full bounded outcome and tell the ow
 for adjacent verification. It must not decompose routine implementation -> QA -> fix loops into a
 sequence of prompts that the user must copy between agents.
 
+## 2.4) Definition Of Done, Test Inventory, And Acceptance Gate (Mandatory)
+
+Every implementation owner, including `BACKEND`, `FRONTEND`, `FULLSTACK`, `LAYOUT`, and a
+`DESIGNER` task that directs implementation or QA, owns the complete validation story. A QA
+subagent supplies independent evidence; it does not take closure responsibility away from the owner.
+
+This policy applies to implementation, debugging, and validation work that claims a behavior or
+contract changed. A pure explanatory, reference, or routing response needs no test inventory and
+must not perform testing theatre. Documentation-only work uses only the source checks needed to
+prove the documentation is accurate; it does not inherit product-runtime acceptance by default.
+
+Every execution handoff and implementation task must state a compact, testable **Definition of Done**:
+
+- the observable behavior or contract that must become true;
+- the preserved boundaries that must remain true;
+- the risk-based owner verification required to prove those conditions; and
+- the exact condition that keeps the task open.
+
+Before final validation, the owner must derive a compact **required test inventory** from that
+Definition of Done and any regression class discovered during implementation. Do not create a
+separate Markdown artifact for a small task: the final report may carry the inventory. Include only
+checks that can prove the changed contract; do not run unrelated known-red global commands as
+performative evidence.
+
+For debugging, the inventory must include evidence that distinguishes the traced root cause from
+the visible symptom whenever that evidence can be gathered safely. A post-fix happy-path test alone
+does not prove a root-cause fix if the old failing path or an equivalent discriminator remains
+unexamined.
+
+The final integrated report must include one compact table with `Check`, `Scenario / environment`,
+`Result`, and `Evidence`, then list:
+
+- every executed test or validation check, with its scenario or command, relevant environment or
+  viewport when applicable, result, and evidence location when one exists;
+- every required check that was not run, with the concrete reason and its coverage consequence; and
+- any intentionally out-of-scope check, with the source-backed reason it is not required for this
+  slice.
+
+Implementation Definition of Done rules:
+
+- An owner may report `Implementation DoD: Passed` only when every required test in the inventory has
+  passed and every executed test has passed.
+- A failed, blocked, flaky, or unavailable required check keeps the task open. The owner must
+  fix-forward and rerun the affected inventory, or return `FAIL`/`BLOCKED` with exact evidence.
+- A QA subagent report that says only `PASS`, summarizes categories, or omits an executed-test list
+  is incomplete evidence and cannot close the task.
+- Source proof may cover a branch that cannot be exercised safely, but it must be listed as such; it
+  never silently substitutes for an omitted required runtime, persistence, or browser test.
+- A non-gating pre-existing failure must not be presented as a passing check. Keep it out of the
+  required inventory only when it is demonstrably outside the changed contract, and report that
+  boundary plainly.
+
+Global QA acceptance is a distinct later layer when the plan or release gate requires broader
+cross-flow/regression testing:
+
+- A passing owner-level or QA-subagent inventory proves only `Implementation DoD: Passed`; it is not
+  permission to claim release readiness or broad product acceptance.
+- The independent QA owner defines and executes its broader acceptance inventory, then reports
+  `Global QA Acceptance: Passed`, `Failed`, or `Pending` with the same test-list discipline.
+- A feature/release is fully accepted only when its required global QA acceptance has passed. Until
+  then, reports must say `Global QA Acceptance: Pending` rather than use an unqualified `PASS`.
+
+The owner must integrate the task-level QA inventory into one final result after any fix-forward. The
+user must never have to reconcile partial test lists or decide whether an unreported failure is
+acceptable.
+
 Human-context rule for prior-agent reports:
 
 - Before writing a next-role prompt, translate the prior agent's report into understandable product
@@ -722,18 +788,26 @@ role:
 Use this shape for BACKEND, FRONTEND, FULLSTACK, LAYOUT, COPY, DESIGNER implementation/spec work,
 and any execution slice that changed files:
 
-1. Task
-2. Stage
-3. Root cause
-4. Files inspected
-5. Files changed
-6. What changed
-7. What was preserved
-8. Validation results
-9. Next recommended role
-10. Blockers
+1. Plan file - linked active plan/spec/task, or `Plan file: none`
+2. Task - exact task name
+3. Stage - exact current execution stage
+4. Product outcome - one plain-language sentence naming the user-visible capability, incident, or
+   system contract this slice advances and whether it is now real, still blocked, or awaiting another
+   gate
+5. Root cause
+6. Files inspected
+7. Files changed
+8. What changed
+9. What was preserved
+10. Validation results
+11. Next recommended role
+12. Blockers
 
 For very small copy/design/docs-only work, agents may omit `What was preserved` if it adds no value.
+
+The first four entries are mandatory context, not report decoration. Do not make Product or the user
+infer the feature from filenames, an acronym, a previous message, or a bare `PASS`. Keep the product
+outcome to one or two concrete sentences; do not repeat the entire plan history.
 
 ### QA Report
 

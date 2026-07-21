@@ -353,40 +353,16 @@ export async function fetchManualWorkoutEvidenceWorkoutIds(userId: string, worko
   }
 
   const supabase = createAdminSupabaseClient();
-  const [assetsResult, actualMetricsResult, comparisonsResult, insightsResult] = await Promise.all([
-    supabase
-      .from("workout_result_assets")
-      .select("planned_workout_id")
-      .eq("user_id", userId)
-      .in("planned_workout_id", workoutIds),
-    supabase
-      .from("workout_actual_metrics")
-      .select("planned_workout_id")
-      .eq("user_id", userId)
-      .in("planned_workout_id", workoutIds),
-    supabase
-      .from("workout_comparisons")
-      .select("planned_workout_id")
-      .eq("user_id", userId)
-      .in("planned_workout_id", workoutIds),
-    supabase
-      .from("workout_ai_insights")
-      .select("planned_workout_id")
-      .eq("user_id", userId)
-      .in("planned_workout_id", workoutIds),
-  ]);
+  const assetsResult = await supabase
+    .from("workout_result_assets")
+    .select("planned_workout_id")
+    .eq("user_id", userId)
+    .in("planned_workout_id", workoutIds);
 
   if (assetsResult.error) throw new Error(assetsResult.error.message);
-  if (actualMetricsResult.error) throw new Error(actualMetricsResult.error.message);
-  if (comparisonsResult.error) throw new Error(comparisonsResult.error.message);
-  if (insightsResult.error) throw new Error(insightsResult.error.message);
 
-  return new Set([
-    ...(assetsResult.data ?? []).map((row) => row.planned_workout_id),
-    ...(actualMetricsResult.data ?? []).map((row) => row.planned_workout_id),
-    ...(comparisonsResult.data ?? []).map((row) => row.planned_workout_id),
-    ...(insightsResult.data ?? []).map((row) => row.planned_workout_id),
-  ]);
+  // Metrics, comparisons, and insights all cascade from this canonical evidence root.
+  return new Set((assetsResult.data ?? []).map((row) => row.planned_workout_id));
 }
 
 function buildManualWorkoutSeedForActivePlanAdd({

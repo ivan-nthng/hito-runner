@@ -16,13 +16,25 @@ import {
   type ManualWorkoutBlockInput,
   type ManualWorkoutConstructorEntryInput,
   type ManualWorkoutDraftInput,
+  type ManualWorkoutDraftProcessingOptions,
   type ManualWorkoutRepeatSafetyKind,
   type ManualWorkoutTargetTruthMode,
   type ManualWorkoutTemplateKey,
 } from "@/lib/manual-workout-authoring/schema";
 import { isManualWorkoutRepeatRecoveryBlock } from "@/lib/manual-workout-authoring/repeat-groups";
 import { getManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
-import { todayIso, type Step, type StepTarget } from "@/lib/training";
+import {
+  canonicalFamilyToLegacyWorkoutType,
+  normalizeCalendarIconKey,
+  normalizeWorkoutFamily,
+  normalizeWorkoutIdentity,
+} from "@/lib/rich-workout-model";
+import {
+  todayIso,
+  type Step,
+  type StepRepeatChildPrescription,
+  type StepTarget,
+} from "@/lib/training";
 import {
   AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
   readWorkoutDocumentSections,
@@ -59,6 +71,7 @@ export type ManualWorkoutCopyPasteReconstructionResult =
       activePlanId: string;
       sourceWorkout: PersistedPlannedWorkoutRow;
       draftInput: ManualWorkoutDraftInput;
+      processingOptions: ManualWorkoutDraftProcessingOptions;
     }
   | {
       ok: false;
@@ -162,6 +175,7 @@ export async function reconstructManualWorkoutCopyDraftForUser(
     activePlanId: activePlan.id,
     sourceWorkout: source.workout,
     draftInput: draft.draftInput,
+    processingOptions: draft.processingOptions,
   };
 }
 
@@ -218,7 +232,11 @@ export function buildManualWorkoutDraftInputFromPersistedWorkout(
     activePlanSourceKind: string | null;
   },
 ):
-  | { ok: true; draftInput: ManualWorkoutDraftInput }
+  | {
+      ok: true;
+      draftInput: ManualWorkoutDraftInput;
+      processingOptions: ManualWorkoutDraftProcessingOptions;
+    }
   | { ok: false; reason: ManualWorkoutCopyPasteFailureReason; message: string } {
   if (workout.workout_type === "rest") {
     return {
@@ -229,8 +247,9 @@ export function buildManualWorkoutDraftInputFromPersistedWorkout(
   }
 
   const templateKey = resolveSourceTemplateKey(workout);
+  const processingOptions = buildPersistedWorkoutDraftProcessingOptions(workout);
 
-  if (!templateKey) {
+  if (!templateKey || !processingOptions) {
     return {
       ok: false,
       reason: "source_workout_not_supported",
@@ -267,7 +286,7 @@ export function buildManualWorkoutDraftInputFromPersistedWorkout(
     },
   };
 
-  return { ok: true, draftInput };
+  return { ok: true, draftInput, processingOptions };
 }
 
 function resolveSourceTemplateKey(
@@ -284,7 +303,56 @@ function resolveSourceTemplateKey(
     }
   }
 
-  return null;
+  const family = normalizeWorkoutFamily(workout.workout_family);
+  if (!family) {
+    return null;
+  }
+
+  switch (family) {
+    case "recovery":
+      return "recovery_jog";
+    case "easy":
+      return "easy_aerobic_run";
+    case "steady":
+      return "steady_aerobic_run";
+    case "long":
+      return "long_aerobic_run";
+    case "tempo":
+      return "controlled_tempo_session";
+    case "intervals":
+      return "time_intervals";
+    case "progression":
+    case "race":
+      return "progression_run";
+    case "hills":
+      return "uphill_repeats";
+    case "trail":
+      return "technical_trail_easy";
+    case "rest":
+      return null;
+  }
+}
+
+function buildPersistedWorkoutDraftProcessingOptions(
+  workout: PersistedPlannedWorkoutRow,
+): ManualWorkoutDraftProcessingOptions | null {
+  const workoutIdentity = normalizeWorkoutIdentity(workout.workout_identity);
+  const workoutFamily = normalizeWorkoutFamily(workout.workout_family);
+  const calendarIconKey = normalizeCalendarIconKey(workout.calendar_icon_key);
+
+  if (!workoutIdentity || !workoutFamily || !calendarIconKey || workoutFamily === "rest") {
+    return null;
+  }
+
+  return {
+    preservedWorkoutModel: {
+      workoutType: canonicalFamilyToLegacyWorkoutType(workoutFamily, workoutIdentity),
+      sourceWorkoutType: workout.source_workout_type ?? workoutIdentity,
+      workoutFamily,
+      workoutIdentity,
+      calendarIconKey,
+    },
+  };
 }
 
 function persistedStepsToManualEntries(
@@ -366,16 +434,33 @@ function repeatChildStepsForPersistedStep(step: Step): Step[] {
   return workoutDocumentRepeatChildren(step);
 }
 
-function repeatChildReconstructionRole(step: Step): "work" | "recovery" {
+function repeatChildReconstructionRole(step: Step): StepRepeatChildPrescription["role"] {
+  switch (step.segment_type) {
+    case "warm_up":
+    case "run":
+    case "walk":
+    case "work":
+    case "recover":
+    case "finish":
+    case "cooldown":
+      return step.segment_type;
+  }
+
   const signal = `${step.segment_type ?? ""} ${step.type ?? ""} ${step.label ?? ""}`.toLowerCase();
 
-  return signal.includes("recover") || signal.includes("walk") ? "recovery" : "work";
+  if (signal.includes("warm")) return "warm_up";
+  if (signal.includes("cool")) return "cooldown";
+  if (signal.includes("recover")) return "recover";
+  if (signal.includes("walk")) return "walk";
+  if (signal.includes("finish")) return "finish";
+  if (signal.includes("run")) return "run";
+  return "work";
 }
 
 function persistedStepToBlock(
   step: Step,
   templateKey: ManualWorkoutTemplateKey,
-  role: "block" | "work" | "recovery",
+  role: "block" | StepRepeatChildPrescription["role"],
 ): ManualWorkoutBlockInput | null {
   const blockKey = blockKeyForStep(step, templateKey, role);
 
@@ -419,13 +504,18 @@ function blockUnitForStep(step: Step) {
 function blockKeyForStep(
   step: Step,
   templateKey: ManualWorkoutTemplateKey,
-  role: "block" | "work" | "recovery",
+  role: "block" | StepRepeatChildPrescription["role"],
 ): ManualWorkoutBlockInput["blockKey"] | null {
-  if (role === "recovery") {
+  if (role === "warm_up") return "warmup_block";
+  if (role === "cooldown") return "cooldown_block";
+  if (role === "finish") return "long_run_finish_block";
+  if (role === "walk") return "rest_walk_jog_recovery_block";
+  if (role === "recover") {
     return templateKey === "uphill_repeats" || templateKey === "run_walk_adaptation"
       ? "rest_walk_jog_recovery_block"
       : "interval_recovery_block";
   }
+  if (role === "run") return "easy_run_block";
 
   const signal = `${step.segment_type ?? ""} ${step.type ?? ""}`.toLowerCase();
 
@@ -485,6 +575,18 @@ function repeatSafetyKindForStep(
   step: Step,
   templateKey: ManualWorkoutTemplateKey,
 ): ManualWorkoutRepeatSafetyKind {
+  const signal = `${step.type ?? ""} ${step.segment_type ?? ""}`.toLowerCase();
+  const childRoles = new Set(
+    workoutDocumentRepeatChildren(step).map((child) => child.segment_type),
+  );
+
+  if (childRoles.has("run") && childRoles.has("walk")) return "run_walk";
+  if (signal.includes("tempo") || signal.includes("threshold")) return "tempo_repeats";
+  if (signal.includes("hill") || signal.includes("climb") || signal.includes("downhill")) {
+    return "hill_repeats";
+  }
+  if (signal.includes("stride")) return "strides";
+
   switch (templateKey) {
     case "controlled_tempo_session":
     case "half_marathon_threshold_durability":
@@ -523,10 +625,25 @@ function sanitizeStepTarget(target: StepTarget | undefined): ManualWorkoutBlockI
     typeof target.extra?.hr_zone === "string"
       ? normalizeManualDraftText(target.extra.hr_zone, MANUAL_DRAFT_TARGET_TEXT_MAX_LENGTH)
       : null;
+  const hrZoneReference =
+    typeof target.extra?.hr_zone_reference === "string"
+      ? normalizeManualDraftText(
+          target.extra.hr_zone_reference,
+          MANUAL_DRAFT_TARGET_TEXT_MAX_LENGTH,
+        )
+      : null;
+  const hrProfileSource =
+    target.extra?.hr_profile_source === "personal" ||
+    target.extra?.hr_profile_source === "estimated"
+      ? target.extra.hr_profile_source
+      : null;
   const targetSource = isAiAuthoredTarget
     ? AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE
     : "user_entered";
   const sanitized: ManualWorkoutBlockInput["target"] = {
+    ...(target.primary_execution_mode
+      ? { primaryExecutionMode: target.primary_execution_mode }
+      : {}),
     ...(isEditableTarget ? { targetSource } : {}),
     ...optionalStringField(
       "intensity",
@@ -562,9 +679,12 @@ function sanitizeStepTarget(target: StepTarget | undefined): ManualWorkoutBlockI
         }
       : {}),
     ...(isAiAuthoredTarget && hrZone ? { hrZone } : {}),
+    ...(isAiAuthoredTarget && hrZoneReference ? { hrZoneReference } : {}),
+    ...(isAiAuthoredTarget && hrProfileSource ? { hrProfileSource } : {}),
     ...(isAiAuthoredTarget &&
     (target.hr_target_source === "personal_hr_zone" ||
-      target.hr_target_source === "default_estimated_hr")
+      target.hr_target_source === "default_estimated_hr" ||
+      target.hr_target_source === "effort_only")
       ? { hrTargetSource: target.hr_target_source }
       : {}),
     ...(isAiAuthoredTarget && hrBpmRange ? { hrBpmRange } : {}),

@@ -1,10 +1,10 @@
 import { z } from "zod";
 
-export const PERSONAL_HEART_RATE_PROFILE_VERSION = "personal_hr_profile_v1" as const;
+export const RUNNER_HEART_RATE_PROFILE_VERSION = "runner_hr_profile_v2" as const;
 export const HEART_RATE_ZONE_REFERENCE_VALUES = ["Z1", "Z2", "Z3", "Z4", "Z5"] as const;
 
 export type HeartRateZoneReference = (typeof HEART_RATE_ZONE_REFERENCE_VALUES)[number];
-export type HeartRateZoneSource = "personal" | "default_estimated" | "unavailable";
+export type HeartRateZoneSource = "personal" | "estimated" | "unavailable";
 
 const heartRateZoneValueObjectSchema = z
   .object({
@@ -25,17 +25,29 @@ const completeHeartRateZonesSchema = z
   .array(heartRateZoneValueSchema)
   .length(HEART_RATE_ZONE_REFERENCE_VALUES.length)
   .superRefine((zones, context) => {
-    const references = new Set(zones.map((zone) => zone.reference));
-
-    for (const reference of HEART_RATE_ZONE_REFERENCE_VALUES) {
-      if (!references.has(reference)) {
+    for (const [index, reference] of HEART_RATE_ZONE_REFERENCE_VALUES.entries()) {
+      if (zones[index]?.reference !== reference) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
-          message: `Heart-rate profile is missing ${reference}.`,
+          path: [index, "reference"],
+          message: `Heart-rate profile must keep ${reference} in canonical order.`,
         });
       }
     }
   });
+const personalHeartRateZonesSchema = completeHeartRateZonesSchema.superRefine((zones, context) => {
+  for (let index = 1; index < zones.length; index += 1) {
+    const previous = zones[index - 1];
+    const current = zones[index];
+    if (previous && current && current.minBpm <= previous.maxBpm) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [index, "minBpm"],
+        message: "Personal heart-rate zones must not overlap.",
+      });
+    }
+  }
+});
 
 export const personalHeartRateProfileInputSchema = z
   .object({
@@ -43,16 +55,26 @@ export const personalHeartRateProfileInputSchema = z
   })
   .strict();
 
-export const storedPersonalHeartRateProfileSchema = z
-  .object({
-    version: z.literal(PERSONAL_HEART_RATE_PROFILE_VERSION),
-    zones: completeHeartRateZonesSchema,
-  })
-  .strict();
+export const storedRunnerHeartRateProfileSchema = z.discriminatedUnion("source", [
+  z
+    .object({
+      version: z.literal(RUNNER_HEART_RATE_PROFILE_VERSION),
+      source: z.literal("estimated"),
+    })
+    .strict(),
+  z
+    .object({
+      version: z.literal(RUNNER_HEART_RATE_PROFILE_VERSION),
+      source: z.literal("personal"),
+      zones: personalHeartRateZonesSchema,
+    })
+    .strict(),
+]);
 
-export const effectivePersonalHeartRateProfileSchema = z
+export const effectiveRunnerHeartRateProfileSchema = z
   .object({
-    source: z.enum(["personal", "default_estimated"]),
+    source: z.enum(["personal", "estimated"]),
+    accepted: z.boolean(),
     sourceNote: z.string().trim().min(1).max(200),
     zones: z
       .array(
@@ -68,12 +90,16 @@ export const effectivePersonalHeartRateProfileSchema = z
       .length(HEART_RATE_ZONE_REFERENCE_VALUES.length),
   })
   .strict();
+export const acceptedRunnerHeartRateProfileSchema = effectiveRunnerHeartRateProfileSchema.extend({
+  accepted: z.literal(true),
+});
 
 export type PersonalHeartRateProfileInput = z.output<typeof personalHeartRateProfileInputSchema>;
-export type StoredPersonalHeartRateProfile = z.output<typeof storedPersonalHeartRateProfileSchema>;
-export type EffectivePersonalHeartRateProfile = z.output<
-  typeof effectivePersonalHeartRateProfileSchema
+export type StoredRunnerHeartRateProfile = z.output<typeof storedRunnerHeartRateProfileSchema>;
+export type EffectiveRunnerHeartRateProfile = z.output<
+  typeof effectiveRunnerHeartRateProfileSchema
 >;
+export type AcceptedRunnerHeartRateProfile = z.output<typeof acceptedRunnerHeartRateProfileSchema>;
 
 export interface HeartRateZoneReadback {
   reference: HeartRateZoneReference;
@@ -86,6 +112,7 @@ export interface HeartRateZoneReadback {
 
 export interface HeartRateZonesSummary {
   source: HeartRateZoneSource;
+  accepted: boolean;
   title: string;
   description: string;
   sourceNote: string | null;
@@ -148,7 +175,7 @@ export function buildHeartRateZonesSummary(
   age: number | null | undefined,
   storedProfile?: unknown,
 ): HeartRateZonesSummary {
-  const effectiveProfile = buildEffectivePersonalHeartRateProfile({
+  const effectiveProfile = buildEffectiveRunnerHeartRateProfile({
     age,
     storedProfile,
   });
@@ -156,6 +183,7 @@ export function buildHeartRateZonesSummary(
   if (!effectiveProfile) {
     return {
       source: "unavailable",
+      accepted: false,
       title: "Heart rate zones",
       description: "Add age to your profile to show broad default estimated starting ranges.",
       sourceNote: null,
@@ -166,6 +194,7 @@ export function buildHeartRateZonesSummary(
 
   return {
     source: effectiveProfile.source,
+    accepted: isAcceptedStoredHeartRateProfile(storedProfile),
     title:
       effectiveProfile.source === "personal"
         ? "Personal heart-rate zones"
@@ -175,8 +204,7 @@ export function buildHeartRateZonesSummary(
         ? "Saved personal ranges used as your current heart-rate guidance."
         : "Estimated from your profile data. These are editable starting ranges, not measured heart-rate zones.",
     sourceNote: effectiveProfile.sourceNote,
-    estimatedMaxHr:
-      effectiveProfile.source === "default_estimated" ? deriveEstimatedMaxHr(age) : null,
+    estimatedMaxHr: effectiveProfile.source === "estimated" ? deriveEstimatedMaxHr(age) : null,
     zones: effectiveProfile.zones.map((zone) => ({
       ...zone,
       rangeBpm: formatBpmRange(zone.minBpm, zone.maxBpm),
@@ -185,24 +213,29 @@ export function buildHeartRateZonesSummary(
   };
 }
 
-export function buildEffectivePersonalHeartRateProfile({
+export function buildEffectiveRunnerHeartRateProfile({
   age,
   storedProfile,
 }: {
   age: number | null | undefined;
   storedProfile?: unknown;
-}): EffectivePersonalHeartRateProfile | null {
-  const personalProfile = parseStoredPersonalHeartRateProfile(storedProfile);
+}): EffectiveRunnerHeartRateProfile | null {
+  const stored = parseStoredRunnerHeartRateProfile(storedProfile);
 
-  if (personalProfile) {
+  if (stored?.source === "personal") {
     return {
       source: "personal",
+      accepted: true,
       sourceNote: PERSONAL_HR_SOURCE_NOTE,
-      zones: orderZones(personalProfile.zones).map((zone) => ({
+      zones: stored.zones.map((zone) => ({
         ...zone,
         label: zoneDefinition(zone.reference).label,
       })),
     };
+  }
+
+  if (storedProfile != null && !stored) {
+    return null;
   }
 
   const estimatedMaxHr = deriveEstimatedMaxHr(age);
@@ -211,7 +244,8 @@ export function buildEffectivePersonalHeartRateProfile({
   }
 
   return {
-    source: "default_estimated",
+    source: "estimated",
+    accepted: stored?.source === "estimated",
     sourceNote: DEFAULT_ESTIMATED_HR_SOURCE_NOTE,
     zones: defaultEstimatedHrBands.map((band) => {
       const [minBpm, maxBpm] = estimatedBpmRange(estimatedMaxHr, band.range);
@@ -226,31 +260,61 @@ export function buildEffectivePersonalHeartRateProfile({
   };
 }
 
-export function normalizePersonalHeartRateProfileForStorage(
-  value: PersonalHeartRateProfileInput,
-): StoredPersonalHeartRateProfile {
-  const parsed = personalHeartRateProfileInputSchema.parse(value);
+export function normalizeAcceptedHeartRateProfileForStorage(input: {
+  age: number;
+  value: PersonalHeartRateProfileInput;
+}): StoredRunnerHeartRateProfile {
+  const parsed = personalHeartRateProfileInputSchema.parse(input.value);
+  const estimated = buildEffectiveRunnerHeartRateProfile({ age: input.age });
+
+  if (
+    estimated &&
+    parsed.zones.every((zone, index) => {
+      const estimatedZone = estimated.zones[index];
+      return (
+        estimatedZone?.reference === zone.reference &&
+        estimatedZone.minBpm === zone.minBpm &&
+        estimatedZone.maxBpm === zone.maxBpm
+      );
+    })
+  ) {
+    return {
+      version: RUNNER_HEART_RATE_PROFILE_VERSION,
+      source: "estimated",
+    };
+  }
+
+  const personalZones = personalHeartRateZonesSchema.parse(parsed.zones);
 
   return {
-    version: PERSONAL_HEART_RATE_PROFILE_VERSION,
-    zones: orderZones(parsed.zones),
+    version: RUNNER_HEART_RATE_PROFILE_VERSION,
+    source: "personal",
+    zones: personalZones,
   };
 }
 
-export function parseStoredPersonalHeartRateProfile(
+export function parseStoredRunnerHeartRateProfile(
   value: unknown,
-): StoredPersonalHeartRateProfile | null {
-  const parsed = storedPersonalHeartRateProfileSchema.safeParse(value);
-  return parsed.success
-    ? {
-        ...parsed.data,
-        zones: orderZones(parsed.data.zones),
-      }
-    : null;
+): StoredRunnerHeartRateProfile | null {
+  const parsed = storedRunnerHeartRateProfileSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
+export function buildAcceptedEffectiveRunnerHeartRateProfile(input: {
+  age: number | null | undefined;
+  storedProfile: unknown;
+}): AcceptedRunnerHeartRateProfile | null {
+  if (!isAcceptedStoredHeartRateProfile(input.storedProfile)) {
+    return null;
+  }
+
+  const effective = buildEffectiveRunnerHeartRateProfile(input);
+  const accepted = acceptedRunnerHeartRateProfileSchema.safeParse(effective);
+  return accepted.success ? accepted.data : null;
 }
 
 export function resolveEffectiveHeartRateGuidance(
-  profile: EffectivePersonalHeartRateProfile | null | undefined,
+  profile: EffectiveRunnerHeartRateProfile | null | undefined,
   authoredReference: string,
 ) {
   if (!profile) {
@@ -354,12 +418,6 @@ function zoneDefinition(reference: HeartRateZoneReference) {
   return definition;
 }
 
-function orderZones<T extends { reference: HeartRateZoneReference }>(zones: readonly T[]): T[] {
-  return HEART_RATE_ZONE_REFERENCE_VALUES.map((reference) => {
-    const zone = zones.find((candidate) => candidate.reference === reference);
-    if (!zone) {
-      throw new Error(`Heart-rate profile is missing ${reference}.`);
-    }
-    return zone;
-  });
+function isAcceptedStoredHeartRateProfile(value: unknown) {
+  return storedRunnerHeartRateProfileSchema.safeParse(value).success;
 }

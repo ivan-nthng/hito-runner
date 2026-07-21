@@ -8,6 +8,7 @@ import {
   type WeekdayName,
 } from "./onboarding-form-model";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
+import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
 
 type PreferredLongRunMode = "optional-any" | "default-sunday";
 
@@ -68,6 +69,20 @@ export function TrainingPreferenceFields({
   const canShowPreferredLongRunDay = restDaysAnswered && hasRunningDaysAnswer;
   const canShowFitnessBenchmark = canShowPreferredLongRunDay && showFitnessBenchmark;
   const canSelectMoreRestDays = fixedRestDays.length < WEEKDAY_OPTIONS.length - 1;
+  const preferredLongRunGroup = useHitoRadioGroup({
+    items: [
+      { value: "" },
+      ...WEEKDAY_OPTIONS.map((weekday) => ({
+        value: weekday.value,
+        disabled: fixedRestDays.includes(weekday.value),
+      })),
+    ],
+    value: preferredLongRunDay,
+  });
+  const fitnessBenchmarkGroup = useHitoRadioGroup({
+    items: FITNESS_LEVEL_OPTIONS.map((option) => ({ value: option.value })),
+    value: fitnessLevel,
+  });
 
   function commitFixedRestDays(nextRestDays: WeekdayName[]) {
     const nextAllowedRunningDayCount = WEEKDAY_OPTIONS.length - nextRestDays.length;
@@ -154,15 +169,14 @@ export function TrainingPreferenceFields({
         >
           <div
             className="hito-choice-toggle-group"
-            role="radiogroup"
+            {...preferredLongRunGroup.groupProps}
             aria-label="Preferred long-run day"
           >
             {preferredLongRunMode === "optional-any" ||
             preferredLongRunMode === "default-sunday" ? (
               <button
                 type="button"
-                role="radio"
-                aria-checked={preferredLongRunDay === ""}
+                {...preferredLongRunGroup.getRadioProps("")}
                 className="hito-choice-toggle hito-choice-toggle-sm"
                 data-selected={preferredLongRunDay === ""}
                 onClick={() => onPreferredLongRunDayChange("")}
@@ -177,9 +191,7 @@ export function TrainingPreferenceFields({
                 <button
                   key={weekday.value}
                   type="button"
-                  role="radio"
-                  aria-checked={active}
-                  aria-disabled={disabled}
+                  {...preferredLongRunGroup.getRadioProps(weekday.value)}
                   disabled={disabled}
                   className="hito-choice-toggle hito-choice-toggle-sm"
                   data-selected={active}
@@ -199,19 +211,19 @@ export function TrainingPreferenceFields({
       onRecent5kTimeChange &&
       onRecent5kPaceChange ? (
         <TrainingPreferenceField label="Fitness benchmark">
-          <div className="grid gap-2" role="radiogroup" aria-label="Fitness benchmark">
+          <div
+            className="grid gap-2"
+            {...fitnessBenchmarkGroup.groupProps}
+            aria-label="Fitness benchmark"
+          >
             {FITNESS_LEVEL_OPTIONS.map((option) => {
               const active = fitnessLevel === option.value;
               return (
                 <button
                   key={option.value}
                   type="button"
-                  role="radio"
-                  aria-checked={active}
-                  className={cn(
-                    "hito-button hito-button-md min-h-14 w-full justify-between whitespace-normal text-left",
-                    active ? "hito-button-primary" : "hito-button-secondary",
-                  )}
+                  {...fitnessBenchmarkGroup.getRadioProps(option.value)}
+                  className="hito-choice-toggle hito-choice-toggle-card min-h-14 w-full justify-between whitespace-normal text-left"
                   data-selected={active}
                   onClick={() => onFitnessLevelChange(option.value)}
                 >
@@ -257,6 +269,13 @@ export function RunningDaysPreferenceField({
 }) {
   const allowedRunningDayCount = WEEKDAY_OPTIONS.length - fixedRestDays.length;
   const selectedRunningDays = Number.parseInt(maxRunningDaysPerWeek, 10);
+  const runningDayOptions = Array.from({ length: allowedRunningDayCount }, (_, index) =>
+    String(index + 1),
+  );
+  const runningDaysGroup = useHitoRadioGroup({
+    items: runningDayOptions.map((value) => ({ value })),
+    value: maxRunningDaysPerWeek,
+  });
 
   return (
     <TrainingPreferenceField
@@ -268,18 +287,17 @@ export function RunningDaysPreferenceField({
         } per week.`
       }
     >
-      <div className="hito-choice-toggle-group" role="radiogroup" aria-label={label}>
-        {Array.from({ length: allowedRunningDayCount }, (_, index) => index + 1).map((count) => {
-          const active = selectedRunningDays === count;
+      <div className="hito-choice-toggle-group" {...runningDaysGroup.groupProps} aria-label={label}>
+        {runningDayOptions.map((count) => {
+          const active = selectedRunningDays === Number(count);
           return (
             <button
               key={count}
               type="button"
-              role="radio"
-              aria-checked={active}
+              {...runningDaysGroup.getRadioProps(count)}
               className="hito-choice-toggle hito-choice-toggle-sm"
               data-selected={active}
-              onClick={() => onMaxRunningDaysPerWeekChange(String(count))}
+              onClick={() => onMaxRunningDaysPerWeekChange(count)}
             >
               {count}
             </button>

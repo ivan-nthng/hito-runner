@@ -35,12 +35,14 @@ export async function validateManualEmptyActivePlanCreationContract() {
     userId: string;
     input: EmptyActivePlanCreationInput;
   }> = [];
+  const savedBaselines: ManualEmptyPlanSetupInput[] = [];
   const success = await createEmptyManualActivePlanForUser(
     userId,
     setup,
     buildFakeEmptyPlanDependencies({
       currentDate: "2026-06-12",
       onPersist: (record) => persisted.push(record),
+      onSaveBaseline: (baseline) => savedBaselines.push(baseline),
     }),
   );
 
@@ -70,6 +72,7 @@ export async function validateManualEmptyActivePlanCreationContract() {
     assert.equal(success.safety.readyForManualAdd, true);
   }
 
+  assert.deepEqual(savedBaselines, [setup]);
   assert.equal(persisted.length, 1);
   const persistedRecord = persisted[0]!;
   assert.equal(persistedRecord.userId, userId);
@@ -81,9 +84,6 @@ export async function validateManualEmptyActivePlanCreationContract() {
   assert.equal(persistedRecord.input.profile.age, setup.age);
   assert.equal(persistedRecord.input.profile.heightCm, setup.heightCm);
   assert.equal(persistedRecord.input.profile.weightKg, setup.weightKg);
-  assert.equal(persistedRecord.input.profilePatch?.age, setup.age);
-  assert.equal(persistedRecord.input.profilePatch?.heightCm, setup.heightCm);
-  assert.equal(persistedRecord.input.profilePatch?.weightKg, setup.weightKg);
   assert.equal(
     readNestedString(persistedRecord.input.goalMetadata, [
       "manual_user_built_plan",
@@ -202,11 +202,21 @@ function buildFakeEmptyPlanDependencies(
     currentDate?: string;
     persistError?: Error;
     onPersist?: (record: { userId: string; input: EmptyActivePlanCreationInput }) => void;
+    onSaveBaseline?: (baseline: ManualEmptyPlanSetupInput) => void;
   } = {},
 ): EmptyPlanDependencies {
   return {
     currentDate: input.currentDate ?? "2026-06-12",
     getActivePlanForUser: async () => input.activePlan ?? null,
+    saveBaselineForUser: async (_userId, baseline) => {
+      input.onSaveBaseline?.({
+        age: baseline.age,
+        heightCm: baseline.heightCm,
+        weightKg: baseline.weightKg,
+        runningLevel: baseline.fitnessLevel,
+      });
+      return {} as Awaited<ReturnType<NonNullable<EmptyPlanDependencies["saveBaselineForUser"]>>>;
+    },
     createEmptyPlanForUser: async (userId, creationInput) => {
       if (input.persistError) {
         throw input.persistError;

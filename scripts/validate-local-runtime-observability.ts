@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { chmod, mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import {
   createAiPlanGenerationLedgerTrace,
   markAiPlanGenerationPersistenceFailed,
@@ -12,18 +13,24 @@ import {
   LOCAL_RUNTIME_URL_ENV,
   createLocalRuntimeRequestContext,
   queryLocalRuntimeEvents,
+  readLocalRuntimeArtifact,
+  recordLocalProviderTranscript,
   recordLocalRuntimeActionFailure,
   recordLocalRuntimeActionOutcome,
   recordLocalRuntimeRequestFailure,
   recordLocalRuntimeRequestOutcome,
+  resolveLocalRuntimeRoot,
   writeLocalRuntimeEvent,
   type LocalRuntimeEvent,
 } from "../src/lib/local-runtime-observability";
 
 const root = await mkdtemp(join(tmpdir(), "hito-local-runtime-observability-"));
 const blockedRoot = `${root}-blocked`;
+const metadataFailureRoot = `${root}-metadata-failure`;
 const previousRuntimeUrl = process.env[LOCAL_RUNTIME_URL_ENV];
 const previousRoot = process.env[LOCAL_RUNTIME_OBSERVABILITY_ROOT_ENV];
+const previousOpenAiApiKey = process.env.OPENAI_API_KEY;
+const previousSupabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
 const privacyCanaries = {
   secret: "sk_LOCAL_OBSERVABILITY_SECRET_CANARY",
   cookie: "LOCAL_OBSERVABILITY_COOKIE_CANARY",
@@ -31,12 +38,19 @@ const privacyCanaries = {
   provider: "LOCAL_OBSERVABILITY_PROVIDER_PAYLOAD_CANARY",
   error: "LOCAL_OBSERVABILITY_ERROR_MESSAGE_CANARY",
 };
+const forbiddenRawCanaries = {
+  openAiKey: "sk_LOCAL_RAW_TRANSCRIPT_SECRET_CANARY",
+  supabaseKey: "LOCAL_RAW_TRANSCRIPT_SUPABASE_SECRET_CANARY",
+};
 
 try {
   process.env[LOCAL_RUNTIME_URL_ENV] = "http://127.0.0.1:3000";
   process.env[LOCAL_RUNTIME_OBSERVABILITY_ROOT_ENV] = root;
+  process.env.OPENAI_API_KEY = forbiddenRawCanaries.openAiKey;
+  process.env.SUPABASE_SECRET_KEY = forbiddenRawCanaries.supabaseKey;
 
   const archivedDateKey = await seedRotationProof(root);
+  const transcriptProof = await proveRawProviderTranscripts(root);
 
   const successContext = createLocalRuntimeRequestContext({
     request: new Request(
@@ -287,12 +301,18 @@ try {
     compilerDiagnosticCodes: compilerEvents[0]?.diagnosticCodes,
     archivedOldDay: archivedDateKey,
     nonLoopbackWriteBlocked: true,
+    rawTranscriptGenerationId: transcriptProof.completedGenerationId,
+    rawTranscriptArchived: transcriptProof.incompleteArchived,
+    defaultRoot: transcriptProof.defaultRoot,
   });
 } finally {
   restoreEnv(LOCAL_RUNTIME_URL_ENV, previousRuntimeUrl);
   restoreEnv(LOCAL_RUNTIME_OBSERVABILITY_ROOT_ENV, previousRoot);
+  restoreEnv("OPENAI_API_KEY", previousOpenAiApiKey);
+  restoreEnv("SUPABASE_SECRET_KEY", previousSupabaseSecretKey);
   await rm(root, { recursive: true, force: true });
   await rm(blockedRoot, { recursive: true, force: true });
+  await rm(metadataFailureRoot, { recursive: true, force: true });
 }
 
 async function seedRotationProof(observabilityRoot: string) {
@@ -323,9 +343,249 @@ async function seedRotationProof(observabilityRoot: string) {
     normalizationStatus: null,
     diagnosticCodes: [],
     canonicalRowCount: null,
+    rawArtifactPath: null,
   };
   await writeFile(join(activeDay, "events.jsonl"), `${JSON.stringify(archivedEvent)}\n`, "utf8");
   return archivedDateKey;
+}
+
+async function proveRawProviderTranscripts(observabilityRoot: string) {
+  const completedGenerationId = "generation_completed_transcript_proof";
+  const completedRequestId = "request_completed_transcript_proof";
+  const completedRequestCanary = "RAW_COMPLETED_REQUEST_BODY_CANARY";
+  const completedResponseCanary = "RAW_COMPLETED_RESPONSE_BODY_CANARY";
+  const completedAt = new Date();
+  completedAt.setHours(12, 0, 0, 0);
+  const completed = await recordLocalProviderTranscript(
+    {
+      requestId: completedRequestId,
+      generationId: completedGenerationId,
+      providerResponseId: "resp_completed_transcript_proof",
+      model: "gpt-proof",
+      outcome: "completed",
+      providerStatus: "completed",
+      httpStatus: 200,
+      responseContentType: "application/json",
+      requestStartedAt: completedAt.toISOString(),
+      responseReceivedAt: new Date(completedAt.getTime() + 500).toISOString(),
+      requestBody: JSON.stringify({ input: completedRequestCanary }),
+      responseBody: JSON.stringify({ output: completedResponseCanary }),
+    },
+    {
+      forceWrite: true,
+      root: observabilityRoot,
+      runtimeUrl: "http://127.0.0.1:3000",
+      now: completedAt,
+    },
+  );
+  assert.equal(completed.written, true);
+  assert.ok(completed.rawArtifactPath);
+
+  const completedEvents = await queryLocalRuntimeEvents({
+    root: observabilityRoot,
+    generationId: completedGenerationId,
+    outcomeCode: "provider_transcript_completed",
+  });
+  assert.equal(completedEvents.length, 1);
+  assert.equal(completedEvents[0]?.requestId, completedRequestId);
+  assert.equal(completedEvents[0]?.providerResponseId, "resp_completed_transcript_proof");
+  assert.equal(completedEvents[0]?.rawArtifactPath, completed.rawArtifactPath);
+  const metadataOnly = JSON.stringify(completedEvents);
+  assert.doesNotMatch(metadataOnly, new RegExp(completedRequestCanary));
+  assert.doesNotMatch(metadataOnly, new RegExp(completedResponseCanary));
+
+  const completedArtifactPath = await readLocalRuntimeArtifact({
+    root: observabilityRoot,
+    rawArtifactPath: completed.rawArtifactPath!,
+  }).then((artifact) => artifact.absolutePath);
+  await chmod(completedArtifactPath, 0o000);
+  try {
+    const listingWithUnreadableRaw = await queryLocalRuntimeEvents({
+      root: observabilityRoot,
+      generationId: completedGenerationId,
+    });
+    assert.equal(listingWithUnreadableRaw.length, 1);
+  } finally {
+    await chmod(completedArtifactPath, 0o600);
+  }
+
+  const completedArtifact = await readLocalRuntimeArtifact({
+    root: observabilityRoot,
+    rawArtifactPath: completed.rawArtifactPath!,
+  });
+  assert.match(completedArtifact.contents, new RegExp(completedRequestCanary));
+  assert.match(completedArtifact.contents, new RegExp(completedResponseCanary));
+  for (const canary of Object.values(forbiddenRawCanaries)) {
+    assert.doesNotMatch(completedArtifact.contents, new RegExp(canary));
+  }
+  assert.equal((await stat(completedArtifact.absolutePath)).mode & 0o777, 0o600);
+  assert.equal((await stat(dirname(completedArtifact.absolutePath))).mode & 0o777, 0o700);
+
+  const metadataCli = runLocalLogsCli([
+    "--generation-id",
+    completedGenerationId,
+    "--root",
+    observabilityRoot,
+  ]);
+  assert.doesNotMatch(metadataCli, new RegExp(completedRequestCanary));
+  assert.match(metadataCli, /rawArtifactPath/);
+  const retrievalCli = runLocalLogsCli([
+    "--generation-id",
+    completedGenerationId,
+    "--raw-transcript",
+    "--root",
+    observabilityRoot,
+  ]);
+  assert.match(retrievalCli, new RegExp(completedRequestCanary));
+  assert.match(retrievalCli, new RegExp(completedResponseCanary));
+
+  const oldAt = new Date(completedAt);
+  oldAt.setDate(oldAt.getDate() - 4);
+  const incompleteGenerationId = "generation_incomplete_transcript_proof";
+  const incomplete = await recordLocalProviderTranscript(
+    {
+      requestId: "request_incomplete_transcript_proof",
+      generationId: incompleteGenerationId,
+      providerResponseId: "resp_incomplete_transcript_proof",
+      model: "gpt-proof",
+      outcome: "incomplete",
+      providerStatus: "incomplete",
+      httpStatus: 200,
+      responseContentType: "application/json",
+      requestStartedAt: oldAt.toISOString(),
+      responseReceivedAt: new Date(oldAt.getTime() + 500).toISOString(),
+      requestBody: JSON.stringify({ input: "RAW_INCOMPLETE_REQUEST_BODY_CANARY" }),
+      responseBody: JSON.stringify({ status: "incomplete" }),
+    },
+    {
+      forceWrite: true,
+      root: observabilityRoot,
+      runtimeUrl: "http://127.0.0.1:3000",
+      now: oldAt,
+    },
+  );
+  assert.equal(incomplete.written, true);
+  assert.ok(incomplete.rawArtifactPath);
+
+  await writeLocalRuntimeEvent(
+    {
+      category: "request",
+      event: "rotation_trigger",
+      status: "success",
+      phase: "request",
+      outcomeCode: "rotation_trigger",
+      timestamp: completedAt.toISOString(),
+    },
+    {
+      forceWrite: true,
+      root: observabilityRoot,
+      runtimeUrl: "http://127.0.0.1:3000",
+      now: completedAt,
+    },
+  );
+  const incompleteEvents = await queryLocalRuntimeEvents({
+    root: observabilityRoot,
+    includeArchive: true,
+    generationId: incompleteGenerationId,
+  });
+  assert.equal(incompleteEvents.length, 1);
+  const archivedArtifact = await readLocalRuntimeArtifact({
+    root: observabilityRoot,
+    rawArtifactPath: incomplete.rawArtifactPath!,
+  });
+  assert.match(archivedArtifact.absolutePath, /\/archive\//);
+
+  const hosted = await recordLocalProviderTranscript(
+    {
+      generationId: "generation_hosted_blocked",
+      model: "gpt-proof",
+      outcome: "failed",
+      requestStartedAt: completedAt.toISOString(),
+      requestBody: "{}",
+      responseBody: "{}",
+    },
+    {
+      forceWrite: true,
+      root: `${observabilityRoot}-hosted`,
+      runtimeUrl: "https://hosted.example.test",
+    },
+  );
+  assert.equal(hosted.written, false);
+  await assert.rejects(stat(`${observabilityRoot}-hosted`), /ENOENT/);
+
+  const repositoryRawRoot = join(process.cwd(), "logs", "unsafe-raw-transcript-proof");
+  const repositoryWrite = await recordLocalProviderTranscript(
+    {
+      generationId: "generation_repository_blocked",
+      model: "gpt-proof",
+      outcome: "failed",
+      requestStartedAt: completedAt.toISOString(),
+      requestBody: "{}",
+      responseBody: "{}",
+    },
+    {
+      forceWrite: true,
+      root: repositoryRawRoot,
+      runtimeUrl: "http://127.0.0.1:3000",
+    },
+  );
+  assert.equal(repositoryWrite.written, false);
+  await assert.rejects(stat(repositoryRawRoot), /ENOENT/);
+
+  const metadataFailureDate = localDateKey(completedAt);
+  await mkdir(join(metadataFailureRoot, "active", metadataFailureDate, "events.jsonl"), {
+    recursive: true,
+  });
+  const metadataFailure = await recordLocalProviderTranscript(
+    {
+      generationId: "generation_metadata_failure",
+      model: "gpt-proof",
+      outcome: "completed",
+      requestStartedAt: completedAt.toISOString(),
+      requestBody: "{}",
+      responseBody: "{}",
+    },
+    {
+      forceWrite: true,
+      root: metadataFailureRoot,
+      runtimeUrl: "http://127.0.0.1:3000",
+      now: completedAt,
+    },
+  );
+  assert.equal(metadataFailure.written, false);
+  const orphanPath = join(
+    metadataFailureRoot,
+    "active",
+    metadataFailureDate,
+    "provider-transcripts",
+    `${completedAt.toISOString().replace(/[:.]/g, "-")}-generation_metadata_failure.json`,
+  );
+  await assert.rejects(stat(orphanPath), /ENOENT/);
+
+  delete process.env[LOCAL_RUNTIME_OBSERVABILITY_ROOT_ENV];
+  const defaultRoot = resolveLocalRuntimeRoot();
+  process.env[LOCAL_RUNTIME_OBSERVABILITY_ROOT_ENV] = observabilityRoot;
+  assert.equal(defaultRoot.startsWith(process.cwd()), false);
+  assert.match(defaultRoot, /\/Library\/Caches\/hito-running\/local-runtime-observability$/);
+
+  return {
+    completedGenerationId,
+    incompleteArchived: true,
+    defaultRoot,
+  };
+}
+
+function runLocalLogsCli(args: string[]) {
+  const result = spawnSync(
+    process.execPath,
+    ["--import", "tsx", "./scripts/query-local-runtime-events.ts", ...args],
+    {
+      cwd: process.cwd(),
+      encoding: "utf8",
+    },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout;
 }
 
 async function readPersistedProof(observabilityRoot: string, ledgerRelativePath: string) {

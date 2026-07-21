@@ -6,10 +6,7 @@ import {
   type AiAuthoredPlanFirstProviderUnit,
   type AiAuthoredPlanFirstProviderWorkout,
 } from "@/lib/ai-authored-plan-first-provider-contract";
-import {
-  buildEffectivePersonalHeartRateProfile,
-  resolveEffectiveHeartRateGuidance,
-} from "@/lib/heart-rate-zones";
+import { resolveEffectiveHeartRateGuidance } from "@/lib/heart-rate-zones";
 import {
   FUTURE_TEMPLATE_VERSION,
   trainingPlanV2Schema,
@@ -144,6 +141,22 @@ function normalizeProviderDraft({
         code: "ai_authored_plan_first_date_out_of_range",
         path,
         message: `${day.date} falls outside ${startDate} through ${endDate}.`,
+      });
+    }
+  }
+
+  const authoredContactsByWeek = new Map<number, number>();
+  const weekOneStart = startOfWeekIso(startDate);
+  for (const day of authoredDays) {
+    const weekNumber = Math.floor(diffDaysIso(day.date, weekOneStart) / 7) + 1;
+    authoredContactsByWeek.set(weekNumber, (authoredContactsByWeek.get(weekNumber) ?? 0) + 1);
+  }
+  for (const [weekNumber, contactCount] of authoredContactsByWeek) {
+    if (contactCount > authoringInput.availability.maxRunningDaysPerWeek) {
+      issues.push({
+        code: "ai_authored_plan_first_availability_ceiling_exceeded",
+        path: `weeks.${weekNumber}`,
+        message: `Week ${weekNumber} has ${contactCount} workouts but the runner allows at most ${authoringInput.availability.maxRunningDaysPerWeek}.`,
       });
     }
   }
@@ -489,32 +502,46 @@ function buildTarget(
   authoringInput: StructuredAuthoringInput,
   issues: CompilerIssue[],
 ): TrainingPlanTarget | undefined {
-  if (!value || (!value.pace && !value.hr_zone && !value.effort)) {
-    return undefined;
-  }
-
   const target: TrainingPlanTarget = {
+    primary_execution_mode: value.primary_execution_mode,
     target_source: AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
     hr_target_source: "effort_only",
     source_note: "AI-authored target preserved from the signed reviewed plan.",
-    ...(value.pace ? { pace: value.pace } : {}),
-    ...(value.effort ? { intensity: value.effort } : {}),
+    ...(value.primary_execution_mode === "pace" ? { pace: value.command } : {}),
+    ...(value.primary_execution_mode === "effort" || value.primary_execution_mode === "run_walk"
+      ? { intensity: value.command }
+      : {}),
   };
 
-  if (!value.hr_zone) {
+  if (value.primary_execution_mode === "pace" && !authoringInput.runnerFacts.benchmark) {
+    issues.push({
+      code: "ai_authored_plan_first_pace_primary_truth_missing",
+      path,
+      message: "Pace-primary execution requires explicit validated runner benchmark truth.",
+    });
+  }
+
+  if (value.primary_execution_mode !== "heart_rate") {
     return target;
   }
 
-  const effectiveProfile =
-    authoringInput.runnerFacts.heartRateProfile ??
-    buildEffectivePersonalHeartRateProfile({ age: authoringInput.runnerFacts.age });
-  const resolvedGuidance = resolveEffectiveHeartRateGuidance(effectiveProfile, value.hr_zone);
+  const effectiveProfile = authoringInput.runnerFacts.heartRateProfile;
+  if (!effectiveProfile.accepted) {
+    issues.push({
+      code: "ai_authored_plan_first_accepted_hr_primary_truth_missing",
+      path,
+      message: "Heart-rate-primary execution requires an accepted heart-rate profile snapshot.",
+    });
+    return target;
+  }
+
+  const resolvedGuidance = resolveEffectiveHeartRateGuidance(effectiveProfile, value.command);
 
   if (!resolvedGuidance) {
     issues.push({
       code: "ai_authored_plan_first_hr_zone_reference_invalid",
       path,
-      message: `Heart-rate reference ${value.hr_zone} is not available in the runner profile.`,
+      message: `Heart-rate reference ${value.command} is not available in the runner profile.`,
     });
     return target;
   }
@@ -548,9 +575,7 @@ function resolveRunnerFacingHeartRateReferences(
     return value;
   }
 
-  const effectiveProfile =
-    authoringInput.runnerFacts.heartRateProfile ??
-    buildEffectivePersonalHeartRateProfile({ age: authoringInput.runnerFacts.age });
+  const effectiveProfile = authoringInput.runnerFacts.heartRateProfile;
   let resolved = value;
 
   for (const reference of new Set(references)) {
@@ -564,7 +589,10 @@ function resolveRunnerFacingHeartRateReferences(
       continue;
     }
 
-    resolved = resolved.replaceAll(reference, guidance.rangeBpm);
+    resolved = resolved.replaceAll(
+      reference,
+      guidance.source === "personal" ? guidance.rangeBpm : `${guidance.rangeBpm} estimated`,
+    );
   }
 
   return resolved;

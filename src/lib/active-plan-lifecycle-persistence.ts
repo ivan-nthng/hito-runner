@@ -76,9 +76,10 @@ export async function applyAtomicReviewedPlanPersistence(input: {
   archiveGoalMetadata: Json;
   logs: Json;
   evidenceRelinks: Json;
+  expectedProfileRevision?: number;
 }) {
   const supabase = createAdminSupabaseClient();
-  const result = await supabase.rpc("apply_reviewed_plan_persistence", {
+  const rpcPayload = {
     p_user_id: input.userId,
     p_profile: input.profile,
     p_plan: input.plan,
@@ -89,7 +90,14 @@ export async function applyAtomicReviewedPlanPersistence(input: {
     p_archive_goal_metadata: input.archiveGoalMetadata,
     p_logs: input.logs,
     p_evidence_relinks: input.evidenceRelinks,
-  });
+  };
+  const result =
+    input.expectedProfileRevision == null
+      ? await supabase.rpc("apply_reviewed_plan_persistence", rpcPayload)
+      : await supabase.rpc("apply_reviewed_plan_persistence_with_profile_revision", {
+          ...rpcPayload,
+          p_expected_profile_revision: input.expectedProfileRevision,
+        });
 
   if (result.error) {
     throw new Error(result.error.message);

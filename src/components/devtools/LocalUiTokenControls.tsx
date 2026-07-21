@@ -67,7 +67,7 @@ function TokenControlGroupRow({
     group.controls.length === 1
       ? activeControls.length === 1
       : activeControls.length === group.controls.length && groupDesiredTokens.length === 1;
-  const currentTokenLabel = getCurrentTokenLabel(group.controls);
+  const availableToken = getAvailableToken(group.controls);
   const currentValueLabel = getCurrentDisplayValueLabel(group.controls);
   const firstDesiredToken =
     isActive && group.controls.length > 1
@@ -80,7 +80,7 @@ function TokenControlGroupRow({
     <div className="grid min-w-0 gap-1 py-0.5" data-local-ui-property-control-row={group.id}>
       <PropertyControlLine
         control={control}
-        currentTokenLabel={currentTokenLabel}
+        availableToken={availableToken}
         currentValueLabel={currentValueLabel}
         desiredOption={desiredOption}
         expanded={group.controls.length > 1 ? expanded : undefined}
@@ -102,7 +102,7 @@ function TokenControlGroupRow({
             <PropertyControlLine
               compact
               control={sideControl}
-              currentTokenLabel={getCurrentTokenLabel([sideControl])}
+              availableToken={getAvailableToken([sideControl])}
               currentValueLabel={getCurrentDisplayValueLabel([sideControl])}
               desiredOption={
                 sideControl.options.find(
@@ -125,8 +125,8 @@ function TokenControlGroupRow({
 
 function PropertyControlLine({
   compact = false,
+  availableToken,
   control,
-  currentTokenLabel,
   currentValueLabel,
   desiredOption,
   expanded,
@@ -139,8 +139,8 @@ function PropertyControlLine({
   onPendingChangeRemove,
 }: {
   compact?: boolean;
+  availableToken: string | null;
   control: InlineChangeTokenControlInput;
-  currentTokenLabel: string | null;
   currentValueLabel: string;
   desiredOption: InlineChangeTokenControlInput["options"][number] | null;
   expanded?: boolean;
@@ -152,7 +152,7 @@ function PropertyControlLine({
   onExpandedChange?: (expanded: boolean) => void;
   onPendingChangeRemove: () => void;
 }) {
-  const currentHelp = getTokenHelpLabel(control, currentTokenLabel);
+  const currentHelp = getTokenHelpLabel(control, availableToken);
   const desiredHelp = desiredOption
     ? `${desiredOption.displayValue}px · ${desiredOption.token}`
     : currentHelp;
@@ -185,7 +185,11 @@ function PropertyControlLine({
         </div>
         {isActive ? (
           <>
-            <ValueTag tone="current" value={currentValueLabel} tooltip={currentHelp} />
+            <ValueTag
+              tone={availableToken ? "available" : "neutral"}
+              value={currentValueLabel}
+              tooltip={currentHelp}
+            />
             <Icon name="arrow-right" size="xs" className="shrink-0 text-muted-foreground" />
             <div className="group relative shrink-0">
               <ValueSelect
@@ -210,7 +214,7 @@ function PropertyControlLine({
             desiredOption={null}
             displayValue={currentValueLabel}
             tooltip={currentHelp}
-            tone="neutral"
+            tone={availableToken ? "available" : "neutral"}
             onValueChange={onDesiredTokenChange}
           />
         )}
@@ -280,7 +284,9 @@ function canMergeTokenControls(controls: InlineChangeTokenControlInput[]) {
       control.confidence === first.confidence &&
       control.currentToken === first.currentToken &&
       control.currentValueLabel === first.currentValueLabel &&
+      control.evidenceState === first.evidenceState &&
       control.kind === first.kind &&
+      control.matchingToken === first.matchingToken &&
       control.nearestToken === first.nearestToken &&
       control.options.length === first.options.length &&
       control.options.every((option, index) => option.token === first.options[index]?.token),
@@ -290,38 +296,21 @@ function canMergeTokenControls(controls: InlineChangeTokenControlInput[]) {
 function getCurrentDisplayValueLabel(controls: InlineChangeTokenControlInput[]) {
   const values = getUniqueValues(controls.map((control) => control.currentValueLabel));
   const valueLabel = values.length === 1 ? values[0] : "Mixed";
-  const isCustom = controls.every((control) => !control.currentToken);
 
-  return isCustom && valueLabel !== "Mixed" ? `${valueLabel}px` : valueLabel;
+  return valueLabel !== "Mixed" ? `${valueLabel}px` : valueLabel;
 }
 
-function getCurrentTokenLabel(controls: InlineChangeTokenControlInput[]) {
-  const confidentTokens = getUniqueValues(
-    controls
-      .map((control) => control.currentToken)
-      .filter((token): token is string => Boolean(token)),
-  );
-  if (confidentTokens.length === 1) return confidentTokens[0];
+function getAvailableToken(controls: InlineChangeTokenControlInput[]) {
+  const controlTokens = controls.map((control) => control.currentToken ?? control.matchingToken);
+  if (controlTokens.some((token) => !token)) return null;
 
-  const nearestTokens = getUniqueValues(
-    controls
-      .map((control) => (control.nearestToken ? `nearest ${control.nearestToken}` : null))
-      .filter((token): token is string => Boolean(token)),
-  );
-  if (nearestTokens.length === 1) return nearestTokens[0];
-
-  return null;
+  const tokens = getUniqueValues(controlTokens.filter((token): token is string => Boolean(token)));
+  return tokens.length === 1 ? tokens[0] : null;
 }
 
-function getTokenHelpLabel(
-  control: InlineChangeTokenControlInput,
-  currentTokenLabel: string | null,
-) {
+function getTokenHelpLabel(control: InlineChangeTokenControlInput, availableToken: string | null) {
   const observedValue = `${control.currentValueLabel}px`;
-  if (currentTokenLabel) return `${observedValue} · ${currentTokenLabel}`;
-  if (control.nearestToken)
-    return `${observedValue} custom value · nearest ${control.nearestToken}`;
-  return `${observedValue} custom value`;
+  return availableToken ? `${observedValue} · ${availableToken}` : observedValue;
 }
 
 function getUniqueValues(values: string[]) {

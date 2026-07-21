@@ -8,7 +8,7 @@ The implemented product is now a hybrid running-plan experience for Hito Running
 - signed-in users can create a real profile, receive a persisted plan, log workouts, and see backend-derived weekly status
 - the current local unblock path keeps a temporary local account login only for loopback development, while deploy-visible auth now exposes only the real email path and authenticated plan truth resolves through Supabase
 
-The product still avoids claims of live coaching, connected integrations, weather-aware adaptation, or measured biometric authority; age-estimated heart-rate guidance is labelled as default, while runner-saved ranges are explicit personal profile truth.
+The product still avoids claims of live coaching, connected integrations, weather-aware adaptation, or measured biometric authority. Age-estimated heart-rate guidance remains explicitly estimated; a runner can accept it as approximate BPM guidance or edit it into personal profile truth.
 
 The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
 
@@ -63,9 +63,9 @@ This is the canonical current product rule for workout-content editing:
   provenance, workout provenance, and prior planned truth must remain durable history.
 
 This rule applies to workout-content editing only. Move, Clear, Copy, Add, schedule reflow, plan
-replacement, and passive inline readback keep their separate contracts. Current runtime gaps are
-recorded in `docs/current-system.md` and `docs/current-state.md`; they are implementation mismatches,
-not product exceptions.
+replacement, and passive inline readback keep their separate contracts. Current runtime implements
+this date-based content-edit contract; operation-specific schedule protections remain separate
+product rules rather than source-based editability exceptions.
 
 ## Workflow And Status Behavior
 
@@ -99,9 +99,12 @@ not product exceptions.
   controls are accepted in the v1 scope: per-segment No target, runner-entered pace exact/range,
   runner-entered HR bpm cap/range, and runner-entered RPE `0-10`. Backend preserves runner-entered
   target source truth, Repeat set stays structural-only, and Work/Recover children own optional
-  targets. Built-in/default templates do not prefill pace or HR; default/age-estimated HR as
+  targets. Built-in/default templates do not prefill pace, HR, or RPE; default/age-estimated HR as
   personal truth, fake personal zones, generated manual pace, power, cadence, grade/elevation,
   route, and terrain targets remain unsupported.
+  The backend template catalog also owns personal-template deletion and per-runner hide/restore
+  state for built-ins without deleting the global registry. The existing picker renders that
+  backend-shaped catalog and exposes personal reuse/delete plus built-in hide/restore controls.
   JSON/Markdown export for persisted manual active plans is available through the calendar header
   overflow and uses the canonical active-plan export seam with safe export ids. Recurrence,
   Restore/Put back/Redo UI, QR/share/import, PDF/watch export, coach/organization authoring, and
@@ -134,7 +137,7 @@ not product exceptions.
   the shared preference controls reveal fixed rest days first, then default running-days/week, then optional preferred long-run day, with fixed rest days disabled in the long-run selector and `No fixed rest days` as an explicit state
   the constructor pre-fills saved runner profile data and training preferences when available, but the runner can edit those values before draft review; fixed rest days and the runner-declared maximum running days remain explicit calendar constraints, while AI authors the actual training weekdays and plan structure
   age, weight, and height are required in the backend contract; exact selected distance, optional target time/date, runner-declared availability, fixed rest days, optional long-run preference, self-reported level, and optional benchmark reach AI as facts rather than backend-authored coaching defaults
-  guided selected-plan cards now collect backend-shaped race/result goal intent for preset or custom distance, optional finish time, optional outcome pace, and optional race day; preview readback shows backend-normalized outcome pace and, when distinct, a separate finish-time-derived pace while keeping both as goal/review truth rather than executable workout pace targets; Quick setup browser/readback proof is accepted for 10K, 21.1K, 42.195K, and Custom 15K using the same OpenAI/local-fixture-authored dated generated-plan path. Custom requires a valid distance before preview; accepted generated plans persist canonical `distance_goal` truth with exact `distance_meters`, preserve AI-authored progression, exact selected-distance endpoint dynamics, child-first repeats, typed structural/provider/compiler failures, watch-ready AI-authored numeric min/km pace, and effective-profile BPM guidance with explicit estimated-versus-personal provenance. Generated-plan preview/detail readback now uses compact workout-document presentation instead of foregrounded proof/debug copy; preview and passive readback remain non-inline-editable, while confirmed generated workouts on today or a future date use the same separate backend-reviewed edit lifecycle as every other confirmed workout. Shared Hito inline editable/read-only primitives are accepted only for true editable or internal specimen contexts, and local inspector task targeting remains non-mutating local devtool behavior. The 5K benchmark lives as optional Training setup input and is not required for the normal Quick setup happy path
+  guided selected-plan cards now collect backend-shaped race/result goal intent for preset or custom distance, optional finish time, optional outcome pace, and optional race day; preview readback shows backend-normalized outcome pace and, when distinct, a separate finish-time-derived pace while keeping both as goal/review truth rather than executable workout pace targets; Quick setup browser/readback proof is accepted for 10K, 21.1K, 42.195K, and Custom 15K using the same OpenAI/local-fixture-authored dated generated-plan path. Custom requires a valid distance before preview; accepted generated plans persist canonical `distance_goal` truth with exact `distance_meters`, preserve AI-authored progression, exact selected-distance endpoint dynamics, child-first repeats, typed structural/provider/compiler failures, and one AI-authored primary execution mode per runnable leaf. Benchmark-backed pace and accepted estimated-or-personal BPM are separate watch commands; effort and Run/Walk remain first-class command modes, and available HR never forces AI to use it. Generated-plan preview/detail readback now uses compact workout-document presentation instead of foregrounded proof/debug copy; preview and passive readback remain non-inline-editable, while confirmed generated workouts on today or a future date use the same separate backend-reviewed edit lifecycle as every other confirmed workout. Shared Hito inline editable/read-only primitives are accepted only for true editable or internal specimen contexts, and local inspector task targeting remains non-mutating local devtool behavior. The 5K benchmark lives as optional Training setup input and is not required for the normal Quick setup happy path
   generated plans carry exact session identity and rich section/repeat structure inside the existing workout structure, while backend validates structural, calendar, metric, review, and persistence safety from exact distance plus explicit runner facts rather than authoring a parallel coaching model
   generated `training-plan-v2` workouts now also carry additive backend-owned rich workout contract fields for family, exact identity, calendar icon key, goal context, and metric mode; saved-mode calendar and shared glyph rendering prefer that backend family/icon truth first, while old compact `workout_type` and `source_workout_type` remain compatible through fallback
   accepted AI/local-fixture drafts preserve authored opener/main/finish structure, ordered Repeat
@@ -157,7 +160,7 @@ not product exceptions.
 - onboarding keeps Manual setup and Quick setup as the visible creation paths, with structured review
   and selected distance-goal review inside Quick setup, and keeps JSON import visibly demoted as an
   advanced fallback for existing Hito plan files
-- `/settings` now separates `Personal data` from `Training preferences` with Hito tabs; personal age/height/weight use the same editable value chips as Quick setup, the personal page shows default estimated heart-rate starting ranges when profile age supports them while clearly labelling them as non-personalized, and training preferences use the same weekday choice rhythm as plan creation to save fixed rest days, default running-days/week, and preferred long-run day as future-plan defaults only, with backend validation preventing impossible rest-day and long-run combinations
+- `/settings` now separates `Personal data` from `Training preferences` with Hito tabs; age, height, weight, fitness, and accepted heart-rate ranges persist as one runner baseline independently of plan creation. Quick setup and Settings share the same BPM editor/readback: unchanged age-derived ranges remain `estimated`, edited ranges become `personal`, and later Settings changes affect only future plan authoring. Training preferences use the same weekday choice rhythm as plan creation to save fixed rest days, default running-days/week, and preferred long-run day as future-plan defaults only, with backend validation preventing impossible rest-day and long-run combinations
 - the backend-owned training-preference contract now uses one mapping between runner-facing names and storage truth:
   `fixedRestDays`, `defaultRunningDaysPerWeek`, and `preferredLongRunDay` map to stored `blocked_days`, `max_running_days_per_week`, and `preferred_long_run_day`; zero fixed rest days is valid, all seven fixed rest days is blocked, default running days must fit the available weekdays, and the default long-run fallback is Sunday, then Saturday, then the latest available weekday without being stored as an explicit preference
 - authenticated no-plan or no-workout states now render the same visible structured plan creation surface instead of stranding users on a retry-only empty state
@@ -203,7 +206,9 @@ not product exceptions.
   and import-from-share remain later slices
 - home and calendar now default to the real current day instead of a frozen demo start date
 - today&apos;s workout can be opened from home or calendar cells, and the user can still manually open any other planned day
-- when today falls outside the current plan window, home now says so explicitly instead of silently dropping the hero
+- while an active schedule exists, every date without a planned workout, including dates after the
+  final scheduled workout, uses the same runner-facing `Rest` grammar; a plan is a set of workouts,
+  not a separate calendar boundary, and a later AI, manual, or imported plan can replace that schedule
 - the home support column now keeps a dismissible planning or plan-window note plus next/nearest workout context, while week status stays in the top/header treatment instead of being repeated in the side support area
 - the visible home shell chrome now keeps `Week` status but no longer shows a technical backend label
 - the sidebar plan note can be dismissed for the current UI session, and the sidebar no longer repeats the same week status pill already present in the header
@@ -302,7 +307,7 @@ not product exceptions.
 - structured imports now persist one clearer segment DSL in saved mode:
   interval-by-distance and interval-by-time both normalize into the same repeat prescription shape, and the existing home plus workout-detail routes keep rendering from that one stored contract
 - workout-detail structure rows now have backend-owned execution instructions:
-  AI-authored numeric min/km pace is the primary execution target when present, while exact effort remains supplemental guidance; authored HR references resolve to runner-facing BPM from the effective saved-or-estimated profile, with the source retained as provenance rather than raw zone jargon becoming the instruction. Workout detail, Today/calendar readback, interval visualization, first-plan review copy, and plan export consume that same backend-shaped truth.
+  each runnable leaf has one AI-authored primary mode: benchmark-backed numeric min/km pace, accepted estimated-or-personal BPM, effort, or Run/Walk. Pace and BPM never compete on one leaf; leaf cues remain separate non-command context, estimated BPM stays labelled estimated rather than personal or measured, and raw zone references remain internal provenance. Workout detail, Today/calendar readback, interval visualization, first-plan review copy, and plan export consume that same backend-shaped truth.
 - saved-mode plan truth now also preserves higher-value richer semantics across import, structured authoring, and text authoring without adding a second runtime model:
   target date, goal metadata, plan preferences, source workout identity, source workout type, planned RPE, estimated fatigue, and recovery priority all persist into the same canonical Supabase plan rows
 - home, calendar, and workout detail now render tempo workouts with a tempo-specific visible identity instead of flattening every quality workout into the same generic label, marathon-specific steady durability work reads as marathon-specific rather than generic steady while keeping a controlled steady glyph, distance-first interval reps keep visible distance-first cues in the workout structure UI, and workout detail now shows backend-owned rich workout identity, metric mode, goal context, segment guidance, cues, and hints instead of static local HR/cadence/fueling advice derived from compact workout type

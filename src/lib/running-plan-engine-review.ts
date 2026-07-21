@@ -222,28 +222,6 @@ export function buildRunningPlanCanonicalPlan(draft: RunningPlanPreviewDraft): T
   return trainingPlanV2Schema.parse(draft.canonicalPlan);
 }
 
-export function buildRunningPlanProfilePatch(draft: RunningPlanPreviewDraft): {
-  age: number;
-  weightKg: number;
-  heightCm: number;
-  baselineNotes: string | null;
-  trainingPreferences: Json;
-} {
-  const input = draft.normalizedInputSummary;
-
-  return {
-    age: input.age,
-    weightKg: input.weightKg,
-    heightCm: input.heightCm,
-    baselineNotes: null,
-    trainingPreferences: toJson({
-      blocked_days: [...input.fixedRestDays],
-      max_running_days_per_week: input.daysPerWeek,
-      preferred_long_run_day: input.preferredLongRunDay,
-    }),
-  };
-}
-
 export function buildRunningPlanPersistenceMetadata(input: {
   draft: RunningPlanPreviewDraft;
   canonicalPlan: TrainingPlanV2;
@@ -328,6 +306,7 @@ function buildDistanceFirstNormalizedInputMetadata(draft: RunningPlanPreviewDraf
     trainingWeekdays: normalizedInput.trainingWeekdays,
     startDate: normalizedInput.startDate,
     benchmarkPaceTruth: normalizedInput.benchmarkPaceTruth,
+    runnerProfileSnapshot: normalizedInput.runnerProfileSnapshot,
     distanceGoal: buildDistanceGoalMetadata(intent),
     planGoalIntent: intent,
   };

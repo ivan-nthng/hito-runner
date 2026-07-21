@@ -13,6 +13,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
+import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { readActiveBuildOutputLock } from "./lib/build-output-lock.mjs";
 import { resolveQaRuntimePaths } from "./lib/qa-runtime-paths.mjs";
@@ -56,7 +57,10 @@ const serveCommandLabel = "npm run serve:local";
 const staleBuildGraceMs = 1000;
 const transportLogMaxBytes = 5 * 1024 * 1024;
 const transportLogArchiveDir = resolve(logsDir, "transport-log-archive");
-const structuredEventsRoot = resolve(rootDir, "logs/local-runtime-observability");
+const structuredEventsRoot = resolve(
+  homedir(),
+  "Library/Caches/hito-running/local-runtime-observability",
+);
 const providerMode = resolveProviderMode(process.argv.slice(3));
 
 const command = process.argv[2] ?? "status";
@@ -172,6 +176,7 @@ async function startCommand() {
       PORT: String(port),
       NITRO_PORT: String(port),
       HITO_AI_GENERATED_PLAN_PROVIDER_MODE: providerMode,
+      HITO_LOCAL_RUNTIME_OBSERVABILITY_ROOT: structuredEventsRoot,
       HITO_AI_GENERATED_PLAN_DEV_FIXTURE: providerMode === "qa_fixture" ? "true" : "false",
       HITO_AI_GENERATED_PLAN_DEV_FIXTURE_DELAY_MS:
         providerMode === "qa_fixture"

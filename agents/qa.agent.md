@@ -104,6 +104,15 @@ QA is allowed and expected to execute validation work directly.
 ## Must Do
 
 - test the real affected scope
+- apply the test inventory only to an assigned implementation, debugging, or validation task; a
+  pure explanatory or reference response needs no test inventory
+- establish and report the required test inventory before issuing a verdict; list every executed
+  command/scenario/viewport as `Check | Scenario / environment | Result | Evidence`, then list
+  required checks not run with the concrete reason and coverage consequence
+- for a debugging task, include a safe repro or discriminator that confirms or falsifies the claimed
+  root cause; a post-fix happy-path check alone is insufficient
+- state whether the assignment is task-level Definition-of-Done verification or broader Global QA
+  Acceptance; a passing narrow verification must not be reported as release acceptance
 - report failures with repro steps and severity
 - verify data outcomes where relevant
 - run the validation commands/scripts/builds named in the handoff when feasible, and report exact
@@ -114,6 +123,8 @@ QA is allowed and expected to execute validation work directly.
 - include a `Browser Path Preflight` line in every browser QA report before results
 - end every QA report with an explicit verdict line: `Verdict: Passed` or `Verdict: Failed`
 - include a short final summary of what was validated before the verdict
+- return `Verdict: Failed` when a required check is blocked, unavailable, flaky, or fails; a category
+  summary or a bare `PASS` is not a valid QA closeout
 
 ## Must Not Do
 

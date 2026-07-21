@@ -41,6 +41,7 @@ import { buildRunningPlanCanonicalPlan } from "../src/lib/running-plan-engine-re
 import { buildDeterministicWorkoutComparison } from "../src/lib/workout-result-import/compare-workout-result";
 import type { Database } from "../src/lib/supabase/database";
 import type { Step, StepTarget } from "../src/lib/training";
+import { buildProofRunnerProfileSnapshot } from "./runner-profile-snapshot-proof-helpers";
 
 type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
 type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
@@ -174,7 +175,8 @@ async function validateGeneratedAndAiPlansUseUnifiedBlockContract() {
 }
 
 async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {
-  const authoring = buildAiGeneratedRunningPlanAuthoringInput(input);
+  const runnerProfileSnapshot = buildProofRunnerProfileSnapshot(input);
+  const authoring = buildAiGeneratedRunningPlanAuthoringInput(input, runnerProfileSnapshot);
   assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);
   if (!authoring.ok) {
     throw new Error(authoring.message);
@@ -190,6 +192,7 @@ async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {
 
   return buildReviewedAiGeneratedRunningPlanPreview(input, {
     aiPreview: aiPreview ?? undefined,
+    runnerProfileSnapshot,
   });
 }
 

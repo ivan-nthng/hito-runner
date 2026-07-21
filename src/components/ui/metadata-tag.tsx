@@ -34,6 +34,7 @@ const HitoMetadataTag = React.forwardRef<HTMLElement, HitoMetadataTagProps>(
       <Comp
         ref={ref}
         className={cn("hito-metadata-tag", className)}
+        data-hito-component="metadata-tag"
         data-interactive={interactive ? "true" : undefined}
         data-readonly={interactive ? undefined : "true"}
         data-tone={tone}

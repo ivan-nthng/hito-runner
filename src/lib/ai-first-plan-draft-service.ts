@@ -18,6 +18,10 @@ import {
   type AiPlanGenerationLedgerTrace,
 } from "@/lib/ai-plan-generation-ledger";
 import { type TrainingPlanV2 } from "@/lib/imported-plan";
+import {
+  recordLocalProviderTranscript,
+  type LocalProviderTranscriptOutcome,
+} from "@/lib/local-runtime-observability";
 import { serverEnv } from "@/lib/supabase/env";
 import {
   structuredPlanAuthoringInputSchema,
@@ -464,6 +468,7 @@ async function requestOpenAiFirstPlanDraft({
 }) {
   const controller = new AbortController();
   const requestStartedAt = Date.now();
+  const requestStartedAtIso = new Date(requestStartedAt).toISOString();
   let abortFired = false;
   let abortReason: "cancelled" | "timeout" | null = null;
   const baseDebug = buildRequestDebug({
@@ -478,6 +483,78 @@ async function requestOpenAiFirstPlanDraft({
     openAiElapsedMs: null,
   });
   let generationTrace = initialGenerationTrace;
+  const requestBody = JSON.stringify({
+    model,
+    ...(supportsReasoningEffort(model) ? { reasoning: { effort: "minimal" } } : {}),
+    max_output_tokens: maxOutputTokens,
+    input: [
+      {
+        role: "system",
+        content: [
+          {
+            type: "input_text",
+            text: prompt.systemPrompt,
+          },
+        ],
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: prompt.userPrompt,
+          },
+        ],
+      },
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME,
+        strict: true,
+        schema: prompt.responseSchema,
+      },
+    },
+  });
+  let responseBodyText: string | null = null;
+  let httpStatus: number | null = null;
+  let responseContentType: string | null = null;
+  let responseReceivedAt: string | null = null;
+  let providerResponseId: string | null = null;
+  let providerStatus: string | null = null;
+  let providerRequestStarted = false;
+  let transcriptRecorded = false;
+  const recordTranscript = async (outcome: LocalProviderTranscriptOutcome) => {
+    if (
+      !providerRequestStarted ||
+      transcriptRecorded ||
+      resolveAiPlanGenerationProviderKind({ apiKey, model }) !== "openai_responses_api"
+    ) {
+      return;
+    }
+    transcriptRecorded = true;
+    await recordLocalProviderTranscript(
+      {
+        generationId: generationTrace?.generationId ?? "generation_unavailable",
+        providerResponseId,
+        model,
+        outcome,
+        providerStatus,
+        httpStatus,
+        responseContentType,
+        requestStartedAt: requestStartedAtIso,
+        responseReceivedAt,
+        requestBody,
+        responseBody: responseBodyText,
+      },
+      {
+        disabled: generationLedger?.disabled,
+        forceWrite: generationLedger?.forceArtifactWrite,
+        root: generationLedger?.artifactRoot,
+        runtimeUrl: generationLedger?.runtimeUrl,
+      },
+    );
+  };
   const cancelRequest = () => {
     if (abortReason) {
       return;
@@ -510,48 +587,43 @@ async function requestOpenAiFirstPlanDraft({
         );
       }
 
+      providerRequestStarted = true;
       const response = await fetchImpl(OPENAI_RESPONSES_URL, {
         method: "POST",
         headers: {
           "content-type": "application/json",
           authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({
-          model,
-          ...(supportsReasoningEffort(model) ? { reasoning: { effort: "minimal" } } : {}),
-          max_output_tokens: maxOutputTokens,
-          input: [
-            {
-              role: "system",
-              content: [
-                {
-                  type: "input_text",
-                  text: prompt.systemPrompt,
-                },
-              ],
-            },
-            {
-              role: "user",
-              content: [
-                {
-                  type: "input_text",
-                  text: prompt.userPrompt,
-                },
-              ],
-            },
-          ],
-          text: {
-            format: {
-              type: "json_schema",
-              name: AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME,
-              strict: true,
-              schema: prompt.responseSchema,
-            },
-          },
-        }),
+        body: requestBody,
         signal: controller.signal,
       });
-      const body = (await response.json()) as OpenAiResponseBody;
+      httpStatus = response.status;
+      responseContentType = response.headers.get("content-type");
+      responseReceivedAt = new Date().toISOString();
+      try {
+        responseBodyText = await response.text();
+      } catch {
+        await recordTranscript("response_read_failed");
+        throw new AiFirstPlanDraftServiceError(
+          "ai_authored_plan_first_provider_response_read_failed",
+          ["OpenAI response body could not be read."],
+          { ...baseDebug, requestPhase: "request_failed" },
+          generationTrace,
+        );
+      }
+      const parsedResponse = safeParseJson(responseBodyText);
+      if (!parsedResponse || typeof parsedResponse !== "object" || Array.isArray(parsedResponse)) {
+        await recordTranscript("malformed_response");
+        throw new AiFirstPlanDraftServiceError(
+          "ai_authored_plan_first_provider_response_malformed",
+          ["OpenAI returned a malformed response envelope."],
+          { ...baseDebug, requestPhase: "request_failed" },
+          generationTrace,
+        );
+      }
+      const body = parsedResponse as OpenAiResponseBody;
+      providerStatus = normalizeProviderResponseStatus(body.status);
+      providerResponseId = typeof body.id === "string" ? body.id : null;
       const responseDebug: AiFirstPlanDraftDebugMetadata = {
         ...baseDebug,
         requestPhase: "response_parsed",
@@ -591,6 +663,7 @@ async function requestOpenAiFirstPlanDraft({
         )) ?? generationTrace;
 
       if (!response.ok) {
+        await recordTranscript("http_error");
         generationTrace =
           (await updateAiPlanGenerationLedgerTrace(
             generationTrace,
@@ -612,7 +685,6 @@ async function requestOpenAiFirstPlanDraft({
         );
       }
 
-      const providerStatus = normalizeProviderResponseStatus(body.status);
       if (providerStatus !== "completed") {
         const incomplete = providerStatus === "incomplete";
         const cancelled = providerStatus === "cancelled";
@@ -633,6 +705,15 @@ async function requestOpenAiFirstPlanDraft({
                 ? extractOpenAiError(body)
                 : `OpenAI first-plan generation did not complete (status: ${providerStatus ?? "missing"}).`,
         ];
+        await recordTranscript(
+          cancelled
+            ? "cancelled"
+            : incomplete
+              ? "incomplete"
+              : failed
+                ? "failed"
+                : "provider_not_completed",
+        );
         generationTrace =
           (await updateAiPlanGenerationLedgerTrace(
             generationTrace,
@@ -661,6 +742,7 @@ async function requestOpenAiFirstPlanDraft({
         );
       }
 
+      await recordTranscript("completed");
       return { body, debug: responseDebug, generationTrace };
     } catch (error) {
       if (error instanceof AiFirstPlanDraftServiceError) {
@@ -704,6 +786,15 @@ async function requestOpenAiFirstPlanDraft({
         generationTrace,
       );
     });
+  } catch (error) {
+    await recordTranscript(
+      abortReason === "timeout"
+        ? "timeout"
+        : abortReason === "cancelled"
+          ? "cancelled"
+          : "transport_error",
+    );
+    throw error;
   } finally {
     signal?.removeEventListener("abort", cancelRequest);
   }
@@ -997,10 +1088,7 @@ function extractOpenAiError(response: OpenAiResponseBody) {
 }
 
 function safeParseJson(raw: string) {
-  const numberTokens =
-    raw.match(/(?<![A-Za-z0-9_"])-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?(?![A-Za-z0-9_"])/g) ??
-    [];
-  if (numberTokens.some((token) => token.length > 48)) {
+  if (hasPathologicalJsonNumber(raw)) {
     return null;
   }
 
@@ -1009,6 +1097,43 @@ function safeParseJson(raw: string) {
   } catch {
     return null;
   }
+}
+
+function hasPathologicalJsonNumber(raw: string) {
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < raw.length; index += 1) {
+    const character = raw[index]!;
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (character === "\\") {
+        escaped = true;
+      } else if (character === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (character === '"') {
+      inString = true;
+      continue;
+    }
+    if (character !== "-" && (character < "0" || character > "9")) {
+      continue;
+    }
+
+    let tokenEnd = index + 1;
+    while (tokenEnd < raw.length && /[0-9eE+.-]/.test(raw[tokenEnd]!)) {
+      tokenEnd += 1;
+    }
+    if (tokenEnd - index > 48) {
+      return true;
+    }
+    index = tokenEnd - 1;
+  }
+
+  return false;
 }
 
 function classifyAiFirstPlanDraftError(error: unknown) {

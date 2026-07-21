@@ -30,17 +30,18 @@ import {
   AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME,
   buildAiAuthoredPlanFirstOpenAiSchema,
   type AiAuthoredPlanFirstProviderDraft,
+  type AiAuthoredPlanFirstProviderUnit,
 } from "../src/lib/ai-authored-plan-first-provider-contract";
 import {
   AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
-  buildAiGeneratedRunningPlanPreview,
-  buildAiGeneratedRunningPlanAuthoringInput,
+  buildAiGeneratedRunningPlanPreview as buildAiGeneratedRunningPlanPreviewRuntime,
+  buildAiGeneratedRunningPlanAuthoringInput as buildAiGeneratedRunningPlanAuthoringInputRuntime,
 } from "../src/lib/ai-generated-running-plan";
 import { buildImportedPlanSeed } from "../src/lib/imported-plan";
 import { buildReviewedFirstPlanImportedSeed } from "../src/lib/active-plan-persistence";
 import { buildPersistedWorkoutInsertRows } from "../src/lib/persisted-plan-replacement";
 import {
-  buildReviewedAiGeneratedRunningPlanPreview,
+  buildReviewedAiGeneratedRunningPlanPreview as buildReviewedAiGeneratedRunningPlanPreviewRuntime,
   confirmRunningPlanDraftForUser,
   runningPlanPreviewInputSchema,
   type RunningPlanPreviewActionInput,
@@ -60,6 +61,10 @@ import {
   workoutDocumentTargetToWire,
 } from "../src/lib/workout-document";
 import { validatePlanFirstProviderRepresentationContract } from "./plan-first-provider-representation-proof";
+import {
+  buildProofPersonalRunnerProfileSnapshot,
+  buildProofRunnerProfileSnapshot,
+} from "./runner-profile-snapshot-proof-helpers";
 
 const baseInput = {
   age: 36,
@@ -135,6 +140,33 @@ const scenarios = [
   expectedFinalDate?: string;
   expectedNonRepeatTempo?: boolean;
 }>;
+
+function buildAiGeneratedRunningPlanAuthoringInput(
+  input: RunningPlanPreviewActionInput,
+  profileSnapshot = buildProofRunnerProfileSnapshot(input),
+) {
+  return buildAiGeneratedRunningPlanAuthoringInputRuntime(input, profileSnapshot);
+}
+
+function buildAiGeneratedRunningPlanPreview(
+  input: RunningPlanPreviewActionInput,
+  options: Parameters<typeof buildAiGeneratedRunningPlanPreviewRuntime>[1] = {},
+) {
+  return buildAiGeneratedRunningPlanPreviewRuntime(input, {
+    ...options,
+    runnerProfileSnapshot: options.runnerProfileSnapshot ?? buildProofRunnerProfileSnapshot(input),
+  });
+}
+
+function buildReviewedAiGeneratedRunningPlanPreview(
+  input: RunningPlanPreviewActionInput,
+  options: Parameters<typeof buildReviewedAiGeneratedRunningPlanPreviewRuntime>[1] = {},
+) {
+  return buildReviewedAiGeneratedRunningPlanPreviewRuntime(input, {
+    ...options,
+    runnerProfileSnapshot: options.runnerProfileSnapshot ?? buildProofRunnerProfileSnapshot(input),
+  });
+}
 
 await validatePlanFirstPreviewScenarios();
 await validatePlanFirstAuthoringAuthority();
@@ -249,6 +281,16 @@ async function validatePlanFirstAuthoringAuthority() {
   if (!authoring.ok) throw new Error(authoring.message);
   assert.equal(authoring.normalizedInputSummary.loadContext, "ai_authored");
 
+  const missingAcceptedBaseline = buildAiGeneratedRunningPlanAuthoringInputRuntime(
+    ambitiousShortHorizonInput,
+    null,
+  );
+  assert.deepEqual(missingAcceptedBaseline, {
+    ok: false,
+    reason: "structured_input_invalid",
+    message: "Save and accept the runner baseline before creating a generated plan.",
+  });
+
   const fixtureOptions = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
     authoringInput: authoring.authoringInput,
     qaFixtureAuthorized: true,
@@ -331,22 +373,50 @@ async function validatePlanFirstAuthoringAuthority() {
 }
 
 async function validateFaithfulPlanFirstAtomization() {
-  const resolved = buildAiGeneratedRunningPlanAuthoringInput(scenarios[0]!.input);
+  const paceInput = {
+    ...scenarios[0]!.input,
+    benchmark: { kind: "recent_5k_pace" as const, recent5kPace: "5:30/km" },
+  };
+  const personalProfileSnapshot = buildProofPersonalRunnerProfileSnapshot(paceInput);
+  assert.equal(personalProfileSnapshot.heartRateProfile.source, "personal");
+  const resolved = buildAiGeneratedRunningPlanAuthoringInput(paceInput, personalProfileSnapshot);
   assert.equal(resolved.ok, true, resolved.ok ? "" : resolved.message);
   if (!resolved.ok) throw new Error(resolved.message);
 
   const authoringInput = resolved.authoringInput;
-  const target = (input: { pace?: string; hrZone?: string; effort?: string }) => ({
-    pace: input.pace ?? null,
-    hr_zone: input.hrZone ?? null,
-    effort: input.effort ?? null,
-  });
+  const target = (input: {
+    mode: "pace" | "heart_rate" | "effort" | "run_walk";
+    pace?: string;
+    hrZone?: Extract<
+      AiAuthoredPlanFirstProviderUnit["target"],
+      { primary_execution_mode: "heart_rate" }
+    >["command"];
+    effort?: string;
+  }): AiAuthoredPlanFirstProviderUnit["target"] => {
+    if (input.mode === "pace") {
+      return {
+        primary_execution_mode: "pace",
+        command: input.pace ?? "5:30/km",
+      };
+    }
+    if (input.mode === "heart_rate") {
+      return {
+        primary_execution_mode: "heart_rate",
+        command: input.hrZone ?? "Z2",
+      };
+    }
+
+    return {
+      primary_execution_mode: input.mode,
+      command: input.effort ?? "Execute",
+    };
+  };
   const unit = (input: {
     segmentType: "warmup" | "main" | "tempo_block" | "cooldown";
     label: string;
     durationMin?: number;
     distanceKm?: number;
-    target?: ReturnType<typeof target>;
+    target: ReturnType<typeof target>;
   }) => ({
     kind: "unit" as const,
     segment_type: input.segmentType,
@@ -356,7 +426,7 @@ async function validateFaithfulPlanFirstAtomization() {
       input.distanceKm != null
         ? { mode: "distance" as const, distance_km: input.distanceKm }
         : { mode: "time" as const, duration_min: input.durationMin! },
-    target: input.target ?? null,
+    target: input.target,
   });
   const draft = {
     workouts: [
@@ -371,7 +441,7 @@ async function validateFaithfulPlanFirstAtomization() {
             segmentType: "main",
             label: "Race pace",
             durationMin: 15,
-            target: target({ pace: "5:00-5:10/km" }),
+            target: target({ mode: "pace", pace: "5:00-5:10/km" }),
           }),
         ],
       },
@@ -387,9 +457,8 @@ async function validateFaithfulPlanFirstAtomization() {
             label: "Tempo",
             durationMin: 20,
             target: target({
+              mode: "pace",
               pace: "5:00-5:10/km",
-              hrZone: "Z3",
-              effort: "Controlled",
             }),
           }),
         ],
@@ -413,28 +482,28 @@ async function validateFaithfulPlanFirstAtomization() {
                 label: "Settle",
                 cue: null,
                 prescription: { mode: "time", duration_min: 1 },
-                target: null,
+                target: target({ mode: "effort", effort: "Settle into smooth form" }),
               },
               {
                 role: "work",
                 label: "Work",
                 cue: null,
                 prescription: { mode: "time", duration_min: 2 },
-                target: target({ pace: "4:50/km", hrZone: "Z4" }),
+                target: target({ mode: "pace", pace: "4:50/km" }),
               },
               {
                 role: "recover",
                 label: "Float",
                 cue: null,
                 prescription: { mode: "time", duration_min: 1 },
-                target: target({ effort: "Easy float" }),
+                target: target({ mode: "effort", effort: "Easy float" }),
               },
               {
                 role: "finish",
                 label: "Finish",
                 cue: null,
                 prescription: { mode: "time", duration_min: 0.5 },
-                target: null,
+                target: target({ mode: "effort", effort: "Finish with relaxed form" }),
               },
             ],
           },
@@ -450,7 +519,7 @@ async function validateFaithfulPlanFirstAtomization() {
                 label: "Stride",
                 cue: null,
                 prescription: { mode: "time", duration_min: 1 / 3 },
-                target: null,
+                target: target({ mode: "effort", effort: "Relaxed-fast and smooth" }),
               },
             ],
           },
@@ -466,7 +535,7 @@ async function validateFaithfulPlanFirstAtomization() {
                 label: "4km",
                 cue: null,
                 prescription: { mode: "distance", distance_km: 4 },
-                target: target({ pace: "5:00/km" }),
+                target: target({ mode: "pace", pace: "5:00/km" }),
               },
             ],
           },
@@ -474,7 +543,7 @@ async function validateFaithfulPlanFirstAtomization() {
             segmentType: "main",
             label: "Final one-off 2km",
             distanceKm: 2,
-            target: target({ pace: "4:55/km" }),
+            target: target({ mode: "pace", pace: "4:55/km" }),
           }),
         ],
       },
@@ -489,7 +558,7 @@ async function validateFaithfulPlanFirstAtomization() {
             segmentType: "main",
             label: "Main",
             durationMin: 60,
-            target: target({ hrZone: "Z2" }),
+            target: target({ mode: "heart_rate", hrZone: "Z2" }),
           }),
         ],
       },
@@ -504,7 +573,7 @@ async function validateFaithfulPlanFirstAtomization() {
             segmentType: "main",
             label: "Trail",
             durationMin: 40,
-            target: target({ effort: "Controlled trail effort" }),
+            target: target({ mode: "effort", effort: "Controlled trail effort" }),
           }),
         ],
       },
@@ -520,19 +589,19 @@ async function validateFaithfulPlanFirstAtomization() {
           segmentType: "warmup",
           label: "Warmup",
           distanceKm: 0.5,
-          target: target({ effort: "Easy warmup" }),
+          target: target({ mode: "effort", effort: "Easy warmup" }),
         }),
         unit({
           segmentType: "main",
           label: "Main",
           distanceKm: 10,
-          target: target({ effort: "Reviewed race effort" }),
+          target: target({ mode: "effort", effort: "Reviewed race effort" }),
         }),
         unit({
           segmentType: "cooldown",
           label: "Cooldown",
           distanceKm: 0.5,
-          target: target({ effort: "Easy cooldown" }),
+          target: target({ mode: "effort", effort: "Easy cooldown" }),
         }),
       ],
     },
@@ -563,12 +632,13 @@ async function validateFaithfulPlanFirstAtomization() {
   assert.ok(tempo);
   assert.equal(tempo.segments[0]?.segment_type, "tempo_block");
   assert.equal(tempo.segments[0]?.prescription?.mode, "time");
+  assert.equal(tempo.segments[0]?.target?.primary_execution_mode, "pace");
   assert.equal(tempo.segments[0]?.target?.pace, "5:00-5:10/km");
-  assert.equal(tempo.segments[0]?.target?.intensity, "Controlled");
+  assert.equal(tempo.segments[0]?.target?.intensity, undefined);
   assert.equal(tempo.segments[0]?.target?.hint, undefined);
-  assert.equal(tempo.segments[0]?.target?.extra?.hr_zone, "Z3");
-  assert.equal(tempo.segments[0]?.target?.hr_bpm_range, "110-135 bpm");
-  assert.equal(tempo.segments[0]?.target?.hr_target_source, "default_estimated_hr");
+  assert.equal(tempo.segments[0]?.target?.extra?.hr_zone, undefined);
+  assert.equal(tempo.segments[0]?.target?.hr_bpm_range, undefined);
+  assert.equal(tempo.segments[0]?.target?.hr_target_source, "effort_only");
   assert.equal(tempo.segments[0]?.target?.cue, undefined);
 
   const faithfulReadback = buildImportedPlanSeed(compiled.canonicalPlan);
@@ -576,23 +646,26 @@ async function validateFaithfulPlanFirstAtomization() {
     (workout) => workout.sourceWorkoutId === tempo.workout_id,
   );
   const tempoReadbackTarget = tempoReadback?.steps[0]?.target;
+  assert.equal(tempoReadbackTarget?.primary_execution_mode, "pace");
   assert.equal(tempoReadbackTarget?.pace, "5:00-5:10/km");
-  assert.equal(tempoReadbackTarget?.intensity, "Controlled");
+  assert.equal(tempoReadbackTarget?.intensity, undefined);
   assert.equal(tempoReadbackTarget?.hint, undefined);
-  assert.equal(tempoReadbackTarget?.extra?.hr_zone, "Z3");
-  assert.equal(tempoReadbackTarget?.hr_bpm_range, "110-135 bpm");
+  assert.equal(tempoReadbackTarget?.extra?.hr_zone, undefined);
+  assert.equal(tempoReadbackTarget?.hr_bpm_range, undefined);
   const tempoExportTarget = workoutDocumentTargetToWire(tempoReadbackTarget);
+  assert.equal(tempoExportTarget?.primary_execution_mode, "pace");
   assert.equal(tempoExportTarget?.pace, "5:00-5:10/km");
-  assert.equal(tempoExportTarget?.intensity, "Controlled");
+  assert.equal(tempoExportTarget?.intensity, undefined);
   assert.equal(tempoExportTarget?.hint, undefined);
-  assert.equal(tempoExportTarget?.hr_zone, "Z3");
-  assert.equal(tempoExportTarget?.hr_bpm_range, "110-135 bpm");
+  assert.equal(tempoExportTarget?.hr_zone, undefined);
+  assert.equal(tempoExportTarget?.hr_bpm_range, undefined);
   const tempoExportRoundTrip = normalizeWorkoutDocumentTarget(tempoExportTarget);
+  assert.equal(tempoExportRoundTrip?.primary_execution_mode, "pace");
   assert.equal(tempoExportRoundTrip?.pace, "5:00-5:10/km");
-  assert.equal(tempoExportRoundTrip?.intensity, "Controlled");
+  assert.equal(tempoExportRoundTrip?.intensity, undefined);
   assert.equal(tempoExportRoundTrip?.hint, undefined);
-  assert.equal(tempoExportRoundTrip?.extra?.hr_zone, "Z3");
-  assert.equal(tempoExportRoundTrip?.hr_bpm_range, "110-135 bpm");
+  assert.equal(tempoExportRoundTrip?.extra?.hr_zone, undefined);
+  assert.equal(tempoExportRoundTrip?.hr_bpm_range, undefined);
 
   const persistedTempoRow = buildPersistedWorkoutInsertRows(
     "00000000-0000-4000-8000-000000000801",
@@ -603,7 +676,7 @@ async function validateFaithfulPlanFirstAtomization() {
   assert.deepEqual(
     persistedTempoTarget,
     tempoReadbackTarget,
-    "Canonical persistence row shaping must preserve AI-authored pace, effort, and HR-zone guidance.",
+    "Canonical persistence row shaping must preserve the AI-authored primary mode and pace command.",
   );
 
   const intervals = compiled.canonicalPlan.planned_workouts.find(
@@ -622,13 +695,15 @@ async function validateFaithfulPlanFirstAtomization() {
     orderedRepeat.children?.map((child) => child.role),
     ["run", "work", "recover", "finish"],
   );
+  assert.equal(orderedRepeat.children?.[0]?.target?.primary_execution_mode, "effort");
+  assert.equal(orderedRepeat.children?.[1]?.target?.primary_execution_mode, "pace");
   assert.equal(orderedRepeat.children?.[1]?.target?.pace, "4:50/km");
   assert.equal(orderedRepeat.children?.[1]?.target?.hint, undefined);
-  assert.equal(orderedRepeat.children?.[1]?.target?.extra?.hr_zone, "Z4");
-  assert.equal(orderedRepeat.children?.[1]?.target?.hr_bpm_range, "130-145 bpm");
-  assert.equal(intervals.metric_mode?.executable_mode, "mixed_metric_executable");
+  assert.equal(orderedRepeat.children?.[1]?.target?.extra?.hr_zone, undefined);
+  assert.equal(orderedRepeat.children?.[1]?.target?.hr_bpm_range, undefined);
+  assert.equal(intervals.metric_mode?.executable_mode, "pace_executable");
   assert.equal(intervals.metric_mode?.pace_targets_allowed, true);
-  assert.equal(intervals.metric_mode?.hr_targets_allowed, true);
+  assert.equal(intervals.metric_mode?.hr_targets_allowed, false);
   const noRecoveryRepeat = intervals.segments[1]?.prescription;
   assert.equal(noRecoveryRepeat?.mode, "repeats");
   if (noRecoveryRepeat?.mode !== "repeats") throw new Error("Missing one-child Repeat proof.");
@@ -636,11 +711,7 @@ async function validateFaithfulPlanFirstAtomization() {
     noRecoveryRepeat.children?.map((child) => child.role),
     ["work"],
   );
-  assert.equal(
-    noRecoveryRepeat.children?.[0]?.target,
-    undefined,
-    "A targetless authored Repeat child must remain targetless after compilation.",
-  );
+  assert.equal(noRecoveryRepeat.children?.[0]?.target?.primary_execution_mode, "effort");
   const twoByFourKm = intervals.segments[2]?.prescription;
   assert.equal(twoByFourKm?.mode, "repeats");
   assert.equal(twoByFourKm?.repeat_count, 2);
@@ -662,6 +733,10 @@ async function validateFaithfulPlanFirstAtomization() {
   );
   assert.equal(longRun?.workout_identity, "long_aerobic_run");
   assert.notEqual(longRun?.workout_identity, "taper_long_run");
+  assert.equal(longRun?.segments[0]?.target?.primary_execution_mode, "heart_rate");
+  assert.equal(longRun?.segments[0]?.target?.hr_target_source, "personal_hr_zone");
+  assert.equal(longRun?.segments[0]?.target?.hr_bpm_range, "121-140 bpm");
+  assert.equal(longRun?.segments[0]?.target?.pace, undefined);
   const endpoint = compiled.canonicalPlan.planned_workouts.at(-1);
   assert.equal(
     selectedDistanceEndpointMainDistanceMeters({
@@ -673,16 +748,23 @@ async function validateFaithfulPlanFirstAtomization() {
   );
 
   let previewProviderCalls = 0;
-  const reviewedProjection = await buildReviewedAiGeneratedRunningPlanPreview(scenarios[0]!.input, {
-    aiPreview: {
-      apiKey: "injected-provider-contract-proof",
-      today: scenarios[0]!.input.startDate,
-      fetchImpl: async () => {
-        previewProviderCalls += 1;
-        return openAiPlanFirstResponse("resp-faithful-projection", draft);
+  const reviewedProjection = await buildReviewedAiGeneratedRunningPlanPreview(
+    {
+      ...scenarios[0]!.input,
+      benchmark: { kind: "recent_5k_pace", recent5kPace: "5:30/km" },
+    },
+    {
+      runnerProfileSnapshot: personalProfileSnapshot,
+      aiPreview: {
+        apiKey: "injected-provider-contract-proof",
+        today: scenarios[0]!.input.startDate,
+        fetchImpl: async () => {
+          previewProviderCalls += 1;
+          return openAiPlanFirstResponse("resp-faithful-projection", draft);
+        },
       },
     },
-  });
+  );
   assert.equal(
     reviewedProjection.ok,
     true,
@@ -732,13 +814,17 @@ async function validateFaithfulPlanFirstAtomization() {
   if (unknownIdentityResult.ok) throw new Error("Unknown identity unexpectedly compiled.");
   assert.match(JSON.stringify(unknownIdentityResult.issues), /workout_identity_invalid/);
 
-  const runnerTargetResolved = buildAiGeneratedRunningPlanAuthoringInput({
-    ...scenarios[0]!.input,
-    planGoalIntent: {
-      distance: { kind: "preset", preset: "10K" },
-      targetFinishTime: "1:10:00",
+  const runnerTargetResolved = buildAiGeneratedRunningPlanAuthoringInput(
+    {
+      ...scenarios[0]!.input,
+      benchmark: { kind: "recent_5k_pace", recent5kPace: "5:30/km" },
+      planGoalIntent: {
+        distance: { kind: "preset", preset: "10K" },
+        targetFinishTime: "1:10:00",
+      },
     },
-  });
+    personalProfileSnapshot,
+  );
   assert.equal(runnerTargetResolved.ok, true);
   if (!runnerTargetResolved.ok) throw new Error(runnerTargetResolved.message);
   const runnerTargetResult = compileAiAuthoredPlanFirstDraft({
@@ -855,7 +941,9 @@ async function validateProviderContractBoundary() {
         };
         benchmark: unknown;
         heart_rate_profile: {
-          source: "default_estimated" | "personal";
+          source: "estimated" | "personal";
+          accepted: true;
+          primary_command_eligible: boolean;
           zones: Array<{
             reference: string;
             min_bpm: number;
@@ -878,17 +966,17 @@ async function validateProviderContractBoundary() {
   assert.match(systemPrompt, /support long runs and quality sessions/i);
   assert.match(systemPrompt, /final 14 calendar days before endpoint/i);
   assert.match(systemPrompt, /M:SS\/km or M:SS-M:SS\/km/i);
-  assert.match(systemPrompt, /exact target-finish pace/i);
-  assert.match(systemPrompt, /When pace guidance is authored/i);
-  assert.match(systemPrompt, /heart_rate_profile reference/i);
-  assert.match(systemPrompt, /resolves it to the supplied BPM range/i);
-  assert.match(systemPrompt, /Prefer Z1-Z5 references only in target\.hr_zone/i);
-  assert.match(systemPrompt, /deterministically resolves that reference/i);
+  assert.match(systemPrompt, /target_finish_time alone is not pace truth/i);
+  assert.match(systemPrompt, /primary_execution_mode=pace/i);
+  assert.match(systemPrompt, /primary_execution_mode=heart_rate/i);
+  assert.match(systemPrompt, /Estimated source remains explicitly estimated/i);
+  assert.match(systemPrompt, /Use Z1-Z5 references only as target\.command/i);
+  assert.match(systemPrompt, /Never put pace and heart rate on the same leaf/i);
   assert.doesNotMatch(systemPrompt, /adaptation bridge|adaptation contacts|Long Run no earlier/i);
   assert.match(systemPrompt, /Author directly from the supplied runner facts/i);
   assert.ok(
-    schemaChars < oldSchemaChars * 0.6,
-    `Provider schema must stay at least 40% smaller than the retired ${oldSchemaChars}-character contract; received ${schemaChars}.`,
+    schemaChars < oldSchemaChars * 0.65,
+    `Provider schema must stay at least 35% smaller than the retired ${oldSchemaChars}-character contract; received ${schemaChars}.`,
   );
   assert.ok(
     userPrompt.length < 3_000,
@@ -984,7 +1072,9 @@ async function validateProviderContractBoundary() {
     false,
     "Strict provider schema must make fixed-rest dates unauthorable.",
   );
-  assert.equal(providerFacts.runnerFacts.runner.heart_rate_profile.source, "default_estimated");
+  assert.equal(providerFacts.runnerFacts.runner.heart_rate_profile.source, "estimated");
+  assert.equal(providerFacts.runnerFacts.runner.heart_rate_profile.accepted, true);
+  assert.equal(providerFacts.runnerFacts.runner.heart_rate_profile.primary_command_eligible, true);
   assert.equal(providerFacts.runnerFacts.runner.selected_fitness_level, "running_regularly");
   assert.equal(providerFacts.runnerFacts.runner.first_session_adaptation.required, false);
   assert.deepEqual(
@@ -1452,13 +1542,17 @@ async function validatePathologicalProviderNumberFailsBeforeReview() {
 
 async function validateProviderStructuralBoundsFailBeforeReview() {
   const scenario = scenarios[0]!;
-  const resolved = buildAiGeneratedRunningPlanAuthoringInput(scenario.input);
+  const paceTruthInput = {
+    ...scenario.input,
+    benchmark: { kind: "recent_5k_pace" as const, recent5kPace: "5:30/km" },
+  };
+  const resolved = buildAiGeneratedRunningPlanAuthoringInput(paceTruthInput);
   assert.equal(resolved.ok, true, resolved.ok ? "" : resolved.message);
   if (!resolved.ok) throw new Error(resolved.message);
 
   const fixtureFetch = buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
     authoringInput: resolved.authoringInput,
-    today: scenario.input.startDate ?? resolved.authoringInput.schedule.startDate,
+    today: paceTruthInput.startDate ?? resolved.authoringInput.schedule.startDate,
   });
   const fixtureResponse = await fixtureFetch("https://api.openai.com/v1/responses", {});
   const fixtureBody = (await fixtureResponse.json()) as { output_text: string };
@@ -1517,28 +1611,28 @@ async function validateProviderStructuralBoundsFailBeforeReview() {
     {
       name: "qualitative pace in executable pace field",
       mutate: (draft) => {
-        findProviderPaceTarget(draft).pace = "comfortably hard";
+        findProviderPaceTarget(draft).command = "comfortably hard";
       },
       expectedIssue: /provider_schema_invalid/i,
     },
     {
       name: "zone label in executable pace field",
       mutate: (draft) => {
-        findProviderPaceTarget(draft).pace = "Z3";
+        findProviderPaceTarget(draft).command = "Z3";
       },
       expectedIssue: /provider_schema_invalid/i,
     },
     {
       name: "invalid pace seconds",
       mutate: (draft) => {
-        findProviderPaceTarget(draft).pace = "4:75/km";
+        findProviderPaceTarget(draft).command = "4:75/km";
       },
       expectedIssue: /provider_schema_invalid/i,
     },
     {
       name: "pace without unit",
       mutate: (draft) => {
-        findProviderPaceTarget(draft).pace = "4:50-5:00";
+        findProviderPaceTarget(draft).command = "4:50-5:00";
       },
       expectedIssue: /provider_schema_invalid/i,
     },
@@ -1551,7 +1645,7 @@ async function validateProviderStructuralBoundsFailBeforeReview() {
       input: resolved.authoringInput,
       apiKey: `provider-structural-${scenarioCase.name}`,
       model: "provider-structural-bound-proof",
-      today: scenario.input.startDate ?? resolved.authoringInput.schedule.startDate,
+      today: paceTruthInput.startDate ?? resolved.authoringInput.schedule.startDate,
       fetchImpl: async () =>
         openAiPlanFirstResponse(`resp_provider_structural_${scenarioCase.name}`, invalidDraft),
     });
@@ -1576,7 +1670,9 @@ function findProviderPaceTarget(draft: AiAuthoredPlanFirstProviderDraft) {
   for (const section of draft.workouts.flatMap((workout) => workout.sections)) {
     const targets =
       section.kind === "unit" ? [section.target] : section.children.map((child) => child.target);
-    const authoredTarget = targets.find((candidate) => candidate?.pace);
+    const authoredTarget = targets.find(
+      (candidate) => candidate?.primary_execution_mode === "pace",
+    );
     if (authoredTarget) return authoredTarget;
   }
   throw new Error("Fixture must expose an AI-authored numeric pace target.");
@@ -1969,15 +2065,22 @@ async function assertReviewedDraftExactness({
       };
     }
   ).selected_plan_engine?.metric_policy;
+  const serializedCanonicalPlan = JSON.stringify(canonicalPlan);
+  const hasPaceCommand =
+    /"primary_execution_mode":"pace"/.test(serializedCanonicalPlan) &&
+    /"pace":"\d{1,2}:[0-5]\d/.test(serializedCanonicalPlan);
+  const hasAcceptedHeartRateCommand =
+    /"primary_execution_mode":"heart_rate"/.test(serializedCanonicalPlan) &&
+    /"hr_target_source":"(?:personal_hr_zone|default_estimated_hr)"/.test(serializedCanonicalPlan);
   assert.equal(
     metricPolicy?.paceTargetsAllowed,
-    true,
-    `${scenarioName} persistence metadata must describe reviewed AI-authored pace truth.`,
+    hasPaceCommand,
+    `${scenarioName} persistence metadata must match reviewed pace-primary truth.`,
   );
   assert.equal(
     metricPolicy?.heartRateTargetsAllowed,
-    true,
-    `${scenarioName} persistence metadata must describe effective heart-rate profile guidance.`,
+    hasAcceptedHeartRateCommand,
+    `${scenarioName} persistence metadata must match reviewed accepted-HR-primary truth.`,
   );
 
   const decoded = await validateSelfContainedRunningPlanReviewToken({
@@ -2022,10 +2125,15 @@ async function assertReviewedDraftExactness({
   assert.equal(tamperedReadModelExactness.reason, "stale_review");
 
   const tamperedTargetDraft = structuredClone(draft);
-  const tamperedPaceTarget = findRecordWithStringKey(tamperedTargetDraft.workoutDocuments, "pace");
-  assert.ok(tamperedPaceTarget, `${scenarioName} must expose signed AI-authored pace guidance.`);
-  if (tamperedPaceTarget) {
-    tamperedPaceTarget.pace = "9:59/km";
+  const tamperedTarget = findRecordWithStringKey(
+    tamperedTargetDraft.workoutDocuments,
+    "primary_execution_mode",
+  );
+  assert.ok(tamperedTarget, `${scenarioName} must expose a signed primary execution mode.`);
+  if (tamperedTarget && typeof tamperedTarget.intensity === "string") {
+    tamperedTarget.intensity = `${tamperedTarget.intensity} (tampered)`;
+  } else if (tamperedTarget) {
+    tamperedTarget.primary_execution_mode = "run_walk";
   }
   const tamperedTargetExactness = await validateRunningPlanReviewExactness({
     draft: tamperedTargetDraft,
@@ -2035,7 +2143,7 @@ async function assertReviewedDraftExactness({
   assert.equal(
     tamperedTargetExactness.ok,
     false,
-    `${scenarioName} must reject an AI-authored pace substitution after review.`,
+    `${scenarioName} must reject an AI-authored primary-command substitution after review.`,
   );
 
   return canonicalPlan;
@@ -2072,24 +2180,54 @@ function assertPlanFirstGuidanceAndRepeatShape({
       `${scenarioName} repeat parents must stay structural-only.`,
     );
   }
-  const paceValues = collectStringValuesForKey(canonicalPlan, "pace");
-  assert.ok(
-    paceValues.length > 0,
-    `${scenarioName} must preserve AI-authored numeric pace guidance.`,
-  );
-  for (const pace of paceValues) {
-    assert.match(
-      pace,
-      new RegExp(AI_AUTHORED_PLAN_FIRST_PACE_MIN_PER_KM_PATTERN),
-      `${scenarioName} pace must remain machine-parseable min/km guidance.`,
-    );
+  let runnableLeafCount = 0;
+  for (const workout of canonicalPlan.planned_workouts) {
+    if (workout.workout_type === "rest") continue;
+    for (const segment of workout.segments) {
+      const leaves =
+        segment.prescription?.mode === "repeats"
+          ? (segment.prescription.children ?? [])
+          : [segment];
+      for (const leaf of leaves) {
+        runnableLeafCount += 1;
+        const target = leaf.target;
+        assert.ok(
+          target?.primary_execution_mode,
+          `${scenarioName} runnable leaves must author one primary execution mode.`,
+        );
+        const hasPace = Boolean(target?.pace ?? target?.pace_min_per_km_range);
+        const hasHeartRate = Boolean(target?.hr_bpm_range ?? target?.hr_bpm);
+        assert.equal(
+          hasPace && hasHeartRate,
+          false,
+          `${scenarioName} one leaf cannot command pace and heart rate together.`,
+        );
+        if (target?.primary_execution_mode === "pace") {
+          assert.match(
+            target.pace ?? target.pace_min_per_km_range ?? "",
+            new RegExp(AI_AUTHORED_PLAN_FIRST_PACE_MIN_PER_KM_PATTERN),
+          );
+        }
+        if (target?.primary_execution_mode === "heart_rate") {
+          assert.ok(
+            target.hr_target_source === "personal_hr_zone" ||
+              target.hr_target_source === "default_estimated_hr",
+            `${scenarioName} HR-primary leaves must retain accepted profile provenance.`,
+          );
+          assert.equal(hasHeartRate, true);
+        }
+        if (
+          target?.primary_execution_mode === "effort" ||
+          target?.primary_execution_mode === "run_walk"
+        ) {
+          assert.equal(hasPace || hasHeartRate, false);
+          assert.ok(target.intensity);
+        }
+      }
+    }
   }
+  assert.ok(runnableLeafCount > 0);
   assert.doesNotMatch(serialized, /repeat_unit|recovery_unit/);
-  assert.match(
-    serialized,
-    /"hr_bpm_range":"\d{2,3}-\d{2,3} bpm"/,
-    `${scenarioName} must materialize runner-facing BPM from the effective profile.`,
-  );
   assert.doesNotMatch(
     serialized,
     /"hr_target_source":"effort_only"[^}]*"hr_bpm_range"/,
@@ -2182,11 +2320,12 @@ function assertNonRepeatTempoFixtureReviewTruth({
   assert.ok(work, `${scenarioName} continuous Tempo must include an authored Work segment.`);
   if (!work) return;
   assert.equal(work.prescription?.mode, "time");
-  assert.equal(work.target?.pace, "4:50-5:00/km");
+  assert.equal(work.target?.primary_execution_mode, "effort");
+  assert.equal(work.target?.pace, undefined);
   assert.equal(work.target?.intensity, "Controlled tempo effort");
   assert.equal(work.target?.hint, undefined);
-  assert.equal(work.target?.extra?.hr_zone, "Z3");
-  assert.match(work.target?.hr_bpm_range ?? "", /^\d{2,3}-\d{2,3} bpm$/);
+  assert.equal(work.target?.extra?.hr_zone, undefined);
+  assert.equal(work.target?.hr_bpm_range, undefined);
 
   const reviewRow = calendarRows.find((row) => row.rowId === tempo.workout_id);
   const reviewWork = reviewRow?.segments.find((segment) => segment.id === work.segment_id);

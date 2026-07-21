@@ -15,9 +15,13 @@ import type {
 
 export const AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE = "ai_authored_plan_guidance" as const;
 
+export const PRIMARY_EXECUTION_MODE_VALUES = ["pace", "heart_rate", "effort", "run_walk"] as const;
+export type PrimaryExecutionMode = (typeof PRIMARY_EXECUTION_MODE_VALUES)[number];
+
 export type WorkoutDocumentType = "easy" | "steady_or_easy" | "rest" | "long_run" | "quality";
 
 export interface WorkoutDocumentTarget {
+  primary_execution_mode?: PrimaryExecutionMode;
   target_source?: string;
   intensity?: string;
   hr_bpm_range?: string;
@@ -130,6 +134,7 @@ export function normalizeWorkoutDocumentTarget(value: unknown): WorkoutDocumentT
   const paceRange = readString(target.pace_min_per_km_range ?? target.pace_range_min_km);
 
   return {
+    ...primaryExecutionModeField(target.primary_execution_mode),
     ...stringField("target_source", target.target_source),
     ...stringField("intensity", target.intensity),
     ...stringField("hr_bpm_range", target.hr_bpm_range),
@@ -170,6 +175,7 @@ export function workoutDocumentTargetToWire(
   };
 
   push("target_source", target.target_source);
+  push("primary_execution_mode", target.primary_execution_mode);
   push("intensity", target.intensity);
   push("hr_bpm_range", target.hr_bpm_range);
   push("hr_bpm", target.hr_bpm);
@@ -280,6 +286,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 const WORKOUT_DOCUMENT_TARGET_KEYS = [
+  "primary_execution_mode",
   "target_source",
   "intensity",
   "hr_bpm_range",
@@ -313,6 +320,13 @@ function unknownRecord(value: unknown): Record<string, unknown> | null {
 
 function readString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function primaryExecutionModeField(value: unknown): Partial<WorkoutDocumentTarget> {
+  return typeof value === "string" &&
+    PRIMARY_EXECUTION_MODE_VALUES.includes(value as PrimaryExecutionMode)
+    ? { primary_execution_mode: value as PrimaryExecutionMode }
+    : {};
 }
 
 function stringField<K extends string>(key: K, value: unknown): Partial<Record<K, string>> {

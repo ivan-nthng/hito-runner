@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
 import {
   buildStaleRepoMirrorMetadata,
@@ -14,12 +15,18 @@ import {
   getAdminCaptureItemForDependencies,
   listAdminCaptureBacklogForDependencies,
   type AdminCaptureDependencies,
+  type AdminCaptureBacklogRead,
   type AdminCaptureRepository,
   type AdminCaptureRow,
 } from "../src/lib/admin-capture.server";
 import { updateAdminCaptureItemTriageForDependencies } from "../src/lib/admin-capture.server";
 import { getAdminRepoWorkItemMetadata } from "../src/lib/admin-work-items";
-import type { AdminCaptureResult } from "../src/lib/admin-capture";
+import {
+  adminCaptureActiveStatuses,
+  adminCaptureStatuses,
+  type AdminCaptureListInput,
+  type AdminCaptureResult,
+} from "../src/lib/admin-capture";
 import type { Database, Json } from "../src/lib/supabase/database";
 
 type ItemInsert = Database["public"]["Tables"]["admin_capture_items"]["Insert"];
@@ -33,6 +40,7 @@ type LiveProbeStep = {
 
 class MemoryAdminCaptureRepository implements AdminCaptureRepository {
   #items = new Map<string, AdminCaptureRow>();
+  listBacklogCalls = 0;
 
   async createItem(input: ItemInsert): Promise<AdminCaptureRow> {
     const now = "2026-05-28T12:00:00.000Z";
@@ -66,21 +74,10 @@ class MemoryAdminCaptureRepository implements AdminCaptureRepository {
     return row;
   }
 
-  async listItems(input: {
-    status: "new" | "in_review" | "ready_for_codex" | "done" | "archived" | "all";
-    includeArchived: boolean;
-    limit: number;
-    search?: string | null;
-    itemType?: string | null;
-    priority?: string | null;
-    targetRole?: string | null;
-    sourceGroup?: string;
-  }): Promise<AdminCaptureRow[]> {
+  async listBacklog(input: AdminCaptureListInput): Promise<AdminCaptureBacklogRead> {
+    this.listBacklogCalls += 1;
     const search = input.search?.toLowerCase() ?? null;
-
-    return Array.from(this.#items.values())
-      .filter((item) => input.status === "all" || item.status === input.status)
-      .filter((item) => input.includeArchived || input.status === "archived" || !item.archived_at)
+    const matchingRows = Array.from(this.#items.values())
       .filter((item) => !input.itemType || item.item_type === input.itemType)
       .filter((item) => !input.priority || item.priority === input.priority)
       .filter((item) => !input.targetRole || item.target_role === input.targetRole)
@@ -104,8 +101,24 @@ class MemoryAdminCaptureRepository implements AdminCaptureRepository {
         return [item.title, item.note, item.route, item.page_url, item.element_text]
           .filter(Boolean)
           .some((value) => value!.toLowerCase().includes(search));
-      })
+      });
+    const statusCounts = Object.fromEntries(
+      adminCaptureStatuses.map((status) => [
+        status,
+        matchingRows.filter((item) => item.status === status).length,
+      ]),
+    ) as AdminCaptureBacklogRead["statusCounts"];
+    const rows = matchingRows
+      .filter((item) =>
+        input.status === "all"
+          ? adminCaptureActiveStatuses.some((status) => status === item.status)
+          : item.status === input.status,
+      )
+      .filter((item) => input.includeArchived || input.status === "archived" || !item.archived_at)
+      .sort((left, right) => Date.parse(right.created_at) - Date.parse(left.created_at))
       .slice(0, input.limit);
+
+    return { rows, statusCounts };
   }
 
   async getItem(id: string): Promise<AdminCaptureRow | null> {
@@ -139,6 +152,12 @@ class MemoryAdminCaptureRepository implements AdminCaptureRepository {
 
   async deleteItem(id: string): Promise<boolean> {
     return this.#items.delete(id);
+  }
+}
+
+class FailingAdminCaptureReadRepository extends MemoryAdminCaptureRepository {
+  override async listBacklog(_input: AdminCaptureListInput): Promise<AdminCaptureBacklogRead> {
+    throw new Error("Forced backlog read failure.");
   }
 }
 
@@ -181,6 +200,9 @@ if (args.has("--live-supabase")) {
 }
 
 async function runDeterministicHarness() {
+  await assertCanonicalBacklogReadContract();
+  await assertSingleRouteBacklogRead();
+
   const repository = new MemoryAdminCaptureRepository();
   const admin = adminDependencies(repository);
   const nonAdmin = nonAdminDependencies(repository);
@@ -223,6 +245,34 @@ async function runDeterministicHarness() {
   assert.equal(nonAdminList.ok, false);
   if (!nonAdminList.ok) {
     assert.equal(nonAdminList.reason, "admin_required");
+  }
+
+  const unavailableList = await listAdminCaptureBacklogForDependencies(
+    { ...admin, repository: null },
+    {
+      status: "all",
+      sourceGroup: "all_work",
+      includeArchived: false,
+      limit: 50,
+    },
+  );
+  assert.equal(unavailableList.ok, false);
+  if (!unavailableList.ok) {
+    assert.equal(unavailableList.reason, "supabase_admin_unavailable");
+  }
+
+  const failedList = await listAdminCaptureBacklogForDependencies(
+    adminDependencies(new FailingAdminCaptureReadRepository()),
+    {
+      status: "all",
+      sourceGroup: "all_work",
+      includeArchived: false,
+      limit: 50,
+    },
+  );
+  assert.equal(failedList.ok, false);
+  if (!failedList.ok) {
+    assert.equal(failedList.reason, "capture_load_failed");
   }
 
   const nonAdminDelete = await deleteAdminCaptureQuickNoteForDependencies(nonAdmin, {
@@ -451,6 +501,12 @@ async function runDeterministicHarness() {
         ok: true,
         mode: "deterministic",
         checks: [
+          "canonical_page_and_complete_status_counts",
+          "page_limit_root_cause_discriminator",
+          "status_archive_and_combined_filter_counts",
+          "single_route_backlog_read",
+          "backend_unavailable_shape",
+          "read_failure_shape",
           "admin_create_list_read_update",
           "non_admin_rejected",
           "deterministic_prompt",
@@ -469,6 +525,206 @@ async function runDeterministicHarness() {
       2,
     ),
   );
+}
+
+async function assertCanonicalBacklogReadContract() {
+  const discriminatorRepository = new MemoryAdminCaptureRepository();
+  const discriminatorAdmin = adminDependencies(discriminatorRepository);
+  const olderBase = Date.parse("2026-05-01T00:00:00.000Z");
+  const newerBase = Date.parse("2026-06-01T00:00:00.000Z");
+
+  for (let index = 0; index < 100; index += 1) {
+    await seedMemoryBacklogItem(discriminatorRepository, {
+      status: "done",
+      title: `Older Done ${index}`,
+      created_at: new Date(olderBase + index * 1000).toISOString(),
+    });
+    await seedMemoryBacklogItem(discriminatorRepository, {
+      status: "new",
+      title: `Newer Active ${index}`,
+      created_at: new Date(newerBase + index * 1000).toISOString(),
+    });
+  }
+
+  const donePage = await mustOk(
+    listAdminCaptureBacklogForDependencies(discriminatorAdmin, {
+      status: "done",
+      sourceGroup: "all_work",
+      includeArchived: false,
+      limit: 100,
+    }),
+  );
+  assert.equal(discriminatorRepository.listBacklogCalls, 1);
+  assert.equal(donePage.view.shown, 100);
+  assert.equal(donePage.view.total, 100);
+  assert.equal(
+    donePage.view.items.every((item) => item.status === "done"),
+    true,
+  );
+  assert.equal(donePage.view.statusCounts.new, 100);
+  assert.equal(donePage.view.statusCounts.done, 100);
+
+  const activePage = await mustOk(
+    listAdminCaptureBacklogForDependencies(discriminatorAdmin, {
+      status: "all",
+      sourceGroup: "all_work",
+      includeArchived: false,
+      limit: 25,
+    }),
+  );
+  assert.equal(discriminatorRepository.listBacklogCalls, 2);
+  assert.equal(activePage.view.shown, 25);
+  assert.equal(activePage.view.total, 100);
+  assert.equal(
+    activePage.view.items.every((item) => item.status === "new"),
+    true,
+  );
+
+  const filteredRepository = new MemoryAdminCaptureRepository();
+  const filteredAdmin = adminDependencies(filteredRepository);
+  const matchingStatuses = ["new", "in_review", "ready_for_codex", "done", "archived"] as const;
+
+  for (const status of matchingStatuses) {
+    await seedMemoryBacklogItem(filteredRepository, {
+      status,
+      title: `Canonical filter contract ${status}`,
+      item_type: "bug",
+      priority: "high",
+      target_role: "backend",
+      archived_at: status === "archived" ? "2026-06-10T00:00:00.000Z" : null,
+      metadata: { source_group: "active_plans" },
+    });
+  }
+
+  await seedMemoryBacklogItem(filteredRepository, {
+    status: "done",
+    title: "Canonical filter contract wrong source",
+    item_type: "bug",
+    priority: "high",
+    target_role: "backend",
+    metadata: { source_group: "backlog" },
+  });
+  await seedMemoryBacklogItem(filteredRepository, {
+    status: "done",
+    title: "Canonical filter contract wrong type",
+    item_type: "change_request",
+    priority: "high",
+    target_role: "backend",
+    metadata: { source_group: "active_plans" },
+  });
+  await seedMemoryBacklogItem(filteredRepository, {
+    status: "done",
+    title: "Canonical filter contract wrong priority",
+    item_type: "bug",
+    priority: "low",
+    target_role: "backend",
+    metadata: { source_group: "active_plans" },
+  });
+  await seedMemoryBacklogItem(filteredRepository, {
+    status: "done",
+    title: "Canonical filter contract wrong role",
+    item_type: "bug",
+    priority: "high",
+    target_role: "frontend",
+    metadata: { source_group: "active_plans" },
+  });
+  await seedMemoryBacklogItem(filteredRepository, {
+    status: "done",
+    title: "Unrelated search text",
+    note: "No matching query here.",
+    item_type: "bug",
+    priority: "high",
+    target_role: "backend",
+    metadata: { source_group: "active_plans" },
+  });
+
+  const commonFilters = {
+    sourceGroup: "active_plans" as const,
+    itemType: "bug" as const,
+    priority: "high" as const,
+    targetRole: "backend" as const,
+    search: "Canonical filter contract",
+    limit: 100,
+  };
+  const filteredDone = await mustOk(
+    listAdminCaptureBacklogForDependencies(filteredAdmin, {
+      ...commonFilters,
+      status: "done",
+      includeArchived: false,
+    }),
+  );
+  assert.equal(filteredDone.view.items.length, 1);
+  assert.equal(filteredDone.view.total, 1);
+  assert.deepEqual(filteredDone.view.statusCounts, {
+    new: 1,
+    in_review: 1,
+    ready_for_codex: 1,
+    done: 1,
+    archived: 1,
+  });
+
+  const filteredActive = await mustOk(
+    listAdminCaptureBacklogForDependencies(filteredAdmin, {
+      ...commonFilters,
+      status: "all",
+      includeArchived: false,
+    }),
+  );
+  assert.equal(filteredActive.view.items.length, 3);
+  assert.equal(filteredActive.view.total, 3);
+  assert.equal(
+    filteredActive.view.items.every((item) =>
+      adminCaptureActiveStatuses.some((status) => status === item.status),
+    ),
+    true,
+  );
+
+  const filteredArchived = await mustOk(
+    listAdminCaptureBacklogForDependencies(filteredAdmin, {
+      ...commonFilters,
+      status: "archived",
+      includeArchived: true,
+    }),
+  );
+  assert.equal(filteredArchived.view.items.length, 1);
+  assert.equal(filteredArchived.view.total, 1);
+}
+
+async function seedMemoryBacklogItem(
+  repository: MemoryAdminCaptureRepository,
+  input: Partial<ItemInsert> & Pick<ItemInsert, "status" | "title">,
+) {
+  return repository.createItem({
+    id: input.id ?? randomUUID(),
+    item_type: input.item_type ?? "context_capture",
+    status: input.status,
+    priority: input.priority ?? null,
+    target_role: input.target_role ?? null,
+    title: input.title,
+    note: input.note ?? input.title,
+    page_url: input.page_url ?? "hito://admin/read-contract-proof",
+    route: input.route ?? "/admin/capture",
+    created_by_user_id: input.created_by_user_id ?? "admin-read-contract-proof",
+    created_by_label: input.created_by_label ?? "Admin read contract proof",
+    metadata: input.metadata ?? {},
+    created_at: input.created_at ?? "2026-06-10T00:00:00.000Z",
+    updated_at: input.updated_at ?? input.created_at ?? "2026-06-10T00:00:00.000Z",
+    archived_at: input.archived_at ?? null,
+  });
+}
+
+async function assertSingleRouteBacklogRead() {
+  const routeSource = await readFile(
+    new URL("../src/routes/admin.capture.tsx", import.meta.url),
+    "utf8",
+  );
+  const listCalls = routeSource.match(/listAdminCaptureBacklog\s*\(\{/g) ?? [];
+
+  assert.equal(listCalls.length, 1);
+  assert.match(routeSource, /loaderDeps:\s*\(\{ search \}\) => search/);
+  assert.match(routeSource, /loader:\s*async \(\{ deps: search \}\)/);
+  assert.doesNotMatch(routeSource, /location\.search/);
+  assert.doesNotMatch(routeSource, /countsResult|filterBacklogViewForStatus/);
 }
 
 function assertStaleRepoMirrorCleanupPolicy() {

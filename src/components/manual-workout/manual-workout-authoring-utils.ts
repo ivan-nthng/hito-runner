@@ -3,7 +3,6 @@ import { buildPlannedWorkoutLanguage } from "@/lib/planned-workout-language";
 import { formatDistanceMeters, formatDurationMin } from "@/lib/training";
 import {
   listManualWorkoutTemplates,
-  listVisibleManualWorkoutStarterTemplates,
   type ManualWorkoutTemplate,
 } from "@/lib/manual-workout-authoring/templates";
 import { workoutTypeColorVar } from "@/lib/workout-color-tokens";
@@ -22,7 +21,6 @@ import type { WorkoutSegmentLike } from "@/lib/rich-workout-model";
 import { workoutGlyphFromCalendarIconKey, type WorkoutGlyphKind } from "@/lib/workout-glyph";
 
 export const MANUAL_WORKOUT_TEMPLATES = listManualWorkoutTemplates();
-export const VISIBLE_MANUAL_WORKOUT_STARTER_TEMPLATES = listVisibleManualWorkoutStarterTemplates();
 
 export function buildManualDraftInput({
   activePlanId,

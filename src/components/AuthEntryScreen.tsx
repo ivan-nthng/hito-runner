@@ -3,9 +3,15 @@ import { useServerFn } from "@tanstack/react-start";
 import loginDesertHorizon from "@/assets/marketing/hero-background/login-desert-horizon.jpg";
 import { HitoLogo } from "@/components/ui/hito-logo";
 import { Icon } from "@/components/ui/icon";
+import { useHitoTabs } from "@/components/ui/hito-tabs";
 import { requestMagicLink } from "@/lib/training-api";
 
 type AuthEntryStatus = "error" | "invalid_credentials" | "local_unavailable" | undefined;
+type AuthEntryTab = "login" | "signup";
+
+const AUTH_ENTRY_TABS = [{ value: "login" }, { value: "signup" }] satisfies Array<{
+  value: AuthEntryTab;
+}>;
 
 function validateEmailInput(value: string) {
   const trimmedValue = value.trim();
@@ -49,9 +55,8 @@ export function AuthEntryScreen({
   const [phase, setPhase] = useState<"idle" | "sending" | "sent">("idle");
   const [error, setError] = useState<string | null>(null);
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState<"login" | "signup">(
-    localBypassEnabled ? "login" : "signup",
-  );
+  const [activeTab, setActiveTab] = useState<AuthEntryTab>(localBypassEnabled ? "login" : "signup");
+  const authTabs = useHitoTabs({ items: AUTH_ENTRY_TABS, value: activeTab });
   const hasEmailText = email.trim().length > 0;
   const emailValidationMessage = error ?? null;
 
@@ -75,7 +80,11 @@ export function AuthEntryScreen({
 
           <div className="hito-auth-alpha-surface hito-surface-flat p-5 lg:p-6">
             {localBypassEnabled ? (
-              <div className="hito-tabs hito-tabs-simple">
+              <div
+                className="hito-tabs hito-tabs-simple"
+                {...authTabs.tabListProps}
+                aria-label="Authentication mode"
+              >
                 {(
                   [
                     { key: "login", label: "Log in" },
@@ -85,6 +94,7 @@ export function AuthEntryScreen({
                   <button
                     key={tab.key}
                     type="button"
+                    {...authTabs.getTabProps(tab.key)}
                     onClick={() => {
                       setActiveTab(tab.key);
                       setPhase("idle");
@@ -100,7 +110,7 @@ export function AuthEntryScreen({
             ) : null}
 
             {localBypassEnabled && activeTab === "login" ? (
-              <div className="mt-6">
+              <div className="mt-6" {...authTabs.getPanelProps("login")}>
                 <form method="post" action="/api/auth/local-login" className="grid gap-5">
                   <input type="hidden" name="next" value={next} />
                   <label className="grid gap-2">
@@ -152,7 +162,10 @@ export function AuthEntryScreen({
                 </form>
               </div>
             ) : (
-              <div className="mt-6">
+              <div
+                className="mt-6"
+                {...(localBypassEnabled ? authTabs.getPanelProps("signup") : {})}
+              >
                 <div className="hito-micro-label flex items-center gap-2">
                   <Icon name="mail" size="xs" className="text-signal" />
                   <span>Continue with email</span>

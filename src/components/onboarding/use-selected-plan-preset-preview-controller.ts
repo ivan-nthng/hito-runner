@@ -18,6 +18,8 @@ interface SelectedPlanPresetPreviewControllerOptions {
   hasRequiredPlanBasics: boolean;
   toastId: string;
   previewReadyDescription: string;
+  previewContextKey?: string;
+  requiredBasicsMessage?: string;
   autoRefreshOpenPreview?: boolean;
   resetOnInputChange?: boolean;
   onResetExternalState?: () => void;
@@ -27,13 +29,16 @@ export function useSelectedPlanPresetPreviewController({
   autoRefreshOpenPreview = false,
   hasRequiredPlanBasics,
   onResetExternalState,
+  previewContextKey = "default",
   previewReadyDescription,
+  requiredBasicsMessage = "Add Age, Height, and Weight before previewing a generated plan.",
   resetOnInputChange = false,
   state,
   toastId,
 }: SelectedPlanPresetPreviewControllerOptions) {
   const previewRunningPlanDraftFn = useServerFn(previewRunningPlanDraft);
   const runningPlanPreviewInputKeyRef = useRef<string | null>(null);
+  const activePreviewRequestKeyRef = useRef<string | null>(null);
   const [status, setStatus] = useState<"idle" | "previewing_plan">("idle");
   const [selectedGoalId, setSelectedGoalId] = useState<PlanGoalSelectionId | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,14 +48,14 @@ export function useSelectedPlanPresetPreviewController({
 
   const previewInputFingerprint = useMemo(() => {
     if (!state.planGoalChoice) {
-      return "no_goal";
+      return `${previewContextKey}:no_goal`;
     }
 
     const inputResult = buildRunningPlanPreviewInput(state, state.planGoalChoice);
     return inputResult.ok
-      ? JSON.stringify(inputResult.input)
-      : `invalid:${state.planGoalChoice}:${inputResult.error}`;
-  }, [state]);
+      ? `${previewContextKey}:${JSON.stringify(inputResult.input)}`
+      : `${previewContextKey}:invalid:${state.planGoalChoice}:${inputResult.error}`;
+  }, [previewContextKey, state]);
   const previousPreviewInputFingerprintRef = useRef(previewInputFingerprint);
   const resetExternalState = useEffectEvent(() => {
     onResetExternalState?.();
@@ -63,6 +68,7 @@ export function useSelectedPlanPresetPreviewController({
     setPreviewOpen(false);
     setPreviewResult(null);
     setPreviewInput(null);
+    activePreviewRequestKeyRef.current = null;
     runningPlanPreviewInputKeyRef.current = null;
   }, []);
 
@@ -72,11 +78,10 @@ export function useSelectedPlanPresetPreviewController({
     setPreviewOpen(false);
     setPreviewResult(null);
     setPreviewInput(null);
+    activePreviewRequestKeyRef.current = null;
     runningPlanPreviewInputKeyRef.current = null;
     resetExternalState();
   }, [resetExternalState]);
-
-  const requiredBasicsMessage = "Add Age, Height, and Weight before previewing a generated plan.";
 
   async function refreshPreview(goalIdOverride?: PlanGoalSelectionId) {
     const goalId = goalIdOverride ?? selectedGoalId;
@@ -115,7 +120,8 @@ export function useSelectedPlanPresetPreviewController({
       return;
     }
 
-    const inputKey = JSON.stringify(inputResult.input);
+    const inputKey = `${previewContextKey}:${JSON.stringify(inputResult.input)}`;
+    activePreviewRequestKeyRef.current = inputKey;
     setError(null);
     resetExternalState();
     setStatus("previewing_plan");
@@ -125,6 +131,11 @@ export function useSelectedPlanPresetPreviewController({
         data: inputResult.input,
       });
 
+      if (activePreviewRequestKeyRef.current !== inputKey) {
+        return;
+      }
+
+      activePreviewRequestKeyRef.current = null;
       runningPlanPreviewInputKeyRef.current = inputKey;
       setPreviewResult(result);
       setPreviewInput(result.ok ? inputResult.input : null);
@@ -141,6 +152,11 @@ export function useSelectedPlanPresetPreviewController({
         description: previewReadyDescription,
       });
     } catch {
+      if (activePreviewRequestKeyRef.current !== inputKey) {
+        return;
+      }
+
+      activePreviewRequestKeyRef.current = null;
       setPreviewResult(null);
       setPreviewInput(null);
       setStatus("idle");
@@ -192,7 +208,9 @@ export function useSelectedPlanPresetPreviewController({
     }
 
     previousPreviewInputFingerprintRef.current = previewInputFingerprint;
+    activePreviewRequestKeyRef.current = null;
     runningPlanPreviewInputKeyRef.current = null;
+    setStatus("idle");
     setPreviewResult(null);
     setPreviewInput(null);
     setError(null);
@@ -209,7 +227,9 @@ export function useSelectedPlanPresetPreviewController({
     }
 
     const inputResult = buildRunningPlanPreviewInput(state, selectedGoalId);
-    const inputKey = inputResult.ok ? JSON.stringify(inputResult.input) : inputResult.error;
+    const inputKey = inputResult.ok
+      ? `${previewContextKey}:${JSON.stringify(inputResult.input)}`
+      : `${previewContextKey}:${inputResult.error}`;
 
     if (runningPlanPreviewInputKeyRef.current === inputKey && previewResult) {
       return;
@@ -218,7 +238,9 @@ export function useSelectedPlanPresetPreviewController({
     refreshRunningPlanPreviewEffect();
   }, [
     autoRefreshOpenPreview,
+    hasRequiredPlanBasics,
     previewOpen,
+    previewContextKey,
     previewResult,
     refreshRunningPlanPreviewEffect,
     selectedGoalId,

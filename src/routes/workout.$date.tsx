@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
+import { useHitoTabs } from "@/components/ui/hito-tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   displayExecutableTargetEntries,
@@ -79,7 +80,13 @@ function WorkoutPage() {
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const router = useRouter();
-  const tab = search.tab;
+  const tab = search.tab as WorkoutDetailSearchTab;
+  const lifecycle = workout ? workoutDetailLifecycleFor(workout, snapshot, feedback) : "rest_day";
+  const surfaceModel = workoutDetailSurfaceModelFor(lifecycle, tab);
+  const workoutTabs = useHitoTabs({
+    items: surfaceModel.tabs.map((item) => ({ value: item.id })),
+    value: surfaceModel.activeSurface,
+  });
 
   if (!workout) {
     return (
@@ -144,8 +151,6 @@ function WorkoutPage() {
       ].filter((metric): metric is { label: string; value: string; unit?: string } =>
         Boolean(metric),
       );
-  const lifecycle = workoutDetailLifecycleFor(workout, snapshot, feedback);
-  const surfaceModel = workoutDetailSurfaceModelFor(lifecycle, tab);
   const canEditWorkout = Boolean(
     snapshot.source === "persisted" &&
     workout.type !== "rest" &&
@@ -214,11 +219,16 @@ function WorkoutPage() {
 
         {surfaceModel.tabs.length > 1 && (
           <div className="mt-10 flex gap-6 border-b border-hairline/80 pb-3">
-            <div className="hito-tab-list hito-tab-list-open">
+            <div
+              className="hito-tab-list hito-tab-list-open"
+              {...workoutTabs.tabListProps}
+              aria-label="Workout detail view"
+            >
               {surfaceModel.tabs.map((tabOption) => (
                 <button
                   key={tabOption.id}
                   type="button"
+                  {...workoutTabs.getTabProps(tabOption.id)}
                   onClick={() =>
                     navigate({
                       search: (current) => ({
@@ -229,7 +239,6 @@ function WorkoutPage() {
                     })
                   }
                   data-active={surfaceModel.activeSurface === tabOption.id}
-                  aria-current={surfaceModel.activeSurface === tabOption.id ? "page" : undefined}
                   className="hito-tab"
                 >
                   {tabOption.label}
@@ -246,6 +255,9 @@ function WorkoutPage() {
               surfaceModel.activeSurface === "complete" && "hito-surface overflow-hidden p-6",
               surfaceModel.activeSurface === "feedback" && "p-1",
             )}
+            {...(surfaceModel.tabs.length > 1
+              ? workoutTabs.getPanelProps(surfaceModel.activeSurface)
+              : {})}
           >
             {surfaceModel.activeSurface === "overview" && (
               <>
@@ -397,27 +409,27 @@ function WorkoutPendingState() {
     <AppShell>
       <div className="hito-route-gutter max-w-6xl space-y-8 py-8">
         <div className="flex items-center gap-3 hito-section-subtitle">
-          <Skeleton className="h-3 w-32 bg-background/30" />
+          <Skeleton className="h-3 w-32" />
         </div>
         <div className="hito-workout-hero-grid">
           <div>
-            <Skeleton className="h-4 w-64 bg-background/30" />
-            <Skeleton className="mt-4 h-16 w-full max-w-2xl bg-background/40" />
-            <Skeleton className="mt-4 h-5 w-full max-w-xl bg-background/30" />
+            <Skeleton className="h-4 w-64" />
+            <Skeleton className="mt-4 h-16 w-full max-w-2xl" />
+            <Skeleton className="mt-4 h-5 w-full max-w-xl" />
           </div>
           <div className="flex gap-4">
-            <Skeleton className="h-16 w-24 bg-background/30" />
-            <Skeleton className="h-16 w-24 bg-background/30" />
-            <Skeleton className="h-16 w-24 bg-background/30" />
+            <Skeleton className="h-16 w-24" />
+            <Skeleton className="h-16 w-24" />
+            <Skeleton className="h-16 w-24" />
           </div>
         </div>
-        <Skeleton className="h-10 w-72 bg-background/30" />
+        <Skeleton className="h-10 w-72" />
         <div className="hito-route-support-grid">
           <Skeleton className="hito-route-panel-skeleton hito-route-panel-skeleton-detail" />
           <div className="space-y-4">
-            <Skeleton className="h-32 rounded-2xl bg-background/20" />
-            <Skeleton className="h-32 rounded-2xl bg-background/20" />
-            <Skeleton className="h-32 rounded-2xl bg-background/20" />
+            <Skeleton className="h-32 rounded-2xl" />
+            <Skeleton className="h-32 rounded-2xl" />
+            <Skeleton className="h-32 rounded-2xl" />
           </div>
         </div>
       </div>

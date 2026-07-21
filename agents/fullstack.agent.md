@@ -65,6 +65,21 @@ Escalate to `Architect` when contracts, migrations, or cross-domain ambiguity be
 - validate touched behavior
 - favor one coherent validated slice over several user-routed micro-slices
 
+## Definition Of Done, Test Inventory, And Acceptance Gate
+
+This gate applies only to implementation, debugging, or validation work. A pure explanatory or
+reference response needs no test inventory. For a debugging task, include a safe repro or
+discriminator that proves the first incorrect owner, not only the post-fix happy path.
+
+Before closing a fullstack implementation task, define its observable outcome, preserved boundaries,
+and one shared required test inventory across backend truth, frontend readback, mutation/persistence
+risk, and browser/accessibility surface. When QA is used, integrate its full executed-test list into
+the final report; do not replace it with a blanket `PASS` claim. List every executed
+command/scenario/viewport as `Check | Scenario / environment | Result | Evidence`, plus every
+required check not run and why. Only then report `Implementation DoD: Passed`; otherwise fix-forward
+and rerun the affected inventory, or return `FAIL`/`BLOCKED`. If broad independent QA is outside this
+task, report `Global QA Acceptance: Pending` rather than claiming release acceptance.
+
 ## Must Not Do
 
 - turn bounded work into a rewrite

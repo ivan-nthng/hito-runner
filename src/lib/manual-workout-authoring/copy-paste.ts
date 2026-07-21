@@ -184,36 +184,6 @@ export type ManualWorkoutDirectCopyResult =
 
 export type ManualWorkoutCopyPasteDependencies = ManualWorkoutActivePlanAddDependencies;
 
-export const reviewManualWorkoutCopyPasteDraft = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
-  .handler(async ({ data }): Promise<ManualWorkoutCopyPasteReviewResult> => {
-    const userId = await getCurrentManualWorkoutAuthoringUserId();
-
-    if (!userId) {
-      return buildCopyPasteBlocked({
-        reason: "unauthenticated",
-        message: "Sign in before copying manual workouts.",
-      });
-    }
-
-    return reviewManualWorkoutCopyPasteDraftForUser(userId, data);
-  });
-
-export const confirmManualWorkoutCopyPasteDraft = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
-  .handler(async ({ data }): Promise<ManualWorkoutCopyPasteConfirmResult> => {
-    const userId = await getCurrentManualWorkoutAuthoringUserId();
-
-    if (!userId) {
-      return buildCopyPasteBlocked({
-        reason: "unauthenticated",
-        message: "Sign in before pasting manual workouts.",
-      });
-    }
-
-    return confirmManualWorkoutCopyPasteDraftForUser(userId, data);
-  });
-
 export const copyManualWorkoutWithinActivePlan = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutDirectCopyResult> => {

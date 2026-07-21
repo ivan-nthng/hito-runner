@@ -57,18 +57,19 @@
 
   .hito-route-support-grid {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 2.5rem;
   }
 
   .hito-workout-hero-grid {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     align-items: end;
     gap: 2rem;
   }
 
   .hito-route-panel-skeleton {
     border-radius: var(--radius-2xl);
-    background: color-mix(in oklch, var(--color-background) 20%, transparent);
   }
 
   .hito-route-panel-skeleton-calendar {

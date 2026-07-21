@@ -14,6 +14,7 @@ import {
 } from "@/lib/training";
 import type { WorkoutResultFeedbackSummary } from "@/lib/workout-result-import/types";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
+import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
 import {
   BodyNotesModal,
   BodyNotesSummaryRow,
@@ -102,6 +103,15 @@ export function CompletionPanel({
   const [form, setForm] = useState<CompletionFormState>(() =>
     buildInitialFormState(savedPayloadFromWorkout, plannedKm, plannedMin, plannedRepeats),
   );
+  const outcomeGroup = useHitoRadioGroup({
+    items: [{ value: "completed" }, { value: "partial" }, { value: "skipped" }],
+    value: form.outcome,
+  });
+  const intervalValues = Array.from({ length: plannedRepeats }, (_, index) => String(index + 1));
+  const intervalGroup = useHitoRadioGroup({
+    items: intervalValues.map((value) => ({ value })),
+    value: String(form.intervalsCompleted),
+  });
   const formRef = useRef<CompletionFormState>(form);
   const [savedBaselineKey, setSavedBaselineKey] = useState(savedPayloadKey);
   const [optimisticSavedPayloadKey, setOptimisticSavedPayloadKey] = useState<string | null>(null);
@@ -254,7 +264,11 @@ export function CompletionPanel({
 
       <div>
         <Label>How did it go?</Label>
-        <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Workout outcome">
+        <div
+          className="mt-3 grid grid-cols-3 gap-2"
+          {...outcomeGroup.groupProps}
+          aria-label="Workout outcome"
+        >
           {(
             [
               {
@@ -282,8 +296,7 @@ export function CompletionPanel({
               <button
                 key={option.v}
                 type="button"
-                role="radio"
-                aria-checked={active}
+                {...outcomeGroup.getRadioProps(option.v)}
                 data-selected={active ? "true" : undefined}
                 onClick={() =>
                   updateForm((current) => ({
@@ -339,25 +352,26 @@ export function CompletionPanel({
                 <div className="hito-label mb-2">Intervals completed</div>
                 <div
                   className="hito-choice-toggle-group flex-nowrap"
-                  role="radiogroup"
+                  {...intervalGroup.groupProps}
                   aria-label="Intervals completed"
                 >
-                  {Array.from({ length: plannedRepeats }).map((_, index) => (
+                  {intervalValues.map((intervalValue) => (
                     <button
-                      key={index}
+                      key={intervalValue}
                       type="button"
-                      role="radio"
-                      aria-checked={form.intervalsCompleted === index + 1}
-                      data-selected={form.intervalsCompleted === index + 1 ? "true" : undefined}
+                      {...intervalGroup.getRadioProps(intervalValue)}
+                      data-selected={
+                        form.intervalsCompleted === Number(intervalValue) ? "true" : undefined
+                      }
                       onClick={() =>
                         updateForm((current) => ({
                           ...current,
-                          intervalsCompleted: index + 1,
+                          intervalsCompleted: Number(intervalValue),
                         }))
                       }
                       className="hito-choice-toggle hito-choice-toggle-sm min-w-0 flex-1 font-mono-num"
                     >
-                      {index + 1}
+                      {intervalValue}
                     </button>
                   ))}
                 </div>
@@ -1312,26 +1326,31 @@ function ScaleControl({
   onChange: (value: number) => void;
   hint: string;
 }) {
+  const scaleValues = Array.from({ length: max }, (_, index) => String(index + 1));
+  const scaleGroup = useHitoRadioGroup({
+    items: scaleValues.map((scaleValue) => ({ value: scaleValue })),
+    value: String(value),
+  });
+
   return (
     <div>
       <div className="hito-label flex items-center justify-between">
         <span>{label}</span>
         <span className="text-foreground/80">{hint}</span>
       </div>
-      <div className="hito-scale-control mt-3" role="radiogroup" aria-label={label}>
-        {Array.from({ length: max }).map((_, index) => (
+      <div className="hito-scale-control mt-3" {...scaleGroup.groupProps} aria-label={label}>
+        {scaleValues.map((scaleValue) => (
           <button
-            key={index}
+            key={scaleValue}
             type="button"
-            role="radio"
-            aria-checked={value === index + 1}
-            aria-label={`${index + 1} of ${max}`}
-            data-active={index < value ? "true" : undefined}
-            data-level={Math.ceil((index + 1) / Math.max(1, max / 5))}
-            onClick={() => onChange(index + 1)}
+            {...scaleGroup.getRadioProps(scaleValue)}
+            aria-label={`${scaleValue} of ${max}`}
+            data-active={Number(scaleValue) <= value ? "true" : undefined}
+            data-level={Math.ceil(Number(scaleValue) / Math.max(1, max / 5))}
+            onClick={() => onChange(Number(scaleValue))}
             className="hito-scale-button"
           >
-            {index + 1}
+            {scaleValue}
           </button>
         ))}
       </div>

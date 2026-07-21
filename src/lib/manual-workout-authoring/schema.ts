@@ -1,7 +1,14 @@
 import { z } from "zod";
-import type { CanonicalMetricModeJson } from "@/lib/rich-workout-model";
+import type {
+  CalendarIconKey,
+  CanonicalMetricModeJson,
+  CanonicalWorkoutFamily,
+  CanonicalWorkoutIdentity,
+} from "@/lib/rich-workout-model";
 import {
   AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
+  PRIMARY_EXECUTION_MODE_VALUES,
+  type PrimaryExecutionMode,
   type WorkoutDocumentContent,
   type WorkoutDocumentType as WorkoutType,
 } from "@/lib/workout-document";
@@ -42,6 +49,7 @@ export const MANUAL_WORKOUT_TARGET_SOURCE_VALUES = [
   "personal_hr_zone",
   "default_estimated_hr",
   "age_estimated",
+  "effort_only",
   AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
 ] as const;
 
@@ -50,6 +58,13 @@ export type ManualWorkoutTargetSource = (typeof MANUAL_WORKOUT_TARGET_SOURCE_VAL
 export interface ManualWorkoutDraftProcessingOptions {
   allowPreservedAiAuthoredTargets?: boolean;
   allowPersistedTemplateShape?: boolean;
+  preservedWorkoutModel?: {
+    workoutType: WorkoutType;
+    sourceWorkoutType: string;
+    workoutFamily: CanonicalWorkoutFamily;
+    workoutIdentity: CanonicalWorkoutIdentity;
+    calendarIconKey: CalendarIconKey;
+  };
 }
 
 export const MANUAL_WORKOUT_TEMPLATE_KEY_VALUES = [
@@ -139,6 +154,7 @@ export type ManualEmptyPlanSetupInput = z.output<typeof manualEmptyPlanSetupInpu
 
 const manualWorkoutTargetInputSchema = z
   .object({
+    primaryExecutionMode: z.enum(PRIMARY_EXECUTION_MODE_VALUES).optional(),
     targetSource: z.enum(MANUAL_WORKOUT_TARGET_SOURCE_VALUES).optional(),
     intensity: z.string().trim().min(1).max(120).optional(),
     label: z.string().trim().min(1).max(120).optional(),
@@ -153,8 +169,12 @@ const manualWorkoutTargetInputSchema = z
     hrBpmRange: z.string().trim().min(1).max(80).optional(),
     hrTargetSource: z.enum(MANUAL_WORKOUT_TARGET_SOURCE_VALUES).optional(),
     hrZone: z.string().trim().min(1).max(80).optional(),
+    hrZoneReference: z.string().trim().min(1).max(80).optional(),
+    hrProfileSource: z.enum(["personal", "estimated"]).optional(),
   })
   .strict();
+
+export type ManualWorkoutPrimaryExecutionMode = PrimaryExecutionMode;
 
 export const manualWorkoutBlockInputSchema = z
   .object({

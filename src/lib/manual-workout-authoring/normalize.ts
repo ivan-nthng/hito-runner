@@ -46,22 +46,23 @@ export function normalizeManualWorkoutDraft(input: {
   targetOptions?: ManualWorkoutDraftProcessingOptions;
 }): NormalizedManualWorkoutDraftResult {
   const { parsedInput, template, targetTruthMode, entries, targetOptions = {} } = input;
+  const preservedModel = targetOptions.preservedWorkoutModel;
+  const workoutType = preservedModel?.workoutType ?? template.workoutType;
   const steps =
-    template.workoutType === "rest"
+    workoutType === "rest"
       ? []
       : manualWorkoutDocumentSectionsFromEntries({ entries, targetTruthMode, targetOptions });
-  const metricMode = buildManualWorkoutMetricMode(template, targetTruthMode, steps);
+  const metricMode = buildManualWorkoutMetricMode(workoutType, targetTruthMode, steps);
   const richWorkout = resolveCanonicalWorkoutModel({
-    workoutType: template.workoutType,
-    sourceWorkoutType: template.workoutIdentity,
-    workoutFamily: template.workoutFamily,
-    workoutIdentity: template.workoutIdentity,
-    calendarIconKey: template.calendarIconKey,
+    workoutType,
+    sourceWorkoutType: preservedModel?.sourceWorkoutType ?? template.workoutIdentity,
+    workoutFamily: preservedModel?.workoutFamily ?? template.workoutFamily,
+    workoutIdentity: preservedModel?.workoutIdentity ?? template.workoutIdentity,
+    calendarIconKey: preservedModel?.calendarIconKey ?? template.calendarIconKey,
     metricMode,
     title: parsedInput.title ?? template.defaultTitle,
     steps,
   });
-  const workoutType = template.workoutType;
   const totalDurationMin = Number(
     steps.reduce((total, step) => total + stepPlannedDurationMin(step, workoutType), 0).toFixed(2),
   );
@@ -81,7 +82,7 @@ export function normalizeManualWorkoutDraft(input: {
       title: parsedInput.title?.trim() || template.defaultTitle,
       notes: parsedInput.notes?.trim() || template.defaultNotes,
       workoutType,
-      sourceWorkoutType: template.templateKey,
+      sourceWorkoutType: preservedModel?.sourceWorkoutType ?? template.templateKey,
       workoutFamily: richWorkout.workoutFamily,
       workoutIdentity: richWorkout.workoutIdentity,
       calendarIconKey: richWorkout.calendarIconKey,
@@ -92,9 +93,9 @@ export function normalizeManualWorkoutDraft(input: {
       recoveryPriority: null,
       totalDurationMin,
       totalDistanceKm,
-      mappingGaps: template.mappingGaps,
+      mappingGaps: preservedModel ? [] : template.mappingGaps,
     },
-    reviewWarnings: template.mappingGaps,
+    reviewWarnings: preservedModel ? [] : template.mappingGaps,
   };
 }
 
@@ -214,15 +215,13 @@ function repeatRoleForBlock(
   switch (blockKey) {
     case "warmup_block":
       return "warm_up";
-    case "walk_break_block":
     case "rest_walk_jog_recovery_block":
       return "walk";
-    case "recovery_block":
     case "interval_recovery_block":
       return "recover";
     case "cooldown_block":
       return "cooldown";
-    case "finish_block":
+    case "long_run_finish_block":
       return "finish";
     case "steady_run_block":
     case "easy_run_block":
@@ -294,11 +293,11 @@ function buildTarget(
 }
 
 function buildManualWorkoutMetricMode(
-  template: ManualWorkoutTemplate,
+  workoutType: ManualWorkoutCanonicalDraft["workoutType"],
   targetTruthMode: ManualWorkoutTargetTruthMode,
   steps: Step[],
 ): CanonicalMetricMode {
-  if (template.workoutType === "rest" || targetTruthMode === "none") {
+  if (workoutType === "rest" || targetTruthMode === "none") {
     return {
       guidance: "effort",
       executableMode: "none",

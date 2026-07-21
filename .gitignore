@@ -18,6 +18,7 @@ dist-ssr
 qa-artifacts/
 .local-artifact-archive/
 test-results/
+supabase/.temp/
 
 # Local legacy/quarantine artifacts that are not part of the app build.
 src/components/OnboardingGate 2.tsx

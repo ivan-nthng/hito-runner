@@ -275,8 +275,8 @@ function assertNoFakeMetricTargets(steps: Step[], templateKey: ManualWorkoutTemp
 
   assert.doesNotMatch(
     serialized,
-    /pace_min_per_km_range|paceMinPerKmRange|hr_bpm_range|hrBpmRange|personal_hr_zone/i,
-    `${templateKey} default skeleton must not include fake pace or personal HR targets`,
+    /pace_min_per_km_range|paceMinPerKmRange|hr_bpm_range|hrBpmRange|personal_hr_zone|["']rpe["']/i,
+    `${templateKey} default skeleton must not include fake pace, HR, or RPE targets`,
   );
   assert.doesNotMatch(
     serialized,

@@ -5,6 +5,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useId } from "react";
 import { cn } from "@/lib/utils";
+import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
 import { parseHitoThemePreference } from "@/lib/theme-preference";
 import {
   HITO_THEME_PREFERENCES,
@@ -24,12 +25,16 @@ export function ThemePreferenceChoiceGroup({
   const labelId = useId();
   const { choosePreference, preference, resolvedTheme } = useHitoThemePreference();
   const resolvedLabel = resolvedTheme === "light" ? "Light" : "Dark";
+  const themeGroup = useHitoRadioGroup({
+    items: HITO_THEME_PREFERENCES.map((value) => ({ value })),
+    value: preference,
+  });
 
   return (
     <div className={cn("grid gap-2", className)}>
       <div
         className="hito-choice-toggle-group flex-nowrap"
-        role="radiogroup"
+        {...themeGroup.groupProps}
         aria-label={label ? undefined : "Theme preference"}
         aria-labelledby={label ? labelId : undefined}
       >
@@ -41,8 +46,7 @@ export function ThemePreferenceChoiceGroup({
             <button
               key={option}
               type="button"
-              role="radio"
-              aria-checked={selected}
+              {...themeGroup.getRadioProps(option)}
               className={cn(
                 "hito-choice-toggle",
                 buttonClassName ?? "hito-choice-toggle-xs min-w-0 flex-1",

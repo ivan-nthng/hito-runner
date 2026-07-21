@@ -117,18 +117,6 @@ export function buildManualEmptyActivePlanCreationInput(input: {
       weightKg: input.setup.weightKg,
       heightCm: input.setup.heightCm,
     },
-    profilePatch: {
-      age: input.setup.age,
-      weightKg: input.setup.weightKg,
-      heightCm: input.setup.heightCm,
-      baselineNotes,
-      trainingPreferences: toJson({
-        manual_setup: {
-          setup_payload_version: MANUAL_EMPTY_PLAN_SETUP_PAYLOAD_VERSION,
-          running_level: input.setup.runningLevel,
-        },
-      }),
-    },
     title: "Manual user-built plan",
     goalSummary: "Manual user-built plan",
     sourceTemplate: "training-plan-v2",

@@ -26,6 +26,7 @@ const SelectTrigger = React.forwardRef<
       className,
     )}
     {...props}
+    data-hito-component="select"
   >
     {children}
     <SelectPrimitive.Icon>

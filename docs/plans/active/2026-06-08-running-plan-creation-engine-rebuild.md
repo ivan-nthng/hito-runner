@@ -18,12 +18,12 @@ product
 
 ## Task
 
-Keep the accepted running-plan creation engine closed while deferring the superseding post-confirm
-editability contract to its own runtime reconciliation.
+Keep the accepted running-plan creation engine and completed post-confirm workout-ownership
+reconciliation closed while future release or product work proceeds separately.
 
 ## Stage
 
-ARCHITECT source-of-truth reconciliation / engine completed; editability reconciliation external.
+ARCHITECT source-of-truth closeout / engine and post-confirm ownership accepted.
 
 ## Exact Handoff Prompt
 
@@ -60,11 +60,11 @@ plan/schedule operations separate from workout-content editing:
   `source_kind`, source status, workout id/date, prior planned truth, logs, evidence, completion, and
   edit history as durable provenance.
 
-Current implementation verdict: partial. Review/confirm, stale protection, atomic edit-audit
-persistence, and provenance exist, but source allowlists, today/log/evidence capability gates,
-persisted-edit reconstruction, the atomic RPC, and workout-detail UI still implement the superseded
-future-unlogged subset. The engine rebuild remains closed; this cross-origin date-based editability
-reconciliation is a separate product/runtime contract and must not be claimed as accepted here.
+Current implementation verdict: accepted. Policy, capability projection, persisted-edit
+reconstruction, atomic persistence, and workout-detail UI share the today/future rule while keeping
+past and Rest rows unavailable. Logged/evidence-backed rows retain their attached history and the
+pre-edit planned truth. This lifecycle reconciliation is complete and does not reopen the closed
+engine rebuild.
 
 Accepted runner-facing workout language:
 
@@ -196,10 +196,11 @@ used as acceptance evidence.
 The running-plan creation engine rebuild is accepted and closed. Its former future-unlogged
 post-confirm editability statement is superseded by the canonical current-product rule: every
 confirmed non-rest workout on today or a future date is editable through reviewed server mutation
-regardless of source, logs, completion, or evidence; past workouts are not editable. Runtime
-reconciliation of that rule is independent work and does not reopen plan creation.
+regardless of source, logs, completion, or evidence; past workouts are not editable. Policy,
+capability projection, reconstruction, atomic persistence, and workout detail now implement that
+rule without reopening plan creation.
 
-Provider upload/comparison, completed-evidence browser proof, paid live-provider acceptance, and
+Provider upload/comparison enhancements, completed-evidence browser proof, hosted release/ops, and
 future product work are independent tracks. They are not remaining conditions of this rebuild.
 
 ## Boundaries

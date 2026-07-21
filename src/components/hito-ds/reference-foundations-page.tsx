@@ -2,6 +2,8 @@ import { useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import loginDesertHorizon from "@/assets/marketing/hero-background/login-desert-horizon.jpg";
 import { HitoLogo, HitoLogoMark } from "@/components/ui/hito-logo";
+import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
+import { useHitoTabs } from "@/components/ui/hito-tabs";
 import { hitoToast } from "@/components/ui/hito-toast";
 import { HITO_ICON_META, HITO_ICON_SIZES, Icon, type HitoIconSize } from "@/components/ui/icon";
 import { HitoDsLightPaletteReference } from "@/components/hito-ds/light-palette-reference";
@@ -315,13 +317,43 @@ const SPACING_PRIMITIVES = [
 ] as const;
 
 const RADIUS_PRIMITIVES = [
-  { name: "radius-sm", token: "--radius-sm", use: "Tiny tags, compact inspector chips" },
-  { name: "radius-md", token: "--radius-md", use: "Small buttons, inputs, menu rows" },
-  { name: "radius-lg", token: "--radius-lg", use: "Default controls and menus" },
-  { name: "radius-xl", token: "--radius-xl", use: "Cards, day rows, compact panels" },
-  { name: "radius-2xl", token: "--radius-2xl", use: "Dialogs and emphasized surfaces" },
-  { name: "radius-3xl", token: "--radius-3xl", use: "Large editorial/product moments" },
-  { name: "radius-4xl", token: "--radius-4xl", use: "Reserved oversized surfaces" },
+  {
+    name: "radius-sm",
+    token: "--radius-sm",
+    value: "4px",
+    use: "Micro tags and compact inspector details",
+  },
+  {
+    name: "radius-md",
+    token: "--radius-md",
+    value: "6px",
+    use: "Small controls, inputs, and menu rows",
+  },
+  { name: "radius-lg", token: "--radius-lg", value: "8px", use: "Default controls and menus" },
+  {
+    name: "radius-xl",
+    token: "--radius-xl",
+    value: "10px",
+    use: "Cards, day rows, and compact panels",
+  },
+  {
+    name: "radius-2xl",
+    token: "--radius-2xl",
+    value: "12px",
+    use: "Dialogs and emphasized surfaces",
+  },
+  {
+    name: "radius-3xl",
+    token: "--radius-3xl",
+    value: "16px",
+    use: "Rare large editorial or product surfaces",
+  },
+  {
+    name: "radius-4xl",
+    token: "--radius-4xl",
+    value: "20px",
+    use: "Reserved oversized surfaces",
+  },
 ] as const;
 
 const TYPOGRAPHY_FAMILIES = [
@@ -381,6 +413,14 @@ const HITO_DS_TOAST_ID = "hito-ds-async-action-toast";
 export function HitoDsFoundationsPage() {
   const [colorTab, setColorTab] = useState<ColorTab>("semantic");
   const [iconPreviewSize, setIconPreviewSize] = useState<HitoIconSize>("md");
+  const colorTabs = useHitoTabs({
+    items: COLOR_TABS.map((value) => ({ value })),
+    value: colorTab,
+  });
+  const iconSizeGroup = useHitoRadioGroup({
+    items: ICON_PREVIEW_SIZES.map((value) => ({ value })),
+    value: iconPreviewSize,
+  });
 
   const copyColorValue = async (value: string, label: string) => {
     if (typeof window === "undefined") {
@@ -600,15 +640,14 @@ export function HitoDsFoundationsPage() {
               </div>
               <div
                 className="hito-tabs hito-tabs-enclosed max-w-full overflow-x-auto"
-                role="tablist"
+                {...colorTabs.tabListProps}
                 aria-label="Color token tabs"
               >
                 {COLOR_TABS.map((tab) => (
                   <button
                     key={tab}
                     type="button"
-                    role="tab"
-                    aria-selected={colorTab === tab}
+                    {...colorTabs.getTabProps(tab)}
                     className="hito-tab"
                     data-active={colorTab === tab ? "true" : undefined}
                     onClick={() => setColorTab(tab)}
@@ -620,7 +659,11 @@ export function HitoDsFoundationsPage() {
             </div>
 
             {colorTab === "semantic" ? (
-              <div className="grid grid-cols-1 gap-4" role="tabpanel" aria-label="Semantic Colors">
+              <div
+                className="grid grid-cols-1 gap-4"
+                {...colorTabs.getPanelProps("semantic")}
+                aria-label="Semantic Colors"
+              >
                 <div className="hito-reference-note">
                   <p className="hito-label">Semantic Colors</p>
                   <p className="hito-body-small mt-2 max-w-3xl">
@@ -636,7 +679,11 @@ export function HitoDsFoundationsPage() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-5" role="tabpanel" aria-label="Primitive">
+              <div
+                className="grid grid-cols-1 gap-5"
+                {...colorTabs.getPanelProps("primitive")}
+                aria-label="Primitive"
+              >
                 <div className="hito-reference-note">
                   <p className="hito-label">Primitive</p>
                   <p className="hito-body-small mt-2 max-w-3xl">
@@ -800,15 +847,14 @@ export function HitoDsFoundationsPage() {
             </div>
             <div
               className="hito-choice-toggle-group items-center"
-              role="radiogroup"
+              {...iconSizeGroup.groupProps}
               aria-label="Icon preview size"
             >
               {ICON_PREVIEW_SIZES.map((previewSize) => (
                 <button
                   key={previewSize}
                   type="button"
-                  role="radio"
-                  aria-checked={iconPreviewSize === previewSize}
+                  {...iconSizeGroup.getRadioProps(previewSize)}
                   className="hito-choice-toggle hito-choice-toggle-sm uppercase"
                   data-selected={iconPreviewSize === previewSize ? "true" : undefined}
                   onClick={() => setIconPreviewSize(previewSize)}
@@ -1340,7 +1386,9 @@ function RadiusPrimitiveRow({ radius }: { radius: (typeof RADIUS_PRIMITIVES)[num
     <div className="grid gap-2 border-t border-hairline pt-3 first:border-t-0 first:pt-0">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <p className="hito-list-row-title">{radius.name}</p>
-        <code className="hito-technical-mono">{radius.token}</code>
+        <code className="hito-technical-mono">
+          {radius.value} · {radius.token}
+        </code>
       </div>
       <div className="flex items-center gap-3">
         <span

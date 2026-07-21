@@ -106,6 +106,10 @@ export type ManualWorkoutSavedTemplateReviewInput = z.output<
   typeof manualWorkoutSavedTemplateReviewInputSchema
 >;
 
+export const manualWorkoutSavedTemplateDeleteInputSchema = z
+  .object({ templateId: z.string().uuid() })
+  .strict();
+
 export interface ManualWorkoutSavedTemplateView {
   id: string;
   displayName: string;
@@ -191,6 +195,20 @@ export type ManualWorkoutSavedTemplateReviewResult =
     }
   | ManualWorkoutSavedTemplateBlockedResult;
 
+export type ManualWorkoutSavedTemplateDeleteResult =
+  | {
+      ok: true;
+      status: "deleted";
+      persisted: true;
+      sourceKind: typeof MANUAL_SAVED_WORKOUT_TEMPLATE_SOURCE_KIND;
+      templateId: string;
+      safety: {
+        currentUserScoped: true;
+        callsOpenAi: false;
+      };
+    }
+  | ManualWorkoutSavedTemplateBlockedResult;
+
 export type ManualWorkoutSavedTemplateBlockedResult = {
   ok: false;
   status: "blocked";
@@ -219,21 +237,6 @@ export const saveManualWorkoutSavedTemplate = createServerFn({ method: "POST" })
     return saveManualWorkoutSavedTemplateForUser(userId, data);
   });
 
-export const listManualWorkoutSavedTemplates = createServerFn({ method: "GET" }).handler(
-  async (): Promise<ManualWorkoutSavedTemplateListResult> => {
-    const userId = await getCurrentManualWorkoutAuthoringUserId();
-
-    if (!userId) {
-      return buildSavedTemplateBlocked({
-        reason: "unauthenticated",
-        message: "Sign in before viewing personal workout templates.",
-      });
-    }
-
-    return listManualWorkoutSavedTemplatesForUser(userId);
-  },
-);
-
 export const reviewManualWorkoutSavedTemplate = createServerFn({ method: "POST" })
   .inputValidator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutSavedTemplateReviewResult> => {
@@ -247,6 +250,21 @@ export const reviewManualWorkoutSavedTemplate = createServerFn({ method: "POST" 
     }
 
     return reviewManualWorkoutSavedTemplateForUser(userId, data);
+  });
+
+export const deleteManualWorkoutSavedTemplate = createServerFn({ method: "POST" })
+  .inputValidator((value: unknown) => value)
+  .handler(async ({ data }): Promise<ManualWorkoutSavedTemplateDeleteResult> => {
+    const userId = await getCurrentManualWorkoutAuthoringUserId();
+
+    if (!userId) {
+      return buildSavedTemplateBlocked({
+        reason: "unauthenticated",
+        message: "Sign in before deleting a personal workout template.",
+      });
+    }
+
+    return deleteManualWorkoutSavedTemplateForUser(userId, data);
   });
 
 export async function saveManualWorkoutSavedTemplateForUser(
@@ -375,6 +393,46 @@ export async function listManualWorkoutSavedTemplatesForUser(
     return buildSavedTemplateBlocked({
       reason: "persistence_failed",
       message: "Personal workout templates could not be loaded.",
+    });
+  }
+}
+
+export async function deleteManualWorkoutSavedTemplateForUser(
+  userId: string,
+  input: unknown,
+  dependencies: ManualWorkoutSavedTemplateDependencies = {},
+): Promise<ManualWorkoutSavedTemplateDeleteResult> {
+  const parsed = manualWorkoutSavedTemplateDeleteInputSchema.safeParse(input);
+  if (!parsed.success) {
+    return buildSavedTemplateBlocked({
+      reason: "invalid_input",
+      message: "The personal workout template delete payload is invalid.",
+    });
+  }
+
+  const repository = dependencies.repository ?? createSupabaseSavedTemplateRepository();
+
+  try {
+    const deleted = await repository.deleteTemplateForUser(userId, parsed.data.templateId);
+    if (!deleted) {
+      return buildSavedTemplateBlocked({
+        reason: "not_found",
+        message: "This personal workout template was not found for the current runner.",
+      });
+    }
+
+    return {
+      ok: true,
+      status: "deleted",
+      persisted: true,
+      sourceKind: MANUAL_SAVED_WORKOUT_TEMPLATE_SOURCE_KIND,
+      templateId: parsed.data.templateId,
+      safety: { currentUserScoped: true, callsOpenAi: false },
+    };
+  } catch {
+    return buildSavedTemplateBlocked({
+      reason: "persistence_failed",
+      message: "The personal workout template could not be deleted.",
     });
   }
 }

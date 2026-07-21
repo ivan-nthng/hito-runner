@@ -9,7 +9,7 @@ export const RUNNING_PLAN_RUNNER_LEVEL_VALUES = [
 ] as const;
 
 export type RunningPlanRunnerLevel = (typeof RUNNING_PLAN_RUNNER_LEVEL_VALUES)[number];
-export type RunningPlanDaysPerWeek = 3 | 4 | 5;
+export type RunningPlanDaysPerWeek = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export const RUNNING_PLAN_WORKOUT_DAY_KIND_VALUES = [
   "recovery",

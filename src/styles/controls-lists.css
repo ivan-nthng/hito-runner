@@ -177,46 +177,19 @@
 
   .hito-button-secondary {
     border: 1px solid transparent;
-    background: color-mix(in oklch, var(--color-muted) 42%, transparent);
+    background: color-mix(in oklch, var(--color-foreground) 10%, transparent);
     color: color-mix(in oklch, var(--color-foreground) 92%, transparent);
   }
 
-  .hito-button-secondary:hover {
-    background: color-mix(in oklch, var(--color-muted) 52%, transparent);
+  .hito-button-secondary:hover,
+  .hito-button-secondary[data-demo-state="hover"] {
+    background: color-mix(in oklch, var(--color-foreground) 14%, transparent);
     color: var(--color-foreground);
   }
 
   .hito-button-secondary:active,
   .hito-button-secondary[data-demo-state="active"] {
-    background: color-mix(in oklch, var(--color-muted) 60%, transparent);
-  }
-
-  [data-hito-theme="light"] .hito-button-secondary {
-    border-color: color-mix(in oklch, var(--color-border) 86%, var(--color-foreground) 8%);
-    background: color-mix(in oklch, var(--color-surface-elevated) 84%, var(--color-background) 16%);
-    color: color-mix(in oklch, var(--color-foreground) 90%, var(--color-muted-foreground) 10%);
-    box-shadow:
-      inset 0 1px 0 color-mix(in oklch, white 68%, transparent),
-      0 1px 2px oklch(0.52 0.025 62 / 0.06);
-  }
-
-  [data-hito-theme="light"] .hito-button-secondary:hover,
-  [data-hito-theme="light"] .hito-button-secondary[data-demo-state="hover"] {
-    border-color: color-mix(in oklch, var(--color-signal) 18%, var(--color-border));
-    background: color-mix(in oklch, var(--color-surface-elevated) 90%, var(--color-signal) 10%);
-    color: var(--color-foreground);
-    box-shadow:
-      inset 0 1px 0 color-mix(in oklch, white 74%, transparent),
-      0 2px 6px oklch(0.52 0.025 62 / 0.08);
-  }
-
-  [data-hito-theme="light"] .hito-button-secondary:active,
-  [data-hito-theme="light"] .hito-button-secondary[data-demo-state="active"] {
-    border-color: color-mix(in oklch, var(--color-signal) 24%, var(--color-border));
-    background: color-mix(in oklch, var(--color-signal) 12%, var(--color-surface-elevated) 88%);
-    box-shadow:
-      inset 0 1px 0 color-mix(in oklch, white 58%, transparent),
-      0 0 0 1px color-mix(in oklch, var(--color-signal) 8%, transparent);
+    background: color-mix(in oklch, var(--color-foreground) 18%, transparent);
   }
 
   .hito-button-secondary[data-tone="success"] {
@@ -224,7 +197,8 @@
     color: color-mix(in oklch, var(--color-success) 84%, var(--color-foreground));
   }
 
-  .hito-button-secondary[data-tone="success"]:hover {
+  .hito-button-secondary[data-tone="success"]:hover,
+  .hito-button-secondary[data-tone="success"][data-demo-state="hover"] {
     background: color-mix(in oklch, var(--color-success) 20%, transparent);
     color: color-mix(in oklch, var(--color-success) 72%, var(--color-foreground));
   }
@@ -234,29 +208,13 @@
     background: color-mix(in oklch, var(--color-success) 26%, transparent);
   }
 
-  [data-hito-theme="light"] .hito-button-secondary[data-tone="success"] {
-    border-color: color-mix(in oklch, var(--color-success) 9%, transparent);
-    background: color-mix(in oklch, var(--color-success) 5%, var(--color-surface));
-    color: color-mix(in oklch, var(--color-success) 48%, var(--color-foreground));
-  }
-
-  [data-hito-theme="light"] .hito-button-secondary[data-tone="success"]:hover,
-  [data-hito-theme="light"] .hito-button-secondary[data-tone="success"][data-demo-state="hover"] {
-    background: color-mix(in oklch, var(--color-success) 8%, var(--color-surface));
-    color: color-mix(in oklch, var(--color-success) 56%, var(--color-foreground));
-  }
-
-  [data-hito-theme="light"] .hito-button-secondary[data-tone="success"]:active,
-  [data-hito-theme="light"] .hito-button-secondary[data-tone="success"][data-demo-state="active"] {
-    background: color-mix(in oklch, var(--color-success) 11%, var(--color-surface));
-  }
-
   .hito-button-secondary[data-tone="error"] {
     background: color-mix(in oklch, var(--color-destructive) 13%, transparent);
     color: color-mix(in oklch, var(--color-destructive) 86%, var(--color-foreground));
   }
 
-  .hito-button-secondary[data-tone="error"]:hover {
+  .hito-button-secondary[data-tone="error"]:hover,
+  .hito-button-secondary[data-tone="error"][data-demo-state="hover"] {
     background: color-mix(in oklch, var(--color-destructive) 19%, transparent);
     color: color-mix(in oklch, var(--color-destructive) 74%, var(--color-foreground));
   }
@@ -264,23 +222,6 @@
   .hito-button-secondary[data-tone="error"]:active,
   .hito-button-secondary[data-tone="error"][data-demo-state="active"] {
     background: color-mix(in oklch, var(--color-destructive) 25%, transparent);
-  }
-
-  [data-hito-theme="light"] .hito-button-secondary[data-tone="error"] {
-    border-color: color-mix(in oklch, var(--color-destructive) 9%, transparent);
-    background: color-mix(in oklch, var(--color-destructive) 5%, var(--color-surface));
-    color: color-mix(in oklch, var(--color-destructive) 50%, var(--color-foreground));
-  }
-
-  [data-hito-theme="light"] .hito-button-secondary[data-tone="error"]:hover,
-  [data-hito-theme="light"] .hito-button-secondary[data-tone="error"][data-demo-state="hover"] {
-    background: color-mix(in oklch, var(--color-destructive) 8%, var(--color-surface));
-    color: color-mix(in oklch, var(--color-destructive) 58%, var(--color-foreground));
-  }
-
-  [data-hito-theme="light"] .hito-button-secondary[data-tone="error"]:active,
-  [data-hito-theme="light"] .hito-button-secondary[data-tone="error"][data-demo-state="active"] {
-    background: color-mix(in oklch, var(--color-destructive) 11%, var(--color-surface));
   }
 
   .hito-button-outlined {

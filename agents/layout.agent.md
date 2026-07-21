@@ -62,6 +62,21 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - keep visual diffs minimal and proportional to the task
 - delete local presentation drift when replacing it with DS primitives
 
+## Definition Of Done, Test Inventory, And Acceptance Gate
+
+This gate applies only to implementation, debugging, or validation work. A pure explanatory or
+reference response needs no test inventory. For a debugging task, include a safe repro or
+discriminator that proves the first incorrect layout owner, not only the post-fix happy path.
+
+Before closing a layout implementation task, define its observable outcome, preserved boundaries,
+and required inventory for the affected responsive ranges, themes, interaction/focus states, and
+shared consumers. When QA is used, integrate its full executed-test list into the final report; do
+not replace it with a blanket `PASS` claim. Report each scenario as `Check | Scenario / environment |
+Result | Evidence`, plus every required check not run and why. Only then report `Implementation DoD:
+Passed`; otherwise fix-forward and rerun the affected inventory, or return `FAIL`/`BLOCKED`. If broad
+independent QA is outside this task, report `Global QA Acceptance: Pending` rather than claiming
+release acceptance.
+
 ## Must Not Do
 
 - change hooks, reducers, validation, API flows, or business rules

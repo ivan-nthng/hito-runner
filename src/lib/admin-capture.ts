@@ -20,6 +20,7 @@ export const adminCaptureStatuses = [
   "done",
   "archived",
 ] as const;
+export const adminCaptureActiveStatuses = ["new", "in_review", "ready_for_codex"] as const;
 export const adminCapturePriorities = ["low", "medium", "high", "urgent"] as const;
 export type AdminCaptureItemType = (typeof adminCaptureItemTypes)[number];
 export type AdminCaptureStatus = (typeof adminCaptureStatuses)[number];

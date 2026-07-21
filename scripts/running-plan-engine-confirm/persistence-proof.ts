@@ -11,7 +11,10 @@ import type {
   RunningPlanReviewedPreviewDraft,
 } from "../../src/lib/running-plan-engine-review";
 import { buildRunningPlanCanonicalPlan } from "../../src/lib/running-plan-engine-review";
-import { applyAtomicReviewedPlanPersistence } from "../../src/lib/active-plan-lifecycle-persistence";
+import {
+  ActivePlanPersistenceRejection,
+  applyAtomicReviewedPlanPersistence,
+} from "../../src/lib/active-plan-lifecycle-persistence";
 import { buildAiGeneratedRunningPlanDevFixturePreviewOptions } from "../../src/lib/ai-generated-running-plan-dev-fixture";
 import { buildAiGeneratedRunningPlanAuthoringInput } from "../../src/lib/ai-generated-running-plan";
 import { buildAiAuthoredPlanFirstProviderContext } from "../../src/lib/ai-authored-plan-first-provider-contract";
@@ -23,12 +26,13 @@ import {
 import { createAdminSupabaseClient } from "../../src/lib/supabase/server";
 import type { Database, Json } from "../../src/lib/supabase/database";
 import {
-  getEffectivePersonalHeartRateProfileForUserId,
+  buildFirstTimeRunnerBaselineReadback,
+  getRunnerPlanAuthoringProfileSnapshotForUserId,
   getUserSettingsForUserId,
   updateUserSettingsForUserId,
 } from "../../src/lib/user-settings-actions";
 import {
-  validateAiAuthoredPaceAndEffectiveHrGuidance,
+  validateAiAuthoredPrimaryExecutionGuidance,
   validateNoClientRowsTrusted,
 } from "./assertions";
 import { validateRunnerFacingTargetReadbackContract } from "../running-plan-engine-target-readback-contract";
@@ -180,6 +184,7 @@ export async function validatePersistenceContract(
     let cleanupProof: DisposableCleanupProof | null = null;
 
     try {
+      await persistReviewedDraftProfileSnapshot(userId, draft);
       const result = await confirmRunningPlanDraftForUser(
         userId,
         buildConfirmInputForConfirm(draft),
@@ -209,7 +214,7 @@ export async function validatePersistenceContract(
           .selected_plan_engine?.review_checksum,
         draft.reviewChecksum,
       );
-      validateAiAuthoredPaceAndEffectiveHrGuidance(persisted.workouts);
+      validateAiAuthoredPrimaryExecutionGuidance(persisted.workouts);
       validateNoClientRowsTrusted(persisted.workouts);
 
       const duplicate = await confirmRunningPlanDraftForUser(
@@ -256,6 +261,30 @@ export async function validatePersistenceContract(
   };
 }
 
+async function persistReviewedDraftProfileSnapshot(
+  userId: string,
+  draft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
+) {
+  const snapshot = draft.normalizedInputSummary.runnerProfileSnapshot;
+
+  await updateUserSettingsForUserId(userId, {
+    firstName: null,
+    lastName: null,
+    displayName: null,
+    age: snapshot.age,
+    weightKg: snapshot.weightKg,
+    heightCm: snapshot.heightCm,
+    fitnessLevel: snapshot.fitnessLevel,
+    heartRateProfile: {
+      zones: snapshot.heartRateProfile.zones.map(({ reference, minBpm, maxBpm }) => ({
+        reference,
+        minBpm,
+        maxBpm,
+      })),
+    },
+  });
+}
+
 async function validatePersonalHeartRateProfilePersistence(input: {
   supabase: ReturnType<typeof createAdminSupabaseClient>;
   preflight: Extract<PersistencePreflight, { shouldRun: true }>;
@@ -278,13 +307,114 @@ async function validatePersonalHeartRateProfilePersistence(input: {
   });
 
   try {
-    await insertRunnerProfile(input.supabase, owner.userId, input.previewInput);
-    await insertRunnerProfile(input.supabase, otherRunner.userId, input.previewInput);
+    const firstTimeReadback = buildFirstTimeRunnerBaselineReadback({
+      age: input.previewInput.age,
+      weightKg: input.previewInput.weightKg,
+      heightCm: input.previewInput.heightCm,
+      fitnessLevel: "running_regularly",
+    });
+    assert.equal(firstTimeReadback.heartRateZones.source, "estimated");
+    assert.equal(firstTimeReadback.heartRateZones.accepted, false);
+
+    const acceptedEstimated = await updateUserSettingsForUserId(
+      owner.userId,
+      {
+        firstName: "Local",
+        lastName: "Runner",
+        displayName: "Local Runner",
+        age: input.previewInput.age,
+        weightKg: input.previewInput.weightKg,
+        heightCm: input.previewInput.heightCm,
+        fitnessLevel: "running_regularly",
+        heartRateProfile: {
+          zones: firstTimeReadback.heartRateZones.zones.map(({ reference, minBpm, maxBpm }) => ({
+            reference,
+            minBpm,
+            maxBpm,
+          })),
+        },
+      },
+      owner.email,
+    );
+    await updateUserSettingsForUserId(otherRunner.userId, {
+      firstName: null,
+      lastName: null,
+      displayName: null,
+      age: input.previewInput.age,
+      weightKg: input.previewInput.weightKg,
+      heightCm: input.previewInput.heightCm,
+      fitnessLevel: "running_regularly",
+      heartRateProfile: { zones: [...PERSONAL_HEART_RATE_ZONES] },
+    });
+
+    const baselineRows = await loadBaselineOnlyCounts(input.supabase, owner.userId);
+    assert.deepEqual(baselineRows, { profiles: 1, plans: 0, workouts: 0 });
+
+    const unavailablePreview = await buildReviewedAiGeneratedRunningPlanPreviewForUser(
+      owner.userId,
+      input.previewInput,
+      {
+        aiPreview: {
+          apiKey: "local-provider-unavailable-proof",
+          generationLedger: { disabled: true },
+          fetchImpl: async () =>
+            new Response(JSON.stringify({ error: { type: "provider_unavailable" } }), {
+              status: 503,
+              headers: { "content-type": "application/json" },
+            }),
+        },
+      },
+    );
+    assert.equal(unavailablePreview.ok, false);
+    assert.deepEqual(await loadBaselineOnlyCounts(input.supabase, owner.userId), baselineRows);
 
     const defaultSettings = await getUserSettingsForUserId(owner.userId, owner.email);
-    assert.equal(defaultSettings?.heartRateZones.source, "default_estimated");
+    assert.equal(defaultSettings?.heartRateZones.source, "estimated");
+    assert.equal(defaultSettings?.heartRateZones.accepted, true);
+    assert.equal(defaultSettings?.fitnessLevel, "running_regularly");
     assert.equal(defaultSettings?.heartRateZones.zones.length, 5);
     assert.equal(defaultSettings?.heartRateZones.zones[3]?.reference, "Z4");
+    assert.equal(acceptedEstimated.profileRevision, defaultSettings?.profileRevision);
+    const estimatedRanges = defaultSettings!.heartRateZones.zones.map(
+      ({ reference, minBpm, maxBpm }) => ({ reference, minBpm, maxBpm }),
+    );
+
+    const nonAgeUpdate = await updateUserSettingsForUserId(owner.userId, {
+      firstName: "Local",
+      lastName: "Runner",
+      displayName: "Local Runner",
+      age: input.previewInput.age,
+      weightKg: input.previewInput.weightKg + 1,
+      heightCm: input.previewInput.heightCm + 1,
+      fitnessLevel: "performance_focused",
+    });
+    assert.deepEqual(
+      nonAgeUpdate.heartRateZones.zones.map(({ reference, minBpm, maxBpm }) => ({
+        reference,
+        minBpm,
+        maxBpm,
+      })),
+      estimatedRanges,
+      "Only age may change estimated BPM ranges.",
+    );
+    const changedAgeEstimate = await updateUserSettingsForUserId(owner.userId, {
+      firstName: "Local",
+      lastName: "Runner",
+      displayName: "Local Runner",
+      age: input.previewInput.age + 5,
+      weightKg: input.previewInput.weightKg + 1,
+      heightCm: input.previewInput.heightCm + 1,
+      fitnessLevel: "performance_focused",
+    });
+    assert.equal(changedAgeEstimate.heartRateZones.source, "estimated");
+    assert.notDeepEqual(
+      changedAgeEstimate.heartRateZones.zones.map(({ reference, minBpm, maxBpm }) => ({
+        reference,
+        minBpm,
+        maxBpm,
+      })),
+      estimatedRanges,
+    );
 
     const persistedSettings = await updateUserSettingsForUserId(
       owner.userId,
@@ -295,6 +425,7 @@ async function validatePersonalHeartRateProfilePersistence(input: {
         age: input.previewInput.age,
         weightKg: input.previewInput.weightKg,
         heightCm: input.previewInput.heightCm,
+        fitnessLevel: "running_regularly",
         heartRateProfile: { zones: [...PERSONAL_HEART_RATE_ZONES] },
       },
       owner.email,
@@ -308,14 +439,39 @@ async function validatePersonalHeartRateProfilePersistence(input: {
       })),
       PERSONAL_HEART_RATE_ZONES,
     );
-
-    const effectiveProfile = await getEffectivePersonalHeartRateProfileForUserId(
-      owner.userId,
-      input.previewInput.age,
-    );
-    assert.equal(effectiveProfile?.source, "personal");
+    const personalAfterAgeChange = await updateUserSettingsForUserId(owner.userId, {
+      firstName: "Local",
+      lastName: "Runner",
+      displayName: "Local Runner",
+      age: input.previewInput.age + 1,
+      weightKg: input.previewInput.weightKg,
+      heightCm: input.previewInput.heightCm,
+      fitnessLevel: "running_regularly",
+    });
+    assert.equal(personalAfterAgeChange.heartRateZones.source, "personal");
     assert.deepEqual(
-      effectiveProfile?.zones.map(({ reference, minBpm, maxBpm }) => ({
+      personalAfterAgeChange.heartRateZones.zones.map(({ reference, minBpm, maxBpm }) => ({
+        reference,
+        minBpm,
+        maxBpm,
+      })),
+      PERSONAL_HEART_RATE_ZONES,
+      "Age changes must not overwrite saved personal BPM ranges.",
+    );
+    await updateUserSettingsForUserId(owner.userId, {
+      firstName: "Local",
+      lastName: "Runner",
+      displayName: "Local Runner",
+      age: input.previewInput.age,
+      weightKg: input.previewInput.weightKg,
+      heightCm: input.previewInput.heightCm,
+      fitnessLevel: "running_regularly",
+    });
+
+    const profileSnapshot = await getRunnerPlanAuthoringProfileSnapshotForUserId(owner.userId);
+    assert.equal(profileSnapshot?.heartRateProfile.source, "personal");
+    assert.deepEqual(
+      profileSnapshot?.heartRateProfile.zones.map(({ reference, minBpm, maxBpm }) => ({
         reference,
         minBpm,
         maxBpm,
@@ -323,10 +479,11 @@ async function validatePersonalHeartRateProfilePersistence(input: {
       PERSONAL_HEART_RATE_ZONES,
     );
 
-    const authoring = buildAiGeneratedRunningPlanAuthoringInput(
-      input.previewInput,
-      effectiveProfile,
-    );
+    const watchCanaryInput = {
+      ...input.previewInput,
+      benchmark: { kind: "recent_5k_pace" as const, recent5kPace: "5:30/km" },
+    };
+    const authoring = buildAiGeneratedRunningPlanAuthoringInput(watchCanaryInput, profileSnapshot);
     assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);
     if (!authoring.ok) {
       throw new Error(authoring.message);
@@ -346,14 +503,57 @@ async function validatePersonalHeartRateProfilePersistence(input: {
     const fixtureOptions = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
       authoringInput: authoring.authoringInput,
       qaFixtureAuthorized: true,
-      today: input.previewInput.startDate,
+      today: watchCanaryInput.startDate,
       env: localFixtureEnv(input.preflight.target.url),
     });
     assert.notEqual(fixtureOptions, null);
 
-    const reviewed = await buildReviewedAiGeneratedRunningPlanPreviewForUser(
+    let reviewed = await buildReviewedAiGeneratedRunningPlanPreviewForUser(
       owner.userId,
-      input.previewInput,
+      watchCanaryInput,
+      { aiPreview: fixtureOptions ?? undefined },
+    );
+    assert.equal(reviewed.ok, true, reviewed.ok ? "" : reviewed.unavailable.error.message);
+    if (!reviewed.ok) {
+      throw new Error(reviewed.unavailable.error.message);
+    }
+
+    await updateUserSettingsForUserId(owner.userId, {
+      firstName: "Local",
+      lastName: "Runner",
+      displayName: "Local Runner",
+      age: input.previewInput.age,
+      weightKg: input.previewInput.weightKg + 0.5,
+      heightCm: input.previewInput.heightCm,
+      fitnessLevel: "running_regularly",
+    });
+    const staleConfirmation = await confirmRunningPlanDraftForUser(
+      owner.userId,
+      input.buildConfirmInputForConfirm(reviewed.draft),
+      { allowLocalQaFixture: true },
+    );
+    assert.equal(staleConfirmation.ok, false);
+    if (!staleConfirmation.ok) {
+      assert.equal(staleConfirmation.reason, "stale_review");
+    }
+    assert.deepEqual(await loadBaselineOnlyCounts(input.supabase, owner.userId), {
+      profiles: 1,
+      plans: 0,
+      workouts: 0,
+    });
+
+    await updateUserSettingsForUserId(owner.userId, {
+      firstName: "Local",
+      lastName: "Runner",
+      displayName: "Local Runner",
+      age: input.previewInput.age,
+      weightKg: input.previewInput.weightKg,
+      heightCm: input.previewInput.heightCm,
+      fitnessLevel: "running_regularly",
+    });
+    reviewed = await buildReviewedAiGeneratedRunningPlanPreviewForUser(
+      owner.userId,
+      watchCanaryInput,
       { aiPreview: fixtureOptions ?? undefined },
     );
     assert.equal(reviewed.ok, true, reviewed.ok ? "" : reviewed.unavailable.error.message);
@@ -366,11 +566,11 @@ async function validatePersonalHeartRateProfilePersistence(input: {
     assert.ok(
       reviewedTargets.some(
         (target) =>
-          target.hr_bpm_range === "151-165 bpm" &&
+          target.hr_bpm_range === "116-135 bpm" &&
           target.hr_target_source === "personal_hr_zone" &&
-          target.extra?.hr_zone_reference === "Z4",
+          target.extra?.hr_zone_reference === "Z2",
       ),
-      "Reviewed plan must resolve authored Z4 to the saved personal BPM range.",
+      "Reviewed plan must resolve authored aerobic Z2 to the saved personal BPM range.",
     );
     assert.ok(
       reviewedTargets.some(
@@ -381,7 +581,7 @@ async function validatePersonalHeartRateProfilePersistence(input: {
     );
     assert.match(
       JSON.stringify(reviewed.draft.workoutDocuments),
-      /151-165 bpm/,
+      /116-135 bpm/,
       "Reviewed read model must expose the resolved personal BPM guidance.",
     );
     validateRunnerFacingTargetReadbackContract(canonicalPlan, "Personal HR persisted profile");
@@ -410,13 +610,13 @@ async function validatePersonalHeartRateProfilePersistence(input: {
     assert.ok(
       exportTargets.some(
         (target) =>
-          target.hr_bpm_range === "151-165 bpm" &&
+          target.hr_bpm_range === "116-135 bpm" &&
           target.hr_target_source === "personal_hr_zone" &&
-          target.extra?.hr_zone_reference === "Z4",
+          target.hr_zone_reference === "Z2",
       ),
       "Export must preserve reviewed BPM guidance and its profile-resolution provenance.",
     );
-    assert.match(renderPlanExportMarkdown(exportPayload), /151-165 bpm/);
+    assert.match(renderPlanExportMarkdown(exportPayload), /116-135 bpm/);
     assert.doesNotMatch(renderPlanExportMarkdown(exportPayload), /\bZ[1-5](?:-Z[1-5])?\b/);
 
     await updateUserSettingsForUserId(owner.userId, {
@@ -426,6 +626,7 @@ async function validatePersonalHeartRateProfilePersistence(input: {
       age: input.previewInput.age,
       weightKg: input.previewInput.weightKg,
       heightCm: input.previewInput.heightCm,
+      fitnessLevel: "running_regularly",
       heartRateProfile: { zones: [...UPDATED_PERSONAL_HEART_RATE_ZONES] },
     });
     const persistedAfterSettingsChange = await loadPersistedPlanForUser(
@@ -449,7 +650,7 @@ async function validatePersonalHeartRateProfilePersistence(input: {
       defaultSource: defaultSettings?.heartRateZones.source,
       savedSource: persistedSettings.heartRateZones.source,
       providerContextSource: providerContext.runner.heart_rate_profile?.source,
-      reviewedBpm: "151-165 bpm",
+      reviewedBpm: "116-135 bpm",
       historicalSnapshotPreserved: true,
       rlsIsolation: true,
     };
@@ -459,25 +660,30 @@ async function validatePersonalHeartRateProfilePersistence(input: {
   }
 }
 
-async function insertRunnerProfile(
+async function loadBaselineOnlyCounts(
   supabase: ReturnType<typeof createAdminSupabaseClient>,
   userId: string,
-  previewInput: RunningPlanPreviewDraft["previewInput"],
 ) {
-  const inserted = await supabase.from("runner_profiles").insert({
-    user_id: userId,
-    goal_type: "distance_build",
-    goal_label: "Personal HR profile proof",
-    baseline_sessions_per_week: previewInput.daysPerWeek ?? 0,
-    baseline_long_run_km: 0,
-    baseline_notes: null,
-    age: previewInput.age,
-    weight_kg: previewInput.weightKg,
-    height_cm: previewInput.heightCm,
-  });
-  if (inserted.error) {
-    throw new Error(inserted.error.message);
-  }
+  const [profiles, plans, workouts] = await Promise.all([
+    supabase
+      .from("runner_profiles")
+      .select("user_id", { count: "exact", head: true })
+      .eq("user_id", userId),
+    supabase.from("plan_cycles").select("id", { count: "exact", head: true }).eq("user_id", userId),
+    supabase
+      .from("planned_workouts")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId),
+  ]);
+  assert.equal(profiles.error, null);
+  assert.equal(plans.error, null);
+  assert.equal(workouts.error, null);
+
+  return {
+    profiles: profiles.count ?? 0,
+    plans: plans.count ?? 0,
+    workouts: workouts.count ?? 0,
+  };
 }
 
 async function validateRunnerProfileRls(input: {
@@ -508,22 +714,40 @@ async function validateRunnerProfileRls(input: {
 
   const malformedProfiles: Array<{ label: string; value: Json }> = [
     {
+      label: "estimated profile carrying stored zones",
+      value: {
+        version: "runner_hr_profile_v2",
+        source: "estimated",
+        zones: [...UPDATED_PERSONAL_HEART_RATE_ZONES],
+      },
+    },
+    {
+      label: "unknown profile provenance",
+      value: {
+        version: "runner_hr_profile_v2",
+        source: "imported",
+      },
+    },
+    {
       label: "missing profile version",
       value: {
+        source: "personal",
         zones: [...UPDATED_PERSONAL_HEART_RATE_ZONES],
       },
     },
     {
       label: "missing zone reference",
       value: {
-        version: "personal_hr_profile_v1",
+        version: "runner_hr_profile_v2",
+        source: "personal",
         zones: [{ minBpm: 90, maxBpm: 110 }, ...UPDATED_PERSONAL_HEART_RATE_ZONES.slice(1)],
       },
     },
     {
       label: "duplicate zone reference",
       value: {
-        version: "personal_hr_profile_v1",
+        version: "runner_hr_profile_v2",
+        source: "personal",
         zones: [
           { reference: "Z1", minBpm: 90, maxBpm: 110 },
           { reference: "Z2", minBpm: 111, maxBpm: 130 },
@@ -536,7 +760,8 @@ async function validateRunnerProfileRls(input: {
     {
       label: "reversed BPM range",
       value: {
-        version: "personal_hr_profile_v1",
+        version: "runner_hr_profile_v2",
+        source: "personal",
         zones: [
           { reference: "Z1", minBpm: 110, maxBpm: 90 },
           ...UPDATED_PERSONAL_HEART_RATE_ZONES.slice(1),
@@ -546,10 +771,23 @@ async function validateRunnerProfileRls(input: {
     {
       label: "non-integer BPM value",
       value: {
-        version: "personal_hr_profile_v1",
+        version: "runner_hr_profile_v2",
+        source: "personal",
         zones: [
           { reference: "Z1", minBpm: 90.5, maxBpm: 110 },
           ...UPDATED_PERSONAL_HEART_RATE_ZONES.slice(1),
+        ],
+      },
+    },
+    {
+      label: "overlapping BPM ranges",
+      value: {
+        version: "runner_hr_profile_v2",
+        source: "personal",
+        zones: [
+          { reference: "Z1", minBpm: 90, maxBpm: 115 },
+          { reference: "Z2", minBpm: 110, maxBpm: 130 },
+          ...UPDATED_PERSONAL_HEART_RATE_ZONES.slice(2),
         ],
       },
     },
@@ -599,7 +837,11 @@ async function validateRunnerProfileRls(input: {
     .eq("user_id", input.otherRunner.userId)
     .single();
   assert.equal(otherProfileAfter.error, null);
-  assert.equal(otherProfileAfter.data?.heart_rate_profile, null);
+  assert.deepEqual(otherProfileAfter.data?.heart_rate_profile, {
+    version: "runner_hr_profile_v2",
+    source: "personal",
+    zones: [...PERSONAL_HEART_RATE_ZONES],
+  });
 }
 
 type ProofTargetRecord = Record<string, unknown> & {
@@ -607,6 +849,7 @@ type ProofTargetRecord = Record<string, unknown> & {
   hr_target_source?: string;
   pace?: string;
   pace_min_per_km_range?: string;
+  hr_zone_reference?: string;
   extra?: {
     hr_zone_reference?: string;
   };
@@ -662,6 +905,79 @@ async function validateReviewedPlanCreationFailureAtomicity(
   const firstWorkoutId = crypto.randomUUID();
 
   try {
+    const baseline = buildFirstTimeRunnerBaselineReadback({
+      age: 36,
+      weightKg: 74,
+      heightCm: 178,
+      fitnessLevel: "running_regularly",
+    });
+    const savedBaseline = await updateUserSettingsForUserId(disposableUser.userId, {
+      firstName: null,
+      lastName: null,
+      displayName: null,
+      age: baseline.age,
+      weightKg: baseline.weightKg,
+      heightCm: baseline.heightCm,
+      fitnessLevel: baseline.fitnessLevel!,
+      heartRateProfile: {
+        zones: baseline.heartRateZones.zones.map(({ reference, minBpm, maxBpm }) => ({
+          reference,
+          minBpm,
+          maxBpm,
+        })),
+      },
+    });
+    const baselineBefore = await supabase
+      .from("runner_profiles")
+      .select("*")
+      .eq("user_id", disposableUser.userId)
+      .single();
+    assert.equal(baselineBefore.error, null);
+
+    await assert.rejects(
+      applyAtomicReviewedPlanPersistence({
+        userId: disposableUser.userId,
+        profile: {
+          goal_type: "distance_build",
+          goal_label: "Stale profile revision proof",
+          baseline_sessions_per_week: 3,
+          baseline_long_run_km: 6,
+          baseline_notes: null,
+        },
+        plan: {
+          id: planId,
+          title: "Stale profile revision proof",
+          goal_summary: "10K",
+          source_template: "stale_profile_revision_proof",
+          schema_version: "training-plan-v2",
+          source_kind: "ai_authored_plan_first_v1",
+          start_date: "2026-07-20",
+          end_date: "2026-07-27",
+          target_date: null,
+          goal_metadata: {},
+          plan_preferences: {},
+        },
+        workouts: [
+          buildAtomicCreationWorkout(firstWorkoutId, planId, disposableUser.userId, "easy"),
+        ] as unknown as Json,
+        expectedActivePlanId: null,
+        expectedActivePlanUpdatedAt: null,
+        expectedHistory: {
+          workout_ids: [],
+          log_ids: [],
+          asset_ids: [],
+          metric_ids: [],
+          comparison_ids: [],
+          insight_ids: [],
+        },
+        archiveGoalMetadata: null,
+        logs: [],
+        evidenceRelinks: [],
+        expectedProfileRevision: savedBaseline.profileRevision + 1,
+      }),
+      (error) => error instanceof ActivePlanPersistenceRejection && error.reason === "stale_review",
+    );
+
     await assert.rejects(
       applyAtomicReviewedPlanPersistence({
         userId: disposableUser.userId,
@@ -707,6 +1023,7 @@ async function validateReviewedPlanCreationFailureAtomicity(
         archiveGoalMetadata: null,
         logs: [],
         evidenceRelinks: [],
+        expectedProfileRevision: savedBaseline.profileRevision,
       }),
     );
 
@@ -727,9 +1044,16 @@ async function validateReviewedPlanCreationFailureAtomicity(
     assert.equal(profile.error, null);
     assert.equal(plans.error, null);
     assert.equal(workouts.error, null);
-    assert.equal(profile.count, 0, "Failed plan creation must roll back the profile upsert.");
+    assert.equal(profile.count, 1, "Failed plan creation must preserve the saved baseline.");
     assert.equal(plans.count, 0, "Failed plan creation must roll back the plan cycle.");
     assert.equal(workouts.count, 0, "Failed plan creation must roll back every workout row.");
+    const baselineAfter = await supabase
+      .from("runner_profiles")
+      .select("*")
+      .eq("user_id", disposableUser.userId)
+      .single();
+    assert.equal(baselineAfter.error, null);
+    assert.deepEqual(baselineAfter.data, baselineBefore.data);
   } finally {
     await cleanupDisposableUser(supabase, disposableUser.userId);
   }

@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icon";
+import { useHitoTabs } from "@/components/ui/hito-tabs";
 import { HitoNativeSelectField } from "@/components/ui/native-select-field";
 
 export type BodyNoteDraft = {
@@ -316,6 +317,10 @@ function BodyAreaMapField({
   const [view, setView] = useState<BodyNoteMapSide>(
     () => getBodyNoteAreaRegion(value)?.side ?? "front",
   );
+  const bodyMapTabs = useHitoTabs({
+    items: [{ value: "front" }, { value: "back" }],
+    value: view,
+  });
   const selectedRegion = getBodyNoteAreaRegion(value);
   const visibleRegions = BODY_NOTE_AREA_REGIONS.filter((region) => region.side === view);
 
@@ -337,11 +342,12 @@ function BodyAreaMapField({
               Pick one bounded area for this note. Add another note if more than one spot felt off.
             </p>
           </div>
-          <div className="hito-tab-list">
+          <div className="hito-tab-list" {...bodyMapTabs.tabListProps} aria-label="Body map side">
             {(["front", "back"] as const).map((side) => (
               <button
                 key={side}
                 type="button"
+                {...bodyMapTabs.getTabProps(side)}
                 onClick={() => setView(side)}
                 data-active={view === side}
                 className="hito-tab capitalize"
@@ -352,7 +358,7 @@ function BodyAreaMapField({
           </div>
         </div>
 
-        <div className="mt-5 flex justify-center">
+        <div className="mt-5 flex justify-center" {...bodyMapTabs.getPanelProps(view)}>
           <svg viewBox="0 0 200 500" className="h-[260px] w-auto max-w-full">
             <BodyMapSilhouette />
             {visibleRegions.map((region) => (

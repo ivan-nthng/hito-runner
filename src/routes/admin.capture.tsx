@@ -17,7 +17,6 @@ import {
   copyTextToClipboard,
   countForStatusFilter,
   EDITABLE_CAPTURE_STATUS_OPTIONS,
-  filterBacklogViewForStatus,
   formatCaptureMutationError,
   formatDateTime,
   formatItemSource,
@@ -59,6 +58,7 @@ import {
   type RepoDerivedInfo,
 } from "@/components/admin/admin-capture-view-model";
 import { Icon } from "@/components/ui/icon";
+import { useHitoTabs } from "@/components/ui/hito-tabs";
 import { HitoMetadataTag } from "@/components/ui/metadata-tag";
 import { HitoNativeSelectField } from "@/components/ui/native-select-field";
 import {
@@ -101,8 +101,8 @@ export const Route = createFileRoute("/admin/capture")({
       },
     ],
   }),
-  loader: async ({ location }) => {
-    const search = location.search as CaptureSearch;
+  loaderDeps: ({ search }) => search,
+  loader: async ({ deps: search }) => {
     const listInput = {
       itemType: search.type === "all" ? null : search.type,
       priority: search.priority === "all" ? null : search.priority,
@@ -111,22 +111,13 @@ export const Route = createFileRoute("/admin/capture")({
       search: captureQueryText(search.q) || null,
       limit: 100,
     };
-    const [result, countsResult] = await Promise.all([
-      listAdminCaptureBacklog({
-        data: {
-          ...listInput,
-          status: search.status,
-          includeArchived: search.status === "archived" || search.status === "all",
-        },
-      }),
-      listAdminCaptureBacklog({
-        data: {
-          ...listInput,
-          status: "all",
-          includeArchived: true,
-        },
-      }),
-    ]);
+    const result = await listAdminCaptureBacklog({
+      data: {
+        ...listInput,
+        status: search.status,
+        includeArchived: search.status === "archived",
+      },
+    });
 
     if (
       !result.ok &&
@@ -136,23 +127,19 @@ export const Route = createFileRoute("/admin/capture")({
         to: "/admin/login",
         search: {
           next: "/admin/capture",
+          status: undefined,
         },
       });
     }
 
-    return {
-      result: result.ok
-        ? { ...result, view: filterBacklogViewForStatus(result.view, search.status) }
-        : result,
-      countsResult,
-    };
+    return { result };
   },
   pendingComponent: CapturePendingState,
   component: AdminCapturePage,
 });
 
 function AdminCapturePage() {
-  const { countsResult, result } = Route.useLoaderData();
+  const { result } = Route.useLoaderData();
   const search = Route.useSearch();
   const router = useRouter();
   const createItemFn = useServerFn(createAdminCaptureItem);
@@ -479,33 +466,34 @@ function AdminCapturePage() {
               <section className="grid gap-6 pt-6">
                 <CaptureStatusTabs
                   activeStatus={search.status}
-                  counts={
-                    countsResult.ok ? countsResult.view.statusCounts : result.view.statusCounts
-                  }
+                  counts={result.view.statusCounts}
                   filters={search}
-                />
-                <CaptureUtilityRow
-                  clearFiltersHref={clearFiltersHref}
-                  query={captureQueryText(search.q)}
-                  rowCountLabel={`Showing ${result.view.shown} of ${result.view.total} items`}
-                  search={search}
-                />
-                <CaptureBacklogList
-                  appendNotes={appendNotes}
-                  copiedPromptIds={copiedPromptIds}
-                  clearFiltersHref={clearFiltersHref}
-                  copyFallbackPrompts={copyFallbackPrompts}
-                  expandedItemId={expandedItemId}
-                  mutation={mutation}
-                  result={result.view}
-                  search={search}
-                  setAppendNotes={setAppendNotes}
-                  setExpandedItemId={setExpandedItemId}
-                  onAppendNote={appendNote}
-                  onCopyPrompt={copyPrompt}
-                  onDeleteQuickNote={deleteQuickNote}
-                  onUpdateTriage={updateTriage}
-                />
+                >
+                  <div className="grid gap-6">
+                    <CaptureUtilityRow
+                      clearFiltersHref={clearFiltersHref}
+                      query={captureQueryText(search.q)}
+                      rowCountLabel={`Showing ${result.view.shown} of ${result.view.total} items`}
+                      search={search}
+                    />
+                    <CaptureBacklogList
+                      appendNotes={appendNotes}
+                      copiedPromptIds={copiedPromptIds}
+                      clearFiltersHref={clearFiltersHref}
+                      copyFallbackPrompts={copyFallbackPrompts}
+                      expandedItemId={expandedItemId}
+                      mutation={mutation}
+                      result={result.view}
+                      search={search}
+                      setAppendNotes={setAppendNotes}
+                      setExpandedItemId={setExpandedItemId}
+                      onAppendNote={appendNote}
+                      onCopyPrompt={copyPrompt}
+                      onDeleteQuickNote={deleteQuickNote}
+                      onUpdateTriage={updateTriage}
+                    />
+                  </div>
+                </CaptureStatusTabs>
               </section>
             )}
           </div>
@@ -530,29 +518,43 @@ function CapturePendingState() {
 
 function CaptureStatusTabs({
   activeStatus,
+  children,
   counts,
   filters,
 }: {
   activeStatus: CaptureStatusFilter;
+  children: ReactNode;
   counts: Record<AdminCaptureStatus, number>;
   filters: CaptureSearch;
 }) {
+  const statusTabs = useHitoTabs({
+    items: STATUS_FILTERS.map((status) => ({ value: status.value })),
+    value: activeStatus,
+  });
+
   return (
-    <div className="hito-tabs hito-tabs-simple overflow-x-auto" role="tablist">
-      {STATUS_FILTERS.map((status) => (
-        <a
-          key={status.value}
-          href={buildCaptureHref(filters, { status: status.value })}
-          role="tab"
-          aria-selected={activeStatus === status.value}
-          className="hito-tab whitespace-nowrap"
-          data-active={activeStatus === status.value ? "true" : undefined}
-        >
-          {status.label}
-          <span className="hito-tab-badge">{countForStatusFilter(status.value, counts)}</span>
-        </a>
-      ))}
-    </div>
+    <>
+      <div
+        className="hito-tabs hito-tabs-simple overflow-x-auto"
+        {...statusTabs.tabListProps}
+        aria-label="Work item status"
+      >
+        {STATUS_FILTERS.map((status) => (
+          <Link
+            key={status.value}
+            to="/admin/capture"
+            search={{ ...filters, status: status.value }}
+            {...statusTabs.getTabProps(status.value)}
+            className="hito-tab whitespace-nowrap"
+            data-active={activeStatus === status.value ? "true" : undefined}
+          >
+            {status.label}
+            <span className="hito-tab-badge">{countForStatusFilter(status.value, counts)}</span>
+          </Link>
+        ))}
+      </div>
+      <div {...statusTabs.getPanelProps(activeStatus)}>{children}</div>
+    </>
   );
 }
 

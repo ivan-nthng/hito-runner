@@ -144,10 +144,10 @@ export interface ActivePlanWorkoutEditingCapabilities {
 }
 
 export interface RunnerProfileSummary {
-  goalType: "build_consistency" | "first_race" | "distance_build";
-  goalLabel: string;
-  baselineSessionsPerWeek: number;
-  baselineLongRunKm: number;
+  goalType: "build_consistency" | "first_race" | "distance_build" | null;
+  goalLabel: string | null;
+  baselineSessionsPerWeek: number | null;
+  baselineLongRunKm: number | null;
   baselineNotes: string | null;
   firstName: string | null;
   lastName: string | null;
@@ -932,6 +932,7 @@ const EXECUTABLE_TARGET_ENTRY_KEYS = new Set([
   "hr_bpm_range",
   "pace_min_per_km_range",
   "pace",
+  "rpe",
   "cadence_spm_range",
 ]);
 
@@ -948,7 +949,23 @@ export function displayExecutableTargetEntries(
   metricMode?: Pick<CanonicalMetricMode, "paceTargetsAllowed" | "hrTargetsAllowed"> | null,
 ) {
   return displayTargetEntries(target).filter((entry) => {
+    if (target?.primary_execution_mode === "run_walk") {
+      return entry.key === "intensity";
+    }
+
+    if (target?.primary_execution_mode === "effort") {
+      return target.rpe != null ? entry.key === "rpe" : entry.key === "intensity";
+    }
+
     if (!EXECUTABLE_TARGET_ENTRY_KEYS.has(entry.key)) {
+      return false;
+    }
+
+    if (target?.primary_execution_mode === "pace" && !isPaceTargetEntry(entry.key)) {
+      return false;
+    }
+
+    if (target?.primary_execution_mode === "heart_rate" && !isHrTargetEntry(entry.key)) {
       return false;
     }
 

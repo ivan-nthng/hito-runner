@@ -7,6 +7,7 @@ import {
   type ManualWorkoutDraftReviewResult,
 } from "../src/lib/manual-workout-authoring";
 import { buildManualWorkoutDraftInputFromPersistedWorkout } from "../src/lib/manual-workout-authoring/copy-paste-reconstruction";
+import { AI_AUTHORED_PLAN_FIRST_WORKOUT_IDENTITY_VALUES } from "../src/lib/ai-authored-plan-first-provider-contract";
 import type { PersistedPlannedWorkoutRow } from "../src/lib/active-plan-persistence";
 import {
   isEditableActivePlanSourceKind,
@@ -14,6 +15,11 @@ import {
   resolveActivePlanWorkoutEditability,
 } from "../src/lib/active-plan-workout-editing/policy";
 import { addDaysIso, todayIso, type Step } from "../src/lib/training";
+import {
+  canonicalFamilyToLegacyWorkoutType,
+  resolveCanonicalWorkoutModel,
+} from "../src/lib/rich-workout-model";
+import { AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE } from "../src/lib/workout-document";
 import { formatReadableDate } from "../src/components/manual-workout/manual-workout-authoring-utils";
 import {
   buildSkippedManualPersistenceResult,
@@ -40,9 +46,11 @@ import { validateManualPersistedTodayAndFutureWorkoutEditContract } from "./manu
 import { validateManualSavedTemplateContract } from "./manual-workout-authoring/saved-template-proof";
 import { validateManualSourceEditingCapabilityReadback } from "./manual-workout-authoring/source-capability-proof";
 import { validateManualTemplateDefaultSkeletons } from "./manual-workout-authoring/template-defaults-proof";
+import { validateManualWorkoutTemplateCatalogContract } from "./manual-workout-authoring/template-catalog-proof";
 import {
   assertReady,
   buildFakePlanCycle,
+  buildFakePlannedWorkout,
   buildFakePlannedWorkoutFromReview,
 } from "./manual-workout-authoring/move-proof-fixtures";
 
@@ -55,8 +63,11 @@ async function main() {
   validateManualConstructorSegmentTargetContract();
   validateManualConstructorDndContract();
   validateManualTemplateDefaultSkeletons();
+  await validateManualWorkoutTemplateCatalogContract();
   validateManualDateOnlyLabels();
   validateActivePlanLifecycleAndContentEditabilityPolicy();
+  validateClosedAiPersistedEditorIdentitySet();
+  validateAiAuthoredOrderedRepeatRoleRoundtrip();
   validateManualSourceEditingCapabilityReadback();
   await validateManualSavedTemplateContract();
   await validateManualEmptyActivePlanCreationContract();
@@ -186,6 +197,180 @@ function validateActivePlanLifecycleAndContentEditabilityPolicy() {
   if (!missingSource.ok) {
     assert.equal(missingSource.reason, "unsupported_source_metadata");
   }
+}
+
+function validateClosedAiPersistedEditorIdentitySet() {
+  for (const [index, workoutIdentity] of AI_AUTHORED_PLAN_FIRST_WORKOUT_IDENTITY_VALUES.entries()) {
+    const model = resolveCanonicalWorkoutModel({
+      workoutType: "quality",
+      sourceWorkoutType: workoutIdentity,
+      workoutIdentity,
+      title: workoutIdentity,
+      steps: [],
+    });
+    const workout = buildFakePlannedWorkout({
+      userId: "00000000-0000-4000-8000-000000000041",
+      planCycleId: "00000000-0000-4000-8000-000000000042",
+      id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      date: "2026-07-22",
+      displayOrder: index,
+      title: workoutIdentity,
+      workoutType: canonicalFamilyToLegacyWorkoutType(model.workoutFamily, model.workoutIdentity),
+      sourceWorkoutType: workoutIdentity,
+      workoutFamily: model.workoutFamily,
+      workoutIdentity: model.workoutIdentity,
+      calendarIconKey: model.calendarIconKey,
+      steps: [
+        {
+          type: "run",
+          segment_type: "main",
+          sequence: 1,
+          label: "AI-authored runnable block",
+          prescription: { mode: "time", duration_min: 30 },
+          duration_min: 30,
+          target: {
+            primary_execution_mode: "effort",
+            target_source: AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
+            intensity: "Easy conversational effort",
+          },
+        },
+      ],
+    });
+    const reconstructed = buildManualWorkoutDraftInputFromPersistedWorkout(
+      workout,
+      workout.workout_date,
+      {
+        activePlanId: workout.plan_cycle_id,
+        activePlanSourceKind: "ai_authored_plan_first_v1",
+      },
+    );
+    assert.equal(
+      reconstructed.ok,
+      true,
+      `${workoutIdentity} should reconstruct through the full manual editor contract`,
+    );
+    if (!reconstructed.ok) continue;
+
+    const reviewed = reviewManualWorkoutDraft(reconstructed.draftInput, {
+      allowPreservedAiAuthoredTargets: true,
+      allowPersistedTemplateShape: true,
+      ...reconstructed.processingOptions,
+    });
+    assert.equal(reviewed.ok, true, `${workoutIdentity} reconstructed review should pass`);
+    if (!reviewed.ok) continue;
+    assert.equal(reviewed.draft.workoutIdentity, workoutIdentity);
+    assert.equal(
+      reviewed.draft.steps[0]?.target?.primary_execution_mode,
+      "effort",
+      `${workoutIdentity} should retain AI primary execution mode`,
+    );
+    assert.equal(
+      reviewed.draft.steps[0]?.target?.target_source,
+      AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
+      `${workoutIdentity} should retain AI target provenance`,
+    );
+  }
+}
+
+function validateAiAuthoredOrderedRepeatRoleRoundtrip() {
+  const model = resolveCanonicalWorkoutModel({
+    workoutType: "quality",
+    sourceWorkoutType: "time_intervals",
+    workoutIdentity: "time_intervals",
+    title: "AI-authored ordered repeat",
+    steps: [],
+  });
+  const target = {
+    primary_execution_mode: "effort" as const,
+    target_source: AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
+    intensity: "AI-authored controlled effort",
+  };
+  const children = [
+    { role: "warm_up" as const, label: "Warm-up", duration: 5 },
+    { role: "run" as const, label: "Run", duration: 4 },
+    { role: "walk" as const, label: "Walk", duration: 1 },
+    { role: "work" as const, label: "Work", duration: 3 },
+    { role: "recover" as const, label: "Recover", duration: 2 },
+    { role: "finish" as const, label: "Finish", duration: 2 },
+    { role: "cooldown" as const, label: "Cooldown", duration: 5 },
+  ].map((child, index) => ({
+    role: child.role,
+    label: child.label,
+    sequence: index + 1,
+    prescription: { mode: "time" as const, duration_min: child.duration },
+    target,
+  }));
+  const workout = buildFakePlannedWorkout({
+    userId: "00000000-0000-4000-8000-000000000051",
+    planCycleId: "00000000-0000-4000-8000-000000000052",
+    id: "00000000-0000-4000-8000-000000000053",
+    date: "2026-07-22",
+    displayOrder: 1,
+    title: "AI-authored ordered repeat",
+    workoutType: canonicalFamilyToLegacyWorkoutType(model.workoutFamily, model.workoutIdentity),
+    sourceWorkoutType: "time_intervals",
+    workoutFamily: model.workoutFamily,
+    workoutIdentity: model.workoutIdentity,
+    calendarIconKey: model.calendarIconKey,
+    steps: [
+      {
+        type: "intervals",
+        segment_type: "interval_block",
+        sequence: 1,
+        label: "AI-authored ordered repeat",
+        prescription: {
+          mode: "repeats",
+          repeat_count: 2,
+          children,
+        },
+        repeats: 2,
+        children: children.map((child) => ({
+          type: child.role,
+          segment_type: child.role,
+          sequence: child.sequence,
+          label: child.label,
+          prescription: child.prescription,
+          duration_min: child.prescription.duration_min,
+          target: child.target,
+        })),
+      },
+    ],
+  });
+  const reconstructed = buildManualWorkoutDraftInputFromPersistedWorkout(
+    workout,
+    workout.workout_date,
+    {
+      activePlanId: workout.plan_cycle_id,
+      activePlanSourceKind: "ai_authored_plan_first_v1",
+    },
+  );
+
+  assert.equal(reconstructed.ok, true, "AI ordered Repeat should reconstruct");
+  if (!reconstructed.ok) return;
+
+  const reviewed = reviewManualWorkoutDraft(reconstructed.draftInput, {
+    allowPreservedAiAuthoredTargets: true,
+    allowPersistedTemplateShape: true,
+    ...reconstructed.processingOptions,
+  });
+  assert.equal(reviewed.ok, true, "AI ordered Repeat should pass reconstructed review");
+  if (!reviewed.ok) return;
+
+  const repeat = reviewed.draft.steps[0];
+  assert.equal(repeat?.target, undefined, "Repeat parent must stay structural");
+  assert.deepEqual(
+    repeat?.prescription?.children?.map((child) => child.role),
+    ["warm_up", "run", "walk", "work", "recover", "finish", "cooldown"],
+    "all canonical Repeat child roles must round-trip in order",
+  );
+  assert.ok(
+    repeat?.prescription?.children?.every(
+      (child) =>
+        child.target?.primary_execution_mode === "effort" &&
+        child.target.target_source === AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
+    ),
+    "unchanged AI Repeat child targets must retain mode and provenance",
+  );
 }
 
 function validateAcceptedFixtures() {
@@ -368,6 +553,10 @@ function validateManualUserEnteredTargetFixtures() {
   assert.equal(paceExact.draft.metricMode.pace_targets_allowed, true);
   assertManualUserEnteredTarget(paceExact.draft.steps, "pace", "runner-entered exact pace");
   assert.equal(
+    paceExact.draft.steps.find((step) => step.target?.pace)?.target?.primary_execution_mode,
+    "pace",
+  );
+  assert.equal(
     paceExact.draft.steps.find((step) => step.target?.pace)?.target?.pace,
     "5:20/km",
     "canonical reviewed draft should preserve exact runner-entered pace",
@@ -407,6 +596,10 @@ function validateManualUserEnteredTargetFixtures() {
   assert.equal(hrCap.draft.metricMode.hr_targets_allowed, true);
   assert.equal(hrCap.draft.metricMode.hr_target_source, "user_entered");
   assertManualUserEnteredTarget(hrCap.draft.steps, "hr_bpm", "HR cap");
+  assert.equal(
+    hrCap.draft.steps.find((step) => step.target?.hr_bpm)?.target?.primary_execution_mode,
+    "heart_rate",
+  );
 
   const hrRange = assertReady("runner-entered HR range", {
     templateKey: "steady_aerobic_run",
@@ -439,6 +632,10 @@ function validateManualUserEnteredTargetFixtures() {
     ],
   });
   assertManualUserEnteredTarget(rpeLow.draft.steps, "rpe", "RPE zero");
+  assert.equal(
+    rpeLow.draft.steps.find((step) => step.target?.rpe === 0)?.target?.primary_execution_mode,
+    "effort",
+  );
 
   const rpeHigh = assertReady("runner-entered RPE ten", {
     templateKey: "controlled_tempo_session",

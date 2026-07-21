@@ -77,6 +77,7 @@ interface StructuredPlanConstructorProps {
     includeRunningLevel?: boolean;
     includeTrainingSetup?: boolean;
     includeScheduleRhythm?: boolean;
+    heartRateProfile?: ReactNode;
     firstSectionNumber?: number;
     firstSectionHasDivider?: boolean;
   };
@@ -179,11 +180,16 @@ export function StructuredPlanConstructor({
               label="Running level"
               helper="Choose the closest current level. You can refine details after the plan exists."
             >
-              <OptionGrid label="Running level">
+              <OptionGrid
+                label="Running level"
+                items={PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS}
+                value={primaryFitnessLevel}
+              >
                 {PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS.map((option) => (
                   <OptionButton
                     key={option.value}
                     active={primaryFitnessLevel === option.value}
+                    value={option.value}
                     icon={fitnessLevelIcon(option.value)}
                     label={option.label}
                     copy={option.copy}
@@ -201,11 +207,16 @@ export function StructuredPlanConstructor({
               label="Available running days per week"
               helper="Optional. Add this now if you want a more tailored starting point."
             >
-              <OptionGrid label="Available running days per week">
+              <OptionGrid
+                label="Available running days per week"
+                items={PRESET_RUNNING_DAY_OPTIONS}
+                value={state.maxRunningDaysPerWeek}
+              >
                 {PRESET_RUNNING_DAY_OPTIONS.map((option) => (
                   <OptionButton
                     key={option.value}
                     active={state.maxRunningDaysPerWeek === option.value}
+                    value={option.value}
                     label={option.label}
                     copy={option.copy}
                     onClick={() => setState.setMaxRunningDaysPerWeek(option.value)}
@@ -318,11 +329,16 @@ export function StructuredPlanConstructor({
               body="Choose how you want workouts to be described."
             >
               <Field label="Guidance style">
-                <OptionGrid label="Guidance style">
+                <OptionGrid
+                  label="Guidance style"
+                  items={GUIDANCE_PREFERENCE_OPTIONS}
+                  value={state.guidancePreference}
+                >
                   {GUIDANCE_PREFERENCE_OPTIONS.map((option) => (
                     <OptionButton
                       key={option.value}
                       active={state.guidancePreference === option.value}
+                      value={option.value}
                       label={option.label}
                       copy={option.copy}
                       onClick={() => setState.setGuidancePreference(option.value)}
@@ -338,11 +354,16 @@ export function StructuredPlanConstructor({
               body="Set a specific goal, timeline, or target if you need one."
             >
               <Field label="Goal distance">
-                <OptionGrid label="Goal distance">
+                <OptionGrid
+                  label="Goal distance"
+                  items={GOAL_DISTANCE_OPTIONS}
+                  value={state.goalDistance}
+                >
                   {GOAL_DISTANCE_OPTIONS.map((option) => (
                     <OptionButton
                       key={option.value}
                       active={state.goalDistance === option.value}
+                      value={option.value}
                       label={option.label}
                       onClick={() => setState.setGoalDistance(option.value)}
                     />
@@ -351,11 +372,12 @@ export function StructuredPlanConstructor({
               </Field>
 
               <Field label="Goal style">
-                <OptionGrid label="Goal style">
+                <OptionGrid label="Goal style" items={GOAL_STYLE_OPTIONS} value={state.goalStyle}>
                   {GOAL_STYLE_OPTIONS.map((option) => (
                     <OptionButton
                       key={option.value}
                       active={state.goalStyle === option.value}
+                      value={option.value}
                       label={option.label}
                       onClick={() => setState.setGoalStyle(option.value)}
                     />
@@ -391,11 +413,16 @@ export function StructuredPlanConstructor({
 
               {showsTerrainSelector && (
                 <Field label="Terrain focus">
-                  <OptionGrid label="Terrain focus">
+                  <OptionGrid
+                    label="Terrain focus"
+                    items={TERRAIN_OPTIONS.map((option) => ({ value: option.value! }))}
+                    value={state.terrainFocus}
+                  >
                     {TERRAIN_OPTIONS.map((option) => (
                       <OptionButton
                         key={option.value}
                         active={state.terrainFocus === option.value}
+                        value={option.value!}
                         label={option.label}
                         copy={option.copy}
                         onClick={() => setState.setTerrainFocus(option.value)}

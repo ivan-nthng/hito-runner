@@ -37,6 +37,7 @@ import {
   MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION,
   type ManualWorkoutDraftInput,
+  type ManualWorkoutDraftProcessingOptions,
   type ManualWorkoutDraftReviewResult,
   type ManualWorkoutTemplateKey,
 } from "@/lib/manual-workout-authoring/schema";
@@ -227,6 +228,7 @@ type ManualWorkoutPersistedEditTarget =
       activePlan: PersistedPlanCycleRow;
       sourceWorkout: PersistedPlannedWorkoutRow;
       sourceDraftInput: ManualWorkoutDraftInput;
+      sourceDraftProcessingOptions: ManualWorkoutDraftProcessingOptions;
       otherWorkouts: PersistedPlannedWorkoutRow[];
     }
   | {
@@ -379,6 +381,7 @@ export async function reviewManualWorkoutPersistedEditDraftForUser(
   const draftReview = reviewManualWorkoutDraft(parsed.data.draftInput, {
     allowPreservedAiAuthoredTargets: true,
     allowPersistedTemplateShape: true,
+    ...target.sourceDraftProcessingOptions,
   });
   if (!draftReview.ok) {
     return buildEditBlocked({
@@ -471,6 +474,7 @@ export async function confirmManualWorkoutPersistedEditForUser(
   const draftReview = reviewManualWorkoutDraft(parsed.data.draftInput, {
     allowPreservedAiAuthoredTargets: true,
     allowPersistedTemplateShape: true,
+    ...target.sourceDraftProcessingOptions,
   });
   if (!draftReview.ok) {
     return buildEditBlocked({
@@ -803,6 +807,7 @@ async function resolveManualWorkoutPersistedEditTarget(
     activePlan,
     sourceWorkout,
     sourceDraftInput: reconstructed.draftInput,
+    sourceDraftProcessingOptions: reconstructed.processingOptions,
     otherWorkouts: planContext.existingWorkouts.workouts.filter(
       (workout) => workout.id !== sourceWorkout.id,
     ),

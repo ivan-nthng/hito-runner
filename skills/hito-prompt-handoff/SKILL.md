@@ -43,6 +43,8 @@ Every prompt should provide:
 - the observed symptom and root-cause evidence;
 - the canonical owner and existing seams to inspect;
 - the product outcome, hard constraints, non-goals, and acceptance evidence;
+- a compact Definition of Done: observable outcome, preserved boundaries, required owner
+  verification, and the condition that keeps the task open; and
 - decisions already made by the user or active plan.
 
 Do not prescribe a technical design, implementation algorithm, SQL shape, schema structure, helper
@@ -105,7 +107,12 @@ Assign the outcome and evidence; leave the execution design to the receiving rol
    source scans, or non-mutating validation without user attention.
 7. State product outcome, constraints, non-goals, and what not to touch without prescribing the
    receiving role's technical solution.
-8. Specify validation evidence, not a code-level implementation recipe.
+8. For an implementation, debugging, or validation task, specify the Definition of Done and the
+   risk-based owner verification inventory, not a code-level implementation recipe. Require the
+   final inventory table as `Check | Scenario / environment | Result | Evidence`; for debugging,
+   require a safe root-cause repro or discriminator. State separately when broader Global QA
+   Acceptance remains a later gate. Do not add a test inventory to a pure explanatory, reference, or
+   routing response.
 9. Rely on the standard report formats in `AGENTS.md` by default. Specify custom output only when
    the task needs stricter evidence, unusual ordering, or a non-standard report shape.
 10. Do not include a long continuity footer by default. Use only the standard shell plus `Blockers`
@@ -130,16 +137,19 @@ one micro-step.
 
 ## Autonomous Completion, Not User Relay
 
-Write one bounded owner task that includes the implementation, validation, and fix-forward loop when
-those activities share one primary owner and safe local evidence is available. The user must not be
-asked to copy a routine implementation result into a separate QA prompt and then copy the QA result
-back to the implementing role.
+Write one bounded owner task that includes the implementation, Definition-of-Done verification, and
+fix-forward loop when those activities share one primary owner and safe local evidence is available.
+The user must not be asked to copy a routine implementation result into a separate QA prompt and then
+copy the QA result back to the implementing role. Independent broad Global QA Acceptance remains a
+separate later gate when the plan or release scope requires it.
 
 - Tell the assigned BACKEND or FRONTEND owner to start/reuse a role-prefixed QA subagent for browser,
-  persistence-readback, fixture, or regression proof that is adjacent to its own change.
+  persistence-readback, fixture, or regression proof that is adjacent to its own Definition of Done.
 - The owner integrates the QA result and fixes any same-owner defect before returning.
-- Return to the user only with a final verdict, a genuine cross-owner defect, an unsafe mutation
-  boundary, a missing tool capability, or a Product decision.
+- The owner reports `Implementation DoD: Passed` only after its full required inventory passes, and
+  labels Global QA Acceptance as pending unless it was explicitly part of the same assigned scope.
+- Return to the user only with an implementation-DoD result, a genuine cross-owner defect, an unsafe
+  mutation boundary, a missing tool capability, or a Product decision.
 - Do not turn a known required browser check into a later user-facing handoff when the owner can
   safely delegate it inside the same task.
 
@@ -219,6 +229,10 @@ Scope:
 
 Validation:
 <required checks>
+
+Definition of Done:
+<observable outcome, preserved boundaries, required owner verification, and whether Global QA
+Acceptance remains pending>
 ~~~
 
 Blockers:

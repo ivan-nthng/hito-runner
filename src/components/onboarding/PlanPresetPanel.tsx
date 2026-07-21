@@ -13,6 +13,7 @@ import type {
   RunningPlanPreviewActionResult,
 } from "@/lib/running-plan-engine-actions";
 import { cn } from "@/lib/utils";
+import { useHitoRadioGroup, type HitoRadioOptionProps } from "@/components/ui/hito-radio-group";
 
 type RunningPlanCreateStatus = "idle" | "creating";
 
@@ -55,6 +56,7 @@ interface PlanPresetPanelProps {
   error: string | null;
   status: "idle" | "previewing_plan";
   hasRequiredPlanBasics: boolean;
+  requiredBasicsCopy?: string;
   previewOpen: boolean;
   onPreviewOpenChange: (open: boolean) => void;
   onRefreshPreview: () => void;
@@ -94,6 +96,7 @@ export function PlanPresetPanel({
   createStatus,
   error,
   hasRequiredPlanBasics,
+  requiredBasicsCopy = "Age, height, and weight are required before Hito can prepare a reviewed plan.",
   onCreatePlan,
   onPreviewOpenChange,
   onRefreshPreview,
@@ -146,9 +149,7 @@ export function PlanPresetPanel({
         {!hasRequiredPlanBasics ? (
           <div className="hito-surface-wash">
             <p className="hito-list-row-title">Add a few basics before previewing</p>
-            <p className="hito-list-row-copy">
-              Age, height, and weight are required before Hito can prepare a reviewed plan.
-            </p>
+            <p className="hito-list-row-copy">{requiredBasicsCopy}</p>
           </div>
         ) : null}
 
@@ -216,6 +217,10 @@ function PlanGoalIntentControls({
     goalChoice === "custom" && localGateField === "customDistance" ? localGateError : null;
   const finishTimeError = localGateField === "finishTime" ? localGateError : null;
   const targetDateError = localGateField === "targetDate" ? localGateError : null;
+  const goalGroup = useHitoRadioGroup({
+    items: PLAN_GOAL_CHOICES.map((choice) => ({ value: choice.value })),
+    value: goalChoice || null,
+  });
 
   return (
     <div className="grid gap-4">
@@ -226,11 +231,16 @@ function PlanGoalIntentControls({
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Training goal">
+      <div
+        className="grid gap-3 sm:grid-cols-2"
+        {...goalGroup.groupProps}
+        aria-label="Training goal"
+      >
         {PLAN_GOAL_CHOICES.map((choice) => (
           <PlanGoalCard
             key={choice.value}
             active={goalChoice === choice.value}
+            radioProps={goalGroup.getRadioProps(choice.value)}
             distance={choice.distance}
             label={choice.label}
             copy={choice.copy}
@@ -319,18 +329,19 @@ function PlanGoalCard({
   distance,
   label,
   onClick,
+  radioProps,
 }: {
   active: boolean;
   copy: string;
   distance: string;
   label: string;
   onClick: () => void;
+  radioProps: HitoRadioOptionProps;
 }) {
   return (
     <button
       type="button"
-      role="radio"
-      aria-checked={active}
+      {...radioProps}
       data-selected={active ? "true" : undefined}
       onClick={onClick}
       className="hito-choice-toggle hito-choice-toggle-card min-h-32 w-full flex-col justify-between text-left"

@@ -24,7 +24,6 @@ import {
 import {
   RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
   buildRunningPlanPersistenceMetadata,
-  buildRunningPlanProfilePatch,
   validateSelfContainedRunningPlanReviewExactness,
 } from "@/lib/running-plan-engine-review";
 import {
@@ -229,7 +228,6 @@ type ActivePlanTransitionReviewPayload = {
 
 type BuildTransitionReviewOk = Extract<ActivePlanTransitionReviewResult, { ok: true }> & {
   canonicalPlan: Parameters<typeof buildRunningPlanPersistenceMetadata>[0]["canonicalPlan"];
-  profilePatch: ReturnType<typeof buildRunningPlanProfilePatch>;
   persistenceMetadata: AdditionalPlanPersistenceMetadata;
   currentPlanContext: ExistingPlanContext;
   payload: ActivePlanTransitionReviewPayload;
@@ -306,7 +304,6 @@ export async function reviewActivePlanTransitionForUser(
 
   const {
     canonicalPlan: _canonicalPlan,
-    profilePatch: _profilePatch,
     persistenceMetadata: _persistenceMetadata,
     currentPlanContext: _context,
     payload: _payload,
@@ -371,7 +368,6 @@ export async function confirmActivePlanTransitionForUser(
       expectedCurrentActivePlanUpdatedAt: review.currentPlan.updatedAt,
       reviewedPlan: review.canonicalPlan,
       replacementStartsAt: review.affectedManualSchedule.affectedFromDate,
-      profilePatch: review.profilePatch,
       planMetadata: mergeTransitionPersistenceMetadata(review.persistenceMetadata, {
         transitionReviewChecksum: review.transitionReviewChecksum,
         archivedPlanId: review.currentPlan.id,
@@ -605,7 +601,6 @@ async function buildActivePlanTransitionReview(
       upcomingManualWorkoutsMergeIntoCandidate: false,
     },
     canonicalPlan: exactness.canonicalPlan,
-    profilePatch: buildRunningPlanProfilePatch(draft),
     persistenceMetadata: buildRunningPlanPersistenceMetadata({
       draft,
       canonicalPlan: exactness.canonicalPlan,

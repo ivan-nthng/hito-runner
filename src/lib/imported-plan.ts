@@ -15,6 +15,7 @@ import {
   toCanonicalMetricModeJson,
   type CanonicalGoalContext,
 } from "@/lib/rich-workout-model";
+import { PRIMARY_EXECUTION_MODE_VALUES } from "@/lib/workout-document";
 import type { RunnerProfileSummary } from "@/lib/training";
 import type { Json } from "@/lib/supabase/database";
 import { reduceRepeatChildrenToChildFirst } from "@/lib/planned-workout-block-contract";
@@ -95,6 +96,7 @@ const placeholderEnvelopeSchema = z.union([z.boolean(), z.record(z.string(), z.u
 
 const v2TargetSchema = z
   .object({
+    primary_execution_mode: z.enum(PRIMARY_EXECUTION_MODE_VALUES).optional(),
     target_source: targetSourceSchema.optional(),
     intensity: z.string().trim().min(1).optional(),
     hr_bpm_range: z.string().trim().min(1).optional(),

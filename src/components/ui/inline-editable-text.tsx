@@ -187,6 +187,7 @@ export function InlineEditableText({
         ) : (
           <input
             ref={fieldRef as RefObject<HTMLInputElement>}
+            data-hito-component="inline-editable-text"
             data-size={isHeaderInput ? size : undefined}
             size={headerInputSize}
             type="text"
@@ -246,6 +247,7 @@ export function InlineEditableText({
       <button
         ref={actionRef}
         type="button"
+        data-hito-component="inline-editable-text"
         className={cn(
           isHeaderInput ? "hito-inline-header-input-trigger" : INLINE_EDITABLE_ACTION_CLASSES,
           className,

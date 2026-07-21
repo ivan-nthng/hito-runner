@@ -18,10 +18,6 @@ import {
   parsePaceSecondsPerKm,
   uniqueWeekdays,
 } from "@/lib/first-plan-authoring-utils";
-import {
-  buildEffectivePersonalHeartRateProfile,
-  type EffectivePersonalHeartRateProfile,
-} from "@/lib/heart-rate-zones";
 import { buildImportedPlanSeed, type TrainingPlanV2 } from "@/lib/imported-plan";
 import {
   normalizePlanGoalIntent,
@@ -50,6 +46,7 @@ import {
 import { todayIso, weekdayLong } from "@/lib/training";
 import { WEEKDAY_NAMES, type WeekdayName } from "@/lib/weekday-rest-invariants";
 import type { WorkoutDocument } from "@/lib/workout-document";
+import type { RunnerPlanAuthoringProfileSnapshot } from "@/lib/user-settings-actions";
 
 export const AI_GENERATED_RUNNING_PLAN_SOURCE_KIND = AI_AUTHORED_PLAN_FIRST_SOURCE_KIND;
 export const AI_GENERATED_RUNNING_PLAN_PREVIEW_VERSION = "ai_generated_running_plan_v1" as const;
@@ -181,7 +178,7 @@ export type AiGeneratedRunningPlanPreviewResult =
 
 export interface BuildAiGeneratedRunningPlanPreviewOptions {
   aiPreview?: Omit<GenerateAiFirstPlanDraftPreviewOptions, "input">;
-  effectiveHeartRateProfile?: EffectivePersonalHeartRateProfile;
+  runnerProfileSnapshot?: RunnerPlanAuthoringProfileSnapshot;
   qaFixtureAuthorized?: boolean;
 }
 
@@ -189,10 +186,7 @@ export async function buildAiGeneratedRunningPlanPreview(
   input: BuildRunningPlanPreviewInput,
   options: BuildAiGeneratedRunningPlanPreviewOptions = {},
 ): Promise<AiGeneratedRunningPlanPreviewResult> {
-  const authoring = buildAiGeneratedRunningPlanAuthoringInput(
-    input,
-    options.effectiveHeartRateProfile,
-  );
+  const authoring = buildAiGeneratedRunningPlanAuthoringInput(input, options.runnerProfileSnapshot);
 
   if (!authoring.ok) {
     const generationTrace = await recordAiPlanGenerationPreflightFailure({
@@ -354,10 +348,7 @@ function isAiGeneratedRunningPlanPreviewSourceKind(
 
 export function buildAiGeneratedRunningPlanAuthoringInput(
   input: BuildRunningPlanPreviewInput,
-  effectiveHeartRateProfile:
-    | EffectivePersonalHeartRateProfile
-    | null
-    | undefined = buildEffectivePersonalHeartRateProfile({ age: input.age }),
+  runnerProfileSnapshot?: RunnerPlanAuthoringProfileSnapshot | null,
 ):
   | {
       ok: true;
@@ -370,6 +361,22 @@ export function buildAiGeneratedRunningPlanAuthoringInput(
       reason: "invalid_plan_goal_intent" | "structured_input_invalid";
       message: string;
     } {
+  if (!runnerProfileSnapshot) {
+    return {
+      ok: false,
+      reason: "structured_input_invalid",
+      message: "Save and accept the runner baseline before creating a generated plan.",
+    };
+  }
+
+  if (!matchesRunnerProfileSnapshot(input, runnerProfileSnapshot)) {
+    return {
+      ok: false,
+      reason: "structured_input_invalid",
+      message: "The runner baseline changed. Save it before creating a generated plan.",
+    };
+  }
+
   const startDate = normalizeStartDate(input.startDate);
   const normalizedIntent = normalizePlanGoalIntent({
     rawIntent: input.planGoalIntent,
@@ -424,7 +431,7 @@ export function buildAiGeneratedRunningPlanAuthoringInput(
       weightKg: input.weightKg,
       selfReportedLevel: input.runnerLevel,
       benchmark: benchmarkPaceTruth,
-      heartRateProfile: effectiveHeartRateProfile,
+      heartRateProfile: runnerProfileSnapshot.heartRateProfile,
     },
     availability: {
       fixedRestDays,
@@ -468,8 +475,37 @@ export function buildAiGeneratedRunningPlanAuthoringInput(
           : "not_supplied",
       trainingWeekdays: availableWeekdays,
       loadContext: "ai_authored",
+      runnerProfileSnapshot,
     },
   };
+}
+
+function matchesRunnerProfileSnapshot(
+  input: BuildRunningPlanPreviewInput,
+  snapshot: RunnerPlanAuthoringProfileSnapshot,
+) {
+  return (
+    input.age === snapshot.age &&
+    input.weightKg === snapshot.weightKg &&
+    input.heightCm === snapshot.heightCm &&
+    input.runnerLevel === planRunnerLevelForFitness(snapshot.fitnessLevel)
+  );
+}
+
+function planRunnerLevelForFitness(
+  fitnessLevel: RunnerPlanAuthoringProfileSnapshot["fitnessLevel"],
+): RunningPlanRunnerLevel {
+  switch (fitnessLevel) {
+    case "new_to_running":
+      return "beginner_new_runner";
+    case "beginner":
+    case "custom":
+      return "sometimes_runs";
+    case "running_regularly":
+      return "runs_a_lot";
+    case "performance_focused":
+      return "professional_competitive";
+  }
 }
 
 function buildAiAuthoredNormalizedInputSummary(

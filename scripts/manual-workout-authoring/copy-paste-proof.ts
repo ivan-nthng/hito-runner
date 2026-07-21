@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import type { PersistedPlannedWorkoutRow } from "../../src/lib/active-plan-persistence";
+import type { ManualWorkoutDraftInput } from "../../src/lib/manual-workout-authoring";
 import {
   confirmManualWorkoutCopyPasteDraftForUser,
   copyManualWorkoutWithinActivePlanForUser,
@@ -7,8 +8,7 @@ import {
   type ManualWorkoutCopyPasteConfirmResult,
   type ManualWorkoutCopyPasteReviewResult,
   type ManualWorkoutDirectCopyResult,
-  type ManualWorkoutDraftInput,
-} from "../../src/lib/manual-workout-authoring";
+} from "../../src/lib/manual-workout-authoring/copy-paste";
 import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "../../src/lib/manual-workout-authoring/schema";
 import type { Step } from "../../src/lib/training";
 import {

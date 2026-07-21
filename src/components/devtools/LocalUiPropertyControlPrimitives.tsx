@@ -37,7 +37,7 @@ export function ValueSelect({
   desiredOption: InlineChangeTokenControlInput["options"][number] | null;
   displayValue: string;
   onValueChange: (token: string) => void;
-  tone: "desired" | "neutral";
+  tone: "available" | "desired" | "neutral";
   tooltip: string;
 }) {
   return (
@@ -49,7 +49,7 @@ export function ValueSelect({
         aria-label={`${ariaLabel}. ${tooltip}`}
         title={tooltip}
         className="max-w-24"
-        tone={tone}
+        tone={tone === "desired" ? "signal" : tone === "available" ? "desired" : tone}
       >
         {displayValue}
       </HitoValueTagSelectTrigger>
@@ -70,12 +70,16 @@ export function ValueTag({
   tooltip,
   value,
 }: {
-  tone?: "current" | "desired" | "neutral";
+  tone?: "available" | "current" | "desired" | "neutral";
   tooltip?: string;
   value: string;
 }) {
   return (
-    <HitoValueTag title={tooltip} aria-label={tooltip} tone={tone}>
+    <HitoValueTag
+      title={tooltip}
+      aria-label={tooltip}
+      tone={tone === "desired" ? "signal" : tone === "available" ? "desired" : tone}
+    >
       {value}
     </HitoValueTag>
   );
@@ -109,7 +113,7 @@ export function TypographyRoleSelect({
         aria-label={`Typography desired role. ${tooltip}`}
         title={tooltip}
         className="min-w-24 max-w-36"
-        tone={tone}
+        tone={tone === "desired" ? "signal" : tone}
       >
         {displayLabel}
       </HitoValueTagSelectTrigger>

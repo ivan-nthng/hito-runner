@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { resolveQaRuntimePaths } from "./lib/qa-runtime-paths.mjs";
 
@@ -37,6 +39,10 @@ process.env.NITRO_PORT = port;
 process.env.PORT = port;
 process.env.HITO_LOCAL_RUNTIME_URL = `http://${formatUrlHost(host)}:${port}`;
 process.env.HITO_LOCAL_RUNTIME_OBSERVABILITY = "1";
+process.env.HITO_LOCAL_RUNTIME_OBSERVABILITY_ROOT = resolve(
+  homedir(),
+  "Library/Caches/hito-running/local-runtime-observability",
+);
 process.env.HITO_AI_GENERATED_PLAN_PROVIDER_MODE = providerMode;
 process.env.HITO_AI_GENERATED_PLAN_DEV_FIXTURE = providerMode === "qa_fixture" ? "true" : "false";
 if (providerMode === "real") {

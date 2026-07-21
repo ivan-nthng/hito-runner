@@ -6,10 +6,35 @@ Active
 
 ## Last Updated
 
-2026-07-19
+2026-07-21
 
 ## Where We Are Now
 
+- Runner baseline and heart-rate truth remediation is accepted and closed: authenticated runners
+  can save age, height, weight, fitness, and accepted estimated/personal BPM provenance without
+  creating a plan; setup and Settings share read/edit truth; profile revision protects signed
+  review; AI may choose accepted BPM or effort as one command; and confirmed numeric BPM snapshots
+  remain unchanged when Settings changes later. Desktop/exact-375px browser, local persistence/RLS,
+  affected validators/build, and cleanup evidence passed without a paid-provider rerun.
+- The Backend Business-Process Canonicalization And Performance Program is accepted and closed:
+  audited runtime families converge on their existing canonical owners; the manual history guard
+  uses the result-asset evidence root instead of four redundant evidence reads; unreachable export,
+  request-user, and reviewed copy/paste wrappers are removed; and required persisted-user lookup is
+  non-null or throws. Admin Capture now returns one selected filtered page plus complete independent
+  status counts through one route server-function read. This is a measured `2 -> 1` server-function
+  boundary, not a database-query reduction: the repository still performs one page read plus five
+  parallel exact status counts. Bounded Implementation DoD and Global QA Acceptance passed; broader
+  release QA remains separate.
+- Runner Core is formally code-frozen for local self-use and controlled local testing:
+  the accepted manual-template runtime, proof helper, and visibility migration are part of the
+  intentional source diff; generated Supabase CLI temp state is excluded; a fresh loopback database
+  rebuild, targeted contract and persistence proofs, production build, and build integrity pass.
+  The managed local server is restored to healthy `real` provider mode with fixture activation
+  disabled, and no new browser or paid-provider run was needed because integrated validation exposed
+  no regression. The superseded direct personal-template list server wrapper and re-export are
+  removed, while the catalog-owned per-user list function remains the single live read owner.
+  Hosted external-user release remains a separate operations gate for non-loopback auth, hosted
+  migration/RLS parity, provider operations, privacy/retention, and deployment recovery.
 - July source-of-truth checkpoint:
   manual workout creation, persisted edit, and preview/readback now share one workout-document
   grammar; child-first repeat groups are treated as containers for ordered ordinary sections; saved
@@ -24,11 +49,13 @@ Active
   identity rejection, ordered Repeat `run` roundtrip, uncapped notes/cues, and review-to-saved
   parity. The accepted post-confirm product rule makes every confirmed non-rest workout on today or
   a future date editable through the same reviewed lifecycle regardless of source, logs, completion,
-  or evidence; past workouts remain non-editable. Runtime reconciliation is still open: current
-  backend capability/reconstruction/RPC guards and workout-detail gating implement the older
-  future-unlogged subset, and full pre-edit planned truth is not yet retained for evidence-attached
-  history. Paid OpenAI
-  end-to-end and completed evidence-attached browser proof remain separate release/ops debt.
+  or evidence; past workouts remain non-editable. Backend policy, capability projection, atomic
+  edit persistence, and workout-detail gating now implement that contract, including today,
+  logged, and evidence-backed rows. Paid OpenAI acceptance also passed for 10K, Half Marathon,
+  Marathon, and Custom 15K: every runnable leaf carries one AI-authored watch command (`pace`,
+  accepted estimated-or-personal BPM, `effort`, or `run_walk`) through review, confirm, persistence, export/import, and
+  readback. The local raw provider transcript store records future loopback OpenAI request/response
+  pairs for diagnosis without becoming a cache, fallback, or second plan engine.
 - The changelog/hub gap exposed a process failure, so history is now split:
   [changelog](./history/changelog.md) owns curated public highlights, while
   [technical log](./history/technical-log.md) owns the complete internal accepted-slice ledger.
@@ -143,10 +170,15 @@ unavailable`, or an auth loop.
   `source_kind` as provenance. For content editing, today/future confirmed non-rest workouts are
   universally available regardless of source, completion, logs, or evidence; past workouts are
   not. The reviewed server mutation, stale checks, provenance, and durable history remain mandatory.
-  Current policy/capability/edit/RPC/frontend code has not yet been reconciled to that broader rule. Manual
+  Policy, capability projection, atomic persistence, and workout-detail UI now implement this rule. Manual
   Copy/Paste remains a direct backend-owned mutation in the proved manual path; universal
   Copy/Paste, recurrence, Restore UI, and active-plan replacement semantics expansion remain
   future-only.
+- The backend manual-template contract now owns non-empty metric-free built-in structures,
+  runner-entered pace/BPM/RPE targets, personal save/reuse/delete, and per-runner built-in
+  hide/restore state. The picker consumes that backend catalog, including personal reuse/delete and
+  built-in hide/restore. Persisted AI and manual workouts reconstruct through the same full reviewed
+  constructor with ordered Repeat and target provenance intact.
 - AI-authored first-plan creation is now plan-first:
   `src/lib/ai-first-plan-draft-service.ts` and `npm run author-ai-first-plan-draft` can run the non-mutating `hito_ai_authored_full_plan_draft` path in mock, invalid, timeout, or live modes. Success returns bounded `ai_authored` canonical `training-plan-v2` output with `source_kind: ai_authored_plan_first_v1`; invalid, unsafe, unavailable, or timed-out output fails before review and persists nothing.
 - The plan-first compiler is the current backend boundary:
@@ -210,8 +242,8 @@ unavailable`, or an auth loop.
   the unused `completeStructuredOnboarding` action and unused `training-api.ts` apply re-export are removed, duplicated first-plan weekday/goal/duration/pace helpers now live in `src/lib/first-plan-authoring-utils.ts`, and Garmin feedback readback no longer imports the Node-only FIT/ZIP ingest module from the shared training API path.
 - The active-plan export facade narrowing slice is now implemented:
   active-plan export action ownership lives in `src/lib/active-plan-export-actions.ts`, the export
-  API route imports that canonical owner directly, and `training-api.ts` no longer keeps
-  `exportActivePlan` / `exportActivePlanForUser` compatibility re-exports.
+  API route calls `exportActivePlanForUser` from that canonical owner directly; no parallel
+  server-function export wrapper remains.
 - Historical only: the former Plan Preset card facade narrowing slice was superseded by the
   pre-customer generated-plan legacy purge. Current Quick setup goal cards are distance shortcuts,
   not backend Plan Preset discovery programs.
@@ -320,7 +352,7 @@ unavailable`, or an auth loop.
   `src/lib/runner-training-preferences.ts` owns one pure Settings/structured-setup mapping between product-facing `fixedRestDays`, `defaultRunningDaysPerWeek`, and `preferredLongRunDay` and stored `blocked_days`, `max_running_days_per_week`, and `preferred_long_run_day`; zero fixed rest days is valid, seven fixed rest days is rejected, default running days must fit available weekdays, and an explicitly preferred long-run day cannot be blocked. Plan-first provider context does not synthesize a long-run preference when the runner omitted it.
   The same module exposes backend-compatible fitness-level mapping where only `custom` plus a direct recent 5K time in the accepted range creates numeric 5K benchmark truth; non-custom levels remain non-numeric context so they cannot create fake pace or heart-rate targets.
 - The runner training-preferences frontend slice is now implemented:
-  `/settings` uses Hito tabs to separate `Personal data` from `Training preferences`, reuses the structured-onboarding editable value chip for age/height/weight, shows backend-shaped default estimated heart-rate starting ranges when profile age supports them, and uses the shared progressive training-preference controls for explicit no/fixed rest days, required default running-days/week, optional preferred long-run day, and bounded fitness-level/custom-5K entry. The backend settings contract now also persists optional personal HR ranges and resolves them over estimated defaults; exposing those range editors in Settings remains a frontend follow-up. No-plan Quick setup pre-fills profile basics plus saved training preferences and keeps those values editable before review/confirm.
+  `/settings` uses Hito tabs to separate `Personal data` from `Training preferences`, reuses the setup BPM editor/readback for age-derived estimated and runner-edited personal ranges, and uses the shared progressive training-preference controls for explicit no/fixed rest days, required default running-days/week, optional preferred long-run day, and bounded fitness-level/custom-5K entry. The canonical baseline action persists age, height, weight, fitness, and accepted HR provenance independently of plan creation; no-plan Quick setup restores the same facts, invalidates stale previews through profile revision, and keeps them editable before review/confirm. Later Settings changes affect future authoring only and do not rewrite confirmed plan snapshots.
 - The structured setup review modal slice is now implemented:
   Quick setup’s `Review setup` action remains non-mutating; `draft_ready` opens a `Review your setup` modal with explicit cancel/close and `Yes, create plan` controls, while `correction_required` stays inline near the form and never creates profile, plan, workout, or log rows.
 - The workout-log save action extraction slice is now implemented:
@@ -573,9 +605,9 @@ The current cleanup checkpoint is after accepted G23 business-process short-path
    proves one material same-owner candidate with one risk class and one validation story.
 2. Keep the archived Hito Stack Simplification Strike as completed cleanup evidence; do not reopen it
    unless source proof shows a missed closeout issue.
-3. Use backlog-only follow-ups for additional Plan Preset families, preset-based active-plan
-   replacement, recurrence, Restore UI, universal Copy/Paste, QR/share/import, and broader
-   persisted workout editing beyond the proved manual scope.
+3. Keep new goal shortcuts, recurrence, Restore UI, universal Copy/Paste, QR/share/import, and other
+   capability expansion in separate backlog work; today/future confirmed workout editing is already
+   accepted across current plan sources.
 4. Keep future UI changes inside shared Hito primitives or documented geometry exceptions, and use
    `/hitoDS` as the inspection surface before shipping new visual patterns.
 

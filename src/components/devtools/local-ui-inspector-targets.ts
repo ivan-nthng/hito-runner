@@ -13,6 +13,7 @@ import type {
   InlineChangeTypographyRoleOption,
 } from "@/components/devtools/local-inline-change-target-utils";
 import { HITO_INSPECTOR_TYPOGRAPHY_ROLES } from "@/lib/hito-typography-roles";
+import { classifyLocalUiTokenEvidence } from "@/components/devtools/local-ui-inspector-token-evidence";
 
 const CONTROL_TAGS = new Set(["button", "a", "input", "textarea", "select"]);
 const CONTROL_ROLES = new Set([
@@ -69,6 +70,7 @@ export const HITO_TYPOGRAPHY_ROLE_OPTIONS: InlineChangeTypographyRoleOption[] =
 
 export function inspectLocalUiTarget(
   element: HTMLElement,
+  confirmedAppliedTokens: Record<string, string> = {},
 ): Pick<
   InlineChangeTargetInput,
   | "classificationReason"
@@ -87,7 +89,7 @@ export function inspectLocalUiTarget(
   const className = String(element.className ?? "");
   const visibleText = getDirectTextEvidence(element);
   const dimensions = buildDimensionEvidence(element);
-  const tokenControls = buildTokenEvidence(styles);
+  const tokenControls = buildTokenEvidence(styles, confirmedAppliedTokens);
   const border = buildBorderEvidence(styles);
   const targetKind = classifyTarget(element, styles, visibleText);
   const cardChrome = buildCardChromeEvidence(targetKind, border, tokenControls);
@@ -444,7 +446,10 @@ function isInlineTextChild(element: Element) {
   );
 }
 
-function buildTokenEvidence(styles: CSSStyleDeclaration) {
+function buildTokenEvidence(
+  styles: CSSStyleDeclaration,
+  confirmedAppliedTokens: Record<string, string>,
+) {
   const tokenControls: InlineChangeTokenControlInput[] = [];
   const spaceOptions = getSpaceTokenOptions();
   const radiusOptions = getRadiusTokenOptions();
@@ -456,6 +461,7 @@ function buildTokenEvidence(styles: CSSStyleDeclaration) {
     "spacing",
     parsePixelValue(styles.paddingLeft),
     spaceOptions,
+    confirmedAppliedTokens["padding-left"],
   );
   addTokenControl(
     tokenControls,
@@ -464,6 +470,7 @@ function buildTokenEvidence(styles: CSSStyleDeclaration) {
     "spacing",
     parsePixelValue(styles.paddingRight),
     spaceOptions,
+    confirmedAppliedTokens["padding-right"],
   );
   addTokenControl(
     tokenControls,
@@ -472,6 +479,7 @@ function buildTokenEvidence(styles: CSSStyleDeclaration) {
     "spacing",
     parsePixelValue(styles.paddingTop),
     spaceOptions,
+    confirmedAppliedTokens["padding-top"],
   );
   addTokenControl(
     tokenControls,
@@ -480,6 +488,7 @@ function buildTokenEvidence(styles: CSSStyleDeclaration) {
     "spacing",
     parsePixelValue(styles.paddingBottom),
     spaceOptions,
+    confirmedAppliedTokens["padding-bottom"],
   );
   addTokenControl(
     tokenControls,
@@ -488,6 +497,7 @@ function buildTokenEvidence(styles: CSSStyleDeclaration) {
     "spacing",
     parsePixelValue(styles.columnGap),
     spaceOptions,
+    confirmedAppliedTokens["gap-horizontal"],
   );
   addTokenControl(
     tokenControls,
@@ -496,6 +506,7 @@ function buildTokenEvidence(styles: CSSStyleDeclaration) {
     "spacing",
     parsePixelValue(styles.rowGap),
     spaceOptions,
+    confirmedAppliedTokens["gap-vertical"],
   );
   addTokenControl(
     tokenControls,
@@ -504,6 +515,7 @@ function buildTokenEvidence(styles: CSSStyleDeclaration) {
     "radius",
     parsePixelValue(styles.borderTopRightRadius),
     radiusOptions,
+    confirmedAppliedTokens["radius-top-right"],
   );
   addTokenControl(
     tokenControls,
@@ -512,6 +524,7 @@ function buildTokenEvidence(styles: CSSStyleDeclaration) {
     "radius",
     parsePixelValue(styles.borderTopLeftRadius),
     radiusOptions,
+    confirmedAppliedTokens["radius-top-left"],
   );
   addTokenControl(
     tokenControls,
@@ -520,6 +533,7 @@ function buildTokenEvidence(styles: CSSStyleDeclaration) {
     "radius",
     parsePixelValue(styles.borderBottomRightRadius),
     radiusOptions,
+    confirmedAppliedTokens["radius-bottom-right"],
   );
   addTokenControl(
     tokenControls,
@@ -528,6 +542,7 @@ function buildTokenEvidence(styles: CSSStyleDeclaration) {
     "radius",
     parsePixelValue(styles.borderBottomLeftRadius),
     radiusOptions,
+    confirmedAppliedTokens["radius-bottom-left"],
   );
 
   return tokenControls;
@@ -540,30 +555,21 @@ function addTokenControl(
   kind: InlineChangeTokenControlKind,
   value: number | null,
   options: InlineChangeTokenControlOption[],
+  confirmedAppliedToken?: string,
 ) {
   if (value == null || value <= 0 || options.length === 0) return;
 
-  const nearest = nearestTokenOption(value, options);
-  const cleanMatch = Math.abs(value - nearest.valuePx) <= 0.75;
+  const evidence = classifyLocalUiTokenEvidence({ confirmedAppliedToken, options, value });
 
   controls.push({
-    confidence: cleanMatch ? "mapped" : "uncertain",
-    currentToken: cleanMatch ? nearest.token : null,
+    ...evidence,
     currentValueLabel: formatCompactPx(value),
     currentValuePx: value,
     id,
     kind,
     label,
-    nearestToken: nearest.token,
-    nearestValuePx: nearest.valuePx,
     options,
   });
-}
-
-function nearestTokenOption(value: number, options: InlineChangeTokenControlOption[]) {
-  return options.reduce((nearest, candidate) =>
-    Math.abs(candidate.valuePx - value) < Math.abs(nearest.valuePx - value) ? candidate : nearest,
-  );
 }
 
 function getSpaceTokenOptions(): InlineChangeTokenControlOption[] {

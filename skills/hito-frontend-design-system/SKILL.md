@@ -232,6 +232,22 @@ After meaningful frontend changes:
 - delegate to QA for final browser verification when needed; Safari is required only for
   Safari-specific coverage or when the built-in browser is blocked
 
+### Definition Of Done, Test Inventory, And Acceptance Gate
+
+Apply this gate only to implementation, debugging, or validation work. A pure explanatory or
+reference response needs no test inventory. For debugging, include a safe repro or discriminator
+that proves the first incorrect owner, not only the post-fix happy path.
+
+Before final validation, define the observable frontend outcome, preserved boundaries, and compact
+required inventory from the changed interaction, responsive/layout risk, state transitions,
+persistence/readback impact, and accessibility surface. If QA contributes evidence, the owning agent
+must integrate QA's complete executed-test list, not merely its verdict. The final report must list
+each executed command, scenario, and viewport as `Check | Scenario / environment | Result |
+Evidence`, plus each required check not run and why. Report `Implementation DoD: Passed` only when
+that inventory passes; otherwise fix-forward and rerun it, or return `FAIL`/`BLOCKED`. If broad
+independent QA is outside this task, report `Global QA Acceptance: Pending` rather than claiming
+release acceptance.
+
 After meaningful Figma bridge changes:
 
 - capture the Figma file/library/page target and direction
@@ -247,5 +263,6 @@ After meaningful Figma bridge changes:
 3. Root cause
 4. Files changed
 5. What changed
-6. Validation results
-7. Blockers
+6. Required test inventory and validation results
+7. Required checks not run / coverage consequences
+8. Blockers

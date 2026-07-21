@@ -3,6 +3,7 @@ import { WorkoutLibraryPlayground } from "@/components/hito-ds/workout-library-p
 import { HitoDsPatternInlineEditing } from "@/components/hito-ds/reference-pattern-inline-editing";
 import { ReferenceListRow, SectionIntro } from "@/components/hito-ds/reference";
 import { Icon } from "@/components/ui/icon";
+import { Skeleton } from "@/components/ui/skeleton";
 import { WorkoutGlyph } from "@/components/WorkoutGlyph";
 import { workoutTypeColorVar } from "@/lib/workout-color-tokens";
 import type { WorkoutGlyphKind } from "@/lib/workout-glyph";
@@ -215,6 +216,17 @@ export function HitoDsPatternsPage() {
               <p className="hito-support-copy mt-3">
                 Loading is neutral and does not imply success or failure before truth arrives.
               </p>
+              <div className="mt-5 grid gap-3" aria-hidden="true">
+                <Skeleton className="h-6 w-2/3" />
+                <div className="grid gap-2">
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-4/5" />
+                </div>
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <Skeleton className="h-9 w-full" />
+                  <Skeleton className="h-9 w-full" />
+                </div>
+              </div>
             </article>
             <article className="hito-state-surface" data-tone="signal">
               <p className="hito-label hito-label-signal">Empty</p>

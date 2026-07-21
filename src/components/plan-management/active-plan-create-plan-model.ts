@@ -11,20 +11,37 @@ import type {
   RunningPlanPreviewActionResult,
 } from "@/lib/running-plan-engine-actions";
 import type { TrainingSnapshot } from "@/lib/training";
+import type { UserSettingsSummary } from "@/lib/user-settings-actions";
 
 type TransitionBlocked = Extract<ActivePlanTransitionReviewResult, { ok: false }>;
 
 export function buildInitialCreatePlanState(
   snapshot: TrainingSnapshot | null | undefined,
+  settings: UserSettingsSummary | null = null,
 ): StructuredConstructorState {
   const profile = snapshot?.profile;
   const schedule = snapshot?.planMeta?.schedulePreferences;
 
   return {
-    age: profile?.age != null ? String(profile.age) : "",
-    heightCm: profile?.heightCm != null ? String(profile.heightCm) : "",
-    weightKg: profile?.weightKg != null ? String(profile.weightKg) : "",
-    fitnessLevel: "running_regularly",
+    age:
+      settings?.age != null
+        ? String(settings.age)
+        : profile?.age != null
+          ? String(profile.age)
+          : "",
+    heightCm:
+      settings?.heightCm != null
+        ? String(settings.heightCm)
+        : profile?.heightCm != null
+          ? String(profile.heightCm)
+          : "",
+    weightKg:
+      settings?.weightKg != null
+        ? String(settings.weightKg)
+        : profile?.weightKg != null
+          ? String(profile.weightKg)
+          : "",
+    fitnessLevel: settings?.fitnessLevel ?? "running_regularly",
     recent5kTime: "",
     recent5kPace: "",
     fixedRestDays: normalizeWeekdayNames(schedule?.fixedRestDays ?? []),

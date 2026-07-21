@@ -1,8 +1,9 @@
+import { useLocation } from "@tanstack/react-router";
 import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
+  useCallback,
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -16,44 +17,97 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
 import { LocalScreenCaptureFlow } from "@/components/devtools/LocalScreenCaptureFlow";
+import { LocalUiInspectorBatchReview } from "@/components/devtools/LocalUiInspectorBatchReview";
+import { LocalUiInspectorConfirmDialog } from "@/components/devtools/LocalUiInspectorConfirmDialog";
+import { LocalUiInspectorSurface } from "@/components/devtools/LocalUiInspectorSurface";
+import {
+  getLocalUiInspectorLauncherPanelPosition,
+  getLocalUiInspectorPanelPosition,
+  isLocalUiInspectorNarrowViewport,
+} from "@/components/devtools/local-ui-inspector-position";
 import { LocalUiTaskDraftPanel } from "@/components/devtools/LocalUiTaskDraftPanel";
-import type { InlineChangeTargetInput } from "@/components/devtools/local-inline-change-target-utils";
+import type {
+  InlineChangeTargetInput,
+  InlineChangeTargetPayload,
+} from "@/components/devtools/local-inline-change-target-utils";
 import { inspectLocalUiTarget } from "@/components/devtools/local-ui-inspector-targets";
+import {
+  createLocalUiInspectorBatchItem,
+  createLocalUiInspectorItemDraft,
+  resolveLocalUiInspectorTarget,
+  type LocalUiInspectorBatchItem,
+  type LocalUiInspectorItemDraft,
+} from "@/components/devtools/local-ui-inspector-session";
+import { useLocalUiInspectorSession } from "@/components/devtools/use-local-ui-inspector-session";
+import {
+  getHitoDsAppliedTokenReferences,
+  resolveHitoDsOwnershipMarkers,
+  type HitoDsOwnershipEvidence,
+} from "@/components/hito-ds/reference-metadata";
 
 type InspectorMode = "idle" | "inspect" | "screen";
 
 type SelectedTarget = InlineChangeTargetInput & {
+  ownership: HitoDsOwnershipEvidence;
   rect: DOMRectReadOnly | null;
 };
 
-type FloatingPanelState = {
-  actionId: string | null;
+type ComposerPanelState = {
   anchor?: "launcher";
+  initialDraft: LocalUiInspectorItemDraft;
+  itemId: string | null;
+  kind: "composer";
+  notice?: string | null;
   position: { x: number; y: number };
   target: SelectedTarget;
 };
 
-const PANEL_VIEWPORT_MARGIN = 10;
-const PANEL_TARGET_GAP = 12;
-const DEFAULT_PANEL_WIDTH = 352;
-const DEFAULT_PANEL_HEIGHT = 540;
-const LAUNCHER_BUTTON_SIZE = 40;
-const LAUNCHER_PANEL_GAP = 8;
-const LAUNCHER_VIEWPORT_OFFSET = 20;
+type ReviewPanelState = {
+  anchor: "launcher";
+  focusItemId: string | null;
+  kind: "review";
+  position: { x: number; y: number };
+};
+
+type InspectorPanelState = ComposerPanelState | ReviewPanelState;
+type ConfirmationState = "discard_item" | "discard_session" | null;
+
 const INSPECTABLE_SELECTOR =
   "button, a, input, textarea, select, [role], [data-hito-ds-pattern], [data-testid], article, section, header, main, aside, nav, form, li, [class]";
 
 export function LocalUiInspector() {
+  const location = useLocation();
+  const routeKey = `${location.pathname}${
+    "searchStr" in location && typeof location.searchStr === "string" ? location.searchStr : ""
+  }${location.hash ?? ""}`;
+  const session = useLocalUiInspectorSession(routeKey);
   const [mode, setMode] = useState<InspectorMode>("idle");
   const [menuOpen, setMenuOpen] = useState(false);
   const [hoverRect, setHoverRect] = useState<DOMRectReadOnly | null>(null);
-  const [panel, setPanel] = useState<FloatingPanelState | null>(null);
-  const panelRef = useRef<FloatingPanelState | null>(null);
+  const [panel, setPanel] = useState<InspectorPanelState | null>(null);
+  const [composerDirty, setComposerDirty] = useState(false);
+  const [confirmation, setConfirmation] = useState<ConfirmationState>(null);
+  const [statusMessage, setStatusMessage] = useState("");
+  const panelRef = useRef<InspectorPanelState | null>(null);
+  const routeRef = useRef(routeKey);
   const suppressNextLayerClickRef = useRef(false);
+  const inspectLauncherRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     panelRef.current = panel;
   }, [panel]);
+
+  useEffect(() => {
+    if (routeRef.current === routeKey) return;
+    routeRef.current = routeKey;
+    setMode("idle");
+    setMenuOpen(false);
+    setHoverRect(null);
+    setPanel(null);
+    setComposerDirty(false);
+    setConfirmation(null);
+    setStatusMessage("Local Inspector draft cleared after route change.");
+  }, [routeKey]);
 
   useEffect(() => {
     const preventProductDismissFromDevtool = (event: Event) => {
@@ -91,12 +145,71 @@ export function LocalUiInspector() {
     };
   }, []);
 
-  const closeInspector = () => {
+  const closeInspectorImmediately = useCallback(() => {
     setMode("idle");
     setMenuOpen(false);
     setHoverRect(null);
     setPanel(null);
-  };
+    setComposerDirty(false);
+  }, []);
+
+  const focusInspectLauncher = useCallback(() => {
+    window.requestAnimationFrame(() => inspectLauncherRef.current?.focus());
+  }, []);
+
+  const showReview = useCallback((focusItemId: string | null) => {
+    setComposerDirty(false);
+    setPanel({
+      anchor: "launcher",
+      focusItemId,
+      kind: "review",
+      position: getLocalUiInspectorLauncherPanelPosition(),
+    });
+  }, []);
+
+  const openReview = useCallback(() => showReview(null), [showReview]);
+
+  const closeComposerClean = useCallback(() => {
+    const currentPanel = panelRef.current;
+    setComposerDirty(false);
+    setHoverRect(null);
+    setPanel((current) => {
+      if (current?.kind === "composer" && current.itemId) {
+        return {
+          anchor: "launcher",
+          focusItemId: current.itemId,
+          kind: "review",
+          position: getLocalUiInspectorLauncherPanelPosition(),
+        };
+      }
+      return null;
+    });
+    if (currentPanel?.kind === "composer" && !currentPanel.itemId) focusInspectLauncher();
+  }, [focusInspectLauncher]);
+
+  const requestPanelClose = useCallback(() => {
+    if (panelRef.current?.kind === "composer" && composerDirty) {
+      setConfirmation("discard_item");
+      return;
+    }
+    if (panelRef.current?.kind === "composer") {
+      closeComposerClean();
+      return;
+    }
+    setPanel(null);
+  }, [closeComposerClean, composerDirty]);
+
+  const requestInspectorExit = useCallback(() => {
+    if (panelRef.current) {
+      requestPanelClose();
+      return;
+    }
+    if (session.items.length > 0) {
+      setConfirmation("discard_session");
+      return;
+    }
+    closeInspectorImmediately();
+  }, [closeInspectorImmediately, requestPanelClose, session.items.length]);
 
   useEffect(() => {
     if (mode !== "inspect") {
@@ -116,22 +229,44 @@ export function LocalUiInspector() {
     if (!panel && mode !== "inspect" && !menuOpen) return;
 
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || event.defaultPrevented || confirmation) return;
+      const eventTarget = event.target;
+      if (
+        eventTarget instanceof Element &&
+        eventTarget.closest('[role="dialog"], [role="listbox"], [role="menu"]')
+      ) {
+        return;
+      }
       event.preventDefault();
-      closeInspector();
+      if (panelRef.current) {
+        requestPanelClose();
+      } else if (mode === "inspect") {
+        requestInspectorExit();
+      } else {
+        closeInspectorImmediately();
+      }
     };
 
-    document.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("keydown", closeOnEscape, true);
 
     return () => {
-      document.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("keydown", closeOnEscape, true);
     };
-  }, [menuOpen, mode, panel]);
+  }, [
+    closeInspectorImmediately,
+    confirmation,
+    menuOpen,
+    mode,
+    panel,
+    requestInspectorExit,
+    requestPanelClose,
+  ]);
 
   useEffect(() => {
     if (!panel) return;
 
     const closePanelFromOutside = (event: PointerEvent) => {
+      if (confirmation) return;
       const target = event.target;
 
       if (target instanceof Element && target.closest("[data-local-ui-inspector-layer]")) {
@@ -141,7 +276,7 @@ export function LocalUiInspector() {
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      closeInspector();
+      requestPanelClose();
     };
 
     document.addEventListener("pointerdown", closePanelFromOutside, true);
@@ -149,7 +284,7 @@ export function LocalUiInspector() {
     return () => {
       document.removeEventListener("pointerdown", closePanelFromOutside, true);
     };
-  }, [panel]);
+  }, [confirmation, panel, requestPanelClose]);
 
   useEffect(() => {
     if (!panel) return;
@@ -167,16 +302,23 @@ export function LocalUiInspector() {
 
   const startQuickBug = () => {
     setMenuOpen(false);
+    setMode("inspect");
     setPanel({
-      actionId: "bug",
       anchor: "launcher",
-      position: getLauncherPanelPosition(),
+      initialDraft: createLocalUiInspectorItemDraft(
+        { targetKind: "behavior", visibleText: document.title || "Current screen" },
+        "bug",
+      ),
+      itemId: null,
+      kind: "composer",
+      position: getLocalUiInspectorLauncherPanelPosition(),
       target: {
         componentId: "LocalUiInspector.bug_prompt",
         elementClasses: null,
         elementRole: null,
         elementTag: "page",
         proposedText: null,
+        ownership: { entry: null, marker: null, state: "unconfirmed" },
         rect: null,
         selector: null,
         suggestedOwner: "frontend",
@@ -220,10 +362,36 @@ export function LocalUiInspector() {
     }
 
     const targetDescription = describeTargetElement(target);
+    const duplicate = session.findDuplicate(targetDescription);
     suppressNextLayerClickRef.current = true;
+    if (duplicate) {
+      setPanel({
+        initialDraft: duplicate.draft,
+        itemId: duplicate.id,
+        kind: "composer",
+        notice: "Already in batch",
+        position: getLocalUiInspectorPanelPosition(
+          target.getBoundingClientRect(),
+          event.clientX,
+          event.clientY,
+        ),
+        target: {
+          ...duplicate.target,
+          ownership: duplicate.ownership,
+          rect: target.getBoundingClientRect(),
+        },
+      });
+      return;
+    }
     setPanel({
-      actionId: null,
-      position: getPanelPosition(target.getBoundingClientRect(), event.clientX, event.clientY),
+      initialDraft: createLocalUiInspectorItemDraft(targetDescription),
+      itemId: null,
+      kind: "composer",
+      position: getLocalUiInspectorPanelPosition(
+        target.getBoundingClientRect(),
+        event.clientX,
+        event.clientY,
+      ),
       target: targetDescription,
     });
   };
@@ -237,7 +405,66 @@ export function LocalUiInspector() {
       return;
     }
 
-    if (panelRef.current) closeInspector();
+    if (panelRef.current) requestPanelClose();
+  };
+
+  const editBatchItem = (item: LocalUiInspectorBatchItem) => {
+    const element = resolveLocalUiInspectorTarget(item.target);
+    const rect = element?.getBoundingClientRect() ?? null;
+    setPanel({
+      initialDraft: item.draft,
+      itemId: item.id,
+      kind: "composer",
+      notice: rect ? null : "Target no longer found",
+      position: rect
+        ? getLocalUiInspectorPanelPosition(rect, rect.right, rect.top)
+        : getLocalUiInspectorLauncherPanelPosition(),
+      target: { ...item.target, ownership: item.ownership, rect },
+    });
+  };
+
+  const commitComposer = ({
+    draft,
+    payload,
+  }: {
+    draft: LocalUiInspectorItemDraft;
+    payload: InlineChangeTargetPayload;
+  }) => {
+    const currentPanel = panelRef.current;
+    if (currentPanel?.kind !== "composer") return;
+    const target = stripLiveTarget(currentPanel.target);
+    const existing = currentPanel.itemId
+      ? (session.items.find((item) => item.id === currentPanel.itemId) ?? null)
+      : null;
+    const created = createLocalUiInspectorBatchItem({
+      draft,
+      id: existing?.id,
+      ownership: currentPanel.target.ownership,
+      payload,
+      routeKey,
+      target,
+    });
+    const nextItem = existing ? { ...created, capturedAt: existing.capturedAt } : created;
+
+    if (existing) {
+      session.replaceItem(nextItem);
+      setStatusMessage("Item updated.");
+      if (isLocalUiInspectorNarrowViewport()) {
+        setPanel(null);
+        focusInspectLauncher();
+      } else {
+        showReview(existing.id);
+      }
+    } else if (!session.isFull) {
+      session.addItem(nextItem);
+      setStatusMessage(
+        `${session.items.length + 1} ${session.items.length === 0 ? "item" : "items"} in local draft.`,
+      );
+      setPanel(null);
+      focusInspectLauncher();
+    }
+    setComposerDirty(false);
+    setHoverRect(null);
   };
 
   return (
@@ -258,29 +485,83 @@ export function LocalUiInspector() {
           onPointerMove={updateHoverTarget}
         />
       ) : null}
-      {panel?.target.rect ? (
+      {panel?.kind === "composer" && panel.target.rect ? (
         <InspectorHighlight rect={panel.target.rect} selected />
       ) : hoverRect ? (
         <InspectorHighlight rect={hoverRect} />
       ) : null}
       {panel ? (
-        <InspectorPanel
-          panel={panel}
-          onActionChange={(actionId) => setPanel((current) => current && { ...current, actionId })}
-          onClose={() => setPanel(null)}
-        />
+        <LocalUiInspectorSurface
+          ariaLabel={
+            panel.kind === "review" ? "Local Inspector batch review" : "Local UI item composer"
+          }
+          onClose={requestPanelClose}
+          placement={{
+            anchor: panel.anchor,
+            position: panel.position,
+            targetRect: panel.kind === "composer" ? panel.target.rect : null,
+          }}
+        >
+          {panel.kind === "composer" ? (
+            <LocalUiTaskDraftPanel
+              batchFull={session.isFull}
+              initialDraft={panel.initialDraft}
+              itemNumber={
+                panel.itemId
+                  ? session.items.findIndex((item) => item.id === panel.itemId) + 1
+                  : undefined
+              }
+              notice={panel.notice}
+              onCancel={requestPanelClose}
+              onDirtyChange={setComposerDirty}
+              onSubmit={commitComposer}
+              ownership={panel.target.ownership}
+              target={panel.target}
+            />
+          ) : (
+            <LocalUiInspectorBatchReview
+              initialFocusItemId={panel.focusItemId}
+              items={session.items}
+              onClear={() => {
+                session.clearItems();
+                setPanel(null);
+                setStatusMessage("Local draft cleared.");
+                focusInspectLauncher();
+              }}
+              onClose={() => {
+                setPanel(null);
+                focusInspectLauncher();
+              }}
+              onContinue={() => {
+                setPanel(null);
+                focusInspectLauncher();
+              }}
+              onEdit={editBatchItem}
+              onRemove={(itemId) => {
+                session.removeItem(itemId);
+                setStatusMessage("Item removed from local draft.");
+                if (session.items.length === 1) {
+                  setPanel(null);
+                  focusInspectLauncher();
+                }
+              }}
+              routeKey={routeKey}
+            />
+          )}
+        </LocalUiInspectorSurface>
       ) : null}
-      {mode === "screen" ? <LocalScreenCaptureFlow onClose={closeInspector} /> : null}
+      {mode === "screen" ? <LocalScreenCaptureFlow onClose={closeInspectorImmediately} /> : null}
 
       {mode === "inspect" || mode === "screen" ? (
         <button
+          ref={inspectLauncherRef}
           type="button"
           className={`hito-button hito-button-secondary hito-button-md relative ${
             mode === "screen" ? "z-[83]" : "z-[72]"
           } aspect-square rounded-full px-0 shadow-soft`}
           aria-label={mode === "screen" ? "Cancel local screen capture" : "Exit local inspect mode"}
           title={mode === "screen" ? "Cancel local screen capture" : "Exit local inspect mode"}
-          onClick={closeInspector}
+          onClick={mode === "inspect" ? requestInspectorExit : closeInspectorImmediately}
         >
           <Icon name="close" size="sm" />
         </button>
@@ -326,11 +607,50 @@ export function LocalUiInspector() {
       )}
 
       {mode === "inspect" ? (
-        <div className="pointer-events-none absolute bottom-full right-0 mb-2 w-56 rounded-md border border-signal/30 bg-background/90 p-2 text-right shadow-soft backdrop-blur">
-          <p className="hito-caption text-foreground">Pencil mode</p>
-          <p className="hito-caption">Hover, then click a UI element.</p>
+        <div className="absolute bottom-full right-0 z-[72] mb-2 grid w-56 justify-items-end gap-2">
+          <div className="pointer-events-none w-full rounded-md border border-signal/30 bg-background/90 p-2 text-right shadow-soft backdrop-blur">
+            <p className="hito-caption text-foreground">Pencil mode</p>
+            <p className="hito-caption">Hover, then click a UI element.</p>
+          </div>
+          {session.items.length > 0 ? (
+            <button
+              type="button"
+              className="hito-button hito-button-secondary hito-button-sm pointer-events-auto"
+              onClick={openReview}
+            >
+              {session.items.length} {session.items.length === 1 ? "item" : "items"}
+            </button>
+          ) : null}
         </div>
       ) : null}
+
+      <p className="sr-only" aria-live="polite">
+        {statusMessage}
+      </p>
+
+      <LocalUiInspectorConfirmDialog
+        confirmLabel="Discard item"
+        description="Unsaved changes to this local item will be lost. Saved batch items stay unchanged."
+        onConfirm={() => {
+          setConfirmation(null);
+          closeComposerClean();
+        }}
+        onOpenChange={(open) => !open && setConfirmation(null)}
+        open={confirmation === "discard_item"}
+        title="Discard this item?"
+      />
+      <LocalUiInspectorConfirmDialog
+        confirmLabel="Discard local draft"
+        description={`This removes ${session.items.length} local ${session.items.length === 1 ? "item" : "items"}. No product or design-system data is affected.`}
+        onConfirm={() => {
+          setConfirmation(null);
+          session.resetSession();
+          closeInspectorImmediately();
+        }}
+        onOpenChange={(open) => !open && setConfirmation(null)}
+        open={confirmation === "discard_session"}
+        title={`Discard ${session.items.length} local ${session.items.length === 1 ? "item" : "items"}?`}
+      />
     </div>
   );
 }
@@ -361,84 +681,11 @@ function InspectorHighlight({
   );
 }
 
-function InspectorPanel({
-  onActionChange,
-  onClose,
-  panel,
-}: {
-  onActionChange: (actionId: string | null) => void;
-  onClose: () => void;
-  panel: FloatingPanelState;
-}) {
-  const panelRef = useRef<HTMLElement | null>(null);
-  const [clampedPosition, setClampedPosition] = useState(panel.position);
-
-  useEffect(() => {
-    setClampedPosition(panel.position);
-  }, [panel.target, panel.position]);
-
-  useLayoutEffect(() => {
-    setClampedPosition(panel.position);
-  }, [panel.position]);
-
-  useLayoutEffect(() => {
-    const element = panelRef.current;
-    if (!element) return;
-
-    const updatePosition = () => {
-      const rect = element.getBoundingClientRect();
-      const nextPosition =
-        panel.anchor === "launcher"
-          ? getLauncherPanelPosition(rect.width, rect.height)
-          : panel.target.rect
-            ? getPanelPosition(
-                panel.target.rect,
-                panel.position.x,
-                panel.position.y,
-                rect.width,
-                rect.height,
-              )
-            : clampPanelPosition(panel.position.x, panel.position.y, rect.width, rect.height);
-
-      setClampedPosition((current) =>
-        Math.abs(current.x - nextPosition.x) < 0.5 && Math.abs(current.y - nextPosition.y) < 0.5
-          ? current
-          : nextPosition,
-      );
-    };
-
-    updatePosition();
-
-    const resizeObserver =
-      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updatePosition);
-    resizeObserver?.observe(element);
-    window.addEventListener("resize", updatePosition);
-
-    return () => {
-      resizeObserver?.disconnect();
-      window.removeEventListener("resize", updatePosition);
-    };
-  }, [panel.actionId, panel.anchor, panel.position, panel.target.rect]);
-
-  return (
-    <section
-      ref={panelRef}
-      data-local-ui-task-panel=""
-      data-local-ui-inspector-layer=""
-      className="fixed z-[71] grid max-h-[calc(100vh-2rem)] w-[min(22rem,calc(100vw-1.25rem))] gap-3 overflow-y-auto rounded-xl border border-hairline bg-background p-3 text-left shadow-soft"
-      style={{ left: clampedPosition.x, top: clampedPosition.y }}
-      aria-label="Local UI task draft"
-      onClick={stopDevtoolEvent}
-      onPointerDown={stopDevtoolEvent}
-    >
-      <LocalUiTaskDraftPanel
-        actionId={panel.actionId}
-        onActionChange={onActionChange}
-        onClose={onClose}
-        target={panel.target}
-      />
-    </section>
-  );
+function stripLiveTarget(target: SelectedTarget): InlineChangeTargetInput {
+  const { ownership, rect, ...serializableTarget } = target;
+  void ownership;
+  void rect;
+  return serializableTarget;
 }
 
 function resolveInspectableElement(target: EventTarget | null, point?: { x: number; y: number }) {
@@ -603,7 +850,15 @@ function isPointNearChrome(element: HTMLElement, point: { x: number; y: number }
 
 function describeTargetElement(element: HTMLElement): SelectedTarget {
   const rect = element.getBoundingClientRect();
-  const targetInspection = inspectLocalUiTarget(element);
+  const elementClasses = element.className ? String(element.className).trim().slice(0, 300) : null;
+  const ownership = resolveHitoDsOwnershipMarkers({
+    componentMarker: element.getAttribute("data-hito-component"),
+    patternMarker: element.getAttribute("data-hito-ds-pattern"),
+  });
+  const targetInspection = inspectLocalUiTarget(
+    element,
+    getHitoDsAppliedTokenReferences(ownership, elementClasses ?? ""),
+  );
   const targetLabel =
     element.getAttribute("aria-label") ||
     element.getAttribute("data-hito-ds-pattern") ||
@@ -612,15 +867,13 @@ function describeTargetElement(element: HTMLElement): SelectedTarget {
     describeStableTag(element);
 
   return {
-    componentId:
-      element.getAttribute("data-hito-component") ||
-      element.getAttribute("data-hito-ds-pattern") ||
-      null,
+    componentId: ownership.entry?.id ?? null,
     ...targetInspection,
-    elementClasses: element.className ? String(element.className).trim().slice(0, 300) : null,
+    elementClasses,
     elementRole: element.getAttribute("role"),
     elementTag: element.tagName.toLowerCase(),
     proposedText: null,
+    ownership,
     rect,
     selector: buildSelector(element),
     suggestedOwner: "frontend",
@@ -635,16 +888,23 @@ function stopDevtoolEvent(event: { stopPropagation: () => void }) {
 
 function buildSelector(element: HTMLElement) {
   const testId = element.getAttribute("data-testid");
-  if (testId) return `[data-testid="${escapeSelectorValue(testId)}"]`;
+  if (testId) {
+    const selector = `[data-testid="${escapeSelectorValue(testId)}"]`;
+    if (isUniqueSelector(selector)) return selector;
+  }
 
   const pattern = element.getAttribute("data-hito-ds-pattern");
-  if (pattern) return `[data-hito-ds-pattern="${escapeSelectorValue(pattern)}"]`;
+  if (pattern) {
+    const selector = `[data-hito-ds-pattern="${escapeSelectorValue(pattern)}"]`;
+    if (isUniqueSelector(selector)) return selector;
+  }
 
   if (element.id) return `#${escapeSelectorValue(element.id)}`;
 
   const ariaLabel = element.getAttribute("aria-label");
   if (ariaLabel) {
-    return `${element.tagName.toLowerCase()}[aria-label="${escapeSelectorValue(ariaLabel)}"]`;
+    const selector = `${element.tagName.toLowerCase()}[aria-label="${escapeSelectorValue(ariaLabel)}"]`;
+    if (isUniqueSelector(selector)) return selector;
   }
 
   const classSelector = String(element.className)
@@ -655,111 +915,42 @@ function buildSelector(element: HTMLElement) {
     .map((className) => `.${escapeSelectorValue(className)}`)
     .join("");
 
-  return `${element.tagName.toLowerCase()}${classSelector}`;
+  const classCandidate = `${element.tagName.toLowerCase()}${classSelector}`;
+  return classSelector && isUniqueSelector(classCandidate)
+    ? classCandidate
+    : buildDomPathSelector(element);
 }
 
-function getPanelPosition(
-  targetRect: DOMRectReadOnly,
-  clientX: number,
-  clientY: number,
-  measuredWidth = DEFAULT_PANEL_WIDTH,
-  measuredHeight = DEFAULT_PANEL_HEIGHT,
-) {
-  const { height: panelHeight, width: panelWidth } = getEffectivePanelSize(
-    measuredWidth,
-    measuredHeight,
-  );
-  const sideY = clampPanelPosition(0, targetRect.top - PANEL_TARGET_GAP, panelWidth, panelHeight).y;
-  const centeredX = targetRect.left + targetRect.width / 2 - panelWidth / 2;
-  const centeredClampedX = clampPanelPosition(centeredX, 0, panelWidth, panelHeight).x;
-  const isInViewport = (candidate: { x: number; y: number }) =>
-    candidate.x >= PANEL_VIEWPORT_MARGIN &&
-    candidate.y >= PANEL_VIEWPORT_MARGIN &&
-    candidate.x + panelWidth <= window.innerWidth - PANEL_VIEWPORT_MARGIN &&
-    candidate.y + panelHeight <= window.innerHeight - PANEL_VIEWPORT_MARGIN;
-  const overlapsTarget = (candidate: { x: number; y: number }) =>
-    !(
-      candidate.x + panelWidth <= targetRect.left ||
-      candidate.x >= targetRect.right ||
-      candidate.y + panelHeight <= targetRect.top ||
-      candidate.y >= targetRect.bottom
-    );
-  const candidates = [
-    { x: targetRect.right + PANEL_TARGET_GAP, y: sideY },
-    { x: targetRect.left - panelWidth - PANEL_TARGET_GAP, y: sideY },
-    {
-      x: centeredClampedX,
-      y: targetRect.bottom + PANEL_TARGET_GAP,
-    },
-    {
-      x: centeredClampedX,
-      y: targetRect.top - panelHeight - PANEL_TARGET_GAP,
-    },
-    { x: clientX + PANEL_TARGET_GAP, y: clientY + PANEL_TARGET_GAP },
-  ];
-
-  const nonOverlappingCandidate = candidates.find(
-    (candidate) => isInViewport(candidate) && !overlapsTarget(candidate),
-  );
-
-  if (nonOverlappingCandidate) return nonOverlappingCandidate;
-
-  const inViewportCandidate = candidates.find(isInViewport);
-
-  if (inViewportCandidate) return inViewportCandidate;
-
-  return clampPanelPosition(
-    clientX + PANEL_TARGET_GAP,
-    clientY + PANEL_TARGET_GAP,
-    panelWidth,
-    panelHeight,
-  );
+function isUniqueSelector(selector: string) {
+  try {
+    return document.querySelectorAll(selector).length === 1;
+  } catch {
+    return false;
+  }
 }
 
-function getLauncherPanelPosition(
-  measuredWidth = DEFAULT_PANEL_WIDTH,
-  measuredHeight = DEFAULT_PANEL_HEIGHT,
-) {
-  return clampPanelPosition(
-    window.innerWidth - LAUNCHER_VIEWPORT_OFFSET - measuredWidth,
-    window.innerHeight -
-      LAUNCHER_VIEWPORT_OFFSET -
-      LAUNCHER_BUTTON_SIZE -
-      LAUNCHER_PANEL_GAP -
-      measuredHeight,
-    measuredWidth,
-    measuredHeight,
-  );
-}
+function buildDomPathSelector(element: HTMLElement) {
+  const segments: string[] = [];
+  let current: HTMLElement | null = element;
 
-function clampPanelPosition(
-  x: number,
-  y: number,
-  measuredWidth = DEFAULT_PANEL_WIDTH,
-  measuredHeight = DEFAULT_PANEL_HEIGHT,
-) {
-  const { height: panelHeight, width: panelWidth } = getEffectivePanelSize(
-    measuredWidth,
-    measuredHeight,
-  );
+  while (current && current !== document.body && segments.length < 6) {
+    if (current.id) {
+      segments.unshift(`#${escapeSelectorValue(current.id)}`);
+      break;
+    }
 
-  return {
-    x: Math.max(
-      PANEL_VIEWPORT_MARGIN,
-      Math.min(x, window.innerWidth - panelWidth - PANEL_VIEWPORT_MARGIN),
-    ),
-    y: Math.max(
-      PANEL_VIEWPORT_MARGIN,
-      Math.min(y, window.innerHeight - panelHeight - PANEL_VIEWPORT_MARGIN),
-    ),
-  };
-}
+    const tag = current.tagName.toLowerCase();
+    const siblings = current.parentElement
+      ? Array.from(current.parentElement.children).filter(
+          (sibling) => sibling.tagName === current?.tagName,
+        )
+      : [];
+    const position = siblings.indexOf(current) + 1;
+    segments.unshift(siblings.length > 1 ? `${tag}:nth-of-type(${position})` : tag);
+    current = current.parentElement;
+  }
 
-function getEffectivePanelSize(measuredWidth: number, measuredHeight: number) {
-  return {
-    height: Math.min(measuredHeight, window.innerHeight - PANEL_VIEWPORT_MARGIN * 2),
-    width: Math.min(measuredWidth, window.innerWidth - PANEL_VIEWPORT_MARGIN * 2),
-  };
+  return segments.join(" > ");
 }
 
 function normalizeVisibleText(text: string) {

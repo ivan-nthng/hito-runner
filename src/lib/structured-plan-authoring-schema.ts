@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { effectivePersonalHeartRateProfileSchema } from "@/lib/heart-rate-zones";
+import { acceptedRunnerHeartRateProfileSchema } from "@/lib/heart-rate-zones";
 import { normalizedPlanGoalIntentSchema } from "@/lib/plan-creation-engine/plan-goal-intent";
 import { RUNNING_PLAN_RUNNER_LEVEL_VALUES } from "@/lib/plan-creation-engine/source-types";
 import { diffDaysIso, todayIso } from "@/lib/training";
@@ -42,7 +42,7 @@ export const structuredPlanAuthoringInputSchema = z
         weightKg: z.number().min(30).max(250),
         selfReportedLevel: z.enum(RUNNING_PLAN_RUNNER_LEVEL_VALUES),
         benchmark: benchmarkSchema,
-        heartRateProfile: effectivePersonalHeartRateProfileSchema.nullable().optional(),
+        heartRateProfile: acceptedRunnerHeartRateProfileSchema,
       })
       .strict(),
     availability: z

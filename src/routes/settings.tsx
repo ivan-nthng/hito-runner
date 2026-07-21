@@ -12,7 +12,9 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EditableValueChip } from "@/components/ui/editable-value-chip";
 import { Icon } from "@/components/ui/icon";
+import { useHitoTabs } from "@/components/ui/hito-tabs";
 import { HeartRateProfileSection } from "@/components/settings/HeartRateProfileSection";
+import { runnerFacingHeartRateSaveError } from "@/components/settings/heart-rate-profile-errors";
 import { APP_NAME } from "@/lib/app-config";
 import type { PersonalHeartRateProfileInput } from "@/lib/heart-rate-zones";
 import { type RunnerFitnessLevel } from "@/lib/runner-training-preferences";
@@ -51,6 +53,12 @@ type SettingsFormState = {
 type SettingsTab = "personal" | "training" | "appearance";
 type ProfileEditableKey = "age" | "heightCm" | "weightKg";
 
+const SETTINGS_TABS = [
+  { value: "personal" },
+  { value: "training" },
+  { value: "appearance" },
+] satisfies Array<{ value: SettingsTab }>;
+
 function SettingsPage() {
   const { snapshot, viewer, settings } = Route.useLoaderData();
   const saveUserSettingsFn = useServerFn(saveUserSettings);
@@ -62,6 +70,7 @@ function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<SettingsFormState>(() => buildSettingsFormState(settings));
   const [activeTab, setActiveTab] = useState<SettingsTab>("personal");
+  const settingsTabs = useHitoTabs({ items: SETTINGS_TABS, value: activeTab });
   const [activeEditableKey, setActiveEditableKey] = useState<ProfileEditableKey | null>(null);
 
   useEffect(() => {
@@ -112,13 +121,14 @@ function SettingsPage() {
         },
       });
       await router.invalidate();
-      setMessage("Personal heart-rate ranges saved.");
+      setMessage("Heart-rate guidance saved.");
       return true;
     } catch (saveError) {
       setError(
-        saveError instanceof Error
-          ? saveError.message
-          : "Personal heart-rate ranges could not be saved.",
+        runnerFacingHeartRateSaveError(
+          saveError,
+          "Heart-rate guidance could not be saved. Check that every BPM range is complete and separate.",
+        ),
       );
       return false;
     } finally {
@@ -248,11 +258,14 @@ function SettingsPage() {
           </p>
         </div>
 
-        <div className="hito-tabs hito-tabs-enclosed" role="tablist" aria-label="Settings section">
+        <div
+          className="hito-tabs hito-tabs-enclosed"
+          {...settingsTabs.tabListProps}
+          aria-label="Settings section"
+        >
           <button
             type="button"
-            role="tab"
-            aria-selected={activeTab === "personal"}
+            {...settingsTabs.getTabProps("personal")}
             className="hito-tab"
             data-active={activeTab === "personal"}
             onClick={() => setActiveTab("personal")}
@@ -261,8 +274,7 @@ function SettingsPage() {
           </button>
           <button
             type="button"
-            role="tab"
-            aria-selected={activeTab === "training"}
+            {...settingsTabs.getTabProps("training")}
             className="hito-tab"
             data-active={activeTab === "training"}
             onClick={() => setActiveTab("training")}
@@ -271,8 +283,7 @@ function SettingsPage() {
           </button>
           <button
             type="button"
-            role="tab"
-            aria-selected={activeTab === "appearance"}
+            {...settingsTabs.getTabProps("appearance")}
             className="hito-tab"
             data-active={activeTab === "appearance"}
             onClick={() => setActiveTab("appearance")}
@@ -282,7 +293,10 @@ function SettingsPage() {
         </div>
 
         {activeTab === "personal" ? (
-          <section className="hito-form-section-grid hito-form-section-grid-avatar" role="tabpanel">
+          <section
+            className="hito-form-section-grid hito-form-section-grid-avatar"
+            {...settingsTabs.getPanelProps("personal")}
+          >
             <div className="hito-avatar-stack self-start">
               <Avatar className="hito-avatar-tile hito-profile-avatar">
                 {settings.avatarUrl ? (
@@ -431,6 +445,7 @@ function SettingsPage() {
 
               <HeartRateProfileSection
                 isSaving={isSaving}
+                onClearError={() => setError(null)}
                 summary={settings.heartRateZones}
                 onSave={saveHeartRateProfile}
               />
@@ -458,7 +473,7 @@ function SettingsPage() {
             </div>
           </section>
         ) : activeTab === "training" ? (
-          <section className="hito-settings-panel" role="tabpanel">
+          <section className="hito-settings-panel" {...settingsTabs.getPanelProps("training")}>
             <div>
               <div className="flex items-center gap-2">
                 <Icon name="calendar" size="sm" className="text-signal" />
@@ -519,7 +534,9 @@ function SettingsPage() {
             </div>
           </section>
         ) : (
-          <ThemePreferenceSection panelRole="tabpanel" />
+          <div {...settingsTabs.getPanelProps("appearance")}>
+            <ThemePreferenceSection />
+          </div>
         )}
       </div>
     </AppShell>
@@ -589,7 +606,7 @@ function buildSettingsFormState(settings: UserSettingsSummary | null): SettingsF
       settings?.trainingPreferences?.max_running_days_per_week != null
         ? String(settings.trainingPreferences.max_running_days_per_week)
         : "",
-    fitnessLevel: "running_regularly",
+    fitnessLevel: settings?.fitnessLevel ?? "running_regularly",
     recent5kTime: "",
   };
 }
@@ -602,6 +619,7 @@ function buildPersonalDataPayload(form: SettingsFormState) {
     age: parseIntegerInput(form.age),
     weightKg: parseDecimalInput(form.weightKg),
     heightCm: parseDecimalInput(form.heightCm),
+    fitnessLevel: form.fitnessLevel,
   };
 }
 

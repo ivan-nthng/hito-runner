@@ -4,6 +4,7 @@ import {
   MANUAL_SAVED_WORKOUT_TEMPLATE_SOURCE_STATUS,
   MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+  deleteManualWorkoutSavedTemplateForUser,
   listManualWorkoutSavedTemplatesForUser,
   reviewManualWorkoutSavedTemplateForUser,
   saveManualWorkoutSavedTemplateForUser,
@@ -157,6 +158,64 @@ export async function validateManualSavedTemplateContract() {
     }
   }
 
+  for (const targetCase of [
+    {
+      label: "BPM",
+      key: "hr_bpm_range" as const,
+      target: {
+        targetSource: "user_entered" as const,
+        hrTargetSource: "user_entered" as const,
+        hrBpmRange: "145-155 bpm",
+      },
+    },
+    {
+      label: "RPE",
+      key: "rpe" as const,
+      target: { targetSource: "user_entered" as const, rpe: 6 },
+    },
+  ]) {
+    const targetInput: ManualWorkoutDraftInput = {
+      templateKey: "easy_aerobic_run",
+      workoutDate: "2026-06-18",
+      entries: [
+        {
+          kind: "block",
+          block: {
+            blockKey: "easy_run_block",
+            durationSeconds: 30 * 60,
+            target: targetCase.target,
+          },
+        },
+      ],
+    };
+    const targetReview = assertReady(`saved template ${targetCase.label} review`, targetInput);
+    const targetSave = await saveManualWorkoutSavedTemplateForUser(
+      userId,
+      {
+        displayName: `My ${targetCase.label} target`,
+        iconKey: "easy",
+        ...buildReviewConfirmInput(targetInput, targetReview),
+      },
+      { repository },
+    );
+    assertSavedTemplateSaved(targetSave, `saved runner-entered ${targetCase.label} template`);
+    if (targetSave.ok) {
+      const targetReconstructed = await reviewManualWorkoutSavedTemplateForUser(
+        userId,
+        { templateId: targetSave.template.id, workoutDate: "2026-06-26" },
+        { repository },
+      );
+      assert.equal(targetReconstructed.ok, true, JSON.stringify(targetReconstructed));
+      if (targetReconstructed.ok) {
+        assertUserEnteredTargetInSteps(
+          targetReconstructed.review.draft.steps,
+          targetCase.key,
+          `saved-template runner-entered ${targetCase.label} target`,
+        );
+      }
+    }
+  }
+
   const crossUser = await reviewManualWorkoutSavedTemplateForUser(
     otherUserId,
     {
@@ -261,6 +320,28 @@ export async function validateManualSavedTemplateContract() {
   if (!unsupportedPayload.ok) {
     assert.equal(unsupportedPayload.reason, "unsupported_payload");
   }
+
+  const crossUserDelete = await deleteManualWorkoutSavedTemplateForUser(
+    otherUserId,
+    { templateId: saveResult.template.id },
+    { repository },
+  );
+  assert.equal(crossUserDelete.ok, false, "another runner must not delete a personal template");
+  if (!crossUserDelete.ok) {
+    assert.equal(crossUserDelete.reason, "not_found");
+  }
+
+  const ownerDelete = await deleteManualWorkoutSavedTemplateForUser(
+    userId,
+    { templateId: saveResult.template.id },
+    { repository },
+  );
+  assert.equal(ownerDelete.ok, true, JSON.stringify(ownerDelete));
+  assert.equal(
+    repository.rows().some((row) => row.id === saveResult.template.id),
+    false,
+    "owner delete should remove exactly the selected personal template",
+  );
 }
 
 function buildFakeSavedTemplateRepository(): FakeSavedTemplateRepository {
@@ -304,6 +385,12 @@ function buildFakeSavedTemplateRepository(): FakeSavedTemplateRepository {
     },
     async getTemplateForUser(userId: string, templateId: string) {
       return rows.find((row) => row.user_id === userId && row.id === templateId) ?? null;
+    },
+    async deleteTemplateForUser(userId: string, templateId: string) {
+      const index = rows.findIndex((row) => row.user_id === userId && row.id === templateId);
+      if (index < 0) return false;
+      rows.splice(index, 1);
+      return true;
     },
   };
 }

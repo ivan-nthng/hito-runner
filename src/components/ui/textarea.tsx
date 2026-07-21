@@ -7,6 +7,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, React.ComponentProps<"tex
     return (
       <textarea
         className={cn("hito-field hito-field-primary hito-textarea-md", className)}
+        data-hito-component="textarea"
         ref={ref}
         {...props}
       />

@@ -51,7 +51,6 @@ async function persistImportedPlanForCurrentRequest(
     firstDayResolution,
     requestedStartDate,
     null,
-    null,
     { clearBeforeImport },
   );
 }

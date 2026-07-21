@@ -47,6 +47,18 @@ const NAV: { to: string; label: string; icon: HitoIconName }[] = [
   { to: "/progress", label: "Progress", icon: "progress" },
 ];
 
+function getCurrentShellNavPath(pathname: string): string | null {
+  if (pathname === "/" || pathname.startsWith("/workout/")) {
+    return "/";
+  }
+
+  if (pathname === "/progress" || pathname.startsWith("/progress/")) {
+    return "/progress";
+  }
+
+  return null;
+}
+
 export function AppShell({
   children,
   snapshot,
@@ -68,6 +80,7 @@ export function AppShell({
   const exportResetTimerRef = useRef<number | null>(null);
   const headerDialogOpenTimerRef = useRef<number | null>(null);
   const loc = useLocation();
+  const currentNavPath = getCurrentShellNavPath(loc.pathname);
   const nextPath = getLoginIntentPath(
     loc.pathname,
     "searchStr" in loc && typeof loc.searchStr === "string" ? loc.searchStr : undefined,
@@ -157,15 +170,14 @@ export function AppShell({
 
         <nav className="hito-shell-nav px-3">
           {NAV.map((navItem) => {
-            const active =
-              loc.pathname === navItem.to ||
-              (navItem.to !== "/" && loc.pathname.startsWith(navItem.to));
+            const active = currentNavPath === navItem.to;
             return (
               <Link
                 key={navItem.to}
                 to={navItem.to}
                 reloadDocument={navItem.to === "/" && useFreshHomeRequest}
                 data-active={active ? "true" : undefined}
+                aria-current={active ? "page" : undefined}
                 className="hito-shell-nav-row"
               >
                 <Icon name={navItem.icon} className="hito-shell-nav-icon" />
@@ -253,7 +265,7 @@ export function AppShell({
                 <DropdownMenuItem className="hito-shell-menu-item" asChild>
                   <Link to="/settings">
                     <Icon name="settings" size="sm" />
-                    User settings
+                    Profile &amp; heart rate
                   </Link>
                 </DropdownMenuItem>
               )}
@@ -403,7 +415,7 @@ export function AppShell({
               {showSettingsAction && (
                 <Link
                   to="/settings"
-                  aria-label="Open user settings"
+                  aria-label="Open profile and heart-rate settings"
                   className="hito-button hito-button-ghost hito-button-sm aspect-square p-0 md:hidden"
                 >
                   <Icon name="settings" size="sm" />
@@ -417,13 +429,14 @@ export function AppShell({
 
         <nav className="hito-shell-mobile-nav md:hidden sticky bottom-0 z-30">
           {NAV.map((navItem) => {
-            const active = loc.pathname === navItem.to;
+            const active = currentNavPath === navItem.to;
             return (
               <Link
                 key={navItem.to}
                 to={navItem.to}
                 reloadDocument={navItem.to === "/" && useFreshHomeRequest}
                 data-active={active ? "true" : undefined}
+                aria-current={active ? "page" : undefined}
                 className="hito-shell-mobile-row"
               >
                 <Icon name={navItem.icon} className="hito-shell-nav-icon" />

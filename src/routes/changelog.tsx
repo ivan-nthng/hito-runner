@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { APP_NAME } from "@/lib/app-config";
+import { useHitoTabs } from "@/components/ui/hito-tabs";
 import {
   formatDayLabel,
   formatEntryCount,
@@ -24,6 +25,10 @@ import changelogMarkdown from "../../docs/history/changelog.md?raw";
 import technicalLogMarkdown from "../../docs/history/technical-log.md?raw";
 
 type ChangelogTab = "highlights" | "technical";
+
+const CHANGELOG_TABS = [{ value: "highlights" }, { value: "technical" }] satisfies Array<{
+  value: ChangelogTab;
+}>;
 
 export const Route = createFileRoute("/changelog")({
   head: () => ({
@@ -49,6 +54,7 @@ const technicalLogYears = groupMonthsByYear(technicalLogMonths);
 
 function ChangelogPage() {
   const [activeTab, setActiveTab] = useState<ChangelogTab>("highlights");
+  const changelogTabs = useHitoTabs({ items: CHANGELOG_TABS, value: activeTab });
   const isHighlightsTab = activeTab === "highlights";
   const entryCount = isHighlightsTab
     ? getChangelogEntryCount(publicChangelogMonths)
@@ -92,11 +98,14 @@ function ChangelogPage() {
         </header>
 
         <section className="grid gap-9" aria-label="Changelog views">
-          <div className="hito-tabs hito-tabs-simple" role="tablist" aria-label="Changelog view">
+          <div
+            className="hito-tabs hito-tabs-simple"
+            {...changelogTabs.tabListProps}
+            aria-label="Changelog view"
+          >
             <button
               type="button"
-              role="tab"
-              aria-selected={activeTab === "highlights"}
+              {...changelogTabs.getTabProps("highlights")}
               className="hito-tab"
               onClick={() => setActiveTab("highlights")}
             >
@@ -104,8 +113,7 @@ function ChangelogPage() {
             </button>
             <button
               type="button"
-              role="tab"
-              aria-selected={activeTab === "technical"}
+              {...changelogTabs.getTabProps("technical")}
               className="hito-tab"
               onClick={() => setActiveTab("technical")}
             >
@@ -114,9 +122,13 @@ function ChangelogPage() {
           </div>
 
           {activeTab === "highlights" ? (
-            <HighlightsTimeline years={changelogHighlightYears} />
+            <div {...changelogTabs.getPanelProps("highlights")}>
+              <HighlightsTimeline years={changelogHighlightYears} />
+            </div>
           ) : (
-            <TechnicalTimeline years={technicalLogYears} />
+            <div {...changelogTabs.getPanelProps("technical")}>
+              <TechnicalTimeline years={technicalLogYears} />
+            </div>
           )}
         </section>
       </div>

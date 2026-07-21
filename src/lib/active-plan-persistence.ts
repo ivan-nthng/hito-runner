@@ -25,7 +25,6 @@ import {
   applyAtomicReviewedPlanPersistence,
 } from "@/lib/active-plan-lifecycle-persistence";
 import { buildPersistedWorkoutInsertRows } from "@/lib/persisted-plan-replacement";
-import type { StructuredFirstPlanProfilePatch } from "@/lib/structured-first-plan-onboarding";
 import type { Database, Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { todayIso, type RunnerProfileSummary } from "@/lib/training";
@@ -42,7 +41,6 @@ type ImportedPlanInput = z.infer<typeof importedPlanSchema>;
 
 export interface EmptyActivePlanCreationInput {
   profile: RunnerProfileSummary;
-  profilePatch: StructuredFirstPlanProfilePatch | null;
   title: string;
   goalSummary: string;
   sourceTemplate: string;
@@ -82,7 +80,6 @@ export async function applyImportedPlanForUser(
   importedPlan: ImportedPlanInput,
   firstDayResolution: FirstDayResolution | null,
   requestedStartDate: string | null = null,
-  profilePatch: StructuredFirstPlanProfilePatch | null = null,
   planMetadata: AdditionalPlanPersistenceMetadata | null = null,
   intent: ImportedPlanApplyIntent = { clearBeforeImport: false },
 ): Promise<PlanApplySuccessResult> {
@@ -98,7 +95,6 @@ export async function applyImportedPlanForUser(
     userId,
     preparedApply,
     preparedApply.planContext,
-    profilePatch,
     planMetadata,
     intent,
   );
@@ -123,8 +119,8 @@ export function buildReviewedFirstPlanImportedSeed(
 export async function createFirstPlanFromReviewedCanonicalPlanForUser(
   userId: string,
   reviewedPlan: ImportedPlanInput,
-  profilePatch: StructuredFirstPlanProfilePatch | null = null,
   planMetadata: AdditionalPlanPersistenceMetadata | null = null,
+  options: { expectedProfileRevision?: number } = {},
 ): Promise<PlanApplySuccessResult> {
   const planContext = await getExistingPlanContext(userId);
 
@@ -137,8 +133,8 @@ export async function createFirstPlanFromReviewedCanonicalPlanForUser(
   await persistNewReviewedPlan({
     userId,
     importedSeed,
-    profilePatch,
     planMetadata,
+    expectedProfileRevision: options.expectedProfileRevision,
   });
 
   return {
@@ -158,7 +154,6 @@ export async function transitionActiveManualPlanToReviewedCanonicalPlanForUser(i
   expectedCurrentActivePlanUpdatedAt: string;
   reviewedPlan: ImportedPlanInput;
   replacementStartsAt: string;
-  profilePatch: StructuredFirstPlanProfilePatch | null;
   planMetadata: AdditionalPlanPersistenceMetadata | null;
 }) {
   const reviewedSeed = buildReviewedFirstPlanImportedSeed(input.reviewedPlan);
@@ -174,7 +169,6 @@ export async function transitionActiveManualPlanToReviewedCanonicalPlanForUser(i
     existingWorkouts,
     importedSeed: reviewedSeed,
     replacementStartsAt: input.replacementStartsAt,
-    profilePatch: input.profilePatch,
     planMetadata: input.planMetadata,
     historyDisposition: "carry_forward",
     buildSupersessionMetadata: ({ insertedPlan, preservedWorkoutCount }) => ({
@@ -218,7 +212,6 @@ export async function createEmptyActivePlanForUser(
       planPreferences: input.planPreferences,
       workouts: [],
     },
-    profilePatch: input.profilePatch,
     planMetadata: input.planMetadata ?? null,
   });
 
@@ -257,7 +250,6 @@ async function replaceActivePlanWithImportedInput(
   userId: string,
   preparedApply: PreparedPlanApplySuccess,
   planContext: ExistingPlanContext,
-  profilePatch: StructuredFirstPlanProfilePatch | null = null,
   planMetadata: AdditionalPlanPersistenceMetadata | null = null,
   intent: ImportedPlanApplyIntent,
 ) {
@@ -265,7 +257,6 @@ async function replaceActivePlanWithImportedInput(
     const insertedPlan = await persistNewReviewedPlan({
       userId,
       importedSeed: preparedApply.importedSeed,
-      profilePatch,
       planMetadata,
     });
 
@@ -279,7 +270,6 @@ async function replaceActivePlanWithImportedInput(
     existingWorkouts: planContext.existingWorkouts,
     importedSeed: preparedApply.importedSeed,
     replacementStartsAt: preparedApply.result.effectiveStartDate,
-    profilePatch,
     planMetadata,
     historyDisposition: intent.clearBeforeImport ? "archive_only" : "carry_forward",
     buildSupersessionMetadata: ({ insertedPlan, preservedWorkoutCount }) => ({
@@ -304,7 +294,6 @@ async function replaceActivePlanWithCompiledSeed(input: {
   existingWorkouts: ExistingPlanContext["existingWorkouts"];
   importedSeed: ImportedPlanSeed;
   replacementStartsAt: string;
-  profilePatch: StructuredFirstPlanProfilePatch | null;
   planMetadata: AdditionalPlanPersistenceMetadata | null;
   historyDisposition: ActivePlanHistoryDisposition;
   buildSupersessionMetadata: (context: {
@@ -357,7 +346,7 @@ async function replaceActivePlanWithCompiledSeed(input: {
         );
   const persistenceInput = {
     userId: input.userId,
-    profile: buildProfilePersistencePayload(carryForward.importedSeed.profile, input.profilePatch),
+    profile: buildProfilePersistencePayload(carryForward.importedSeed.profile),
     plan: planPayload,
     workouts: workoutRows as unknown as Json,
     expectedActivePlanId: input.currentActivePlan.id,
@@ -441,15 +430,15 @@ export async function getExistingPlanContext(userId: string): Promise<ExistingPl
 async function persistNewReviewedPlan(input: {
   userId: string;
   importedSeed: ImportedPlanSeed;
-  profilePatch: StructuredFirstPlanProfilePatch | null;
   planMetadata: AdditionalPlanPersistenceMetadata | null;
+  expectedProfileRevision?: number;
 }) {
   const planId = crypto.randomUUID();
   const workoutRows = buildPersistedWorkoutRows(planId, input.userId, input.importedSeed);
 
   return applyAtomicReviewedPlanPersistence({
     userId: input.userId,
-    profile: buildProfilePersistencePayload(input.importedSeed.profile, input.profilePatch),
+    profile: buildProfilePersistencePayload(input.importedSeed.profile),
     plan: buildPlanPersistencePayload(planId, input.importedSeed, input.planMetadata),
     workouts: workoutRows as unknown as Json,
     expectedActivePlanId: null,
@@ -465,31 +454,19 @@ async function persistNewReviewedPlan(input: {
     archiveGoalMetadata: null,
     logs: [],
     evidenceRelinks: [],
+    ...(input.expectedProfileRevision == null
+      ? {}
+      : { expectedProfileRevision: input.expectedProfileRevision }),
   });
 }
 
-function buildProfilePersistencePayload(
-  profile: RunnerProfileSummary,
-  profilePatch: StructuredFirstPlanProfilePatch | null = null,
-): Json {
-  const baselineNotes = profilePatch ? profilePatch.baselineNotes : (profile.baselineNotes ?? null);
-
+function buildProfilePersistencePayload(profile: RunnerProfileSummary): Json {
   return {
     goal_type: profile.goalType,
     goal_label: profile.goalLabel,
     baseline_sessions_per_week: profile.baselineSessionsPerWeek,
     baseline_long_run_km: profile.baselineLongRunKm,
-    baseline_notes: baselineNotes,
-    ...(profilePatch
-      ? {
-          age: profilePatch.age,
-          weight_kg: profilePatch.weightKg,
-          height_cm: profilePatch.heightCm,
-          ...(profilePatch.trainingPreferences !== undefined
-            ? { training_preferences: profilePatch.trainingPreferences }
-            : {}),
-        }
-      : {}),
+    baseline_notes: profile.baselineNotes ?? null,
   };
 }
 

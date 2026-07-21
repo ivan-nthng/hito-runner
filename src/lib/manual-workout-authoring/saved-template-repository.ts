@@ -15,6 +15,7 @@ export type ManualWorkoutSavedTemplateRepository = {
     userId: string,
     templateId: string,
   ) => Promise<RunnerManualWorkoutTemplateRow | null>;
+  deleteTemplateForUser: (userId: string, templateId: string) => Promise<boolean>;
 };
 
 export function createSupabaseSavedTemplateRepository(): ManualWorkoutSavedTemplateRepository {
@@ -61,6 +62,21 @@ export function createSupabaseSavedTemplateRepository(): ManualWorkoutSavedTempl
       }
 
       return result.data ?? null;
+    },
+    async deleteTemplateForUser(userId, templateId) {
+      const result = await supabase
+        .from("runner_manual_workout_templates")
+        .delete()
+        .eq("user_id", userId)
+        .eq("id", templateId)
+        .select("id")
+        .maybeSingle();
+
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
+
+      return Boolean(result.data);
     },
   };
 }

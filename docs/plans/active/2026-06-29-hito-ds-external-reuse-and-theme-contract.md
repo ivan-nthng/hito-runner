@@ -1,4 +1,4 @@
-# Hito DS External Reuse And Theme Contract
+# Hito DS Discoverability, Agent Contract, And Safe Reuse Plan
 
 ## Status
 
@@ -14,80 +14,21 @@ high
 
 ## Next Recommended Role
 
-architect
+product
 
 ## Task
 
-Define and implement a safe external reuse layer for Hito DS so other projects can use Hito primitives and tokens without destabilizing the Hito product.
+Select the next bounded Hito DS discoverability, agent-contract, or external-reuse gate after the
+Local Inspector child task's accepted owner-level closeout.
 
 ## Stage
 
-ARCHITECT plan / external reusable themeable Hito DS contract.
+Inspector child closed / broader discoverability remains Product-selected backlog.
 
-## Exact Handoff Prompt
+## Next Gate
 
-```text
-ROLE: ARCHITECT
-
-Task:
-Define the implementation-ready architecture for Hito DS external reuse and theming.
-
-Stage:
-ARCHITECT plan / external reusable themeable Hito DS contract.
-
-Plan:
-docs/plans/active/2026-06-29-hito-ds-external-reuse-and-theme-contract.md
-
-Context:
-Product wants to reuse Hito's design system in other projects without breaking the internal Hito product. The immediate goal is not to extract a full npm package. The first goal is a documented reuse layer inside /hitoDS that explains which primitives, tokens, and recipes are stable enough to copy or consume, and how another project can customize colors, radii, typography, spacing, shadows, density, and focus states through theme tokens.
-
-Root cause:
-Visible symptom: another project wants Hito-like UI consistency but cannot safely know what to copy, customize, or avoid.
-Underlying cause: Hito DS currently exists as an app-owned internal system, not as a documented external reuse contract.
-Canonical owner: Hito DS architecture/specimen layer first, then Frontend/Designer implementation. Do not start by creating a package or changing product runtime.
-
-Scope:
-1. Audit current Hito DS sources: src/styles.css, src/routes/hitoDS.tsx, src/components/ui/*, src/components/hito-ds/*, and existing DS plans/specs.
-2. Classify primitives as reusable core, Hito-product-specific, workout-specific, internal-only, or not ready.
-3. Define the theme token contract:
-   - color tokens;
-   - surface and border tokens;
-   - typography tokens;
-   - spacing and density tokens;
-   - radius tokens;
-   - shadow/elevation tokens;
-   - focus and motion tokens.
-4. Define the external customization model: another project may override theme tokens, but should not fork component anatomy or hardcode local visual values.
-5. Define the custom-component rule: if a reusable component does not exist, build the custom component from Hito tokens first.
-6. Define the /hitoDS Reuse section:
-   - overview;
-   - install/copy guidance;
-   - theming guide;
-   - token tables;
-   - Button as the first component example;
-   - examples of good token-based custom components;
-   - examples of bad hardcoded local components;
-   - public vs internal-only boundaries.
-7. Decide whether phase 1 is documentation/specimen-only or includes light token normalization in src/styles.css.
-8. Define a later package-extraction path only as a future phase, not as the first implementation.
-
-Do not:
-- Do not extract a package in the first slice unless Product explicitly approves it later.
-- Do not rename or restructure current product classes just for external reuse.
-- Do not move Hito app runtime to a new package yet.
-- Do not mix workout-specific tokens or training-plan semantics into the generic external core.
-- Do not create a broad enterprise design system.
-- Do not break existing /hitoDS deep links or product screens.
-
-Validation:
-- Source audit with exact reusable/internal classifications.
-- A compact implementation-ready spec or plan update.
-- Scoped git diff --check for docs changes.
-- If source changes are proposed for a later role, include exact FRONTEND/DESIGNER handoff and validation expectations.
-
-Expected output:
-Return one implementation-ready next-role prompt and a compact architecture decision record. Name what stays internal, what becomes reusable, and what is deferred.
-```
+No implementation handoff is active. Product must select a new bounded discoverability,
+agent-guidance, or external-distribution gate before this broader backlog plan resumes.
 
 ## Owner
 
@@ -95,278 +36,239 @@ ARCHITECT / DESIGNER / FRONTEND
 
 ## Last Updated
 
-2026-06-29
+2026-07-21
 
 ## Context
 
-Hito already has a working internal design system: shared CSS tokens/classes in
-`src/styles.css`, shared UI primitives, and the `/hitoDS` reference route. That internal system
-should remain the source of truth for Hito product work.
+Hito already has the raw ingredients of a design system:
 
-The new product need is different: another project should be able to reuse the Hito visual language
-without copying random app code, breaking Hito, or freezing stale styles. The outside project needs
-clear instructions for:
+- shared theme and semantic variables in `src/styles/foundations.css`;
+- focused React primitives in `src/components/ui/*`;
+- established control, state-surface, dialog, menu, selection, typography, and calendar contracts;
+- a live `/hitoDS` route with Foundations, Components, and Patterns pages; and
+- a local Inspector that can already identify targets but cannot truthfully prove DS ownership or
+  token provenance.
 
-- which Hito primitives are stable enough to reuse;
-- which tokens can be overridden;
-- how to create custom components that still feel consistent;
-- what must remain Hito-product-specific.
+The problem is discoverability. A human or agent must currently infer which source owner is canonical
+by searching CSS, components, reference specimens, and past documentation. That creates duplicate
+UI recipes and unsafe guesses even when an appropriate Hito primitive already exists.
 
-## Problem Definition
+## Research Packet (2026-07-21)
 
-Visible symptom:
+This is the retained starting context for the next owner. It records a focused public review of
+Astryx and an accompanying Hito source inventory; it is not a mandate to copy Astryx or adopt its
+visual language.
 
-- External projects can like Hito's visual language, but there is no safe public/reuse contract.
-- A developer might copy random `styles.css` fragments, route-local classes, workout-specific colors,
-  or one-off product surfaces and create drift immediately.
+### Astryx Sources Reviewed
 
-Underlying cause:
+- [Astryx overview](https://astryx.atmeta.com/): public positioning, library breadth, templates,
+  themes, and React/StyleX direction.
+- [Getting started](https://astryx.atmeta.com/docs/getting-started): package boundaries, theme
+  variables, CSS cascade-layer guidance, and component import model.
+- [All tokens](https://astryx.atmeta.com/docs/tokens): explicit semantic colors, spacing, size,
+  border, radius, shadow, motion, and typography token families with light/dark values.
+- [Component library](https://astryx.atmeta.com/components): searchable component catalogue with
+  variants, states, and examples.
+- [Themes](https://astryx.atmeta.com/themes): default theme plus theme-preview and playground model.
+- [Working with AI](https://astryx.atmeta.com/docs/working-with-ai): generated agent context, compact
+  CLI output, component/docs discovery, and MCP search/get concept.
 
-- Hito DS is currently app-owned and internal. It has strong primitives, but no documented external
-  boundary, no theme override contract, and no public/internal classification.
+### Findings To Preserve
 
-Canonical owner:
+1. Astryx is strongest as a developer and agent tooling system: discoverability, source-like token
+   reference, component examples, theme previews, and compact context retrieval.
+2. Hito is stronger as a product-owned system: it already carries runner-specific interaction,
+   accessibility, review/confirm, and browser/persistence acceptance contracts that a generic
+   library cannot supply.
+3. The useful adaptation is operational, not visual: make existing Hito truth easier to find and
+   verify. Do not import Astryx components, visual recipes, StyleX, or its many generic templates.
+4. Hito needs semantic light/dark contract visibility, not a marketplace of alternate brands/themes.
+5. Agent readiness must mean read-only, current, queryable guidance before UI work. It must not mean
+   autonomous DS mutation or a second source of truth.
 
-- Hito DS architecture and specimen documentation first.
-- Frontend implementation later, only after the public/internal contract is clear.
+### Hito Evidence Reviewed
+
+- [Hito foundations](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/styles/foundations.css): live semantic colors, radius, typography,
+  elevation, spacing, and light/dark source owners.
+- [Hito DS route model](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/hito-ds/reference-model.ts): live Foundations,
+  Components, and Patterns information architecture.
+- [Hito DS overview](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/hito-ds/reference-overview-page.tsx): current source
+  hierarchy and reference-surface rules.
+- [Hito UI primitives](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/ui/): existing focused React component owners.
+- [Completed Hito DS IA and specimen contract](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-15-hito-ds-information-architecture-and-specimen-contract.md):
+  accepted reference-truth and conformance boundary.
+- [Local Inspector DS evidence task](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/2026-07-21-local-inspector-ds-evidence-and-batch-drafts.md):
+  positive ownership/provenance consumer that must share the same metadata truth.
+- [Current package manifest](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/package.json): repository distribution truth is private today;
+  reusable primitives do not yet imply a published external package.
+
+### Retained Product Conclusion
+
+Build one small source-backed Hito DS knowledge layer before any package/distribution decision:
+
+- explicit semantic token reference;
+- maintained component/pattern metadata with positive confirmation only;
+- `/hitoDS` as the live catalogue, not a static duplicate;
+- compact local agent discovery derived from the same truth; and
+- Inspector consumption of that truth without persistence or automatic DS mutation.
+
+Do not resume the broader discoverability or distribution program merely because this plan is high
+priority. First close the bounded Inspector child task; Product must separately select any later
+knowledge-layer or external-reuse gate.
+
+## 2026-07-21 Local Inspector Child Checkpoint
+
+The first local consumer now uses a bounded eight-entry positive reference metadata seam and proves
+that missing markers and computed token equality remain neutral. This does not complete the broader
+knowledge-layer plan: `/hitoDS` and agent guidance do not yet consume this metadata contract.
+
+The bounded Inspector child has completed its FRONTEND owner-level DoD. Its Component identity,
+compact Actions menu, add-to-DS proposal, instance/similar object removal, confirmed-DS scope,
+batch/text/focus behavior, and exact-375px body-only Sheet scrolling passed on a fresh production
+build. Evidence lives in
+`qa-artifacts/screenshots/2026-07-21/local-inspector-component-actions-closeout/`.
+
+Future discoverability work must consume or replace the accepted metadata seam rather than add a
+parallel registry. The local-only Inspector child needs no further release-wide QA after its bounded
+browser acceptance; the broader discoverability/distribution program remains backlog until Product
+selects a new gate.
 
 ## Product Decision
 
-Create an external reuse layer inside Hito DS before extracting a package.
+Adopt the useful operating ideas from mature external systems without copying their visual language
+or building their scale:
 
-Phase 1 should be documentation/specimen-first:
+1. **Explicit token contract:** document the live semantic token families, their source owners,
+   light/dark behavior, and intentional domain-only exclusions.
+2. **Component and pattern contract:** positively identify maintained Hito components and patterns
+   with source/reference metadata. Missing evidence means `unconfirmed`, never `not in the DS`.
+3. **Agent-readable discovery:** agents must be able to retrieve compact, current token/component/
+   pattern guidance before creating or changing visible UI.
+4. **Live catalog:** evolve the existing `/hitoDS` reference route so it demonstrates real owners,
+   state coverage, source links, and usage boundaries instead of a parallel static catalogue.
+5. **Safe reuse before distribution:** first make internal reuse reliable. External publishing,
+   package extraction, additional themes, and remote MCP are separate decision gates after the
+   contract proves small, stable, and useful.
 
-- keep Hito product runtime unchanged;
-- add or plan a `/hitoDS` reuse section;
-- document theme tokens and component recipes;
-- show how another project can override theme values;
-- show how to build custom components from tokens.
+The repository currently contains reusable React primitives but is not itself a published external
+package. This plan must not claim otherwise.
 
-Do not start with an npm package. A package can become a later phase after the reuse contract proves
-useful and stable.
+## Canonical Truth Hierarchy
 
-## Core Principles
+1. Live Hito runtime source owns implemented component behavior and token values.
+2. One minimal source-backed DS metadata boundary describes maintained components and patterns.
+3. `/hitoDS` renders that truth as live reference/specimen material.
+4. Agent-facing discovery output is derived from the same source-backed truth.
+5. The local Inspector consumes only positive metadata and explicit token provenance; it never
+   writes to the DS or infers ownership from a class name or matching computed value.
+6. Figma, generated examples, exported artifacts, and AI responses are downstream consumers, never
+   runtime truth.
 
-1. Hito product must keep working exactly as it does today.
-2. External reuse should be opt-in and documented, not a hidden dependency on internal app code.
-3. Components should read theme tokens, not hardcoded Hito brand values.
-4. Another project may customize theme tokens, but should preserve component anatomy and interaction
-   rules.
-5. If a component does not exist, build the custom component from Hito tokens first.
-6. Workout/training semantics are Hito-specific and must not leak into the generic external core.
-7. Prefer a small useful reuse layer over a generic enterprise component library.
+## Scope
 
-## Proposed Reusable Core
+### Included
 
-Initial reusable candidates:
+- Source inventory and classification of Hito token families, primitives, patterns, domain-specific
+  elements, and intentional local exceptions.
+- A minimal metadata/manifest contract that removes duplicate lists between `/hitoDS`, Inspector,
+  and agent guidance.
+- An agent-readable, local and read-only discovery interface or generated context contract.
+- `/hitoDS` information architecture and live-specimen improvements where required by the selected
+  contract.
+- Token documentation that distinguishes semantic foundations from workout, calendar, and other
+  domain-specific color/geometry truth.
+- A later, evidence-gated external reuse/distribution decision.
 
-- Button
-- Link/button-like action
-- Text field
-- Date/time field wrapper
-- Select/menu/popover shell
-- Dialog/sheet shell
-- Card/surface
-- Status marker/pill
-- Editable value chip
-- Tabs/segmented choices
-- Tooltip/help copy anatomy
+### Excluded
 
-Initial token families:
+- Product UI redesign, Runner Core behavior, backend/persistence work, or plan/workout semantics.
+- A generic component explosion, theme marketplace, package extraction, CSS-framework migration,
+  remote service, or automatic AI code modification.
+- Renaming every existing class/token before source proof shows it is necessary.
+- Treating custom/local UI as a failure when it is an intentional domain geometry or route-owned
+  composition.
 
-- color: text, muted text, accent, critical, success, surface, backdrop, border
-- typography: display, title, body, caption, technical/mono
-- spacing: page, section, row, control, compact control
-- radius: control, card, dialog, menu, pill/dot exception
-- elevation: surface, popover, dialog
-- focus: ring color, ring width, outline behavior
-- density: compact, default, spacious
-- motion: duration/ease for simple hover/focus/reveal states
+## Workstream And Gates
 
-Internal-only candidates:
-
-- workout type color taxonomy
-- workout section color taxonomy
-- training-plan readback semantics
-- manual workout constructor behavior
-- calendar workout persistence rules
-- route-specific Hito onboarding and plan-management copy
-- admin-only capture/debugger implementation details
-
-## External Theme Model
-
-External projects should be able to use a default Hito theme or define their own theme by overriding
-CSS variables.
-
-Example direction:
-
-```css
-:root {
-  --hito-color-accent: #f97316;
-  --hito-color-surface: #10100f;
-  --hito-color-text: #f8f4ec;
-  --hito-radius-card: 18px;
-  --hito-radius-control: 12px;
-  --hito-font-display: "Your Display Font";
-  --hito-font-body: "Your Body Font";
-}
-```
-
-This example is illustrative. The actual variable names must come from the current source audit and
-should not be invented without checking `src/styles.css`.
-
-## Custom Component Rule
-
-If another project needs a component that Hito DS does not provide, the project should build it from
-Hito tokens instead of hardcoding local values.
-
-Good direction:
-
-```css
-.custom-feature-card {
-  background: var(--hito-surface-base);
-  border: 1px solid var(--hito-border-subtle);
-  border-radius: var(--hito-radius-card);
-  padding: var(--hito-space-6);
-  color: var(--hito-text-primary);
-}
-```
-
-Bad direction:
-
-```css
-.custom-feature-card {
-  background: #111;
-  border-radius: 999px;
-  padding: 37px;
-}
-```
-
-The exact token names should be corrected during the architecture/source audit.
-
-## Phased Plan
-
-### Phase 0: Hold Until Current Critical Gates Are Done
-
-Do not interrupt:
-
-- unified AI-generated plan creation readiness;
-- manual template contract correction;
-- any active blocker preventing normal product use.
-
-This plan is high priority, but not higher than restoring core plan creation.
-
-### Phase 1: Architecture And Classification
+### Gate 1: Source Classification And Contract Decision
 
 Owner: ARCHITECT.
 
-Deliverables:
+Produce an evidence-backed map of:
 
-- reusable vs internal classification table;
-- token-family map from live source;
-- first external reuse boundary;
-- decision on whether any token names need normalization before documentation;
-- next role prompt for DESIGNER or FRONTEND.
+- semantic foundations and their actual source owners;
+- maintained generic primitives;
+- maintained Hito patterns;
+- domain-specific or route-owned components that must not enter a generic core;
+- internal/devtool-only elements;
+- reference-only specimens and known gaps.
 
-### Phase 2: Designer Reuse Spec
+Decide the smallest metadata truth that can power the Inspector, `/hitoDS`, and agent discovery.
+It must be maintained once, derived where possible, and small enough to audit.
 
-Owner: DESIGNER.
+### Gate 2: First Internal Discoverability Slice
 
-Deliverables:
+Owner: selected by Gate 1, expected FRONTEND with DESIGNER/QA support.
 
-- `/hitoDS Reuse` IA;
-- theme customization guide;
-- component anatomy rules;
-- Button example as the first fully documented reusable component;
-- custom-component token usage examples;
-- copy for public/internal warnings.
+Implement only the first bounded improvement that makes present-day Hito DS reuse safer. Candidate
+outcomes include a live token/reference index, source-backed component metadata, or compact agent
+context derived from live owners. The selected slice must delete or replace overlapping documentation
+or lists rather than add a parallel catalog.
 
-### Phase 3: Frontend Documentation/Specimen Implementation
+### Gate 3: Live Catalog And Agent Guidance
 
-Owner: FRONTEND.
+Owner: selected by Gate 1.
 
-Deliverables:
+Make `/hitoDS` and agent guidance consume the same truth. Real components should be rendered when
+their normal behavior is part of the contract; deliberately forced visual states may remain specimen
+fixtures when labelled as such. Agent guidance must explain component/pattern ownership, allowed
+states, token use, accessibility boundaries, and how to locate the owner without copying large docs
+into every prompt.
 
-- `/hitoDS` Reuse section or page;
-- default theme specimen;
-- alternate theme specimen;
-- copyable token examples;
-- Button recipe and usage examples;
-- at least one custom component example built only from tokens;
-- no runtime behavior change to normal Hito product screens.
-
-### Phase 4: QA / External Consumer Dry Run
-
-Owner: QA.
-
-Deliverables:
-
-- browser proof for `/hitoDS Reuse`;
-- desktop and 375px coverage;
-- no console/page errors;
-- token override example visually works;
-- no internal workout/product tokens presented as generic external core.
-
-### Phase 5: Package Extraction Decision
+### Gate 4: Safe Reuse Decision
 
 Owner: ARCHITECT / PRODUCT.
 
-Only after the reuse section proves useful, decide whether to extract:
+Only after internal consumers prove the contract, decide whether Hito needs any distribution form:
+documentation-only reuse, a copyable internal bundle, a package, or no extraction. This is a
+business/API decision, not an automatic technical outcome.
 
-- no package yet, docs-only reuse;
-- copyable CSS bundle;
-- private npm package;
-- monorepo package;
-- Figma/library bridge.
+## Quality And Validation Rules
 
-## Acceptance Criteria
-
-- Hito product behavior is unchanged.
-- `/hitoDS` clearly distinguishes reusable core from Hito-specific internals.
-- Another project can understand how to reuse Button and theme tokens without reading product route
-  source.
-- Theme overrides cover color, radius, typography, spacing/density, and focus at minimum.
-- Custom component guidance exists and explicitly requires token-first construction.
-- No broad package extraction happens before Product approves it.
-- Future package extraction has a smaller, proven source contract.
+- Documentation and metadata must describe current source, not aspirations.
+- A token value match is not token provenance.
+- A `hito-*` class is not proof of React component ownership.
+- Every metadata entry must point to a live canonical source/reference owner.
+- Unknown entries remain unconfirmed instead of acquiring false labels.
+- Agent guidance must be concise and queryable; it must not require agents to ingest a large static
+  manual before a small UI change.
+- The first implementation batch must use normal Hito DS/browser validation for touched UI, exact
+  375px proof where a visible surface changes, and the required test inventory/DoD policy.
+- Documentation-only planning work requires only source/reference checks and `git diff --check`.
 
 ## Risks
 
-- Over-extracting too early and destabilizing Hito product work.
-- Accidentally documenting route-local or workout-specific styles as reusable public API.
-- Creating two design systems: internal Hito DS and external Hito DS.
-- Theme overrides becoming too flexible and letting external projects break consistency.
-- Naming tokens before checking live source, then forcing churn later.
-
-## What Not To Touch
-
-- Do not change runner-facing product UI in this planning slice.
-- Do not change workout colors or training-plan semantics.
-- Do not create a package yet.
-- Do not rename live classes or variables without a later implementation owner and QA plan.
-- Do not treat Figma as runtime truth.
-
-## QA Expectations
-
-Future QA should verify:
-
-- `/hitoDS Reuse` loads on desktop and exact 375px;
-- default and alternate theme specimens render correctly;
-- copyable code examples match current source;
-- no page-level horizontal overflow;
-- no console/page errors;
-- public/internal warnings are visible and understandable.
+- Accidentally making a second registry beside real runtime code.
+- Promoting domain-specific workout/calendar semantics into a generic reusable library.
+- Treating matching CSS values as authoritative token provenance.
+- Building an external package before there is a stable public API or supported distribution policy.
+- Expanding the catalog faster than its owners and examples can remain current.
 
 ## Exit Criteria
 
-This plan can close when:
+This plan is complete only when:
 
-- external reuse architecture is accepted;
-- `/hitoDS Reuse` is implemented and QA-passed;
-- the first component recipe and theme override examples are documented;
-- Product has decided whether package extraction is still needed.
+- one source-backed Hito DS knowledge contract is implemented and used by `/hitoDS`, agent guidance,
+  and the Inspector where applicable;
+- live token, component, and pattern discoverability no longer requires broad ad hoc repo searches;
+- the first bounded implementation slice passes its complete owner-level DoD and required browser
+  proof;
+- duplicate reference lists or stale guidance are removed or explicitly retained with a source-backed
+  reason; and
+- Product makes an explicit evidence-based decision about external distribution rather than assuming
+  a package exists.
 
 ## Suggested Next Step
 
-After the current critical plan-creation blockers are resolved, route the `Exact Handoff Prompt` to
-ARCHITECT.
+Run the Exact Handoff Prompt with FRONTEND to close only the bounded Inspector child task. Do not
+start product UI, agent-guidance, package, or distribution work from this fix-forward.

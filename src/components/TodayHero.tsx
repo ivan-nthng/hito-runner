@@ -15,13 +15,22 @@ import {
   workoutTypeMeta,
   workoutDistanceKm,
   workoutDuration,
+  weekOf,
 } from "@/lib/training";
 
 export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
-  const workout = findWorkout(snapshot.workouts, snapshot.currentDate);
-  if (!workout) {
-    return <TodayFallback snapshot={snapshot} />;
+  const scheduledWorkout = findWorkout(snapshot.workouts, snapshot.currentDate);
+  const planStart = snapshot.planMeta?.startDate ?? snapshot.workouts[0]?.date ?? null;
+
+  if (!scheduledWorkout && planStart && snapshot.currentDate < planStart) {
+    return <PlanStartsLaterHero snapshot={snapshot} planStart={planStart} />;
   }
+
+  const workout =
+    scheduledWorkout ??
+    findWorkout(weekOf(snapshot.workouts, snapshot.currentDate), snapshot.currentDate);
+  if (!workout) return null;
+
   const feedbackMeta = feedbackMarkerMeta(workout.feedbackMarker);
   const meta = workoutTypeMeta(workout);
   const isRestDay = workout.type === "rest";
@@ -149,42 +158,14 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
   );
 }
 
-function TodayFallback({ snapshot }: { snapshot: TrainingSnapshot }) {
-  const planStart = snapshot.workouts[0]?.date ?? null;
-  const planEnd = snapshot.workouts.at(-1)?.date ?? null;
+function PlanStartsLaterHero({
+  snapshot,
+  planStart,
+}: {
+  snapshot: TrainingSnapshot;
+  planStart: string;
+}) {
   const nextWorkout = snapshot.workouts.find((item) => item.date > snapshot.currentDate);
-  const previousWorkout = [...snapshot.workouts]
-    .reverse()
-    .find((item) => item.date < snapshot.currentDate);
-
-  const closestWorkout =
-    planStart && snapshot.currentDate < planStart ? nextWorkout : (previousWorkout ?? nextWorkout);
-
-  const heading =
-    planStart && snapshot.currentDate < planStart
-      ? "Your plan starts later."
-      : planEnd && snapshot.currentDate > planEnd
-        ? "This plan has already ended."
-        : "Nothing is scheduled for today.";
-
-  const body =
-    planStart && snapshot.currentDate < planStart
-      ? `Today is ${formatDate(snapshot.currentDate, {
-          month: "short",
-          day: "numeric",
-        })}, while your current plan begins on ${formatDate(planStart, {
-          month: "short",
-          day: "numeric",
-        })}.`
-      : planEnd && snapshot.currentDate > planEnd
-        ? `Today is ${formatDate(snapshot.currentDate, {
-            month: "short",
-            day: "numeric",
-          })}, but this plan ends on ${formatDate(planEnd, {
-            month: "short",
-            day: "numeric",
-          })}.`
-        : "Open another day from the calendar whenever you want to review the plan.";
 
   return (
     <section className="pt-1 lg:pt-2">
@@ -205,16 +186,19 @@ function TodayFallback({ snapshot }: { snapshot: TrainingSnapshot }) {
           </div>
 
           <h2 className="mt-3 max-w-2xl text-balance font-display text-4xl leading-[1.05] lg:text-5xl">
-            {heading}
+            Your plan starts later.
           </h2>
 
-          <p className="hito-support-copy mt-4 max-w-xl">{body}</p>
+          <p className="hito-support-copy mt-4 max-w-xl">
+            Today is {formatDate(snapshot.currentDate, { month: "short", day: "numeric" })}, while
+            your current plan begins on {formatDate(planStart, { month: "short", day: "numeric" })}.
+          </p>
 
           <div className="mt-6 flex flex-wrap items-center gap-2">
-            {closestWorkout && (
+            {nextWorkout && (
               <Link
                 to="/workout/$date"
-                params={{ date: closestWorkout.date }}
+                params={{ date: nextWorkout.date }}
                 className="hito-button hito-button-primary hito-button-sm"
               >
                 Open nearest workout
@@ -232,18 +216,16 @@ function TodayFallback({ snapshot }: { snapshot: TrainingSnapshot }) {
             title="Plan Window"
             icon={<Icon name="plan-note" size="xs" className="text-signal" />}
           >
-            {planStart && planEnd
-              ? `${formatDate(planStart, { month: "short", day: "numeric" })} to ${formatDate(planEnd, { month: "short", day: "numeric" })}`
-              : "No imported workouts are available yet."}
+            Begins {formatDate(planStart, { month: "short", day: "numeric" })}
           </DismissibleSupportNote>
 
-          {closestWorkout && (
+          {nextWorkout && (
             <section className="py-4">
               <div>
-                <div className="hito-section-subtitle">Nearest Workout</div>
-                <div className="mt-1 text-sm text-foreground/90">{closestWorkout.title}</div>
+                <div className="hito-section-subtitle">Next Workout</div>
+                <div className="mt-1 text-sm text-foreground/90">{nextWorkout.title}</div>
                 <div className="hito-caption mt-2 font-mono-num">
-                  {formatDate(closestWorkout.date, {
+                  {formatDate(nextWorkout.date, {
                     weekday: "short",
                     month: "short",
                     day: "numeric",

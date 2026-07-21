@@ -1,11 +1,28 @@
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
+import { useHitoRadioGroup, type HitoRadioOptionProps } from "@/components/ui/hito-radio-group";
 
-export function OptionGrid({ children, label }: { children: ReactNode; label: string }) {
+const OptionGridContext = createContext<((value: string) => HitoRadioOptionProps) | null>(null);
+
+export function OptionGrid({
+  children,
+  items,
+  label,
+  value,
+}: {
+  children: ReactNode;
+  items: ReadonlyArray<{ value: string; disabled?: boolean }>;
+  label: string;
+  value?: string | null;
+}) {
+  const radioGroup = useHitoRadioGroup({ items: [...items], value });
+
   return (
-    <div className="hito-onboarding-option-grid" role="radiogroup" aria-label={label}>
-      {children}
-    </div>
+    <OptionGridContext.Provider value={radioGroup.getRadioProps}>
+      <div className="hito-onboarding-option-grid" {...radioGroup.groupProps} aria-label={label}>
+        {children}
+      </div>
+    </OptionGridContext.Provider>
   );
 }
 
@@ -15,18 +32,22 @@ export function OptionButton({
   label,
   copy,
   onClick,
+  value,
 }: {
   active: boolean;
   icon?: HitoIconName;
   label: string;
   copy?: string;
   onClick: () => void;
+  value: string;
 }) {
+  const getRadioProps = useContext(OptionGridContext);
+  const radioProps = getRadioProps?.(value);
+
   return (
     <button
       type="button"
-      role="radio"
-      aria-checked={active}
+      {...radioProps}
       data-selected={active ? "true" : undefined}
       onClick={onClick}
       className="hito-choice-toggle hito-choice-toggle-lg w-full justify-start whitespace-normal text-left"

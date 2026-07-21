@@ -138,15 +138,3 @@ export function getIsObservableTokenControl(control: InlineChangeTokenControlInp
 export function getBaseToken(control: InlineChangeTokenControlInput) {
   return control.currentToken ?? null;
 }
-
-export function getHasObservedProperties(
-  target: InlineChangeTargetInput,
-  tokenControls: InlineChangeTokenControlInput[],
-) {
-  return (
-    tokenControls.length > 0 ||
-    Boolean(target.typography) ||
-    Boolean(target.border) ||
-    Boolean(target.cardChrome?.isDetected)
-  );
-}

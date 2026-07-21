@@ -128,11 +128,11 @@ function validateManualWorkoutEntries(
     });
   }
 
-  if (template.requiresWarmupCooldown) {
+  if (template.requiresWarmupCooldown && !options.allowPersistedTemplateShape) {
     validateWarmupCooldownChronology(entries, issues);
   }
 
-  if (template.longRunRequiresMultiBlockAboveSeconds) {
+  if (template.longRunRequiresMultiBlockAboveSeconds && !options.allowPersistedTemplateShape) {
     validateLongRunAnatomy(template, entries, issues);
   }
 

@@ -30,8 +30,12 @@ import { CALENDAR_ICON_KEY_VALUES, type CalendarIconKey } from "@/lib/rich-worko
 import {
   addManualWorkoutToActivePlan,
   copyManualWorkoutWithinActivePlan,
-  listManualWorkoutSavedTemplates,
+  deleteManualWorkoutSavedTemplate,
+  hideManualWorkoutBuiltInTemplate,
+  listManualWorkoutTemplateCatalog,
   reviewManualWorkoutSavedTemplate,
+  restoreAllManualWorkoutBuiltInTemplates,
+  restoreManualWorkoutBuiltInTemplate,
   saveManualWorkoutSavedTemplate,
 } from "@/lib/manual-workout-authoring";
 import { reviewManualWorkoutDraftAction } from "@/lib/manual-workout-authoring/actions";
@@ -40,7 +44,6 @@ import type {
   ManualWorkoutDraftInput,
   ManualWorkoutDraftReviewResult,
   ManualWorkoutSavedTemplateReviewResult,
-  ManualWorkoutSavedTemplateSaveResult,
   ManualWorkoutSavedTemplateView,
   ManualWorkoutTemplateKey,
   ManualWorkoutTargetTruthMode,
@@ -60,10 +63,9 @@ import {
   buildManualDraftInput,
   cloneManualWorkoutEntries,
   formatReadableDate,
-  getDefaultManualWorkoutTemplate,
-  VISIBLE_MANUAL_WORKOUT_STARTER_TEMPLATES,
   templateIconKind,
   templateIconTone,
+  templateRunnerFacingLabel,
 } from "@/components/manual-workout/manual-workout-authoring-utils";
 import {
   ManualWorkoutConstructorEditor,
@@ -76,16 +78,13 @@ import {
   type ManualCopiedWorkoutSource,
 } from "@/components/manual-workout/ManualWorkoutSourceActionMenu";
 import {
-  EMPTY_SAVED_TEMPLATES_STATE,
+  EMPTY_TEMPLATE_CATALOG_STATE,
   MANUAL_ADD_MENU_CONTENT_CLASS,
   MANUAL_ADD_MENU_ICON_CLASS,
   MANUAL_ADD_MENU_ITEM_CLASS,
-  type ManualSavedTemplatesState,
+  type ManualTemplateCatalogState,
 } from "@/components/manual-workout/ManualWorkoutTemplatePicker.model";
-import {
-  ManualTemplatePickerDialog,
-  ManualTemplateSubmenu,
-} from "@/components/manual-workout/ManualWorkoutTemplatePicker";
+import { ManualTemplatePickerDialog } from "@/components/manual-workout/ManualWorkoutTemplatePicker";
 
 export { ManualWorkoutSourceActionMenu } from "@/components/manual-workout/ManualWorkoutSourceActionMenu";
 export type { ManualCopiedWorkoutSource } from "@/components/manual-workout/ManualWorkoutSourceActionMenu";
@@ -122,6 +121,7 @@ export type ManualSaveTemplateRequest = {
 };
 
 const MANUAL_ADD_TOAST_ID = "manual-active-plan-add";
+const MANUAL_TEMPLATE_CATALOG_TOAST_ID = "manual-template-catalog";
 const PASTE_UNAVAILABLE_MESSAGE =
   "Hito could not paste this workout yet. Try again from the calendar.";
 
@@ -156,8 +156,14 @@ export function ManualWorkoutAddMenu({
 }) {
   const reviewManualWorkoutDraftFn = useServerFn(reviewManualWorkoutDraftAction);
   const copyManualWorkoutWithinActivePlanFn = useServerFn(copyManualWorkoutWithinActivePlan);
-  const listManualWorkoutSavedTemplatesFn = useServerFn(listManualWorkoutSavedTemplates);
+  const deleteManualWorkoutSavedTemplateFn = useServerFn(deleteManualWorkoutSavedTemplate);
+  const hideManualWorkoutBuiltInTemplateFn = useServerFn(hideManualWorkoutBuiltInTemplate);
+  const listManualWorkoutTemplateCatalogFn = useServerFn(listManualWorkoutTemplateCatalog);
   const reviewManualWorkoutSavedTemplateFn = useServerFn(reviewManualWorkoutSavedTemplate);
+  const restoreAllManualWorkoutBuiltInTemplatesFn = useServerFn(
+    restoreAllManualWorkoutBuiltInTemplates,
+  );
+  const restoreManualWorkoutBuiltInTemplateFn = useServerFn(restoreManualWorkoutBuiltInTemplate);
   const saveManualWorkoutSavedTemplateFn = useServerFn(saveManualWorkoutSavedTemplate);
   const addManualWorkoutToActivePlanFn = useServerFn(addManualWorkoutToActivePlan);
   const confirmInFlightRef = useRef(false);
@@ -174,9 +180,16 @@ export function ManualWorkoutAddMenu({
   const [reviewResult, setReviewResult] = useState<ManualWorkoutDraftReviewResult | null>(null);
   const [reviewedDraft, setReviewedDraft] = useState<ReviewedManualDraft | null>(null);
   const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
-  const [savedTemplatesState, setSavedTemplatesState] = useState<ManualSavedTemplatesState>(
-    EMPTY_SAVED_TEMPLATES_STATE,
+  const [templateCatalogState, setTemplateCatalogState] = useState<ManualTemplateCatalogState>(
+    EMPTY_TEMPLATE_CATALOG_STATE,
   );
+  const [templateCatalogAction, setTemplateCatalogAction] = useState<string | null>(null);
+  const templateOptions = templateCatalogState.catalog
+    ? [
+        ...templateCatalogState.catalog.visibleBuiltInTemplates,
+        ...templateCatalogState.catalog.hiddenBuiltInTemplates,
+      ]
+    : [];
   const isBusy = status !== "idle";
   const canPasteCopiedWorkout = Boolean(
     copiedWorkoutSource && copiedWorkoutSource.activePlanId === activePlanId,
@@ -210,6 +223,11 @@ export function ManualWorkoutAddMenu({
   };
 
   const openScratchConstructor = () => {
+    if (!templateCatalogState.catalog) {
+      openTemplatePickerDialog();
+      return;
+    }
+
     setSelection({ kind: "scratch", date, template: null });
     setTitle("");
     setNotes("");
@@ -224,8 +242,8 @@ export function ManualWorkoutAddMenu({
   const openTemplatePickerDialog = () => {
     setAddMenuOpen(false);
 
-    if (savedTemplatesState.status === "idle" || savedTemplatesState.status === "failed") {
-      void loadSavedTemplates();
+    if (templateCatalogState.status === "idle" || templateCatalogState.status === "failed") {
+      void loadTemplateCatalog();
     }
 
     if (typeof window === "undefined") {
@@ -238,12 +256,11 @@ export function ManualWorkoutAddMenu({
 
   const handleAddMenuOpenChange = (open: boolean) => {
     setAddMenuOpen(open);
-
     if (
       open &&
-      (savedTemplatesState.status === "idle" || savedTemplatesState.status === "failed")
+      (templateCatalogState.status === "idle" || templateCatalogState.status === "failed")
     ) {
-      void loadSavedTemplates();
+      void loadTemplateCatalog();
     }
   };
 
@@ -290,37 +307,34 @@ export function ManualWorkoutAddMenu({
     setEntries(cloneManualWorkoutEntries(input.entries));
   };
 
-  const loadSavedTemplates = async () => {
-    setSavedTemplatesState((current) => ({
+  const loadTemplateCatalog = async () => {
+    setTemplateCatalogState((current) => ({
       status: "loading",
-      templates: current.templates,
+      catalog: current.catalog,
       message: null,
     }));
 
     try {
-      const result = await listManualWorkoutSavedTemplatesFn({ data: undefined });
+      const result = await listManualWorkoutTemplateCatalogFn({ data: undefined });
       if (!result?.ok) {
-        setSavedTemplatesState({
+        setTemplateCatalogState({
           status: "failed",
-          templates: [],
-          message: result?.message ?? "Personal workout templates are not available right now.",
+          catalog: null,
+          message: result?.message ?? "Workout templates are not available right now.",
         });
         return;
       }
 
-      setSavedTemplatesState({
+      setTemplateCatalogState({
         status: "ready",
-        templates: result.templates,
+        catalog: result,
         message: null,
       });
     } catch (error) {
-      setSavedTemplatesState({
+      setTemplateCatalogState({
         status: "failed",
-        templates: [],
-        message:
-          error instanceof Error
-            ? error.message
-            : "Personal workout templates could not be loaded.",
+        catalog: null,
+        message: error instanceof Error ? error.message : "Workout templates could not be loaded.",
       });
     }
   };
@@ -491,7 +505,7 @@ export function ManualWorkoutAddMenu({
       throw new Error(result.message);
     }
 
-    syncSavedTemplateStateAfterSave(result);
+    await loadTemplateCatalog();
     hitoToast.success({
       id: MANUAL_ADD_TOAST_ID,
       title: "Template saved",
@@ -499,17 +513,53 @@ export function ManualWorkoutAddMenu({
     });
   };
 
-  const syncSavedTemplateStateAfterSave = (
-    result: Extract<ManualWorkoutSavedTemplateSaveResult, { ok: true }>,
-  ) => {
-    setSavedTemplatesState((current) => ({
-      status: "ready",
-      message: null,
-      templates: [
-        result.template,
-        ...current.templates.filter((template) => template.id !== result.template.id),
-      ],
-    }));
+  const runTemplateCatalogAction = async ({
+    actionId,
+    pendingDescription,
+    pendingTitle,
+    run,
+    successDescription,
+    successTitle,
+  }: {
+    actionId: string;
+    pendingDescription: string;
+    pendingTitle: string;
+    run: () => Promise<{ ok: boolean; message?: string } | null | undefined>;
+    successDescription: string;
+    successTitle: string;
+  }) => {
+    if (templateCatalogAction) return;
+
+    setTemplateCatalogAction(actionId);
+    hitoToast.working({
+      id: MANUAL_TEMPLATE_CATALOG_TOAST_ID,
+      title: pendingTitle,
+      description: pendingDescription,
+    });
+
+    try {
+      const result = await run();
+      if (!result?.ok) {
+        throw new Error(result?.message ?? "The workout template catalog could not be updated.");
+      }
+      await loadTemplateCatalog();
+      hitoToast.success({
+        id: MANUAL_TEMPLATE_CATALOG_TOAST_ID,
+        title: successTitle,
+        description: successDescription,
+      });
+    } catch (error) {
+      hitoToast.error({
+        id: MANUAL_TEMPLATE_CATALOG_TOAST_ID,
+        title: "Template update failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "The workout template catalog could not be updated.",
+      });
+    } finally {
+      setTemplateCatalogAction(null);
+    }
   };
 
   const confirmReviewedDraft = async () => {
@@ -692,7 +742,7 @@ export function ManualWorkoutAddMenu({
             <>
               <DropdownMenuItem
                 className={MANUAL_ADD_MENU_ITEM_CLASS}
-                disabled={isBusy}
+                disabled={isBusy || !templateCatalogState.catalog}
                 onSelect={openScratchConstructor}
               >
                 <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="edit" size="xs" />
@@ -702,7 +752,7 @@ export function ManualWorkoutAddMenu({
                 </span>
               </DropdownMenuItem>
               <DropdownMenuItem
-                className={`${MANUAL_ADD_MENU_ITEM_CLASS} md:hidden`}
+                className={MANUAL_ADD_MENU_ITEM_CLASS}
                 disabled={isBusy}
                 onSelect={openTemplatePickerDialog}
               >
@@ -714,18 +764,16 @@ export function ManualWorkoutAddMenu({
                   </span>
                 </span>
               </DropdownMenuItem>
-              <ManualTemplateSubmenu
-                disabled={isBusy}
-                onSelectSavedTemplate={openSavedTemplate}
-                onSelectTemplate={openConstructor}
-                savedTemplatesState={savedTemplatesState}
-                triggerClassName="hidden md:flex"
-              />
               {showRestDayOption ? (
                 <DropdownMenuItem
                   className={MANUAL_ADD_MENU_ITEM_CLASS}
-                  disabled={isBusy}
-                  onSelect={() => openConstructor(getDefaultManualWorkoutTemplate("rest_day"))}
+                  disabled={isBusy || !templateCatalogState.catalog}
+                  onSelect={() => {
+                    const template = templateOptions.find(
+                      (candidate) => candidate.templateKey === "rest_day",
+                    );
+                    if (template) openConstructor(template);
+                  }}
                 >
                   <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="minus" size="xs" />
                   <span className="min-w-0">
@@ -742,9 +790,59 @@ export function ManualWorkoutAddMenu({
       </DropdownMenu>
 
       <ManualTemplatePickerDialog
+        catalogAction={templateCatalogAction}
+        catalogState={templateCatalogState}
         open={templatePickerOpen}
         onOpenChange={setTemplatePickerOpen}
-        onRefreshSavedTemplates={() => void loadSavedTemplates()}
+        onDeleteSavedTemplate={(template) => {
+          void runTemplateCatalogAction({
+            actionId: `delete:${template.id}`,
+            pendingTitle: "Deleting template",
+            pendingDescription: `Removing ${template.displayName} from your templates.`,
+            run: () => deleteManualWorkoutSavedTemplateFn({ data: { templateId: template.id } }),
+            successTitle: "Template deleted",
+            successDescription: `${template.displayName} was removed from your templates.`,
+          });
+        }}
+        onHideBuiltInTemplate={(template) => {
+          const label = templateRunnerFacingLabel(template);
+          void runTemplateCatalogAction({
+            actionId: `hide:${template.templateKey}`,
+            pendingTitle: "Hiding template",
+            pendingDescription: `Removing ${label} from your visible built-in templates.`,
+            run: () =>
+              hideManualWorkoutBuiltInTemplateFn({
+                data: { templateKey: template.templateKey },
+              }),
+            successTitle: "Template hidden",
+            successDescription: `${label} is hidden for this account.`,
+          });
+        }}
+        onRefreshCatalog={() => void loadTemplateCatalog()}
+        onRestoreAllBuiltInTemplates={() => {
+          void runTemplateCatalogAction({
+            actionId: "restore:all",
+            pendingTitle: "Restoring templates",
+            pendingDescription: "Restoring all built-in workout templates for this account.",
+            run: () => restoreAllManualWorkoutBuiltInTemplatesFn({ data: undefined }),
+            successTitle: "Templates restored",
+            successDescription: "All built-in workout templates are visible again.",
+          });
+        }}
+        onRestoreBuiltInTemplate={(template) => {
+          const label = templateRunnerFacingLabel(template);
+          void runTemplateCatalogAction({
+            actionId: `restore:${template.templateKey}`,
+            pendingTitle: "Restoring template",
+            pendingDescription: `Restoring ${label} to your visible built-in templates.`,
+            run: () =>
+              restoreManualWorkoutBuiltInTemplateFn({
+                data: { templateKey: template.templateKey },
+              }),
+            successTitle: "Template restored",
+            successDescription: `${label} is visible in the picker again.`,
+          });
+        }}
         onSelectSavedTemplate={(template) => {
           setTemplatePickerOpen(false);
           openSavedTemplate(template);
@@ -753,7 +851,6 @@ export function ManualWorkoutAddMenu({
           setTemplatePickerOpen(false);
           openConstructor(template);
         }}
-        savedTemplatesState={savedTemplatesState}
       />
 
       <ManualWorkoutConstructorDialog
@@ -781,7 +878,10 @@ export function ManualWorkoutAddMenu({
           setConstructorOpen(open);
         }}
         onScratchTemplateChange={(templateKey) => {
-          const template = getDefaultManualWorkoutTemplate(templateKey);
+          const template = templateOptions.find(
+            (candidate) => candidate.templateKey === templateKey,
+          );
+          if (!template) return;
           setSelection((current) =>
             current?.kind === "scratch" ? { ...current, template } : current,
           );
@@ -812,6 +912,7 @@ export function ManualWorkoutAddMenu({
         selection={selection}
         status={status}
         targetTruthMode={targetTruthMode}
+        templateOptions={templateOptions}
         title={title}
       />
     </>
@@ -840,6 +941,7 @@ export function ManualWorkoutConstructorDialog({
   selection,
   status,
   targetTruthMode,
+  templateOptions,
   title,
 }: {
   confirmLabel: string;
@@ -863,6 +965,7 @@ export function ManualWorkoutConstructorDialog({
   selection: ManualDraftSelection | null;
   status: ManualDraftStatus;
   targetTruthMode: ManualWorkoutTargetTruthMode;
+  templateOptions: ManualWorkoutTemplate[];
   title: string;
 }) {
   const selectedTemplate = selectionTemplate(selection);
@@ -930,7 +1033,7 @@ export function ManualWorkoutConstructorDialog({
                 selectedTemplateKey={selectedTemplate?.templateKey ?? null}
                 source={source}
                 targetTruthMode={targetTruthMode}
-                templateOptions={VISIBLE_MANUAL_WORKOUT_STARTER_TEMPLATES}
+                templateOptions={templateOptions}
                 title={title}
               />
               {readyReview ? (

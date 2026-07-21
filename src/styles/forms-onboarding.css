@@ -125,33 +125,30 @@
 
   .hito-onboarding-submit-footer {
     position: fixed;
-    right: 1rem;
-    bottom: max(0.75rem, env(safe-area-inset-bottom));
-    left: 1rem;
+    right: 0;
+    bottom: 0;
+    left: var(--hito-shell-sidebar-width);
     z-index: 30;
-    margin-inline: auto;
-    max-width: 64rem;
+    border-top: 1px solid var(--color-hairline);
+    background: var(--color-background);
     pointer-events: none;
   }
 
   .hito-onboarding-submit-footer-inner {
     display: flex;
+    width: min(64rem, calc(100% - (2 * var(--space-6))));
+    margin-inline: auto;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    border: 1px solid var(--color-hairline);
-    border-radius: 1.5rem;
-    background: color-mix(in oklch, var(--color-background) 90%, transparent);
-    padding: 0.75rem;
-    box-shadow: 0 18px 56px color-mix(in oklch, var(--color-foreground) 14%, transparent);
-    backdrop-filter: blur(18px);
+    padding-block: 0.875rem;
     pointer-events: auto;
   }
 
-  @media (min-width: 640px) {
+  @media (min-width: 1024px) {
     .hito-onboarding-submit-footer-inner {
-      padding: 0.875rem 1rem;
+      width: min(64rem, calc(100% - (2 * var(--space-10))));
     }
   }
 
@@ -166,12 +163,21 @@
       bottom: auto;
       left: auto;
       margin-top: 2rem;
+      border-top: 0;
+      background: transparent;
     }
 
     .hito-onboarding-submit-footer-inner {
       display: grid;
+      width: auto;
+      margin-inline: 0;
       grid-template-columns: minmax(0, 1fr) auto;
+      border: 1px solid var(--color-hairline);
+      border-radius: var(--radius-2xl);
+      background: color-mix(in oklch, var(--color-background) 90%, transparent);
       padding: 0.5rem;
+      box-shadow: 0 18px 56px color-mix(in oklch, var(--color-foreground) 14%, transparent);
+      backdrop-filter: blur(18px);
     }
   }
 
@@ -1681,6 +1687,7 @@
 
   .hito-editable-value-chip-frame[data-state="editing"] {
     flex: 0 1 auto;
+    flex-wrap: wrap;
   }
 
   .hito-editable-value-chip {
@@ -1691,14 +1698,15 @@
     max-width: 100%;
     align-items: center;
     gap: 0.45rem;
-    border: 1px solid transparent;
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    background: color-mix(in oklch, var(--color-muted) 48%, transparent);
+    background: var(--color-input);
     padding: 0 0.85rem;
     color: color-mix(in oklch, var(--color-foreground) 88%, transparent);
     font-size: 0.8125rem;
     text-align: left;
     transition:
+      border-color 160ms ease,
       background-color 160ms ease,
       color 160ms ease,
       box-shadow 160ms ease,
@@ -1706,14 +1714,16 @@
   }
 
   .hito-editable-value-chip:hover,
+  .hito-editable-value-chip[data-demo-state="hover"],
   .hito-editable-value-chip:focus-visible {
-    background: color-mix(in oklch, var(--color-muted) 66%, transparent);
+    border-color: color-mix(in oklch, var(--color-signal) 42%, var(--color-border));
+    background: color-mix(in oklch, var(--color-signal) 9%, var(--color-surface));
     color: var(--color-foreground);
   }
 
   .hito-editable-value-chip:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 20%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-signal) 22%, transparent);
   }
 
   .hito-editable-value-chip:active {
@@ -1722,7 +1732,24 @@
 
   .hito-editable-value-chip[data-state="empty"] {
     padding-left: 0.75rem;
-    color: color-mix(in oklch, var(--color-foreground) 82%, transparent);
+    color: color-mix(in oklch, var(--color-foreground) 92%, transparent);
+  }
+
+  .hito-editable-value-chip[data-state="invalid"] {
+    border-color: color-mix(in oklch, var(--color-destructive) 48%, var(--color-border));
+    background: color-mix(in oklch, var(--color-destructive) 7%, var(--color-surface));
+    color: var(--color-foreground);
+  }
+
+  .hito-editable-value-chip[data-state="invalid"]:hover,
+  .hito-editable-value-chip[data-state="invalid"][data-demo-state="hover"],
+  .hito-editable-value-chip[data-state="invalid"]:focus-visible {
+    border-color: color-mix(in oklch, var(--color-destructive) 64%, var(--color-border));
+    background: color-mix(in oklch, var(--color-destructive) 11%, var(--color-surface));
+  }
+
+  .hito-editable-value-chip[data-state="invalid"] .hito-editable-value-chip-icon {
+    color: var(--color-destructive);
   }
 
   .hito-editable-value-chip-icon {
@@ -1766,6 +1793,7 @@
   }
 
   .hito-editable-value-chip:hover .hito-editable-value-chip-edit-icon,
+  .hito-editable-value-chip[data-demo-state="hover"] .hito-editable-value-chip-edit-icon,
   .hito-editable-value-chip:focus-visible .hito-editable-value-chip-edit-icon {
     opacity: 0.72;
   }
@@ -1787,7 +1815,7 @@
     flex: 1 1 auto;
     border: 1px solid color-mix(in oklch, var(--color-signal) 76%, transparent);
     border-radius: var(--radius-md);
-    background: color-mix(in oklch, var(--color-muted) 58%, transparent);
+    background: color-mix(in oklch, var(--color-input) 74%, var(--color-surface));
     padding: 0 2.25rem 0 0.85rem;
     font-family: var(--font-mono);
     font-size: 0.8125rem;
@@ -1803,6 +1831,12 @@
 
   .hito-editable-value-chip-input:focus {
     outline: none;
+  }
+
+  .hito-editable-value-chip-input[aria-invalid="true"] {
+    border-color: color-mix(in oklch, var(--color-destructive) 62%, var(--color-border));
+    background: color-mix(in oklch, var(--color-destructive) 7%, var(--color-surface));
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-destructive) 16%, transparent);
   }
 
   .hito-editable-value-chip-clear {
@@ -1869,6 +1903,39 @@
   .hito-editable-value-chip-action[data-action="cancel"]:hover {
     background: color-mix(in oklch, var(--color-muted) 72%, transparent);
     color: var(--color-foreground);
+  }
+
+  .hito-editable-value-chip-error {
+    flex: 1 0 100%;
+    padding-left: 0.125rem;
+    color: var(--color-destructive);
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  @media (hover: none), (pointer: coarse), (max-width: 640px) {
+    .hito-editable-value-chip,
+    .hito-editable-value-chip-input,
+    .hito-editable-value-chip-action {
+      height: 2.75rem;
+      min-height: 2.75rem;
+    }
+
+    .hito-editable-value-chip-input {
+      padding-right: 3rem;
+    }
+
+    .hito-editable-value-chip-action {
+      width: 2.75rem;
+      min-width: 2.75rem;
+    }
+
+    .hito-editable-value-chip-clear {
+      right: 0;
+      width: 2.75rem;
+      height: 2.75rem;
+    }
   }
 
   .hito-disclosure {

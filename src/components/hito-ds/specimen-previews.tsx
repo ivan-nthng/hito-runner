@@ -14,6 +14,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
+import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
 import { cn } from "@/lib/utils";
 
 type ButtonVariant = "primary" | "secondary" | "outlined" | "ghost";
@@ -419,26 +420,30 @@ export function ChoiceSelector<T extends string>({
   getLabel?: (value: T) => string;
   textTransform?: "capitalize" | "uppercase" | "none";
 }) {
+  const choiceGroup = useHitoRadioGroup({
+    items: options.map((item) => ({ value: item })),
+    value,
+  });
+
   return (
     <div className="w-full">
       <p className="hito-label">{label}</p>
-      <div className="hito-choice-toggle-group mt-3" role="radiogroup" aria-label={label}>
+      <div className="hito-choice-toggle-group mt-3" {...choiceGroup.groupProps} aria-label={label}>
         {options.map((item) => {
           const selected = value === item;
           return (
             <button
               key={item}
               type="button"
+              {...choiceGroup.getRadioProps(item)}
               onClick={() => onChange(item)}
               data-selected={selected}
-              aria-checked={selected}
               className={cn(
                 "hito-choice-toggle",
                 `hito-choice-toggle-${size}`,
                 textTransform === "capitalize" && "capitalize",
                 textTransform === "uppercase" && "uppercase",
               )}
-              role="radio"
             >
               {getLabel ? getLabel(item) : item}
             </button>
@@ -475,24 +480,16 @@ export function SelectionControlPreview({
   if (kind === "toggle") {
     return (
       <div className="grid gap-3">
-        <div
-          className="hito-choice-toggle-group"
-          role="radiogroup"
-          aria-label="Selection control preview"
-        >
-          <button
-            type="button"
+        <div className="hito-choice-toggle-group">
+          <span
             className={cn(
-              "hito-choice-toggle",
+              "hito-choice-toggle pointer-events-none cursor-default",
               cardMode ? "hito-choice-toggle-card" : `hito-choice-toggle-${size}`,
+              disabled && "opacity-50",
             )}
             data-selected={selected}
             data-demo-state={focusDemo ? "focus" : undefined}
-            aria-checked={selected}
-            aria-disabled={disabled || undefined}
-            aria-invalid={invalid || undefined}
-            disabled={disabled}
-            role="radio"
+            data-invalid={invalid || undefined}
           >
             {cardMode ? (
               <span>
@@ -502,16 +499,16 @@ export function SelectionControlPreview({
             ) : (
               "Preview choice"
             )}
-          </button>
+          </span>
           {!cardMode && (
-            <button
-              type="button"
-              className={cn("hito-choice-toggle", `hito-choice-toggle-${size}`)}
-              aria-checked="false"
-              role="radio"
+            <span
+              className={cn(
+                "hito-choice-toggle pointer-events-none cursor-default",
+                `hito-choice-toggle-${size}`,
+              )}
             >
               Other choice
-            </button>
+            </span>
           )}
         </div>
         <p className="hito-caption">

@@ -294,9 +294,17 @@
   .hito-product-dialog {
     display: grid;
     min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto;
     gap: 0;
     overflow: hidden;
+  }
+
+  .hito-product-dialog-header,
+  .hito-product-dialog-body,
+  .hito-product-dialog-body-scroll-fill,
+  .hito-product-dialog-footer {
+    min-width: 0;
   }
 
   .hito-product-dialog-content-fit {

@@ -511,19 +511,10 @@ export async function validateManualPersistedTodayAndFutureWorkoutEditContract()
         label: "Tempo work",
         prescription: { mode: "time", duration_min: 20 },
         target: {
+          primary_execution_mode: "pace",
           target_source: "ai_authored_plan_guidance",
           pace: "4:50-5:00/km",
-          intensity: "Controlled tempo effort",
-          hr_target_source: "personal_hr_zone",
-          hr_bpm_range: "136-150 bpm",
-          hr_bpm_min: 136,
-          hr_bpm_max: 150,
           source_note: "AI-authored guidance.",
-          extra: {
-            hr_zone: "Z3",
-            hr_zone_reference: "Z3",
-            hr_profile_source: "personal",
-          },
         },
       },
       {
@@ -559,19 +550,80 @@ export async function validateManualPersistedTodayAndFutureWorkoutEditContract()
       ? generatedReconstruct.draftInput.entries[1].block.target
       : undefined;
   assert.deepEqual(generatedTarget, {
+    primaryExecutionMode: "pace",
     targetSource: "ai_authored_plan_guidance",
-    intensity: "Controlled tempo effort",
     sourceNote: "AI-authored guidance.",
     pace: "4:50-5:00/km",
     paceTargetSource: "ai_authored_plan_guidance",
-    hrZone: "Z3",
-    hrTargetSource: "personal_hr_zone",
-    hrBpmRange: "136-150 bpm",
   });
+  const generatedTempoEntry = generatedReconstruct.draftInput.entries?.[1];
+  assert.equal(generatedTempoEntry?.kind, "block");
+  if (!generatedTempoEntry || generatedTempoEntry.kind !== "block") {
+    throw new Error("AI tempo reconstruction must retain its ordinary work block.");
+  }
   const generatedEditedDraftInput: ManualWorkoutDraftInput = {
     ...generatedReconstruct.draftInput,
     title: "Runner-edited AI tempo",
-    notes: "Runner changed notes only; authored structure stays exact.",
+    notes: "Runner used the full constructor; unchanged AI target truth stays exact.",
+    entries: [
+      {
+        kind: "block",
+        block: {
+          blockKey: "easy_run_block",
+          distanceMeters: 1_200,
+          label: "Added distance opener",
+        },
+      },
+      {
+        ...generatedTempoEntry,
+        block: {
+          ...generatedTempoEntry.block,
+          durationSeconds: 18 * 60,
+        },
+      },
+      {
+        kind: "repeat_group",
+        group: {
+          repeatCount: 3,
+          safetyKind: "intervals",
+          groupLabel: "Runner-added mixed execution set",
+          workBlock: {
+            blockKey: "interval_work_block",
+            durationSeconds: 2 * 60,
+            label: "Pace work",
+            target: { paceMinPerKmRange: "4:55-5:05/km" },
+          },
+          children: [
+            {
+              blockKey: "interval_work_block",
+              durationSeconds: 2 * 60,
+              label: "Pace work",
+              target: { paceMinPerKmRange: "4:55-5:05/km" },
+            },
+            {
+              blockKey: "steady_run_block",
+              durationSeconds: 2 * 60,
+              label: "HR support",
+              target: { hrBpmRange: "145-155 bpm" },
+            },
+            {
+              blockKey: "interval_recovery_block",
+              durationSeconds: 90,
+              label: "Effort recovery",
+              target: { rpe: 3 },
+            },
+          ],
+        },
+      },
+      {
+        kind: "block",
+        block: { blockKey: "easy_run_block", durationSeconds: 5 * 60, label: "Duplicated easy" },
+      },
+      {
+        kind: "block",
+        block: { blockKey: "easy_run_block", durationSeconds: 5 * 60, label: "Duplicated easy" },
+      },
+    ],
   };
   const publicAiProvenanceReview = reviewManualWorkoutDraft(generatedEditedDraftInput);
   assert.equal(publicAiProvenanceReview.ok, false);
@@ -598,21 +650,36 @@ export async function validateManualPersistedTodayAndFutureWorkoutEditContract()
     assert.equal(generatedReview.review.trustedClientRows, false);
     assert.equal(generatedReview.safety.activePlanSourceVerified, true);
     assert.equal(generatedReview.safety.trustedClientRows, false);
+    assert.equal(generatedReview.draftReview.draft.workoutIdentity, "controlled_tempo_session");
+    assert.equal(generatedReview.draftReview.draft.steps.length, 5);
+    assert.equal(generatedReview.draftReview.draft.steps[0]?.distance_km, 1.2);
+    assert.equal(generatedReview.draftReview.draft.steps[1]?.duration_min, 18);
     assert.deepEqual(generatedReview.draftReview.draft.steps[1]?.target, {
+      primary_execution_mode: "pace",
       target_source: "ai_authored_plan_guidance",
-      intensity: "Controlled tempo effort",
       source_note: "AI-authored guidance.",
       pace: "4:50-5:00/km",
-      hr_target_source: "personal_hr_zone",
-      hr_bpm_range: "136-150 bpm",
-      hr_bpm_min: 136,
-      hr_bpm_max: 150,
-      extra: {
-        hr_zone: "Z3",
-        hr_zone_reference: "Z3",
-        hr_profile_source: "personal",
-      },
     });
+    const editedRepeat = generatedReview.draftReview.draft.steps[2];
+    assert.equal(editedRepeat?.prescription?.mode, "repeats");
+    assert.equal(editedRepeat?.prescription?.repeat_count, 3);
+    assert.equal(editedRepeat?.target, undefined);
+    assert.deepEqual(
+      editedRepeat?.prescription?.children?.map((child) => ({
+        role: child.role,
+        mode: child.target?.primary_execution_mode,
+        source: child.target?.target_source,
+      })),
+      [
+        { role: "work", mode: "pace", source: "user_entered" },
+        { role: "run", mode: "heart_rate", source: "user_entered" },
+        { role: "recover", mode: "effort", source: "user_entered" },
+      ],
+    );
+    assert.deepEqual(
+      generatedReview.draftReview.draft.steps.slice(3).map((step) => step.label),
+      ["Duplicated easy", "Duplicated easy"],
+    );
   }
 
   const tamperedGeneratedTargetInput = structuredClone(generatedEditedDraftInput);
@@ -714,19 +781,10 @@ export async function validateManualPersistedTodayAndFutureWorkoutEditContract()
       editedTemplateKey: "controlled_tempo_session",
       editedTitle: "Runner-edited AI tempo",
       target: {
+        primary_execution_mode: "pace",
         target_source: "ai_authored_plan_guidance",
-        intensity: "Controlled tempo effort",
         source_note: "AI-authored guidance.",
         pace: "4:50-5:00/km",
-        hr_target_source: "personal_hr_zone",
-        hr_bpm_range: "136-150 bpm",
-        hr_bpm_min: 136,
-        hr_bpm_max: 150,
-        extra: {
-          hr_zone: "Z3",
-          hr_zone_reference: "Z3",
-          hr_profile_source: "personal",
-        },
       },
     },
   ]);

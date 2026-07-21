@@ -2,6 +2,7 @@ import type {
   ManualWorkoutBlockInput,
   ManualWorkoutDraftIssue,
   ManualWorkoutDraftProcessingOptions,
+  ManualWorkoutPrimaryExecutionMode,
   ManualWorkoutTargetSource,
   ManualWorkoutTargetTruthMode,
 } from "@/lib/manual-workout-authoring/schema";
@@ -37,6 +38,7 @@ export type ResolvedManualWorkoutTarget =
     }
   | {
       kind: "effort_rpe";
+      primaryExecutionMode: "effort" | "run_walk";
       source: ResolvedManualWorkoutTargetSource;
       intensity?: string;
       label?: string;
@@ -45,12 +47,13 @@ export type ResolvedManualWorkoutTarget =
       hrZone?: string;
       hrBpmRange?: string;
       hrBpmRangeValues?: { min: number; max: number };
-      hrTargetSource?: "personal_hr_zone" | "default_estimated_hr";
+      hrTargetSource?: "personal_hr_zone" | "default_estimated_hr" | "effort_only";
       rpe?: number;
       sourceNote?: string;
     }
   | {
       kind: "pace";
+      primaryExecutionMode: "pace";
       source: ResolvedManualWorkoutTargetSource;
       intensity?: string;
       label?: string;
@@ -59,7 +62,7 @@ export type ResolvedManualWorkoutTarget =
       hrZone?: string;
       hrBpmRange?: string;
       hrBpmRangeValues?: { min: number; max: number };
-      hrTargetSource?: "personal_hr_zone" | "default_estimated_hr";
+      hrTargetSource?: "personal_hr_zone" | "default_estimated_hr" | "effort_only";
       sourceNote?: string;
       pace?: string;
       paceSecondsPerKm?: number;
@@ -71,7 +74,8 @@ export type ResolvedManualWorkoutTarget =
     }
   | {
       kind: "heart_rate";
-      source: typeof USER_ENTERED_TARGET_SOURCE;
+      primaryExecutionMode: "heart_rate";
+      source: ResolvedManualWorkoutTargetSource;
       label?: string;
       cue?: string;
       hint?: string;
@@ -82,6 +86,10 @@ export type ResolvedManualWorkoutTarget =
         min: number;
         max: number;
       };
+      hrTargetSource?: "personal_hr_zone" | "default_estimated_hr" | "effort_only";
+      hrZone?: string;
+      hrZoneReference?: string;
+      hrProfileSource?: "personal" | "estimated";
     };
 
 type ResolvedManualWorkoutTargetResult =
@@ -124,6 +132,7 @@ export function resolveManualWorkoutTargetInput(
   const preservesAiAuthoredTarget =
     targetSource === AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE &&
     options.allowPreservedAiAuthoredTargets === true;
+  const primaryExecutionMode = target.primaryExecutionMode;
 
   validateSource(target.targetSource, ["targetSource"], issues, options);
 
@@ -145,12 +154,13 @@ export function resolveManualWorkoutTargetInput(
   }
 
   if (hasHr || target.hrTargetSource) {
-    const preservesEffectiveAiHr =
+    const preservesAiHrMetadata =
       preservesAiAuthoredTarget &&
       (target.hrTargetSource === "personal_hr_zone" ||
-        target.hrTargetSource === "default_estimated_hr");
+        target.hrTargetSource === "default_estimated_hr" ||
+        target.hrTargetSource === "effort_only");
 
-    if (!preservesEffectiveAiHr) {
+    if (!preservesAiHrMetadata) {
       validateSource(
         target.hrTargetSource ?? target.targetSource,
         ["hrTargetSource"],
@@ -159,7 +169,7 @@ export function resolveManualWorkoutTargetInput(
       );
     }
 
-    if (hrTargetSource !== USER_ENTERED_TARGET_SOURCE && !preservesEffectiveAiHr) {
+    if (hasHr && hrTargetSource !== USER_ENTERED_TARGET_SOURCE && !preservesAiHrMetadata) {
       issues.push({
         code: "unsafe_metric_truth",
         message: "Executable manual heart-rate targets must be runner-entered.",
@@ -198,6 +208,11 @@ export function resolveManualWorkoutTargetInput(
   }
 
   if (preservesAiAuthoredTarget) {
+    validatePreservedAiPrimaryExecutionMode(
+      primaryExecutionMode,
+      { hasPace, hasHr, hasEffort },
+      issues,
+    );
     const hrRange =
       hasHrRange && target.hrBpmRange
         ? parseHrBpmRange(target.hrBpmRange, ["hrBpmRange"], issues)
@@ -209,10 +224,13 @@ export function resolveManualWorkoutTargetInput(
       ...sharedTargetFields(target),
       ...(target.intensity ? { intensity: target.intensity } : {}),
       ...(target.hrZone ? { hrZone: target.hrZone } : {}),
+      ...(target.hrZoneReference ? { hrZoneReference: target.hrZoneReference } : {}),
+      ...(target.hrProfileSource ? { hrProfileSource: target.hrProfileSource } : {}),
       ...(target.hrBpmRange ? { hrBpmRange: target.hrBpmRange } : {}),
       ...(hrRange ? { hrBpmRangeValues: hrRange } : {}),
       ...(target.hrTargetSource === "personal_hr_zone" ||
-      target.hrTargetSource === "default_estimated_hr"
+      target.hrTargetSource === "default_estimated_hr" ||
+      target.hrTargetSource === "effort_only"
         ? { hrTargetSource: target.hrTargetSource }
         : {}),
     };
@@ -222,6 +240,7 @@ export function resolveManualWorkoutTargetInput(
         ok: true,
         target: {
           kind: "pace",
+          primaryExecutionMode: "pace",
           source: AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
           ...shared,
           pace: target.pace,
@@ -234,9 +253,22 @@ export function resolveManualWorkoutTargetInput(
         ok: true,
         target: {
           kind: "pace",
+          primaryExecutionMode: "pace",
           source: AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
           ...shared,
           paceMinPerKmRange: target.paceMinPerKmRange,
+        },
+      };
+    }
+
+    if (primaryExecutionMode === "heart_rate") {
+      return {
+        ok: true,
+        target: {
+          kind: "heart_rate",
+          primaryExecutionMode,
+          source: AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
+          ...shared,
         },
       };
     }
@@ -245,6 +277,7 @@ export function resolveManualWorkoutTargetInput(
       ok: true,
       target: {
         kind: "effort_rpe",
+        primaryExecutionMode: primaryExecutionMode === "run_walk" ? "run_walk" : "effort",
         source: AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
         ...shared,
         ...(rpe !== undefined ? { rpe } : {}),
@@ -260,6 +293,7 @@ export function resolveManualWorkoutTargetInput(
       ok: true,
       target: {
         kind: "pace",
+        primaryExecutionMode: "pace",
         source: USER_ENTERED_TARGET_SOURCE,
         ...sharedTargetFields(target),
         pace: formatPaceSecondsPerKm(paceSeconds),
@@ -280,6 +314,7 @@ export function resolveManualWorkoutTargetInput(
       ok: true,
       target: {
         kind: "pace",
+        primaryExecutionMode: "pace",
         source: USER_ENTERED_TARGET_SOURCE,
         ...sharedTargetFields(target),
         paceMinPerKmRange: `${formatPaceSecondsPerKm(paceRange.min)}-${formatPaceSecondsPerKm(
@@ -298,6 +333,7 @@ export function resolveManualWorkoutTargetInput(
       ok: true,
       target: {
         kind: "heart_rate",
+        primaryExecutionMode: "heart_rate",
         source: USER_ENTERED_TARGET_SOURCE,
         ...sharedTargetFields(target),
         hrBpmCap,
@@ -313,6 +349,7 @@ export function resolveManualWorkoutTargetInput(
       ok: true,
       target: {
         kind: "heart_rate",
+        primaryExecutionMode: "heart_rate",
         source: USER_ENTERED_TARGET_SOURCE,
         ...sharedTargetFields(target),
         hrBpmRange: `${hrRange.min}-${hrRange.max} bpm`,
@@ -326,6 +363,7 @@ export function resolveManualWorkoutTargetInput(
       ok: true,
       target: {
         kind: "effort_rpe",
+        primaryExecutionMode: "effort",
         source: USER_ENTERED_TARGET_SOURCE,
         ...sharedTargetFields(target),
         ...(target.intensity ? { intensity: target.intensity } : {}),
@@ -371,6 +409,7 @@ export function manualWorkoutTargetToStepTarget(
   const hint =
     resolved.hint ?? (resolved.source === USER_ENTERED_TARGET_SOURCE ? fallbackHint : undefined);
   const base: StepTarget = {
+    primary_execution_mode: resolved.primaryExecutionMode,
     target_source: resolved.source,
     ...(hint ? { hint } : {}),
     ...(resolved.label ? { label: resolved.label } : {}),
@@ -380,13 +419,17 @@ export function manualWorkoutTargetToStepTarget(
       ? {
           extra: {
             hr_zone: resolved.hrZone,
-            hr_zone_reference: resolved.hrZone,
+            hr_zone_reference:
+              "hrZoneReference" in resolved && resolved.hrZoneReference
+                ? resolved.hrZoneReference
+                : resolved.hrZone,
+            ...("hrProfileSource" in resolved && resolved.hrProfileSource
+              ? { hr_profile_source: resolved.hrProfileSource }
+              : {}),
             ...("hrTargetSource" in resolved && resolved.hrTargetSource
               ? {
                   hr_profile_source:
-                    resolved.hrTargetSource === "personal_hr_zone"
-                      ? "personal"
-                      : "default_estimated",
+                    resolved.hrTargetSource === "personal_hr_zone" ? "personal" : "estimated",
                 }
               : {}),
           },
@@ -425,7 +468,10 @@ export function manualWorkoutTargetToStepTarget(
   if (resolved.kind === "heart_rate") {
     return {
       ...base,
-      hr_target_source: USER_ENTERED_TARGET_SOURCE,
+      hr_target_source:
+        resolved.source === AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE
+          ? resolved.hrTargetSource
+          : USER_ENTERED_TARGET_SOURCE,
       ...(resolved.hrBpmCap
         ? { hr_bpm: `${resolved.hrBpmCap} bpm`, hr_bpm_cap: resolved.hrBpmCap }
         : {}),
@@ -452,6 +498,44 @@ export function hasManualWorkoutPaceTarget(resolved: ResolvedManualWorkoutTarget
 
 export function hasManualWorkoutHrTarget(resolved: ResolvedManualWorkoutTarget) {
   return resolved.kind === "heart_rate";
+}
+
+function validatePreservedAiPrimaryExecutionMode(
+  mode: ManualWorkoutPrimaryExecutionMode | undefined,
+  targetFamilies: { hasPace: boolean; hasHr: boolean; hasEffort: boolean },
+  issues: ManualTargetIssue[],
+) {
+  if (!mode) {
+    issues.push({
+      code: "unsafe_metric_truth",
+      message: "AI-authored target guidance must retain its primary execution mode.",
+      path: ["primaryExecutionMode"],
+    });
+    return;
+  }
+
+  const valid =
+    (mode === "pace" &&
+      targetFamilies.hasPace &&
+      !targetFamilies.hasHr &&
+      !targetFamilies.hasEffort) ||
+    (mode === "heart_rate" &&
+      targetFamilies.hasHr &&
+      !targetFamilies.hasPace &&
+      !targetFamilies.hasEffort) ||
+    ((mode === "effort" || mode === "run_walk") &&
+      targetFamilies.hasEffort &&
+      !targetFamilies.hasPace &&
+      !targetFamilies.hasHr);
+
+  if (!valid) {
+    issues.push({
+      code: "unsafe_metric_truth",
+      message:
+        "AI-authored target guidance must retain exactly one target family matching its primary execution mode.",
+      path: ["primaryExecutionMode"],
+    });
+  }
 }
 
 function validateSource(

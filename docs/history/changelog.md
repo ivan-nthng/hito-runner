@@ -17,6 +17,13 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 - `Admin & Ops` for admin login, analytics, test-account management, and internal operational surfaces.
 - `QA / Reliability` for fixture matrices, high-risk proof passes, browser-policy hardening, and regression coverage.
 
+## 2026-07-21
+
+- Run Creation Engine: unified first-time and returning runner baseline plus heart-rate setup.
+  Runners can accept clearly estimated BPM ranges or save edited personal ranges before plan
+  creation; the AI may use accepted BPM or effort as one workout command, and later Settings changes
+  affect future plans without rewriting already confirmed workouts.
+
 ## 2026-07-13
 
 - Calendar & Workout Identity: improved saved-calendar workout actions around direct Move and

@@ -10,17 +10,8 @@ export {
 export {
   copyManualWorkoutWithinActivePlan,
   copyManualWorkoutWithinActivePlanForUser,
-  confirmManualWorkoutCopyPasteDraft,
-  confirmManualWorkoutCopyPasteDraftForUser,
-  manualWorkoutCopyPasteConfirmInputSchema,
   manualWorkoutDirectCopyInputSchema,
-  manualWorkoutCopyPasteReviewInputSchema,
-  reviewManualWorkoutCopyPasteDraft,
-  reviewManualWorkoutCopyPasteDraftForUser,
-  type ManualWorkoutCopyPasteConfirmResult,
-  type ManualWorkoutCopyPasteDependencies,
   type ManualWorkoutCopyPasteFailureReason,
-  type ManualWorkoutCopyPasteReviewResult,
   type ManualWorkoutDirectCopyResult,
 } from "@/lib/manual-workout-authoring/copy-paste";
 export {
@@ -73,8 +64,10 @@ export {
   MANUAL_SAVED_WORKOUT_TEMPLATE_SOURCE_KIND,
   MANUAL_SAVED_WORKOUT_TEMPLATE_SOURCE_STATUS,
   MANUAL_WORKOUT_TEMPLATE_REGISTRY_VERSION,
-  listManualWorkoutSavedTemplates,
+  deleteManualWorkoutSavedTemplate,
+  deleteManualWorkoutSavedTemplateForUser,
   listManualWorkoutSavedTemplatesForUser,
+  manualWorkoutSavedTemplateDeleteInputSchema,
   manualWorkoutSavedTemplateReviewInputSchema,
   manualWorkoutSavedTemplateSaveInputSchema,
   reviewManualWorkoutSavedTemplate,
@@ -82,6 +75,7 @@ export {
   saveManualWorkoutSavedTemplate,
   saveManualWorkoutSavedTemplateForUser,
   type ManualWorkoutSavedTemplateDependencies,
+  type ManualWorkoutSavedTemplateDeleteResult,
   type ManualWorkoutSavedTemplateFailureReason,
   type ManualWorkoutSavedTemplateListResult,
   type ManualWorkoutSavedTemplateReviewInput,
@@ -92,6 +86,20 @@ export {
   type ManualWorkoutSavedTemplateView,
 } from "@/lib/manual-workout-authoring/saved-templates";
 export { buildManualWorkoutUserBuiltTrainingPlan } from "@/lib/manual-workout-authoring/persistence";
+export {
+  MANUAL_WORKOUT_TEMPLATE_CATALOG_SOURCE_KIND,
+  hideManualWorkoutBuiltInTemplate,
+  listManualWorkoutTemplateCatalog,
+  listManualWorkoutTemplateCatalogForUser,
+  restoreAllManualWorkoutBuiltInTemplates,
+  restoreAllManualWorkoutBuiltInTemplatesForUser,
+  restoreManualWorkoutBuiltInTemplate,
+  updateManualWorkoutBuiltInVisibilityForUser,
+  type ManualWorkoutTemplateCatalogDependencies,
+  type ManualWorkoutTemplateCatalogResult,
+  type ManualWorkoutTemplateVisibilityRepository,
+  type ManualWorkoutTemplateVisibilityResult,
+} from "@/lib/manual-workout-authoring/template-catalog";
 export {
   getManualWorkoutTemplate,
   listSupportedManualWorkoutTemplates,

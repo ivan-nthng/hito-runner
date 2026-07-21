@@ -107,14 +107,38 @@ Verify Hito behavior with real browser evidence and honest coverage.
 3. Write the browser path preflight before opening or navigating any external browser.
 4. Check whether the canonical persistent local QA server is already healthy before starting or
    restarting any local app server.
-5. Identify the smallest end-to-end scope that proves the change.
+5. Identify the smallest end-to-end scope that proves the change and write the required test
+   inventory before executing it.
 6. Run the CLI/build/script checks named by the handoff when they are relevant and feasible.
 7. Test admin/auth blocking separately from happy path when relevant.
 8. Verify data outcomes for any mutation.
 9. Source-verify any branch that cannot be safely exercised.
 10. Capture screenshots for UI-facing evidence when possible and store them under the task's `qa-artifacts/screenshots/YYYY-MM-DD/<task-slug>/` folder.
-11. Report exact failures with repro steps.
-12. End with a verdict.
+11. Report every executed check with scenario/command, environment or viewport where relevant,
+    result, and evidence location. Separately list required checks not run, why, and the resulting
+    coverage gap.
+12. Report exact failures with repro steps.
+13. End with a verdict.
+
+## Definition Of Done, Test Inventory, And Acceptance Gate
+
+Every QA assignment must declare its validation layer: either narrow task-level Definition-of-Done
+verification or broader Global QA Acceptance. QA must provide a complete executed-test inventory, not
+only grouped prose such as "browser QA passed". A required test that fails, is blocked, is
+unavailable, or is flaky yields `Verdict: Failed`; it cannot be hidden as a coverage note. A
+source-only assertion may cover an unexercisable branch only when the report says so explicitly and
+it does not replace a required runtime, persistence, or browser check.
+
+Apply this skill only to an assigned validation task, not a pure explanatory or reference response.
+For debugging validation, include a safe repro or discriminator that confirms or falsifies the
+claimed root cause. Present the inventory as `Check | Scenario / environment | Result | Evidence`,
+then list every required test not run and its coverage consequence.
+
+A passing narrow QA run may state `Implementation DoD Verification: Passed` while `Global QA
+Acceptance: Pending`; it must not claim broad release acceptance. A global QA assignment owns the
+broader acceptance inventory and may state `Global QA Acceptance: Passed` only when that inventory
+passes. The implementation owner must integrate task-level QA evidence after any fix-forward before
+closing its task.
 
 ## Bolder QA Matrix Rule
 
@@ -138,13 +162,14 @@ Verify Hito behavior with real browser evidence and honest coverage.
 
 1. Task
 2. Stage
-3. Browser Path Preflight
-4. Scope tested
-5. Results
-6. Issues found
-7. Coverage gaps
-8. Screenshot evidence
-9. Verdict
+3. Validation layer: `Definition of Done verification` or `Global QA Acceptance`
+4. Browser Path Preflight
+5. Required test inventory: `Check | Scenario / environment | Expected evidence`
+6. Executed test inventory and results: `Check | Scenario / environment | Result | Evidence`
+7. Issues found
+8. Required checks not run / coverage gaps
+9. Screenshot evidence
+10. Verdict
 
 Verdict must be exactly:
 

@@ -1,6 +1,7 @@
-import { type ReactNode, useId, useState } from "react";
+import { type ReactNode, useState } from "react";
 
 import { HitoMetadataTag } from "@/components/ui/metadata-tag";
+import { useHitoTabs } from "@/components/ui/hito-tabs";
 
 type PlaygroundStatusTone = "signal" | "neutral" | "warning" | "destructive" | "rollout";
 type HitoDsWorkbenchTab = "demo" | "variants";
@@ -37,9 +38,12 @@ export function HitoDsPlayground({
   title: string;
   variants?: ReactNode;
 }) {
-  const tabId = useId();
   const hasWorkbenchTabs = demo !== undefined && variants !== undefined;
   const [activeTab, setActiveTab] = useState<HitoDsWorkbenchTab>(defaultTab);
+  const workbenchTabs = useHitoTabs({
+    items: [{ value: "demo" }, { value: "variants" }],
+    value: activeTab,
+  });
   const stageContent = hasWorkbenchTabs ? (activeTab === "demo" ? demo : variants) : preview;
   const workbenchMode = hasWorkbenchTabs ? activeTab : "demo";
 
@@ -59,7 +63,7 @@ export function HitoDsPlayground({
           <div className="hito-ds-playground-tabs">
             <div
               className="hito-tabs hito-tabs-simple"
-              role="tablist"
+              {...workbenchTabs.tabListProps}
               aria-label={`${title} specimen modes`}
             >
               {(["demo", "variants"] as const).map((tab) => {
@@ -69,11 +73,8 @@ export function HitoDsPlayground({
                 return (
                   <button
                     key={tab}
-                    id={`${tabId}-${tab}-tab`}
                     type="button"
-                    role="tab"
-                    aria-selected={selected}
-                    aria-controls={`${tabId}-${tab}-panel`}
+                    {...workbenchTabs.getTabProps(tab)}
                     className="hito-tab"
                     data-active={selected ? "true" : undefined}
                     onClick={() => setActiveTab(tab)}
@@ -88,9 +89,7 @@ export function HitoDsPlayground({
         <div className="hito-ds-playground-shell" data-mode={workbenchMode}>
           <article className="hito-ds-playground-stage" data-mode={workbenchMode}>
             <div
-              id={hasWorkbenchTabs ? `${tabId}-${activeTab}-panel` : undefined}
-              role={hasWorkbenchTabs ? "tabpanel" : undefined}
-              aria-labelledby={hasWorkbenchTabs ? `${tabId}-${activeTab}-tab` : undefined}
+              {...(hasWorkbenchTabs ? workbenchTabs.getPanelProps(activeTab) : {})}
               className="hito-ds-playground-panel"
               data-mode={workbenchMode}
             >

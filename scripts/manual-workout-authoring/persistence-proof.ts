@@ -8,10 +8,16 @@ import {
   confirmManualWorkoutMoveForUser,
   confirmManualWorkoutPersistedEditForUser,
   createEmptyManualActivePlanForUser,
+  deleteManualWorkoutSavedTemplateForUser,
+  listManualWorkoutTemplateCatalogForUser,
   reconstructManualWorkoutPersistedEditDraftForUser,
+  restoreAllManualWorkoutBuiltInTemplatesForUser,
   reviewManualWorkoutDeleteClearForUser,
   reviewManualWorkoutMoveForUser,
   reviewManualWorkoutPersistedEditDraftForUser,
+  reviewManualWorkoutSavedTemplateForUser,
+  saveManualWorkoutSavedTemplateForUser,
+  updateManualWorkoutBuiltInVisibilityForUser,
   type ManualEmptyPlanSetupInput,
   type ManualWorkoutDraftInput,
   type ManualWorkoutDraftReviewResult,
@@ -32,6 +38,7 @@ import {
   buildAiGeneratedRunningPlanDevFixturePreviewOptions,
 } from "../../src/lib/ai-generated-running-plan-dev-fixture";
 import { buildAiGeneratedRunningPlanAuthoringInput } from "../../src/lib/ai-generated-running-plan";
+import { buildHeartRateZonesSummary } from "../../src/lib/heart-rate-zones";
 import { buildSourceWorkoutFingerprint } from "../../src/lib/manual-workout-authoring/edit-workout-review-token";
 import {
   TRAINING_PLAN_V2_IMPORT_SOURCE_KIND,
@@ -42,6 +49,10 @@ import { createAdminSupabaseClient } from "../../src/lib/supabase/server";
 import { addDaysIso, todayIso, weekdayLong } from "../../src/lib/training";
 import { buildReviewedAiGeneratedRunningPlanPreview } from "../../src/lib/running-plan-engine-actions";
 import { buildRunningPlanCanonicalPlan } from "../../src/lib/running-plan-engine-review";
+import {
+  getRunnerPlanAuthoringProfileSnapshotForUserId,
+  saveRunnerBaselineForUserId,
+} from "../../src/lib/user-settings-actions";
 import {
   AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
   readWorkoutDocumentSections,
@@ -221,6 +232,7 @@ export async function validateManualWorkoutDisposablePersistenceProof({
     originalPlanSourceKind: string;
     mutationFailureAtomic: true;
     moveAndClearPersisted: true;
+    templateLifecyclePersisted: true;
   } | null = null;
   let cleanup: ManualDisposableCleanupProof | null = null;
 
@@ -256,6 +268,11 @@ export async function validateManualWorkoutDisposablePersistenceProof({
     assert.equal(persisted.profile.user_id, disposableUser.userId);
     validateManualPlanMetadata(persisted.plan, review.reviewChecksum);
     validateNoFakePaceOrPersonalHr(persisted.workouts);
+    await validateManualTemplatePersistence({
+      userId: disposableUser.userId,
+      input,
+      review,
+    });
     const manualEdit = await reviewConfirmAndReadPersistedWorkoutEdit({
       supabase,
       userId: disposableUser.userId,
@@ -312,6 +329,7 @@ export async function validateManualWorkoutDisposablePersistenceProof({
       originalPlanSourceKind: manualEdit.confirm.sourceMetadata.originalPlanSourceKind,
       mutationFailureAtomic,
       moveAndClearPersisted,
+      templateLifecyclePersisted: true,
     };
   } finally {
     cleanup = await cleanupDisposableManualWorkoutUser(supabase, disposableUser.userId);
@@ -347,6 +365,61 @@ export async function validateManualWorkoutDisposablePersistenceProof({
     replacementCarryForward,
     clearBeforeImport,
   };
+}
+
+async function validateManualTemplatePersistence(input: {
+  userId: string;
+  input: ManualWorkoutDraftInput;
+  review: ManualWorkoutReadyReview;
+}) {
+  const saved = await saveManualWorkoutSavedTemplateForUser(input.userId, {
+    displayName: "Disposable reviewed easy",
+    iconKey: "easy",
+    draftInput: input.input,
+    reviewToken: input.review.reviewToken,
+    reviewChecksum: input.review.reviewChecksum,
+  });
+  assert.equal(saved.ok, true, JSON.stringify(saved));
+  if (!saved.ok) throw new Error(saved.message);
+
+  const catalog = await listManualWorkoutTemplateCatalogForUser(input.userId);
+  assert.equal(catalog.ok, true, JSON.stringify(catalog));
+  if (!catalog.ok) throw new Error(catalog.message);
+  assert.equal(
+    catalog.personalTemplates.some((template) => template.id === saved.template.id),
+    true,
+  );
+
+  const reused = await reviewManualWorkoutSavedTemplateForUser(input.userId, {
+    templateId: saved.template.id,
+    workoutDate: addDaysIso(input.review.draft.workoutDate, 7),
+  });
+  assert.equal(reused.ok, true, JSON.stringify(reused));
+  if (!reused.ok) throw new Error(reused.message);
+  assert.deepEqual(reused.review.draft.steps, input.review.draft.steps);
+
+  const hidden = await updateManualWorkoutBuiltInVisibilityForUser(
+    input.userId,
+    { templateKey: "easy_aerobic_run" },
+    "hide",
+  );
+  assert.equal(hidden.ok, true, JSON.stringify(hidden));
+  const hiddenCatalog = await listManualWorkoutTemplateCatalogForUser(input.userId);
+  assert.equal(hiddenCatalog.ok, true, JSON.stringify(hiddenCatalog));
+  if (!hiddenCatalog.ok) throw new Error(hiddenCatalog.message);
+  assert.equal(
+    hiddenCatalog.visibleBuiltInTemplates.some(
+      (template) => template.templateKey === "easy_aerobic_run",
+    ),
+    false,
+  );
+
+  const restored = await restoreAllManualWorkoutBuiltInTemplatesForUser(input.userId);
+  assert.equal(restored.ok, true, JSON.stringify(restored));
+  const deleted = await deleteManualWorkoutSavedTemplateForUser(input.userId, {
+    templateId: saved.template.id,
+  });
+  assert.equal(deleted.ok, true, JSON.stringify(deleted));
 }
 
 async function validateMoveAndClearPersistence(input: {
@@ -1275,7 +1348,6 @@ async function validateClearBeforeImportAtomicPersistence(input: {
       null,
       null,
       null,
-      null,
       { clearBeforeImport: true },
     );
     assert.equal(applied.ok, true);
@@ -1396,12 +1468,29 @@ async function validateCanonicalOriginWorkoutEditPersistence(input: {
         fixedRestDays: ["Tuesday", "Saturday"] as const,
         preferredLongRunDay: "Sunday" as const,
         startDate: addDaysIso(todayIso(), 1),
-        benchmark: { kind: "unknown" as const },
+        benchmark: { kind: "recent_5k_pace" as const, recent5kPace: "5:30/km" },
         planGoalIntent: {
           distance: { kind: "preset" as const, preset: "10K" as const },
         },
       };
-      const authoring = buildAiGeneratedRunningPlanAuthoringInput(previewInput);
+      await saveRunnerBaselineForUserId(disposableUser.userId, {
+        age: previewInput.age,
+        heightCm: previewInput.heightCm,
+        weightKg: previewInput.weightKg,
+        fitnessLevel: "beginner",
+        heartRateProfile: {
+          zones: buildHeartRateZonesSummary(previewInput.age).zones.map(
+            ({ reference, minBpm, maxBpm }) => ({ reference, minBpm, maxBpm }),
+          ),
+        },
+      });
+      const runnerProfileSnapshot = await getRunnerPlanAuthoringProfileSnapshotForUserId(
+        disposableUser.userId,
+      );
+      const authoring = buildAiGeneratedRunningPlanAuthoringInput(
+        previewInput,
+        runnerProfileSnapshot,
+      );
       assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);
       if (!authoring.ok) throw new Error(authoring.message);
       const fixtureOptions = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
@@ -1424,6 +1513,7 @@ async function validateCanonicalOriginWorkoutEditPersistence(input: {
       let reviewed: Awaited<ReturnType<typeof buildReviewedAiGeneratedRunningPlanPreview>>;
       try {
         reviewed = await buildReviewedAiGeneratedRunningPlanPreview(previewInput, {
+          runnerProfileSnapshot,
           aiPreview: {
             ...fixtureOptions,
             generationLedger: { disabled: true },

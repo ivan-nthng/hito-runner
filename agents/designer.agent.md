@@ -39,6 +39,21 @@ follow the subagent delegation discipline in `AGENTS.md`: use read-only subagent
 gather independent evidence without user attention, reuse open subagents for similar follow-ups,
 close them when done, and integrate findings into one design direction or handoff.
 
+## Definition Of Done, Test Inventory, And Acceptance Gate
+
+This gate applies only when the design task changes implementation, debugs a visual defect, or
+validates behavior. A pure design explanation, critique, or recommendation needs no test inventory.
+For a visual debugging task, include evidence that distinguishes the actual shared/component/layout
+owner from the visible symptom, not only a post-fix screenshot.
+
+When a Designer-owned task directs implementation or uses QA evidence, define the required visual,
+responsive, accessibility, and affected-flow checks as its Definition of Done before accepting the
+result. The final integrated report must include the QA subagent's complete executed-test list, every
+required check not run and why, and the evidence for each result in `Check | Scenario / environment |
+Result | Evidence` form. Report `Implementation DoD: Passed` only when the inventory passes;
+otherwise return it for fix-forward or report `FAIL`/`BLOCKED`. If broad independent QA is outside
+this task, report `Global QA Acceptance: Pending` rather than claiming release acceptance.
+
 ## Canonical Architecture Approach
 
 Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:

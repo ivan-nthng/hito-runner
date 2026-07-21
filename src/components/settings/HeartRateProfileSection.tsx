@@ -15,11 +15,15 @@ type HeartRateProfileDraftZone = {
 };
 
 export function HeartRateProfileSection({
+  appearance = "settings",
   isSaving,
+  onClearError,
   onSave,
   summary,
 }: {
+  appearance?: "settings" | "embedded";
   isSaving: boolean;
+  onClearError?: () => void;
   onSave: (profile: PersonalHeartRateProfileInput) => Promise<boolean>;
   summary: HeartRateZonesSummary;
 }) {
@@ -27,6 +31,7 @@ export function HeartRateProfileSection({
   const [draft, setDraft] = useState(() => buildDraft(summary));
   const [validationError, setValidationError] = useState<string | null>(null);
   const isPersonal = summary.source === "personal";
+  const isEstimated = summary.source === "estimated";
   const canEdit = summary.zones.length > 0;
 
   useEffect(() => {
@@ -39,6 +44,7 @@ export function HeartRateProfileSection({
     setDraft(buildDraft(summary));
     setValidationError(null);
     setIsEditing(false);
+    onClearError?.();
   };
 
   const saveProfile = async () => {
@@ -57,29 +63,40 @@ export function HeartRateProfileSection({
       return;
     }
 
+    if (hasOverlappingRanges(parsed.data)) {
+      setValidationError("Keep each BPM range separate so one range ends before the next begins.");
+      return;
+    }
+
     setValidationError(null);
     if (await onSave(parsed.data)) {
       setIsEditing(false);
     }
   };
 
+  const acceptCurrentRanges = async () => {
+    await onSave({
+      zones: summary.zones.map((zone) => ({
+        reference: zone.reference,
+        minBpm: zone.minBpm,
+        maxBpm: zone.maxBpm,
+      })),
+    });
+  };
+
   return (
-    <section className="hito-settings-section">
+    <section className={appearance === "settings" ? "hito-settings-section min-w-0" : "min-w-0"}>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="hito-section-title">Heart-rate guidance</h2>
+            {appearance === "settings" ? (
+              <h2 className="hito-section-title">Heart-rate guidance</h2>
+            ) : null}
             <span
               className="hito-status-pill"
-              data-tone={
-                isPersonal ? "success" : summary.source === "default_estimated" ? "signal" : "muted"
-              }
+              data-tone={isPersonal ? "success" : isEstimated ? "signal" : "muted"}
             >
-              {isPersonal
-                ? "Personal"
-                : summary.source === "default_estimated"
-                  ? "Estimated"
-                  : "Unavailable"}
+              {isPersonal ? "Personal" : isEstimated ? "Estimated" : "Unavailable"}
             </span>
           </div>
           <p className="hito-support-copy mt-3 max-w-2xl">{summary.description}</p>
@@ -87,14 +104,31 @@ export function HeartRateProfileSection({
         </div>
 
         {canEdit && !isEditing ? (
-          <button
-            type="button"
-            className="hito-button hito-button-secondary hito-button-sm"
-            onClick={() => setIsEditing(true)}
-          >
-            <Icon name="edit" size="sm" />
-            {isPersonal ? "Edit personal ranges" : "Set personal ranges"}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {!summary.accepted ? (
+              <button
+                type="button"
+                className="hito-button hito-button-primary hito-button-sm"
+                disabled={isSaving}
+                onClick={() => void acceptCurrentRanges()}
+              >
+                {isSaving ? "Saving..." : "Use estimated ranges"}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="hito-button hito-button-secondary hito-button-sm"
+              disabled={isSaving}
+              onClick={() => {
+                setValidationError(null);
+                onClearError?.();
+                setIsEditing(true);
+              }}
+            >
+              <Icon name="edit" size="sm" />
+              Edit ranges
+            </button>
+          </div>
         ) : null}
       </div>
 
@@ -110,7 +144,7 @@ export function HeartRateProfileSection({
                   <p className="hito-list-row-title">{zone.label}</p>
                   <p className="hito-list-row-copy">{zone.description}</p>
                 </div>
-                <div className="grid grid-cols-2 gap-2 sm:w-64">
+                <div className="grid min-w-0 grid-cols-1 gap-2 sm:w-64 sm:grid-cols-2">
                   <HeartRateField
                     invalid={Boolean(validationError)}
                     label={`${zone.label} minimum`}
@@ -153,7 +187,7 @@ export function HeartRateProfileSection({
               disabled={isSaving}
               onClick={() => void saveProfile()}
             >
-              {isSaving ? "Saving..." : "Save personal ranges"}
+              {isSaving ? "Saving..." : "Save ranges"}
             </button>
             <button
               type="button"
@@ -168,12 +202,17 @@ export function HeartRateProfileSection({
       ) : summary.zones.length > 0 ? (
         <div className="hito-row-group mt-4">
           {summary.zones.map((zone) => (
-            <div key={zone.reference} className="hito-list-row items-start">
+            <div
+              key={zone.reference}
+              className="hito-list-row min-w-0 items-start max-sm:flex-col max-sm:items-stretch max-sm:gap-2"
+            >
               <div className="min-w-0">
                 <p className="hito-list-row-title">{zone.label}</p>
                 <p className="hito-list-row-copy">{zone.description}</p>
               </div>
-              <span className="hito-metric-value whitespace-nowrap">{zone.rangeBpm}</span>
+              <span className="hito-metric-value whitespace-nowrap max-sm:self-start">
+                {zone.rangeBpm}
+              </span>
             </div>
           ))}
         </div>
@@ -200,9 +239,9 @@ function HeartRateField({
   value: string;
 }) {
   return (
-    <label className="grid gap-1.5">
+    <label className="grid min-w-0 gap-1.5">
       <span className="hito-form-label">{label}</span>
-      <span className="relative">
+      <span className="relative block min-w-0">
         <input
           type="number"
           inputMode="numeric"
@@ -233,4 +272,11 @@ function buildDraft(summary: HeartRateZonesSummary): HeartRateProfileDraftZone[]
     minBpm: String(zone.minBpm),
     maxBpm: String(zone.maxBpm),
   }));
+}
+
+function hasOverlappingRanges(profile: PersonalHeartRateProfileInput) {
+  return profile.zones.some((zone, index) => {
+    const previous = profile.zones[index - 1];
+    return previous ? zone.minBpm <= previous.maxBpm : false;
+  });
 }

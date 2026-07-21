@@ -2,6 +2,8 @@ import "@tanstack/react-start/server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  adminCaptureActiveStatuses,
+  adminCaptureStatuses,
   type AdminCaptureBacklogView,
   type AdminCaptureCopyPromptView,
   type AdminCaptureCreateInput,
@@ -54,9 +56,14 @@ type RepoWorkItemView = NonNullable<AdminCaptureItemView["repoWorkItem"]>;
 
 export type AdminCaptureRow = AdminCaptureItemRow;
 
+export interface AdminCaptureBacklogRead {
+  rows: AdminCaptureRow[];
+  statusCounts: Record<AdminCaptureStatus, number>;
+}
+
 export interface AdminCaptureRepository {
   createItem(input: AdminCaptureItemInsert): Promise<AdminCaptureRow>;
-  listItems(input: AdminCaptureListInput): Promise<AdminCaptureRow[]>;
+  listBacklog(input: AdminCaptureListInput): Promise<AdminCaptureBacklogRead>;
   getItem(id: string): Promise<AdminCaptureRow | null>;
   updateItem(id: string, patch: AdminCaptureItemUpdate): Promise<AdminCaptureRow | null>;
   deleteItem(id: string): Promise<boolean>;
@@ -122,15 +129,14 @@ export async function listAdminCaptureBacklogForDependencies(
   }
 
   try {
-    const rows = await dependencies.repository.listItems(input);
+    const { rows, statusCounts } = await dependencies.repository.listBacklog(input);
     const items = rows.map(mapItemView);
-    const statusCounts = buildStatusCounts(items);
 
     return {
       ok: true,
       view: {
         generatedAt: dependencies.now?.().toISOString() ?? new Date().toISOString(),
-        total: rows.length,
+        total: countBacklogTotal(input, statusCounts),
         shown: items.length,
         items,
         statusCounts,
@@ -537,40 +543,42 @@ export function createSupabaseAdminCaptureRepository(
 
       return data as AdminCaptureRow;
     },
-    async listItems(input) {
-      let query = supabase
+    async listBacklog(input) {
+      let pageQuery = supabase
         .from("admin_capture_items")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(input.limit);
 
-      if (input.status !== "all") {
-        query = query.eq("status", input.status);
+      if (input.status === "all") {
+        pageQuery = pageQuery.in("status", adminCaptureActiveStatuses);
+      } else {
+        pageQuery = pageQuery.eq("status", input.status);
       }
 
       if (!input.includeArchived && input.status !== "archived") {
-        query = query.is("archived_at", null);
+        pageQuery = pageQuery.is("archived_at", null);
       }
 
       if (input.itemType) {
-        query = query.eq("item_type", input.itemType);
+        pageQuery = pageQuery.eq("item_type", input.itemType);
       }
 
       if (input.priority) {
-        query = query.eq("priority", input.priority);
+        pageQuery = pageQuery.eq("priority", input.priority);
       }
 
       if (input.targetRole) {
-        query = query.eq("target_role", input.targetRole);
+        pageQuery = pageQuery.eq("target_role", input.targetRole);
       }
 
       if (input.sourceGroup !== "all_work") {
-        query = query.eq("metadata->>source_group", input.sourceGroup);
+        pageQuery = pageQuery.eq("metadata->>source_group", input.sourceGroup);
       }
 
       if (input.search) {
         const term = `%${sanitizeSearchTerm(input.search)}%`;
-        query = query.or(
+        pageQuery = pageQuery.or(
           [
             `title.ilike.${term}`,
             `note.ilike.${term}`,
@@ -583,13 +591,19 @@ export function createSupabaseAdminCaptureRepository(
         );
       }
 
-      const { data, error } = await query;
+      const [pageResult, statusCounts] = await Promise.all([
+        pageQuery,
+        countSupabaseAdminCaptureStatuses(supabase, input),
+      ]);
 
-      if (error) {
-        throw new Error(error.message);
+      if (pageResult.error) {
+        throw new Error(pageResult.error.message);
       }
 
-      return (data ?? []) as AdminCaptureRow[];
+      return {
+        rows: (pageResult.data ?? []) as AdminCaptureRow[],
+        statusCounts,
+      };
     },
     async getItem(id) {
       const { data, error } = await supabase
@@ -700,18 +714,58 @@ function getAdminCaptureRowSource(row: AdminCaptureItemRow): AdminCaptureItemVie
   return "quick_note";
 }
 
-function buildStatusCounts(items: AdminCaptureItemView[]): Record<AdminCaptureStatus, number> {
-  return {
-    new: countStatus(items, "new"),
-    in_review: countStatus(items, "in_review"),
-    ready_for_codex: countStatus(items, "ready_for_codex"),
-    done: countStatus(items, "done"),
-    archived: countStatus(items, "archived"),
-  };
+async function countSupabaseAdminCaptureStatuses(
+  supabase: SupabaseClient<Database>,
+  input: AdminCaptureListInput,
+): Promise<Record<AdminCaptureStatus, number>> {
+  const counts = await Promise.all(
+    adminCaptureStatuses.map(async (status) => {
+      let query = supabase
+        .from("admin_capture_items")
+        .select("id", { count: "exact", head: true })
+        .eq("status", status);
+
+      if (input.itemType) query = query.eq("item_type", input.itemType);
+      if (input.priority) query = query.eq("priority", input.priority);
+      if (input.targetRole) query = query.eq("target_role", input.targetRole);
+
+      if (input.sourceGroup !== "all_work") {
+        query = query.eq("metadata->>source_group", input.sourceGroup);
+      }
+
+      if (input.search) {
+        const term = `%${sanitizeSearchTerm(input.search)}%`;
+        query = query.or(
+          [
+            `title.ilike.${term}`,
+            `note.ilike.${term}`,
+            `route.ilike.${term}`,
+            `page_url.ilike.${term}`,
+            `element_text.ilike.${term}`,
+            `nearby_heading.ilike.${term}`,
+            `target_role.ilike.${term}`,
+          ].join(","),
+        );
+      }
+
+      const { count, error } = await query;
+
+      if (error) throw new Error(error.message);
+
+      return [status, count ?? 0] as const;
+    }),
+  );
+
+  return Object.fromEntries(counts) as Record<AdminCaptureStatus, number>;
 }
 
-function countStatus(items: AdminCaptureItemView[], status: AdminCaptureStatus) {
-  return items.filter((item) => item.status === status).length;
+function countBacklogTotal(
+  input: AdminCaptureListInput,
+  counts: Record<AdminCaptureStatus, number>,
+) {
+  if (input.status !== "all") return counts[input.status];
+
+  return adminCaptureActiveStatuses.reduce((total, status) => total + counts[status], 0);
 }
 
 function buildMetadataWithNoteHistory(
@@ -873,7 +927,7 @@ function mapRepoWorkItemView(metadata: Json): AdminCaptureItemView["repoWorkItem
       typeof metadata.work_item_lifecycle === "string"
         ? (metadata.work_item_lifecycle as RepoWorkItemView["workItemLifecycle"])
         : fallback.workItemLifecycle,
-    sourceGroup,
+    sourceGroup: sourceGroup as RepoWorkItemView["sourceGroup"],
     sourceGroupLabel:
       typeof metadata.source_group_label === "string"
         ? metadata.source_group_label.slice(0, 80)

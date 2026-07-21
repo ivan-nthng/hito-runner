@@ -108,13 +108,13 @@ const SPACING_TOKENS = [
 ] as const;
 
 const RADIUS_TOKENS = [
-  { name: "radius-sm", token: "--radius-sm" },
-  { name: "radius-md", token: "--radius-md" },
-  { name: "radius-lg", token: "--radius-lg" },
-  { name: "radius-xl", token: "--radius-xl" },
-  { name: "radius-2xl", token: "--radius-2xl" },
-  { name: "radius-3xl", token: "--radius-3xl" },
-  { name: "radius-4xl", token: "--radius-4xl" },
+  { name: "radius-sm", token: "--radius-sm", value: "4px" },
+  { name: "radius-md", token: "--radius-md", value: "6px" },
+  { name: "radius-lg", token: "--radius-lg", value: "8px" },
+  { name: "radius-xl", token: "--radius-xl", value: "10px" },
+  { name: "radius-2xl", token: "--radius-2xl", value: "12px" },
+  { name: "radius-3xl", token: "--radius-3xl", value: "16px" },
+  { name: "radius-4xl", token: "--radius-4xl", value: "20px" },
 ] as const;
 
 const BUTTON_STATES: Array<{
@@ -385,6 +385,7 @@ function SpacingRadiusGrid() {
                 style={{ borderRadius: `var(${token.token})` }}
               />
               <code className="hito-technical-mono">{token.token}</code>
+              <span className="hito-caption">{token.value}</span>
             </div>
           ))}
         </div>
@@ -852,20 +853,20 @@ function AuditControlMatrix() {
       <MatrixPanel title="Explicit pending change">
         <div className="grid max-w-xl gap-3">
           <StaticPropertyRow expanded iconName="radius-top-left" label="Radius">
-            <StaticValueChip tone="current" help="12px · --radius-lg">
-              12
+            <StaticValueChip tone="current" help="8px · --radius-lg">
+              8
             </StaticValueChip>
             <Icon name="arrow-right" size="xs" className="text-muted-foreground" />
-            <StaticValueChip tone="desired" help="8px · --radius-md">
-              8
+            <StaticValueChip tone="desired" help="6px · --radius-md">
+              6
             </StaticValueChip>
           </StaticPropertyRow>
           <div className="ml-7 grid gap-2 rounded-md border border-hairline bg-surface/35 p-2">
             <StaticPropertyRow compact iconName="radius-top-left" label="Top-left radius">
-              <StaticValueChip help="12px · --radius-lg">12</StaticValueChip>
+              <StaticValueChip help="8px · --radius-lg">8</StaticValueChip>
             </StaticPropertyRow>
             <StaticPropertyRow compact iconName="radius-bottom-right" label="Bottom-right radius">
-              <StaticValueChip help="12px · --radius-lg">12</StaticValueChip>
+              <StaticValueChip help="8px · --radius-lg">8</StaticValueChip>
             </StaticPropertyRow>
           </div>
           <button type="button" className="hito-button hito-button-secondary hito-button-sm w-fit">

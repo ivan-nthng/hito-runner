@@ -5,6 +5,8 @@ import { Icon } from "@/components/ui/icon";
 import { PlanPresetPanel } from "@/components/onboarding/PlanPresetPanel";
 import { QuickSetupPlanSetupSections } from "@/components/onboarding/QuickSetupPlanSetupSections";
 import { StructuredPlanConstructor } from "@/components/onboarding/StructuredPlanConstructor";
+import { OnboardingRunnerHeartRateProfile } from "@/components/onboarding/OnboardingRunnerBaseline";
+import { useOnboardingRunnerBaseline } from "@/components/onboarding/use-onboarding-runner-baseline";
 import {
   isPresetPrimarySetupReady,
   normalizePresetPrimaryFitnessLevel,
@@ -47,7 +49,9 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const [heightCm, setHeightCm] = useState(() =>
     defaults?.heightCm != null ? String(defaults.heightCm) : "",
   );
-  const [fitnessLevel, setFitnessLevel] = useState<RunnerFitnessLevel>("running_regularly");
+  const [fitnessLevel, setFitnessLevel] = useState<RunnerFitnessLevel>(
+    () => defaults?.fitnessLevel ?? "running_regularly",
+  );
   const [recent5kTime, setRecent5kTime] = useState("");
   const [recent5kPace, setRecent5kPace] = useState("");
   const [fixedRestDays, setFixedRestDays] = useState<WeekdayName[]>(
@@ -152,19 +156,27 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     [constructorState, goalDistance, terrainFocus],
   );
   const hasRequiredPlanBasics = isPresetPrimarySetupReady(constructorState);
-  const isManualSetupReady = isManualProfileReady(constructorState);
+  const runnerBaseline = useOnboardingRunnerBaseline({
+    defaults,
+    state: constructorState,
+  });
+  const hasAcceptedRunnerBaseline = hasRequiredPlanBasics && runnerBaseline.isReady;
+  const isManualSetupReady = isManualProfileReady(constructorState) && runnerBaseline.isReady;
   const selectedPlanPreview = useSelectedPlanPresetPreviewController({
     state: effectiveConstructorState,
-    hasRequiredPlanBasics,
+    hasRequiredPlanBasics: hasAcceptedRunnerBaseline,
     toastId: STRUCTURED_REVIEW_TOAST_ID,
     previewReadyDescription: "Review the backend-shaped calendar before creating the plan.",
+    previewContextKey: runnerBaseline.previewContextKey,
+    requiredBasicsMessage:
+      "Save your runner baseline and accept the BPM guidance before previewing a generated plan.",
     autoRefreshOpenPreview: true,
     resetOnInputChange: true,
     onResetExternalState: () => setRunningPlanConfirmResult(null),
   });
   const isPresetBusy = selectedPlanPreview.isBusy || runningPlanCreateStatus !== "idle";
   const isManualCreateBusy = manualCreateStatus !== "idle";
-  const isBusy = isPresetBusy || isManualCreateBusy;
+  const isBusy = isPresetBusy || isManualCreateBusy || runnerBaseline.isSaving;
   const selectedGoalId = planGoalChoice || null;
   const selectedPlanGoalPreviewGate = resolveSelectedPlanGoalPreviewGate(
     {
@@ -181,7 +193,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     selectedPreviewMatchesGoal && selectedPlanPreview.previewResult?.ok === true;
   const generatedCreateDisabled =
     isBusy ||
-    !hasRequiredPlanBasics ||
+    !hasAcceptedRunnerBaseline ||
     !selectedGoalId ||
     !selectedPlanGoalPreviewGate.ok ||
     (selectedPlanPreview.previewOpen && selectedPreviewIsReady);
@@ -192,6 +204,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     ? generatedCreateFooterHint({
         error: selectedPlanPreview.error,
         hasRequiredPlanBasics,
+        hasAcceptedRunnerBaseline,
         planGoalChoice,
         previewGate: selectedPlanGoalPreviewGate,
         previewIsOpen: selectedPlanPreview.previewOpen,
@@ -200,6 +213,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
       })
     : manualCreateFooterHint({
         error: manualCreateError,
+        hasAcceptedRunnerBaseline,
         isManualSetupReady,
         status: manualCreateStatus,
       });
@@ -425,6 +439,17 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
           }}
           includeTrainingSetup={false}
           includeScheduleRhythm={false}
+          heartRateProfile={
+            <OnboardingRunnerHeartRateProfile
+              canPrepare={runnerBaseline.canPrepare}
+              onClearError={runnerBaseline.clearError}
+              error={runnerBaseline.error}
+              isSaving={runnerBaseline.isSaving}
+              onPrepare={runnerBaseline.prepare}
+              onSave={runnerBaseline.saveHeartRateProfile}
+              summary={runnerBaseline.summary}
+            />
+          }
         />
 
         <div className="flex justify-center">
@@ -490,7 +515,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
                   createStatus={runningPlanCreateStatus}
                   error={selectedPlanPreview.error}
                   status={selectedPlanPreview.status}
-                  hasRequiredPlanBasics={hasRequiredPlanBasics}
+                  hasRequiredPlanBasics={hasAcceptedRunnerBaseline}
+                  requiredBasicsCopy="Save your runner baseline and accept the BPM guidance before Hito prepares a reviewed plan."
                   previewOpen={selectedPlanPreview.previewOpen}
                   onPreviewOpenChange={selectedPlanPreview.setPreviewOpen}
                   planGoalChoice={planGoalChoice}
@@ -540,10 +566,12 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
 
 function manualCreateFooterHint({
   error,
+  hasAcceptedRunnerBaseline,
   isManualSetupReady,
   status,
 }: {
   error: string | null;
+  hasAcceptedRunnerBaseline: boolean;
   isManualSetupReady: boolean;
   status: ManualCreateStatus;
 }): { message: string; tone: "error" | "neutral" } {
@@ -553,7 +581,9 @@ function manualCreateFooterHint({
 
   if (!isManualSetupReady) {
     return {
-      message: "Add age, height, and weight to create a plan.",
+      message: hasAcceptedRunnerBaseline
+        ? "Add age, height, and weight to create a plan."
+        : "Save your runner baseline and accept the BPM guidance before creating a plan.",
       tone: "neutral",
     };
   }
@@ -573,6 +603,7 @@ function manualCreateFooterHint({
 
 function generatedCreateFooterHint({
   error,
+  hasAcceptedRunnerBaseline,
   hasRequiredPlanBasics,
   planGoalChoice,
   previewGate,
@@ -581,6 +612,7 @@ function generatedCreateFooterHint({
   status,
 }: {
   error: string | null;
+  hasAcceptedRunnerBaseline: boolean;
   hasRequiredPlanBasics: boolean;
   planGoalChoice: StructuredConstructorState["planGoalChoice"];
   previewGate: ReturnType<typeof resolveSelectedPlanGoalPreviewGate>;
@@ -595,6 +627,13 @@ function generatedCreateFooterHint({
   if (!hasRequiredPlanBasics) {
     return {
       message: "Add age, height, and weight before creating a plan.",
+      tone: "neutral",
+    };
+  }
+
+  if (!hasAcceptedRunnerBaseline) {
+    return {
+      message: "Save your runner baseline and accept the BPM guidance before creating a plan.",
       tone: "neutral",
     };
   }

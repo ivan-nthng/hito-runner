@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { PlanPresetPanel } from "@/components/onboarding/PlanPresetPanel";
+import { OnboardingRunnerHeartRateProfile } from "@/components/onboarding/OnboardingRunnerBaseline";
 import { StructuredPlanConstructor } from "@/components/onboarding/StructuredPlanConstructor";
 import {
   isPresetPrimarySetupReady,
@@ -9,12 +10,14 @@ import {
   type WeekdayName,
 } from "@/components/onboarding/onboarding-form-model";
 import { useSelectedPlanPresetPreviewController } from "@/components/onboarding/use-selected-plan-preset-preview-controller";
+import { useOnboardingRunnerBaseline } from "@/components/onboarding/use-onboarding-runner-baseline";
 import {
   resolveSelectedPlanGoalPreviewGate,
   type PlanGoalIntentDraftState,
 } from "@/components/onboarding/selected-running-plan-flow-utils";
 import { hitoToast } from "@/components/ui/hito-toast";
 import { Icon } from "@/components/ui/icon";
+import { useHitoTabs } from "@/components/ui/hito-tabs";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +34,8 @@ import {
   type ActivePlanTransitionReviewResult,
 } from "@/lib/active-plan-transition-actions";
 import type { TrainingSnapshot } from "@/lib/training";
+import { getSettingsRouteData } from "@/lib/training-api";
+import type { UserSettingsSummary } from "@/lib/user-settings-actions";
 import {
   ActivePlanTransitionReviewDialog,
   CustomPlanTransitionNotice,
@@ -45,6 +50,10 @@ import {
 
 type CreateMode = "quick" | "custom";
 type TransitionStatus = "idle" | "reviewing" | "confirming";
+
+const CREATE_MODE_TABS = [{ value: "quick" }, { value: "custom" }] satisfies Array<{
+  value: CreateMode;
+}>;
 
 const ACTIVE_PLAN_CREATE_TOAST_ID = "active-plan-create-transition";
 
@@ -61,12 +70,19 @@ export function ActivePlanCreatePlanDialog({
 }) {
   const reviewActivePlanTransitionFn = useServerFn(reviewActivePlanTransition);
   const confirmActivePlanTransitionFn = useServerFn(confirmActivePlanTransition);
+  const getSettingsRouteDataFn = useServerFn(getSettingsRouteData);
   const structuredFormRef = useRef<HTMLFormElement | null>(null);
   const transitionInFlightRef = useRef(false);
   const previousOpenRef = useRef(open);
   const initialStateKeyRef = useRef<string | null>(null);
 
-  const initialState = useMemo(() => buildInitialCreatePlanState(snapshot), [snapshot]);
+  const [settingsDefaults, setSettingsDefaults] = useState<UserSettingsSummary | null>(null);
+  const [settingsStatus, setSettingsStatus] = useState<"idle" | "loading">("idle");
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const initialState = useMemo(
+    () => buildInitialCreatePlanState(snapshot, settingsDefaults),
+    [settingsDefaults, snapshot],
+  );
   const initialStateKey = useMemo(
     () => buildInitialCreatePlanStateKey(initialState),
     [initialState],
@@ -191,6 +207,11 @@ export function ActivePlanCreatePlanDialog({
   );
   const hasActivePlan = Boolean(snapshot?.planMeta?.id);
   const hasRequiredPlanBasics = isPresetPrimarySetupReady(constructorState);
+  const runnerBaseline = useOnboardingRunnerBaseline({
+    defaults: settingsDefaults,
+    state: constructorState,
+  });
+  const hasAcceptedRunnerBaseline = hasRequiredPlanBasics && runnerBaseline.isReady;
   const selectedGoalId = planGoalChoice || null;
   const planGoalDraftState: PlanGoalIntentDraftState = {
     planGoalChoice,
@@ -206,7 +227,10 @@ export function ActivePlanCreatePlanDialog({
   const selectedPlanPreview = useSelectedPlanPresetPreviewController({
     state: effectiveConstructorState,
     autoRefreshOpenPreview: true,
-    hasRequiredPlanBasics,
+    hasRequiredPlanBasics: hasAcceptedRunnerBaseline,
+    previewContextKey: runnerBaseline.previewContextKey,
+    requiredBasicsMessage:
+      "Save your runner baseline and accept the BPM guidance before previewing a generated plan.",
     resetOnInputChange: true,
     toastId: ACTIVE_PLAN_CREATE_TOAST_ID,
     previewReadyDescription: "Review the candidate plan before reviewing the active-plan change.",
@@ -216,7 +240,15 @@ export function ActivePlanCreatePlanDialog({
     },
   });
   const resetSelectedPlanPreviewState = selectedPlanPreview.resetPreviewState;
-  const isBusy = selectedPlanPreview.isBusy || transitionStatus !== "idle";
+  const isBusy =
+    selectedPlanPreview.isBusy ||
+    transitionStatus !== "idle" ||
+    settingsStatus === "loading" ||
+    runnerBaseline.isSaving;
+  const createModeTabs = useHitoTabs({
+    items: CREATE_MODE_TABS.map((item) => ({ ...item, disabled: isBusy })),
+    value: createMode,
+  });
   const selectedPreviewMatchesGoal = selectedPlanPreview.selectedGoalId === selectedGoalId;
   const selectedPreviewIsReady =
     selectedPreviewMatchesGoal && selectedPlanPreview.previewResult?.ok === true;
@@ -224,6 +256,7 @@ export function ActivePlanCreatePlanDialog({
     createMode,
     error: selectedPlanPreview.error,
     hasActivePlan,
+    hasAcceptedRunnerBaseline,
     hasRequiredPlanBasics,
     planGoalChoice,
     previewGate: selectedPlanGoalPreviewGate,
@@ -235,7 +268,7 @@ export function ActivePlanCreatePlanDialog({
     isBusy ||
     createMode !== "quick" ||
     !hasActivePlan ||
-    !hasRequiredPlanBasics ||
+    !hasAcceptedRunnerBaseline ||
     !selectedGoalId ||
     !selectedPlanGoalPreviewGate.ok ||
     (selectedPlanPreview.previewOpen && selectedPreviewIsReady);
@@ -298,6 +331,37 @@ export function ActivePlanCreatePlanDialog({
     setTransitionStatus("idle");
     transitionInFlightRef.current = false;
   }, [initialState, initialStateKey, open, resetSelectedPlanPreviewState]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    let cancelled = false;
+    setSettingsStatus("loading");
+    setSettingsError(null);
+
+    void getSettingsRouteDataFn()
+      .then((result) => {
+        if (!cancelled) {
+          setSettingsDefaults(result.settings);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSettingsError("Your saved runner baseline could not be loaded. Close and try again.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setSettingsStatus("idle");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [getSettingsRouteDataFn, open]);
 
   async function reviewSelectedPlanTransition() {
     if (transitionInFlightRef.current) {
@@ -391,8 +455,10 @@ export function ActivePlanCreatePlanDialog({
       return;
     }
 
-    if (!hasRequiredPlanBasics) {
-      selectedPlanPreview.setError("Add age, height, and weight before creating a plan.");
+    if (!hasAcceptedRunnerBaseline) {
+      selectedPlanPreview.setError(
+        "Save your runner baseline and accept the BPM guidance before creating a plan.",
+      );
       return;
     }
 
@@ -513,13 +579,12 @@ export function ActivePlanCreatePlanDialog({
             <div className="grid gap-6">
               <div
                 className="hito-tabs hito-tabs-simple w-fit max-w-full flex-wrap"
-                role="tablist"
+                {...createModeTabs.tabListProps}
                 aria-label="Create plan mode"
               >
                 <button
                   type="button"
-                  role="tab"
-                  aria-selected={createMode === "quick"}
+                  {...createModeTabs.getTabProps("quick")}
                   className="hito-tab"
                   data-active={createMode === "quick"}
                   disabled={isBusy}
@@ -529,8 +594,7 @@ export function ActivePlanCreatePlanDialog({
                 </button>
                 <button
                   type="button"
-                  role="tab"
-                  aria-selected={createMode === "custom"}
+                  {...createModeTabs.getTabProps("custom")}
                   className="hito-tab"
                   data-active={createMode === "custom"}
                   disabled={isBusy}
@@ -541,85 +605,108 @@ export function ActivePlanCreatePlanDialog({
               </div>
 
               {createMode === "quick" ? (
-                <StructuredPlanConstructor
-                  mode="quick"
-                  formRef={structuredFormRef}
-                  state={constructorState}
-                  setState={{
-                    setAge,
-                    setWeightKg,
-                    setHeightCm,
-                    setFitnessLevel,
-                    setRecent5kTime,
-                    setRecent5kPace,
-                    setFixedRestDays,
-                    setRestDaysAnswered,
-                    setMaxRunningDaysPerWeek,
-                    setPreferredLongRunDay,
-                    setGoalDistance,
-                    setGoalStyle,
-                    setTargetTime,
-                    setStartDate,
-                    setTargetDate,
-                    setTerrainFocus,
-                    setGuidancePreference,
-                    setStrengthPreference,
-                    setComment,
-                  }}
-                  constructorStatus="idle"
-                  constructorError={null}
-                  isBusy={isBusy || !hasActivePlan}
-                  isConstructorReady={hasRequiredPlanBasics}
-                  onSubmit={() => {
-                    selectedPlanPreview.setError("Choose a goal before reviewing the plan change.");
-                  }}
-                  planPresetPanel={
-                    <PlanPresetPanel
-                      confirmResult={null}
-                      previewResult={selectedPlanPreview.previewResult}
-                      createStatus={transitionStatus === "reviewing" ? "creating" : "idle"}
-                      error={selectedPlanPreview.error}
-                      status={selectedPlanPreview.status}
-                      hasRequiredPlanBasics={hasRequiredPlanBasics}
-                      previewOpen={selectedPlanPreview.previewOpen}
-                      planGoalChoice={planGoalChoice}
-                      planGoalCustomDistanceKm={planGoalCustomDistanceKm}
-                      planGoalCustomDistanceLabel={planGoalCustomDistanceLabel}
-                      planGoalFinishTime={planGoalFinishTime}
-                      planGoalTargetDate={planGoalTargetDate}
-                      onPlanGoalChoiceChange={changePlanGoalChoice}
-                      onPlanGoalCustomDistanceKmChange={setPlanGoalCustomDistanceKm}
-                      onPlanGoalCustomDistanceLabelChange={setPlanGoalCustomDistanceLabel}
-                      onPlanGoalFinishTimeChange={setPlanGoalFinishTime}
-                      onPlanGoalTargetDateChange={setPlanGoalTargetDate}
-                      onPreviewOpenChange={(nextOpen) => {
-                        selectedPlanPreview.setPreviewOpen(nextOpen);
-                        if (!nextOpen) {
-                          setTransitionReviewResult(null);
+                <div {...createModeTabs.getPanelProps("quick")}>
+                  <StructuredPlanConstructor
+                    mode="quick"
+                    formRef={structuredFormRef}
+                    state={constructorState}
+                    setState={{
+                      setAge,
+                      setWeightKg,
+                      setHeightCm,
+                      setFitnessLevel,
+                      setRecent5kTime,
+                      setRecent5kPace,
+                      setFixedRestDays,
+                      setRestDaysAnswered,
+                      setMaxRunningDaysPerWeek,
+                      setPreferredLongRunDay,
+                      setGoalDistance,
+                      setGoalStyle,
+                      setTargetTime,
+                      setStartDate,
+                      setTargetDate,
+                      setTerrainFocus,
+                      setGuidancePreference,
+                      setStrengthPreference,
+                      setComment,
+                    }}
+                    constructorStatus="idle"
+                    constructorError={null}
+                    isBusy={isBusy || !hasActivePlan}
+                    isConstructorReady={hasAcceptedRunnerBaseline}
+                    onSubmit={() => {
+                      selectedPlanPreview.setError(
+                        "Choose a goal before reviewing the plan change.",
+                      );
+                    }}
+                    planPresetPanel={
+                      <PlanPresetPanel
+                        confirmResult={null}
+                        previewResult={selectedPlanPreview.previewResult}
+                        createStatus={transitionStatus === "reviewing" ? "creating" : "idle"}
+                        error={selectedPlanPreview.error}
+                        status={selectedPlanPreview.status}
+                        hasRequiredPlanBasics={hasAcceptedRunnerBaseline}
+                        requiredBasicsCopy="Save your runner baseline and accept the BPM guidance before Hito prepares a reviewed plan."
+                        previewOpen={selectedPlanPreview.previewOpen}
+                        planGoalChoice={planGoalChoice}
+                        planGoalCustomDistanceKm={planGoalCustomDistanceKm}
+                        planGoalCustomDistanceLabel={planGoalCustomDistanceLabel}
+                        planGoalFinishTime={planGoalFinishTime}
+                        planGoalTargetDate={planGoalTargetDate}
+                        onPlanGoalChoiceChange={changePlanGoalChoice}
+                        onPlanGoalCustomDistanceKmChange={setPlanGoalCustomDistanceKm}
+                        onPlanGoalCustomDistanceLabelChange={setPlanGoalCustomDistanceLabel}
+                        onPlanGoalFinishTimeChange={setPlanGoalFinishTime}
+                        onPlanGoalTargetDateChange={setPlanGoalTargetDate}
+                        onPreviewOpenChange={(nextOpen) => {
+                          selectedPlanPreview.setPreviewOpen(nextOpen);
+                          if (!nextOpen) {
+                            setTransitionReviewResult(null);
+                          }
+                        }}
+                        onRefreshPreview={() => {
+                          void selectedPlanPreview.refreshPreview();
+                        }}
+                        onCreatePlan={() => {
+                          void reviewSelectedPlanTransition();
+                        }}
+                        previewDialogDescription="This candidate is still preview-only. Next, Hito reviews what changes in your current plan before anything is saved."
+                        previewDialogPrimaryActionLabel="Review plan change"
+                        previewDialogPrimaryActionPendingLabel="Reviewing change..."
+                        previewDialogExtraNotice={
+                          transitionReviewResult && !transitionReviewResult.ok ? (
+                            <TransitionBlockedNotice result={transitionReviewResult} />
+                          ) : null
                         }
-                      }}
-                      onRefreshPreview={() => {
-                        void selectedPlanPreview.refreshPreview();
-                      }}
-                      onCreatePlan={() => {
-                        void reviewSelectedPlanTransition();
-                      }}
-                      previewDialogDescription="This candidate is still preview-only. Next, Hito reviews what changes in your current plan before anything is saved."
-                      previewDialogPrimaryActionLabel="Review plan change"
-                      previewDialogPrimaryActionPendingLabel="Reviewing change..."
-                      previewDialogExtraNotice={
-                        transitionReviewResult && !transitionReviewResult.ok ? (
-                          <TransitionBlockedNotice result={transitionReviewResult} />
-                        ) : null
-                      }
-                    />
-                  }
-                />
+                      />
+                    }
+                    quickSetupSections={{
+                      heartRateProfile: (
+                        <OnboardingRunnerHeartRateProfile
+                          canPrepare={runnerBaseline.canPrepare && !settingsError}
+                          error={runnerBaseline.error ?? settingsError}
+                          isSaving={runnerBaseline.isSaving || settingsStatus === "loading"}
+                          onClearError={() => {
+                            runnerBaseline.clearError();
+                            setSettingsError(null);
+                          }}
+                          onPrepare={runnerBaseline.prepare}
+                          onSave={runnerBaseline.saveHeartRateProfile}
+                          summary={runnerBaseline.summary}
+                        />
+                      ),
+                    }}
+                  />
+                </div>
               ) : (
-                <CustomPlanTransitionNotice
-                  onUseQuick={() => setCreateMode("quick")}
-                  onOpenPlan={onOpenPlan}
-                />
+                <div {...createModeTabs.getPanelProps("custom")}>
+                  <CustomPlanTransitionNotice
+                    onUseQuick={() => setCreateMode("quick")}
+                    onOpenPlan={onOpenPlan}
+                  />
+                </div>
               )}
             </div>
           </div>
@@ -676,6 +763,7 @@ function activePlanCreateFooterHint({
   createMode,
   error,
   hasActivePlan,
+  hasAcceptedRunnerBaseline,
   hasRequiredPlanBasics,
   planGoalChoice,
   previewGate,
@@ -686,6 +774,7 @@ function activePlanCreateFooterHint({
   createMode: CreateMode;
   error: string | null;
   hasActivePlan: boolean;
+  hasAcceptedRunnerBaseline: boolean;
   hasRequiredPlanBasics: boolean;
   planGoalChoice: StructuredConstructorState["planGoalChoice"];
   previewGate: ReturnType<typeof resolveSelectedPlanGoalPreviewGate>;
@@ -714,6 +803,13 @@ function activePlanCreateFooterHint({
   if (!hasRequiredPlanBasics) {
     return {
       message: "Add age, height, and weight before creating a plan.",
+      tone: "muted",
+    };
+  }
+
+  if (!hasAcceptedRunnerBaseline) {
+    return {
+      message: "Save your runner baseline and accept the BPM guidance before creating a plan.",
       tone: "muted",
     };
   }

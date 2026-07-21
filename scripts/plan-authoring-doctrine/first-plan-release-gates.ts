@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { buildReviewedFirstPlanImportedSeed } from "../../src/lib/active-plan-persistence";
 import { generateAiFirstPlanDraftPreview } from "../../src/lib/ai-first-plan-draft-service";
-import { buildAiGeneratedRunningPlanAuthoringInput } from "../../src/lib/ai-generated-running-plan";
+import { buildAiGeneratedRunningPlanAuthoringInput as buildAiGeneratedRunningPlanAuthoringInputRuntime } from "../../src/lib/ai-generated-running-plan";
 import {
   AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
   buildAiGeneratedRunningPlanDevFixtureOpenAiFetch,
@@ -13,7 +13,16 @@ import {
   type AiAuthoredPlanFirstProviderDraft,
 } from "../../src/lib/ai-authored-plan-first-provider-contract";
 import type { TrainingPlanV2 } from "../../src/lib/imported-plan";
+import type { BuildRunningPlanPreviewInput } from "../../src/lib/plan-creation-engine";
 import { addDaysIso, diffDaysIso } from "../../src/lib/training";
+import { buildProofRunnerProfileSnapshot } from "../runner-profile-snapshot-proof-helpers";
+
+function buildAiGeneratedRunningPlanAuthoringInput(input: BuildRunningPlanPreviewInput) {
+  return buildAiGeneratedRunningPlanAuthoringInputRuntime(
+    input,
+    buildProofRunnerProfileSnapshot(input),
+  );
+}
 
 export async function assertFirstPlanReleaseGateContracts() {
   await assertFirstSessionAdaptationContracts();

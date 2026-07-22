@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite dev",
-    "prebuild": "node ./scripts/clean-build-output.mjs",
+    "prebuild": "node ./scripts/clean-build-output.mjs && node ./scripts/validate-supabase-deployment-parity.mjs --vercel-build",
     "build": "vite build",
     "postbuild": "node ./scripts/finalize-build-output.mjs",
     "build:dev": "vite build --mode development",
@@ -23,6 +23,7 @@
     "local:logs": "node --import tsx ./scripts/query-local-runtime-events.ts",
     "supabase:local:configure": "node ./scripts/configure-local-supabase-env.mjs",
     "supabase:local:status": "node ./scripts/configure-local-supabase-env.mjs --check",
+    "supabase:deployment:parity": "node ./scripts/validate-supabase-deployment-parity.mjs --linked",
     "artifact:hygiene": "node ./scripts/report-local-artifact-hygiene.mjs",
     "metrics:lines": "node ./scripts/report-line-counts.mjs",
     "work:dashboard": "node ./scripts/hito-work-dashboard.mjs",

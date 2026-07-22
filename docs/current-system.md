@@ -17,6 +17,7 @@
 - the canonical deployment runtime is now Nitro for Vercel:
   `npm run build` emits local Nitro/Vite staging under the non-iCloud cache root and publishes the managed local QA runtime from there; repo-local `.output/` should not be regenerated during normal local QA build flow
   `vercel build` emits `.vercel/output/` with Vercel functions
+- hosted releases use `scripts/validate-supabase-deployment-parity.mjs` as the fail-closed schema boundary: the linked release check requires repository/hosted migration-history equality and the Vercel prebuild requires the configured hosted Data API to expose the runner-baseline columns plus revision-aware plan persistence RPC before application build output can be accepted
 - Nitro still writes its hardcoded well-known pointer at `node_modules/.nitro/last-build.json` during local production builds; this is not served runtime or Vite staging/cache, and generated conflict siblings there remain a build-output lifecycle red flag
 - admin login requires server-only `HITO_ADMIN_SESSION_SECRET`; deployed admin login also requires `HITO_ADMIN_PASSWORD_HASH`; the admin username is fixed by the backend contract and plaintext admin passwords are not stored in tracked source or public bundles
 - request middleware in `src/start.ts` now resolves:

@@ -10,6 +10,7 @@ Active
 
 ## Where We Are Now
 
+- Production runner-baseline schema parity is owned by the versioned Supabase migration history and deployment parity validator: hosted migration history must match the repository, while the Vercel build refuses to publish application output until the Data API exposes the baseline revision, fitness/HR profile fields, and revision-aware reviewed-plan RPC.
 - Runner baseline and heart-rate truth remediation is accepted and closed: authenticated runners
   can save age, height, weight, fitness, and accepted estimated/personal BPM provenance without
   creating a plan; setup and Settings share read/edit truth; profile revision protects signed

@@ -110,6 +110,13 @@ function formatComponentAction(item: LocalUiInspectorBatchItem) {
     ];
   }
   const scope = formatItemScope(item);
+  if (action.type === "reuse_existing_component") {
+    return [
+      `- Component reuse action: Reuse existing component at ${scope.label.toLowerCase()}.`,
+      "- Prompt-only request: inspect the captured target and current Hito DS source, then reuse the closest existing component or pattern that preserves the target's semantics and behavior when one fits.",
+      "- If no existing Hito DS component or pattern fits, report the inspected source and candidate evidence; this Inspector request has not selected, registered, or changed a component.",
+    ];
+  }
   return [
     `- Object action: Remove object at ${scope.label.toLowerCase()}.`,
     "- Prompt-only request: remove the scoped page object usage without retiring or deleting a shared DS component.",

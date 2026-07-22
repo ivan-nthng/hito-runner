@@ -534,6 +534,12 @@ export function LocalUiInspector() {
           aria-label={mode === "screen" ? "Cancel local screen capture" : "Exit local inspect mode"}
           title={mode === "screen" ? "Cancel local screen capture" : "Exit local inspect mode"}
           onClick={mode === "inspect" ? requestInspectorExit : closeInspectorImmediately}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            if (mode === "inspect") requestInspectorExit();
+            else closeInspectorImmediately();
+          }}
         >
           <Icon name="close" size="sm" />
         </button>

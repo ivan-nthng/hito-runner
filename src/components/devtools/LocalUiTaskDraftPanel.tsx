@@ -16,7 +16,7 @@ import {
 import {
   type LocalUiInspectorItemDraft,
   type LocalUiComponentAction,
-  type LocalUiObjectRemovalScope,
+  type LocalUiScopedComponentActionScope,
 } from "@/components/devtools/local-ui-inspector-session";
 import { ChromeControlRows } from "@/components/devtools/LocalUiChromeControls";
 import { TokenControlRows } from "@/components/devtools/LocalUiTokenControls";
@@ -68,14 +68,16 @@ export function LocalUiTaskDraftPanel({
   const isEditing = typeof itemNumber === "number";
   const isRemovingInstance = draft.componentAction?.type === "remove_instance";
   const isAddingToDs = draft.componentAction?.type === "add_to_ds";
+  const isReusingExistingComponent = draft.componentAction?.type === "reuse_existing_component";
+  const isScopedComponentAction = isRemovingInstance || isReusingExistingComponent;
   const effectiveFixScope: InlineChangeFixScope = isAddingToDs
     ? "hito_ds"
-    : draft.componentAction?.type === "remove_instance"
+    : isScopedComponentAction && draft.componentAction
       ? draft.componentAction.scope
       : draft.fixScope;
   const scopeOptions = INLINE_CHANGE_SCOPE_OPTIONS.filter((option) => {
     if (isAddingToDs) return option.id === "hito_ds";
-    if (isRemovingInstance) return option.id !== "hito_ds";
+    if (isScopedComponentAction) return option.id !== "hito_ds";
     return option.id !== "hito_ds" || Boolean(ownership.entry);
   });
   const selectedAction = useMemo(
@@ -106,7 +108,7 @@ export function LocalUiTaskDraftPanel({
   const componentAction =
     draft.componentAction?.type === "remove_instance"
       ? getInlineChangeAction("remove_component")
-      : draft.componentAction?.type === "add_to_ds"
+      : draft.componentAction?.type === "add_to_ds" || isReusingExistingComponent
         ? getInlineChangeAction("align_with_hito_ds")
         : null;
   const draftAction = useMemo(
@@ -345,11 +347,11 @@ export function LocalUiTaskDraftPanel({
             disabled={isAddingToDs}
             value={effectiveFixScope}
             onValueChange={(value) => {
-              if (isRemovingInstance) {
+              if (isScopedComponentAction && draft.componentAction) {
                 updateDraft({
                   componentAction: {
-                    scope: value as LocalUiObjectRemovalScope,
-                    type: "remove_instance",
+                    ...draft.componentAction,
+                    scope: value as LocalUiScopedComponentActionScope,
                   },
                 });
                 return;

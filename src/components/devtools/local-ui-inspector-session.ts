@@ -8,11 +8,15 @@ import type {
 
 export const LOCAL_UI_INSPECTOR_BATCH_LIMIT = 8;
 
-export type LocalUiObjectRemovalScope = Extract<InlineChangeFixScope, "screen" | "component">;
+export type LocalUiScopedComponentActionScope = Extract<
+  InlineChangeFixScope,
+  "screen" | "component"
+>;
 
 export type LocalUiComponentAction =
   | { type: "add_to_ds" }
-  | { scope: LocalUiObjectRemovalScope; type: "remove_instance" }
+  | { scope: LocalUiScopedComponentActionScope; type: "remove_instance" }
+  | { scope: LocalUiScopedComponentActionScope; type: "reuse_existing_component" }
   | null;
 
 export type LocalUiInspectorItemDraft = {
@@ -117,6 +121,9 @@ export function updateLocalUiInspectorBatchItem(
 export function getLocalUiInspectorItemSummary(item: LocalUiInspectorBatchItem) {
   if (item.draft.componentAction?.type === "remove_instance") return "Remove object";
   if (item.draft.componentAction?.type === "add_to_ds") return "Add to design system";
+  if (item.draft.componentAction?.type === "reuse_existing_component") {
+    return "Reuse existing component";
+  }
   if (item.payload.target.proposedText)
     return `Replace text with “${item.payload.target.proposedText}”`;
   if (item.payload.comment) return item.payload.comment;

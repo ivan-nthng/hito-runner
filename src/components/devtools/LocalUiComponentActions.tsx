@@ -48,7 +48,9 @@ export function LocalUiActionsPropertyRow({
       ? "Add to design system"
       : value?.type === "remove_instance"
         ? "Remove object"
-        : null;
+        : value?.type === "reuse_existing_component"
+          ? "Reuse existing component"
+          : null;
 
   return (
     <div className="grid min-w-0 gap-1 py-0.5" data-local-ui-property-control-row="Actions">
@@ -86,10 +88,18 @@ export function LocalUiActionsPropertyRow({
               data-local-ui-inspector-layer=""
             >
               {!ownership.entry ? (
-                <DropdownMenuItem onSelect={() => onChange({ type: "add_to_ds" })}>
-                  <Icon name="components" size="sm" />
-                  Add to design system
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem
+                    onSelect={() => onChange({ scope: "screen", type: "reuse_existing_component" })}
+                  >
+                    <Icon name="components" size="sm" />
+                    Reuse existing component
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => onChange({ type: "add_to_ds" })}>
+                    <Icon name="components" size="sm" />
+                    Add to design system
+                  </DropdownMenuItem>
+                </>
               ) : null}
               <DropdownMenuItem
                 data-tone="destructive"

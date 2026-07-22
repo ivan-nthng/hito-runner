@@ -53,8 +53,14 @@ evidence. This is not a product workflow, design-system registry, or persistence
 - Confirmed component identity appears in technical target metadata. When positive source-backed
   ownership does not resolve, the Component row is omitted and `Add to design system` remains an
   explicit prompt-only action.
-- `Actions` is the final observed-property row. It can request `Add to design system` for an
-  unresolved target or `Remove object` for any target; exactly one action request may be selected.
+- `Actions` is the final observed-property row. An unresolved target can request `Reuse existing
+component` or `Add to design system`; every target can request `Remove object`, and exactly one
+  action request may be selected.
+- `Reuse existing component` is a prompt-only request to inspect the captured target and current
+  Hito DS source, reuse a fitting existing component or pattern when one exists, and report source
+  evidence when none fits. The Inspector never chooses a candidate or mutates source/runtime UI.
+- `Reuse existing component` is limited to `Only here` or `All similar instances`; it cannot claim a
+  design-system-level change for an unresolved target.
 - `Remove object` targets only the selected instance or similar instances. It never retires a Hito
   DS component. Removing a maintained component requires a separate governance task.
 - Ordinary text, property, and visual requests may target one instance, similar instances, or the
@@ -107,13 +113,16 @@ The replaced single-item `LocalUiPromptActionControls.tsx` path is deleted and h
   `qa-artifacts/screenshots/2026-07-21/local-inspector-single-discard-lifecycle/proof.json`;
 - source-backed Button, Editable Value Field, descendant, and unconfirmed-container proof:
   `qa-artifacts/screenshots/2026-07-22/local-inspector-source-backed-ownership/proof.json`.
+- unresolved `Reuse existing component`, prompt truth, responsive actions, and keyboard-exit proof:
+  `qa-artifacts/screenshots/2026-07-22/local-inspector-reuse-existing-component/proof.json`.
 
 The accepted inventory covers eight-item batching, duplicate handling, prompt output, token and
 ownership discriminators, focus/Escape behavior, copy fallback, local-only visibility, desktop,
 exact 375px, mobile scrolling, direct new/edit cancellation, session exit, runtime health, cleanup,
 targeted lint, production build, build integrity, and scoped diff hygiene. Canonical Hito Buttons and
 Editable Value Fields now resolve through positive source-backed evidence; arbitrary technical
-containers omit the Component row and retain the prompt-only `Add to design system` action.
+containers omit the Component row and retain prompt-only `Reuse existing component` and `Add to
+design system` actions.
 
 ## Closeout
 

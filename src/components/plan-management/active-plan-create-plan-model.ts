@@ -49,21 +49,12 @@ export function buildInitialCreatePlanState(
     maxRunningDaysPerWeek:
       schedule?.runningDaysPerWeek != null ? String(schedule.runningDaysPerWeek) : "",
     preferredLongRunDay: normalizeWeekdayName(schedule?.preferredLongRunDay) ?? "",
-    goalDistance: "build_consistency",
-    goalStyle: "balanced",
-    targetTime: "",
     startDate: "",
-    targetDate: "",
     planGoalChoice: "",
     planGoalCustomDistanceKm: "",
     planGoalCustomDistanceLabel: "",
     planGoalFinishTime: "",
     planGoalTargetDate: "",
-    terrainFocus: "standard",
-    watchAccess: "watch_or_app",
-    guidancePreference: "effort",
-    strengthPreference: "none",
-    comment: "",
   };
 }
 

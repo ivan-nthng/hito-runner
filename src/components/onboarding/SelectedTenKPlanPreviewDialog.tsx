@@ -67,7 +67,7 @@ export function SelectedRunningPlanPreviewDialog({
   onOpenChange,
   onRefresh,
   open,
-  description = "Review the AI-authored plan before creating it. Nothing is saved until you confirm.",
+  description = "Review the plan before creating it. Nothing is saved until you confirm.",
   primaryActionLabel = "Create plan",
   primaryActionPendingLabel = "Creating plan...",
   extraNotice,
@@ -175,7 +175,6 @@ function CreateBlockedNotice({
         <div className="min-w-0">
           <p className="hito-list-row-title">{view.title}</p>
           <p className="hito-list-row-copy">{view.copy}</p>
-          {view.helper ? <p className="hito-field-helper mt-2">{view.helper}</p> : null}
         </div>
         {view.openPlan ? (
           <a href="/" className="hito-button hito-button-secondary hito-button-sm shrink-0">
@@ -190,7 +189,6 @@ function CreateBlockedNotice({
 function createBlockedView(result: Extract<RunningPlanConfirmActionResult, { ok: false }>): {
   title: string;
   copy: string;
-  helper?: string;
   openPlan?: boolean;
   tone: "destructive" | "signal";
 } {
@@ -210,21 +208,18 @@ function createBlockedView(result: Extract<RunningPlanConfirmActionResult, { ok:
       return {
         title: "Refresh this preview",
         copy: "This reviewed preview is no longer current. Refresh the selected preview, then create again.",
-        helper: result.message,
         tone: "signal",
       };
     case "unauthenticated":
       return {
         title: "Sign in before creating",
         copy: "This session cannot create a selected running plan yet.",
-        helper: result.message,
         tone: "destructive",
       };
     case "persistence_failed":
       return {
         title: "Plan was not created",
         copy: "The selected running plan could not be saved. The current plan is unchanged.",
-        helper: result.message,
         tone: "destructive",
       };
   }
@@ -252,38 +247,38 @@ function PreviewUnavailableState({ result }: { result: SelectedRunningPlanPrevie
 const PREVIEW_UNAVAILABLE_VIEWS = {
   invalid_structural_input: {
     title: "Check the plan details",
-    copy: "Some required plan details are missing or invalid, so Hito could not start authoring this plan.",
+    copy: "Some required plan details are missing or invalid, so Hito could not prepare a preview.",
     nextStep: "Review the plan details and try again.",
     tone: "destructive",
   },
   provider_runtime_failure: {
-    title: "Plan authoring is unavailable",
-    copy: "Hito could not reach the plan authoring service right now. Your goal details do not need to change.",
+    title: "Plan preview is temporarily unavailable",
+    copy: "Hito could not prepare the plan right now. Your goal details do not need to change.",
     nextStep: "Try again in a moment.",
     tone: "signal",
   },
   provider_incomplete_output: {
-    title: "The plan draft was incomplete",
-    copy: "The authoring service returned only part of the plan, so Hito could not prepare a complete review. Your goal details do not need to change.",
-    nextStep: "Try authoring the plan again.",
+    title: "The plan preview was incomplete",
+    copy: "Hito could not prepare a complete plan for review. Your goal details do not need to change.",
+    nextStep: "Try preparing the plan again.",
     tone: "signal",
   },
   malformed_provider_output: {
-    title: "The plan draft could not be read",
-    copy: "The authoring service returned a plan Hito could not safely interpret, so no review was created. Your goal details do not need to change.",
-    nextStep: "Try authoring the plan again.",
+    title: "The plan preview could not be prepared",
+    copy: "Hito could not turn this attempt into a complete plan for review. Your goal details do not need to change.",
+    nextStep: "Try preparing the plan again.",
     tone: "signal",
   },
   compiler_rejection: {
-    title: "The plan draft could not be compiled",
-    copy: "Hito could not safely compile the authored draft into a reviewable plan. Your goal details do not need to change.",
-    nextStep: "Try authoring a new draft.",
+    title: "The plan preview could not be prepared",
+    copy: "Hito could not prepare a complete plan for review. Your goal details do not need to change.",
+    nextStep: "Try preparing the plan again.",
     tone: "signal",
   },
   review_refusal: {
-    title: "The plan review could not be verified",
-    copy: "Hito could not verify this authored draft for confirmation, so it was not made available for review. Your goal details do not need to change.",
-    nextStep: "Refresh and create a new preview.",
+    title: "The plan review is unavailable",
+    copy: "Hito could not prepare this plan for confirmation. Your goal details do not need to change.",
+    nextStep: "Refresh the preview and try again.",
     tone: "signal",
   },
 } as const satisfies Record<

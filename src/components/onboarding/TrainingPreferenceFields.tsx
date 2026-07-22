@@ -340,7 +340,7 @@ export function RecentFiveKBenchmarkFields({
       ? "Use a positive recent 5K pace such as 5:00/km."
       : missingRequiredBenchmark
         ? "Use a recent 5K time or pace."
-        : "Optional. Add either value; Hito uses it only when backend benchmark truth supports pace targets.";
+        : "Optional. Add either value to help Hito choose useful pace guidance.";
 
   return (
     <div className={cn("grid gap-2", className)}>

@@ -5,7 +5,6 @@ import { OnboardingRunnerHeartRateProfile } from "@/components/onboarding/Onboar
 import { StructuredPlanConstructor } from "@/components/onboarding/StructuredPlanConstructor";
 import {
   isPresetPrimarySetupReady,
-  resolveTerrainFocus,
   type StructuredConstructorState,
   type WeekdayName,
 } from "@/components/onboarding/onboarding-form-model";
@@ -17,7 +16,6 @@ import {
 } from "@/components/onboarding/selected-running-plan-flow-utils";
 import { hitoToast } from "@/components/ui/hito-toast";
 import { Icon } from "@/components/ui/icon";
-import { useHitoTabs } from "@/components/ui/hito-tabs";
 import {
   Dialog,
   DialogContent,
@@ -38,7 +36,6 @@ import { getSettingsRouteData } from "@/lib/training-api";
 import type { UserSettingsSummary } from "@/lib/user-settings-actions";
 import {
   ActivePlanTransitionReviewDialog,
-  CustomPlanTransitionNotice,
   TransitionBlockedNotice,
 } from "@/components/plan-management/ActivePlanTransitionReviewDialog";
 import {
@@ -48,24 +45,17 @@ import {
   buildTransitionBlockedResult,
 } from "@/components/plan-management/active-plan-create-plan-model";
 
-type CreateMode = "quick" | "custom";
 type TransitionStatus = "idle" | "reviewing" | "confirming";
-
-const CREATE_MODE_TABS = [{ value: "quick" }, { value: "custom" }] satisfies Array<{
-  value: CreateMode;
-}>;
 
 const ACTIVE_PLAN_CREATE_TOAST_ID = "active-plan-create-transition";
 
 export function ActivePlanCreatePlanDialog({
   open,
   onOpenChange,
-  onOpenPlan,
   snapshot,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onOpenPlan: () => void;
   snapshot: TrainingSnapshot | null | undefined;
 }) {
   const reviewActivePlanTransitionFn = useServerFn(reviewActivePlanTransition);
@@ -87,7 +77,6 @@ export function ActivePlanCreatePlanDialog({
     () => buildInitialCreatePlanStateKey(initialState),
     [initialState],
   );
-  const [createMode, setCreateMode] = useState<CreateMode>("quick");
   const [age, setAge] = useState(initialState.age);
   const [weightKg, setWeightKg] = useState(initialState.weightKg);
   const [heightCm, setHeightCm] = useState(initialState.heightCm);
@@ -104,15 +93,7 @@ export function ActivePlanCreatePlanDialog({
   const [preferredLongRunDay, setPreferredLongRunDay] = useState<WeekdayName | "">(
     initialState.preferredLongRunDay,
   );
-  const [goalDistance, setGoalDistance] = useState<StructuredConstructorState["goalDistance"]>(
-    initialState.goalDistance,
-  );
-  const [goalStyle, setGoalStyle] = useState<StructuredConstructorState["goalStyle"]>(
-    initialState.goalStyle,
-  );
-  const [targetTime, setTargetTime] = useState(initialState.targetTime);
   const [startDate, setStartDate] = useState(initialState.startDate);
-  const [targetDate, setTargetDate] = useState(initialState.targetDate);
   const [planGoalChoice, setPlanGoalChoice] = useState<
     StructuredConstructorState["planGoalChoice"]
   >(initialState.planGoalChoice);
@@ -124,16 +105,6 @@ export function ActivePlanCreatePlanDialog({
   );
   const [planGoalFinishTime, setPlanGoalFinishTime] = useState(initialState.planGoalFinishTime);
   const [planGoalTargetDate, setPlanGoalTargetDate] = useState(initialState.planGoalTargetDate);
-  const [terrainFocus, setTerrainFocus] = useState<StructuredConstructorState["terrainFocus"]>(
-    initialState.terrainFocus,
-  );
-  const [guidancePreference, setGuidancePreference] = useState<
-    StructuredConstructorState["guidancePreference"]
-  >(initialState.guidancePreference);
-  const [strengthPreference, setStrengthPreference] = useState<
-    StructuredConstructorState["strengthPreference"]
-  >(initialState.strengthPreference);
-  const [comment, setComment] = useState(initialState.comment);
   const [transitionStatus, setTransitionStatus] = useState<TransitionStatus>("idle");
   const [transitionReviewInput, setTransitionReviewInput] =
     useState<ActivePlanTransitionReviewInput | null>(null);
@@ -155,30 +126,17 @@ export function ActivePlanCreatePlanDialog({
       restDaysAnswered,
       maxRunningDaysPerWeek,
       preferredLongRunDay,
-      goalDistance,
-      goalStyle,
-      targetTime,
       startDate,
-      targetDate,
       planGoalChoice,
       planGoalCustomDistanceKm,
       planGoalCustomDistanceLabel,
       planGoalFinishTime,
       planGoalTargetDate,
-      terrainFocus,
-      watchAccess: "watch_or_app",
-      guidancePreference,
-      strengthPreference,
-      comment,
     }),
     [
       age,
-      comment,
       fitnessLevel,
       fixedRestDays,
-      goalDistance,
-      goalStyle,
-      guidancePreference,
       heightCm,
       maxRunningDaysPerWeek,
       planGoalCustomDistanceKm,
@@ -191,19 +149,8 @@ export function ActivePlanCreatePlanDialog({
       recent5kTime,
       restDaysAnswered,
       startDate,
-      strengthPreference,
-      targetDate,
-      targetTime,
-      terrainFocus,
       weightKg,
     ],
-  );
-  const effectiveConstructorState = useMemo(
-    () => ({
-      ...constructorState,
-      terrainFocus: resolveTerrainFocus(goalDistance, terrainFocus),
-    }),
-    [constructorState, goalDistance, terrainFocus],
   );
   const hasActivePlan = Boolean(snapshot?.planMeta?.id);
   const hasRequiredPlanBasics = isPresetPrimarySetupReady(constructorState);
@@ -225,7 +172,7 @@ export function ActivePlanCreatePlanDialog({
     selectedGoalId,
   );
   const selectedPlanPreview = useSelectedPlanPresetPreviewController({
-    state: effectiveConstructorState,
+    state: constructorState,
     autoRefreshOpenPreview: true,
     hasRequiredPlanBasics: hasAcceptedRunnerBaseline,
     previewContextKey: runnerBaseline.previewContextKey,
@@ -245,15 +192,10 @@ export function ActivePlanCreatePlanDialog({
     transitionStatus !== "idle" ||
     settingsStatus === "loading" ||
     runnerBaseline.isSaving;
-  const createModeTabs = useHitoTabs({
-    items: CREATE_MODE_TABS.map((item) => ({ ...item, disabled: isBusy })),
-    value: createMode,
-  });
   const selectedPreviewMatchesGoal = selectedPlanPreview.selectedGoalId === selectedGoalId;
   const selectedPreviewIsReady =
     selectedPreviewMatchesGoal && selectedPlanPreview.previewResult?.ok === true;
   const footerHint = activePlanCreateFooterHint({
-    createMode,
     error: selectedPlanPreview.error,
     hasActivePlan,
     hasAcceptedRunnerBaseline,
@@ -266,7 +208,6 @@ export function ActivePlanCreatePlanDialog({
   });
   const footerButtonDisabled =
     isBusy ||
-    createMode !== "quick" ||
     !hasActivePlan ||
     !hasAcceptedRunnerBaseline ||
     !selectedGoalId ||
@@ -298,7 +239,6 @@ export function ActivePlanCreatePlanDialog({
     }
 
     initialStateKeyRef.current = initialStateKey;
-    setCreateMode("quick");
     setAge(initialState.age);
     setWeightKg(initialState.weightKg);
     setHeightCm(initialState.heightCm);
@@ -309,20 +249,12 @@ export function ActivePlanCreatePlanDialog({
     setRestDaysAnswered(initialState.restDaysAnswered);
     setMaxRunningDaysPerWeek(initialState.maxRunningDaysPerWeek);
     setPreferredLongRunDay(initialState.preferredLongRunDay);
-    setGoalDistance(initialState.goalDistance);
-    setGoalStyle(initialState.goalStyle);
-    setTargetTime(initialState.targetTime);
     setStartDate(initialState.startDate);
-    setTargetDate(initialState.targetDate);
     setPlanGoalChoice(initialState.planGoalChoice);
     setPlanGoalCustomDistanceKm(initialState.planGoalCustomDistanceKm);
     setPlanGoalCustomDistanceLabel(initialState.planGoalCustomDistanceLabel);
     setPlanGoalFinishTime(initialState.planGoalFinishTime);
     setPlanGoalTargetDate(initialState.planGoalTargetDate);
-    setTerrainFocus(initialState.terrainFocus);
-    setGuidancePreference(initialState.guidancePreference);
-    setStrengthPreference(initialState.strengthPreference);
-    setComment(initialState.comment);
     resetSelectedPlanPreviewState();
     setTransitionReviewInput(null);
     setTransitionReviewResult(null);
@@ -442,11 +374,6 @@ export function ActivePlanCreatePlanDialog({
 
   function handleCreatePlanClick() {
     if (isBusy) {
-      return;
-    }
-
-    if (createMode !== "quick") {
-      selectedPlanPreview.setError("Use Quick plan to create a reviewed generated plan.");
       return;
     }
 
@@ -576,139 +503,86 @@ export function ActivePlanCreatePlanDialog({
           </DialogHeader>
 
           <div className="hito-product-dialog-body-scroll-fill">
-            <div className="grid gap-6">
-              <div
-                className="hito-tabs hito-tabs-simple w-fit max-w-full flex-wrap"
-                {...createModeTabs.tabListProps}
-                aria-label="Create plan mode"
-              >
-                <button
-                  type="button"
-                  {...createModeTabs.getTabProps("quick")}
-                  className="hito-tab"
-                  data-active={createMode === "quick"}
-                  disabled={isBusy}
-                  onClick={() => setCreateMode("quick")}
-                >
-                  Quick plan
-                </button>
-                <button
-                  type="button"
-                  {...createModeTabs.getTabProps("custom")}
-                  className="hito-tab"
-                  data-active={createMode === "custom"}
-                  disabled={isBusy}
-                  onClick={() => setCreateMode("custom")}
-                >
-                  Custom plan
-                </button>
-              </div>
-
-              {createMode === "quick" ? (
-                <div {...createModeTabs.getPanelProps("quick")}>
-                  <StructuredPlanConstructor
-                    mode="quick"
-                    formRef={structuredFormRef}
-                    state={constructorState}
-                    setState={{
-                      setAge,
-                      setWeightKg,
-                      setHeightCm,
-                      setFitnessLevel,
-                      setRecent5kTime,
-                      setRecent5kPace,
-                      setFixedRestDays,
-                      setRestDaysAnswered,
-                      setMaxRunningDaysPerWeek,
-                      setPreferredLongRunDay,
-                      setGoalDistance,
-                      setGoalStyle,
-                      setTargetTime,
-                      setStartDate,
-                      setTargetDate,
-                      setTerrainFocus,
-                      setGuidancePreference,
-                      setStrengthPreference,
-                      setComment,
-                    }}
-                    constructorStatus="idle"
-                    constructorError={null}
-                    isBusy={isBusy || !hasActivePlan}
-                    isConstructorReady={hasAcceptedRunnerBaseline}
-                    onSubmit={() => {
-                      selectedPlanPreview.setError(
-                        "Choose a goal before reviewing the plan change.",
-                      );
-                    }}
-                    planPresetPanel={
-                      <PlanPresetPanel
-                        confirmResult={null}
-                        previewResult={selectedPlanPreview.previewResult}
-                        createStatus={transitionStatus === "reviewing" ? "creating" : "idle"}
-                        error={selectedPlanPreview.error}
-                        status={selectedPlanPreview.status}
-                        hasRequiredPlanBasics={hasAcceptedRunnerBaseline}
-                        requiredBasicsCopy="Save your runner baseline and accept the BPM guidance before Hito prepares a reviewed plan."
-                        previewOpen={selectedPlanPreview.previewOpen}
-                        planGoalChoice={planGoalChoice}
-                        planGoalCustomDistanceKm={planGoalCustomDistanceKm}
-                        planGoalCustomDistanceLabel={planGoalCustomDistanceLabel}
-                        planGoalFinishTime={planGoalFinishTime}
-                        planGoalTargetDate={planGoalTargetDate}
-                        onPlanGoalChoiceChange={changePlanGoalChoice}
-                        onPlanGoalCustomDistanceKmChange={setPlanGoalCustomDistanceKm}
-                        onPlanGoalCustomDistanceLabelChange={setPlanGoalCustomDistanceLabel}
-                        onPlanGoalFinishTimeChange={setPlanGoalFinishTime}
-                        onPlanGoalTargetDateChange={setPlanGoalTargetDate}
-                        onPreviewOpenChange={(nextOpen) => {
-                          selectedPlanPreview.setPreviewOpen(nextOpen);
-                          if (!nextOpen) {
-                            setTransitionReviewResult(null);
-                          }
-                        }}
-                        onRefreshPreview={() => {
-                          void selectedPlanPreview.refreshPreview();
-                        }}
-                        onCreatePlan={() => {
-                          void reviewSelectedPlanTransition();
-                        }}
-                        previewDialogDescription="This candidate is still preview-only. Next, Hito reviews what changes in your current plan before anything is saved."
-                        previewDialogPrimaryActionLabel="Review plan change"
-                        previewDialogPrimaryActionPendingLabel="Reviewing change..."
-                        previewDialogExtraNotice={
-                          transitionReviewResult && !transitionReviewResult.ok ? (
-                            <TransitionBlockedNotice result={transitionReviewResult} />
-                          ) : null
-                        }
-                      />
+            <StructuredPlanConstructor
+              formRef={structuredFormRef}
+              state={constructorState}
+              setState={{
+                setAge,
+                setWeightKg,
+                setHeightCm,
+                setFitnessLevel,
+                setRecent5kTime,
+                setRecent5kPace,
+                setFixedRestDays,
+                setRestDaysAnswered,
+                setMaxRunningDaysPerWeek,
+                setPreferredLongRunDay,
+                setStartDate,
+              }}
+              isBusy={isBusy || !hasActivePlan}
+              isConstructorReady={hasAcceptedRunnerBaseline}
+              onSubmit={() => {
+                selectedPlanPreview.setError("Choose a goal before reviewing the plan change.");
+              }}
+              planPresetPanel={
+                <PlanPresetPanel
+                  confirmResult={null}
+                  previewResult={selectedPlanPreview.previewResult}
+                  createStatus={transitionStatus === "reviewing" ? "creating" : "idle"}
+                  error={selectedPlanPreview.error}
+                  status={selectedPlanPreview.status}
+                  hasRequiredPlanBasics={hasAcceptedRunnerBaseline}
+                  requiredBasicsCopy="Save your runner baseline and accept the BPM guidance before Hito prepares a reviewed plan."
+                  previewOpen={selectedPlanPreview.previewOpen}
+                  planGoalChoice={planGoalChoice}
+                  planGoalCustomDistanceKm={planGoalCustomDistanceKm}
+                  planGoalCustomDistanceLabel={planGoalCustomDistanceLabel}
+                  planGoalFinishTime={planGoalFinishTime}
+                  planGoalTargetDate={planGoalTargetDate}
+                  onPlanGoalChoiceChange={changePlanGoalChoice}
+                  onPlanGoalCustomDistanceKmChange={setPlanGoalCustomDistanceKm}
+                  onPlanGoalCustomDistanceLabelChange={setPlanGoalCustomDistanceLabel}
+                  onPlanGoalFinishTimeChange={setPlanGoalFinishTime}
+                  onPlanGoalTargetDateChange={setPlanGoalTargetDate}
+                  onPreviewOpenChange={(nextOpen) => {
+                    selectedPlanPreview.setPreviewOpen(nextOpen);
+                    if (!nextOpen) {
+                      setTransitionReviewResult(null);
                     }
-                    quickSetupSections={{
-                      heartRateProfile: (
-                        <OnboardingRunnerHeartRateProfile
-                          canPrepare={runnerBaseline.canPrepare && !settingsError}
-                          error={runnerBaseline.error ?? settingsError}
-                          isSaving={runnerBaseline.isSaving || settingsStatus === "loading"}
-                          onClearError={() => {
-                            runnerBaseline.clearError();
-                            setSettingsError(null);
-                          }}
-                          onPrepare={runnerBaseline.prepare}
-                          onSave={runnerBaseline.saveHeartRateProfile}
-                          summary={runnerBaseline.summary}
-                        />
-                      ),
+                  }}
+                  onRefreshPreview={() => {
+                    void selectedPlanPreview.refreshPreview();
+                  }}
+                  onCreatePlan={() => {
+                    void reviewSelectedPlanTransition();
+                  }}
+                  previewDialogDescription="This plan is still a preview. Next, review what will change before anything is saved."
+                  previewDialogPrimaryActionLabel="Review plan change"
+                  previewDialogPrimaryActionPendingLabel="Reviewing change..."
+                  previewDialogExtraNotice={
+                    transitionReviewResult && !transitionReviewResult.ok ? (
+                      <TransitionBlockedNotice result={transitionReviewResult} />
+                    ) : null
+                  }
+                />
+              }
+              quickSetupSections={{
+                heartRateProfile: (
+                  <OnboardingRunnerHeartRateProfile
+                    canPrepare={runnerBaseline.canPrepare && !settingsError}
+                    error={runnerBaseline.error ?? settingsError}
+                    isSaving={runnerBaseline.isSaving || settingsStatus === "loading"}
+                    onClearError={() => {
+                      runnerBaseline.clearError();
+                      setSettingsError(null);
                     }}
+                    onPrepare={runnerBaseline.prepare}
+                    onSave={runnerBaseline.saveHeartRateProfile}
+                    summary={runnerBaseline.summary}
                   />
-                </div>
-              ) : (
-                <div {...createModeTabs.getPanelProps("custom")}>
-                  <CustomPlanTransitionNotice
-                    onUseQuick={() => setCreateMode("quick")}
-                    onOpenPlan={onOpenPlan}
-                  />
-                </div>
-              )}
-            </div>
+                ),
+              }}
+            />
           </div>
 
           <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
@@ -760,7 +634,6 @@ export function ActivePlanCreatePlanDialog({
 }
 
 function activePlanCreateFooterHint({
-  createMode,
   error,
   hasActivePlan,
   hasAcceptedRunnerBaseline,
@@ -771,7 +644,6 @@ function activePlanCreateFooterHint({
   previewIsReady,
   status,
 }: {
-  createMode: CreateMode;
   error: string | null;
   hasActivePlan: boolean;
   hasAcceptedRunnerBaseline: boolean;
@@ -784,13 +656,6 @@ function activePlanCreateFooterHint({
 }): { message: string; tone: "muted" | "error" } {
   if (error) {
     return { message: error, tone: "error" };
-  }
-
-  if (createMode !== "quick") {
-    return {
-      message: "Use Quick plan to create a reviewed generated replacement.",
-      tone: "muted",
-    };
   }
 
   if (!hasActivePlan) {

@@ -136,7 +136,7 @@ function TransitionReviewSummary({ review }: { review: TransitionReviewOk }) {
                   {review.preservedHistory.loggedWorkoutCount} logs
                 </span>
                 <span className="hito-status-pill" data-tone="muted">
-                  {review.preservedHistory.providerEvidenceCount} evidence
+                  {review.preservedHistory.providerEvidenceCount} activity records
                 </span>
                 <span className="hito-status-pill" data-tone="muted">
                   {review.preservedHistory.comparisonCount} comparisons
@@ -152,18 +152,15 @@ function TransitionReviewSummary({ review }: { review: TransitionReviewOk }) {
               <p className="hito-label">Metric honesty</p>
               <p className="hito-list-row-copy">
                 {review.metricHonesty.paceTargetRowCount > 0
-                  ? `${review.metricHonesty.paceTargetRowCount} rows include backend-backed pace targets.`
-                  : "No backend-backed pace rows in this candidate."}
+                  ? `${review.metricHonesty.paceTargetRowCount} workouts include pace guidance.`
+                  : "This plan does not use pace guidance."}
               </p>
               <div className="flex flex-wrap gap-2">
                 <span className="hito-status-pill" data-tone="muted">
-                  no fake pace
+                  {review.metricHonesty.paceTargetRowCount} pace-guided workouts
                 </span>
                 <span className="hito-status-pill" data-tone="muted">
-                  no fake personal HR
-                </span>
-                <span className="hito-status-pill" data-tone="muted">
-                  {review.metricHonesty.hrTargetRowCount} HR target rows
+                  {review.metricHonesty.hrTargetRowCount} BPM-guided workouts
                 </span>
               </div>
             </div>
@@ -177,9 +174,7 @@ function TransitionReviewSummary({ review }: { review: TransitionReviewOk }) {
             <p className="hito-label">What Hito will preserve</p>
             <p className="hito-list-row-copy">{review.manualTemplates.statement}</p>
             <p className="hito-field-helper">
-              Server rebuilt candidate: {review.safety.serverRebuiltCandidate ? "yes" : "no"} ·
-              trusted client rows: {review.safety.trustedClientRows ? "yes" : "no"} · previous plan
-              archived: {review.safety.oldPlanWillBeArchived ? "yes" : "no"}
+              Your previous plan and completed history stay available after this change.
             </p>
           </div>
         </div>
@@ -193,78 +188,30 @@ export function TransitionBlockedNotice({
 }: {
   result: TransitionBlocked | Extract<ActivePlanTransitionConfirmResult, { ok: false }>;
 }) {
+  const copy = transitionBlockedCopy(result.reason);
+
   return (
     <div className="hito-surface-wash" data-tone="destructive">
       <p className="hito-list-row-title">Plan change blocked</p>
-      <p className="hito-list-row-copy">{result.message}</p>
-      <p className="hito-field-helper mt-2">Reason: {result.reason}</p>
+      <p className="hito-list-row-copy">{copy}</p>
     </div>
   );
 }
 
-export function CustomPlanTransitionNotice({
-  onOpenPlan,
-  onUseQuick,
-}: {
-  onUseQuick: () => void;
-  onOpenPlan: () => void;
-}) {
-  return (
-    <div className="grid gap-4">
-      <section className="hito-surface-wash" data-tone="signal">
-        <div className="flex items-start gap-3">
-          <Icon name="warning" size="sm" className="mt-0.5 text-signal" />
-          <div className="min-w-0">
-            <p className="hito-list-row-title">Custom plan transition is not live yet</p>
-            <p className="hito-list-row-copy">
-              Quick generated plans can use the reviewed active-plan transition now. A fully custom
-              active-plan replacement needs its own reviewed candidate seam, so Hito will not change
-              your current plan from this tab.
-            </p>
-          </div>
-        </div>
-      </section>
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          className="hito-button hito-button-primary hito-button-md"
-          onClick={onUseQuick}
-        >
-          Use Quick plan
-        </button>
-        <button
-          type="button"
-          className="hito-button hito-button-secondary hito-button-md"
-          onClick={onOpenPlan}
-        >
-          Plan actions
-        </button>
-      </div>
-    </div>
-  );
-}
-
-export function UnsupportedActivePlanNotice({ onOpenPlan }: { onOpenPlan: () => void }) {
-  return (
-    <div className="hito-surface-wash" data-tone="destructive">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="hito-list-row-title">Create a plan needs an active plan first</p>
-          <p className="hito-list-row-copy">
-            This reviewed transition starts from the current active plan. Your current plan is
-            unchanged if Hito cannot verify that active-plan state.
-          </p>
-        </div>
-        <button
-          type="button"
-          className="hito-button hito-button-secondary hito-button-sm shrink-0"
-          onClick={onOpenPlan}
-        >
-          Plan actions
-        </button>
-      </div>
-    </div>
-  );
+function transitionBlockedCopy(reason: TransitionBlocked["reason"]) {
+  switch (reason) {
+    case "unauthenticated":
+      return "Sign in again before reviewing this plan change.";
+    case "no_active_plan":
+      return "Open your current plan, then try creating a replacement again.";
+    case "persistence_failed":
+      return "The new plan could not be saved. Your current plan is unchanged.";
+    case "invalid_review":
+    case "stale_review":
+    case "input_mismatch":
+    case "preview_unavailable":
+      return "This review is no longer current. Refresh the preview and review the change again.";
+  }
 }
 
 function ReviewFact({ label, value }: { label: string; value: string }) {

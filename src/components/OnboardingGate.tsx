@@ -10,12 +10,7 @@ import { useOnboardingRunnerBaseline } from "@/components/onboarding/use-onboard
 import {
   isPresetPrimarySetupReady,
   normalizePresetPrimaryFitnessLevel,
-  resolveTerrainFocus,
-  type GoalDistance,
-  type GoalStyle,
-  type StrengthPreference,
   type StructuredConstructorState,
-  type TerrainFocus,
   type WeekdayName,
 } from "@/components/onboarding/onboarding-form-model";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
@@ -66,23 +61,13 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const [preferredLongRunDay, setPreferredLongRunDay] = useState<WeekdayName | "">(
     () => defaults?.trainingPreferences?.preferred_long_run_day ?? "",
   );
-  const [goalDistance, setGoalDistance] = useState<GoalDistance>("build_consistency");
-  const [goalStyle, setGoalStyle] = useState<GoalStyle>("balanced");
-  const [targetTime, setTargetTime] = useState("");
   const [startDate, setStartDate] = useState("");
-  const [targetDate, setTargetDate] = useState("");
   const [planGoalChoice, setPlanGoalChoice] =
     useState<StructuredConstructorState["planGoalChoice"]>("");
   const [planGoalCustomDistanceKm, setPlanGoalCustomDistanceKm] = useState("");
   const [planGoalCustomDistanceLabel, setPlanGoalCustomDistanceLabel] = useState("");
   const [planGoalFinishTime, setPlanGoalFinishTime] = useState("");
   const [planGoalTargetDate, setPlanGoalTargetDate] = useState("");
-  const [terrainFocus, setTerrainFocus] = useState<TerrainFocus>("standard");
-  const watchAccess: StructuredConstructorState["watchAccess"] = "watch_or_app";
-  const [guidancePreference, setGuidancePreference] =
-    useState<StructuredConstructorState["guidancePreference"]>("effort");
-  const [strengthPreference, setStrengthPreference] = useState<StrengthPreference>("none");
-  const [comment, setComment] = useState("");
   const [manualCreateStatus, setManualCreateStatus] = useState<ManualCreateStatus>("idle");
   const [manualCreateError, setManualCreateError] = useState<string | null>(null);
   const [runningPlanConfirmResult, setRunningPlanConfirmResult] =
@@ -104,30 +89,17 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
       restDaysAnswered,
       maxRunningDaysPerWeek,
       preferredLongRunDay,
-      goalDistance,
-      goalStyle,
-      targetTime,
       startDate,
-      targetDate,
       planGoalChoice,
       planGoalCustomDistanceKm,
       planGoalCustomDistanceLabel,
       planGoalFinishTime,
       planGoalTargetDate,
-      terrainFocus,
-      watchAccess,
-      guidancePreference,
-      strengthPreference,
-      comment,
     }),
     [
       age,
-      comment,
       fitnessLevel,
       fixedRestDays,
-      goalDistance,
-      goalStyle,
-      guidancePreference,
       heightCm,
       maxRunningDaysPerWeek,
       planGoalCustomDistanceKm,
@@ -140,20 +112,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
       recent5kTime,
       restDaysAnswered,
       startDate,
-      strengthPreference,
-      targetDate,
-      targetTime,
-      terrainFocus,
-      watchAccess,
       weightKg,
     ],
-  );
-  const effectiveConstructorState: StructuredConstructorState = useMemo(
-    () => ({
-      ...constructorState,
-      terrainFocus: resolveTerrainFocus(goalDistance, terrainFocus),
-    }),
-    [constructorState, goalDistance, terrainFocus],
   );
   const hasRequiredPlanBasics = isPresetPrimarySetupReady(constructorState);
   const runnerBaseline = useOnboardingRunnerBaseline({
@@ -163,10 +123,10 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const hasAcceptedRunnerBaseline = hasRequiredPlanBasics && runnerBaseline.isReady;
   const isManualSetupReady = isManualProfileReady(constructorState) && runnerBaseline.isReady;
   const selectedPlanPreview = useSelectedPlanPresetPreviewController({
-    state: effectiveConstructorState,
+    state: constructorState,
     hasRequiredPlanBasics: hasAcceptedRunnerBaseline,
     toastId: STRUCTURED_REVIEW_TOAST_ID,
-    previewReadyDescription: "Review the backend-shaped calendar before creating the plan.",
+    previewReadyDescription: "Review the calendar before creating the plan.",
     previewContextKey: runnerBaseline.previewContextKey,
     requiredBasicsMessage:
       "Save your runner baseline and accept the BPM guidance before previewing a generated plan.",
@@ -299,7 +259,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     hitoToast.working({
       id: STRUCTURED_REVIEW_TOAST_ID,
       title: "Creating plan",
-      description: "Hito is confirming the reviewed selected plan server-side.",
+      description: "Hito is saving the plan you reviewed.",
     });
 
     try {
@@ -469,7 +429,6 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
         {advancedSettingsOpen ? (
           <div id="advanced-generated-plan-setup">
             <StructuredPlanConstructor
-              mode="quick"
               formRef={structuredFormRef}
               state={constructorState}
               setState={{
@@ -483,18 +442,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
                 setRestDaysAnswered,
                 setMaxRunningDaysPerWeek,
                 setPreferredLongRunDay,
-                setGoalDistance,
-                setGoalStyle,
-                setTargetTime,
                 setStartDate,
-                setTargetDate,
-                setTerrainFocus,
-                setGuidancePreference,
-                setStrengthPreference,
-                setComment,
               }}
-              constructorStatus="idle"
-              constructorError={null}
               isBusy={isBusy}
               isConstructorReady={hasRequiredPlanBasics}
               onSubmit={() => {
@@ -596,7 +545,7 @@ function manualCreateFooterHint({
   }
 
   return {
-    message: "Creates an empty manual plan. No fake workouts will be added.",
+    message: "Creates an empty manual plan without adding workouts.",
     tone: "neutral",
   };
 }

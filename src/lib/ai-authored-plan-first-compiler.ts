@@ -506,7 +506,7 @@ function buildTarget(
     primary_execution_mode: value.primary_execution_mode,
     target_source: AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
     hr_target_source: "effort_only",
-    source_note: "AI-authored target preserved from the signed reviewed plan.",
+    source_note: "Target from the created plan.",
     ...(value.primary_execution_mode === "pace" ? { pace: value.command } : {}),
     ...(value.primary_execution_mode === "effort" || value.primary_execution_mode === "run_walk"
       ? { intensity: value.command }

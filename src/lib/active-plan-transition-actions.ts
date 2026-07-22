@@ -5,6 +5,7 @@ import {
   transitionActiveManualPlanToReviewedCanonicalPlanForUser,
   type ExistingPlanContext,
 } from "@/lib/active-plan-persistence";
+import { ActivePlanPersistenceRejection } from "@/lib/active-plan-lifecycle-persistence";
 import { getRequestAuthContext } from "@/lib/backend/auth";
 import type { AdditionalPlanPersistenceMetadata } from "@/lib/plan-authoring-snapshot";
 import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
@@ -37,6 +38,7 @@ import type { Json } from "@/lib/supabase/database";
 import { serverEnv } from "@/lib/supabase/env";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { todayIso } from "@/lib/training";
+import { getRunnerPlanAuthoringProfileSnapshotForUserId } from "@/lib/user-settings-actions";
 
 export const ACTIVE_PLAN_TRANSITION_REVIEW_CONTRACT_VERSION =
   "active_plan_transition_review_v1" as const;
@@ -230,6 +232,7 @@ type BuildTransitionReviewOk = Extract<ActivePlanTransitionReviewResult, { ok: t
   canonicalPlan: Parameters<typeof buildRunningPlanPersistenceMetadata>[0]["canonicalPlan"];
   persistenceMetadata: AdditionalPlanPersistenceMetadata;
   currentPlanContext: ExistingPlanContext;
+  expectedProfileRevision: number;
   payload: ActivePlanTransitionReviewPayload;
   generationTrace: AiPlanGenerationLedgerTrace | null;
 };
@@ -243,6 +246,7 @@ type ActivePlanTransitionDistanceGoalSummary = {
 
 export type ActivePlanTransitionDependencies = {
   getPlanContext: (userId: string) => Promise<ExistingPlanContext>;
+  getRunnerProfileSnapshot: typeof getRunnerPlanAuthoringProfileSnapshotForUserId;
   loadEvidenceSummary: (
     userId: string,
     workoutIds: readonly string[],
@@ -253,6 +257,7 @@ export type ActivePlanTransitionDependencies = {
 
 const defaultDependencies: ActivePlanTransitionDependencies = {
   getPlanContext: getExistingPlanContext,
+  getRunnerProfileSnapshot: getRunnerPlanAuthoringProfileSnapshotForUserId,
   loadEvidenceSummary: loadTransitionEvidenceSummary,
   persistTransition: transitionActiveManualPlanToReviewedCanonicalPlanForUser,
   today: todayIso,
@@ -306,6 +311,7 @@ export async function reviewActivePlanTransitionForUser(
     canonicalPlan: _canonicalPlan,
     persistenceMetadata: _persistenceMetadata,
     currentPlanContext: _context,
+    expectedProfileRevision: _expectedProfileRevision,
     payload: _payload,
     generationTrace: _generationTrace,
     ...review
@@ -368,6 +374,7 @@ export async function confirmActivePlanTransitionForUser(
       expectedCurrentActivePlanUpdatedAt: review.currentPlan.updatedAt,
       reviewedPlan: review.canonicalPlan,
       replacementStartsAt: review.affectedManualSchedule.affectedFromDate,
+      expectedProfileRevision: review.expectedProfileRevision,
       planMetadata: mergeTransitionPersistenceMetadata(review.persistenceMetadata, {
         transitionReviewChecksum: review.transitionReviewChecksum,
         archivedPlanId: review.currentPlan.id,
@@ -404,7 +411,19 @@ export async function confirmActivePlanTransitionForUser(
         callsOpenAi: false,
       },
     };
-  } catch {
+  } catch (error) {
+    if (error instanceof ActivePlanPersistenceRejection && error.reason === "stale_review") {
+      await markAiPlanGenerationPersistenceFailed({
+        trace: review.generationTrace,
+        reason: "stale_review",
+      });
+      return buildTransitionFailure({
+        reason: "stale_review",
+        message: error.message,
+        input: parsed.data.reviewInput.candidate,
+      });
+    }
+
     await markAiPlanGenerationPersistenceFailed({
       trace: review.generationTrace,
       reason: "active_plan_transition_persistence_failed",
@@ -473,6 +492,30 @@ async function buildActivePlanTransitionReview(
   }
 
   const { draft, exactness } = candidateReview;
+  let currentProfileSnapshot: Awaited<
+    ReturnType<typeof getRunnerPlanAuthoringProfileSnapshotForUserId>
+  >;
+  try {
+    currentProfileSnapshot = await dependencies.getRunnerProfileSnapshot(userId);
+  } catch {
+    return buildTransitionFailure({
+      reason: "persistence_failed",
+      message: "The runner baseline could not be verified before reviewing this plan change.",
+      input: candidate,
+    });
+  }
+
+  if (
+    !currentProfileSnapshot ||
+    !stableJsonEqual(currentProfileSnapshot, draft.normalizedInputSummary.runnerProfileSnapshot)
+  ) {
+    return buildTransitionFailure({
+      reason: "stale_review",
+      message: "The runner baseline changed after preview. Refresh the plan before continuing.",
+      input: candidate,
+    });
+  }
+
   const distanceGoal = buildTransitionDistanceGoalSummary(draft);
 
   const reviewDate = dependencies.today();
@@ -584,7 +627,7 @@ async function buildActivePlanTransitionReview(
       comparisonCount: evidence.comparisonCount,
       aiInsightCount: evidence.aiInsightCount,
       statement:
-        "Logged workouts, provider evidence, comparisons, and protected history are carried forward into the active calendar and remain recoverable from runner history.",
+        "Logged workouts, recorded activity data, comparisons, and protected history are carried forward into the active calendar and remain recoverable from runner history.",
     },
     manualTemplates: {
       preserved: true,
@@ -607,6 +650,7 @@ async function buildActivePlanTransitionReview(
       reviewChecksum: exactness.reviewChecksum,
     }),
     currentPlanContext: context,
+    expectedProfileRevision: currentProfileSnapshot.profileRevision,
     payload,
   };
 }

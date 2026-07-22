@@ -1,4 +1,3 @@
-import type { StructuredFirstPlanOnboardingInput } from "@/lib/structured-first-plan-onboarding";
 import { parseDurationSeconds, parsePaceSecondsPerKm } from "@/lib/first-plan-authoring-utils";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 
@@ -10,18 +9,6 @@ export type WeekdayName =
   | "Friday"
   | "Saturday"
   | "Sunday";
-export type GoalDistance = StructuredFirstPlanOnboardingInput["goal"]["goalDistance"];
-export type GoalStyle = StructuredFirstPlanOnboardingInput["goal"]["goalStyle"];
-export type TerrainFocus = StructuredFirstPlanOnboardingInput["goal"]["terrainFocus"];
-export type WatchAccess = NonNullable<
-  NonNullable<StructuredFirstPlanOnboardingInput["execution"]>["watchAccess"]
->;
-export type GuidancePreference = NonNullable<
-  NonNullable<StructuredFirstPlanOnboardingInput["execution"]>["guidancePreference"]
->;
-export type StrengthPreference = NonNullable<
-  NonNullable<StructuredFirstPlanOnboardingInput["strength"]>["preference"]
->;
 export type PlanGoalChoice = "" | "10k" | "half_marathon" | "marathon" | "custom";
 
 export interface StructuredConstructorState {
@@ -35,9 +22,6 @@ export interface StructuredConstructorState {
   restDaysAnswered: boolean;
   maxRunningDaysPerWeek: string;
   preferredLongRunDay: WeekdayName | "";
-  goalDistance: GoalDistance;
-  goalStyle: GoalStyle;
-  targetTime: string;
   startDate: string;
   targetDate: string;
   planGoalChoice: PlanGoalChoice;
@@ -45,15 +29,7 @@ export interface StructuredConstructorState {
   planGoalCustomDistanceLabel: string;
   planGoalFinishTime: string;
   planGoalTargetDate: string;
-  terrainFocus: TerrainFocus;
-  watchAccess: WatchAccess;
-  guidancePreference: GuidancePreference;
-  strengthPreference: StrengthPreference;
-  comment: string;
 }
-
-export const ONBOARDING_TEXTAREA_CLASS =
-  "hito-field hito-field-secondary hito-textarea-md resize-none";
 
 export const WEEKDAY_OPTIONS: { value: WeekdayName; label: string }[] = [
   { value: "Monday", label: "Mon" },
@@ -126,66 +102,6 @@ export const PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS: {
   },
 ];
 
-export const GOAL_DISTANCE_OPTIONS: { value: GoalDistance; label: string }[] = [
-  { value: "build_consistency", label: "Build consistency" },
-  { value: "5k", label: "5K" },
-  { value: "10k", label: "10K" },
-  { value: "half_marathon", label: "Half marathon" },
-  { value: "marathon", label: "Marathon" },
-  { value: "ultra_marathon", label: "Ultra marathon" },
-  { value: "mountain_running", label: "Mountain running" },
-];
-
-export const GOAL_STYLE_OPTIONS: { value: GoalStyle; label: string }[] = [
-  { value: "relaxed", label: "Relaxed" },
-  { value: "balanced", label: "Balanced" },
-  { value: "ambitious", label: "Ambitious" },
-  { value: "target_time", label: "Target time" },
-];
-
-export const TERRAIN_OPTIONS: { value: TerrainFocus; label: string; copy: string }[] = [
-  { value: "standard", label: "Standard", copy: "Roads, paths, or usual mixed terrain." },
-  { value: "rolling", label: "Rolling", copy: "Some hills are welcome." },
-  { value: "mountain", label: "Mountain", copy: "Prepare for sustained climbs or descents." },
-];
-
-export const GUIDANCE_PREFERENCE_OPTIONS: {
-  value: GuidancePreference;
-  label: string;
-  copy: string;
-}[] = [
-  { value: "effort", label: "Effort", copy: "Use RPE and simple running cues." },
-  {
-    value: "pace",
-    label: "Pace",
-    copy: "Use broad pace targets when benchmark truth supports it.",
-  },
-  { value: "heart_rate", label: "Heart rate", copy: "Use effort for now unless HR zones exist." },
-  { value: "mixed", label: "Mixed", copy: "Blend cues with safe numeric targets when available." },
-];
-
-export const STRENGTH_OPTIONS: { value: StrengthPreference; label: string; copy: string }[] = [
-  { value: "none", label: "None", copy: "Keep the plan running-only." },
-  { value: "mobility", label: "Mobility", copy: "Add light mobility support where useful." },
-  {
-    value: "strength_mobility",
-    label: "Strength / mobility support",
-    copy: "Simple support only, not a detailed gym program.",
-  },
-];
-
-export function resolveTerrainFocus(goalDistance: GoalDistance, terrainFocus: TerrainFocus) {
-  if (goalDistance === "mountain_running") {
-    return "mountain";
-  }
-
-  if (goalDistance === "marathon" || goalDistance === "ultra_marathon") {
-    return terrainFocus ?? "standard";
-  }
-
-  return "standard";
-}
-
 export function normalizePresetPrimaryFitnessLevel(
   value: RunnerFitnessLevel,
 ): PresetPrimaryFitnessLevel {
@@ -214,17 +130,6 @@ export function isPositiveRecent5kPace(value: string) {
   const seconds = parsePaceSecondsPerKm(value);
 
   return seconds != null && seconds > 0;
-}
-
-export function formatTerrainFocus(terrainFocus: NonNullable<TerrainFocus>) {
-  switch (terrainFocus) {
-    case "standard":
-      return "Standard";
-    case "rolling":
-      return "Rolling";
-    case "mountain":
-      return "Mountain";
-  }
 }
 
 function requiredNumber(
@@ -267,40 +172,4 @@ function requiredNumber(
   }
 
   return { ok: true, value: parsed };
-}
-
-function optionalValidNumber(
-  value: string,
-  options: {
-    min: number;
-    max: number;
-    integer?: boolean;
-    increment?: number;
-  },
-) {
-  const trimmed = value.trim();
-
-  if (!trimmed) {
-    return null;
-  }
-
-  const parsed = Number(trimmed);
-
-  if (!Number.isFinite(parsed)) {
-    return null;
-  }
-
-  if (options.integer && !Number.isInteger(parsed)) {
-    return null;
-  }
-
-  if (parsed < options.min || parsed > options.max) {
-    return null;
-  }
-
-  if (options.increment && !Number.isInteger(parsed / options.increment)) {
-    return null;
-  }
-
-  return parsed;
 }

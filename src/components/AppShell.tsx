@@ -543,7 +543,6 @@ export function AppShell({
       <ActivePlanCreatePlanDialog
         open={activePlanCreateOpen}
         onOpenChange={setActivePlanCreateOpen}
-        onOpenPlan={() => openPlanActionDialog("edit-schedule")}
         snapshot={snapshot}
       />
       <PlanManagementDialog

@@ -152,6 +152,7 @@ export async function transitionActiveManualPlanToReviewedCanonicalPlanForUser(i
   userId: string;
   currentActivePlan: PersistedPlanCycleRow;
   expectedCurrentActivePlanUpdatedAt: string;
+  expectedProfileRevision: number;
   reviewedPlan: ImportedPlanInput;
   replacementStartsAt: string;
   planMetadata: AdditionalPlanPersistenceMetadata | null;
@@ -166,6 +167,7 @@ export async function transitionActiveManualPlanToReviewedCanonicalPlanForUser(i
     userId: input.userId,
     currentActivePlan: input.currentActivePlan,
     expectedCurrentActivePlanUpdatedAt: input.expectedCurrentActivePlanUpdatedAt,
+    expectedProfileRevision: input.expectedProfileRevision,
     existingWorkouts,
     importedSeed: reviewedSeed,
     replacementStartsAt: input.replacementStartsAt,
@@ -291,6 +293,7 @@ async function replaceActivePlanWithCompiledSeed(input: {
   userId: string;
   currentActivePlan: PersistedPlanCycleRow;
   expectedCurrentActivePlanUpdatedAt: string | null;
+  expectedProfileRevision?: number;
   existingWorkouts: ExistingPlanContext["existingWorkouts"];
   importedSeed: ImportedPlanSeed;
   replacementStartsAt: string;
@@ -366,7 +369,10 @@ async function replaceActivePlanWithCompiledSeed(input: {
             input.expectedCurrentActivePlanUpdatedAt ?? input.currentActivePlan.updated_at,
           clearBeforeImport: true,
         })
-      : await applyAtomicReviewedPlanPersistence(persistenceInput);
+      : await applyAtomicReviewedPlanPersistence({
+          ...persistenceInput,
+          expectedProfileRevision: input.expectedProfileRevision,
+        });
 
   if (!persisted.archivedPlan) {
     throw new Error("Atomic plan replacement did not return the archived plan.");

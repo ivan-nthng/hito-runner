@@ -1,6 +1,6 @@
 # Hito Work Dashboard
 
-Generated: 2026-07-21T23:16:19.411Z
+Generated: 2026-07-22T00:46:42.082Z
 Mode: dashboard-only
 
 Keep this file open in a side pane. Re-run one command below whenever you want the Admin work-item
@@ -200,15 +200,15 @@ Next Gate
 <code>in_progress</code>
 
 #### Task
-Hold source-size cleanup after the pre-commit simplification and release-bundle checkpoint.
+Hold source-size cleanup after the accepted runner plan-creation flow simplification.
 
 <sub><code>STAGE</code></sub>
 
-<code>ARCHITECT holding / clean source-control boundary established.</code>
+<code>ARCHITECT holding / canonical runner plan-creation flow accepted.</code>
 
 <sub><code>LAST VISIBLE NOTE</code></sub>
 
-Pre-Commit Release Bundle Checkpoint - 2026-07-21: Classified the accumulated dirty tree by canonical owner instead of treating it as one new
+Runner Plan-Creation Flow Simplification - 2026-07-21: Accepted one canonical runner path: persisted baseline and accepted estimated/personal BPM truth
 
 <sub><code>NEXT ROLE</code></sub>
 

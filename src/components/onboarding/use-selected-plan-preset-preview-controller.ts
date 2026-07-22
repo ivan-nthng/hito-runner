@@ -161,7 +161,7 @@ export function useSelectedPlanPresetPreviewController({
       setPreviewInput(null);
       setStatus("idle");
       setError(
-        "Hito could not start plan authoring right now. Nothing was created or saved. Try again.",
+        "Hito could not prepare the plan right now. Nothing was created or saved. Try again.",
       );
     }
   }

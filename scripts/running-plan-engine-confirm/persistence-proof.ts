@@ -244,7 +244,7 @@ export async function validatePersistenceContract(
       });
     }
   }
-  const creationFailureAtomic = await validateReviewedPlanCreationFailureAtomicity(supabase);
+  const creationFailureAtomic = await validateReviewedPlanPersistenceFailureAtomicity(supabase);
   const personalHeartRateProfile = await validatePersonalHeartRateProfilePersistence({
     supabase,
     preflight,
@@ -892,7 +892,7 @@ function localFixtureEnv(loopbackSupabaseUrl: string) {
   };
 }
 
-async function validateReviewedPlanCreationFailureAtomicity(
+async function validateReviewedPlanPersistenceFailureAtomicity(
   supabase: ReturnType<typeof createAdminSupabaseClient>,
 ) {
   const disposableUser = await createDisposableSupabaseUser({
@@ -903,6 +903,34 @@ async function validateReviewedPlanCreationFailureAtomicity(
   });
   const planId = crypto.randomUUID();
   const firstWorkoutId = crypto.randomUUID();
+  const profilePayload = {
+    goal_type: "distance_build",
+    goal_label: "Atomic 10K proof",
+    baseline_sessions_per_week: 3,
+    baseline_long_run_km: 6,
+    baseline_notes: null,
+  };
+  const buildPlanPayload = (id: string, title: string, sourceTemplate: string) => ({
+    id,
+    title,
+    goal_summary: "10K",
+    source_template: sourceTemplate,
+    schema_version: "training-plan-v2",
+    source_kind: "ai_authored_plan_first_v1",
+    start_date: "2026-07-20",
+    end_date: "2026-07-27",
+    target_date: null,
+    goal_metadata: {},
+    plan_preferences: {},
+  });
+  const buildExpectedHistory = (workoutIds: string[] = []) => ({
+    workout_ids: workoutIds,
+    log_ids: [],
+    asset_ids: [],
+    metric_ids: [],
+    comparison_ids: [],
+    insight_ids: [],
+  });
 
   try {
     const baseline = buildFirstTimeRunnerBaselineReadback({
@@ -937,39 +965,14 @@ async function validateReviewedPlanCreationFailureAtomicity(
     await assert.rejects(
       applyAtomicReviewedPlanPersistence({
         userId: disposableUser.userId,
-        profile: {
-          goal_type: "distance_build",
-          goal_label: "Stale profile revision proof",
-          baseline_sessions_per_week: 3,
-          baseline_long_run_km: 6,
-          baseline_notes: null,
-        },
-        plan: {
-          id: planId,
-          title: "Stale profile revision proof",
-          goal_summary: "10K",
-          source_template: "stale_profile_revision_proof",
-          schema_version: "training-plan-v2",
-          source_kind: "ai_authored_plan_first_v1",
-          start_date: "2026-07-20",
-          end_date: "2026-07-27",
-          target_date: null,
-          goal_metadata: {},
-          plan_preferences: {},
-        },
+        profile: profilePayload,
+        plan: buildPlanPayload(planId, "Stale profile revision proof", "stale_profile_revision"),
         workouts: [
           buildAtomicCreationWorkout(firstWorkoutId, planId, disposableUser.userId, "easy"),
         ] as unknown as Json,
         expectedActivePlanId: null,
         expectedActivePlanUpdatedAt: null,
-        expectedHistory: {
-          workout_ids: [],
-          log_ids: [],
-          asset_ids: [],
-          metric_ids: [],
-          comparison_ids: [],
-          insight_ids: [],
-        },
+        expectedHistory: buildExpectedHistory(),
         archiveGoalMetadata: null,
         logs: [],
         evidenceRelinks: [],
@@ -981,26 +984,8 @@ async function validateReviewedPlanCreationFailureAtomicity(
     await assert.rejects(
       applyAtomicReviewedPlanPersistence({
         userId: disposableUser.userId,
-        profile: {
-          goal_type: "distance_build",
-          goal_label: "Atomic 10K proof",
-          baseline_sessions_per_week: 3,
-          baseline_long_run_km: 6,
-          baseline_notes: null,
-        },
-        plan: {
-          id: planId,
-          title: "Atomic creation failure proof",
-          goal_summary: "10K",
-          source_template: "atomic_creation_failure_proof",
-          schema_version: "training-plan-v2",
-          source_kind: "ai_authored_plan_first_v1",
-          start_date: "2026-07-20",
-          end_date: "2026-07-27",
-          target_date: null,
-          goal_metadata: {},
-          plan_preferences: {},
-        },
+        profile: profilePayload,
+        plan: buildPlanPayload(planId, "Atomic creation failure proof", "atomic_creation_failure"),
         workouts: [
           buildAtomicCreationWorkout(firstWorkoutId, planId, disposableUser.userId, "easy"),
           buildAtomicCreationWorkout(
@@ -1012,14 +997,7 @@ async function validateReviewedPlanCreationFailureAtomicity(
         ] as unknown as Json,
         expectedActivePlanId: null,
         expectedActivePlanUpdatedAt: null,
-        expectedHistory: {
-          workout_ids: [],
-          log_ids: [],
-          asset_ids: [],
-          metric_ids: [],
-          comparison_ids: [],
-          insight_ids: [],
-        },
+        expectedHistory: buildExpectedHistory(),
         archiveGoalMetadata: null,
         logs: [],
         evidenceRelinks: [],
@@ -1054,11 +1032,96 @@ async function validateReviewedPlanCreationFailureAtomicity(
       .single();
     assert.equal(baselineAfter.error, null);
     assert.deepEqual(baselineAfter.data, baselineBefore.data);
+
+    const activePlanId = crypto.randomUUID();
+    const activeWorkoutId = crypto.randomUUID();
+    const created = await applyAtomicReviewedPlanPersistence({
+      userId: disposableUser.userId,
+      profile: profilePayload,
+      plan: buildPlanPayload(activePlanId, "Atomic active plan proof", "atomic_active_plan_proof"),
+      workouts: [
+        buildAtomicCreationWorkout(activeWorkoutId, activePlanId, disposableUser.userId, "easy"),
+      ] as unknown as Json,
+      expectedActivePlanId: null,
+      expectedActivePlanUpdatedAt: null,
+      expectedHistory: buildExpectedHistory(),
+      archiveGoalMetadata: null,
+      logs: [],
+      evidenceRelinks: [],
+      expectedProfileRevision: savedBaseline.profileRevision,
+    });
+    assert.equal(created.archivedPlan, null);
+    assert.equal(created.planCycle.id, activePlanId);
+
+    const changedBaseline = await updateUserSettingsForUserId(disposableUser.userId, {
+      firstName: null,
+      lastName: null,
+      displayName: null,
+      age: baseline.age,
+      weightKg: baseline.weightKg,
+      heightCm: baseline.heightCm,
+      fitnessLevel: baseline.fitnessLevel!,
+      heartRateProfile: { zones: [...PERSONAL_HEART_RATE_ZONES] },
+    });
+    assert.equal(changedBaseline.profileRevision, savedBaseline.profileRevision + 1);
+
+    const replacementPlanId = crypto.randomUUID();
+    await assert.rejects(
+      applyAtomicReviewedPlanPersistence({
+        userId: disposableUser.userId,
+        profile: profilePayload,
+        plan: buildPlanPayload(
+          replacementPlanId,
+          "Atomic replacement race proof",
+          "atomic_replacement_race_proof",
+        ),
+        workouts: [
+          buildAtomicCreationWorkout(
+            crypto.randomUUID(),
+            replacementPlanId,
+            disposableUser.userId,
+            "quality",
+          ),
+        ] as unknown as Json,
+        expectedActivePlanId: activePlanId,
+        expectedActivePlanUpdatedAt: created.planCycle.updated_at,
+        expectedHistory: buildExpectedHistory([activeWorkoutId]),
+        archiveGoalMetadata: null,
+        logs: [],
+        evidenceRelinks: [],
+        expectedProfileRevision: savedBaseline.profileRevision,
+      }),
+      (error) => error instanceof ActivePlanPersistenceRejection && error.reason === "stale_review",
+    );
+
+    const [plansAfterRace, workoutsAfterRace, profileAfterRace] = await Promise.all([
+      supabase.from("plan_cycles").select("id,status").eq("user_id", disposableUser.userId),
+      supabase
+        .from("planned_workouts")
+        .select("id,plan_cycle_id")
+        .eq("user_id", disposableUser.userId),
+      supabase
+        .from("runner_profiles")
+        .select("baseline_revision")
+        .eq("user_id", disposableUser.userId)
+        .single(),
+    ]);
+    assert.equal(plansAfterRace.error, null);
+    assert.equal(workoutsAfterRace.error, null);
+    assert.equal(profileAfterRace.error, null);
+    assert.deepEqual(plansAfterRace.data, [{ id: activePlanId, status: "active" }]);
+    assert.deepEqual(workoutsAfterRace.data, [
+      { id: activeWorkoutId, plan_cycle_id: activePlanId },
+    ]);
+    assert.equal(profileAfterRace.data?.baseline_revision, changedBaseline.profileRevision);
   } finally {
     await cleanupDisposableUser(supabase, disposableUser.userId);
   }
 
-  return true as const;
+  return {
+    creationRollback: true,
+    replacementProfileRaceRejected: true,
+  } as const;
 }
 
 function buildAtomicCreationWorkout(

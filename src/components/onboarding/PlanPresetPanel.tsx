@@ -361,7 +361,7 @@ function PlanGoalCard({
           </span>
         ) : (
           <span className="hito-status-pill shrink-0" data-tone="muted">
-            AI review
+            Preview
           </span>
         )}
       </span>

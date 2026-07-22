@@ -355,25 +355,6 @@ export function resolveEffectiveHeartRateGuidance(
   };
 }
 
-export function buildDefaultEstimatedHrBandReadback(
-  age: number | null | undefined,
-  key: DefaultEstimatedHrBandKey,
-): HeartRateZoneReadback | null {
-  const estimatedMaxHr = deriveEstimatedMaxHr(age);
-  const band = defaultEstimatedHrBands.find((candidate) => candidate.key === key);
-
-  if (estimatedMaxHr == null || !band) {
-    return null;
-  }
-
-  return {
-    reference: band.reference,
-    label: band.label,
-    description: band.description,
-    ...bpmRangeReadback(estimatedMaxHr, band.range),
-  };
-}
-
 function deriveEstimatedMaxHr(age: number | null | undefined) {
   if (typeof age !== "number" || !Number.isFinite(age)) {
     return null;

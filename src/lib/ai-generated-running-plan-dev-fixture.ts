@@ -524,7 +524,7 @@ function buildLongRunFixtureDay(date: string, acceptedHeartRateAvailable: boolea
 function buildEndpointFixtureDay(date: string, distanceMeters: number) {
   return {
     date,
-    phase: "Fixture authored",
+    phase: "Training plan",
     workout_identity: "selected_distance_completion_or_checkpoint" as const,
     title: "Selected Distance",
     cue: "Complete the selected distance.",
@@ -547,7 +547,7 @@ function workoutDay(
 ): AiAuthoredPlanFirstProviderDraft["workouts"][number] {
   return {
     date,
-    phase: "Fixture authored",
+    phase: "Training plan",
     workout_identity: workoutIdentity,
     title,
     cue: `${title} execution.`,

@@ -18,11 +18,11 @@ architect
 
 ## Task
 
-Hold source-size cleanup after the pre-commit simplification and release-bundle checkpoint.
+Hold source-size cleanup after the accepted runner plan-creation flow simplification.
 
 ## Stage
 
-ARCHITECT holding / clean source-control boundary established.
+ARCHITECT holding / canonical runner plan-creation flow accepted.
 
 ## Exact Handoff Prompt
 
@@ -40,10 +40,12 @@ Plan:
 /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-30-hito-source-size-governance-and-cleanup-plan.md
 
 Context:
-The deterministic-authoring, selected-plan discovery, and unreachable delete-plan cleanup batches
-are accepted. The remaining nearby lifecycle, preview/confirm, manual, import/export, schedule,
-and evidence owners have live consumers. The cleanup track is deliberately on hold rather than
-selecting cosmetic or file-size-driven work.
+The deterministic-authoring, selected-plan discovery, unreachable delete-plan, and runner
+plan-creation simplification batches are accepted. The zero-caller advanced constructor and
+no-action Custom replacement tab are removed; baseline/BPM, generated preview, first confirm, and
+active-plan replacement now share canonical truth and profile-revision exactness. The remaining
+manual, import/export, schedule, lifecycle, and evidence owners have live consumers. The cleanup
+track is deliberately on hold rather than selecting cosmetic or file-size-driven work.
 
 Root cause:
 Visible symptom: cleanup momentum can create speculative micro-batches after the proved dead paths
@@ -74,6 +76,36 @@ Stop conditions:
 - Stop and ask Product one concrete question when the proposed cleanup changes what a runner can do
   or what data/history Hito preserves.
 ```
+
+## Runner Plan-Creation Flow Simplification - 2026-07-21
+
+- Accepted one canonical runner path: persisted baseline and accepted estimated/personal BPM truth
+  feed the shared generated preview, explicit review, confirm, and immutable saved-plan readback.
+  First-plan confirm and active-plan replacement now both reject a changed profile/HR snapshot and
+  enforce the reviewed profile revision in atomic persistence.
+- FRONTEND removed the zero-caller advanced constructor branch, its obsolete form state, and the
+  no-action Custom replacement tab. The remaining `Advanced settings` disclosure opens the current
+  Quick generated-plan controls rather than a parallel authoring model.
+- Manual empty-plan creation and JSON import remain intentionally independent because they have
+  different user intent and mutation semantics; both still converge on canonical persisted plan and
+  workout entities. Active-plan replacement remains a distinct reviewed transition because it
+  archives the previous plan and preserves history.
+- Runner surfaces now use plain plan, preview, review, create, BPM, and activity-record language.
+  Internal AI/provider/compiler/fixture/review-token terminology remains available only to source,
+  diagnostics, validators, and developer documentation.
+- Source shape for the integrated frontend/backend/proof slice is `391` added and `1,147` removed
+  lines, net `-756`. Added lines are bounded stale-profile, stale-HR, and atomic-race proofs; the
+  runtime cleanup also removed the unused default estimated-HR readback helper.
+- Targeted lint, generated-plan/confirm/manual/doctrine validators, atomic persistence proof,
+  production build, build integrity, desktop and exact `375px` browser proof, database readback, and
+  disposable cleanup-to-zero passed. No paid OpenAI or hosted Supabase was used.
+
+Accepted QA artifact:
+
+`/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/qa-artifacts/screenshots/2026-07-21/plan-creation-deletion-first-cleanup-qa/proof.json`
+
+Cleanup returns to evidence-gated hold. The remaining generated, manual, import, replacement,
+schedule, and persistence owners are live contracts rather than parallel legacy paths.
 
 ## Pre-Commit Release Bundle Checkpoint - 2026-07-21
 

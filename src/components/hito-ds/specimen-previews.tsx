@@ -33,6 +33,10 @@ type ModalFooterMode = "none" | "actions" | "note-actions";
 type DataTableSortDirection = "asc" | "desc";
 type DataTableSpecimenSortKey = "preview" | "none";
 
+const BUTTON_VARIANTS: ButtonVariant[] = ["primary", "secondary", "outlined", "ghost"];
+const BUTTON_TONES: ButtonTone[] = ["default", "success", "error"];
+const BUTTON_SIZES: ButtonSize[] = ["xs", "sm", "md", "lg", "xl"];
+
 export function DataTableSpecimenPreview({
   sortable,
   activeSort,
@@ -667,6 +671,7 @@ export function DemoButton({
   variant,
   tone = "default",
   size,
+  iconOnly = false,
   leftIcon,
   rightIcon,
   disabled = false,
@@ -676,6 +681,7 @@ export function DemoButton({
   variant: ButtonVariant;
   tone?: ButtonTone;
   size: ButtonSize;
+  iconOnly?: boolean;
   leftIcon?: boolean;
   rightIcon?: boolean;
   disabled?: boolean;
@@ -686,22 +692,76 @@ export function DemoButton({
     <button
       type="button"
       disabled={disabled}
+      aria-busy={loading || undefined}
+      aria-label={iconOnly ? `${loading ? "Loading " : ""}${tone} ${variant} action` : undefined}
       className={cn(
         "hito-button w-fit max-w-full shrink-0 justify-self-start whitespace-nowrap capitalize",
         `hito-button-${variant}`,
         `hito-button-${size}`,
+        iconOnly && "hito-button-icon",
       )}
       data-tone={tone === "default" ? undefined : tone}
       data-demo-state={demoState}
     >
       {loading ? (
         <Icon name="loader" size="xs" className="animate-spin" />
+      ) : iconOnly ? (
+        <Icon name="check" size={size === "xs" || size === "sm" ? "xs" : "sm"} />
       ) : (
         leftIcon && <Icon name="circle" size="xs" />
       )}
-      {loading ? "Loading" : variant}
-      {!loading && rightIcon && <Icon name="arrow-right" size="xs" />}
+      {iconOnly ? null : loading ? "Loading" : variant}
+      {!iconOnly && !loading && rightIcon && <Icon name="arrow-right" size="xs" />}
     </button>
+  );
+}
+
+export function IconOnlyButtonMatrix() {
+  return (
+    <div className="grid gap-6">
+      <div className="grid gap-5">
+        {BUTTON_TONES.map((tone) => (
+          <div key={`icon-only-${tone}`} className="grid gap-3">
+            <p className="hito-micro-label">{tone}</p>
+            {BUTTON_SIZES.map((size) => (
+              <div
+                key={`icon-only-${tone}-${size}`}
+                className="flex min-w-0 flex-wrap items-center gap-3"
+              >
+                <span className="hito-caption w-8 shrink-0 uppercase">{size}</span>
+                {BUTTON_VARIANTS.map((variant) => (
+                  <DemoButton
+                    key={`icon-only-${tone}-${size}-${variant}`}
+                    variant={variant}
+                    tone={tone}
+                    size={size}
+                    iconOnly
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      <div className="grid gap-3">
+        <p className="hito-micro-label">Focus, disabled, loading · MD</p>
+        {BUTTON_TONES.map((tone) => (
+          <div key={`icon-only-states-${tone}`} className="grid gap-3">
+            {BUTTON_VARIANTS.map((variant) => (
+              <div
+                key={`icon-only-states-${tone}-${variant}`}
+                className="flex min-w-0 flex-wrap items-center gap-3"
+              >
+                <span className="hito-caption w-20 shrink-0 capitalize">{variant}</span>
+                <DemoButton variant={variant} tone={tone} size="md" iconOnly demoState="focus" />
+                <DemoButton variant={variant} tone={tone} size="md" iconOnly disabled />
+                <DemoButton variant={variant} tone={tone} size="md" iconOnly loading disabled />
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 

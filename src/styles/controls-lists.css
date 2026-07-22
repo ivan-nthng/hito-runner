@@ -41,7 +41,8 @@
   }
 
   .hito-button-xs {
-    min-height: 1.75rem;
+    --hito-button-control-size: 1.75rem;
+    min-height: var(--hito-button-control-size);
     border-radius: var(--radius-sm);
     padding: 0 0.5rem;
     font-size: 0.6875rem;
@@ -49,28 +50,41 @@
   }
 
   .hito-button-sm {
-    min-height: 2rem;
+    --hito-button-control-size: 2rem;
+    min-height: var(--hito-button-control-size);
     padding: 0 0.75rem;
     font-size: 0.75rem;
     letter-spacing: 0.01em;
   }
 
   .hito-button-md {
-    min-height: 2.5rem;
+    --hito-button-control-size: 2.5rem;
+    min-height: var(--hito-button-control-size);
     padding: 0 0.875rem;
     font-size: 0.875rem;
   }
 
   .hito-button-lg {
-    min-height: 2.75rem;
+    --hito-button-control-size: 2.75rem;
+    min-height: var(--hito-button-control-size);
     padding: 0 1rem;
     font-size: 0.875rem;
   }
 
   .hito-button-xl {
-    min-height: 3.25rem;
+    --hito-button-control-size: 3.25rem;
+    min-height: var(--hito-button-control-size);
     padding: 0 1.25rem;
     font-size: 0.9375rem;
+  }
+
+  .hito-button-icon {
+    width: var(--hito-button-control-size);
+    min-width: var(--hito-button-control-size);
+    height: var(--hito-button-control-size);
+    min-height: var(--hito-button-control-size);
+    flex: 0 0 auto;
+    padding-inline: 0;
   }
 
   .hito-button-primary {
@@ -79,7 +93,8 @@
     box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-signal) 18%, transparent);
   }
 
-  .hito-button-primary:hover {
+  .hito-button-primary:hover,
+  .hito-button-primary[data-demo-state="hover"] {
     background: color-mix(in oklch, var(--color-signal) 90%, white);
   }
 
@@ -113,7 +128,8 @@
     box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-success) 22%, transparent);
   }
 
-  .hito-button-primary[data-tone="success"]:hover {
+  .hito-button-primary[data-tone="success"]:hover,
+  .hito-button-primary[data-tone="success"][data-demo-state="hover"] {
     background: color-mix(in oklch, var(--color-success) 88%, white);
   }
 
@@ -147,7 +163,8 @@
     box-shadow: 0 0 0 1px color-mix(in oklch, var(--color-destructive) 22%, transparent);
   }
 
-  .hito-button-primary[data-tone="error"]:hover {
+  .hito-button-primary[data-tone="error"]:hover,
+  .hito-button-primary[data-tone="error"][data-demo-state="hover"] {
     background: color-mix(in oklch, var(--color-destructive) 88%, white);
   }
 
@@ -230,7 +247,8 @@
     color: color-mix(in oklch, var(--color-foreground) 88%, transparent);
   }
 
-  .hito-button-outlined:hover {
+  .hito-button-outlined:hover,
+  .hito-button-outlined[data-demo-state="hover"] {
     border-color: color-mix(in oklch, var(--color-foreground) 26%, transparent);
     background: color-mix(in oklch, var(--color-foreground) 6%, transparent);
     color: var(--color-foreground);
@@ -247,7 +265,8 @@
     color: var(--color-success);
   }
 
-  .hito-button-outlined[data-tone="success"]:hover {
+  .hito-button-outlined[data-tone="success"]:hover,
+  .hito-button-outlined[data-tone="success"][data-demo-state="hover"] {
     border-color: color-mix(in oklch, var(--color-success) 52%, transparent);
     background: color-mix(in oklch, var(--color-success) 10%, transparent);
     color: color-mix(in oklch, var(--color-success) 78%, var(--color-foreground));
@@ -281,7 +300,8 @@
     color: var(--color-destructive);
   }
 
-  .hito-button-outlined[data-tone="error"]:hover {
+  .hito-button-outlined[data-tone="error"]:hover,
+  .hito-button-outlined[data-tone="error"][data-demo-state="hover"] {
     border-color: color-mix(in oklch, var(--color-destructive) 56%, transparent);
     background: color-mix(in oklch, var(--color-destructive) 10%, transparent);
     color: color-mix(in oklch, var(--color-destructive) 80%, var(--color-foreground));
@@ -315,7 +335,8 @@
     color: var(--color-muted-foreground);
   }
 
-  .hito-button-ghost:hover {
+  .hito-button-ghost:hover,
+  .hito-button-ghost[data-demo-state="hover"] {
     background: color-mix(in oklch, var(--color-foreground) 7%, transparent);
     color: var(--color-foreground);
   }
@@ -330,7 +351,8 @@
     color: var(--color-success);
   }
 
-  .hito-button-ghost[data-tone="success"]:hover {
+  .hito-button-ghost[data-tone="success"]:hover,
+  .hito-button-ghost[data-tone="success"][data-demo-state="hover"] {
     background: color-mix(in oklch, var(--color-success) 10%, transparent);
     color: color-mix(in oklch, var(--color-success) 78%, var(--color-foreground));
   }
@@ -340,26 +362,12 @@
     background: color-mix(in oklch, var(--color-success) 15%, transparent);
   }
 
-  [data-hito-theme="light"] .hito-button-ghost[data-tone="success"] {
-    color: color-mix(in oklch, var(--color-success) 50%, var(--color-foreground));
-  }
-
-  [data-hito-theme="light"] .hito-button-ghost[data-tone="success"]:hover,
-  [data-hito-theme="light"] .hito-button-ghost[data-tone="success"][data-demo-state="hover"] {
-    background: color-mix(in oklch, var(--color-success) 5%, var(--color-surface));
-    color: color-mix(in oklch, var(--color-success) 58%, var(--color-foreground));
-  }
-
-  [data-hito-theme="light"] .hito-button-ghost[data-tone="success"]:active,
-  [data-hito-theme="light"] .hito-button-ghost[data-tone="success"][data-demo-state="active"] {
-    background: color-mix(in oklch, var(--color-success) 8%, var(--color-surface));
-  }
-
   .hito-button-ghost[data-tone="error"] {
     color: var(--color-destructive);
   }
 
-  .hito-button-ghost[data-tone="error"]:hover {
+  .hito-button-ghost[data-tone="error"]:hover,
+  .hito-button-ghost[data-tone="error"][data-demo-state="hover"] {
     background: color-mix(in oklch, var(--color-destructive) 10%, transparent);
     color: color-mix(in oklch, var(--color-destructive) 80%, var(--color-foreground));
   }
@@ -367,21 +375,6 @@
   .hito-button-ghost[data-tone="error"]:active,
   .hito-button-ghost[data-tone="error"][data-demo-state="active"] {
     background: color-mix(in oklch, var(--color-destructive) 15%, transparent);
-  }
-
-  [data-hito-theme="light"] .hito-button-ghost[data-tone="error"] {
-    color: color-mix(in oklch, var(--color-destructive) 52%, var(--color-foreground));
-  }
-
-  [data-hito-theme="light"] .hito-button-ghost[data-tone="error"]:hover,
-  [data-hito-theme="light"] .hito-button-ghost[data-tone="error"][data-demo-state="hover"] {
-    background: color-mix(in oklch, var(--color-destructive) 5%, var(--color-surface));
-    color: color-mix(in oklch, var(--color-destructive) 60%, var(--color-foreground));
-  }
-
-  [data-hito-theme="light"] .hito-button-ghost[data-tone="error"]:active,
-  [data-hito-theme="light"] .hito-button-ghost[data-tone="error"][data-demo-state="active"] {
-    background: color-mix(in oklch, var(--color-destructive) 8%, var(--color-surface));
   }
 
   .hito-tabs,

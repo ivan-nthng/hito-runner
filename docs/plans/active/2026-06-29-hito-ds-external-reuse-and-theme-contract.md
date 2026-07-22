@@ -2,7 +2,7 @@
 
 ## Status
 
-backlog
+active
 
 ## Type
 
@@ -14,21 +14,22 @@ high
 
 ## Next Recommended Role
 
-product
+backend
 
 ## Task
 
-Select the next bounded Hito DS discoverability, agent-contract, or external-reuse gate after the
-Local Inspector child task's accepted owner-level closeout.
+Align Settings persistence with the canonical runner-baseline bounds, then rerun the bounded
+Editable Value Field Settings and native-keyboard acceptance inventory.
 
 ## Stage
 
-Inspector child closed / broader discoverability remains Product-selected backlog.
+Editable Value Field lifecycle consolidated / Settings acceptance blocked at backend validation.
 
 ## Next Gate
 
-No implementation handoff is active. Product must select a new bounded discoverability,
-agent-guidance, or external-distribution gate before this broader backlog plan resumes.
+Backend must make the Settings save boundary enforce the already-canonical age, height, and weight
+ranges without changing profile lifecycle semantics. The same bounded acceptance inventory must then
+prove invalid-save rejection and native Tab behavior before this child returns to backlog closeout.
 
 ## Owner
 
@@ -36,7 +37,7 @@ ARCHITECT / DESIGNER / FRONTEND
 
 ## Last Updated
 
-2026-07-21
+2026-07-22
 
 ## Context
 
@@ -118,7 +119,7 @@ knowledge-layer or external-reuse gate.
 
 ## 2026-07-21 Local Inspector Child Checkpoint
 
-The first local consumer now uses a bounded eight-entry positive reference metadata seam and proves
+The first local consumer now uses a bounded nine-entry positive reference metadata seam and proves
 that missing markers and computed token equality remain neutral. This does not complete the broader
 knowledge-layer plan: `/hitoDS` and agent guidance do not yet consume this metadata contract.
 
@@ -132,6 +133,62 @@ Future discoverability work must consume or replace the accepted metadata seam r
 parallel registry. The local-only Inspector child needs no further release-wide QA after its bounded
 browser acceptance; the broader discoverability/distribution program remains backlog until Product
 selects a new gate.
+
+## 2026-07-22 Editable Value Field Child Checkpoint
+
+The former shared `EditableValueChip` is now the canonical `EditableValueField`, with no compatibility
+alias. Read/add mode consumes the existing Secondary Button recipe, edit mode consumes the existing
+Secondary Field recipe, and commit, cancel, and clear consume the existing icon-only Button
+configuration. The former bespoke height, background, focus, and green commit recipes were removed.
+
+`/hitoDS`, the Figma export board, and the positive component metadata registry now expose the same
+Editable Value Field owner. The Button reference also covers icon-only Primary, Secondary, Outlined,
+and Ghost variants across Default, Success, and Error tones, all five canonical sizes, focus,
+disabled, and loading states.
+
+Task-level browser acceptance passed in light and dark themes on desktop and exact `375x812`, including
+pointer-away, Enter, Tab, Escape, Clear, invalid-value, accessibility, runtime-health, and no-write
+persistence boundaries. Evidence lives in
+`qa-artifacts/screenshots/2026-07-22/editable-value-field-and-icon-button-qa/`. Global QA remains a
+separate later gate; this broader discoverability/distribution plan remains backlog until Product
+selects another bounded child.
+
+## 2026-07-22 Editable Value Field Lifecycle And Settings Closeout Hold
+
+The numeric and select variants now consume one internal lifecycle owner for draft sync, autofocus,
+blur and cross-field transition, commit, cancel, clear, and keyboard handling. Numeric validation and
+formatting and native select option/display semantics remain the only justified specializations; the
+accepted Button, Field, `/hitoDS`, export, and metadata contracts were not reopened.
+
+Fresh Settings persistence QA found a separate backend-owned blocker: an invalid `heightCm=50` stayed
+visibly invalid in the shared field but the Settings action accepted and persisted it because its
+input schema is broader than the canonical runner-baseline schema beside it. Native Tab behavior also
+remains unproven because neither available browser path could establish page-level Tab focus.
+Evidence and the complete inventory live in
+`qa-artifacts/screenshots/2026-07-22/editable-value-field-lifecycle-settings-closeout/qa-report.md`.
+The disposable runner was deleted with auth absent and all canonical row counts at zero.
+
+Do not patch the shared field or add route-local validation as a substitute for the backend boundary.
+After backend alignment, rerun only the failed invalid-save and blocked native-Tab gates plus the
+small regression inventory; the broader discoverability program then returns to Product-selected
+backlog.
+
+## 2026-07-22 Editable Value Field Compact Edit Anatomy Checkpoint
+
+The canonical Editable Value Field edit state now consumes the existing compact `SM` Field and
+icon-only Button contracts. Numeric and select variants keep Clear inside the field and expose only
+one external Primary check action. The redundant external cancel button was removed; Escape remains
+the keyboard cancel-and-restore path in the shared lifecycle. Read/add mode and its accepted
+Secondary Button treatment were not changed.
+
+Independent browser acceptance passed for Quick setup, Advanced setup, Settings, `/hitoDS`, and the
+Figma export reference in light and dark desktop and exact `375x812`. It covered pointer blur,
+cross-field transition, Enter, native Tab, Escape, Clear, invalid feedback, the Settings explicit
+save/reload boundary, accessibility, runtime health, and disposable cleanup. Evidence lives in
+`qa-artifacts/screenshots/2026-07-22/editable-value-field-compact-anatomy-closeout/qa-report.md`.
+
+This checkpoint does not change the separate backend-owned Settings bounds hold above. Global QA
+remains a later release-level gate.
 
 ## Product Decision
 

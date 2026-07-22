@@ -216,7 +216,7 @@ export function HitoDateField({
   );
 }
 
-export function HitoEditableDateChip({
+export function HitoEditableDateField({
   label,
   value,
   onChange,
@@ -270,7 +270,7 @@ export function HitoEditableDateChip({
   if (!isEditing) {
     return (
       <div className="grid gap-2">
-        <div ref={frameRef} className="hito-editable-value-chip-frame">
+        <div ref={frameRef} className="hito-editable-value-field-frame">
           <button
             type="button"
             aria-label={hasSavedValue ? `Edit ${label.toLowerCase()}` : `Add ${label}`}
@@ -281,17 +281,17 @@ export function HitoEditableDateChip({
               setDraftValue(nextDraft);
               setIsEditing(true);
             }}
-            className="hito-editable-value-chip"
+            className="hito-button hito-button-secondary hito-button-md hito-editable-value-field"
             data-state={hasSavedValue ? "saved" : "empty"}
           >
             {hasSavedValue ? null : (
-              <Icon name="plus" size="sm" className="hito-editable-value-chip-icon" />
+              <Icon name="plus" size="sm" className="hito-editable-value-field-icon" />
             )}
-            <span className="hito-editable-value-chip-content">
+            <span className="hito-editable-value-field-content">
               {hasSavedValue ? (
                 <>
-                  <span className="hito-editable-value-chip-label">{label}</span>
-                  <span className="hito-editable-value-chip-text">{value}</span>
+                  <span className="hito-micro-label hito-editable-value-field-label">{label}</span>
+                  <span className="hito-editable-value-field-text">{value}</span>
                 </>
               ) : (
                 <span>Add {label}</span>
@@ -301,7 +301,7 @@ export function HitoEditableDateChip({
               <Icon
                 name="edit"
                 size="sm"
-                className="hito-editable-value-chip-icon hito-editable-value-chip-edit-icon"
+                className="hito-editable-value-field-icon hito-editable-value-field-edit-icon"
               />
             ) : null}
           </button>

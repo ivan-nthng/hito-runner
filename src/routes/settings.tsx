@@ -10,7 +10,7 @@ import {
   type WeekdayName,
 } from "@/components/onboarding/onboarding-form-model";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { EditableValueChip } from "@/components/ui/editable-value-chip";
+import { EditableValueField } from "@/components/ui/editable-value-field";
 import { Icon } from "@/components/ui/icon";
 import { useHitoTabs } from "@/components/ui/hito-tabs";
 import { HeartRateProfileSection } from "@/components/settings/HeartRateProfileSection";
@@ -399,8 +399,8 @@ function SettingsPage() {
                 <p className="hito-support-copy mt-2">
                   The same compact profile facts used during plan setup.
                 </p>
-                <div className="hito-editable-value-chip-group mt-4">
-                  <EditableValueChip
+                <div className="hito-editable-value-field-group mt-4">
+                  <EditableValueField
                     fieldKey="age"
                     label="Age"
                     value={form.age}
@@ -413,7 +413,7 @@ function SettingsPage() {
                     step={1}
                     inputMode="numeric"
                   />
-                  <EditableValueChip
+                  <EditableValueField
                     fieldKey="heightCm"
                     label="Height"
                     value={form.heightCm}
@@ -426,7 +426,7 @@ function SettingsPage() {
                     step={1}
                     inputMode="numeric"
                   />
-                  <EditableValueChip
+                  <EditableValueField
                     fieldKey="weightKg"
                     label="Weight"
                     value={form.weightKg}

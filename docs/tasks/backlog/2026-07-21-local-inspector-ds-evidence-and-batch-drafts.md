@@ -34,7 +34,7 @@ FRONTEND
 
 ## Last Updated
 
-2026-07-21
+2026-07-22
 
 ## Root Cause And Canonical Owner
 
@@ -50,8 +50,9 @@ evidence. This is not a product workflow, design-system registry, or persistence
   component requests; copy has a manual fallback.
 - Computed token proximity is observed evidence. Authored Hito token provenance and confirmed
   component ownership are stated only when source-backed evidence exists.
-- Confirmed component identity appears in technical target metadata. Unresolved identity uses the
-  neutral `Component not confirmed` state without implying absence from the design system.
+- Confirmed component identity appears in technical target metadata. When positive source-backed
+  ownership does not resolve, the Component row is omitted and `Add to design system` remains an
+  explicit prompt-only action.
 - `Actions` is the final observed-property row. It can request `Add to design system` for an
   unresolved target or `Remove object` for any target; exactly one action request may be selected.
 - `Remove object` targets only the selected instance or similar instances. It never retires a Hito
@@ -60,6 +61,10 @@ evidence. This is not a product workflow, design-system registry, or persistence
   design-system level when confirmed ownership exists.
 - Desktop uses the composer panel; exact 375px uses the existing Sheet anatomy with fixed
   header/footer and one scrolling body.
+- Composer cancellation immediately discards only the unfinished local copy; cancelling an edit leaves
+  its added batch item unchanged. Exiting the Inspector immediately clears the route-local session.
+- The top-level Inspector close is the only explicit whole-session discard affordance. Batch review
+  has no `Clear all` action or discard confirmation.
 
 ## Architecture Boundary
 
@@ -70,7 +75,9 @@ evidence. This is not a product workflow, design-system registry, or persistence
 - The Inspector does not mutate selected UI or source. It generates a prompt for a later explicit
   implementation task.
 - `src/components/hito-ds/reference-metadata.ts` is a small positive allowlist, not a second Hito DS
-  catalog. Runtime Hito DS primitives and `/hitoDS` remain canonical.
+  catalog. It recognizes explicit registered markers plus the complete semantic Hito Button class
+  contract on interactive hosts; arbitrary Hito-looking classes remain unconfirmed. Runtime Hito DS
+  primitives and `/hitoDS` remain canonical.
 - The retained screen-capture prompt is a separate local screenshot flow, not a competing batch
   drafting owner.
 
@@ -82,7 +89,7 @@ evidence. This is not a product workflow, design-system registry, or persistence
 - evidence: `src/components/devtools/local-ui-inspector-token-evidence.ts` and
   `src/components/hito-ds/reference-metadata.ts`;
 - surfaces: `LocalUiInspector`, `LocalUiTaskDraftPanel`, `LocalUiInspectorBatchReview`,
-  `LocalUiInspectorSurface`, `LocalUiInspectorConfirmDialog`, and `LocalUiComponentActions`.
+  `LocalUiInspectorSurface`, and `LocalUiComponentActions`.
 
 The replaced single-item `LocalUiPromptActionControls.tsx` path is deleted and has no live import.
 
@@ -93,17 +100,25 @@ The replaced single-item `LocalUiPromptActionControls.tsx` path is deleted and h
 - final component/action and local-only proof:
   `qa-artifacts/screenshots/2026-07-21/local-inspector-component-actions-closeout/closeout-proof.json`;
 - exact component/action simplification proof:
-  `qa-artifacts/screenshots/2026-07-21/local-inspector-component-actions-simplification/local-inspector-component-actions-consolidated-proof.json`.
+  `qa-artifacts/screenshots/2026-07-21/local-inspector-component-actions-simplification/local-inspector-component-actions-consolidated-proof.json`;
+- direct composer cancellation and Inspector-session exit proof:
+  `qa-artifacts/screenshots/2026-07-21/local-inspector-direct-cancel-close/proof.json`;
+- single-discard lifecycle, multi-item batch, and pointer fix-forward proof:
+  `qa-artifacts/screenshots/2026-07-21/local-inspector-single-discard-lifecycle/proof.json`;
+- source-backed Button, Editable Value Field, descendant, and unconfirmed-container proof:
+  `qa-artifacts/screenshots/2026-07-22/local-inspector-source-backed-ownership/proof.json`.
 
 The accepted inventory covers eight-item batching, duplicate handling, prompt output, token and
 ownership discriminators, focus/Escape behavior, copy fallback, local-only visibility, desktop,
-exact 375px, mobile scrolling, runtime health, cleanup, targeted lint, production build, build
-integrity, and scoped diff hygiene.
+exact 375px, mobile scrolling, direct new/edit cancellation, session exit, runtime health, cleanup,
+targeted lint, production build, build integrity, and scoped diff hygiene. Canonical Hito Buttons and
+Editable Value Fields now resolve through positive source-backed evidence; arbitrary technical
+containers omit the Component row and retain the prompt-only `Add to design system` action.
 
 ## Closeout
 
 Implementation DoD: Passed.
 
-Broader hosted/product Global QA is not required for this local-only non-mutating devtool. Its
-bounded owner-level browser inventory is the final acceptance gate; runner and production behavior
-remain outside this tool's contract.
+Global QA Acceptance: Pending as a separate broader release layer. The bounded local-devtool
+owner-level inventory is complete; runner and production behavior remain outside this tool's
+contract.

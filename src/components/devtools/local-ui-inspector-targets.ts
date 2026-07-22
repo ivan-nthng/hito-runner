@@ -607,7 +607,7 @@ function getRootRadiusPx() {
 }
 
 function hasControlClass(className: string) {
-  return /\bhito-(button|field|choice-toggle|tab|menu|editable-value-chip|date-field)\b/.test(
+  return /\bhito-(button|field|choice-toggle|tab|menu|editable-value-field|date-field)\b/.test(
     className,
   );
 }

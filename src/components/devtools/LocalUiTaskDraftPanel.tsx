@@ -46,7 +46,6 @@ export function LocalUiTaskDraftPanel({
   itemNumber,
   notice,
   onCancel,
-  onDirtyChange,
   onSubmit,
   ownership,
   target,
@@ -56,7 +55,6 @@ export function LocalUiTaskDraftPanel({
   itemNumber?: number;
   notice?: string | null;
   onCancel: () => void;
-  onDirtyChange: (dirty: boolean) => void;
   onSubmit: (result: {
     draft: LocalUiInspectorItemDraft;
     payload: InlineChangeTargetPayload;
@@ -185,10 +183,6 @@ export function LocalUiTaskDraftPanel({
     window.requestAnimationFrame(() => headingRef.current?.focus());
   }, [initialDraft]);
 
-  useEffect(() => {
-    onDirtyChange(isDirty);
-  }, [isDirty, onDirtyChange]);
-
   const updateDraft = (update: Partial<LocalUiInspectorItemDraft>) => {
     setDraft((current) => ({ ...current, ...update }));
   };
@@ -254,7 +248,7 @@ export function LocalUiTaskDraftPanel({
         {notice ? <p className="hito-caption text-signal">{notice}</p> : null}
         {batchFull && !isEditing ? (
           <p className="hito-caption text-warn">
-            Batch is full. Review, generate, remove, or clear items before adding another.
+            Batch is full. Generate a prompt or remove an item before adding another.
           </p>
         ) : null}
 
@@ -402,7 +396,7 @@ export function LocalUiTaskDraftPanel({
           </button>
         </div>
         <p className="sr-only" aria-live="polite">
-          {isDirty ? "Item has unsaved changes." : "Item has no unsaved changes."}
+          {isDirty ? "Current draft has changes." : "Current draft is unchanged."}
         </p>
       </div>
     </div>

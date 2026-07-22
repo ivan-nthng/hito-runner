@@ -1,6 +1,11 @@
 import type { ReactNode } from "react";
 
-import { DemoButton, DemoInput } from "@/components/hito-ds/specimen-previews";
+import {
+  DemoButton,
+  DemoInput,
+  IconOnlyButtonMatrix,
+} from "@/components/hito-ds/specimen-previews";
+import { EditableValueField } from "@/components/ui/editable-value-field";
 import { HitoMetadataTag } from "@/components/ui/metadata-tag";
 import {
   HITO_ICON_META,
@@ -247,6 +252,15 @@ export function HitoFigmaExportBoard() {
         </ExportSection>
 
         <ExportSection
+          eyebrow="Editable Value Field"
+          id="editable-value-field"
+          title="Compact read/add mode and explicit inline edit actions"
+          body="Uses the canonical Secondary Button read surface, Secondary Field edit surface, and standard icon-only Button configuration."
+        >
+          <EditableValueFieldMatrix />
+        </ExportSection>
+
+        <ExportSection
           eyebrow="Inline text"
           id="inline-editable-text"
           title="Inline editable and read-only text states"
@@ -470,6 +484,11 @@ function ButtonMatrix() {
         </div>
       </div>
 
+      <div className="grid gap-4">
+        <h3 className="hito-label">Icon-only button contract</h3>
+        <IconOnlyButtonMatrix />
+      </div>
+
       <MatrixPanel title="Icon grammar">
         <div className="grid gap-3">
           {BUTTON_SIZES.map((size) => (
@@ -486,19 +505,98 @@ function ButtonMatrix() {
                   {...treatment.props}
                 />
               ))}
-              <button
-                type="button"
-                className={cn(
-                  "hito-button hito-button-ghost aspect-square px-0",
-                  `hito-button-${size}`,
-                )}
-                aria-label={`Icon-only ghost action ${size}`}
-              >
-                <Icon name="more-horizontal" size={size === "xs" || size === "sm" ? "xs" : "sm"} />
-              </button>
+              <DemoButton variant="ghost" size={size} iconOnly />
             </div>
           ))}
         </div>
+      </MatrixPanel>
+    </div>
+  );
+}
+
+function EditableValueFieldMatrix() {
+  const noActiveField = null;
+  const noop = () => {};
+
+  return (
+    <div className="grid gap-6">
+      <MatrixPanel title="Read and add states">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
+          <EditableValueField
+            fieldKey="empty"
+            label="Age"
+            value=""
+            setValue={noop}
+            activeEditableKey={noActiveField}
+            setActiveEditableKey={noop}
+            placeholder="34"
+            min={13}
+            max={100}
+            step={1}
+            inputMode="numeric"
+          />
+          <EditableValueField
+            fieldKey="populated"
+            label="Height"
+            value="178"
+            setValue={noop}
+            activeEditableKey={noActiveField}
+            setActiveEditableKey={noop}
+            placeholder="178"
+            min={120}
+            max={230}
+            step={1}
+            inputMode="numeric"
+            unit="cm"
+          />
+          {(["hover", "active", "focus"] as const).map((demoState) => (
+            <EditableValueField
+              key={demoState}
+              fieldKey={demoState}
+              label={demoState}
+              value="72"
+              setValue={noop}
+              activeEditableKey={noActiveField}
+              setActiveEditableKey={noop}
+              placeholder="72"
+              min={30}
+              max={250}
+              step={0.5}
+              inputMode="decimal"
+              unit="kg"
+              demoState={demoState}
+            />
+          ))}
+          <EditableValueField
+            fieldKey="invalid-read"
+            label="Age"
+            value="3"
+            setValue={noop}
+            activeEditableKey={noActiveField}
+            setActiveEditableKey={noop}
+            placeholder="34"
+            min={13}
+            max={100}
+            step={1}
+            inputMode="numeric"
+          />
+        </div>
+      </MatrixPanel>
+      <MatrixPanel title="Edit mode · compact SM field, field-local Clear, Primary commit">
+        <EditableValueField
+          fieldKey="editing"
+          label="Weight"
+          value="72"
+          setValue={noop}
+          activeEditableKey="editing"
+          setActiveEditableKey={noop}
+          placeholder="72"
+          min={30}
+          max={250}
+          step={0.5}
+          inputMode="decimal"
+          unit="kg"
+        />
       </MatrixPanel>
     </div>
   );

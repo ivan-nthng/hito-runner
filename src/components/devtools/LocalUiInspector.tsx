@@ -18,7 +18,6 @@ import {
 import { Icon } from "@/components/ui/icon";
 import { LocalScreenCaptureFlow } from "@/components/devtools/LocalScreenCaptureFlow";
 import { LocalUiInspectorBatchReview } from "@/components/devtools/LocalUiInspectorBatchReview";
-import { LocalUiInspectorConfirmDialog } from "@/components/devtools/LocalUiInspectorConfirmDialog";
 import { LocalUiInspectorSurface } from "@/components/devtools/LocalUiInspectorSurface";
 import {
   getLocalUiInspectorLauncherPanelPosition,
@@ -41,7 +40,7 @@ import {
 import { useLocalUiInspectorSession } from "@/components/devtools/use-local-ui-inspector-session";
 import {
   getHitoDsAppliedTokenReferences,
-  resolveHitoDsOwnershipMarkers,
+  resolveHitoDsOwnershipForElement,
   type HitoDsOwnershipEvidence,
 } from "@/components/hito-ds/reference-metadata";
 
@@ -70,7 +69,6 @@ type ReviewPanelState = {
 };
 
 type InspectorPanelState = ComposerPanelState | ReviewPanelState;
-type ConfirmationState = "discard_item" | "discard_session" | null;
 
 const INSPECTABLE_SELECTOR =
   "button, a, input, textarea, select, [role], [data-hito-ds-pattern], [data-testid], article, section, header, main, aside, nav, form, li, [class]";
@@ -85,8 +83,6 @@ export function LocalUiInspector() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [hoverRect, setHoverRect] = useState<DOMRectReadOnly | null>(null);
   const [panel, setPanel] = useState<InspectorPanelState | null>(null);
-  const [composerDirty, setComposerDirty] = useState(false);
-  const [confirmation, setConfirmation] = useState<ConfirmationState>(null);
   const [statusMessage, setStatusMessage] = useState("");
   const panelRef = useRef<InspectorPanelState | null>(null);
   const routeRef = useRef(routeKey);
@@ -104,8 +100,6 @@ export function LocalUiInspector() {
     setMenuOpen(false);
     setHoverRect(null);
     setPanel(null);
-    setComposerDirty(false);
-    setConfirmation(null);
     setStatusMessage("Local Inspector draft cleared after route change.");
   }, [routeKey]);
 
@@ -150,7 +144,6 @@ export function LocalUiInspector() {
     setMenuOpen(false);
     setHoverRect(null);
     setPanel(null);
-    setComposerDirty(false);
   }, []);
 
   const focusInspectLauncher = useCallback(() => {
@@ -158,7 +151,6 @@ export function LocalUiInspector() {
   }, []);
 
   const showReview = useCallback((focusItemId: string | null) => {
-    setComposerDirty(false);
     setPanel({
       anchor: "launcher",
       focusItemId,
@@ -169,9 +161,8 @@ export function LocalUiInspector() {
 
   const openReview = useCallback(() => showReview(null), [showReview]);
 
-  const closeComposerClean = useCallback(() => {
+  const discardComposerDraft = useCallback(() => {
     const currentPanel = panelRef.current;
-    setComposerDirty(false);
     setHoverRect(null);
     setPanel((current) => {
       if (current?.kind === "composer" && current.itemId) {
@@ -187,29 +178,20 @@ export function LocalUiInspector() {
     if (currentPanel?.kind === "composer" && !currentPanel.itemId) focusInspectLauncher();
   }, [focusInspectLauncher]);
 
-  const requestPanelClose = useCallback(() => {
-    if (panelRef.current?.kind === "composer" && composerDirty) {
-      setConfirmation("discard_item");
-      return;
-    }
+  const closePanelImmediately = useCallback(() => {
     if (panelRef.current?.kind === "composer") {
-      closeComposerClean();
+      discardComposerDraft();
       return;
     }
     setPanel(null);
-  }, [closeComposerClean, composerDirty]);
+    focusInspectLauncher();
+  }, [discardComposerDraft, focusInspectLauncher]);
 
   const requestInspectorExit = useCallback(() => {
-    if (panelRef.current) {
-      requestPanelClose();
-      return;
-    }
-    if (session.items.length > 0) {
-      setConfirmation("discard_session");
-      return;
-    }
+    session.resetSession();
     closeInspectorImmediately();
-  }, [closeInspectorImmediately, requestPanelClose, session.items.length]);
+    focusInspectLauncher();
+  }, [closeInspectorImmediately, focusInspectLauncher, session]);
 
   useEffect(() => {
     if (mode !== "inspect") {
@@ -229,7 +211,7 @@ export function LocalUiInspector() {
     if (!panel && mode !== "inspect" && !menuOpen) return;
 
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented || confirmation) return;
+      if (event.key !== "Escape" || event.defaultPrevented) return;
       const eventTarget = event.target;
       if (
         eventTarget instanceof Element &&
@@ -239,7 +221,7 @@ export function LocalUiInspector() {
       }
       event.preventDefault();
       if (panelRef.current) {
-        requestPanelClose();
+        closePanelImmediately();
       } else if (mode === "inspect") {
         requestInspectorExit();
       } else {
@@ -254,19 +236,17 @@ export function LocalUiInspector() {
     };
   }, [
     closeInspectorImmediately,
-    confirmation,
+    closePanelImmediately,
     menuOpen,
     mode,
     panel,
     requestInspectorExit,
-    requestPanelClose,
   ]);
 
   useEffect(() => {
     if (!panel) return;
 
     const closePanelFromOutside = (event: PointerEvent) => {
-      if (confirmation) return;
       const target = event.target;
 
       if (target instanceof Element && target.closest("[data-local-ui-inspector-layer]")) {
@@ -276,7 +256,7 @@ export function LocalUiInspector() {
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      requestPanelClose();
+      closePanelImmediately();
     };
 
     document.addEventListener("pointerdown", closePanelFromOutside, true);
@@ -284,7 +264,7 @@ export function LocalUiInspector() {
     return () => {
       document.removeEventListener("pointerdown", closePanelFromOutside, true);
     };
-  }, [confirmation, panel, requestPanelClose]);
+  }, [closePanelImmediately, panel]);
 
   useEffect(() => {
     if (!panel) return;
@@ -405,7 +385,7 @@ export function LocalUiInspector() {
       return;
     }
 
-    if (panelRef.current) requestPanelClose();
+    if (panelRef.current) closePanelImmediately();
   };
 
   const editBatchItem = (item: LocalUiInspectorBatchItem) => {
@@ -463,7 +443,6 @@ export function LocalUiInspector() {
       setPanel(null);
       focusInspectLauncher();
     }
-    setComposerDirty(false);
     setHoverRect(null);
   };
 
@@ -495,7 +474,7 @@ export function LocalUiInspector() {
           ariaLabel={
             panel.kind === "review" ? "Local Inspector batch review" : "Local UI item composer"
           }
-          onClose={requestPanelClose}
+          onClose={closePanelImmediately}
           placement={{
             anchor: panel.anchor,
             position: panel.position,
@@ -512,8 +491,7 @@ export function LocalUiInspector() {
                   : undefined
               }
               notice={panel.notice}
-              onCancel={requestPanelClose}
-              onDirtyChange={setComposerDirty}
+              onCancel={closePanelImmediately}
               onSubmit={commitComposer}
               ownership={panel.target.ownership}
               target={panel.target}
@@ -522,12 +500,6 @@ export function LocalUiInspector() {
             <LocalUiInspectorBatchReview
               initialFocusItemId={panel.focusItemId}
               items={session.items}
-              onClear={() => {
-                session.clearItems();
-                setPanel(null);
-                setStatusMessage("Local draft cleared.");
-                focusInspectLauncher();
-              }}
               onClose={() => {
                 setPanel(null);
                 focusInspectLauncher();
@@ -569,6 +541,7 @@ export function LocalUiInspector() {
         <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild>
             <button
+              ref={inspectLauncherRef}
               type="button"
               className="hito-button hito-button-primary hito-button-md aspect-square rounded-full px-0 shadow-soft"
               aria-label="Open local UI task tools"
@@ -607,7 +580,7 @@ export function LocalUiInspector() {
       )}
 
       {mode === "inspect" ? (
-        <div className="absolute bottom-full right-0 z-[72] mb-2 grid w-56 justify-items-end gap-2">
+        <div className="pointer-events-none absolute bottom-full right-0 z-[72] mb-2 grid w-56 justify-items-end gap-2">
           <div className="pointer-events-none w-full rounded-md border border-signal/30 bg-background/90 p-2 text-right shadow-soft backdrop-blur">
             <p className="hito-caption text-foreground">Pencil mode</p>
             <p className="hito-caption">Hover, then click a UI element.</p>
@@ -627,30 +600,6 @@ export function LocalUiInspector() {
       <p className="sr-only" aria-live="polite">
         {statusMessage}
       </p>
-
-      <LocalUiInspectorConfirmDialog
-        confirmLabel="Discard item"
-        description="Unsaved changes to this local item will be lost. Saved batch items stay unchanged."
-        onConfirm={() => {
-          setConfirmation(null);
-          closeComposerClean();
-        }}
-        onOpenChange={(open) => !open && setConfirmation(null)}
-        open={confirmation === "discard_item"}
-        title="Discard this item?"
-      />
-      <LocalUiInspectorConfirmDialog
-        confirmLabel="Discard local draft"
-        description={`This removes ${session.items.length} local ${session.items.length === 1 ? "item" : "items"}. No product or design-system data is affected.`}
-        onConfirm={() => {
-          setConfirmation(null);
-          session.resetSession();
-          closeInspectorImmediately();
-        }}
-        onOpenChange={(open) => !open && setConfirmation(null)}
-        open={confirmation === "discard_session"}
-        title={`Discard ${session.items.length} local ${session.items.length === 1 ? "item" : "items"}?`}
-      />
     </div>
   );
 }
@@ -851,10 +800,7 @@ function isPointNearChrome(element: HTMLElement, point: { x: number; y: number }
 function describeTargetElement(element: HTMLElement): SelectedTarget {
   const rect = element.getBoundingClientRect();
   const elementClasses = element.className ? String(element.className).trim().slice(0, 300) : null;
-  const ownership = resolveHitoDsOwnershipMarkers({
-    componentMarker: element.getAttribute("data-hito-component"),
-    patternMarker: element.getAttribute("data-hito-ds-pattern"),
-  });
+  const ownership = resolveHitoDsOwnershipForElement(element);
   const targetInspection = inspectLocalUiTarget(
     element,
     getHitoDsAppliedTokenReferences(ownership, elementClasses ?? ""),

@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { AdminMetadataMenu } from "@/components/admin/AdminOperationalComponents";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { EditableSelectValueChip, EditableValueChip } from "@/components/ui/editable-value-chip";
+import { EditableSelectValueField, EditableValueField } from "@/components/ui/editable-value-field";
 import {
   HitoDateField,
-  HitoEditableDateChip,
+  HitoEditableDateField,
   HitoMaskedTimeField,
 } from "@/components/ui/hito-date-time-input";
 import { Icon } from "@/components/ui/icon";
@@ -20,6 +20,7 @@ import {
   DataTableSpecimenPreview,
   DemoButton,
   DemoInput,
+  IconOnlyButtonMatrix,
   SelectionControlPreview,
   ToggleRow,
 } from "@/components/hito-ds/specimen-previews";
@@ -185,6 +186,14 @@ export function HitoDsComponentControls() {
                   size={size}
                   leftIcon={leftIcon}
                   rightIcon={rightIcon}
+                  demoState="active"
+                />
+                <DemoButton
+                  variant={variant}
+                  tone={buttonTone}
+                  size={size}
+                  leftIcon={leftIcon}
+                  rightIcon={rightIcon}
                   demoState="focus"
                 />
                 <DemoButton
@@ -215,6 +224,16 @@ export function HitoDsComponentControls() {
                 stays border-led. Success and error are semantic tones, not separate button
                 families.
               </p>
+            </div>
+            <div className="border-t border-hairline pt-5">
+              <p className="hito-label">Icon-only configuration</p>
+              <p className="hito-caption mt-1 max-w-2xl">
+                Icon-only actions are square configurations of the same Button variants, tones,
+                sizes, focus, disabled, and loading states. They always require an accessible name.
+              </p>
+              <div className="mt-5">
+                <IconOnlyButtonMatrix />
+              </div>
             </div>
           </div>
         }
@@ -743,8 +762,8 @@ export function HitoDsComponentControls() {
                 <p className="hito-label">Date and time inputs</p>
                 <p className="hito-caption mt-2 max-w-2xl">
                   Date/time truth stays ISO or duration-shaped in state. Calendar selection, typed
-                  date entry, compact optional date chips, and masked time entry share the same Hito
-                  field rhythm.
+                  date entry, compact optional date fields, and masked time entry share the same
+                  Hito field rhythm.
                 </p>
               </div>
               <div className="hito-reference-list">
@@ -819,12 +838,12 @@ export function HitoDsComponentControls() {
                 </article>
                 <article className="hito-reference-row items-start">
                   <div>
-                    <p className="hito-list-row-title">Optional date chip</p>
+                    <p className="hito-list-row-title">Optional date field</p>
                     <p className="hito-caption mt-2">
                       Empty state is an action; saved state is visible and editable.
                     </p>
                   </div>
-                  <HitoEditableDateChip
+                  <HitoEditableDateField
                     label="Plan Start Date"
                     value={editableDateDemo}
                     onChange={setEditableDateDemo}
@@ -901,21 +920,21 @@ export function HitoDsComponentControls() {
             </div>
 
             <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Editable value chip</p>
+              <p className="hito-label">Editable Value Field</p>
               <p className="hito-caption mt-2 max-w-2xl">
-                Compact scalar facts use editable value chips, not full form cards or normal text
+                Compact scalar facts use Editable Value Fields, not full form cards or normal text
                 rows.
               </p>
               <div className="hito-reference-list mt-4">
                 <article className="hito-reference-row">
                   <div>
-                    <p className="hito-list-row-title">Interactive scalar and select chips</p>
+                    <p className="hito-list-row-title">Interactive scalar and select fields</p>
                     <p className="hito-caption mt-2">
-                      These are the runtime owners. Click any empty or saved chip to enter its real
+                      These are the runtime owners. Click any empty or saved field to enter its real
                       editing state. Height holds the deterministic hover specimen.
                     </p>
                   </div>
-                  <div className="hito-editable-value-chip-group">
+                  <div className="hito-editable-value-field-group">
                     {(
                       [
                         ["age", "Age", "36", 12, 110, 1, "numeric", undefined],
@@ -923,7 +942,7 @@ export function HitoDsComponentControls() {
                         ["weight", "Weight", "72", 25, 350, 0.1, "decimal", "kg"],
                       ] as const
                     ).map(([fieldKey, label, placeholder, min, max, step, inputMode, unit]) => (
-                      <EditableValueChip
+                      <EditableValueField
                         key={fieldKey}
                         fieldKey={fieldKey}
                         label={label}
@@ -942,7 +961,7 @@ export function HitoDsComponentControls() {
                         demoState={fieldKey === "height" ? "hover" : undefined}
                       />
                     ))}
-                    <EditableSelectValueChip
+                    <EditableSelectValueField
                       activeEditableKey={activeEditableField}
                       emptyLabel="Add terrain"
                       fieldKey="terrain"
@@ -1017,7 +1036,7 @@ export function HitoDsComponentControls() {
         caption={[
           {
             label: "Proves",
-            body: "Text fields, textareas, validation feedback, date/time inputs, avatar actions, and editable value chips share one field rhythm.",
+            body: "Text fields, textareas, validation feedback, date/time inputs, avatar actions, and Editable Value Fields share one field rhythm.",
           },
           {
             label: "Does not imply",

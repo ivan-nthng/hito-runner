@@ -1,6 +1,6 @@
 import { useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
-import { EditableSelectValueChip, EditableValueChip } from "@/components/ui/editable-value-chip";
-import { HitoEditableDateChip } from "@/components/ui/hito-date-time-input";
+import { EditableSelectValueField, EditableValueField } from "@/components/ui/editable-value-field";
+import { HitoEditableDateField } from "@/components/ui/hito-date-time-input";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 import { OptionButton, OptionGrid } from "./onboarding-choice-controls";
 import {
@@ -91,8 +91,8 @@ export function QuickSetupPlanSetupSections({
           body="Add the few facts Hito needs before plan setup."
         >
           <div className="grid gap-4">
-            <div className="hito-editable-value-chip-group">
-              <EditableValueChip
+            <div className="hito-editable-value-field-group">
+              <EditableValueField
                 fieldKey="age"
                 label="Age"
                 value={state.age}
@@ -105,7 +105,7 @@ export function QuickSetupPlanSetupSections({
                 step={1}
                 inputMode="numeric"
               />
-              <EditableValueChip
+              <EditableValueField
                 fieldKey="heightCm"
                 label="Height"
                 value={state.heightCm}
@@ -118,7 +118,7 @@ export function QuickSetupPlanSetupSections({
                 step={1}
                 inputMode="numeric"
               />
-              <EditableValueChip
+              <EditableValueField
                 fieldKey="weightKg"
                 label="Weight"
                 value={state.weightKg}
@@ -183,8 +183,8 @@ export function QuickSetupPlanSetupSections({
           body="Add optional benchmark and weekly availability."
         >
           <div className="grid gap-4">
-            <div className="hito-editable-value-chip-group">
-              <EditableSelectValueChip
+            <div className="hito-editable-value-field-group">
+              <EditableSelectValueField
                 fieldKey="recent5kTime"
                 label="5K"
                 emptyLabel="Add 5K result"
@@ -233,7 +233,7 @@ export function QuickSetupPlanSetupSections({
               fixedRestDaysHelper="Optional. Protect days you want to keep free."
               preferredLongRunHelper="Optional. Leave this open if you do not have a preferred day."
             />
-            <HitoEditableDateChip
+            <HitoEditableDateField
               label="Plan Start Date"
               value={state.startDate}
               onChange={setState.setStartDate}

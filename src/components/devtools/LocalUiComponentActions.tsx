@@ -13,20 +13,20 @@ import {
 import { Icon } from "@/components/ui/icon";
 
 export function LocalUiComponentIdentity({ ownership }: { ownership: HitoDsOwnershipEvidence }) {
-  const componentName = ownership.entry?.label ?? "Component not confirmed";
+  if (!ownership.entry) return null;
+
+  const componentName = ownership.entry.label;
 
   return (
     <p
-      className={`hito-caption flex min-w-0 items-center gap-1.5 ${
-        ownership.entry ? "text-info" : "text-muted-foreground"
-      }`}
-      data-local-ui-component-identity={ownership.entry ? "confirmed" : "unconfirmed"}
+      className="hito-caption flex min-w-0 items-center gap-1.5 text-info"
+      data-local-ui-component-identity="confirmed"
     >
-      {ownership.entry ? <Icon name="components" size="xs" className="shrink-0" /> : null}
+      <Icon name="components" size="xs" className="shrink-0" />
       <span
         className="min-w-0 truncate"
-        aria-label={ownership.entry ? `Confirmed component: ${componentName}` : undefined}
-        title={ownership.entry ? componentName : undefined}
+        aria-label={`Confirmed component: ${componentName}`}
+        title={componentName}
       >
         {componentName}
       </span>

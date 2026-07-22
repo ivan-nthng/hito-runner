@@ -28,7 +28,6 @@ export function useLocalUiInspectorSession(routeKey: string) {
         });
         return added;
       },
-      clearItems: () => setItems([]),
       findDuplicate: (target: Pick<InlineChangeTargetInput, "selector" | "targetKind">) =>
         findDuplicateLocalUiInspectorItem(items, routeKey, target),
       isFull: items.length >= LOCAL_UI_INSPECTOR_BATCH_LIMIT,

@@ -10,14 +10,6 @@ import {
 import { copyTextToClipboard } from "@/components/devtools/local-ui-clipboard";
 import { getFixScopeLabel } from "@/components/devtools/local-inline-change-target-utils";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -32,7 +24,6 @@ type CopyState = "idle" | "copying" | "copied" | "copy_failed";
 export function LocalUiInspectorBatchReview({
   initialFocusItemId,
   items,
-  onClear,
   onClose,
   onContinue,
   onEdit,
@@ -41,7 +32,6 @@ export function LocalUiInspectorBatchReview({
 }: {
   initialFocusItemId?: string | null;
   items: LocalUiInspectorBatchItem[];
-  onClear: () => void;
   onClose: () => void;
   onContinue: () => void;
   onEdit: (item: LocalUiInspectorBatchItem) => void;
@@ -49,7 +39,6 @@ export function LocalUiInspectorBatchReview({
   routeKey: string;
 }) {
   const [copyState, setCopyState] = useState<CopyState>("idle");
-  const [clearOpen, setClearOpen] = useState(false);
   const titleId = useId();
   const titleRef = useRef<HTMLHeadingElement | null>(null);
   const promptRef = useRef<HTMLTextAreaElement | null>(null);
@@ -256,7 +245,7 @@ export function LocalUiInspectorBatchReview({
               ? "Copying…"
               : copyState === "copied"
                 ? "Prompt copied"
-                : "Generate Prompt"}
+                : "Generate prompt"}
           </button>
           <button
             type="button"
@@ -265,13 +254,6 @@ export function LocalUiInspectorBatchReview({
           >
             Continue selecting
           </button>
-          <button
-            type="button"
-            className="hito-button hito-button-ghost hito-button-sm"
-            onClick={() => setClearOpen(true)}
-          >
-            Clear all
-          </button>
         </div>
         <p className="hito-caption" aria-live="polite">
           {copyState === "copied"
@@ -279,42 +261,6 @@ export function LocalUiInspectorBatchReview({
             : `${items.length} ${items.length === 1 ? "item" : "items"} in this local draft.`}
         </p>
       </div>
-
-      <Dialog open={clearOpen} onOpenChange={setClearOpen}>
-        <DialogContent
-          className="!z-[90] w-[min(26rem,calc(100vw-1.5rem))]"
-          overlayClassName="!z-[89]"
-          data-local-ui-inspector-layer=""
-        >
-          <DialogHeader>
-            <DialogTitle>Clear local draft?</DialogTitle>
-            <DialogDescription>
-              This removes all {items.length} local items. No product or design-system data is
-              affected.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <button
-              type="button"
-              className="hito-button hito-button-secondary hito-button-sm"
-              onClick={() => setClearOpen(false)}
-            >
-              Keep draft
-            </button>
-            <button
-              type="button"
-              className="hito-button hito-button-primary hito-button-sm"
-              data-tone="error"
-              onClick={() => {
-                setClearOpen(false);
-                onClear();
-              }}
-            >
-              Clear all
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -25,6 +25,12 @@ This agent does not implement code. It creates and maintains backlog artifacts.
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
 
+## Evidence Alignment
+
+Separate the user's symptom and supplied evidence from a confirmed cause. A backlog item may carry
+a hypothesis, but must label it as such and name the exact log, query, source proof, or replay
+needed before implementation when the owner is not established.
+
 ## Subagent Expectations
 
 For backlog source investigation, screenshot/evidence review, duplicate-ticket searches, and
@@ -32,17 +38,6 @@ ownership tracing, follow the subagent delegation discipline in `AGENTS.md`: use
 subagents when independent research can run without user attention, reuse open subagents for similar
 follow-ups, close them when done, and integrate their findings into one backlog item or routing
 decision.
-
-## Canonical Architecture Approach
-
-Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
-
-- one canonical pipeline, no parallel product systems for the same truth
-- backend owns validation, normalization, persistence, lifecycle rules, entitlement, and mutation safety
-- frontend/design/copy/QA work must render, explain, or verify backend-shaped truth rather than inventing rules locally
-- deterministic product truth comes before AI interpretation or recommendations
-- risky mutations require explicit review/confirm or confirmation boundaries
-- prefer reuse, deletion, and consolidation over new abstractions
 
 ## Scope
 

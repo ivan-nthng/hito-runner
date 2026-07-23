@@ -1,4 +1,5 @@
 import { normalizePlanGoalIntent } from "../../src/lib/plan-creation-engine/plan-goal-intent";
+import { buildAcceptedEffectiveRunnerHeartRateProfile } from "../../src/lib/heart-rate-zones";
 import type { StructuredPlanAuthoringInput } from "../../src/lib/structured-plan-authoring-schema";
 import type { FixtureKind } from "./cli";
 
@@ -18,6 +19,18 @@ export function buildDefaultAuthoringInput(fixtureKind: FixtureKind): Structured
     throw new Error(planGoalIntent.message);
   }
 
+  const heartRateProfile = buildAcceptedEffectiveRunnerHeartRateProfile({
+    age: 36,
+    storedProfile: {
+      version: "runner_hr_profile_v2",
+      source: "estimated",
+    },
+  });
+
+  if (!heartRateProfile) {
+    throw new Error("Representative plan-first fixture requires an accepted HR profile.");
+  }
+
   return {
     schedule: {
       startDate: "2026-07-06",
@@ -33,6 +46,7 @@ export function buildDefaultAuthoringInput(fixtureKind: FixtureKind): Structured
         paceSecondsPerKm: 330,
         label: "Recent 5K pace 5:30/km",
       },
+      heartRateProfile,
     },
     availability: {
       fixedRestDays: ["Wednesday", "Friday", "Sunday"],

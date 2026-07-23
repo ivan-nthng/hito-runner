@@ -14,6 +14,12 @@ import type {
 } from "@/lib/rich-workout-model";
 
 export const AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE = "ai_authored_plan_guidance" as const;
+export const AI_AUTHORED_PACE_PROVENANCE_VALUES = [
+  "benchmark_backed",
+  "goal_informed_ai_estimate",
+  "no_benchmark_ai_estimate",
+] as const;
+export type AiAuthoredPaceProvenance = (typeof AI_AUTHORED_PACE_PROVENANCE_VALUES)[number];
 
 export const PRIMARY_EXECUTION_MODE_VALUES = ["pace", "heart_rate", "effort", "run_walk"] as const;
 export type PrimaryExecutionMode = (typeof PRIMARY_EXECUTION_MODE_VALUES)[number];

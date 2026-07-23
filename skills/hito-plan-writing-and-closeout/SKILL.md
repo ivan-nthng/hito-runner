@@ -9,6 +9,13 @@ description: Use when creating, updating, pausing, closing, or archiving Hito pl
 
 Keep Hito planning artifacts canonical, current, and easy for the next role to execute.
 
+## Durable Lessons Only
+
+Do not create a new process document for routine work. A recurring lesson belongs in an existing
+role rule, validator/fixture, active plan, or `docs/history/technical-log.md` only when a passing
+artifact identifies the failure pattern, the durable guard, and the rejected dead end. Otherwise the
+final report or a compact active-plan note is sufficient.
+
 ## Active Plan Rules
 
 Use `docs/plans/active/` for live work that still guides execution.

@@ -1,5 +1,6 @@
 @layer components {
   .hito-label {
+    --hito-typography-role: label;
     font-size: 0.75rem;
     font-weight: 600;
     letter-spacing: 0.01em;
@@ -17,6 +18,7 @@
   }
 
   .hito-display-title {
+    --hito-typography-role: display-title;
     font-family: var(--font-display);
     font-size: clamp(3.5rem, 7vw, 5rem);
     font-feature-settings: "ss01";
@@ -153,6 +155,7 @@
   }
 
   .hito-page-title {
+    --hito-typography-role: page-title;
     margin-top: 0.5rem;
     max-width: 44rem;
     font-family: var(--font-display);
@@ -164,6 +167,7 @@
   }
 
   .hito-modal-title {
+    --hito-typography-role: modal-title;
     font-family: var(--font-display);
     font-size: clamp(1.75rem, 5vw, 2rem);
     font-feature-settings: "ss01";
@@ -175,6 +179,7 @@
   }
 
   .hito-panel-title {
+    --hito-typography-role: panel-title;
     font-family: var(--font-display);
     font-size: clamp(1.25rem, 3vw, 1.375rem);
     font-feature-settings: "ss01";
@@ -203,6 +208,7 @@
   }
 
   .hito-section-title {
+    --hito-typography-role: section-title;
     font-family: var(--font-display);
     font-size: 1.5rem;
     font-feature-settings: "ss01";
@@ -212,6 +218,7 @@
   }
 
   .hito-body {
+    --hito-typography-role: body;
     font-size: 0.875rem;
     font-weight: 400;
     line-height: 1.58;
@@ -220,6 +227,7 @@
   }
 
   .hito-body-small {
+    --hito-typography-role: body-small;
     font-size: 0.8125rem;
     font-weight: 400;
     line-height: 1.5;
@@ -244,12 +252,14 @@
   }
 
   .hito-caption {
+    --hito-typography-role: caption;
     font-size: 0.6875rem;
     line-height: 1.45;
     color: var(--color-muted-foreground);
   }
 
   .hito-form-label {
+    --hito-typography-role: form-label;
     font-size: 0.75rem;
     font-weight: 600;
     letter-spacing: 0.01em;
@@ -259,6 +269,7 @@
   }
 
   .hito-micro-label {
+    --hito-typography-role: micro-label;
     font-size: 0.6875rem;
     font-weight: 500;
     letter-spacing: 0.18em;
@@ -276,6 +287,7 @@
   }
 
   .hito-technical-mono {
+    --hito-typography-role: technical-mono;
     font-family: var(--font-mono);
     font-size: 0.75rem;
     font-variant-numeric: tabular-nums;

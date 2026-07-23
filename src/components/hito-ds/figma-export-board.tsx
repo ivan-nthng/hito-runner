@@ -254,8 +254,8 @@ export function HitoFigmaExportBoard() {
         <ExportSection
           eyebrow="Editable Value Field"
           id="editable-value-field"
-          title="Compact read/add mode and explicit inline edit actions"
-          body="Uses the canonical Secondary Button read surface, Secondary Field edit surface, and standard icon-only Button configuration."
+          title="Secondary SM read/add with compact inline editing"
+          body="Uses the canonical Secondary Button SM read/add surface, Secondary Field SM edit surface, and Primary icon-only Button SM commit action."
         >
           <EditableValueFieldMatrix />
         </ExportSection>

@@ -14,7 +14,8 @@ Active
 - Runner baseline and heart-rate truth remediation is accepted and closed: authenticated runners
   can save age, height, weight, fitness, and accepted estimated/personal BPM provenance without
   creating a plan; setup and Settings share read/edit truth; profile revision protects signed
-  review; AI may choose accepted BPM or effort as one command; and confirmed numeric BPM snapshots
+  review; AI may choose numeric pace or accepted BPM as the single command while effort remains
+  supplemental guidance; and confirmed numeric BPM snapshots
   remain unchanged when Settings changes later. Desktop/exact-375px browser, local persistence/RLS,
   affected validators/build, and cleanup evidence passed without a paid-provider rerun.
 - The Backend Business-Process Canonicalization And Performance Program is accepted and closed:
@@ -53,9 +54,11 @@ Active
   or evidence; past workouts remain non-editable. Backend policy, capability projection, atomic
   edit persistence, and workout-detail gating now implement that contract, including today,
   logged, and evidence-backed rows. Paid OpenAI acceptance also passed for 10K, Half Marathon,
-  Marathon, and Custom 15K: every runnable leaf carries one AI-authored watch command (`pace`,
-  accepted estimated-or-personal BPM, `effort`, or `run_walk`) through review, confirm, persistence, export/import, and
-  readback. The local raw provider transcript store records future loopback OpenAI request/response
+  Marathon, and Custom 15K at the plan-first transport boundary. The current generated contract
+  requires exactly one numeric AI-authored watch command (`pace` or accepted
+  estimated-or-personal BPM) on every runnable leaf; effort, RPE, talk-test, and cues are
+  supplemental only. Coach-authored Hydration is a targetless, non-runnable step. These truths
+  survive review, confirm, persistence, export/import, and readback. The local raw provider transcript store records future loopback OpenAI request/response
   pairs for diagnosis without becoming a cache, fallback, or second plan engine.
 - The changelog/hub gap exposed a process failure, so history is now split:
   [changelog](./history/changelog.md) owns curated public highlights, while
@@ -350,10 +353,10 @@ unavailable`, or an auth loop.
 - The runner training-preferences backend storage slice is now implemented:
   the linked Supabase project and local database type now include `runner_profiles.training_preferences jsonb`; `user-settings-actions.ts` validates and persists bounded `blocked_days`, `preferred_long_run_day`, and `max_running_days_per_week` values without changing existing personal-data saves, and structured first-plan confirmation now stores the same stable weekly defaults alongside age, weight, and height.
 - The runner training-preferences shared contract slice is now implemented:
-  `src/lib/runner-training-preferences.ts` owns one pure Settings/structured-setup mapping between product-facing `fixedRestDays`, `defaultRunningDaysPerWeek`, and `preferredLongRunDay` and stored `blocked_days`, `max_running_days_per_week`, and `preferred_long_run_day`; zero fixed rest days is valid, seven fixed rest days is rejected, default running days must fit available weekdays, and an explicitly preferred long-run day cannot be blocked. Plan-first provider context does not synthesize a long-run preference when the runner omitted it.
+  `src/lib/runner-training-preferences.ts` owns one pure Settings/structured-setup mapping between product-facing `fixedRestDays`, `defaultRunningDaysPerWeek`, and `preferredLongRunDay` and stored `blocked_days`, `max_running_days_per_week`, and `preferred_long_run_day`; zero fixed rest days is valid, seven fixed rest days is rejected, the weekly value remains an independent upper ceiling, and an explicitly preferred long-run day cannot be blocked. Plan-first provider context does not synthesize a long-run preference when the runner omitted it.
   The same module exposes backend-compatible fitness-level mapping where only `custom` plus a direct recent 5K time in the accepted range creates numeric 5K benchmark truth; non-custom levels remain non-numeric context so they cannot create fake pace or heart-rate targets.
 - The runner training-preferences frontend slice is now implemented:
-  `/settings` uses Hito tabs to separate `Personal data` from `Training preferences`, reuses the setup BPM editor/readback for age-derived estimated and runner-edited personal ranges, and uses the shared progressive training-preference controls for explicit no/fixed rest days, required default running-days/week, optional preferred long-run day, and bounded fitness-level/custom-5K entry. The canonical baseline action persists age, height, weight, fitness, and accepted HR provenance independently of plan creation; no-plan Quick setup restores the same facts, invalidates stale previews through profile revision, and keeps them editable before review/confirm. Later Settings changes affect future authoring only and do not rewrite confirmed plan snapshots.
+  `/settings` uses Hito tabs to separate `Personal data` from `Training preferences`, reuses the setup BPM editor/readback for age-derived estimated and runner-edited personal ranges, and uses the shared progressive training-preference controls for explicit no/fixed rest days, optional weekly running ceiling, optional preferred long-run day, and bounded fitness-level/custom-5K entry. The canonical baseline action persists age, height, weight, fitness, and accepted HR provenance independently of plan creation; no-plan Quick setup restores the same facts, invalidates stale previews through profile revision, and keeps them editable before review/confirm. Later Settings changes affect future authoring only and do not rewrite confirmed plan snapshots.
 - The structured setup review modal slice is now implemented:
   Quick setup’s `Review setup` action remains non-mutating; `draft_ready` opens a `Review your setup` modal with explicit cancel/close and `Yes, create plan` controls, while `correction_required` stays inline near the form and never creates profile, plan, workout, or log rows.
 - The workout-log save action extraction slice is now implemented:
@@ -537,11 +540,12 @@ unavailable`, or an auth loop.
 - The workout segment instruction-completeness contract is now implemented:
   imported, generated, preview, and persisted readback preserve authored target and guidance text; generated-plan pace is AI-authored numeric min/km truth, while authored HR references resolve to snapshot BPM from the runner's effective saved-or-estimated profile and preserve that source through export/readback.
 - Plan-first provider context now carries only exact goal intent, explicit runner facts, availability,
-  and fixed rest days. Backend-derived archetypes, baseline load, horizon, density, progression, and
+  and independently optional weekly-ceiling/fixed-rest constraints. Backend-derived archetypes,
+  fabricated seven-day availability, baseline load, horizon, density, progression, and
   structured-onboarding coaching conversion are removed; current validators exercise the canonical
   provider fixture, compiler, review, import/export, WorkoutDocument, and persistence owners.
 - The original direct structured plan-authoring backend action surface is superseded for visible onboarding:
-  current no-plan generated-plan callers use `previewRunningPlanDraft` followed by `confirmRunningPlanDraft`; the backend validates bounded explicit profile facts, benchmark, target time/date, exact distance, availability, and rest-day inputs before review and persists only the confirmed `ai_authored_plan_first_v1` draft.
+  current no-plan generated-plan callers use `previewRunningPlanDraft` followed by `confirmRunningPlanDraft`; the backend validates bounded explicit profile facts, benchmark, target time/date, exact distance, and only the availability/rest-day constraints actually supplied before review, then persists only the confirmed `ai_authored_plan_first_v1` draft.
 - The Phase 4 frontend cleanup slice has been superseded by the structured first-plan constructor:
   visible no-plan and shell surfaces present structured plan creation as the primary product path, while JSON remains available only as a demoted advanced import for existing Hito plan files, migration, and testing.
 - The first Hito design-system implementation slices are now implemented:

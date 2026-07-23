@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export const RUNNER_HEART_RATE_PROFILE_VERSION = "runner_hr_profile_v2" as const;
 export const HEART_RATE_ZONE_REFERENCE_VALUES = ["Z1", "Z2", "Z3", "Z4", "Z5"] as const;
+export const HEART_RATE_GUIDANCE_MIN_BPM = 40;
+export const HEART_RATE_GUIDANCE_MAX_BPM = 220;
 
 export type HeartRateZoneReference = (typeof HEART_RATE_ZONE_REFERENCE_VALUES)[number];
 export type HeartRateZoneSource = "personal" | "estimated" | "unavailable";
@@ -9,8 +11,16 @@ export type HeartRateZoneSource = "personal" | "estimated" | "unavailable";
 const heartRateZoneValueObjectSchema = z
   .object({
     reference: z.enum(HEART_RATE_ZONE_REFERENCE_VALUES),
-    minBpm: z.number().int().min(1).max(300),
-    maxBpm: z.number().int().min(1).max(300),
+    minBpm: z
+      .number()
+      .int("Heart-rate guidance must use whole BPM values.")
+      .min(HEART_RATE_GUIDANCE_MIN_BPM, "Heart-rate guidance must be at least 40 BPM.")
+      .max(HEART_RATE_GUIDANCE_MAX_BPM, "Heart-rate guidance must be at most 220 BPM."),
+    maxBpm: z
+      .number()
+      .int("Heart-rate guidance must use whole BPM values.")
+      .min(HEART_RATE_GUIDANCE_MIN_BPM, "Heart-rate guidance must be at least 40 BPM.")
+      .max(HEART_RATE_GUIDANCE_MAX_BPM, "Heart-rate guidance must be at most 220 BPM."),
   })
   .strict();
 const heartRateZoneValueSchema = heartRateZoneValueObjectSchema.refine(
@@ -23,31 +33,10 @@ const heartRateZoneValueSchema = heartRateZoneValueObjectSchema.refine(
 
 const completeHeartRateZonesSchema = z
   .array(heartRateZoneValueSchema)
-  .length(HEART_RATE_ZONE_REFERENCE_VALUES.length)
-  .superRefine((zones, context) => {
-    for (const [index, reference] of HEART_RATE_ZONE_REFERENCE_VALUES.entries()) {
-      if (zones[index]?.reference !== reference) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [index, "reference"],
-          message: `Heart-rate profile must keep ${reference} in canonical order.`,
-        });
-      }
-    }
-  });
-const personalHeartRateZonesSchema = completeHeartRateZonesSchema.superRefine((zones, context) => {
-  for (let index = 1; index < zones.length; index += 1) {
-    const previous = zones[index - 1];
-    const current = zones[index];
-    if (previous && current && current.minBpm <= previous.maxBpm) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: [index, "minBpm"],
-        message: "Personal heart-rate zones must not overlap.",
-      });
-    }
-  }
-});
+  .length(HEART_RATE_ZONE_REFERENCE_VALUES.length, {
+    message: "Heart-rate profile must contain all five guidance bands.",
+  })
+  .superRefine(validateHeartRateGuidanceBandOrder);
 
 export const personalHeartRateProfileInputSchema = z
   .object({
@@ -66,7 +55,7 @@ export const storedRunnerHeartRateProfileSchema = z.discriminatedUnion("source",
     .object({
       version: z.literal(RUNNER_HEART_RATE_PROFILE_VERSION),
       source: z.literal("personal"),
-      zones: personalHeartRateZonesSchema,
+      zones: completeHeartRateZonesSchema,
     })
     .strict(),
 ]);
@@ -87,7 +76,10 @@ export const effectiveRunnerHeartRateProfileSchema = z
             path: ["maxBpm"],
           }),
       )
-      .length(HEART_RATE_ZONE_REFERENCE_VALUES.length),
+      .length(HEART_RATE_ZONE_REFERENCE_VALUES.length, {
+        message: "Heart-rate profile must contain all five guidance bands.",
+      })
+      .superRefine(validateHeartRateGuidanceBandOrder),
   })
   .strict();
 export const acceptedRunnerHeartRateProfileSchema = effectiveRunnerHeartRateProfileSchema.extend({
@@ -284,12 +276,10 @@ export function normalizeAcceptedHeartRateProfileForStorage(input: {
     };
   }
 
-  const personalZones = personalHeartRateZonesSchema.parse(parsed.zones);
-
   return {
     version: RUNNER_HEART_RATE_PROFILE_VERSION,
     source: "personal",
-    zones: personalZones,
+    zones: parsed.zones,
   };
 }
 
@@ -401,4 +391,45 @@ function zoneDefinition(reference: HeartRateZoneReference) {
 
 function isAcceptedStoredHeartRateProfile(value: unknown) {
   return storedRunnerHeartRateProfileSchema.safeParse(value).success;
+}
+
+function validateHeartRateGuidanceBandOrder(
+  zones: ReadonlyArray<{
+    reference: HeartRateZoneReference;
+    minBpm: number;
+    maxBpm: number;
+  }>,
+  context: z.RefinementCtx,
+) {
+  for (const [index, reference] of HEART_RATE_ZONE_REFERENCE_VALUES.entries()) {
+    if (zones[index]?.reference !== reference) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [index, "reference"],
+        message: `Heart-rate profile must keep ${reference} in canonical order.`,
+      });
+    }
+
+    if (index === 0) continue;
+    const previous = zones[index - 1];
+    const current = zones[index];
+    if (!previous || !current) continue;
+
+    if (current.minBpm < previous.minBpm) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [index, "minBpm"],
+        message:
+          "Heart-rate guidance lower bounds must be non-decreasing from Recovery through Tempo.",
+      });
+    }
+    if (current.maxBpm < previous.maxBpm) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [index, "maxBpm"],
+        message:
+          "Heart-rate guidance upper bounds must be non-decreasing from Recovery through Tempo.",
+      });
+    }
+  }
 }

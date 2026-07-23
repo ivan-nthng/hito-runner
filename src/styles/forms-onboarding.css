@@ -117,6 +117,63 @@
     -webkit-appearance: none;
   }
 
+  .hito-compound-range-field {
+    display: grid;
+    min-width: 0;
+    gap: var(--space-2);
+  }
+
+  .hito-compound-range-control {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+    align-items: center;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .hito-compound-range-control:focus-within {
+    border-color: transparent;
+    background: color-mix(in oklch, var(--color-muted) 64%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 16%, transparent);
+  }
+
+  .hito-compound-range-control[data-invalid="true"] {
+    border-color: color-mix(in oklch, var(--color-destructive) 46%, transparent);
+    background: color-mix(in oklch, var(--color-destructive) 7%, var(--color-background));
+  }
+
+  .hito-compound-range-control[data-invalid="true"]:focus-within {
+    border-color: color-mix(in oklch, var(--color-destructive) 58%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-destructive) 16%, transparent);
+  }
+
+  .hito-compound-range-control[data-disabled="true"] {
+    background: color-mix(in oklch, var(--color-muted) 26%, transparent);
+    color: color-mix(in oklch, var(--color-foreground) 78%, transparent);
+  }
+
+  .hito-compound-range-input,
+  .hito-compound-range-input:hover:not(:disabled),
+  .hito-compound-range-input:focus {
+    min-width: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .hito-compound-range-separator,
+  .hito-compound-range-unit {
+    color: var(--color-muted-foreground);
+    white-space: nowrap;
+  }
+
+  .hito-compound-range-unit {
+    padding-inline-end: var(--space-3);
+  }
+
   .hito-onboarding-surface {
     max-width: 64rem;
     margin-inline: auto;
@@ -1651,12 +1708,14 @@
   }
 
   .hito-field-helper {
+    --hito-typography-role: helper;
     font-size: 0.75rem;
     line-height: 1.45;
     color: var(--color-muted-foreground);
   }
 
   .hito-field-error {
+    --hito-typography-role: error-success;
     font-size: 0.875rem;
     font-weight: 500;
     line-height: 1.45;
@@ -1664,6 +1723,7 @@
   }
 
   .hito-field-success {
+    --hito-typography-role: error-success;
     font-size: 0.875rem;
     font-weight: 500;
     line-height: 1.45;
@@ -1859,7 +1919,156 @@
     max-width: 100%;
   }
 
+  .hito-heart-rate-editor {
+    overflow: hidden;
+    border-block: 1px solid var(--color-hairline);
+  }
+
+  .hito-heart-rate-scale {
+    display: grid;
+    grid-template-columns: minmax(12rem, 0.8fr) minmax(16rem, 1.4fr) minmax(11rem, 0.7fr);
+    gap: var(--space-5);
+    padding: var(--space-3) var(--space-4) var(--space-1);
+  }
+
+  .hito-heart-rate-scale-values {
+    display: flex;
+    grid-column: 2;
+    justify-content: space-between;
+    font-family: var(--font-mono);
+  }
+
+  .hito-heart-rate-lanes {
+    display: grid;
+  }
+
+  .hito-heart-rate-lane {
+    --hito-dual-range-accent: var(--color-workout-steady);
+    display: grid;
+    grid-template-columns: minmax(12rem, 0.8fr) minmax(16rem, 1.4fr) minmax(11rem, 0.7fr);
+    align-items: center;
+    gap: var(--space-5);
+    min-width: 0;
+    padding: var(--space-4);
+    border-top: 1px solid var(--color-hairline);
+    transition: background-color 160ms ease;
+  }
+
+  .hito-heart-rate-lane:first-child {
+    border-top: 0;
+  }
+
+  .hito-heart-rate-lane:hover,
+  .hito-heart-rate-lane:focus-within {
+    background: color-mix(in oklch, var(--color-foreground) 3%, transparent);
+  }
+
+  .hito-heart-rate-lane[data-zone="Z1"] {
+    --hito-dual-range-accent: var(--color-workout-recovery);
+  }
+
+  .hito-heart-rate-lane[data-zone="Z2"] {
+    --hito-dual-range-accent: var(--color-workout-easy);
+  }
+
+  .hito-heart-rate-lane[data-zone="Z3"] {
+    --hito-dual-range-accent: var(--color-workout-long-run);
+  }
+
+  .hito-heart-rate-lane[data-zone="Z4"] {
+    --hito-dual-range-accent: var(--color-workout-steady);
+  }
+
+  .hito-heart-rate-lane[data-zone="Z5"] {
+    --hito-dual-range-accent: var(--color-workout-tempo);
+  }
+
+  .hito-heart-rate-lane-identity {
+    display: grid;
+    grid-template-columns: var(--space-1) minmax(0, 1fr);
+    gap: var(--space-3);
+    align-items: stretch;
+    min-width: 0;
+  }
+
+  .hito-heart-rate-zone-marker {
+    width: var(--space-1);
+    min-height: var(--space-10);
+    border-radius: var(--radius-sm);
+    background: var(--hito-dual-range-accent);
+  }
+
+  .hito-heart-rate-lane-range {
+    display: grid;
+    min-width: 0;
+  }
+
+  .hito-heart-rate-lane-fields {
+    display: grid;
+    min-width: 0;
+  }
+
+  .hito-heart-rate-editor-footer {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: var(--space-5);
+    padding: var(--space-4);
+    border-top: 1px solid var(--color-hairline);
+  }
+
+  @media (max-width: 820px) {
+    .hito-heart-rate-scale,
+    .hito-heart-rate-lane {
+      grid-template-columns: minmax(10rem, 0.85fr) minmax(14rem, 1.2fr);
+    }
+
+    .hito-heart-rate-scale-values {
+      grid-column: 2;
+    }
+
+    .hito-heart-rate-lane-fields {
+      grid-column: 2;
+    }
+  }
+
   @media (max-width: 480px) {
+    .hito-heart-rate-scale,
+    .hito-heart-rate-lane {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .hito-heart-rate-scale {
+      padding-inline: 0;
+    }
+
+    .hito-heart-rate-scale-values,
+    .hito-heart-rate-lane-fields {
+      grid-column: 1;
+    }
+
+    .hito-heart-rate-lane {
+      gap: var(--space-3);
+      padding-inline: 0;
+    }
+
+    .hito-heart-rate-lane:hover,
+    .hito-heart-rate-lane:focus-within {
+      background: transparent;
+    }
+
+    .hito-heart-rate-editor-footer {
+      align-items: stretch;
+      flex-direction: column;
+      padding-inline: 0;
+    }
+
+    .hito-heart-rate-editor-footer .hito-settings-actions {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      width: 100%;
+    }
+
     .hito-plan-schedule-edit .hito-list-row {
       flex-wrap: wrap;
       align-items: flex-start;

@@ -38,6 +38,18 @@ Verify Hito behavior with real browser evidence and honest coverage.
 - Do not cite orchestration-agent execution limits as a reason to skip QA work; those limits do not
   apply to the QA role while executing validation.
 
+## Evidence And Fixture Discipline
+
+Follow `AGENTS.md` section 2.45. For a reported defect, first collect a safe discriminator that can
+confirm or falsify the claimed root cause. Use a minimized redacted replay only when the failure is
+deterministic and an existing validator/test seam can own it; document its provenance class and
+expected invariant. Disposable fixtures must use the established local cleanup and zero-readback
+proof. Do not create persistent replay storage, a product fallback, or a second truth path.
+
+Begin acceptance by checking the centralized `Execution preflight` and its promised proof from
+`AGENTS.md` section 0.1. Missing, contradicted, or untestable receipts are a coverage gap that keeps
+the behavior-changing task open; do not create artificial replay evidence for subjective visual work.
+
 ## Browser Policy
 
 - Use the built-in Codex app/browser testing environment first whenever it can cover the task.

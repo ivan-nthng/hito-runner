@@ -164,6 +164,7 @@ async function validateGeneratedAndAiPlansUseUnifiedBlockContract() {
   assertGeneratedPlanUsesUnifiedBlockContract(
     selectedPlan,
     "selected-plan generated canonical plan",
+    { requireHydration: true },
   );
 
   const arbitraryRepeatPlan = buildArbitraryRepeatChildrenTrainingPlan(selectedPlan);
@@ -196,7 +197,11 @@ async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {
   });
 }
 
-function assertGeneratedPlanUsesUnifiedBlockContract(plan: TrainingPlanV2, label: string) {
+function assertGeneratedPlanUsesUnifiedBlockContract(
+  plan: TrainingPlanV2,
+  label: string,
+  options: { requireHydration?: boolean } = {},
+) {
   assert.equal(plan.schema_version, "training-plan-v2", `${label} should stay training-plan-v2.`);
   assertNoLegacyRepeatPairFields(plan, label);
 
@@ -210,6 +215,25 @@ function assertGeneratedPlanUsesUnifiedBlockContract(plan: TrainingPlanV2, label
     const language = buildLanguageForTrainingPlanWorkout(workout, plan.source_kind ?? null);
     assertAcceptedLanguageShape(language);
     assertNoGeneratedWorkoutUserEnteredTargetTruth(workout, label);
+
+    workout.segments.forEach((segment, segmentIndex) => {
+      if (segment.segment_type !== "fueling") return;
+
+      const hydrationBlock = language.runnerFacingBlocks[segmentIndex];
+      assert.equal(hydrationBlock?.type, "hydration", `${label} should expose Hydration.`);
+      assert.equal(hydrationBlock?.label, "Hydration", `${label} should label Hydration.`);
+      assert.equal(segment.prescription?.mode, "none", `${label} Hydration stays targetless.`);
+      assert.equal(segment.target, undefined, `${label} Hydration must not become a command.`);
+    });
+  }
+
+  if (options.requireHydration) {
+    assert.ok(
+      plan.planned_workouts.some((workout) =>
+        workout.segments.some((segment) => segment.segment_type === "fueling"),
+      ),
+      `${label} must exercise the canonical Hydration read-model path.`,
+    );
   }
 
   for (const workout of repeatWorkouts) {

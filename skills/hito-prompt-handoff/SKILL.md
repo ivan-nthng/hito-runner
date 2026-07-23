@@ -26,13 +26,18 @@ Before writing any next-role prompt, ask:
 If it is only symptom-level, rewrite the handoff before sending it. The prompt must name:
 
 - the visible symptom
-- the suspected underlying cause
+- the evidence-backed underlying cause, or the exact artifact required to establish it
 - the canonical owner that should fix it
 - the existing seam/pattern that should be reused first
 - the stop condition if the true root cause belongs to another role
 
 For BACKEND and FRONTEND prompts, this gate is mandatory in the `Root cause and architecture fit`
 section. For QA prompts, this gate becomes explicit source-boundary proof and stop conditions.
+
+Every handoff that authorizes implementation, debugging, or QA must tell the assigned owner to
+publish the centralized `Execution preflight` from `AGENTS.md` section 0.1 before its first write or
+validation mutation. Do not duplicate its template in every prompt; carry only task-specific evidence
+and stop conditions.
 
 ## Solution Ownership Boundary
 
@@ -367,46 +372,9 @@ For BACKEND and FRONTEND prompts, `Root cause and architecture fit` must tell th
   systemic follow-up if the real fix is outside the current slice
 - clean up dead code from failed or replaced attempts when safe
 
-For QA handoffs, use a numbered prompt shape:
-
-```md
-ROLE: QA
-
-1. Task
-
-<exact validation task>
-
-2. Stage
-
-QA validation / <specific checkpoint>
-
-3. Context
-
-<what changed and why this validation is needed>
-
-4. Browser Path Preflight
-
-<browser requirement or backend-only reason browser is not used>
-
-5. QA Execution Authority
-
-QA must execute this validation directly. Run the required CLI/build/script/browser/dev-server/local
-fixture checks needed to prove the scope. Do not return another handoff prompt merely because the
-validation uses commands, browser tooling, screenshots, local artifacts, or disposable local/test
-fixtures. Do not edit product code or implement fixes; report failures with evidence.
-
-6. Validation coverage
-
-Read/inspect:
-- <file>
-
-Run:
-- <command>
-
-7. Required behavior proof
-
-<exact invariants, counts, statuses, and boundaries to verify>
-```
+For QA handoffs, rely on the standard `ROLE: QA` prompt and report format in `AGENTS.md` plus
+`skills/hito-qa-browser-regression/SKILL.md`. Add only task-specific evidence, fixture, or safety
+requirements; do not duplicate a second numbered QA template here.
 
 QA handoff wording rule:
 

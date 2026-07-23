@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { buildLocalUiInspectorBatchPrompt } from "@/components/devtools/local-ui-inspector-batch-prompt";
 import {
   getLocalUiInspectorItemSummary,
@@ -22,16 +22,20 @@ import { Textarea } from "@/components/ui/textarea";
 type CopyState = "idle" | "copying" | "copied" | "copy_failed";
 
 export function LocalUiInspectorBatchReview({
+  autoGenerate = false,
   initialFocusItemId,
   items,
+  onClear,
   onClose,
   onContinue,
   onEdit,
   onRemove,
   routeKey,
 }: {
+  autoGenerate?: boolean;
   initialFocusItemId?: string | null;
   items: LocalUiInspectorBatchItem[];
+  onClear: () => void;
   onClose: () => void;
   onContinue: () => void;
   onEdit: (item: LocalUiInspectorBatchItem) => void;
@@ -42,6 +46,7 @@ export function LocalUiInspectorBatchReview({
   const titleId = useId();
   const titleRef = useRef<HTMLHeadingElement | null>(null);
   const promptRef = useRef<HTMLTextAreaElement | null>(null);
+  const autoGenerateHandledRef = useRef(false);
   const prompt = useMemo(
     () =>
       buildLocalUiInspectorBatchPrompt(items, {
@@ -58,6 +63,13 @@ export function LocalUiInspectorBatchReview({
       }),
     [items, routeKey],
   );
+
+  const copyPrompt = useCallback(async () => {
+    if (items.length === 0 || copyState === "copying") return;
+    setCopyState("copying");
+    const result = await copyTextToClipboard(prompt);
+    setCopyState(result.ok ? "copied" : "copy_failed");
+  }, [copyState, items.length, prompt]);
 
   useEffect(() => {
     setCopyState("idle");
@@ -81,12 +93,11 @@ export function LocalUiInspectorBatchReview({
     });
   }, [copyState]);
 
-  const copyPrompt = async () => {
-    if (items.length === 0 || copyState === "copying") return;
-    setCopyState("copying");
-    const result = await copyTextToClipboard(prompt);
-    setCopyState(result.ok ? "copied" : "copy_failed");
-  };
+  useEffect(() => {
+    if (!autoGenerate || autoGenerateHandledRef.current || items.length === 0) return;
+    autoGenerateHandledRef.current = true;
+    void copyPrompt();
+  }, [autoGenerate, copyPrompt, items.length]);
 
   const removeItem = (itemId: string) => {
     const itemIndex = items.findIndex((item) => item.id === itemId);
@@ -107,15 +118,22 @@ export function LocalUiInspectorBatchReview({
       aria-labelledby={titleId}
     >
       <div className="relative min-w-0 pr-8" data-local-ui-inspector-header="">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <h2 ref={titleRef} id={titleId} tabIndex={-1} className="hito-panel-title outline-none">
             Draft
           </h2>
-          <HitoMetadataTag tone="muted">
-            {items.length} / {LOCAL_UI_INSPECTOR_BATCH_LIMIT}
-          </HitoMetadataTag>
+          <span className="hito-caption text-muted-foreground">
+            {items.length} of {LOCAL_UI_INSPECTOR_BATCH_LIMIT}
+          </span>
+          <button
+            type="button"
+            className="hito-button hito-button-ghost hito-button-xs ml-auto min-h-7 shrink-0 px-2"
+            onClick={onClear}
+          >
+            <Icon name="trash" size="xs" />
+            Clear draft
+          </button>
         </div>
-        <p className="hito-caption mt-0.5 truncate">{routeKey}</p>
         <button
           type="button"
           className="hito-button hito-button-ghost hito-button-sm absolute -right-1 -top-1 min-h-7 px-2"
@@ -130,8 +148,6 @@ export function LocalUiInspectorBatchReview({
         className="grid min-w-0 gap-3 max-md:min-h-0 max-md:auto-rows-max max-md:overflow-y-auto max-md:overscroll-contain max-md:pr-1"
         data-local-ui-inspector-scroll-body=""
       >
-        <p className="hito-caption">Local draft; refresh discards it.</p>
-
         <ol
           className="hito-row-group min-w-0"
           aria-label="Local Inspector draft items"
@@ -233,10 +249,10 @@ export function LocalUiInspectorBatchReview({
         className="grid min-w-0 gap-2 border-t border-hairline pt-3"
         data-local-ui-inspector-footer=""
       >
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <div className="grid min-w-0 gap-2">
           <button
             type="button"
-            className="hito-button hito-button-primary hito-button-sm"
+            className="hito-button hito-button-primary hito-button-sm w-full justify-center"
             disabled={items.length === 0 || copyState === "copying"}
             onClick={() => void copyPrompt()}
           >
@@ -249,16 +265,14 @@ export function LocalUiInspectorBatchReview({
           </button>
           <button
             type="button"
-            className="hito-button hito-button-secondary hito-button-sm"
+            className="hito-button hito-button-secondary hito-button-sm w-full justify-center"
             onClick={onContinue}
           >
             Continue selecting
           </button>
         </div>
-        <p className="hito-caption" aria-live="polite">
-          {copyState === "copied"
-            ? "Prompt copied. The local batch is still available."
-            : `${items.length} ${items.length === 1 ? "item" : "items"} in this local draft.`}
+        <p className="sr-only" aria-live="polite">
+          {copyState === "copied" ? "Prompt copied." : ""}
         </p>
       </div>
     </div>

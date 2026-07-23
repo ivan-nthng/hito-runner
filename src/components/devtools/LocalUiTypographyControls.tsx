@@ -23,6 +23,9 @@ export function TypographyControlRow({
     : `Custom · ${getObservedTypographyLabel(typography)}`;
   const desiredHelp = desiredRole ? getRoleDetail(desiredRole) : currentHelp;
   const currentRoleId = typography.currentRole?.id ?? null;
+  const selectableCurrentRoleId = typography.options.some((option) => option.id === currentRoleId)
+    ? currentRoleId
+    : null;
 
   return (
     <div className="grid min-w-0 py-0.5" data-local-ui-property-control-row="typography">
@@ -57,7 +60,7 @@ export function TypographyControlRow({
           <TypographyRoleSelect
             currentRoleId={currentRoleId}
             displayLabel={currentLabel}
-            selectedRoleId={currentRoleId}
+            selectedRoleId={selectableCurrentRoleId}
             tooltip={currentHelp}
             tone="neutral"
             onDesiredRoleChange={onDesiredRoleChange}

@@ -120,7 +120,7 @@ export function parseStoredRunnerTrainingPreferences(
   }
 
   try {
-    return normalizeRunnerTrainingPreferences(value, { requireDefaultRunningDays: false });
+    return normalizeRunnerTrainingPreferences(value);
   } catch {
     return null;
   }
@@ -129,7 +129,7 @@ export function parseStoredRunnerTrainingPreferences(
 export function normalizeRunnerTrainingPreferencesForSave(
   value: unknown,
 ): RunnerTrainingPreferencesStorage {
-  return normalizeRunnerTrainingPreferences(value, { requireDefaultRunningDays: true });
+  return normalizeRunnerTrainingPreferences(value);
 }
 
 export function mapRunnerTrainingPreferencesProductToStorage(
@@ -246,10 +246,7 @@ export function normalizeRunnerFitnessBenchmark(
   };
 }
 
-function normalizeRunnerTrainingPreferences(
-  value: unknown,
-  options: { requireDefaultRunningDays: boolean },
-): RunnerTrainingPreferencesStorage {
+function normalizeRunnerTrainingPreferences(value: unknown): RunnerTrainingPreferencesStorage {
   const record = asRecord(value);
 
   if (!record) {
@@ -265,16 +262,10 @@ function normalizeRunnerTrainingPreferences(
     ? parseOptionalWeekday(record.preferredLongRunDay)
     : parseOptionalWeekday(record.preferred_long_run_day);
   const maxRunningDaysPerWeek = productShape
-    ? parseOptionalRunningDays(record.defaultRunningDaysPerWeek, options.requireDefaultRunningDays)
-    : parseOptionalRunningDays(record.max_running_days_per_week, options.requireDefaultRunningDays);
-  const availableDayCount = RUNNER_TRAINING_WEEKDAYS.length - blockedDays.length;
-
+    ? parseOptionalRunningDays(record.defaultRunningDaysPerWeek)
+    : parseOptionalRunningDays(record.max_running_days_per_week);
   if (blockedDays.length >= RUNNER_TRAINING_WEEKDAYS.length) {
     throw new Error("Leave at least one weekday available for running.");
-  }
-
-  if (maxRunningDaysPerWeek != null && maxRunningDaysPerWeek > availableDayCount) {
-    throw new Error("Running days per week must fit outside the fixed rest days.");
   }
 
   if (preferredLongRunDay && blockedDays.includes(preferredLongRunDay)) {
@@ -308,12 +299,8 @@ function parseOptionalWeekday(value: unknown): WeekdayName | null {
   return parseRunnerWeekday(value);
 }
 
-function parseOptionalRunningDays(value: unknown, required: boolean): number | null {
+function parseOptionalRunningDays(value: unknown): number | null {
   if (value == null || value === "") {
-    if (required) {
-      throw new Error("Default running days per week is required.");
-    }
-
     return null;
   }
 

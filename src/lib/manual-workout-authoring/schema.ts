@@ -7,6 +7,7 @@ import type {
 } from "@/lib/rich-workout-model";
 import {
   AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
+  AI_AUTHORED_PACE_PROVENANCE_VALUES,
   PRIMARY_EXECUTION_MODE_VALUES,
   type PrimaryExecutionMode,
   type WorkoutDocumentContent,
@@ -163,6 +164,7 @@ const manualWorkoutTargetInputSchema = z
     hint: z.string().trim().min(1).max(200).optional(),
     rpe: z.union([z.string().trim().min(1).max(32), z.number().min(0).max(10)]).optional(),
     paceTargetSource: z.enum(MANUAL_WORKOUT_TARGET_SOURCE_VALUES).optional(),
+    paceProvenance: z.enum(AI_AUTHORED_PACE_PROVENANCE_VALUES).optional(),
     pace: z.string().trim().min(1).max(80).optional(),
     paceMinPerKmRange: z.string().trim().min(1).max(80).optional(),
     hrBpmCap: z.union([z.number().int(), z.string().trim().min(1).max(16)]).optional(),

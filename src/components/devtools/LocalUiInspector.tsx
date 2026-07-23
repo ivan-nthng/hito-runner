@@ -18,6 +18,7 @@ import {
 import { Icon } from "@/components/ui/icon";
 import { LocalScreenCaptureFlow } from "@/components/devtools/LocalScreenCaptureFlow";
 import { LocalUiInspectorBatchReview } from "@/components/devtools/LocalUiInspectorBatchReview";
+import { LocalUiInspectorModeBar } from "@/components/devtools/LocalUiInspectorModeBar";
 import { LocalUiInspectorSurface } from "@/components/devtools/LocalUiInspectorSurface";
 import {
   getLocalUiInspectorLauncherPanelPosition,
@@ -63,6 +64,7 @@ type ComposerPanelState = {
 
 type ReviewPanelState = {
   anchor: "launcher";
+  autoGenerate: boolean;
   focusItemId: string | null;
   kind: "review";
   position: { x: number; y: number };
@@ -103,42 +105,6 @@ export function LocalUiInspector() {
     setStatusMessage("Local Inspector draft cleared after route change.");
   }, [routeKey]);
 
-  useEffect(() => {
-    const preventProductDismissFromDevtool = (event: Event) => {
-      const customEvent = event as CustomEvent<{ originalEvent?: Event }>;
-      const originalTarget = customEvent.detail?.originalEvent?.target;
-      const target = originalTarget instanceof Element ? originalTarget : event.target;
-
-      if (target instanceof Element && target.closest("[data-local-ui-inspector-layer]")) {
-        event.preventDefault();
-      }
-    };
-
-    window.addEventListener(
-      "dismissableLayer.pointerDownOutside",
-      preventProductDismissFromDevtool,
-      true,
-    );
-    window.addEventListener(
-      "dismissableLayer.focusOutside",
-      preventProductDismissFromDevtool,
-      true,
-    );
-
-    return () => {
-      window.removeEventListener(
-        "dismissableLayer.pointerDownOutside",
-        preventProductDismissFromDevtool,
-        true,
-      );
-      window.removeEventListener(
-        "dismissableLayer.focusOutside",
-        preventProductDismissFromDevtool,
-        true,
-      );
-    };
-  }, []);
-
   const closeInspectorImmediately = useCallback(() => {
     setMode("idle");
     setMenuOpen(false);
@@ -150,9 +116,10 @@ export function LocalUiInspector() {
     window.requestAnimationFrame(() => inspectLauncherRef.current?.focus());
   }, []);
 
-  const showReview = useCallback((focusItemId: string | null) => {
+  const showReview = useCallback((focusItemId: string | null, autoGenerate = false) => {
     setPanel({
       anchor: "launcher",
+      autoGenerate,
       focusItemId,
       kind: "review",
       position: getLocalUiInspectorLauncherPanelPosition(),
@@ -168,6 +135,7 @@ export function LocalUiInspector() {
       if (current?.kind === "composer" && current.itemId) {
         return {
           anchor: "launcher",
+          autoGenerate: false,
           focusItemId: current.itemId,
           kind: "review",
           position: getLocalUiInspectorLauncherPanelPosition(),
@@ -192,6 +160,13 @@ export function LocalUiInspector() {
     closeInspectorImmediately();
     focusInspectLauncher();
   }, [closeInspectorImmediately, focusInspectLauncher, session]);
+
+  const clearInspectorBatch = useCallback(() => {
+    session.resetSession();
+    setStatusMessage("Collected Inspector items cleared.");
+    setPanel(null);
+    focusInspectLauncher();
+  }, [focusInspectLauncher, session]);
 
   useEffect(() => {
     if (mode !== "inspect") {
@@ -405,9 +380,11 @@ export function LocalUiInspector() {
 
   const commitComposer = ({
     draft,
+    intent,
     payload,
   }: {
     draft: LocalUiInspectorItemDraft;
+    intent: "add" | "generate";
     payload: InlineChangeTargetPayload;
   }) => {
     const currentPanel = panelRef.current;
@@ -429,7 +406,9 @@ export function LocalUiInspector() {
     if (existing) {
       session.replaceItem(nextItem);
       setStatusMessage("Item updated.");
-      if (isLocalUiInspectorNarrowViewport()) {
+      if (intent === "generate") {
+        showReview(existing.id, true);
+      } else if (isLocalUiInspectorNarrowViewport()) {
         setPanel(null);
         focusInspectLauncher();
       } else {
@@ -437,11 +416,14 @@ export function LocalUiInspector() {
       }
     } else if (!session.isFull) {
       session.addItem(nextItem);
-      setStatusMessage(
-        `${session.items.length + 1} ${session.items.length === 0 ? "item" : "items"} in local draft.`,
-      );
-      setPanel(null);
-      focusInspectLauncher();
+      if (intent === "generate") {
+        setStatusMessage("Prompt generated from the current Inspector item.");
+        showReview(nextItem.id, true);
+      } else {
+        setStatusMessage("Item added to the Inspector list.");
+        setPanel(null);
+        focusInspectLauncher();
+      }
     }
     setHoverRect(null);
   };
@@ -452,7 +434,6 @@ export function LocalUiInspector() {
       data-local-ui-inspector-root=""
       className="pointer-events-auto fixed bottom-5 right-5 z-[70]"
       onClick={stopDevtoolEvent}
-      onPointerDown={stopDevtoolEvent}
     >
       {mode === "inspect" ? (
         <div
@@ -475,6 +456,12 @@ export function LocalUiInspector() {
             panel.kind === "review" ? "Local Inspector batch review" : "Local UI item composer"
           }
           onClose={closePanelImmediately}
+          onInternalPointerEnd={() => {
+            suppressNextLayerClickRef.current = false;
+          }}
+          onInternalPointerStart={() => {
+            suppressNextLayerClickRef.current = true;
+          }}
           placement={{
             anchor: panel.anchor,
             position: panel.position,
@@ -498,8 +485,10 @@ export function LocalUiInspector() {
             />
           ) : (
             <LocalUiInspectorBatchReview
+              autoGenerate={panel.autoGenerate}
               initialFocusItemId={panel.focusItemId}
               items={session.items}
+              onClear={clearInspectorBatch}
               onClose={() => {
                 setPanel(null);
                 focusInspectLauncher();
@@ -524,26 +513,23 @@ export function LocalUiInspector() {
       ) : null}
       {mode === "screen" ? <LocalScreenCaptureFlow onClose={closeInspectorImmediately} /> : null}
 
-      {mode === "inspect" || mode === "screen" ? (
+      {mode === "screen" ? (
         <button
           ref={inspectLauncherRef}
           type="button"
-          className={`hito-button hito-button-secondary hito-button-md relative ${
-            mode === "screen" ? "z-[83]" : "z-[72]"
-          } aspect-square rounded-full px-0 shadow-soft`}
-          aria-label={mode === "screen" ? "Cancel local screen capture" : "Exit local inspect mode"}
-          title={mode === "screen" ? "Cancel local screen capture" : "Exit local inspect mode"}
-          onClick={mode === "inspect" ? requestInspectorExit : closeInspectorImmediately}
+          className="hito-button hito-button-secondary hito-button-md relative z-[83] aspect-square rounded-full px-0 shadow-soft"
+          aria-label="Cancel local screen capture"
+          title="Cancel local screen capture"
+          onClick={closeInspectorImmediately}
           onKeyDown={(event) => {
             if (event.key !== "Enter" && event.key !== " ") return;
             event.preventDefault();
-            if (mode === "inspect") requestInspectorExit();
-            else closeInspectorImmediately();
+            closeInspectorImmediately();
           }}
         >
           <Icon name="close" size="sm" />
         </button>
-      ) : (
+      ) : mode === "idle" ? (
         <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild>
             <button
@@ -583,24 +569,16 @@ export function LocalUiInspector() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      )}
+      ) : null}
 
       {mode === "inspect" ? (
-        <div className="pointer-events-none absolute bottom-full right-0 z-[72] mb-2 grid w-56 justify-items-end gap-2">
-          <div className="pointer-events-none w-full rounded-md border border-signal/30 bg-background/90 p-2 text-right shadow-soft backdrop-blur">
-            <p className="hito-caption text-foreground">Pencil mode</p>
-            <p className="hito-caption">Hover, then click a UI element.</p>
-          </div>
-          {session.items.length > 0 ? (
-            <button
-              type="button"
-              className="hito-button hito-button-secondary hito-button-sm pointer-events-auto"
-              onClick={openReview}
-            >
-              {session.items.length} {session.items.length === 1 ? "item" : "items"}
-            </button>
-          ) : null}
-        </div>
+        <LocalUiInspectorModeBar
+          itemCount={session.items.length}
+          reviewOpen={panel?.kind === "review"}
+          onExit={requestInspectorExit}
+          onOpenReview={openReview}
+          ref={inspectLauncherRef}
+        />
       ) : null}
 
       <p className="sr-only" aria-live="polite">

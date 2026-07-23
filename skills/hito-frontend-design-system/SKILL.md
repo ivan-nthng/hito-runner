@@ -9,6 +9,18 @@ description: Use for Hito frontend work touching UI layout, components, dialogs,
 
 Build UI from Hito DS primitives and backend-shaped truth instead of adding local drift.
 
+## Evidence And Replay Alignment
+
+`AGENTS.md` sections 2.45 and 2.56 own the shared defect discipline. Use source and DOM/state
+evidence to identify the actual component, layout, or rendering owner; a screenshot proves a visual
+symptom, not ownership. For a deterministic interaction regression, extend an existing test,
+validator, or focused fixture when it can safely prevent recurrence. Do not add a replay engine or
+route-local evidence system for a one-off visual preference.
+
+Publish the centralized `Execution preflight` from `AGENTS.md` section 0.1 before the first UI or
+DS write. The final report must carry its matching closure receipts, including what shared or local
+path was replaced, deleted, or deliberately retained.
+
 ## Required Reading
 
 1. `docs/current-system.md`

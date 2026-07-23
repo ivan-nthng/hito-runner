@@ -800,6 +800,21 @@ export function HitoDsFoundationsPage() {
               operational UI, labels, body, actions, navigation, and feedback. JetBrains Mono owns
               measured or fixed-format truth only.
             </p>
+            <div className="hito-body-small mt-3" data-hito-typography-provenance-specimen="">
+              <span data-hito-typography-provenance-case="inherited">
+                Nested text inherits the nearest confirmed role.
+              </span>{" "}
+              <span className="hito-caption" data-hito-typography-provenance-case="nested-override">
+                A nested canonical role overrides it.
+              </span>
+            </div>
+            <p
+              className="mt-3"
+              data-hito-typography-provenance-case="unresolved-lookalike"
+              style={{ fontSize: "0.875rem", fontWeight: 400, lineHeight: 1.58 }}
+            >
+              Matching computed values without provenance remain Custom.
+            </p>
           </div>
 
           <div className="hito-reference-list">

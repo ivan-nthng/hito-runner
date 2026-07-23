@@ -28,23 +28,22 @@ state, copy, data, or component-behavior defect?`
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
 
+## Evidence Alignment
+
+Use screenshots, browser/DOM measurements, and source ownership to prove a layout defect. Do not
+turn a visual preference into a fake replay test, and do not use CSS as evidence that a state or
+component-behavior failure is fixed.
+
+Before the first layout write, publish the `Execution preflight` required by `AGENTS.md` section
+0.1. Use the accepted visual decision as the evidence receipt for a preference; trace a reported
+behavior defect to its component, state, or rendering owner before changing layout.
+
 ## Subagent Expectations
 
 For layout audits, responsive evidence gathering, DS/source scans, and screenshot comparison, follow
 the subagent delegation discipline in `AGENTS.md`: use read-only subagents where safe, reuse open
 subagents for similar checks, close them when done, and integrate findings into one layout decision
 or implementation report.
-
-## Canonical Architecture Approach
-
-Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
-
-- one canonical pipeline, no parallel product systems for the same truth
-- backend owns validation, normalization, persistence, lifecycle rules, entitlement, and mutation safety
-- frontend/design/copy/QA work must render, explain, or verify backend-shaped truth rather than inventing rules locally
-- deterministic product truth comes before AI interpretation or recommendations
-- risky mutations require explicit review/confirm or confirmation boundaries
-- prefer reuse, deletion, and consolidation over new abstractions
 
 ## Scope
 
@@ -62,20 +61,11 @@ Follow the mandatory Hito architecture approach in `AGENTS.md` without exception
 - keep visual diffs minimal and proportional to the task
 - delete local presentation drift when replacing it with DS primitives
 
-## Definition Of Done, Test Inventory, And Acceptance Gate
+## Layout Definition Of Done
 
-This gate applies only to implementation, debugging, or validation work. A pure explanatory or
-reference response needs no test inventory. For a debugging task, include a safe repro or
-discriminator that proves the first incorrect layout owner, not only the post-fix happy path.
-
-Before closing a layout implementation task, define its observable outcome, preserved boundaries,
-and required inventory for the affected responsive ranges, themes, interaction/focus states, and
-shared consumers. When QA is used, integrate its full executed-test list into the final report; do
-not replace it with a blanket `PASS` claim. Report each scenario as `Check | Scenario / environment |
-Result | Evidence`, plus every required check not run and why. Only then report `Implementation DoD:
-Passed`; otherwise fix-forward and rerun the affected inventory, or return `FAIL`/`BLOCKED`. If broad
-independent QA is outside this task, report `Global QA Acceptance: Pending` rather than claiming
-release acceptance.
+`AGENTS.md` section 2.4 owns the common Definition of Done and report format. Derive the required
+inventory from affected responsive ranges, themes, interaction/focus states, and shared consumers.
+For a defect, prove the actual layout owner rather than closing on a post-fix screenshot alone.
 
 ## Must Not Do
 

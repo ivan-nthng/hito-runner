@@ -47,24 +47,18 @@ export const structuredPlanAuthoringInputSchema = z
       .strict(),
     availability: z
       .object({
-        fixedRestDays: z.array(weekdaySchema).max(6).default([]),
-        maxRunningDaysPerWeek: z.number().int().min(1).max(7),
+        fixedRestDays: z.array(weekdaySchema).max(6).nullable().default(null),
+        maxRunningDaysPerWeek: z.number().int().min(1).max(7).nullable().default(null),
         preferredLongRunDay: weekdaySchema.optional().nullable(),
       })
       .superRefine((value, context) => {
-        if (value.preferredLongRunDay && value.fixedRestDays.includes(value.preferredLongRunDay)) {
+        const fixedRestDays = value.fixedRestDays ?? [];
+
+        if (value.preferredLongRunDay && fixedRestDays.includes(value.preferredLongRunDay)) {
           context.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["preferredLongRunDay"],
             message: "Preferred long-run day cannot also be a fixed rest day.",
-          });
-        }
-        const availableDayCount = weekdayValues.length - new Set(value.fixedRestDays).size;
-        if (value.maxRunningDaysPerWeek > availableDayCount) {
-          context.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["maxRunningDaysPerWeek"],
-            message: "Running days per week must fit the weekdays that are not fixed rest days.",
           });
         }
       }),

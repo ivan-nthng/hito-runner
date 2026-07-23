@@ -18,6 +18,13 @@ Verify that Hito's generated running plans and recommendations are credible, saf
 - If the requested review lacks enough generated-plan evidence, Running Coach should state the missing evidence and hand off to QA or Backend. It should not self-test.
 - Running Coach may create or update markdown coaching artifacts when the requested output is too large for chat, such as plan matrices, workout inventories, doctrine tables, or backend-ready scenario contracts.
 
+## Evidence Discipline
+
+Treat QA/browser/persistence reports, exported plans, and supplied fixtures as factual evidence;
+treat claims without them as hypotheses or missing coverage. Do not create a coaching process system
+or duplicate technical proof. A recurring coaching lesson belongs in the existing doctrine or a
+backend-ready validator contract only when accepted evidence identifies the scenario and guardrail.
+
 ## Required Reading
 
 For Hito plan-quality work, read:

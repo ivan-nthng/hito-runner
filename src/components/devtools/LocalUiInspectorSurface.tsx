@@ -13,11 +13,15 @@ export function LocalUiInspectorSurface({
   ariaLabel,
   children,
   onClose,
+  onInternalPointerEnd,
+  onInternalPointerStart,
   placement,
 }: {
   ariaLabel: string;
   children: ReactNode;
   onClose: () => void;
+  onInternalPointerEnd: () => void;
+  onInternalPointerStart: () => void;
   placement: LocalUiInspectorSurfacePlacement;
 }) {
   const narrow = useNarrowViewport();
@@ -30,6 +34,18 @@ export function LocalUiInspectorSurface({
           data-local-ui-inspector-layer=""
           className="!z-[82] flex h-dvh w-full max-w-none flex-col gap-0 overflow-hidden border-0 p-0 sm:max-w-none [&>.hito-ui-sheet-close]:hidden"
           aria-label={ariaLabel}
+          onPointerCancelCapture={onInternalPointerEnd}
+          onPointerDownCapture={onInternalPointerStart}
+          onPointerUpCapture={onInternalPointerEnd}
+          onInteractOutside={(event) => {
+            const originalTarget = event.detail.originalEvent.target;
+            if (
+              originalTarget instanceof Element &&
+              originalTarget.closest("[data-local-ui-inspector-layer]")
+            ) {
+              event.preventDefault();
+            }
+          }}
         >
           <SheetTitle className="sr-only">Local Inspector</SheetTitle>
           <SheetDescription className="sr-only">
@@ -44,7 +60,12 @@ export function LocalUiInspectorSurface({
   }
 
   return (
-    <LocalUiInspectorDesktopPanel ariaLabel={ariaLabel} placement={placement}>
+    <LocalUiInspectorDesktopPanel
+      ariaLabel={ariaLabel}
+      onInternalPointerEnd={onInternalPointerEnd}
+      onInternalPointerStart={onInternalPointerStart}
+      placement={placement}
+    >
       {children}
     </LocalUiInspectorDesktopPanel>
   );
@@ -53,10 +74,14 @@ export function LocalUiInspectorSurface({
 function LocalUiInspectorDesktopPanel({
   ariaLabel,
   children,
+  onInternalPointerEnd,
+  onInternalPointerStart,
   placement,
 }: {
   ariaLabel: string;
   children: ReactNode;
+  onInternalPointerEnd: () => void;
+  onInternalPointerStart: () => void;
   placement: LocalUiInspectorSurfacePlacement;
 }) {
   const panelRef = useRef<HTMLElement | null>(null);
@@ -113,6 +138,9 @@ function LocalUiInspectorDesktopPanel({
       className="fixed z-[71] grid max-h-[calc(100vh-2rem)] w-[min(22rem,calc(100vw-1.25rem))] gap-3 overflow-y-auto rounded-xl border border-hairline bg-background p-3 text-left shadow-soft"
       style={{ left: clampedPosition.x, top: clampedPosition.y }}
       aria-label={ariaLabel}
+      onPointerCancelCapture={onInternalPointerEnd}
+      onPointerDownCapture={onInternalPointerStart}
+      onPointerUpCapture={onInternalPointerEnd}
     >
       {children}
     </section>

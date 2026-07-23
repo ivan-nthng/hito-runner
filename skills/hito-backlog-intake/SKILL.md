@@ -5,6 +5,13 @@ description: Use when capturing Hito bugs, UI screenshots, improvement ideas, pr
 
 # Hito Backlog Intake
 
+## Evidence Discipline
+
+Preserve the report's time, surface, attachment, and observed behavior. Mark a root cause as a
+hypothesis until source, log, database, validator, or browser/DOM evidence supports it. When that
+evidence is not safely available during intake, name the exact artifact the next owner must obtain;
+do not turn a screenshot, intuition, or prior prompt into a confirmed cause.
+
 ## Purpose
 
 Convert messy user feedback into a clear, investigated, evidence-backed backlog item that another

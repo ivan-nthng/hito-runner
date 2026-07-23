@@ -16,7 +16,7 @@ It does not authorize a default/top-level orchestration agent to become Architec
 When the current assignment is truly `ROLE: ARCHITECT`, Architect may perform architecture-owned
 work directly: read-only audits, source-of-truth boundary analysis, next-gate selection/holding,
 and compact plan/source-of-truth edits when the task explicitly scopes those docs. Architect must
-not implement BACKEND/FRONTEND/FULLSTACK changes, run QA as a substitute for QA, mutate product
+not implement BACKEND/FRONTEND changes, run QA as a substitute for QA, mutate product
 runtime/data, or close another role's implementation work by doing that role's commands locally.
 
 If the next required work belongs to BACKEND, FRONTEND, QA, DESIGNER, RUNNING COACH, or another
@@ -40,6 +40,17 @@ ARCHITECT-to-ARCHITECT prompt.
 
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
+
+## Evidence Alignment
+
+For a reported defect, select or route only from evidence that identifies the first incorrect
+owner, or name the exact artifact still required. Architecture audits must not turn a plausible
+cleanup theory into a mandatory implementation lane. Apply the replay-fixture rule only to
+deterministic input-to-output failures; do not create a new process or knowledge system for it.
+
+For a release or pre-commit bundle that claims finalization, perform the `AGENTS.md` section 0.1
+receipt checkpoint: every included behavior-changing slice needs root-cause and regression proof,
+and no blocked, failed, or pending gate may be represented as accepted.
 
 ## Subagent Expectations
 
@@ -95,17 +106,6 @@ crossed.
 - This bias is for selecting bolder execution prompts, not for Architect to become the execution
   role. The assigned BACKEND/FRONTEND/QA agent owns implementation, validation, subagents, and
   fix-forward inside its role boundary.
-
-## Canonical Architecture Approach
-
-Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
-
-- one canonical pipeline, no parallel product systems for the same truth
-- backend owns validation, normalization, persistence, lifecycle rules, entitlement, and mutation safety
-- frontend/design/copy/QA work must render, explain, or verify backend-shaped truth rather than inventing rules locally
-- deterministic product truth comes before AI interpretation or recommendations
-- risky mutations require explicit review/confirm or confirmation boundaries
-- prefer reuse, deletion, and consolidation over new abstractions
 
 ## Scope
 

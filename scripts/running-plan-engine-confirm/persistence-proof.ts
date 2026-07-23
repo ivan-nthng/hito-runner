@@ -60,18 +60,18 @@ type BuildConfirmInputForConfirm = (
 const REQUIRE_PERSISTENCE_FLAG = DISPOSABLE_REQUIRE_PERSISTENCE_FLAG;
 const DISPOSABLE_TEST_PASSWORD = "Hito-local-proof-2026!";
 const PERSONAL_HEART_RATE_ZONES = [
-  { reference: "Z1", minBpm: 95, maxBpm: 115 },
+  { reference: "Z1", minBpm: 95, maxBpm: 120 },
   { reference: "Z2", minBpm: 116, maxBpm: 135 },
-  { reference: "Z3", minBpm: 136, maxBpm: 150 },
-  { reference: "Z4", minBpm: 151, maxBpm: 165 },
-  { reference: "Z5", minBpm: 166, maxBpm: 185 },
+  { reference: "Z3", minBpm: 130, maxBpm: 150 },
+  { reference: "Z4", minBpm: 145, maxBpm: 165 },
+  { reference: "Z5", minBpm: 160, maxBpm: 185 },
 ] as const;
 const UPDATED_PERSONAL_HEART_RATE_ZONES = [
   { reference: "Z1", minBpm: 90, maxBpm: 110 },
-  { reference: "Z2", minBpm: 111, maxBpm: 130 },
-  { reference: "Z3", minBpm: 131, maxBpm: 145 },
-  { reference: "Z4", minBpm: 146, maxBpm: 160 },
-  { reference: "Z5", minBpm: 161, maxBpm: 180 },
+  { reference: "Z2", minBpm: 115, maxBpm: 130 },
+  { reference: "Z3", minBpm: 135, maxBpm: 145 },
+  { reference: "Z4", minBpm: 150, maxBpm: 160 },
+  { reference: "Z5", minBpm: 165, maxBpm: 180 },
 ] as const;
 const DISPOSABLE_CLEANUP_SPECS = [
   {
@@ -168,6 +168,10 @@ export async function validatePersistenceContract(
     distanceMeters: number | null;
     rows: number;
     sourceKind: string;
+    availability: {
+      fixedRestDays: string[] | null;
+      maxRunningDaysPerWeek: number | null;
+    };
     cleanup: DisposableCleanupProof;
   }> = [];
 
@@ -216,6 +220,27 @@ export async function validatePersistenceContract(
       );
       validateAiAuthoredPrimaryExecutionGuidance(persisted.workouts);
       validateNoClientRowsTrusted(persisted.workouts);
+      const persistedPlanPreferences = asJsonRecord(persisted.plan.plan_preferences);
+      const expectedFixedRestDays = draft.normalizedInputSummary.fixedRestDays;
+      const expectedMaxRunningDaysPerWeek = draft.normalizedInputSummary.daysPerWeek;
+      assert.equal(
+        Object.hasOwn(persistedPlanPreferences ?? {}, "blocked_days"),
+        expectedFixedRestDays != null,
+      );
+      assert.deepEqual(persistedPlanPreferences?.blocked_days, expectedFixedRestDays ?? undefined);
+      assert.equal(
+        Object.hasOwn(persistedPlanPreferences ?? {}, "max_running_days_per_week"),
+        expectedMaxRunningDaysPerWeek != null,
+      );
+      assert.equal(
+        persistedPlanPreferences?.max_running_days_per_week,
+        expectedMaxRunningDaysPerWeek ?? undefined,
+      );
+      assert.equal(persistedPlanPreferences?.preferred_running_days, undefined);
+      assert.equal(
+        persistedPlanPreferences?.preferred_long_run_day,
+        draft.normalizedInputSummary.preferredLongRunDay ?? undefined,
+      );
 
       const duplicate = await confirmRunningPlanDraftForUser(
         userId,
@@ -232,6 +257,10 @@ export async function validatePersistenceContract(
         distanceMeters: distanceGoal.distanceMeters,
         rows: persisted.workouts.length,
         sourceKind: draft.sourceKind,
+        availability: {
+          fixedRestDays: expectedFixedRestDays,
+          maxRunningDaysPerWeek: expectedMaxRunningDaysPerWeek,
+        },
       };
     } finally {
       cleanupProof = await cleanupDisposableUser(supabase, userId);
@@ -259,6 +288,14 @@ export async function validatePersistenceContract(
     creationFailureAtomic,
     personalHeartRateProfile,
   };
+}
+
+function asJsonRecord(value: Json | null | undefined): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
 }
 
 async function persistReviewedDraftProfileSnapshot(
@@ -349,6 +386,28 @@ async function validatePersonalHeartRateProfilePersistence(input: {
 
     const baselineRows = await loadBaselineOnlyCounts(input.supabase, owner.userId);
     assert.deepEqual(baselineRows, { profiles: 1, plans: 0, workouts: 0 });
+
+    const settingsBeforeInvalidBaseline = await getUserSettingsForUserId(owner.userId, owner.email);
+    await assert.rejects(
+      updateUserSettingsForUserId(
+        owner.userId,
+        {
+          firstName: "Local",
+          lastName: "Runner",
+          displayName: "Local Runner",
+          age: input.previewInput.age,
+          weightKg: input.previewInput.weightKg,
+          heightCm: 50,
+          fitnessLevel: "running_regularly",
+        },
+        owner.email,
+      ),
+    );
+    assert.deepEqual(
+      await getUserSettingsForUserId(owner.userId, owner.email),
+      settingsBeforeInvalidBaseline,
+      "Invalid Settings baseline values must be rejected before profile persistence.",
+    );
 
     const unavailablePreview = await buildReviewedAiGeneratedRunningPlanPreviewForUser(
       owner.userId,
@@ -651,6 +710,9 @@ async function validatePersonalHeartRateProfilePersistence(input: {
       savedSource: persistedSettings.heartRateZones.source,
       providerContextSource: providerContext.runner.heart_rate_profile?.source,
       reviewedBpm: "116-135 bpm",
+      overlappingPersonalPersisted: true,
+      gappedPersonalPersisted: true,
+      invalidSettingsBaselineRejected: true,
       historicalSnapshotPreserved: true,
       rlsIsolation: true,
     };
@@ -758,6 +820,14 @@ async function validateRunnerProfileRls(input: {
       },
     },
     {
+      label: "incomplete guidance band set",
+      value: {
+        version: "runner_hr_profile_v2",
+        source: "personal",
+        zones: [...UPDATED_PERSONAL_HEART_RATE_ZONES.slice(0, 4)],
+      },
+    },
+    {
       label: "reversed BPM range",
       value: {
         version: "runner_hr_profile_v2",
@@ -780,13 +850,47 @@ async function validateRunnerProfileRls(input: {
       },
     },
     {
-      label: "overlapping BPM ranges",
+      label: "BPM below the product envelope",
       value: {
         version: "runner_hr_profile_v2",
         source: "personal",
         zones: [
-          { reference: "Z1", minBpm: 90, maxBpm: 115 },
-          { reference: "Z2", minBpm: 110, maxBpm: 130 },
+          { reference: "Z1", minBpm: 39, maxBpm: 110 },
+          ...UPDATED_PERSONAL_HEART_RATE_ZONES.slice(1),
+        ],
+      },
+    },
+    {
+      label: "BPM above the product envelope",
+      value: {
+        version: "runner_hr_profile_v2",
+        source: "personal",
+        zones: [
+          ...UPDATED_PERSONAL_HEART_RATE_ZONES.slice(0, 4),
+          { reference: "Z5", minBpm: 165, maxBpm: 221 },
+        ],
+      },
+    },
+    {
+      label: "decreasing lower guidance bounds",
+      value: {
+        version: "runner_hr_profile_v2",
+        source: "personal",
+        zones: [
+          { reference: "Z1", minBpm: 100, maxBpm: 110 },
+          { reference: "Z2", minBpm: 99, maxBpm: 130 },
+          ...UPDATED_PERSONAL_HEART_RATE_ZONES.slice(2),
+        ],
+      },
+    },
+    {
+      label: "decreasing upper guidance bounds",
+      value: {
+        version: "runner_hr_profile_v2",
+        source: "personal",
+        zones: [
+          { reference: "Z1", minBpm: 90, maxBpm: 120 },
+          { reference: "Z2", minBpm: 115, maxBpm: 119 },
           ...UPDATED_PERSONAL_HEART_RATE_ZONES.slice(2),
         ],
       },

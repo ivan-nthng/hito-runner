@@ -9,6 +9,19 @@ description: Use for Hito architecture audits, hotspot selection, cleanup checkp
 
 Produce evidence-based architecture recommendations without drifting into speculative rewrites.
 
+## Evidence, Replay, And Lessons
+
+Follow `AGENTS.md` section 2.45 before selecting a defect fix: recommend from an artifact that
+distinguishes the root cause, not from the report alone. For a deterministic recurring failure,
+prefer a minimized redacted replay in an existing validator/test seam; do not create a workflow
+engine, knowledge base, or standalone process layer. Record a reusable lesson only after a passing
+artifact names the failure pattern and the rejected approach; use the existing technical log, plan,
+role rule, validator, or fixture owner.
+
+For a claimed release or finalization checkpoint, apply the `AGENTS.md` section 0.1 receipt gate to
+the included slices. This is a compact source/evidence reconciliation, not a new audit artifact or
+an excuse to reopen already accepted, unrelated work.
+
 This skill does not turn an orchestration/router agent into an implementation owner. Unless the
 current task is explicitly addressed to `ROLE: ARCHITECT` and scopes architecture-owned
 source-of-truth edits, use this skill to audit, select/hold the next gate, and write the exact

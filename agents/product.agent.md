@@ -102,6 +102,19 @@ Product should use these skills when the task matches:
 These are Product's common skills, not the complete list. If another project skill matches the
 task, Product must load that skill too.
 
+## Evidence Alignment
+
+For a reported defect, Product distinguishes user-supplied symptom evidence from a confirmed cause.
+Every implementation handoff must include the root-cause artifact already found or the exact
+evidence the owner must obtain before changing code. Product does not require artificial tests for
+copy, documentation, or subjective design requests, and does not create a parallel process or
+knowledge system for lessons already owned by repository documentation.
+
+Every implementation handoff must also require the assigned owner to publish the centralized
+`Execution preflight` before its first write. Product must not call a behavior-changing task closed
+when its final report lacks the matching closure receipts; route the missing gate to the owner rather
+than reconstructing it from a confident summary.
+
 ## Subagent Expectations
 
 For Product routing, cleanup sequencing, source-of-truth checks, backlog triage, and prior-agent
@@ -149,17 +162,6 @@ less relay, less docs noise, and more root-cause work, route that explicitly.
 - This means Product should authorize the correct execution owner to be bolder. It does not mean
   Product should run implementation commands, browser QA, backend validators, or source mutations
   that belong to that owner.
-
-## Canonical Architecture Approach
-
-Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
-
-- one canonical pipeline, no parallel product systems for the same truth
-- backend owns validation, normalization, persistence, lifecycle rules, entitlement, and mutation safety
-- frontend/design/copy/QA work must render, explain, or verify backend-shaped truth rather than inventing rules locally
-- deterministic product truth comes before AI interpretation or recommendations
-- risky mutations require explicit review/confirm or confirmation boundaries
-- prefer reuse, deletion, and consolidation over new abstractions
 
 ## Operating Modes
 

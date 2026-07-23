@@ -67,10 +67,23 @@ component` or `Add to design system`; every target can request `Remove object`, 
   design-system level when confirmed ownership exists.
 - Desktop uses the composer panel; exact 375px uses the existing Sheet anatomy with fixed
   header/footer and one scrolling body.
+- Pencil mode uses one compact capture bar with a static Hito signal marker, Pencil identity, a
+  conditional `Draft N` review trigger, and one explicit session exit. The launcher and redundant
+  selection instruction are hidden while Pencil mode is active.
+- `Clear draft` lives inside batch review. It removes collected items, closes review, and keeps
+  Pencil mode active; session exit remains the distinct whole-session discard affordance.
+- A valid composer draft offers primary `Generate prompt` for direct generation and secondary
+  `Add to list`; the composer header close is the only current-draft cancel control.
+- Shared Select and DropdownMenu controls keep their native selection, Escape, focus-return, and
+  outside-pointer behavior. Inspector-owned overlays suppress only the one click that can be
+  retargeted to the underlying hit layer when a portaled menu opens on pointerdown.
+- Batch review shows one quiet capacity count, keeps prompt generation obvious, and does not repeat
+  route or local-draft metadata. `Generate prompt` and `Continue selecting` are separate stacked,
+  full-width actions at desktop and exact 375px.
 - Composer cancellation immediately discards only the unfinished local copy; cancelling an edit leaves
   its added batch item unchanged. Exiting the Inspector immediately clears the route-local session.
 - The top-level Inspector close is the only explicit whole-session discard affordance. Batch review
-  has no `Clear all` action or discard confirmation.
+  may clear its collected items without exiting Pencil, and neither path uses discard confirmation.
 
 ## Architecture Boundary
 
@@ -95,7 +108,7 @@ component` or `Add to design system`; every target can request `Remove object`, 
 - evidence: `src/components/devtools/local-ui-inspector-token-evidence.ts` and
   `src/components/hito-ds/reference-metadata.ts`;
 - surfaces: `LocalUiInspector`, `LocalUiTaskDraftPanel`, `LocalUiInspectorBatchReview`,
-  `LocalUiInspectorSurface`, and `LocalUiComponentActions`.
+  `LocalUiInspectorModeBar`, `LocalUiInspectorSurface`, and `LocalUiComponentActions`.
 
 The replaced single-item `LocalUiPromptActionControls.tsx` path is deleted and has no live import.
 
@@ -115,6 +128,12 @@ The replaced single-item `LocalUiPromptActionControls.tsx` path is deleted and h
   `qa-artifacts/screenshots/2026-07-22/local-inspector-source-backed-ownership/proof.json`.
 - unresolved `Reuse existing component`, prompt truth, responsive actions, and keyboard-exit proof:
   `qa-artifacts/screenshots/2026-07-22/local-inspector-reuse-existing-component/proof.json`.
+- overlay event ownership, compact Pencil composer/review, direct generation, and final desktop plus
+  exact-375px proof:
+  `qa-artifacts/screenshots/2026-07-22/local-inspector-overlay-composer-closeout/proof.json`.
+- compact Capture Bar hierarchy, launcher suppression, review-local clear, stacked review actions,
+  session exit, and eight-item exact-375px scrolling proof:
+  `qa-artifacts/screenshots/2026-07-22/local-inspector-capture-bar/proof.json`.
 
 The accepted inventory covers eight-item batching, duplicate handling, prompt output, token and
 ownership discriminators, focus/Escape behavior, copy fallback, local-only visibility, desktop,
@@ -122,7 +141,9 @@ exact 375px, mobile scrolling, direct new/edit cancellation, session exit, runti
 targeted lint, production build, build integrity, and scoped diff hygiene. Canonical Hito Buttons and
 Editable Value Fields now resolve through positive source-backed evidence; arbitrary technical
 containers omit the Component row and retain prompt-only `Reuse existing component` and `Add to
-design system` actions.
+design system` actions. Shared Inspector menus now close on normal selection, Escape, and genuine
+outside interaction without letting a portaled-menu pointer gesture fall through to the target hit
+layer.
 
 ## Closeout
 

@@ -133,7 +133,7 @@
   unchanged age-derived ranges can be explicitly accepted as `estimated`, changed complete ranges become `personal`, and age changes regenerate only accepted estimated profiles. Stable zone references remain internal authoring provenance, while review/readback resolves accepted profiles to immutable numeric BPM snapshots with `personal_hr_zone` or `default_estimated_hr` target source truth.
 - `src/lib/runner-training-preferences.ts`
   owns the shared pure runner training-preference contract used by settings and structured first-plan setup:
-  it maps product-facing `fixedRestDays`, `defaultRunningDaysPerWeek`, and `preferredLongRunDay` into the stored `blocked_days`, `max_running_days_per_week`, and `preferred_long_run_day` shape; validates that fixed rest days leave at least one trainable weekday, default running days fit the available weekdays, and an explicitly preferred long-run day is not blocked; and exposes bounded fitness-level mapping where only a direct recent 5K time or pace produces numeric benchmark truth
+  it maps product-facing `fixedRestDays`, `defaultRunningDaysPerWeek`, and `preferredLongRunDay` into the stored `blocked_days`, `max_running_days_per_week`, and `preferred_long_run_day` shape; validates that fixed rest days leave at least one trainable weekday and an explicitly preferred long-run day is not blocked, while preserving the weekly value as an independent ceiling; and exposes bounded fitness-level mapping where only a direct recent 5K time or pace produces numeric benchmark truth
 - `src/lib/rich-workout-model.ts`
   owns the first backend-only rich workout taxonomy contract:
   it defines allowed canonical `workout_family`, `workout_identity`, `calendar_icon_key`, and `metric_mode` values; maps current legacy `workout_type`, `source_workout_type`, title, and segment target truth into rich compatibility fields; for compact-only old rows without `source_workout_type`, it infers tempo, threshold, interval, progression, race/tune-up, hill, or generic quality identity from title/step semantics before falling back to `quality_session`; maps rich family/identity back to the legacy DB `workout_type` family for old paths; and derives metric mode from actual emitted target keys without inventing pace or HR truth, with rest days marked as having no execution metric targets
@@ -149,15 +149,10 @@
 - `src/lib/first-plan-authoring-utils.ts`
   owns the small shared first-plan authoring helper layer used by structured onboarding:
   bounded visible form values, weekday de-duplication, real-date validation, and duration/pace parsing live there instead of being duplicated across first-plan modules; it no longer owns execution defaults, long-run selection, day spreading, or goal coaching helpers
-- `src/lib/structured-first-plan-onboarding.ts`
-  owns the visible first-plan form type contract still consumed by frontend constructor code. The
-  live generated-plan serializer is
-  `buildAiGeneratedRunningPlanAuthoringInput`, which sends only explicit runner facts, exact goal
-  intent, and declared calendar constraints to the provider; current review/confirm truth belongs
-  to the running-plan engine review/actions seams, not to a second structured review model.
 - `src/lib/structured-plan-authoring-schema.ts`
   owns the bounded plan-first provider-context schema: exact goal intent, explicit runner facts,
-  declared availability, fixed rest days, and the effective runner heart-rate profile. It does not
+  independent optional weekly ceiling and fixed-rest constraints, optional long-run preference,
+  and the effective runner heart-rate profile. It does not
   derive runner archetypes, baseline load, horizon, workout density, progression, or other coaching
   decisions; HR references are resolved deterministically from profile truth rather than interpreted
   as backend coaching.
@@ -173,7 +168,8 @@
   or the loopback-only provider fixture, and accepts one compact closed response containing a flat
   non-rest `workouts[]` list plus one exact endpoint. Provider output uses canonical workout and
   segment enums, structural-only Repeat parents, ordered child truth, bounded numeric prescriptions,
-  exact min/km pace, and effective-profile HR references; it has no plan-level narrative metadata,
+  exact min/km pace or accepted-profile numeric BPM commands, and targetless coach-authored
+  Hydration steps; it has no plan-level narrative metadata,
   duplicate goal presentation, week wrappers, or alternate authoring grammar. The service compiles
   that response into canonical `training-plan-v2` and returns either `ai_authored` output or a
   bounded unavailable result before review. It does not save plans, call AI at confirm, or expose
@@ -182,9 +178,10 @@
   owns the backend parser/atomizer/compiler boundary for that same closed provider contract: every
   provider-valid field has one lossless canonical projection, while malformed transport or
   contract-invalid structure fails before review. AI owns titles, phases, identities, sections,
-  numeric `M:SS/km` or `M:SS-M:SS/km` pace guidance, supplied HR references, effort, and cues;
-  backend owns date/rest-day integrity, structural Repeat conversion, deterministic
-  reference-to-BPM resolution from the effective profile, canonical `training-plan-v2` output, and
+  numeric `M:SS/km` or `M:SS-M:SS/km` pace guidance, accepted-profile numeric BPM guidance, effort
+  context, and cues; backend owns date/rest-day integrity, structural Repeat conversion,
+  deterministic BPM/source snapshot validation against the effective profile, canonical
+  `training-plan-v2` output, and
   exact review/readback fields without semantic fallback or coaching substitution.
 - `src/lib/entitlements/*`
   owns the first backend-only Basic/Pro entitlement foundation:
@@ -331,15 +328,15 @@
   form model live in focused `src/components/onboarding/*` modules so those paths share option
   registries and request-building helpers instead of maintaining separate local truth
 - current generated-plan onboarding uses `previewRunningPlanDraft` followed by
-  `confirmRunningPlanDraft`; the backend validates required explicit runner facts, impossible
-  running-day/rest-day combinations, exact selected distance, optional benchmark, target time, and
+  `confirmRunningPlanDraft`; the backend validates required explicit runner facts, supplied
+  availability constraints, exact selected distance, optional benchmark, target time, and
   target date, and persists only after an explicit confirmed `ai_authored_plan_first_v1` review
   benchmark and target-time/date details remain generation/plan context rather than long-lived runner profile truth
-  recent 5K time or pace is provider context, not a backend workout-authoring algorithm; the AI/local fixture authors the complete plan and one primary execution mode per runnable leaf. The compiler preserves benchmark-backed pace, references from an explicitly accepted estimated or personal HR profile resolved to snapshot BPM, effort, or Run/Walk exactly as authored, keeps leaf cues as separate non-command context, rejects unsupported or contradictory commands, and never falls back to a deterministic plan
+  recent 5K time or pace is provider context, not a backend workout-authoring algorithm; the AI/local fixture authors the complete plan and one numeric pace-or-BPM execution mode per generated runnable leaf. The compiler preserves the AI-authored numeric value, classifies benchmark-informed or estimated pace provenance from signed runner facts, validates exact BPM against the accepted estimated or personal profile snapshot, keeps effort/Run-Walk text as separate non-command context, preserves targetless Hydration through the canonical `fueling` atom, rejects unsupported or contradictory commands, and never falls back to a deterministic plan
 - the visible constructor now starts from saved runner profile defaults when available:
-  age, weight, height, fixed rest days, default running-days/week, and preferred long-run day prefill from `runner_profiles`, remain editable in the constructor, and the confirmed first plan persists the edited values back to runner-level profile defaults without mutating any existing active plan
+  age, weight, height, fixed rest days, maximum running-days/week, and preferred long-run day prefill from `runner_profiles` when present and remain editable or omittable before review; omitted availability does not become a seven-day preference
 - settings and structured onboarding share the same frontend primitives for those profile defaults:
-  `EditableValueField` owns the compact age/height/weight add-edit-save interaction, and `TrainingPreferenceFields` owns the progressive Hito controls for explicit no/fixed rest days, required default running-days/week, optional preferred long-run day, and bounded fitness-level/custom-5K entry while leaving validation and persistence to backend-owned settings and running-plan actions
+  `EditableValueField` owns the compact age/height/weight add-edit-save interaction, and `TrainingPreferenceFields` owns the progressive Hito controls for explicit no/fixed rest days, optional maximum running-days/week, optional preferred long-run day, and bounded fitness-level/custom-5K entry while leaving validation and persistence to backend-owned settings and running-plan actions
 - advanced JSON import remains available inside onboarding as a demoted fallback path for existing Hito plan files, migration, and testing
 - structured first-plan onboarding feeds the AI/local-fixture plan-first compiler, while advanced JSON import applies canonical `training-plan-v2`; both persist reviewed profile, plan, and workout truth through the same atomic lifecycle seam, and the clear-before-import choice is one transaction-backed import intent rather than a committed clear followed by a separate apply
 - canonical apply-time start normalization now lives in [src/lib/plan-apply-policy.ts](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-apply-policy.ts):
@@ -422,7 +419,7 @@
   while one bounded interval DSL supports both distance-based and time-based repeat units
   older persisted rows may still carry legacy target aliases, but new writes now persist only the canonical target keys
 - executable workout steps are now normalized with runner-facing instruction truth before workout detail readback:
-  non-rest segments and ordered Repeat children carry executable structure plus exactly one AI-authored primary target mode; plan-first pace commands accept only numeric min/km values backed by explicit benchmark truth, heart-rate commands require an explicitly accepted estimated or personal profile and resolve to labelled snapshot BPM guidance, effort and Run/Walk remain first-class commands, and leaf guidance stays separate from the watch command. Repeat parents remain targetless, and the compiler never invents fallback pace, HR, recovery, or deterministic workout content
+  generated runnable segments and ordered Repeat children carry executable structure plus exactly one AI-authored numeric pace-or-BPM target; plan-first pace accepts numeric min/km values with benchmark-informed or AI-estimated provenance, heart-rate accepts only an exact numeric range from the explicitly accepted estimated or personal snapshot, and leaf effort/Run-Walk guidance stays separate from the watch command. Repeat parents and coach-authored Hydration remain targetless; Hydration reuses the canonical non-runnable `fueling` segment, and the compiler never invents fallback pace, HR, recovery, or deterministic workout content
 - workout detail now renders those executable step instructions directly:
   the route surfaces backend-shaped executable target entries separately from segment `guidance`, target `cue`, target `hint`, focus/RPE/source copy, unaccepted age-estimated context, and backend family/identity/icon/metric/goal readbacks; old compact-only or legacy effort/cue-only rows remain readable without producing preferred executable target entries, while Today/calendar readback, interval visualization, first-plan review copy, and plan export use the same display-safe target helpers instead of computing metric truth locally
 - plan-first generated workouts carry the AI-authored exact session identity without changing the broad calendar family:

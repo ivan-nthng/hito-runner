@@ -4,19 +4,21 @@ This file is the canonical execution policy for AI agents in this project templa
 
 Customize the pipeline terms below for the new project before real execution begins.
 
-## 0) Always-Visible Root-Cause Rule
+## 0) Always-Visible Evidence And Root-Cause Rule
 
 Before every project-work response or action, pause and ask:
 
 `Are we fixing the root cause, or are we patching a visible symptom?`
 
 If the answer is not clearly "root cause", the agent must stop and trace the failure to the first
-incorrect owner before proposing or executing work.
+incorrect owner before proposing or executing work. For a reported behavior defect, a plausible
+diagnosis is not enough: establish one artifact that supports the cause before changing code.
 
 Mandatory root-cause check:
 
 - Name the visible symptom.
-- Name the likely underlying cause.
+- Name the demonstrated underlying cause, or the exact query, log, fixture, or source inspection
+  still needed to establish it.
 - Name the canonical owner of that cause: backend validation, normalization, persistence, auth,
   AI contract, import/export, route state, form serialization, async lifecycle, shared component,
   Hito DS primitive, rendering view model, or documentation/source-of-truth.
@@ -24,8 +26,42 @@ Mandatory root-cause check:
 - If the current task can only patch the symptom, say so explicitly and route the root-cause fix to
   the correct owner instead of presenting the symptom patch as complete.
 
-This rule is intentionally duplicated near the top of this file so it stays visible. Section 2.56
-contains the fuller implementation discipline.
+Section 2.45 defines the evidence and replay rules; Section 2.56 defines the canonical-owner fix
+discipline.
+
+## 0.1) Mandatory Execution Preflight And Closure Receipts
+
+The rules above are operational gates, not background advice. This compact receipt makes them visible
+without creating a second workflow document, task system, or evidence store.
+
+Before the first write, migration, product-data mutation, or implementation validator change in an
+implementation, debugging, or QA task, the assigned execution owner must publish this brief
+`Execution preflight` in its first work update:
+
+- `Task and bounded outcome` — the exact behavior or contract being changed.
+- `Evidence before code` — the artifact proving the cause, or the exact artifact still required.
+- `Canonical owner` — the first incorrect source-of-truth boundary to change.
+- `Smallest root-cause outcome` — what becomes true and what obsolete path should disappear.
+- `Required proof` — the risk-based validation needed for closure.
+- `Stop condition` — the boundary that would return the task to another owner or Product decision.
+
+For a design preference, copy, documentation, or reference-only task, state the accepted decision
+or source evidence instead of inventing a defect replay. If cause evidence is still obtainable, the
+owner must obtain it before writing; a likely cause is not a receipt. One preflight covers one
+bounded same-owner batch and must be revised when its owner or root cause changes.
+
+No behavior-changing task may close without matching closure receipts in its standard final report:
+
+- the root-cause discriminator or an explicit safe evidence limitation;
+- the regression proof appropriate to the risk, including a minimized replay only when deterministic;
+- every required check and every required check not run, with its coverage consequence; and
+- what replaced, was deleted, or deliberately remains and why.
+
+QA treats a missing or contradicted receipt as incomplete acceptance, not as a passing test. For a
+release or pre-commit bundle that claims finalization, the release owner or ARCHITECT must also
+confirm that every included behavior-changing slice has its receipt and no `Blocked`, `Failed`, or
+`Pending` gate is represented as accepted. Documentation-only work remains proportionate and does
+not need runtime receipts.
 
 ## 1) Mission And Non-Negotiables
 
@@ -170,7 +206,7 @@ sequence of prompts that the user must copy between agents.
 
 ## 2.4) Definition Of Done, Test Inventory, And Acceptance Gate (Mandatory)
 
-Every implementation owner, including `BACKEND`, `FRONTEND`, `FULLSTACK`, `LAYOUT`, and a
+Every implementation owner, including `BACKEND`, `FRONTEND`, `LAYOUT`, and a
 `DESIGNER` task that directs implementation or QA, owns the complete validation story. A QA
 subagent supplies independent evidence; it does not take closure responsibility away from the owner.
 
@@ -234,6 +270,38 @@ The owner must integrate the task-level QA inventory into one final result after
 user must never have to reconcile partial test lists or decide whether an unreported failure is
 acceptable.
 
+## 2.45) Evidence And Replay Gate (Mandatory For Reported Defects)
+
+This gate applies before implementation of a reported behavior defect. It does not apply to pure
+questions, copy-only work, documentation-only work, or a product/design preference that does not
+claim existing behavior is wrong.
+
+- Establish one artifact outside the agent's reasoning: a relevant log event, database read,
+  source/reachability proof, failing validator, failing replay fixture, or browser/DOM evidence for
+  a visual or interaction defect.
+- The artifact must distinguish the proposed root cause from the visible symptom. A screenshot can
+  establish a visual defect, but it does not by itself establish a backend, persistence, or async
+  cause.
+- If the needed artifact is safely obtainable, obtain it before fixing. If it is unavailable, state
+  the exact query, log, fixture, or access boundary needed; do not turn a hypothesis into a fix.
+- For deterministic input-to-output defects, preserve a minimized, redacted fixture in the existing
+  test or validator location when it will prevent recurrence. Prove that it fails before the fix and
+  passes after it. Do not create a fixture, replay harness, or storage system for subjective visual
+  work or a one-off condition that cannot recur.
+- A reusable replay records its input provenance class, the invariant or expected output, and the
+  reason the fixture is safe to retain. Disposable fixture data follows the existing local cleanup
+  and zero/readback proof rules; replay evidence is never a product fallback or a second truth path.
+- Never place secrets, raw provider credentials, cookies, private runner data, or production-only
+  payloads in fixtures or evidence. Reuse existing local-only artifacts and redaction boundaries.
+
+Record a procedural lesson in the existing technical log, role policy, validator, or fixture only
+when it has a passing artifact, a named failure pattern, and one rejected approach. Current facts,
+plan state, and architecture decisions do not need this lesson gate. Do not create a knowledge base,
+memory engine, or standalone process document for routine lessons.
+
+The gate strengthens Definition of Done; it does not replace risk-based browser, persistence,
+build, or independent QA proof.
+
 Human-context rule for prior-agent reports:
 
 - Before writing a next-role prompt, translate the prior agent's report into understandable product
@@ -285,12 +353,16 @@ Do not assume the reader can infer the task from prior chat history.
 
 ## 2.5) Anti Over-Engineering Rule (Mandatory)
 
+- Before adding code, name the existing owner and the smallest verifiable behavior change.
 - Prefer deletion over abstraction
 - Prefer simplification over flexibility
 - Prefer fewer states over configurable states
 - Prefer one path over multiple compatible paths
 - Do not introduce new layers unless removing a larger one
 - Temporary compatibility layers must have a removal plan
+- After adding code, remove what the canonical replacement made obsolete or state exactly why it
+  remains. If the implementation is materially larger than the task's behavior warrants, stop and
+  re-check the owner before continuing.
 
 Goal:
 
@@ -633,7 +705,7 @@ handed to a role agent.
 
 This applies especially to agents that write code, validate behavior, inspect source, perform
 cleanup audits, investigate bugs, review artifacts, or prepare source-of-truth decisions:
-`ARCHITECT`, `BACKEND`, `FRONTEND`, `FULLSTACK`, `QA`, `DESIGNER`, `DESIGN SYSTEM`, `LAYOUT`,
+`ARCHITECT`, `BACKEND`, `FRONTEND`, `QA`, `DESIGNER`, `DESIGN SYSTEM`, `LAYOUT`,
 `DATA QUALITY`, `BACKLOG MANAGER`, `PRODUCT`, `SYSTEM ADVISOR`, and `RUNNING COACH`.
 
 Use subagents when all of these are true:
@@ -785,23 +857,24 @@ role:
 
 ### Implementation Report
 
-Use this shape for BACKEND, FRONTEND, FULLSTACK, LAYOUT, COPY, DESIGNER implementation/spec work,
+Use this shape for BACKEND, FRONTEND, LAYOUT, COPY, DESIGNER implementation/spec work,
 and any execution slice that changed files:
 
 1. Plan file - linked active plan/spec/task, or `Plan file: none`
 2. Task - exact task name
 3. Stage - exact current execution stage
-4. Product outcome - one plain-language sentence naming the user-visible capability, incident, or
+4. Execution preflight receipt - or the explicit documentation/design exemption
+5. Product outcome - one plain-language sentence naming the user-visible capability, incident, or
    system contract this slice advances and whether it is now real, still blocked, or awaiting another
    gate
-5. Root cause
-6. Files inspected
-7. Files changed
-8. What changed
-9. What was preserved
-10. Validation results
-11. Next recommended role
-12. Blockers
+6. Root cause
+7. Files inspected
+8. Files changed
+9. What changed
+10. What was preserved
+11. Validation results and closure receipts
+12. Next recommended role
+13. Blockers
 
 For very small copy/design/docs-only work, agents may omit `What was preserved` if it adds no value.
 
@@ -815,14 +888,15 @@ Use this shape for QA validation:
 
 1. Task
 2. Stage
-3. Browser Path Preflight
-4. QA Execution Authority
-5. Files inspected
-6. Validation coverage
-7. Required behavior proof
-8. Issues found
-9. Coverage gaps
-10. Verdict: Passed or Failed
+3. Execution preflight / root-cause receipt check
+4. Browser Path Preflight
+5. QA Execution Authority
+6. Files inspected
+7. Validation coverage
+8. Required behavior proof
+9. Issues found
+10. Coverage gaps
+11. Verdict: Passed or Failed
 
 QA reports that skip an explicit verdict are incomplete.
 
@@ -833,16 +907,17 @@ plans:
 
 1. Task
 2. Stage
-3. Files inspected
-4. Current state
-5. Findings
-6. Decision or recommendation
-7. Selected next gate or owner
-8. What must not be touched
-9. Files changed
-10. Validation results
-11. Next recommended role
-12. Blockers
+3. Gate/receipt status for every slice being accepted or released
+4. Files inspected
+5. Current state
+6. Findings
+7. Decision or recommendation
+8. Selected next gate or owner
+9. What must not be touched
+10. Files changed
+11. Validation results
+12. Next recommended role
+13. Blockers
 
 ### Running Coach Report
 

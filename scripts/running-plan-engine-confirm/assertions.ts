@@ -36,6 +36,11 @@ export function validateCanonicalRowsAreNumeric(
 
     for (const segment of row.segments) {
       assert.ok(segment.prescription, `${row.workout_id}.${segment.segment_type} lacks structure.`);
+      if (segment.segment_type === "fueling") {
+        assert.equal(segment.prescription?.mode, "none");
+        assert.equal(segment.target, undefined);
+        continue;
+      }
       assert.notEqual(
         segment.prescription?.mode,
         "none",
@@ -50,8 +55,12 @@ export function validateAiAuthoredPrimaryExecutionGuidance(rows: readonly unknow
 
   visitRecords(rows, (record) => {
     const mode = record.primary_execution_mode;
-    if (!["pace", "heart_rate", "effort", "run_walk"].includes(String(mode))) return;
+    if (record.target_source !== "ai_authored_plan_guidance") return;
     targetCount += 1;
+    assert.ok(
+      mode === "pace" || mode === "heart_rate",
+      "Generated runnable guidance must use numeric pace or BPM, never prose-only modes.",
+    );
     assert.equal(
       record.target_source,
       "ai_authored_plan_guidance",
@@ -70,10 +79,6 @@ export function validateAiAuthoredPrimaryExecutionGuidance(rows: readonly unknow
           record.hr_target_source === "default_estimated_hr",
         "HR-primary execution must retain accepted profile provenance.",
       );
-    }
-    if (mode === "effort" || mode === "run_walk") {
-      assert.equal(hasPace || hasHeartRate, false);
-      assert.equal(typeof record.intensity, "string");
     }
   });
 

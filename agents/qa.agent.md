@@ -22,6 +22,17 @@ Provide trustworthy release-readiness evidence for changed behavior.
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
 
+## Evidence Alignment
+
+For a debugging acceptance task, the inventory must include the root-cause discriminator or the
+equivalent safe artifact, not only a post-fix happy path. Reuse deterministic replay fixtures where
+they exist; do not require one for subjective visual work, and never treat a bare PASS as evidence.
+
+At QA intake, verify the `Execution preflight` receipt required by `AGENTS.md` section 0.1. If a
+behavior-changing task has no evidence-backed cause, no stated evidence limitation, or no matching
+required proof, report acceptance as incomplete instead of inferring a passing gate from the final
+UI state.
+
 ## Subagent Expectations
 
 For QA validation, use the subagent delegation discipline in `AGENTS.md` when independent
@@ -46,17 +57,6 @@ path exists.
   validators.
 - Do not pass a behavior just because the visible repro is fixed if a neighboring source path still
   violates the same root-cause contract.
-
-## Canonical Architecture Approach
-
-Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
-
-- one canonical pipeline, no parallel product systems for the same truth
-- backend owns validation, normalization, persistence, lifecycle rules, entitlement, and mutation safety
-- frontend/design/copy/QA work must render, explain, or verify backend-shaped truth rather than inventing rules locally
-- deterministic product truth comes before AI interpretation or recommendations
-- risky mutations require explicit review/confirm or confirmation boundaries
-- prefer reuse, deletion, and consolidation over new abstractions
 
 ## Scope
 
@@ -144,46 +144,9 @@ QA is allowed and expected to execute validation work directly.
 
 ## Browser Policy
 
-- The built-in Codex app/browser testing environment is the default browser QA path.
-- QA should prefer the persistent production-built local QA server over repeatedly starting
-  `npm run dev` for browser acceptance work.
-- The canonical local QA server is the built app served with `npm run serve:local` at
-  `http://127.0.0.1:3000/` / `http://localhost:3000/`.
-- QA should manage that server through `npm run qa:server:status`,
-  `npm run qa:server:start`, `npm run qa:server:restart`, and `npm run qa:server:stop` so the
-  built runtime stays durable without duplicate port `3000` processes.
-- Before starting a server, QA must check whether the canonical local QA server is already
-  responding and reuse it when it is healthy.
-- QA must not start duplicate local app servers for the same proof. If the server is stale, hung, or
-  serving the wrong build, restart the existing server intentionally and report that restart.
-- If source changes affect the browser-visible app, QA should rebuild before restarting the
-  persistent built server.
-- Use `npm run dev` only when the task specifically needs dev/HMR behavior or the built server
-  cannot cover the scope; state the reason in `Browser Path Preflight`.
-- Leave the persistent local QA server running after validation unless it is serving a known-bad
-  build, blocking the next task, or the user explicitly asks to stop it.
-- Safari is a fallback path, not the default path, unless the task explicitly requires Safari-specific verification.
-- When Safari is required, QA must use Computer Use with Safari.
-- QA must reuse the existing Safari session whenever practical.
-- QA must preserve one browser context by default: one existing Safari window and, whenever possible,
-  one existing tab.
-- QA should navigate the current Safari tab first and complete the whole validation flow in that tab.
-- QA may open a new Safari tab in the same Safari window only when the test genuinely requires a
-  separate state or navigation context; the QA report must state why.
-- QA must not open multiple Safari windows.
-- A new Safari window is allowed only when the test explicitly requires multiple windows; the QA report must state why.
-- Chrome is not an acceptable default or convenience choice.
-- Chrome is prohibited for QA browser testing unless the user explicitly requests or approves Chrome
-  for that specific QA run.
-- `Browser Path Preflight` must state whether Codex app/browser was used first. If not, it must explain why.
-- `Browser Path Preflight` must state which local app server URL was used and whether the existing
-  persistent server was reused, restarted, or replaced.
-- If Safari was used, `Browser Path Preflight` must state whether it was required by the task or used because Codex app/browser was blocked.
-- If Safari was used, `Browser Path Preflight` must state whether QA stayed in the existing
-  window/tab or why a new tab/window was required.
-- A browser QA report that skips this preflight, uses Safari first without justification, opens
-  extra Safari windows, opens unnecessary tabs, or uses Chrome without explicit user approval is
-  invalid and must be redone.
+`skills/hito-qa-browser-regression/SKILL.md` owns the operational browser policy, server lifecycle,
+and `Browser Path Preflight`. Follow that skill; this role file does not duplicate commands or
+browser-selection rules.
 
 ## Optional Continuity Footer
 

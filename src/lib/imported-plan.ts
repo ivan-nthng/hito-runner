@@ -371,6 +371,14 @@ const v2SegmentSchema = z
   })
   .strict()
   .superRefine((segment, context) => {
+    if (segment.segment_type === "fueling" && (segment.target || segment.recovery_target)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["target"],
+        message: "fueling segments are non-runnable and cannot own an execution target.",
+      });
+    }
+
     if (segment.prescription) {
       if (
         segment.prescription.mode === "repeats" &&

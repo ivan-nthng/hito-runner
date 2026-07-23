@@ -53,8 +53,9 @@ import {
   validateSelfContainedRunningPlanReviewToken,
 } from "../src/lib/running-plan-engine-review";
 import { selectedDistanceEndpointMainDistanceMeters } from "../src/lib/plan-creation-engine";
+import { normalizeRunnerTrainingPreferencesForSave } from "../src/lib/runner-training-preferences";
 import { structuredPlanAuthoringInputSchema } from "../src/lib/structured-plan-authoring-schema";
-import { addDaysIso, diffDaysIso, weekdayLong } from "../src/lib/training";
+import { addDaysIso, weekdayLong } from "../src/lib/training";
 import {
   normalizeWorkoutDocumentTarget,
   readWorkoutDocumentSections,
@@ -170,6 +171,7 @@ function buildReviewedAiGeneratedRunningPlanPreview(
 
 await validatePlanFirstPreviewScenarios();
 await validatePlanFirstAuthoringAuthority();
+await validateOptionalAvailabilityStates();
 await validateProviderContractBoundary();
 await validateFaithfulPlanFirstAtomization();
 validateDistanceFirstInputTruth();
@@ -349,27 +351,128 @@ async function validatePlanFirstAuthoringAuthority() {
   );
   assert.equal(invalidProviderCalls, 0);
 
-  const missingAvailability = await buildReviewedAiGeneratedRunningPlanPreview(
+  const flexibleAvailabilityInput = {
+    ...ambitiousShortHorizonInput,
+    daysPerWeek: null,
+    fixedRestDays: null,
+  };
+  const flexibleAvailability = await buildReviewedAiGeneratedRunningPlanPreview(
+    flexibleAvailabilityInput,
     {
-      ...ambitiousShortHorizonInput,
-      daysPerWeek: null,
-    },
-    {
-      aiPreview: {
-        apiKey: "must-not-call-provider",
-        fetchImpl: async () => {
-          invalidProviderCalls += 1;
-          throw new Error("Structurally insufficient input reached provider.");
-        },
-      },
+      aiPreview: buildScenarioAiPreviewOptions(flexibleAvailabilityInput),
     },
   );
-  assert.equal(missingAvailability.ok, false);
-  if (missingAvailability.ok) {
-    throw new Error("Missing running-day availability unexpectedly reached review.");
-  }
-  assert.equal(missingAvailability.unavailable.previewOutcome, "invalid_structural_input");
+  assert.equal(
+    flexibleAvailability.ok,
+    true,
+    flexibleAvailability.ok ? "" : flexibleAvailability.unavailable.error.message,
+  );
+  if (!flexibleAvailability.ok) throw new Error(flexibleAvailability.unavailable.error.message);
+  assert.equal(flexibleAvailability.draft.normalizedInputSummary.daysPerWeek, null);
+  assert.equal(flexibleAvailability.draft.normalizedInputSummary.fixedRestDays, null);
   assert.equal(invalidProviderCalls, 0);
+}
+
+async function validateOptionalAvailabilityStates() {
+  assert.deepEqual(
+    normalizeRunnerTrainingPreferencesForSave({
+      fixedRestDays: ["Tuesday", "Saturday"],
+      defaultRunningDaysPerWeek: 6,
+      preferredLongRunDay: "Sunday",
+    }),
+    {
+      blocked_days: ["Tuesday", "Saturday"],
+      max_running_days_per_week: 6,
+      preferred_long_run_day: "Sunday",
+    },
+  );
+  assert.deepEqual(
+    normalizeRunnerTrainingPreferencesForSave({
+      fixedRestDays: [],
+      defaultRunningDaysPerWeek: null,
+      preferredLongRunDay: null,
+    }),
+    {
+      blocked_days: [],
+      max_running_days_per_week: null,
+      preferred_long_run_day: null,
+    },
+  );
+
+  const states = [
+    {
+      name: "both",
+      input: { ...baseInput, preferredLongRunDay: null },
+      expectedFixedRestDays: baseInput.fixedRestDays,
+      expectedCeiling: baseInput.daysPerWeek,
+    },
+    {
+      name: "ceiling_only",
+      input: { ...baseInput, fixedRestDays: null, preferredLongRunDay: null },
+      expectedFixedRestDays: null,
+      expectedCeiling: baseInput.daysPerWeek,
+    },
+    {
+      name: "fixed_rest_only",
+      input: { ...baseInput, daysPerWeek: null, preferredLongRunDay: null },
+      expectedFixedRestDays: baseInput.fixedRestDays,
+      expectedCeiling: null,
+    },
+    {
+      name: "neither",
+      input: {
+        ...baseInput,
+        daysPerWeek: null,
+        fixedRestDays: null,
+        preferredLongRunDay: null,
+      },
+      expectedFixedRestDays: null,
+      expectedCeiling: null,
+    },
+  ] as const;
+
+  for (const state of states) {
+    const input: RunningPlanPreviewActionInput = {
+      ...state.input,
+      planGoalIntent: { distance: { kind: "preset", preset: "10K" } },
+    };
+    const reviewed = await buildReviewedAiGeneratedRunningPlanPreview(input, {
+      aiPreview: buildScenarioAiPreviewOptions(input),
+    });
+    assert.equal(
+      reviewed.ok,
+      true,
+      reviewed.ok ? "" : `${state.name}: ${reviewed.unavailable.error.message}`,
+    );
+    if (!reviewed.ok) continue;
+
+    assert.equal(reviewed.draft.normalizedInputSummary.daysPerWeek, state.expectedCeiling);
+    assert.deepEqual(
+      reviewed.draft.normalizedInputSummary.fixedRestDays,
+      state.expectedFixedRestDays,
+    );
+    const canonicalPlan = buildRunningPlanCanonicalPlan(reviewed.draft);
+    assert.equal(
+      canonicalPlan.plan_preferences?.max_running_days_per_week,
+      state.expectedCeiling ?? undefined,
+    );
+    assert.deepEqual(
+      canonicalPlan.plan_preferences?.blocked_days,
+      state.expectedFixedRestDays ?? undefined,
+    );
+    assert.equal(canonicalPlan.plan_preferences?.preferred_running_days, undefined);
+    assert.equal(canonicalPlan.plan_preferences?.preferred_long_run_day, undefined);
+    const seed = buildReviewedFirstPlanImportedSeed(canonicalPlan);
+    const persistedPreferences = seed.planPreferences as Record<string, unknown> | null;
+    assert.equal(
+      persistedPreferences?.max_running_days_per_week,
+      state.expectedCeiling ?? undefined,
+    );
+    assert.deepEqual(persistedPreferences?.blocked_days, state.expectedFixedRestDays ?? undefined);
+    assert.equal(reviewed.draft.persisted, false);
+    assert.ok(reviewed.draft.reviewToken);
+    assert.equal(reviewed.draft.reviewChecksum.length, 64);
+  }
 }
 
 async function validateFaithfulPlanFirstAtomization() {
@@ -385,13 +488,9 @@ async function validateFaithfulPlanFirstAtomization() {
 
   const authoringInput = resolved.authoringInput;
   const target = (input: {
-    mode: "pace" | "heart_rate" | "effort" | "run_walk";
+    mode: "pace" | "heart_rate";
     pace?: string;
-    hrZone?: Extract<
-      AiAuthoredPlanFirstProviderUnit["target"],
-      { primary_execution_mode: "heart_rate" }
-    >["command"];
-    effort?: string;
+    hrReference?: "Z1" | "Z2" | "Z3" | "Z4" | "Z5";
   }): AiAuthoredPlanFirstProviderUnit["target"] => {
     if (input.mode === "pace") {
       return {
@@ -399,16 +498,14 @@ async function validateFaithfulPlanFirstAtomization() {
         command: input.pace ?? "5:30/km",
       };
     }
-    if (input.mode === "heart_rate") {
-      return {
-        primary_execution_mode: "heart_rate",
-        command: input.hrZone ?? "Z2",
-      };
-    }
-
+    const profileReference = input.hrReference ?? "Z2";
+    const zone = authoringInput.runnerFacts.heartRateProfile.zones.find(
+      (candidate) => candidate.reference === profileReference,
+    );
+    assert.ok(zone);
     return {
-      primary_execution_mode: input.mode,
-      command: input.effort ?? "Execute",
+      primary_execution_mode: "heart_rate",
+      command: `${zone.minBpm}-${zone.maxBpm} bpm`,
     };
   };
   const unit = (input: {
@@ -482,7 +579,7 @@ async function validateFaithfulPlanFirstAtomization() {
                 label: "Settle",
                 cue: null,
                 prescription: { mode: "time", duration_min: 1 },
-                target: target({ mode: "effort", effort: "Settle into smooth form" }),
+                target: target({ mode: "pace", pace: "5:50-6:00/km" }),
               },
               {
                 role: "work",
@@ -496,14 +593,14 @@ async function validateFaithfulPlanFirstAtomization() {
                 label: "Float",
                 cue: null,
                 prescription: { mode: "time", duration_min: 1 },
-                target: target({ mode: "effort", effort: "Easy float" }),
+                target: target({ mode: "pace", pace: "6:45-7:15/km" }),
               },
               {
                 role: "finish",
                 label: "Finish",
                 cue: null,
                 prescription: { mode: "time", duration_min: 0.5 },
-                target: target({ mode: "effort", effort: "Finish with relaxed form" }),
+                target: target({ mode: "pace", pace: "5:30-5:40/km" }),
               },
             ],
           },
@@ -519,7 +616,7 @@ async function validateFaithfulPlanFirstAtomization() {
                 label: "Stride",
                 cue: null,
                 prescription: { mode: "time", duration_min: 1 / 3 },
-                target: target({ mode: "effort", effort: "Relaxed-fast and smooth" }),
+                target: target({ mode: "pace", pace: "4:20-4:40/km" }),
               },
             ],
           },
@@ -558,8 +655,13 @@ async function validateFaithfulPlanFirstAtomization() {
             segmentType: "main",
             label: "Main",
             durationMin: 60,
-            target: target({ mode: "heart_rate", hrZone: "Z2" }),
+            target: target({ mode: "heart_rate", hrReference: "Z2" }),
           }),
+          {
+            kind: "hydration",
+            label: "Hydration",
+            cue: "Take water.",
+          },
         ],
       },
       {
@@ -573,7 +675,7 @@ async function validateFaithfulPlanFirstAtomization() {
             segmentType: "main",
             label: "Trail",
             durationMin: 40,
-            target: target({ mode: "effort", effort: "Controlled trail effort" }),
+            target: target({ mode: "pace", pace: "6:10-6:40/km" }),
           }),
         ],
       },
@@ -589,19 +691,19 @@ async function validateFaithfulPlanFirstAtomization() {
           segmentType: "warmup",
           label: "Warmup",
           distanceKm: 0.5,
-          target: target({ mode: "effort", effort: "Easy warmup" }),
+          target: target({ mode: "pace", pace: "6:45-7:15/km" }),
         }),
         unit({
           segmentType: "main",
           label: "Main",
           distanceKm: 10,
-          target: target({ mode: "effort", effort: "Reviewed race effort" }),
+          target: target({ mode: "pace", pace: "5:20-5:30/km" }),
         }),
         unit({
           segmentType: "cooldown",
           label: "Cooldown",
           distanceKm: 0.5,
-          target: target({ mode: "effort", effort: "Easy cooldown" }),
+          target: target({ mode: "pace", pace: "7:00-7:30/km" }),
         }),
       ],
     },
@@ -617,8 +719,8 @@ async function validateFaithfulPlanFirstAtomization() {
   );
   assert.equal(
     compiled.canonicalPlan.training_constraints?.running_days_per_week,
-    5,
-    "Compiled plan density must describe AI-authored workout dates.",
+    undefined,
+    "AI-authored workout density must remain calendar truth, not runner availability metadata.",
   );
   assert.equal(
     compiled.canonicalPlan.plan_preferences?.max_running_days_per_week,
@@ -695,7 +797,7 @@ async function validateFaithfulPlanFirstAtomization() {
     orderedRepeat.children?.map((child) => child.role),
     ["run", "work", "recover", "finish"],
   );
-  assert.equal(orderedRepeat.children?.[0]?.target?.primary_execution_mode, "effort");
+  assert.equal(orderedRepeat.children?.[0]?.target?.primary_execution_mode, "pace");
   assert.equal(orderedRepeat.children?.[1]?.target?.primary_execution_mode, "pace");
   assert.equal(orderedRepeat.children?.[1]?.target?.pace, "4:50/km");
   assert.equal(orderedRepeat.children?.[1]?.target?.hint, undefined);
@@ -711,7 +813,7 @@ async function validateFaithfulPlanFirstAtomization() {
     noRecoveryRepeat.children?.map((child) => child.role),
     ["work"],
   );
-  assert.equal(noRecoveryRepeat.children?.[0]?.target?.primary_execution_mode, "effort");
+  assert.equal(noRecoveryRepeat.children?.[0]?.target?.primary_execution_mode, "pace");
   const twoByFourKm = intervals.segments[2]?.prescription;
   assert.equal(twoByFourKm?.mode, "repeats");
   assert.equal(twoByFourKm?.repeat_count, 2);
@@ -737,6 +839,11 @@ async function validateFaithfulPlanFirstAtomization() {
   assert.equal(longRun?.segments[0]?.target?.hr_target_source, "personal_hr_zone");
   assert.equal(longRun?.segments[0]?.target?.hr_bpm_range, "121-140 bpm");
   assert.equal(longRun?.segments[0]?.target?.pace, undefined);
+  const hydration = longRun?.segments.find((segment) => segment.segment_type === "fueling");
+  assert.equal(hydration?.label, "Hydration");
+  assert.equal(hydration?.guidance, "Take water.");
+  assert.equal(hydration?.prescription?.mode, "none");
+  assert.equal(hydration?.target, undefined);
   const endpoint = compiled.canonicalPlan.planned_workouts.at(-1);
   assert.equal(
     selectedDistanceEndpointMainDistanceMeters({
@@ -924,9 +1031,9 @@ async function validateProviderContractBoundary() {
       calendar: {
         start_date: string;
         latest_date: string;
-        eligible_workout_weekdays: string[];
-        rest_weekdays: string[];
-        max_workouts_per_week: number;
+        eligible_workout_weekdays: string[] | null;
+        fixed_rest_weekdays: string[] | null;
+        max_workouts_per_week: number | null;
       };
       runner: {
         age: number;
@@ -964,14 +1071,23 @@ async function validateProviderContractBoundary() {
   assert.match(systemPrompt, /2x4km followed by one final 2km/i);
   assert.match(systemPrompt, /coherent weekly training program/i);
   assert.match(systemPrompt, /support long runs and quality sessions/i);
-  assert.match(systemPrompt, /final 14 calendar days before endpoint/i);
+  assert.match(systemPrompt, /You own taper and workout density through the endpoint/i);
+  assert.doesNotMatch(systemPrompt, /final 14 calendar days before endpoint/i);
+  assert.match(systemPrompt, /endpoint\.date is reserved exclusively for endpoint/i);
+  assert.match(systemPrompt, /every workouts\[\]\.date must be strictly earlier/i);
   assert.match(systemPrompt, /M:SS\/km or M:SS-M:SS\/km/i);
-  assert.match(systemPrompt, /target_finish_time alone is not pace truth/i);
+  assert.match(systemPrompt, /benchmark improves precision but is not required/i);
   assert.match(systemPrompt, /primary_execution_mode=pace/i);
   assert.match(systemPrompt, /primary_execution_mode=heart_rate/i);
-  assert.match(systemPrompt, /Estimated source remains explicitly estimated/i);
-  assert.match(systemPrompt, /Use Z1-Z5 references only as target\.command/i);
-  assert.match(systemPrompt, /Never put pace and heart rate on the same leaf/i);
+  assert.match(systemPrompt, /accepted profile source remains estimated or personal/i);
+  assert.match(systemPrompt, /Never put raw Z1-Z5 references/i);
+  assert.match(systemPrompt, /one leaf never has both pace and BPM/i);
+  assert.match(systemPrompt, /kind=hydration/i);
+  assert.match(systemPrompt, /no prescription, duration, distance, Repeat, pace, BPM/i);
+  assert.doesNotMatch(
+    systemPrompt,
+    /primary_execution_mode=effort|primary_execution_mode=run_walk/i,
+  );
   assert.doesNotMatch(systemPrompt, /adaptation bridge|adaptation contacts|Long Run no earlier/i);
   assert.match(systemPrompt, /Author directly from the supplied runner facts/i);
   assert.ok(
@@ -996,7 +1112,7 @@ async function validateProviderContractBoundary() {
   assert.match(serializedSchema, /complete ordered children array executes/i);
   assert.doesNotMatch(serializedSchema, /"repeat_count"/);
   assert.doesNotMatch(serializedSchema, /duration_seconds|distance_meters/);
-  assert.doesNotMatch(serializedSchema, /metadata|warnings|assumptions|medical|goal/);
+  assert.doesNotMatch(serializedSchema, /"metadata"|"warnings"|"assumptions"|"medical"|"goal"\s*:/);
   const providerTitlePattern = (
     responseSchema.properties as {
       workouts: {
@@ -1022,16 +1138,19 @@ async function validateProviderContractBoundary() {
     "distance_meters",
     "target_finish_time",
   ]);
+  assert.ok(Array.isArray(providerFacts.runnerFacts.calendar.eligible_workout_weekdays));
+  const eligibleWorkoutWeekdays =
+    providerFacts.runnerFacts.calendar.eligible_workout_weekdays ?? [];
   assert.deepEqual(
     new Set([
-      ...providerFacts.runnerFacts.calendar.eligible_workout_weekdays,
-      ...providerFacts.runnerFacts.calendar.rest_weekdays,
+      ...eligibleWorkoutWeekdays,
+      ...(providerFacts.runnerFacts.calendar.fixed_rest_weekdays ?? []),
     ]).size,
     7,
   );
   assert.deepEqual(
-    providerFacts.runnerFacts.calendar.eligible_workout_weekdays.filter((day) =>
-      providerFacts.runnerFacts.calendar.rest_weekdays.includes(day),
+    eligibleWorkoutWeekdays.filter((day) =>
+      (providerFacts.runnerFacts.calendar.fixed_rest_weekdays ?? []).includes(day),
     ),
     [],
   );
@@ -1059,13 +1178,15 @@ async function validateProviderContractBoundary() {
   ).workouts.items.properties.date.pattern;
   assert.equal(
     new RegExp(providerDatePattern).test(resolved.authoringInput.schedule.startDate),
-    !resolved.authoringInput.availability.fixedRestDays.includes(
+    !(resolved.authoringInput.availability.fixedRestDays ?? []).includes(
       resolved.authoringInput.schedule.startWeekday,
     ),
   );
   const fixedRestDate = Array.from({ length: 7 }, (_, offset) =>
     addDaysIso(resolved.authoringInput.schedule.startDate, offset),
-  ).find((date) => resolved.authoringInput.availability.fixedRestDays.includes(weekdayLong(date)));
+  ).find((date) =>
+    (resolved.authoringInput.availability.fixedRestDays ?? []).includes(weekdayLong(date)),
+  );
   assert.ok(fixedRestDate, "Provider contract proof requires a fixed-rest date.");
   assert.equal(
     new RegExp(providerDatePattern).test(fixedRestDate!),
@@ -1600,15 +1721,6 @@ async function validateProviderStructuralBoundsFailBeforeReview() {
       expectedIssue: /repeat_structure_invalid|provider_schema_invalid|rounds/i,
     },
     {
-      name: "incomplete trailing horizon",
-      mutate: (draft) => {
-        draft.workouts = draft.workouts.filter(
-          (workout) => diffDaysIso(draft.endpoint.date, workout.date) > 14,
-        );
-      },
-      expectedIssue: /incomplete_horizon|final 14 calendar days/i,
-    },
-    {
       name: "qualitative pace in executable pace field",
       mutate: (draft) => {
         findProviderPaceTarget(draft).command = "comfortably hard";
@@ -1655,6 +1767,20 @@ async function validateProviderStructuralBoundsFailBeforeReview() {
     assert.match(result.issues.join("\n"), scenarioCase.expectedIssue);
     assert.equal(JSON.stringify(result).includes("reviewToken"), false);
   }
+
+  const aiAuthoredTaperGap = structuredClone(providerDraft);
+  aiAuthoredTaperGap.workouts = aiAuthoredTaperGap.workouts.filter(
+    (workout) => workout.date < addDaysIso(aiAuthoredTaperGap.endpoint.date, -14),
+  );
+  const taperResult = await generateAiFirstPlanDraftPreview({
+    input: resolved.authoringInput,
+    apiKey: "provider-authored-taper-gap-proof",
+    model: "provider-authored-taper-gap-proof",
+    today: paceTruthInput.startDate ?? resolved.authoringInput.schedule.startDate,
+    fetchImpl: async () =>
+      openAiPlanFirstResponse("resp_provider_authored_taper_gap", aiAuthoredTaperGap),
+  });
+  assert.equal(taperResult.ok, true, taperResult.ok ? "" : JSON.stringify(taperResult.issues));
 }
 
 function findProviderRepeatStep(draft: AiAuthoredPlanFirstProviderDraft) {
@@ -2187,7 +2313,9 @@ function assertPlanFirstGuidanceAndRepeatShape({
       const leaves =
         segment.prescription?.mode === "repeats"
           ? (segment.prescription.children ?? [])
-          : [segment];
+          : segment.segment_type === "fueling"
+            ? []
+            : [segment];
       for (const leaf of leaves) {
         runnableLeafCount += 1;
         const target = leaf.target;
@@ -2216,15 +2344,23 @@ function assertPlanFirstGuidanceAndRepeatShape({
           );
           assert.equal(hasHeartRate, true);
         }
-        if (
-          target?.primary_execution_mode === "effort" ||
-          target?.primary_execution_mode === "run_walk"
-        ) {
-          assert.equal(hasPace || hasHeartRate, false);
-          assert.ok(target.intensity);
-        }
+        assert.ok(
+          target?.primary_execution_mode === "pace" ||
+            target?.primary_execution_mode === "heart_rate",
+          `${scenarioName} generated runnable leaves allow only numeric pace or BPM commands.`,
+        );
       }
     }
+  }
+  const hydrationSteps = canonicalPlan.planned_workouts.flatMap((workout) =>
+    workout.segments.filter((segment) => segment.segment_type === "fueling"),
+  );
+  assert.ok(hydrationSteps.length > 0, `${scenarioName} must cover authored Hydration.`);
+  for (const hydration of hydrationSteps) {
+    assert.equal(hydration.label, "Hydration");
+    assert.equal(hydration.guidance, "Take water.");
+    assert.equal(hydration.prescription?.mode, "none");
+    assert.equal(hydration.target, undefined);
   }
   assert.ok(runnableLeafCount > 0);
   assert.doesNotMatch(serialized, /repeat_unit|recovery_unit/);
@@ -2320,9 +2456,9 @@ function assertNonRepeatTempoFixtureReviewTruth({
   assert.ok(work, `${scenarioName} continuous Tempo must include an authored Work segment.`);
   if (!work) return;
   assert.equal(work.prescription?.mode, "time");
-  assert.equal(work.target?.primary_execution_mode, "effort");
-  assert.equal(work.target?.pace, undefined);
-  assert.equal(work.target?.intensity, "Controlled tempo effort");
+  assert.equal(work.target?.primary_execution_mode, "pace");
+  assert.equal(work.target?.pace, "4:50-5:00/km");
+  assert.equal(work.target?.intensity, undefined);
   assert.equal(work.target?.hint, undefined);
   assert.equal(work.target?.extra?.hr_zone, undefined);
   assert.equal(work.target?.hr_bpm_range, undefined);

@@ -141,7 +141,7 @@ export interface AiGeneratedRunningPlanPreviewActionTrace {
   previewInputSummary: {
     runnerLevel: RunningPlanRunnerLevel;
     daysPerWeek: number | null;
-    fixedRestDayCount: number;
+    fixedRestDayCount: number | null;
     preferredLongRunDay: WeekdayName | null;
     startDate: string | null;
     benchmarkKind: BuildRunningPlanPreviewInput["benchmark"] extends infer Benchmark
@@ -398,21 +398,15 @@ export function buildAiGeneratedRunningPlanAuthoringInput(
     };
   }
 
-  const fixedRestDays = uniqueWeekdays(input.fixedRestDays ?? []);
-  const availableWeekdays = deriveAvailableTrainingWeekdays(fixedRestDays);
-  const daysPerWeek = input.daysPerWeek;
-  if (daysPerWeek == null) {
+  const normalizedFixedRestDays = uniqueWeekdays(input.fixedRestDays ?? []);
+  const fixedRestDays = normalizedFixedRestDays.length > 0 ? normalizedFixedRestDays : null;
+  const availableWeekdays = deriveAvailableTrainingWeekdays(fixedRestDays ?? []);
+  const daysPerWeek = input.daysPerWeek ?? null;
+  if (availableWeekdays.length === 0) {
     return {
       ok: false,
       reason: "structured_input_invalid",
-      message: "Choose the maximum running days per week before creating a generated plan.",
-    };
-  }
-  if (availableWeekdays.length === 0 || daysPerWeek > availableWeekdays.length) {
-    return {
-      ok: false,
-      reason: "structured_input_invalid",
-      message: "Running days per week must fit the weekdays that are not fixed rest days.",
+      message: "Leave at least one weekday available for running.",
     };
   }
   const preferredLongRunDay =
@@ -653,9 +647,7 @@ function projectCanonicalPrescription(
   prescription: TrainingPlanV2["planned_workouts"][number]["segments"][number]["prescription"],
 ): RunningPlanSegmentPrescription {
   if (!prescription || prescription.mode === "none") {
-    throw new Error(
-      "AI-authored canonical workout reached preview projection without displayable prescription structure.",
-    );
+    return { mode: "none" };
   }
 
   if (prescription.mode === "distance") {
@@ -822,6 +814,8 @@ function normalizeWorkoutDayKind({
   switch (workoutFamily) {
     case "recovery":
       return "recovery";
+    case "fueling":
+      return "hydration";
     case "easy":
       return "easy";
     case "steady":
@@ -994,7 +988,10 @@ function buildPreviewActionTrace(input: {
     previewInputSummary: {
       runnerLevel: input.input.runnerLevel,
       daysPerWeek: input.input.daysPerWeek ?? null,
-      fixedRestDayCount: input.input.fixedRestDays?.length ?? 0,
+      fixedRestDayCount:
+        input.input.fixedRestDays && input.input.fixedRestDays.length > 0
+          ? input.input.fixedRestDays.length
+          : null,
       preferredLongRunDay: input.input.preferredLongRunDay ?? null,
       startDate: input.input.startDate ?? null,
       benchmarkKind: input.input.benchmark?.kind ?? null,

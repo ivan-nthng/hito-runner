@@ -29,6 +29,12 @@ import {
   type RunningPlanReviewedPreviewDraft,
 } from "../src/lib/running-plan-engine-review";
 import {
+  buildHeartRateZonesSummary,
+  normalizeAcceptedHeartRateProfileForStorage,
+  personalHeartRateProfileInputSchema,
+} from "../src/lib/heart-rate-zones";
+import { runnerBaselineSaveInputSchema } from "../src/lib/user-settings-actions";
+import {
   assertSelectedDistanceEndpointProof,
   tamperReviewToken,
   validateAiAuthoredPrimaryExecutionGuidance,
@@ -132,6 +138,8 @@ const scenarios = [
 async function main() {
   const persistenceOptions = readPersistenceCliOptions();
   assertRemovedDeterministicPreviewEntrypoints();
+  validateRunnerBaselineBounds();
+  validatePersonalHeartRateGuidanceBandContract();
 
   const reviewedDrafts = [];
   for (const scenario of scenarios) {
@@ -158,9 +166,12 @@ async function main() {
     throw new Error(formatPersistenceBlocker(persistencePreflight));
   }
 
+  const persistenceAvailabilityDrafts = persistencePreflight.shouldRun
+    ? await buildAvailabilityPersistenceDrafts()
+    : [];
   const persistenceProof = persistencePreflight.shouldRun
     ? await validatePersistenceContract(
-        reviewedDrafts,
+        [...reviewedDrafts, ...persistenceAvailabilityDrafts],
         persistencePreflight,
         buildConfirmInputFromDraft,
       )
@@ -176,10 +187,204 @@ async function main() {
     activeManualTransition: activeManualTransitionProof,
     deterministicPreviewBuilders: "removed",
     persistence: persistenceProof,
+    availabilityPersistence:
+      "persistedDistanceGoals" in persistenceProof
+        ? persistenceProof.persistedDistanceGoals.slice(-4).map((proof) => ({
+            fixedRestDays: proof.availability.fixedRestDays,
+            maxRunningDaysPerWeek: proof.availability.maxRunningDaysPerWeek,
+            rows: proof.rows,
+            cleanupZero: Object.values(proof.cleanup).every(
+              (value) => value === 0 || value === true,
+            ),
+          }))
+        : [],
   });
 }
 
-async function validateAiGeneratedDistanceGoalScenario(scenario: (typeof scenarios)[number]) {
+async function buildAvailabilityPersistenceDrafts() {
+  const availabilityStates = [
+    {
+      name: "Availability both",
+      input: {
+        ...baseInput,
+        daysPerWeek: 6 as const,
+        fixedRestDays: ["Tuesday", "Saturday"],
+        preferredLongRunDay: null,
+      },
+    },
+    {
+      name: "Availability ceiling only",
+      input: { ...baseInput, fixedRestDays: null, preferredLongRunDay: null },
+    },
+    {
+      name: "Availability fixed rest only",
+      input: { ...baseInput, daysPerWeek: null, preferredLongRunDay: null },
+    },
+    {
+      name: "Availability flexible",
+      input: {
+        ...baseInput,
+        daysPerWeek: null,
+        fixedRestDays: null,
+        preferredLongRunDay: null,
+      },
+    },
+  ] as const;
+
+  return Promise.all(
+    availabilityStates.map((state) =>
+      validateAiGeneratedDistanceGoalScenario({
+        name: state.name,
+        input: {
+          ...state.input,
+          planGoalIntent: { distance: { kind: "preset", preset: "10K" } },
+        },
+        expectedEndpointMeters: 10_000,
+      }),
+    ),
+  );
+}
+
+function validateRunnerBaselineBounds() {
+  const middleBaseline = {
+    age: 36,
+    weightKg: 74,
+    heightCm: 178,
+    fitnessLevel: "running_regularly" as const,
+  };
+
+  for (const validBaseline of [
+    middleBaseline,
+    { ...middleBaseline, age: 13, weightKg: 30, heightCm: 120 },
+    { ...middleBaseline, age: 100, weightKg: 250, heightCm: 230 },
+  ]) {
+    assert.equal(
+      runnerBaselineSaveInputSchema.safeParse(validBaseline).success,
+      true,
+      `Runner baseline bounds must accept ${JSON.stringify(validBaseline)}.`,
+    );
+  }
+
+  for (const invalidBaseline of [
+    { ...middleBaseline, age: 12 },
+    { ...middleBaseline, age: 101 },
+    { ...middleBaseline, age: 36.5 },
+    { ...middleBaseline, weightKg: 29.5 },
+    { ...middleBaseline, weightKg: 250.5 },
+    { ...middleBaseline, heightCm: 119 },
+    { ...middleBaseline, heightCm: 231 },
+    { ...middleBaseline, heightCm: 178.5 },
+  ]) {
+    assert.equal(
+      runnerBaselineSaveInputSchema.safeParse(invalidBaseline).success,
+      false,
+      `Runner baseline bounds must reject ${JSON.stringify(invalidBaseline)}.`,
+    );
+  }
+}
+
+function validatePersonalHeartRateGuidanceBandContract() {
+  const overlapZones = [
+    { reference: "Z1", minBpm: 95, maxBpm: 120 },
+    { reference: "Z2", minBpm: 116, maxBpm: 135 },
+    { reference: "Z3", minBpm: 130, maxBpm: 150 },
+    { reference: "Z4", minBpm: 145, maxBpm: 165 },
+    { reference: "Z5", minBpm: 160, maxBpm: 185 },
+  ] as const;
+  const gappedZones = [
+    { reference: "Z1", minBpm: 90, maxBpm: 110 },
+    { reference: "Z2", minBpm: 115, maxBpm: 130 },
+    { reference: "Z3", minBpm: 135, maxBpm: 145 },
+    { reference: "Z4", minBpm: 150, maxBpm: 160 },
+    { reference: "Z5", minBpm: 165, maxBpm: 180 },
+  ] as const;
+
+  for (const [label, zones] of [
+    ["overlapping", overlapZones],
+    ["gapped", gappedZones],
+  ] as const) {
+    assert.equal(
+      personalHeartRateProfileInputSchema.safeParse({ zones }).success,
+      true,
+      `${label} ordered guidance bands must be valid input.`,
+    );
+    assert.equal(
+      normalizeAcceptedHeartRateProfileForStorage({ age: 36, value: { zones } }).source,
+      "personal",
+      `${label} changed guidance must persist as personal truth.`,
+    );
+  }
+
+  const estimated = buildHeartRateZonesSummary(36);
+  assert.equal(estimated.source, "estimated");
+  const acceptedEstimate = normalizeAcceptedHeartRateProfileForStorage({
+    age: 36,
+    value: {
+      zones: estimated.zones.map(({ reference, minBpm, maxBpm }) => ({
+        reference,
+        minBpm,
+        maxBpm,
+      })),
+    },
+  });
+  assert.deepEqual(acceptedEstimate, {
+    version: "runner_hr_profile_v2",
+    source: "estimated",
+  });
+
+  const invalidCases = [
+    {
+      label: "reversed range",
+      zones: overlapZones.map((zone, index) =>
+        index === 0 ? { ...zone, minBpm: 121, maxBpm: 120 } : zone,
+      ),
+      message: /minimum must not exceed/i,
+    },
+    {
+      label: "incomplete set",
+      zones: overlapZones.slice(0, 4),
+      message: /all five guidance bands/i,
+    },
+    {
+      label: "below product envelope",
+      zones: overlapZones.map((zone, index) => (index === 0 ? { ...zone, minBpm: 39 } : zone)),
+      message: /at least 40 BPM/i,
+    },
+    {
+      label: "above product envelope",
+      zones: overlapZones.map((zone, index) => (index === 4 ? { ...zone, maxBpm: 221 } : zone)),
+      message: /at most 220 BPM/i,
+    },
+    {
+      label: "decreasing lower bounds",
+      zones: overlapZones.map((zone, index) => (index === 2 ? { ...zone, minBpm: 115 } : zone)),
+      message: /lower bounds must be non-decreasing/i,
+    },
+    {
+      label: "decreasing upper bounds",
+      zones: overlapZones.map((zone, index) => (index === 2 ? { ...zone, maxBpm: 130 } : zone)),
+      message: /upper bounds must be non-decreasing/i,
+    },
+  ] as const;
+
+  for (const invalidCase of invalidCases) {
+    const result = personalHeartRateProfileInputSchema.safeParse({ zones: invalidCase.zones });
+    assert.equal(result.success, false, `${invalidCase.label} must be rejected.`);
+    if (!result.success) {
+      assert.match(
+        result.error.issues.map((issue) => issue.message).join(" | "),
+        invalidCase.message,
+        `${invalidCase.label} must return actionable validation.`,
+      );
+    }
+  }
+}
+
+async function validateAiGeneratedDistanceGoalScenario(scenario: {
+  name: string;
+  input: RunningPlanPreviewActionInput;
+  expectedEndpointMeters: number;
+}) {
   const draft = await buildReviewedAiFixture(scenario.input);
   const canonicalPlan = buildRunningPlanCanonicalPlan(draft);
   const importedSeed = buildImportedPlanSeed(canonicalPlan);
@@ -261,6 +466,27 @@ async function validateFailureBoundaries(
     assert.equal(changedStartExactness.reason, "stale_review");
   }
 
+  for (const changedAvailabilityDraft of [
+    await buildReviewedAiFixture({
+      ...reviewedDraft.previewInput,
+      daysPerWeek: null,
+    }),
+    await buildReviewedAiFixture({
+      ...reviewedDraft.previewInput,
+      fixedRestDays: null,
+    }),
+  ]) {
+    const changedAvailabilityExactness = await validateRunningPlanReviewExactness({
+      draft: changedAvailabilityDraft,
+      reviewToken: reviewedDraft.reviewToken,
+      reviewChecksum: reviewedDraft.reviewChecksum,
+    });
+    assert.equal(changedAvailabilityExactness.ok, false);
+    if (!changedAvailabilityExactness.ok) {
+      assert.equal(changedAvailabilityExactness.reason, "stale_review");
+    }
+  }
+
   const invalidTokenExactness = await validateRunningPlanReviewExactness({
     draft: reviewedDraft,
     reviewToken: tamperReviewToken(reviewedDraft.reviewToken),
@@ -317,13 +543,18 @@ async function validateFlatLongRunProgressionReviewDoesNotInvalidatePlanFirst(
       isPreEndpointBuildLongRun(workout)
         ? {
             ...workout,
-            segments: workout.segments.map((segment) => ({
-              ...segment,
-              prescription: {
-                mode: "time" as const,
-                duration_min: Math.round((75 / Math.max(1, workout.segments.length)) * 10) / 10,
-              },
-            })),
+            segments: workout.segments.map((segment) =>
+              segment.segment_type === "fueling"
+                ? segment
+                : {
+                    ...segment,
+                    prescription: {
+                      mode: "time" as const,
+                      duration_min:
+                        Math.round((75 / Math.max(1, workout.segments.length)) * 10) / 10,
+                    },
+                  },
+            ),
           }
         : workout,
     ),

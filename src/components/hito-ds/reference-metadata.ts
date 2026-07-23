@@ -51,11 +51,11 @@ export const HITO_DS_REFERENCE_ENTRIES: HitoDsReferenceEntry[] = [
     sourcePath: "src/styles/controls-lists.css",
   },
   {
-    anchor: "inputs",
+    anchor: "editable-value-field",
     id: "editable-value-field",
     kind: "component",
     label: "Editable Value Field",
-    referencePath: "/hitoDS/components#inputs",
+    referencePath: "/hitoDS/components#editable-value-field",
     sourcePath: "src/components/ui/editable-value-field.tsx",
   },
   {

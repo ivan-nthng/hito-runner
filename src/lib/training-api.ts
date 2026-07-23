@@ -262,6 +262,7 @@ function parseActivePlanScheduleEditInput(value: unknown): ActivePlanScheduleEdi
 
 function buildPlanSchedulePreferencesSummary(
   value: Json | null,
+  workouts: readonly Workout[],
 ): PlanSchedulePreferencesSummary | null {
   const record = asJsonRecord(value);
 
@@ -270,21 +271,36 @@ function buildPlanSchedulePreferencesSummary(
   }
 
   const fixedRestDays = readPlanWeekdays(record.blocked_days);
-  const preferredRunDays = readPlanWeekdays(record.preferred_run_days);
-  const runningDaysPerWeek =
-    readPositiveInteger(record.max_running_days_per_week) ??
-    (preferredRunDays.length > 0 ? preferredRunDays.length : null);
+  const maxRunningDaysPerWeek = readPositiveInteger(record.max_running_days_per_week);
+  const runningDaysPerWeek = derivePeakAuthoredRunningDaysPerWeek(workouts);
   const preferredLongRunDay = readPlanWeekday(record.preferred_long_run_day);
 
-  if (!fixedRestDays.length && runningDaysPerWeek == null && !preferredLongRunDay) {
+  if (
+    !fixedRestDays.length &&
+    maxRunningDaysPerWeek == null &&
+    runningDaysPerWeek == null &&
+    !preferredLongRunDay
+  ) {
     return null;
   }
 
   return {
     fixedRestDays,
+    maxRunningDaysPerWeek,
     runningDaysPerWeek,
     preferredLongRunDay,
   };
+}
+
+function derivePeakAuthoredRunningDaysPerWeek(workouts: readonly Workout[]) {
+  const counts = workouts
+    .filter((workout) => workout.type !== "rest")
+    .reduce((byWeek, workout) => {
+      byWeek.set(workout.week, (byWeek.get(workout.week) ?? 0) + 1);
+      return byWeek;
+    }, new Map<number, number>());
+
+  return counts.size > 0 ? Math.max(...counts.values()) : null;
 }
 
 function asJsonRecord(value: Json | null | undefined): Record<string, unknown> | null {
@@ -403,7 +419,10 @@ async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
       goal: planCycle.goal_summary,
       source: "persisted",
       sourceKind: planCycle.source_kind,
-      schedulePreferences: buildPlanSchedulePreferencesSummary(planCycle.plan_preferences),
+      schedulePreferences: buildPlanSchedulePreferencesSummary(
+        planCycle.plan_preferences,
+        workouts,
+      ),
       workoutEditing: buildActivePlanWorkoutEditingCapabilities(planCycle),
     },
     profile,

@@ -45,6 +45,7 @@ export const RUNNER_FACING_BLOCK_TYPE_VALUES = [
   "recover",
   "finish",
   "cooldown",
+  "hydration",
   "repeat_set",
 ] as const;
 
@@ -58,6 +59,7 @@ export const RUNNER_FACING_BLOCK_TYPE_LABELS: Record<RunnerFacingBlockType, stri
   recover: "Recover",
   finish: "Finish",
   cooldown: "Cooldown",
+  hydration: "Hydration",
   repeat_set: "Repeat set",
 };
 
@@ -336,6 +338,10 @@ function resolveBlockType(
 
 function resolveNonRepeatBlockType(segment: WorkoutSegmentLike): RunnerFacingBlockType {
   const semanticText = blockSemanticText(segment);
+
+  if (/(?:^|_)(fueling|hydration)(?:_|$)|\bhydration\b/.test(semanticText)) {
+    return "hydration";
+  }
 
   if (
     /(?:^|_)(warmup|warm_up|prep|preparation|activation|drills?)(?:_|$)|\bwarm[-\s]?up\b/.test(

@@ -28,6 +28,12 @@ this bad output, or only describing the visible bad row?`
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
 
+## Evidence Alignment
+
+Every data-quality finding must be tied to a concrete row, query, validator result, or safe replay.
+When a deterministic transformation is wrong, add a minimized redacted regression fixture to the
+existing validation seam if it will prevent recurrence; do not retain private production payloads.
+
 ## Subagent Expectations
 
 For data-quality audits, fixture/source scans, validator review, and independent non-mutating
@@ -44,17 +50,6 @@ Data-quality work should find the shared failing contract, not only flag one bad
 - Do not create long Markdown inventories unless they are the only durable evidence needed.
 - If validation breaks after a contract is tightened, treat the break as useful signal and identify
   the canonical owner to fix.
-
-## Canonical Architecture Approach
-
-Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
-
-- one canonical pipeline, no parallel product systems for the same truth
-- backend owns validation, normalization, persistence, lifecycle rules, entitlement, and mutation safety
-- frontend/design/copy/QA work must render, explain, or verify backend-shaped truth rather than inventing rules locally
-- deterministic product truth comes before AI interpretation or recommendations
-- risky mutations require explicit review/confirm or confirmation boundaries
-- prefer reuse, deletion, and consolidation over new abstractions
 
 ## Scope
 

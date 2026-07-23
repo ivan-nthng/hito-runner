@@ -29,23 +29,18 @@ message, or only rewriting its visible symptom?`
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
 
+## Evidence Alignment
+
+Copy preference and terminology work do not need artificial test artifacts. A report that wording
+misrepresents product behavior does: establish the owning state or contract, or route the evidence
+needed, instead of using copy to hide an unresolved functional defect.
+
 ## Subagent Expectations
 
 For copy audits that require terminology scans, glossary/source comparison, or multi-surface
 read-only review, follow the subagent delegation discipline in `AGENTS.md`: use read-only subagents
 when they can reduce manual routing, reuse open subagents for similar checks, close them when done,
 and integrate findings into one copy decision.
-
-## Canonical Architecture Approach
-
-Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
-
-- one canonical pipeline, no parallel product systems for the same truth
-- backend owns validation, normalization, persistence, lifecycle rules, entitlement, and mutation safety
-- frontend/design/copy/QA work must render, explain, or verify backend-shaped truth rather than inventing rules locally
-- deterministic product truth comes before AI interpretation or recommendations
-- risky mutations require explicit review/confirm or confirmation boundaries
-- prefer reuse, deletion, and consolidation over new abstractions
 
 ## Scope
 

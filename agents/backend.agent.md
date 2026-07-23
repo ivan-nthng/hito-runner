@@ -20,6 +20,17 @@ Build reliable APIs, scripts, schema changes, and server-side guards that preser
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
 
+## Evidence Alignment
+
+Before changing a reported backend defect, establish the evidence artifact required by `AGENTS.md`.
+For a deterministic contract or transformation regression, preserve a minimized, redacted replay in
+the existing validator or fixture seam when it proves recurrence. Do not invent a new harness or
+persist raw runner/provider data merely to satisfy this gate.
+
+Before the first backend write, publish the `Execution preflight` required by `AGENTS.md` section
+0.1. Do not start a migration, server change, validator rewrite, or persistence mutation with a
+plausible cause standing in for the required artifact.
+
 ## Subagent Expectations
 
 For backend implementation, cleanup, source/import audits, validator work, and non-mutating command
@@ -55,18 +66,6 @@ seam, the batch is not done.
   durable facts when needed.
 - Do not leave compatibility/fallback code active after the canonical replacement is proved unless a
   live caller requires it.
-
-## Canonical Architecture Approach
-
-Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
-
-- one canonical pipeline, no parallel product systems for the same truth
-- backend owns validation, normalization, persistence, lifecycle rules, entitlement, and mutation safety
-- frontend/design/copy/QA work must render, explain, or verify backend-shaped truth rather than inventing rules locally
-- deterministic product truth comes before AI interpretation or recommendations
-- risky mutations require explicit review/confirm or confirmation boundaries
-- prefer reuse, deletion, and consolidation over new abstractions
-- bug fixes must resolve the backend-owned root cause, not only mask the visible symptom
 
 ## Scope
 
@@ -185,20 +184,12 @@ In the final response, include:
 - whether any stale or duplicate path was deleted, hard-blocked, or left with a removal plan
 - validation run
 
-## Definition Of Done, Test Inventory, And Acceptance Gate
+## Backend Definition Of Done
 
-This gate applies only to implementation, debugging, or validation work. A pure explanatory or
-reference response needs no test inventory. For a debugging task, include a safe repro or
-discriminator that proves the first incorrect backend owner, not only the post-fix happy path.
-
-Before closing a backend implementation task, define its observable outcome, preserved boundaries,
-and required validation inventory from the changed server contract, persistence risk, and consumer
-impact. When QA is used, integrate its full executed-test list into the final report; do not replace
-it with a blanket `PASS` claim. Report the inventory as `Check | Scenario / environment | Result |
-Evidence`, plus every required check not run and why. Only then report `Implementation DoD: Passed`;
-otherwise fix-forward and rerun the affected inventory, or return `FAIL`/`BLOCKED`. If broad
-independent QA is outside this task, report `Global QA Acceptance: Pending` rather than claiming
-release acceptance.
+`AGENTS.md` section 2.4 owns the common Definition of Done and report format. Derive the required
+inventory from the changed server contract, persistence risk, and consumer impact. For a defect,
+include a safe backend discriminator that proves the first incorrect owner; do not close on a
+post-fix happy path alone.
 
 ## Optional Continuity Footer
 

@@ -112,6 +112,8 @@ export interface PlanMeta {
 
 export interface PlanSchedulePreferencesSummary {
   fixedRestDays: string[];
+  maxRunningDaysPerWeek: number | null;
+  /** Peak authored weekly frequency, not the runner's availability ceiling. */
   runningDaysPerWeek: number | null;
   preferredLongRunDay: string | null;
 }

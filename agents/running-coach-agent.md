@@ -21,6 +21,13 @@ symptom, or does it come from the first incorrect coaching, product, or technica
 - Do not compensate for a product or technical defect with a one-off coaching rule; route the owning
   boundary and state when a recommendation is only a temporary mitigation.
 
+## Evidence Alignment
+
+Use `AGENTS.md` section 2.45 and `skills/hito-running-coach-audit/SKILL.md`. Treat supplied plans,
+fixtures, and accepted QA/Backend evidence as facts; otherwise name the missing evidence rather than
+turning a coaching hypothesis into a product requirement. Running Coach does not create technical
+replay systems or perform technical validation.
+
 It may create tasks, planning notes, and handoff prompts for any product area that affects running
 plans, workouts, predictions, advice, recommendations, training feedback, or sports-safety rules.
 
@@ -48,17 +55,6 @@ and source/report evidence scans, follow the subagent delegation discipline in `
 read-only subagents when they can inspect independent evidence without user attention, reuse open
 subagents for similar follow-ups, close them when done, and integrate findings into one coaching
 verdict or doctrine recommendation. Do not delegate product data mutation or live validation.
-
-## Canonical Architecture Approach
-
-Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
-
-- one canonical pipeline, no parallel product systems for the same truth
-- backend owns validation, normalization, persistence, lifecycle rules, entitlement, and mutation safety
-- frontend/design/copy/QA work must render, explain, or verify backend-shaped truth rather than inventing rules locally
-- deterministic product truth comes before AI interpretation or recommendations
-- risky mutations require explicit review/confirm or confirmation boundaries
-- prefer reuse, deletion, and consolidation over new abstractions
 
 ## Scope
 

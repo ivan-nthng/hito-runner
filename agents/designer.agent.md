@@ -32,6 +32,17 @@ experience, or only making its visible symptom look calmer?`
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
 
+## Evidence Alignment
+
+Visual feedback, screenshots, and accessible interaction evidence may establish a design defect.
+When the observed problem may instead be state, persistence, or shared-component behavior, identify
+the evidence and owner before designing a visual mitigation. Do not invent replay fixtures for
+subjective design preferences.
+
+Before changing implementation or directing an implementation slice, publish the `Execution
+preflight` required by `AGENTS.md` section 0.1. A design preference may use its accepted decision as
+the receipt; a claimed behavior defect still needs the evidence that distinguishes its owner.
+
 ## Subagent Expectations
 
 For design audits, multi-surface UI research, DS/source inspection, and screenshot/spec comparison,
@@ -39,31 +50,12 @@ follow the subagent delegation discipline in `AGENTS.md`: use read-only subagent
 gather independent evidence without user attention, reuse open subagents for similar follow-ups,
 close them when done, and integrate findings into one design direction or handoff.
 
-## Definition Of Done, Test Inventory, And Acceptance Gate
+## Designer Definition Of Done
 
-This gate applies only when the design task changes implementation, debugs a visual defect, or
-validates behavior. A pure design explanation, critique, or recommendation needs no test inventory.
-For a visual debugging task, include evidence that distinguishes the actual shared/component/layout
-owner from the visible symptom, not only a post-fix screenshot.
-
-When a Designer-owned task directs implementation or uses QA evidence, define the required visual,
-responsive, accessibility, and affected-flow checks as its Definition of Done before accepting the
-result. The final integrated report must include the QA subagent's complete executed-test list, every
-required check not run and why, and the evidence for each result in `Check | Scenario / environment |
-Result | Evidence` form. Report `Implementation DoD: Passed` only when the inventory passes;
-otherwise return it for fix-forward or report `FAIL`/`BLOCKED`. If broad independent QA is outside
-this task, report `Global QA Acceptance: Pending` rather than claiming release acceptance.
-
-## Canonical Architecture Approach
-
-Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
-
-- one canonical pipeline, no parallel product systems for the same truth
-- backend owns validation, normalization, persistence, lifecycle rules, entitlement, and mutation safety
-- frontend/design/copy/QA work must render, explain, or verify backend-shaped truth rather than inventing rules locally
-- deterministic product truth comes before AI interpretation or recommendations
-- risky mutations require explicit review/confirm or confirmation boundaries
-- prefer reuse, deletion, and consolidation over new abstractions
+`AGENTS.md` section 2.4 owns the common Definition of Done and report format. Apply it only when a
+design task changes implementation, debugs a visual defect, or validates behavior. For visual
+debugging, distinguish the real shared/component/layout owner from the symptom; a screenshot alone
+does not establish ownership.
 
 ## Operating Modes
 

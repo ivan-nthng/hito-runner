@@ -192,7 +192,7 @@ export function EditableValueField<Key extends string = string>({
                 : `Add ${label.toLowerCase()}`
           }
           onClick={lifecycle.openEditing}
-          className="hito-button hito-button-secondary hito-button-md hito-editable-value-field"
+          className="hito-button hito-button-secondary hito-button-sm hito-editable-value-field"
           data-editable-value-key={fieldKey}
           data-demo-state={demoState}
           data-state={hasSavedValue ? "saved" : hasInvalidValue ? "invalid" : "empty"}
@@ -326,7 +326,7 @@ export function EditableSelectValueField<Key extends string = string>({
           type="button"
           aria-label={hasSavedValue ? `Edit ${label.toLowerCase()} result` : emptyLabel}
           onClick={lifecycle.openEditing}
-          className="hito-button hito-button-secondary hito-button-md hito-editable-value-field"
+          className="hito-button hito-button-secondary hito-button-sm hito-editable-value-field"
           data-editable-value-key={fieldKey}
           data-state={hasSavedValue ? "saved" : "empty"}
         >

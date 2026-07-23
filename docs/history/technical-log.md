@@ -1,7 +1,7 @@
 # Hito Technical Log
 
 Status: active internal ledger
-Last Updated: 2026-07-21
+Last Updated: 2026-07-23
 Owner: PRODUCT
 
 ## Purpose And Source Boundary
@@ -29,6 +29,26 @@ Entry format:
 
 Every accepted implementation, QA acceptance gate, source-cleanup batch, or durable process repair
 must either add an entry here or explicitly state why it is not technical-log material.
+
+## 2026-07-23
+
+- PRODUCT / Pace-derived workflow gates made operational — added one centralized execution
+  preflight before source or test mutations, matching closure receipts, QA intake verification, and
+  a compact finalization checkpoint for release/pre-commit bundles; retired the inactive FULLSTACK
+  role so new work cannot bypass the named owner boundary. Evidence: `AGENTS.md`, affected
+  implementation/QA/architecture/Product roles, and matching skills. Boundary: no workflow engine,
+  task store, mandatory human-device gate, product behavior, or runtime test was added.
+
+## 2026-07-22
+
+- PRODUCT + ARCHITECT read-only audit / agent evidence and replay alignment — made `AGENTS.md` the
+  single detailed contract for root-cause evidence, deterministic redacted replay fixtures, cleanup,
+  and durable lessons; removed duplicated architecture/DoD/browser rules from role files and the
+  obsolete serial workflow document; assigned operational browser policy to the QA skill; and removed
+  the redundant numbered QA prompt template. Evidence: `AGENTS.md`, `agents/`, and `skills/` source
+  scans with clean scoped diff checks. Boundary: no product behavior, persistence, test runtime,
+  production configuration, or QA acceptance claim changed; no workflow engine, knowledge base, or
+  mandatory human-device gate was added.
 
 ## 2026-07-21
 

@@ -36,7 +36,8 @@ For `new_to_running` and `beginner`, the first 14 calendar days must:
 - keep at least one recovery or rest day between contacts;
 - use only the runner-facing identities `Run/Walk`, `Easy`, or `Recovery`;
 - use conservative, displayable duration and Repeat-child structure;
-- use conversational effort cues without invented pace or personal heart-rate targets;
+- give every movement leaf one broad AI-authored numeric pace target or accepted-profile BPM target,
+  with conversational effort retained only as supplemental cue text;
 - contain no Long Run, tempo, threshold, interval, hill, progression, steady-finish, or
   selected-distance endpoint workout.
 
@@ -59,7 +60,7 @@ The plan-first provider context carries:
 - the one-day recovery-spacing minimum;
 - the allowed opening identities;
 - the earliest first true Long Run day;
-- the effort-only opening target policy;
+- the numeric pace-or-BPM opening target policy;
 - permission for AI to extend its authored horizon instead of compressing load;
 - runner-selected availability, fixed rest days, goal distance, and requested date as facts.
 
@@ -91,7 +92,7 @@ system.
 - awkward three-day availability retains the required contacts without violating fixed rest days;
 - `Run/Walk` keeps its canonical recovery identity and ordered Repeat children;
 - the first true Long Run is no earlier than day 15;
-- opening contacts contain no pace or HR targets;
+- opening contacts contain numeric pace or accepted-profile BPM targets and no prose-only primary command;
 - an AI-authored extended endpoint survives compiler, review, and confirm provenance;
 - provider-authored workout dates and titles equal compiled non-rest rows, proving no backend
   substitution;

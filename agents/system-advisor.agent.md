@@ -18,6 +18,12 @@ Help the team choose the right direction when the question is broader than one i
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
 
+## Evidence Alignment
+
+Strategic advice must distinguish observed facts from hypotheses and name the evidence still needed
+when a recommendation depends on an unproven cause. Do not recommend a new workflow, memory system,
+or abstraction when the existing canonical process can absorb the lesson.
+
 ## Subagent Expectations
 
 For broad system-health reviews, cleanup comparisons, source-of-truth checks, and independent
@@ -35,17 +41,6 @@ root-cause cleanup lane instead of another cautious planning loop.
 - Prefer implemented functionality and existing owners over new frameworks, docs, or orchestration.
 - Do not recommend new Markdown process unless it directly removes ambiguity or replaces larger
   recurring noise.
-
-## Canonical Architecture Approach
-
-Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
-
-- one canonical pipeline, no parallel product systems for the same truth
-- backend owns validation, normalization, persistence, lifecycle rules, entitlement, and mutation safety
-- frontend/design/copy/QA work must render, explain, or verify backend-shaped truth rather than inventing rules locally
-- deterministic product truth comes before AI interpretation or recommendations
-- risky mutations require explicit review/confirm or confirmation boundaries
-- prefer reuse, deletion, and consolidation over new abstractions
 
 ## Scope
 

@@ -50,7 +50,7 @@ export function HitoDsOverviewPage() {
           <ReferenceListRow
             label="Patterns"
             title="Start here for composed UI"
-            body="Use this group for editorial timelines, tables, shell nav, async states, analytics summaries, and disclosure rows."
+            body="Use this group for inline editing, editorial rhythm, route-state composition, workout taxonomy, and compact summary truth."
           />
           <ReferenceListRow
             label="Backlog"
@@ -168,15 +168,17 @@ export function HitoDsOverviewPage() {
             body="The DS owns editorial timeline typography, backdrop, dots, and inline code; changelog grouping, rail layout, and sticky boundaries stay with `/changelog`."
           />
           <ReferenceListRow
-            label="In rollout"
-            title="More interactive explorers can follow"
-            body="Select, dropdown/menu, async toast lifecycle, shell rows, and deeper pattern references can become standardized specimens only when a concrete QA or product-consumer need appears."
-          />
-          <ReferenceListRow
             label="Temporary"
             title="Compatibility wrappers stay small"
             body="Only behavior-bearing wrapper exports remain. Generic wrapper residue should be deleted once product surfaces move to Hito DS classes or focused primitives."
           />
+          <div id="value-tag">
+            <ReferenceListRow
+              label="Local devtool"
+              title="Value Tag is not a product primitive"
+              body="HitoValueTag and its remove/select variants currently serve Local Inspector property controls plus palette and Figma audit specimens. With no runner or Admin product consumer, they remain excluded from the canonical visual component catalog."
+            />
+          </div>
         </div>
       </section>
     </>

@@ -61,8 +61,8 @@ export interface RunningPlanPreviewNormalizedInputSummary {
   heightCm: number;
   weightKg: number;
   runnerLevel: RunningPlanRunnerLevel;
-  daysPerWeek: RunningPlanDaysPerWeek;
-  fixedRestDays: WeekdayName[];
+  daysPerWeek: RunningPlanDaysPerWeek | null;
+  fixedRestDays: WeekdayName[] | null;
   preferredLongRunDay: WeekdayName | null;
   startDate: string;
   benchmarkPaceTruth: RunningPlanBenchmarkPaceTruth | null;

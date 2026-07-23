@@ -4,18 +4,13 @@ export type HitoTypographyRole = {
   id: string;
   inspectorSelectable?: boolean;
   label: string;
-  match?: {
-    fontFamilyIncludes: string;
-    fontSizePx: number;
-    fontWeight: string;
-    letterSpacingPx?: number;
-    lineHeightPx: number;
-  };
   sample: string;
   spec: string;
   technicalDetails: string;
   use: string;
 };
+
+export const HITO_TYPOGRAPHY_PROVENANCE_PROPERTY = "--hito-typography-role";
 
 export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
   {
@@ -73,12 +68,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     description: "Primary label inside list-row anatomy.",
     id: "list-row-title",
     label: "List row title",
-    match: {
-      fontFamilyIncludes: "Poppins",
-      fontSizePx: 14,
-      fontWeight: "400",
-      lineHeightPx: 18.9,
-    },
     sample: "Same typography, no click",
     spec: "Poppins · 0.875rem · 400 · lh 1.35",
     technicalDetails: "Poppins · 0.875rem · 400 · lh 1.35",
@@ -89,12 +78,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     description: "Default body copy role.",
     id: "body",
     label: "Body",
-    match: {
-      fontFamilyIncludes: "Poppins",
-      fontSizePx: 14,
-      fontWeight: "400",
-      lineHeightPx: 22.12,
-    },
     sample: "This compares the planned workout with the uploaded run.",
     spec: "Poppins · 0.875rem · 400 · lh 1.58",
     technicalDetails: "Poppins · 0.875rem · 400 · lh 1.58",
@@ -105,12 +88,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     description: "Small supporting body copy role.",
     id: "body-small",
     label: "Body small",
-    match: {
-      fontFamilyIncludes: "Poppins",
-      fontSizePx: 13,
-      fontWeight: "400",
-      lineHeightPx: 19.5,
-    },
     sample: "Saved workout history stays preserved.",
     spec: "Poppins · 0.8125rem · 400 · lh 1.5",
     technicalDetails: "Poppins · 0.8125rem · 400 · lh 1.5",
@@ -121,12 +98,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     description: "Field-adjacent helper copy role.",
     id: "helper",
     label: "Helper",
-    match: {
-      fontFamilyIncludes: "Poppins",
-      fontSizePx: 12,
-      fontWeight: "400",
-      lineHeightPx: 17.4,
-    },
     sample: "Nothing changes until you choose Apply update.",
     spec: "Poppins · 0.75rem · 400 · lh 1.45",
     technicalDetails: "Poppins · 0.75rem · 400 · lh 1.45",
@@ -137,12 +108,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     description: "Quiet caption and secondary metadata role.",
     id: "caption",
     label: "Caption",
-    match: {
-      fontFamilyIncludes: "Poppins",
-      fontSizePx: 11,
-      fontWeight: "400",
-      lineHeightPx: 15.95,
-    },
     sample: "Extracted activity: morning-run.fit",
     spec: "Poppins · 0.6875rem · 400 · lh 1.45",
     technicalDetails: "Poppins · 0.6875rem · 400 · lh 1.45",
@@ -183,12 +148,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     description: "Technical monospace readback role.",
     id: "technical-mono",
     label: "Technical mono",
-    match: {
-      fontFamilyIncludes: "JetBrains",
-      fontSizePx: 12,
-      fontWeight: "400",
-      lineHeightPx: 17.4,
-    },
     sample: "training-plan-v2",
     spec: "JetBrains Mono · 0.75rem · tabular nums · lh 1.45",
     technicalDetails: "JetBrains Mono · 0.75rem · 400 · lh 1.45",

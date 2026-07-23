@@ -1,9 +1,12 @@
 import type { GenerateAiFirstPlanDraftPreviewOptions } from "@/lib/ai-first-plan-draft-service";
 import {
+  AI_AUTHORED_PLAN_FIRST_HYDRATION_CUE,
+  AI_AUTHORED_PLAN_FIRST_HYDRATION_LABEL,
   AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME,
   buildAiAuthoredFirstSessionAdaptationContext,
   type AiAuthoredPlanFirstProviderDraft,
 } from "@/lib/ai-authored-plan-first-provider-contract";
+import { resolveEffectiveHeartRateGuidance } from "@/lib/heart-rate-zones";
 import type { StructuredPlanAuthoringInput } from "@/lib/structured-plan-authoring-schema";
 import { isLoopbackRuntimeUrl } from "@/lib/supabase/env";
 import { addDaysIso, startOfWeekIso } from "@/lib/training";
@@ -37,6 +40,10 @@ type ProviderFixtureRepeatChild = Extract<
   ProviderFixtureSection,
   { kind: "repeat" }
 >["children"][number];
+type ProviderFixtureTargetContext = Pick<
+  StructuredPlanAuthoringInput["runnerFacts"],
+  "heartRateProfile"
+>;
 
 type AiGeneratedRunningPlanFixturePreviewOptions = Omit<
   GenerateAiFirstPlanDraftPreviewOptions,
@@ -222,23 +229,26 @@ function buildProviderFixtureDraft(
   const endpointDate = findAvailableDateOnOrBefore(
     adaptationContext.adaptation.required ? endDate : (requestedTargetDate ?? endDate),
     startDate,
-    authoringInput.availability.fixedRestDays,
+    authoringInput.availability.fixedRestDays ?? [],
   );
   const workouts = buildFixtureWorkoutDays({
     startDate,
     endDate,
     endpointDate,
     maxWorkoutsPerWeek: authoringInput.availability.maxRunningDaysPerWeek,
-    fixedRestDays: authoringInput.availability.fixedRestDays,
+    fixedRestDays: authoringInput.availability.fixedRestDays ?? [],
     fixtureScenario,
     adaptationRequired: adaptationContext.adaptation.required,
-    paceTruthAvailable: Boolean(authoringInput.runnerFacts.benchmark),
-    acceptedHeartRateAvailable: authoringInput.runnerFacts.heartRateProfile.accepted,
+    targetContext: {
+      heartRateProfile: authoringInput.runnerFacts.heartRateProfile,
+    },
   });
 
   return {
     workouts,
-    endpoint: buildEndpointFixtureDay(endpointDate, distance.distanceMeters),
+    endpoint: buildEndpointFixtureDay(endpointDate, distance.distanceMeters, {
+      heartRateProfile: authoringInput.runnerFacts.heartRateProfile,
+    }),
   };
 }
 
@@ -246,12 +256,11 @@ function buildFixtureWorkoutDays(input: {
   startDate: string;
   endDate: string;
   endpointDate: string;
-  maxWorkoutsPerWeek: number;
+  maxWorkoutsPerWeek: number | null;
   fixedRestDays: readonly WeekdayName[];
   fixtureScenario: AiGeneratedRunningPlanDevFixtureScenario;
   adaptationRequired: boolean;
-  paceTruthAvailable: boolean;
-  acceptedHeartRateAvailable: boolean;
+  targetContext: ProviderFixtureTargetContext;
 }): AiAuthoredPlanFirstProviderDraft["workouts"] {
   const days = new Map<string, AiAuthoredPlanFirstProviderDraft["workouts"][number]>();
   if (input.adaptationRequired) {
@@ -274,7 +283,7 @@ function buildFixtureWorkoutDays(input: {
           "Local plan-first fixture could not author the required adaptation bridge.",
         );
       }
-      days.set(date, build(date));
+      days.set(date, build(date, input.targetContext));
       nextContactDate = addDaysIso(date, 2);
     }
 
@@ -290,7 +299,7 @@ function buildFixtureWorkoutDays(input: {
     }
     days.set(
       firstLongRunDate,
-      buildAdaptationLongRunFixtureDay(firstLongRunDate, input.acceptedHeartRateAvailable),
+      buildAdaptationLongRunFixtureDay(firstLongRunDate, input.targetContext),
     );
 
     const qualityDate = findSchedulableFixtureDate({
@@ -303,7 +312,7 @@ function buildFixtureWorkoutDays(input: {
         input.fixtureScenario === NON_REPEAT_TEMPO_FIXTURE_SCENARIO
           ? buildTempoFixtureDay
           : buildRepeatFixtureDay;
-      days.set(qualityDate, buildQuality(qualityDate, input.paceTruthAvailable));
+      days.set(qualityDate, buildQuality(qualityDate, input.targetContext));
     }
   } else {
     const candidates = [
@@ -312,19 +321,19 @@ function buildFixtureWorkoutDays(input: {
         offset: 2,
         build: (date: string) =>
           input.fixtureScenario === NON_REPEAT_TEMPO_FIXTURE_SCENARIO
-            ? buildTempoFixtureDay(date, input.paceTruthAvailable)
-            : buildRepeatFixtureDay(date, input.paceTruthAvailable),
+            ? buildTempoFixtureDay(date, input.targetContext)
+            : buildRepeatFixtureDay(date, input.targetContext),
       },
       {
         offset: 6,
-        build: (date: string) => buildLongRunFixtureDay(date, input.acceptedHeartRateAvailable),
+        build: (date: string) => buildLongRunFixtureDay(date, input.targetContext),
       },
       { offset: 9, build: buildEasyFixtureDay },
       ...(input.fixtureScenario === NON_REPEAT_TEMPO_FIXTURE_SCENARIO
         ? [
             {
               offset: 16,
-              build: (date: string) => buildRepeatFixtureDay(date, input.paceTruthAvailable),
+              build: (date: string) => buildRepeatFixtureDay(date, input.targetContext),
             },
           ]
         : []),
@@ -338,7 +347,7 @@ function buildFixtureWorkoutDays(input: {
       );
       if (!date || date === input.endpointDate) continue;
       if (!canAddWorkout(days, date, input.maxWorkoutsPerWeek)) continue;
-      days.set(date, candidate.build(date));
+      days.set(date, candidate.build(date, input.targetContext));
     }
   }
 
@@ -368,7 +377,7 @@ function buildFixtureWorkoutDays(input: {
       fixedRestDays: input.fixedRestDays,
     });
     if (finalHorizonDate) {
-      days.set(finalHorizonDate, buildEasyFixtureDay(finalHorizonDate));
+      days.set(finalHorizonDate, buildEasyFixtureDay(finalHorizonDate, input.targetContext));
     }
   }
 
@@ -380,7 +389,7 @@ function findSchedulableFixtureDate(input: {
   endDate: string;
   endpointDate: string;
   days: ReadonlyMap<string, unknown>;
-  maxWorkoutsPerWeek: number;
+  maxWorkoutsPerWeek: number | null;
   fixedRestDays: readonly WeekdayName[];
 }) {
   for (let date = input.candidate; date <= input.endDate; date = addDaysIso(date, 1)) {
@@ -395,25 +404,34 @@ function findSchedulableFixtureDate(input: {
   return null;
 }
 
-function buildEasyFixtureDay(date: string) {
+function buildEasyFixtureDay(date: string, context: ProviderFixtureTargetContext) {
   return workoutDay(date, "easy_aerobic_run", "Easy Run", [
-    unitSection("warmup", "Warm Up", timePrescription(5), effortTarget("Easy gradual movement")),
-    unitSection("main", "Work", timePrescription(25), effortTarget("Conversational easy effort")),
-    unitSection("cooldown", "Cool Down", timePrescription(5), effortTarget("Easy downshift")),
+    unitSection("warmup", "Warm Up", timePrescription(5), paceTarget("7:15-7:45/km", context)),
+    unitSection("main", "Work", timePrescription(25), heartRateTarget("Z2", context)),
+    unitSection("cooldown", "Cool Down", timePrescription(5), paceTarget("7:30-8:00/km", context)),
   ]);
 }
 
-function buildRunWalkFixtureDay(date: string) {
-  return buildRunWalkAdaptationFixtureDay(date, 4);
+function buildRunWalkFixtureDay(date: string, context: ProviderFixtureTargetContext) {
+  return buildRunWalkAdaptationFixtureDay(date, 4, context);
 }
 
-function buildProgressedRunWalkFixtureDay(date: string) {
-  return buildRunWalkAdaptationFixtureDay(date, 5);
+function buildProgressedRunWalkFixtureDay(date: string, context: ProviderFixtureTargetContext) {
+  return buildRunWalkAdaptationFixtureDay(date, 5, context);
 }
 
-function buildRunWalkAdaptationFixtureDay(date: string, repeatCount: number) {
+function buildRunWalkAdaptationFixtureDay(
+  date: string,
+  repeatCount: number,
+  context: ProviderFixtureTargetContext,
+) {
   return workoutDay(date, "recovery_jog", "Run/Walk", [
-    unitSection("warmup", "Warm Up Walk", timePrescription(5), effortTarget("Easy walk")),
+    unitSection(
+      "warmup",
+      "Warm Up Walk",
+      timePrescription(5),
+      paceTarget("9:30-11:00/km", context),
+    ),
     {
       kind: "repeat",
       segment_type: "interval_block",
@@ -421,71 +439,85 @@ function buildRunWalkAdaptationFixtureDay(date: string, repeatCount: number) {
       cue: null,
       rounds: repeatCount,
       children: [
-        repeatChild(
-          "run",
-          "Easy Jog",
-          timePrescription(2),
-          runWalkTarget("Conversational easy jog"),
-        ),
-        repeatChild("walk", "Walk", timePrescription(1), runWalkTarget("Relaxed walk")),
+        repeatChild("run", "Easy Jog", timePrescription(2), paceTarget("7:30-8:15/km", context)),
+        repeatChild("walk", "Walk", timePrescription(1), paceTarget("9:30-11:00/km", context)),
       ],
     },
-    unitSection("cooldown", "Cool Down Walk", timePrescription(5), effortTarget("Easy walk")),
+    unitSection(
+      "cooldown",
+      "Cool Down Walk",
+      timePrescription(5),
+      paceTarget("9:30-11:00/km", context),
+    ),
   ]);
 }
 
-function buildAdaptationEasyFixtureDay(date: string) {
+function buildAdaptationEasyFixtureDay(date: string, context: ProviderFixtureTargetContext) {
   return workoutDay(date, "easy_aerobic_run", "Easy", [
-    unitSection("warmup", "Warm Up Walk", timePrescription(5), effortTarget("Easy walk")),
-    unitSection("main", "Work", timePrescription(15), effortTarget("Conversational easy effort")),
-    unitSection("cooldown", "Cool Down Walk", timePrescription(5), effortTarget("Easy walk")),
+    unitSection(
+      "warmup",
+      "Warm Up Walk",
+      timePrescription(5),
+      paceTarget("9:30-11:00/km", context),
+    ),
+    unitSection("main", "Work", timePrescription(15), heartRateTarget("Z2", context)),
+    unitSection(
+      "cooldown",
+      "Cool Down Walk",
+      timePrescription(5),
+      paceTarget("9:30-11:00/km", context),
+    ),
   ]);
 }
 
-function buildRecoveryFixtureDay(date: string) {
+function buildRecoveryFixtureDay(date: string, context: ProviderFixtureTargetContext) {
   return workoutDay(date, "recovery_jog", "Recovery", [
-    unitSection("warmup", "Warm Up Walk", timePrescription(5), effortTarget("Easy walk")),
     unitSection(
-      "recovery_jog",
-      "Work",
-      timePrescription(12),
-      effortTarget("Relaxed recovery effort"),
+      "warmup",
+      "Warm Up Walk",
+      timePrescription(5),
+      paceTarget("9:30-11:00/km", context),
     ),
-    unitSection("cooldown", "Cool Down Walk", timePrescription(5), effortTarget("Easy walk")),
+    unitSection("recovery_jog", "Work", timePrescription(12), heartRateTarget("Z1", context)),
+    unitSection(
+      "cooldown",
+      "Cool Down Walk",
+      timePrescription(5),
+      paceTarget("9:30-11:00/km", context),
+    ),
   ]);
 }
 
-function buildAdaptationLongRunFixtureDay(date: string, acceptedHeartRateAvailable: boolean) {
+function buildAdaptationLongRunFixtureDay(date: string, context: ProviderFixtureTargetContext) {
   return workoutDay(date, "long_aerobic_run", "Long Run", [
-    unitSection("warmup", "Warm Up Walk", timePrescription(5), effortTarget("Easy walk")),
     unitSection(
-      "main",
-      "Work",
-      timePrescription(30),
-      acceptedHeartRateAvailable
-        ? heartRateTarget("Z2")
-        : effortTarget("Conversational easy effort"),
+      "warmup",
+      "Warm Up Walk",
+      timePrescription(5),
+      paceTarget("9:30-11:00/km", context),
     ),
-    unitSection("cooldown", "Cool Down Walk", timePrescription(5), effortTarget("Easy walk")),
+    unitSection("main", "Work", timePrescription(30), heartRateTarget("Z2", context)),
+    hydrationSection(),
+    unitSection(
+      "cooldown",
+      "Cool Down Walk",
+      timePrescription(5),
+      paceTarget("9:30-11:00/km", context),
+    ),
   ]);
 }
 
-function buildTempoFixtureDay(date: string, paceTruthAvailable: boolean) {
+function buildTempoFixtureDay(date: string, context: ProviderFixtureTargetContext) {
   return workoutDay(date, "controlled_tempo_session", "Tempo", [
-    unitSection("warmup", "Warm Up", timePrescription(10), effortTarget("Easy gradual movement")),
-    unitSection(
-      "tempo_block",
-      "Work",
-      timePrescription(20),
-      paceTruthAvailable ? paceTarget("4:50-5:00/km") : effortTarget("Controlled tempo effort"),
-    ),
-    unitSection("cooldown", "Cool Down", timePrescription(10), effortTarget("Easy downshift")),
+    unitSection("warmup", "Warm Up", timePrescription(10), paceTarget("7:00-7:30/km", context)),
+    unitSection("tempo_block", "Work", timePrescription(20), paceTarget("4:50-5:00/km", context)),
+    unitSection("cooldown", "Cool Down", timePrescription(10), paceTarget("7:15-7:45/km", context)),
   ]);
 }
 
-function buildRepeatFixtureDay(date: string, paceTruthAvailable: boolean) {
+function buildRepeatFixtureDay(date: string, context: ProviderFixtureTargetContext) {
   return workoutDay(date, "controlled_tempo_session", "Tempo", [
-    unitSection("warmup", "Warm Up", timePrescription(10), effortTarget("Easy gradual movement")),
+    unitSection("warmup", "Warm Up", timePrescription(10), paceTarget("7:00-7:30/km", context)),
     {
       kind: "repeat",
       segment_type: "interval_block",
@@ -493,35 +525,33 @@ function buildRepeatFixtureDay(date: string, paceTruthAvailable: boolean) {
       cue: null,
       rounds: 3,
       children: [
+        repeatChild("work", "Work", timePrescription(2), paceTarget("4:45-4:55/km", context)),
         repeatChild(
-          "work",
-          "Work",
-          timePrescription(2),
-          paceTruthAvailable ? paceTarget("4:45-4:55/km") : effortTarget("Controlled hard"),
+          "recover",
+          "Recovery",
+          timePrescription(1.5),
+          paceTarget("7:15-8:00/km", context),
         ),
-        repeatChild("recover", "Recovery", timePrescription(1.5), effortTarget("Easy")),
       ],
     },
-    unitSection("cooldown", "Cool Down", timePrescription(10), effortTarget("Easy downshift")),
+    unitSection("cooldown", "Cool Down", timePrescription(10), paceTarget("7:15-7:45/km", context)),
   ]);
 }
 
-function buildLongRunFixtureDay(date: string, acceptedHeartRateAvailable: boolean) {
+function buildLongRunFixtureDay(date: string, context: ProviderFixtureTargetContext) {
   return workoutDay(date, "long_aerobic_run", "Long Run", [
-    unitSection("warmup", "Warm Up", timePrescription(10), effortTarget("Easy gradual movement")),
-    unitSection(
-      "main",
-      "Work",
-      timePrescription(40),
-      acceptedHeartRateAvailable
-        ? heartRateTarget("Z2")
-        : effortTarget("Conversational aerobic effort"),
-    ),
-    unitSection("cooldown", "Cool Down", timePrescription(5), effortTarget("Easy downshift")),
+    unitSection("warmup", "Warm Up", timePrescription(10), paceTarget("7:00-7:30/km", context)),
+    unitSection("main", "Work", timePrescription(40), heartRateTarget("Z2", context)),
+    hydrationSection(),
+    unitSection("cooldown", "Cool Down", timePrescription(5), paceTarget("7:15-7:45/km", context)),
   ]);
 }
 
-function buildEndpointFixtureDay(date: string, distanceMeters: number) {
+function buildEndpointFixtureDay(
+  date: string,
+  distanceMeters: number,
+  context: ProviderFixtureTargetContext,
+) {
   return {
     date,
     phase: "Training plan",
@@ -533,7 +563,7 @@ function buildEndpointFixtureDay(date: string, distanceMeters: number) {
         "main",
         "Work",
         distancePrescription(distanceMeters / 1000),
-        effortTarget("Selected-distance effort"),
+        paceTarget("5:30-5:45/km", context),
       ),
     ],
   };
@@ -586,33 +616,30 @@ function repeatChild(
   };
 }
 
-function paceTarget(pace: string): ProviderFixtureTarget {
+function paceTarget(pace: string, _context: ProviderFixtureTargetContext): ProviderFixtureTarget {
   return {
     primary_execution_mode: "pace",
     command: pace,
   };
 }
 
-function effortTarget(effort: string): ProviderFixtureTarget {
-  return {
-    primary_execution_mode: "effort",
-    command: effort,
-  };
-}
-
 function heartRateTarget(
-  reference: Extract<ProviderFixtureTarget, { primary_execution_mode: "heart_rate" }>["command"],
+  reference: "Z1" | "Z2" | "Z3" | "Z4" | "Z5",
+  context: ProviderFixtureTargetContext,
 ): ProviderFixtureTarget {
+  const guidance = resolveEffectiveHeartRateGuidance(context.heartRateProfile, reference);
+  if (!guidance) throw new Error(`Fixture heart-rate reference ${reference} is unavailable.`);
   return {
     primary_execution_mode: "heart_rate",
-    command: reference,
+    command: guidance.rangeBpm,
   };
 }
 
-function runWalkTarget(effort: string): ProviderFixtureTarget {
+function hydrationSection(): ProviderFixtureSection {
   return {
-    primary_execution_mode: "run_walk",
-    command: effort,
+    kind: "hydration",
+    label: AI_AUTHORED_PLAN_FIRST_HYDRATION_LABEL,
+    cue: AI_AUTHORED_PLAN_FIRST_HYDRATION_CUE,
   };
 }
 
@@ -627,8 +654,10 @@ function distancePrescription(distanceKm: number) {
 function canAddWorkout(
   days: ReadonlyMap<string, unknown>,
   date: string,
-  maxWorkoutsPerWeek: number,
+  maxWorkoutsPerWeek: number | null,
 ) {
+  if (maxWorkoutsPerWeek == null) return true;
+
   const weekStart = startOfWeekIso(date);
   return (
     [...days.keys()].filter((candidateDate) => startOfWeekIso(candidateDate) === weekStart).length <

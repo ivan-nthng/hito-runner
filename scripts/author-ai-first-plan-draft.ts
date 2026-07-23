@@ -179,7 +179,7 @@ function buildPlanFirstProof(
       total + workout.segments.filter((segment) => segment.prescription.mode === "repeats").length,
     0,
   );
-  const serialized = JSON.stringify(plan);
+  const targetProof = buildExecutionTargetProof(plan);
   const issues: string[] = [];
 
   if (plan.source_kind !== AI_AUTHORED_PLAN_FIRST_SOURCE_KIND) {
@@ -203,6 +203,20 @@ function buildPlanFirstProof(
   if (repeatCount <= 0) {
     issues.push("No ordered repeat structures survived compilation.");
   }
+  if (targetProof.runnableLeafCount <= 0) {
+    issues.push("No runnable leaves survived compilation.");
+  }
+  if (targetProof.invalidRunnableLeafCount > 0) {
+    issues.push(
+      `${targetProof.invalidRunnableLeafCount} runnable leaves lack one exclusive numeric pace or BPM target.`,
+    );
+  }
+  if (targetProof.targetedRepeatParentCount > 0) {
+    issues.push(`${targetProof.targetedRepeatParentCount} Repeat parents own executable targets.`);
+  }
+  if (targetProof.invalidHydrationCount > 0) {
+    issues.push(`${targetProof.invalidHydrationCount} Hydration steps own executable truth.`);
+  }
   return {
     ok: issues.length === 0,
     issues,
@@ -216,6 +230,63 @@ function buildPlanFirstProof(
         }
       : null,
     repeatCount,
+    ...targetProof,
+  };
+}
+
+function buildExecutionTargetProof(plan: Parameters<typeof buildPlanFirstProof>[0]) {
+  let runnableLeafCount = 0;
+  let paceLeafCount = 0;
+  let heartRateLeafCount = 0;
+  let invalidRunnableLeafCount = 0;
+  let targetedRepeatParentCount = 0;
+  let hydrationCount = 0;
+  let invalidHydrationCount = 0;
+
+  const inspectTarget = (target: Record<string, unknown> | undefined) => {
+    runnableLeafCount += 1;
+    const mode = target?.primary_execution_mode;
+    const pace = typeof target?.pace === "string" && target.pace.length > 0;
+    const bpm = typeof target?.hr_bpm_range === "string" && target.hr_bpm_range.length > 0;
+    const valid = (mode === "pace" && pace && !bpm) || (mode === "heart_rate" && bpm && !pace);
+
+    if (!valid) {
+      invalidRunnableLeafCount += 1;
+      return;
+    }
+    if (mode === "pace") paceLeafCount += 1;
+    if (mode === "heart_rate") heartRateLeafCount += 1;
+  };
+
+  for (const workout of plan.planned_workouts) {
+    for (const segment of workout.segments) {
+      if (segment.segment_type === "rest") continue;
+      if (segment.segment_type === "fueling") {
+        hydrationCount += 1;
+        if (segment.prescription.mode !== "none" || segment.target || segment.recovery_target) {
+          invalidHydrationCount += 1;
+        }
+        continue;
+      }
+      if (segment.prescription.mode === "repeats") {
+        if (segment.target || segment.recovery_target) targetedRepeatParentCount += 1;
+        for (const child of segment.prescription.children ?? []) {
+          inspectTarget(child.target as Record<string, unknown> | undefined);
+        }
+        continue;
+      }
+      inspectTarget(segment.target as Record<string, unknown> | undefined);
+    }
+  }
+
+  return {
+    runnableLeafCount,
+    paceLeafCount,
+    heartRateLeafCount,
+    invalidRunnableLeafCount,
+    targetedRepeatParentCount,
+    hydrationCount,
+    invalidHydrationCount,
   };
 }
 

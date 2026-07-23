@@ -7,7 +7,10 @@ import type {
   ManualWorkoutTargetTruthMode,
 } from "@/lib/manual-workout-authoring/schema";
 import type { StepTarget } from "@/lib/training";
-import { AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE } from "@/lib/workout-document";
+import {
+  AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
+  type AiAuthoredPaceProvenance,
+} from "@/lib/workout-document";
 
 const USER_ENTERED_TARGET_SOURCE = "user_entered" as const;
 const USER_ENTERED_SOURCE_ALIASES = new Set<ManualWorkoutTargetSource>([
@@ -71,6 +74,7 @@ export type ResolvedManualWorkoutTarget =
         min: number;
         max: number;
       };
+      paceProvenance?: AiAuthoredPaceProvenance;
     }
   | {
       kind: "heart_rate";
@@ -244,6 +248,7 @@ export function resolveManualWorkoutTargetInput(
           source: AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
           ...shared,
           pace: target.pace,
+          ...(target.paceProvenance ? { paceProvenance: target.paceProvenance } : {}),
         },
       };
     }
@@ -257,6 +262,7 @@ export function resolveManualWorkoutTargetInput(
           source: AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
           ...shared,
           paceMinPerKmRange: target.paceMinPerKmRange,
+          ...(target.paceProvenance ? { paceProvenance: target.paceProvenance } : {}),
         },
       };
     }
@@ -408,6 +414,29 @@ export function manualWorkoutTargetToStepTarget(
 
   const hint =
     resolved.hint ?? (resolved.source === USER_ENTERED_TARGET_SOURCE ? fallbackHint : undefined);
+  const targetExtra = {
+    ...(resolved.kind === "pace" && resolved.paceProvenance
+      ? { pace_provenance: resolved.paceProvenance }
+      : {}),
+    ...("hrZone" in resolved && resolved.hrZone
+      ? {
+          hr_zone: resolved.hrZone,
+          hr_zone_reference:
+            "hrZoneReference" in resolved && resolved.hrZoneReference
+              ? resolved.hrZoneReference
+              : resolved.hrZone,
+          ...("hrProfileSource" in resolved && resolved.hrProfileSource
+            ? { hr_profile_source: resolved.hrProfileSource }
+            : {}),
+          ...("hrTargetSource" in resolved && resolved.hrTargetSource
+            ? {
+                hr_profile_source:
+                  resolved.hrTargetSource === "personal_hr_zone" ? "personal" : "estimated",
+              }
+            : {}),
+        }
+      : {}),
+  };
   const base: StepTarget = {
     primary_execution_mode: resolved.primaryExecutionMode,
     target_source: resolved.source,
@@ -415,26 +444,7 @@ export function manualWorkoutTargetToStepTarget(
     ...(resolved.label ? { label: resolved.label } : {}),
     ...(resolved.sourceNote ? { source_note: resolved.sourceNote } : {}),
     ...(resolved.cue ? { cue: resolved.cue } : {}),
-    ...("hrZone" in resolved && resolved.hrZone
-      ? {
-          extra: {
-            hr_zone: resolved.hrZone,
-            hr_zone_reference:
-              "hrZoneReference" in resolved && resolved.hrZoneReference
-                ? resolved.hrZoneReference
-                : resolved.hrZone,
-            ...("hrProfileSource" in resolved && resolved.hrProfileSource
-              ? { hr_profile_source: resolved.hrProfileSource }
-              : {}),
-            ...("hrTargetSource" in resolved && resolved.hrTargetSource
-              ? {
-                  hr_profile_source:
-                    resolved.hrTargetSource === "personal_hr_zone" ? "personal" : "estimated",
-                }
-              : {}),
-          },
-        }
-      : {}),
+    ...(Object.keys(targetExtra).length > 0 ? { extra: targetExtra } : {}),
     ...("hrTargetSource" in resolved && resolved.hrTargetSource
       ? { hr_target_source: resolved.hrTargetSource }
       : {}),

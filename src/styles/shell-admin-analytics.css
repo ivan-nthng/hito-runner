@@ -19,6 +19,7 @@
   }
 
   .hito-shell-nav-row {
+    --hito-typography-role: nav-menu;
     display: flex;
     min-height: 2.5rem;
     align-items: center;
@@ -74,6 +75,7 @@
   }
 
   .hito-shell-mobile-row {
+    --hito-typography-role: nav-menu;
     display: grid;
     min-width: 0;
     justify-items: center;
@@ -260,6 +262,7 @@
   }
 
   .hito-shell-menu-item {
+    --hito-typography-role: nav-menu;
     min-height: 2rem;
     border-radius: var(--radius-md);
     padding: 0.45rem 0.5rem;
@@ -270,6 +273,7 @@
   }
 
   .hito-nav-text {
+    --hito-typography-role: nav-menu;
     font-size: 0.875rem;
     font-weight: 500;
     line-height: 1;
@@ -277,6 +281,7 @@
   }
 
   .hito-menu-text {
+    --hito-typography-role: nav-menu;
     font-size: 0.8125rem;
     font-weight: 500;
     line-height: 1.3;
@@ -300,6 +305,7 @@
   }
 
   .hito-shell-theme-menu-item {
+    --hito-typography-role: nav-menu;
     min-height: 2rem;
     border-radius: var(--radius-md);
     padding: 0.45rem 0.5rem 0.45rem 1.95rem;
@@ -340,6 +346,7 @@
   }
 
   .hito-metric-value {
+    --hito-typography-role: metric;
     min-width: 0;
     max-width: 100%;
     font-family: var(--font-mono);
@@ -937,6 +944,7 @@
   }
 
   .hito-status-pill {
+    --hito-typography-role: status;
     display: inline-flex;
     align-items: center;
     flex-shrink: 0;

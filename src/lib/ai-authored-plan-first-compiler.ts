@@ -1,6 +1,10 @@
 import {
   AI_AUTHORED_PLAN_FIRST_ENDPOINT_IDENTITY,
+  AI_AUTHORED_PLAN_FIRST_HYDRATION_CUE,
+  AI_AUTHORED_PLAN_FIRST_HYDRATION_LABEL,
+  AI_AUTHORED_PLAN_FIRST_HR_ZONE_REFERENCE_VALUES,
   aiAuthoredPlanFirstProviderDraftSchema,
+  resolveAiAuthoredPaceProvenance,
   type AiAuthoredPlanFirstProviderDraft,
   type AiAuthoredPlanFirstProviderStep,
   type AiAuthoredPlanFirstProviderUnit,
@@ -152,11 +156,12 @@ function normalizeProviderDraft({
     authoredContactsByWeek.set(weekNumber, (authoredContactsByWeek.get(weekNumber) ?? 0) + 1);
   }
   for (const [weekNumber, contactCount] of authoredContactsByWeek) {
-    if (contactCount > authoringInput.availability.maxRunningDaysPerWeek) {
+    const maxRunningDaysPerWeek = authoringInput.availability.maxRunningDaysPerWeek;
+    if (maxRunningDaysPerWeek != null && contactCount > maxRunningDaysPerWeek) {
       issues.push({
         code: "ai_authored_plan_first_availability_ceiling_exceeded",
         path: `weeks.${weekNumber}`,
-        message: `Week ${weekNumber} has ${contactCount} workouts but the runner allows at most ${authoringInput.availability.maxRunningDaysPerWeek}.`,
+        message: `Week ${weekNumber} has ${contactCount} workouts but the runner allows at most ${maxRunningDaysPerWeek}.`,
       });
     }
   }
@@ -175,19 +180,6 @@ function normalizeProviderDraft({
       code: "ai_authored_plan_first_horizon_out_of_range",
       path: "endpoint.date",
       message: "Provider draft exceeds the canonical 52-week plan horizon.",
-    });
-  }
-
-  const lastAuthoredWorkout = providerResult.data.workouts
-    .slice()
-    .sort((left, right) => left.date.localeCompare(right.date))
-    .at(-1);
-  if (!lastAuthoredWorkout || diffDaysIso(endDate, lastAuthoredWorkout.date) > 14) {
-    issues.push({
-      code: "ai_authored_plan_first_incomplete_horizon",
-      path: "workouts",
-      message:
-        "Provider draft must include a non-endpoint workout in the final 14 calendar days before endpoint.",
     });
   }
 
@@ -212,7 +204,8 @@ function compileProviderDraft({
   authoringInput: StructuredAuthoringInput;
   issues: CompilerIssue[];
 }): TrainingPlanV2 {
-  const restDays = uniqueWeekdays(authoringInput.availability.fixedRestDays);
+  const fixedRestDays = authoringInput.availability.fixedRestDays;
+  const restDays = uniqueWeekdays(fixedRestDays ?? []);
   const weekOneStart = startOfWeekIso(authoringInput.schedule.startDate);
   const targetDate = draft.endpoint.date;
   const authoredDays = new Map<string, AiAuthoredPlanFirstProviderWorkout>();
@@ -263,24 +256,6 @@ function compileProviderDraft({
   );
   const goalLabel = requireSelectedDistance(authoringInput).label;
   const preferredLongRunDay = authoringInput.availability.preferredLongRunDay ?? undefined;
-  const authoredRunningDays = uniqueWeekdays(
-    workouts
-      .filter((workout) => workout.workout_type !== "rest")
-      .map((workout) => workout.weekday as WeekdayName),
-  );
-  const authoredRunningDaysPerWeek = Math.max(
-    1,
-    ...Array.from(
-      workouts
-        .filter((workout) => workout.workout_type !== "rest")
-        .reduce((counts, workout) => {
-          counts.set(workout.week_number, (counts.get(workout.week_number) ?? 0) + 1);
-          return counts;
-        }, new Map<number, number>())
-        .values(),
-    ),
-  );
-
   return {
     schema_version: FUTURE_TEMPLATE_VERSION,
     plan_id: `ai-authored-plan-first-${slugify(goalLabel)}-${firstDate}`,
@@ -313,15 +288,13 @@ function compileProviderDraft({
     preparation_horizon_weeks: preparationHorizonWeeks,
     target_date: targetDate,
     plan_preferences: {
-      preferred_running_days: authoredRunningDays,
-      blocked_days: restDays,
+      ...(fixedRestDays ? { blocked_days: restDays } : {}),
       ...(preferredLongRunDay ? { preferred_long_run_day: preferredLongRunDay } : {}),
-      max_running_days_per_week: authoringInput.availability.maxRunningDaysPerWeek,
-    },
-    training_constraints: {
-      running_days_per_week: authoredRunningDaysPerWeek,
-      full_rest_days: restDays,
-      ...(preferredLongRunDay ? { long_run_day: preferredLongRunDay } : {}),
+      ...(authoringInput.availability.maxRunningDaysPerWeek != null
+        ? {
+            max_running_days_per_week: authoringInput.availability.maxRunningDaysPerWeek,
+          }
+        : {}),
     },
     planned_workouts: workouts,
   };
@@ -355,6 +328,13 @@ function buildWorkout({
       issues,
     }),
   );
+  if (!segments.some((segment) => segment.segment_type !== "fueling")) {
+    issues.push({
+      code: "ai_authored_plan_first_hydration_without_runnable_step",
+      path: `${date}.sections`,
+      message: "Hydration cannot be the only step in a generated workout.",
+    });
+  }
   const workoutIdentity = day.workout_identity;
   const workoutFamily = familyForIdentity(workoutIdentity);
   const metricMode = toCanonicalMetricModeJson(deriveCanonicalMetricMode(segments));
@@ -416,6 +396,18 @@ function buildSegment({
   issues: CompilerIssue[];
 }): TrainingPlanV2["planned_workouts"][number]["segments"][number] {
   const path = `${date}.sections.${sequence - 1}`;
+
+  if (section.kind === "hydration") {
+    return {
+      segment_id: `ai-plan-first-${date}-segment-${sequence}`,
+      segment_type: "fueling",
+      label: AI_AUTHORED_PLAN_FIRST_HYDRATION_LABEL,
+      sequence,
+      guidance: AI_AUTHORED_PLAN_FIRST_HYDRATION_CUE,
+      prescription: { mode: "none" },
+    };
+  }
+
   const label = resolveRunnerFacingHeartRateReferences(
     section.label,
     `${path}.label`,
@@ -502,26 +494,23 @@ function buildTarget(
   authoringInput: StructuredAuthoringInput,
   issues: CompilerIssue[],
 ): TrainingPlanTarget | undefined {
+  const paceProvenance = resolveAiAuthoredPaceProvenance(authoringInput);
   const target: TrainingPlanTarget = {
     primary_execution_mode: value.primary_execution_mode,
     target_source: AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
     hr_target_source: "effort_only",
     source_note: "Target from the created plan.",
     ...(value.primary_execution_mode === "pace" ? { pace: value.command } : {}),
-    ...(value.primary_execution_mode === "effort" || value.primary_execution_mode === "run_walk"
-      ? { intensity: value.command }
-      : {}),
   };
 
-  if (value.primary_execution_mode === "pace" && !authoringInput.runnerFacts.benchmark) {
-    issues.push({
-      code: "ai_authored_plan_first_pace_primary_truth_missing",
-      path,
-      message: "Pace-primary execution requires explicit validated runner benchmark truth.",
-    });
-  }
-
-  if (value.primary_execution_mode !== "heart_rate") {
+  if (value.primary_execution_mode === "pace") {
+    target.source_note =
+      paceProvenance === "benchmark_backed"
+        ? "AI-authored pace informed by the runner benchmark."
+        : paceProvenance === "goal_informed_ai_estimate"
+          ? "AI-estimated pace informed by the selected goal; no runner benchmark supplied."
+          : "AI-estimated pace; no runner benchmark supplied.";
+    target.extra = { pace_provenance: paceProvenance };
     return target;
   }
 
@@ -535,18 +524,20 @@ function buildTarget(
     return target;
   }
 
-  const resolvedGuidance = resolveEffectiveHeartRateGuidance(effectiveProfile, value.command);
+  const resolvedGuidance = AI_AUTHORED_PLAN_FIRST_HR_ZONE_REFERENCE_VALUES.map((reference) =>
+    resolveEffectiveHeartRateGuidance(effectiveProfile, reference),
+  ).find((guidance) => guidance?.rangeBpm === value.command);
 
   if (!resolvedGuidance) {
     issues.push({
       code: "ai_authored_plan_first_hr_zone_reference_invalid",
       path,
-      message: `Heart-rate reference ${value.command} is not available in the runner profile.`,
+      message: `Heart-rate command ${value.command} is not available in the accepted runner profile snapshot.`,
     });
     return target;
   }
 
-  target.hr_bpm_range = resolvedGuidance.rangeBpm;
+  target.hr_bpm_range = value.command;
   target.hr_bpm_min = resolvedGuidance.minBpm;
   target.hr_bpm_max = resolvedGuidance.maxBpm;
   target.hr_target_source =

@@ -190,6 +190,64 @@ save/reload boundary, accessibility, runtime health, and disposable cleanup. Evi
 This checkpoint does not change the separate backend-owned Settings bounds hold above. Global QA
 remains a later release-level gate.
 
+## 2026-07-22 Visual Catalog Reconciliation Checkpoint
+
+The current shared UI source was classified into canonical visual primitives, reusable behavior or
+pattern owners, and intentional utility/devtool exclusions. All 26 owners in `src/components/ui`
+now have either a live `/hitoDS` home or an explicit source-backed exclusion; shared owners outside
+that folder retain their existing component, pattern, or domain workbench homes.
+
+The existing catalog remains the only visual source of truth. Components now exposes a compact
+nested-owner index plus a standalone, navigable Editable Value Field specimen. Patterns exposes
+live Skeleton and Tooltip destinations. The Figma export wording matches the current compact `SM`
+Editable Value Field anatomy. Value Tag is explicitly documented as a Local Inspector/palette audit
+owner rather than promoted into the product component catalog. Inspector reference metadata remains
+a deliberately small positive allowlist and is not a universal registry.
+
+Independent browser acceptance passed in light and dark desktop and exact `375x812`, including
+catalog navigation, deep links, live specimens, mobile jump navigation, focus, runtime health,
+targeted lint, production build, and build integrity. Native Safari confirmed Tooltip keyboard
+behavior; an automation-only false failure did not result in a new shared lifecycle. Evidence lives
+in `qa-artifacts/screenshots/2026-07-22/hito-ds-visual-catalog-reconciliation/qa-report.md`.
+
+This checkpoint changes no runner-facing behavior and does not promote workout, calendar, timeline,
+manual-authoring, or other domain geometry into generic primitives. Global QA remains a separate
+later gate, and the parent plan remains active for its independent Settings-bounds and external
+reuse/distribution decisions.
+
+## 2026-07-22 Typography Provenance Contract
+
+`src/lib/hito-typography-roles.ts` remains the single role inventory consumed by the live
+`/hitoDS` catalog, Figma/reference output, and the local Inspector. Each canonical role must be
+declared by its actual Hito typography owner through one inherited CSS custom-property signal whose
+value is the stable role id from that inventory. A descendant therefore resolves the nearest active
+Hito role without requiring route-local attributes or duplicated JSX metadata; a nested canonical
+role overrides its ancestor through the normal cascade.
+
+Inspector recognition and Inspector replacement choices are separate concerns. Every canonical
+role may be positively recognized, including component-owned Button, Nav/Menu, Metric, Status, and
+Error/Success roles, while the replacement menu may remain limited to the safe selectable text-role
+subset. A matching font family, size, weight, line height, or class-name shape is not provenance and
+must not confirm DS ownership. When no inherited provenance signal is present, Inspector reports
+`Custom` and retains the observed computed typography as evidence rather than discarding it.
+
+This contract changes no typography recipe, copy, responsive behavior, product state, or domain
+geometry. Intentional domain-specific or route-local typography remains unresolved until it is
+deliberately adopted by a canonical role; it must not be relabelled merely to make the audit green.
+Task-level acceptance requires source parity across every role owner plus browser proof for direct,
+nested/inherited, nested-override, responsive, component-owned, and unresolved negative cases on
+desktop and exact `375px`. Global QA remains a separate release-level gate.
+
+The contract is implemented across all 19 canonical roles while the Inspector replacement menu
+remains the existing 14-role safe subset. The former computed-value matcher and its role metadata
+were removed. `/hitoDS` now carries one compact provenance proof for inherited, nested-override,
+and unresolved-lookalike behavior without creating another specimen system. Independent task-level
+QA passed in light and dark themes on desktop and exact `375x812`, including the negative `Custom`
+discriminator, responsive role identity, component-role readback, keyboard focus, overflow, runtime
+health, build integrity, and a runner-facing login consumer. Evidence lives in
+`qa-artifacts/screenshots/2026-07-22/hito-typography-provenance-qa/qa-report.md`. Implementation DoD is
+passed; Global QA remains pending.
+
 ## Product Decision
 
 Adopt the useful operating ideas from mature external systems without copying their visual language

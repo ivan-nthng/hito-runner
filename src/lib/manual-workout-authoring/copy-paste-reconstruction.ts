@@ -37,6 +37,7 @@ import {
 } from "@/lib/training";
 import {
   AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
+  AI_AUTHORED_PACE_PROVENANCE_VALUES,
   readWorkoutDocumentSections,
   workoutDocumentRepeatChildren,
 } from "@/lib/workout-document";
@@ -616,6 +617,9 @@ function sanitizeStepTarget(target: StepTarget | undefined): ManualWorkoutBlockI
     MANUAL_DRAFT_TARGET_TEXT_MAX_LENGTH,
   );
   const pace = normalizeManualDraftText(target.pace, MANUAL_DRAFT_TARGET_TEXT_MAX_LENGTH);
+  const paceProvenance = AI_AUTHORED_PACE_PROVENANCE_VALUES.find(
+    (candidate) => target.extra?.pace_provenance === candidate,
+  );
   const hrBpmRange = normalizeManualDraftText(
     target.hr_bpm_range,
     MANUAL_DRAFT_TARGET_TEXT_MAX_LENGTH,
@@ -678,6 +682,7 @@ function sanitizeStepTarget(target: StepTarget | undefined): ManualWorkoutBlockI
           paceTargetSource: targetSource,
         }
       : {}),
+    ...(isAiAuthoredTarget && paceProvenance ? { paceProvenance } : {}),
     ...(isAiAuthoredTarget && hrZone ? { hrZone } : {}),
     ...(isAiAuthoredTarget && hrZoneReference ? { hrZoneReference } : {}),
     ...(isAiAuthoredTarget && hrProfileSource ? { hrProfileSource } : {}),

@@ -9,6 +9,18 @@ description: Use for Hito backend implementation involving Supabase schema, serv
 
 Implement backend-owned truth safely while preserving Hito's canonical persisted model.
 
+## Evidence And Replay Alignment
+
+`AGENTS.md` sections 2.45 and 2.56 own the shared defect discipline. Establish a source, log,
+database, validator, or safe fixture discriminator before patching. When a deterministic backend
+contract can recur, add a minimized redacted case to the existing validator/test seam and prove it
+fails before the fix and passes after; do not create a replay service, store raw runner/provider
+data, or add a second truth path.
+
+Publish the centralized `Execution preflight` from `AGENTS.md` section 0.1 before the first server,
+schema, validator, or persistence write. The final report must carry its matching closure receipts,
+including any canonical path removed or retained.
+
 ## Required Reading
 
 1. `docs/current-system.md`

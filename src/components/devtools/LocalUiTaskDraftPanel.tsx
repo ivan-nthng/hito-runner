@@ -57,6 +57,7 @@ export function LocalUiTaskDraftPanel({
   onCancel: () => void;
   onSubmit: (result: {
     draft: LocalUiInspectorItemDraft;
+    intent: "add" | "generate";
     payload: InlineChangeTargetPayload;
   }) => void;
   ownership: HitoDsOwnershipEvidence;
@@ -203,9 +204,9 @@ export function LocalUiTaskDraftPanel({
     updateDraft({ componentAction });
   };
 
-  const submit = () => {
+  const submit = (intent: "add" | "generate") => {
     if (submitDisabled) return;
-    onSubmit({ draft, payload });
+    onSubmit({ draft, intent, payload });
   };
 
   return (
@@ -215,7 +216,7 @@ export function LocalUiTaskDraftPanel({
       onKeyDown={(event) => {
         if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
           event.preventDefault();
-          submit();
+          submit("generate");
         }
       }}
     >
@@ -383,18 +384,19 @@ export function LocalUiTaskDraftPanel({
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 border-t border-hairline pt-3">
           <button
             type="button"
-            className="hito-button hito-button-ghost hito-button-sm"
-            onClick={onCancel}
+            className="hito-button hito-button-secondary hito-button-sm"
+            disabled={submitDisabled}
+            onClick={() => submit("add")}
           >
-            Cancel
+            {isEditing ? "Update list" : "Add to list"}
           </button>
           <button
             type="button"
             className="hito-button hito-button-primary hito-button-sm"
             disabled={submitDisabled}
-            onClick={submit}
+            onClick={() => submit("generate")}
           >
-            {isEditing ? "Update item" : "Add item"}
+            Generate prompt
           </button>
         </div>
         <p className="sr-only" aria-live="polite">

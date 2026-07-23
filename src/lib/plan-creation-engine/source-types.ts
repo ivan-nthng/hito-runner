@@ -58,6 +58,9 @@ export interface RunningPlanBenchmarkPaceTruth {
 
 export type RunningPlanSegmentPrescription =
   | {
+      mode: "none";
+    }
+  | {
       mode: "time";
       durationSeconds: RunningPlanRange;
       intensityLabel: string;
@@ -103,6 +106,7 @@ export interface RunningPlanWatchExecutableSegmentTemplate {
     | "work"
     | "recovery"
     | "finish"
+    | "hydration"
     | "cooldown";
   primaryPrescription: RunningPlanSegmentPrescription;
   targetTruthMode: RunningPlanTargetTruthMode;

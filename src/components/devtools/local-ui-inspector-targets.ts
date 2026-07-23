@@ -12,7 +12,12 @@ import type {
   InlineChangeTypographyEvidence,
   InlineChangeTypographyRoleOption,
 } from "@/components/devtools/local-inline-change-target-utils";
-import { HITO_INSPECTOR_TYPOGRAPHY_ROLES } from "@/lib/hito-typography-roles";
+import {
+  HITO_INSPECTOR_TYPOGRAPHY_ROLES,
+  HITO_TYPOGRAPHY_PROVENANCE_PROPERTY,
+  HITO_TYPOGRAPHY_ROLES,
+  type HitoTypographyRole,
+} from "@/lib/hito-typography-roles";
 import { classifyLocalUiTokenEvidence } from "@/components/devtools/local-ui-inspector-token-evidence";
 
 const CONTROL_TAGS = new Set(["button", "a", "input", "textarea", "select"]);
@@ -59,14 +64,22 @@ const HITO_RADIUS_SCALE = [
   ["--radius-4xl", 16],
 ] as const;
 
-export const HITO_TYPOGRAPHY_ROLE_OPTIONS: InlineChangeTypographyRoleOption[] =
-  HITO_INSPECTOR_TYPOGRAPHY_ROLES.map((role) => ({
+function toTypographyRoleOption(role: HitoTypographyRole): InlineChangeTypographyRoleOption {
+  return {
     className: role.className,
     description: role.description,
     id: role.id,
     label: role.label,
     technicalDetails: role.technicalDetails,
-  }));
+  };
+}
+
+const HITO_TYPOGRAPHY_ROLES_BY_ID = new Map(
+  HITO_TYPOGRAPHY_ROLES.map((role) => [role.id, toTypographyRoleOption(role)]),
+);
+
+export const HITO_TYPOGRAPHY_ROLE_OPTIONS: InlineChangeTypographyRoleOption[] =
+  HITO_INSPECTOR_TYPOGRAPHY_ROLES.map(toTypographyRoleOption);
 
 export function inspectLocalUiTarget(
   element: HTMLElement,
@@ -362,15 +375,22 @@ function buildTypographyEvidence(
     .filter((classPart) =>
       HITO_TYPOGRAPHY_ROLE_OPTIONS.some((role) => role.className === classPart),
     );
+  const provenanceRoleId = normalizeCssValue(
+    styles.getPropertyValue(HITO_TYPOGRAPHY_PROVENANCE_PROPERTY),
+  );
+  const currentRole = provenanceRoleId
+    ? (HITO_TYPOGRAPHY_ROLES_BY_ID.get(provenanceRoleId) ?? null)
+    : null;
+  const hasProvenanceText =
+    currentRole != null && normalizeVisibleText(element.textContent || "").length > 0;
   const hasTextSignal =
-    visibleText.length > 0 &&
-    (typographyClasses.length > 0 || HEADING_TAGS.has(tag) || TEXT_TAGS.has(tag));
+    (visibleText.length > 0 || hasProvenanceText) &&
+    (currentRole != null ||
+      typographyClasses.length > 0 ||
+      HEADING_TAGS.has(tag) ||
+      TEXT_TAGS.has(tag));
 
   if (!hasTextSignal) return null;
-
-  const currentRole =
-    HITO_TYPOGRAPHY_ROLE_OPTIONS.find((role) => typographyClasses.includes(role.className)) ??
-    findComputedTypographyRole(styles);
 
   return {
     classNames: typographyClasses,
@@ -385,34 +405,8 @@ function buildTypographyEvidence(
   };
 }
 
-function findComputedTypographyRole(styles: CSSStyleDeclaration) {
-  const fontSizePx = parsePixelValue(styles.fontSize);
-  const lineHeightPx = parsePixelValue(styles.lineHeight);
-  if (fontSizePx == null || lineHeightPx == null) return null;
-
-  return (
-    HITO_INSPECTOR_TYPOGRAPHY_ROLES.find((role) => {
-      const match = role.match;
-      if (!match) return false;
-
-      const letterSpacingPx = parsePixelValue(styles.letterSpacing);
-      const letterSpacingMatches =
-        match.letterSpacingPx == null ||
-        (letterSpacingPx != null && isNear(letterSpacingPx, match.letterSpacingPx));
-
-      return (
-        styles.fontFamily.toLowerCase().includes(match.fontFamilyIncludes.toLowerCase()) &&
-        isNear(fontSizePx, match.fontSizePx) &&
-        styles.fontWeight === match.fontWeight &&
-        isNear(lineHeightPx, match.lineHeightPx) &&
-        letterSpacingMatches
-      );
-    }) ?? null
-  );
-}
-
 function canExposeTypography(targetKind: InlineChangeTargetKind) {
-  return targetKind === "text" || targetKind === "hierarchy";
+  return targetKind === "text" || targetKind === "hierarchy" || targetKind === "control";
 }
 
 function getDirectTextEvidence(element: HTMLElement) {

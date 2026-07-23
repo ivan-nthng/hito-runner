@@ -1,9 +1,10 @@
 import type { CSSProperties } from "react";
 import { WorkoutLibraryPlayground } from "@/components/hito-ds/workout-library-playground";
 import { HitoDsPatternInlineEditing } from "@/components/hito-ds/reference-pattern-inline-editing";
-import { ReferenceListRow, SectionIntro } from "@/components/hito-ds/reference";
+import { ProductLinks, ReferenceListRow, SectionIntro } from "@/components/hito-ds/reference";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { WorkoutGlyph } from "@/components/WorkoutGlyph";
 import { workoutTypeColorVar } from "@/lib/workout-color-tokens";
 import type { WorkoutGlyphKind } from "@/lib/workout-glyph";
@@ -61,6 +62,24 @@ const CALENDAR_TYPE_EXAMPLES: ReadonlyArray<{
 export function HitoDsPatternsPage() {
   return (
     <>
+      <section className="hito-reference-note" aria-labelledby="nested-pattern-index-title">
+        <p className="hito-label hito-label-signal">On this page</p>
+        <h2 id="nested-pattern-index-title" className="hito-section-title mt-3">
+          Nested shared state owners.
+        </h2>
+        <p className="hito-support-copy mt-3 max-w-2xl">
+          Skeleton and Tooltip are live owners inside the broader States grammar. These links land
+          on their actual specimens.
+        </p>
+        <div className="hito-list-row-copy mt-4">
+          <ProductLinks
+            links={[
+              { href: "#skeleton", label: "Skeleton" },
+              { href: "#tooltip", label: "Tooltip" },
+            ]}
+          />
+        </div>
+      </section>
       <HitoDsPatternInlineEditing />
       <section id="editorial-patterns" className="ds-section">
         <SectionIntro
@@ -207,8 +226,8 @@ export function HitoDsPatternsPage() {
             ))}
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
-            <article className="hito-state-surface" aria-busy="true">
-              <p className="hito-label">Loading</p>
+            <article id="skeleton" className="hito-state-surface" aria-busy="true">
+              <p className="hito-label">Skeleton / loading</p>
               <h3 className="hito-section-title mt-3 flex items-center gap-2">
                 <Icon name="loader" size="sm" className="animate-spin text-muted-foreground" />
                 Loading your plan.
@@ -305,27 +324,41 @@ export function HitoDsPatternsPage() {
             </div>
           </article>
         </div>
-        <div className="mt-5 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <div id="tooltip" className="mt-5 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
           <article className="hito-row-group">
             <div className="hito-list-row items-start">
               <div>
-                <p className="hito-label">Tooltip shell</p>
+                <p className="hito-label">Tooltip</p>
                 <p className="hito-list-row-copy">
-                  Used for calendar and workout-structure hover context. Chart geometry stays
-                  route-owned.
+                  Hover or focus the live trigger. Shared tooltip behavior owns short contextual
+                  hints; chart geometry stays route-owned.
                 </p>
               </div>
             </div>
           </article>
-          <div className="hito-tooltip">
-            <span className="flex items-center gap-2">
-              <span className="hito-tooltip-dot text-signal" />
-              <span className="hito-tooltip-title">Warm-up</span>
-            </span>
-            <span className="hito-tooltip-meta mt-1 block font-mono-num">10 min</span>
-            <span className="hito-tooltip-meta mt-1.5 block">
-              Short, scoped context only. No coaching wall.
-            </span>
+          <div className="flex items-start">
+            <TooltipProvider delayDuration={120}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className="hito-button hito-button-secondary hito-button-md"
+                  >
+                    Hover or focus for context
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent sideOffset={8}>
+                  <span className="flex items-center gap-2">
+                    <span className="hito-tooltip-dot text-signal" />
+                    <span className="hito-tooltip-title">Warm-up</span>
+                  </span>
+                  <span className="hito-tooltip-meta mt-1 block font-mono-num">10 min</span>
+                  <span className="hito-tooltip-meta mt-1.5 block">
+                    Short, scoped context only. No coaching wall.
+                  </span>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
         <div className="mt-5 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">

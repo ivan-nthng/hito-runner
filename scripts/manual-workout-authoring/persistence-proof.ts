@@ -1554,10 +1554,13 @@ async function validateCanonicalOriginWorkoutEditPersistence(input: {
       assert.equal(edit.editedWorkout.id, edit.sourceWorkout.id);
       assert.equal(edit.editedWorkout.title, edit.editedDraftInput.title);
       assert.deepEqual(
-        findAiAuthoredPaceTarget(edit.editedWorkout.steps),
-        findAiAuthoredPaceTarget(edit.sourceWorkout.steps),
+        findAiAuthoredPaceTarget(edit.editedWorkout.steps, "4:50-5:00/km"),
+        findAiAuthoredPaceTarget(edit.sourceWorkout.steps, "4:50-5:00/km"),
       );
-      assert.equal(findAiAuthoredPaceTarget(edit.editedWorkout.steps)?.pace, "4:50-5:00/km");
+      assert.equal(
+        findAiAuthoredPaceTarget(edit.editedWorkout.steps, "4:50-5:00/km")?.pace,
+        "4:50-5:00/km",
+      );
       assert.deepEqual(readLatestUserEditProvenance(edit.edited.plan), {
         originalPlanSourceKind: origin.sourceKind,
         originalPlanOriginSourceKind: null,
@@ -1608,7 +1611,8 @@ async function reviewConfirmAndReadPersistedWorkoutEdit(input: {
   const sourceWorkout = input.persisted.workouts.find(
     (workout) =>
       (!input.workoutIdentity || workout.workout_identity === input.workoutIdentity) &&
-      (!input.workoutPace || findAiAuthoredPaceTarget(workout.steps)?.pace === input.workoutPace),
+      (!input.workoutPace ||
+        findAiAuthoredPaceTarget(workout.steps, input.workoutPace)?.pace === input.workoutPace),
   );
   assert.ok(sourceWorkout, "Persisted edit proof requires one planned workout.");
 
@@ -1664,11 +1668,12 @@ async function reviewConfirmAndReadPersistedWorkoutEdit(input: {
   };
 }
 
-function findAiAuthoredPaceTarget(value: unknown) {
+function findAiAuthoredPaceTarget(value: unknown, expectedPace?: string) {
   for (const section of readWorkoutDocumentSections(value)) {
     if (
       section.target?.target_source === AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE &&
-      section.target.pace
+      section.target.pace &&
+      (!expectedPace || section.target.pace === expectedPace)
     ) {
       return section.target;
     }
@@ -1676,7 +1681,8 @@ function findAiAuthoredPaceTarget(value: unknown) {
     for (const child of section.prescription?.children ?? []) {
       if (
         child.target?.target_source === AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE &&
-        child.target.pace
+        child.target.pace &&
+        (!expectedPace || child.target.pace === expectedPace)
       ) {
         return child.target;
       }

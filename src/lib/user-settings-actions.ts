@@ -62,18 +62,6 @@ type SettingsRouteDataDependencies = {
   loadViewer: () => Promise<SettingsViewerSummary>;
 };
 
-const userSettingsInputSchema = z.object({
-  firstName: z.string().trim().max(80).nullable(),
-  lastName: z.string().trim().max(80).nullable(),
-  displayName: z.string().trim().max(120).nullable(),
-  age: z.number().int().min(0).max(120).nullable(),
-  weightKg: z.number().min(0).max(500).nullable(),
-  heightCm: z.number().min(0).max(300).nullable(),
-  fitnessLevel: z.enum(FITNESS_LEVEL_VALUES).optional(),
-  heartRateProfile: personalHeartRateProfileInputSchema.optional(),
-  trainingPreferences: runnerTrainingPreferencesSaveInputSchema.nullable().optional(),
-});
-
 export const runnerBaselineSaveInputSchema = z
   .object({
     age: z.number().int().min(13).max(100),
@@ -85,6 +73,18 @@ export const runnerBaselineSaveInputSchema = z
   .strict();
 
 export type RunnerBaselineSaveInput = z.output<typeof runnerBaselineSaveInputSchema>;
+
+const userSettingsInputSchema = z.object({
+  firstName: z.string().trim().max(80).nullable(),
+  lastName: z.string().trim().max(80).nullable(),
+  displayName: z.string().trim().max(120).nullable(),
+  age: runnerBaselineSaveInputSchema.shape.age.nullable(),
+  weightKg: runnerBaselineSaveInputSchema.shape.weightKg.nullable(),
+  heightCm: runnerBaselineSaveInputSchema.shape.heightCm.nullable(),
+  fitnessLevel: z.enum(FITNESS_LEVEL_VALUES).optional(),
+  heartRateProfile: personalHeartRateProfileInputSchema.optional(),
+  trainingPreferences: runnerTrainingPreferencesSaveInputSchema.nullable().optional(),
+});
 
 type UserSettingsInput = z.output<typeof userSettingsInputSchema>;
 
@@ -192,9 +192,10 @@ export async function getUserSettingsForUserId(
 
 export async function updateUserSettingsForUserId(
   userId: string,
-  data: UserSettingsInput,
+  input: UserSettingsInput,
   email: string | null = null,
 ): Promise<UserSettingsSummary> {
+  const data = userSettingsInputSchema.parse(input);
   const supabase = createAdminSupabaseClient();
   const currentProfile = await getSettingsProfileRow(userId);
   const fitnessLevel = data.fitnessLevel ?? parseFitnessLevel(currentProfile?.fitness_level);

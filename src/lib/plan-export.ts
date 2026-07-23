@@ -19,6 +19,7 @@ import type { CanonicalGoalContext, CanonicalMetricMode } from "@/lib/rich-worko
 import type { PlannedWorkoutLanguageReadModel } from "@/lib/planned-workout-language";
 import { reduceRepeatChildrenToChildFirst } from "@/lib/planned-workout-block-contract";
 import { resolveActivePlanSourceStatus } from "@/lib/active-plan-workout-editing/policy";
+import { parseStoredRunnerTrainingPreferences } from "@/lib/runner-training-preferences";
 import {
   readWorkoutDocumentSections,
   workoutDocumentRepeatChildRoleForSection,
@@ -49,6 +50,11 @@ export interface ActivePlanExportPayload {
     dayCount: number;
     workoutCount: number;
     weeksCount: number;
+  };
+  availability: {
+    fixedRestDays: string[] | null;
+    maxRunningDaysPerWeek: number | null;
+    preferredLongRunDay: string | null;
   };
   workouts: ActivePlanExportWorkout[];
 }
@@ -116,6 +122,7 @@ export function buildActivePlanExportPayload(args: {
       workoutCount: orderedWorkouts.filter((workout) => workout.workoutType !== "rest").length,
       weeksCount: weeks.size,
     },
+    availability: buildExportAvailability(args.planCycle.plan_preferences),
     workouts: orderedWorkouts,
   };
 }
@@ -161,6 +168,16 @@ export function renderPlanExportMarkdown(payload: ActivePlanExportPayload) {
 
   if (payload.plan.targetDate) {
     lines.push(`- Target date: ${formatDate(payload.plan.targetDate)}`);
+  }
+
+  if (payload.availability.maxRunningDaysPerWeek != null) {
+    lines.push(
+      `- Weekly running availability: up to ${payload.availability.maxRunningDaysPerWeek} days`,
+    );
+  }
+
+  if (payload.availability.fixedRestDays?.length) {
+    lines.push(`- Fixed rest days: ${payload.availability.fixedRestDays.join(", ")}`);
   }
 
   lines.push(
@@ -217,6 +234,10 @@ export function renderPlanExportMarkdown(payload: ActivePlanExportPayload) {
 
 export function activePlanExportToTrainingPlanV2(payload: ActivePlanExportPayload) {
   const planDistanceGoal = resolvePlanDistanceGoal(payload.workouts);
+  const hasAvailability =
+    payload.availability.fixedRestDays != null ||
+    payload.availability.maxRunningDaysPerWeek != null ||
+    payload.availability.preferredLongRunDay != null;
 
   return {
     schema_version: "training-plan-v2",
@@ -241,6 +262,23 @@ export function activePlanExportToTrainingPlanV2(payload: ActivePlanExportPayloa
     },
     start_date: payload.plan.effectiveStartDate,
     target_date: payload.plan.targetDate ?? undefined,
+    ...(hasAvailability
+      ? {
+          plan_preferences: {
+            ...(payload.availability.fixedRestDays != null
+              ? { blocked_days: payload.availability.fixedRestDays }
+              : {}),
+            ...(payload.availability.maxRunningDaysPerWeek != null
+              ? {
+                  max_running_days_per_week: payload.availability.maxRunningDaysPerWeek,
+                }
+              : {}),
+            ...(payload.availability.preferredLongRunDay
+              ? { preferred_long_run_day: payload.availability.preferredLongRunDay }
+              : {}),
+          },
+        }
+      : {}),
     planned_workouts: payload.workouts.map((workout) => ({
       workout_id: workout.workoutId,
       date: workout.date,
@@ -262,6 +300,30 @@ export function activePlanExportToTrainingPlanV2(payload: ActivePlanExportPayloa
       segments: workoutToTrainingPlanV2Segments(workout),
     })),
   };
+}
+
+function buildExportAvailability(value: PersistedPlanCycleRow["plan_preferences"]) {
+  const record = asJsonRecord(value);
+  const preferences = parseStoredRunnerTrainingPreferences(value);
+
+  return {
+    fixedRestDays:
+      record && Object.hasOwn(record, "blocked_days") ? (preferences?.blocked_days ?? []) : null,
+    maxRunningDaysPerWeek:
+      record && Object.hasOwn(record, "max_running_days_per_week")
+        ? (preferences?.max_running_days_per_week ?? null)
+        : null,
+    preferredLongRunDay:
+      record && Object.hasOwn(record, "preferred_long_run_day")
+        ? (preferences?.preferred_long_run_day ?? null)
+        : null,
+  };
+}
+
+function asJsonRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 }
 
 function resolvePlanDistanceGoal(workouts: readonly ActivePlanExportWorkout[]) {

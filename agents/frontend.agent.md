@@ -22,37 +22,16 @@ schedule, persistence, AI, backlog, or product truth locally.
 If another project skill matches the task, load it too. `AGENTS.md` remains the global policy source;
 this file is the frontend operating shortcut, not a replacement for project rules.
 
-## Project Skill Map
+## Evidence Alignment
 
-Before starting work, choose every matching project skill from this map. `AGENTS.md` remains the
-canonical source for the project skill list; if this map and `AGENTS.md` disagree, follow
-`AGENTS.md` and update this map as an instruction-layer maintenance task.
+For a reported frontend defect, establish a source, browser/DOM, log, or safe replay artifact before
+changing code. Treat a screenshot as evidence of visible drift, then trace the actual component,
+state, or backend-shaped owner. Add a minimized replay only for deterministic input-to-output logic,
+never as ceremony for a visual preference.
 
-- `skills/hito-frontend-design-system/SKILL.md`
-  Frontend UI, Hito DS, components, layout, dialogs, forms, typography, route surfaces, admin,
-  onboarding, settings, workout detail, Figma/code design-system bridge, or DS consistency.
-- `skills/hito-qa-browser-regression/SKILL.md`
-  QA validation, browser/UI regression, Safari fallback, auth/admin flow checks, frontend
-  verification, source/CLI validator QA, screenshot evidence, and final Passed/Failed verdicts.
-- `skills/hito-plan-writing-and-closeout/SKILL.md`
-  Creating, updating, pausing, closing, archiving, compacting, or changelog-checking active/archive
-  plans.
-- `skills/hito-prompt-handoff/SKILL.md`
-  Next-role prompts, checkpoint continuity, role decomposition, execution handoffs, QA prompts, and
-  routing without making the user relay micro-steps.
-- `skills/hito-architecture-audit/SKILL.md`
-  Architecture audits, ownership/source-of-truth checks, hotspot selection, cleanup checkpoints,
-  product-track prioritization, or deciding whether a structure is coherent before implementation.
-- `skills/hito-backend-supabase-contract/SKILL.md`
-  Backend/Supabase/server-action/auth/admin/import/export/entitlement/integration/AI-context
-  contract work. Frontend uses it to recognize backend-owned boundaries and route correctly, not to
-  self-promote into backend implementation.
-- `skills/hito-backlog-intake/SKILL.md`
-  Capturing bugs, screenshots, unclear feedback, product irritations, or future work into structured
-  backlog items without implementing code.
-- `skills/hito-running-coach-audit/SKILL.md`
-  Training-plan quality, running doctrine, workout diversity, progression, recovery, race
-  specificity, terrain/hill logic, metric realism, and sports-safety guardrail reviews.
+Before the first frontend write, publish the `Execution preflight` required by `AGENTS.md` section
+0.1. A screenshot can start the preflight for visual drift, but it cannot replace the source or
+runtime evidence needed to name the shared component, state, or rendering owner.
 
 ## Startup
 
@@ -284,20 +263,12 @@ Use the standard Implementation Report in `AGENTS.md` for changed files. Include
 - next recommended role
 - blockers
 
-## Definition Of Done, Test Inventory, And Acceptance Gate
+## Frontend Definition Of Done
 
-This gate applies only to implementation, debugging, or validation work. A pure explanatory or
-reference response needs no test inventory. For a debugging task, include a safe repro or
-discriminator that proves the first incorrect frontend owner, not only the post-fix happy path.
-
-Before closing a frontend implementation task, define its observable outcome, preserved boundaries,
-and required validation inventory from the changed interaction, responsive/layout risk, state
-transitions, persistence/readback impact, and accessibility surface. When QA is used, integrate its
-full executed-test list into the final report; do not replace it with a blanket `PASS` claim. List
-every executed command/scenario/viewport as `Check | Scenario / environment | Result | Evidence`,
-plus every required check not run and why. Only then report `Implementation DoD: Passed`; otherwise
-fix-forward and rerun the affected inventory, or return `FAIL`/`BLOCKED`. If broad independent QA is
-outside this task, report `Global QA Acceptance: Pending` rather than claiming release acceptance.
+`AGENTS.md` section 2.4 owns the common Definition of Done and report format. Derive the required
+inventory from the changed interaction, responsive/layout risk, state transitions, accessibility,
+and any persistence/readback boundary. For a defect, include a discriminator that proves the first
+incorrect frontend owner; a post-fix screenshot alone is not sufficient.
 
 ## Prior-Result Response Shape
 

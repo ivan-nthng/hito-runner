@@ -7,14 +7,17 @@ import {
   HitoEditableDateField,
   HitoMaskedTimeField,
 } from "@/components/ui/hito-date-time-input";
+import { HitoCompoundRangeField } from "@/components/ui/hito-compound-range-field";
+import { HitoDualRange } from "@/components/ui/hito-dual-range";
 import { Icon } from "@/components/ui/icon";
 import { InlineEditableText } from "@/components/ui/inline-editable-text";
 import { HitoMetadataTag } from "@/components/ui/metadata-tag";
 import { HitoNativeSelectField } from "@/components/ui/native-select-field";
 import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
 import { useHitoTabs } from "@/components/ui/hito-tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
-import { ProductLinks, ReferenceListRow } from "@/components/hito-ds/reference";
+import { ProductLinks, ReferenceListRow, SectionIntro } from "@/components/hito-ds/reference";
 import {
   ChoiceSelector,
   DataTableSpecimenPreview,
@@ -78,6 +81,11 @@ export function HitoDsComponentControls() {
   const [inputRightIcon, setInputRightIcon] = useState(false);
   const [inputState, setInputState] = useState<InputState>("default");
   const [inputFeedback, setInputFeedback] = useState<InputFeedback>("neutral");
+  const [dualRangeValue, setDualRangeValue] = useState<readonly [number, number]>([124, 156]);
+  const [compoundRangeValue, setCompoundRangeValue] = useState<readonly [string, string]>([
+    "124",
+    "156",
+  ]);
   const [dateFieldDemo, setDateFieldDemo] = useState("2026-12-11");
   const [editableDateDemo, setEditableDateDemo] = useState("");
   const [boundedDateDemo, setBoundedDateDemo] = useState("2026-05-29");
@@ -721,9 +729,9 @@ export function HitoDsComponentControls() {
               </label>
               <label className="grid min-w-0 gap-2 lg:col-span-2">
                 <span className="hito-label">Textarea</span>
-                <textarea
+                <Textarea
                   rows={5}
-                  className="hito-field hito-field-primary hito-textarea-md resize-none"
+                  className="resize-none"
                   placeholder="Describe goal, constraints, recent results, or JSON notes."
                 />
               </label>
@@ -754,6 +762,55 @@ export function HitoDsComponentControls() {
                     />
                   ))}
                 </div>
+              </div>
+            </div>
+
+            <div className="border-t border-hairline pt-5">
+              <div>
+                <p className="hito-label">Dual-value range</p>
+                <p className="hito-caption mt-2 max-w-2xl">
+                  Use two accessible handles to adjust an ordered interval. Pair the rail with the
+                  compound Hito Field when both endpoints need direct numeric entry.
+                </p>
+              </div>
+              <div className="mt-4 grid min-w-0 gap-3">
+                <HitoDualRange
+                  min={80}
+                  max={200}
+                  minLabel="Specimen minimum"
+                  maxLabel="Specimen maximum"
+                  value={dualRangeValue}
+                  onMinValueChange={(value) =>
+                    setDualRangeValue(([currentMin, currentMax]) => [
+                      Math.min(value, currentMax),
+                      currentMax,
+                    ])
+                  }
+                  onMaxValueChange={(value) =>
+                    setDualRangeValue(([currentMin, currentMax]) => [
+                      currentMin,
+                      Math.max(value, currentMin),
+                    ])
+                  }
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <span className="hito-caption">Minimum {dualRangeValue[0]}</span>
+                  <span className="hito-caption">Maximum {dualRangeValue[1]}</span>
+                </div>
+                <HitoCompoundRangeField
+                  label="Range"
+                  lowerLabel="Specimen lower bound"
+                  upperLabel="Specimen upper bound"
+                  lowerValue={compoundRangeValue[0]}
+                  upperValue={compoundRangeValue[1]}
+                  min={40}
+                  max={220}
+                  unit="BPM"
+                  onLowerValueChange={(value) =>
+                    setCompoundRangeValue(([, upper]) => [value, upper])
+                  }
+                  onUpperValueChange={(value) => setCompoundRangeValue(([lower]) => [lower, value])}
+                />
               </div>
             </div>
 
@@ -918,67 +975,6 @@ export function HitoDsComponentControls() {
                 </article>
               </div>
             </div>
-
-            <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Editable Value Field</p>
-              <p className="hito-caption mt-2 max-w-2xl">
-                Compact scalar facts use Editable Value Fields, not full form cards or normal text
-                rows.
-              </p>
-              <div className="hito-reference-list mt-4">
-                <article className="hito-reference-row">
-                  <div>
-                    <p className="hito-list-row-title">Interactive scalar and select fields</p>
-                    <p className="hito-caption mt-2">
-                      These are the runtime owners. Click any empty or saved field to enter its real
-                      editing state. Height holds the deterministic hover specimen.
-                    </p>
-                  </div>
-                  <div className="hito-editable-value-field-group">
-                    {(
-                      [
-                        ["age", "Age", "36", 12, 110, 1, "numeric", undefined],
-                        ["height", "Height", "175", 80, 250, 1, "numeric", "cm"],
-                        ["weight", "Weight", "72", 25, 350, 0.1, "decimal", "kg"],
-                      ] as const
-                    ).map(([fieldKey, label, placeholder, min, max, step, inputMode, unit]) => (
-                      <EditableValueField
-                        key={fieldKey}
-                        fieldKey={fieldKey}
-                        label={label}
-                        value={editableValues[fieldKey]}
-                        setValue={(value) =>
-                          setEditableValues((current) => ({ ...current, [fieldKey]: value }))
-                        }
-                        activeEditableKey={activeEditableField}
-                        setActiveEditableKey={setActiveEditableField}
-                        placeholder={placeholder}
-                        min={min}
-                        max={max}
-                        step={step}
-                        inputMode={inputMode}
-                        unit={unit}
-                        demoState={fieldKey === "height" ? "hover" : undefined}
-                      />
-                    ))}
-                    <EditableSelectValueField
-                      activeEditableKey={activeEditableField}
-                      emptyLabel="Add terrain"
-                      fieldKey="terrain"
-                      label="Terrain"
-                      options={[
-                        { value: "road", label: "Road" },
-                        { value: "trail", label: "Trail" },
-                        { value: "mixed", label: "Mixed" },
-                      ]}
-                      setActiveEditableKey={setActiveEditableField}
-                      setValue={setEditableTerrain}
-                      value={editableTerrain}
-                    />
-                  </div>
-                </article>
-              </div>
-            </div>
           </div>
         }
         controls={
@@ -1057,6 +1053,67 @@ export function HitoDsComponentControls() {
           },
         ]}
       />
+
+      <section id="editable-value-field" className="ds-section">
+        <SectionIntro
+          label="Editable Value Field"
+          title="Compact facts, one shared edit lifecycle."
+          body="Use this shared owner for compact scalar or select facts that read as values until the user explicitly edits them. Do not replace it with full form cards or normal text rows."
+        />
+        <div className="hito-reference-list">
+          <article className="hito-reference-row">
+            <div>
+              <p className="hito-list-row-title">Interactive scalar and select fields</p>
+              <p className="hito-caption mt-2">
+                These are the runtime owners. Click any empty or saved field to enter its real
+                editing state. Height holds the deterministic hover specimen.
+              </p>
+            </div>
+            <div className="hito-editable-value-field-group">
+              {(
+                [
+                  ["age", "Age", "36", 12, 110, 1, "numeric", undefined],
+                  ["height", "Height", "175", 80, 250, 1, "numeric", "cm"],
+                  ["weight", "Weight", "72", 25, 350, 0.1, "decimal", "kg"],
+                ] as const
+              ).map(([fieldKey, label, placeholder, min, max, step, inputMode, unit]) => (
+                <EditableValueField
+                  key={fieldKey}
+                  fieldKey={fieldKey}
+                  label={label}
+                  value={editableValues[fieldKey]}
+                  setValue={(value) =>
+                    setEditableValues((current) => ({ ...current, [fieldKey]: value }))
+                  }
+                  activeEditableKey={activeEditableField}
+                  setActiveEditableKey={setActiveEditableField}
+                  placeholder={placeholder}
+                  min={min}
+                  max={max}
+                  step={step}
+                  inputMode={inputMode}
+                  unit={unit}
+                  demoState={fieldKey === "height" ? "hover" : undefined}
+                />
+              ))}
+              <EditableSelectValueField
+                activeEditableKey={activeEditableField}
+                emptyLabel="Add terrain"
+                fieldKey="terrain"
+                label="Terrain"
+                options={[
+                  { value: "road", label: "Road" },
+                  { value: "trail", label: "Trail" },
+                  { value: "mixed", label: "Mixed" },
+                ]}
+                setActiveEditableKey={setActiveEditableField}
+                setValue={setEditableTerrain}
+                value={editableTerrain}
+              />
+            </div>
+          </article>
+        </div>
+      </section>
 
       <HitoDsPlayground
         id="status"

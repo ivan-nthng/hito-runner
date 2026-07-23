@@ -46,6 +46,16 @@ or state contract that caused the drift, or only restyling one visible surface?`
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
 
+## Evidence Alignment
+
+Use screenshots, DOM/computed-style evidence, and source-backed component/token ownership to prove
+design-system drift. A supplied visual complaint proves a presentation symptom, not a backend or
+state cause; do not create a speculative DS primitive or process layer to mask it.
+
+Before the first design-system write, publish the `Execution preflight` required by `AGENTS.md`
+section 0.1. The receipt must name the shared token, primitive, or pattern owner rather than a
+route-local symptom, unless source evidence proves the route owns the behavior.
+
 ## Subagent Expectations
 
 For Hito DS architecture, specimen audits, Figma bridge/source inspection, component inventory, and
@@ -66,17 +76,6 @@ Design-system architecture should remove repeated local UI systems, not document
 - Do not create a new frontend spec when the correct action is a safe reuse/deletion batch.
 - If an audit finds many equivalent route-local patterns, route one autonomous Frontend cleanup
   batch with clear validation instead of a chain of micro-gates.
-
-## Canonical Architecture Approach
-
-Follow the mandatory Hito architecture approach in `AGENTS.md` without exception:
-
-- one canonical pipeline, no parallel product systems for the same truth
-- backend owns validation, normalization, persistence, lifecycle rules, entitlement, and mutation safety
-- frontend/design/copy/QA work must render, explain, or verify backend-shaped truth rather than inventing rules locally
-- deterministic product truth comes before AI interpretation or recommendations
-- risky mutations require explicit review/confirm or confirmation boundaries
-- prefer reuse, deletion, and consolidation over new abstractions
 
 ## Scope
 

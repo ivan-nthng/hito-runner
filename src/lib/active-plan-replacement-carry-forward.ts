@@ -6,6 +6,7 @@ import {
 } from "@/lib/persisted-plan-replacement";
 import type { Database, Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
+import { collectRowsForIdBatches } from "@/lib/supabase/batched-in-filter";
 
 type SupabaseAdminClient = ReturnType<typeof createAdminSupabaseClient>;
 
@@ -260,53 +261,56 @@ async function loadEvidenceRows(
   }
 
   const [assets, metrics, comparisons, insights] = await Promise.all([
-    supabase
-      .from("workout_result_assets")
-      .select("id, planned_workout_id, workout_log_id")
-      .eq("user_id", userId)
-      .in("planned_workout_id", workoutIds),
-    supabase
-      .from("workout_actual_metrics")
-      .select("id, planned_workout_id, workout_log_id")
-      .eq("user_id", userId)
-      .in("planned_workout_id", workoutIds),
-    supabase
-      .from("workout_comparisons")
-      .select("id, planned_workout_id, difference_payload")
-      .eq("user_id", userId)
-      .in("planned_workout_id", workoutIds),
-    supabase
-      .from("workout_ai_insights")
-      .select("id, planned_workout_id")
-      .eq("user_id", userId)
-      .in("planned_workout_id", workoutIds),
+    collectRowsForIdBatches(workoutIds, (ids) =>
+      supabase
+        .from("workout_result_assets")
+        .select("id, planned_workout_id, workout_log_id")
+        .eq("user_id", userId)
+        .in("planned_workout_id", ids),
+    ),
+    collectRowsForIdBatches(workoutIds, (ids) =>
+      supabase
+        .from("workout_actual_metrics")
+        .select("id, planned_workout_id, workout_log_id")
+        .eq("user_id", userId)
+        .in("planned_workout_id", ids),
+    ),
+    collectRowsForIdBatches(workoutIds, (ids) =>
+      supabase
+        .from("workout_comparisons")
+        .select("id, planned_workout_id, difference_payload")
+        .eq("user_id", userId)
+        .in("planned_workout_id", ids),
+    ),
+    collectRowsForIdBatches(workoutIds, (ids) =>
+      supabase
+        .from("workout_ai_insights")
+        .select("id, planned_workout_id")
+        .eq("user_id", userId)
+        .in("planned_workout_id", ids),
+    ),
   ]);
 
-  if (assets.error) throw new Error(assets.error.message);
-  if (metrics.error) throw new Error(metrics.error.message);
-  if (comparisons.error) throw new Error(comparisons.error.message);
-  if (insights.error) throw new Error(insights.error.message);
-
   return [
-    ...(assets.data ?? []).map((row) => ({
+    ...assets.map((row) => ({
       table: "workout_result_assets" as const,
       id: row.id,
       plannedWorkoutId: row.planned_workout_id,
       workoutLogId: row.workout_log_id,
     })),
-    ...(metrics.data ?? []).map((row) => ({
+    ...metrics.map((row) => ({
       table: "workout_actual_metrics" as const,
       id: row.id,
       plannedWorkoutId: row.planned_workout_id,
       workoutLogId: row.workout_log_id,
     })),
-    ...(comparisons.data ?? []).map((row) => ({
+    ...comparisons.map((row) => ({
       table: "workout_comparisons" as const,
       id: row.id,
       plannedWorkoutId: row.planned_workout_id,
       differencePayload: row.difference_payload,
     })),
-    ...(insights.data ?? []).map((row) => ({
+    ...insights.map((row) => ({
       table: "workout_ai_insights" as const,
       id: row.id,
       plannedWorkoutId: row.planned_workout_id,

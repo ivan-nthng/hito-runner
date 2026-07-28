@@ -1,16 +1,23 @@
 import type { GenerateAiFirstPlanDraftPreviewOptions } from "@/lib/ai-first-plan-draft-service";
 import {
-  AI_AUTHORED_PLAN_FIRST_HYDRATION_CUE,
-  AI_AUTHORED_PLAN_FIRST_HYDRATION_LABEL,
   AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME,
   buildAiAuthoredFirstSessionAdaptationContext,
-  type AiAuthoredPlanFirstProviderDraft,
+  type AiAuthoredPlanFirstCompilerDraft,
 } from "@/lib/ai-authored-plan-first-provider-contract";
-import { resolveEffectiveHeartRateGuidance } from "@/lib/heart-rate-zones";
+import {
+  buildEffectiveRunnerHeartRateProfile,
+  resolveEffectiveHeartRateGuidance,
+} from "@/lib/heart-rate-zones";
+import { normalizePlanGoalIntent } from "@/lib/plan-creation-engine/plan-goal-intent";
 import type { StructuredPlanAuthoringInput } from "@/lib/structured-plan-authoring-schema";
+import { structuredPlanAuthoringInputSchema } from "@/lib/structured-plan-authoring-schema";
 import { isLoopbackRuntimeUrl } from "@/lib/supabase/env";
 import { addDaysIso, startOfWeekIso } from "@/lib/training";
 import { WEEKDAY_NAMES, type WeekdayName } from "@/lib/weekday-rest-invariants";
+import {
+  WORKOUT_DOCUMENT_HYDRATION_CUE,
+  WORKOUT_DOCUMENT_HYDRATION_LABEL,
+} from "@/lib/workout-document";
 
 export const AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV =
   "HITO_AI_GENERATED_PLAN_DEV_FIXTURE" as const;
@@ -22,10 +29,13 @@ export const AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV =
   "HITO_AI_GENERATED_PLAN_DEV_FIXTURE_SCENARIO" as const;
 export const AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL =
   "hito-local-qa-dev-ai-generated-plan-fixture" as const;
+export const AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID =
+  "local-dev-ai-plan-first-10k" as const;
 
 const MAX_AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_DELAY_MS = 10 * 60 * 1000;
 const NON_REPEAT_TEMPO_FIXTURE_SCENARIO = "non_repeat_tempo" as const;
 const DEFAULT_FIXTURE_HORIZON_DAYS = 28;
+const QA_FIXTURE_START_DATE = "2026-07-06";
 
 type RuntimeEnv = Record<string, string | undefined>;
 export type AiGeneratedRunningPlanProviderMode = "real" | "qa_fixture";
@@ -33,7 +43,7 @@ type AiGeneratedRunningPlanDevFixtureScenario =
   | "default"
   | typeof NON_REPEAT_TEMPO_FIXTURE_SCENARIO;
 type ProviderFixtureSection =
-  AiAuthoredPlanFirstProviderDraft["workouts"][number]["sections"][number];
+  AiAuthoredPlanFirstCompilerDraft["workouts"][number]["sections"][number];
 type ProviderFixtureUnitSection = Extract<ProviderFixtureSection, { kind: "unit" }>;
 type ProviderFixtureTarget = NonNullable<ProviderFixtureUnitSection["target"]>;
 type ProviderFixtureRepeatChild = Extract<
@@ -51,9 +61,7 @@ type AiGeneratedRunningPlanFixturePreviewOptions = Omit<
 >;
 
 export function buildAiGeneratedRunningPlanDevFixturePreviewOptions(input: {
-  authoringInput: StructuredPlanAuthoringInput;
   qaFixtureAuthorized: boolean;
-  today?: string | null;
   env?: RuntimeEnv;
 }): AiGeneratedRunningPlanFixturePreviewOptions | null {
   if (!input.qaFixtureAuthorized || !isAiGeneratedRunningPlanDevFixtureEnabled(input.env)) {
@@ -61,17 +69,59 @@ export function buildAiGeneratedRunningPlanDevFixturePreviewOptions(input: {
   }
 
   const delayMs = resolveAiGeneratedRunningPlanDevFixtureDelayMs(input.env);
+  const authoringInput = buildAiGeneratedRunningPlanQaFixtureAuthoringInput();
 
   return {
     apiKey: "local-qa-dev-ai-generated-plan-fixture",
     model: AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
-    today: input.today ?? input.authoringInput.schedule.startDate,
-    fetchImpl: buildAiGeneratedRunningPlanDevFixtureFetch(
-      input,
-      delayMs,
-      resolveAiGeneratedRunningPlanDevFixtureScenario(input.env),
-    ),
+    today: authoringInput.schedule.startDate,
+    fetchImpl: buildAiGeneratedRunningPlanDevFixtureFetch({ authoringInput }, delayMs, "default"),
   };
+}
+
+export function buildAiGeneratedRunningPlanQaFixtureAuthoringInput(): StructuredPlanAuthoringInput {
+  const heartRateProfile = buildEffectiveRunnerHeartRateProfile({ age: 36 });
+  if (!heartRateProfile) {
+    throw new Error("Local QA fixture could not build its fixed heart-rate profile.");
+  }
+
+  const planGoalIntent = normalizePlanGoalIntent({
+    rawIntent: {
+      distance: { kind: "preset", preset: "10K" },
+    },
+    startDate: QA_FIXTURE_START_DATE,
+  });
+  if (!planGoalIntent.ok || !planGoalIntent.intent.distance) {
+    throw new Error("Local QA fixture could not build its fixed distance goal.");
+  }
+
+  return structuredPlanAuthoringInputSchema.parse({
+    schedule: {
+      startDate: QA_FIXTURE_START_DATE,
+    },
+    runnerFacts: {
+      age: 36,
+      heightCm: 178,
+      weightKg: 72,
+      selfReportedLevel: "runs_a_lot",
+      benchmark: {
+        kind: "recent_5k",
+        source: "recent_5k_pace",
+        paceSecondsPerKm: 330,
+        label: "Recent 5K pace 5:30/km",
+      },
+      heartRateProfile: {
+        ...heartRateProfile,
+        accepted: true,
+      },
+    },
+    availability: {
+      fixedRestDays: ["Wednesday", "Friday", "Sunday"],
+      maxRunningDaysPerWeek: 4,
+      preferredLongRunDay: "Saturday",
+    },
+    planGoalIntent: planGoalIntent.intent,
+  });
 }
 
 export function isAiGeneratedRunningPlanDevFixtureEnabled(env = readRuntimeEnv()) {
@@ -182,7 +232,9 @@ function buildAiGeneratedRunningPlanDevFixtureFetch(
   delayMs: number,
   fixtureScenario: AiGeneratedRunningPlanDevFixtureScenario,
 ): typeof fetch {
-  const draft = buildProviderFixtureDraft(input.authoringInput, fixtureScenario);
+  const outputText = JSON.stringify(
+    buildProviderFixtureDraft(input.authoringInput, fixtureScenario),
+  );
   const distance = requireSelectedDistance(input.authoringInput);
 
   return async (_url, init) => {
@@ -192,7 +244,7 @@ function buildAiGeneratedRunningPlanDevFixtureFetch(
       JSON.stringify({
         id: `local-dev-ai-plan-first-${slugify(distance.label)}`,
         status: "completed",
-        output_text: JSON.stringify(draft),
+        output_text: outputText,
         usage: {
           input_tokens: 100,
           output_tokens: 100,
@@ -215,7 +267,7 @@ function buildAiGeneratedRunningPlanDevFixtureFetch(
 function buildProviderFixtureDraft(
   authoringInput: StructuredPlanAuthoringInput,
   fixtureScenario: AiGeneratedRunningPlanDevFixtureScenario,
-): AiAuthoredPlanFirstProviderDraft {
+): AiAuthoredPlanFirstCompilerDraft {
   const distance = requireSelectedDistance(authoringInput);
   const startDate = authoringInput.schedule.startDate;
   const requestedTargetDate = authoringInput.planGoalIntent.targetDate;
@@ -261,8 +313,8 @@ function buildFixtureWorkoutDays(input: {
   fixtureScenario: AiGeneratedRunningPlanDevFixtureScenario;
   adaptationRequired: boolean;
   targetContext: ProviderFixtureTargetContext;
-}): AiAuthoredPlanFirstProviderDraft["workouts"] {
-  const days = new Map<string, AiAuthoredPlanFirstProviderDraft["workouts"][number]>();
+}): AiAuthoredPlanFirstCompilerDraft["workouts"] {
+  const days = new Map<string, AiAuthoredPlanFirstCompilerDraft["workouts"][number]>();
   if (input.adaptationRequired) {
     const adaptationBuilders = [
       buildRunWalkFixtureDay,
@@ -571,10 +623,10 @@ function buildEndpointFixtureDay(
 
 function workoutDay(
   date: string,
-  workoutIdentity: AiAuthoredPlanFirstProviderDraft["workouts"][number]["workout_identity"],
+  workoutIdentity: AiAuthoredPlanFirstCompilerDraft["workouts"][number]["workout_identity"],
   title: string,
-  sections: AiAuthoredPlanFirstProviderDraft["workouts"][number]["sections"],
-): AiAuthoredPlanFirstProviderDraft["workouts"][number] {
+  sections: AiAuthoredPlanFirstCompilerDraft["workouts"][number]["sections"],
+): AiAuthoredPlanFirstCompilerDraft["workouts"][number] {
   return {
     date,
     phase: "Training plan",
@@ -631,6 +683,7 @@ function heartRateTarget(
   if (!guidance) throw new Error(`Fixture heart-rate reference ${reference} is unavailable.`);
   return {
     primary_execution_mode: "heart_rate",
+    band_reference: reference,
     command: guidance.rangeBpm,
   };
 }
@@ -638,8 +691,8 @@ function heartRateTarget(
 function hydrationSection(): ProviderFixtureSection {
   return {
     kind: "hydration",
-    label: AI_AUTHORED_PLAN_FIRST_HYDRATION_LABEL,
-    cue: AI_AUTHORED_PLAN_FIRST_HYDRATION_CUE,
+    label: WORKOUT_DOCUMENT_HYDRATION_LABEL,
+    cue: WORKOUT_DOCUMENT_HYDRATION_CUE,
   };
 }
 

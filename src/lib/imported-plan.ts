@@ -16,6 +16,10 @@ import {
   type CanonicalGoalContext,
 } from "@/lib/rich-workout-model";
 import { PRIMARY_EXECUTION_MODE_VALUES } from "@/lib/workout-document";
+import {
+  assertWorkoutDurationTitleContract,
+  collectWorkoutDurationTitleIssues,
+} from "@/lib/workout-duration-title-contract";
 import type { RunnerProfileSummary } from "@/lib/training";
 import type { Json } from "@/lib/supabase/database";
 import { reduceRepeatChildrenToChildFirst } from "@/lib/planned-workout-block-contract";
@@ -39,6 +43,7 @@ export const REMOVED_LEGACY_IMPORT_NOTICE =
 export const TRAINING_PLAN_V2_SEGMENT_TYPE_VALUES = [
   "warmup",
   "main",
+  "finish",
   "cooldown",
   "recovery",
   "rest",
@@ -119,7 +124,19 @@ const v2TargetSchema = z
     hint: z.string().trim().min(1).optional(),
     extra: z.record(z.string(), targetValueSchema).optional(),
   })
-  .catchall(targetValueSchema);
+  .catchall(targetValueSchema)
+  .superRefine((target, context) => {
+    for (const [key, nestedValue] of Object.entries(target.extra ?? {})) {
+      const flatValue = (target as Record<string, unknown>)[key];
+      if (flatValue !== undefined && !Object.is(flatValue, nestedValue)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `Target metadata "${key}" conflicts with target.extra.${key}.`,
+        });
+      }
+    }
+  });
 
 const v2RunnerProfileSchema = z
   .object({
@@ -404,6 +421,15 @@ const v2SegmentSchema = z
         });
       }
 
+      if (segment.segment_type === "finish" && segment.prescription.mode === "repeats") {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["prescription", "mode"],
+          message:
+            "finish is a runnable unit segment; Repeat parents keep finish truth on an ordered child.",
+        });
+      }
+
       if (
         (segment.segment_type === "rest" || segment.segment_type === "fueling") &&
         segment.prescription.mode !== "none"
@@ -561,7 +587,25 @@ export function validateImportedPlanJson(raw: string) {
       };
     }
 
-    return trainingPlanV2Schema.safeParse(parsedJson);
+    const result = trainingPlanV2Schema.safeParse(parsedJson);
+
+    if (!result.success) {
+      return result;
+    }
+
+    const durationIssues = collectWorkoutDurationTitleIssues(result.data.planned_workouts);
+    return durationIssues.length === 0
+      ? result
+      : {
+          success: false as const,
+          error: new z.ZodError(
+            durationIssues.map((issue) => ({
+              code: z.ZodIssueCode.custom,
+              path: issue.path.split("."),
+              message: issue.message,
+            })),
+          ),
+        };
   } catch {
     return null;
   }
@@ -583,6 +627,7 @@ export function buildImportedPlanSeed(plan: ImportedPlan): ImportedPlanSeed {
 }
 
 function buildTrainingPlanV2Seed(plan: TrainingPlanV2): ImportedPlanSeed {
+  assertWorkoutDurationTitleContract(plan.planned_workouts);
   const workouts = plan.planned_workouts
     .slice()
     .sort(

@@ -8,7 +8,10 @@ import {
 import { ActivePlanPersistenceRejection } from "../src/lib/active-plan-lifecycle-persistence";
 import { buildActivePlanReplacementCarryForward } from "../src/lib/active-plan-replacement-carry-forward";
 import { buildReviewedFirstPlanImportedSeed } from "../src/lib/active-plan-persistence";
-import { buildAiGeneratedRunningPlanDevFixturePreviewOptions } from "../src/lib/ai-generated-running-plan-dev-fixture";
+import {
+  AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
+  buildAiGeneratedRunningPlanDevFixtureOpenAiFetch,
+} from "../src/lib/ai-generated-running-plan-dev-fixture";
 import {
   AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
   buildAiGeneratedRunningPlanAuthoringInput,
@@ -18,6 +21,7 @@ import { buildImportedPlanSeed } from "../src/lib/imported-plan";
 import {
   buildReviewedAiGeneratedRunningPlanPreview,
   confirmRunningPlanDraftForUser,
+  runningPlanConfirmInputSchema,
   type RunningPlanConfirmActionInput,
   type RunningPlanPreviewActionInput,
 } from "../src/lib/running-plan-engine-actions";
@@ -28,7 +32,9 @@ import {
   type RunningPlanPreviewDraft,
   type RunningPlanReviewedPreviewDraft,
 } from "../src/lib/running-plan-engine-review";
+import { base64UrlDecodeUtf8 } from "../src/lib/review-token-signing";
 import {
+  buildEffectiveRunnerHeartRateProfile,
   buildHeartRateZonesSummary,
   normalizeAcceptedHeartRateProfileForStorage,
   personalHeartRateProfileInputSchema,
@@ -193,9 +199,10 @@ async function main() {
             fixedRestDays: proof.availability.fixedRestDays,
             maxRunningDaysPerWeek: proof.availability.maxRunningDaysPerWeek,
             rows: proof.rows,
-            cleanupZero: Object.values(proof.cleanup).every(
-              (value) => value === 0 || value === true,
-            ),
+            cleanupZero:
+              Object.values(proof.cleanup.ownedRows).every((value) => value === 0) &&
+              proof.cleanup.authUserPreserved &&
+              proof.cleanup.leaseReleased,
           }))
         : [],
   });
@@ -298,10 +305,26 @@ function validatePersonalHeartRateGuidanceBandContract() {
     { reference: "Z4", minBpm: 150, maxBpm: 160 },
     { reference: "Z5", minBpm: 165, maxBpm: 180 },
   ] as const;
+  const coincidentZones = [
+    { reference: "Z1", minBpm: 100, maxBpm: 120 },
+    { reference: "Z2", minBpm: 100, maxBpm: 120 },
+    { reference: "Z3", minBpm: 100, maxBpm: 120 },
+    { reference: "Z4", minBpm: 100, maxBpm: 120 },
+    { reference: "Z5", minBpm: 100, maxBpm: 120 },
+  ] as const;
+  const boundaryZones = [
+    { reference: "Z1", minBpm: 60, maxBpm: 60 },
+    { reference: "Z2", minBpm: 60, maxBpm: 100 },
+    { reference: "Z3", minBpm: 100, maxBpm: 150 },
+    { reference: "Z4", minBpm: 150, maxBpm: 200 },
+    { reference: "Z5", minBpm: 200, maxBpm: 200 },
+  ] as const;
 
   for (const [label, zones] of [
     ["overlapping", overlapZones],
     ["gapped", gappedZones],
+    ["coincident", coincidentZones],
+    ["60-200 boundaries", boundaryZones],
   ] as const) {
     assert.equal(
       personalHeartRateProfileInputSchema.safeParse({ zones }).success,
@@ -347,13 +370,13 @@ function validatePersonalHeartRateGuidanceBandContract() {
     },
     {
       label: "below product envelope",
-      zones: overlapZones.map((zone, index) => (index === 0 ? { ...zone, minBpm: 39 } : zone)),
-      message: /at least 40 BPM/i,
+      zones: overlapZones.map((zone, index) => (index === 0 ? { ...zone, minBpm: 59 } : zone)),
+      message: /at least 60 BPM/i,
     },
     {
       label: "above product envelope",
-      zones: overlapZones.map((zone, index) => (index === 4 ? { ...zone, maxBpm: 221 } : zone)),
-      message: /at most 220 BPM/i,
+      zones: overlapZones.map((zone, index) => (index === 4 ? { ...zone, maxBpm: 201 } : zone)),
+      message: /at most 200 BPM/i,
     },
     {
       label: "decreasing lower bounds",
@@ -378,6 +401,37 @@ function validatePersonalHeartRateGuidanceBandContract() {
       );
     }
   }
+
+  const historicalProfile = {
+    version: "runner_hr_profile_v2",
+    source: "personal",
+    zones: [
+      { reference: "Z1", minBpm: 40, maxBpm: 75 },
+      { reference: "Z2", minBpm: 75, maxBpm: 110 },
+      { reference: "Z3", minBpm: 110, maxBpm: 145 },
+      { reference: "Z4", minBpm: 145, maxBpm: 175 },
+      { reference: "Z5", minBpm: 175, maxBpm: 220 },
+    ],
+  } as const;
+  assert.equal(
+    personalHeartRateProfileInputSchema.safeParse({ zones: historicalProfile.zones }).success,
+    false,
+    "Historical out-of-envelope values must not be accepted as new personal input.",
+  );
+  const historicalEffective = buildEffectiveRunnerHeartRateProfile({
+    age: 36,
+    storedProfile: historicalProfile,
+  });
+  assert.equal(historicalEffective?.source, "personal");
+  assert.deepEqual(
+    historicalEffective?.zones.map(({ reference, minBpm, maxBpm }) => ({
+      reference,
+      minBpm,
+      maxBpm,
+    })),
+    historicalProfile.zones,
+    "Historical personal guidance must remain readable without clamp or rewrite.",
+  );
 }
 
 async function validateAiGeneratedDistanceGoalScenario(scenario: {
@@ -427,16 +481,20 @@ async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {
     throw new Error(authoring.message);
   }
 
-  const fixturePreviewOptions = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
+  const today = input.startDate ?? authoring.authoringInput.schedule.startDate;
+  const fetchImpl = buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
     authoringInput: authoring.authoringInput,
-    qaFixtureAuthorized: true,
-    today: input.startDate ?? authoring.authoringInput.schedule.startDate,
+    today,
     env: localAiGeneratedFixtureEnv(),
   });
-  assert.notEqual(fixturePreviewOptions, null, "AI confirm proof must use the local fixture.");
 
   const result = await buildReviewedAiGeneratedRunningPlanPreview(input, {
-    aiPreview: fixturePreviewOptions ?? undefined,
+    aiPreview: {
+      apiKey: "local-qa-dev-ai-generated-plan-fixture",
+      model: AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
+      today,
+      fetchImpl,
+    },
     runnerProfileSnapshot,
   });
   assert.equal(result.ok, true, result.ok ? "" : result.unavailable.error.message);
@@ -486,6 +544,59 @@ async function validateFailureBoundaries(
       assert.equal(changedAvailabilityExactness.reason, "stale_review");
     }
   }
+
+  const transientCommentCanary = `private-plan-context-${crypto.randomUUID()}`;
+  const commentedDraft = await buildReviewedAiFixture({
+    ...reviewedDraft.previewInput,
+    runnerComment: transientCommentCanary,
+  });
+  assert.equal("runnerComment" in commentedDraft.previewInput, false);
+  assert.equal("runnerComment" in commentedDraft.normalizedInputSummary, false);
+  assert.equal(commentedDraft.reviewChecksum, reviewedDraft.reviewChecksum);
+  assert.equal(JSON.stringify(commentedDraft).includes(transientCommentCanary), false);
+  const encodedCommentedEnvelope = commentedDraft.reviewToken.split(".")[1];
+  assert.ok(encodedCommentedEnvelope);
+  const decodedCommentedEnvelope = base64UrlDecodeUtf8(encodedCommentedEnvelope!);
+  assert.equal(decodedCommentedEnvelope.includes(transientCommentCanary), false);
+  assert.doesNotMatch(
+    decodedCommentedEnvelope,
+    /"runnerComment"|"requestContext"|"plan_request_comment"/,
+  );
+  const commentedExactness = await validateRunningPlanReviewExactness({
+    draft: commentedDraft,
+    reviewToken: commentedDraft.reviewToken,
+    reviewChecksum: commentedDraft.reviewChecksum,
+  });
+  assert.equal(commentedExactness.ok, true);
+  const legacyCommentBearingDraft = {
+    ...commentedDraft,
+    previewInput: {
+      ...commentedDraft.previewInput,
+      runnerComment: transientCommentCanary,
+    },
+  } as unknown as RunningPlanPreviewDraft;
+  const legacyCommentBearingReview = await addRunningPlanReviewProof(legacyCommentBearingDraft);
+  const legacyCommentBearingExactness = await validateRunningPlanReviewExactness({
+    draft: legacyCommentBearingDraft,
+    reviewToken: legacyCommentBearingReview.reviewToken,
+    reviewChecksum: legacyCommentBearingReview.reviewChecksum,
+  });
+  assert.equal(legacyCommentBearingExactness.ok, false);
+  if (!legacyCommentBearingExactness.ok) {
+    assert.equal(legacyCommentBearingExactness.reason, "invalid_review");
+  }
+  assert.equal(
+    runningPlanConfirmInputSchema.safeParse({
+      previewInput: {
+        ...commentedDraft.previewInput,
+        runnerComment: transientCommentCanary,
+      },
+      sourceKind: commentedDraft.sourceKind,
+      reviewToken: commentedDraft.reviewToken,
+      reviewChecksum: commentedDraft.reviewChecksum,
+    }).success,
+    false,
+  );
 
   const invalidTokenExactness = await validateRunningPlanReviewExactness({
     draft: reviewedDraft,

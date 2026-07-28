@@ -31,10 +31,13 @@ export interface BuildRunningPlanPreviewInput {
   preferredLongRunDay?: WeekdayName | null;
   startDate?: string | null;
   benchmark?: RunningPlanBenchmarkInput | null;
+  runnerComment?: string | null;
   planGoalIntent: PlanGoalIntentInput & {
     distance: NonNullable<PlanGoalIntentInput["distance"]>;
   };
 }
+
+export type RunningPlanReviewedPreviewInput = Omit<BuildRunningPlanPreviewInput, "runnerComment">;
 
 export interface RunningPlanPreviewCalendarRow {
   rowId: string;

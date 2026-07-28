@@ -94,6 +94,9 @@ export type ResolvedManualWorkoutTarget =
       hrZone?: string;
       hrZoneReference?: string;
       hrProfileSource?: "personal" | "estimated";
+      hrBandBpmMin?: number;
+      hrBandBpmMax?: number;
+      hrExecutionRangeKind?: "full_band" | "ai_selected_subrange";
     };
 
 type ResolvedManualWorkoutTargetResult =
@@ -230,6 +233,9 @@ export function resolveManualWorkoutTargetInput(
       ...(target.hrZone ? { hrZone: target.hrZone } : {}),
       ...(target.hrZoneReference ? { hrZoneReference: target.hrZoneReference } : {}),
       ...(target.hrProfileSource ? { hrProfileSource: target.hrProfileSource } : {}),
+      ...(target.hrBandBpmMin != null ? { hrBandBpmMin: target.hrBandBpmMin } : {}),
+      ...(target.hrBandBpmMax != null ? { hrBandBpmMax: target.hrBandBpmMax } : {}),
+      ...(target.hrExecutionRangeKind ? { hrExecutionRangeKind: target.hrExecutionRangeKind } : {}),
       ...(target.hrBpmRange ? { hrBpmRange: target.hrBpmRange } : {}),
       ...(hrRange ? { hrBpmRangeValues: hrRange } : {}),
       ...(target.hrTargetSource === "personal_hr_zone" ||
@@ -418,13 +424,14 @@ export function manualWorkoutTargetToStepTarget(
     ...(resolved.kind === "pace" && resolved.paceProvenance
       ? { pace_provenance: resolved.paceProvenance }
       : {}),
-    ...("hrZone" in resolved && resolved.hrZone
+    ...(("hrZone" in resolved && resolved.hrZone) ||
+    ("hrZoneReference" in resolved && resolved.hrZoneReference)
       ? {
-          hr_zone: resolved.hrZone,
+          ...("hrZone" in resolved && resolved.hrZone ? { hr_zone: resolved.hrZone } : {}),
           hr_zone_reference:
             "hrZoneReference" in resolved && resolved.hrZoneReference
               ? resolved.hrZoneReference
-              : resolved.hrZone,
+              : resolved.hrZone!,
           ...("hrProfileSource" in resolved && resolved.hrProfileSource
             ? { hr_profile_source: resolved.hrProfileSource }
             : {}),
@@ -435,6 +442,15 @@ export function manualWorkoutTargetToStepTarget(
               }
             : {}),
         }
+      : {}),
+    ...("hrBandBpmMin" in resolved && resolved.hrBandBpmMin != null
+      ? { hr_band_bpm_min: resolved.hrBandBpmMin }
+      : {}),
+    ...("hrBandBpmMax" in resolved && resolved.hrBandBpmMax != null
+      ? { hr_band_bpm_max: resolved.hrBandBpmMax }
+      : {}),
+    ...("hrExecutionRangeKind" in resolved && resolved.hrExecutionRangeKind
+      ? { hr_execution_range_kind: resolved.hrExecutionRangeKind }
       : {}),
   };
   const base: StepTarget = {

@@ -28,6 +28,23 @@ const benchmarkSchema = z
   .strict()
   .nullable();
 
+export const GENERATED_PLAN_RUNNER_COMMENT_MAX_LENGTH = 500;
+
+const generatedPlanRunnerCommentValueSchema = z
+  .string()
+  .trim()
+  .min(1, "Add a comment or leave this field blank.")
+  .max(
+    GENERATED_PLAN_RUNNER_COMMENT_MAX_LENGTH,
+    `Keep the plan comment to ${GENERATED_PLAN_RUNNER_COMMENT_MAX_LENGTH} characters or fewer.`,
+  );
+
+export const generatedPlanRunnerCommentInputSchema = z.preprocess(
+  (value) =>
+    value == null || (typeof value === "string" && value.trim().length === 0) ? undefined : value,
+  generatedPlanRunnerCommentValueSchema.optional(),
+);
+
 export const structuredPlanAuthoringInputSchema = z
   .object({
     schedule: z
@@ -66,6 +83,12 @@ export const structuredPlanAuthoringInputSchema = z
       message: "Choose a training distance before creating a generated plan.",
       path: ["distance"],
     }),
+    requestContext: z
+      .object({
+        runnerComment: generatedPlanRunnerCommentValueSchema,
+      })
+      .strict()
+      .optional(),
   })
   .strict()
   .superRefine((value, context) => {

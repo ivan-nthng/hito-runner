@@ -83,7 +83,12 @@ Active
 - The current local admin plan has now been cut over into Supabase:
   the linked project contains the base persisted schema, the current JSON week is imported as the active canonical plan, and saved-mode SSR now resolves `/progress` and `/workout/$date` from Supabase.
 - A practical tester-account lifecycle tool is now implemented:
-  Backend can create a tester, reset that tester back to onboarding, optionally reseed plan data, and delete the tester through one canonical CLI path documented in `docs/process/test-user-lifecycle.md`.
+  Backend now reuses a bounded named QA tester pool for baseline/no-plan, saved-plan/readback,
+  direct provider/engine, and two isolation roles. The canonical CLI inventories all metadata-proven
+  testers and eleven app-owned data seams, leases pool roles for persistence proofs, supports
+  profile-preserving plan reset, and binds destructive cleanup to an exact drift-checked manifest.
+  Admins, unclassified identities, and reusable pool members are excluded from bulk cleanup; the
+  local Admin facade cannot delete pool or metadata-admin identities.
 - The first local admin test-account backend contract is implemented:
   a server-action-ready local/dev-only seam can list local bypass tester/admin entries from `.tanstack/hito-running-local-accounts.json`, return bounded admin view data including local test passwords only after local-runtime plus admin checks, mark protected admin accounts as non-deletable, and delete tester accounts by removing the local entry plus linked Supabase auth user when configured.
 - The first local admin Test accounts UI slice is implemented:
@@ -184,13 +189,13 @@ unavailable`, or an auth loop.
   built-in hide/restore. Persisted AI and manual workouts reconstruct through the same full reviewed
   constructor with ordered Repeat and target provenance intact.
 - AI-authored first-plan creation is now plan-first:
-  `src/lib/ai-first-plan-draft-service.ts` and `npm run author-ai-first-plan-draft` can run the non-mutating `hito_ai_authored_full_plan_draft` path in mock, invalid, timeout, or live modes. Success returns bounded `ai_authored` canonical `training-plan-v2` output with `source_kind: ai_authored_plan_first_v1`; invalid, unsafe, unavailable, or timed-out output fails before review and persists nothing.
+  `src/lib/ai-first-plan-draft-service.ts` and `npm run author-ai-first-plan-draft` can run the non-mutating `hito_ai_authored_full_plan_v1` provider path in mock, invalid, timeout, or live modes. The self-describing full response keeps each runnable leaf or Repeat child beside its own prescription and numeric target and validates directly as the compiler draft. Success returns bounded `ai_authored` canonical `training-plan-v2` output with `source_kind: ai_authored_plan_first_v1`; invalid, unsafe, unavailable, or timed-out output fails before review and persists nothing.
 - The plan-first compiler is the current backend boundary:
   `src/lib/ai-authored-plan-first-provider-contract.ts` and
-  `src/lib/ai-authored-plan-first-compiler.ts` now share one compact closed grammar: a flat non-rest
+  `src/lib/ai-authored-plan-first-compiler.ts` now share one direct closed grammar: a flat non-rest
   workout list plus one exact endpoint, canonical identities and segment types, structural-only
   Repeat parents with ordered children, bounded prescriptions, exact min/km pace, profile-backed HR
-  references, effort, and execution cues. The compiler preserves those fields without semantic
+  references, and supplemental execution cues. The compiler preserves those fields without semantic
   fallback, rejects malformed transport or structurally invalid values before review, and does not
   accept plan-level provider narrative, duplicate goal presentation, or partial horizons. Replaced
   specimen/weekly/internal generated-plan variants are not rollback paths.

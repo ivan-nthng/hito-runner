@@ -182,10 +182,7 @@ async function startCommand() {
         providerMode === "qa_fixture"
           ? (process.env.HITO_AI_GENERATED_PLAN_DEV_FIXTURE_DELAY_MS ?? "")
           : "",
-      HITO_AI_GENERATED_PLAN_DEV_FIXTURE_SCENARIO:
-        providerMode === "qa_fixture"
-          ? (process.env.HITO_AI_GENERATED_PLAN_DEV_FIXTURE_SCENARIO ?? "")
-          : "",
+      HITO_AI_GENERATED_PLAN_DEV_FIXTURE_SCENARIO: "",
     },
   });
 

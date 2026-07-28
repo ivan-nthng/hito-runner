@@ -2,6 +2,7 @@ import "@tanstack/react-start/server-only";
 import { parseBodyNotesValue } from "@/lib/body-notes";
 import type { Database, Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
+import { collectRowsForIdBatches } from "@/lib/supabase/batched-in-filter";
 import {
   deriveWeekStatus,
   deriveWorkoutRichModel,
@@ -729,15 +730,11 @@ async function buildWorkoutAiPromptInput(args: {
   }
 
   const workoutIds = workoutsResult.data.map((row) => row.id);
-  const logsResult = workoutIds.length
-    ? await supabase.from("workout_logs").select("*").in("planned_workout_id", workoutIds)
-    : { data: [] as PersistedWorkoutLogRow[], error: null };
+  const logs = await collectRowsForIdBatches(workoutIds, (ids) =>
+    supabase.from("workout_logs").select("*").in("planned_workout_id", ids),
+  );
 
-  if (logsResult.error) {
-    throw new Error(logsResult.error.message);
-  }
-
-  const logsByWorkoutId = new Map(logsResult.data.map((log) => [log.planned_workout_id, log]));
+  const logsByWorkoutId = new Map(logs.map((log) => [log.planned_workout_id, log]));
   const contextDate = plannedWorkout.workout_date;
   const workouts = workoutsResult.data.map((row) =>
     persistedWorkoutRowToView(row, logsByWorkoutId.get(row.id) ?? null, contextDate),

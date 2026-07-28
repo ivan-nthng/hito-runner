@@ -27,13 +27,19 @@ import {
   structuredPlanAuthoringInputSchema,
   type StructuredPlanAuthoringInput,
 } from "@/lib/structured-plan-authoring-schema";
+import { createServerOnlyFn } from "@tanstack/react-start";
+import type { Dispatcher } from "undici";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
-const DEFAULT_OPENAI_PLAN_MODEL = "gpt-5";
+const DEFAULT_OPENAI_PLAN_MODEL = "gpt-5.2";
 const DEFAULT_AI_FIRST_PLAN_TIMEOUT_MS = 0;
 const DEFAULT_AI_FIRST_PLAN_MAX_OUTPUT_TOKENS = 32_000;
 const AI_FIRST_PLAN_CONTRACT_MODE = "plan_first" as const;
-const AI_FIRST_PLAN_RESPONSE_SCHEMA_MODE = "responses_json_schema_plan_first_strict" as const;
+const AI_FIRST_PLAN_RESPONSE_SCHEMA_MODE =
+  "responses_json_schema_plan_first_direct_v1_strict" as const;
+const OPENAI_PROVIDER_HEADERS_TIMEOUT_MS = 0;
+const OPENAI_PROVIDER_BODY_TIMEOUT_MS = 0;
+let openAiProviderDispatcherPromise: Promise<Dispatcher> | null = null;
 
 type OpenAiResponseBody = {
   id?: string;
@@ -51,9 +57,6 @@ type OpenAiResponseBody = {
     input_tokens?: number;
     output_tokens?: number;
     total_tokens?: number;
-  };
-  error?: {
-    message?: string;
   };
 };
 
@@ -93,7 +96,21 @@ export interface AiFirstPlanDraftDebugMetadata {
     | "request_cancelled"
     | "response_incomplete"
     | "timeout_before_response";
+  abortReason: "cancelled" | "timeout" | null;
   abortFired: boolean;
+  transportMode: "not_started" | "canonical_no_deadline" | "injected";
+  transportHeadersTimeoutMs: number | null;
+  transportBodyTimeoutMs: number | null;
+  transportFailureCode:
+    | "request_signal_aborted"
+    | "backend_timeout"
+    | "provider_headers_timeout"
+    | "provider_body_timeout"
+    | "provider_connect_timeout"
+    | "provider_connection_reset"
+    | "provider_dns_failure"
+    | "provider_transport_error"
+    | null;
   openAiElapsedMs: number | null;
   promptCharEstimate: number | null;
   systemPromptChars: number | null;
@@ -124,7 +141,6 @@ export interface AiFirstPlanDraftUnavailableMetadata {
 export type AiFirstPlanDraftPreviewResult =
   | {
       ok: true;
-      authoringInput: StructuredPlanAuthoringInput;
       canonicalPlan: TrainingPlanV2;
       metadata: AiFirstPlanDraftPreviewMetadata;
     }
@@ -133,7 +149,6 @@ export type AiFirstPlanDraftPreviewResult =
       reason: "ai_authored_plan_first_unavailable";
       message: string;
       issues: string[];
-      authoringInput: StructuredPlanAuthoringInput;
       metadata: AiFirstPlanDraftUnavailableMetadata;
     }
   | {
@@ -205,7 +220,6 @@ export async function generateAiFirstPlanDraftPreview({
       options: generationLedger,
     });
     return unavailableAiFirstPlanDraft({
-      authoringInput,
       reason: "openai_not_configured",
       issues: ["OpenAI is not configured for AI-authored first-plan drafting."],
       model: resolvedModel,
@@ -230,6 +244,9 @@ export async function generateAiFirstPlanDraftPreview({
       signal,
       generationLedger,
       prompt,
+      transcriptRedactedValues: authoringInput.requestContext?.runnerComment
+        ? [authoringInput.requestContext.runnerComment]
+        : [],
       generationTrace: latestGenerationTrace,
     });
     latestGenerationTrace = response.generationTrace;
@@ -257,7 +274,6 @@ export async function generateAiFirstPlanDraftPreview({
       });
 
       return unavailableAiFirstPlanDraft({
-        authoringInput,
         reason: "ai_first_plan_draft_non_json_output",
         issues: ["OpenAI returned a non-JSON AI first-plan draft payload."],
         model: resolvedModel,
@@ -268,9 +284,33 @@ export async function generateAiFirstPlanDraftPreview({
       });
     }
 
+    const runnerComment = authoringInput.requestContext?.runnerComment;
+    if (runnerComment && containsExactRunnerContext(parsedOutput, runnerComment)) {
+      const reason = "ai_authored_plan_first_runner_context_echoed";
+      latestGenerationTrace = await recordAiPlanGenerationUnavailable({
+        trace: latestGenerationTrace,
+        reason,
+        issues: [reason],
+        parseStatus: "parsed_json",
+        normalizationStatus: "failed",
+        options: generationLedger,
+      });
+
+      return unavailableAiFirstPlanDraft({
+        reason,
+        issues: ["OpenAI repeated transient runner context in the authored plan output."],
+        model: resolvedModel,
+        responseId: latestGenerationTrace?.provider.responseId ?? response.body.id ?? null,
+        startedAt,
+        debug: { ...responseDebug, requestPhase: "rejected_after_validation" },
+        generationTrace: latestGenerationTrace,
+      });
+    }
+
+    const { requestContext: _requestContext, ...compilerAuthoringInput } = authoringInput;
     const normalized = normalizeOpenAiFirstPlanContractOutput({
       parsedOutput,
-      authoringInput,
+      authoringInput: compilerAuthoringInput,
     });
 
     if (!normalized.ok) {
@@ -284,7 +324,6 @@ export async function generateAiFirstPlanDraftPreview({
       });
 
       return unavailableAiFirstPlanDraft({
-        authoringInput,
         reason: normalized.reason,
         issues: normalized.issues.map((issue) => `${issue.code}: ${issue.message}`).slice(0, 12),
         model: resolvedModel,
@@ -317,7 +356,6 @@ export async function generateAiFirstPlanDraftPreview({
 
     return {
       ok: true,
-      authoringInput,
       canonicalPlan: finalized.canonicalPlan,
       metadata: {
         ...finalized.metadata,
@@ -330,7 +368,10 @@ export async function generateAiFirstPlanDraftPreview({
       },
     };
   } catch (error) {
-    const unavailableReason = classifyAiFirstPlanDraftError(error);
+    const unavailableReason =
+      error instanceof AiFirstPlanDraftServiceError
+        ? error.reason
+        : "ai_authored_plan_first_provider_transport_failed";
     const errorGenerationTrace = generationTraceFromError(error) ?? latestGenerationTrace;
     const unavailableParseStatus =
       error instanceof AiFirstPlanDraftServiceError &&
@@ -350,9 +391,15 @@ export async function generateAiFirstPlanDraftPreview({
     latestGenerationTrace = await recordAiPlanGenerationUnavailable({
       trace: errorGenerationTrace,
       reason: unavailableReason,
-      issues: [
-        `${unavailableReason}: ${boundedErrorMessage(error, "Provider request failed safely.")}`,
-      ],
+      issues:
+        error instanceof AiFirstPlanDraftServiceError && error.debug.transportFailureCode
+          ? [error.debug.transportFailureCode]
+          : [
+              `${unavailableReason}: ${boundedErrorMessage(
+                error,
+                "Provider request failed safely.",
+              )}`,
+            ],
       parseStatus:
         errorGenerationTrace?.pipeline.parseStatus &&
         errorGenerationTrace.pipeline.parseStatus !== "not_started"
@@ -368,7 +415,6 @@ export async function generateAiFirstPlanDraftPreview({
     });
 
     return unavailableAiFirstPlanDraft({
-      authoringInput,
       reason: unavailableReason,
       issues: [boundedErrorMessage(error, unavailableReason)],
       model: resolvedModel,
@@ -454,6 +500,7 @@ async function requestOpenAiFirstPlanDraft({
   signal,
   generationLedger,
   prompt,
+  transcriptRedactedValues,
   generationTrace: initialGenerationTrace,
 }: {
   apiKey: string;
@@ -464,6 +511,7 @@ async function requestOpenAiFirstPlanDraft({
   signal?: AbortSignal;
   generationLedger?: AiPlanGenerationLedgerOptions;
   prompt: ReturnType<typeof buildOpenAiFirstPlanContractPrompt>;
+  transcriptRedactedValues: readonly string[];
   generationTrace: AiPlanGenerationLedgerTrace | null;
 }) {
   const controller = new AbortController();
@@ -479,13 +527,15 @@ async function requestOpenAiFirstPlanDraft({
     userPromptChars: prompt.userPrompt.length,
     responseSchemaChars: JSON.stringify(prompt.responseSchema).length,
     requestPhase: "request_started",
+    abortReason: null,
     abortFired: false,
+    transportMode: fetchImpl === globalThis.fetch ? "canonical_no_deadline" : "injected",
     openAiElapsedMs: null,
   });
   let generationTrace = initialGenerationTrace;
   const requestBody = JSON.stringify({
     model,
-    ...(supportsReasoningEffort(model) ? { reasoning: { effort: "minimal" } } : {}),
+    ...(supportsReasoningEffort(model) ? { reasoning: { effort: "low" } } : {}),
     max_output_tokens: maxOutputTokens,
     input: [
       {
@@ -508,6 +558,7 @@ async function requestOpenAiFirstPlanDraft({
       },
     ],
     text: {
+      verbosity: "low",
       format: {
         type: "json_schema",
         name: AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME,
@@ -546,6 +597,7 @@ async function requestOpenAiFirstPlanDraft({
         responseReceivedAt,
         requestBody,
         responseBody: responseBodyText,
+        redactedValues: transcriptRedactedValues,
       },
       {
         disabled: generationLedger?.disabled,
@@ -580,6 +632,7 @@ async function requestOpenAiFirstPlanDraft({
           {
             ...baseDebug,
             requestPhase: "request_cancelled",
+            abortReason: "cancelled",
             abortFired: true,
             openAiElapsedMs: Date.now() - requestStartedAt,
           },
@@ -588,7 +641,7 @@ async function requestOpenAiFirstPlanDraft({
       }
 
       providerRequestStarted = true;
-      const response = await fetchImpl(OPENAI_RESPONSES_URL, {
+      const requestInit: RequestInit & { dispatcher?: Dispatcher } = {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -596,7 +649,11 @@ async function requestOpenAiFirstPlanDraft({
         },
         body: requestBody,
         signal: controller.signal,
-      });
+      };
+      if (fetchImpl === globalThis.fetch) {
+        requestInit.dispatcher = await getOpenAiProviderDispatcher();
+      }
+      const response = await fetchImpl(OPENAI_RESPONSES_URL, requestInit);
       httpStatus = response.status;
       responseContentType = response.headers.get("content-type");
       responseReceivedAt = new Date().toISOString();
@@ -679,7 +736,7 @@ async function requestOpenAiFirstPlanDraft({
 
         throw new AiFirstPlanDraftServiceError(
           "ai_authored_plan_first_request_failed",
-          [extractOpenAiError(body)],
+          ["OpenAI rejected the first-plan request."],
           { ...responseDebug, requestPhase: "request_failed" },
           generationTrace,
         );
@@ -702,7 +759,7 @@ async function requestOpenAiFirstPlanDraft({
             : cancelled
               ? "OpenAI cancelled first-plan generation before completion."
               : failed
-                ? extractOpenAiError(body)
+                ? "OpenAI failed first-plan generation."
                 : `OpenAI first-plan generation did not complete (status: ${providerStatus ?? "missing"}).`,
         ];
         await recordTranscript(
@@ -750,9 +807,18 @@ async function requestOpenAiFirstPlanDraft({
       }
 
       const cancelled = abortReason === "cancelled";
+      const transportFailureCode = cancelled
+        ? "request_signal_aborted"
+        : abortReason === "timeout"
+          ? "backend_timeout"
+          : classifyProviderTransportFailure(error);
       throw new AiFirstPlanDraftServiceError(
-        cancelled ? "ai_authored_plan_first_cancelled" : classifyAiFirstPlanDraftError(error),
-        [boundedErrorMessage(error, "AI first-plan request failed.")],
+        cancelled
+          ? "ai_authored_plan_first_cancelled"
+          : abortReason === "timeout"
+            ? "ai_authored_plan_first_timed_out"
+            : "ai_authored_plan_first_provider_transport_failed",
+        [transportFailureCode],
         {
           ...baseDebug,
           requestPhase: cancelled
@@ -760,7 +826,9 @@ async function requestOpenAiFirstPlanDraft({
             : abortReason === "timeout"
               ? "timeout_before_response"
               : "request_failed",
+          abortReason,
           abortFired,
+          transportFailureCode,
           openAiElapsedMs: Date.now() - requestStartedAt,
         },
         generationTrace,
@@ -780,6 +848,7 @@ async function requestOpenAiFirstPlanDraft({
         {
           ...baseDebug,
           requestPhase: "timeout_before_response",
+          abortReason: "timeout",
           abortFired: true,
           openAiElapsedMs: Date.now() - requestStartedAt,
         },
@@ -830,7 +899,9 @@ function buildNotStartedDebug({
     userPromptChars: null,
     responseSchemaChars: null,
     requestPhase: "not_started",
+    abortReason: null,
     abortFired: false,
+    transportMode: "not_started",
     openAiElapsedMs: null,
   });
 }
@@ -843,7 +914,9 @@ function buildRequestDebug({
   userPromptChars,
   responseSchemaChars,
   requestPhase,
+  abortReason,
   abortFired,
+  transportMode,
   openAiElapsedMs,
 }: {
   model: string;
@@ -853,7 +926,9 @@ function buildRequestDebug({
   userPromptChars: number | null;
   responseSchemaChars: number | null;
   requestPhase: AiFirstPlanDraftDebugMetadata["requestPhase"];
+  abortReason: AiFirstPlanDraftDebugMetadata["abortReason"];
   abortFired: boolean;
+  transportMode: AiFirstPlanDraftDebugMetadata["transportMode"];
   openAiElapsedMs: number | null;
 }): AiFirstPlanDraftDebugMetadata {
   return {
@@ -862,7 +937,14 @@ function buildRequestDebug({
     contractMode: AI_FIRST_PLAN_CONTRACT_MODE,
     responseSchemaMode: AI_FIRST_PLAN_RESPONSE_SCHEMA_MODE,
     requestPhase,
+    abortReason,
     abortFired,
+    transportMode,
+    transportHeadersTimeoutMs:
+      transportMode === "canonical_no_deadline" ? OPENAI_PROVIDER_HEADERS_TIMEOUT_MS : null,
+    transportBodyTimeoutMs:
+      transportMode === "canonical_no_deadline" ? OPENAI_PROVIDER_BODY_TIMEOUT_MS : null,
+    transportFailureCode: null,
     openAiElapsedMs,
     promptCharEstimate:
       systemPromptChars == null || userPromptChars == null || responseSchemaChars == null
@@ -978,7 +1060,6 @@ function diagnosticCodesFromIssues(issues: readonly string[], fallback?: string)
 }
 
 function unavailableAiFirstPlanDraft({
-  authoringInput,
   reason,
   issues,
   model,
@@ -987,7 +1068,6 @@ function unavailableAiFirstPlanDraft({
   debug,
   generationTrace,
 }: {
-  authoringInput: StructuredPlanAuthoringInput;
   reason: string;
   issues: string[];
   model: string;
@@ -1013,7 +1093,6 @@ function unavailableAiFirstPlanDraft({
     reason: "ai_authored_plan_first_unavailable",
     message: "We could not create a safe AI-authored plan draft. Please retry.",
     issues: validationIssues,
-    authoringInput,
     metadata: {
       sourceKind: AI_AUTHORED_PLAN_FIRST_SOURCE_KIND,
       sourceStatus: "plan_first_unavailable",
@@ -1027,6 +1106,20 @@ function unavailableAiFirstPlanDraft({
       debug,
     },
   };
+}
+
+function containsExactRunnerContext(value: unknown, runnerComment: string): boolean {
+  if (typeof value === "string") {
+    return value.includes(runnerComment);
+  }
+  if (Array.isArray(value)) {
+    return value.some((entry) => containsExactRunnerContext(entry, runnerComment));
+  }
+  if (value && typeof value === "object") {
+    return Object.values(value).some((entry) => containsExactRunnerContext(entry, runnerComment));
+  }
+
+  return false;
 }
 
 async function withTimeout<T>(
@@ -1079,14 +1172,6 @@ function extractStructuredOutputText(
   );
 }
 
-function extractOpenAiError(response: OpenAiResponseBody) {
-  if (typeof response.error?.message === "string" && response.error.message.trim()) {
-    return response.error.message.trim();
-  }
-
-  return "Unknown OpenAI error.";
-}
-
 function safeParseJson(raw: string) {
   if (hasPathologicalJsonNumber(raw)) {
     return null;
@@ -1136,16 +1221,49 @@ function hasPathologicalJsonNumber(raw: string) {
   return false;
 }
 
-function classifyAiFirstPlanDraftError(error: unknown) {
-  if (error instanceof AiFirstPlanDraftServiceError) {
-    return error.reason;
+function classifyProviderTransportFailure(
+  error: unknown,
+): NonNullable<AiFirstPlanDraftDebugMetadata["transportFailureCode"]> {
+  switch (findTransportErrorCode(error)) {
+    case "UND_ERR_HEADERS_TIMEOUT":
+      return "provider_headers_timeout";
+    case "UND_ERR_BODY_TIMEOUT":
+      return "provider_body_timeout";
+    case "UND_ERR_CONNECT_TIMEOUT":
+      return "provider_connect_timeout";
+    case "ECONNRESET":
+    case "UND_ERR_SOCKET":
+      return "provider_connection_reset";
+    case "EAI_AGAIN":
+    case "ENOTFOUND":
+      return "provider_dns_failure";
+    default:
+      return "provider_transport_error";
+  }
+}
+
+const getOpenAiProviderDispatcher = createServerOnlyFn(async (): Promise<Dispatcher> => {
+  openAiProviderDispatcherPromise ??= import("undici").then(
+    ({ Agent }) =>
+      new Agent({
+        headersTimeout: OPENAI_PROVIDER_HEADERS_TIMEOUT_MS,
+        bodyTimeout: OPENAI_PROVIDER_BODY_TIMEOUT_MS,
+      }),
+  );
+  return openAiProviderDispatcherPromise;
+});
+
+function findTransportErrorCode(error: unknown, depth = 0): string | null {
+  if (!error || typeof error !== "object" || depth > 3) {
+    return null;
   }
 
-  if (error instanceof Error && error.name === "AbortError") {
-    return "ai_authored_plan_first_cancelled";
+  const code = Reflect.get(error, "code");
+  if (typeof code === "string" && /^[A-Z0-9_]+$/.test(code)) {
+    return code;
   }
 
-  return "ai_authored_plan_first_unavailable";
+  return findTransportErrorCode(Reflect.get(error, "cause"), depth + 1);
 }
 
 function boundedErrorMessage(error: unknown, defaultMessage: string) {

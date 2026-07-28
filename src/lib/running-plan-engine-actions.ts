@@ -32,7 +32,6 @@ import {
   planGoalIntentInputSchema,
 } from "@/lib/plan-creation-engine";
 import { RUNNING_PLAN_RUNNER_LEVEL_VALUES } from "@/lib/plan-creation-engine/source-types";
-import { findLocalAuthAccountByUserId } from "@/lib/local-auth";
 import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
 import {
   RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
@@ -43,6 +42,7 @@ import {
   type RunningPlanReviewedPreviewDraft,
 } from "@/lib/running-plan-engine-review";
 import { stableJsonEqual } from "@/lib/review-token-signing";
+import { generatedPlanRunnerCommentInputSchema } from "@/lib/structured-plan-authoring-schema";
 import { getRunnerPlanAuthoringProfileSnapshotForUserId } from "@/lib/user-settings-actions";
 import { WEEKDAY_NAMES } from "@/lib/weekday-rest-invariants";
 
@@ -89,6 +89,7 @@ export const runningPlanPreviewInputSchema = z
     preferredLongRunDay: weekdayNameSchema.optional().nullable(),
     startDate: z.string().trim().optional().nullable(),
     benchmark: runningPlanBenchmarkSchema.optional().nullable(),
+    runnerComment: generatedPlanRunnerCommentInputSchema,
     planGoalIntent: planGoalIntentInputSchema.extend({
       distance: planGoalIntentDistanceInputSchema,
     }),
@@ -97,9 +98,13 @@ export const runningPlanPreviewInputSchema = z
 
 export const runningPlanSourceKindSchema = z.literal(AI_GENERATED_RUNNING_PLAN_SOURCE_KIND);
 
+const runningPlanReviewedPreviewInputSchema = runningPlanPreviewInputSchema.omit({
+  runnerComment: true,
+});
+
 export const runningPlanConfirmInputSchema = z
   .object({
-    previewInput: runningPlanPreviewInputSchema,
+    previewInput: runningPlanReviewedPreviewInputSchema,
     sourceKind: runningPlanSourceKindSchema,
     reviewToken: z.string().trim().min(16),
     reviewChecksum: z.string().trim().length(64),
@@ -171,7 +176,7 @@ export const previewRunningPlanDraft = createServerFn({ method: "POST" })
 
     return buildReviewedAiGeneratedRunningPlanPreviewForUser(persistedUserId, data, {
       aiPreview: { signal: getRequest().signal },
-      qaFixtureAuthorized: await isLocalQaFixtureAuthorized(auth),
+      qaFixtureAuthorized: isLocalQaFixtureSessionAuthorized(auth),
     });
   });
 
@@ -207,7 +212,7 @@ export const confirmRunningPlanDraft = createServerFn({ method: "POST" })
     }
 
     return confirmRunningPlanDraftForUser(userId, data, {
-      allowLocalQaFixture: await isLocalQaFixtureAuthorized(auth),
+      allowLocalQaFixture: isLocalQaFixtureSessionAuthorized(auth),
     });
   });
 
@@ -493,13 +498,10 @@ function buildConfirmFailure(input: {
   };
 }
 
-async function isLocalQaFixtureAuthorized(auth: ReturnType<typeof getRequestAuthContext>) {
-  if (auth.provider !== "local" || !auth.userId || !isAiGeneratedRunningPlanDevFixtureEnabled()) {
-    return false;
-  }
-
-  const account = await findLocalAuthAccountByUserId(auth.userId);
-  return account?.role === "tester" && account.qaFixtureAccess === true;
+function isLocalQaFixtureSessionAuthorized(auth: ReturnType<typeof getRequestAuthContext>) {
+  return (
+    auth.provider === "local" && Boolean(auth.userId) && isAiGeneratedRunningPlanDevFixtureEnabled()
+  );
 }
 
 function isLocalQaFixtureReviewedDraft(draft: AiGeneratedRunningPlanPreviewDraft) {

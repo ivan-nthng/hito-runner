@@ -107,6 +107,7 @@ export const MANUAL_WORKOUT_BLOCK_KEY_VALUES = [
   "long_run_body_block",
   "long_run_finish_block",
   "strides_block",
+  "hydration_block",
   "drills_mobility_note_block",
   "coach_cue_note_block",
 ] as const;
@@ -173,6 +174,9 @@ const manualWorkoutTargetInputSchema = z
     hrZone: z.string().trim().min(1).max(80).optional(),
     hrZoneReference: z.string().trim().min(1).max(80).optional(),
     hrProfileSource: z.enum(["personal", "estimated"]).optional(),
+    hrBandBpmMin: z.number().int().optional(),
+    hrBandBpmMax: z.number().int().optional(),
+    hrExecutionRangeKind: z.enum(["full_band", "ai_selected_subrange"]).optional(),
   })
   .strict();
 

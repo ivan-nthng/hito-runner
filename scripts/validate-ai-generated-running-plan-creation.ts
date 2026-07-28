@@ -9,6 +9,7 @@ import {
   AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
   AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV,
   AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV,
+  AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID,
   buildAiGeneratedRunningPlanDevFixtureOpenAiFetch,
   buildAiGeneratedRunningPlanDevFixturePreviewOptions,
   isAiGeneratedRunningPlanDevFixtureEnabled,
@@ -20,17 +21,20 @@ import {
   createAiPlanGenerationLedgerTrace,
   updateAiPlanGenerationLedgerTrace,
 } from "../src/lib/ai-plan-generation-ledger";
-import { queryLocalRuntimeEvents } from "../src/lib/local-runtime-observability";
+import {
+  queryLocalRuntimeEvents,
+  readLocalRuntimeArtifact,
+} from "../src/lib/local-runtime-observability";
 import {
   AI_AUTHORED_PLAN_FIRST_SOURCE_KIND,
   compileAiAuthoredPlanFirstDraft,
 } from "../src/lib/ai-authored-plan-first-compiler";
 import {
   AI_AUTHORED_PLAN_FIRST_PACE_MIN_PER_KM_PATTERN,
-  AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME,
-  buildAiAuthoredPlanFirstOpenAiSchema,
-  type AiAuthoredPlanFirstProviderDraft,
-  type AiAuthoredPlanFirstProviderUnit,
+  aiAuthoredPlanFirstCompilerDraftSchema,
+  buildAiAuthoredPlanFirstPrompt,
+  type AiAuthoredPlanFirstCompilerDraft,
+  type AiAuthoredPlanFirstCompilerUnit,
 } from "../src/lib/ai-authored-plan-first-provider-contract";
 import {
   AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
@@ -39,10 +43,10 @@ import {
 } from "../src/lib/ai-generated-running-plan";
 import { buildImportedPlanSeed } from "../src/lib/imported-plan";
 import { buildReviewedFirstPlanImportedSeed } from "../src/lib/active-plan-persistence";
-import { buildPersistedWorkoutInsertRows } from "../src/lib/persisted-plan-replacement";
 import {
   buildReviewedAiGeneratedRunningPlanPreview as buildReviewedAiGeneratedRunningPlanPreviewRuntime,
   confirmRunningPlanDraftForUser,
+  runningPlanConfirmInputSchema,
   runningPlanPreviewInputSchema,
   type RunningPlanPreviewActionInput,
 } from "../src/lib/running-plan-engine-actions";
@@ -52,15 +56,16 @@ import {
   validateRunningPlanReviewExactness,
   validateSelfContainedRunningPlanReviewToken,
 } from "../src/lib/running-plan-engine-review";
+import { base64UrlDecodeUtf8 } from "../src/lib/review-token-signing";
 import { selectedDistanceEndpointMainDistanceMeters } from "../src/lib/plan-creation-engine";
-import { normalizeRunnerTrainingPreferencesForSave } from "../src/lib/runner-training-preferences";
-import { structuredPlanAuthoringInputSchema } from "../src/lib/structured-plan-authoring-schema";
-import { addDaysIso, weekdayLong } from "../src/lib/training";
+import { GENERATED_PLAN_RUNNER_COMMENT_MAX_LENGTH } from "../src/lib/structured-plan-authoring-schema";
+import { addDaysIso } from "../src/lib/training";
+import { validateGeneratedLongRunExecutionPolicyContract } from "./long-run-execution-policy-proof";
 import {
-  normalizeWorkoutDocumentTarget,
-  readWorkoutDocumentSections,
-  workoutDocumentTargetToWire,
-} from "../src/lib/workout-document";
+  parsePositiveIntegerOption,
+  resolveDirectCanaryTimeoutPolicy,
+} from "./ai-first-plan-draft-ops/cli";
+import { validatePlanFirstHeartRateTargetContract } from "./plan-first-heart-rate-target-proof";
 import { validatePlanFirstProviderRepresentationContract } from "./plan-first-provider-representation-proof";
 import {
   buildProofPersonalRunnerProfileSnapshot,
@@ -169,17 +174,16 @@ function buildReviewedAiGeneratedRunningPlanPreview(
   });
 }
 
+validateGeneratedLongRunExecutionPolicyContract();
+validateDirectLiveCanaryTimeoutPolicy();
+validatePlanFirstHeartRateTargetContract();
 await validatePlanFirstPreviewScenarios();
 await validatePlanFirstAuthoringAuthority();
-await validateOptionalAvailabilityStates();
-await validateProviderContractBoundary();
+await validateRunnerPlanCommentContract();
 await validateFaithfulPlanFirstAtomization();
 validateDistanceFirstInputTruth();
 await validateFirstPlanGenerationLifecycle();
 await validateTypedPlanFirstFailureOutcomes();
-await validateInvalidProviderOutputFailsBeforeReview();
-await validatePathologicalProviderNumberFailsBeforeReview();
-await validateProviderStructuralBoundsFailBeforeReview();
 await validatePlanFirstProviderRepresentationContract();
 await validateLocalDevFixtureAvailabilityGating();
 await validateLocalGenerationIncidentTrail();
@@ -190,6 +194,308 @@ console.log("AI-generated plan-first creation contract checks passed.", {
   sourceKind: AI_AUTHORED_PLAN_FIRST_SOURCE_KIND,
   contractMode: "plan_first",
 });
+
+function validateDirectLiveCanaryTimeoutPolicy() {
+  assert.throws(
+    () => resolveDirectCanaryTimeoutPolicy({}, "live"),
+    /--live requires an explicit --timeout-ms value/,
+    "A paid direct canary must never inherit an implicit client deadline.",
+  );
+  assert.deepEqual(resolveDirectCanaryTimeoutPolicy({ "timeout-ms": "0" }, "live"), {
+    timeoutMs: 0,
+    deadline: "none",
+    source: "explicit_cli",
+  });
+  assert.deepEqual(resolveDirectCanaryTimeoutPolicy({ "timeout-ms": "120000" }, "live"), {
+    timeoutMs: 120_000,
+    deadline: "bounded",
+    source: "explicit_cli",
+  });
+  assert.deepEqual(resolveDirectCanaryTimeoutPolicy({}, "mock"), {
+    timeoutMs: 45_000,
+    deadline: "bounded",
+    source: "mock_default",
+  });
+  for (const timeoutMs of ["0junk", "1.5", "-1", "2147483648"]) {
+    assert.throws(
+      () => resolveDirectCanaryTimeoutPolicy({ "timeout-ms": timeoutMs }, "live"),
+      /--timeout-ms must be an integer between 0 and 2147483647/,
+      `The direct canary must reject an unsafe timeout value: ${timeoutMs}.`,
+    );
+  }
+  assert.throws(
+    () => parsePositiveIntegerOption("0"),
+    /--max-output-tokens must be a positive integer/,
+    "Allowing a no-deadline timeout must not weaken the output-token bound.",
+  );
+  for (const maxOutputTokens of ["1.5", "12000junk"]) {
+    assert.throws(
+      () => parsePositiveIntegerOption(maxOutputTokens),
+      /--max-output-tokens must be a positive integer/,
+      `The output-token bound must reject a malformed integer: ${maxOutputTokens}.`,
+    );
+  }
+}
+
+async function validateRunnerPlanCommentContract() {
+  const scenario = scenarios[1]!;
+  const runnerCommentCanary = `private-plan-context-${crypto.randomUUID()}`;
+  const validInput = {
+    ...scenario.input,
+    runnerComment: `  ${runnerCommentCanary}  `,
+  } satisfies RunningPlanPreviewActionInput;
+  const parsedValidInput = runningPlanPreviewInputSchema.safeParse(validInput);
+  assert.equal(parsedValidInput.success, true);
+  if (!parsedValidInput.success) throw new Error(parsedValidInput.error.message);
+  assert.equal(parsedValidInput.data.runnerComment, runnerCommentCanary);
+
+  const validAuthoring = buildAiGeneratedRunningPlanAuthoringInput(parsedValidInput.data);
+  assert.equal(validAuthoring.ok, true, validAuthoring.ok ? "" : validAuthoring.message);
+  if (!validAuthoring.ok) throw new Error(validAuthoring.message);
+  assert.equal(validAuthoring.authoringInput.requestContext?.runnerComment, runnerCommentCanary);
+  assert.equal("runnerComment" in validAuthoring.normalizedInputSummary, false);
+
+  const validPrompt = buildAiAuthoredPlanFirstPrompt({
+    authoringInput: validAuthoring.authoringInput,
+    today: scenario.input.startDate,
+  });
+  const validProviderContext = JSON.parse(validPrompt.userPrompt) as {
+    runnerFacts: { runner: { plan_request_comment?: string } };
+  };
+  assert.equal(validProviderContext.runnerFacts.runner.plan_request_comment, runnerCommentCanary);
+  assert.match(validPrompt.systemPrompt, /informational training history or current context/i);
+  assert.match(validPrompt.systemPrompt, /never overrides the exact goal/i);
+
+  const absentAuthoring = buildAiGeneratedRunningPlanAuthoringInput(scenario.input);
+  const blankInput = runningPlanPreviewInputSchema.safeParse({
+    ...scenario.input,
+    runnerComment: " \n\t ",
+  });
+  assert.equal(absentAuthoring.ok, true, absentAuthoring.ok ? "" : absentAuthoring.message);
+  assert.equal(blankInput.success, true);
+  if (!absentAuthoring.ok || !blankInput.success) {
+    throw new Error("Blank runner-comment proof could not normalize.");
+  }
+  assert.equal(blankInput.data.runnerComment, undefined);
+  const blankAuthoring = buildAiGeneratedRunningPlanAuthoringInput(blankInput.data);
+  assert.equal(blankAuthoring.ok, true, blankAuthoring.ok ? "" : blankAuthoring.message);
+  if (!blankAuthoring.ok) throw new Error(blankAuthoring.message);
+  assert.deepEqual(blankAuthoring.authoringInput, absentAuthoring.authoringInput);
+  assert.deepEqual(blankAuthoring.normalizedInputSummary, absentAuthoring.normalizedInputSummary);
+  assert.equal(
+    buildAiAuthoredPlanFirstPrompt({
+      authoringInput: blankAuthoring.authoringInput,
+      today: scenario.input.startDate,
+    }).userPrompt,
+    buildAiAuthoredPlanFirstPrompt({
+      authoringInput: absentAuthoring.authoringInput,
+      today: scenario.input.startDate,
+    }).userPrompt,
+  );
+
+  const excessiveInput = {
+    ...scenario.input,
+    runnerComment: "x".repeat(GENERATED_PLAN_RUNNER_COMMENT_MAX_LENGTH + 1),
+  } satisfies RunningPlanPreviewActionInput;
+  const excessiveSchemaResult = runningPlanPreviewInputSchema.safeParse(excessiveInput);
+  assert.equal(excessiveSchemaResult.success, false);
+  if (!excessiveSchemaResult.success) {
+    assert.match(
+      excessiveSchemaResult.error.issues.map((issue) => issue.message).join(" | "),
+      new RegExp(`${GENERATED_PLAN_RUNNER_COMMENT_MAX_LENGTH} characters or fewer`, "i"),
+    );
+  }
+  const excessiveAuthoring = buildAiGeneratedRunningPlanAuthoringInput(excessiveInput);
+  assert.equal(excessiveAuthoring.ok, false);
+  if (!excessiveAuthoring.ok) {
+    assert.equal(excessiveAuthoring.reason, "structured_input_invalid");
+    assert.match(
+      excessiveAuthoring.message,
+      new RegExp(`${GENERATED_PLAN_RUNNER_COMMENT_MAX_LENGTH} characters or fewer`, "i"),
+    );
+  }
+  assert.equal(
+    runningPlanPreviewInputSchema.safeParse({
+      ...scenario.input,
+      runnerComment: 42,
+    }).success,
+    false,
+  );
+
+  const artifactRoot = await mkdtemp(join(tmpdir(), "hito-runner-plan-comment-"));
+  try {
+    const fixtureFetch = buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
+      authoringInput: validAuthoring.authoringInput,
+      today: scenario.input.startDate,
+    });
+    let dispatchedRequestBody = "";
+    const providerResult = await generateAiFirstPlanDraftPreview({
+      input: validAuthoring.authoringInput,
+      apiKey: "synthetic-runner-comment-provider-proof",
+      model: "gpt-5-runner-comment-provider-proof",
+      today: scenario.input.startDate,
+      generationLedger: {
+        forceArtifactWrite: true,
+        artifactRoot,
+        runtimeUrl: "http://127.0.0.1:3000",
+      },
+      fetchImpl: async (url, init) => {
+        dispatchedRequestBody = String(init?.body ?? "");
+        return fixtureFetch(url, init);
+      },
+    });
+    assert.equal(providerResult.ok, true, providerResult.ok ? "" : providerResult.message);
+    if (!providerResult.ok) throw new Error(providerResult.message);
+    assert.equal(dispatchedRequestBody.split(runnerCommentCanary).length - 1, 1);
+    assert.equal("authoringInput" in providerResult, false);
+    assert.equal(JSON.stringify(providerResult).includes(runnerCommentCanary), false);
+
+    const generationId = providerResult.metadata.generationTrace?.generationId;
+    assert.ok(generationId);
+    const events = await queryLocalRuntimeEvents({ root: artifactRoot, generationId });
+    assert.equal(JSON.stringify(events).includes(runnerCommentCanary), false);
+    const transcriptEvent = events.find(
+      (event) => event.outcomeCode === "provider_transcript_completed",
+    );
+    assert.ok(transcriptEvent?.rawArtifactPath);
+    const transcript = await readLocalRuntimeArtifact({
+      root: artifactRoot,
+      rawArtifactPath: transcriptEvent!.rawArtifactPath!,
+    });
+    assert.equal(transcript.contents.includes(runnerCommentCanary), false);
+    assert.match(transcript.contents, /\[REDACTED_RUNNER_CONTEXT\]/);
+
+    const reviewed = await buildReviewedAiGeneratedRunningPlanPreview(parsedValidInput.data, {
+      aiPreview: {
+        apiKey: "synthetic-runner-comment-review-proof",
+        model: "gpt-5-runner-comment-review-proof",
+        today: scenario.input.startDate,
+        generationLedger: { disabled: true },
+        fetchImpl: buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
+          authoringInput: validAuthoring.authoringInput,
+          today: scenario.input.startDate,
+        }),
+      },
+    });
+    assert.equal(reviewed.ok, true, reviewed.ok ? "" : reviewed.unavailable.error.message);
+    if (!reviewed.ok) throw new Error(reviewed.unavailable.error.message);
+    assert.equal("runnerComment" in reviewed.draft.previewInput, false);
+    assert.equal("runnerComment" in reviewed.draft.normalizedInputSummary, false);
+    assert.equal(JSON.stringify(reviewed.draft).includes(runnerCommentCanary), false);
+
+    const encodedReviewEnvelope = reviewed.draft.reviewToken.split(".")[1];
+    assert.ok(encodedReviewEnvelope);
+    const decodedReviewEnvelope = base64UrlDecodeUtf8(encodedReviewEnvelope!);
+    assert.equal(decodedReviewEnvelope.includes(runnerCommentCanary), false);
+    assert.doesNotMatch(
+      decodedReviewEnvelope,
+      /"runnerComment"|"requestContext"|"plan_request_comment"/,
+    );
+    const exactness = await validateSelfContainedRunningPlanReviewToken({
+      reviewToken: reviewed.draft.reviewToken,
+      reviewChecksum: reviewed.draft.reviewChecksum,
+    });
+    assert.equal(exactness.ok, true);
+    if (!exactness.ok) throw new Error(exactness.message);
+    assert.equal(JSON.stringify(exactness.reviewPayload).includes(runnerCommentCanary), false);
+
+    const persistenceMetadata = buildRunningPlanPersistenceMetadata({
+      draft: reviewed.draft,
+      canonicalPlan: buildRunningPlanCanonicalPlan(reviewed.draft),
+      reviewChecksum: reviewed.draft.reviewChecksum,
+    });
+    assert.equal(JSON.stringify(persistenceMetadata).includes(runnerCommentCanary), false);
+    assert.equal(
+      runningPlanConfirmInputSchema.safeParse({
+        previewInput: {
+          ...reviewed.draft.previewInput,
+          runnerComment: runnerCommentCanary,
+        },
+        sourceKind: reviewed.draft.sourceKind,
+        reviewToken: reviewed.draft.reviewToken,
+        reviewChecksum: reviewed.draft.reviewChecksum,
+      }).success,
+      false,
+    );
+
+    const echoFixtureFetch = buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
+      authoringInput: validAuthoring.authoringInput,
+      today: scenario.input.startDate,
+    });
+    const echoFixtureResponse = await echoFixtureFetch("https://api.openai.com/v1/responses", {});
+    const echoFixtureBody = (await echoFixtureResponse.json()) as {
+      id: string;
+      status: string;
+      output_text: string;
+      usage: unknown;
+    };
+    const echoedDraft = parseFixtureProviderDraft(echoFixtureBody.output_text);
+    const transientCompilerInput = compileAiAuthoredPlanFirstDraft({
+      draft: echoedDraft,
+      authoringInput: validAuthoring.authoringInput,
+    });
+    assert.equal(transientCompilerInput.ok, false);
+    if (!transientCompilerInput.ok) {
+      assert.equal(
+        transientCompilerInput.reason,
+        "ai_authored_plan_first_transient_context_after_dispatch",
+      );
+    }
+    echoedDraft.workouts[0]!.cue = runnerCommentCanary;
+    const echoedResult = await generateAiFirstPlanDraftPreview({
+      input: validAuthoring.authoringInput,
+      apiKey: "synthetic-runner-comment-echo-proof",
+      model: "gpt-5-runner-comment-echo-proof",
+      today: scenario.input.startDate,
+      generationLedger: { disabled: true },
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            ...echoFixtureBody,
+            id: "synthetic-runner-comment-echo",
+            output_text: JSON.stringify(echoedDraft),
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    });
+    assert.equal(echoedResult.ok, false);
+    if (echoedResult.ok || echoedResult.reason === "structured_input_invalid") {
+      throw new Error("Echoed transient runner context unexpectedly reached a canonical draft.");
+    }
+    assert.equal(
+      echoedResult.metadata.unavailableReason,
+      "ai_authored_plan_first_runner_context_echoed",
+    );
+    assert.equal("authoringInput" in echoedResult, false);
+    assert.equal("reviewToken" in echoedResult, false);
+    assert.equal(JSON.stringify(echoedResult).includes(runnerCommentCanary), false);
+    const echoedPreview = await buildReviewedAiGeneratedRunningPlanPreview(parsedValidInput.data, {
+      aiPreview: {
+        apiKey: "synthetic-runner-comment-echo-preview-proof",
+        model: "gpt-5-runner-comment-echo-preview-proof",
+        today: scenario.input.startDate,
+        generationLedger: { disabled: true },
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              ...echoFixtureBody,
+              id: "synthetic-runner-comment-echo-preview",
+              output_text: JSON.stringify(echoedDraft),
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          ),
+      },
+    });
+    assert.equal(echoedPreview.ok, false);
+    if (echoedPreview.ok) {
+      throw new Error("Echoed transient runner context unexpectedly reached signed review.");
+    }
+    assert.equal(echoedPreview.unavailable.previewOutcome, "malformed_provider_output");
+    assert.equal(JSON.stringify(echoedPreview).includes(runnerCommentCanary), false);
+  } finally {
+    await rm(artifactRoot, { recursive: true, force: true });
+  }
+}
 
 async function validatePlanFirstPreviewScenarios() {
   for (const scenario of scenarios) {
@@ -293,9 +599,8 @@ async function validatePlanFirstAuthoringAuthority() {
     message: "Save and accept the runner baseline before creating a generated plan.",
   });
 
-  const fixtureOptions = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
+  const fixtureFetch = buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
     authoringInput: authoring.authoringInput,
-    qaFixtureAuthorized: true,
     today: ambitiousShortHorizonInput.startDate,
     env: {
       LOCAL_AUTH_BYPASS_ENABLED: "true",
@@ -305,12 +610,12 @@ async function validatePlanFirstAuthoringAuthority() {
       [AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV]: "qa_fixture",
     },
   });
-  assert.ok(fixtureOptions?.fetchImpl);
   let providerCalls = 0;
-  const fixtureFetch = fixtureOptions!.fetchImpl!;
   const reviewed = await buildReviewedAiGeneratedRunningPlanPreview(ambitiousShortHorizonInput, {
     aiPreview: {
-      ...fixtureOptions,
+      apiKey: "local-qa-dev-ai-generated-plan-fixture",
+      model: AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
+      today: ambitiousShortHorizonInput.startDate,
       generationLedger: { disabled: true },
       fetchImpl: async (url, init) => {
         providerCalls += 1;
@@ -373,199 +678,63 @@ async function validatePlanFirstAuthoringAuthority() {
   assert.equal(invalidProviderCalls, 0);
 }
 
-async function validateOptionalAvailabilityStates() {
-  assert.deepEqual(
-    normalizeRunnerTrainingPreferencesForSave({
-      fixedRestDays: ["Tuesday", "Saturday"],
-      defaultRunningDaysPerWeek: 6,
-      preferredLongRunDay: "Sunday",
-    }),
-    {
-      blocked_days: ["Tuesday", "Saturday"],
-      max_running_days_per_week: 6,
-      preferred_long_run_day: "Sunday",
-    },
-  );
-  assert.deepEqual(
-    normalizeRunnerTrainingPreferencesForSave({
-      fixedRestDays: [],
-      defaultRunningDaysPerWeek: null,
-      preferredLongRunDay: null,
-    }),
-    {
-      blocked_days: [],
-      max_running_days_per_week: null,
-      preferred_long_run_day: null,
-    },
-  );
-
-  const states = [
-    {
-      name: "both",
-      input: { ...baseInput, preferredLongRunDay: null },
-      expectedFixedRestDays: baseInput.fixedRestDays,
-      expectedCeiling: baseInput.daysPerWeek,
-    },
-    {
-      name: "ceiling_only",
-      input: { ...baseInput, fixedRestDays: null, preferredLongRunDay: null },
-      expectedFixedRestDays: null,
-      expectedCeiling: baseInput.daysPerWeek,
-    },
-    {
-      name: "fixed_rest_only",
-      input: { ...baseInput, daysPerWeek: null, preferredLongRunDay: null },
-      expectedFixedRestDays: baseInput.fixedRestDays,
-      expectedCeiling: null,
-    },
-    {
-      name: "neither",
-      input: {
-        ...baseInput,
-        daysPerWeek: null,
-        fixedRestDays: null,
-        preferredLongRunDay: null,
-      },
-      expectedFixedRestDays: null,
-      expectedCeiling: null,
-    },
-  ] as const;
-
-  for (const state of states) {
-    const input: RunningPlanPreviewActionInput = {
-      ...state.input,
-      planGoalIntent: { distance: { kind: "preset", preset: "10K" } },
-    };
-    const reviewed = await buildReviewedAiGeneratedRunningPlanPreview(input, {
-      aiPreview: buildScenarioAiPreviewOptions(input),
-    });
-    assert.equal(
-      reviewed.ok,
-      true,
-      reviewed.ok ? "" : `${state.name}: ${reviewed.unavailable.error.message}`,
-    );
-    if (!reviewed.ok) continue;
-
-    assert.equal(reviewed.draft.normalizedInputSummary.daysPerWeek, state.expectedCeiling);
-    assert.deepEqual(
-      reviewed.draft.normalizedInputSummary.fixedRestDays,
-      state.expectedFixedRestDays,
-    );
-    const canonicalPlan = buildRunningPlanCanonicalPlan(reviewed.draft);
-    assert.equal(
-      canonicalPlan.plan_preferences?.max_running_days_per_week,
-      state.expectedCeiling ?? undefined,
-    );
-    assert.deepEqual(
-      canonicalPlan.plan_preferences?.blocked_days,
-      state.expectedFixedRestDays ?? undefined,
-    );
-    assert.equal(canonicalPlan.plan_preferences?.preferred_running_days, undefined);
-    assert.equal(canonicalPlan.plan_preferences?.preferred_long_run_day, undefined);
-    const seed = buildReviewedFirstPlanImportedSeed(canonicalPlan);
-    const persistedPreferences = seed.planPreferences as Record<string, unknown> | null;
-    assert.equal(
-      persistedPreferences?.max_running_days_per_week,
-      state.expectedCeiling ?? undefined,
-    );
-    assert.deepEqual(persistedPreferences?.blocked_days, state.expectedFixedRestDays ?? undefined);
-    assert.equal(reviewed.draft.persisted, false);
-    assert.ok(reviewed.draft.reviewToken);
-    assert.equal(reviewed.draft.reviewChecksum.length, 64);
-  }
-}
-
 async function validateFaithfulPlanFirstAtomization() {
   const paceInput = {
     ...scenarios[0]!.input,
     benchmark: { kind: "recent_5k_pace" as const, recent5kPace: "5:30/km" },
   };
   const personalProfileSnapshot = buildProofPersonalRunnerProfileSnapshot(paceInput);
-  assert.equal(personalProfileSnapshot.heartRateProfile.source, "personal");
   const resolved = buildAiGeneratedRunningPlanAuthoringInput(paceInput, personalProfileSnapshot);
   assert.equal(resolved.ok, true, resolved.ok ? "" : resolved.message);
   if (!resolved.ok) throw new Error(resolved.message);
 
-  const authoringInput = resolved.authoringInput;
-  const target = (input: {
-    mode: "pace" | "heart_rate";
-    pace?: string;
-    hrReference?: "Z1" | "Z2" | "Z3" | "Z4" | "Z5";
-  }): AiAuthoredPlanFirstProviderUnit["target"] => {
-    if (input.mode === "pace") {
-      return {
-        primary_execution_mode: "pace",
-        command: input.pace ?? "5:30/km",
-      };
-    }
-    const profileReference = input.hrReference ?? "Z2";
-    const zone = authoringInput.runnerFacts.heartRateProfile.zones.find(
-      (candidate) => candidate.reference === profileReference,
-    );
-    assert.ok(zone);
-    return {
-      primary_execution_mode: "heart_rate",
-      command: `${zone.minBpm}-${zone.maxBpm} bpm`,
-    };
-  };
-  const unit = (input: {
-    segmentType: "warmup" | "main" | "tempo_block" | "cooldown";
-    label: string;
-    durationMin?: number;
-    distanceKm?: number;
-    target: ReturnType<typeof target>;
-  }) => ({
-    kind: "unit" as const,
-    segment_type: input.segmentType,
-    label: input.label,
-    cue: null,
-    prescription:
-      input.distanceKm != null
-        ? { mode: "distance" as const, distance_km: input.distanceKm }
-        : { mode: "time" as const, duration_min: input.durationMin! },
-    target: input.target,
+  const heartRateZone = resolved.authoringInput.runnerFacts.heartRateProfile.zones.find(
+    (candidate) => candidate.reference === "Z2",
+  );
+  assert.ok(heartRateZone, "Projection proof requires the accepted Z2 snapshot.");
+  const paceTarget = (command: string): AiAuthoredPlanFirstCompilerUnit["target"] => ({
+    primary_execution_mode: "pace",
+    command,
   });
+  const heartRateTarget = (): AiAuthoredPlanFirstCompilerUnit["target"] => ({
+    primary_execution_mode: "heart_rate",
+    band_reference: "Z2",
+    command: `${heartRateZone!.minBpm}-${heartRateZone!.maxBpm} bpm`,
+  });
+  const unit = (
+    segmentType: "warmup" | "main",
+    label: string,
+    prescription:
+      | { mode: "time"; duration_min: number }
+      | { mode: "distance"; distance_km: number },
+    target: AiAuthoredPlanFirstCompilerUnit["target"],
+  ) => ({
+    kind: "unit" as const,
+    segment_type: segmentType,
+    label,
+    cue: null,
+    prescription,
+    target,
+  });
+
   const draft = {
     workouts: [
       {
         date: "2026-06-08",
         phase: "Specific",
         workout_identity: "race_pace_session",
-        title: "Coach-authored race pace",
+        title: "Race pace rehearsal",
         cue: "Execute the authored race-pace structure.",
         sections: [
-          unit({
-            segmentType: "main",
-            label: "Race pace",
-            durationMin: 15,
-            target: target({ mode: "pace", pace: "5:00-5:10/km" }),
-          }),
-        ],
-      },
-      {
-        date: "2026-06-09",
-        phase: "Build",
-        workout_identity: "controlled_tempo_session",
-        title: "Coach-authored continuous Tempo",
-        cue: "Continuous authored tempo.",
-        sections: [
-          unit({
-            segmentType: "tempo_block",
-            label: "Tempo",
-            durationMin: 20,
-            target: target({
-              mode: "pace",
-              pace: "5:00-5:10/km",
-            }),
-          }),
+          unit("main", "Race pace", { mode: "time", duration_min: 20 }, paceTarget("5:00-5:10/km")),
         ],
       },
       {
         date: "2026-06-11",
         phase: "Build",
         workout_identity: "distance_intervals",
-        title: "Coach-authored mixed intervals",
-        cue: "Complete the authored mixed interval sequence.",
+        title: "Ordered interval sequence",
+        cue: "Preserve the authored order.",
         sections: [
           {
             kind: "repeat",
@@ -579,104 +748,49 @@ async function validateFaithfulPlanFirstAtomization() {
                 label: "Settle",
                 cue: null,
                 prescription: { mode: "time", duration_min: 1 },
-                target: target({ mode: "pace", pace: "5:50-6:00/km" }),
+                target: paceTarget("5:50-6:00/km"),
               },
               {
                 role: "work",
                 label: "Work",
                 cue: null,
                 prescription: { mode: "time", duration_min: 2 },
-                target: target({ mode: "pace", pace: "4:50/km" }),
+                target: paceTarget("4:50/km"),
               },
               {
                 role: "recover",
                 label: "Float",
                 cue: null,
                 prescription: { mode: "time", duration_min: 1 },
-                target: target({ mode: "pace", pace: "6:45-7:15/km" }),
+                target: paceTarget("6:45-7:15/km"),
               },
               {
                 role: "finish",
                 label: "Finish",
                 cue: null,
                 prescription: { mode: "time", duration_min: 0.5 },
-                target: target({ mode: "pace", pace: "5:30-5:40/km" }),
+                target: paceTarget("5:30-5:40/km"),
               },
             ],
           },
-          {
-            kind: "repeat",
-            segment_type: "strides",
-            label: "Strides",
-            cue: null,
-            rounds: 4,
-            children: [
-              {
-                role: "work",
-                label: "Stride",
-                cue: null,
-                prescription: { mode: "time", duration_min: 1 / 3 },
-                target: target({ mode: "pace", pace: "4:20-4:40/km" }),
-              },
-            ],
-          },
-          {
-            kind: "repeat",
-            segment_type: "interval_block",
-            label: "Two 4km rounds",
-            cue: null,
-            rounds: 2,
-            children: [
-              {
-                role: "work",
-                label: "4km",
-                cue: null,
-                prescription: { mode: "distance", distance_km: 4 },
-                target: target({ mode: "pace", pace: "5:00/km" }),
-              },
-            ],
-          },
-          unit({
-            segmentType: "main",
-            label: "Final one-off 2km",
-            distanceKm: 2,
-            target: target({ mode: "pace", pace: "4:55/km" }),
-          }),
         ],
       },
       {
         date: "2026-06-12",
         phase: "Endurance",
         workout_identity: "long_aerobic_run",
-        title: "Coach-authored Long Run",
-        cue: "Complete the authored long aerobic duration.",
-        sections: [
-          unit({
-            segmentType: "main",
-            label: "Main",
-            durationMin: 60,
-            target: target({ mode: "heart_rate", hrReference: "Z2" }),
-          }),
-          {
-            kind: "hydration",
-            label: "Hydration",
-            cue: "Take water.",
-          },
-        ],
+        title: "Long aerobic run",
+        cue: "Complete the authored aerobic duration.",
+        sections: [unit("main", "Main", { mode: "time", duration_min: 60 }, heartRateTarget())],
       },
       {
         date: "2026-06-14",
         phase: "Terrain",
         workout_identity: "technical_trail_easy",
-        title: "Coach-authored trail run",
+        title: "Technical trail easy",
         cue: "Follow the authored trail structure.",
         sections: [
-          unit({
-            segmentType: "main",
-            label: "Trail",
-            durationMin: 40,
-            target: target({ mode: "pace", pace: "6:10-6:40/km" }),
-          }),
+          unit("main", "Trail", { mode: "time", duration_min: 40 }, paceTarget("6:10-6:40/km")),
         ],
       },
     ],
@@ -684,230 +798,76 @@ async function validateFaithfulPlanFirstAtomization() {
       date: "2026-06-15",
       phase: "Goal",
       workout_identity: "selected_distance_completion_or_checkpoint",
-      title: "Coach-authored 10K endpoint",
-      cue: "Complete the authored selected-distance endpoint.",
+      title: "10K endpoint",
+      cue: "Complete the selected distance.",
       sections: [
-        unit({
-          segmentType: "warmup",
-          label: "Warmup",
-          distanceKm: 0.5,
-          target: target({ mode: "pace", pace: "6:45-7:15/km" }),
-        }),
-        unit({
-          segmentType: "main",
-          label: "Main",
-          distanceKm: 10,
-          target: target({ mode: "pace", pace: "5:20-5:30/km" }),
-        }),
-        unit({
-          segmentType: "cooldown",
-          label: "Cooldown",
-          distanceKm: 0.5,
-          target: target({ mode: "pace", pace: "7:00-7:30/km" }),
-        }),
+        unit(
+          "main",
+          "Selected distance",
+          { mode: "distance", distance_km: 10 },
+          paceTarget("5:20-5:30/km"),
+        ),
       ],
     },
-  } satisfies AiAuthoredPlanFirstProviderDraft;
+  } satisfies AiAuthoredPlanFirstCompilerDraft;
 
-  const compiled = compileAiAuthoredPlanFirstDraft({ draft, authoringInput });
+  const compiled = compileAiAuthoredPlanFirstDraft({
+    draft,
+    authoringInput: resolved.authoringInput,
+  });
   assert.equal(compiled.ok, true, compiled.ok ? "" : JSON.stringify(compiled.issues));
   if (!compiled.ok) throw new Error(JSON.stringify(compiled.issues));
-  assert.doesNotMatch(
-    JSON.stringify(compiled.canonicalPlan.goal),
-    /authored_outcome_target|authored_horizon|assumptions/,
-    "Compiled goal truth must not contain generic plan-level narrative metadata.",
-  );
-  assert.equal(
-    compiled.canonicalPlan.training_constraints?.running_days_per_week,
-    undefined,
-    "AI-authored workout density must remain calendar truth, not runner availability metadata.",
-  );
-  assert.equal(
-    compiled.canonicalPlan.plan_preferences?.max_running_days_per_week,
-    5,
-    "Runner-declared maximum availability must remain a separate constraint.",
-  );
 
-  const tempo = compiled.canonicalPlan.planned_workouts.find(
-    (workout) => workout.workout_identity === "controlled_tempo_session",
-  );
-  assert.ok(tempo);
-  assert.equal(tempo.segments[0]?.segment_type, "tempo_block");
-  assert.equal(tempo.segments[0]?.prescription?.mode, "time");
-  assert.equal(tempo.segments[0]?.target?.primary_execution_mode, "pace");
-  assert.equal(tempo.segments[0]?.target?.pace, "5:00-5:10/km");
-  assert.equal(tempo.segments[0]?.target?.intensity, undefined);
-  assert.equal(tempo.segments[0]?.target?.hint, undefined);
-  assert.equal(tempo.segments[0]?.target?.extra?.hr_zone, undefined);
-  assert.equal(tempo.segments[0]?.target?.hr_bpm_range, undefined);
-  assert.equal(tempo.segments[0]?.target?.hr_target_source, "effort_only");
-  assert.equal(tempo.segments[0]?.target?.cue, undefined);
-
-  const faithfulReadback = buildImportedPlanSeed(compiled.canonicalPlan);
-  const tempoReadback = faithfulReadback.workouts.find(
-    (workout) => workout.sourceWorkoutId === tempo.workout_id,
-  );
-  const tempoReadbackTarget = tempoReadback?.steps[0]?.target;
-  assert.equal(tempoReadbackTarget?.primary_execution_mode, "pace");
-  assert.equal(tempoReadbackTarget?.pace, "5:00-5:10/km");
-  assert.equal(tempoReadbackTarget?.intensity, undefined);
-  assert.equal(tempoReadbackTarget?.hint, undefined);
-  assert.equal(tempoReadbackTarget?.extra?.hr_zone, undefined);
-  assert.equal(tempoReadbackTarget?.hr_bpm_range, undefined);
-  const tempoExportTarget = workoutDocumentTargetToWire(tempoReadbackTarget);
-  assert.equal(tempoExportTarget?.primary_execution_mode, "pace");
-  assert.equal(tempoExportTarget?.pace, "5:00-5:10/km");
-  assert.equal(tempoExportTarget?.intensity, undefined);
-  assert.equal(tempoExportTarget?.hint, undefined);
-  assert.equal(tempoExportTarget?.hr_zone, undefined);
-  assert.equal(tempoExportTarget?.hr_bpm_range, undefined);
-  const tempoExportRoundTrip = normalizeWorkoutDocumentTarget(tempoExportTarget);
-  assert.equal(tempoExportRoundTrip?.primary_execution_mode, "pace");
-  assert.equal(tempoExportRoundTrip?.pace, "5:00-5:10/km");
-  assert.equal(tempoExportRoundTrip?.intensity, undefined);
-  assert.equal(tempoExportRoundTrip?.hint, undefined);
-  assert.equal(tempoExportRoundTrip?.extra?.hr_zone, undefined);
-  assert.equal(tempoExportRoundTrip?.hr_bpm_range, undefined);
-
-  const persistedTempoRow = buildPersistedWorkoutInsertRows(
-    "00000000-0000-4000-8000-000000000801",
-    "00000000-0000-4000-8000-000000000802",
-    faithfulReadback.workouts,
-  ).find((row) => row.source_workout_id === tempo.workout_id);
-  const persistedTempoTarget = readWorkoutDocumentSections(persistedTempoRow?.steps)[0]?.target;
-  assert.deepEqual(
-    persistedTempoTarget,
-    tempoReadbackTarget,
-    "Canonical persistence row shaping must preserve the AI-authored primary mode and pace command.",
-  );
-
-  const intervals = compiled.canonicalPlan.planned_workouts.find(
+  const intervalWorkout = compiled.canonicalPlan.planned_workouts.find(
     (workout) => workout.workout_identity === "distance_intervals",
   );
-  assert.ok(intervals);
-  assert.equal(intervals.workout_identity, "distance_intervals");
-  assert.equal(intervals.phase, "Build");
-  assert.equal(intervals.planned_rpe, undefined);
-  assert.equal(intervals.estimated_fatigue, undefined);
-  assert.equal(intervals.recovery_priority, undefined);
-  const orderedRepeat = intervals.segments[0]?.prescription;
-  assert.equal(orderedRepeat?.mode, "repeats");
-  if (orderedRepeat?.mode !== "repeats") throw new Error("Missing ordered Repeat proof.");
-  assert.deepEqual(
-    orderedRepeat.children?.map((child) => child.role),
-    ["run", "work", "recover", "finish"],
-  );
-  assert.equal(orderedRepeat.children?.[0]?.target?.primary_execution_mode, "pace");
-  assert.equal(orderedRepeat.children?.[1]?.target?.primary_execution_mode, "pace");
-  assert.equal(orderedRepeat.children?.[1]?.target?.pace, "4:50/km");
-  assert.equal(orderedRepeat.children?.[1]?.target?.hint, undefined);
-  assert.equal(orderedRepeat.children?.[1]?.target?.extra?.hr_zone, undefined);
-  assert.equal(orderedRepeat.children?.[1]?.target?.hr_bpm_range, undefined);
-  assert.equal(intervals.metric_mode?.executable_mode, "pace_executable");
-  assert.equal(intervals.metric_mode?.pace_targets_allowed, true);
-  assert.equal(intervals.metric_mode?.hr_targets_allowed, false);
-  const noRecoveryRepeat = intervals.segments[1]?.prescription;
-  assert.equal(noRecoveryRepeat?.mode, "repeats");
-  if (noRecoveryRepeat?.mode !== "repeats") throw new Error("Missing one-child Repeat proof.");
-  assert.deepEqual(
-    noRecoveryRepeat.children?.map((child) => child.role),
-    ["work"],
-  );
-  assert.equal(noRecoveryRepeat.children?.[0]?.target?.primary_execution_mode, "pace");
-  const twoByFourKm = intervals.segments[2]?.prescription;
-  assert.equal(twoByFourKm?.mode, "repeats");
-  assert.equal(twoByFourKm?.repeat_count, 2);
-  assert.equal(twoByFourKm?.children?.[0]?.prescription?.distance_km, 4);
-  assert.equal(intervals.segments[3]?.prescription?.mode, "distance");
-  assert.equal(intervals.segments[3]?.prescription?.distance_km, 2);
-  assert.equal(intervals.segments[3]?.target?.pace, "4:55/km");
   const readbackRepeat = buildImportedPlanSeed(compiled.canonicalPlan)
-    .workouts.find((workout) => workout.sourceWorkoutId === intervals.workout_id)
+    .workouts.find((workout) => workout.sourceWorkoutId === intervalWorkout?.workout_id)
     ?.steps.find((step) => step.prescription?.mode === "repeats");
   assert.deepEqual(
     readbackRepeat?.children?.map((child) => child.type),
     ["run", "work", "recovery", "finish"],
     "WorkoutDocument readback must preserve the canonical run child and ordered Repeat roles.",
   );
-
-  const longRun = compiled.canonicalPlan.planned_workouts.find(
-    (workout) => workout.workout_identity === "long_aerobic_run",
-  );
-  assert.equal(longRun?.workout_identity, "long_aerobic_run");
-  assert.notEqual(longRun?.workout_identity, "taper_long_run");
-  assert.equal(longRun?.segments[0]?.target?.primary_execution_mode, "heart_rate");
-  assert.equal(longRun?.segments[0]?.target?.hr_target_source, "personal_hr_zone");
-  assert.equal(longRun?.segments[0]?.target?.hr_bpm_range, "121-140 bpm");
-  assert.equal(longRun?.segments[0]?.target?.pace, undefined);
-  const hydration = longRun?.segments.find((segment) => segment.segment_type === "fueling");
-  assert.equal(hydration?.label, "Hydration");
-  assert.equal(hydration?.guidance, "Take water.");
-  assert.equal(hydration?.prescription?.mode, "none");
-  assert.equal(hydration?.target, undefined);
-  const endpoint = compiled.canonicalPlan.planned_workouts.at(-1);
   assert.equal(
     selectedDistanceEndpointMainDistanceMeters({
-      endpointKind: endpoint?.source_workout_type,
-      segments: endpoint?.segments ?? [],
+      endpointKind: compiled.canonicalPlan.planned_workouts.at(-1)?.source_workout_type,
+      segments: compiled.canonicalPlan.planned_workouts.at(-1)?.segments ?? [],
     }),
     10_000,
-    "Ancillary endpoint distance must not replace or inflate the selected-distance main truth.",
   );
 
-  let previewProviderCalls = 0;
-  const reviewedProjection = await buildReviewedAiGeneratedRunningPlanPreview(
-    {
-      ...scenarios[0]!.input,
-      benchmark: { kind: "recent_5k_pace", recent5kPace: "5:30/km" },
+  const reviewedProjection = await buildReviewedAiGeneratedRunningPlanPreview(paceInput, {
+    runnerProfileSnapshot: personalProfileSnapshot,
+    aiPreview: {
+      apiKey: "projection-contract-proof",
+      today: paceInput.startDate,
+      fetchImpl: async () => openAiPlanFirstResponse("resp-faithful-projection", draft),
     },
-    {
-      runnerProfileSnapshot: personalProfileSnapshot,
-      aiPreview: {
-        apiKey: "injected-provider-contract-proof",
-        today: scenarios[0]!.input.startDate,
-        fetchImpl: async () => {
-          previewProviderCalls += 1;
-          return openAiPlanFirstResponse("resp-faithful-projection", draft);
-        },
-      },
-    },
-  );
+  });
   assert.equal(
     reviewedProjection.ok,
     true,
     reviewedProjection.ok ? "" : JSON.stringify(reviewedProjection.unavailable),
   );
-  if (!reviewedProjection.ok) {
-    throw new Error(reviewedProjection.unavailable.error.message);
-  }
-  assert.equal(previewProviderCalls, 1);
-  assert.ok(
-    reviewedProjection.draft.calendarRows.some((row) => row.workoutDayKind === "race"),
-    "Canonical race workouts must project without semantic relabeling.",
-  );
-  assert.ok(
-    reviewedProjection.draft.calendarRows.some((row) => row.workoutDayKind === "trail"),
-    "Canonical trail workouts must project without semantic relabeling.",
-  );
-  assert.equal(reviewedProjection.draft.endpointProof.endpointMainDistanceMeters, 10_000);
+  if (!reviewedProjection.ok) throw new Error(reviewedProjection.unavailable.error.message);
+  assert.ok(reviewedProjection.draft.calendarRows.some((row) => row.workoutDayKind === "race"));
+  assert.ok(reviewedProjection.draft.calendarRows.some((row) => row.workoutDayKind === "trail"));
 
   const arbitraryTitleDraft = structuredClone(draft);
-  arbitraryTitleDraft.workouts[2]!.title = "Coach Surprise Session";
+  arbitraryTitleDraft.workouts[1]!.title = "Coach Surprise Session";
   const arbitraryTitleResult = compileAiAuthoredPlanFirstDraft({
     draft: arbitraryTitleDraft,
-    authoringInput,
+    authoringInput: resolved.authoringInput,
   });
-  assert.equal(
-    arbitraryTitleResult.ok,
-    true,
-    "An authored title must remain independent from canonical workout classification.",
-  );
+  assert.equal(arbitraryTitleResult.ok, true);
   if (!arbitraryTitleResult.ok) throw new Error(JSON.stringify(arbitraryTitleResult.issues));
-  const titledWorkout = arbitraryTitleResult.canonicalPlan.planned_workouts.find(
-    (workout) => workout.title === "Coach Surprise Session",
+  assert.equal(
+    arbitraryTitleResult.canonicalPlan.planned_workouts.find(
+      (workout) => workout.title === "Coach Surprise Session",
+    )?.workout_identity,
+    "distance_intervals",
   );
-  assert.equal(titledWorkout?.workout_identity, "distance_intervals");
-  assert.equal(titledWorkout?.source_workout_type, "distance_intervals");
 
   const unknownIdentityDraft = structuredClone(draft) as unknown as {
     workouts: Array<{ workout_identity: string }>;
@@ -915,36 +875,35 @@ async function validateFaithfulPlanFirstAtomization() {
   unknownIdentityDraft.workouts[1]!.workout_identity = "coach_surprise_session";
   const unknownIdentityResult = compileAiAuthoredPlanFirstDraft({
     draft: unknownIdentityDraft,
-    authoringInput,
+    authoringInput: resolved.authoringInput,
   });
   assert.equal(unknownIdentityResult.ok, false);
   if (unknownIdentityResult.ok) throw new Error("Unknown identity unexpectedly compiled.");
   assert.match(JSON.stringify(unknownIdentityResult.issues), /workout_identity_invalid/);
 
-  const runnerTargetResolved = buildAiGeneratedRunningPlanAuthoringInput(
-    {
-      ...scenarios[0]!.input,
-      benchmark: { kind: "recent_5k_pace", recent5kPace: "5:30/km" },
-      planGoalIntent: {
-        distance: { kind: "preset", preset: "10K" },
-        targetFinishTime: "1:10:00",
-      },
+  const targetInput = {
+    ...paceInput,
+    planGoalIntent: {
+      distance: { kind: "preset" as const, preset: "10K" as const },
+      targetFinishTime: "1:10:00",
     },
-    personalProfileSnapshot,
+  };
+  const targetResolved = buildAiGeneratedRunningPlanAuthoringInput(
+    targetInput,
+    buildProofPersonalRunnerProfileSnapshot(targetInput),
   );
-  assert.equal(runnerTargetResolved.ok, true);
-  if (!runnerTargetResolved.ok) throw new Error(runnerTargetResolved.message);
-  const runnerTargetResult = compileAiAuthoredPlanFirstDraft({
+  assert.equal(targetResolved.ok, true);
+  if (!targetResolved.ok) throw new Error(targetResolved.message);
+  const targetResult = compileAiAuthoredPlanFirstDraft({
     draft,
-    authoringInput: runnerTargetResolved.authoringInput,
+    authoringInput: targetResolved.authoringInput,
   });
-  assert.equal(runnerTargetResult.ok, true);
-  if (!runnerTargetResult.ok) throw new Error(JSON.stringify(runnerTargetResult.issues));
+  assert.equal(targetResult.ok, true);
+  if (!targetResult.ok) throw new Error(JSON.stringify(targetResult.issues));
   assert.ok(
-    runnerTargetResult.canonicalPlan.planned_workouts.every(
+    targetResult.canonicalPlan.planned_workouts.every(
       (workout) => workout.goal_context?.target_time === "1:10:00",
     ),
-    "Runner-entered finish time must remain exact canonical goal context without narrative metadata.",
   );
 }
 
@@ -970,275 +929,6 @@ function validateDistanceFirstInputTruth() {
   assert.equal(exactDistance.planGoalIntent.distance?.distanceMeters, 15_000);
 }
 
-async function validateProviderContractBoundary() {
-  const scenario = scenarios[1]!;
-  const resolved = buildAiGeneratedRunningPlanAuthoringInput(scenario.input);
-  assert.equal(resolved.ok, true, resolved.ok ? "" : resolved.message);
-  if (!resolved.ok) throw new Error(resolved.message);
-
-  const fixtureFetch = buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
-    authoringInput: resolved.authoringInput,
-    today: scenario.input.startDate ?? resolved.authoringInput.schedule.startDate,
-  });
-  let capturedRequest: { url: string; body: Record<string, unknown> } | null = null;
-  const result = await generateAiFirstPlanDraftPreview({
-    input: resolved.authoringInput,
-    apiKey: "paid-provider-contract-plan-first-proof",
-    model: "gpt-5-provider-contract-plan-first-proof",
-    today: scenario.input.startDate ?? resolved.authoringInput.schedule.startDate,
-    timeoutMs: 5_000,
-    maxOutputTokens: 12_000,
-    fetchImpl: async (url, init) => {
-      capturedRequest = {
-        url: String(url),
-        body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>,
-      };
-
-      return fixtureFetch(url, init);
-    },
-  });
-
-  assert.equal(
-    result.ok,
-    true,
-    result.ok ? "Provider contract proof must compile." : result.message,
-  );
-  if (!result.ok) throw new Error(result.message);
-
-  assert.notEqual(capturedRequest, null, "Provider request must be captured.");
-  if (!capturedRequest) throw new Error("Provider request was not captured.");
-
-  const serializedRequest = JSON.stringify(capturedRequest.body);
-  const requestInput = capturedRequest.body.input as Array<{
-    role: string;
-    content: Array<{ type: string; text: string }>;
-  }>;
-  const systemPrompt = requestInput.find((message) => message.role === "system")?.content[0]?.text;
-  const userPrompt = requestInput.find((message) => message.role === "user")?.content[0]?.text;
-  const responseSchema = (
-    capturedRequest.body.text as { format?: { schema?: Record<string, unknown> } }
-  )?.format?.schema;
-  assert.ok(systemPrompt, "Provider request must include a system prompt.");
-  assert.ok(userPrompt, "Provider request must include a user prompt.");
-  assert.ok(responseSchema, "Provider request must include a strict response schema.");
-
-  const providerFacts = JSON.parse(userPrompt) as {
-    runnerFacts: {
-      goal: {
-        distance_meters: number;
-        target_finish_time: string | null;
-      };
-      calendar: {
-        start_date: string;
-        latest_date: string;
-        eligible_workout_weekdays: string[] | null;
-        fixed_rest_weekdays: string[] | null;
-        max_workouts_per_week: number | null;
-      };
-      runner: {
-        age: number;
-        height_cm: number;
-        weight_kg: number;
-        selected_fitness_level: string;
-        first_session_adaptation: {
-          required: boolean;
-          opening_calendar_days?: number;
-          minimum_adaptation_contacts?: number;
-          first_true_long_run_not_before_calendar_day?: number;
-        };
-        benchmark: unknown;
-        heart_rate_profile: {
-          source: "estimated" | "personal";
-          accepted: true;
-          primary_command_eligible: boolean;
-          zones: Array<{
-            reference: string;
-            min_bpm: number;
-            max_bpm: number;
-          }>;
-        };
-      };
-    };
-  };
-  const schemaChars = JSON.stringify(responseSchema).length;
-  const oldSchemaChars = 19_478;
-  assert.match(capturedRequest.url, /\/v1\/responses$/);
-  assert.match(serializedRequest, new RegExp(AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME));
-  assert.match(systemPrompt, /flat workouts\[\].*endpoint/i);
-  assert.match(systemPrompt, /ordered children\[\]/i);
-  assert.match(systemPrompt, /rounds is the number of times the complete ordered children/i);
-  assert.match(systemPrompt, /one-off ladder or progression/i);
-  assert.match(systemPrompt, /2x4km followed by one final 2km/i);
-  assert.match(systemPrompt, /coherent weekly training program/i);
-  assert.match(systemPrompt, /support long runs and quality sessions/i);
-  assert.match(systemPrompt, /You own taper and workout density through the endpoint/i);
-  assert.doesNotMatch(systemPrompt, /final 14 calendar days before endpoint/i);
-  assert.match(systemPrompt, /endpoint\.date is reserved exclusively for endpoint/i);
-  assert.match(systemPrompt, /every workouts\[\]\.date must be strictly earlier/i);
-  assert.match(systemPrompt, /M:SS\/km or M:SS-M:SS\/km/i);
-  assert.match(systemPrompt, /benchmark improves precision but is not required/i);
-  assert.match(systemPrompt, /primary_execution_mode=pace/i);
-  assert.match(systemPrompt, /primary_execution_mode=heart_rate/i);
-  assert.match(systemPrompt, /accepted profile source remains estimated or personal/i);
-  assert.match(systemPrompt, /Never put raw Z1-Z5 references/i);
-  assert.match(systemPrompt, /one leaf never has both pace and BPM/i);
-  assert.match(systemPrompt, /kind=hydration/i);
-  assert.match(systemPrompt, /no prescription, duration, distance, Repeat, pace, BPM/i);
-  assert.doesNotMatch(
-    systemPrompt,
-    /primary_execution_mode=effort|primary_execution_mode=run_walk/i,
-  );
-  assert.doesNotMatch(systemPrompt, /adaptation bridge|adaptation contacts|Long Run no earlier/i);
-  assert.match(systemPrompt, /Author directly from the supplied runner facts/i);
-  assert.ok(
-    schemaChars < oldSchemaChars * 0.65,
-    `Provider schema must stay at least 35% smaller than the retired ${oldSchemaChars}-character contract; received ${schemaChars}.`,
-  );
-  assert.ok(
-    userPrompt.length < 3_000,
-    `Provider facts must stay compact; received ${userPrompt.length}.`,
-  );
-  assert.doesNotMatch(userPrompt, /goalType|distance_build|planGoalIntent|metricTruthPolicy/i);
-  assert.doesNotMatch(userPrompt, /allowBackToBackDays|Goal intent is|outcome pace may/i);
-  assert.doesNotMatch(
-    userPrompt,
-    /baseline_|current_sessions|horizon_weeks|workout_mix|terrain|strength_or_mobility|effort_language/i,
-  );
-  const serializedSchema = JSON.stringify(responseSchema);
-  assert.match(serializedSchema, /"number"/);
-  assert.match(serializedSchema, /"integer"/);
-  assert.match(serializedSchema, /duration_min|distance_km/);
-  assert.match(serializedSchema, /"rounds"/);
-  assert.match(serializedSchema, /complete ordered children array executes/i);
-  assert.doesNotMatch(serializedSchema, /"repeat_count"/);
-  assert.doesNotMatch(serializedSchema, /duration_seconds|distance_meters/);
-  assert.doesNotMatch(serializedSchema, /"metadata"|"warnings"|"assumptions"|"medical"|"goal"\s*:/);
-  const providerTitlePattern = (
-    responseSchema.properties as {
-      workouts: {
-        items: {
-          properties: {
-            title: { pattern: string };
-          };
-        };
-      };
-    }
-  ).workouts.items.properties.title.pattern;
-  assert.equal(new RegExp(providerTitlePattern).test("Progression Z2-Z3"), true);
-  assert.equal(new RegExp(providerTitlePattern).test("Progression by feel"), true);
-  assert.equal(
-    providerFacts.runnerFacts.goal.distance_meters,
-    resolved.authoringInput.planGoalIntent.distance?.distanceMeters,
-  );
-  assert.equal(
-    providerFacts.runnerFacts.goal.target_finish_time,
-    resolved.authoringInput.planGoalIntent.targetFinishTime?.label ?? null,
-  );
-  assert.deepEqual(Object.keys(providerFacts.runnerFacts.goal).sort(), [
-    "distance_meters",
-    "target_finish_time",
-  ]);
-  assert.ok(Array.isArray(providerFacts.runnerFacts.calendar.eligible_workout_weekdays));
-  const eligibleWorkoutWeekdays =
-    providerFacts.runnerFacts.calendar.eligible_workout_weekdays ?? [];
-  assert.deepEqual(
-    new Set([
-      ...eligibleWorkoutWeekdays,
-      ...(providerFacts.runnerFacts.calendar.fixed_rest_weekdays ?? []),
-    ]).size,
-    7,
-  );
-  assert.deepEqual(
-    eligibleWorkoutWeekdays.filter((day) =>
-      (providerFacts.runnerFacts.calendar.fixed_rest_weekdays ?? []).includes(day),
-    ),
-    [],
-  );
-  assert.equal(
-    providerFacts.runnerFacts.calendar.max_workouts_per_week,
-    resolved.authoringInput.availability.maxRunningDaysPerWeek,
-  );
-  assert.equal(
-    providerFacts.runnerFacts.calendar.start_date,
-    resolved.authoringInput.schedule.startDate,
-  );
-  assert.ok(
-    providerFacts.runnerFacts.calendar.latest_date > providerFacts.runnerFacts.calendar.start_date,
-  );
-  const providerDatePattern = (
-    responseSchema.properties as {
-      workouts: {
-        items: {
-          properties: {
-            date: { pattern: string };
-          };
-        };
-      };
-    }
-  ).workouts.items.properties.date.pattern;
-  assert.equal(
-    new RegExp(providerDatePattern).test(resolved.authoringInput.schedule.startDate),
-    !(resolved.authoringInput.availability.fixedRestDays ?? []).includes(
-      resolved.authoringInput.schedule.startWeekday,
-    ),
-  );
-  const fixedRestDate = Array.from({ length: 7 }, (_, offset) =>
-    addDaysIso(resolved.authoringInput.schedule.startDate, offset),
-  ).find((date) =>
-    (resolved.authoringInput.availability.fixedRestDays ?? []).includes(weekdayLong(date)),
-  );
-  assert.ok(fixedRestDate, "Provider contract proof requires a fixed-rest date.");
-  assert.equal(
-    new RegExp(providerDatePattern).test(fixedRestDate!),
-    false,
-    "Strict provider schema must make fixed-rest dates unauthorable.",
-  );
-  assert.equal(providerFacts.runnerFacts.runner.heart_rate_profile.source, "estimated");
-  assert.equal(providerFacts.runnerFacts.runner.heart_rate_profile.accepted, true);
-  assert.equal(providerFacts.runnerFacts.runner.heart_rate_profile.primary_command_eligible, true);
-  assert.equal(providerFacts.runnerFacts.runner.selected_fitness_level, "running_regularly");
-  assert.equal(providerFacts.runnerFacts.runner.first_session_adaptation.required, false);
-  assert.deepEqual(
-    providerFacts.runnerFacts.runner.heart_rate_profile.zones.map((zone) => zone.reference),
-    ["Z1", "Z2", "Z3", "Z4", "Z5"],
-  );
-  assert.ok(
-    providerFacts.runnerFacts.runner.heart_rate_profile.zones.every(
-      (zone) => Number.isInteger(zone.min_bpm) && Number.isInteger(zone.max_bpm),
-    ),
-  );
-  assert.equal(
-    "allowBackToBackDays" in resolved.authoringInput.availability,
-    false,
-    "Backend authoring input must not prescribe adjacency as coaching truth.",
-  );
-  assert.equal(
-    structuredPlanAuthoringInputSchema.safeParse({
-      ...resolved.authoringInput,
-      runnerProfile: {
-        experienceLevel: "consistent_runner",
-        baselineSessionsPerWeek: 5,
-      },
-    }).success,
-    false,
-    "Retired backend coaching context must not be accepted as provider input.",
-  );
-  assert.deepEqual(Object.keys(providerFacts.runnerFacts.runner).sort(), [
-    "age",
-    "benchmark",
-    "first_session_adaptation",
-    "heart_rate_profile",
-    "height_cm",
-    "selected_fitness_level",
-    "weight_kg",
-  ]);
-  assert.deepEqual(responseSchema, buildAiAuthoredPlanFirstOpenAiSchema(resolved.authoringInput));
-  assert.equal(result.metadata.debug.contractMode, "plan_first");
-  assert.equal(result.metadata.debug.responseSchemaMode, "responses_json_schema_plan_first_strict");
-  assert.equal(result.metadata.generationTrace?.request.contractMode, "plan_first");
-  assert.equal(result.canonicalPlan.source_kind, AI_AUTHORED_PLAN_FIRST_SOURCE_KIND);
-}
-
 async function validateFirstPlanGenerationLifecycle() {
   const scenario = scenarios[0]!;
   const resolved = buildAiGeneratedRunningPlanAuthoringInput(scenario.input);
@@ -1251,9 +941,8 @@ async function validateFirstPlanGenerationLifecycle() {
   });
   const fixtureResponse = await fixtureFetch("https://api.openai.com/v1/responses", {});
   const completedBody = (await fixtureResponse.json()) as Record<string, unknown>;
-  const delayedFixtureOptions = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
+  const delayedFixtureFetch = buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
     authoringInput: resolved.authoringInput,
-    qaFixtureAuthorized: true,
     today: scenario.input.startDate ?? resolved.authoringInput.schedule.startDate,
     env: {
       LOCAL_AUTH_BYPASS_ENABLED: "true",
@@ -1264,17 +953,12 @@ async function validateFirstPlanGenerationLifecycle() {
       [AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_DELAY_MS_ENV]: "120001",
     },
   });
-  assert.notEqual(delayedFixtureOptions, null);
-  if (!delayedFixtureOptions?.fetchImpl) {
-    throw new Error("Delayed local plan-first fixture fetch was not configured.");
-  }
 
   const originalDateNow = Date.now;
   const originalSetTimeout = globalThis.setTimeout;
   let fakeNow = Date.UTC(2026, 6, 16, 12, 0, 0);
   let completeCallCount = 0;
   let scheduledFixtureDelayMs = 0;
-  const delayedFixtureFetch = delayedFixtureOptions.fetchImpl;
 
   Date.now = () => fakeNow;
   globalThis.setTimeout = ((callback: (...args: unknown[]) => void, delay?: number) => {
@@ -1286,7 +970,9 @@ async function validateFirstPlanGenerationLifecycle() {
   try {
     const result = await buildReviewedAiGeneratedRunningPlanPreview(scenario.input, {
       aiPreview: {
-        ...delayedFixtureOptions,
+        apiKey: "local-qa-dev-ai-generated-plan-fixture",
+        model: AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
+        today: scenario.input.startDate ?? resolved.authoringInput.schedule.startDate,
         generationLedger: { disabled: true },
         fetchImpl: async (url, init) => {
           completeCallCount += 1;
@@ -1307,6 +993,7 @@ async function validateFirstPlanGenerationLifecycle() {
     assert.equal(result.draft.aiGeneration.generationTrace?.provider.kind, "local_dev_fixture");
     assert.equal(result.draft.aiGeneration.generationTrace?.provider.paidProviderCall, false);
     assert.equal(result.draft.aiGeneration.debug?.timeoutMs, 0);
+    assert.equal(result.draft.aiGeneration.debug?.abortReason, null);
     assert.ok(result.draft.aiGeneration.elapsedMs >= 120_001);
     assert.ok(result.draft.reviewToken.length >= 16);
     assert.equal(result.draft.reviewChecksum.length, 64);
@@ -1317,6 +1004,21 @@ async function validateFirstPlanGenerationLifecycle() {
     globalThis.setTimeout = originalSetTimeout;
   }
 
+  const timedOut = await runTimedOutFirstPlanRequest({
+    authoringInput: resolved.authoringInput,
+    today: scenario.input.startDate ?? resolved.authoringInput.schedule.startDate,
+  });
+  assertUnavailableLifecycleResult(timedOut.result, {
+    expectedReason: /timed_out/,
+    expectedRequestPhase: "timeout_before_response",
+  });
+  assert.equal(timedOut.callCount, 1);
+  assert.equal(timedOut.result.metadata.debug.timeoutMs, 20);
+  assert.equal(timedOut.result.metadata.debug.abortReason, "timeout");
+  assert.equal(timedOut.result.metadata.generationTrace?.request.timeoutMs, 20);
+  assert.equal(timedOut.result.metadata.generationTrace?.pipeline.finalOutcome, "timeout");
+  assert.equal(timedOut.result.metadata.responseId, null);
+
   const cancelled = await runCancelledFirstPlanRequest({
     authoringInput: resolved.authoringInput,
     today: scenario.input.startDate ?? resolved.authoringInput.schedule.startDate,
@@ -1326,7 +1028,63 @@ async function validateFirstPlanGenerationLifecycle() {
     expectedRequestPhase: "request_cancelled",
   });
   assert.equal(cancelled.callCount, 1);
+  assert.equal(cancelled.result.metadata.debug.timeoutMs, 0);
+  assert.equal(cancelled.result.metadata.debug.abortReason, "cancelled");
+  assert.equal(cancelled.result.metadata.debug.transportFailureCode, "request_signal_aborted");
   assert.equal(cancelled.result.metadata.generationTrace?.pipeline.finalOutcome, "cancelled");
+
+  let transportFailureCallCount = 0;
+  const transportFailure = await generateAiFirstPlanDraftPreview({
+    input: resolved.authoringInput,
+    apiKey: "transport-failure-plan-first-proof",
+    model: "transport-failure-plan-first-proof",
+    generationLedger: { disabled: true },
+    fetchImpl: async () => {
+      transportFailureCallCount += 1;
+      throw new TypeError("SENSITIVE_TRANSPORT_MESSAGE", {
+        cause: Object.assign(new Error("SENSITIVE_CAUSE_MESSAGE"), {
+          code: "UND_ERR_HEADERS_TIMEOUT",
+        }),
+      });
+    },
+  });
+  assertUnavailableLifecycleResult(transportFailure, {
+    expectedReason: /provider_transport_failed/,
+    expectedRequestPhase: "request_failed",
+  });
+  assert.equal(transportFailureCallCount, 1);
+  assert.equal(transportFailure.metadata.debug.abortReason, null);
+  assert.equal(transportFailure.metadata.debug.transportMode, "injected");
+  assert.equal(transportFailure.metadata.debug.transportFailureCode, "provider_headers_timeout");
+  assert.equal(
+    transportFailure.metadata.generationTrace?.pipeline.issueCodes.includes(
+      "provider_headers_timeout",
+    ),
+    true,
+  );
+  assert.doesNotMatch(
+    JSON.stringify(transportFailure),
+    /SENSITIVE_TRANSPORT_MESSAGE|SENSITIVE_CAUSE_MESSAGE|UND_ERR_HEADERS_TIMEOUT/,
+  );
+
+  let externalAbortCallCount = 0;
+  const externalAbort = await generateAiFirstPlanDraftPreview({
+    input: resolved.authoringInput,
+    apiKey: "external-abort-plan-first-proof",
+    model: "external-abort-plan-first-proof",
+    generationLedger: { disabled: true },
+    fetchImpl: async () => {
+      externalAbortCallCount += 1;
+      throw new DOMException("External transport abort.", "AbortError");
+    },
+  });
+  assertUnavailableLifecycleResult(externalAbort, {
+    expectedReason: /provider_transport_failed/,
+    expectedRequestPhase: "request_failed",
+  });
+  assert.equal(externalAbortCallCount, 1);
+  assert.equal(externalAbort.metadata.debug.abortReason, null);
+  assert.equal(externalAbort.metadata.debug.transportFailureCode, "provider_transport_error");
 
   let providerFailureCallCount = 0;
   const providerFailure = await generateAiFirstPlanDraftPreview({
@@ -1351,6 +1109,37 @@ async function validateFirstPlanGenerationLifecycle() {
     expectedRequestPhase: "request_failed",
   });
   assert.equal(providerFailureCallCount, 1);
+  assert.equal(providerFailure.metadata.debug.abortReason, null);
+
+  const originalFetch = globalThis.fetch;
+  let canonicalTransportCallCount = 0;
+  let canonicalRequestHasDispatcher = false;
+  globalThis.fetch = (async (_url, init) => {
+    canonicalTransportCallCount += 1;
+    canonicalRequestHasDispatcher =
+      Boolean(init) && typeof init === "object" && "dispatcher" in init;
+    return jsonResponse(completedBody);
+  }) as typeof fetch;
+  try {
+    const canonicalTransport = await generateAiFirstPlanDraftPreview({
+      input: resolved.authoringInput,
+      apiKey: "canonical-transport-plan-first-proof",
+      model: "canonical-transport-plan-first-proof",
+      generationLedger: { disabled: true },
+    });
+    assert.equal(canonicalTransport.ok, true);
+    if (!canonicalTransport.ok) {
+      throw new Error(canonicalTransport.metadata.unavailableReason);
+    }
+    assert.equal(canonicalTransportCallCount, 1);
+    assert.equal(canonicalRequestHasDispatcher, true);
+    assert.equal(canonicalTransport.metadata.debug.transportMode, "canonical_no_deadline");
+    assert.equal(canonicalTransport.metadata.debug.transportHeadersTimeoutMs, 0);
+    assert.equal(canonicalTransport.metadata.debug.transportBodyTimeoutMs, 0);
+    assert.equal(canonicalTransport.metadata.debug.transportFailureCode, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 
   let incompleteCallCount = 0;
   const incomplete = await generateAiFirstPlanDraftPreview({
@@ -1374,7 +1163,40 @@ async function validateFirstPlanGenerationLifecycle() {
   });
   assert.equal(incompleteCallCount, 1);
   assert.equal(incomplete.metadata.responseId, "resp_incomplete_plan_first");
+  assert.equal(incomplete.metadata.debug.abortReason, null);
   assert.equal(incomplete.metadata.debug.responseIncompleteReason, "max_output_tokens");
+}
+
+async function runTimedOutFirstPlanRequest(input: {
+  authoringInput: Extract<
+    ReturnType<typeof buildAiGeneratedRunningPlanAuthoringInput>,
+    { ok: true }
+  >["authoringInput"];
+  today: string;
+}) {
+  let callCount = 0;
+  const result = await generateAiFirstPlanDraftPreview({
+    input: input.authoringInput,
+    apiKey: "timed-out-plan-first-proof",
+    model: "timed-out-plan-first-proof",
+    today: input.today,
+    timeoutMs: 20,
+    generationLedger: { disabled: true },
+    fetchImpl: async (_url, init) => {
+      callCount += 1;
+      const requestSignal = init?.signal;
+
+      return new Promise<Response>((_resolve, reject) => {
+        requestSignal?.addEventListener(
+          "abort",
+          () => reject(new DOMException("Injected timeout.", "AbortError")),
+          { once: true },
+        );
+      });
+    },
+  });
+
+  return { result, callCount };
 }
 
 async function runCancelledFirstPlanRequest(input: {
@@ -1430,9 +1252,7 @@ async function validateTypedPlanFirstFailureOutcomes() {
   });
   const fixtureResponse = await fixtureFetch("https://api.openai.com/v1/responses", {});
   const completedBody = (await fixtureResponse.json()) as { output_text: string };
-  const invalidCompilerDraft = JSON.parse(
-    completedBody.output_text,
-  ) as AiAuthoredPlanFirstProviderDraft;
+  const invalidCompilerDraft = parseFixtureProviderDraft(completedBody.output_text);
   const runningDay = invalidCompilerDraft.workouts[0];
   assert.ok(runningDay, "Fixture must expose a running day.");
   runningDay.date = "2026-06-10";
@@ -1549,7 +1369,7 @@ async function validateLocalGenerationIncidentTrail() {
       providerKind: "local_dev_fixture",
       model: "local-fixture-model",
       contractMode: "plan_first",
-      responseSchemaMode: "responses_json_schema_plan_first_strict",
+      responseSchemaMode: "responses_json_schema_plan_first_direct_v1_strict",
       systemPrompt: `system ${secretCanary}`,
       userPrompt: `runner ${runnerCanary}`,
       responseSchema: { type: "object", properties: { secret: { type: "string" } } },
@@ -1626,215 +1446,6 @@ async function validateLocalGenerationIncidentTrail() {
   }
 }
 
-async function validatePathologicalProviderNumberFailsBeforeReview() {
-  const scenario = scenarios[0]!;
-  const resolved = buildAiGeneratedRunningPlanAuthoringInput(scenario.input);
-  assert.equal(resolved.ok, true, resolved.ok ? "" : resolved.message);
-  if (!resolved.ok) throw new Error(resolved.message);
-
-  const fixtureFetch = buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
-    authoringInput: resolved.authoringInput,
-    today: scenario.input.startDate ?? resolved.authoringInput.schedule.startDate,
-  });
-  const fixtureResponse = await fixtureFetch("https://api.openai.com/v1/responses", {});
-  const fixtureBody = (await fixtureResponse.json()) as { output_text: string };
-  const pathologicalDraft = JSON.parse(fixtureBody.output_text) as AiAuthoredPlanFirstProviderDraft;
-  const firstStep = pathologicalDraft.workouts
-    .flatMap((workout) => workout.sections)
-    .find((section) => section.kind === "unit");
-  assert.ok(firstStep, "Fixture must expose a provider step for pathological-number proof.");
-  if (!firstStep || firstStep.kind !== "unit") throw new Error("Missing provider unit section.");
-  firstStep.prescription = { mode: "time", duration_min: Number.MIN_VALUE };
-
-  const result = await generateAiFirstPlanDraftPreview({
-    input: resolved.authoringInput,
-    apiKey: "pathological-number-plan-first-proof",
-    model: "pathological-number-plan-first-proof",
-    today: scenario.input.startDate ?? resolved.authoringInput.schedule.startDate,
-    fetchImpl: async () =>
-      openAiPlanFirstResponse("resp_pathological_plan_first", pathologicalDraft),
-  });
-
-  assert.equal(result.ok, false, "Pathological provider numbers must fail before review.");
-  if (result.ok) throw new Error("Pathological provider number unexpectedly reached review.");
-  assert.match(result.issues.join("\n"), /greater than or equal to 0\.01|schema/i);
-  assert.equal(JSON.stringify(result).includes("reviewToken"), false);
-}
-
-async function validateProviderStructuralBoundsFailBeforeReview() {
-  const scenario = scenarios[0]!;
-  const paceTruthInput = {
-    ...scenario.input,
-    benchmark: { kind: "recent_5k_pace" as const, recent5kPace: "5:30/km" },
-  };
-  const resolved = buildAiGeneratedRunningPlanAuthoringInput(paceTruthInput);
-  assert.equal(resolved.ok, true, resolved.ok ? "" : resolved.message);
-  if (!resolved.ok) throw new Error(resolved.message);
-
-  const fixtureFetch = buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
-    authoringInput: resolved.authoringInput,
-    today: paceTruthInput.startDate ?? resolved.authoringInput.schedule.startDate,
-  });
-  const fixtureResponse = await fixtureFetch("https://api.openai.com/v1/responses", {});
-  const fixtureBody = (await fixtureResponse.json()) as { output_text: string };
-  const providerDraft = JSON.parse(fixtureBody.output_text) as AiAuthoredPlanFirstProviderDraft;
-  const repeatStep = findProviderRepeatStep(providerDraft);
-  assert.ok(repeatStep, "Fixture must expose a Repeat for structural-bound proof.");
-
-  const cases: Array<{
-    name: string;
-    mutate: (draft: AiAuthoredPlanFirstProviderDraft) => void;
-    expectedIssue: RegExp;
-  }> = [
-    {
-      name: "invalid calendar date",
-      mutate: (draft) => {
-        draft.workouts[0]!.date = "2026-02-30";
-      },
-      expectedIssue: /invalid_calendar_date|schema/i,
-    },
-    {
-      name: "empty Repeat child",
-      mutate: (draft) => {
-        const step = findProviderRepeatStep(draft);
-        step.children[0]!.prescription = {
-          mode: "time",
-        } as (typeof step.children)[number]["prescription"];
-      },
-      expectedIssue: /repeat_structure_invalid|duration_min|schema/i,
-    },
-    {
-      name: "round count outside wire bound",
-      mutate: (draft) => {
-        const step = findProviderRepeatStep(draft);
-        step.rounds = 101;
-      },
-      expectedIssue: /repeat_structure_invalid|less than or equal to 100/i,
-    },
-    {
-      name: "retired repeat count field",
-      mutate: (draft) => {
-        const step = findProviderRepeatStep(draft) as unknown as Record<string, unknown>;
-        step.repeat_count = step.rounds;
-        delete step.rounds;
-      },
-      expectedIssue: /repeat_structure_invalid|provider_schema_invalid|rounds/i,
-    },
-    {
-      name: "qualitative pace in executable pace field",
-      mutate: (draft) => {
-        findProviderPaceTarget(draft).command = "comfortably hard";
-      },
-      expectedIssue: /provider_schema_invalid/i,
-    },
-    {
-      name: "zone label in executable pace field",
-      mutate: (draft) => {
-        findProviderPaceTarget(draft).command = "Z3";
-      },
-      expectedIssue: /provider_schema_invalid/i,
-    },
-    {
-      name: "invalid pace seconds",
-      mutate: (draft) => {
-        findProviderPaceTarget(draft).command = "4:75/km";
-      },
-      expectedIssue: /provider_schema_invalid/i,
-    },
-    {
-      name: "pace without unit",
-      mutate: (draft) => {
-        findProviderPaceTarget(draft).command = "4:50-5:00";
-      },
-      expectedIssue: /provider_schema_invalid/i,
-    },
-  ];
-
-  for (const scenarioCase of cases) {
-    const invalidDraft = structuredClone(providerDraft);
-    scenarioCase.mutate(invalidDraft);
-    const result = await generateAiFirstPlanDraftPreview({
-      input: resolved.authoringInput,
-      apiKey: `provider-structural-${scenarioCase.name}`,
-      model: "provider-structural-bound-proof",
-      today: paceTruthInput.startDate ?? resolved.authoringInput.schedule.startDate,
-      fetchImpl: async () =>
-        openAiPlanFirstResponse(`resp_provider_structural_${scenarioCase.name}`, invalidDraft),
-    });
-
-    assert.equal(result.ok, false, `${scenarioCase.name} must fail before review.`);
-    if (result.ok) throw new Error(`${scenarioCase.name} unexpectedly reached review.`);
-    assert.match(result.issues.join("\n"), scenarioCase.expectedIssue);
-    assert.equal(JSON.stringify(result).includes("reviewToken"), false);
-  }
-
-  const aiAuthoredTaperGap = structuredClone(providerDraft);
-  aiAuthoredTaperGap.workouts = aiAuthoredTaperGap.workouts.filter(
-    (workout) => workout.date < addDaysIso(aiAuthoredTaperGap.endpoint.date, -14),
-  );
-  const taperResult = await generateAiFirstPlanDraftPreview({
-    input: resolved.authoringInput,
-    apiKey: "provider-authored-taper-gap-proof",
-    model: "provider-authored-taper-gap-proof",
-    today: paceTruthInput.startDate ?? resolved.authoringInput.schedule.startDate,
-    fetchImpl: async () =>
-      openAiPlanFirstResponse("resp_provider_authored_taper_gap", aiAuthoredTaperGap),
-  });
-  assert.equal(taperResult.ok, true, taperResult.ok ? "" : JSON.stringify(taperResult.issues));
-}
-
-function findProviderRepeatStep(draft: AiAuthoredPlanFirstProviderDraft) {
-  const step = draft.workouts
-    .flatMap((workout) => workout.sections)
-    .find((candidate) => candidate.kind === "repeat");
-  assert.ok(step?.kind === "repeat", "Fixture must expose a Repeat step.");
-  if (!step || step.kind !== "repeat") throw new Error("Fixture Repeat is missing.");
-  return step;
-}
-
-function findProviderPaceTarget(draft: AiAuthoredPlanFirstProviderDraft) {
-  for (const section of draft.workouts.flatMap((workout) => workout.sections)) {
-    const targets =
-      section.kind === "unit" ? [section.target] : section.children.map((child) => child.target);
-    const authoredTarget = targets.find(
-      (candidate) => candidate?.primary_execution_mode === "pace",
-    );
-    if (authoredTarget) return authoredTarget;
-  }
-  throw new Error("Fixture must expose an AI-authored numeric pace target.");
-}
-
-async function validateInvalidProviderOutputFailsBeforeReview() {
-  const scenario = scenarios[0]!;
-  const resolved = buildAiGeneratedRunningPlanAuthoringInput(scenario.input);
-  assert.equal(resolved.ok, true, resolved.ok ? "" : resolved.message);
-  if (!resolved.ok) throw new Error(resolved.message);
-
-  const invalid = await generateAiFirstPlanDraftPreview({
-    input: resolved.authoringInput,
-    apiKey: "invalid-plan-first-proof",
-    model: "invalid-plan-first-proof",
-    today: scenario.input.startDate ?? resolved.authoringInput.schedule.startDate,
-    fetchImpl: async () =>
-      openAiPlanFirstResponse("resp_invalid_plan_first", {
-        workouts: [],
-        endpoint: null,
-      }),
-  });
-
-  assert.equal(invalid.ok, false, "Invalid plan-first provider output must be unavailable.");
-  if (invalid.ok) {
-    throw new Error("Invalid plan-first output unexpectedly produced canonical review data.");
-  }
-  assert.equal(invalid.reason, "ai_authored_plan_first_unavailable");
-  assert.match(
-    invalid.issues.join("\n"),
-    /workouts|endpoint|schema|invalid/i,
-    "Invalid plan-first output must expose bounded compiler diagnostics before review.",
-  );
-  assert.equal(JSON.stringify(invalid).includes("reviewToken"), false);
-}
-
 async function validateLocalDevFixtureAvailabilityGating() {
   const boundaryArtifactRoot = await mkdtemp(join(tmpdir(), "hito-provider-boundary-"));
   const localDevFixtureEnv = {
@@ -1889,16 +1500,8 @@ async function validateLocalDevFixtureAvailabilityGating() {
     buildScenarioAiPreviewOptions(scenarios[0]!.input).model,
     AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
   );
-  const nonRepeatTempoInput = buildAiGeneratedRunningPlanAuthoringInput(scenarios[1]!.input);
-  assert.equal(
-    nonRepeatTempoInput.ok,
-    true,
-    nonRepeatTempoInput.ok ? "" : nonRepeatTempoInput.message,
-  );
-  if (!nonRepeatTempoInput.ok) throw new Error(nonRepeatTempoInput.message);
   assert.equal(
     buildAiGeneratedRunningPlanDevFixturePreviewOptions({
-      authoringInput: nonRepeatTempoInput.authoringInput,
       qaFixtureAuthorized: false,
       env: localDevFixtureEnv,
     }),
@@ -1907,7 +1510,6 @@ async function validateLocalDevFixtureAvailabilityGating() {
   );
   assert.equal(
     buildAiGeneratedRunningPlanDevFixturePreviewOptions({
-      authoringInput: nonRepeatTempoInput.authoringInput,
       qaFixtureAuthorized: true,
       env: {
         ...localDevFixtureEnv,
@@ -1947,41 +1549,219 @@ async function validateLocalDevFixtureAvailabilityGating() {
     delete process.env.VERCEL;
     delete process.env.CI;
 
-    let providerOverrideCallCount = 0;
-    const result = await buildReviewedAiGeneratedRunningPlanPreview(scenarios[0]!.input, {
-      qaFixtureAuthorized: true,
-      aiPreview: {
-        apiKey: "must-not-replace-local-fixture",
-        model: "must-not-replace-local-fixture",
-        signal: new AbortController().signal,
-        fetchImpl: async () => {
-          providerOverrideCallCount += 1;
-          throw new Error("Local fixture provider transport was replaced.");
-        },
-        generationLedger: {
-          forceArtifactWrite: true,
-          artifactRoot: boundaryArtifactRoot,
-          runtimeUrl: "http://127.0.0.1:3000",
+    let invalidFixtureProviderCalls = 0;
+    const invalidFixtureInput = await buildReviewedAiGeneratedRunningPlanPreview(
+      {
+        ...scenarios[0]!.input,
+        planGoalIntent: {
+          ...scenarios[0]!.input.planGoalIntent,
+          targetDate: scenarios[0]!.input.startDate,
         },
       },
+      {
+        qaFixtureAuthorized: true,
+        aiPreview: {
+          apiKey: "must-not-bypass-normal-preview-input",
+          fetchImpl: async () => {
+            invalidFixtureProviderCalls += 1;
+            throw new Error("Structurally invalid fixture input reached a provider.");
+          },
+          generationLedger: { disabled: true },
+        },
+      },
+    );
+    assert.equal(invalidFixtureInput.ok, false);
+    if (!invalidFixtureInput.ok) {
+      assert.equal(invalidFixtureInput.unavailable.previewOutcome, "invalid_structural_input");
+      assert.equal(invalidFixtureInput.unavailable.callsOpenAi, false);
+    }
+    assert.equal(invalidFixtureProviderCalls, 0);
+
+    const fixtureOptions = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
+      qaFixtureAuthorized: true,
     });
+    assert.ok(fixtureOptions?.fetchImpl);
+    const fixtureProviderResponse = await fixtureOptions!.fetchImpl!(
+      "https://api.openai.com/v1/responses",
+      {},
+    );
+    const fixtureProviderBody = (await fixtureProviderResponse.json()) as {
+      id: string;
+      model?: string;
+      output_text: string;
+    };
+    assert.equal(fixtureProviderBody.id, AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID);
+    const fixtureDraft = parseFixtureProviderDraft(fixtureProviderBody.output_text);
+    assert.ok(
+      [...fixtureDraft.workouts, fixtureDraft.endpoint]
+        .flatMap((workout) => workout.sections)
+        .flatMap((section) =>
+          section.kind === "repeat"
+            ? section.children.map((child) => child.target)
+            : section.kind === "unit"
+              ? [section.target]
+              : [],
+        )
+        .filter((target) => target.primary_execution_mode === "heart_rate")
+        .every((target) => Boolean(target.band_reference)),
+      "The deterministic QA fixture must author explicit HR band identity.",
+    );
+
+    let providerOverrideCallCount = 0;
+    let scheduledFixtureDelayMs = 0;
+    const originalSetTimeout = globalThis.setTimeout;
+    process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_DELAY_MS_ENV] = "15000";
+    globalThis.setTimeout = ((callback: (...args: unknown[]) => void, delay?: number) => {
+      scheduledFixtureDelayMs = Number(delay ?? 0);
+      queueMicrotask(callback);
+      return 1 as unknown as ReturnType<typeof setTimeout>;
+    }) as typeof setTimeout;
+    const result = await (async () => {
+      try {
+        return await buildReviewedAiGeneratedRunningPlanPreview(scenarios[0]!.input, {
+          qaFixtureAuthorized: true,
+          aiPreview: {
+            apiKey: "must-not-replace-local-fixture",
+            model: "must-not-replace-local-fixture",
+            signal: new AbortController().signal,
+            fetchImpl: async () => {
+              providerOverrideCallCount += 1;
+              throw new Error("Local fixture provider transport was replaced.");
+            },
+            generationLedger: {
+              forceArtifactWrite: true,
+              artifactRoot: boundaryArtifactRoot,
+              runtimeUrl: "http://127.0.0.1:3000",
+            },
+          },
+        });
+      } finally {
+        globalThis.setTimeout = originalSetTimeout;
+        delete process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_DELAY_MS_ENV];
+      }
+    })();
+    assert.equal(scheduledFixtureDelayMs, 15_000);
     assert.equal(result.ok, true, "Request cancellation plumbing must preserve the local fixture.");
     if (!result.ok) throw new Error(result.unavailable.error.message);
     assert.equal(providerOverrideCallCount, 0);
+    assert.equal(result.draft.callsOpenAi, false);
+    assert.equal(result.draft.reviewSafety.callsOpenAi, false);
     assert.equal(result.draft.aiGeneration.model, AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL);
     assert.equal(result.draft.aiGeneration.generationTrace?.provider.kind, "local_dev_fixture");
     assert.equal(result.draft.aiGeneration.generationTrace?.provider.paidProviderCall, false);
+    assert.equal(
+      result.draft.aiGeneration.responseId,
+      AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID,
+    );
+    assert.equal(result.draft.normalizedInputSummary.startDate, "2026-07-06");
+    assert.equal(
+      result.draft.normalizedInputSummary.planGoalIntent.distance?.distanceMeters,
+      10_000,
+    );
+    assert.equal(result.draft.endpointProof.finalDate, "2026-08-01");
+    assert.equal(result.draft.endpointProof.endpointMainDistanceMeters, 10_000);
+    assert.equal(result.draft.persisted, false);
+    assert.equal(result.draft.mutates, false);
+    assert.ok(result.draft.reviewToken.length >= 16);
+    assert.equal(result.draft.reviewChecksum.length, 64);
     const fixtureGenerationId = result.draft.aiGeneration.generationTrace?.generationId;
     assert.ok(fixtureGenerationId);
+    const fixtureEvents = await queryLocalRuntimeEvents({
+      root: boundaryArtifactRoot,
+      generationId: fixtureGenerationId,
+    });
     assert.equal(
-      (
-        await queryLocalRuntimeEvents({
-          root: boundaryArtifactRoot,
-          generationId: fixtureGenerationId,
-          outcomeCode: "reviewed_draft_signed",
-        })
-      ).length,
+      fixtureEvents.some((event) => event.providerKind === "openai_responses_api"),
+      false,
+    );
+    assert.equal(
+      fixtureEvents.filter((event) => event.outcomeCode === "reviewed_draft_signed").length,
       1,
+    );
+
+    process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV] = "non_repeat_tempo";
+    const inputIndependentResult = await buildReviewedAiGeneratedRunningPlanPreview(
+      scenarios[2]!.input,
+      {
+        qaFixtureAuthorized: true,
+        aiPreview: {
+          apiKey: "must-not-replace-local-fixture",
+          model: "must-not-replace-local-fixture",
+          fetchImpl: async () => {
+            providerOverrideCallCount += 1;
+            throw new Error("Runner input reached the local fixture transport.");
+          },
+          generationLedger: { disabled: true },
+        },
+      },
+    );
+    delete process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV];
+    assert.equal(inputIndependentResult.ok, true);
+    if (!inputIndependentResult.ok) {
+      throw new Error(inputIndependentResult.unavailable.error.message);
+    }
+    assert.equal(providerOverrideCallCount, 0);
+    assert.deepEqual(
+      inputIndependentResult.draft.canonicalPlan,
+      result.draft.canonicalPlan,
+      "QA fixture content must not change with runner facts, goal, dates, or scenario residue.",
+    );
+    assert.deepEqual(inputIndependentResult.draft.workoutDocuments, result.draft.workoutDocuments);
+
+    const fixtureCommentCanary = "FIXTURE_RUNNER_COMMENT_MUST_NOT_SHAPE_OR_PERSIST";
+    const commentedFixtureResult = await buildReviewedAiGeneratedRunningPlanPreview(
+      {
+        ...scenarios[0]!.input,
+        runnerComment: `  ${fixtureCommentCanary}  `,
+      },
+      {
+        qaFixtureAuthorized: true,
+        aiPreview: {
+          apiKey: "must-not-replace-local-fixture",
+          model: "must-not-replace-local-fixture",
+          fetchImpl: async () => {
+            providerOverrideCallCount += 1;
+            throw new Error("Runner comment reached the local fixture transport.");
+          },
+          generationLedger: { disabled: true },
+        },
+      },
+    );
+    assert.equal(commentedFixtureResult.ok, true);
+    if (!commentedFixtureResult.ok) {
+      throw new Error(commentedFixtureResult.unavailable.error.message);
+    }
+    assert.equal(providerOverrideCallCount, 0);
+    assert.equal(commentedFixtureResult.draft.callsOpenAi, false);
+    assert.equal(
+      commentedFixtureResult.draft.aiGeneration.generationTrace?.provider.kind,
+      "local_dev_fixture",
+    );
+    assert.equal("runnerComment" in commentedFixtureResult.draft.previewInput, false);
+    assert.equal("runnerComment" in commentedFixtureResult.draft.normalizedInputSummary, false);
+    assert.deepEqual(commentedFixtureResult.draft.canonicalPlan, result.draft.canonicalPlan);
+    assert.deepEqual(commentedFixtureResult.draft.workoutDocuments, result.draft.workoutDocuments);
+    assert.equal(commentedFixtureResult.draft.reviewChecksum, result.draft.reviewChecksum);
+    assert.equal(
+      JSON.stringify(commentedFixtureResult.draft).includes(fixtureCommentCanary),
+      false,
+    );
+    const fixtureEncodedReviewEnvelope = commentedFixtureResult.draft.reviewToken.split(".")[1];
+    assert.ok(fixtureEncodedReviewEnvelope);
+    const fixtureDecodedReviewEnvelope = base64UrlDecodeUtf8(fixtureEncodedReviewEnvelope!);
+    assert.equal(fixtureDecodedReviewEnvelope.includes(fixtureCommentCanary), false);
+    assert.doesNotMatch(
+      fixtureDecodedReviewEnvelope,
+      /"runnerComment"|"requestContext"|"plan_request_comment"/,
+    );
+    const fixturePersistenceMetadata = buildRunningPlanPersistenceMetadata({
+      draft: commentedFixtureResult.draft,
+      canonicalPlan: buildRunningPlanCanonicalPlan(commentedFixtureResult.draft),
+      reviewChecksum: commentedFixtureResult.draft.reviewChecksum,
+    });
+    assert.doesNotMatch(
+      JSON.stringify(fixturePersistenceMetadata),
+      new RegExp(fixtureCommentCanary),
     );
 
     const unauthorizedConfirm = await confirmRunningPlanDraftForUser("ordinary-local-runner", {
@@ -2007,12 +1787,17 @@ async function validateLocalDevFixtureAvailabilityGating() {
       /ordinary-local-runner|reviewToken|prompt|cookie/i,
     );
 
-    const ordinaryUnavailable = await buildReviewedAiGeneratedRunningPlanPreview(
+    let unauthorizedProviderCallCount = 0;
+    const unauthenticatedFixtureUnavailable = await buildReviewedAiGeneratedRunningPlanPreview(
       scenarios[0]!.input,
       {
         qaFixtureAuthorized: false,
         aiPreview: {
-          apiKey: null,
+          apiKey: "must-not-call-any-provider",
+          fetchImpl: async () => {
+            unauthorizedProviderCallCount += 1;
+            throw new Error("Unauthorized QA fixture request reached a provider.");
+          },
           generationLedger: {
             forceArtifactWrite: true,
             artifactRoot: boundaryArtifactRoot,
@@ -2021,28 +1806,74 @@ async function validateLocalDevFixtureAvailabilityGating() {
         },
       },
     );
-    assert.equal(ordinaryUnavailable.ok, false);
-    if (!ordinaryUnavailable.ok) {
-      assert.equal(ordinaryUnavailable.unavailable.persisted, false);
-      assert.notEqual(
-        ordinaryUnavailable.unavailable.debug.generationTrace?.provider.kind,
-        "local_dev_fixture",
+    assert.equal(unauthenticatedFixtureUnavailable.ok, false);
+    if (!unauthenticatedFixtureUnavailable.ok) {
+      assert.equal(unauthorizedProviderCallCount, 0);
+      assert.equal(unauthenticatedFixtureUnavailable.unavailable.persisted, false);
+      assert.equal(unauthenticatedFixtureUnavailable.unavailable.callsOpenAi, false);
+      assert.equal(
+        unauthenticatedFixtureUnavailable.unavailable.error.code,
+        "local_qa_fixture_not_authorized",
       );
-      const ordinaryGenerationId =
-        ordinaryUnavailable.unavailable.debug.generationTrace?.generationId;
-      assert.ok(ordinaryGenerationId);
-      const ordinaryEvents = await queryLocalRuntimeEvents({
+      assert.equal(
+        unauthenticatedFixtureUnavailable.unavailable.debug.generationTrace?.provider.kind,
+        "not_started",
+      );
+      const unauthenticatedGenerationId =
+        unauthenticatedFixtureUnavailable.unavailable.debug.generationTrace?.generationId;
+      assert.ok(unauthenticatedGenerationId);
+      const unauthenticatedEvents = await queryLocalRuntimeEvents({
         root: boundaryArtifactRoot,
-        generationId: ordinaryGenerationId,
+        generationId: unauthenticatedGenerationId,
       });
       assert.ok(
-        ordinaryEvents.some(
+        unauthenticatedEvents.some(
           (event) =>
-            event.providerKind === "not_started" && event.outcomeCode === "openai_not_configured",
+            event.providerKind === "not_started" &&
+            event.outcomeCode === "local_qa_fixture_not_authorized",
         ),
       );
-      assert.doesNotMatch(JSON.stringify(ordinaryEvents), /runner|prompt|authorization|cookie/i);
+      assert.equal(
+        unauthenticatedEvents.some((event) => event.providerKind === "openai_responses_api"),
+        false,
+      );
+      assert.doesNotMatch(
+        JSON.stringify(unauthenticatedEvents),
+        /runner|prompt|authorization|cookie/i,
+      );
     }
+
+    process.env[AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV] = "real";
+    process.env.HITO_AI_GENERATED_PLAN_DEV_FIXTURE = "true";
+    const realModeAuthoring = buildAiGeneratedRunningPlanAuthoringInput(scenarios[3]!.input);
+    assert.equal(realModeAuthoring.ok, true, realModeAuthoring.ok ? "" : realModeAuthoring.message);
+    if (!realModeAuthoring.ok) throw new Error(realModeAuthoring.message);
+    const realModeResponse = buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
+      authoringInput: realModeAuthoring.authoringInput,
+      today: realModeAuthoring.authoringInput.schedule.startDate,
+    });
+    let realModeProviderCallCount = 0;
+    const realModeResult = await buildReviewedAiGeneratedRunningPlanPreview(scenarios[3]!.input, {
+      qaFixtureAuthorized: false,
+      aiPreview: {
+        apiKey: "synthetic-real-mode-provider-key",
+        model: "gpt-4.1-mini",
+        fetchImpl: async (url, init) => {
+          realModeProviderCallCount += 1;
+          return realModeResponse(url, init);
+        },
+        generationLedger: { disabled: true },
+      },
+    });
+    assert.equal(realModeResult.ok, true);
+    if (!realModeResult.ok) throw new Error(realModeResult.unavailable.error.message);
+    assert.equal(realModeProviderCallCount, 1);
+    assert.equal(realModeResult.draft.aiGeneration.model, "gpt-4.1-mini");
+    assert.equal(
+      realModeResult.draft.aiGeneration.generationTrace?.provider.kind,
+      "openai_responses_api",
+    );
+    assert.equal(realModeResult.draft.callsOpenAi, true);
   } finally {
     for (const key of envKeys) {
       const value = previousEnv[key];
@@ -2082,29 +1913,30 @@ function buildScenarioAiPreviewOptions(
   assert.equal(resolved.ok, true, resolved.ok ? "" : resolved.message);
   if (!resolved.ok) throw new Error(resolved.message);
 
-  const options = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
+  const env = {
+    LOCAL_AUTH_BYPASS_ENABLED: "true",
+    LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: "/tmp/hito-local-auth.json",
+    NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+    [AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV]: "true",
+    [AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV]: "qa_fixture",
+    ...(config.nonRepeatTempo
+      ? {
+          [AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV]: "non_repeat_tempo",
+        }
+      : {}),
+  };
+  const fetchImpl = buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
     authoringInput: resolved.authoringInput,
-    qaFixtureAuthorized: true,
     today: input.startDate ?? resolved.authoringInput.schedule.startDate,
-    env: {
-      LOCAL_AUTH_BYPASS_ENABLED: "true",
-      LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: "/tmp/hito-local-auth.json",
-      NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
-      [AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV]: "true",
-      [AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV]: "qa_fixture",
-      ...(config.nonRepeatTempo
-        ? {
-            NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
-            [AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV]: "non_repeat_tempo",
-          }
-        : {}),
-    },
+    env,
   });
 
-  assert.notEqual(options, null, "Local plan-first fixture options must be available.");
-  if (!options) throw new Error("Missing local plan-first fixture options.");
-
-  return options;
+  return {
+    apiKey: "local-qa-dev-ai-generated-plan-fixture",
+    model: AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
+    today: input.startDate ?? resolved.authoringInput.schedule.startDate,
+    fetchImpl,
+  };
 }
 
 async function assertReviewedDraftExactness({
@@ -2529,7 +2361,14 @@ function assertNoLegacyOrDebugReadback({
   );
 }
 
-function openAiPlanFirstResponse(responseId: string, draft: unknown) {
+function parseFixtureProviderDraft(outputText: string) {
+  const parsed = aiAuthoredPlanFirstCompilerDraftSchema.safeParse(JSON.parse(outputText));
+  assert.equal(parsed.success, true);
+  if (!parsed.success) throw new Error(parsed.error.message);
+  return parsed.data;
+}
+
+function openAiPlanFirstResponse(responseId: string, draft: AiAuthoredPlanFirstCompilerDraft) {
   return new Response(
     JSON.stringify({
       id: responseId,

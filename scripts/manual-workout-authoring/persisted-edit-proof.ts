@@ -556,6 +556,111 @@ export async function validateManualPersistedTodayAndFutureWorkoutEditContract()
     pace: "4:50-5:00/km",
     paceTargetSource: "ai_authored_plan_guidance",
   });
+
+  const generatedHeartRateSourceWorkout = {
+    ...generatedSourceWorkout,
+    id: "99999999-9999-4999-8999-000000000806",
+    source_workout_id: "ai-workout-heart-rate-1",
+    title: "AI-authored aerobic run",
+    source_workout_type: "easy_aerobic_run",
+    workout_family: "easy",
+    workout_identity: "easy_aerobic_run",
+    calendar_icon_key: "easy",
+    steps: [
+      {
+        type: "work",
+        segment_type: "main",
+        label: "Aerobic work",
+        prescription: { mode: "time", duration_min: 40 },
+        target: {
+          primary_execution_mode: "heart_rate",
+          target_source: "ai_authored_plan_guidance",
+          hr_bpm_range: "125-135 bpm",
+          hr_bpm_min: 125,
+          hr_bpm_max: 135,
+          hr_target_source: "personal_hr_zone",
+          cue: "Keep the aerobic stage controlled.",
+          extra: {
+            hr_zone_reference: "Z2",
+            hr_profile_source: "personal",
+            hr_band_bpm_min: 121,
+            hr_band_bpm_max: 140,
+            hr_execution_range_kind: "ai_selected_subrange",
+          },
+        },
+      },
+    ] as PersistedPlannedWorkoutRow["steps"],
+  } satisfies PersistedPlannedWorkoutRow;
+  const generatedHeartRateReconstruct = await reconstructManualWorkoutPersistedEditDraftForUser(
+    userId,
+    {
+      activePlanId: generatedPlan.id,
+      plannedWorkoutId: generatedHeartRateSourceWorkout.id,
+      workoutDate: generatedHeartRateSourceWorkout.workout_date,
+    },
+    buildFakeEditDependencies({
+      activePlan: generatedPlan,
+      workouts: [generatedHeartRateSourceWorkout, keptWorkout],
+    }),
+  );
+  assert.equal(
+    generatedHeartRateReconstruct.ok,
+    true,
+    formatJsonResult(generatedHeartRateReconstruct),
+  );
+  if (!generatedHeartRateReconstruct.ok) {
+    throw new Error(formatJsonResult(generatedHeartRateReconstruct));
+  }
+  const reconstructedHeartRateTarget =
+    generatedHeartRateReconstruct.draftInput.entries?.[0]?.kind === "block"
+      ? generatedHeartRateReconstruct.draftInput.entries[0].block.target
+      : undefined;
+  assert.deepEqual(reconstructedHeartRateTarget, {
+    primaryExecutionMode: "heart_rate",
+    targetSource: "ai_authored_plan_guidance",
+    cue: "Keep the aerobic stage controlled.",
+    hrBpmRange: "125-135 bpm",
+    hrTargetSource: "personal_hr_zone",
+    hrZoneReference: "Z2",
+    hrProfileSource: "personal",
+    hrBandBpmMin: 121,
+    hrBandBpmMax: 140,
+    hrExecutionRangeKind: "ai_selected_subrange",
+  });
+  const generatedHeartRateReview = await reviewManualWorkoutPersistedEditDraftForUser(
+    userId,
+    {
+      activePlanId: generatedPlan.id,
+      plannedWorkoutId: generatedHeartRateSourceWorkout.id,
+      workoutDate: generatedHeartRateSourceWorkout.workout_date,
+      draftInput: generatedHeartRateReconstruct.draftInput,
+    },
+    buildFakeEditDependencies({
+      activePlan: generatedPlan,
+      workouts: [generatedHeartRateSourceWorkout, keptWorkout],
+    }),
+  );
+  assert.equal(generatedHeartRateReview.ok, true, formatJsonResult(generatedHeartRateReview));
+  if (!generatedHeartRateReview.ok) {
+    throw new Error(formatJsonResult(generatedHeartRateReview));
+  }
+  assert.deepEqual(generatedHeartRateReview.draftReview.draft.steps[0]?.target, {
+    primary_execution_mode: "heart_rate",
+    target_source: "ai_authored_plan_guidance",
+    cue: "Keep the aerobic stage controlled.",
+    hr_bpm_range: "125-135 bpm",
+    hr_bpm_min: 125,
+    hr_bpm_max: 135,
+    hr_target_source: "personal_hr_zone",
+    extra: {
+      hr_zone_reference: "Z2",
+      hr_profile_source: "personal",
+      hr_band_bpm_min: 121,
+      hr_band_bpm_max: 140,
+      hr_execution_range_kind: "ai_selected_subrange",
+    },
+  });
+
   const generatedTempoEntry = generatedReconstruct.draftInput.entries?.[1];
   assert.equal(generatedTempoEntry?.kind, "block");
   if (!generatedTempoEntry || generatedTempoEntry.kind !== "block") {

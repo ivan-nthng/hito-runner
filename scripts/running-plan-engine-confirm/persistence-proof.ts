@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 
 import {
   buildReviewedAiGeneratedRunningPlanPreviewForUser,
+  buildReviewedAiGeneratedRunningPlanPreview,
   confirmRunningPlanDraftForUser,
   type RunningPlanConfirmActionInput,
 } from "../../src/lib/running-plan-engine-actions";
@@ -15,15 +16,27 @@ import {
   ActivePlanPersistenceRejection,
   applyAtomicReviewedPlanPersistence,
 } from "../../src/lib/active-plan-lifecycle-persistence";
-import { buildAiGeneratedRunningPlanDevFixturePreviewOptions } from "../../src/lib/ai-generated-running-plan-dev-fixture";
+import {
+  AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV,
+  AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
+  AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV,
+  AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV,
+  buildAiGeneratedRunningPlanDevFixtureOpenAiFetch,
+} from "../../src/lib/ai-generated-running-plan-dev-fixture";
+import { AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID } from "../../src/lib/ai-generated-running-plan-dev-fixture";
 import { buildAiGeneratedRunningPlanAuthoringInput } from "../../src/lib/ai-generated-running-plan";
-import { buildAiAuthoredPlanFirstProviderContext } from "../../src/lib/ai-authored-plan-first-provider-contract";
+import { buildImportedPlanSeed } from "../../src/lib/imported-plan";
+import {
+  buildAiAuthoredPlanFirstProviderContext,
+  type AiAuthoredPlanFirstCompilerDraft,
+} from "../../src/lib/ai-authored-plan-first-provider-contract";
 import {
   activePlanExportToTrainingPlanV2,
   buildActivePlanExportPayload,
   renderPlanExportMarkdown,
 } from "../../src/lib/plan-export";
 import { createAdminSupabaseClient } from "../../src/lib/supabase/server";
+import { getPersistedSnapshot } from "../../src/lib/training-api";
 import type { Database, Json } from "../../src/lib/supabase/database";
 import {
   buildFirstTimeRunnerBaselineReadback,
@@ -37,22 +50,19 @@ import {
 } from "./assertions";
 import { validateRunnerFacingTargetReadbackContract } from "../running-plan-engine-target-readback-contract";
 import {
-  cleanupDisposableSupabaseUser,
-  createDisposableSupabaseUser,
+  acquireQaPoolSupabaseUser,
   DISPOSABLE_REQUIRE_PERSISTENCE_FLAG,
   readDisposablePersistenceCliOptions,
+  releaseQaPoolSupabaseUser,
   resolveDisposablePersistencePreflight,
   type DisposablePersistencePreflight,
-  type DisposableSupabaseCleanupProof,
-  type DisposableSupabaseCleanupSpec,
-} from "../lib/disposable-persistence-proof";
+  type QaPoolSupabaseCleanupProof,
+} from "../lib/qa-pool-persistence-proof";
+import { buildLargeReadbackProviderFixture } from "../plan-first-provider-representation-proof";
+import { buildProofPersonalRunnerProfileSnapshot } from "../runner-profile-snapshot-proof-helpers";
 
-type DisposableCleanupProofCountKey =
-  | "workoutLogsRemaining"
-  | "planCyclesRemaining"
-  | "plannedWorkoutsRemaining"
-  | "runnerProfilesRemaining";
-type DisposableCleanupProof = DisposableSupabaseCleanupProof<DisposableCleanupProofCountKey>;
+type DisposableCleanupProof = QaPoolSupabaseCleanupProof;
+type QaPoolUserLease = Awaited<ReturnType<typeof acquireQaPoolSupabaseUser>>;
 type BuildConfirmInputForConfirm = (
   draft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
 ) => RunningPlanConfirmActionInput;
@@ -73,37 +83,6 @@ const UPDATED_PERSONAL_HEART_RATE_ZONES = [
   { reference: "Z4", minBpm: 150, maxBpm: 160 },
   { reference: "Z5", minBpm: 165, maxBpm: 180 },
 ] as const;
-const DISPOSABLE_CLEANUP_SPECS = [
-  {
-    table: "workout_logs",
-    userColumn: "user_id",
-    countColumn: "id",
-    proofKey: "workoutLogsRemaining",
-    zeroMessage: "Disposable workout logs must be cleaned up.",
-  },
-  {
-    table: "planned_workouts",
-    userColumn: "user_id",
-    countColumn: "id",
-    proofKey: "plannedWorkoutsRemaining",
-    zeroMessage: "Disposable planned workouts must be cleaned up.",
-  },
-  {
-    table: "plan_cycles",
-    userColumn: "user_id",
-    countColumn: "id",
-    proofKey: "planCyclesRemaining",
-    zeroMessage: "Disposable plan cycles must be cleaned up.",
-  },
-  {
-    table: "runner_profiles",
-    userColumn: "user_id",
-    countColumn: "user_id",
-    proofKey: "runnerProfilesRemaining",
-    zeroMessage: "Disposable runner profile must be cleaned up.",
-  },
-] as const satisfies readonly DisposableSupabaseCleanupSpec<DisposableCleanupProofCountKey>[];
-
 export type PersistencePreflight = DisposablePersistencePreflight;
 
 export function readCliOptions() {
@@ -163,6 +142,7 @@ export async function validatePersistenceContract(
   buildConfirmInputForConfirm: BuildConfirmInputForConfirm,
 ) {
   const supabase = createAdminSupabaseClient();
+  const largeReadbackDraft = await buildLargeReadbackReviewedDraft();
   const persistedDistanceGoals: Array<{
     goalLabel: string;
     distanceMeters: number | null;
@@ -175,12 +155,11 @@ export async function validatePersistenceContract(
     cleanup: DisposableCleanupProof;
   }> = [];
 
-  for (const draft of reviewedDrafts) {
+  for (const draft of [...reviewedDrafts, largeReadbackDraft]) {
     const distanceGoal = distanceGoalSummary(draft);
-    const disposableUser = await createDisposableSupabaseUser({
+    const disposableUser = await acquireQaPoolSupabaseUser({
       supabase,
-      emailPrefix: "running-plan-confirm",
-      label: distanceGoal.goalLabel,
+      poolRole: "provider-engine",
       creationErrorMessage: "Disposable user creation failed.",
     });
     const userId = disposableUser.userId;
@@ -220,6 +199,25 @@ export async function validatePersistenceContract(
       );
       validateAiAuthoredPrimaryExecutionGuidance(persisted.workouts);
       validateNoClientRowsTrusted(persisted.workouts);
+
+      if (draft.canonicalRowCount >= 210) {
+        const snapshot = await getPersistedSnapshot(userId);
+        assert.equal(snapshot.workouts.length, draft.canonicalRowCount);
+        assert.equal(snapshot.planMeta?.id, persisted.plan.id);
+        assert.deepEqual(
+          snapshot.workouts.map((workout) => workout.id),
+          persisted.workouts.map((workout) => workout.id),
+          "Calendar/detail readback must preserve every persisted workout in order.",
+        );
+        const exportPayload = buildActivePlanExportPayload({
+          planCycle: persisted.plan,
+          workouts: persisted.workouts,
+          exportedAt: "2026-07-27T12:00:00.000Z",
+        });
+        const reimported = activePlanExportToTrainingPlanV2(exportPayload);
+        assert.equal(reimported.planned_workouts.length, draft.canonicalRowCount);
+        assert.equal(buildImportedPlanSeed(reimported).workouts.length, draft.canonicalRowCount);
+      }
       const persistedPlanPreferences = asJsonRecord(persisted.plan.plan_preferences);
       const expectedFixedRestDays = draft.normalizedInputSummary.fixedRestDays;
       const expectedMaxRunningDaysPerWeek = draft.normalizedInputSummary.daysPerWeek;
@@ -263,7 +261,7 @@ export async function validatePersistenceContract(
         },
       };
     } finally {
-      cleanupProof = await cleanupDisposableUser(supabase, userId);
+      cleanupProof = await cleanupDisposableUser(supabase, disposableUser);
     }
 
     if (distanceGoalProof && cleanupProof) {
@@ -274,6 +272,12 @@ export async function validatePersistenceContract(
     }
   }
   const creationFailureAtomic = await validateReviewedPlanPersistenceFailureAtomicity(supabase);
+  const qaFixtureRuntime = await validateQaFixtureRuntimePersistence({
+    supabase,
+    preflight,
+    previewInput: reviewedDrafts[0]!.previewInput,
+    buildConfirmInputForConfirm,
+  });
   const personalHeartRateProfile = await validatePersonalHeartRateProfilePersistence({
     supabase,
     preflight,
@@ -286,7 +290,211 @@ export async function validatePersistenceContract(
     target: preflight.target,
     persistedDistanceGoals,
     creationFailureAtomic,
+    qaFixtureRuntime,
     personalHeartRateProfile,
+  };
+}
+
+async function buildLargeReadbackReviewedDraft() {
+  const fixture = buildLargeReadbackProviderFixture();
+  const reviewed = await buildReviewedAiGeneratedRunningPlanPreview(fixture.input, {
+    runnerProfileSnapshot: buildProofPersonalRunnerProfileSnapshot(fixture.input),
+    aiPreview: {
+      apiKey: "large-readback-capacity-proof",
+      model: "large-readback-capacity-proof",
+      generationLedger: { disabled: true },
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            id: "resp_large_readback_capacity",
+            status: "completed",
+            output_text: JSON.stringify(fixture.draft),
+            usage: { input_tokens: 100, output_tokens: 100, total_tokens: 200 },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    },
+  });
+  assert.equal(reviewed.ok, true, reviewed.ok ? "" : reviewed.unavailable.error.message);
+  if (!reviewed.ok) throw new Error(reviewed.unavailable.error.message);
+  assert.equal(reviewed.draft.canonicalNonRestRowCount, 211);
+  assert.ok(
+    reviewed.draft.canonicalRowCount >= 210,
+    "Large readback proof must retain at least the reported 210 persisted calendar rows.",
+  );
+  return reviewed.draft;
+}
+
+async function validateQaFixtureRuntimePersistence(input: {
+  supabase: ReturnType<typeof createAdminSupabaseClient>;
+  preflight: Extract<PersistencePreflight, { shouldRun: true }>;
+  previewInput: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>["previewInput"];
+  buildConfirmInputForConfirm: BuildConfirmInputForConfirm;
+}) {
+  const disposableUser = await acquireQaPoolSupabaseUser({
+    supabase: input.supabase,
+    poolRole: "provider-engine",
+    creationErrorMessage: "Disposable QA fixture user creation failed.",
+  });
+  const envKeys = [
+    AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV,
+    AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV,
+    AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV,
+    "LOCAL_AUTH_BYPASS_ACCOUNTS_FILE",
+    "LOCAL_AUTH_BYPASS_ENABLED",
+    "NEXT_PUBLIC_SUPABASE_URL",
+  ] as const;
+  const previousEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
+  let proof: {
+    providerCalls: number;
+    rows: number;
+    sourceKind: string;
+    responseId: string;
+    reviewChecksum: string;
+    persistedResponseId: string;
+    transientContextAbsent: true;
+  } | null = null;
+  let cleanup: DisposableCleanupProof | null = null;
+  let providerCalls = 0;
+  const transientContextCanary = `private-plan-context-${crypto.randomUUID()}`;
+
+  try {
+    process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV] = "true";
+    process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV] = "non_repeat_tempo";
+    process.env[AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV] = "qa_fixture";
+    process.env.LOCAL_AUTH_BYPASS_ACCOUNTS_FILE = "scripts/fixtures/local-auth-users.json";
+    process.env.LOCAL_AUTH_BYPASS_ENABLED = "true";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = input.preflight.target.url;
+
+    const firstTimeReadback = buildFirstTimeRunnerBaselineReadback({
+      age: input.previewInput.age,
+      weightKg: input.previewInput.weightKg,
+      heightCm: input.previewInput.heightCm,
+      fitnessLevel: "running_regularly",
+    });
+    await updateUserSettingsForUserId(
+      disposableUser.userId,
+      {
+        firstName: "QA",
+        lastName: "Fixture",
+        displayName: "QA Fixture",
+        age: input.previewInput.age,
+        weightKg: input.previewInput.weightKg,
+        heightCm: input.previewInput.heightCm,
+        fitnessLevel: "running_regularly",
+        heartRateProfile: {
+          zones: firstTimeReadback.heartRateZones.zones.map(({ reference, minBpm, maxBpm }) => ({
+            reference,
+            minBpm,
+            maxBpm,
+          })),
+        },
+      },
+      disposableUser.email,
+    );
+
+    const reviewed = await buildReviewedAiGeneratedRunningPlanPreviewForUser(
+      disposableUser.userId,
+      {
+        ...input.previewInput,
+        runnerComment: transientContextCanary,
+      },
+      {
+        qaFixtureAuthorized: true,
+        aiPreview: {
+          apiKey: "must-not-reach-provider",
+          model: "must-not-reach-provider",
+          fetchImpl: async () => {
+            providerCalls += 1;
+            throw new Error("QA fixture runtime reached the provider transport.");
+          },
+          generationLedger: { disabled: true },
+        },
+      },
+    );
+    assert.equal(reviewed.ok, true, reviewed.ok ? "" : reviewed.unavailable.error.message);
+    if (!reviewed.ok) throw new Error(reviewed.unavailable.error.message);
+    assert.equal(reviewed.draft.callsOpenAi, false);
+    assert.equal(reviewed.draft.aiGeneration.generationTrace?.provider.kind, "local_dev_fixture");
+    assert.equal(
+      reviewed.draft.aiGeneration.responseId,
+      AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID,
+    );
+    assert.equal(JSON.stringify(reviewed.draft).includes(transientContextCanary), false);
+
+    const confirmed = await confirmRunningPlanDraftForUser(
+      disposableUser.userId,
+      input.buildConfirmInputForConfirm(reviewed.draft),
+      { allowLocalQaFixture: true },
+    );
+    assert.equal(confirmed.ok, true, JSON.stringify(confirmed));
+    assert.equal(providerCalls, 0);
+
+    const persisted = await loadPersistedPlanForUser(input.supabase, disposableUser.userId);
+    assert.equal(persisted.workouts.length, reviewed.draft.canonicalRowCount);
+    assert.equal(persisted.plan.source_kind, reviewed.draft.sourceKind);
+    const persistedJson = JSON.stringify(persisted);
+    assert.equal(persistedJson.includes(transientContextCanary), false);
+    assert.doesNotMatch(persistedJson, /"runnerComment"|"requestContext"|"plan_request_comment"/);
+    validateAiAuthoredPrimaryExecutionGuidance(persisted.workouts);
+    validateNoClientRowsTrusted(persisted.workouts);
+    const persistedEngineMetadata = (
+      persisted.plan.goal_metadata as {
+        selected_plan_engine?: {
+          review_checksum?: string;
+          ai_generation?: {
+            response_id?: string;
+          };
+        };
+      }
+    ).selected_plan_engine;
+    assert.equal(persistedEngineMetadata?.review_checksum, reviewed.draft.reviewChecksum);
+    assert.equal(
+      persistedEngineMetadata?.ai_generation?.response_id,
+      AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID,
+    );
+    const exportPayload = buildActivePlanExportPayload({
+      planCycle: persisted.plan,
+      workouts: persisted.workouts,
+      exportedAt: "2026-07-26T12:00:00.000Z",
+    });
+    assert.equal(JSON.stringify(exportPayload).includes(transientContextCanary), false);
+    assert.equal(
+      JSON.stringify(activePlanExportToTrainingPlanV2(exportPayload)).includes(
+        transientContextCanary,
+      ),
+      false,
+    );
+
+    proof = {
+      providerCalls,
+      rows: persisted.workouts.length,
+      sourceKind: persisted.plan.source_kind,
+      responseId: AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID,
+      reviewChecksum: reviewed.draft.reviewChecksum,
+      persistedResponseId: AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID,
+      transientContextAbsent: true,
+    };
+  } finally {
+    cleanup = await cleanupDisposableUser(input.supabase, disposableUser);
+    for (const key of envKeys) {
+      const value = previousEnv[key];
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+    assert.ok(cleanup);
+  }
+
+  if (!proof || !cleanup) {
+    throw new Error("QA fixture runtime persistence proof did not complete.");
+  }
+
+  return {
+    ...proof,
+    cleanup,
   };
 }
 
@@ -328,22 +536,21 @@ async function validatePersonalHeartRateProfilePersistence(input: {
   previewInput: RunningPlanPreviewDraft["previewInput"];
   buildConfirmInputForConfirm: BuildConfirmInputForConfirm;
 }) {
-  const owner = await createDisposableSupabaseUser({
+  const owner = await acquireQaPoolSupabaseUser({
     supabase: input.supabase,
-    emailPrefix: "personal-hr-owner",
-    validationKind: "personal_hr_profile",
+    poolRole: "isolation-a",
     password: DISPOSABLE_TEST_PASSWORD,
     creationErrorMessage: "Disposable personal-HR owner creation failed.",
   });
-  const otherRunner = await createDisposableSupabaseUser({
-    supabase: input.supabase,
-    emailPrefix: "personal-hr-other",
-    validationKind: "personal_hr_profile_rls",
-    password: DISPOSABLE_TEST_PASSWORD,
-    creationErrorMessage: "Disposable personal-HR RLS runner creation failed.",
-  });
+  let otherRunner: QaPoolUserLease | null = null;
 
   try {
+    otherRunner = await acquireQaPoolSupabaseUser({
+      supabase: input.supabase,
+      poolRole: "isolation-b",
+      password: DISPOSABLE_TEST_PASSWORD,
+      creationErrorMessage: "Disposable personal-HR RLS runner creation failed.",
+    });
     const firstTimeReadback = buildFirstTimeRunnerBaselineReadback({
       age: input.previewInput.age,
       weightKg: input.previewInput.weightKg,
@@ -559,18 +766,24 @@ async function validatePersonalHeartRateProfilePersistence(input: {
       PERSONAL_HEART_RATE_ZONES,
     );
 
-    const fixtureOptions = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
-      authoringInput: authoring.authoringInput,
-      qaFixtureAuthorized: true,
+    const fixtureFetch = buildPersonalHeartRateSubrangeFixtureFetch(
+      buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
+        authoringInput: authoring.authoringInput,
+        today: watchCanaryInput.startDate,
+        env: localFixtureEnv(input.preflight.target.url),
+      }),
+    );
+    const fixtureOptions = {
+      apiKey: "local-qa-dev-ai-generated-plan-fixture",
+      model: AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
       today: watchCanaryInput.startDate,
-      env: localFixtureEnv(input.preflight.target.url),
-    });
-    assert.notEqual(fixtureOptions, null);
+      fetchImpl: fixtureFetch,
+    };
 
     let reviewed = await buildReviewedAiGeneratedRunningPlanPreviewForUser(
       owner.userId,
       watchCanaryInput,
-      { aiPreview: fixtureOptions ?? undefined },
+      { aiPreview: fixtureOptions },
     );
     assert.equal(reviewed.ok, true, reviewed.ok ? "" : reviewed.unavailable.error.message);
     if (!reviewed.ok) {
@@ -613,7 +826,7 @@ async function validatePersonalHeartRateProfilePersistence(input: {
     reviewed = await buildReviewedAiGeneratedRunningPlanPreviewForUser(
       owner.userId,
       watchCanaryInput,
-      { aiPreview: fixtureOptions ?? undefined },
+      { aiPreview: fixtureOptions },
     );
     assert.equal(reviewed.ok, true, reviewed.ok ? "" : reviewed.unavailable.error.message);
     if (!reviewed.ok) {
@@ -625,11 +838,40 @@ async function validatePersonalHeartRateProfilePersistence(input: {
     assert.ok(
       reviewedTargets.some(
         (target) =>
+          target.primary_execution_mode === "heart_rate" &&
+          target.target_source === "ai_authored_plan_guidance" &&
           target.hr_bpm_range === "116-135 bpm" &&
+          target.hr_bpm_min === 116 &&
+          target.hr_bpm_max === 135 &&
           target.hr_target_source === "personal_hr_zone" &&
-          target.extra?.hr_zone_reference === "Z2",
+          target.label === "Personal HR" &&
+          target.source_note === "Saved by the runner as personal heart-rate truth." &&
+          target.extra?.hr_zone_reference === "Z2" &&
+          target.extra.hr_profile_source === "personal" &&
+          target.extra.hr_band_bpm_min === 116 &&
+          target.extra.hr_band_bpm_max === 135 &&
+          target.extra.hr_execution_range_kind === "full_band",
       ),
-      "Reviewed plan must resolve authored aerobic Z2 to the saved personal BPM range.",
+      "Reviewed plan must preserve authored Z2 identity and its full personal band snapshot.",
+    );
+    assert.ok(
+      reviewedTargets.some(
+        (target) =>
+          target.primary_execution_mode === "heart_rate" &&
+          target.target_source === "ai_authored_plan_guidance" &&
+          target.hr_bpm_range === "121-130 bpm" &&
+          target.hr_bpm_min === 121 &&
+          target.hr_bpm_max === 130 &&
+          target.hr_target_source === "personal_hr_zone" &&
+          target.label === "Personal HR" &&
+          target.source_note === "Saved by the runner as personal heart-rate truth." &&
+          target.extra?.hr_zone_reference === "Z2" &&
+          target.extra.hr_profile_source === "personal" &&
+          target.extra.hr_band_bpm_min === 116 &&
+          target.extra.hr_band_bpm_max === 135 &&
+          target.extra.hr_execution_range_kind === "ai_selected_subrange",
+      ),
+      "Reviewed plan must preserve the AI-selected execution subrange inside its full Z2 snapshot.",
     );
     assert.ok(
       reviewedTargets.some(
@@ -669,11 +911,42 @@ async function validatePersonalHeartRateProfilePersistence(input: {
     assert.ok(
       exportTargets.some(
         (target) =>
+          target.primary_execution_mode === "heart_rate" &&
+          target.target_source === "ai_authored_plan_guidance" &&
           target.hr_bpm_range === "116-135 bpm" &&
+          target.hr_bpm_min === 116 &&
+          target.hr_bpm_max === 135 &&
           target.hr_target_source === "personal_hr_zone" &&
-          target.hr_zone_reference === "Z2",
+          target.label === "Personal HR" &&
+          target.source_note === "Saved by the runner as personal heart-rate truth." &&
+          target.hr_zone_reference === "Z2" &&
+          target.hr_profile_source === "personal" &&
+          target.hr_band_bpm_min === 116 &&
+          target.hr_band_bpm_max === 135 &&
+          target.hr_execution_range_kind === "full_band" &&
+          target.extra === undefined,
       ),
-      "Export must preserve reviewed BPM guidance and its profile-resolution provenance.",
+      "Export must preserve reviewed BPM guidance, named identity, parent snapshot, and provenance.",
+    );
+    assert.ok(
+      exportTargets.some(
+        (target) =>
+          target.primary_execution_mode === "heart_rate" &&
+          target.target_source === "ai_authored_plan_guidance" &&
+          target.hr_bpm_range === "121-130 bpm" &&
+          target.hr_bpm_min === 121 &&
+          target.hr_bpm_max === 130 &&
+          target.hr_target_source === "personal_hr_zone" &&
+          target.label === "Personal HR" &&
+          target.source_note === "Saved by the runner as personal heart-rate truth." &&
+          target.hr_zone_reference === "Z2" &&
+          target.hr_profile_source === "personal" &&
+          target.hr_band_bpm_min === 116 &&
+          target.hr_band_bpm_max === 135 &&
+          target.hr_execution_range_kind === "ai_selected_subrange" &&
+          target.extra === undefined,
+      ),
+      "Export must preserve the confirmed execution subrange independently of its parent band.",
     );
     assert.match(renderPlanExportMarkdown(exportPayload), /116-135 bpm/);
     assert.doesNotMatch(renderPlanExportMarkdown(exportPayload), /\bZ[1-5](?:-Z[1-5])?\b/);
@@ -710,6 +983,7 @@ async function validatePersonalHeartRateProfilePersistence(input: {
       savedSource: persistedSettings.heartRateZones.source,
       providerContextSource: providerContext.runner.heart_rate_profile?.source,
       reviewedBpm: "116-135 bpm",
+      reviewedSubrangeBpm: "121-130 bpm",
       overlappingPersonalPersisted: true,
       gappedPersonalPersisted: true,
       invalidSettingsBaselineRejected: true,
@@ -717,8 +991,10 @@ async function validatePersonalHeartRateProfilePersistence(input: {
       rlsIsolation: true,
     };
   } finally {
-    await cleanupDisposableUser(input.supabase, owner.userId);
-    await cleanupDisposableUser(input.supabase, otherRunner.userId);
+    if (otherRunner) {
+      await cleanupDisposableUser(input.supabase, otherRunner);
+    }
+    await cleanupDisposableUser(input.supabase, owner);
   }
 }
 
@@ -855,7 +1131,7 @@ async function validateRunnerProfileRls(input: {
         version: "runner_hr_profile_v2",
         source: "personal",
         zones: [
-          { reference: "Z1", minBpm: 39, maxBpm: 110 },
+          { reference: "Z1", minBpm: 59, maxBpm: 110 },
           ...UPDATED_PERSONAL_HEART_RATE_ZONES.slice(1),
         ],
       },
@@ -867,7 +1143,7 @@ async function validateRunnerProfileRls(input: {
         source: "personal",
         zones: [
           ...UPDATED_PERSONAL_HEART_RATE_ZONES.slice(0, 4),
-          { reference: "Z5", minBpm: 165, maxBpm: 221 },
+          { reference: "Z5", minBpm: 165, maxBpm: 201 },
         ],
       },
     },
@@ -949,12 +1225,26 @@ async function validateRunnerProfileRls(input: {
 }
 
 type ProofTargetRecord = Record<string, unknown> & {
+  hr_band_bpm_max?: number;
+  hr_band_bpm_min?: number;
+  hr_bpm_max?: number;
+  hr_bpm_min?: number;
   hr_bpm_range?: string;
+  hr_execution_range_kind?: string;
+  hr_profile_source?: string;
   hr_target_source?: string;
+  label?: string;
   pace?: string;
   pace_min_per_km_range?: string;
+  primary_execution_mode?: string;
+  source_note?: string;
+  target_source?: string;
   hr_zone_reference?: string;
   extra?: {
+    hr_band_bpm_max?: number;
+    hr_band_bpm_min?: number;
+    hr_execution_range_kind?: string;
+    hr_profile_source?: string;
     hr_zone_reference?: string;
   };
 };
@@ -986,6 +1276,52 @@ function collectTargetRecords(value: unknown): ProofTargetRecord[] {
   return targets;
 }
 
+function buildPersonalHeartRateSubrangeFixtureFetch(fetchImpl: typeof fetch): typeof fetch {
+  return async (input, init) => {
+    const response = await fetchImpl(input, init);
+    const providerResponse = (await response.json()) as {
+      output_text?: string;
+      [key: string]: unknown;
+    };
+    assert.equal(typeof providerResponse.output_text, "string");
+    const draft = JSON.parse(providerResponse.output_text) as AiAuthoredPlanFirstCompilerDraft;
+    let authoredSubrange = false;
+
+    for (const workout of draft.workouts) {
+      for (const section of workout.sections) {
+        if (section.kind !== "unit") continue;
+        const target = section.target;
+        if (
+          target.primary_execution_mode === "heart_rate" &&
+          target.band_reference === "Z2" &&
+          target.command === "116-135 bpm"
+        ) {
+          section.target = {
+            ...target,
+            command: "121-130 bpm",
+          };
+          section.cue = "Use the narrower aerobic range for this controlled stage.";
+          authoredSubrange = true;
+          break;
+        }
+      }
+      if (authoredSubrange) break;
+    }
+
+    assert.equal(authoredSubrange, true, "The persistence fixture must author one Z2 subrange.");
+    return new Response(
+      JSON.stringify({
+        ...providerResponse,
+        output_text: JSON.stringify(draft),
+      }),
+      {
+        status: response.status,
+        headers: { "content-type": "application/json" },
+      },
+    );
+  };
+}
+
 function localFixtureEnv(loopbackSupabaseUrl: string) {
   return {
     LOCAL_AUTH_BYPASS_ENABLED: "true",
@@ -999,10 +1335,9 @@ function localFixtureEnv(loopbackSupabaseUrl: string) {
 async function validateReviewedPlanPersistenceFailureAtomicity(
   supabase: ReturnType<typeof createAdminSupabaseClient>,
 ) {
-  const disposableUser = await createDisposableSupabaseUser({
+  const disposableUser = await acquireQaPoolSupabaseUser({
     supabase,
-    emailPrefix: "running-plan-atomic-create",
-    label: "forced-failure",
+    poolRole: "saved-plan-readback",
     creationErrorMessage: "Disposable atomic plan-creation user creation failed.",
   });
   const planId = crypto.randomUUID();
@@ -1219,7 +1554,7 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
     ]);
     assert.equal(profileAfterRace.data?.baseline_revision, changedBaseline.profileRevision);
   } finally {
-    await cleanupDisposableUser(supabase, disposableUser.userId);
+    await cleanupDisposableUser(supabase, disposableUser);
   }
 
   return {
@@ -1303,11 +1638,12 @@ async function loadPersistedPlanForUser(
 
 async function cleanupDisposableUser(
   supabase: ReturnType<typeof createAdminSupabaseClient>,
-  userId: string,
+  lease: QaPoolUserLease,
 ): Promise<DisposableCleanupProof> {
-  return cleanupDisposableSupabaseUser({
+  return releaseQaPoolSupabaseUser({
     supabase,
-    userId,
-    cleanupSpecs: DISPOSABLE_CLEANUP_SPECS,
+    userId: lease.userId,
+    poolRole: lease.poolRole,
+    leaseToken: lease.leaseToken,
   });
 }

@@ -30,11 +30,26 @@ const SUSPECTED_TEST_PREFIXES = ["qa-", "test-", "codex-", "apply-"];
 export function classifyAdminAnalyticsUser(
   input: AdminUserClassificationInput,
 ): AdminUserClassificationInfo {
-  if (input.localAccountRole === "admin") {
+  const appMetadata = input.appMetadata ?? {};
+  const localRole = stringMetadata(appMetadata.hito_local_role);
+  const hitoRole = stringMetadata(appMetadata.hito_role);
+
+  if (
+    input.localAccountRole === "admin" ||
+    appMetadata.hito_admin === true ||
+    hitoRole === "admin" ||
+    localRole === "admin"
+  ) {
     return {
-      classification: "local_admin",
-      classificationReason: "local_account_admin",
-      classificationSource: "local_accounts_file",
+      classification: input.localAccountRole === "admin" ? "local_admin" : "supabase_admin",
+      classificationReason:
+        input.localAccountRole === "admin"
+          ? "local_account_admin"
+          : localRole === "admin"
+            ? "supabase_local_admin"
+            : "supabase_admin_metadata",
+      classificationSource:
+        input.localAccountRole === "admin" ? "local_accounts_file" : "supabase_app_metadata",
     };
   }
 
@@ -43,19 +58,6 @@ export function classifyAdminAnalyticsUser(
       classification: "local_test",
       classificationReason: "local_account_tester",
       classificationSource: "local_accounts_file",
-    };
-  }
-
-  const appMetadata = input.appMetadata ?? {};
-  const localRole = stringMetadata(appMetadata.hito_local_role);
-  const hitoRole = stringMetadata(appMetadata.hito_role);
-
-  if (appMetadata.hito_admin === true || hitoRole === "admin" || localRole === "admin") {
-    return {
-      classification: "supabase_admin",
-      classificationReason:
-        localRole === "admin" ? "supabase_local_admin" : "supabase_admin_metadata",
-      classificationSource: "supabase_app_metadata",
     };
   }
 

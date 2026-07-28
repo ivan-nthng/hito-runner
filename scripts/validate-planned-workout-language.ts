@@ -28,7 +28,10 @@ import {
   type TrainingPlanV2,
 } from "../src/lib/imported-plan";
 import { buildPersistedWorkoutInsertRows } from "../src/lib/persisted-plan-replacement";
-import { buildAiGeneratedRunningPlanDevFixturePreviewOptions } from "../src/lib/ai-generated-running-plan-dev-fixture";
+import {
+  AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
+  buildAiGeneratedRunningPlanDevFixtureOpenAiFetch,
+} from "../src/lib/ai-generated-running-plan-dev-fixture";
 import {
   AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
   buildAiGeneratedRunningPlanAuthoringInput,
@@ -183,16 +186,20 @@ async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {
     throw new Error(authoring.message);
   }
 
-  const aiPreview = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
+  const today = input.startDate ?? authoring.authoringInput.schedule.startDate;
+  const fetchImpl = buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
     authoringInput: authoring.authoringInput,
-    qaFixtureAuthorized: true,
-    today: input.startDate ?? authoring.authoringInput.schedule.startDate,
+    today,
     env: localAiGeneratedFixtureEnv(),
   });
-  assert.notEqual(aiPreview, null, "Planned-workout language proof must use local AI fixture.");
 
   return buildReviewedAiGeneratedRunningPlanPreview(input, {
-    aiPreview: aiPreview ?? undefined,
+    aiPreview: {
+      apiKey: "local-qa-dev-ai-generated-plan-fixture",
+      model: AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
+      today,
+      fetchImpl,
+    },
     runnerProfileSnapshot,
   });
 }
@@ -735,7 +742,7 @@ function assertNoGeneratedWorkoutUserEnteredTargetTruth(
     assert.equal(
       targetRecords.some((target) => targetValue(target, "pace_min_per_km_range")),
       false,
-      `${label} must not emit pace targets unless the accepted benchmark seam allows pace.`,
+      `${label} must not emit pace targets when its canonical metric mode disallows pace.`,
     );
   }
 }

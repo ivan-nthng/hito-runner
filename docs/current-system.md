@@ -164,9 +164,11 @@
   `src/lib/ai-generated-running-plan.ts`, and the running-plan review/confirm seams.
 - `src/lib/ai-first-plan-draft-service.ts`
   owns the non-mutating AI-authored plan-first service: it accepts the canonical runner-facts and
-  calendar-constraints input, requests one `hito_ai_authored_full_plan_draft` response from OpenAI
-  or the loopback-only provider fixture, and accepts one compact closed response containing a flat
-  non-rest `workouts[]` list plus one exact endpoint. Provider output uses canonical workout and
+  calendar-constraints input, requests one `hito_ai_authored_full_plan_v1` response from OpenAI or
+  the loopback-only provider fixture, and accepts one self-describing full response with leaf-local
+  prescriptions and targets, a flat non-rest `workouts[]` list, and one exact endpoint. The full
+  response is validated directly as the compiler draft before review.
+  Provider output uses canonical workout and
   segment enums, structural-only Repeat parents, ordered child truth, bounded numeric prescriptions,
   exact min/km pace or accepted-profile numeric BPM commands, and targetless coach-authored
   Hydration steps; it has no plan-level narrative metadata,
@@ -312,8 +314,9 @@
   authenticated users without setup can create an empty manual plan from required basics, or use
   Quick setup for backend-owned selected distance-goal review. `previewRunningPlanDraft` runs the
   non-mutating plan-first AI/local-fixture path, compiles accepted
-  `hito_ai_authored_full_plan_draft` output into canonical `training-plan-v2`, and returns the signed
-  review. `confirmRunningPlanDraft` verifies that review and persists it without a second AI call.
+  `hito_ai_authored_full_plan_v1` output directly into the compiler and then canonical
+  `training-plan-v2`, and returns the signed review. `confirmRunningPlanDraft` verifies that review
+  and persists it without a second AI call.
   The structured constructor supplies advanced Quick setup inputs but does not own another
   generated-plan action path.
 - Dictate-to-Plan / voice-to-plan is retired from current system truth:
@@ -543,7 +546,7 @@
 - server-side writes and persisted reads flow through one backend seam rather than direct client DB access
 - settings, avatar metadata, and settings viewer labels resolve through the same persisted-user mapping used by saved mode, so temporary local-bypass identities do not read settings from the raw local session id
 - `npm run import:current-plan` is now a hardened local ops helper for canonical `training-plan-v2` import preflight; the default command prints help and does not mutate, `--dry-run --plan-file <path>` validates the seed without opening a Supabase client, and `--apply` is blocked unless the caller also passes `--allow-local-supabase-mutation` against a loopback Supabase URL
-- `npm run test-user -- ...` is the canonical Backend lifecycle tool for tester-account create, reset, optional plan seeding, and cleanup-to-zero delete against the local loopback Supabase auth/data model; it refuses non-loopback targets before creating a client and has no hosted mutation override
+- `npm run test-user -- ...` is the canonical Backend lifecycle tool for a bounded five-role reusable QA tester pool, metadata-authoritative inventory, stable dry-run cleanup manifests, profile-preserving plan reset, full app-owned row/storage reset, and cleanup-to-zero delete against loopback Supabase; normal persistence proofs lease named roles instead of minting timestamp/random Auth users, admin metadata and unclassified identities remain protected, candidate or target drift refuses apply, and the CLI has no hosted mutation override
 - `.tanstack/hito-running-local-accounts.json` is now the preferred ignored local credentials file for repeatable tester login on the temporary local bypass path
 
 ## Runtime Invariants

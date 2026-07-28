@@ -1,8 +1,23 @@
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
+import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { createHash, randomBytes } from "node:crypto";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { tsImport } from "tsx/esm/api";
+import {
+  QA_TESTER_POOL,
+  assertQaCleanupManifestMatches,
+  assertQaPoolAuthUser,
+  buildQaCleanupManifest,
+  buildQaTestUserInventory,
+  classifyQaIdentity,
+  ensureQaPoolAuthUser,
+  findAuthUserByEmail as findQaAuthUserByEmail,
+  getQaUserOwnedCounts,
+  poolLocalAccount,
+  readQaPoolLeases,
+  requireQaPoolRole,
+  resetQaPoolUserData,
+} from "./lib/qa-test-user-lifecycle.mjs";
 
 const { createFirstPlanFromReviewedCanonicalPlanForUser } = await tsImport(
   "../src/lib/active-plan-persistence.ts",
@@ -15,9 +30,24 @@ const DEFAULT_ACCOUNTS_FILE = ".tanstack/hito-running-local-accounts.json";
 const command = process.argv[2];
 const options = parseArgs(process.argv.slice(3));
 
-if (!["create", "reset", "delete"].includes(command)) {
+if (
+  ![
+    "create",
+    "reset-plan",
+    "reset",
+    "delete",
+    "inventory",
+    "cleanup-manifest",
+    "cleanup-apply",
+    "pool-ensure",
+    "pool-plan-readback",
+    "pool-reset-plan",
+    "pool-reset",
+    "pool-delete",
+  ].includes(command)
+) {
   throw new Error(
-    "Usage: npm run test-user -- <create|reset|delete> --email <email> [--username <name>] [--password <password>] [--plan <absolute-json-path>] [--confirm-email <email>]",
+    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-plan-readback|pool-reset-plan|pool-reset|pool-delete|create|reset-plan|reset|delete> [options]",
   );
 }
 
@@ -29,12 +59,251 @@ const supabase = createClient(config.supabaseUrl, config.supabaseServerKey, {
   },
 });
 
-if (command === "create") {
+if (command === "inventory") {
+  await handleInventory();
+} else if (command === "cleanup-manifest") {
+  await handleCleanupManifest();
+} else if (command === "cleanup-apply") {
+  await handleCleanupApply();
+} else if (command === "pool-ensure") {
+  await handlePoolEnsure();
+} else if (command === "pool-plan-readback") {
+  await handlePoolPlanReadback();
+} else if (command === "pool-reset-plan") {
+  await handlePoolReset({ preserveProfile: true });
+} else if (command === "pool-reset") {
+  await handlePoolReset();
+} else if (command === "pool-delete") {
+  await handlePoolDelete();
+} else if (command === "create") {
   await handleCreate();
+} else if (command === "reset-plan") {
+  await handleReset({ preserveProfile: true });
 } else if (command === "reset") {
   await handleReset();
 } else {
   await handleDelete();
+}
+
+async function handleInventory() {
+  const inventory = await buildCurrentInventory();
+  console.log(JSON.stringify({ ...inventory, leases: await readQaPoolLeases() }, null, 2));
+}
+
+async function handleCleanupManifest() {
+  const manifest = buildQaCleanupManifest(await buildCurrentInventory());
+  await writeOptionalEvidenceFile(options.output, manifest);
+  console.log(JSON.stringify(manifest, null, 2));
+}
+
+async function handleCleanupApply() {
+  const manifestPath = requireEvidencePath(options.manifest, "--manifest");
+  const confirmation = requireOption(options["confirm-selection"], "--confirm-selection");
+  const expected = JSON.parse(await readFile(manifestPath, "utf8"));
+
+  if (confirmation !== expected.selectionHash) {
+    throw new Error("--confirm-selection must exactly match the reviewed manifest selectionHash.");
+  }
+
+  const current = buildQaCleanupManifest(await buildCurrentInventory());
+  assertQaCleanupManifestMatches(expected, current);
+  const accounts = await loadLocalAccounts();
+
+  for (const candidate of current.candidates) {
+    const authUser = await supabase.auth.admin.getUserById(candidate.id);
+    if (authUser.error || !authUser.data.user) {
+      throw new Error(
+        authUser.error?.message ?? `Cleanup candidate ${candidate.id} disappeared before apply.`,
+      );
+    }
+    const classification = classifyQaIdentity(authUser.data.user);
+    if (classification.kind !== "test_candidate") {
+      throw new Error(`Cleanup candidate ${candidate.id} is no longer metadata-proven test data.`);
+    }
+
+    await resetQaPoolUserData({ supabase, userId: candidate.id });
+    const deletion = await supabase.auth.admin.deleteUser(candidate.id, false);
+    if (deletion.error) {
+      throw new Error(deletion.error.message);
+    }
+  }
+
+  const removedIds = new Set(current.candidates.map((candidate) => candidate.id));
+  const removedEmails = new Set(current.candidates.map((candidate) => candidate.email));
+  const staleIds = new Set(current.staleCredentials.map((credential) => credential.userId));
+  const protectedAuthIdsByEmail = new Map(
+    current.protectedIdentities.map((identity) => [identity.email, identity.id]),
+  );
+  const nextAccounts = accounts
+    .filter(
+      (account) =>
+        account.role === "admin" ||
+        (!removedIds.has(account.userId) &&
+          !removedEmails.has(account.email) &&
+          !staleIds.has(account.userId)),
+    )
+    .map((account) => ({
+      ...account,
+      userId:
+        account.role === "admin"
+          ? (protectedAuthIdsByEmail.get(account.email) ?? account.userId)
+          : account.userId,
+    }));
+  await saveLocalAccounts(nextAccounts);
+
+  console.log(
+    JSON.stringify(
+      {
+        ok: true,
+        action: "cleanup-apply",
+        selectionHash: current.selectionHash,
+        removedAuthUsers: current.candidates.length,
+        removedStaleCredentials: current.staleCredentials.length,
+        postInventory: await buildCurrentInventory(),
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+async function handlePoolEnsure() {
+  const role = requireQaPoolRole(options.role);
+  const accounts = await loadLocalAccounts();
+  const existingLocalAccount =
+    accounts.find((account) => account.email === QA_TESTER_POOL[role].email) ?? null;
+  const password =
+    options.password ?? existingLocalAccount?.password ?? randomBytes(24).toString("base64url");
+  const authUser = await ensureQaPoolAuthUser({ supabase, role, password });
+  const nextAccounts = upsertLocalAccount(accounts, poolLocalAccount(role, password, authUser.id));
+  await saveLocalAccounts(nextAccounts);
+
+  console.log(
+    JSON.stringify(
+      {
+        ok: true,
+        action: "pool-ensure",
+        role,
+        email: QA_TESTER_POOL[role].email,
+        authUserId: authUser.id,
+        ownedRows: await getUserDataCounts(authUser.id),
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+async function handlePoolPlanReadback() {
+  const role = requireQaPoolRole(options.role);
+  const definition = QA_TESTER_POOL[role];
+  const authUser = await findAuthUserByEmail(definition.email);
+
+  if (!authUser) {
+    throw new Error(`QA pool user ${definition.email} was not found.`);
+  }
+
+  await assertQaPoolAuthUser({ supabase, role, userId: authUser.id });
+  const persisted = await readImportedPlanForUser(authUser.id);
+  if (!persisted.planCycle.id || persisted.workoutCount <= 0) {
+    throw new Error("Persisted plan readback evidence requires one plan and non-empty workouts.");
+  }
+
+  const evidence = {
+    artifactKind: "qa_pool_persisted_plan_readback_v1",
+    environment: "local",
+    role,
+    userId: authUser.id,
+    ...persisted,
+  };
+  await writeOptionalEvidenceFile(options.output, evidence);
+  console.log(JSON.stringify(evidence, null, 2));
+}
+
+async function handlePoolReset({ preserveProfile = false } = {}) {
+  const role = requireQaPoolRole(options.role);
+  await assertPoolRoleIsNotLeased(role);
+  const definition = QA_TESTER_POOL[role];
+  const authUser = await findAuthUserByEmail(definition.email);
+
+  if (!authUser) {
+    throw new Error(`QA pool user ${definition.email} was not found.`);
+  }
+
+  await assertQaPoolAuthUser({ supabase, role, userId: authUser.id });
+  const profileBefore = preserveProfile ? await readRunnerProfileForUser(authUser.id) : null;
+  if (preserveProfile && !profileBefore) {
+    throw new Error(`pool-reset-plan requires a saved profile for ${definition.email}.`);
+  }
+  const beforeCounts = await getUserDataCounts(authUser.id);
+  const afterCounts = await resetQaPoolUserData({
+    supabase,
+    userId: authUser.id,
+    preserveProfile,
+  });
+  const profileAfter = preserveProfile ? await readRunnerProfileForUser(authUser.id) : null;
+
+  if (preserveProfile && JSON.stringify(profileAfter) !== JSON.stringify(profileBefore)) {
+    throw new Error(`Runner profile changed while resetting ${definition.email}.`);
+  }
+
+  console.log(
+    JSON.stringify(
+      {
+        ok: true,
+        action: preserveProfile ? "pool-reset-plan" : "pool-reset",
+        role,
+        email: definition.email,
+        beforeCounts,
+        afterCounts,
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+async function handlePoolDelete() {
+  const role = requireQaPoolRole(options.role);
+  const confirmation = requireQaPoolRole(options["confirm-role"]);
+
+  if (confirmation !== role) {
+    throw new Error("--confirm-role must exactly match --role.");
+  }
+
+  await assertPoolRoleIsNotLeased(role);
+  const definition = QA_TESTER_POOL[role];
+  const authUser = await findAuthUserByEmail(definition.email);
+  const accounts = await loadLocalAccounts();
+
+  if (authUser) {
+    await assertQaPoolAuthUser({ supabase, role, userId: authUser.id });
+    await resetQaPoolUserData({ supabase, userId: authUser.id });
+    const deletion = await supabase.auth.admin.deleteUser(authUser.id, false);
+    if (deletion.error) {
+      throw new Error(deletion.error.message);
+    }
+  }
+
+  await saveLocalAccounts(
+    accounts.filter(
+      (account) => account.email !== definition.email && account.username !== definition.username,
+    ),
+  );
+
+  console.log(
+    JSON.stringify(
+      {
+        ok: true,
+        action: "pool-delete",
+        role,
+        email: definition.email,
+        removedAuthUser: Boolean(authUser),
+      },
+      null,
+      2,
+    ),
+  );
 }
 
 async function handleCreate() {
@@ -76,8 +345,8 @@ async function handleCreate() {
     username,
     password,
     email,
+    userId: authUser.id,
     role: "tester",
-    qaFixtureAccess: true,
     displayName,
   });
 
@@ -86,7 +355,7 @@ async function handleCreate() {
   let importedPlan = null;
 
   if (options.plan) {
-    await resetPersistedUserData(authUser.id);
+    await resetQaPoolUserData({ supabase, userId: authUser.id });
     importedPlan = await importPlanForUser(authUser.id, options.plan);
   }
 
@@ -111,36 +380,71 @@ async function handleCreate() {
   );
 }
 
-async function handleReset() {
+async function handleReset({ preserveProfile = false } = {}) {
   const email = requireEmail(options.email);
   const accounts = await loadLocalAccounts();
   const localAccount = accounts.find((account) => account.email === email) ?? null;
-  assertNotProtectedAccount(email, localAccount, "reset");
+
+  if (preserveProfile) {
+    if (options.plan) {
+      throw new Error("reset-plan does not accept --plan; it must leave the tester with no plan.");
+    }
+    assertLocalTesterAccount(email, localAccount);
+  } else {
+    assertNotProtectedAccount(email, localAccount, "reset");
+  }
+
   const authUser = await findAuthUserByEmail(email);
 
   if (!authUser) {
     throw new Error(`Supabase auth user not found for ${email}.`);
   }
+  assertMetadataProvenTester(authUser, preserveProfile ? "reset-plan" : "reset");
+
+  const profileBefore = preserveProfile ? await readRunnerProfileForUser(authUser.id) : null;
+
+  if (preserveProfile && !profileBefore) {
+    throw new Error(
+      `reset-plan requires an existing saved runner baseline for ${email}; use reset for a full onboarding reset.`,
+    );
+  }
 
   const beforeCounts = await getUserDataCounts(authUser.id);
-  await resetPersistedUserData(authUser.id);
+  await resetQaPoolUserData({
+    supabase,
+    userId: authUser.id,
+    preserveProfile,
+  });
 
   let importedPlan = null;
 
-  if (options.plan) {
+  if (!preserveProfile && options.plan) {
     importedPlan = await importPlanForUser(authUser.id, options.plan);
   }
 
+  const profileAfter = preserveProfile ? await readRunnerProfileForUser(authUser.id) : null;
   const afterCounts = await getUserDataCounts(authUser.id);
+
+  if (preserveProfile && JSON.stringify(profileAfter) !== JSON.stringify(profileBefore)) {
+    throw new Error(`Runner profile changed while resetting plan data for ${email}.`);
+  }
+  if (
+    preserveProfile &&
+    (afterCounts.planCycles !== 0 ||
+      afterCounts.plannedWorkouts !== 0 ||
+      afterCounts.workoutLogs !== 0)
+  ) {
+    throw new Error(`Canonical plan rows still exist after resetting plan data for ${email}.`);
+  }
 
   console.log(
     JSON.stringify(
       {
         ok: true,
-        action: "reset",
+        action: preserveProfile ? "reset-plan" : "reset",
         email,
         authUserId: authUser.id,
-        importedPlan,
+        ...(preserveProfile ? { profilePreserved: true } : { importedPlan }),
         beforeCounts,
         afterCounts,
       },
@@ -170,6 +474,8 @@ async function handleDelete() {
   const beforeCounts = authUser ? await getUserDataCounts(authUser.id) : null;
 
   if (authUser) {
+    assertMetadataProvenTester(authUser, "delete");
+    await resetQaPoolUserData({ supabase, userId: authUser.id });
     const deletion = await supabase.auth.admin.deleteUser(authUser.id, false);
 
     if (deletion.error) {
@@ -267,7 +573,6 @@ function normalizeAccount(account) {
     email,
     userId: account.userId ?? deriveUserId(username),
     role: account.role === "admin" ? "admin" : "tester",
-    qaFixtureAccess: account.qaFixtureAccess === true,
     displayName: account.displayName?.trim() || humanizeUsername(username),
   };
 }
@@ -285,6 +590,7 @@ async function ensureAuthUser({ email, displayName, role, username }) {
   const existingUser = await findAuthUserByEmail(email);
 
   if (existingUser) {
+    assertMetadataProvenTester(existingUser, "reuse");
     return existingUser;
   }
 
@@ -314,74 +620,38 @@ async function ensureAuthUser({ email, displayName, role, username }) {
 }
 
 async function findAuthUserByEmail(email) {
-  let page = 1;
-  const perPage = 200;
-
-  while (true) {
-    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const matchedUser =
-      data.users.find((user) => normalizeEmail(user.email) === normalizeEmail(email)) ?? null;
-
-    if (matchedUser) {
-      return matchedUser;
-    }
-
-    if (data.users.length < perPage) {
-      return null;
-    }
-
-    page += 1;
-  }
+  return findQaAuthUserByEmail(supabase, email);
 }
 
 async function getUserDataCounts(userId) {
-  const [profile, plans, workouts, logs] = await Promise.all([
-    supabase
-      .from("runner_profiles")
-      .select("user_id", { count: "exact", head: true })
-      .eq("user_id", userId),
-    supabase.from("plan_cycles").select("id", { count: "exact", head: true }).eq("user_id", userId),
-    supabase
-      .from("planned_workouts")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId),
-    supabase
-      .from("workout_logs")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId),
-  ]);
-
-  for (const result of [profile, plans, workouts, logs]) {
-    if (result.error) {
-      throw new Error(result.error.message);
-    }
-  }
-
+  const counts = await getQaUserOwnedCounts(supabase, userId);
   return {
-    runnerProfiles: profile.count ?? 0,
-    planCycles: plans.count ?? 0,
-    plannedWorkouts: workouts.count ?? 0,
-    workoutLogs: logs.count ?? 0,
+    runnerProfiles: counts.runner_profiles,
+    planCycles: counts.plan_cycles,
+    plannedWorkouts: counts.planned_workouts,
+    workoutLogs: counts.workout_logs,
+    workoutResultAssets: counts.workout_result_assets,
+    workoutActualMetrics: counts.workout_actual_metrics,
+    workoutComparisons: counts.workout_comparisons,
+    workoutAiInsights: counts.workout_ai_insights,
+    runnerManualWorkoutTemplates: counts.runner_manual_workout_templates,
+    runnerEntitlements: counts.runner_entitlements,
+    runnerCapabilityUsage: counts.runner_capability_usage,
   };
 }
 
-async function resetPersistedUserData(userId) {
-  const planDelete = await supabase.from("plan_cycles").delete().eq("user_id", userId);
+async function readRunnerProfileForUser(userId) {
+  const result = await supabase
+    .from("runner_profiles")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
 
-  if (planDelete.error) {
-    throw new Error(planDelete.error.message);
+  if (result.error) {
+    throw new Error(result.error.message);
   }
 
-  const profileDelete = await supabase.from("runner_profiles").delete().eq("user_id", userId);
-
-  if (profileDelete.error) {
-    throw new Error(profileDelete.error.message);
-  }
+  return result.data;
 }
 
 async function importPlanForUser(userId, planPath) {
@@ -437,10 +707,13 @@ async function readImportedPlanForUser(userId) {
     .eq("status", "active")
     .order("created_at", { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
   if (planCycle.error) {
     throw new Error(planCycle.error.message);
+  }
+  if (!planCycle.data) {
+    throw new Error("Persisted plan readback evidence requires one active plan.");
   }
 
   const workouts = await supabase
@@ -466,6 +739,66 @@ function assertNotProtectedAccount(email, localAccount, action) {
   if (localAccount?.role === "admin") {
     throw new Error(`Refusing to ${action} admin account ${localAccount.email}.`);
   }
+}
+
+function assertLocalTesterAccount(email, localAccount) {
+  if (localAccount?.role !== "tester") {
+    throw new Error(`reset-plan is restricted to a local tester account: ${email}.`);
+  }
+}
+
+function assertMetadataProvenTester(authUser, action) {
+  const classification = classifyQaIdentity(authUser);
+
+  if (classification.kind !== "test_candidate" && classification.kind !== "pool_member") {
+    throw new Error(
+      `Refusing to ${action} Auth identity ${authUser.email ?? authUser.id}; app metadata does not prove it is a tester.`,
+    );
+  }
+}
+
+async function buildCurrentInventory() {
+  return buildQaTestUserInventory({
+    supabase,
+    environment: "local",
+    target: {
+      origin: new URL(config.supabaseUrl).origin,
+      loopback: true,
+    },
+    localAccounts: await loadLocalAccounts(),
+  });
+}
+
+async function assertPoolRoleIsNotLeased(role) {
+  const lease = (await readQaPoolLeases()).find((candidate) => candidate.role === role);
+  if (lease) {
+    throw new Error(
+      `QA pool role ${role} is leased by pid ${lease.pid ?? "unknown"} since ${
+        lease.acquiredAt ?? "unknown"
+      }.`,
+    );
+  }
+}
+
+async function writeOptionalEvidenceFile(value, payload) {
+  if (!value) return;
+  const outputPath = requireEvidencePath(value, "--output");
+  const temporaryPath = `${outputPath}.${process.pid}.tmp`;
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  await writeFile(temporaryPath, `${JSON.stringify(payload, null, 2)}\n`, {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+  await rename(temporaryPath, outputPath);
+}
+
+function requireEvidencePath(value, label) {
+  const requested = path.resolve(process.cwd(), requireOption(value, label));
+  const evidenceRoot = path.resolve(process.cwd(), ".tanstack");
+  if (requested !== evidenceRoot && !requested.startsWith(`${evidenceRoot}${path.sep}`)) {
+    throw new Error(`${label} must be inside the ignored .tanstack directory.`);
+  }
+  return requested;
 }
 
 function parseArgs(argv) {

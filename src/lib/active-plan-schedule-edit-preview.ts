@@ -13,6 +13,7 @@ import {
   uniqueRunnerWeekdays,
 } from "@/lib/runner-training-preferences";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
+import { collectRowsForIdBatches } from "@/lib/supabase/batched-in-filter";
 import { addDaysIso, todayIso, weekdayLong } from "@/lib/training";
 import type { Json } from "@/lib/supabase/database";
 import type { WeekdayName } from "@/lib/weekday-rest-invariants";
@@ -1364,38 +1365,41 @@ async function fetchScheduleEditEvidenceWorkoutIds(userId: string, workoutIds: s
   }
 
   const supabase = createAdminSupabaseClient();
-  const [assetsResult, actualMetricsResult, comparisonsResult, insightsResult] = await Promise.all([
-    supabase
-      .from("workout_result_assets")
-      .select("planned_workout_id")
-      .eq("user_id", userId)
-      .in("planned_workout_id", workoutIds),
-    supabase
-      .from("workout_actual_metrics")
-      .select("planned_workout_id")
-      .eq("user_id", userId)
-      .in("planned_workout_id", workoutIds),
-    supabase
-      .from("workout_comparisons")
-      .select("planned_workout_id")
-      .eq("user_id", userId)
-      .in("planned_workout_id", workoutIds),
-    supabase
-      .from("workout_ai_insights")
-      .select("planned_workout_id")
-      .eq("user_id", userId)
-      .in("planned_workout_id", workoutIds),
+  const [assets, actualMetrics, comparisons, insights] = await Promise.all([
+    collectRowsForIdBatches(workoutIds, (ids) =>
+      supabase
+        .from("workout_result_assets")
+        .select("planned_workout_id")
+        .eq("user_id", userId)
+        .in("planned_workout_id", ids),
+    ),
+    collectRowsForIdBatches(workoutIds, (ids) =>
+      supabase
+        .from("workout_actual_metrics")
+        .select("planned_workout_id")
+        .eq("user_id", userId)
+        .in("planned_workout_id", ids),
+    ),
+    collectRowsForIdBatches(workoutIds, (ids) =>
+      supabase
+        .from("workout_comparisons")
+        .select("planned_workout_id")
+        .eq("user_id", userId)
+        .in("planned_workout_id", ids),
+    ),
+    collectRowsForIdBatches(workoutIds, (ids) =>
+      supabase
+        .from("workout_ai_insights")
+        .select("planned_workout_id")
+        .eq("user_id", userId)
+        .in("planned_workout_id", ids),
+    ),
   ]);
 
-  if (assetsResult.error) throw new Error(assetsResult.error.message);
-  if (actualMetricsResult.error) throw new Error(actualMetricsResult.error.message);
-  if (comparisonsResult.error) throw new Error(comparisonsResult.error.message);
-  if (insightsResult.error) throw new Error(insightsResult.error.message);
-
   return new Set([
-    ...(assetsResult.data ?? []).map((row) => row.planned_workout_id),
-    ...(actualMetricsResult.data ?? []).map((row) => row.planned_workout_id),
-    ...(comparisonsResult.data ?? []).map((row) => row.planned_workout_id),
-    ...(insightsResult.data ?? []).map((row) => row.planned_workout_id),
+    ...assets.map((row) => row.planned_workout_id),
+    ...actualMetrics.map((row) => row.planned_workout_id),
+    ...comparisons.map((row) => row.planned_workout_id),
+    ...insights.map((row) => row.planned_workout_id),
   ]);
 }

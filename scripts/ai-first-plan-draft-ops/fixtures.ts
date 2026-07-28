@@ -4,13 +4,12 @@ import type { StructuredPlanAuthoringInput } from "../../src/lib/structured-plan
 import type { FixtureKind } from "./cli";
 
 export function buildDefaultAuthoringInput(fixtureKind: FixtureKind): StructuredPlanAuthoringInput {
-  if (fixtureKind !== "representative_10k") {
-    throw new Error(`Unsupported plan-first fixture: ${fixtureKind}`);
-  }
+  const goalDistance = fixtureKind === "representative_half" ? "Half Marathon" : "10K";
 
   const planGoalIntent = normalizePlanGoalIntent({
     rawIntent: {
-      distance: { kind: "preset", preset: "10K" },
+      distance: { kind: "preset", preset: goalDistance },
+      ...(fixtureKind === "representative_half" ? { targetDate: "2026-11-15" } : {}),
     },
     startDate: "2026-07-06",
   });

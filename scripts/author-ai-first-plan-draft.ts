@@ -16,6 +16,7 @@ import {
   parseFixtureKind,
   parsePositiveIntegerOption,
   printHelp,
+  resolveDirectCanaryTimeoutPolicy,
   resolveMode,
   stringOption,
   type FixtureKind,
@@ -37,7 +38,8 @@ const inputSource = inputFile ? "input_file" : "fixture";
 const fixtureLabel = inputFile ? null : fixtureKind;
 const input = await readInput(options, fixtureKind);
 const authoringInput = structuredPlanAuthoringInputSchema.parse(input);
-const timeoutMs = parsePositiveIntegerOption(options["timeout-ms"]) ?? 45_000;
+const timeoutPolicy = resolveDirectCanaryTimeoutPolicy(options, mode);
+const timeoutMs = timeoutPolicy.timeoutMs;
 const maxOutputTokens = parsePositiveIntegerOption(options["max-output-tokens"]) ?? 32_000;
 const requirePlanFirstProof = hasFlag(options, "require-plan-first-proof");
 const fetchImpl = mode === "live" ? undefined : buildMockOpenAiFetch(mode, authoringInput);
@@ -50,6 +52,24 @@ const result = await generateAiFirstPlanDraftPreview({
   model: mode === "live" ? undefined : AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
   fetchImpl,
 });
+const runtimeEvidence =
+  !result.ok && result.reason === "structured_input_invalid"
+    ? {
+        timeoutPolicy,
+        generationId: null,
+        providerKind: "not_started",
+        providerStatus: null,
+        requestPhase: "not_started",
+        abortReason: null,
+      }
+    : {
+        timeoutPolicy,
+        generationId: result.metadata.generationTrace?.generationId ?? null,
+        providerKind: result.metadata.generationTrace?.provider.kind ?? "not_started",
+        providerStatus: result.metadata.debug.responseStatus,
+        requestPhase: result.metadata.debug.requestPhase,
+        abortReason: result.metadata.debug.abortReason,
+      };
 
 if (!result.ok) {
   console.log(
@@ -58,6 +78,7 @@ if (!result.ok) {
         ok: false,
         mode,
         contractMode: "plan_first",
+        ...runtimeEvidence,
         inputSource,
         fixture: fixtureLabel,
         reason: result.reason,
@@ -88,6 +109,7 @@ if (!result.ok) {
         ok: proofOk,
         mode,
         contractMode: "plan_first",
+        ...runtimeEvidence,
         inputSource,
         fixture: fixtureLabel,
         persisted: false,

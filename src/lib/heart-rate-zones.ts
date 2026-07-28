@@ -2,37 +2,70 @@ import { z } from "zod";
 
 export const RUNNER_HEART_RATE_PROFILE_VERSION = "runner_hr_profile_v2" as const;
 export const HEART_RATE_ZONE_REFERENCE_VALUES = ["Z1", "Z2", "Z3", "Z4", "Z5"] as const;
-export const HEART_RATE_GUIDANCE_MIN_BPM = 40;
-export const HEART_RATE_GUIDANCE_MAX_BPM = 220;
+export const HEART_RATE_GUIDANCE_MIN_BPM = 60;
+export const HEART_RATE_GUIDANCE_MAX_BPM = 200;
+
+const HISTORICAL_HEART_RATE_GUIDANCE_MIN_BPM = 40;
+const HISTORICAL_HEART_RATE_GUIDANCE_MAX_BPM = 220;
 
 export type HeartRateZoneReference = (typeof HEART_RATE_ZONE_REFERENCE_VALUES)[number];
 export type HeartRateZoneSource = "personal" | "estimated" | "unavailable";
 
-const heartRateZoneValueObjectSchema = z
+const personalHeartRateZoneValueObjectSchema = z
   .object({
     reference: z.enum(HEART_RATE_ZONE_REFERENCE_VALUES),
     minBpm: z
       .number()
       .int("Heart-rate guidance must use whole BPM values.")
-      .min(HEART_RATE_GUIDANCE_MIN_BPM, "Heart-rate guidance must be at least 40 BPM.")
-      .max(HEART_RATE_GUIDANCE_MAX_BPM, "Heart-rate guidance must be at most 220 BPM."),
+      .min(HEART_RATE_GUIDANCE_MIN_BPM, "Heart-rate guidance must be at least 60 BPM.")
+      .max(HEART_RATE_GUIDANCE_MAX_BPM, "Heart-rate guidance must be at most 200 BPM."),
     maxBpm: z
       .number()
       .int("Heart-rate guidance must use whole BPM values.")
-      .min(HEART_RATE_GUIDANCE_MIN_BPM, "Heart-rate guidance must be at least 40 BPM.")
-      .max(HEART_RATE_GUIDANCE_MAX_BPM, "Heart-rate guidance must be at most 220 BPM."),
+      .min(HEART_RATE_GUIDANCE_MIN_BPM, "Heart-rate guidance must be at least 60 BPM.")
+      .max(HEART_RATE_GUIDANCE_MAX_BPM, "Heart-rate guidance must be at most 200 BPM."),
   })
   .strict();
-const heartRateZoneValueSchema = heartRateZoneValueObjectSchema.refine(
+const personalHeartRateZoneValueSchema = personalHeartRateZoneValueObjectSchema.refine(
   (zone) => zone.minBpm <= zone.maxBpm,
   {
-    message: "Heart-rate zone minimum must not exceed its maximum.",
+    message: "Heart-rate guidance band minimum must not exceed its maximum.",
     path: ["maxBpm"],
   },
 );
 
-const completeHeartRateZonesSchema = z
-  .array(heartRateZoneValueSchema)
+const historicalHeartRateZoneValueObjectSchema = z
+  .object({
+    reference: z.enum(HEART_RATE_ZONE_REFERENCE_VALUES),
+    minBpm: z
+      .number()
+      .int()
+      .min(HISTORICAL_HEART_RATE_GUIDANCE_MIN_BPM)
+      .max(HISTORICAL_HEART_RATE_GUIDANCE_MAX_BPM),
+    maxBpm: z
+      .number()
+      .int()
+      .min(HISTORICAL_HEART_RATE_GUIDANCE_MIN_BPM)
+      .max(HISTORICAL_HEART_RATE_GUIDANCE_MAX_BPM),
+  })
+  .strict();
+const historicalHeartRateZoneValueSchema = historicalHeartRateZoneValueObjectSchema.refine(
+  (zone) => zone.minBpm <= zone.maxBpm,
+  {
+    message: "Heart-rate guidance band minimum must not exceed its maximum.",
+    path: ["maxBpm"],
+  },
+);
+
+const completePersonalHeartRateZonesSchema = z
+  .array(personalHeartRateZoneValueSchema)
+  .length(HEART_RATE_ZONE_REFERENCE_VALUES.length, {
+    message: "Heart-rate profile must contain all five guidance bands.",
+  })
+  .superRefine(validateHeartRateGuidanceBandOrder);
+
+const completeStoredHeartRateZonesSchema = z
+  .array(historicalHeartRateZoneValueSchema)
   .length(HEART_RATE_ZONE_REFERENCE_VALUES.length, {
     message: "Heart-rate profile must contain all five guidance bands.",
   })
@@ -40,7 +73,7 @@ const completeHeartRateZonesSchema = z
 
 export const personalHeartRateProfileInputSchema = z
   .object({
-    zones: completeHeartRateZonesSchema,
+    zones: completePersonalHeartRateZonesSchema,
   })
   .strict();
 
@@ -55,7 +88,7 @@ export const storedRunnerHeartRateProfileSchema = z.discriminatedUnion("source",
     .object({
       version: z.literal(RUNNER_HEART_RATE_PROFILE_VERSION),
       source: z.literal("personal"),
-      zones: completeHeartRateZonesSchema,
+      zones: completeStoredHeartRateZonesSchema,
     })
     .strict(),
 ]);
@@ -67,12 +100,12 @@ export const effectiveRunnerHeartRateProfileSchema = z
     sourceNote: z.string().trim().min(1).max(200),
     zones: z
       .array(
-        heartRateZoneValueObjectSchema
+        historicalHeartRateZoneValueObjectSchema
           .extend({
             label: z.string().trim().min(1).max(80),
           })
           .refine((zone) => zone.minBpm <= zone.maxBpm, {
-            message: "Heart-rate zone minimum must not exceed its maximum.",
+            message: "Heart-rate guidance band minimum must not exceed its maximum.",
             path: ["maxBpm"],
           }),
       )
@@ -311,38 +344,34 @@ export function resolveEffectiveHeartRateGuidance(
     return null;
   }
 
-  const match = authoredReference
-    .trim()
-    .toUpperCase()
-    .match(/^Z([1-5])(?:\s*-\s*Z([1-5]))?$/);
-  if (!match) {
+  const canonicalReference = authoredReference.trim().toUpperCase();
+  if (!HEART_RATE_ZONE_REFERENCE_VALUES.includes(canonicalReference as HeartRateZoneReference)) {
     return null;
   }
 
-  const startReference = `Z${match[1]}` as HeartRateZoneReference;
-  const endReference = `Z${match[2] ?? match[1]}` as HeartRateZoneReference;
-  const startIndex = HEART_RATE_ZONE_REFERENCE_VALUES.indexOf(startReference);
-  const endIndex = HEART_RATE_ZONE_REFERENCE_VALUES.indexOf(endReference);
-  if (startIndex > endIndex) {
-    return null;
-  }
-
-  const startZone = profile.zones.find((zone) => zone.reference === startReference);
-  const endZone = profile.zones.find((zone) => zone.reference === endReference);
-  if (!startZone || !endZone) {
+  const reference = canonicalReference as HeartRateZoneReference;
+  const zone = profile.zones.find((candidate) => candidate.reference === reference);
+  if (!zone) {
     return null;
   }
 
   return {
-    authoredReference: authoredReference.trim(),
-    canonicalReference:
-      startReference === endReference ? startReference : `${startReference}-${endReference}`,
+    canonicalReference: reference,
     source: profile.source,
     sourceNote: profile.sourceNote,
-    minBpm: startZone.minBpm,
-    maxBpm: endZone.maxBpm,
-    rangeBpm: formatBpmRange(startZone.minBpm, endZone.maxBpm),
+    minBpm: zone.minBpm,
+    maxBpm: zone.maxBpm,
+    rangeBpm: formatBpmRange(zone.minBpm, zone.maxBpm),
   };
+}
+
+export function heartRateGuidanceBandLabel(reference: string) {
+  const canonicalReference = reference.trim().toUpperCase();
+  if (!HEART_RATE_ZONE_REFERENCE_VALUES.includes(canonicalReference as HeartRateZoneReference)) {
+    return null;
+  }
+
+  return zoneDefinition(canonicalReference as HeartRateZoneReference).label;
 }
 
 function deriveEstimatedMaxHr(age: number | null | undefined) {

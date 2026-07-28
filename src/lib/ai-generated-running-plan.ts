@@ -11,7 +11,9 @@ import {
 } from "@/lib/ai-plan-generation-ledger";
 import {
   buildAiGeneratedRunningPlanDevFixturePreviewOptions,
+  buildAiGeneratedRunningPlanQaFixtureAuthoringInput,
   isAiGeneratedRunningPlanDevFixtureEnabled,
+  resolveAiGeneratedRunningPlanProviderMode,
 } from "@/lib/ai-generated-running-plan-dev-fixture";
 import {
   parseDurationSeconds,
@@ -28,6 +30,7 @@ import type {
   BuildRunningPlanPreviewInput,
   RunningPlanPreviewCalendarRow,
   RunningPlanPreviewNormalizedInputSummary,
+  RunningPlanReviewedPreviewInput,
 } from "@/lib/plan-creation-engine/preview-builder-shared";
 import { RUNNING_PLAN_PREVIEW_REST_DAY_KIND } from "@/lib/plan-creation-engine/preview-builder-shared";
 import {
@@ -40,6 +43,7 @@ import {
 } from "@/lib/plan-creation-engine/source-types";
 import { deriveAvailableTrainingWeekdays } from "@/lib/runner-training-preferences";
 import {
+  generatedPlanRunnerCommentInputSchema,
   structuredPlanAuthoringInputSchema,
   type StructuredPlanAuthoringInput,
 } from "@/lib/structured-plan-authoring-schema";
@@ -74,18 +78,18 @@ export interface AiGeneratedRunningPlanPreviewDraft {
   source_status: AiGeneratedRunningPlanSourceStatus;
   persisted: false;
   mutates: false;
-  callsOpenAi: true;
+  callsOpenAi: boolean;
   planVersion: typeof AI_GENERATED_RUNNING_PLAN_PREVIEW_VERSION;
   previewOutcome: Extract<AiGeneratedRunningPlanPreviewOutcome, "preview_ready">;
   reviewSafety: {
     persisted: false;
     mutates: false;
     confirmPathImplemented: true;
-    callsOpenAi: true;
+    callsOpenAi: boolean;
     confirmCallsOpenAi: false;
     trustedClientRows: false;
   };
-  previewInput: BuildRunningPlanPreviewInput;
+  previewInput: RunningPlanReviewedPreviewInput;
   normalizedInputSummary: RunningPlanPreviewNormalizedInputSummary;
   calendarRows: readonly RunningPlanPreviewCalendarRow[];
   workoutDocuments: readonly WorkoutDocument[];
@@ -112,7 +116,7 @@ export type AiGeneratedRunningPlanPreviewUnavailable = {
   source_status: "preview_unavailable";
   persisted: false;
   mutates: false;
-  callsOpenAi: true;
+  callsOpenAi: boolean;
   previewOutcome: Extract<
     AiGeneratedRunningPlanPreviewOutcome,
     | "invalid_structural_input"
@@ -127,6 +131,7 @@ export type AiGeneratedRunningPlanPreviewUnavailable = {
       | "ai_generated_plan_unavailable"
       | "impossible_plan_goal"
       | "invalid_plan_goal_intent"
+      | "local_qa_fixture_not_authorized"
       | "structured_input_invalid";
     message: string;
     issues: readonly string[];
@@ -186,6 +191,34 @@ export async function buildAiGeneratedRunningPlanPreview(
   input: BuildRunningPlanPreviewInput,
   options: BuildAiGeneratedRunningPlanPreviewOptions = {},
 ): Promise<AiGeneratedRunningPlanPreviewResult> {
+  const providerMode = resolveAiGeneratedRunningPlanProviderMode();
+  const qaFixtureMode = providerMode === "qa_fixture";
+
+  if (
+    qaFixtureMode &&
+    (!isAiGeneratedRunningPlanDevFixtureEnabled() || options.qaFixtureAuthorized !== true)
+  ) {
+    const reason = "local_qa_fixture_not_authorized";
+    const generationTrace = await recordAiPlanGenerationPreflightFailure({
+      reason,
+      options: options.aiPreview?.generationLedger,
+    });
+
+    return {
+      ok: false,
+      unavailable: buildAiGeneratedRunningPlanPreviewUnavailable({
+        code: reason,
+        message:
+          "This local QA fixture session is not authorized to prepare a generated-plan preview.",
+        issues: ["The local QA fixture refused this account before provider invocation."],
+        generationTrace,
+        input,
+        normalizedInputSummary: null,
+        previewOutcome: "provider_runtime_failure",
+      }),
+    };
+  }
+
   const authoring = buildAiGeneratedRunningPlanAuthoringInput(input, options.runnerProfileSnapshot);
 
   if (!authoring.ok) {
@@ -208,22 +241,44 @@ export async function buildAiGeneratedRunningPlanPreview(
     };
   }
 
-  const devFixtureOptions = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
-    authoringInput: authoring.authoringInput,
-    qaFixtureAuthorized: options.qaFixtureAuthorized === true,
-    today: input.startDate,
-  });
-  const aiPreviewOptions =
-    devFixtureOptions != null
-      ? {
-          ...(options.aiPreview ?? {}),
-          ...devFixtureOptions,
-          signal: options.aiPreview?.signal,
-          generationLedger: options.aiPreview?.generationLedger,
-        }
-      : options.aiPreview;
+  const generationAuthoringInput = qaFixtureMode
+    ? buildAiGeneratedRunningPlanQaFixtureAuthoringInput()
+    : authoring.authoringInput;
+  let aiPreviewOptions = options.aiPreview;
+  if (qaFixtureMode) {
+    const devFixtureOptions = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
+      qaFixtureAuthorized: true,
+    });
+    if (!devFixtureOptions) {
+      const reason = "local_qa_fixture_not_authorized";
+      const generationTrace = await recordAiPlanGenerationPreflightFailure({
+        reason,
+        options: options.aiPreview?.generationLedger,
+      });
+
+      return {
+        ok: false,
+        unavailable: buildAiGeneratedRunningPlanPreviewUnavailable({
+          code: reason,
+          message: "This local QA fixture runtime cannot prepare a generated-plan preview safely.",
+          issues: ["The local QA fixture transport was unavailable before provider invocation."],
+          generationTrace,
+          input,
+          normalizedInputSummary: authoring.normalizedInputSummary,
+          previewOutcome: "provider_runtime_failure",
+        }),
+      };
+    }
+
+    aiPreviewOptions = {
+      ...(options.aiPreview ?? {}),
+      ...devFixtureOptions,
+      signal: options.aiPreview?.signal,
+      generationLedger: options.aiPreview?.generationLedger,
+    };
+  }
   const result = await generateAiFirstPlanDraftPreview({
-    input: authoring.authoringInput,
+    input: generationAuthoringInput,
     ...(aiPreviewOptions ?? {}),
   });
 
@@ -249,7 +304,12 @@ export async function buildAiGeneratedRunningPlanPreview(
 
   const canonicalPlan = result.canonicalPlan;
   const normalizedInputSummary = buildAiAuthoredNormalizedInputSummary(
-    authoring.normalizedInputSummary,
+    qaFixtureMode
+      ? buildLocalQaFixtureNormalizedInputSummary(
+          authoring.normalizedInputSummary,
+          generationAuthoringInput,
+        )
+      : authoring.normalizedInputSummary,
     canonicalPlan,
   );
   let calendarRows: readonly RunningPlanPreviewCalendarRow[];
@@ -288,10 +348,11 @@ export async function buildAiGeneratedRunningPlanPreview(
   const endpointProof = buildEndpointProof(calendarRows);
   const endpointIssues = collectPreviewEndpointProofIssues({
     rows: calendarRows,
-    distanceMeters: authoring.planGoalIntent.distance?.distanceMeters ?? null,
+    distanceMeters: generationAuthoringInput.planGoalIntent.distance?.distanceMeters ?? null,
     targetDate: canonicalPlan.target_date ?? null,
     endpointProof,
   });
+  const callsOpenAi = Boolean(result.metadata.generationTrace?.provider.paidProviderCall);
   return {
     ok: true,
     draft: {
@@ -301,18 +362,18 @@ export async function buildAiGeneratedRunningPlanPreview(
       source_status: result.metadata.status as AiGeneratedRunningPlanSourceStatus,
       persisted: false,
       mutates: false,
-      callsOpenAi: true,
+      callsOpenAi,
       planVersion: AI_GENERATED_RUNNING_PLAN_PREVIEW_VERSION,
       previewOutcome: "preview_ready",
       reviewSafety: {
         persisted: false,
         mutates: false,
         confirmPathImplemented: true,
-        callsOpenAi: true,
+        callsOpenAi,
         confirmCallsOpenAi: false,
         trustedClientRows: false,
       },
-      previewInput: toStablePreviewInput(input),
+      previewInput: toReviewedPreviewInput(input),
       normalizedInputSummary,
       calendarRows,
       workoutDocuments,
@@ -377,6 +438,17 @@ export function buildAiGeneratedRunningPlanAuthoringInput(
     };
   }
 
+  const runnerCommentResult = generatedPlanRunnerCommentInputSchema.safeParse(input.runnerComment);
+  if (!runnerCommentResult.success) {
+    return {
+      ok: false,
+      reason: "structured_input_invalid",
+      message:
+        runnerCommentResult.error.issues.at(0)?.message ??
+        "The plan comment could not be normalized.",
+    };
+  }
+  const runnerComment = runnerCommentResult.data;
   const startDate = normalizeStartDate(input.startDate);
   const normalizedIntent = normalizePlanGoalIntent({
     rawIntent: input.planGoalIntent,
@@ -433,6 +505,7 @@ export function buildAiGeneratedRunningPlanAuthoringInput(
       preferredLongRunDay,
     },
     planGoalIntent,
+    ...(runnerComment ? { requestContext: { runnerComment } } : {}),
   });
 
   if (!authoringInput.success) {
@@ -529,6 +602,33 @@ function buildAiAuthoredNormalizedInputSummary(
           ? "runner_preference"
           : "ai_authored",
     trainingWeekdays,
+    loadContext: "ai_authored",
+  };
+}
+
+function buildLocalQaFixtureNormalizedInputSummary(
+  runnerSummary: RunningPlanPreviewNormalizedInputSummary,
+  fixtureInput: StructuredPlanAuthoringInput,
+): RunningPlanPreviewNormalizedInputSummary {
+  return {
+    ...runnerSummary,
+    normalizedBy: "backend_local_qa_fixture_input_v1",
+    age: fixtureInput.runnerFacts.age,
+    heightCm: fixtureInput.runnerFacts.heightCm,
+    weightKg: fixtureInput.runnerFacts.weightKg,
+    runnerLevel: fixtureInput.runnerFacts.selfReportedLevel,
+    daysPerWeek: fixtureInput.availability.maxRunningDaysPerWeek,
+    fixedRestDays: fixtureInput.availability.fixedRestDays,
+    preferredLongRunDay: fixtureInput.availability.preferredLongRunDay ?? null,
+    startDate: fixtureInput.schedule.startDate,
+    benchmarkPaceTruth: fixtureInput.runnerFacts.benchmark,
+    planGoalIntent: fixtureInput.planGoalIntent,
+    longRunDaySource: fixtureInput.availability.preferredLongRunDay
+      ? "ai_authored"
+      : "not_supplied",
+    trainingWeekdays: deriveAvailableTrainingWeekdays(
+      fixtureInput.availability.fixedRestDays ?? [],
+    ),
     loadContext: "ai_authored",
   };
 }
@@ -864,6 +964,10 @@ function normalizeSegmentRole(
       return "recovery";
     case "tempo_block":
       return "work";
+    case "finish":
+      return "finish";
+    case "fueling":
+      return "checkpoint";
     default:
       return "main";
   }
@@ -932,7 +1036,7 @@ export function buildAiGeneratedRunningPlanPreviewUnavailable(input: {
     source_status: "preview_unavailable",
     persisted: false,
     mutates: false,
-    callsOpenAi: true,
+    callsOpenAi: Boolean(input.generationTrace?.provider.paidProviderCall),
     previewOutcome: input.previewOutcome,
     error: {
       code: input.code,
@@ -959,7 +1063,8 @@ function classifyAiFirstPlanDraftFailure(
 
   if (
     unavailableReason === "ai_first_plan_draft_non_json_output" ||
-    unavailableReason === "ai_authored_plan_first_provider_schema_invalid"
+    unavailableReason === "ai_authored_plan_first_provider_schema_invalid" ||
+    unavailableReason === "ai_authored_plan_first_runner_context_echoed"
   ) {
     return "malformed_provider_output";
   }
@@ -971,8 +1076,12 @@ function classifyAiFirstPlanDraftFailure(
   return "provider_runtime_failure";
 }
 
-function toStablePreviewInput(input: BuildRunningPlanPreviewInput): BuildRunningPlanPreviewInput {
-  return JSON.parse(JSON.stringify(input)) as BuildRunningPlanPreviewInput;
+function toReviewedPreviewInput(
+  input: BuildRunningPlanPreviewInput,
+): RunningPlanReviewedPreviewInput {
+  const { runnerComment: _runnerComment, ...reviewedInput } = input;
+
+  return JSON.parse(JSON.stringify(reviewedInput)) as RunningPlanReviewedPreviewInput;
 }
 
 function buildPreviewActionTrace(input: {

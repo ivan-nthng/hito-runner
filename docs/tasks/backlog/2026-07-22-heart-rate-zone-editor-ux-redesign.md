@@ -101,7 +101,7 @@ physiological zones and not a classifier for every possible BPM value.
 - Gaps are also valid. Hito does not need to assign every BPM value to one band.
 - Within a band, require `lower <= upper`. Across the ordered set, lower endpoints and upper
   endpoints must each remain non-decreasing. Equality is allowed.
-- Use `40-220 BPM` as the editable product sanity envelope. This is an input boundary, not a
+- Use `60-200 BPM` as the editable product sanity envelope. This is an input boundary, not a
   medical assessment or a promise that every value is appropriate for every runner.
 - Existing estimated values remain backend-shaped guidance. Editing must not silently rewrite the
   estimation formula or convert unchanged estimated guidance to personal truth.
@@ -112,7 +112,7 @@ and gap semantics and would make adjacent handles falsely dependent.
 
 The selected visual direction remains `Precision Lanes`, corrected as follows:
 
-- Show one aligned dual-handle rail per guidance band on one fixed shared `40-220 BPM` scale.
+- Show one aligned dual-handle rail per guidance band on one fixed shared `60-200 BPM` scale.
 - Dragging, tapping, or using the keyboard changes only the active band's endpoint. It never moves
   an adjacent band's handle automatically.
 - Constrain a rail interaction to `lower <= upper` and to the non-decreasing ordered bounds. When a
@@ -149,9 +149,27 @@ or route-local field styling.
 
 ## Accepted Evidence And Remaining Gate
 
-- Backend reconciliation accepts ordered overlapping and gapped bands inside `40-220 BPM` while
+- Backend reconciliation accepts ordered overlapping, coincident, and gapped bands inside `60-200 BPM` while
   preserving estimated/personal provenance, profile revision, immutable confirmed-workout BPM
   snapshots, and historical-data safety.
+- Stored personal profiles accepted under the former `40-220 BPM` envelope remain readable exactly
+  as saved. The stricter boundary applies only when a personal profile is newly stored or changed.
+- Generated heart-rate commands must identify one complete named band. Composite references such
+  as `Z1-Z2` are outside the provider/compiler contract and are never merged across a gap.
+- Generated BPM targets now carry one explicit named-band reference, the full accepted parent-band
+  snapshot, and the actual execution range. Numerically coincident or overlapping bands remain
+  distinct authorable choices because identity is no longer inferred from numeric equality.
+- AI may author the complete selected band or a contained execution subrange at least `5 BPM` wide
+  with a stage-specific cue. Zero-width bands, composite/cross-band commands, narrower ranges, and
+  short-stage HR subranges fail before review without backend repair.
+- Named-band identity, accepted-band source, parent snapshot, execution range, and
+  `full_band` / `ai_selected_subrange` provenance survive signed review, confirmation,
+  persistence, export/re-import, saved readback, and unchanged persisted-edit reconstruction.
+- Final Backend cleanup leaves one new-export wire shape for Unit and Repeat-child targets. The
+  historical nested metadata shape and identical dual metadata remain readable, while contradictory
+  flat/nested metadata is rejected before canonical reconstruction. The focused maintained HR proof
+  owns the exact 5 BPM, gap, taper/short-stage, pre-review refusal, lifecycle snapshot, and fixture
+  boundaries; overlapping semantic proof and the dead `authoredReference` output were removed.
 - `HeartRateProfileSection` is the shared product owner across Settings, onboarding, and plan
   replacement. It uses the fixed-scale `HitoDualRange` and the shared Hito Field compound endpoint
   control documented under `/hitoDS/components#inputs`.
@@ -161,7 +179,10 @@ or route-local field styling.
 - Light/dark desktop and exact `375px` browser evidence, including replacement-dialog containment,
   runtime health, and disposable cleanup, is stored under
   `qa-artifacts/screenshots/2026-07-22/heart-rate-guidance-band-editor-qa/`.
-- Implementation DoD passed. Global QA Acceptance remains pending as the separate release gate.
+- Backend owner-level reconciliation for the `60-200 BPM` policy passed. The shared frontend consumes
+  the canonical bounds for validation but still has static tick labels from the former scale; that
+  bounded Frontend reconciliation and renewed browser evidence remain outside this Backend slice.
+  Global QA Acceptance remains pending as the separate release gate.
 
 ## Source Investigation
 
@@ -178,8 +199,9 @@ Confirmed consumers:
 
 Confirmed canonical contract and frontend binding:
 
-- `src/lib/heart-rate-zones.ts` owns the accepted `40-220 BPM` validation and ordered guidance-band
-  semantics; application and persistence accept both overlap and gaps.
+- `src/lib/heart-rate-zones.ts` owns the accepted `60-200 BPM` validation and ordered guidance-band
+  semantics; application and persistence accept overlap, coincidence, and gaps while the stored
+  profile decoder keeps historical values readable.
 - `src/components/settings/heart-rate-profile-editor-model.ts` projects that contract into one fixed
   visual scale, endpoint validation, last-valid rail positions, and active-endpoint boundaries.
 - Running Coach classified the named ranges as workout-purpose guidance bands and explicitly
@@ -189,7 +211,7 @@ External guidance supports keeping estimates non-diagnostic: the
 [American Heart Association](https://www.heart.org/en/healthy-living/exercise-and-physical-activity/fitness-basics/target-heart-rates)
 calls age-derived targets general guidance, and a
 [published comparison study](https://pubmed.ncbi.nlm.nih.gov/23913510/) reports wide individual
-error for common age-prediction equations. The `40-220 BPM` envelope is therefore only a broad
+error for common age-prediction equations. The `60-200 BPM` envelope is therefore only a broad
 product input sanity bound; Hito does not present it as a personalized medical range.
 
 ## Likely Root Cause
@@ -210,8 +232,7 @@ with a fixed scale, independent-band rail behavior, and one reusable compound Hi
   evidence that the existing canonical contract cannot support the accepted UX.
 - No changes to age-derived estimation, `estimated` / `personal` provenance, profile revision,
   preview invalidation, signed review/confirm, or immutable confirmed-plan BPM snapshots.
-- No raw `Z1-Z5` runner labels, age-based medical claims, coaching-plan changes, or AI-contract
-  changes.
+- No raw `Z1-Z5` runner labels, age-based medical claims, or coaching-plan changes.
 - No separate onboarding, Settings, or replacement editor implementations.
 
 ## Validation Expectations

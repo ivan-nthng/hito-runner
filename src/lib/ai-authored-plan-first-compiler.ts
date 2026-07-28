@@ -1,14 +1,11 @@
 import {
   AI_AUTHORED_PLAN_FIRST_ENDPOINT_IDENTITY,
-  AI_AUTHORED_PLAN_FIRST_HYDRATION_CUE,
-  AI_AUTHORED_PLAN_FIRST_HYDRATION_LABEL,
-  AI_AUTHORED_PLAN_FIRST_HR_ZONE_REFERENCE_VALUES,
-  aiAuthoredPlanFirstProviderDraftSchema,
+  aiAuthoredPlanFirstCompilerDraftSchema,
   resolveAiAuthoredPaceProvenance,
-  type AiAuthoredPlanFirstProviderDraft,
-  type AiAuthoredPlanFirstProviderStep,
-  type AiAuthoredPlanFirstProviderUnit,
-  type AiAuthoredPlanFirstProviderWorkout,
+  type AiAuthoredPlanFirstCompilerDraft,
+  type AiAuthoredPlanFirstCompilerStep,
+  type AiAuthoredPlanFirstCompilerUnit,
+  type AiAuthoredPlanFirstCompilerWorkout,
 } from "@/lib/ai-authored-plan-first-provider-contract";
 import { resolveEffectiveHeartRateGuidance } from "@/lib/heart-rate-zones";
 import {
@@ -17,6 +14,7 @@ import {
   type TrainingPlanV2,
 } from "@/lib/imported-plan";
 import { SELECTED_DISTANCE_ENDPOINT_SOURCE_KIND } from "@/lib/plan-creation-engine/selected-distance-endpoint";
+import { collectWorkoutDurationTitleIssues } from "@/lib/workout-duration-title-contract";
 import {
   canonicalFamilyToLegacyWorkoutType,
   deriveCanonicalMetricMode,
@@ -24,19 +22,34 @@ import {
   toCanonicalMetricModeJson,
   type CanonicalWorkoutIdentity,
 } from "@/lib/rich-workout-model";
+import {
+  validateLongRunExecutionPolicy,
+  type LongRunExecutionStage,
+  type LongRunExecutionStageRole,
+} from "@/lib/long-run-execution-policy";
 import type { StructuredPlanAuthoringInput } from "@/lib/structured-plan-authoring-schema";
 import { addDaysIso, diffDaysIso, startOfWeekIso, weekdayLong } from "@/lib/training";
 import { WEEKDAY_NAMES, type WeekdayName } from "@/lib/weekday-rest-invariants";
-import { AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE } from "@/lib/workout-document";
+import {
+  AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
+  WORKOUT_DOCUMENT_HYDRATION_CUE,
+  WORKOUT_DOCUMENT_HYDRATION_LABEL,
+} from "@/lib/workout-document";
 import type { ZodIssue } from "zod";
 
 type CompilerIssue = { code: string; message: string; path?: string };
-type StructuredAuthoringInput = StructuredPlanAuthoringInput;
+type StructuredAuthoringInput = Omit<StructuredPlanAuthoringInput, "requestContext">;
 type TrainingPlanSegment = TrainingPlanV2["planned_workouts"][number]["segments"][number];
 type TrainingPlanTarget = NonNullable<TrainingPlanSegment["target"]>;
 type TrainingPlanRepeatChild = NonNullable<
   NonNullable<TrainingPlanSegment["prescription"]>["children"]
 >[number];
+type TargetExecutionContext = {
+  workoutIdentity: CanonicalWorkoutIdentity;
+  segmentType: string;
+  repeatChildRole?: AiAuthoredPlanFirstCompilerUnit["role"];
+  authoredPurpose: string | null;
+};
 
 export const AI_AUTHORED_PLAN_FIRST_SOURCE_KIND = "ai_authored_plan_first_v1" as const;
 export type AiAuthoredPlanFirstCompileResult =
@@ -58,6 +71,20 @@ export function compileAiAuthoredPlanFirstDraft({
   draft: unknown;
   authoringInput: StructuredAuthoringInput;
 }): AiAuthoredPlanFirstCompileResult {
+  if ("requestContext" in authoringInput) {
+    return {
+      ok: false,
+      reason: "ai_authored_plan_first_transient_context_after_dispatch",
+      issues: [
+        {
+          code: "ai_authored_plan_first_transient_context_after_dispatch",
+          message: "Transient runner context cannot enter the post-provider compiler boundary.",
+          path: "authoringInput.requestContext",
+        },
+      ],
+    };
+  }
+
   const normalized = normalizeProviderDraft({ draft, authoringInput });
 
   if (!normalized.ok) {
@@ -92,6 +119,21 @@ export function compileAiAuthoredPlanFirstDraft({
     };
   }
 
+  const durationTitleIssues = collectWorkoutDurationTitleIssues(
+    canonicalResult.data.planned_workouts,
+  );
+  if (durationTitleIssues.length > 0) {
+    return {
+      ok: false,
+      reason: "ai_authored_plan_first_rejected_before_review",
+      issues: durationTitleIssues.map((issue) => ({
+        code: `ai_authored_plan_first_${issue.code}`,
+        path: issue.path,
+        message: issue.message,
+      })),
+    };
+  }
+
   return {
     ok: true,
     canonicalPlan: canonicalResult.data,
@@ -106,9 +148,9 @@ function normalizeProviderDraft({
   draft: unknown;
   authoringInput: StructuredAuthoringInput;
 }):
-  | { ok: true; draft: AiAuthoredPlanFirstProviderDraft; issues: CompilerIssue[] }
+  | { ok: true; draft: AiAuthoredPlanFirstCompilerDraft; issues: CompilerIssue[] }
   | { ok: false; reason: string; issues: CompilerIssue[] } {
-  const providerResult = aiAuthoredPlanFirstProviderDraftSchema.safeParse(draft);
+  const providerResult = aiAuthoredPlanFirstCompilerDraftSchema.safeParse(draft);
 
   if (!providerResult.success) {
     return {
@@ -200,7 +242,7 @@ function compileProviderDraft({
   authoringInput,
   issues,
 }: {
-  draft: AiAuthoredPlanFirstProviderDraft;
+  draft: AiAuthoredPlanFirstCompilerDraft;
   authoringInput: StructuredAuthoringInput;
   issues: CompilerIssue[];
 }): TrainingPlanV2 {
@@ -208,7 +250,7 @@ function compileProviderDraft({
   const restDays = uniqueWeekdays(fixedRestDays ?? []);
   const weekOneStart = startOfWeekIso(authoringInput.schedule.startDate);
   const targetDate = draft.endpoint.date;
-  const authoredDays = new Map<string, AiAuthoredPlanFirstProviderWorkout>();
+  const authoredDays = new Map<string, AiAuthoredPlanFirstCompilerWorkout>();
   for (const day of [...draft.workouts, draft.endpoint]) {
     authoredDays.set(day.date, day);
   }
@@ -310,7 +352,7 @@ function buildWorkout({
   isEndpoint,
   issues,
 }: {
-  day: AiAuthoredPlanFirstProviderWorkout;
+  day: AiAuthoredPlanFirstCompilerWorkout;
   date: string;
   weekday: string;
   weekNumber: number;
@@ -319,11 +361,22 @@ function buildWorkout({
   isEndpoint: boolean;
   issues: CompilerIssue[];
 }): TrainingPlanV2["planned_workouts"][number] {
+  issues.push(
+    ...validateLongRunExecutionPolicy({
+      workoutIdentity: day.workout_identity,
+      stages: providerSectionsToExecutionStages(day.sections, date),
+    }).map((issue) => ({
+      code: `ai_authored_plan_first_${issue.code}`,
+      path: issue.path ?? `${date}.sections`,
+      message: issue.message,
+    })),
+  );
   const segments = day.sections.map((section, index) =>
     buildSegment({
       section,
       date,
       sequence: index + 1,
+      workoutIdentity: day.workout_identity,
       authoringInput,
       issues,
     }),
@@ -338,31 +391,12 @@ function buildWorkout({
   const workoutIdentity = day.workout_identity;
   const workoutFamily = familyForIdentity(workoutIdentity);
   const metricMode = toCanonicalMetricModeJson(deriveCanonicalMetricMode(segments));
-  const phase = resolveRunnerFacingHeartRateReferences(
-    day.phase,
-    `${date}.phase`,
-    authoringInput,
-    issues,
-  );
-  const title = resolveRunnerFacingHeartRateReferences(
-    day.title,
-    `${date}.title`,
-    authoringInput,
-    issues,
-  );
-  const summary = resolveRunnerFacingHeartRateReferences(
-    day.cue,
-    `${date}.cue`,
-    authoringInput,
-    issues,
-  );
-
   return {
     workout_id: `ai-plan-first-${slugify(workoutIdentity)}-${date}`,
     date,
     weekday,
     week_number: weekNumber,
-    phase,
+    phase: day.phase,
     workout_type: canonicalFamilyToLegacyWorkoutType(workoutFamily, workoutIdentity),
     source_workout_type: isEndpoint ? SELECTED_DISTANCE_ENDPOINT_SOURCE_KIND : workoutIdentity,
     workout_family: workoutFamily,
@@ -376,22 +410,120 @@ function buildWorkout({
           ? "AI-authored pace guidance is preserved from the signed reviewed plan."
           : metricMode.reason,
     },
-    title,
-    summary,
+    title: day.title,
+    summary: day.cue,
     segments,
   };
+}
+
+function providerSectionsToExecutionStages(
+  sections: AiAuthoredPlanFirstCompilerWorkout["sections"],
+  date: string,
+): LongRunExecutionStage[] {
+  return sections.flatMap((section, sectionIndex) => {
+    const sectionPath = `${date}.sections.${sectionIndex}`;
+    if (section.kind === "hydration") {
+      return [{ role: "event" as const, runnable: false, path: sectionPath }];
+    }
+
+    if (section.kind === "unit") {
+      return [
+        providerUnitToExecutionStage({
+          role: providerUnitStageRole(section.segment_type),
+          prescription: section.prescription,
+          target: section.target,
+          path: sectionPath,
+        }),
+      ];
+    }
+
+    return Array.from({ length: section.rounds }, (_, roundIndex) =>
+      section.children.map((child, childIndex) =>
+        providerUnitToExecutionStage({
+          role: providerRepeatChildStageRole(child.role),
+          prescription: child.prescription,
+          target: child.target,
+          path: `${sectionPath}.rounds.${roundIndex}.children.${childIndex}`,
+        }),
+      ),
+    ).flat();
+  });
+}
+
+function providerUnitToExecutionStage({
+  role,
+  prescription,
+  target,
+  path,
+}: {
+  role: LongRunExecutionStageRole;
+  prescription: AiAuthoredPlanFirstCompilerUnit["prescription"];
+  target: AiAuthoredPlanFirstCompilerUnit["target"];
+  path: string;
+}): LongRunExecutionStage {
+  return {
+    role,
+    runnable: true,
+    ...(prescription.mode === "time"
+      ? { durationSeconds: prescription.duration_min * 60 }
+      : { distanceMeters: prescription.distance_km * 1000 }),
+    target: {
+      mode: target.primary_execution_mode,
+      command: target.command,
+    },
+    path,
+  };
+}
+
+function providerUnitStageRole(
+  segmentType: Extract<AiAuthoredPlanFirstCompilerStep, { kind: "unit" }>["segment_type"],
+): LongRunExecutionStageRole {
+  switch (segmentType) {
+    case "warmup":
+      return "entry";
+    case "cooldown":
+      return "settle";
+    case "finish":
+      return "finish";
+    case "recovery":
+    case "recovery_jog":
+      return "support";
+    default:
+      return "body";
+  }
+}
+
+function providerRepeatChildStageRole(
+  role: AiAuthoredPlanFirstCompilerUnit["role"],
+): LongRunExecutionStageRole {
+  switch (role) {
+    case "warm_up":
+      return "entry";
+    case "cooldown":
+      return "settle";
+    case "recover":
+    case "walk":
+      return "support";
+    case "finish":
+      return "finish";
+    case "run":
+    case "work":
+      return "body";
+  }
 }
 
 function buildSegment({
   section,
   date,
   sequence,
+  workoutIdentity,
   authoringInput,
   issues,
 }: {
-  section: AiAuthoredPlanFirstProviderStep;
+  section: AiAuthoredPlanFirstCompilerStep;
   date: string;
   sequence: number;
+  workoutIdentity: CanonicalWorkoutIdentity;
   authoringInput: StructuredAuthoringInput;
   issues: CompilerIssue[];
 }): TrainingPlanV2["planned_workouts"][number]["segments"][number] {
@@ -401,30 +533,20 @@ function buildSegment({
     return {
       segment_id: `ai-plan-first-${date}-segment-${sequence}`,
       segment_type: "fueling",
-      label: AI_AUTHORED_PLAN_FIRST_HYDRATION_LABEL,
+      label: WORKOUT_DOCUMENT_HYDRATION_LABEL,
       sequence,
-      guidance: AI_AUTHORED_PLAN_FIRST_HYDRATION_CUE,
+      guidance: WORKOUT_DOCUMENT_HYDRATION_CUE,
       prescription: { mode: "none" },
     };
   }
-
-  const label = resolveRunnerFacingHeartRateReferences(
-    section.label,
-    `${path}.label`,
-    authoringInput,
-    issues,
-  );
-  const guidance = section.cue
-    ? resolveRunnerFacingHeartRateReferences(section.cue, `${path}.cue`, authoringInput, issues)
-    : null;
 
   if (section.kind === "repeat") {
     return {
       segment_id: `ai-plan-first-${date}-segment-${sequence}`,
       segment_type: section.segment_type,
-      label,
+      label: section.label,
       sequence,
-      ...(guidance ? { guidance } : {}),
+      ...(section.cue ? { guidance: section.cue } : {}),
       prescription: {
         mode: "repeats",
         repeat_count: section.rounds,
@@ -433,6 +555,8 @@ function buildSegment({
             child,
             sequence: childIndex + 1,
             path: `${path}.children.${childIndex}`,
+            workoutIdentity,
+            segmentType: section.segment_type,
             authoringInput,
             issues,
           }),
@@ -441,14 +565,18 @@ function buildSegment({
     };
   }
 
-  const target = buildTarget(section.target, path, authoringInput, issues);
+  const target = buildTarget(section.target, path, authoringInput, issues, {
+    workoutIdentity,
+    segmentType: section.segment_type,
+    authoredPurpose: section.cue,
+  });
 
   return {
     segment_id: `ai-plan-first-${date}-segment-${sequence}`,
     segment_type: section.segment_type,
-    label,
+    label: section.label,
     sequence,
-    ...(guidance ? { guidance } : {}),
+    ...(section.cue ? { guidance: section.cue } : {}),
     prescription: { ...section.prescription },
     ...(target ? { target } : {}),
   };
@@ -458,41 +586,42 @@ function buildRepeatChild({
   child,
   sequence,
   path,
+  workoutIdentity,
+  segmentType,
   authoringInput,
   issues,
 }: {
-  child: AiAuthoredPlanFirstProviderUnit;
+  child: AiAuthoredPlanFirstCompilerUnit;
   sequence: number;
   path: string;
+  workoutIdentity: CanonicalWorkoutIdentity;
+  segmentType: string;
   authoringInput: StructuredAuthoringInput;
   issues: CompilerIssue[];
 }): TrainingPlanRepeatChild {
-  const target = buildTarget(child.target, path, authoringInput, issues);
-  const label = resolveRunnerFacingHeartRateReferences(
-    child.label,
-    `${path}.label`,
-    authoringInput,
-    issues,
-  );
-  const guidance = child.cue
-    ? resolveRunnerFacingHeartRateReferences(child.cue, `${path}.cue`, authoringInput, issues)
-    : null;
+  const target = buildTarget(child.target, path, authoringInput, issues, {
+    workoutIdentity,
+    segmentType,
+    repeatChildRole: child.role,
+    authoredPurpose: child.cue,
+  });
 
   return {
     role: child.role,
-    label,
+    label: child.label,
     sequence,
-    ...(guidance ? { guidance } : {}),
+    ...(child.cue ? { guidance: child.cue } : {}),
     prescription: { ...child.prescription },
     ...(target ? { target } : {}),
   };
 }
 
 function buildTarget(
-  value: AiAuthoredPlanFirstProviderUnit["target"],
+  value: AiAuthoredPlanFirstCompilerUnit["target"],
   path: string,
   authoringInput: StructuredAuthoringInput,
   issues: CompilerIssue[],
+  context: TargetExecutionContext,
 ): TrainingPlanTarget | undefined {
   const paceProvenance = resolveAiAuthoredPaceProvenance(authoringInput);
   const target: TrainingPlanTarget = {
@@ -524,79 +653,129 @@ function buildTarget(
     return target;
   }
 
-  const resolvedGuidance = AI_AUTHORED_PLAN_FIRST_HR_ZONE_REFERENCE_VALUES.map((reference) =>
-    resolveEffectiveHeartRateGuidance(effectiveProfile, reference),
-  ).find((guidance) => guidance?.rangeBpm === value.command);
-
+  const resolvedGuidance = resolveEffectiveHeartRateGuidance(
+    effectiveProfile,
+    value.band_reference,
+  );
   if (!resolvedGuidance) {
     issues.push({
-      code: "ai_authored_plan_first_hr_zone_reference_invalid",
+      code: "ai_authored_plan_first_hr_band_reference_invalid",
       path,
-      message: `Heart-rate command ${value.command} is not available in the accepted runner profile snapshot.`,
+      message: `Heart-rate band ${value.band_reference} is not available in the accepted runner profile snapshot.`,
+    });
+    return target;
+  }
+
+  const executionRange = parseBpmExecutionRange(value.command);
+  if (!executionRange || executionRange.minBpm >= executionRange.maxBpm) {
+    issues.push({
+      code: "ai_authored_plan_first_hr_execution_range_invalid",
+      path,
+      message: "Heart-rate execution requires an increasing numeric BPM range.",
+    });
+    return target;
+  }
+
+  const usesFullBand =
+    executionRange.minBpm === resolvedGuidance.minBpm &&
+    executionRange.maxBpm === resolvedGuidance.maxBpm;
+  if (
+    executionRange.minBpm < resolvedGuidance.minBpm ||
+    executionRange.maxBpm > resolvedGuidance.maxBpm
+  ) {
+    issues.push({
+      code: "ai_authored_plan_first_hr_execution_range_outside_band",
+      path,
+      message: `Heart-rate command ${value.command} must stay inside ${value.band_reference} ${resolvedGuidance.rangeBpm}.`,
+    });
+    return target;
+  }
+  if (!usesFullBand && executionRange.maxBpm - executionRange.minBpm < 5) {
+    issues.push({
+      code: "ai_authored_plan_first_hr_execution_subrange_too_narrow",
+      path,
+      message: "An AI-selected heart-rate subrange must span at least 5 BPM.",
+    });
+    return target;
+  }
+  if (!usesFullBand && !context.authoredPurpose?.trim()) {
+    issues.push({
+      code: "ai_authored_plan_first_hr_execution_subrange_purpose_missing",
+      path,
+      message: "An AI-selected heart-rate subrange requires an authored stage cue.",
+    });
+    return target;
+  }
+  if (!usesFullBand && prohibitsHeartRateSubrange(context)) {
+    issues.push({
+      code: "ai_authored_plan_first_hr_execution_subrange_prohibited",
+      path,
+      message:
+        "Short intervals, strides, uphill repeats, and taper tune-up transitions cannot use an HR-primary subrange.",
     });
     return target;
   }
 
   target.hr_bpm_range = value.command;
-  target.hr_bpm_min = resolvedGuidance.minBpm;
-  target.hr_bpm_max = resolvedGuidance.maxBpm;
+  target.hr_bpm_min = executionRange.minBpm;
+  target.hr_bpm_max = executionRange.maxBpm;
   target.hr_target_source =
     resolvedGuidance.source === "personal" ? "personal_hr_zone" : "default_estimated_hr";
   target.label = resolvedGuidance.source === "personal" ? "Personal HR" : "Estimated HR";
   target.source_note = resolvedGuidance.sourceNote;
   target.extra = {
-    hr_zone: resolvedGuidance.authoredReference,
     hr_zone_reference: resolvedGuidance.canonicalReference,
     hr_profile_source: resolvedGuidance.source,
+    hr_band_bpm_min: resolvedGuidance.minBpm,
+    hr_band_bpm_max: resolvedGuidance.maxBpm,
+    hr_execution_range_kind: usesFullBand ? "full_band" : "ai_selected_subrange",
   };
 
   return target;
 }
 
-const AI_AUTHORED_HR_REFERENCE_PATTERN = /\bZ[1-5](?:-Z[1-5])?\b/g;
+const ALWAYS_SHORT_STAGE_HR_SUBRANGE_IDENTITIES = new Set<CanonicalWorkoutIdentity>([
+  "distance_intervals",
+  "time_intervals",
+  "5k_sharpening_repeats",
+  "10k_rhythm_intervals",
+  "uphill_repeats",
+]);
 
-function resolveRunnerFacingHeartRateReferences(
-  value: string,
-  path: string,
-  authoringInput: StructuredAuthoringInput,
-  issues: CompilerIssue[],
-) {
-  const references = value.match(AI_AUTHORED_HR_REFERENCE_PATTERN);
-  if (!references?.length) {
-    return value;
+function prohibitsHeartRateSubrange(context: TargetExecutionContext) {
+  if (ALWAYS_SHORT_STAGE_HR_SUBRANGE_IDENTITIES.has(context.workoutIdentity)) return true;
+  if (context.segmentType === "strides") return true;
+  if (
+    context.workoutIdentity === "taper_tuneup_run" &&
+    (context.segmentType === "finish" || context.repeatChildRole != null)
+  ) {
+    return true;
   }
 
-  const effectiveProfile = authoringInput.runnerFacts.heartRateProfile;
-  let resolved = value;
+  return false;
+}
 
-  for (const reference of new Set(references)) {
-    const guidance = resolveEffectiveHeartRateGuidance(effectiveProfile, reference);
-    if (!guidance) {
-      issues.push({
-        code: "ai_authored_plan_first_hr_zone_reference_invalid",
-        path,
-        message: `Heart-rate reference ${reference} is not available in the runner profile.`,
-      });
-      continue;
-    }
+function parseBpmExecutionRange(command: string) {
+  const match = /^(\d{2,3})-(\d{2,3}) bpm$/.exec(command);
+  if (!match) return null;
 
-    resolved = resolved.replaceAll(
-      reference,
-      guidance.source === "personal" ? guidance.rangeBpm : `${guidance.rangeBpm} estimated`,
-    );
-  }
-
-  return resolved;
+  return {
+    minBpm: Number(match[1]),
+    maxBpm: Number(match[2]),
+  };
 }
 
 function validateEndpointDistance(
-  endpoint: AiAuthoredPlanFirstProviderWorkout,
+  endpoint: AiAuthoredPlanFirstCompilerWorkout,
   authoringInput: StructuredAuthoringInput,
   issues: CompilerIssue[],
 ) {
   const expectedKm = requireSelectedDistance(authoringInput).distanceKm;
   const actualKm = endpoint.sections
-    .filter((section) => section.segment_type === "main")
+    .filter(
+      (section): section is Exclude<AiAuthoredPlanFirstCompilerStep, { kind: "hydration" }> =>
+        section.kind !== "hydration" && section.segment_type === "main",
+    )
     .reduce((total, section) => {
       if (section.kind === "unit") {
         return (

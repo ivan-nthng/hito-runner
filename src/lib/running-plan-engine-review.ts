@@ -10,6 +10,7 @@ import {
 } from "@/lib/plan-creation-engine";
 import type { TrainingPlanV2 } from "@/lib/imported-plan";
 import { trainingPlanV2Schema } from "@/lib/imported-plan";
+import { assertWorkoutDurationTitleContract } from "@/lib/workout-duration-title-contract";
 import {
   base64UrlDecodeUtf8,
   base64UrlEncodeUtf8,
@@ -25,6 +26,11 @@ import { serverEnv } from "@/lib/supabase/env";
 export const RUNNING_PLAN_REVIEW_CONTRACT_VERSION = "running_plan_review_v1" as const;
 export const RUNNING_PLAN_CONFIRMED_SOURCE_STATUS = "confirmed_selected_plan" as const;
 const SELF_CONTAINED_RUNNING_PLAN_REVIEW_TOKEN_PREFIX = "running-plan-review-v1";
+const TRANSIENT_RUNNER_CONTEXT_FIELDS = new Set([
+  "runnerComment",
+  "requestContext",
+  "plan_request_comment",
+]);
 
 type SelfContainedRunningPlanReviewEnvelope = {
   draft: AiGeneratedRunningPlanPreviewDraft;
@@ -219,7 +225,9 @@ async function validateRunningPlanReviewExactnessAgainstVerifiedToken(input: {
 }
 
 export function buildRunningPlanCanonicalPlan(draft: RunningPlanPreviewDraft): TrainingPlanV2 {
-  return trainingPlanV2Schema.parse(draft.canonicalPlan);
+  const canonicalPlan = trainingPlanV2Schema.parse(draft.canonicalPlan);
+  assertWorkoutDurationTitleContract(canonicalPlan.planned_workouts);
+  return canonicalPlan;
 }
 
 export function buildRunningPlanPersistenceMetadata(input: {
@@ -453,9 +461,17 @@ function parseSelfContainedRunningPlanReviewToken(token: string):
   }
 
   try {
-    const envelope = JSON.parse(
-      base64UrlDecodeUtf8(encodedEnvelope),
-    ) as SelfContainedRunningPlanReviewEnvelope;
+    const decodedEnvelope = JSON.parse(base64UrlDecodeUtf8(encodedEnvelope)) as unknown;
+
+    if (containsTransientRunnerContextField(decodedEnvelope)) {
+      return {
+        ok: false,
+        message:
+          "This AI-authored generated-plan review contains transient runner context. Refresh the preview before creating a plan.",
+      };
+    }
+
+    const envelope = decodedEnvelope as SelfContainedRunningPlanReviewEnvelope;
 
     if (!isAiGeneratedRunningPlanPreviewDraft(envelope.draft)) {
       return {
@@ -487,6 +503,21 @@ function parseSelfContainedRunningPlanReviewToken(token: string):
         "This AI-authored generated-plan review token could not be decoded. Refresh the preview before creating a plan.",
     };
   }
+}
+
+function containsTransientRunnerContextField(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.some(containsTransientRunnerContextField);
+  }
+
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  return Object.entries(value).some(
+    ([key, entry]) =>
+      TRANSIENT_RUNNER_CONTEXT_FIELDS.has(key) || containsTransientRunnerContextField(entry),
+  );
 }
 
 function canonicalPlanStablePayload(plan: TrainingPlanV2) {

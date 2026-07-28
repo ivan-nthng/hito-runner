@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { buildAiGeneratedRunningPlanDevFixturePreviewOptions } from "../src/lib/ai-generated-running-plan-dev-fixture";
+import {
+  AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
+  buildAiGeneratedRunningPlanDevFixtureOpenAiFetch,
+} from "../src/lib/ai-generated-running-plan-dev-fixture";
 import { buildAiGeneratedRunningPlanAuthoringInput } from "../src/lib/ai-generated-running-plan";
 import {
   buildReviewedAiGeneratedRunningPlanPreview,
@@ -254,16 +257,20 @@ async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {
     throw new Error(authoring.message);
   }
 
-  const aiPreview = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
+  const today = input.startDate ?? authoring.authoringInput.schedule.startDate;
+  const fetchImpl = buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
     authoringInput: authoring.authoringInput,
-    qaFixtureAuthorized: true,
-    today: input.startDate ?? authoring.authoringInput.schedule.startDate,
+    today,
     env: localAiGeneratedFixtureEnv(),
   });
-  assert.notEqual(aiPreview, null, "Plan-goal intent proof must use local AI fixture.");
 
   return buildReviewedAiGeneratedRunningPlanPreview(input, {
-    aiPreview: aiPreview ?? undefined,
+    aiPreview: {
+      apiKey: "local-qa-dev-ai-generated-plan-fixture",
+      model: AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
+      today,
+      fetchImpl,
+    },
     runnerProfileSnapshot,
   });
 }

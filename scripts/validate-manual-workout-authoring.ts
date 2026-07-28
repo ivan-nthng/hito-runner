@@ -53,10 +53,13 @@ import {
   buildFakePlannedWorkout,
   buildFakePlannedWorkoutFromReview,
 } from "./manual-workout-authoring/move-proof-fixtures";
+import { validateManualLongRunExecutionPolicyContract } from "./long-run-execution-policy-proof";
 
 async function main() {
   const options = readManualPersistenceCliOptions();
+  validateManualLongRunExecutionPolicyContract();
   validateAcceptedFixtures();
+  validateManualTitleDurationContract();
   validateManualUserEnteredTargetFixtures();
   validateOrderedRepeatChildrenRoundtrip();
   validateRejectedFixtures();
@@ -109,6 +112,29 @@ function validateManualDateOnlyLabels() {
     "Sun, Jun 14",
     "manual date-only labels must not drift through UTC timezone conversion",
   );
+}
+
+function validateManualTitleDurationContract() {
+  const input: ManualWorkoutDraftInput = {
+    templateKey: "easy_aerobic_run",
+    workoutDate: "2026-06-16",
+    title: "70 min easy aerobic run",
+    entries: [
+      {
+        kind: "block",
+        block: { blockKey: "easy_run_block", durationSeconds: 70 * 60, label: "Easy run" },
+      },
+    ],
+  };
+  const exact = reviewManualWorkoutDraft(input);
+  assert.equal(exact.ok, true, exact.ok ? "" : formatJsonResult(exact));
+
+  const mismatch = reviewManualWorkoutDraft({ ...input, title: "60 min easy aerobic run" });
+  assert.equal(mismatch.ok, false);
+  if (!mismatch.ok) {
+    assert.equal(mismatch.reason, "unsafe_block_structure");
+    assert.ok(mismatch.issues.some((issue) => issue.path?.[0] === "title"));
+  }
 }
 
 function validateActivePlanLifecycleAndContentEditabilityPolicy() {
@@ -220,21 +246,7 @@ function validateClosedAiPersistedEditorIdentitySet() {
       workoutFamily: model.workoutFamily,
       workoutIdentity: model.workoutIdentity,
       calendarIconKey: model.calendarIconKey,
-      steps: [
-        {
-          type: "run",
-          segment_type: "main",
-          sequence: 1,
-          label: "AI-authored runnable block",
-          prescription: { mode: "time", duration_min: 30 },
-          duration_min: 30,
-          target: {
-            primary_execution_mode: "effort",
-            target_source: AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
-            intensity: "Easy conversational effort",
-          },
-        },
-      ],
+      steps: buildClosedIdentityProofSteps(workoutIdentity),
     });
     const reconstructed = buildManualWorkoutDraftInputFromPersistedWorkout(
       workout,
@@ -270,6 +282,49 @@ function validateClosedAiPersistedEditorIdentitySet() {
       `${workoutIdentity} should retain AI target provenance`,
     );
   }
+}
+
+function buildClosedIdentityProofSteps(
+  workoutIdentity: (typeof AI_AUTHORED_PLAN_FIRST_WORKOUT_IDENTITY_VALUES)[number],
+): Step[] {
+  const runnable = (sequence: number): Step => ({
+    type: "run",
+    segment_type: "main",
+    sequence,
+    label: "AI-authored runnable block",
+    prescription: { mode: "time", duration_min: 30 },
+    duration_min: 30,
+    target: {
+      primary_execution_mode: "effort",
+      target_source: AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
+      intensity: "Easy conversational effort",
+    },
+  });
+
+  if (workoutIdentity === "progression_run") {
+    return [runnable(1), runnable(2)];
+  }
+
+  if (
+    workoutIdentity === "hike_run_endurance" ||
+    workoutIdentity === "mountain_long_run_time_on_feet" ||
+    workoutIdentity === "ultra_time_on_feet_durability"
+  ) {
+    return [
+      runnable(1),
+      {
+        type: "hydration",
+        segment_type: "fueling",
+        sequence: 2,
+        label: "Hydration",
+        guidance: "Take water.",
+        prescription: { mode: "none" },
+      },
+      runnable(3),
+    ];
+  }
+
+  return [runnable(1)];
 }
 
 function validateAiAuthoredOrderedRepeatRoleRoundtrip() {

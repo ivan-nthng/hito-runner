@@ -1,5 +1,6 @@
 import type { EmptyActivePlanCreationInput } from "@/lib/active-plan-persistence";
 import { trainingPlanV2Schema, type TrainingPlanV2 } from "@/lib/imported-plan";
+import { assertWorkoutDurationTitleContract } from "@/lib/workout-duration-title-contract";
 import {
   MANUAL_EMPTY_PLAN_SETUP_PAYLOAD_VERSION,
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
@@ -20,7 +21,7 @@ import type {
 export function buildManualWorkoutUserBuiltTrainingPlan(
   draft: ManualWorkoutCanonicalDraft,
 ): TrainingPlanV2 {
-  return trainingPlanV2Schema.parse({
+  const canonicalPlan = trainingPlanV2Schema.parse({
     schema_version: "training-plan-v2",
     plan_name: "Manual user-built plan",
     source_kind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
@@ -58,6 +59,8 @@ export function buildManualWorkoutUserBuiltTrainingPlan(
     },
     planned_workouts: [buildManualWorkoutTrainingPlanRow(draft)],
   } satisfies TrainingPlanV2);
+  assertWorkoutDurationTitleContract(canonicalPlan.planned_workouts);
+  return canonicalPlan;
 }
 
 function buildManualWorkoutTrainingPlanRow(

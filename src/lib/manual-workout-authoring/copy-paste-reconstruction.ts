@@ -463,6 +463,15 @@ function persistedStepToBlock(
   templateKey: ManualWorkoutTemplateKey,
   role: "block" | StepRepeatChildPrescription["role"],
 ): ManualWorkoutBlockInput | null {
+  if (step.segment_type === "fueling") {
+    return step.prescription?.mode === "none" &&
+      !step.target &&
+      !step.duration_min &&
+      !step.distance_km
+      ? { blockKey: "hydration_block" }
+      : null;
+  }
+
   const blockKey = blockKeyForStep(step, templateKey, role);
 
   if (!blockKey) {
@@ -534,6 +543,7 @@ function blockKeyForStep(
   if (signal.includes("hill")) return "hill_work_block";
   if (signal.includes("progression")) return "progression_block";
   if (signal.includes("steady")) return "steady_run_block";
+  if (signal.includes("finish")) return "long_run_finish_block";
   if (signal.includes("long_run_finish")) return "long_run_finish_block";
   if (signal.includes("long_run_body")) return "long_run_body_block";
   if (signal.includes("interval")) {
@@ -641,6 +651,21 @@ function sanitizeStepTarget(target: StepTarget | undefined): ManualWorkoutBlockI
     target.extra?.hr_profile_source === "estimated"
       ? target.extra.hr_profile_source
       : null;
+  const hrBandBpmMin =
+    typeof target.extra?.hr_band_bpm_min === "number" &&
+    Number.isInteger(target.extra.hr_band_bpm_min)
+      ? target.extra.hr_band_bpm_min
+      : null;
+  const hrBandBpmMax =
+    typeof target.extra?.hr_band_bpm_max === "number" &&
+    Number.isInteger(target.extra.hr_band_bpm_max)
+      ? target.extra.hr_band_bpm_max
+      : null;
+  const hrExecutionRangeKind =
+    target.extra?.hr_execution_range_kind === "full_band" ||
+    target.extra?.hr_execution_range_kind === "ai_selected_subrange"
+      ? target.extra.hr_execution_range_kind
+      : null;
   const targetSource = isAiAuthoredTarget
     ? AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE
     : "user_entered";
@@ -686,6 +711,9 @@ function sanitizeStepTarget(target: StepTarget | undefined): ManualWorkoutBlockI
     ...(isAiAuthoredTarget && hrZone ? { hrZone } : {}),
     ...(isAiAuthoredTarget && hrZoneReference ? { hrZoneReference } : {}),
     ...(isAiAuthoredTarget && hrProfileSource ? { hrProfileSource } : {}),
+    ...(isAiAuthoredTarget && hrBandBpmMin != null ? { hrBandBpmMin } : {}),
+    ...(isAiAuthoredTarget && hrBandBpmMax != null ? { hrBandBpmMax } : {}),
+    ...(isAiAuthoredTarget && hrExecutionRangeKind ? { hrExecutionRangeKind } : {}),
     ...(isAiAuthoredTarget &&
     (target.hr_target_source === "personal_hr_zone" ||
       target.hr_target_source === "default_estimated_hr" ||

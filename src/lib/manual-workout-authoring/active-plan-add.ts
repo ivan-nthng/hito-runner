@@ -33,6 +33,7 @@ import {
   type ManualWorkoutTargetTruthMode,
 } from "@/lib/manual-workout-authoring/schema";
 import { buildPersistedWorkoutInsertRows } from "@/lib/persisted-plan-replacement";
+import { collectRowsForIdBatches } from "@/lib/supabase/batched-in-filter";
 import type { Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { diffDaysIso, todayIso } from "@/lib/training";
@@ -353,16 +354,16 @@ export async function fetchManualWorkoutEvidenceWorkoutIds(userId: string, worko
   }
 
   const supabase = createAdminSupabaseClient();
-  const assetsResult = await supabase
-    .from("workout_result_assets")
-    .select("planned_workout_id")
-    .eq("user_id", userId)
-    .in("planned_workout_id", workoutIds);
-
-  if (assetsResult.error) throw new Error(assetsResult.error.message);
+  const assets = await collectRowsForIdBatches(workoutIds, (ids) =>
+    supabase
+      .from("workout_result_assets")
+      .select("planned_workout_id")
+      .eq("user_id", userId)
+      .in("planned_workout_id", ids),
+  );
 
   // Metrics, comparisons, and insights all cascade from this canonical evidence root.
-  return new Set((assetsResult.data ?? []).map((row) => row.planned_workout_id));
+  return new Set(assets.map((row) => row.planned_workout_id));
 }
 
 function buildManualWorkoutSeedForActivePlanAdd({

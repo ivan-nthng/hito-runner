@@ -27,7 +27,6 @@ export interface ManualWorkoutTemplate {
   requiresWarmupCooldown: boolean;
   requiresRepeatGroup: boolean;
   repeatedIntensityRequiresRecovery: boolean;
-  longRunRequiresMultiBlockAboveSeconds: number | null;
   mappingGaps: string[];
 }
 
@@ -71,7 +70,6 @@ export const MANUAL_WORKOUT_TEMPLATE_REGISTRY = {
     requiresWarmupCooldown: false,
     requiresRepeatGroup: false,
     repeatedIntensityRequiresRecovery: false,
-    longRunRequiresMultiBlockAboveSeconds: null,
     mappingGaps: [],
   },
   recovery_jog: supportTemplate({
@@ -140,7 +138,6 @@ export const MANUAL_WORKOUT_TEMPLATE_REGISTRY = {
     requiresWarmupCooldown: false,
     requiresRepeatGroup: true,
     repeatedIntensityRequiresRecovery: true,
-    longRunRequiresMultiBlockAboveSeconds: null,
     mappingGaps: [],
   },
   progression_run: {
@@ -158,8 +155,20 @@ export const MANUAL_WORKOUT_TEMPLATE_REGISTRY = {
       entry(block("warmup_block", { durationSeconds: 10 * 60 })),
       entry(
         block("progression_block", {
-          durationSeconds: 25 * 60,
-          label: "Easy to steady progression",
+          durationSeconds: 8 * 60,
+          label: "Controlled opening stage",
+        }),
+      ),
+      entry(
+        block("progression_block", {
+          durationSeconds: 8 * 60,
+          label: "Middle progression stage",
+        }),
+      ),
+      entry(
+        block("progression_block", {
+          durationSeconds: 9 * 60,
+          label: "Steady closing stage",
         }),
       ),
       entry(block("cooldown_block", { durationSeconds: 5 * 60 })),
@@ -167,7 +176,6 @@ export const MANUAL_WORKOUT_TEMPLATE_REGISTRY = {
     requiresWarmupCooldown: true,
     requiresRepeatGroup: false,
     repeatedIntensityRequiresRecovery: false,
-    longRunRequiresMultiBlockAboveSeconds: null,
     mappingGaps: [],
   },
   controlled_tempo_session: repeatWorkoutTemplate({
@@ -343,7 +351,6 @@ export const MANUAL_WORKOUT_TEMPLATE_REGISTRY = {
     requiresWarmupCooldown: false,
     requiresRepeatGroup: true,
     repeatedIntensityRequiresRecovery: true,
-    longRunRequiresMultiBlockAboveSeconds: null,
     mappingGaps: [
       "Running Coach names run_walk_adaptation as an adaptation identity, but the current canonical identity list has no dedicated run-walk identity. Backend maps it to existing recovery_jog identity with explicit run/walk repeat anatomy.",
     ],
@@ -431,7 +438,6 @@ function supportTemplate(input: {
     requiresWarmupCooldown: false,
     requiresRepeatGroup: false,
     repeatedIntensityRequiresRecovery: false,
-    longRunRequiresMultiBlockAboveSeconds: null,
     mappingGaps: input.mappingGaps ?? [],
   };
 }
@@ -476,7 +482,6 @@ function repeatWorkoutTemplate(input: {
     requiresWarmupCooldown: true,
     requiresRepeatGroup: true,
     repeatedIntensityRequiresRecovery: true,
-    longRunRequiresMultiBlockAboveSeconds: null,
     mappingGaps: [],
   };
 }
@@ -510,7 +515,6 @@ function longRunTemplate(input: {
     requiresWarmupCooldown: false,
     requiresRepeatGroup: false,
     repeatedIntensityRequiresRecovery: false,
-    longRunRequiresMultiBlockAboveSeconds: 60 * 60,
     mappingGaps: [],
   };
 }

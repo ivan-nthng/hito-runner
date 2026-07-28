@@ -12,6 +12,7 @@ import {
   listManualWorkoutTemplateCatalogForUser,
   reconstructManualWorkoutPersistedEditDraftForUser,
   restoreAllManualWorkoutBuiltInTemplatesForUser,
+  reviewManualWorkoutDraft,
   reviewManualWorkoutDeleteClearForUser,
   reviewManualWorkoutMoveForUser,
   reviewManualWorkoutPersistedEditDraftForUser,
@@ -34,8 +35,9 @@ import {
 } from "../../src/lib/active-plan-lifecycle-persistence";
 import { AI_AUTHORED_PLAN_FIRST_SOURCE_KIND } from "../../src/lib/ai-authored-plan-first-compiler";
 import {
+  AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
   AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV,
-  buildAiGeneratedRunningPlanDevFixturePreviewOptions,
+  buildAiGeneratedRunningPlanDevFixtureOpenAiFetch,
 } from "../../src/lib/ai-generated-running-plan-dev-fixture";
 import { buildAiGeneratedRunningPlanAuthoringInput } from "../../src/lib/ai-generated-running-plan";
 import { buildHeartRateZonesSummary } from "../../src/lib/heart-rate-zones";
@@ -58,16 +60,15 @@ import {
   readWorkoutDocumentSections,
 } from "../../src/lib/workout-document";
 import {
-  cleanupDisposableSupabaseUser,
-  createDisposableSupabaseUser,
+  acquireQaPoolSupabaseUser,
   DISPOSABLE_REQUIRE_PERSISTENCE_FLAG,
   readDisposablePersistenceCliOptions,
+  releaseQaPoolSupabaseUser,
   resolveDisposablePersistencePreflight,
   type DisposablePersistencePreflight,
-  type DisposableSupabaseCleanupProof,
-  type DisposableSupabaseCleanupSpec,
   type DisposableSupabaseTarget,
-} from "../lib/disposable-persistence-proof";
+  type QaPoolSupabaseCleanupProof,
+} from "../lib/qa-pool-persistence-proof";
 
 type ManualWorkoutReadyReview = Extract<ManualWorkoutDraftReviewResult, { ok: true }>;
 type PersistedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
@@ -78,79 +79,10 @@ type PersistedManualPlanReadback = {
   profile: PersistedRunnerProfileRow;
 };
 
-type ManualDisposableCleanupProofCountKey =
-  | "workoutComparisonsRemaining"
-  | "workoutMetricsRemaining"
-  | "workoutAssetsRemaining"
-  | "workoutLogsRemaining"
-  | "planCyclesRemaining"
-  | "plannedWorkoutsRemaining"
-  | "savedTemplatesRemaining"
-  | "runnerProfilesRemaining";
-type ManualDisposableCleanupProof = DisposableSupabaseCleanupProof<
-  ManualDisposableCleanupProofCountKey,
-  true
->;
+type ManualDisposableCleanupProof = QaPoolSupabaseCleanupProof;
+type QaPoolUserLease = Awaited<ReturnType<typeof acquireQaPoolSupabaseUser>>;
 
 export const MANUAL_REQUIRE_PERSISTENCE_FLAG = DISPOSABLE_REQUIRE_PERSISTENCE_FLAG;
-const MANUAL_DISPOSABLE_CLEANUP_SPECS = [
-  {
-    table: "workout_comparisons",
-    userColumn: "user_id",
-    countColumn: "id",
-    proofKey: "workoutComparisonsRemaining",
-    zeroMessage: "Disposable manual workout comparisons must be cleaned up.",
-  },
-  {
-    table: "workout_actual_metrics",
-    userColumn: "user_id",
-    countColumn: "id",
-    proofKey: "workoutMetricsRemaining",
-    zeroMessage: "Disposable manual workout metrics must be cleaned up.",
-  },
-  {
-    table: "workout_result_assets",
-    userColumn: "user_id",
-    countColumn: "id",
-    proofKey: "workoutAssetsRemaining",
-    zeroMessage: "Disposable manual workout assets must be cleaned up.",
-  },
-  {
-    table: "workout_logs",
-    userColumn: "user_id",
-    countColumn: "id",
-    proofKey: "workoutLogsRemaining",
-    zeroMessage: "Disposable manual workout logs must be cleaned up.",
-  },
-  {
-    table: "planned_workouts",
-    userColumn: "user_id",
-    countColumn: "id",
-    proofKey: "plannedWorkoutsRemaining",
-    zeroMessage: "Disposable manual planned workouts must be cleaned up.",
-  },
-  {
-    table: "plan_cycles",
-    userColumn: "user_id",
-    countColumn: "id",
-    proofKey: "planCyclesRemaining",
-    zeroMessage: "Disposable manual plan cycles must be cleaned up.",
-  },
-  {
-    table: "runner_manual_workout_templates",
-    userColumn: "user_id",
-    countColumn: "id",
-    proofKey: "savedTemplatesRemaining",
-    zeroMessage: "Disposable manual saved workout templates must be cleaned up.",
-  },
-  {
-    table: "runner_profiles",
-    userColumn: "user_id",
-    countColumn: "user_id",
-    proofKey: "runnerProfilesRemaining",
-    zeroMessage: "Disposable manual runner profile must be cleaned up.",
-  },
-] as const satisfies readonly DisposableSupabaseCleanupSpec<ManualDisposableCleanupProofCountKey>[];
 
 export type ManualPersistenceTarget = DisposableSupabaseTarget;
 export type ManualPersistencePreflight = DisposablePersistencePreflight;
@@ -216,10 +148,9 @@ export async function validateManualWorkoutDisposablePersistenceProof({
   preflight: Extract<ManualPersistencePreflight, { shouldRun: true }>;
 }) {
   const supabase = createAdminSupabaseClient();
-  const disposableUser = await createDisposableSupabaseUser({
+  const disposableUser = await acquireQaPoolSupabaseUser({
     supabase,
-    emailPrefix: "manual-workout-confirm",
-    validationKind: "manual_workout_confirm_persistence",
+    poolRole: "saved-plan-readback",
     creationErrorMessage: "Disposable manual workout user creation failed.",
   });
   let proof: {
@@ -232,6 +163,7 @@ export async function validateManualWorkoutDisposablePersistenceProof({
     originalPlanSourceKind: string;
     mutationFailureAtomic: true;
     moveAndClearPersisted: true;
+    longRunHydrationPersisted: true;
     templateLifecyclePersisted: true;
   } | null = null;
   let cleanup: ManualDisposableCleanupProof | null = null;
@@ -318,6 +250,11 @@ export async function validateManualWorkoutDisposablePersistenceProof({
       supabase,
       userId: disposableUser.userId,
     });
+    const longRunHydrationPersisted = await validateLongRunHydrationPersistence({
+      supabase,
+      userId: disposableUser.userId,
+      activePlanId: emptyPlan.activePlanId,
+    });
 
     proof = {
       rows: persisted.workouts.length,
@@ -329,10 +266,11 @@ export async function validateManualWorkoutDisposablePersistenceProof({
       originalPlanSourceKind: manualEdit.confirm.sourceMetadata.originalPlanSourceKind,
       mutationFailureAtomic,
       moveAndClearPersisted,
+      longRunHydrationPersisted,
       templateLifecyclePersisted: true,
     };
   } finally {
-    cleanup = await cleanupDisposableManualWorkoutUser(supabase, disposableUser.userId);
+    cleanup = await cleanupDisposableManualWorkoutUser(supabase, disposableUser);
   }
 
   assert.ok(proof, "Manual workout persistence proof must complete before cleanup reporting.");
@@ -357,7 +295,7 @@ export async function validateManualWorkoutDisposablePersistenceProof({
   return {
     mode: preflight.mode,
     target: preflight.target,
-    disposableRunId: disposableUser.runId,
+    testerPoolRole: disposableUser.poolRole,
     persisted: proof,
     cleanup,
     importedEdit,
@@ -365,6 +303,82 @@ export async function validateManualWorkoutDisposablePersistenceProof({
     replacementCarryForward,
     clearBeforeImport,
   };
+}
+
+async function validateLongRunHydrationPersistence(input: {
+  supabase: ReturnType<typeof createAdminSupabaseClient>;
+  userId: string;
+  activePlanId: string;
+}) {
+  const draftInput: ManualWorkoutDraftInput = {
+    templateKey: "long_aerobic_run",
+    workoutDate: addDaysIso(todayIso(), 10),
+    entries: [
+      {
+        kind: "block",
+        block: {
+          blockKey: "long_run_body_block",
+          durationSeconds: 80 * 60,
+        },
+      },
+      {
+        kind: "block",
+        block: {
+          blockKey: "hydration_block",
+        },
+      },
+      {
+        kind: "block",
+        block: {
+          blockKey: "cooldown_block",
+          durationSeconds: 25 * 60,
+        },
+      },
+    ],
+  };
+  const review = reviewManualWorkoutDraft(draftInput);
+  assert.equal(review.ok, true, JSON.stringify(review));
+  if (!review.ok) throw new Error(review.message);
+
+  const added = await addManualWorkoutToActivePlanForUser(input.userId, {
+    activePlanId: input.activePlanId,
+    draftInput,
+    reviewToken: review.reviewToken,
+    reviewChecksum: review.reviewChecksum,
+  });
+  assert.equal(added.ok, true, JSON.stringify(added));
+  if (!added.ok) throw new Error(added.message);
+
+  const persisted = await loadPersistedManualPlanForUser(input.supabase, input.userId);
+  const workout = persisted.workouts.find((candidate) => candidate.id === added.plannedWorkoutId);
+  assert.ok(workout, "Persisted long run must be readable.");
+  const hydration = readWorkoutDocumentSections(workout?.steps).find(
+    (step) => step.segment_type === "fueling",
+  );
+  assert.equal(hydration?.label, "Hydration");
+  assert.equal(hydration?.guidance, "Take water.");
+  assert.equal(hydration?.prescription?.mode, "none");
+  assert.equal(hydration?.target, undefined);
+
+  const clearReview = await reviewManualWorkoutDeleteClearForUser(input.userId, {
+    activePlanId: input.activePlanId,
+    plannedWorkoutId: added.plannedWorkoutId,
+  });
+  assert.equal(clearReview.ok, true, JSON.stringify(clearReview));
+  if (!clearReview.ok) throw new Error(clearReview.message);
+
+  const cleared = await confirmManualWorkoutDeleteClearForUser(input.userId, {
+    activePlanId: input.activePlanId,
+    plannedWorkoutId: added.plannedWorkoutId,
+    reviewToken: clearReview.review.reviewToken,
+    reviewChecksum: clearReview.review.reviewChecksum,
+  });
+  assert.equal(cleared.ok, true, JSON.stringify(cleared));
+  if (!cleared.ok) throw new Error(cleared.message);
+
+  const afterClear = await loadPersistedManualPlanForUser(input.supabase, input.userId);
+  assert.equal(afterClear.workouts.length, 0);
+  return true as const;
 }
 
 async function validateManualTemplatePersistence(input: {
@@ -597,10 +611,9 @@ async function validateImportedWorkoutEditAtomicPersistence(input: {
   review: ManualWorkoutReadyReview;
   supabase: ReturnType<typeof createAdminSupabaseClient>;
 }) {
-  const disposableUser = await createDisposableSupabaseUser({
+  const disposableUser = await acquireQaPoolSupabaseUser({
     supabase: input.supabase,
-    emailPrefix: "imported-workout-edit",
-    validationKind: "imported_workout_edit_atomic_persistence",
+    poolRole: "saved-plan-readback",
     creationErrorMessage: "Disposable imported workout edit user creation failed.",
   });
   let proof: {
@@ -861,7 +874,7 @@ async function validateImportedWorkoutEditAtomicPersistence(input: {
       historyPreserved: true,
     };
   } finally {
-    cleanup = await cleanupDisposableManualWorkoutUser(input.supabase, disposableUser.userId);
+    cleanup = await cleanupDisposableManualWorkoutUser(input.supabase, disposableUser);
   }
 
   assert.ok(proof, "Imported workout edit persistence proof must complete.");
@@ -1005,10 +1018,9 @@ async function validateReplacementCarryForwardPersistence(input: {
   review: ManualWorkoutReadyReview;
   supabase: ReturnType<typeof createAdminSupabaseClient>;
 }) {
-  const disposableUser = await createDisposableSupabaseUser({
+  const disposableUser = await acquireQaPoolSupabaseUser({
     supabase: input.supabase,
-    emailPrefix: "plan-replacement-carry-forward",
-    validationKind: "plan_replacement_atomic_carry_forward",
+    poolRole: "saved-plan-readback",
     creationErrorMessage: "Disposable plan replacement user creation failed.",
   });
   let cleanup: ManualDisposableCleanupProof | null = null;
@@ -1180,7 +1192,7 @@ async function validateReplacementCarryForwardPersistence(input: {
       evidenceRelinked: true as const,
     };
   } finally {
-    cleanup = await cleanupDisposableManualWorkoutUser(input.supabase, disposableUser.userId);
+    cleanup = await cleanupDisposableManualWorkoutUser(input.supabase, disposableUser);
     assert.ok(cleanup, "Replacement carry-forward cleanup proof must be captured.");
   }
 }
@@ -1189,10 +1201,9 @@ async function validateClearBeforeImportAtomicPersistence(input: {
   review: ManualWorkoutReadyReview;
   supabase: ReturnType<typeof createAdminSupabaseClient>;
 }) {
-  const disposableUser = await createDisposableSupabaseUser({
+  const disposableUser = await acquireQaPoolSupabaseUser({
     supabase: input.supabase,
-    emailPrefix: "clear-before-import",
-    validationKind: "clear_before_import_atomic_persistence",
+    poolRole: "saved-plan-readback",
     creationErrorMessage: "Disposable clear-before-import user creation failed.",
   });
   let cleanup: ManualDisposableCleanupProof | null = null;
@@ -1388,7 +1399,7 @@ async function validateClearBeforeImportAtomicPersistence(input: {
       lateFailureAtomic: true as const,
     };
   } finally {
-    cleanup = await cleanupDisposableManualWorkoutUser(input.supabase, disposableUser.userId);
+    cleanup = await cleanupDisposableManualWorkoutUser(input.supabase, disposableUser);
     assert.ok(cleanup, "Clear-before-import cleanup proof must be captured.");
   }
 }
@@ -1449,10 +1460,9 @@ async function validateCanonicalOriginWorkoutEditPersistence(input: {
   const proofs: CanonicalOriginEditProof[] = [];
 
   for (const origin of origins) {
-    const disposableUser = await createDisposableSupabaseUser({
+    const disposableUser = await acquireQaPoolSupabaseUser({
       supabase: input.supabase,
-      emailPrefix: `${origin.label}-workout-edit`,
-      validationKind: `${origin.label}_workout_edit_atomic_persistence`,
+      poolRole: "saved-plan-readback",
       creationErrorMessage: `Disposable ${origin.label} workout edit user creation failed.`,
     });
     let proof: Omit<CanonicalOriginEditProof, "cleanup"> | null = null;
@@ -1493,39 +1503,29 @@ async function validateCanonicalOriginWorkoutEditPersistence(input: {
       );
       assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);
       if (!authoring.ok) throw new Error(authoring.message);
-      const fixtureOptions = buildAiGeneratedRunningPlanDevFixturePreviewOptions({
+      const fixtureEnv = {
+        LOCAL_AUTH_BYPASS_ENABLED: "true",
+        LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: "/tmp/hito-local-auth.json",
+        NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
+        HITO_AI_GENERATED_PLAN_DEV_FIXTURE: "true",
+        HITO_AI_GENERATED_PLAN_PROVIDER_MODE: "qa_fixture",
+        [AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV]: "non_repeat_tempo",
+      };
+      const fixtureFetch = buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
         authoringInput: authoring.authoringInput,
-        qaFixtureAuthorized: true,
         today: previewInput.startDate,
-        env: {
-          LOCAL_AUTH_BYPASS_ENABLED: "true",
-          LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: "/tmp/hito-local-auth.json",
-          NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
-          HITO_AI_GENERATED_PLAN_DEV_FIXTURE: "true",
-          HITO_AI_GENERATED_PLAN_PROVIDER_MODE: "qa_fixture",
-          [AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV]: "non_repeat_tempo",
+        env: fixtureEnv,
+      });
+      const reviewed = await buildReviewedAiGeneratedRunningPlanPreview(previewInput, {
+        runnerProfileSnapshot,
+        aiPreview: {
+          apiKey: "local-qa-dev-ai-generated-plan-fixture",
+          model: AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
+          today: previewInput.startDate,
+          fetchImpl: fixtureFetch,
+          generationLedger: { disabled: true },
         },
       });
-      assert.ok(fixtureOptions, "Local AI plan fixture must be available for persistence proof.");
-      const previousFixtureScenario =
-        process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV];
-      process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV] = "non_repeat_tempo";
-      let reviewed: Awaited<ReturnType<typeof buildReviewedAiGeneratedRunningPlanPreview>>;
-      try {
-        reviewed = await buildReviewedAiGeneratedRunningPlanPreview(previewInput, {
-          runnerProfileSnapshot,
-          aiPreview: {
-            ...fixtureOptions,
-            generationLedger: { disabled: true },
-          },
-        });
-      } finally {
-        if (previousFixtureScenario === undefined) {
-          delete process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV];
-        } else {
-          process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV] = previousFixtureScenario;
-        }
-      }
       assert.equal(reviewed.ok, true, reviewed.ok ? "" : reviewed.unavailable.error.message);
       if (!reviewed.ok) throw new Error(reviewed.unavailable.error.message);
       const reviewedPlan = {
@@ -1586,7 +1586,7 @@ async function validateCanonicalOriginWorkoutEditPersistence(input: {
         originalWorkoutIdentity: edit.sourceWorkout.workout_identity,
       };
     } finally {
-      cleanup = await cleanupDisposableManualWorkoutUser(input.supabase, disposableUser.userId);
+      cleanup = await cleanupDisposableManualWorkoutUser(input.supabase, disposableUser);
     }
 
     assert.ok(proof, `${origin.label} workout edit persistence proof must complete.`);
@@ -1825,13 +1825,12 @@ function validateNoFakePaceOrPersonalHr(rows: readonly PersistedWorkoutRow[]) {
 
 async function cleanupDisposableManualWorkoutUser(
   supabase: ReturnType<typeof createAdminSupabaseClient>,
-  userId: string,
+  lease: QaPoolUserLease,
 ): Promise<ManualDisposableCleanupProof> {
-  return cleanupDisposableSupabaseUser({
+  return releaseQaPoolSupabaseUser({
     supabase,
-    userId,
-    cleanupSpecs: MANUAL_DISPOSABLE_CLEANUP_SPECS,
-    includeAuthUserRemaining: true,
-    authUserAbsentMessage: "Disposable manual workout auth user must be absent after cleanup.",
+    userId: lease.userId,
+    poolRole: lease.poolRole,
+    leaseToken: lease.leaseToken,
   });
 }

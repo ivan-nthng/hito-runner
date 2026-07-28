@@ -344,7 +344,7 @@ function readPositiveInteger(value: unknown): number | null {
   return value;
 }
 
-async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
+export async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
   const profileRow = await getRunnerProfileRow(userId);
 
   if (!profileRow) {

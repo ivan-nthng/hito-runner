@@ -31,13 +31,32 @@ are accepted and closed.
 
 ## Current Canonical Provider Contract
 
-PlanCreation uses one compact closed provider grammar: exact runner/goal facts in, then a flat
-non-rest `workouts[]` list plus one selected-distance endpoint out. Provider output uses canonical
-workout and segment identities, structural-only Repeat parents with ordered children, bounded
-duration/distance prescriptions, exact min/km pace, effective-profile HR references, effort, and
-short execution cues. It has no week wrappers, duplicate goal fields, plan-level narrative,
-compatibility repair, or semantic fallback. Backend compiles that exact truth into the signed
-reviewed `training-plan-v2` document.
+PlanCreation uses one direct, self-describing provider grammar: exact runner/goal facts in, then a
+flat non-rest `workouts[]` list plus one selected-distance endpoint out. Every workout and endpoint
+carries its own ordered `sections[]`; runnable leaves carry their own prescription and one numeric
+pace-or-BPM command, structural-only Repeat parents carry ordered children, and targetless
+Hydration remains a non-runnable section. The response has no compact catalog, reference table,
+expansion phase, week wrapper, duplicate goal fields, compatibility repair, or semantic fallback.
+Backend validates and compiles that authored truth without adding coaching content, then signs the
+canonical `training-plan-v2` review for explicit confirm and exact persistence.
+
+## Final Release Evidence
+
+The 2026-07-27 full-wire Global QA gate accepted the current direct provider path:
+
+`UI -> one real provider dispatch -> signed review -> one explicit confirm -> saved readback -> export`
+
+The accepted proof covers personal HR snapshots, transient Plan context redaction, Repeat and
+Hydration readback, large-plan persistence, desktop and exact-375px review, cleanup to zero, and
+protected-admin isolation. Earlier compact-wire and failed-canary artifacts remain historical
+diagnostics, not active contracts or rollback paths.
+
+Evidence: [generated-plan full-wire Global QA](../../../qa-artifacts/screenshots/2026-07-27/generated-plan-full-wire-global-qa/proof.json).
+
+Large-plan readback also established one shared Backend persistence boundary: PostgREST ID filters
+must use the canonical batched-query helper across every live consumer. A source-control bundle that
+includes only generated-plan readback without the helper's other active-plan, manual-authoring, and
+evidence consumers is incomplete.
 
 ## Historical Record Boundary
 

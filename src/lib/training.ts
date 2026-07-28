@@ -1,6 +1,7 @@
 import { signedOutPreviewPlanSeed } from "@/data/signed-out-preview-plan";
 import type { ActivePlanWorkoutSourceEditingCapabilities } from "@/lib/active-plan-workout-editing/source-capabilities";
 import type { BodyNote } from "@/lib/body-notes";
+import { heartRateGuidanceBandLabel } from "@/lib/heart-rate-zones";
 import {
   buildPlannedWorkoutLanguage,
   type PlannedWorkoutLanguageBlock,
@@ -24,6 +25,8 @@ import {
 } from "@/lib/rich-workout-model";
 import type { WorkoutFeedbackMarkerSummary } from "@/lib/workout-result-import/types";
 import {
+  workoutDocumentExecutableDurationForSections,
+  workoutDocumentExecutableDurationMin,
   workoutDocumentRepeatChildRoleForSection,
   workoutDocumentRepeatChildren,
   workoutDocumentRepeatCount,
@@ -662,13 +665,7 @@ export function deriveWeekStatus(workouts: Workout[], currentDate: string): Week
 }
 
 export function workoutDuration(workout: Pick<Workout, "steps" | "type">): number {
-  let total = 0;
-
-  for (const step of workout.steps) {
-    total += stepPlannedDurationMin(step, workout.type);
-  }
-
-  return total;
+  return workoutDocumentExecutableDurationForSections(workout.steps);
 }
 
 export function workoutStructureDuration(workout: Pick<Workout, "steps" | "type">): number {
@@ -895,14 +892,16 @@ export function displayTargetEntries(target: StepTarget | undefined) {
   };
 
   pushEntry("intensity", target.intensity);
+  const heartRateReadback = heartRateTargetReadback(target);
   pushEntry(
     "hr_bpm_range",
-    target.hr_bpm_range ?? target.hr_bpm,
-    target.hr_target_source === "default_estimated_hr"
-      ? "Estimated HR"
-      : target.hr_target_source === "personal_hr_zone"
-        ? "Personal HR"
-        : undefined,
+    heartRateReadback?.value ?? target.hr_bpm_range ?? target.hr_bpm,
+    heartRateReadback?.label ??
+      (target.hr_target_source === "default_estimated_hr"
+        ? "Estimated HR"
+        : target.hr_target_source === "personal_hr_zone"
+          ? "Personal HR"
+          : undefined),
   );
   pushEntry("pace_min_per_km_range", target.pace_min_per_km_range ?? target.pace_range_min_km);
   pushEntry("pace", target.pace);
@@ -928,7 +927,55 @@ const INTERNAL_TARGET_PROVENANCE_KEYS = new Set([
   "hr_zone",
   "hr_zone_reference",
   "hr_profile_source",
+  "hr_band_bpm_min",
+  "hr_band_bpm_max",
+  "hr_execution_range_kind",
 ]);
+
+function heartRateTargetReadback(target: StepTarget) {
+  const reference =
+    typeof target.extra?.hr_zone_reference === "string" ? target.extra.hr_zone_reference : null;
+  const rangeKind = target.extra?.hr_execution_range_kind;
+  const bandMin = target.extra?.hr_band_bpm_min;
+  const bandMax = target.extra?.hr_band_bpm_max;
+  const executionRange = target.hr_bpm_range ?? target.hr_bpm;
+  const bandLabel = reference ? heartRateGuidanceBandLabel(reference) : null;
+
+  if (
+    !bandLabel ||
+    !executionRange ||
+    (rangeKind !== "full_band" && rangeKind !== "ai_selected_subrange")
+  ) {
+    return null;
+  }
+
+  const sourceLabel =
+    target.hr_target_source === "personal_hr_zone"
+      ? "Personal HR"
+      : target.hr_target_source === "default_estimated_hr"
+        ? "Estimated HR"
+        : "Heart rate";
+
+  if (rangeKind === "full_band") {
+    return {
+      label: `${sourceLabel} · ${bandLabel} full band`,
+      value: executionRange,
+    };
+  }
+
+  const parentBand =
+    typeof bandMin === "number" &&
+    Number.isInteger(bandMin) &&
+    typeof bandMax === "number" &&
+    Number.isInteger(bandMax)
+      ? ` within ${bandLabel} ${bandMin}-${bandMax} bpm`
+      : "";
+
+  return {
+    label: `${sourceLabel} · AI-selected ${bandLabel} subrange`,
+    value: `${executionRange}${parentBand}`,
+  };
+}
 
 const EXECUTABLE_TARGET_ENTRY_KEYS = new Set([
   "hr_bpm_range",
@@ -1227,18 +1274,8 @@ export function stepPlannedDistanceKm(step: Step) {
 }
 
 export function stepPlannedDurationMin(step: Step, workoutType: WorkoutType) {
-  let total = step.duration_min ?? 0;
-  const repeatCount = repeatCountForStep(step);
-  const repeatChildren = repeatChildSteps(step);
-
-  if (repeatCount && repeatChildren.length) {
-    total +=
-      repeatCount *
-      repeatChildren.reduce((sum, child) => sum + stepPlannedDurationMin(child, workoutType), 0);
-    return total;
-  }
-
-  return total;
+  void workoutType;
+  return workoutDocumentExecutableDurationMin(step);
 }
 
 export function stepStructureDurationMin(step: Step, workoutType: WorkoutType) {

@@ -57,7 +57,7 @@ const EXPECTED_TEMPLATE_SKELETONS: ExpectedTemplateSkeleton[] = [
   {
     templateKey: "progression_run",
     runnerFacingWorkoutType: "progression",
-    runnerFacingBlocks: ["Warm-up", "Work", "Cooldown"],
+    runnerFacingBlocks: ["Warm-up", "Work", "Work", "Finish", "Cooldown"],
   },
   {
     templateKey: "controlled_tempo_session",

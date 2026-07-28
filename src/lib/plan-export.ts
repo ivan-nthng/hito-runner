@@ -543,7 +543,7 @@ function repeatPrescriptionChildrenForExport(
 ): StepRepeatChildPrescription[] {
   return reduceRepeatChildrenToChildFirst<StepTarget>({
     children: prescription.children,
-  }).children;
+  }).children.map(repeatChildToTrainingPlanV2);
 }
 
 function stepToRepeatChildPrescription(
@@ -562,8 +562,23 @@ function stepToRepeatChildPrescription(
     sequence: step.sequence ?? index + 1,
     ...(stringValue(step.guidance) ? { guidance: stringValue(step.guidance) } : {}),
     prescription,
-    ...(step.target ? { target: step.target } : {}),
+    ...targetForTrainingPlanV2(step.target),
   };
+}
+
+function repeatChildToTrainingPlanV2(
+  child: StepRepeatChildPrescription,
+): StepRepeatChildPrescription {
+  const { target, ...childWithoutTarget } = child;
+  return {
+    ...childWithoutTarget,
+    ...targetForTrainingPlanV2(target),
+  };
+}
+
+function targetForTrainingPlanV2(target: StepTarget | undefined) {
+  const wireTarget = workoutDocumentTargetToWire(target);
+  return wireTarget ? { target: wireTarget as StepTarget } : {};
 }
 
 function stepToRepeatChildRole(step: Step): StepRepeatChildPrescription["role"] | null {

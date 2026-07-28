@@ -132,6 +132,22 @@ export function reviewManualWorkoutDraft(
     entries: validation.entries,
     targetOptions: options,
   });
+  try {
+    buildManualWorkoutUserBuiltTrainingPlan(normalized.draft);
+  } catch (error) {
+    return rejectManualWorkoutDraft({
+      reason: "unsafe_block_structure",
+      message: "The workout title duration must match its executable structure.",
+      issues: [
+        {
+          code: "unsafe_block_structure",
+          message: error instanceof Error ? error.message : "Workout title duration is invalid.",
+          path: ["title"],
+        },
+      ],
+      conflicts: [],
+    });
+  }
   const exactnessPayload = buildManualWorkoutReviewExactnessPayload(normalized.draft);
   const reviewChecksum = stableManualWorkoutChecksum64Hex(exactnessPayload);
 

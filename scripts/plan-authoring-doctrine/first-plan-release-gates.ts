@@ -10,7 +10,8 @@ import { AI_AUTHORED_PLAN_FIRST_SOURCE_KIND } from "../../src/lib/ai-authored-pl
 import {
   buildAiAuthoredFirstSessionAdaptationContext,
   buildAiAuthoredPlanFirstPrompt,
-  type AiAuthoredPlanFirstProviderDraft,
+  aiAuthoredPlanFirstCompilerDraftSchema,
+  type AiAuthoredPlanFirstCompilerDraft,
 } from "../../src/lib/ai-authored-plan-first-provider-contract";
 import type { TrainingPlanV2 } from "../../src/lib/imported-plan";
 import type { BuildRunningPlanPreviewInput } from "../../src/lib/plan-creation-engine";
@@ -76,7 +77,7 @@ export async function assertFirstPlanReleaseGateContracts() {
   assert.equal(serviceResult.metadata.debug.contractMode, "plan_first");
   assert.equal(
     serviceResult.metadata.debug.responseSchemaMode,
-    "responses_json_schema_plan_first_strict",
+    "responses_json_schema_plan_first_direct_v1_strict",
   );
   assert.doesNotMatch(
     JSON.stringify(serviceResult),
@@ -263,7 +264,7 @@ async function assertFirstSessionAdaptationContracts() {
 
 function assertAdaptationOpening(input: {
   startDate: string;
-  providerDraft: AiAuthoredPlanFirstProviderDraft;
+  providerDraft: AiAuthoredPlanFirstCompilerDraft;
   canonicalPlan: TrainingPlanV2;
 }) {
   const authoredDays = input.providerDraft.workouts.sort((left, right) =>
@@ -324,7 +325,10 @@ async function readFixtureDraft(
     today: authoringInput.schedule.startDate,
   })("https://api.openai.com/v1/responses", {});
   const body = (await response.json()) as { output_text: string };
-  return JSON.parse(body.output_text) as AiAuthoredPlanFirstProviderDraft;
+  const parsed = aiAuthoredPlanFirstCompilerDraftSchema.safeParse(JSON.parse(body.output_text));
+  assert.equal(parsed.success, true);
+  if (!parsed.success) throw new Error(parsed.error.message);
+  return parsed.data;
 }
 
 function assertPlanFirstCanonicalResult(plan: TrainingPlanV2, label: string) {
@@ -336,7 +340,7 @@ function assertPlanFirstCanonicalResult(plan: TrainingPlanV2, label: string) {
   assert.ok(plan.planned_workouts.length > 0, `${label} must include calendar rows.`);
 }
 
-function openAiPlanFirstResponse(responseId: string, draft: unknown) {
+function openAiPlanFirstResponse(responseId: string, draft: AiAuthoredPlanFirstCompilerDraft) {
   return new Response(
     JSON.stringify({
       id: responseId,

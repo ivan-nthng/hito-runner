@@ -1,6 +1,7 @@
 import "@tanstack/react-start/server-only";
 
 import type { Database } from "@/lib/supabase/database";
+import { collectRowsForIdBatches } from "@/lib/supabase/batched-in-filter";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { readWorkoutComparisonDifferencePayload } from "@/lib/workout-result-import/comparison-payload";
 import { buildWorkoutResultEvidenceBundle } from "@/lib/workout-result-import/evidence-bundle";
@@ -101,46 +102,36 @@ export async function getWorkoutFeedbackMarkerMap(plannedWorkoutIds: string[]) {
   }
 
   const supabase = createAdminSupabaseClient();
-  const assetResult = await supabase
-    .from("workout_result_assets")
-    .select("*")
-    .in("planned_workout_id", uniqueWorkoutIds)
-    .order("created_at", { ascending: false });
+  const assetRows = await collectRowsForIdBatches(uniqueWorkoutIds, (ids) =>
+    supabase
+      .from("workout_result_assets")
+      .select("*")
+      .in("planned_workout_id", ids)
+      .order("created_at", { ascending: false }),
+  );
 
-  if (assetResult.error) {
-    throw new Error(assetResult.error.message);
-  }
-
-  const latestAssetByWorkoutId = newestByPlannedWorkoutId(assetResult.data);
+  const latestAssetByWorkoutId = newestByPlannedWorkoutId(assetRows);
   const latestAssetIds = Array.from(latestAssetByWorkoutId.values(), (row) => row.id);
-  const metricsResult = latestAssetIds.length
-    ? await supabase
-        .from("workout_actual_metrics")
-        .select("*")
-        .in("result_asset_id", latestAssetIds)
-        .neq("status", "superseded")
-        .order("created_at", { ascending: false })
-    : { data: [] as PersistedWorkoutActualMetricsRow[], error: null };
+  const metricRows = await collectRowsForIdBatches(latestAssetIds, (ids) =>
+    supabase
+      .from("workout_actual_metrics")
+      .select("*")
+      .in("result_asset_id", ids)
+      .neq("status", "superseded")
+      .order("created_at", { ascending: false }),
+  );
 
-  if (metricsResult.error) {
-    throw new Error(metricsResult.error.message);
-  }
+  const latestMetricsByAssetId = newestByResultAssetId(metricRows);
+  const comparisonIds = Array.from(new Set(metricRows.map((row) => row.id)));
+  const comparisonRows = await collectRowsForIdBatches(comparisonIds, (ids) =>
+    supabase
+      .from("workout_comparisons")
+      .select("*")
+      .in("actual_metrics_id", ids)
+      .order("created_at", { ascending: false }),
+  );
 
-  const latestMetricsByAssetId = newestByResultAssetId(metricsResult.data);
-  const comparisonIds = Array.from(new Set(metricsResult.data.map((row) => row.id)));
-  const comparisonResult = comparisonIds.length
-    ? await supabase
-        .from("workout_comparisons")
-        .select("*")
-        .in("actual_metrics_id", comparisonIds)
-        .order("created_at", { ascending: false })
-    : { data: [] as PersistedWorkoutComparisonRow[], error: null };
-
-  if (comparisonResult.error) {
-    throw new Error(comparisonResult.error.message);
-  }
-
-  const latestComparisonByActualMetricsId = newestByActualMetricsId(comparisonResult.data);
+  const latestComparisonByActualMetricsId = newestByActualMetricsId(comparisonRows);
   const markerByWorkoutId = new Map<string, WorkoutFeedbackMarkerSummary>();
 
   for (const plannedWorkoutId of uniqueWorkoutIds) {

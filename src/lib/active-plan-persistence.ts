@@ -25,6 +25,10 @@ import {
   applyAtomicReviewedPlanPersistence,
 } from "@/lib/active-plan-lifecycle-persistence";
 import { buildPersistedWorkoutInsertRows } from "@/lib/persisted-plan-replacement";
+import {
+  collectRowsForIdBatches,
+  splitIdsForPostgrestInFilter,
+} from "@/lib/supabase/batched-in-filter";
 import type { Database, Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { todayIso, type RunnerProfileSummary } from "@/lib/training";
@@ -510,17 +514,13 @@ export async function getPlanWorkoutsWithLogs(planCycleId: string) {
   const workouts = await getPlanWorkouts(planCycleId);
   const supabase = createAdminSupabaseClient();
   const workoutIds = workouts.map((workout) => workout.id);
-  const logsResult = workoutIds.length
-    ? await supabase.from("workout_logs").select("*").in("planned_workout_id", workoutIds)
-    : { data: [], error: null };
-
-  if (logsResult.error) {
-    throw new Error(logsResult.error.message);
-  }
+  const logs = await collectRowsForIdBatches(workoutIds, (ids) =>
+    supabase.from("workout_logs").select("*").in("planned_workout_id", ids),
+  );
 
   return {
     workouts,
-    logsByWorkoutId: new Map(logsResult.data.map((log) => [log.planned_workout_id, log])),
+    logsByWorkoutId: new Map(logs.map((log) => [log.planned_workout_id, log])),
   };
 }
 
@@ -592,30 +592,27 @@ async function recoverArchivedLogsOntoActivePlan(
 
   const planOrder = new Map(archivedPlansResult.data.map((plan, index) => [plan.id, index]));
   const archivedPlanIds = archivedPlansResult.data.map((plan) => plan.id);
-  const archivedWorkoutsResult = await supabase
-    .from("planned_workouts")
-    .select("*")
-    .in("plan_cycle_id", archivedPlanIds)
-    .in("workout_date", unresolvedDates)
-    .order("workout_date", { ascending: true })
-    .order("display_order", { ascending: true });
-
-  if (archivedWorkoutsResult.error) {
-    throw new Error(archivedWorkoutsResult.error.message);
+  const archivedWorkouts = [] as PersistedPlannedWorkoutRow[];
+  for (const planIds of splitIdsForPostgrestInFilter(archivedPlanIds)) {
+    archivedWorkouts.push(
+      ...(await collectRowsForIdBatches(unresolvedDates, (dates) =>
+        supabase
+          .from("planned_workouts")
+          .select("*")
+          .in("plan_cycle_id", planIds)
+          .in("workout_date", dates)
+          .order("workout_date", { ascending: true })
+          .order("display_order", { ascending: true }),
+      )),
+    );
   }
 
-  const archivedWorkoutIds = archivedWorkoutsResult.data.map((workout) => workout.id);
-  const archivedLogsResult = archivedWorkoutIds.length
-    ? await supabase.from("workout_logs").select("*").in("planned_workout_id", archivedWorkoutIds)
-    : { data: [], error: null };
-
-  if (archivedLogsResult.error) {
-    throw new Error(archivedLogsResult.error.message);
-  }
-
-  const archivedLogsByWorkoutId = new Map(
-    archivedLogsResult.data.map((log) => [log.planned_workout_id, log]),
+  const archivedWorkoutIds = archivedWorkouts.map((workout) => workout.id);
+  const archivedLogs = await collectRowsForIdBatches(archivedWorkoutIds, (ids) =>
+    supabase.from("workout_logs").select("*").in("planned_workout_id", ids),
   );
+
+  const archivedLogsByWorkoutId = new Map(archivedLogs.map((log) => [log.planned_workout_id, log]));
   const archivedCandidatesByDate = new Map<
     string,
     Array<{
@@ -625,7 +622,7 @@ async function recoverArchivedLogsOntoActivePlan(
     }>
   >();
 
-  for (const workout of archivedWorkoutsResult.data) {
+  for (const workout of archivedWorkouts) {
     const log = archivedLogsByWorkoutId.get(workout.id);
 
     if (!log) {

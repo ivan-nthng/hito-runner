@@ -14,6 +14,9 @@ import type {
 } from "@/lib/rich-workout-model";
 
 export const AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE = "ai_authored_plan_guidance" as const;
+export const WORKOUT_DOCUMENT_HYDRATION_LABEL = "Hydration" as const;
+export const WORKOUT_DOCUMENT_HYDRATION_CUE = "Take water." as const;
+
 export const AI_AUTHORED_PACE_PROVENANCE_VALUES = [
   "benchmark_backed",
   "goal_informed_ai_estimate",
@@ -230,6 +233,34 @@ export function workoutDocumentRepeatChildren(
   return section.children ?? [];
 }
 
+/** The canonical timed-work calculation for review, persistence, and readback. */
+export function workoutDocumentExecutableDurationMin(section: WorkoutDocumentSection): number {
+  const directDuration = readPositiveDuration(
+    section.duration_min ?? section.prescription?.duration_min,
+  );
+  const repeatCount = workoutDocumentRepeatCount(section);
+  const children = workoutDocumentRepeatChildren(section);
+
+  if (repeatCount && children.length > 0) {
+    return (
+      directDuration +
+      repeatCount *
+        children.reduce((total, child) => total + workoutDocumentExecutableDurationMin(child), 0)
+    );
+  }
+
+  return directDuration;
+}
+
+export function workoutDocumentExecutableDurationForSections(
+  sections: readonly WorkoutDocumentSection[],
+): number {
+  return sections.reduce(
+    (total, section) => total + workoutDocumentExecutableDurationMin(section),
+    0,
+  );
+}
+
 export function workoutDocumentRepeatChildToSection(
   child: WorkoutDocumentRepeatChildPrescription,
 ): WorkoutDocumentSection {
@@ -326,6 +357,10 @@ function unknownRecord(value: unknown): Record<string, unknown> | null {
 
 function readString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function readPositiveDuration(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
 }
 
 function primaryExecutionModeField(value: unknown): Partial<WorkoutDocumentTarget> {

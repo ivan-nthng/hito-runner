@@ -11,11 +11,19 @@ import {
   getManualWorkoutTemplate,
   type ManualWorkoutTemplate,
 } from "@/lib/manual-workout-authoring/templates";
-import { validateManualWorkoutTargetInput } from "@/lib/manual-workout-authoring/target-input";
+import {
+  resolveManualWorkoutTargetInput,
+  validateManualWorkoutTargetInput,
+} from "@/lib/manual-workout-authoring/target-input";
 import {
   getManualWorkoutRepeatGroupChildren,
   isManualWorkoutRepeatRecoveryBlock,
 } from "@/lib/manual-workout-authoring/repeat-groups";
+import {
+  validateLongRunExecutionPolicy,
+  type LongRunExecutionStage,
+  type LongRunExecutionStageRole,
+} from "@/lib/long-run-execution-policy";
 
 export type ManualWorkoutDraftValidationResult =
   | {
@@ -33,6 +41,7 @@ const NOTE_ONLY_BLOCKS = new Set<ManualWorkoutBlockInput["blockKey"]>([
   "coach_cue_note_block",
   "drills_mobility_note_block",
 ]);
+const NON_RUNNABLE_EVENT_BLOCKS = new Set<ManualWorkoutBlockInput["blockKey"]>(["hydration_block"]);
 
 const SUBSTANTIVE_WORK_BLOCKS = new Set<ManualWorkoutBlockInput["blockKey"]>([
   "steady_run_block",
@@ -132,9 +141,19 @@ function validateManualWorkoutEntries(
     validateWarmupCooldownChronology(entries, issues);
   }
 
-  if (template.longRunRequiresMultiBlockAboveSeconds && !options.allowPersistedTemplateShape) {
-    validateLongRunAnatomy(template, entries, issues);
-  }
+  issues.push(
+    ...validateLongRunExecutionPolicy({
+      workoutIdentity: options.preservedWorkoutModel?.workoutIdentity ?? template.workoutIdentity,
+      stages: manualEntriesToExecutionStages(entries, targetTruthMode, options),
+    }).map(
+      (issue) =>
+        ({
+          code: issue.code.includes("target") ? "unsafe_metric_truth" : "unsafe_block_structure",
+          message: issue.message,
+          path: ["entries"],
+        }) satisfies ManualWorkoutDraftIssue,
+    ),
+  );
 
   return issues;
 }
@@ -193,7 +212,26 @@ function validateBlock(
 
   issues.push(...validateManualWorkoutTargetInput(block, "structure_only", path, options));
 
+  if (NON_RUNNABLE_EVENT_BLOCKS.has(block.blockKey)) {
+    if (block.durationSeconds || block.distanceMeters || block.target || block.noteText) {
+      issues.push({
+        code: "unsafe_block_structure",
+        message: `${block.blockKey} is a fixed targetless non-runnable event.`,
+        path,
+      });
+    }
+    return;
+  }
+
   if (NOTE_ONLY_BLOCKS.has(block.blockKey)) {
+    if (block.durationSeconds || block.distanceMeters || block.target) {
+      issues.push({
+        code: "unsafe_block_structure",
+        message: `${block.blockKey} is a targetless non-runnable event.`,
+        path,
+      });
+    }
+
     if (!block.noteText?.trim()) {
       issues.push({
         code: "missing_executable_structure",
@@ -241,10 +279,11 @@ function validateRepeatGroup(
   for (const [childIndex, child] of children.entries()) {
     validateBlock(child, issues, [...path, "children", childIndex], options);
 
-    if (NOTE_ONLY_BLOCKS.has(child.blockKey)) {
+    if (NOTE_ONLY_BLOCKS.has(child.blockKey) || NON_RUNNABLE_EVENT_BLOCKS.has(child.blockKey)) {
       issues.push({
         code: "unsafe_block_structure",
-        message: "Repeat groups can include executable child sections only, not note blocks.",
+        message:
+          "Repeat groups can include executable child sections only, not notes or Hydration events.",
         path: [...path, "children", childIndex, "blockKey"],
       });
     }
@@ -319,47 +358,95 @@ function validateWarmupCooldownChronology(
   }
 }
 
-function validateLongRunAnatomy(
-  template: ManualWorkoutTemplate,
+function manualEntriesToExecutionStages(
   entries: ManualWorkoutConstructorEntryInput[],
-  issues: ManualWorkoutDraftIssue[],
-) {
-  const totalSeconds = entries.reduce((total, entryValue) => {
+  targetTruthMode: ManualWorkoutTargetTruthMode,
+  options: ManualWorkoutDraftProcessingOptions,
+): LongRunExecutionStage[] {
+  return entries.flatMap((entryValue, entryIndex) => {
     if (entryValue.kind === "block") {
-      return total + (entryValue.block.durationSeconds ?? 0);
+      return [
+        manualBlockToExecutionStage(
+          entryValue.block,
+          targetTruthMode,
+          options,
+          `entries.${entryIndex}`,
+        ),
+      ];
     }
 
-    const repeatSeconds = getManualWorkoutRepeatGroupChildren(entryValue.group).reduce(
-      (childTotal, child) => childTotal + (child.durationSeconds ?? 0),
-      0,
-    );
-    return total + entryValue.group.repeatCount * repeatSeconds;
-  }, 0);
+    return Array.from({ length: entryValue.group.repeatCount }, (_, roundIndex) =>
+      getManualWorkoutRepeatGroupChildren(entryValue.group).map((child, childIndex) =>
+        manualBlockToExecutionStage(
+          child,
+          targetTruthMode,
+          options,
+          `entries.${entryIndex}.rounds.${roundIndex}.children.${childIndex}`,
+        ),
+      ),
+    ).flat();
+  });
+}
 
-  if (
-    totalSeconds <= (template.longRunRequiresMultiBlockAboveSeconds ?? Number.POSITIVE_INFINITY)
-  ) {
-    return;
+function manualBlockToExecutionStage(
+  block: ManualWorkoutBlockInput,
+  targetTruthMode: ManualWorkoutTargetTruthMode,
+  options: ManualWorkoutDraftProcessingOptions,
+  path: string,
+): LongRunExecutionStage {
+  return {
+    role: manualWorkoutBlockStageRole(block.blockKey),
+    runnable:
+      !NOTE_ONLY_BLOCKS.has(block.blockKey) && !NON_RUNNABLE_EVENT_BLOCKS.has(block.blockKey),
+    ...(block.durationSeconds ? { durationSeconds: block.durationSeconds } : {}),
+    ...(block.distanceMeters ? { distanceMeters: block.distanceMeters } : {}),
+    ...manualBlockNumericTarget(block, targetTruthMode, options),
+    path,
+  };
+}
+
+function manualBlockNumericTarget(
+  block: ManualWorkoutBlockInput,
+  targetTruthMode: ManualWorkoutTargetTruthMode,
+  options: ManualWorkoutDraftProcessingOptions,
+): Pick<LongRunExecutionStage, "target"> {
+  const resolved = resolveManualWorkoutTargetInput(block, targetTruthMode, options);
+  if (!resolved.ok) return {};
+
+  if (resolved.target.kind === "pace") {
+    const command = resolved.target.pace ?? resolved.target.paceMinPerKmRange;
+    return command ? { target: { mode: "pace", command } } : {};
   }
 
-  const executableRunBlocks = entries.filter(
-    (entryValue) =>
-      entryValue.kind === "block" &&
-      !NOTE_ONLY_BLOCKS.has(entryValue.block.blockKey) &&
-      Boolean(entryValue.block.durationSeconds || entryValue.block.distanceMeters),
-  );
-  const hasLongRunBody = entries.some(
-    (entryValue) =>
-      entryValue.kind === "block" && entryValue.block.blockKey === "long_run_body_block",
-  );
+  if (resolved.target.kind === "heart_rate") {
+    const command =
+      resolved.target.hrBpmRange ??
+      (resolved.target.hrBpmCap != null ? `${resolved.target.hrBpmCap} bpm` : null);
+    return command ? { target: { mode: "heart_rate", command } } : {};
+  }
 
-  if (!hasLongRunBody || executableRunBlocks.length < 2) {
-    issues.push({
-      code: "unsafe_block_structure",
-      message:
-        "Long runs over 60 minutes must include long-run body plus another executable block.",
-      path: ["entries"],
-    });
+  return {};
+}
+
+export function manualWorkoutBlockStageRole(
+  blockKey: ManualWorkoutBlockInput["blockKey"],
+): LongRunExecutionStageRole {
+  switch (blockKey) {
+    case "warmup_block":
+      return "entry";
+    case "cooldown_block":
+      return "settle";
+    case "long_run_finish_block":
+      return "finish";
+    case "hydration_block":
+      return "event";
+    case "coach_cue_note_block":
+    case "drills_mobility_note_block":
+    case "interval_recovery_block":
+    case "rest_walk_jog_recovery_block":
+      return "support";
+    default:
+      return "body";
   }
 }
 

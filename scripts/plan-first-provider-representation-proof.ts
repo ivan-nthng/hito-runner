@@ -6,10 +6,11 @@ import {
   AI_AUTHORED_PLAN_FIRST_REPEAT_SECTION_TYPE_VALUES,
   AI_AUTHORED_PLAN_FIRST_UNIT_SECTION_TYPE_VALUES,
   AI_AUTHORED_PLAN_FIRST_WORKOUT_IDENTITY_VALUES,
-  aiAuthoredPlanFirstProviderDraftSchema,
+  aiAuthoredPlanFirstCompilerDraftSchema,
   buildAiAuthoredPlanFirstPrompt,
-  type AiAuthoredPlanFirstProviderDraft,
-  type AiAuthoredPlanFirstProviderUnit,
+  type AiAuthoredPlanFirstCompilerDraft,
+  type AiAuthoredPlanFirstCompilerStep,
+  type AiAuthoredPlanFirstCompilerUnit,
 } from "../src/lib/ai-authored-plan-first-provider-contract";
 import { generateAiFirstPlanDraftPreview } from "../src/lib/ai-first-plan-draft-service";
 import {
@@ -19,6 +20,7 @@ import {
 import {
   buildImportedPlanSeed,
   importedPlanSchema,
+  validateImportedPlanJson,
   type TrainingPlanV2,
 } from "../src/lib/imported-plan";
 import {
@@ -34,9 +36,18 @@ import { PLANNED_WORKOUT_REPEAT_CHILD_ROLE_VALUES } from "../src/lib/planned-wor
 import type { Database } from "../src/lib/supabase/database";
 import { addDaysIso, weekdayLong } from "../src/lib/training";
 import {
+  WORKOUT_DOCUMENT_HYDRATION_CUE,
+  WORKOUT_DOCUMENT_HYDRATION_LABEL,
+  normalizeWorkoutDocumentTarget,
+} from "../src/lib/workout-document";
+import {
   buildProofPersonalRunnerProfileSnapshot,
   buildProofRunnerProfileSnapshot,
 } from "./runner-profile-snapshot-proof-helpers";
+import {
+  buildPolicyCompliantLongRunSections,
+  buildPolicyCompliantProviderSectionsForIdentity,
+} from "./long-run-execution-policy-proof";
 
 type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
 type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
@@ -61,12 +72,26 @@ const scenarios: Scenario[] = [
     weeks: 10,
   },
 ];
+const canonicalWireCoverage = {
+  unitHeartRate: false,
+  repeatChildHeartRate: false,
+};
 
 function buildAiGeneratedRunningPlanAuthoringInput(
   input: RunningPlanPreviewActionInput,
   profileSnapshot = buildProofRunnerProfileSnapshot(input),
 ) {
   return buildAiGeneratedRunningPlanAuthoringInputRuntime(input, profileSnapshot);
+}
+
+function requireAuthoringInput(input: RunningPlanPreviewActionInput) {
+  const result = buildAiGeneratedRunningPlanAuthoringInput(
+    input,
+    buildProofPersonalRunnerProfileSnapshot(input),
+  );
+  assert.equal(result.ok, true, result.ok ? "" : result.message);
+  if (!result.ok) throw new Error(result.message);
+  return result.authoringInput;
 }
 
 function buildReviewedAiGeneratedRunningPlanPreview(
@@ -98,11 +123,19 @@ export async function validatePlanFirstProviderRepresentationContract() {
   );
   await assertReviewableDraft(capacityInput, capacityDraft, "36-week capacity");
 
+  await assertRunnableSupportHydrationReviewContract(capacityInput, capacityDraft);
+  await assertRepeatDurationEditorialDiscretion(capacityInput, capacityDraft);
+  await assertWorkoutTitleDurationContract(capacityInput, capacityDraft);
   assertClosedProviderSchema(capacityInput, capacityDraft);
   assertAvailabilityContract(capacityInput, capacityDraft);
   assertProviderEnumClosure(capacityInput, capacityDraft);
-  assertRunnerFacingHeartRateReferenceResolution(capacityInput, capacityDraft);
-  await assertTransportFailures(capacityInput, capacityDraft);
+  await assertRunnerFacingHeartRateReferenceContract(capacityInput, capacityDraft);
+  await assertDirectProviderSchemaRejectionContract(capacityInput, capacityDraft);
+  await assertProviderRequestContract(capacityInput, capacityDraft);
+  assert.deepEqual(canonicalWireCoverage, {
+    unitHeartRate: true,
+    repeatChildHeartRate: true,
+  });
 
   return {
     capacityWeeks: 36,
@@ -113,9 +146,227 @@ export async function validatePlanFirstProviderRepresentationContract() {
   };
 }
 
-function assertRunnerFacingHeartRateReferenceResolution(
+async function assertRepeatDurationEditorialDiscretion(
   input: RunningPlanPreviewActionInput,
-  validDraft: AiAuthoredPlanFirstProviderDraft,
+  validDraft: AiAuthoredPlanFirstCompilerDraft,
+) {
+  const authoredDraft = structuredClone(validDraft);
+  const workout = authoredDraft.workouts[0];
+  assert.ok(workout);
+  workout!.workout_identity = "quality_session";
+  workout!.title = "AI-authored duration discretion proof";
+  workout!.cue = "Execute the authored structure.";
+  workout!.sections = [
+    {
+      kind: "repeat",
+      segment_type: "interval_block",
+      label: "Unusual authored repeat",
+      cue: "Backend preserves the authored duration.",
+      rounds: 2,
+      children: [
+        {
+          role: "work",
+          label: "Authored work",
+          cue: null,
+          prescription: { mode: "time", duration_min: 115 },
+          target: {
+            primary_execution_mode: "pace",
+            command: "6:20-6:50/km",
+          },
+        },
+      ],
+    },
+  ];
+
+  const reviewed = await buildReviewedAiGeneratedRunningPlanPreview(input, {
+    runnerProfileSnapshot: buildProofPersonalRunnerProfileSnapshot(input),
+    aiPreview: {
+      apiKey: "repeat-duration-editorial-discretion-proof",
+      model: "repeat-duration-editorial-discretion-proof",
+      generationLedger: { disabled: true },
+      fetchImpl: providerResponse("resp_repeat_duration_editorial_discretion", authoredDraft),
+    },
+  });
+  assert.equal(
+    reviewed.ok,
+    true,
+    reviewed.ok
+      ? ""
+      : `Backend must not turn unusual Repeat duration into a coaching veto when no hard contract fails: ${reviewed.unavailable.error.issues.join(", ")}`,
+  );
+}
+
+async function assertWorkoutTitleDurationContract(
+  input: RunningPlanPreviewActionInput,
+  validDraft: AiAuthoredPlanFirstCompilerDraft,
+) {
+  const exactDraft = structuredClone(validDraft);
+  const exactWorkout = exactDraft.workouts[0];
+  assert.ok(exactWorkout);
+  exactWorkout!.workout_identity = "easy_aerobic_run";
+  exactWorkout!.title = "Easy aerobic run";
+  exactWorkout!.cue = "Follow the complete timed structure.";
+  exactWorkout!.sections = [
+    providerTimeUnit("warmup", 10),
+    providerTimeUnit("main", 40),
+    providerTimeUnit("recovery", 10),
+  ];
+  await assertReviewableDraft(input, exactDraft, "timed workout with structure-owned duration");
+
+  const forbiddenProviderDurationTitle = structuredClone(exactDraft);
+  forbiddenProviderDurationTitle.workouts[0]!.title = "60 min easy aerobic run";
+  assert.equal(
+    aiAuthoredPlanFirstCompilerDraftSchema.safeParse(forbiddenProviderDurationTitle).success,
+    false,
+  );
+
+  const rejectedProviderDurationTitle = await buildReviewedAiGeneratedRunningPlanPreview(input, {
+    aiPreview: {
+      apiKey: "provider-title-duration-rejection-proof",
+      model: "provider-title-duration-rejection-proof",
+      generationLedger: { disabled: true },
+      fetchImpl: providerResponse(
+        "resp_provider_title_duration_rejection",
+        forbiddenProviderDurationTitle,
+      ),
+    },
+  });
+  assert.equal(rejectedProviderDurationTitle.ok, false);
+  if (!rejectedProviderDurationTitle.ok) {
+    assert.equal(
+      rejectedProviderDurationTitle.unavailable.previewOutcome,
+      "malformed_provider_output",
+    );
+    assert.equal(rejectedProviderDurationTitle.unavailable.persisted, false);
+    assert.doesNotMatch(
+      JSON.stringify(rejectedProviderDurationTitle),
+      /reviewToken|reviewChecksum/,
+    );
+  }
+
+  const repeatDraft = structuredClone(exactDraft);
+  repeatDraft.workouts[0]!.workout_identity = "distance_intervals";
+  repeatDraft.workouts[0]!.title = "Interval session";
+  repeatDraft.workouts[0]!.sections = [
+    {
+      kind: "repeat",
+      segment_type: "interval_block",
+      label: "Timed repeat",
+      cue: "Run each complete round.",
+      rounds: 3,
+      children: [
+        {
+          role: "work",
+          label: "Work",
+          cue: "Run smoothly.",
+          prescription: { mode: "time", duration_min: 6 },
+          target: paceTarget("5:20-5:40/km"),
+        },
+        {
+          role: "recover",
+          label: "Recovery",
+          cue: "Keep moving.",
+          prescription: { mode: "time", duration_min: 4 },
+          target: paceTarget("6:45-7:15/km"),
+        },
+      ],
+    },
+  ];
+  await assertReviewableDraft(
+    input,
+    repeatDraft,
+    "Repeat timed workout with structure-owned duration",
+  );
+
+  const exactCompiled = compileAiAuthoredPlanFirstDraft({
+    draft: exactDraft,
+    authoringInput: requireAuthoringInput(input),
+  });
+  assert.equal(exactCompiled.ok, true);
+  if (!exactCompiled.ok) throw new Error(JSON.stringify(exactCompiled));
+  assert.equal(
+    validateImportedPlanJson(JSON.stringify(exactCompiled.canonicalPlan))?.success,
+    true,
+  );
+  assert.doesNotThrow(() => buildImportedPlanSeed(exactCompiled.canonicalPlan));
+  const exported = exportAndReimportCanonicalPlan(exactCompiled.canonicalPlan);
+  assert.equal(validateImportedPlanJson(JSON.stringify(exported))?.success, true);
+
+  const legacyDurationTitlePlan = structuredClone(exactCompiled.canonicalPlan);
+  legacyDurationTitlePlan.planned_workouts[0]!.title = "60 min easy aerobic run";
+  assert.equal(validateImportedPlanJson(JSON.stringify(legacyDurationTitlePlan))?.success, true);
+
+  const invalidImported = structuredClone(legacyDurationTitlePlan);
+  invalidImported.planned_workouts[0]!.segments[1]!.prescription = {
+    mode: "time",
+    duration_min: 50,
+  };
+  assert.equal(validateImportedPlanJson(JSON.stringify(invalidImported))?.success, false);
+  assert.throws(() => buildImportedPlanSeed(invalidImported));
+}
+
+async function assertRunnableSupportHydrationReviewContract(
+  input: RunningPlanPreviewActionInput,
+  validDraft: AiAuthoredPlanFirstCompilerDraft,
+) {
+  const withoutHydration = structuredClone(validDraft);
+  const workout = withoutHydration.workouts[0];
+  assert.ok(workout);
+  workout!.workout_identity = "long_aerobic_run";
+  workout!.title = "Runnable support duration proof";
+  workout!.cue = "Execute every timed section.";
+  workout!.sections = [
+    providerTimeUnit("warmup", 5),
+    providerTimeUnit("main", 80),
+    providerTimeUnit("recovery", 10),
+  ];
+
+  const rejectedBeforeReview = await buildReviewedAiGeneratedRunningPlanPreview(input, {
+    aiPreview: {
+      apiKey: "runnable-support-hydration-rejection",
+      model: "runnable-support-hydration-rejection",
+      generationLedger: { disabled: true },
+      fetchImpl: providerResponse("resp_runnable_support_hydration_rejection", withoutHydration),
+    },
+  });
+  assert.equal(rejectedBeforeReview.ok, false);
+  if (!rejectedBeforeReview.ok) {
+    assert.equal(rejectedBeforeReview.unavailable.previewOutcome, "compiler_rejection");
+    assert.doesNotMatch(
+      JSON.stringify(rejectedBeforeReview),
+      /reviewToken|reviewChecksum|canonicalPlan/,
+    );
+  }
+
+  const withHydration = structuredClone(withoutHydration);
+  withHydration.workouts[0]!.sections.splice(2, 0, {
+    kind: "hydration",
+    label: "Hydration",
+    cue: "Take water.",
+  });
+  await assertReviewableDraft(input, withHydration, "95-minute runnable support with Hydration");
+}
+
+function providerTimeUnit(
+  segmentType: "warmup" | "main" | "recovery",
+  durationMin: number,
+): AiAuthoredPlanFirstCompilerStep {
+  return {
+    kind: "unit",
+    segment_type: segmentType,
+    label: "Timed runnable section",
+    cue: null,
+    prescription: { mode: "time", duration_min: durationMin },
+    target: {
+      primary_execution_mode: "pace",
+      command: "6:10-6:30/km",
+    },
+  };
+}
+
+async function assertRunnerFacingHeartRateReferenceContract(
+  input: RunningPlanPreviewActionInput,
+  validDraft: AiAuthoredPlanFirstCompilerDraft,
 ) {
   const resolved = buildAiGeneratedRunningPlanAuthoringInput(
     input,
@@ -129,15 +380,14 @@ function assertRunnerFacingHeartRateReferenceResolution(
   const section = workout?.sections[0];
   assert.ok(workout && section?.kind === "unit");
 
-  workout.cue = "Keep Z2 controlled.";
-  section.cue = "Stay smooth in Z2.";
   const z2Command = heartRateCommand(resolved.authoringInput, "Z2");
   section.target = {
     primary_execution_mode: "heart_rate",
+    band_reference: "Z2",
     command: z2Command,
   };
 
-  assert.equal(aiAuthoredPlanFirstProviderDraftSchema.safeParse(draft).success, true);
+  assert.equal(aiAuthoredPlanFirstCompilerDraftSchema.safeParse(draft).success, true);
   const compiled = compileAiAuthoredPlanFirstDraft({
     draft,
     authoringInput: resolved.authoringInput,
@@ -149,16 +399,81 @@ function assertRunnerFacingHeartRateReferenceResolution(
     (candidate) => candidate.date === workout.date,
   );
   assert.ok(compiledWorkout);
-  assert.doesNotMatch(compiledWorkout.summary, /\bZ[1-5](?:-Z[1-5])?\b/);
-  assert.match(compiledWorkout.summary, /\b\d{2,3}-\d{2,3} bpm\b/);
-  assert.doesNotMatch(compiledWorkout.segments[0]?.guidance ?? "", /\bZ[1-5](?:-Z[1-5])?\b/);
-  assert.match(compiledWorkout.segments[0]?.guidance ?? "", /\b\d{2,3}-\d{2,3} bpm\b/);
-  assert.equal(compiledWorkout.segments[0]?.target?.extra?.hr_zone, "Z2");
+  const fullBandTarget = compiledWorkout.segments[0]?.target;
+  assert.equal(fullBandTarget?.extra?.hr_zone_reference, "Z2");
+  assert.equal(fullBandTarget?.extra?.hr_band_bpm_min, 121);
+  assert.equal(fullBandTarget?.extra?.hr_band_bpm_max, 140);
+  assert.equal(fullBandTarget?.extra?.hr_execution_range_kind, "full_band");
+
+  const subrangeDraft = structuredClone(draft);
+  const subrangeSection = subrangeDraft.workouts[0]!.sections[0]!;
+  assert.equal(subrangeSection.kind, "unit");
+  if (subrangeSection.kind !== "unit") throw new Error("Unit section is required.");
+  subrangeSection.cue = "Hold the controlled middle of the selected band for this stage.";
+  subrangeSection.target = {
+    primary_execution_mode: "heart_rate",
+    band_reference: "Z2",
+    command: "125-135 bpm",
+  };
+  await assertReviewableDraft(input, subrangeDraft, "contained named-band HR subrange");
+
+  const repeatChildDraft = structuredClone(draft);
+  const repeatChild = findTypedRepeatSection(repeatChildDraft).children[0]!;
+  repeatChild.target = {
+    primary_execution_mode: "heart_rate",
+    band_reference: "Z2",
+    command: z2Command,
+  };
+  await assertReviewableDraft(input, repeatChildDraft, "named-band HR Repeat child");
+
+  const underFiveDraft = structuredClone(draft);
+  const underFiveSection = underFiveDraft.workouts[0]!.sections[0]!;
+  assert.equal(underFiveSection.kind, "unit");
+  if (underFiveSection.kind !== "unit") throw new Error("Unit section is required.");
+  underFiveSection.target = {
+    primary_execution_mode: "heart_rate",
+    band_reference: "Z2",
+    command: "125-129 bpm",
+  };
+  const rejectedBeforeReview = await buildReviewedAiGeneratedRunningPlanPreview(input, {
+    runnerProfileSnapshot: buildProofPersonalRunnerProfileSnapshot(input),
+    aiPreview: {
+      apiKey: "named-band-rejection-before-review",
+      model: "named-band-rejection-before-review",
+      generationLedger: { disabled: true },
+      fetchImpl: providerResponse("resp_named_band_rejection_before_review", underFiveDraft),
+    },
+  });
+  assert.equal(rejectedBeforeReview.ok, false);
+  if (!rejectedBeforeReview.ok) {
+    assert.equal(rejectedBeforeReview.unavailable.previewOutcome, "compiler_rejection");
+    assert.equal(rejectedBeforeReview.unavailable.persisted, false);
+    assert.doesNotMatch(
+      JSON.stringify(rejectedBeforeReview),
+      /reviewToken|reviewChecksum|canonicalPlan/,
+    );
+  }
+
+  for (const [label, cue] of [
+    ["single raw reference", "Keep Z2 controlled."],
+    ["composite raw reference", "Keep Z1-Z2 controlled."],
+  ] as const) {
+    const rawReferenceDraft = structuredClone(draft);
+    rawReferenceDraft.workouts[0]!.cue = cue;
+    const rawReferenceResult = compileAiAuthoredPlanFirstDraft({
+      draft: rawReferenceDraft,
+      authoringInput: resolved.authoringInput,
+    });
+    assert.equal(rawReferenceResult.ok, false, `${label} must be rejected.`);
+    if (!rawReferenceResult.ok) {
+      assert.match(JSON.stringify(rawReferenceResult.issues), /provider_schema_invalid/);
+    }
+  }
 }
 
 function assertProviderEnumClosure(
   input: RunningPlanPreviewActionInput,
-  validDraft: AiAuthoredPlanFirstProviderDraft,
+  validDraft: AiAuthoredPlanFirstCompilerDraft,
 ) {
   const resolved = buildAiGeneratedRunningPlanAuthoringInput(
     input,
@@ -167,9 +482,9 @@ function assertProviderEnumClosure(
   assert.equal(resolved.ok, true, resolved.ok ? "" : resolved.message);
   if (!resolved.ok) throw new Error(resolved.message);
 
-  const assertCompiles = (draft: AiAuthoredPlanFirstProviderDraft, value: string) => {
+  const assertCompiles = (draft: AiAuthoredPlanFirstCompilerDraft, value: string) => {
     assert.equal(
-      aiAuthoredPlanFirstProviderDraftSchema.safeParse(draft).success,
+      aiAuthoredPlanFirstCompilerDraftSchema.safeParse(draft).success,
       true,
       `${value} must be provider-valid.`,
     );
@@ -183,6 +498,10 @@ function assertProviderEnumClosure(
   for (const identity of AI_AUTHORED_PLAN_FIRST_WORKOUT_IDENTITY_VALUES) {
     const draft = structuredClone(validDraft);
     draft.workouts[0]!.workout_identity = identity;
+    draft.workouts[0]!.sections = buildPolicyCompliantProviderSectionsForIdentity(
+      identity,
+      heartRateCommand(resolved.authoringInput, "Z2"),
+    );
     assertCompiles(draft, identity);
   }
 
@@ -208,10 +527,9 @@ function assertProviderEnumClosure(
 
   for (const hrReference of AI_AUTHORED_PLAN_FIRST_HR_ZONE_REFERENCE_VALUES) {
     const draft = structuredClone(validDraft);
-    findTypedHeartRateTarget(draft).command = heartRateCommand(
-      resolved.authoringInput,
-      hrReference,
-    );
+    const target = findTypedHeartRateTarget(draft);
+    target.band_reference = hrReference;
+    target.command = heartRateCommand(resolved.authoringInput, hrReference);
     assertCompiles(draft, `hr:${hrReference}`);
   }
 
@@ -240,10 +558,10 @@ async function assertReviewableScenario(scenario: Scenario) {
 
 async function assertReviewableDraft(
   input: RunningPlanPreviewActionInput,
-  draft: AiAuthoredPlanFirstProviderDraft,
+  draft: AiAuthoredPlanFirstCompilerDraft,
   scenarioName: string,
 ) {
-  assert.equal(aiAuthoredPlanFirstProviderDraftSchema.safeParse(draft).success, true);
+  assert.equal(aiAuthoredPlanFirstCompilerDraftSchema.safeParse(draft).success, true);
   const reviewed = await buildReviewedAiGeneratedRunningPlanPreview(input, {
     runnerProfileSnapshot: buildProofPersonalRunnerProfileSnapshot(input),
     aiPreview: {
@@ -293,7 +611,7 @@ async function assertReviewableDraft(
 
 function assertClosedProviderSchema(
   input: RunningPlanPreviewActionInput,
-  validDraft: AiAuthoredPlanFirstProviderDraft,
+  validDraft: AiAuthoredPlanFirstCompilerDraft,
 ) {
   const resolved = buildAiGeneratedRunningPlanAuthoringInput(
     input,
@@ -308,13 +626,67 @@ function assertClosedProviderSchema(
   });
   const schemaText = JSON.stringify(prompt.responseSchema);
   assert.doesNotMatch(schemaText, /warnings|assumptions|metadata|week_number|weeks/);
-  assert.match(schemaText, /primary_execution_mode/);
-  assert.match(schemaText, /"const":"pace"/);
-  assert.match(schemaText, /"const":"heart_rate"/);
+  assert.doesNotMatch(schemaText, /contract_version/);
+  assert.doesNotMatch(
+    schemaText,
+    /catalog|prescription_ref|target_ref|phase_ref|label_ref|cue_ref/,
+  );
+  assert.match(schemaText, /"prescription"/);
+  assert.match(schemaText, /"target"/);
+  assert.match(schemaText, /"primary_execution_mode"/);
+  assert.match(schemaText, /"command"/);
+  assert.match(schemaText, /"pace"/);
+  assert.match(schemaText, /"heart_rate"/);
+  assert.match(schemaText, / bpm\$/);
+  assert.doesNotMatch(
+    schemaText,
+    /"heart_rate":\{"type":"object"/,
+    "Direct provider targets must keep HR identity and BPM on the local target.",
+  );
   assert.match(prompt.systemPrompt, /one leaf never has both pace and BPM/);
+  assert.match(prompt.systemPrompt, /suffix exactly as lowercase bpm/i);
   assert.match(prompt.systemPrompt, /benchmark improves precision but is not required/i);
-  assert.match(prompt.systemPrompt, /one exact numeric BPM range/i);
+  assert.match(prompt.systemPrompt, /numeric execution subrange/i);
+  assert.match(prompt.systemPrompt, /band_reference must identify exactly one complete named/i);
+  assert.match(prompt.systemPrompt, /never combine references/i);
   assert.match(prompt.systemPrompt, /kind=hydration/i);
+  assert.match(
+    prompt.systemPrompt,
+    /choose one substantive mode for the whole long-run before authoring its sections/i,
+  );
+  assert.match(
+    prompt.systemPrompt,
+    /never place adjacent substantive body sections with the same numeric command/i,
+  );
+  assert.match(prompt.systemPrompt, /sum participant-executed runnable duration_min/i);
+  assert.match(
+    prompt.systemPrompt,
+    /Every timed kind=unit section counts once, including warmup, cooldown, recovery, and recovery_jog/i,
+  );
+  assert.match(
+    prompt.systemPrompt,
+    /Every timed Repeat child counts once per round, including recover and walk children/i,
+  );
+  assert.match(prompt.systemPrompt, /Only non-runnable kind=hydration steps are excluded/i);
+  assert.match(prompt.systemPrompt, /exactly 90 minutes is not above 90/i);
+  assert.match(prompt.systemPrompt, /10-minute warmup plus 65-minute main plus 20-minute finish/i);
+  assert.match(
+    JSON.stringify(prompt.responseSchema),
+    /10 \+ 65 \+ 20 = 95 requires Hydration between the 65-minute main and 20-minute finish/,
+  );
+  assert.match(
+    prompt.systemPrompt,
+    /mandatory even when warmup, finish, cooldown, or runnable recovery already exists/i,
+  );
+  assert.match(
+    prompt.systemPrompt,
+    /mandatory time-based long-run threshold above takes precedence/i,
+  );
+  assert.match(prompt.systemPrompt, /before returning, audit every long-run workout/i);
+  assert.doesNotMatch(
+    prompt.systemPrompt,
+    /general long aerobic work usually uses BPM while pace-specific portions use pace/i,
+  );
   assert.doesNotMatch(prompt.systemPrompt, /primary_execution_mode=effort|run_walk/i);
   assert.doesNotMatch(
     prompt.userPrompt,
@@ -332,7 +704,7 @@ function assertClosedProviderSchema(
   const estimatedSchemaText = JSON.stringify(estimatedPrompt.responseSchema);
   assert.match(
     estimatedSchemaText,
-    /"const":"heart_rate"/,
+    /"heart_rate"/,
     "An explicitly accepted estimated profile must remain provider-authorable as a primary command.",
   );
   assert.match(estimatedPrompt.systemPrompt, /source remains estimated or personal/i);
@@ -353,9 +725,9 @@ function assertClosedProviderSchema(
     today: noPaceTruthInput.startDate ?? noPaceTruth.authoringInput.schedule.startDate,
   });
   const noPaceSchema = JSON.stringify(noPacePrompt.responseSchema);
-  assert.match(noPaceSchema, /"const":"pace"/);
+  assert.match(noPaceSchema, /"pace"/);
   assert.match(noPacePrompt.systemPrompt, /goal_informed_ai_estimate/);
-  assert.match(noPaceSchema, /"const":"heart_rate"/);
+  assert.match(noPaceSchema, /"heart_rate"/);
   const goalInformedDraft = structuredClone(validDraft);
   rewriteHeartRateTargets(goalInformedDraft, {
     primary_execution_mode: "pace",
@@ -411,6 +783,7 @@ function assertClosedProviderSchema(
   const estimatedHeartRateDraft = structuredClone(validDraft);
   rewriteHeartRateTargets(estimatedHeartRateDraft, {
     primary_execution_mode: "heart_rate",
+    band_reference: "Z2",
     command: heartRateCommand(estimatedResolved.authoringInput, "Z2"),
   });
   const estimatedHeartRateCompiled = compileAiAuthoredPlanFirstDraft({
@@ -578,7 +951,7 @@ function assertClosedProviderSchema(
   if (hydrationWorkout) {
     hydrationWorkout.sections = [{ kind: "hydration", label: "Hydration", cue: "Take water." }];
   }
-  assert.equal(aiAuthoredPlanFirstProviderDraftSchema.safeParse(hydrationOnly).success, true);
+  assert.equal(aiAuthoredPlanFirstCompilerDraftSchema.safeParse(hydrationOnly).success, true);
   const hydrationOnlyResult = compileAiAuthoredPlanFirstDraft({
     draft: hydrationOnly,
     authoringInput: resolved.authoringInput,
@@ -594,7 +967,7 @@ function assertClosedProviderSchema(
 
 function assertAvailabilityContract(
   input: RunningPlanPreviewActionInput,
-  validDraft: AiAuthoredPlanFirstProviderDraft,
+  validDraft: AiAuthoredPlanFirstCompilerDraft,
 ) {
   const underCeiling = buildAiGeneratedRunningPlanAuthoringInput(
     input,
@@ -630,7 +1003,7 @@ function assertAvailabilityContract(
     );
     assert.equal(
       authoredPeak,
-      4,
+      3,
       "AI-selected density may remain below the runner's availability ceiling.",
     );
     assert.equal(
@@ -644,7 +1017,7 @@ function assertAvailabilityContract(
     );
   }
 
-  const overCeilingInput = { ...input, daysPerWeek: 4 as const };
+  const overCeilingInput = { ...input, daysPerWeek: 3 as const };
   const overCeiling = buildAiGeneratedRunningPlanAuthoringInput(
     overCeilingInput,
     buildProofPersonalRunnerProfileSnapshot(overCeilingInput),
@@ -809,9 +1182,9 @@ function assertAvailabilityContract(
   }
 }
 
-async function assertTransportFailures(
+async function assertProviderRequestContract(
   input: RunningPlanPreviewActionInput,
-  validDraft: AiAuthoredPlanFirstProviderDraft,
+  validDraft: AiAuthoredPlanFirstCompilerDraft,
 ) {
   const resolved = buildAiGeneratedRunningPlanAuthoringInput(
     input,
@@ -820,78 +1193,258 @@ async function assertTransportFailures(
   assert.equal(resolved.ok, true, resolved.ok ? "" : resolved.message);
   if (!resolved.ok) throw new Error(resolved.message);
 
-  const incomplete = await generateAiFirstPlanDraftPreview({
+  let capturedRequestBody: Record<string, unknown> | null = null;
+  const strictRequest = await generateAiFirstPlanDraftPreview({
     input: resolved.authoringInput,
-    apiKey: "incomplete-closed-contract-proof",
-    model: "closed-contract-proof",
+    apiKey: "strict-request-contract-proof",
+    model: "gpt-5.2",
     generationLedger: { disabled: true },
-    fetchImpl: async () =>
-      new Response(
-        JSON.stringify({
-          id: "resp_incomplete_closed_contract",
-          status: "incomplete",
-          incomplete_details: { reason: "max_output_tokens" },
-          output_text: JSON.stringify(validDraft).slice(0, 500),
-        }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      ),
+    fetchImpl: async (_url, init) => {
+      capturedRequestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return providerResponse("resp_strict_request_contract", validDraft)(_url, init);
+    },
   });
-  assert.equal(incomplete.ok, false);
-  if (incomplete.ok || incomplete.reason === "structured_input_invalid") {
-    throw new Error("Incomplete provider output unexpectedly reached canonical review.");
-  }
-  assert.equal(incomplete.metadata.unavailableReason, "ai_authored_plan_first_incomplete_output");
-  assert.doesNotMatch(JSON.stringify(incomplete), /reviewToken|reviewChecksum|canonicalPlan/);
+  assert.equal(strictRequest.ok, true);
+  const capturedText = capturedRequestBody?.text as
+    | { verbosity?: unknown; format?: { type?: unknown; strict?: unknown } }
+    | undefined;
+  assert.equal(capturedRequestBody?.model, "gpt-5.2");
+  assert.deepEqual(capturedRequestBody?.reasoning, { effort: "low" });
+  assert.equal(capturedText?.verbosity, "low");
+  assert.deepEqual(capturedText?.format, {
+    ...(capturedText?.format ?? {}),
+    type: "json_schema",
+    strict: true,
+  });
 
-  const malformed = await generateAiFirstPlanDraftPreview({
+  const uppercaseBpmDraft = structuredClone(validDraft);
+  const uppercaseBpmTarget = findDirectHeartRateTarget(uppercaseBpmDraft);
+  assert.ok(uppercaseBpmTarget);
+  uppercaseBpmTarget.command = uppercaseBpmTarget.command.replace(/ bpm$/, " BPM");
+  const uppercaseBpm = await generateAiFirstPlanDraftPreview({
     input: resolved.authoringInput,
-    apiKey: "malformed-closed-contract-proof",
-    model: "closed-contract-proof",
+    apiKey: "uppercase-bpm-contract-proof",
+    model: "gpt-5.2",
     generationLedger: { disabled: true },
-    fetchImpl: async () =>
-      new Response(
-        JSON.stringify({
-          id: "resp_malformed_closed_contract",
-          status: "completed",
-          output_text: '{"workouts":[',
-        }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      ),
+    fetchImpl: providerResponse("resp_uppercase_bpm_contract", uppercaseBpmDraft),
   });
-  assert.equal(malformed.ok, false);
-  if (malformed.ok || malformed.reason === "structured_input_invalid") {
-    throw new Error("Malformed provider output unexpectedly reached canonical review.");
+  assert.equal(uppercaseBpm.ok, false);
+  if (uppercaseBpm.ok || uppercaseBpm.reason === "structured_input_invalid") {
+    throw new Error("Non-canonical uppercase BPM unexpectedly reached canonical review.");
   }
-  assert.equal(malformed.metadata.unavailableReason, "ai_first_plan_draft_non_json_output");
-
-  const pathologicalNumber = "0." + "0".repeat(96) + "1";
-  const pathologicalOutput = JSON.stringify(validDraft).replace(
-    /"duration_min":\d+(?:\.\d+)?/,
-    `"duration_min":${pathologicalNumber}`,
+  assert.equal(
+    uppercaseBpm.metadata.unavailableReason,
+    "ai_authored_plan_first_provider_schema_invalid",
   );
-  const pathological = await generateAiFirstPlanDraftPreview({
-    input: resolved.authoringInput,
-    apiKey: "pathological-number-contract-proof",
-    model: "closed-contract-proof",
-    generationLedger: { disabled: true },
-    fetchImpl: async () =>
-      new Response(
-        JSON.stringify({
-          id: "resp_pathological_number",
-          status: "completed",
-          output_text: pathologicalOutput,
-        }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      ),
-  });
-  assert.equal(pathological.ok, false);
-  if (pathological.ok || pathological.reason === "structured_input_invalid") {
-    throw new Error("Pathological numeric output unexpectedly reached canonical review.");
-  }
-  assert.equal(pathological.metadata.unavailableReason, "ai_first_plan_draft_non_json_output");
 }
 
-function assertProviderFieldParity(draft: AiAuthoredPlanFirstProviderDraft, plan: TrainingPlanV2) {
+async function assertDirectProviderSchemaRejectionContract(
+  input: RunningPlanPreviewActionInput,
+  validDraft: AiAuthoredPlanFirstCompilerDraft,
+) {
+  const resolved = buildAiGeneratedRunningPlanAuthoringInput(
+    input,
+    buildProofPersonalRunnerProfileSnapshot(input),
+  );
+  assert.equal(resolved.ok, true, resolved.ok ? "" : resolved.message);
+  if (!resolved.ok) throw new Error(resolved.message);
+
+  const parsedDirectDraft = aiAuthoredPlanFirstCompilerDraftSchema.safeParse(validDraft);
+  assert.equal(parsedDirectDraft.success, true);
+  assert.deepEqual(Object.keys(validDraft).sort(), ["endpoint", "workouts"]);
+  assert.deepEqual(Object.keys(findDirectHeartRateTarget(validDraft)).sort(), [
+    "band_reference",
+    "command",
+    "primary_execution_mode",
+  ]);
+
+  const independentDraft = {
+    workouts: [
+      {
+        date: resolved.authoringInput.schedule.startDate,
+        phase: "Opening",
+        workout_identity: "time_intervals",
+        title: "Direct interval proof",
+        cue: "Keep every authored stage.",
+        sections: [
+          {
+            kind: "unit",
+            segment_type: "warmup",
+            label: "Warm-up",
+            cue: null,
+            prescription: { mode: "time", duration_min: 10 },
+            target: { primary_execution_mode: "pace", command: "6:20-6:50/km" },
+          },
+          {
+            kind: "repeat",
+            segment_type: "interval_block",
+            label: "Two controlled repetitions",
+            cue: "Keep the authored order.",
+            rounds: 2,
+            children: [
+              {
+                role: "work",
+                label: "Work",
+                cue: "Controlled pace.",
+                prescription: { mode: "time", duration_min: 2 },
+                target: { primary_execution_mode: "pace", command: "4:50-5:00/km" },
+              },
+              {
+                role: "recover",
+                label: "Recovery",
+                cue: null,
+                prescription: { mode: "time", duration_min: 1 },
+                target: { primary_execution_mode: "pace", command: "7:10-7:40/km" },
+              },
+            ],
+          },
+          {
+            kind: "hydration",
+            label: WORKOUT_DOCUMENT_HYDRATION_LABEL,
+            cue: WORKOUT_DOCUMENT_HYDRATION_CUE,
+          },
+        ],
+      },
+    ],
+    endpoint: {
+      date: validDraft.endpoint.date,
+      phase: "Endpoint",
+      workout_identity: "selected_distance_completion_or_checkpoint",
+      title: "10K endpoint",
+      cue: "Complete the selected distance.",
+      sections: [
+        {
+          kind: "unit",
+          segment_type: "main",
+          label: "10K",
+          cue: null,
+          prescription: { mode: "distance", distance_km: 10 },
+          target: { primary_execution_mode: "pace", command: "4:50-5:00/km" },
+        },
+      ],
+    },
+  } satisfies AiAuthoredPlanFirstCompilerDraft;
+  const independentParsed = aiAuthoredPlanFirstCompilerDraftSchema.safeParse(independentDraft);
+  assert.equal(independentParsed.success, true);
+  if (!independentParsed.success) throw new Error(independentParsed.error.message);
+  assert.deepEqual(independentParsed.data.workouts[0]?.sections, [
+    {
+      kind: "unit",
+      segment_type: "warmup",
+      label: "Warm-up",
+      cue: null,
+      prescription: { mode: "time", duration_min: 10 },
+      target: { primary_execution_mode: "pace", command: "6:20-6:50/km" },
+    },
+    {
+      kind: "repeat",
+      segment_type: "interval_block",
+      label: "Two controlled repetitions",
+      cue: "Keep the authored order.",
+      rounds: 2,
+      children: [
+        {
+          role: "work",
+          label: "Work",
+          cue: "Controlled pace.",
+          prescription: { mode: "time", duration_min: 2 },
+          target: { primary_execution_mode: "pace", command: "4:50-5:00/km" },
+        },
+        {
+          role: "recover",
+          label: "Recovery",
+          cue: null,
+          prescription: { mode: "time", duration_min: 1 },
+          target: { primary_execution_mode: "pace", command: "7:10-7:40/km" },
+        },
+      ],
+    },
+    {
+      kind: "hydration",
+      label: WORKOUT_DOCUMENT_HYDRATION_LABEL,
+      cue: WORKOUT_DOCUMENT_HYDRATION_CUE,
+    },
+  ]);
+
+  const missingLocalTarget = structuredClone(validDraft);
+  const firstRunnable = findFirstDirectRunnableLeaf(missingLocalTarget) as unknown as Record<
+    string,
+    unknown
+  >;
+  delete firstRunnable.target;
+  const rejectedLocalTarget = await generateAiFirstPlanDraftPreview({
+    input: resolved.authoringInput,
+    apiKey: "direct-local-target-proof",
+    model: "direct-local-target-proof",
+    generationLedger: { disabled: true },
+    fetchImpl: providerResponse("resp_direct_local_target_invalid", missingLocalTarget),
+  });
+  assert.equal(rejectedLocalTarget.ok, false);
+  if (rejectedLocalTarget.ok || rejectedLocalTarget.reason === "structured_input_invalid") {
+    throw new Error("Missing direct local target unexpectedly reached canonical review.");
+  }
+  assert.equal(
+    rejectedLocalTarget.metadata.unavailableReason,
+    "ai_authored_plan_first_provider_schema_invalid",
+  );
+  assert.doesNotMatch(
+    JSON.stringify(rejectedLocalTarget),
+    /reviewToken|reviewChecksum|canonicalPlan/,
+  );
+
+  const nestedHeartRateTarget = structuredClone(validDraft);
+  const retiredTarget = findDirectHeartRateTarget(nestedHeartRateTarget) as unknown as Record<
+    string,
+    unknown
+  >;
+  const bandReference = retiredTarget.band_reference;
+  const command = retiredTarget.command;
+  delete retiredTarget.primary_execution_mode;
+  delete retiredTarget.band_reference;
+  delete retiredTarget.command;
+  retiredTarget.heart_rate = {
+    band_reference: bandReference,
+    command,
+  };
+  const rejectedNestedTarget = await generateAiFirstPlanDraftPreview({
+    input: resolved.authoringInput,
+    apiKey: "retired-nested-heart-rate-target-proof",
+    model: "retired-nested-heart-rate-target-proof",
+    generationLedger: { disabled: true },
+    fetchImpl: providerResponse("resp_retired_nested_heart_rate_target", nestedHeartRateTarget),
+  });
+  assert.equal(rejectedNestedTarget.ok, false);
+  if (rejectedNestedTarget.ok || rejectedNestedTarget.reason === "structured_input_invalid") {
+    throw new Error("Retired nested HR target unexpectedly remained provider-authorable.");
+  }
+  assert.equal(
+    rejectedNestedTarget.metadata.unavailableReason,
+    "ai_authored_plan_first_provider_schema_invalid",
+  );
+
+  const retiredWireShape = {
+    contract_version: "retired",
+    workouts: [],
+    endpoint: {},
+  };
+  const rejectedRetiredShape = await generateAiFirstPlanDraftPreview({
+    input: resolved.authoringInput,
+    apiKey: "retired-wire-shape-proof",
+    model: "retired-wire-shape-proof",
+    generationLedger: { disabled: true },
+    fetchImpl: providerResponse("resp_retired_wire_shape_invalid", retiredWireShape),
+  });
+  assert.equal(rejectedRetiredShape.ok, false);
+  if (rejectedRetiredShape.ok || rejectedRetiredShape.reason === "structured_input_invalid") {
+    throw new Error("A retired provider wire shape unexpectedly reached canonical review.");
+  }
+  assert.equal(
+    rejectedRetiredShape.metadata.unavailableReason,
+    "ai_authored_plan_first_provider_schema_invalid",
+  );
+}
+
+function assertProviderFieldParity(draft: AiAuthoredPlanFirstCompilerDraft, plan: TrainingPlanV2) {
   for (const authored of [...draft.workouts, draft.endpoint]) {
     const compiled = plan.planned_workouts.find((workout) => workout.date === authored.date);
     assert.ok(compiled, `Missing compiled workout for ${authored.date}.`);
@@ -980,30 +1533,170 @@ function exportAndReimportCanonicalPlan(plan: TrainingPlanV2) {
     workouts: rows,
     exportedAt: timestamp,
   });
+  const exported = activePlanExportToTrainingPlanV2(payload);
+  assertCanonicalTargetWire(exported);
+  assertHistoricalNestedTargetCompatibility(exported);
+  assertContradictoryTargetMetadataRejected(exported);
 
-  return importedPlanSchema.parse(activePlanExportToTrainingPlanV2(payload));
+  return importedPlanSchema.parse(exported);
 }
 
 function assertTargetParity(
-  authored: AiAuthoredPlanFirstProviderUnit["target"],
+  authored: AiAuthoredPlanFirstCompilerUnit["target"],
   compiled: TrainingPlanV2["planned_workouts"][number]["segments"][number]["target"],
 ) {
-  assert.equal(compiled?.primary_execution_mode, authored.primary_execution_mode);
+  const canonicalTarget = normalizeWorkoutDocumentTarget(compiled);
+  assert.equal(canonicalTarget?.primary_execution_mode, authored.primary_execution_mode);
   assert.equal(
-    compiled?.pace,
+    canonicalTarget?.pace,
     authored.primary_execution_mode === "pace" ? authored.command : undefined,
   );
-  assert.equal(compiled?.intensity, undefined);
+  assert.equal(canonicalTarget?.intensity, undefined);
   if (authored.primary_execution_mode === "heart_rate") {
-    assert.equal(compiled?.hr_bpm_range, authored.command);
-    assert.equal(compiled?.hr_target_source, "personal_hr_zone");
-  } else {
+    assert.equal(canonicalTarget?.hr_bpm_range, authored.command);
+    assert.equal(canonicalTarget?.hr_target_source, "personal_hr_zone");
+    const bandReference = targetMetadata(canonicalTarget, "hr_zone_reference");
+    const bandMin = targetMetadata(canonicalTarget, "hr_band_bpm_min");
+    const bandMax = targetMetadata(canonicalTarget, "hr_band_bpm_max");
+    assert.equal(bandReference, authored.band_reference);
+    assert.equal(typeof bandMin, "number");
+    assert.equal(typeof bandMax, "number");
+    const fullBandCommand = `${bandMin}-${bandMax} bpm`;
     assert.equal(
-      compiled?.extra?.pace_provenance ??
-        (compiled as Record<string, unknown> | undefined)?.pace_provenance,
-      "benchmark_backed",
+      targetMetadata(canonicalTarget, "hr_execution_range_kind"),
+      authored.command === fullBandCommand ? "full_band" : "ai_selected_subrange",
+    );
+  } else {
+    assert.equal(canonicalTarget?.extra?.pace_provenance, "benchmark_backed");
+  }
+}
+
+function targetMetadata(target: ReturnType<typeof normalizeWorkoutDocumentTarget>, key: string) {
+  return target?.extra?.[key];
+}
+
+const HR_TARGET_METADATA_KEYS = [
+  "hr_zone_reference",
+  "hr_profile_source",
+  "hr_band_bpm_min",
+  "hr_band_bpm_max",
+  "hr_execution_range_kind",
+] as const;
+
+function assertCanonicalTargetWire(plan: TrainingPlanV2) {
+  let targetCount = 0;
+  for (const workout of plan.planned_workouts) {
+    for (const segment of workout.segments) {
+      if (segment.target) {
+        targetCount += 1;
+        assertCanonicalWireTarget(segment.target as unknown as Record<string, unknown>, "unit");
+      }
+      for (const child of segment.prescription?.children ?? []) {
+        if (child.target) {
+          targetCount += 1;
+          assertCanonicalWireTarget(
+            child.target as unknown as Record<string, unknown>,
+            "repeat_child",
+          );
+        }
+      }
+    }
+  }
+  assert.ok(targetCount > 0, "Export proof requires executable targets.");
+}
+
+function assertCanonicalWireTarget(
+  target: Record<string, unknown>,
+  location: "unit" | "repeat_child",
+) {
+  assert.equal(
+    "extra" in target,
+    false,
+    "New TrainingPlanV2 exports must use one flat target metadata representation.",
+  );
+  if (target.primary_execution_mode !== "heart_rate") return;
+  for (const key of HR_TARGET_METADATA_KEYS) {
+    assert.ok(
+      typeof target[key] === "string" || typeof target[key] === "number",
+      `Exported HR target requires flat ${key}.`,
     );
   }
+  if (location === "unit") canonicalWireCoverage.unitHeartRate = true;
+  if (location === "repeat_child") canonicalWireCoverage.repeatChildHeartRate = true;
+}
+
+function assertHistoricalNestedTargetCompatibility(plan: TrainingPlanV2) {
+  const historical = structuredClone(plan);
+  const target = firstWireHeartRateTarget(historical);
+  const nested: Record<string, string | number> = {};
+  for (const key of HR_TARGET_METADATA_KEYS) {
+    const value = target[key];
+    assert.ok(typeof value === "string" || typeof value === "number");
+    nested[key] = value;
+    delete target[key];
+  }
+  target.extra = nested;
+  assert.equal(
+    importedPlanSchema.safeParse(historical).success,
+    true,
+    "Historical nested target metadata must remain readable.",
+  );
+
+  const identicalDual = structuredClone(plan);
+  const identicalTarget = firstWireHeartRateTarget(identicalDual);
+  identicalTarget.extra = Object.fromEntries(
+    HR_TARGET_METADATA_KEYS.map((key) => [key, identicalTarget[key] as string | number]),
+  );
+  assert.equal(
+    importedPlanSchema.safeParse(identicalDual).success,
+    true,
+    "Identical flat and nested historical metadata must remain readable.",
+  );
+}
+
+function assertContradictoryTargetMetadataRejected(plan: TrainingPlanV2) {
+  for (const key of HR_TARGET_METADATA_KEYS) {
+    const contradictory = structuredClone(plan);
+    const target = firstWireHeartRateTarget(contradictory);
+    const flatValue = target[key];
+    assert.ok(typeof flatValue === "string" || typeof flatValue === "number");
+    target.extra = {
+      [key]: typeof flatValue === "number" ? flatValue + 1 : `${flatValue}-conflict`,
+    };
+    const result = importedPlanSchema.safeParse(contradictory);
+    assert.equal(result.success, false, `Contradictory ${key} metadata must be rejected.`);
+    if (!result.success) {
+      assert.match(
+        JSON.stringify(result.error.issues),
+        new RegExp(`conflicts with target\\.extra\\.${key}`),
+      );
+    }
+  }
+}
+
+function firstWireHeartRateTarget(plan: TrainingPlanV2) {
+  const target = collectWireTargets(plan).find(
+    (candidate) => candidate.primary_execution_mode === "heart_rate",
+  );
+  assert.ok(target, "Export proof requires a heart-rate target.");
+  return target;
+}
+
+function collectWireTargets(plan: TrainingPlanV2) {
+  const targets: Array<Record<string, string | number | Record<string, string | number>>> = [];
+  for (const workout of plan.planned_workouts) {
+    for (const segment of workout.segments) {
+      if (segment.target) {
+        targets.push(segment.target as (typeof targets)[number]);
+      }
+      for (const child of segment.prescription?.children ?? []) {
+        if (child.target) {
+          targets.push(child.target as (typeof targets)[number]);
+        }
+      }
+    }
+  }
+  return targets;
 }
 
 function assertSinglePrimaryExecutionCommand(plan: TrainingPlanV2, scenarioName: string) {
@@ -1066,10 +1759,72 @@ function buildScenarioInput(scenario: Scenario): RunningPlanPreviewActionInput {
   };
 }
 
+export function buildLargeReadbackProviderFixture() {
+  const input: RunningPlanPreviewActionInput = {
+    ...buildScenarioInput({
+      name: "52-week readback capacity",
+      distance: { kind: "preset", preset: "Marathon" },
+      weeks: 52,
+    }),
+    fixedRestDays: null,
+    preferredLongRunDay: null,
+  };
+  const authoringInput = requireAuthoringInput(input);
+  const startDate = authoringInput.schedule.startDate;
+  const endpointDate = authoringInput.planGoalIntent.targetDate;
+  const distance = authoringInput.planGoalIntent.distance;
+  if (!endpointDate || !distance) {
+    throw new Error("Large readback fixture requires a selected distance and target date.");
+  }
+
+  const workouts: AiAuthoredPlanFirstCompilerDraft["workouts"] = [];
+  const targetContext = { z2Command: heartRateCommand(authoringInput, "Z2") };
+
+  for (
+    let date = startDate;
+    date < endpointDate && workouts.length < 210;
+    date = addDaysIso(date, 1)
+  ) {
+    const weekday = weekdayLong(date);
+    if (weekday === "Saturday" || weekday === "Sunday") continue;
+    workouts.push(buildAuthoredWorkout(date, Math.floor(workouts.length / 5), 0, targetContext));
+  }
+
+  assert.equal(
+    workouts.length,
+    210,
+    "Large readback fixture must contain 210 pre-endpoint workouts.",
+  );
+
+  return {
+    input,
+    draft: {
+      workouts,
+      endpoint: {
+        date: endpointDate,
+        phase: "Goal",
+        workout_identity: "selected_distance_completion_or_checkpoint",
+        title: "Selected-distance endpoint",
+        cue: "Execute the authored selected-distance plan.",
+        sections: [
+          {
+            kind: "unit" as const,
+            segment_type: "main" as const,
+            label: "Selected distance",
+            cue: "Complete the selected distance.",
+            prescription: { mode: "distance" as const, distance_km: distance.distanceKm },
+            target: paceTarget("5:20-5:30/km"),
+          },
+        ],
+      },
+    } satisfies AiAuthoredPlanFirstCompilerDraft,
+  };
+}
+
 function buildProviderDraft(
   input: AiGeneratedRunningPlanPreviewInput,
   weeks: number,
-): AiAuthoredPlanFirstProviderDraft {
+): AiAuthoredPlanFirstCompilerDraft {
   const resolved = buildAiGeneratedRunningPlanAuthoringInput(
     input,
     buildProofPersonalRunnerProfileSnapshot(input),
@@ -1080,13 +1835,13 @@ function buildProviderDraft(
   if (!distance) throw new Error("Distance is required.");
   const startDate = resolved.authoringInput.schedule.startDate;
   const endpointDate = addDaysIso(startDate, weeks * 7 - 1);
-  const workouts: AiAuthoredPlanFirstProviderDraft["workouts"] = [];
+  const workouts: AiAuthoredPlanFirstCompilerDraft["workouts"] = [];
   const targetContext = {
     z2Command: heartRateCommand(resolved.authoringInput, "Z2"),
   };
 
   for (let week = 0; week < weeks; week += 1) {
-    const offsets = [0, 2, 3, 4, 6];
+    const offsets = [0, 2, 4, 6];
     for (const [contact, dayOffset] of offsets.entries()) {
       const date = addDaysIso(startDate, week * 7 + dayOffset);
       if (date >= endpointDate) continue;
@@ -1124,7 +1879,7 @@ function buildAuthoredWorkout(
   week: number,
   contact: number,
   targetContext: { z2Command: string },
-): AiAuthoredPlanFirstProviderDraft["workouts"][number] {
+): AiAuthoredPlanFirstCompilerDraft["workouts"][number] {
   if (contact === 1) {
     return {
       date,
@@ -1179,21 +1934,7 @@ function buildAuthoredWorkout(
       workout_identity: "long_aerobic_run",
       title: "Long aerobic run",
       cue: "Run the full authored duration.",
-      sections: [
-        unitSection("main", "Long run", 60 + week, {
-          primary_execution_mode: "heart_rate",
-          command: targetContext.z2Command,
-        }),
-        ...(week === 1
-          ? ([
-              {
-                kind: "hydration",
-                label: "Hydration",
-                cue: "Take water.",
-              },
-            ] as const)
-          : []),
-      ],
+      sections: buildPolicyCompliantLongRunSections(60 + week, targetContext.z2Command),
     };
   }
 
@@ -1212,6 +1953,7 @@ function buildAuthoredWorkout(
           ? paceTarget("5:20-5:30/km")
           : {
               primary_execution_mode: "heart_rate",
+              band_reference: "Z2",
               command: targetContext.z2Command,
             },
       ),
@@ -1223,7 +1965,7 @@ function unitSection(
   segmentType: "warmup" | "main" | "cooldown" | "tempo_block",
   label: string,
   durationMin: number,
-  target: AiAuthoredPlanFirstProviderUnit["target"],
+  target: AiAuthoredPlanFirstCompilerUnit["target"],
 ) {
   return {
     kind: "unit" as const,
@@ -1253,7 +1995,7 @@ function findHydrationSection(draft: Record<string, unknown>) {
   return hydration!;
 }
 
-function findTypedRepeatSection(draft: AiAuthoredPlanFirstProviderDraft) {
+function findTypedRepeatSection(draft: AiAuthoredPlanFirstCompilerDraft) {
   const repeat = draft.workouts
     .flatMap((workout) => workout.sections)
     .find((section) => section.kind === "repeat");
@@ -1262,7 +2004,7 @@ function findTypedRepeatSection(draft: AiAuthoredPlanFirstProviderDraft) {
   return repeat;
 }
 
-function findUnitSection(draft: AiAuthoredPlanFirstProviderDraft) {
+function findUnitSection(draft: AiAuthoredPlanFirstCompilerDraft) {
   const unit = draft.workouts
     .flatMap((workout) => workout.sections)
     .find((section) => section.kind === "unit");
@@ -1271,7 +2013,7 @@ function findUnitSection(draft: AiAuthoredPlanFirstProviderDraft) {
   return unit;
 }
 
-function findTypedHeartRateTarget(draft: AiAuthoredPlanFirstProviderDraft) {
+function findTypedHeartRateTarget(draft: AiAuthoredPlanFirstCompilerDraft) {
   for (const section of draft.workouts.flatMap((workout) => workout.sections)) {
     if (section.kind === "unit" && section.target.primary_execution_mode === "heart_rate") {
       return section.target;
@@ -1301,8 +2043,8 @@ function firstCompiledTarget(plan: TrainingPlanV2, mode: "pace" | "heart_rate") 
 }
 
 function rewriteHeartRateTargets(
-  draft: AiAuthoredPlanFirstProviderDraft,
-  replacement: AiAuthoredPlanFirstProviderUnit["target"],
+  draft: AiAuthoredPlanFirstCompilerDraft,
+  replacement: AiAuthoredPlanFirstCompilerUnit["target"],
 ) {
   for (const section of draft.workouts.flatMap((workout) => workout.sections)) {
     if (section.kind === "unit" && section.target.primary_execution_mode === "heart_rate") {
@@ -1318,7 +2060,7 @@ function rewriteHeartRateTargets(
   }
 }
 
-function paceTarget(pace: string): AiAuthoredPlanFirstProviderUnit["target"] {
+function paceTarget(pace: string): AiAuthoredPlanFirstCompilerUnit["target"] {
   return {
     primary_execution_mode: "pace",
     command: pace,
@@ -1333,11 +2075,9 @@ function heartRateCommand(
   reference: (typeof AI_AUTHORED_PLAN_FIRST_HR_ZONE_REFERENCE_VALUES)[number],
 ) {
   const profile = authoringInput.runnerFacts.heartRateProfile;
-  const [startReference, endReference = startReference] = reference.split("-");
-  const start = profile.zones.find((zone) => zone.reference === startReference);
-  const end = profile.zones.find((zone) => zone.reference === endReference);
-  assert.ok(start && end);
-  return `${start.minBpm}-${end.maxBpm} bpm`;
+  const zone = profile.zones.find((candidate) => candidate.reference === reference);
+  assert.ok(zone);
+  return `${zone.minBpm}-${zone.maxBpm} bpm`;
 }
 
 function findTarget(draft: Record<string, unknown>) {
@@ -1357,6 +2097,33 @@ function findTarget(draft: Record<string, unknown>) {
     if (child) return child.target;
   }
   throw new Error("Target is required.");
+}
+
+function findFirstDirectRunnableLeaf(draft: AiAuthoredPlanFirstCompilerDraft) {
+  for (const section of draft.workouts.flatMap((workout) => workout.sections)) {
+    if (section.kind === "unit") return section;
+    if (section.kind === "repeat" && section.children[0]) return section.children[0];
+  }
+  for (const section of draft.endpoint.sections) {
+    if (section.kind === "unit") return section;
+    if (section.kind === "repeat" && section.children[0]) return section.children[0];
+  }
+  throw new Error("Direct provider draft requires one runnable leaf.");
+}
+
+function findDirectHeartRateTarget(draft: AiAuthoredPlanFirstCompilerDraft) {
+  for (const workout of [...draft.workouts, draft.endpoint]) {
+    for (const section of workout.sections) {
+      if (section.kind === "unit" && section.target.primary_execution_mode === "heart_rate") {
+        return section.target;
+      }
+      if (section.kind !== "repeat") continue;
+      for (const child of section.children) {
+        if (child.target.primary_execution_mode === "heart_rate") return child.target;
+      }
+    }
+  }
+  throw new Error("Expected a direct heart-rate target.");
 }
 
 function providerResponse(responseId: string, draft: unknown): typeof fetch {

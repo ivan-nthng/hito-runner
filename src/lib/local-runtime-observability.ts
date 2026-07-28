@@ -120,6 +120,7 @@ export interface LocalProviderTranscriptInput {
   responseReceivedAt?: string | null;
   requestBody: string;
   responseBody?: string | null;
+  redactedValues?: readonly string[];
 }
 
 export function createLocalRuntimeRequestContext(input: {
@@ -367,6 +368,11 @@ export async function recordLocalProviderTranscript(
 
   const generationId = sanitizeCode(input.generationId, 120);
   const requestStartedAt = safeTimestamp(input.requestStartedAt);
+  const requestBody = redactLocalProviderTranscriptBody(input.requestBody, input.redactedValues);
+  const responseBody =
+    input.responseBody == null
+      ? null
+      : redactLocalProviderTranscriptBody(input.responseBody, input.redactedValues);
   const filename = `${requestStartedAt.replace(/[:.]/g, "-")}-${generationId}.json`;
   const localOptions: LocalRuntimeObservabilityOptions = {
     ...options,
@@ -400,11 +406,11 @@ export async function recordLocalProviderTranscript(
             method: "POST",
             url: "https://api.openai.com/v1/responses",
             contentType: "application/json",
-            body: input.requestBody,
+            body: requestBody,
           },
           response: {
             contentType: sanitizeNullableCode(input.responseContentType, 120),
-            body: input.responseBody ?? null,
+            body: responseBody,
           },
         },
         null,
@@ -463,6 +469,59 @@ export async function recordLocalProviderTranscript(
     ).catch(() => undefined);
     return { written: false, rawArtifactPath: null };
   }
+}
+
+function redactLocalProviderTranscriptBody(
+  body: string,
+  redactedValues: readonly string[] | undefined,
+) {
+  const values = (redactedValues ?? []).filter((value) => value.length > 0);
+  if (values.length === 0) {
+    return body;
+  }
+
+  try {
+    return JSON.stringify(redactLocalProviderTranscriptValue(JSON.parse(body) as unknown, values));
+  } catch {
+    return redactLocalProviderTranscriptText(body, values);
+  }
+}
+
+function redactLocalProviderTranscriptValue(
+  value: unknown,
+  redactedValues: readonly string[],
+): unknown {
+  if (typeof value === "string") {
+    return redactLocalProviderTranscriptText(value, redactedValues);
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => redactLocalProviderTranscriptValue(entry, redactedValues));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        redactLocalProviderTranscriptValue(entry, redactedValues),
+      ]),
+    );
+  }
+  return value;
+}
+
+function redactLocalProviderTranscriptText(text: string, redactedValues: readonly string[]) {
+  const candidates = new Set<string>();
+  for (const value of redactedValues) {
+    let candidate = value;
+    candidates.add(candidate);
+    for (let depth = 0; depth < 3; depth += 1) {
+      candidate = JSON.stringify(candidate).slice(1, -1);
+      candidates.add(candidate);
+    }
+  }
+
+  return [...candidates]
+    .sort((left, right) => right.length - left.length)
+    .reduce((redacted, value) => redacted.replaceAll(value, "[REDACTED_RUNNER_CONTEXT]"), text);
 }
 
 export async function readLocalRuntimeArtifact(input: {

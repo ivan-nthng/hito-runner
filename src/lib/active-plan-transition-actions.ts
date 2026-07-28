@@ -9,6 +9,7 @@ import { ActivePlanPersistenceRejection } from "@/lib/active-plan-lifecycle-pers
 import { getRequestAuthContext } from "@/lib/backend/auth";
 import type { AdditionalPlanPersistenceMetadata } from "@/lib/plan-authoring-snapshot";
 import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
+import { collectRowsForIdBatches } from "@/lib/supabase/batched-in-filter";
 import {
   runningPlanConfirmInputSchema,
   type RunningPlanConfirmActionInput,
@@ -803,41 +804,38 @@ async function loadTransitionEvidenceSummary(
 
   const supabase = createAdminSupabaseClient();
   const [assets, actualMetrics, comparisons, insights] = await Promise.all([
-    supabase
-      .from("workout_result_assets")
-      .select("id, planned_workout_id")
-      .eq("user_id", userId)
-      .in("planned_workout_id", [...workoutIds]),
-    supabase
-      .from("workout_actual_metrics")
-      .select("id, planned_workout_id")
-      .eq("user_id", userId)
-      .in("planned_workout_id", [...workoutIds]),
-    supabase
-      .from("workout_comparisons")
-      .select("id, planned_workout_id")
-      .eq("user_id", userId)
-      .in("planned_workout_id", [...workoutIds]),
-    supabase
-      .from("workout_ai_insights")
-      .select("id, planned_workout_id")
-      .eq("user_id", userId)
-      .in("planned_workout_id", [...workoutIds]),
+    collectRowsForIdBatches(workoutIds, (ids) =>
+      supabase
+        .from("workout_result_assets")
+        .select("id, planned_workout_id")
+        .eq("user_id", userId)
+        .in("planned_workout_id", ids),
+    ),
+    collectRowsForIdBatches(workoutIds, (ids) =>
+      supabase
+        .from("workout_actual_metrics")
+        .select("id, planned_workout_id")
+        .eq("user_id", userId)
+        .in("planned_workout_id", ids),
+    ),
+    collectRowsForIdBatches(workoutIds, (ids) =>
+      supabase
+        .from("workout_comparisons")
+        .select("id, planned_workout_id")
+        .eq("user_id", userId)
+        .in("planned_workout_id", ids),
+    ),
+    collectRowsForIdBatches(workoutIds, (ids) =>
+      supabase
+        .from("workout_ai_insights")
+        .select("id, planned_workout_id")
+        .eq("user_id", userId)
+        .in("planned_workout_id", ids),
+    ),
   ]);
 
-  for (const result of [assets, actualMetrics, comparisons, insights]) {
-    if (result.error) {
-      throw new Error(result.error.message);
-    }
-  }
-
   const evidenceBackedWorkoutIds = new Set<string>();
-  for (const row of [
-    ...(assets.data ?? []),
-    ...(actualMetrics.data ?? []),
-    ...(comparisons.data ?? []),
-    ...(insights.data ?? []),
-  ]) {
+  for (const row of [...assets, ...actualMetrics, ...comparisons, ...insights]) {
     if (row.planned_workout_id) {
       evidenceBackedWorkoutIds.add(row.planned_workout_id);
     }

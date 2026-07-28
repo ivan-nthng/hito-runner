@@ -15,7 +15,12 @@ import { requireAdminAccessForDependencies } from "@/lib/admin-access.server";
 import type { RequestAuthContext } from "@/lib/backend/auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database";
-import { hasSupabaseServerEnv, serverEnv } from "@/lib/supabase/env";
+import {
+  hasSupabaseServerEnv,
+  isLoopbackRuntimeUrl,
+  publicEnv,
+  serverEnv,
+} from "@/lib/supabase/env";
 
 const DEFAULT_ACCOUNTS_FILE = ".tanstack/hito-running-local-accounts.json";
 const PAGE_SIZE = 200;
@@ -51,6 +56,7 @@ interface NormalizedLocalAuthAccount {
 interface SupabaseAuthUserSummary {
   id: string;
   email: string | null;
+  appMetadata: Record<string, unknown>;
 }
 
 export interface SupabaseAdminPort {
@@ -147,12 +153,29 @@ export async function deleteAdminLocalTestAccountForDependencies(
 
   try {
     const authUser = await dependencies.supabaseAdmin.findAuthUserByEmail(email);
-    const nextAccounts = loaded.accounts.filter((account) => account.email !== email);
-    await saveLocalAccounts(dependencies.accountsFilePath, nextAccounts);
 
     if (authUser) {
+      const classification = classifyAdminAnalyticsUser({
+        email: authUser.email,
+        appMetadata: authUser.appMetadata,
+        localAccountRole: localAccount.role,
+      });
+      if (
+        classification.classification === "local_admin" ||
+        classification.classification === "supabase_admin" ||
+        authUser.appMetadata.hito_qa_pool_version
+      ) {
+        return failure(
+          "protected_account",
+          "Protected admin and reusable QA pool accounts cannot be deleted here.",
+        );
+      }
+
       await dependencies.supabaseAdmin.deleteAuthUser(authUser.id);
     }
+
+    const nextAccounts = loaded.accounts.filter((account) => account.email !== email);
+    await saveLocalAccounts(dependencies.accountsFilePath, nextAccounts);
 
     return {
       ok: true,
@@ -189,9 +212,10 @@ async function buildCurrentDependencies(): Promise<AdminLocalTestAccountDependen
       serverEnv.localAuthBypassEnabled && serverEnv.localAuthBypassAccountsFile,
     ),
     accountsFilePath,
-    supabaseAdmin: hasSupabaseServerEnv
-      ? createSupabaseAdminPort(createAdminSupabaseClient())
-      : null,
+    supabaseAdmin:
+      hasSupabaseServerEnv && isLoopbackRuntimeUrl(publicEnv.supabaseUrl)
+        ? createSupabaseAdminPort(createAdminSupabaseClient())
+        : null,
   };
 }
 
@@ -233,10 +257,16 @@ async function buildAccountView(
   account: NormalizedLocalAuthAccount,
   supabaseAdmin: SupabaseAdminPort | null,
 ): Promise<AdminLocalTestAccountView> {
-  const linkedSupabaseUser = await resolveLinkedSupabaseUser(account.email, supabaseAdmin);
-  const protectedFromDeletion = account.role === "admin";
+  const linked = await resolveLinkedSupabaseUser(account.email, supabaseAdmin);
+  const protectedFromDeletion =
+    account.role === "admin" ||
+    linked.authUser?.appMetadata.hito_admin === true ||
+    linked.authUser?.appMetadata.hito_role === "admin" ||
+    linked.authUser?.appMetadata.hito_local_role === "admin" ||
+    Boolean(linked.authUser?.appMetadata.hito_qa_pool_version);
   const classification = classifyAdminAnalyticsUser({
     email: account.email,
+    appMetadata: linked.authUser?.appMetadata,
     localAccountRole: account.role,
   });
 
@@ -250,7 +280,7 @@ async function buildAccountView(
     userIdSource: account.userIdSource,
     protectedFromDeletion,
     deletable: !protectedFromDeletion,
-    linkedSupabaseUser,
+    linkedSupabaseUser: linked.view,
     classification: classification.classification === "local_admin" ? "local_admin" : "local_test",
     classificationReason: classification.classificationReason,
     classificationSource: classification.classificationSource,
@@ -260,11 +290,17 @@ async function buildAccountView(
 async function resolveLinkedSupabaseUser(
   email: string,
   supabaseAdmin: SupabaseAdminPort | null,
-): Promise<AdminLocalTestAccountView["linkedSupabaseUser"]> {
+): Promise<{
+  view: AdminLocalTestAccountView["linkedSupabaseUser"];
+  authUser: SupabaseAuthUserSummary | null;
+}> {
   if (!supabaseAdmin) {
     return {
-      status: "not_configured",
-      userId: null,
+      view: {
+        status: "not_configured",
+        userId: null,
+      },
+      authUser: null,
     };
   }
 
@@ -272,13 +308,19 @@ async function resolveLinkedSupabaseUser(
     const authUser = await supabaseAdmin.findAuthUserByEmail(email);
 
     return {
-      status: authUser ? "linked" : "missing",
-      userId: authUser?.id ?? null,
+      view: {
+        status: authUser ? "linked" : "missing",
+        userId: authUser?.id ?? null,
+      },
+      authUser,
     };
   } catch {
     return {
-      status: "lookup_failed",
-      userId: null,
+      view: {
+        status: "lookup_failed",
+        userId: null,
+      },
+      authUser: null,
     };
   }
 }
@@ -319,7 +361,10 @@ async function loadLocalAccounts(accountsFilePath: string): Promise<NormalizedLo
 
 async function saveLocalAccounts(accountsFilePath: string, accounts: NormalizedLocalAuthAccount[]) {
   await mkdir(path.dirname(accountsFilePath), { recursive: true });
-  await writeFile(accountsFilePath, `${JSON.stringify({ accounts }, null, 2)}\n`, "utf8");
+  await writeFile(accountsFilePath, `${JSON.stringify({ accounts }, null, 2)}\n`, {
+    encoding: "utf8",
+    mode: 0o600,
+  });
 }
 
 function normalizeAccount(account: RawLocalAuthAccount): NormalizedLocalAuthAccount {
@@ -362,6 +407,7 @@ function createSupabaseAdminPort(supabase: SupabaseClient<Database>): SupabaseAd
           return {
             id: matchedUser.id,
             email: matchedUser.email ?? null,
+            appMetadata: matchedUser.app_metadata ?? {},
           };
         }
 

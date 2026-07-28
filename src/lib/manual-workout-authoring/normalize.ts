@@ -30,8 +30,15 @@ import {
   resolveManualWorkoutTargetInput,
 } from "@/lib/manual-workout-authoring/target-input";
 import type { ManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
-import { isManualWorkoutNoteOnlyBlock } from "@/lib/manual-workout-authoring/validator";
+import {
+  isManualWorkoutNoteOnlyBlock,
+  manualWorkoutBlockStageRole,
+} from "@/lib/manual-workout-authoring/validator";
 import { getManualWorkoutRepeatGroupChildren } from "@/lib/manual-workout-authoring/repeat-groups";
+import {
+  WORKOUT_DOCUMENT_HYDRATION_CUE,
+  WORKOUT_DOCUMENT_HYDRATION_LABEL,
+} from "@/lib/workout-document";
 
 export interface NormalizedManualWorkoutDraftResult {
   draft: ManualWorkoutCanonicalDraft;
@@ -137,6 +144,18 @@ function blockToStep(
 ): Step | null {
   if (isManualWorkoutNoteOnlyBlock(block.blockKey)) {
     return null;
+  }
+
+  if (block.blockKey === "hydration_block") {
+    return {
+      type: "hydration",
+      segment_id: `manual-segment-${sequence}`,
+      segment_type: "fueling",
+      sequence,
+      label: WORKOUT_DOCUMENT_HYDRATION_LABEL,
+      guidance: WORKOUT_DOCUMENT_HYDRATION_CUE,
+      prescription: { mode: "none" },
+    };
   }
 
   const prescription = blockToUnitPrescription(block);
@@ -350,6 +369,8 @@ function segmentTypeForBlock(blockKey: ManualWorkoutBlockInput["blockKey"]) {
       return "warmup";
     case "cooldown_block":
       return "cooldown";
+    case "long_run_finish_block":
+      return "finish";
     case "interval_recovery_block":
     case "rest_walk_jog_recovery_block":
       return "recovery";

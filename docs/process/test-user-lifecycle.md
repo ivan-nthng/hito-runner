@@ -31,11 +31,14 @@ bounded to `service_role`, and no local setup script issues ad hoc grants.
 
 This repo supports one narrow test-user lifecycle path:
 
-- create a Supabase auth user for testing
-- optionally create local credentials for the temporary local login path
-- optionally seed a test plan from JSON
-- reset the user back to a clean onboarding state
-- delete the test user safely
+- ensure and reuse a bounded named Supabase Auth tester pool
+- keep local credentials linked to the current Auth user IDs
+- reset a designated tester to no plan while preserving its saved runner profile
+- reset a tester back to a clean onboarding state
+- lease isolation identities only for bounded concurrent or RLS proof
+- inventory metadata-classified testers and all app-owned rows
+- generate a stable cleanup manifest before destructive maintenance
+- delete a tester safely
 
 The canonical command entrypoint is:
 
@@ -45,20 +48,93 @@ npm run test-user -- <command> ...
 
 ## Scope
 
-This tool is for `tester` accounts only.
+This tool is for metadata-proven `tester` accounts only.
 
-It must not be used to reset or delete the protected primary account.
-Create also refuses to replace a protected local admin account.
+It must not be used to reset or delete a protected admin or unclassified identity. Auth
+`app_metadata`, not an email pattern, proves tester eligibility. Admin metadata always wins a
+classification conflict.
+
+## Named Pool
+
+Normal QA reuses these roles:
+
+| Role | Purpose |
+| --- | --- |
+| `baseline-no-plan` | Saved baseline/profile with no active plan |
+| `saved-plan-readback` | Review, confirm, persistence, export, and readback proof |
+| `provider-engine` | Direct backend/provider-engine proof without browser creation |
+| `isolation-a` | First identity for bounded RLS/collision proof |
+| `isolation-b` | Second identity for bounded RLS/collision proof |
+
+Persistence validators lease these identities and reset their app-owned rows on release. A
+concurrent attempt to use the same role fails closed instead of minting another timestamp/random
+Auth user.
+
+```bash
+npm run test-user -- pool-ensure \
+  --role provider-engine
+
+npm run test-user -- pool-reset --role provider-engine
+
+npm run test-user -- pool-reset-plan --role baseline-no-plan
+
+npm run test-user -- pool-delete \
+  --role provider-engine \
+  --confirm-role provider-engine
+```
+
+Provider/engine iteration uses the direct backend seam. Browser creation and confirmation remain a
+separate cross-flow gate.
+
+`pool-ensure` generates a private local password when the role is first created and reuses the
+ignored credentials-registry value afterward. Passing `--password` is optional and rotates only that
+local pool identity.
+
+## Inventory And Cleanup
+
+Email domains and prefixes are diagnostic only and remain `manual_review`.
+
+```bash
+npm run test-user -- inventory
+
+npm run test-user -- cleanup-manifest \
+  --output .tanstack/qa-test-user-local-cleanup-manifest.json
+```
+
+The ignored manifest records the exact loopback target, Auth identity, metadata basis, all eleven
+app-owned table counts, credential drift, protected identities, and a stable selection hash. Apply
+re-reads the target and candidates and refuses any drift:
+
+```bash
+npm run test-user -- cleanup-apply \
+  --manifest .tanstack/qa-test-user-local-cleanup-manifest.json \
+  --confirm-selection '<reviewed selectionHash>'
+```
+
+The local CLI never accepts a hosted target. Linked cleanup is a controlled release operation: the
+exact linked project and metadata-only candidate manifest must be verified independently before
+apply. Admin and unclassified identities remain protected, and this loopback workflow never
+provisions a linked reusable pool.
+
+## Legacy Explicit Commands
+
+The explicit email commands remain only for bounded repair or migration of an already named local
+tester. They are not the normal QA lifecycle and never generate timestamp/random identities
+automatically.
 
 ## Required Identifiers
 
-For `create`:
+For legacy `create`:
 
 - `email`
 - `username`
 - `password`
 
 For `reset`:
+
+- `email`
+
+For `reset-plan`:
 
 - `email`
 
@@ -71,7 +147,7 @@ For `delete`:
 
 ## Command Contract
 
-### Create
+### Legacy create
 
 Meaning in this repo:
 
@@ -106,7 +182,7 @@ What it writes:
 - `public.planned_workouts` only when `--plan` is provided
 - local ignored accounts file for credentials login
 
-### Reset
+### Legacy reset
 
 Meaning in this repo:
 
@@ -142,7 +218,53 @@ What reset preserves:
 - the `auth.users` row
 - the local credentials account entry
 
-### Delete
+### Reset plan only
+
+Use `reset-plan` for repeatable local PlanCreation design sessions. It is limited to a local
+`tester` account and requires that tester to already have a saved runner baseline.
+
+Command:
+
+```bash
+npm run test-user -- reset-plan \
+  --email qa-runner-01@local.test
+```
+
+What reset-plan removes:
+
+- all `public.plan_cycles` rows for the tester
+- all `public.planned_workouts` rows through cascade
+- all `public.workout_logs` and workout evidence rows through cascade
+
+What reset-plan preserves and verifies unchanged:
+
+- the `auth.users` row
+- the local credentials account entry
+- the complete `public.runner_profiles` row, including baseline revision and heart-rate profile
+
+The command fails if the account is not a local tester, has no saved profile, receives `--plan`,
+changes the profile row, or leaves any counted plan rows behind.
+
+For a 15-second preview-loading design session, start the managed loopback runtime with the existing
+fixture delay:
+
+```bash
+npm run local:fixture
+```
+
+Generate a plan from an explicit valid goal/distance and confirm it through the normal review dialog.
+After inspecting the saved plan, run `reset-plan` to return to no-plan state without re-entering the
+baseline. Restore the ordinary managed runtime when the fixture session is over:
+
+```bash
+npm run local:real
+```
+
+Both mode commands restart the same canonical server at `http://127.0.0.1:3000/` and print its active
+provider mode. Any existing authenticated local browser session remains valid while switching modes;
+fixture access does not require a separate account, credential change, or login step.
+
+### Legacy delete
 
 Meaning in this repo:
 
@@ -184,7 +306,9 @@ Backend must verify all of the following before running delete:
 
 The script itself refuses to reset or delete:
 
-- local accounts marked as `admin`
+- Auth identities without current tester `app_metadata`
+- Auth or local accounts marked as `admin`
+- pool identities with an active lease
 
 ## Local Credentials Path
 

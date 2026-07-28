@@ -97,7 +97,7 @@ try {
     providerKind: "local_dev_fixture",
     model: "local-observability-proof",
     contractMode: "plan_first",
-    responseSchemaMode: "responses_json_schema_plan_first_strict",
+    responseSchemaMode: "responses_json_schema_plan_first_direct_v1_strict",
     systemPrompt: `system ${privacyCanaries.secret}`,
     userPrompt: `runner ${privacyCanaries.runner}`,
     responseSchema: {
@@ -156,7 +156,7 @@ try {
     providerKind: "local_dev_fixture",
     model: "local-observability-proof",
     contractMode: "plan_first",
-    responseSchemaMode: "responses_json_schema_plan_first_strict",
+    responseSchemaMode: "responses_json_schema_plan_first_direct_v1_strict",
     systemPrompt: "redacted",
     userPrompt: "redacted",
     responseSchema: { type: "object" },
@@ -354,6 +354,7 @@ async function proveRawProviderTranscripts(observabilityRoot: string) {
   const completedRequestId = "request_completed_transcript_proof";
   const completedRequestCanary = "RAW_COMPLETED_REQUEST_BODY_CANARY";
   const completedResponseCanary = "RAW_COMPLETED_RESPONSE_BODY_CANARY";
+  const redactedRunnerContextCanary = "RUNNER_CONTEXT_TRANSCRIPT_REDACTION_CANARY";
   const completedAt = new Date();
   completedAt.setHours(12, 0, 0, 0);
   const completed = await recordLocalProviderTranscript(
@@ -368,8 +369,15 @@ async function proveRawProviderTranscripts(observabilityRoot: string) {
       responseContentType: "application/json",
       requestStartedAt: completedAt.toISOString(),
       responseReceivedAt: new Date(completedAt.getTime() + 500).toISOString(),
-      requestBody: JSON.stringify({ input: completedRequestCanary }),
-      responseBody: JSON.stringify({ output: completedResponseCanary }),
+      requestBody: JSON.stringify({
+        input: completedRequestCanary,
+        runnerContext: redactedRunnerContextCanary,
+      }),
+      responseBody: JSON.stringify({
+        output: completedResponseCanary,
+        echoedRunnerContext: redactedRunnerContextCanary,
+      }),
+      redactedValues: [redactedRunnerContextCanary],
     },
     {
       forceWrite: true,
@@ -415,6 +423,8 @@ async function proveRawProviderTranscripts(observabilityRoot: string) {
   });
   assert.match(completedArtifact.contents, new RegExp(completedRequestCanary));
   assert.match(completedArtifact.contents, new RegExp(completedResponseCanary));
+  assert.doesNotMatch(completedArtifact.contents, new RegExp(redactedRunnerContextCanary));
+  assert.match(completedArtifact.contents, /\[REDACTED_RUNNER_CONTEXT\]/);
   for (const canary of Object.values(forbiddenRawCanaries)) {
     assert.doesNotMatch(completedArtifact.contents, new RegExp(canary));
   }
@@ -438,6 +448,45 @@ async function proveRawProviderTranscripts(observabilityRoot: string) {
   ]);
   assert.match(retrievalCli, new RegExp(completedRequestCanary));
   assert.match(retrievalCli, new RegExp(completedResponseCanary));
+
+  const malformedGenerationId = "generation_malformed_transcript_redaction_proof";
+  const malformedRunnerContextCanary = 'Recent "threshold" run\nfelt controlled.';
+  const escapedRunnerContextCanary = JSON.stringify(
+    JSON.stringify(malformedRunnerContextCanary),
+  ).slice(1, -1);
+  const malformed = await recordLocalProviderTranscript(
+    {
+      requestId: "request_malformed_transcript_redaction_proof",
+      generationId: malformedGenerationId,
+      providerResponseId: "resp_malformed_transcript_redaction_proof",
+      model: "gpt-proof",
+      outcome: "malformed_response",
+      providerStatus: "failed",
+      httpStatus: 200,
+      responseContentType: "application/json",
+      requestStartedAt: new Date(completedAt.getTime() + 1_000).toISOString(),
+      responseReceivedAt: new Date(completedAt.getTime() + 1_500).toISOString(),
+      requestBody: JSON.stringify({ runnerContext: malformedRunnerContextCanary }),
+      responseBody: `{"output_text":"${escapedRunnerContextCanary}`,
+      redactedValues: [malformedRunnerContextCanary],
+    },
+    {
+      forceWrite: true,
+      root: observabilityRoot,
+      runtimeUrl: "http://127.0.0.1:3000",
+      now: completedAt,
+    },
+  );
+  assert.equal(malformed.written, true);
+  assert.ok(malformed.rawArtifactPath);
+  const malformedArtifact = await readLocalRuntimeArtifact({
+    root: observabilityRoot,
+    rawArtifactPath: malformed.rawArtifactPath!,
+  });
+  assert.doesNotMatch(malformedArtifact.contents, /Recent/);
+  assert.doesNotMatch(malformedArtifact.contents, /threshold/);
+  assert.doesNotMatch(malformedArtifact.contents, /felt controlled/);
+  assert.match(malformedArtifact.contents, /\[REDACTED_RUNNER_CONTEXT\]/);
 
   const oldAt = new Date(completedAt);
   oldAt.setDate(oldAt.getDate() - 4);

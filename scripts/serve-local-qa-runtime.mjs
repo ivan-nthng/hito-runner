@@ -45,9 +45,9 @@ process.env.HITO_LOCAL_RUNTIME_OBSERVABILITY_ROOT = resolve(
 );
 process.env.HITO_AI_GENERATED_PLAN_PROVIDER_MODE = providerMode;
 process.env.HITO_AI_GENERATED_PLAN_DEV_FIXTURE = providerMode === "qa_fixture" ? "true" : "false";
+delete process.env.HITO_AI_GENERATED_PLAN_DEV_FIXTURE_SCENARIO;
 if (providerMode === "real") {
   delete process.env.HITO_AI_GENERATED_PLAN_DEV_FIXTURE_DELAY_MS;
-  delete process.env.HITO_AI_GENERATED_PLAN_DEV_FIXTURE_SCENARIO;
 }
 process.argv = [process.execPath, serverEntry, ...runtimeArgs];
 

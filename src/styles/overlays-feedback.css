@@ -17,6 +17,19 @@
     border-radius: var(--radius-2xl);
   }
 
+  .hito-ui-popover-surface {
+    max-width: min(
+      calc(100vw - (var(--space-3) * 2)),
+      var(--radix-popover-content-available-width)
+    );
+    max-height: min(
+      calc(100dvh - (var(--space-3) * 2)),
+      var(--radix-popover-content-available-height)
+    );
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
   .hito-ui-dialog-close,
   .hito-ui-sheet-close {
     display: inline-flex;

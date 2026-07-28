@@ -251,6 +251,7 @@
     min-width: 0;
     flex-wrap: wrap;
     gap: 0.45rem 0.75rem;
+    padding-top: 0.25rem;
     color: color-mix(in oklch, var(--color-foreground) 66%, transparent);
     font-size: 0.72rem;
     font-weight: 650;
@@ -272,41 +273,225 @@
     box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--color-background) 35%, transparent);
   }
 
-  .hito-selected-plan-calendar-detail {
-    display: flex;
-    min-width: 0;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.75rem;
-    border-top: 1px solid var(--color-hairline);
-    padding-top: 0.75rem;
-  }
-
-  .hito-selected-plan-calendar-detail > * {
-    min-width: 0;
-  }
-
   .hito-selected-plan-calendar-weeks {
     display: grid;
     min-width: 0;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
-    gap: 0.85rem 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+    gap: 0.4rem 0.55rem;
   }
 
   .hito-selected-plan-calendar-week {
     display: grid;
-    align-content: start;
-    gap: 0.42rem;
     min-width: 0;
-    border-top: 1px solid var(--color-hairline);
-    padding-top: 0.55rem;
+    align-content: start;
   }
 
   .hito-selected-plan-calendar-week-grid {
     display: grid;
     min-width: 0;
     grid-template-columns: repeat(7, minmax(2.2rem, 1fr));
-    gap: 0.25rem;
+    gap: 0.22rem;
+  }
+
+  .hito-selected-plan-calendar-day {
+    display: block;
+    aspect-ratio: 1;
+    min-width: 0;
+    overflow: hidden;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: color-mix(
+      in oklch,
+      var(--hito-selected-plan-calendar-tone, var(--color-muted-foreground)) 16%,
+      transparent
+    );
+    padding: 0;
+    text-align: left;
+    transition:
+      background-color 150ms ease,
+      box-shadow 150ms ease;
+  }
+
+  .hito-selected-plan-calendar-day[data-calendar-state="rest"] {
+    --hito-selected-plan-calendar-tone: var(--color-muted-foreground);
+    background: color-mix(in oklch, var(--color-muted-foreground) 7%, transparent);
+  }
+
+  .hito-selected-plan-calendar-day:hover {
+    background: color-mix(
+      in oklch,
+      var(--hito-selected-plan-calendar-tone, var(--color-muted-foreground)) 24%,
+      transparent
+    );
+  }
+
+  .hito-selected-plan-calendar-day[data-calendar-state="rest"]:hover {
+    background: color-mix(in oklch, var(--color-muted-foreground) 12%, transparent);
+  }
+
+  .hito-selected-plan-calendar-day[aria-expanded="true"] {
+    box-shadow: inset 0 0 0 1px
+      color-mix(
+        in oklch,
+        var(--hito-selected-plan-calendar-tone, var(--color-foreground)) 42%,
+        transparent
+      );
+  }
+
+  .hito-selected-plan-calendar-day:focus-visible {
+    outline: 2px solid color-mix(in oklch, var(--color-signal) 48%, transparent);
+    outline-offset: 2px;
+  }
+
+  .hito-selected-plan-calendar-day > [data-hito-calendar-day-cell] {
+    min-height: 0;
+    overflow: hidden;
+    border: 0;
+    border-radius: inherit;
+    background: transparent;
+    padding: 0.25rem !important;
+  }
+
+  .hito-selected-plan-calendar-day > [data-hito-calendar-day-cell] > :last-child {
+    margin-top: 0.2rem !important;
+  }
+
+  .hito-selected-plan-calendar-popover {
+    max-height: min(36rem, var(--radix-popover-content-available-height));
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .hito-product-dialog-footer-center {
+    align-items: center;
+    justify-content: center;
+  }
+
+  .hito-generated-plan-wait {
+    display: grid;
+    justify-items: center;
+    gap: 1rem;
+    padding-block: 1rem 1.25rem;
+    text-align: center;
+  }
+
+  .hito-generated-plan-wait-marker {
+    display: grid;
+    width: 3.5rem;
+    height: 3.5rem;
+    place-items: center;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--color-signal) 9%, transparent);
+    color: var(--color-muted-foreground);
+    animation: hito-generated-plan-marker-tone 3.2s ease-in-out infinite;
+  }
+
+  .hito-generated-plan-wait[data-complete="true"] .hito-generated-plan-wait-marker {
+    background: color-mix(in oklch, var(--color-success) 12%, transparent);
+    color: var(--color-success);
+    animation: none;
+  }
+
+  .hito-generated-plan-wait-progress {
+    width: min(100%, 24rem);
+    height: 0.25rem;
+    overflow: hidden;
+    border-radius: 999px;
+  }
+
+  .hito-generated-plan-wait-progress-fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    animation: hito-generated-plan-progress-wait 10s cubic-bezier(0.18, 0.8, 0.2, 1) forwards;
+  }
+
+  .hito-generated-plan-wait[data-complete="true"] .hito-generated-plan-wait-progress-fill {
+    width: 100%;
+    animation: none;
+    background: var(--color-success);
+    transition: width 240ms ease-out;
+  }
+
+  .hito-generated-plan-wait-lines {
+    display: grid;
+    width: min(100%, 30rem);
+    min-height: 1.5em;
+    place-items: center;
+  }
+
+  .hito-generated-plan-wait-lines > span {
+    grid-area: 1 / 1;
+    opacity: 0;
+    animation: hito-generated-plan-wait-line 16s linear infinite;
+  }
+
+  .hito-generated-plan-wait-lines > span:nth-child(2) {
+    animation-delay: -12s;
+  }
+
+  .hito-generated-plan-wait-lines > span:nth-child(3) {
+    animation-delay: -8s;
+  }
+
+  .hito-generated-plan-wait-lines > span:nth-child(4) {
+    animation-delay: -4s;
+  }
+
+  @keyframes hito-generated-plan-marker-tone {
+    0%,
+    100% {
+      color: var(--color-muted-foreground);
+    }
+
+    50% {
+      color: var(--color-signal);
+    }
+  }
+
+  @keyframes hito-generated-plan-progress-wait {
+    from {
+      width: 0;
+    }
+
+    to {
+      width: 96%;
+    }
+  }
+
+  @keyframes hito-generated-plan-wait-line {
+    0%,
+    22% {
+      opacity: 1;
+    }
+
+    25%,
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hito-generated-plan-wait-marker,
+    .hito-generated-plan-wait-progress-fill,
+    .hito-generated-plan-wait-lines > span {
+      animation: none;
+      transition: none;
+    }
+
+    .hito-generated-plan-wait-progress-fill {
+      width: 64%;
+    }
+
+    .hito-generated-plan-wait-lines > span {
+      display: none;
+    }
+
+    .hito-generated-plan-wait-lines > span:first-child {
+      display: block;
+      opacity: 1;
+    }
   }
 
   .hito-manual-workout-dialog-header {
@@ -1293,16 +1478,8 @@
       align-self: auto;
     }
 
-    .hito-selected-plan-calendar-detail {
-      flex-direction: column;
-    }
-
-    .hito-selected-plan-calendar-week {
-      gap: 0.45rem;
-    }
-
     .hito-selected-plan-calendar-week-grid {
-      gap: 0.28rem;
+      gap: 0.2rem;
     }
   }
 
@@ -1835,6 +2012,7 @@
   }
 
   .hito-editable-value-field-error {
+    --hito-typography-role: error-success;
     flex: 1 0 100%;
     padding-left: 0.125rem;
     font-size: 0.875rem;
@@ -1921,14 +2099,13 @@
 
   .hito-heart-rate-editor {
     overflow: hidden;
-    border-block: 1px solid var(--color-hairline);
   }
 
   .hito-heart-rate-scale {
     display: grid;
     grid-template-columns: minmax(12rem, 0.8fr) minmax(16rem, 1.4fr) minmax(11rem, 0.7fr);
     gap: var(--space-5);
-    padding: var(--space-3) var(--space-4) var(--space-1);
+    padding: var(--space-3) 0 var(--space-1);
   }
 
   .hito-heart-rate-scale-values {
@@ -1940,6 +2117,7 @@
 
   .hito-heart-rate-lanes {
     display: grid;
+    gap: var(--space-2);
   }
 
   .hito-heart-rate-lane {
@@ -1949,13 +2127,8 @@
     align-items: center;
     gap: var(--space-5);
     min-width: 0;
-    padding: var(--space-4);
-    border-top: 1px solid var(--color-hairline);
+    padding: var(--space-3) 0;
     transition: background-color 160ms ease;
-  }
-
-  .hito-heart-rate-lane:first-child {
-    border-top: 0;
   }
 
   .hito-heart-rate-lane:hover,
@@ -2008,15 +2181,6 @@
     min-width: 0;
   }
 
-  .hito-heart-rate-editor-footer {
-    display: flex;
-    align-items: end;
-    justify-content: space-between;
-    gap: var(--space-5);
-    padding: var(--space-4);
-    border-top: 1px solid var(--color-hairline);
-  }
-
   @media (max-width: 820px) {
     .hito-heart-rate-scale,
     .hito-heart-rate-lane {
@@ -2055,18 +2219,6 @@
     .hito-heart-rate-lane:hover,
     .hito-heart-rate-lane:focus-within {
       background: transparent;
-    }
-
-    .hito-heart-rate-editor-footer {
-      align-items: stretch;
-      flex-direction: column;
-      padding-inline: 0;
-    }
-
-    .hito-heart-rate-editor-footer .hito-settings-actions {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      width: 100%;
     }
 
     .hito-plan-schedule-edit .hito-list-row {

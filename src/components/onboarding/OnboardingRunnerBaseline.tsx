@@ -1,5 +1,7 @@
-import { HeartRateProfileSection } from "@/components/settings/HeartRateProfileSection";
-import type { PersonalHeartRateProfileInput } from "@/lib/heart-rate-zones";
+import {
+  HeartRateProfileSection,
+  type HeartRateProfileDraftState,
+} from "@/components/settings/HeartRateProfileSection";
 import type { UserSettingsSummary } from "@/lib/user-settings-actions";
 
 export function OnboardingRunnerHeartRateProfile({
@@ -7,16 +9,18 @@ export function OnboardingRunnerHeartRateProfile({
   onClearError,
   error,
   isSaving,
+  onDraftStateChange,
   onPrepare,
-  onSave,
+  recommendedAge,
   summary,
 }: {
   canPrepare: boolean;
   error: string | null;
   isSaving: boolean;
   onClearError: () => void;
+  onDraftStateChange: (state: HeartRateProfileDraftState) => void;
   onPrepare: () => Promise<boolean>;
-  onSave: (profile: PersonalHeartRateProfileInput) => Promise<boolean>;
+  recommendedAge: number | null;
   summary: UserSettingsSummary["heartRateZones"] | null;
 }) {
   return (
@@ -26,7 +30,8 @@ export function OnboardingRunnerHeartRateProfile({
           appearance="embedded"
           isSaving={isSaving}
           onClearError={onClearError}
-          onSave={onSave}
+          onDraftStateChange={onDraftStateChange}
+          recommendedAge={recommendedAge}
           summary={summary}
         />
       ) : (

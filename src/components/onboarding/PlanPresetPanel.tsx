@@ -1,9 +1,11 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode, type RefObject } from "react";
 import { HitoDateField, HitoMaskedTimeField } from "@/components/ui/hito-date-time-input";
+import { Textarea } from "@/components/ui/textarea";
 import type { PlanGoalChoice } from "@/components/onboarding/onboarding-form-model";
 import { SelectedRunningPlanPreviewDialog } from "@/components/onboarding/SelectedTenKPlanPreviewDialog";
 import {
   derivePlanGoalPaceReadback,
+  planGoalChoiceLabel,
   type PlanGoalIntentDraftState,
   parsePlanGoalCustomDistanceKm,
   resolveSelectedPlanGoalPreviewGate,
@@ -65,16 +67,19 @@ interface PlanPresetPanelProps {
   previewDialogPrimaryActionLabel?: string;
   previewDialogPrimaryActionPendingLabel?: string;
   previewDialogExtraNotice?: ReactNode;
+  previewReturnFocusRef?: RefObject<HTMLElement | null>;
   planGoalChoice: PlanGoalChoice;
   planGoalCustomDistanceKm: string;
   planGoalCustomDistanceLabel: string;
   planGoalFinishTime: string;
   planGoalTargetDate: string;
+  runnerComment: string;
   onPlanGoalChoiceChange: (value: PlanGoalChoice) => void;
   onPlanGoalCustomDistanceKmChange: (value: string) => void;
   onPlanGoalCustomDistanceLabelChange: (value: string) => void;
   onPlanGoalFinishTimeChange: (value: string) => void;
   onPlanGoalTargetDateChange: (value: string) => void;
+  onRunnerCommentChange: (value: string) => void;
 }
 
 function finishTimePlaceholder(goalChoice: PlanGoalChoice) {
@@ -106,18 +111,28 @@ export function PlanPresetPanel({
   previewDialogExtraNotice,
   previewDialogPrimaryActionLabel,
   previewDialogPrimaryActionPendingLabel,
+  previewReturnFocusRef,
   planGoalChoice,
   planGoalCustomDistanceKm,
   planGoalCustomDistanceLabel,
   planGoalFinishTime,
   planGoalTargetDate,
+  runnerComment,
   onPlanGoalChoiceChange,
   onPlanGoalCustomDistanceKmChange,
   onPlanGoalCustomDistanceLabelChange,
   onPlanGoalFinishTimeChange,
   onPlanGoalTargetDateChange,
+  onRunnerCommentChange,
   status,
 }: PlanPresetPanelProps) {
+  const runnerCommentHelperId = useId();
+  const previewGoalLabel = planGoalChoice
+    ? planGoalChoice === "custom" && planGoalCustomDistanceLabel.trim()
+      ? planGoalCustomDistanceLabel.trim()
+      : planGoalChoiceLabel(planGoalChoice)
+    : "Generated";
+
   return (
     <section className="hito-plan-preset-stage hito-section-divider pt-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -146,6 +161,22 @@ export function PlanPresetPanel({
           onTargetDateChange={onPlanGoalTargetDateChange}
         />
 
+        <label className="grid min-w-0 gap-2">
+          <span className="hito-form-label">Plan context (optional)</span>
+          <Textarea
+            aria-describedby={runnerCommentHelperId}
+            className="min-h-24 resize-y"
+            name="runnerComment"
+            onChange={(event) => onRunnerCommentChange(event.target.value)}
+            placeholder="For example, I ran an even 8K yesterday and recovered well."
+            rows={3}
+            value={runnerComment}
+          />
+          <span className="hito-field-helper" id={runnerCommentHelperId}>
+            Share a recent result or training circumstance for this plan request.
+          </span>
+        </label>
+
         {!hasRequiredPlanBasics ? (
           <div className="hito-surface-wash">
             <p className="hito-list-row-title">Add a few basics before previewing</p>
@@ -164,12 +195,14 @@ export function PlanPresetPanel({
         result={previewResult}
         status={status}
         error={error}
+        goalLabel={previewGoalLabel}
         onRefresh={onRefreshPreview}
         onCreate={onCreatePlan}
         description={previewDialogDescription}
         primaryActionLabel={previewDialogPrimaryActionLabel}
         primaryActionPendingLabel={previewDialogPrimaryActionPendingLabel}
         extraNotice={previewDialogExtraNotice}
+        returnFocusRef={previewReturnFocusRef}
       />
     </section>
   );

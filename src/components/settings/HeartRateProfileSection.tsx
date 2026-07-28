@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
   buildHeartRateProfileDraft,
   fieldErrorKey,
@@ -12,29 +12,37 @@ import {
 import { HitoCompoundRangeField } from "@/components/ui/hito-compound-range-field";
 import { HitoDualRange } from "@/components/ui/hito-dual-range";
 import {
+  buildHeartRateZonesSummary,
   type HeartRateZonesSummary,
   type PersonalHeartRateProfileInput,
 } from "@/lib/heart-rate-zones";
+
+export type HeartRateProfileDraftState = {
+  canSubmit: boolean;
+  isDirty: boolean;
+  key: string;
+  profileToPersist: PersonalHeartRateProfileInput | null;
+};
 
 export function HeartRateProfileSection({
   appearance = "settings",
   isSaving,
   onClearError,
-  onSave,
+  onDraftStateChange,
+  recommendedAge,
   summary,
 }: {
   appearance?: "settings" | "embedded";
   isSaving: boolean;
   onClearError?: () => void;
-  onSave: (profile: PersonalHeartRateProfileInput) => Promise<boolean>;
+  onDraftStateChange?: (state: HeartRateProfileDraftState) => void;
+  recommendedAge: number | null;
   summary: HeartRateZonesSummary;
 }) {
   const [draft, setDraft] = useState(() => buildHeartRateProfileDraft(summary));
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const [recommendedApplied, setRecommendedApplied] = useState(false);
   const summaryRef = useRef(summary);
   summaryRef.current = summary;
-  const isPersonal = summary.source === "personal";
-  const isEstimated = summary.source === "estimated";
   const canEdit = summary.zones.length > 0;
   const summaryKey = `${summary.source}:${summary.accepted}:${summary.zones
     .map((zone) => `${zone.reference}:${zone.minBpm}:${zone.maxBpm}`)
@@ -42,76 +50,107 @@ export function HeartRateProfileSection({
 
   useEffect(() => {
     setDraft(buildHeartRateProfileDraft(summaryRef.current));
-    setSaveError(null);
+    setRecommendedApplied(false);
   }, [summaryKey]); // The content key avoids discarding drafts on parent-only rerenders.
 
-  const isDirty = draft.some((zone, index) => {
+  const valuesAreDirty = draft.some((zone, index) => {
     const original = summary.zones[index];
     return (
       zone.minBpm !== String(original?.minBpm ?? "") ||
       zone.maxBpm !== String(original?.maxBpm ?? "")
     );
   });
-  const requiresPersonalValidation = isPersonal || isDirty;
-  const validation = validateHeartRateProfileDraft(draft);
-  const visibleSummaryError = requiresPersonalValidation ? validation.summary : null;
-  const canSaveUnchangedEstimate = isEstimated && !summary.accepted && !isDirty;
-  const canSavePersonalDraft = requiresPersonalValidation && validation.profile != null && isDirty;
-  const canSave = canSaveUnchangedEstimate || canSavePersonalDraft;
-
-  const cancelEditing = () => {
-    setDraft(buildHeartRateProfileDraft(summary));
-    setSaveError(null);
-    onClearError?.();
-  };
-
-  const saveProfile = async () => {
-    const profile = canSaveUnchangedEstimate
-      ? buildProfileFromSummary(summary)
-      : validation.profile;
-    if (!profile) {
-      setSaveError(
-        visibleSummaryError ?? "Check the highlighted ranges before saving your personal guidance.",
+  const isDirty = valuesAreDirty || recommendedApplied;
+  const validation = useMemo(() => validateHeartRateProfileDraft(draft), [draft]);
+  const recommendedSummary = useMemo(
+    () => buildHeartRateZonesSummary(recommendedAge),
+    [recommendedAge],
+  );
+  const unchangedAcceptedProfile = summary.accepted && !isDirty;
+  const canSubmit = unchangedAcceptedProfile || validation.profile != null;
+  const profileToPersist =
+    validation.profile && (!summary.accepted || isDirty) ? validation.profile : null;
+  const visibleSummaryError = isDirty || !summary.accepted ? validation.summary : null;
+  const matchesRecommended =
+    profileToPersist != null &&
+    recommendedSummary.zones.length === profileToPersist.zones.length &&
+    profileToPersist.zones.every((zone, index) => {
+      const recommendedZone = recommendedSummary.zones[index];
+      return (
+        zone.reference === recommendedZone?.reference &&
+        zone.minBpm === recommendedZone.minBpm &&
+        zone.maxBpm === recommendedZone.maxBpm
       );
+    });
+  const effectiveDraftSource = profileToPersist
+    ? matchesRecommended
+      ? "estimated"
+      : "personal"
+    : isDirty
+      ? "invalid-draft"
+      : summary.source;
+  const draftStateKey = JSON.stringify({
+    source: effectiveDraftSource,
+    values: draft.map((zone) => [zone.reference, zone.minBpm, zone.maxBpm]),
+  });
+  const publishDraftState = useEffectEvent((state: HeartRateProfileDraftState) => {
+    onDraftStateChange?.(state);
+  });
+  const publishedDraftState = useMemo(
+    () => ({
+      canSubmit,
+      isDirty,
+      key: draftStateKey,
+      profileToPersist,
+    }),
+    [canSubmit, draftStateKey, isDirty, profileToPersist],
+  );
+
+  useEffect(() => {
+    publishDraftState(publishedDraftState);
+  }, [publishDraftState, publishedDraftState]);
+
+  const applyRecommended = () => {
+    if (recommendedSummary.zones.length === 0) {
       return;
     }
 
-    setSaveError(null);
-    if (await onSave(profile)) {
-      onClearError?.();
-    }
+    onClearError?.();
+    setRecommendedApplied(true);
+    setDraft(buildHeartRateProfileDraft(recommendedSummary));
   };
 
   const updateTextValue = (index: number, field: HeartRateDraftField, value: string) => {
-    setSaveError(null);
     onClearError?.();
     setDraft((current) => updateHeartRateDraftText({ draft: current, field, index, value }));
   };
 
   const updateSliderValue = (index: number, field: HeartRateDraftField, value: number) => {
-    setSaveError(null);
     onClearError?.();
     setDraft((current) => updateHeartRateDraftFromSlider({ draft: current, field, index, value }));
   };
 
   return (
     <section className={appearance === "settings" ? "hito-settings-section min-w-0" : "min-w-0"}>
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            {appearance === "settings" ? (
-              <h2 className="hito-section-title">Heart-rate guidance</h2>
-            ) : null}
-            <span
-              className="hito-status-pill"
-              data-tone={isPersonal ? "success" : isEstimated ? "signal" : "muted"}
-            >
-              {isPersonal ? "Personal" : isEstimated ? "Estimated" : "Unavailable"}
-            </span>
-          </div>
-          <p className="hito-support-copy mt-3 max-w-2xl">{summary.description}</p>
-          {summary.sourceNote ? <p className="hito-caption mt-2">{summary.sourceNote}</p> : null}
+          {appearance === "settings" ? (
+            <h2 className="hito-section-title">Heart-rate guidance</h2>
+          ) : (
+            <p className="hito-label">Guidance bands</p>
+          )}
+          <p className="hito-support-copy mt-2 max-w-2xl">
+            Adjust the BPM ranges Hito can use for future plan authoring.
+          </p>
         </div>
+        <button
+          type="button"
+          className="hito-button hito-button-secondary hito-button-sm shrink-0"
+          disabled={isSaving || recommendedAge == null}
+          onClick={applyRecommended}
+        >
+          Recommended
+        </button>
       </div>
 
       {canEdit ? (
@@ -128,15 +167,16 @@ export function HeartRateProfileSection({
 
           <div className="hito-heart-rate-lanes">
             {draft.map((zone, index) => {
-              const minError = requiresPersonalValidation
-                ? validation.fieldErrors[fieldErrorKey(index, "minBpm")]
-                : undefined;
-              const maxError = requiresPersonalValidation
-                ? validation.fieldErrors[fieldErrorKey(index, "maxBpm")]
-                : undefined;
-              const zoneError = requiresPersonalValidation
-                ? validation.zoneErrors[index]
-                : undefined;
+              const minError =
+                isDirty || !summary.accepted
+                  ? validation.fieldErrors[fieldErrorKey(index, "minBpm")]
+                  : undefined;
+              const maxError =
+                isDirty || !summary.accepted
+                  ? validation.fieldErrors[fieldErrorKey(index, "maxBpm")]
+                  : undefined;
+              const zoneError =
+                isDirty || !summary.accepted ? validation.zoneErrors[index] : undefined;
               const fieldError = minError ?? maxError ?? zoneError;
               const minimumBounds = heartRateSliderBounds(draft, index, "minBpm");
               const maximumBounds = heartRateSliderBounds(draft, index, "maxBpm");
@@ -195,40 +235,9 @@ export function HeartRateProfileSection({
             })}
           </div>
 
-          <div className="hito-heart-rate-editor-footer">
-            <div className="min-w-0">
-              <p className="hito-body-small">
-                {isEstimated
-                  ? "Estimated guidance may overlap or leave gaps. Any change becomes personal guidance."
-                  : "Personal guidance is used for future plan authoring."}
-              </p>
-              <p className="hito-caption mt-1">
-                Bands stay ordered by purpose. Confirmed workout BPM snapshots stay unchanged.
-              </p>
-            </div>
-            <div className="hito-settings-actions">
-              <button
-                type="button"
-                className="hito-button hito-button-primary hito-button-md"
-                disabled={isSaving || !canSave}
-                onClick={() => void saveProfile()}
-              >
-                {isSaving ? "Saving..." : "Save ranges"}
-              </button>
-              <button
-                type="button"
-                className="hito-button hito-button-ghost hito-button-md"
-                disabled={isSaving || !isDirty}
-                onClick={cancelEditing}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-
-          {visibleSummaryError || saveError ? (
+          {visibleSummaryError ? (
             <div className="hito-state-surface p-3" data-tone="destructive" role="alert">
-              <p className="hito-body-small">{saveError ?? visibleSummaryError}</p>
+              <p className="hito-body-small">{visibleSummaryError}</p>
             </div>
           ) : null}
         </div>
@@ -241,14 +250,4 @@ export function HeartRateProfileSection({
       )}
     </section>
   );
-}
-
-function buildProfileFromSummary(summary: HeartRateZonesSummary): PersonalHeartRateProfileInput {
-  return {
-    zones: summary.zones.map((zone) => ({
-      reference: zone.reference,
-      minBpm: zone.minBpm,
-      maxBpm: zone.maxBpm,
-    })),
-  };
 }

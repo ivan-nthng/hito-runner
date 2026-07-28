@@ -65,6 +65,7 @@ export function ActivePlanCreatePlanDialog({
   const transitionInFlightRef = useRef(false);
   const previousOpenRef = useRef(open);
   const initialStateKeyRef = useRef<string | null>(null);
+  const previewReturnFocusRef = useRef<HTMLElement | null>(null);
 
   const [settingsDefaults, setSettingsDefaults] = useState<UserSettingsSummary | null>(null);
   const [settingsStatus, setSettingsStatus] = useState<"idle" | "loading">("idle");
@@ -86,7 +87,6 @@ export function ActivePlanCreatePlanDialog({
   const [recent5kTime, setRecent5kTime] = useState(initialState.recent5kTime);
   const [recent5kPace, setRecent5kPace] = useState(initialState.recent5kPace);
   const [fixedRestDays, setFixedRestDays] = useState<WeekdayName[]>(initialState.fixedRestDays);
-  const [restDaysAnswered, setRestDaysAnswered] = useState(initialState.restDaysAnswered);
   const [maxRunningDaysPerWeek, setMaxRunningDaysPerWeek] = useState(
     initialState.maxRunningDaysPerWeek,
   );
@@ -105,6 +105,7 @@ export function ActivePlanCreatePlanDialog({
   );
   const [planGoalFinishTime, setPlanGoalFinishTime] = useState(initialState.planGoalFinishTime);
   const [planGoalTargetDate, setPlanGoalTargetDate] = useState(initialState.planGoalTargetDate);
+  const [runnerComment, setRunnerComment] = useState(initialState.runnerComment);
   const [transitionStatus, setTransitionStatus] = useState<TransitionStatus>("idle");
   const [transitionReviewInput, setTransitionReviewInput] =
     useState<ActivePlanTransitionReviewInput | null>(null);
@@ -123,7 +124,6 @@ export function ActivePlanCreatePlanDialog({
       recent5kTime,
       recent5kPace,
       fixedRestDays,
-      restDaysAnswered,
       maxRunningDaysPerWeek,
       preferredLongRunDay,
       startDate,
@@ -132,6 +132,7 @@ export function ActivePlanCreatePlanDialog({
       planGoalCustomDistanceLabel,
       planGoalFinishTime,
       planGoalTargetDate,
+      runnerComment,
     }),
     [
       age,
@@ -147,7 +148,7 @@ export function ActivePlanCreatePlanDialog({
       preferredLongRunDay,
       recent5kPace,
       recent5kTime,
-      restDaysAnswered,
+      runnerComment,
       startDate,
       weightKg,
     ],
@@ -173,8 +174,8 @@ export function ActivePlanCreatePlanDialog({
   );
   const selectedPlanPreview = useSelectedPlanPresetPreviewController({
     state: constructorState,
-    autoRefreshOpenPreview: true,
     hasRequiredPlanBasics: hasAcceptedRunnerBaseline,
+    onPreviewDispatch: () => setRunnerComment(""),
     previewContextKey: runnerBaseline.previewContextKey,
     requiredBasicsMessage:
       "Save your runner baseline and accept the BPM guidance before previewing a generated plan.",
@@ -192,6 +193,12 @@ export function ActivePlanCreatePlanDialog({
     transitionStatus !== "idle" ||
     settingsStatus === "loading" ||
     runnerBaseline.isSaving;
+  const pendingPreviewCanReopen =
+    selectedPlanPreview.status === "previewing_plan" &&
+    !selectedPlanPreview.previewOpen &&
+    transitionStatus === "idle" &&
+    settingsStatus === "idle" &&
+    !runnerBaseline.isSaving;
   const selectedPreviewMatchesGoal = selectedPlanPreview.selectedGoalId === selectedGoalId;
   const selectedPreviewIsReady =
     selectedPreviewMatchesGoal && selectedPlanPreview.previewResult?.ok === true;
@@ -207,7 +214,7 @@ export function ActivePlanCreatePlanDialog({
     status: selectedPlanPreview.status,
   });
   const footerButtonDisabled =
-    isBusy ||
+    (isBusy && !pendingPreviewCanReopen) ||
     !hasActivePlan ||
     !hasAcceptedRunnerBaseline ||
     !selectedGoalId ||
@@ -246,7 +253,6 @@ export function ActivePlanCreatePlanDialog({
     setRecent5kTime(initialState.recent5kTime);
     setRecent5kPace(initialState.recent5kPace);
     setFixedRestDays(initialState.fixedRestDays);
-    setRestDaysAnswered(initialState.restDaysAnswered);
     setMaxRunningDaysPerWeek(initialState.maxRunningDaysPerWeek);
     setPreferredLongRunDay(initialState.preferredLongRunDay);
     setStartDate(initialState.startDate);
@@ -255,6 +261,7 @@ export function ActivePlanCreatePlanDialog({
     setPlanGoalCustomDistanceLabel(initialState.planGoalCustomDistanceLabel);
     setPlanGoalFinishTime(initialState.planGoalFinishTime);
     setPlanGoalTargetDate(initialState.planGoalTargetDate);
+    setRunnerComment(initialState.runnerComment);
     resetSelectedPlanPreviewState();
     setTransitionReviewInput(null);
     setTransitionReviewResult(null);
@@ -372,7 +379,7 @@ export function ActivePlanCreatePlanDialog({
     }
   }
 
-  function handleCreatePlanClick() {
+  async function handleCreatePlanClick(trigger?: HTMLElement) {
     if (isBusy) {
       return;
     }
@@ -399,8 +406,23 @@ export function ActivePlanCreatePlanDialog({
       return;
     }
 
+    const activeElement = trigger ?? document.activeElement;
+    previewReturnFocusRef.current = activeElement instanceof HTMLElement ? activeElement : null;
+
+    if (selectedPlanPreview.status === "previewing_plan") {
+      selectedPlanPreview.setPreviewOpen(true);
+      return;
+    }
+
     if (selectedPreviewIsReady) {
       selectedPlanPreview.setPreviewOpen(true);
+      return;
+    }
+
+    if (!(await runnerBaseline.persistHeartRateDraft())) {
+      selectedPlanPreview.setError(
+        runnerBaseline.error ?? "Check the highlighted BPM ranges before creating this plan.",
+      );
       return;
     }
 
@@ -514,7 +536,6 @@ export function ActivePlanCreatePlanDialog({
                 setRecent5kTime,
                 setRecent5kPace,
                 setFixedRestDays,
-                setRestDaysAnswered,
                 setMaxRunningDaysPerWeek,
                 setPreferredLongRunDay,
                 setStartDate,
@@ -539,11 +560,13 @@ export function ActivePlanCreatePlanDialog({
                   planGoalCustomDistanceLabel={planGoalCustomDistanceLabel}
                   planGoalFinishTime={planGoalFinishTime}
                   planGoalTargetDate={planGoalTargetDate}
+                  runnerComment={runnerComment}
                   onPlanGoalChoiceChange={changePlanGoalChoice}
                   onPlanGoalCustomDistanceKmChange={setPlanGoalCustomDistanceKm}
                   onPlanGoalCustomDistanceLabelChange={setPlanGoalCustomDistanceLabel}
                   onPlanGoalFinishTimeChange={setPlanGoalFinishTime}
                   onPlanGoalTargetDateChange={setPlanGoalTargetDate}
+                  onRunnerCommentChange={setRunnerComment}
                   onPreviewOpenChange={(nextOpen) => {
                     selectedPlanPreview.setPreviewOpen(nextOpen);
                     if (!nextOpen) {
@@ -559,6 +582,7 @@ export function ActivePlanCreatePlanDialog({
                   previewDialogDescription="This plan is still a preview. Next, review what will change before anything is saved."
                   previewDialogPrimaryActionLabel="Review plan change"
                   previewDialogPrimaryActionPendingLabel="Reviewing change..."
+                  previewReturnFocusRef={previewReturnFocusRef}
                   previewDialogExtraNotice={
                     transitionReviewResult && !transitionReviewResult.ok ? (
                       <TransitionBlockedNotice result={transitionReviewResult} />
@@ -576,8 +600,9 @@ export function ActivePlanCreatePlanDialog({
                       runnerBaseline.clearError();
                       setSettingsError(null);
                     }}
+                    onDraftStateChange={runnerBaseline.onHeartRateDraftStateChange}
                     onPrepare={runnerBaseline.prepare}
-                    onSave={runnerBaseline.saveHeartRateProfile}
+                    recommendedAge={runnerBaseline.recommendedAge}
                     summary={runnerBaseline.summary}
                   />
                 ),
@@ -603,8 +628,11 @@ export function ActivePlanCreatePlanDialog({
               type="button"
               className="hito-button hito-button-primary hito-button-md"
               disabled={footerButtonDisabled}
-              aria-busy={selectedPlanPreview.status === "previewing_plan" || undefined}
-              onClick={handleCreatePlanClick}
+              aria-busy={
+                (selectedPlanPreview.status === "previewing_plan" && !pendingPreviewCanReopen) ||
+                undefined
+              }
+              onClick={(event) => handleCreatePlanClick(event.currentTarget)}
             >
               {selectedPlanPreview.status === "previewing_plan"
                 ? "Creating preview..."

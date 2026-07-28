@@ -14,7 +14,6 @@ interface StructuredPlanConstructorProps {
     setRecent5kTime: (value: string) => void;
     setRecent5kPace: (value: string) => void;
     setFixedRestDays: Dispatch<SetStateAction<WeekdayName[]>>;
-    setRestDaysAnswered: (value: boolean) => void;
     setMaxRunningDaysPerWeek: (value: string) => void;
     setPreferredLongRunDay: (value: WeekdayName | "") => void;
     setStartDate: (value: string) => void;

@@ -27,7 +27,6 @@ export function PlanScheduleEditPanel({
   available,
   defaultOpen = false,
   fixedRestDays,
-  restDaysAnswered,
   maxRunningDaysPerWeek,
   preferredLongRunDay,
   previewStatus,
@@ -39,7 +38,6 @@ export function PlanScheduleEditPanel({
   summary,
   isBusy,
   onFixedRestDaysChange,
-  onRestDaysAnsweredChange,
   onMaxRunningDaysPerWeekChange,
   onPreferredLongRunDayChange,
   onReview,
@@ -49,7 +47,6 @@ export function PlanScheduleEditPanel({
   available: boolean;
   defaultOpen?: boolean;
   fixedRestDays: WeekdayName[];
-  restDaysAnswered: boolean;
   maxRunningDaysPerWeek: string;
   preferredLongRunDay: WeekdayName | "";
   previewStatus: PlanSchedulePreviewStatus;
@@ -61,7 +58,6 @@ export function PlanScheduleEditPanel({
   summary: PlanScheduleEditSummary;
   isBusy: boolean;
   onFixedRestDaysChange: (value: WeekdayName[]) => void;
-  onRestDaysAnsweredChange: (value: boolean) => void;
   onMaxRunningDaysPerWeekChange: (value: string) => void;
   onPreferredLongRunDayChange: (value: WeekdayName | "") => void;
   onReview: () => void;
@@ -72,8 +68,7 @@ export function PlanScheduleEditPanel({
     return null;
   }
 
-  const canReview =
-    restDaysAnswered && maxRunningDaysPerWeek.trim().length > 0 && previewStatus !== "previewing";
+  const canReview = maxRunningDaysPerWeek.trim().length > 0 && previewStatus !== "previewing";
   const reflowResult = result?.ok && result.mode === "schedule_reflow" ? result : null;
   const regenerationResult = result?.ok && result.mode === "requires_regeneration" ? result : null;
 
@@ -133,11 +128,6 @@ export function PlanScheduleEditPanel({
               onFixedRestDaysChange(value);
               onReviewAgain();
             }}
-            restDaysAnswered={restDaysAnswered}
-            onRestDaysAnsweredChange={(value) => {
-              onRestDaysAnsweredChange(value);
-              onReviewAgain();
-            }}
             maxRunningDaysPerWeek={maxRunningDaysPerWeek}
             onMaxRunningDaysPerWeekChange={(value) => {
               onMaxRunningDaysPerWeekChange(value);
@@ -149,6 +139,7 @@ export function PlanScheduleEditPanel({
               onReviewAgain();
             }}
             preferredLongRunMode="optional-any"
+            runningDaysMode="frequency"
             showFitnessBenchmark={false}
             fixedRestDaysHelper="Choose rest days for this active-plan edit only. This does not update profile defaults."
             maxRunningDaysHelper="Keep the same weekly frequency for a date-only reflow. A frequency change needs a reviewed plan change from Add plan."

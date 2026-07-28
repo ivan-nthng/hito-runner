@@ -11,12 +11,11 @@ import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
 
 type PreferredLongRunMode = "optional-any" | "default-sunday";
+type RunningDaysPreferenceMode = "ceiling" | "frequency";
 
 interface TrainingPreferenceFieldsProps {
   fixedRestDays: WeekdayName[];
   onFixedRestDaysChange: (value: WeekdayName[]) => void;
-  restDaysAnswered: boolean;
-  onRestDaysAnsweredChange: (value: boolean) => void;
   maxRunningDaysPerWeek: string;
   onMaxRunningDaysPerWeekChange: (value: string) => void;
   preferredLongRunDay: WeekdayName | "";
@@ -34,13 +33,12 @@ interface TrainingPreferenceFieldsProps {
   maxRunningDaysHelper?: string;
   preferredLongRunHelper?: string;
   showRunningDays?: boolean;
+  runningDaysMode?: RunningDaysPreferenceMode;
 }
 
 export function TrainingPreferenceFields({
   fixedRestDays,
   onFixedRestDaysChange,
-  restDaysAnswered,
-  onRestDaysAnsweredChange,
   maxRunningDaysPerWeek,
   onMaxRunningDaysPerWeekChange,
   preferredLongRunDay,
@@ -58,16 +56,10 @@ export function TrainingPreferenceFields({
   maxRunningDaysHelper,
   preferredLongRunHelper,
   showRunningDays = true,
+  runningDaysMode = "ceiling",
 }: TrainingPreferenceFieldsProps) {
   const allowedRunningDayCount = WEEKDAY_OPTIONS.length - fixedRestDays.length;
-  const selectedRunningDays = Number.parseInt(maxRunningDaysPerWeek, 10);
-  const hasRunningDaysAnswer =
-    maxRunningDaysPerWeek.trim().length > 0 &&
-    Number.isInteger(selectedRunningDays) &&
-    selectedRunningDays >= 1 &&
-    selectedRunningDays <= allowedRunningDayCount;
-  const canShowPreferredLongRunDay = restDaysAnswered && hasRunningDaysAnswer;
-  const canShowFitnessBenchmark = canShowPreferredLongRunDay && showFitnessBenchmark;
+  const canShowFitnessBenchmark = showFitnessBenchmark;
   const canSelectMoreRestDays = fixedRestDays.length < WEEKDAY_OPTIONS.length - 1;
   const preferredLongRunGroup = useHitoRadioGroup({
     items: [
@@ -87,10 +79,10 @@ export function TrainingPreferenceFields({
   function commitFixedRestDays(nextRestDays: WeekdayName[]) {
     const nextAllowedRunningDayCount = WEEKDAY_OPTIONS.length - nextRestDays.length;
 
-    onRestDaysAnsweredChange(true);
     onFixedRestDaysChange(nextRestDays);
 
     if (
+      runningDaysMode === "frequency" &&
       maxRunningDaysPerWeek.trim() &&
       Number.parseInt(maxRunningDaysPerWeek, 10) > nextAllowedRunningDayCount
     ) {
@@ -107,7 +99,10 @@ export function TrainingPreferenceFields({
       <TrainingPreferenceField
         label="Fixed rest days"
         helper={
-          fixedRestDaysHelper ?? "Pick fixed rest days or choose no fixed rest days to continue."
+          fixedRestDaysHelper ??
+          (runningDaysMode === "ceiling"
+            ? "Optional. Choose only weekdays that must stay free."
+            : "Choose weekdays that must stay free in this schedule.")
         }
       >
         <div className="hito-choice-toggle-group" role="group" aria-label="Fixed rest days">
@@ -115,10 +110,10 @@ export function TrainingPreferenceFields({
             type="button"
             onClick={() => commitFixedRestDays([])}
             className="hito-choice-toggle hito-choice-toggle-sm"
-            data-selected={restDaysAnswered && fixedRestDays.length === 0}
-            aria-pressed={restDaysAnswered && fixedRestDays.length === 0}
+            data-selected={fixedRestDays.length === 0}
+            aria-pressed={fixedRestDays.length === 0}
           >
-            No fixed rest days
+            {runningDaysMode === "ceiling" ? "Flexible" : "No fixed rest days"}
           </button>
           {WEEKDAY_OPTIONS.map((weekday) => {
             const active = fixedRestDays.includes(weekday.value);
@@ -147,63 +142,61 @@ export function TrainingPreferenceFields({
         </div>
       </TrainingPreferenceField>
 
-      {restDaysAnswered && showRunningDays ? (
+      {showRunningDays ? (
         <RunningDaysPreferenceField
           fixedRestDays={fixedRestDays}
           maxRunningDaysPerWeek={maxRunningDaysPerWeek}
           onMaxRunningDaysPerWeekChange={onMaxRunningDaysPerWeekChange}
           label={runningDaysLabel}
           helper={maxRunningDaysHelper}
+          mode={runningDaysMode}
         />
       ) : null}
 
-      {canShowPreferredLongRunDay ? (
-        <TrainingPreferenceField
-          label="Preferred long-run day"
-          helper={
-            preferredLongRunHelper ??
-            (preferredLongRunMode === "default-sunday"
-              ? "Leave unselected to keep Sunday as the default."
-              : "Optional. Leave open if any available day is fine.")
-          }
+      <TrainingPreferenceField
+        label="Preferred long-run day"
+        helper={
+          preferredLongRunHelper ??
+          (preferredLongRunMode === "default-sunday"
+            ? "Leave unselected to keep Sunday as the default."
+            : "Optional. Leave open if any available day is fine.")
+        }
+      >
+        <div
+          className="hito-choice-toggle-group"
+          {...preferredLongRunGroup.groupProps}
+          aria-label="Preferred long-run day"
         >
-          <div
-            className="hito-choice-toggle-group"
-            {...preferredLongRunGroup.groupProps}
-            aria-label="Preferred long-run day"
-          >
-            {preferredLongRunMode === "optional-any" ||
-            preferredLongRunMode === "default-sunday" ? (
+          {preferredLongRunMode === "optional-any" || preferredLongRunMode === "default-sunday" ? (
+            <button
+              type="button"
+              {...preferredLongRunGroup.getRadioProps("")}
+              className="hito-choice-toggle hito-choice-toggle-sm"
+              data-selected={preferredLongRunDay === ""}
+              onClick={() => onPreferredLongRunDayChange("")}
+            >
+              {preferredLongRunMode === "default-sunday" ? "Use default" : "Any"}
+            </button>
+          ) : null}
+          {WEEKDAY_OPTIONS.map((weekday) => {
+            const active = preferredLongRunDay === weekday.value;
+            const disabled = fixedRestDays.includes(weekday.value);
+            return (
               <button
+                key={weekday.value}
                 type="button"
-                {...preferredLongRunGroup.getRadioProps("")}
+                {...preferredLongRunGroup.getRadioProps(weekday.value)}
+                disabled={disabled}
                 className="hito-choice-toggle hito-choice-toggle-sm"
-                data-selected={preferredLongRunDay === ""}
-                onClick={() => onPreferredLongRunDayChange("")}
+                data-selected={active}
+                onClick={() => onPreferredLongRunDayChange(weekday.value)}
               >
-                {preferredLongRunMode === "default-sunday" ? "Use default" : "Any"}
+                {weekday.label}
               </button>
-            ) : null}
-            {WEEKDAY_OPTIONS.map((weekday) => {
-              const active = preferredLongRunDay === weekday.value;
-              const disabled = fixedRestDays.includes(weekday.value);
-              return (
-                <button
-                  key={weekday.value}
-                  type="button"
-                  {...preferredLongRunGroup.getRadioProps(weekday.value)}
-                  disabled={disabled}
-                  className="hito-choice-toggle hito-choice-toggle-sm"
-                  data-selected={active}
-                  onClick={() => onPreferredLongRunDayChange(weekday.value)}
-                >
-                  {weekday.label}
-                </button>
-              );
-            })}
-          </div>
-        </TrainingPreferenceField>
-      ) : null}
+            );
+          })}
+        </div>
+      </TrainingPreferenceField>
 
       {canShowFitnessBenchmark &&
       fitnessLevel &&
@@ -257,37 +250,62 @@ export function TrainingPreferenceFields({
 export function RunningDaysPreferenceField({
   fixedRestDays,
   helper,
-  label = "Default running days per week",
+  label,
   maxRunningDaysPerWeek,
+  mode = "ceiling",
   onMaxRunningDaysPerWeekChange,
 }: {
   fixedRestDays: WeekdayName[];
   helper?: string;
   label?: string;
   maxRunningDaysPerWeek: string;
+  mode?: RunningDaysPreferenceMode;
   onMaxRunningDaysPerWeekChange: (value: string) => void;
 }) {
-  const allowedRunningDayCount = WEEKDAY_OPTIONS.length - fixedRestDays.length;
+  const allowedRunningDayCount =
+    mode === "ceiling" ? WEEKDAY_OPTIONS.length : WEEKDAY_OPTIONS.length - fixedRestDays.length;
   const selectedRunningDays = Number.parseInt(maxRunningDaysPerWeek, 10);
   const runningDayOptions = Array.from({ length: allowedRunningDayCount }, (_, index) =>
     String(index + 1),
   );
   const runningDaysGroup = useHitoRadioGroup({
-    items: runningDayOptions.map((value) => ({ value })),
+    items: [
+      ...(mode === "ceiling" ? [{ value: "" }] : []),
+      ...runningDayOptions.map((value) => ({ value })),
+    ],
     value: maxRunningDaysPerWeek,
   });
+  const resolvedLabel =
+    label ?? (mode === "ceiling" ? "Weekly running ceiling" : "Running days per week");
 
   return (
     <TrainingPreferenceField
-      label={label}
+      label={resolvedLabel}
       helper={
         helper ??
-        `Choose 1-${allowedRunningDayCount} running day${
-          allowedRunningDayCount === 1 ? "" : "s"
-        } per week.`
+        (mode === "ceiling"
+          ? "Optional. This is a maximum, not a target workout count."
+          : `Choose 1-${allowedRunningDayCount} running day${
+              allowedRunningDayCount === 1 ? "" : "s"
+            } per week.`)
       }
     >
-      <div className="hito-choice-toggle-group" {...runningDaysGroup.groupProps} aria-label={label}>
+      <div
+        className="hito-choice-toggle-group"
+        {...runningDaysGroup.groupProps}
+        aria-label={resolvedLabel}
+      >
+        {mode === "ceiling" ? (
+          <button
+            type="button"
+            {...runningDaysGroup.getRadioProps("")}
+            className="hito-choice-toggle hito-choice-toggle-sm"
+            data-selected={maxRunningDaysPerWeek === ""}
+            onClick={() => onMaxRunningDaysPerWeekChange("")}
+          >
+            Flexible
+          </button>
+        ) : null}
         {runningDayOptions.map((count) => {
           const active = selectedRunningDays === Number(count);
           return (
@@ -297,6 +315,11 @@ export function RunningDaysPreferenceField({
               {...runningDaysGroup.getRadioProps(count)}
               className="hito-choice-toggle hito-choice-toggle-sm"
               data-selected={active}
+              aria-label={
+                mode === "ceiling"
+                  ? `Up to ${count} running day${count === "1" ? "" : "s"} per week`
+                  : `${count} running day${count === "1" ? "" : "s"} per week`
+              }
               onClick={() => onMaxRunningDaysPerWeekChange(count)}
             >
               {count}

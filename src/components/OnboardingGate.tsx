@@ -36,6 +36,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const structuredFormRef = useRef<HTMLFormElement | null>(null);
   const runningPlanCreateInFlightRef = useRef(false);
   const manualCreateInFlightRef = useRef(false);
+  const previewReturnFocusRef = useRef<HTMLElement | null>(null);
 
   const [age, setAge] = useState(() => (defaults?.age != null ? String(defaults.age) : ""));
   const [weightKg, setWeightKg] = useState(() =>
@@ -52,7 +53,6 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const [fixedRestDays, setFixedRestDays] = useState<WeekdayName[]>(
     () => defaults?.trainingPreferences?.blocked_days ?? [],
   );
-  const [restDaysAnswered, setRestDaysAnswered] = useState(true);
   const [maxRunningDaysPerWeek, setMaxRunningDaysPerWeek] = useState(() =>
     defaults?.trainingPreferences?.max_running_days_per_week != null
       ? String(defaults.trainingPreferences.max_running_days_per_week)
@@ -68,6 +68,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const [planGoalCustomDistanceLabel, setPlanGoalCustomDistanceLabel] = useState("");
   const [planGoalFinishTime, setPlanGoalFinishTime] = useState("");
   const [planGoalTargetDate, setPlanGoalTargetDate] = useState("");
+  const [runnerComment, setRunnerComment] = useState("");
   const [manualCreateStatus, setManualCreateStatus] = useState<ManualCreateStatus>("idle");
   const [manualCreateError, setManualCreateError] = useState<string | null>(null);
   const [runningPlanConfirmResult, setRunningPlanConfirmResult] =
@@ -86,7 +87,6 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
       recent5kTime,
       recent5kPace,
       fixedRestDays,
-      restDaysAnswered,
       maxRunningDaysPerWeek,
       preferredLongRunDay,
       startDate,
@@ -95,6 +95,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
       planGoalCustomDistanceLabel,
       planGoalFinishTime,
       planGoalTargetDate,
+      runnerComment,
     }),
     [
       age,
@@ -110,7 +111,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
       preferredLongRunDay,
       recent5kPace,
       recent5kTime,
-      restDaysAnswered,
+      runnerComment,
       startDate,
       weightKg,
     ],
@@ -130,13 +131,19 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     previewContextKey: runnerBaseline.previewContextKey,
     requiredBasicsMessage:
       "Save your runner baseline and accept the BPM guidance before previewing a generated plan.",
-    autoRefreshOpenPreview: true,
     resetOnInputChange: true,
+    onPreviewDispatch: () => setRunnerComment(""),
     onResetExternalState: () => setRunningPlanConfirmResult(null),
   });
   const isPresetBusy = selectedPlanPreview.isBusy || runningPlanCreateStatus !== "idle";
   const isManualCreateBusy = manualCreateStatus !== "idle";
   const isBusy = isPresetBusy || isManualCreateBusy || runnerBaseline.isSaving;
+  const pendingPreviewCanReopen =
+    selectedPlanPreview.status === "previewing_plan" &&
+    !selectedPlanPreview.previewOpen &&
+    runningPlanCreateStatus === "idle" &&
+    manualCreateStatus === "idle" &&
+    !runnerBaseline.isSaving;
   const selectedGoalId = planGoalChoice || null;
   const selectedPlanGoalPreviewGate = resolveSelectedPlanGoalPreviewGate(
     {
@@ -152,31 +159,21 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const selectedPreviewIsReady =
     selectedPreviewMatchesGoal && selectedPlanPreview.previewResult?.ok === true;
   const generatedCreateDisabled =
-    isBusy ||
+    (isBusy && !pendingPreviewCanReopen) ||
     !hasAcceptedRunnerBaseline ||
     !selectedGoalId ||
     !selectedPlanGoalPreviewGate.ok ||
     (selectedPlanPreview.previewOpen && selectedPreviewIsReady);
-  const footerButtonDisabled = advancedSettingsOpen
-    ? generatedCreateDisabled
-    : isBusy || !isManualSetupReady;
-  const footerHint = advancedSettingsOpen
-    ? generatedCreateFooterHint({
-        error: selectedPlanPreview.error,
-        hasRequiredPlanBasics,
-        hasAcceptedRunnerBaseline,
-        planGoalChoice,
-        previewGate: selectedPlanGoalPreviewGate,
-        previewIsOpen: selectedPlanPreview.previewOpen,
-        previewIsReady: selectedPreviewIsReady,
-        status: selectedPlanPreview.status,
-      })
-    : manualCreateFooterHint({
-        error: manualCreateError,
-        hasAcceptedRunnerBaseline,
-        isManualSetupReady,
-        status: manualCreateStatus,
-      });
+  const footerHint = generatedCreateFooterHint({
+    error: selectedPlanPreview.error,
+    hasRequiredPlanBasics,
+    hasAcceptedRunnerBaseline,
+    planGoalChoice,
+    previewGate: selectedPlanGoalPreviewGate,
+    previewIsOpen: selectedPlanPreview.previewOpen,
+    previewIsReady: selectedPreviewIsReady,
+    status: selectedPlanPreview.status,
+  });
 
   const changePlanGoalChoice = (value: StructuredConstructorState["planGoalChoice"]) => {
     setPlanGoalChoice(value);
@@ -190,28 +187,32 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   };
 
   const toggleAdvancedSettings = () => {
-    const nextOpen = !advancedSettingsOpen;
-
-    if (!nextOpen) {
-      selectedPlanPreview.setPreviewOpen(false);
-      hitoToast.dismiss(STRUCTURED_REVIEW_TOAST_ID);
-    }
-
-    setAdvancedSettingsOpen(nextOpen);
+    setAdvancedSettingsOpen((current) => !current);
   };
 
-  const handleCreatePlanClick = () => {
-    if (!advancedSettingsOpen) {
-      void createManualPlan();
+  const handleCreatePlanClick = async (trigger?: HTMLElement) => {
+    if (!selectedGoalId) {
+      selectedPlanPreview.setError("Choose a training distance before creating a generated plan.");
       return;
     }
 
-    if (!selectedGoalId) {
+    const activeElement = trigger ?? document.activeElement;
+    previewReturnFocusRef.current = activeElement instanceof HTMLElement ? activeElement : null;
+
+    if (selectedPlanPreview.status === "previewing_plan") {
+      selectedPlanPreview.setPreviewOpen(true);
       return;
     }
 
     if (selectedPreviewIsReady) {
       selectedPlanPreview.setPreviewOpen(true);
+      return;
+    }
+
+    if (!(await runnerBaseline.persistHeartRateDraft())) {
+      selectedPlanPreview.setError(
+        runnerBaseline.error ?? "Check the highlighted BPM ranges before creating this plan.",
+      );
       return;
     }
 
@@ -321,6 +322,14 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     }
 
     manualCreateInFlightRef.current = true;
+    if (!(await runnerBaseline.persistHeartRateDraft())) {
+      manualCreateInFlightRef.current = false;
+      setManualCreateError(
+        runnerBaseline.error ?? "Check the highlighted BPM ranges before starting training.",
+      );
+      return;
+    }
+
     setManualCreateStatus("creating");
     setManualCreateError(null);
     hitoToast.working({
@@ -377,7 +386,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
         </p>
         <h1 className="hito-page-title mt-3">Choose how to start your plan.</h1>
         <p className="hito-body mt-4 text-muted-foreground">
-          Add the basics once, then open an empty calendar or expand generated-plan settings.
+          Add the basics once, then choose a training distance or open an empty manual calendar.
         </p>
       </div>
 
@@ -392,7 +401,6 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
             setRecent5kTime,
             setRecent5kPace,
             setFixedRestDays,
-            setRestDaysAnswered,
             setMaxRunningDaysPerWeek,
             setPreferredLongRunDay,
             setStartDate,
@@ -405,11 +413,43 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
               onClearError={runnerBaseline.clearError}
               error={runnerBaseline.error}
               isSaving={runnerBaseline.isSaving}
+              onDraftStateChange={runnerBaseline.onHeartRateDraftStateChange}
               onPrepare={runnerBaseline.prepare}
-              onSave={runnerBaseline.saveHeartRateProfile}
+              recommendedAge={runnerBaseline.recommendedAge}
               summary={runnerBaseline.summary}
             />
           }
+        />
+
+        <PlanPresetPanel
+          confirmResult={runningPlanConfirmResult}
+          previewResult={selectedPlanPreview.previewResult}
+          createStatus={runningPlanCreateStatus}
+          error={selectedPlanPreview.error}
+          status={selectedPlanPreview.status}
+          hasRequiredPlanBasics={hasAcceptedRunnerBaseline}
+          requiredBasicsCopy="Save your runner baseline and accept the BPM guidance before Hito prepares a reviewed plan."
+          previewOpen={selectedPlanPreview.previewOpen}
+          onPreviewOpenChange={selectedPlanPreview.setPreviewOpen}
+          planGoalChoice={planGoalChoice}
+          planGoalCustomDistanceKm={planGoalCustomDistanceKm}
+          planGoalCustomDistanceLabel={planGoalCustomDistanceLabel}
+          planGoalFinishTime={planGoalFinishTime}
+          planGoalTargetDate={planGoalTargetDate}
+          runnerComment={runnerComment}
+          onPlanGoalChoiceChange={changePlanGoalChoice}
+          onPlanGoalCustomDistanceKmChange={setPlanGoalCustomDistanceKm}
+          onPlanGoalCustomDistanceLabelChange={setPlanGoalCustomDistanceLabel}
+          onPlanGoalFinishTimeChange={setPlanGoalFinishTime}
+          onPlanGoalTargetDateChange={setPlanGoalTargetDate}
+          onRunnerCommentChange={setRunnerComment}
+          onRefreshPreview={() => {
+            void selectedPlanPreview.refreshPreview();
+          }}
+          onCreatePlan={() => {
+            void confirmSelectedRunningPlan();
+          }}
+          previewReturnFocusRef={previewReturnFocusRef}
         />
 
         <div className="flex justify-center">
@@ -439,16 +479,13 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
                 setRecent5kTime,
                 setRecent5kPace,
                 setFixedRestDays,
-                setRestDaysAnswered,
                 setMaxRunningDaysPerWeek,
                 setPreferredLongRunDay,
                 setStartDate,
               }}
               isBusy={isBusy}
               isConstructorReady={hasRequiredPlanBasics}
-              onSubmit={() => {
-                selectedPlanPreview.setError("Choose a goal before building a generated preview.");
-              }}
+              onSubmit={() => handleCreatePlanClick()}
               quickSetupSections={{
                 includeBaseline: false,
                 includeRunningLevel: false,
@@ -457,38 +494,34 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
                 firstSectionNumber: 4,
                 firstSectionHasDivider: false,
               }}
-              planPresetPanel={
-                <PlanPresetPanel
-                  confirmResult={runningPlanConfirmResult}
-                  previewResult={selectedPlanPreview.previewResult}
-                  createStatus={runningPlanCreateStatus}
-                  error={selectedPlanPreview.error}
-                  status={selectedPlanPreview.status}
-                  hasRequiredPlanBasics={hasAcceptedRunnerBaseline}
-                  requiredBasicsCopy="Save your runner baseline and accept the BPM guidance before Hito prepares a reviewed plan."
-                  previewOpen={selectedPlanPreview.previewOpen}
-                  onPreviewOpenChange={selectedPlanPreview.setPreviewOpen}
-                  planGoalChoice={planGoalChoice}
-                  planGoalCustomDistanceKm={planGoalCustomDistanceKm}
-                  planGoalCustomDistanceLabel={planGoalCustomDistanceLabel}
-                  planGoalFinishTime={planGoalFinishTime}
-                  planGoalTargetDate={planGoalTargetDate}
-                  onPlanGoalChoiceChange={changePlanGoalChoice}
-                  onPlanGoalCustomDistanceKmChange={setPlanGoalCustomDistanceKm}
-                  onPlanGoalCustomDistanceLabelChange={setPlanGoalCustomDistanceLabel}
-                  onPlanGoalFinishTimeChange={setPlanGoalFinishTime}
-                  onPlanGoalTargetDateChange={setPlanGoalTargetDate}
-                  onRefreshPreview={() => {
-                    void selectedPlanPreview.refreshPreview();
-                  }}
-                  onCreatePlan={() => {
-                    void confirmSelectedRunningPlan();
-                  }}
-                />
-              }
             />
           </div>
         ) : null}
+
+        <div className="hito-row-group">
+          <div className="hito-list-row flex-wrap items-center gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="hito-list-row-title">Manual calendar</p>
+              <p className="hito-list-row-copy">
+                Opens a saved empty calendar so you can build every workout yourself.
+              </p>
+              {manualCreateError ? <p className="hito-field-error">{manualCreateError}</p> : null}
+            </div>
+            <button
+              type="button"
+              className="hito-button hito-button-secondary hito-button-md w-full sm:w-auto"
+              disabled={isBusy || !isManualSetupReady}
+              aria-busy={manualCreateStatus === "creating" || undefined}
+              onClick={() => {
+                void createManualPlan();
+              }}
+            >
+              {manualCreateStatus === "creating"
+                ? "Opening manual calendar..."
+                : "Build my plan myself"}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="hito-onboarding-submit-footer">
@@ -501,9 +534,9 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
           <button
             type="button"
             className="hito-button hito-button-primary hito-button-lg shrink-0"
-            disabled={footerButtonDisabled}
-            aria-busy={isBusy || undefined}
-            onClick={handleCreatePlanClick}
+            disabled={generatedCreateDisabled}
+            aria-busy={(isBusy && !pendingPreviewCanReopen) || undefined}
+            onClick={(event) => handleCreatePlanClick(event.currentTarget)}
           >
             Create plan
           </button>
@@ -511,43 +544,6 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
       </div>
     </section>
   );
-}
-
-function manualCreateFooterHint({
-  error,
-  hasAcceptedRunnerBaseline,
-  isManualSetupReady,
-  status,
-}: {
-  error: string | null;
-  hasAcceptedRunnerBaseline: boolean;
-  isManualSetupReady: boolean;
-  status: ManualCreateStatus;
-}): { message: string; tone: "error" | "neutral" } {
-  if (error) {
-    return { message: error, tone: "error" };
-  }
-
-  if (!isManualSetupReady) {
-    return {
-      message: hasAcceptedRunnerBaseline
-        ? "Add age, height, and weight to create a plan."
-        : "Save your runner baseline and accept the BPM guidance before creating a plan.",
-      tone: "neutral",
-    };
-  }
-
-  if (status === "creating") {
-    return {
-      message: "Creating an empty manual plan now.",
-      tone: "neutral",
-    };
-  }
-
-  return {
-    message: "Creates an empty manual plan without adding workouts.",
-    tone: "neutral",
-  };
 }
 
 function generatedCreateFooterHint({

@@ -19,7 +19,6 @@ export interface StructuredConstructorState {
   recent5kTime: string;
   recent5kPace: string;
   fixedRestDays: WeekdayName[];
-  restDaysAnswered: boolean;
   maxRunningDaysPerWeek: string;
   preferredLongRunDay: WeekdayName | "";
   startDate: string;
@@ -29,6 +28,7 @@ export interface StructuredConstructorState {
   planGoalCustomDistanceLabel: string;
   planGoalFinishTime: string;
   planGoalTargetDate: string;
+  runnerComment: string;
 }
 
 export const WEEKDAY_OPTIONS: { value: WeekdayName; label: string }[] = [

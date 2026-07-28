@@ -21,6 +21,7 @@ export function buildInitialCreatePlanState(
 ): StructuredConstructorState {
   const profile = snapshot?.profile;
   const schedule = snapshot?.planMeta?.schedulePreferences;
+  const savedPreferences = settings?.trainingPreferences;
 
   return {
     age:
@@ -44,17 +45,26 @@ export function buildInitialCreatePlanState(
     fitnessLevel: settings?.fitnessLevel ?? "running_regularly",
     recent5kTime: "",
     recent5kPace: "",
-    fixedRestDays: normalizeWeekdayNames(schedule?.fixedRestDays ?? []),
-    restDaysAnswered: true,
+    fixedRestDays: normalizeWeekdayNames(
+      savedPreferences?.blocked_days ?? schedule?.fixedRestDays ?? [],
+    ),
     maxRunningDaysPerWeek:
-      schedule?.runningDaysPerWeek != null ? String(schedule.runningDaysPerWeek) : "",
-    preferredLongRunDay: normalizeWeekdayName(schedule?.preferredLongRunDay) ?? "",
+      savedPreferences?.max_running_days_per_week != null
+        ? String(savedPreferences.max_running_days_per_week)
+        : schedule?.maxRunningDaysPerWeek != null
+          ? String(schedule.maxRunningDaysPerWeek)
+          : "",
+    preferredLongRunDay:
+      normalizeWeekdayName(
+        savedPreferences?.preferred_long_run_day ?? schedule?.preferredLongRunDay,
+      ) ?? "",
     startDate: "",
     planGoalChoice: "",
     planGoalCustomDistanceKm: "",
     planGoalCustomDistanceLabel: "",
     planGoalFinishTime: "",
     planGoalTargetDate: "",
+    runnerComment: "",
   };
 }
 

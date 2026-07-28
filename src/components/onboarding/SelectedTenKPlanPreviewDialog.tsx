@@ -1,4 +1,12 @@
-import { useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import {
   Dialog,
   DialogContent,
@@ -7,13 +15,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Icon } from "@/components/ui/icon";
 import {
   HitoCalendarDayCell,
   type HitoCalendarWorkoutIdentity,
 } from "@/components/ui/hito-calendar-day";
 import { buildCalendarWorkoutIdentity } from "@/components/calendar/calendar-projection";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { WorkoutDocumentReadback } from "@/components/workout-structure/WorkoutDocumentReadback";
+import { GeneratedPlanPreviewLoadingState } from "@/components/onboarding/GeneratedPlanPreviewLoadingState";
+import { useGeneratedPlanReadyTransition } from "@/components/onboarding/generated-plan-preview-transition";
+import {
+  fixedRestDaysReadback,
+  weeklyRunningCeilingReadback,
+} from "@/components/onboarding/training-preference-readback";
 import { workoutDocumentNotesForSteps } from "@/components/workout-structure/workout-document-notes";
 import {
   workoutDocumentTimelineItems,
@@ -25,6 +40,8 @@ import type {
 } from "@/lib/running-plan-engine-actions";
 import { formatDistanceMeters } from "@/lib/training";
 import type { WorkoutDocument } from "@/lib/workout-document";
+import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type SelectedRunningPlanPreviewResult = RunningPlanPreviewActionResult;
 type SelectedRunningPlanPreviewDraft = Extract<
@@ -39,8 +56,8 @@ type SelectedRunningPlanCalendarRow = SelectedRunningPlanPreviewDraft["calendarR
 type SelectedRunningPlanPreviewStatus = "idle" | "previewing_plan";
 type RunningPlanCreateStatus = "idle" | "creating";
 
-function previewGoalLabel(draft: SelectedRunningPlanPreviewDraft | null) {
-  return draft?.normalizedInputSummary.planGoalIntent.distance?.label ?? "Selected";
+function reviewedGoalLabel(draft: SelectedRunningPlanPreviewDraft) {
+  return draft.normalizedInputSummary.planGoalIntent.distance?.label ?? "Distance unavailable";
 }
 
 interface SelectedRunningPlanPreviewDialogProps {
@@ -51,18 +68,21 @@ interface SelectedRunningPlanPreviewDialogProps {
   result: SelectedRunningPlanPreviewResult | null;
   status: SelectedRunningPlanPreviewStatus;
   error: string | null;
+  goalLabel: string;
   onRefresh: () => void;
   onCreate: () => void;
   description?: string;
   primaryActionLabel?: string;
   primaryActionPendingLabel?: string;
   extraNotice?: ReactNode;
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }
 
 export function SelectedRunningPlanPreviewDialog({
   confirmResult,
   createStatus,
   error,
+  goalLabel,
   onCreate,
   onOpenChange,
   onRefresh,
@@ -72,40 +92,111 @@ export function SelectedRunningPlanPreviewDialog({
   primaryActionPendingLabel = "Creating plan...",
   extraNotice,
   result,
+  returnFocusRef,
   status,
 }: SelectedRunningPlanPreviewDialogProps) {
+  const fallbackReturnFocusRef = useRef<HTMLElement | null>(null);
+  const dialogContentRef = useRef<HTMLDivElement | null>(null);
+  const readyFocusTargetRef = useRef<HTMLButtonElement | null>(null);
+  const wasLoadingExperienceVisibleRef = useRef(false);
   const loading = status === "previewing_plan";
   const creating = createStatus === "creating";
   const draft = result?.ok ? result.draft : null;
   const unavailable = result && !result.ok ? result.unavailable : null;
   const reviewReady = Boolean(draft?.reviewToken && draft?.reviewChecksum);
+  const initialLoading = loading && !draft;
+  const showLoadingCompletion = useGeneratedPlanReadyTransition({
+    hasReviewedDraft: reviewReady,
+    initialLoading,
+    open,
+  });
+  const loadingExperienceVisible = initialLoading || showLoadingCompletion;
+  const reviewVisible = Boolean(draft) && !showLoadingCompletion;
+  const compact = !reviewVisible;
+  const refreshing = loading && reviewVisible;
+  const failedPreview = Boolean(error || unavailable);
+  const unavailableIsCorrectable = unavailable?.previewOutcome === "invalid_structural_input";
+
+  useEffect(() => {
+    if (loadingExperienceVisible) {
+      wasLoadingExperienceVisibleRef.current = true;
+      return;
+    }
+
+    if (!reviewVisible || !wasLoadingExperienceVisibleRef.current) {
+      return;
+    }
+
+    wasLoadingExperienceVisibleRef.current = false;
+    const focusFrame = window.requestAnimationFrame(() => {
+      const activeElement = document.activeElement;
+
+      if (
+        activeElement === document.body ||
+        activeElement === dialogContentRef.current ||
+        activeElement == null
+      ) {
+        readyFocusTargetRef.current?.focus();
+      }
+    });
+
+    return () => window.cancelAnimationFrame(focusFrame);
+  }, [loadingExperienceVisible, reviewVisible]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-review hito-dialog-height-review"
+        ref={dialogContentRef}
+        className={cn(
+          "hito-dialog-stable hito-product-dialog hito-dialog-surface-product",
+          compact
+            ? "hito-product-dialog-content-fit hito-dialog-size-wide"
+            : "hito-dialog-size-review hito-dialog-height-review",
+        )}
         overlayClassName="hito-dialog-overlay-stable"
-      >
-        <DialogHeader className="hito-product-dialog-header">
-          <div className="min-w-0">
-            <p className="hito-micro-label" data-tone="signal">
-              Selected plan
-            </p>
-            <DialogTitle className="hito-modal-title mt-2">
-              {previewGoalLabel(draft)} plan preview
-            </DialogTitle>
-            <DialogDescription className="hito-body max-w-2xl">{description}</DialogDescription>
-          </div>
-        </DialogHeader>
+        showCloseButton={!loadingExperienceVisible}
+        onOpenAutoFocus={() => {
+          const activeElement = document.activeElement;
+          fallbackReturnFocusRef.current =
+            activeElement instanceof HTMLElement ? activeElement : null;
+        }}
+        onCloseAutoFocus={(event) => {
+          const returnTarget = returnFocusRef?.current ?? fallbackReturnFocusRef.current;
 
-        <div className="hito-product-dialog-body-scroll-fill">
-          {loading && !draft ? (
-            <div className="hito-surface-wash" data-tone="signal">
-              <p className="hito-list-row-title">Preparing plan preview</p>
-              <p className="hito-list-row-copy">
-                Hito is preparing the calendar and workout structure for review.
+          if (!returnTarget?.isConnected) {
+            return;
+          }
+
+          event.preventDefault();
+          returnTarget.focus();
+        }}
+      >
+        {loadingExperienceVisible ? (
+          <div className="sr-only">
+            <DialogTitle>{`Preparing your ${goalLabel} plan`}</DialogTitle>
+            <DialogDescription>Plan preview preparation is in progress.</DialogDescription>
+          </div>
+        ) : (
+          <DialogHeader className="hito-product-dialog-header">
+            <div className="min-w-0">
+              <p className="hito-micro-label" data-tone="signal">
+                Generated plan
               </p>
+              <DialogTitle className="hito-modal-title mt-2">{goalLabel} plan preview</DialogTitle>
+              <DialogDescription className="hito-body max-w-2xl">{description}</DialogDescription>
             </div>
+          </DialogHeader>
+        )}
+
+        <div
+          className={compact ? "hito-product-dialog-body" : "hito-product-dialog-body-scroll-fill"}
+          aria-busy={loading || creating || undefined}
+        >
+          {loadingExperienceVisible ? (
+            <GeneratedPlanPreviewLoadingState
+              complete={showLoadingCompletion}
+              goalLabel={goalLabel}
+            />
           ) : null}
 
           {error ? (
@@ -116,47 +207,101 @@ export function SelectedRunningPlanPreviewDialog({
           ) : null}
 
           {unavailable ? <PreviewUnavailableState result={unavailable} /> : null}
-          {draft ? <PreviewDraftView draft={draft} /> : null}
+          {refreshing ? (
+            <div
+              className="hito-surface-wash mb-4"
+              data-tone="signal"
+              role="status"
+              aria-live="polite"
+            >
+              <div className="flex items-start gap-3">
+                <Icon name="loader" size="sm" className="mt-0.5 animate-spin" />
+                <div className="min-w-0">
+                  <p className="hito-list-row-title">Refreshing preview</p>
+                  <p className="hito-list-row-copy">
+                    Hito is preparing a new reviewed version. Nothing is being saved.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+          {creating ? (
+            <div
+              className="hito-surface-wash mb-4"
+              data-tone="signal"
+              role="status"
+              aria-live="polite"
+            >
+              <p className="hito-list-row-title">Creating your plan</p>
+              <p className="hito-list-row-copy">Hito is saving the plan you reviewed.</p>
+            </div>
+          ) : null}
+          {reviewVisible && draft ? <PreviewDraftView draft={draft} /> : null}
           {confirmResult && !confirmResult.ok ? (
             <CreateBlockedNotice result={confirmResult} />
           ) : null}
-          {extraNotice}
+          {!loadingExperienceVisible ? extraNotice : null}
         </div>
 
-        <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-            {draft ? (
-              <>
-                <span className="hito-status-pill" data-tone="success">
-                  Reviewed
-                </span>
-                <span className="hito-status-pill" data-tone="muted">
-                  Not saved yet
-                </span>
-              </>
+        {loadingExperienceVisible ? (
+          <DialogFooter className="hito-product-dialog-footer hito-product-dialog-footer-center sm:space-x-0">
+            <button
+              type="button"
+              className="hito-button hito-button-secondary hito-button-md"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancel
+            </button>
+          </DialogFooter>
+        ) : reviewVisible && draft ? (
+          <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              <span className="hito-status-pill" data-tone="success">
+                Ready to review
+              </span>
+              <span className="hito-status-pill" data-tone="muted">
+                Not saved
+              </span>
+            </div>
+            <button
+              ref={readyFocusTargetRef}
+              type="button"
+              className="hito-button hito-button-secondary hito-button-md"
+              disabled={loading || creating}
+              onClick={onRefresh}
+            >
+              {loading ? "Refreshing..." : "Refresh preview"}
+            </button>
+            <button
+              type="button"
+              className="hito-button hito-button-primary hito-button-md"
+              disabled={!reviewReady || loading || creating}
+              aria-busy={creating || undefined}
+              onClick={onCreate}
+            >
+              {creating ? primaryActionPendingLabel : primaryActionLabel}
+            </button>
+          </DialogFooter>
+        ) : failedPreview ? (
+          <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
+            {!unavailableIsCorrectable ? (
+              <button
+                type="button"
+                className="hito-button hito-button-secondary hito-button-md"
+                onClick={() => onOpenChange(false)}
+              >
+                Close
+              </button>
             ) : null}
-          </div>
-          <button
-            type="button"
-            className="hito-button hito-button-secondary hito-button-md"
-            disabled={loading || creating}
-            onClick={onRefresh}
-          >
-            {loading ? "Refreshing..." : "Refresh preview"}
-          </button>
-          <button
-            type="button"
-            className="hito-button hito-button-primary hito-button-md"
-            disabled={!reviewReady || loading || creating}
-            onClick={onCreate}
-          >
-            {creating
-              ? primaryActionPendingLabel
-              : reviewReady
-                ? primaryActionLabel
-                : "Review required"}
-          </button>
-        </DialogFooter>
+            <button
+              type="button"
+              className="hito-button hito-button-primary hito-button-md"
+              onClick={unavailableIsCorrectable ? () => onOpenChange(false) : onRefresh}
+            >
+              {unavailableIsCorrectable ? "Review details" : "Try again"}
+            </button>
+          </DialogFooter>
+        ) : null}
       </DialogContent>
     </Dialog>
   );
@@ -197,9 +342,14 @@ function createBlockedView(result: Extract<RunningPlanConfirmActionResult, { ok:
       return {
         title: "Active plan already exists",
         copy: "Selected plans can create a new plan only when there is no active plan.",
-        helper: "Use Current Plan from the calendar to start a reviewed plan change.",
         openPlan: true,
         tone: "signal",
+      };
+    case "fixture_not_authorized":
+      return {
+        title: "Preview session unavailable",
+        copy: "This local preview session can no longer create the reviewed plan. Nothing was saved.",
+        tone: "destructive",
       };
     case "stale_review":
     case "invalid_review":
@@ -292,6 +442,7 @@ const PREVIEW_UNAVAILABLE_VIEWS = {
 >;
 
 function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft }) {
+  const isMobile = useIsMobile();
   const rowsByWeek = groupRowsByWeek(draft.calendarRows);
   const workoutDocumentsById = useMemo(
     () =>
@@ -310,33 +461,11 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
   const missingWorkoutDocumentRow =
     draft.calendarRows.find((row) => !workoutDocumentsById.has(row.rowId)) ?? null;
   const nonRestRows = draft.calendarRows.filter((row) => !row.isRestDay);
-  const endpointRow =
-    draft.calendarRows.find((row) => row.rowId === draft.endpointProof.finalRowId) ??
-    nonRestRows.at(-1) ??
-    null;
-  const sampleRow =
-    nonRestRows.find(
-      (row) =>
-        row.workoutDayKind !== "easy" &&
-        row.workoutDayKind !== "recovery" &&
-        row.workoutDayKind !== "final_selected_distance_day",
-    ) ??
-    nonRestRows.find((row) => row.workoutDayKind !== "final_selected_distance_day") ??
-    null;
-  const [activeCalendarRowId, setActiveCalendarRowId] = useState<string | null>(
-    endpointRow?.rowId ?? sampleRow?.rowId ?? draft.calendarRows[0]?.rowId ?? null,
-  );
-  const activeCalendarRow =
-    draft.calendarRows.find((row) => row.rowId === activeCalendarRowId) ??
-    endpointRow ??
-    sampleRow ??
-    draft.calendarRows[0] ??
-    null;
-  const activeWorkoutDocument =
-    (activeCalendarRow ? workoutDocumentsById.get(activeCalendarRow.rowId) : null) ?? null;
-  const activeCalendarIdentity = activeWorkoutDocument
-    ? previewCalendarWorkoutIdentity(activeWorkoutDocument)
-    : null;
+  const [activeCalendarRowId, setActiveCalendarRowId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setActiveCalendarRowId(null);
+  }, [draft.reviewChecksum]);
 
   if (missingWorkoutDocumentRow) {
     return (
@@ -355,31 +484,31 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
       <section className="hito-row-group">
         <div className="hito-list-row items-start">
           <div className="grid flex-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <PreviewFact label="Goal" value={previewGoalLabel(draft)} />
+            <PreviewFact label="Goal" value={reviewedGoalLabel(draft)} />
             <PreviewFact
               label="Plan length"
               value={`${rowsByWeek.length} weeks · ${nonRestRows.length} workouts`}
             />
             <PreviewFact
-              label="Rhythm"
-              value={`${draft.normalizedInputSummary.daysPerWeek} runs/week`}
+              label="Weekly ceiling"
+              value={weeklyRunningCeilingReadback(draft.normalizedInputSummary.daysPerWeek)}
             />
             <PreviewFact label="Workout guidance" value={metricTruthReadback(draft)} />
             <PreviewFact label="Start date" value={draft.normalizedInputSummary.startDate} />
             <PreviewFact
               label="Fixed rest"
-              value={
-                draft.normalizedInputSummary.fixedRestDays.length
-                  ? draft.normalizedInputSummary.fixedRestDays.join(", ")
-                  : "Open"
+              value={fixedRestDaysReadback(draft.normalizedInputSummary.fixedRestDays)}
+            />
+            <PreviewFact
+              label={
+                draft.normalizedInputSummary.longRunDaySource === "runner_preference"
+                  ? "Long-run preference"
+                  : "Plan long-run day"
               }
+              value={draft.normalizedInputSummary.preferredLongRunDay ?? "Plan-selected"}
             />
             <PreviewFact
-              label="Long run"
-              value={draft.normalizedInputSummary.preferredLongRunDay ?? "Default"}
-            />
-            <PreviewFact
-              label="Training weekdays"
+              label="Plan weekdays"
               value={draft.normalizedInputSummary.trainingWeekdays.join(", ")}
             />
             <PreviewFact
@@ -397,7 +526,7 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
           <div>
             <p className="hito-label">{rowsByWeek.length}-week calendar preview</p>
             <p className="hito-list-row-copy">
-              Review the planned workout rhythm and select any day to inspect its exact structure.
+              Review the planned workout rhythm and exact structure for every day.
             </p>
           </div>
           <span className="hito-status-pill" data-tone="signal">
@@ -406,101 +535,120 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
         </div>
 
         <div className="hito-selected-plan-calendar grid gap-2">
+          <div
+            className="hito-selected-plan-calendar-weeks"
+            aria-label={`${reviewedGoalLabel(draft)} preview calendar`}
+          >
+            {rowsByWeek.map(([weekNumber, rows]) => (
+              <div
+                key={weekNumber}
+                className="hito-selected-plan-calendar-week"
+                role="group"
+                aria-label={`Week ${weekNumber}`}
+              >
+                <div className="hito-selected-plan-calendar-week-grid">
+                  {rows.map((row) => {
+                    const document = workoutDocumentsById.get(row.rowId);
+                    if (!document) return null;
+
+                    const identity = previewCalendarWorkoutIdentity(document);
+                    const endpoint = calendarEndpointReadback(row);
+                    const day = formatCalendarDayNumber(row.date);
+                    const selected = row.rowId === activeCalendarRowId;
+                    const detailId = `generated-plan-workout-${row.rowId}`;
+                    const ariaLabel = [
+                      `${row.date} ${row.weekday}`,
+                      identity.label,
+                      row.title,
+                      endpoint,
+                      "Open exact workout details",
+                    ]
+                      .filter(Boolean)
+                      .join(". ");
+                    const presentation = buildPreviewCalendarDayPresentation(row, document);
+
+                    return (
+                      <Popover
+                        key={row.rowId}
+                        open={selected}
+                        onOpenChange={(nextOpen) =>
+                          setActiveCalendarRowId((current) =>
+                            nextOpen ? row.rowId : current === row.rowId ? null : current,
+                          )
+                        }
+                      >
+                        <PopoverAnchor asChild>
+                          <button
+                            type="button"
+                            className="hito-selected-plan-calendar-day"
+                            data-calendar-state={row.isRestDay ? "rest" : "workout"}
+                            style={
+                              {
+                                "--hito-selected-plan-calendar-tone": identity.color,
+                              } as CSSProperties
+                            }
+                            aria-controls={detailId}
+                            aria-details={selected ? detailId : undefined}
+                            aria-expanded={selected}
+                            aria-haspopup="dialog"
+                            aria-label={ariaLabel}
+                            aria-pressed={selected}
+                            onClick={() => setActiveCalendarRowId(row.rowId)}
+                            onFocus={() => setActiveCalendarRowId(row.rowId)}
+                            onMouseEnter={() => {
+                              if (!isMobile) {
+                                setActiveCalendarRowId(row.rowId);
+                              }
+                            }}
+                          >
+                            <HitoCalendarDayCell
+                              {...presentation}
+                              className="h-full"
+                              day={day}
+                              dense
+                            />
+                          </button>
+                        </PopoverAnchor>
+                        <PopoverContent
+                          id={detailId}
+                          align="start"
+                          sideOffset={8}
+                          collisionPadding={12}
+                          className="hito-selected-plan-calendar-popover w-[min(30rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] overflow-y-auto p-4"
+                          aria-label={`${row.date} ${row.weekday} workout details`}
+                          onOpenAutoFocus={(event) => event.preventDefault()}
+                        >
+                          {document.workoutType === "rest" ? (
+                            <div className="min-w-0">
+                              <p className="hito-label">
+                                {row.date} · {row.weekday} · {identity.label}
+                              </p>
+                              <p className="hito-list-row-title mt-1">Rest day</p>
+                              <p className="hito-list-row-copy mt-1">
+                                This day has no workout structure or target guidance.
+                              </p>
+                            </div>
+                          ) : (
+                            <PreviewWorkoutDocument
+                              document={document}
+                              label={`${row.date} · ${row.weekday} · ${identity.label}`}
+                            />
+                          )}
+                        </PopoverContent>
+                      </Popover>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
           <div className="hito-selected-plan-calendar-legend" aria-label="Calendar legend">
             {calendarLegend.map((identity) => (
               <PreviewLegendItem key={identity.label} identity={identity} />
             ))}
           </div>
-
-          <TooltipProvider delayDuration={120}>
-            <div
-              className="hito-selected-plan-calendar-weeks"
-              aria-label={`${previewGoalLabel(draft)} preview calendar`}
-            >
-              {rowsByWeek.map(([weekNumber, rows]) => (
-                <div key={weekNumber} className="hito-selected-plan-calendar-week">
-                  <p className="hito-label">Week {weekNumber}</p>
-                  <div className="hito-selected-plan-calendar-week-grid">
-                    {rows.map((row) => {
-                      const document = workoutDocumentsById.get(row.rowId);
-                      if (!document) return null;
-
-                      const identity = previewCalendarWorkoutIdentity(document);
-                      const endpoint = calendarEndpointReadback(row);
-                      const day = formatCalendarDayNumber(row.date);
-                      const selected = row.rowId === activeCalendarRowId;
-                      const ariaLabel = [
-                        `${row.date} ${row.weekday}`,
-                        identity.label,
-                        row.title,
-                        endpoint,
-                      ]
-                        .filter(Boolean)
-                        .join(". ");
-                      const presentation = buildPreviewCalendarDayPresentation(row, document);
-
-                      return (
-                        <Tooltip key={row.rowId}>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              className="block aspect-square min-w-0 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal/30"
-                              aria-label={ariaLabel}
-                              aria-pressed={selected}
-                              onClick={() => setActiveCalendarRowId(row.rowId)}
-                              onFocus={() => setActiveCalendarRowId(row.rowId)}
-                              onMouseEnter={() => setActiveCalendarRowId(row.rowId)}
-                            >
-                              <HitoCalendarDayCell
-                                {...presentation}
-                                className="h-full rounded-md border border-hairline p-1"
-                                day={day}
-                                dense
-                                interactive
-                                selected={selected}
-                              />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-80" sideOffset={8}>
-                            <span className="hito-tooltip-meta block">
-                              {row.date} · {row.weekday} · {identity.label}
-                            </span>
-                            <span className="hito-tooltip-title mt-1 block">{row.title}</span>
-                            {endpoint ? (
-                              <span className="hito-tooltip-meta mt-1 block">{endpoint}</span>
-                            ) : null}
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </TooltipProvider>
-
-          {activeCalendarRow && activeCalendarIdentity ? (
-            <PreviewCalendarDetail identity={activeCalendarIdentity} row={activeCalendarRow} />
-          ) : null}
         </div>
-      </section>
-
-      <section className="grid gap-3">
-        <div>
-          <p className="hito-label">Workout document</p>
-          <p className="hito-list-row-copy">
-            Select a calendar day to review the exact structure and target guidance before creating
-            this plan.
-          </p>
-        </div>
-        {activeWorkoutDocument?.workoutType === "rest" ? (
-          <div className="hito-surface-wash">
-            <p className="hito-list-row-title">Rest day</p>
-            <p className="hito-list-row-copy">This selected day has no workout target guidance.</p>
-          </div>
-        ) : activeWorkoutDocument ? (
-          <PreviewWorkoutDocument document={activeWorkoutDocument} label="Selected workout day" />
-        ) : null}
       </section>
     </div>
   );
@@ -518,7 +666,7 @@ function PlanGoalIntentReadback({
     (!outcomePace ||
       outcomePace.source !== "derived_from_finish_time" ||
       outcomePace.label !== derivedOutcomePace?.label);
-  const distanceLabel = intent.distance?.label ?? "Plan default";
+  const distanceLabel = intent.distance?.label ?? "Distance unavailable";
   const assumption = intent.assumptions.at(0);
 
   return (
@@ -570,7 +718,7 @@ function distanceReadback(
   intent: SelectedRunningPlanPreviewDraft["normalizedInputSummary"]["planGoalIntent"],
 ) {
   if (!intent.distance) {
-    return "Plan default";
+    return "Distance unavailable";
   }
 
   return `${intent.distance.label} · ${intent.distance.distanceKm} km`;
@@ -601,7 +749,7 @@ function PreviewWorkoutDocument({ document, label }: { document: WorkoutDocument
   const items = workoutDocumentTimelineItems(document);
 
   return (
-    <article className="hito-surface-wash min-w-0">
+    <article className="min-w-0">
       <WorkoutDocumentReadback
         heading={{
           eyebrow: label,
@@ -666,32 +814,6 @@ function PreviewLegendItem({ identity }: { identity: HitoCalendarWorkoutIdentity
   );
 }
 
-function PreviewCalendarDetail({
-  identity,
-  row,
-}: {
-  identity: HitoCalendarWorkoutIdentity;
-  row: SelectedRunningPlanCalendarRow;
-}) {
-  const endpoint = calendarEndpointReadback(row);
-
-  return (
-    <div className="hito-selected-plan-calendar-detail" aria-live="polite">
-      <div className="min-w-0">
-        <p className="hito-body-small">
-          {row.date} · {row.weekday} · {identity.label}
-        </p>
-        <p className="hito-list-row-title mt-1">{row.title}</p>
-      </div>
-      {endpoint ? (
-        <span className="hito-status-pill shrink-0" data-tone="success">
-          {endpoint}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
 function buildPreviewCalendarDayPresentation(
   row: SelectedRunningPlanCalendarRow,
   document: WorkoutDocument,
@@ -702,17 +824,31 @@ function buildPreviewCalendarDayPresentation(
   title?: string;
   workout: HitoCalendarWorkoutIdentity;
 } {
+  const identity = previewCalendarWorkoutIdentity(document);
+
   return {
-    result: row.isRestDay ? "none" : "planned",
+    result: "none",
     state: row.isRestDay ? "rest" : "workout",
     supportingText: calendarEndpointReadback(row),
     title: row.isRestDay ? undefined : row.title,
-    workout: previewCalendarWorkoutIdentity(document),
+    workout: {
+      ...identity,
+      short: "",
+    },
   };
 }
 
 function previewCalendarWorkoutIdentity(document: WorkoutDocument): HitoCalendarWorkoutIdentity {
-  return buildCalendarWorkoutIdentity(document);
+  return buildCalendarWorkoutIdentity({
+    workoutType: document.workoutType,
+    sourceWorkoutType: document.sourceWorkoutType,
+    workoutFamily: document.workoutFamily,
+    workoutIdentity: document.workoutIdentity,
+    calendarIconKey: document.calendarIconKey,
+    metricMode: document.metricMode,
+    title: document.title,
+    steps: document.steps,
+  });
 }
 
 function formatCalendarDayNumber(date: string) {

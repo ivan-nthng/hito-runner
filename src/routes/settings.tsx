@@ -13,10 +13,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EditableValueField } from "@/components/ui/editable-value-field";
 import { Icon } from "@/components/ui/icon";
 import { useHitoTabs } from "@/components/ui/hito-tabs";
-import { HeartRateProfileSection } from "@/components/settings/HeartRateProfileSection";
-import { runnerFacingHeartRateSaveError } from "@/components/settings/heart-rate-profile-errors";
+import {
+  HeartRateProfileSection,
+  type HeartRateProfileDraftState,
+} from "@/components/settings/HeartRateProfileSection";
 import { APP_NAME } from "@/lib/app-config";
-import type { PersonalHeartRateProfileInput } from "@/lib/heart-rate-zones";
 import { type RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 import { saveUserSettings, type UserSettingsSummary } from "@/lib/user-settings-actions";
 import { getSettingsRouteData } from "@/lib/training-api";
@@ -43,7 +44,6 @@ type SettingsFormState = {
   weightKg: string;
   heightCm: string;
   blockedDays: WeekdayName[];
-  restDaysAnswered: boolean;
   preferredLongRunDay: WeekdayName | "";
   maxRunningDaysPerWeek: string;
   fitnessLevel: RunnerFitnessLevel;
@@ -69,12 +69,16 @@ function SettingsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<SettingsFormState>(() => buildSettingsFormState(settings));
+  const [heartRateDraftState, setHeartRateDraftState] = useState<HeartRateProfileDraftState | null>(
+    null,
+  );
   const [activeTab, setActiveTab] = useState<SettingsTab>("personal");
   const settingsTabs = useHitoTabs({ items: SETTINGS_TABS, value: activeTab });
   const [activeEditableKey, setActiveEditableKey] = useState<ProfileEditableKey | null>(null);
 
   useEffect(() => {
     setForm(buildSettingsFormState(settings));
+    setHeartRateDraftState(null);
   }, [settings]);
 
   const initials = useMemo(
@@ -89,13 +93,24 @@ function SettingsPage() {
   );
 
   const savePersonalData = async () => {
+    if (heartRateDraftState && !heartRateDraftState.canSubmit) {
+      setError("Check the highlighted BPM ranges before saving personal data.");
+      setMessage(null);
+      return;
+    }
+
     setIsSaving(true);
     setError(null);
     setMessage(null);
 
     try {
       await saveUserSettingsFn({
-        data: buildPersonalDataPayload(form),
+        data: {
+          ...buildPersonalDataPayload(form),
+          ...(heartRateDraftState?.profileToPersist
+            ? { heartRateProfile: heartRateDraftState.profileToPersist }
+            : {}),
+        },
       });
       await router.invalidate();
       setMessage("Personal data saved.");
@@ -108,47 +123,7 @@ function SettingsPage() {
     }
   };
 
-  const saveHeartRateProfile = async (heartRateProfile: PersonalHeartRateProfileInput) => {
-    setIsSaving(true);
-    setError(null);
-    setMessage(null);
-
-    try {
-      await saveUserSettingsFn({
-        data: {
-          ...buildPersonalDataPayload(buildSettingsFormState(settings)),
-          heartRateProfile,
-        },
-      });
-      await router.invalidate();
-      setMessage("Heart-rate guidance saved.");
-      return true;
-    } catch (saveError) {
-      setError(
-        runnerFacingHeartRateSaveError(
-          saveError,
-          "Heart-rate guidance could not be saved. Check that every BPM range is complete and separate.",
-        ),
-      );
-      return false;
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const saveTrainingPreferences = async () => {
-    if (!form.restDaysAnswered) {
-      setError("Choose fixed rest days or No fixed rest days.");
-      setMessage(null);
-      return;
-    }
-
-    if (!form.maxRunningDaysPerWeek.trim()) {
-      setError("Choose default running days per week.");
-      setMessage(null);
-      return;
-    }
-
     if (form.fitnessLevel === "custom" && !isPositiveRecent5kTime(form.recent5kTime)) {
       setError("Use a positive recent 5K time such as 25:00.");
       setMessage(null);
@@ -446,14 +421,15 @@ function SettingsPage() {
               <HeartRateProfileSection
                 isSaving={isSaving}
                 onClearError={() => setError(null)}
+                onDraftStateChange={setHeartRateDraftState}
+                recommendedAge={parseRecommendedAge(form.age)}
                 summary={settings.heartRateZones}
-                onSave={saveHeartRateProfile}
               />
 
               <div className="hito-settings-actions">
                 <button
                   type="button"
-                  disabled={isSaving}
+                  disabled={isSaving || heartRateDraftState?.canSubmit === false}
                   className="hito-button hito-button-primary hito-button-lg"
                   onClick={() => {
                     void savePersonalData();
@@ -490,10 +466,6 @@ function SettingsPage() {
               onFixedRestDaysChange={(value) =>
                 setForm((current) => ({ ...current, blockedDays: value }))
               }
-              restDaysAnswered={form.restDaysAnswered}
-              onRestDaysAnsweredChange={(value) =>
-                setForm((current) => ({ ...current, restDaysAnswered: value }))
-              }
               maxRunningDaysPerWeek={form.maxRunningDaysPerWeek}
               onMaxRunningDaysPerWeekChange={(value) =>
                 setForm((current) => ({ ...current, maxRunningDaysPerWeek: value }))
@@ -516,7 +488,8 @@ function SettingsPage() {
                 setForm((current) => ({ ...current, recent5kTime: value }))
               }
               preferredLongRunMode="default-sunday"
-              fixedRestDaysHelper="Choose the weekdays Hito should keep clear when creating future plans."
+              fixedRestDaysHelper="Optional. Choose only weekdays Hito must keep clear in future plans."
+              maxRunningDaysHelper="Optional. This is an upper ceiling for future plans, not a target workout count."
               preferredLongRunHelper="Rest days are unavailable here. Leave unselected to keep Sunday as the default."
             />
 
@@ -600,7 +573,6 @@ function buildSettingsFormState(settings: UserSettingsSummary | null): SettingsF
     weightKg: settings?.weightKg != null ? String(settings.weightKg) : "",
     heightCm: settings?.heightCm != null ? String(settings.heightCm) : "",
     blockedDays: settings?.trainingPreferences?.blocked_days ?? [],
-    restDaysAnswered: Boolean(settings?.trainingPreferences),
     preferredLongRunDay: settings?.trainingPreferences?.preferred_long_run_day ?? "",
     maxRunningDaysPerWeek:
       settings?.trainingPreferences?.max_running_days_per_week != null
@@ -646,6 +618,12 @@ function parseIntegerInput(value: string) {
 
   const parsed = Number.parseInt(trimmed, 10);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseRecommendedAge(value: string) {
+  const trimmed = value.trim();
+  const age = Number(trimmed);
+  return trimmed && Number.isInteger(age) && age >= 13 && age <= 100 ? age : null;
 }
 
 function parseDecimalInput(value: string) {

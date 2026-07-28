@@ -63,7 +63,6 @@ export function PlanManagementDialog({
   const [scheduleFixedRestDays, setScheduleFixedRestDays] = useState<WeekdayName[]>(
     initialScheduleDefaults.fixedRestDays,
   );
-  const [scheduleRestDaysAnswered, setScheduleRestDaysAnswered] = useState(true);
   const [scheduleRunningDaysPerWeek, setScheduleRunningDaysPerWeek] = useState(
     String(initialScheduleDefaults.runningDaysPerWeek),
   );
@@ -109,7 +108,6 @@ export function PlanManagementDialog({
       setClearConfirmed(false);
       const nextScheduleDefaults = deriveScheduleEditDefaults(snapshot);
       setScheduleFixedRestDays(nextScheduleDefaults.fixedRestDays);
-      setScheduleRestDaysAnswered(true);
       setScheduleRunningDaysPerWeek(String(nextScheduleDefaults.runningDaysPerWeek));
       setSchedulePreferredLongRunDay(nextScheduleDefaults.preferredLongRunDay ?? "");
       setSchedulePreviewStatus("idle");
@@ -150,11 +148,6 @@ export function PlanManagementDialog({
 
   const buildScheduleEditInput = (): ActivePlanScheduleEditInput | null => {
     const runningDaysPerWeek = Number.parseInt(scheduleRunningDaysPerWeek, 10);
-
-    if (!scheduleRestDaysAnswered) {
-      setScheduleError("Choose fixed rest days or choose no fixed rest days first.");
-      return null;
-    }
 
     if (!Number.isInteger(runningDaysPerWeek) || runningDaysPerWeek < 1) {
       setScheduleError("Choose how many running days per week Hito should use.");
@@ -302,7 +295,6 @@ export function PlanManagementDialog({
                 available={Boolean(planMeta)}
                 defaultOpen
                 fixedRestDays={scheduleFixedRestDays}
-                restDaysAnswered={scheduleRestDaysAnswered}
                 maxRunningDaysPerWeek={scheduleRunningDaysPerWeek}
                 preferredLongRunDay={schedulePreferredLongRunDay}
                 previewStatus={schedulePreviewStatus}
@@ -314,7 +306,6 @@ export function PlanManagementDialog({
                 summary={scheduleSummary}
                 isBusy={isBusy}
                 onFixedRestDaysChange={setScheduleFixedRestDays}
-                onRestDaysAnsweredChange={setScheduleRestDaysAnswered}
                 onMaxRunningDaysPerWeekChange={setScheduleRunningDaysPerWeek}
                 onPreferredLongRunDayChange={setSchedulePreferredLongRunDay}
                 onReview={() => {

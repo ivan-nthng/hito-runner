@@ -7,6 +7,7 @@ import {
 import { isRealIsoDate, parseDurationSeconds } from "@/lib/first-plan-authoring-utils";
 import type { PlanGoalIntentInput, RunningPlanRunnerLevel } from "@/lib/plan-creation-engine";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
+import { generatedPlanRunnerCommentInputSchema } from "@/lib/structured-plan-authoring-schema";
 import type {
   RunningPlanConfirmActionInput,
   RunningPlanPreviewActionInput,
@@ -61,9 +62,16 @@ export function buildRunningPlanPreviewInput(
     integer: true,
   });
   const benchmark = buildRunningPlanBenchmarkInput(state);
+  const runnerComment = generatedPlanRunnerCommentInputSchema.safeParse(state.runnerComment);
 
   if (!benchmark.ok) {
     return { ok: false, error: benchmark.error };
+  }
+  if (!runnerComment.success) {
+    return {
+      ok: false,
+      error: runnerComment.error.issues.at(0)?.message ?? "Review the plan comment.",
+    };
   }
 
   const goalGate = resolveSelectedPlanGoalPreviewGate(state, goalSelection);
@@ -86,11 +94,12 @@ export function buildRunningPlanPreviewInput(
       weightKg: weightKg.value,
       runnerLevel: mapRunnerLevelToPlanEngine(state.fitnessLevel),
       daysPerWeek,
-      fixedRestDays: state.restDaysAnswered ? state.fixedRestDays : null,
+      fixedRestDays: state.fixedRestDays.length > 0 ? state.fixedRestDays : null,
       preferredLongRunDay: state.preferredLongRunDay || null,
       startDate: state.startDate.trim() || null,
       benchmark: benchmark.input,
       planGoalIntent: planGoalIntent.input,
+      ...(runnerComment.data ? { runnerComment: runnerComment.data } : {}),
     },
   };
 }

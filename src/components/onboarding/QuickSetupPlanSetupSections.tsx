@@ -24,7 +24,6 @@ type QuickSetupPlanSetupSectionsProps = {
     setRecent5kTime: (value: string) => void;
     setRecent5kPace: (value: string) => void;
     setFixedRestDays: Dispatch<SetStateAction<WeekdayName[]>>;
-    setRestDaysAnswered: (value: boolean) => void;
     setMaxRunningDaysPerWeek: (value: string) => void;
     setPreferredLongRunDay: (value: WeekdayName | "") => void;
     setStartDate: (value: string) => void;
@@ -205,8 +204,8 @@ export function QuickSetupPlanSetupSections({
               fixedRestDays={state.fixedRestDays}
               maxRunningDaysPerWeek={state.maxRunningDaysPerWeek}
               onMaxRunningDaysPerWeekChange={setState.setMaxRunningDaysPerWeek}
-              label="Available running days per week"
-              helper="Optional. This uses the same weekly rhythm controls as saved schedule preferences."
+              label="Weekly running ceiling"
+              helper="Optional. Choose the most days you want to run in a week, or keep it flexible."
             />
           </div>
         </QuickSetupSection>
@@ -222,8 +221,6 @@ export function QuickSetupPlanSetupSections({
             <TrainingPreferenceFields
               fixedRestDays={state.fixedRestDays}
               onFixedRestDaysChange={setState.setFixedRestDays}
-              restDaysAnswered={state.restDaysAnswered}
-              onRestDaysAnsweredChange={setState.setRestDaysAnswered}
               maxRunningDaysPerWeek={state.maxRunningDaysPerWeek}
               onMaxRunningDaysPerWeekChange={setState.setMaxRunningDaysPerWeek}
               preferredLongRunDay={state.preferredLongRunDay}

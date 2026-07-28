@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import type { StructuredConstructorState } from "@/components/onboarding/onboarding-form-model";
+import type { HeartRateProfileDraftState } from "@/components/settings/HeartRateProfileSection";
 import type { PersonalHeartRateProfileInput } from "@/lib/heart-rate-zones";
 import { runnerFacingHeartRateSaveError } from "@/components/settings/heart-rate-profile-errors";
 import {
@@ -25,19 +26,24 @@ export function useOnboardingRunnerBaseline({
   const [savedSettings, setSavedSettings] = useState(defaults);
   const [status, setStatus] = useState<"idle" | "saving">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [heartRateDraftState, setHeartRateDraftState] = useState<HeartRateProfileDraftState | null>(
+    null,
+  );
   const input = useMemo(() => buildRunnerBaselineInput(state), [state]);
   const inputKey = input ? JSON.stringify(input) : "invalid";
   const savedInputKey = savedSettings ? runnerBaselineKey(savedSettings) : null;
   const matchesSavedBaseline = input != null && inputKey === savedInputKey;
   const summary = matchesSavedBaseline ? (savedSettings?.heartRateZones ?? null) : null;
-  const isReady = Boolean(summary?.accepted);
+  const isReady = Boolean(summary && (summary.accepted || heartRateDraftState?.canSubmit));
 
   useEffect(() => {
     setError(null);
+    setHeartRateDraftState(null);
   }, [inputKey]);
 
   useEffect(() => {
     setSavedSettings(defaults);
+    setHeartRateDraftState(null);
   }, [defaults]);
 
   const persist = async (heartRateProfile?: PersonalHeartRateProfileInput) => {
@@ -57,13 +63,17 @@ export function useOnboardingRunnerBaseline({
         },
       });
       setSavedSettings(result.settings);
+      if (heartRateProfile && !result.settings.heartRateZones.accepted) {
+        setError("The saved BPM guidance could not be accepted. Review the ranges and try again.");
+        return false;
+      }
       return true;
     } catch (saveError) {
       setError(
         runnerFacingHeartRateSaveError(
           saveError,
           heartRateProfile
-            ? "Heart-rate guidance could not be saved. Check that every BPM range is complete and separate."
+            ? "Heart-rate guidance could not be saved. Check the highlighted BPM ranges."
             : "Your runner baseline could not be saved.",
         ),
       );
@@ -73,17 +83,34 @@ export function useOnboardingRunnerBaseline({
     }
   };
 
+  const persistHeartRateDraft = async () => {
+    if (!summary || !heartRateDraftState?.canSubmit) {
+      setError("Check the highlighted BPM ranges before continuing.");
+      return false;
+    }
+
+    if (!heartRateDraftState.profileToPersist) {
+      return summary.accepted;
+    }
+
+    return persist(heartRateDraftState.profileToPersist);
+  };
+
   return {
     canPrepare: input != null,
     clearError: () => setError(null),
     error,
+    heartRateDraftState,
     isReady,
     isSaving: status === "saving",
-    previewContextKey: matchesSavedBaseline
-      ? `profile:${savedSettings?.profileRevision ?? "missing"}`
-      : `baseline-pending:${inputKey}`,
+    onHeartRateDraftStateChange: setHeartRateDraftState,
+    persistHeartRateDraft,
     prepare: () => persist(),
-    saveHeartRateProfile: (profile: PersonalHeartRateProfileInput) => persist(profile),
+    previewContextKey:
+      matchesSavedBaseline && heartRateDraftState
+        ? `baseline:${inputKey}:heart-rate:${heartRateDraftState.key}`
+        : `baseline-pending:${inputKey}`,
+    recommendedAge: input?.age ?? null,
     summary,
   };
 }

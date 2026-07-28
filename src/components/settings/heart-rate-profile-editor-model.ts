@@ -28,7 +28,7 @@ export type HeartRateDraftValidation = {
 export const HEART_RATE_GUIDANCE_SCALE = {
   min: HEART_RATE_GUIDANCE_MIN_BPM,
   max: HEART_RATE_GUIDANCE_MAX_BPM,
-  ticks: [40, 85, 130, 175, 220],
+  ticks: [60, 95, 130, 165, 200],
 } as const;
 
 export function buildHeartRateProfileDraft(
@@ -40,8 +40,8 @@ export function buildHeartRateProfileDraft(
     description: zone.description,
     minBpm: String(zone.minBpm),
     maxBpm: String(zone.maxBpm),
-    sliderMinBpm: zone.minBpm,
-    sliderMaxBpm: zone.maxBpm,
+    sliderMinBpm: clamp(zone.minBpm, HEART_RATE_GUIDANCE_MIN_BPM, HEART_RATE_GUIDANCE_MAX_BPM),
+    sliderMaxBpm: clamp(zone.maxBpm, HEART_RATE_GUIDANCE_MIN_BPM, HEART_RATE_GUIDANCE_MAX_BPM),
   }));
 }
 
@@ -66,12 +66,13 @@ export function updateHeartRateDraftText({
     return next;
   }
 
-  next[index] = {
-    ...zone,
-    [field === "minBpm" ? "sliderMinBpm" : "sliderMaxBpm"]: parsedValue,
-  };
-
-  return next;
+  return rippleHeartRateDraft({
+    draft: next,
+    field,
+    index,
+    value: parsedValue,
+    preserveActiveText: true,
+  });
 }
 
 export function updateHeartRateDraftFromSlider({
@@ -93,15 +94,13 @@ export function updateHeartRateDraftFromSlider({
   const [lowerBound, upperBound] = heartRateSliderBounds(draft, index, field);
   const nextValue = clamp(Math.round(value), lowerBound, upperBound);
 
-  return draft.map((item, zoneIndex) =>
-    zoneIndex === index
-      ? {
-          ...item,
-          [field]: String(nextValue),
-          [field === "minBpm" ? "sliderMinBpm" : "sliderMaxBpm"]: nextValue,
-        }
-      : item,
-  );
+  return rippleHeartRateDraft({
+    draft,
+    field,
+    index,
+    value: nextValue,
+    preserveActiveText: false,
+  });
 }
 
 export function heartRateSliderBounds(
@@ -114,20 +113,11 @@ export function heartRateSliderBounds(
     return [HEART_RATE_GUIDANCE_MIN_BPM, HEART_RATE_GUIDANCE_MAX_BPM];
   }
 
-  const previous = draft[index - 1];
-  const following = draft[index + 1];
-
   if (field === "minBpm") {
-    return [
-      previous?.sliderMinBpm ?? HEART_RATE_GUIDANCE_MIN_BPM,
-      Math.min(zone.sliderMaxBpm, following?.sliderMinBpm ?? HEART_RATE_GUIDANCE_MAX_BPM),
-    ];
+    return [HEART_RATE_GUIDANCE_MIN_BPM, zone.sliderMaxBpm];
   }
 
-  return [
-    Math.max(zone.sliderMinBpm, previous?.sliderMaxBpm ?? HEART_RATE_GUIDANCE_MIN_BPM),
-    following?.sliderMaxBpm ?? HEART_RATE_GUIDANCE_MAX_BPM,
-  ];
+  return [zone.sliderMinBpm, HEART_RATE_GUIDANCE_MAX_BPM];
 }
 
 export function validateHeartRateProfileDraft(
@@ -225,8 +215,105 @@ function canSyncTextValue(
   field: HeartRateDraftField,
   value: number,
 ) {
-  const [lowerBound, upperBound] = heartRateSliderBounds(draft, index, field);
-  return value >= lowerBound && value <= upperBound;
+  const zone = draft[index];
+  if (!zone) {
+    return false;
+  }
+
+  const pairedValue = parseBpm(field === "minBpm" ? zone.maxBpm : zone.minBpm);
+  if (pairedValue == null) {
+    return false;
+  }
+
+  return field === "minBpm" ? value <= pairedValue : value >= pairedValue;
+}
+
+function rippleHeartRateDraft({
+  draft,
+  field,
+  index,
+  preserveActiveText,
+  value,
+}: {
+  draft: HeartRateProfileDraftZone[];
+  field: HeartRateDraftField;
+  index: number;
+  preserveActiveText: boolean;
+  value: number;
+}) {
+  const next = draft.map((zone) => ({ ...zone }));
+  const sliderField = field === "minBpm" ? "sliderMinBpm" : "sliderMaxBpm";
+  const originalSliderValues = draft.map((zone) => ({
+    sliderMinBpm: zone.sliderMinBpm,
+    sliderMaxBpm: zone.sliderMaxBpm,
+  }));
+
+  next[index][sliderField] = value;
+  rippleOrderedEndpoint(next, index, sliderField);
+
+  if (field === "minBpm") {
+    for (let zoneIndex = 0; zoneIndex < next.length; zoneIndex += 1) {
+      const zone = next[zoneIndex];
+      if (zone.sliderMaxBpm < zone.sliderMinBpm) {
+        zone.sliderMaxBpm = zone.sliderMinBpm;
+        rippleOrderedEndpoint(next, zoneIndex, "sliderMaxBpm");
+      }
+    }
+  } else {
+    for (let zoneIndex = next.length - 1; zoneIndex >= 0; zoneIndex -= 1) {
+      const zone = next[zoneIndex];
+      if (zone.sliderMinBpm > zone.sliderMaxBpm) {
+        zone.sliderMinBpm = zone.sliderMaxBpm;
+        rippleOrderedEndpoint(next, zoneIndex, "sliderMinBpm");
+      }
+    }
+  }
+
+  return next.map((zone, zoneIndex) => {
+    const original = originalSliderValues[zoneIndex];
+    const minChanged = zone.sliderMinBpm !== original.sliderMinBpm;
+    const maxChanged = zone.sliderMaxBpm !== original.sliderMaxBpm;
+    const activeMin = zoneIndex === index && field === "minBpm";
+    const activeMax = zoneIndex === index && field === "maxBpm";
+
+    return {
+      ...zone,
+      minBpm:
+        minChanged && (activeMin || parseBpm(zone.minBpm) != null)
+          ? activeMin && preserveActiveText
+            ? zone.minBpm
+            : String(zone.sliderMinBpm)
+          : zone.minBpm,
+      maxBpm:
+        maxChanged && (activeMax || parseBpm(zone.maxBpm) != null)
+          ? activeMax && preserveActiveText
+            ? zone.maxBpm
+            : String(zone.sliderMaxBpm)
+          : zone.maxBpm,
+    };
+  });
+}
+
+function rippleOrderedEndpoint(
+  draft: HeartRateProfileDraftZone[],
+  index: number,
+  field: "sliderMinBpm" | "sliderMaxBpm",
+) {
+  for (let zoneIndex = index - 1; zoneIndex >= 0; zoneIndex -= 1) {
+    const nextValue = draft[zoneIndex + 1][field];
+    if (draft[zoneIndex][field] <= nextValue) {
+      break;
+    }
+    draft[zoneIndex][field] = nextValue;
+  }
+
+  for (let zoneIndex = index + 1; zoneIndex < draft.length; zoneIndex += 1) {
+    const previousValue = draft[zoneIndex - 1][field];
+    if (draft[zoneIndex][field] >= previousValue) {
+      break;
+    }
+    draft[zoneIndex][field] = previousValue;
+  }
 }
 
 function parseBpm(value: string) {

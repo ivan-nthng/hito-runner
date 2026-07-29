@@ -11,7 +11,6 @@ const localAuthAccountSchema = z.object({
   email: z.string().trim().email().optional(),
   userId: z.string().uuid().optional(),
   role: z.enum(["admin", "tester"]).optional(),
-  qaFixtureAccess: z.boolean().optional(),
   displayName: z.string().trim().min(1).optional(),
 });
 
@@ -28,7 +27,6 @@ export interface LocalAuthAccountConfig {
   email: string;
   userId: string;
   role: "admin" | "tester";
-  qaFixtureAccess: boolean;
   displayName: string;
 }
 
@@ -185,7 +183,6 @@ async function normalizeAccount(
     email,
     userId: account.userId ?? (await deriveUserId(username)),
     role: account.role ?? (username === "ivan" ? "admin" : "tester"),
-    qaFixtureAccess: account.qaFixtureAccess === true,
     displayName: account.displayName?.trim() ?? humanizeUsername(username),
   };
 }

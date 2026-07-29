@@ -5,7 +5,6 @@ import { resolveRunnerEntitlement } from "@/lib/entitlements/resolve-runner-enti
 import type {
   CapabilityCheckResult,
   CapabilityKey,
-  CapabilityLockedResponse,
   CapabilityUsageSummary,
   EntitlementSupabaseClient,
 } from "@/lib/entitlements/types";
@@ -73,20 +72,6 @@ export async function checkRunnerCapability({
     tier: entitlement.tier,
     source: entitlement.source,
     usage,
-  };
-}
-
-export function capabilityLockedResponse(
-  check: Extract<CapabilityCheckResult, { allowed: false }>,
-): CapabilityLockedResponse {
-  return {
-    ok: false,
-    reason: "capability_locked",
-    capability: check.capabilityKey,
-    currentTier: check.tier,
-    requiredTier: check.requiredTier,
-    message: check.message,
-    ...(check.usage ? { usage: check.usage } : {}),
   };
 }
 

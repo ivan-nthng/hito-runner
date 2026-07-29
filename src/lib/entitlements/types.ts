@@ -46,14 +46,4 @@ export type CapabilityCheckResult =
       usage: CapabilityUsageSummary | null;
     };
 
-export interface CapabilityLockedResponse {
-  ok: false;
-  reason: "capability_locked";
-  capability: CapabilityKey;
-  currentTier: RunnerTier;
-  requiredTier: "pro";
-  message: string;
-  usage?: CapabilityUsageSummary;
-}
-
 export type EntitlementSupabaseClient = SupabaseClient<Database>;

@@ -84,7 +84,7 @@ export function LocalUiActionsPropertyRow({
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"
-              className="z-[84] min-w-56"
+              className="z-[94] min-w-56"
               data-local-ui-inspector-layer=""
             >
               {!ownership.entry ? (

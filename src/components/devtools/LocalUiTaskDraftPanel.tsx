@@ -20,11 +20,13 @@ import {
 } from "@/components/devtools/local-ui-inspector-session";
 import { ChromeControlRows } from "@/components/devtools/LocalUiChromeControls";
 import { TokenControlRows } from "@/components/devtools/LocalUiTokenControls";
+import { LocalUiTextControlRow } from "@/components/devtools/LocalUiTextControlRow";
 import { TypographyControlRow } from "@/components/devtools/LocalUiTypographyControls";
 import {
   buildTypographyRoleSelection,
   getBaseToken,
   getHasActionableDraft,
+  getHasProposedTextChange,
   getInferredDraftAction,
   getIsObservableTokenControl,
   getIsTokenControlActive,
@@ -86,7 +88,8 @@ export function LocalUiTaskDraftPanel({
     [draft.actionId],
   );
   const targetKind = normalizeTargetKind(target.targetKind);
-  const showReplacementText = selectedAction?.id === "edit_text";
+  const hasTextProperty = targetKind !== "behavior" && Boolean(target.visibleText?.trim());
+  const hasTextChange = getHasProposedTextChange(target.visibleText, draft.proposedText);
   const observableTokenControls = useMemo(
     () => (target.tokenControls ?? []).filter(getIsObservableTokenControl),
     [target.tokenControls],
@@ -115,7 +118,8 @@ export function LocalUiTaskDraftPanel({
   const draftAction = useMemo(
     () =>
       componentAction ??
-      selectedAction ??
+      (hasTextChange ? getInlineChangeAction("edit_text") : null) ??
+      (selectedAction?.id === "edit_text" ? null : selectedAction) ??
       getInferredDraftAction(
         tokenControlSelections,
         typographyRoleSelection,
@@ -125,6 +129,7 @@ export function LocalUiTaskDraftPanel({
     [
       componentAction,
       draft.chromeRemovalSelection,
+      hasTextChange,
       selectedAction,
       tokenControlSelections,
       typographyRoleSelection,
@@ -142,7 +147,7 @@ export function LocalUiTaskDraftPanel({
           promptActionSelection: isRemovingInstance
             ? { id: "remove_component", label: "Remove object" }
             : null,
-          proposedText: showReplacementText ? draft.proposedText : null,
+          proposedText: hasTextProperty ? draft.proposedText : null,
           tokenControlSelections: isRemovingInstance ? [] : tokenControlSelections,
           typographyRoleSelection: isRemovingInstance ? null : typographyRoleSelection,
         },
@@ -154,7 +159,7 @@ export function LocalUiTaskDraftPanel({
       draftAction,
       effectiveFixScope,
       isRemovingInstance,
-      showReplacementText,
+      hasTextProperty,
       target,
       tokenControlSelections,
       typographyRoleSelection,
@@ -170,6 +175,7 @@ export function LocalUiTaskDraftPanel({
       action: draftAction,
       chromeRemovalSelection: draft.chromeRemovalSelection,
       comment: draft.comment,
+      currentText: target.visibleText,
       proposedText: draft.proposedText,
       promptActionSelection: null,
       tokenControlSelections,
@@ -259,6 +265,13 @@ export function LocalUiTaskDraftPanel({
           <p className="hito-caption text-foreground">Observed properties</p>
           {!isRemovingInstance ? (
             <>
+              {hasTextProperty && target.visibleText ? (
+                <LocalUiTextControlRow
+                  currentText={target.visibleText}
+                  proposedText={draft.proposedText}
+                  onProposedTextChange={(proposedText) => updateDraft({ proposedText })}
+                />
+              ) : null}
               <ChromeControlRows
                 border={target.border}
                 cardChrome={target.cardChrome}
@@ -315,32 +328,20 @@ export function LocalUiTaskDraftPanel({
           />
         </div>
 
-        {showReplacementText && !isRemovingInstance ? (
-          <label className="grid min-w-0 gap-1">
-            <span className="hito-caption text-foreground">Replacement text</span>
-            <Textarea
-              className="min-h-20 resize-none py-1.5"
-              value={draft.proposedText}
-              onChange={(event) => updateDraft({ proposedText: event.target.value })}
-            />
-          </label>
-        ) : (
-          <label className="grid min-w-0 gap-1">
-            <span className="hito-caption text-foreground">
-              {selectedAction?.id === "bug" ? "Issue" : "Comment"}
-            </span>
-            <Textarea
-              className="min-h-16 resize-none py-1.5"
-              placeholder={
-                selectedAction?.id === "bug"
-                  ? "What is broken?"
-                  : "Describe the task for this target."
-              }
-              value={draft.comment}
-              onChange={(event) => updateDraft({ comment: event.target.value })}
-            />
-          </label>
-        )}
+        <label className="grid min-w-0 gap-1">
+          <span className="hito-caption text-foreground">Comment</span>
+          <Textarea
+            aria-label="Comment"
+            className="min-h-16 resize-none py-1.5"
+            placeholder={
+              selectedAction?.id === "bug"
+                ? "What is broken?"
+                : "Optional rationale, investigation, or instruction."
+            }
+            value={draft.comment}
+            onChange={(event) => updateDraft({ comment: event.target.value })}
+          />
+        </label>
 
         <label className="grid min-w-0 gap-1">
           <span className="hito-caption text-foreground">Scope of fix</span>
@@ -363,7 +364,7 @@ export function LocalUiTaskDraftPanel({
             <SelectTrigger size="sm" className="min-w-0" aria-label="Scope of fix">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent align="end" className="z-[84] w-64" data-local-ui-inspector-layer="">
+            <SelectContent align="end" className="z-[94] w-64" data-local-ui-inspector-layer="">
               {scopeOptions.map((option) => (
                 <SelectItem key={option.id} value={option.id}>
                   {option.label}

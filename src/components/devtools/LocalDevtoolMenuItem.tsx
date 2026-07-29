@@ -1,5 +1,11 @@
-import { DropdownMenuCheckboxItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { useLocalUiInspectorToggle } from "@/components/devtools/local-devtool-gate";
+import { lazy, Suspense } from "react";
+import { useLocalDevtoolBoundary } from "@/components/devtools/local-devtool-boundary";
+
+const LocalDevtoolMenuItemRuntime = lazy(() =>
+  import("@/components/devtools/LocalDevtoolRuntime").then((module) => ({
+    default: module.LocalDevtoolMenuItemRuntime,
+  })),
+);
 
 export function LocalDevtoolMenuItem({
   itemClassName,
@@ -8,24 +14,16 @@ export function LocalDevtoolMenuItem({
   itemClassName?: string;
   separatorClassName?: string;
 }) {
-  const localDevtool = useLocalUiInspectorToggle();
+  const available = useLocalDevtoolBoundary();
 
-  if (!localDevtool.available) return null;
+  if (!available) return null;
 
   return (
-    <>
-      <DropdownMenuCheckboxItem
-        checked={localDevtool.enabled}
-        className={itemClassName}
-        onCheckedChange={(checked) => {
-          localDevtool.setEnabled(checked === true);
-        }}
-        onSelect={(event) => event.preventDefault()}
-      >
-        <span className="min-w-0 flex-1">Dev tool</span>
-        <span className="hito-menu-meta ml-auto">{localDevtool.enabled ? "On" : "Off"}</span>
-      </DropdownMenuCheckboxItem>
-      <DropdownMenuSeparator className={separatorClassName} />
-    </>
+    <Suspense fallback={null}>
+      <LocalDevtoolMenuItemRuntime
+        itemClassName={itemClassName}
+        separatorClassName={separatorClassName}
+      />
+    </Suspense>
   );
 }

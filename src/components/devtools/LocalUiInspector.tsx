@@ -4,9 +4,11 @@ import {
   type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +41,7 @@ import {
   type LocalUiInspectorItemDraft,
 } from "@/components/devtools/local-ui-inspector-session";
 import { useLocalUiInspectorSession } from "@/components/devtools/use-local-ui-inspector-session";
+import { useLocalUiInspectorPortalHost } from "@/components/devtools/use-local-ui-inspector-portal-host";
 import {
   getHitoDsAppliedTokenReferences,
   resolveHitoDsOwnershipForElement,
@@ -74,6 +77,7 @@ type InspectorPanelState = ComposerPanelState | ReviewPanelState;
 
 const INSPECTABLE_SELECTOR =
   "button, a, input, textarea, select, [role], [data-hito-ds-pattern], [data-testid], article, section, header, main, aside, nav, form, li, [class]";
+const INSPECTOR_LAYER_SELECTOR = "[data-local-ui-inspector-layer]";
 
 export function LocalUiInspector() {
   const location = useLocation();
@@ -81,6 +85,7 @@ export function LocalUiInspector() {
     "searchStr" in location && typeof location.searchStr === "string" ? location.searchStr : ""
   }${location.hash ?? ""}`;
   const session = useLocalUiInspectorSession(routeKey);
+  const portalHost = useLocalUiInspectorPortalHost();
   const [mode, setMode] = useState<InspectorMode>("idle");
   const [menuOpen, setMenuOpen] = useState(false);
   const [hoverRect, setHoverRect] = useState<DOMRectReadOnly | null>(null);
@@ -113,7 +118,12 @@ export function LocalUiInspector() {
   }, []);
 
   const focusInspectLauncher = useCallback(() => {
-    window.requestAnimationFrame(() => inspectLauncherRef.current?.focus());
+    const focusLauncher = () => inspectLauncherRef.current?.focus({ preventScroll: true });
+    window.requestAnimationFrame(() => {
+      focusLauncher();
+      window.setTimeout(focusLauncher, 0);
+      window.requestAnimationFrame(focusLauncher);
+    });
   }, []);
 
   const showReview = useCallback((focusItemId: string | null, autoGenerate = false) => {
@@ -182,19 +192,96 @@ export function LocalUiInspector() {
     };
   }, [mode]);
 
+  useLayoutEffect(() => {
+    if (!portalHost) return;
+
+    const restoreAriaVisibility = () => restoreLocalUiInspectorAriaVisibility();
+    restoreAriaVisibility();
+
+    const observer = new MutationObserver(restoreAriaVisibility);
+    observer.observe(document.body, {
+      attributeFilter: ["aria-hidden", "data-aria-hidden"],
+      attributes: true,
+      childList: true,
+      subtree: true,
+    });
+
+    return () => observer.disconnect();
+  }, [portalHost]);
+
+  useEffect(() => {
+    const isolateProductFocusForInspectorLayer = (event: FocusEvent) => {
+      const target = event.target;
+      const relatedTarget = event.relatedTarget;
+      const inspectorFocus =
+        (target instanceof Element && target.closest(INSPECTOR_LAYER_SELECTOR)) ||
+        (relatedTarget instanceof Element && relatedTarget.closest(INSPECTOR_LAYER_SELECTOR));
+
+      if (!inspectorFocus) return;
+
+      stopNativePropagation(event);
+    };
+
+    document.addEventListener("focusin", isolateProductFocusForInspectorLayer);
+    document.addEventListener("focusout", isolateProductFocusForInspectorLayer);
+
+    return () => {
+      document.removeEventListener("focusin", isolateProductFocusForInspectorLayer);
+      document.removeEventListener("focusout", isolateProductFocusForInspectorLayer);
+    };
+  }, []);
+
+  useEffect(() => {
+    const isolateProductDismissForInspectorLayer = (event: Event) => {
+      const originalEvent = getDismissableLayerOriginalEvent(event);
+      const target = originalEvent?.target;
+
+      if (!(target instanceof Element) || !target.closest(INSPECTOR_LAYER_SELECTOR)) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    window.addEventListener(
+      "dismissableLayer.pointerDownOutside",
+      isolateProductDismissForInspectorLayer,
+      true,
+    );
+    window.addEventListener(
+      "dismissableLayer.focusOutside",
+      isolateProductDismissForInspectorLayer,
+      true,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "dismissableLayer.pointerDownOutside",
+        isolateProductDismissForInspectorLayer,
+        true,
+      );
+      window.removeEventListener(
+        "dismissableLayer.focusOutside",
+        isolateProductDismissForInspectorLayer,
+        true,
+      );
+    };
+  }, []);
+
   useEffect(() => {
     if (!panel && mode !== "inspect" && !menuOpen) return;
 
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (document.querySelector('[data-local-ui-inspector-layer] [role="tooltip"]')) return;
       const eventTarget = event.target;
-      if (
-        eventTarget instanceof Element &&
-        eventTarget.closest('[role="dialog"], [role="listbox"], [role="menu"]')
-      ) {
-        return;
+      if (eventTarget instanceof Element) {
+        const inspectorPopup = eventTarget.closest(
+          '[role="dialog"], [role="listbox"], [role="menu"]',
+        );
+        if (inspectorPopup?.closest("[data-local-ui-inspector-layer]")) return;
       }
       event.preventDefault();
+      event.stopPropagation();
       if (panelRef.current) {
         closePanelImmediately();
       } else if (mode === "inspect") {
@@ -428,21 +515,26 @@ export function LocalUiInspector() {
     setHoverRect(null);
   };
 
-  return (
+  if (!portalHost) return null;
+
+  return createPortal(
     <div
       data-local-ui-inspector-layer=""
       data-local-ui-inspector-root=""
-      className="pointer-events-auto fixed bottom-5 right-5 z-[70]"
+      className="pointer-events-auto fixed bottom-5 right-5 z-[90]"
       onClick={stopDevtoolEvent}
+      onFocus={stopDevtoolEvent}
+      onPointerDown={stopDevtoolEvent}
     >
       {mode === "inspect" ? (
         <div
           data-local-ui-inspector-hit-layer=""
           data-local-ui-inspector-layer=""
-          className="fixed inset-0 z-[68] cursor-crosshair bg-transparent"
+          className="fixed inset-0 z-[88] cursor-crosshair bg-transparent"
           onClick={closeFromHitLayerClick}
           onPointerDown={selectHoverTarget}
           onPointerMove={updateHoverTarget}
+          onPointerUp={stopDevtoolEvent}
         />
       ) : null}
       {panel?.kind === "composer" && panel.target.rect ? (
@@ -546,7 +638,10 @@ export function LocalUiInspector() {
             data-local-ui-inspector-layer=""
             align="end"
             sideOffset={8}
-            className="min-w-44"
+            className="z-[94] min-w-44"
+            onClick={stopDevtoolEvent}
+            onFocus={stopDevtoolEvent}
+            onPointerDown={stopDevtoolEvent}
           >
             <DropdownMenuLabel>Local UI tools</DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -584,7 +679,8 @@ export function LocalUiInspector() {
       <p className="sr-only" aria-live="polite">
         {statusMessage}
       </p>
-    </div>
+    </div>,
+    portalHost,
   );
 }
 
@@ -599,7 +695,7 @@ function InspectorHighlight({
     <div
       aria-hidden="true"
       data-local-ui-inspector-selected-highlight={selected ? "" : undefined}
-      className={`pointer-events-none fixed z-[69] rounded-md border border-signal bg-signal/10 ${
+      className={`pointer-events-none fixed z-[89] rounded-md border border-signal bg-signal/10 ${
         selected
           ? "shadow-[0_0_0_4px_rgba(98,228,255,0.24),0_0_30px_rgba(98,228,255,0.18)]"
           : "shadow-[0_0_0_3px_rgba(98,228,255,0.16)]"
@@ -623,10 +719,13 @@ function stripLiveTarget(target: SelectedTarget): InlineChangeTargetInput {
 
 function resolveInspectableElement(target: EventTarget | null, point?: { x: number; y: number }) {
   if (!(target instanceof Element)) return null;
-  if (target.closest("[data-local-ui-inspector-layer]")) return null;
+  if (target.closest(INSPECTOR_LAYER_SELECTOR)) return null;
+
+  const preciseTarget = findPreciseInspectableDescendant(target);
+  if (preciseTarget) return preciseTarget;
 
   const control = target.closest<HTMLElement>("button, a, input, textarea, select");
-  if (control && !control.closest("[data-local-ui-inspector-layer]")) return control;
+  if (control && !control.closest(INSPECTOR_LAYER_SELECTOR)) return control;
 
   const directTarget = target instanceof HTMLElement ? target : target.parentElement;
   if (directTarget && isTextLikeTarget(directTarget)) return directTarget;
@@ -655,11 +754,35 @@ function isTextLikeTarget(element: HTMLElement) {
       className,
     );
 
+  const maxChildCount = hasTypographyClass ? 2 : 1;
+
   return (
     visibleText.length > 0 &&
-    element.childElementCount <= 1 &&
+    element.childElementCount <= maxChildCount &&
     (hasTypographyClass || /^(h[1-6]|p|span|small|strong|label|figcaption|legend)$/.test(tag))
   );
+}
+
+function findPreciseInspectableDescendant(target: Element) {
+  let current: Element | null = target;
+  let depth = 0;
+
+  while (
+    current &&
+    current !== document.body &&
+    current !== document.documentElement &&
+    depth < 4
+  ) {
+    if (current.closest(INSPECTOR_LAYER_SELECTOR)) return null;
+
+    if (current instanceof HTMLElement && isTextLikeTarget(current)) return current;
+    if (current.matches("button, a, input, textarea, select")) return null;
+
+    current = current.parentElement;
+    depth += 1;
+  }
+
+  return null;
 }
 
 function findAuditableLayoutOwner(start: HTMLElement) {
@@ -672,7 +795,7 @@ function findAuditableLayoutOwner(start: HTMLElement) {
     current !== document.documentElement &&
     depth < 6
   ) {
-    if (current.closest("[data-local-ui-inspector-layer]")) return null;
+    if (current.closest(INSPECTOR_LAYER_SELECTOR)) return null;
     if (current.matches("button, a, input, textarea, select")) return null;
 
     if (getAuditableOwnerScore(current) >= 5 && !isPageSizedElement(current)) {
@@ -731,7 +854,7 @@ function findSurfaceChromeAncestor(target: Element, point?: { x: number; y: numb
   let current = target instanceof HTMLElement ? target : target.parentElement;
 
   while (current && current !== document.body && current !== document.documentElement) {
-    if (current.closest("[data-local-ui-inspector-layer]")) return null;
+    if (current.closest(INSPECTOR_LAYER_SELECTOR)) return null;
 
     if (looksLikeSurface(current) && (!point || isPointNearChrome(current, point))) {
       return current;
@@ -814,6 +937,33 @@ function describeTargetElement(element: HTMLElement): SelectedTarget {
 
 function stopDevtoolEvent(event: { stopPropagation: () => void }) {
   event.stopPropagation();
+}
+
+function stopNativePropagation(event: Event) {
+  event.stopPropagation();
+  event.stopImmediatePropagation();
+}
+
+function restoreLocalUiInspectorAriaVisibility() {
+  document
+    .querySelectorAll<HTMLElement>(
+      [
+        `${INSPECTOR_LAYER_SELECTOR}[aria-hidden="true"]`,
+        `${INSPECTOR_LAYER_SELECTOR}[data-aria-hidden]`,
+        `${INSPECTOR_LAYER_SELECTOR} [aria-hidden="true"]`,
+        `${INSPECTOR_LAYER_SELECTOR} [data-aria-hidden]`,
+      ].join(", "),
+    )
+    .forEach((element) => {
+      element.removeAttribute("aria-hidden");
+      element.removeAttribute("data-aria-hidden");
+    });
+}
+
+function getDismissableLayerOriginalEvent(event: Event) {
+  if (!("detail" in event)) return null;
+  const detail = (event as CustomEvent<{ originalEvent?: Event }>).detail;
+  return detail?.originalEvent ?? null;
 }
 
 function buildSelector(element: HTMLElement) {

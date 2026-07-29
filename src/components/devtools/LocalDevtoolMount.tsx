@@ -1,20 +1,20 @@
 import { lazy, Suspense } from "react";
-import { useLocalUiInspectorToggle } from "@/components/devtools/local-devtool-gate";
+import { useLocalDevtoolBoundary } from "@/components/devtools/local-devtool-boundary";
 
-const LocalUiInspector = lazy(() =>
-  import("@/components/devtools/LocalUiInspector").then((module) => ({
-    default: module.LocalUiInspector,
+const LocalDevtoolMountRuntime = lazy(() =>
+  import("@/components/devtools/LocalDevtoolRuntime").then((module) => ({
+    default: module.LocalDevtoolMountRuntime,
   })),
 );
 
 export function LocalDevtoolMount() {
-  const localInspector = useLocalUiInspectorToggle();
+  const available = useLocalDevtoolBoundary();
 
-  if (!localInspector.enabled) return null;
+  if (!available) return null;
 
   return (
     <Suspense fallback={null}>
-      <LocalUiInspector />
+      <LocalDevtoolMountRuntime />
     </Suspense>
   );
 }

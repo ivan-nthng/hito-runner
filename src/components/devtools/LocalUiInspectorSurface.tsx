@@ -32,10 +32,13 @@ export function LocalUiInspectorSurface({
         <SheetContent
           side="right"
           data-local-ui-inspector-layer=""
-          className="!z-[82] flex h-dvh w-full max-w-none flex-col gap-0 overflow-hidden border-0 p-0 sm:max-w-none [&>.hito-ui-sheet-close]:hidden"
+          className="!z-[92] flex h-dvh w-full max-w-none flex-col gap-0 overflow-hidden border-0 p-0 sm:max-w-none [&>.hito-ui-sheet-close]:hidden"
           aria-label={ariaLabel}
+          onClick={stopInspectorSurfaceEvent}
+          onFocus={stopInspectorSurfaceEvent}
           onPointerCancelCapture={onInternalPointerEnd}
           onPointerDownCapture={onInternalPointerStart}
+          onPointerDown={stopInspectorSurfaceEvent}
           onPointerUpCapture={onInternalPointerEnd}
           onInteractOutside={(event) => {
             const originalTarget = event.detail.originalEvent.target;
@@ -135,16 +138,23 @@ function LocalUiInspectorDesktopPanel({
       ref={panelRef}
       data-local-ui-task-panel=""
       data-local-ui-inspector-layer=""
-      className="fixed z-[71] grid max-h-[calc(100vh-2rem)] w-[min(22rem,calc(100vw-1.25rem))] gap-3 overflow-y-auto rounded-xl border border-hairline bg-background p-3 text-left shadow-soft"
+      className="fixed z-[91] grid max-h-[calc(100vh-2rem)] w-[min(22rem,calc(100vw-1.25rem))] gap-3 overflow-y-auto rounded-xl border border-hairline bg-background p-3 text-left shadow-soft"
       style={{ left: clampedPosition.x, top: clampedPosition.y }}
       aria-label={ariaLabel}
+      onClick={stopInspectorSurfaceEvent}
+      onFocus={stopInspectorSurfaceEvent}
       onPointerCancelCapture={onInternalPointerEnd}
       onPointerDownCapture={onInternalPointerStart}
+      onPointerDown={stopInspectorSurfaceEvent}
       onPointerUpCapture={onInternalPointerEnd}
     >
       {children}
     </section>
   );
+}
+
+function stopInspectorSurfaceEvent(event: { stopPropagation: () => void }) {
+  event.stopPropagation();
 }
 
 function useNarrowViewport() {

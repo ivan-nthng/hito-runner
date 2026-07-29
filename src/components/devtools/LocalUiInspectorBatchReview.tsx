@@ -196,7 +196,7 @@ export function LocalUiInspectorBatchReview({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
                     align="end"
-                    className="z-[84] min-w-40"
+                    className="z-[94] min-w-40"
                     data-local-ui-inspector-layer=""
                   >
                     <DropdownMenuItem onSelect={() => onEdit(item)}>

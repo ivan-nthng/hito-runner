@@ -13,7 +13,7 @@ export const LocalUiInspectorModeBar = forwardRef<
 >(({ itemCount, onExit, onOpenReview, reviewOpen }, ref) => (
   <TooltipProvider delayDuration={160}>
     <div
-      className="relative z-[70] flex max-w-[calc(100vw-2.5rem)] items-center gap-1 rounded-lg border border-hairline bg-background/90 p-1.5 shadow-soft backdrop-blur"
+      className="relative z-[90] flex max-w-[calc(100vw-2.5rem)] items-center gap-1 rounded-lg border border-hairline bg-background/90 p-1.5 shadow-soft backdrop-blur"
       data-local-ui-inspector-mode-bar=""
       role="group"
       aria-label="Pencil Inspector controls"
@@ -51,7 +51,7 @@ export const LocalUiInspectorModeBar = forwardRef<
             <Icon name="close" size="xs" />
           </button>
         </TooltipTrigger>
-        <TooltipContent className="z-[84]" side="top" sideOffset={8}>
+        <TooltipContent className="z-[94]" side="top" sideOffset={8}>
           Exit Pencil Inspector and discard draft
         </TooltipContent>
       </Tooltip>

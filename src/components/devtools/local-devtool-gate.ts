@@ -1,16 +1,11 @@
 import { useEffect, useState } from "react";
+import { canLoadLocalDevtool } from "@/components/devtools/local-devtool-boundary";
 
 export const LOCAL_UI_INSPECTOR_STORAGE_KEY = "hito.localUiInspector.enabled";
 export const LOCAL_UI_INSPECTOR_TOGGLE_EVENT = "hito:local-ui-inspector-toggle";
 
-const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
-
 export function canUseLocalUiInspector(hostname?: string) {
-  if (typeof window === "undefined" && hostname == null) return false;
-
-  // Built QA serves production bundles on loopback, so gate by runtime host instead of import.meta.env.DEV.
-  const host = (hostname ?? window.location.hostname).toLowerCase();
-  return LOOPBACK_HOSTNAMES.has(host) || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host);
+  return canLoadLocalDevtool(hostname);
 }
 
 export function readLocalUiInspectorEnabled() {

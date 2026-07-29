@@ -43,24 +43,27 @@ export type InlineChangeTypographyRoleOption = {
   description: string;
   id: string;
   label: string;
-  technicalDetails?: string;
+  spec: string;
 };
 
 export type InlineChangeTypographyEvidence = {
   classNames: string[];
   currentRole: InlineChangeTypographyRoleOption | null;
   fontFamily: string | null;
+  fontFeatureSettings: string | null;
   fontSize: string | null;
+  fontStyle: string | null;
+  fontVariantNumeric: string | null;
+  fontVariationSettings: string | null;
   fontWeight: string | null;
   letterSpacing: string | null;
   lineHeight: string | null;
   options: InlineChangeTypographyRoleOption[];
   tag: string;
+  textTransform: string | null;
 };
 
 export type InlineChangeTypographySelection = {
-  currentDetails: string | null;
-  currentIsCustom: boolean;
   currentRole: InlineChangeTypographyRoleOption | null;
   desiredRole: InlineChangeTypographyRoleOption | null;
 };
@@ -506,15 +509,19 @@ function normalizeTypographyEvidence(
     classNames: value.classNames.slice(0, 6),
     currentRole: normalizeTypographyRole(value.currentRole),
     fontFamily: value.fontFamily,
+    fontFeatureSettings: value.fontFeatureSettings,
     fontSize: value.fontSize,
+    fontStyle: value.fontStyle,
+    fontVariantNumeric: value.fontVariantNumeric,
+    fontVariationSettings: value.fontVariationSettings,
     fontWeight: value.fontWeight,
     letterSpacing: value.letterSpacing,
     lineHeight: value.lineHeight,
     options: value.options
       .map(normalizeTypographyRole)
-      .filter((role): role is InlineChangeTypographyRoleOption => Boolean(role))
-      .slice(0, 12),
+      .filter((role): role is InlineChangeTypographyRoleOption => Boolean(role)),
     tag: value.tag,
+    textTransform: value.textTransform,
   };
 }
 
@@ -525,8 +532,6 @@ function normalizeTypographySelection(
   if (!desiredRole) return null;
 
   return {
-    currentDetails: normalizeTargetValue(value?.currentDetails)?.slice(0, 180) ?? null,
-    currentIsCustom: Boolean(value?.currentIsCustom),
     currentRole: normalizeTypographyRole(value?.currentRole),
     desiredRole,
   };
@@ -542,6 +547,6 @@ function normalizeTypographyRole(
     description: value.description,
     id: value.id,
     label: value.label,
-    technicalDetails: value.technicalDetails,
+    spec: value.spec,
   };
 }

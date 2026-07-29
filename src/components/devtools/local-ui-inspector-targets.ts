@@ -70,7 +70,7 @@ function toTypographyRoleOption(role: HitoTypographyRole): InlineChangeTypograph
     description: role.description,
     id: role.id,
     label: role.label,
-    technicalDetails: role.technicalDetails,
+    spec: role.spec,
   };
 }
 
@@ -229,6 +229,9 @@ function buildBaseEvidence(
       typography.lineHeight ? `line-height ${typography.lineHeight}` : null,
       typography.fontWeight ? `weight ${typography.fontWeight}` : null,
       typography.letterSpacing ? `letter-spacing ${typography.letterSpacing}` : null,
+      typography.textTransform && typography.textTransform !== "none"
+        ? `text-transform ${typography.textTransform}`
+        : null,
     ]
       .filter(Boolean)
       .join("; ");
@@ -395,13 +398,18 @@ function buildTypographyEvidence(
   return {
     classNames: typographyClasses,
     currentRole,
-    fontFamily: normalizeCssValue(styles.fontFamily),
-    fontSize: normalizeCssValue(styles.fontSize),
-    fontWeight: normalizeCssValue(styles.fontWeight),
-    letterSpacing: normalizeCssValue(styles.letterSpacing),
-    lineHeight: normalizeCssValue(styles.lineHeight),
+    fontFamily: normalizeComputedTypographyValue(styles.fontFamily),
+    fontFeatureSettings: normalizeComputedTypographyValue(styles.fontFeatureSettings),
+    fontSize: normalizeComputedTypographyValue(styles.fontSize),
+    fontStyle: normalizeComputedTypographyValue(styles.fontStyle),
+    fontVariantNumeric: normalizeComputedTypographyValue(styles.fontVariantNumeric),
+    fontVariationSettings: normalizeComputedTypographyValue(styles.fontVariationSettings),
+    fontWeight: normalizeComputedTypographyValue(styles.fontWeight),
+    letterSpacing: normalizeComputedTypographyValue(styles.letterSpacing),
+    lineHeight: normalizeComputedTypographyValue(styles.lineHeight),
     options: HITO_TYPOGRAPHY_ROLE_OPTIONS,
     tag,
+    textTransform: normalizeComputedTypographyValue(styles.textTransform),
   };
 }
 
@@ -670,6 +678,10 @@ function normalizeVisibleText(text: string) {
 function normalizeCssValue(value: string) {
   const normalized = value.trim();
   return normalized && normalized !== "normal" ? normalized : null;
+}
+
+function normalizeComputedTypographyValue(value: string) {
+  return value.trim() || null;
 }
 
 function roundPx(value: number) {

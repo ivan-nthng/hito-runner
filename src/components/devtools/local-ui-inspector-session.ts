@@ -52,7 +52,7 @@ export function createLocalUiInspectorItemDraft(
     desiredTokens: {},
     desiredTypographyRole: null,
     fixScope: "screen",
-    proposedText: target.visibleText ?? "",
+    proposedText: "",
   };
 }
 
@@ -124,8 +124,10 @@ export function getLocalUiInspectorItemSummary(item: LocalUiInspectorBatchItem) 
   if (item.draft.componentAction?.type === "reuse_existing_component") {
     return "Reuse existing component";
   }
-  if (item.payload.target.proposedText)
-    return `Replace text with “${item.payload.target.proposedText}”`;
+  if (item.payload.target.proposedText) {
+    const replacement = `Replace text with “${item.payload.target.proposedText}”`;
+    return item.payload.comment ? `${replacement} · ${item.payload.comment}` : replacement;
+  }
   if (item.payload.comment) return item.payload.comment;
   if (item.payload.target.tokenControls.length > 0) return "Update selected properties";
   if (item.payload.target.typographyRoleSelection?.desiredRole) {

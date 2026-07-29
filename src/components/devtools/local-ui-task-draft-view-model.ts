@@ -19,28 +19,9 @@ export function buildTypographyRoleSelection(
   if (!desiredRole || desiredRole.id === typography.currentRole?.id) return null;
 
   return {
-    currentDetails:
-      typography.currentRole?.technicalDetails ?? getObservedTypographyDetails(typography),
-    currentIsCustom: !typography.currentRole,
     currentRole: typography.currentRole,
     desiredRole,
   };
-}
-
-function getObservedTypographyDetails(
-  typography: NonNullable<InlineChangeTargetInput["typography"]>,
-) {
-  return (
-    [
-      typography.fontFamily,
-      typography.fontSize,
-      typography.fontWeight ? `weight ${typography.fontWeight}` : null,
-      typography.lineHeight ? `lh ${typography.lineHeight}` : null,
-      typography.letterSpacing ? `letter ${typography.letterSpacing}` : null,
-    ]
-      .filter(Boolean)
-      .join(" · ") || null
-  );
 }
 
 export function getInferredDraftAction(
@@ -77,6 +58,7 @@ export function getInferredDraftAction(
 export function getHasActionableDraft({
   action,
   comment,
+  currentText,
   proposedText,
   tokenControlSelections,
   typographyRoleSelection,
@@ -86,12 +68,15 @@ export function getHasActionableDraft({
   action: InlineChangeAction | null;
   chromeRemovalSelection: InlineChangeChromeRemovalSelection | null;
   comment: string;
+  currentText: string | null | undefined;
   promptActionSelection: InlineChangePromptActionSelection | null;
   proposedText: string;
   tokenControlSelections: InlineChangeTokenControlSelection[];
   typographyRoleSelection: InlineChangeTypographySelection | null;
 }) {
+  const hasTextChange = getHasProposedTextChange(currentText, proposedText);
   const hasPropertyChange =
+    hasTextChange ||
     tokenControlSelections.length > 0 ||
     Boolean(typographyRoleSelection) ||
     Boolean(chromeRemovalSelection) ||
@@ -103,7 +88,7 @@ export function getHasActionableDraft({
     case "bug":
       return comment.trim().length > 0 || hasPropertyChange;
     case "edit_text":
-      return proposedText.trim().length > 0;
+      return hasTextChange;
     case "remove_border":
       return chromeRemovalSelection?.kind === "border";
     case "remove_card_chrome":
@@ -121,6 +106,16 @@ export function getHasActionableDraft({
     default:
       return comment.trim().length > 0 || hasPropertyChange;
   }
+}
+
+export function getHasProposedTextChange(
+  currentText: string | null | undefined,
+  proposedText: string,
+) {
+  const normalizedProposedText = proposedText.trim();
+  return (
+    normalizedProposedText.length > 0 && normalizedProposedText !== (currentText?.trim() ?? "")
+  );
 }
 
 export function getIsTokenControlActive(

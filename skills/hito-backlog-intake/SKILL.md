@@ -48,26 +48,9 @@ screenshot or attachment is part of the backlog item itself and should travel wi
 ## Admin Backlog Import Compatibility
 
 Backlog items under `docs/tasks/backlog/` are mirrored into the admin Backlog, so every new or
-materially updated backlog item must include one canonical import-ready metadata block in the
-markdown itself before any extended human-facing sections.
-
-Required canonical sections:
-
-- `Status`
-- `Type`
-- `Priority`
-- `Next Recommended Role`
-- `Task`
-- `Stage`
-- `Exact Handoff Prompt`
-
-Allowed canonical values:
-
-- `Status`: `backlog`, `in_progress`, `completed`, `closed`, `archived`
-- `Type`: `bug`, `change_request`, `context_capture`, `plan`, `frontend_spec`, `product_brief`
-- `Priority`: `low`, `medium`, `high`, `urgent`
-- `Next Recommended Role`: `architect`, `backend`, `frontend`, `designer`, `copy`, `qa`,
-  `product`, `running_coach`
+materially updated backlog item must follow the single lifecycle, identity, scope, frontend-lane,
+and archival contract in `AGENTS.md` section 5.5 before any extended human-facing sections. Do not
+maintain a second field or status list here.
 
 Backlog-specific fields such as `Severity`, `Owner`, `Reported`, `Evidence`, `Observed Behavior`,
 and `Validation Expectations` remain required for human triage, but they do not replace the
@@ -82,8 +65,30 @@ canonical import-ready block.
 5. Separate confirmed facts from hypotheses.
 6. Decide item type, severity, priority, status, and next owner.
 7. Create or update the backlog markdown file.
-8. Include a precise handoff prompt for the next role.
+8. Include a precise handoff prompt when the item is `ready` or `in_progress`; do not fabricate one
+   for terminal history.
 9. Run `git diff --check` for markdown-only changes.
+
+## Small-Fix Batching
+
+Use this workflow only for reports the user explicitly calls bugs, asks to save to the backlog, or
+agrees to defer after discussion. Ideas and feature requests keep the normal Product conversation:
+discuss first, then decide whether to make, defer, or discard them. For captured bugs, keep each
+report as its own work item. Do not create one broad daily "bug fixes" document: that hides different
+evidence, owners, and risk boundaries.
+
+Assign the optional canonical `Batch` field only when reports share one execution owner, one
+canonical surface or source-of-truth boundary, and one validation story. Use a stable descriptive
+slug, for example `2026-07-27-design-system-reference-fixes`.
+
+At three or four confirmed compatible items, tell Product that the batch is ready to discuss. This
+is not permission to dispatch implementation automatically. Product presents the bounded batch and
+its shared validation cost; the user explicitly decides when to start. Bypass the threshold only
+for urgent, user-blocking, privacy/security, auth, persistence, destructive, or release-gating
+defects with demonstrated evidence.
+
+Items whose owner is still unknown may share an investigation batch, but they are not execution
+work until the source evidence or required discriminator is recorded.
 
 ## Clarification Rule
 
@@ -119,8 +124,9 @@ Every backlog item should include:
 - `Severity`
 - `Priority`
 - `Human Priority`
-- `Human Status`
 - `Owner`
+- `Scope`
+- `Archive Intent`
 - `Reported`
 - `User Report`
 - `Evidence`
@@ -131,8 +137,8 @@ Every backlog item should include:
 - `Recommended Fix Direction`
 - `What Not To Touch`
 - `Validation Expectations`
-- `Next Recommended Role`
-- `Exact Handoff Prompt`
+- `Next Recommended Role` when required by `AGENTS.md` section 5.5
+- `Exact Handoff Prompt` when required by `AGENTS.md` section 5.5
 
 ## Human Triage Labels
 
@@ -163,15 +169,6 @@ Human Priority:
 - `next`
 - `later`
 - `parking-lot`
-
-Human Status:
-
-- `new`
-- `triaged`
-- `ready`
-- `blocked`
-- `done`
-- `archived`
 
 ## Guardrails
 

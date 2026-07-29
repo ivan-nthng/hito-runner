@@ -6,6 +6,7 @@ import {
   buildStaleRepoMirrorMetadata,
   findStaleActiveRepoMirrorRows,
 } from "./import-repo-work-items-to-admin-backlog";
+import { assertCanonicalMarkdownWorkItemContract } from "./admin-backlog-import/contract-proof";
 import {
   appendAdminCaptureItemNoteForDependencies,
   createAdminCaptureItemForDependencies,
@@ -200,6 +201,7 @@ if (args.has("--live-supabase")) {
 }
 
 async function runDeterministicHarness() {
+  assertCanonicalMarkdownWorkItemContract();
   await assertCanonicalBacklogReadContract();
   await assertSingleRouteBacklogRead();
 
@@ -397,15 +399,22 @@ async function runDeterministicHarness() {
     created_by_label: "Repo work item importer",
     metadata: {
       imported_from_repo: true,
+      work_item_id: "admin-canonical-markdown-mirror",
       source_path: "docs/plans/active/example.md",
       source_type: "active_plan",
       ...repoMetadataForSourceType("active_plan"),
       work_item_status: "in_progress",
+      work_item_owner: "backend",
+      work_item_scope: "admin-capture",
+      archive_intent: "retain_in_place",
+      work_item_batch: "admin-contract",
+      frontend_lane: "product",
       markdown_status: "in_progress",
       markdown_type: "context_capture",
       markdown_priority: "high",
       markdown_next_role: "backend",
       markdown_prompt_source: "exact_handoff_prompt",
+      markdown_metadata_state: "complete",
     },
   });
   const repoList = await mustOk(
@@ -421,6 +430,27 @@ async function runDeterministicHarness() {
   assert.equal(repoList.view.items[0]?.source, "repo_import");
   assert.equal(repoList.view.items[0]?.repoWorkItem?.sourceLabel, "Active plan");
   assert.equal(repoList.view.items[0]?.repoWorkItem?.sourceGroup, "active_plans");
+  assert.deepEqual(repoList.view.items[0]?.repoWorkItem, {
+    workItemId: "admin-canonical-markdown-mirror",
+    sourcePath: "docs/plans/active/example.md",
+    sourceType: "active_plan",
+    workItemKind: "plan",
+    workItemLifecycle: "active",
+    sourceGroup: "active_plans",
+    sourceGroupLabel: "Active plans",
+    sourceLabel: "Active plan",
+    workItemStatus: "in_progress",
+    workItemType: "context_capture",
+    workItemPriority: "high",
+    owner: "backend",
+    scope: "admin-capture",
+    archiveIntent: "retain_in_place",
+    batch: "admin-contract",
+    frontendLane: "product",
+    metadataState: "complete",
+    missingRequiredFields: [],
+    invalidRequiredFields: [],
+  });
 
   const activePlanList = await mustOk(
     listAdminCaptureBacklogForDependencies(admin, {
@@ -517,6 +547,8 @@ async function runDeterministicHarness() {
           "repo_derived_list_detail_copy",
           "repo_derived_markdown_prompt_copy",
           "repo_derived_read_only",
+          "canonical_markdown_work_item_contract",
+          "canonical_repo_projection_metadata",
           "stale_repo_mirror_cleanup_policy",
         ],
         promptLength: prompt.prompt.prompt.length,

@@ -2,7 +2,7 @@
 
 ## Status
 
-active
+backlog
 
 ## Type
 
@@ -14,22 +14,21 @@ high
 
 ## Next Recommended Role
 
-backend
+product
 
 ## Task
 
-Align Settings persistence with the canonical runner-baseline bounds, then rerun the bounded
-Editable Value Field Settings and native-keyboard acceptance inventory.
+Select a new bounded discoverability or safe-reuse outcome without reopening accepted Inspector,
+typography, or heart-rate guidance work.
 
 ## Stage
 
-Editable Value Field lifecycle consolidated / Settings acceptance blocked at backend validation.
+PRODUCT selection / the former Settings-bounds blocker is superseded by accepted backend and frontend heart-rate guidance work; broader Global QA remains separate.
 
 ## Next Gate
 
-Backend must make the Settings save boundary enforce the already-canonical age, height, and weight
-ranges without changing profile lifecycle semantics. The same bounded acceptance inventory must then
-prove invalid-save rejection and native Tab behavior before this child returns to backlog closeout.
+No implementation gate is selected. A future task must begin from fresh source evidence and reuse the
+accepted Hito DS catalog and Inspector provenance owners instead of creating a parallel registry.
 
 ## Owner
 
@@ -37,7 +36,25 @@ ARCHITECT / DESIGNER / FRONTEND
 
 ## Last Updated
 
-2026-07-22
+2026-07-24
+
+## Exact Handoff Prompt
+
+```text
+ROLE: PRODUCT
+
+Task:
+Select one new, source-proven bounded Hito DS discoverability or safe-reuse task, or retain this plan in backlog.
+
+Stage:
+PRODUCT selection / completed Inspector, typography, and heart-rate guidance slices remain closed.
+
+Context:
+The Local Inspector and typography provenance work are accepted local-only tooling. The shared heart-rate guidance editor is accepted across its existing runner consumers. Global QA is a separate release gate and does not reopen these task-level outcomes.
+
+Required outcome:
+Choose work only when fresh evidence identifies one canonical owner, one user or maintainer problem, and a bounded validation story. Preserve the existing catalog, metadata, and runner-profile contracts.
+```
 
 ## Context
 
@@ -247,6 +264,25 @@ discriminator, responsive role identity, component-role readback, keyboard focus
 health, build integrity, and a runner-facing login consumer. Evidence lives in
 `qa-artifacts/screenshots/2026-07-22/hito-typography-provenance-qa/qa-report.md`. Implementation DoD is
 passed; Global QA remains pending.
+
+## 2026-07-23 Typography Inspector Preview Closeout
+
+The typography provenance and Local Inspector preview child is complete. Shared aliases now publish
+their existing inherited provenance without visual recipe changes; the Inspector renders the selected
+element's true computed typography first and the existing 14 safe replacements as live role samples.
+The central 19-role inventory, component-owned recognition boundary, `Custom` negative boundary,
+local-only prompt behavior, `/hitoDS` consumer proof, and Figma/reference parity remain intact.
+
+Owner-level browser and WebKit evidence passed on desktop and exact `375px`, alongside source,
+runtime, build, integrity, cleanup, and scoped-diff checks. Global QA remains a separate release
+gate. The implemented child specification is
+`docs/tasks/frontend-specs/2026-07-23-hito-typography-provenance-and-inspector-preview-contract.md`.
+
+The bounded Picker Anatomy follow-up is also complete. The Inspector now uses literal `Ab` font
+specimens, a truthful name or `Custom` label, and one concise technical descriptor per option. This
+preserves the 19-role inventory, the 14-role replacement subset, source-backed provenance, and the
+component-owned boundary while making visual comparison faster. Its owner-level proof is in
+`qa-artifacts/screenshots/2026-07-23/local-inspector-typography-picker-anatomy-followup/`.
 
 ## Product Decision
 

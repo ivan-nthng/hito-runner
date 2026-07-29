@@ -92,6 +92,32 @@ Every task has one active role. The active role is real execution authority, not
 - If task identity and the leading `ROLE:` disagree, do not guess or switch roles. Stop and report
   the mismatch so the task can be assigned correctly.
 
+### Frontend Lane Selection (Mandatory)
+
+`FRONTEND` has three persistent work lanes. They share the same global rules and frontend role file,
+but each task must name exactly one lane so one thread does not accumulate unrelated product context:
+
+- `DevTools` — loopback-only Local Inspector, local design suite, devtool mount/gate, and Inspector
+  interaction surfaces under `src/components/devtools/**`. It never changes product behavior to
+  accommodate the tool.
+- `Product` — authenticated runner experience: onboarding, plan creation/review, calendar, workouts,
+  settings, active-plan management, and product-facing routes/components. It does not own DevTools,
+  public marketing, or shared design-system contracts.
+- `Marketing` — public entry and brand experience, including `AuthEntryScreen`, public landing
+  presentation, and marketing assets/copy. It does not change runner product behavior, auth backend,
+  or account/session semantics.
+
+Shared Hito design-system primitives remain a separate executable Design System ownership boundary
+rather than a fourth frontend lane. Design System owns their architecture, implementation, and
+validation under `src/components/ui/**`, `src/components/hito-ds/**`, canonical DS CSS/tokens, and
+`/hitoDS`. A frontend lane that discovers a shared DS defect routes that owner instead of applying a
+local compatibility recipe.
+
+Every user-facing execution prompt addressed to `ROLE: FRONTEND` must name `Frontend lane: DevTools`,
+`Frontend lane: Product`, or `Frontend lane: Marketing` immediately after its task/stage context.
+The Product router must also identify the selected lane in its Russian status shell. Do not assign a
+mixed-lane task; split or route the shared owner before implementation.
+
 ### Execution authority
 
 - An execution role may inspect, edit, run, validate, and use/reuse subagents as its own role file
@@ -203,6 +229,23 @@ required, a Product decision is needed, or the necessary subagent capability is 
 The orchestration handoff must describe the full bounded outcome and tell the owner to use subagents
 for adjacent verification. It must not decompose routine implementation -> QA -> fix loops into a
 sequence of prompts that the user must copy between agents.
+
+### Local Slice Verification Rule (Mandatory)
+
+Every behavior, UI, interaction, styling, or contract slice owned by one execution role must include
+an independent check inside that same owner task, even when the code change looks small (for example,
+a button color, padding, event handler, or validation branch). The owner must start or reuse one
+bounded QA subagent or the relevant independent reviewer (such as DESIGNER for a visual decision),
+integrate its result, and fix-forward before reporting back.
+
+- A separate user-facing `ROLE: QA` task is reserved for Global QA Acceptance, a cross-owner/release
+  matrix, or an explicitly assigned independent acceptance scope. It is not the default follow-up to
+  a local implementation change.
+- The implementation owner may run fast local checks itself, but those do not replace the required
+  independent subagent evidence when such a subagent can safely inspect the changed behavior.
+- Documentation-only, copy-only, or instruction-only edits without product behavior are exempt.
+  If no independent subagent can safely run, the owner must state the exact limitation and complete
+  the strongest safe local verification; it must not ask the user to relay a routine QA task.
 
 ## 2.4) Definition Of Done, Test Inventory, And Acceptance Gate (Mandatory)
 
@@ -323,6 +366,10 @@ Language rule:
 Exact next-role prompt recipient rule:
 
 - Every exact next-role prompt must begin by naming who the task is for.
+- Every user-facing response that contains an exact next-role prompt must state the recommended
+  model and reasoning effort immediately before its fenced prompt block, in this compact form:
+  `Model: <model>. Reasoning effort: <level>.` This is mandatory guidance for the user setting up
+  the destination task; do not leave model choice implicit.
 - The first line inside the prompt block must be `ROLE: <ROLE>`, for example `ROLE: FRONTEND`,
   `ROLE: QA`, `ROLE: BACKEND`, `ROLE: ARCHITECT`, `ROLE: DESIGNER`, `ROLE: COPY`, or
   `ROLE: RUNNING COACH`. Use `ROLE: PRODUCT` when the next step is product definition, prompt
@@ -649,6 +696,7 @@ Mandatory startup for every project-work response:
    - `agents/product.agent.md`
    - `agents/architect.agent.md`
    - `agents/backend.agent.md`
+   - `agents/integration-manager.agent.md`
    - `agents/frontend.agent.md`
    - `agents/qa.agent.md`
    - `agents/running-coach-agent.md`
@@ -715,6 +763,10 @@ Use subagents when all of these are true:
 - the subtask is independent enough to run in parallel or on a reused open subagent
 - the subtask has a clear read-only or disjoint write scope
 - the main agent can integrate the result and remain accountable for the final decision
+
+For a local behavior/UI/contract slice, treat this test as satisfied by default: a bounded independent
+QA or specialist-review subtask must be started or reused unless it is documentation-only or the
+tools are genuinely unavailable. Small diffs do not waive this rule.
 
 For `ARCHITECT` and `BACKEND` on the Hito Stack Simplification / global cleanup track, a final report
 is incomplete unless it includes one of:
@@ -827,8 +879,9 @@ Minimum documentation rule for cleanup and artifact work:
   do not list every internal micro-gate unless the list is itself the accepted source of truth.
 
 Final reports for non-trivial work must state whether subagents were used, reused, and closed. If no
-subagents were used, give a short reason such as `none — single-file change`, `none — sequential
-browser session`, or `none — subagent tools unavailable`.
+subagents were used, give a real boundary reason such as `none — documentation-only with no product
+behavior`, `none — inherently fragile shared browser session with no safe independent path`, or
+`none — subagent tools unavailable`. A small or single-file behavior change is not a valid reason.
 
 ## 2.9) Standard Report Formats
 
@@ -1004,7 +1057,10 @@ Completion gate:
 
 ## 5.5) Repo-Derived Admin Backlog Import Contract
 
-The admin Backlog importer mirrors repo-authored markdown from these roots:
+Markdown is canonical for repo-authored work items. Admin Supabase is a deterministic, read-only
+mirror of that truth; it is not a second editable task system.
+
+The importer scans these canonical roots:
 
 - `docs/tasks/backlog`
 - `docs/tasks/product-briefs`
@@ -1012,35 +1068,139 @@ The admin Backlog importer mirrors repo-authored markdown from these roots:
 - `docs/plans/active`
 - `docs/plans/archive`
 
-For any new or materially updated work item inside those roots, agents must keep one canonical
-import-ready metadata block in the markdown itself. Extra human-facing sections are allowed, but they
-must not replace this block.
+### Canonical Metadata
 
-Required canonical sections:
+Every new or materially updated work item in those roots must keep one lead metadata block. Core
+fields are:
 
+- `Work Item ID` — immutable lowercase kebab-case identity, normally the filename stem; preserve it
+  across rename or active-to-archive moves.
 - `Status`
 - `Type`
 - `Priority`
-- `Next Recommended Role`
+- `Owner` — the role accountable for the current state, not merely the next handoff target.
+- `Scope` — one service-domain slug from the ownership map in `docs/current-functional-map.md`.
+- `Archive Intent`
 - `Task`
-- `Stage`
-- `Exact Handoff Prompt`
 
-Canonical value expectations:
+Conditional fields are:
 
-- `Status`: `backlog`, `in_progress`, `completed`, `closed`, or `archived`
+- `Batch` — optional stable batch/workstream slug. It groups related items but creates no parent,
+  hierarchy, registry, or new workflow.
+- `Frontend Lane` — required when the current or next implementation owner is `frontend`; allowed
+  values are `product`, `devtools`, and `marketing`. Shared Design System work omits this field
+  because it is a separate owner boundary.
+- `Next Recommended Role`, `Stage`, and `Exact Handoff Prompt` — required for `ready` and
+  `in_progress`. For `blocked`, `Stage` must name the blocker; include the next role and prompt only
+  when one bounded owner can resolve it. Preserve a meaningful historical prompt on terminal items,
+  but never invent one solely to satisfy metadata.
+
+Canonical values:
+
+- `Status`: `backlog`, `ready`, `in_progress`, `blocked`, `completed`, `closed`, or `archived`
 - `Type`: `bug`, `change_request`, `context_capture`, `plan`, `frontend_spec`, or `product_brief`
 - `Priority`: `low`, `medium`, `high`, or `urgent`
+- `Owner`: one of `architect`, `backend`, `frontend`, `design_system`, `designer`, `copy`, `qa`,
+  `product`, or `running_coach`
 - `Next Recommended Role`: `architect`, `backend`, `frontend`, `designer`, `copy`, `qa`,
   `product`, or `running_coach`
+- `Archive Intent`: `retain_in_place` or `archive_when_closed`
 - `Exact Handoff Prompt`: one execution-ready fenced prompt beginning with `ROLE: <ROLE>`
 
-Additional sections such as `Severity`, `Owner`, `Reported`, `Evidence`, `Context`, `Risks`, or
-`QA Expectations` remain valid when the document type needs them, but they are secondary metadata
-and must not be used instead of the canonical import-ready block.
+`Track Tags` and other free-form labels may remain for human context, but they never replace
+`Scope`, `Batch`, or `Frontend Lane`.
 
-If a role creates or updates backlog items, plans, frontend specs, or product briefs without this
-canonical block, the work is incomplete because admin Backlog mirroring and prompt copy can drift.
+### Small-Fix Batch Intake
+
+This is a bug-intake workflow, not the default product-conversation workflow. Ideas, feature
+requests, and open-ended product observations remain conversational until Product and the user
+decide to make or retain work. Capture an individual `backlog` work item when the user explicitly
+calls the report a bug, asks to save it to the backlog, or agrees during discussion to defer it.
+Each captured bug keeps its own evidence, expected behavior, source investigation, and owner
+boundary; do not collapse unrelated reports into a dated catch-all document.
+
+Product assigns a `Batch` only when items share all of the following:
+
+- one accountable execution owner (and one Frontend Lane when applicable);
+- one canonical source-of-truth boundary or a tightly related surface;
+- one risk class and a realistic shared validation story.
+
+Use a stable descriptive batch slug such as `2026-07-27-design-system-reference-fixes`, not a
+generic daily bucket. A batch is eligible for execution discussion when it has three or four
+confirmed, bounded items. It may run earlier only for `urgent` work, a user-blocking regression,
+privacy/security, persistence, auth, destructive behavior, or another demonstrated release gate.
+
+The threshold is a Product notification point, not automatic dispatch. When a newly captured bug
+becomes the third or fourth compatible item, Product summarizes the candidate batch, its owner,
+boundaries, and shared validation cost, then asks whether to start it. The user retains that explicit
+start decision. Do not wait for a count threshold when a confirmed P0 needs immediate root-cause
+work.
+
+Unproven reports may be batched for investigation, but they do not become an implementation batch
+until source, log, browser, database, or validator evidence establishes the owner or names the
+specific discriminator the execution owner must obtain.
+
+### Lifecycle Meaning
+
+- `backlog` — accepted or retained work that is not execution-ready.
+- `ready` — bounded work with an accountable owner and complete handoff.
+- `in_progress` — execution or acceptance is currently active.
+- `blocked` — work cannot proceed until a named decision, evidence gate, or external dependency is
+  resolved.
+- `completed` — the accepted outcome exists.
+- `closed` — canceled, superseded, rejected, or no longer needed.
+- `archived` — memory-only history under an accepted archive boundary.
+
+Repository inventory uses those values directly: `in_progress` is current active work, `ready` is
+ready work, `blocked` is blocked/approval-gated work, `completed` or `closed` is a completed
+historical record, and `archived` is archived memory. `backlog` is accepted but not execution-ready
+work. Malformed records are reported separately rather than guessed into one of those categories.
+
+An unsupported value, contradictory lifecycle metadata, or duplicate `Work Item ID` makes an item
+malformed. Missing new fields on untouched historical records remain explicit legacy metadata debt
+during transition; do not rewrite accepted history merely to satisfy the new template. Once an item
+is new, materially updated, or intentionally normalized, missing core fields make it malformed.
+Import inference may keep legacy history visible, but it must not silently upgrade it to ready work.
+
+### Archival Contract
+
+- Never archive or delete by age alone.
+- A completed item remains visible when `Archive Intent` is `retain_in_place`, it still owns current
+  reference truth, an umbrella plan still guides work, or its stable path is needed by live links.
+- A plan with `archive_when_closed` moves from `docs/plans/active` to `docs/plans/archive` only after
+  it is terminal, has no open gate or handoff, and inbound current links are reconciled. Preserve
+  `Work Item ID` and accepted history during the move.
+- Backlog items, briefs, and specs remain in their existing roots with terminal status unless a
+  separately accepted archive owner exists. Do not invent new archive folders during normalization.
+- Archived history is preserved, not rewritten to match a newer template. Add only the minimum
+  metadata needed to disambiguate identity or lifecycle when source evidence is clear.
+
+### Mirror And Compatibility Contract
+
+- New structured fields fit the existing `admin_capture_items.metadata` JSON envelope; they do not
+  require a new table, entity, registry, or task hierarchy.
+- When implemented, the importer must use `Work Item ID` as the primary mirror identity and retain
+  `source_type + source_path` only as a legacy fallback. Duplicate IDs fail the dry-run instead of
+  creating or merging ambiguous work.
+- Preserve existing Admin statuses: `backlog` and `blocked` map to `new`; `ready` and `in_progress`
+  map to `ready_for_codex`; `completed` and `closed` map to `done`; `archived` maps to `archived`.
+  Repo-derived rows never use `in_review`; exact Markdown lifecycle remains in metadata.
+- A source move with the same `Work Item ID` updates one mirror rather than creating a second work
+  item. A mirror becomes stale only when no approved source and no replacement with the same ID
+  exists. Stale mirrors may be archived only through an explicit importer action and are never
+  history-deleted.
+- Transition order is fixed:
+  1. Backend makes importer/dashboard parsing backward-compatible without live Admin mutation.
+  2. Architect classifies all sources and normalizes current actionable Markdown; untouched history
+     keeps explicit legacy metadata debt rather than receiving invented prompts or decisions.
+  3. A separate release/admin gate runs the dry-run, reviews identity moves and stale mirrors, then
+     explicitly approves live sync or stale-mirror archive.
+  Do not combine these phases in one batch.
+- Dashboard adoption remains a projection change, not a new workflow: show the canonical lifecycle,
+  owner, scope, optional batch/lane, and archive intent for active-plan rows, while continuing to
+  derive every row from Markdown.
+
+Extra human-facing sections remain valid, but they must not replace this metadata contract.
 
 ## 6) Change Safety And Guardrails
 

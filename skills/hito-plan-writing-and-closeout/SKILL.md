@@ -45,26 +45,8 @@ to restate every section. Keep them to the compact facts needed by the next role
 ## Repo-Derived Admin Backlog Mirror Compatibility
 
 Plans under `docs/plans/active/` and `docs/plans/archive/` are mirrored into the admin Backlog.
-Every new or materially updated plan should keep one canonical import-ready metadata block in the
-markdown itself so the importer and copied handoff prompt stay deterministic.
-
-Required canonical sections:
-
-- `Status`
-- `Type`
-- `Priority`
-- `Next Recommended Role`
-- `Task`
-- `Stage`
-- `Exact Handoff Prompt`
-
-Allowed canonical values:
-
-- `Status`: `backlog`, `in_progress`, `completed`, `closed`, `archived`
-- `Type`: `bug`, `change_request`, `context_capture`, `plan`, `frontend_spec`, `product_brief`
-- `Priority`: `low`, `medium`, `high`, `urgent`
-- `Next Recommended Role`: `architect`, `backend`, `frontend`, `designer`, `copy`, `qa`,
-  `product`, `running_coach`
+Every new or materially updated plan must follow the single lifecycle, identity, scope, frontend-lane,
+and archival contract in `AGENTS.md` section 5.5. Do not maintain a second field or status list here.
 
 Plan-specific sections such as `Context`, `Problem Definition`, `Responsibilities`, `QA
 Expectations`, `Risks`, `Exit Criteria`, or `Suggested Next Step` remain valid and often required,
@@ -74,8 +56,10 @@ but they do not replace the canonical import-ready block.
 
 When a track is complete:
 
-- mark the plan `Complete / Closed` if no future phases remain
-- mark it `Paused after <phase>` if future phases remain but work should stop now
+- use `completed` when the accepted outcome exists and `closed` when the track was canceled,
+  superseded, rejected, or is no longer needed
+- use `blocked` only for a named unresolved gate; use `backlog` for intentionally retained work that
+  is not execution-ready
 - record residual QA hygiene as non-blocking if it does not justify reopening implementation
 - update `docs/history/technical-log.md` for every accepted implementation, QA acceptance,
   source-cleanup, local-tooling, or durable process slice before closeout, or explicitly record why

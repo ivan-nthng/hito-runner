@@ -1,8 +1,12 @@
 # Manual Workout Creation, Editing, Copy, Templates, And Recurrence
 
+## Work Item ID
+
+2026-06-04-manual-workout-creation-edit-copy-recurrence
+
 ## Status
 
-in_progress
+closed
 
 ## Type
 
@@ -12,20 +16,28 @@ change_request
 
 high
 
-## Next Recommended Role
+## Owner
 
-BACKEND
+product
+
+## Scope
+
+manual-workout-authoring
+
+## Archive Intent
+
+retain_in_place
 
 ## Task
 
-Define the product, coaching, backend, and design-system architecture for user-built plans and manual
-workout authoring.
+Record the superseded architecture request that led to the accepted manual-workout authoring
+contracts.
 
 ## Stage
 
-ARCHITECT plan / manual workout authoring backend handoff ready.
+Closed / superseded by accepted manual-workout authoring work.
 
-## Exact Handoff Prompt
+## Historical Exact Handoff Prompt
 
 ```text
 ROLE: BACKEND
@@ -198,7 +210,7 @@ Output:
 
 high
 
-## Owner
+## Historical Delivery Owners
 
 RUNNING COACH / ARCHITECT / BACKEND / FRONTEND / DESIGN SYSTEM / QA
 

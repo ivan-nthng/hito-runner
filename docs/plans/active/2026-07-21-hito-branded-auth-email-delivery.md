@@ -1,5 +1,9 @@
 # Hito Branded Auth Email Delivery
 
+## Work Item ID
+
+2026-07-21-hito-branded-auth-email-delivery
+
 ## Status
 
 in_progress
@@ -11,6 +15,18 @@ change_request
 ## Priority
 
 high
+
+## Owner
+
+designer
+
+## Scope
+
+auth-app-shell-admin-boundary
+
+## Archive Intent
+
+archive_when_closed
 
 ## Next Recommended Role
 
@@ -24,6 +40,24 @@ hosted delivery once approved SMTP credentials and sender identity are available
 ## Stage
 
 DESIGNER template direction and versioned email source / hosted delivery prerequisites pending.
+
+## Exact Handoff Prompt
+
+```text
+ROLE: DESIGNER
+
+Task:
+Create the versioned Hito-branded Supabase passwordless sign-in email template and email-client
+proof without applying hosted sender or SMTP configuration.
+
+Stage:
+DESIGNER template direction and versioned email source.
+
+Required outcome:
+Produce the accepted non-secret Hito email template and client-safe proof while preserving the
+current Supabase callback variables. Keep hosted sender configuration and controlled delivery
+blocked until the documented credentials, verified sender identity, and mailbox exist.
+```
 
 ## Problem Definition
 
@@ -76,7 +110,7 @@ block preparing the exact visual template now.
 - Once prerequisites are supplied, the same plan continues to hosted sender/template application and
   controlled delivery/callback proof.
 
-## Exact Handoff Prompt
+## Detailed Handoff Context
 
 ```text
 ROLE: DESIGNER

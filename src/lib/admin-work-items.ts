@@ -15,8 +15,52 @@ export const adminWorkItemSourceGroups = [
   "archive",
 ] as const;
 
+export const adminRepoWorkItemStatuses = [
+  "backlog",
+  "ready",
+  "in_progress",
+  "blocked",
+  "completed",
+  "closed",
+  "archived",
+] as const;
+
+export const adminRepoWorkItemTypes = [
+  "bug",
+  "change_request",
+  "context_capture",
+  "plan",
+  "frontend_spec",
+  "product_brief",
+] as const;
+
+export const adminRepoWorkItemPriorities = ["low", "medium", "high", "urgent"] as const;
+
+export const adminRepoWorkItemOwners = [
+  "architect",
+  "backend",
+  "frontend",
+  "design_system",
+  "designer",
+  "copy",
+  "qa",
+  "product",
+  "running_coach",
+] as const;
+
+export const adminRepoWorkItemArchiveIntents = ["retain_in_place", "archive_when_closed"] as const;
+
+export const adminRepoWorkItemFrontendLanes = ["product", "devtools", "marketing"] as const;
+
 export type AdminRepoWorkItemSourceType = (typeof adminRepoWorkItemSourceTypes)[number];
 export type AdminWorkItemSourceGroup = (typeof adminWorkItemSourceGroups)[number];
+export type AdminRepoWorkItemStatus = (typeof adminRepoWorkItemStatuses)[number];
+export type AdminRepoWorkItemType = (typeof adminRepoWorkItemTypes)[number];
+export type AdminRepoWorkItemPriority = (typeof adminRepoWorkItemPriorities)[number];
+export type AdminRepoWorkItemOwner = (typeof adminRepoWorkItemOwners)[number];
+export type AdminRepoWorkItemArchiveIntent = (typeof adminRepoWorkItemArchiveIntents)[number];
+export type AdminRepoWorkItemFrontendLane = (typeof adminRepoWorkItemFrontendLanes)[number];
+export type AdminRepoWorkItemMetadataState = "complete" | "legacy_debt" | "malformed";
 export type AdminRepoWorkItemKind = "backlog_item" | "plan" | "frontend_spec" | "brief";
 export type AdminRepoWorkItemLifecycle = "backlog" | "active" | "archived" | "spec" | "brief";
 
@@ -87,6 +131,34 @@ export function isAdminRepoWorkItemSourceType(value: string): value is AdminRepo
 
 export function isAdminWorkItemSourceGroup(value: string): value is AdminWorkItemSourceGroup {
   return adminWorkItemSourceGroups.includes(value as AdminWorkItemSourceGroup);
+}
+
+export function isAdminRepoWorkItemStatus(value: string): value is AdminRepoWorkItemStatus {
+  return adminRepoWorkItemStatuses.includes(value as AdminRepoWorkItemStatus);
+}
+
+export function isAdminRepoWorkItemType(value: string): value is AdminRepoWorkItemType {
+  return adminRepoWorkItemTypes.includes(value as AdminRepoWorkItemType);
+}
+
+export function isAdminRepoWorkItemPriority(value: string): value is AdminRepoWorkItemPriority {
+  return adminRepoWorkItemPriorities.includes(value as AdminRepoWorkItemPriority);
+}
+
+export function isAdminRepoWorkItemOwner(value: string): value is AdminRepoWorkItemOwner {
+  return adminRepoWorkItemOwners.includes(value as AdminRepoWorkItemOwner);
+}
+
+export function isAdminRepoWorkItemArchiveIntent(
+  value: string,
+): value is AdminRepoWorkItemArchiveIntent {
+  return adminRepoWorkItemArchiveIntents.includes(value as AdminRepoWorkItemArchiveIntent);
+}
+
+export function isAdminRepoWorkItemFrontendLane(
+  value: string,
+): value is AdminRepoWorkItemFrontendLane {
+  return adminRepoWorkItemFrontendLanes.includes(value as AdminRepoWorkItemFrontendLane);
 }
 
 export function getAdminRepoWorkItemMetadata(

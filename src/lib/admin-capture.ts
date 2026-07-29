@@ -2,9 +2,16 @@ import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
   adminWorkItemSourceGroups,
+  type AdminRepoWorkItemArchiveIntent,
+  type AdminRepoWorkItemFrontendLane,
   type AdminRepoWorkItemKind,
   type AdminRepoWorkItemLifecycle,
+  type AdminRepoWorkItemMetadataState,
+  type AdminRepoWorkItemOwner,
+  type AdminRepoWorkItemPriority,
   type AdminRepoWorkItemSourceType,
+  type AdminRepoWorkItemStatus,
+  type AdminRepoWorkItemType,
   type AdminWorkItemSourceGroup,
 } from "@/lib/admin-work-items";
 import { adminCaptureTargetRoles, type AdminCaptureTargetRole } from "@/lib/admin-capture-roles";
@@ -28,6 +35,7 @@ export type AdminCapturePriority = (typeof adminCapturePriorities)[number];
 export type AdminCaptureSourceGroupFilter = AdminWorkItemSourceGroup;
 
 export interface AdminCaptureRepoWorkItemView {
+  workItemId: string | null;
   sourcePath: string;
   sourceType: AdminRepoWorkItemSourceType;
   workItemKind: AdminRepoWorkItemKind;
@@ -35,7 +43,17 @@ export interface AdminCaptureRepoWorkItemView {
   sourceGroup: Exclude<AdminWorkItemSourceGroup, "all_work">;
   sourceGroupLabel: string;
   sourceLabel: string;
-  workItemStatus: string | null;
+  workItemStatus: AdminRepoWorkItemStatus | null;
+  workItemType: AdminRepoWorkItemType | null;
+  workItemPriority: AdminRepoWorkItemPriority | null;
+  owner: AdminRepoWorkItemOwner | null;
+  scope: string | null;
+  archiveIntent: AdminRepoWorkItemArchiveIntent | null;
+  batch: string | null;
+  frontendLane: AdminRepoWorkItemFrontendLane | null;
+  metadataState: AdminRepoWorkItemMetadataState;
+  missingRequiredFields: string[];
+  invalidRequiredFields: string[];
 }
 
 export type AdminCaptureFailureReason =

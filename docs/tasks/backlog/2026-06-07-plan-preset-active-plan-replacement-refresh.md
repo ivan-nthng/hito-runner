@@ -1,8 +1,12 @@
 # Plan Preset Active-Plan Replacement And Refresh
 
+## Work Item ID
+
+2026-06-07-plan-preset-active-plan-replacement-refresh
+
 ## Status
 
-in_progress
+backlog
 
 ## Type
 
@@ -12,20 +16,28 @@ change_request
 
 medium
 
-## Next Recommended Role
+## Owner
 
-qa
+product
+
+## Scope
+
+active-plan-lifecycle-calendar-planned-workouts
+
+## Archive Intent
+
+retain_in_place
 
 ## Task
 
-Implement the reviewed active-plan transition seam for starting a generated or preset plan from an
-existing active manual plan.
+Retain future active-plan replacement and refresh work as backlog without reopening the accepted
+reviewed transition seam.
 
 ## Stage
 
-QA validation / reviewed active-plan transition lifecycle
+PRODUCT backlog / no active implementation or standalone QA gate selected.
 
-## Exact Handoff Prompt
+## Historical Exact Handoff Prompt
 
 ```text
 ROLE: QA
@@ -158,7 +170,8 @@ Relationship to adjacent lifecycle actions:
 ## Acceptance
 
 - Architecture decision is complete.
-- Backend implementation is complete and QA is selected as the next owner.
+- The historical backend implementation is complete; this record is now backlog and has no active
+  standalone QA gate.
 - Protected history, logs, evidence, manual templates, and active-plan lifecycle are explicitly
   handled.
 - Frontend does not invent replacement rules.

@@ -46,6 +46,8 @@ The handoff writer assigns the problem; the receiving role designs and executes 
 Every prompt should provide:
 
 - the observed symptom and root-cause evidence;
+- for `ROLE: FRONTEND`, one explicit `Frontend lane: DevTools | Product | Marketing` label after the
+  task/stage context;
 - the canonical owner and existing seams to inspect;
 - the product outcome, hard constraints, non-goals, and acceptance evidence;
 - a compact Definition of Done: observable outcome, preserved boundaries, required owner
@@ -150,6 +152,9 @@ separate later gate when the plan or release scope requires it.
 
 - Tell the assigned BACKEND or FRONTEND owner to start/reuse a role-prefixed QA subagent for browser,
   persistence-readback, fixture, or regression proof that is adjacent to its own Definition of Done.
+- Require that local behavior, UI, styling, or contract slices use that independent subagent inside
+  the owner task even for small diffs. A standalone user-facing QA task is for Global QA Acceptance,
+  cross-owner/release coverage, or an explicitly assigned acceptance scope, not routine closeout.
 - The owner integrates the QA result and fixes any same-owner defect before returning.
 - The owner reports `Implementation DoD: Passed` only after its full required inventory passes, and
   labels Global QA Acceptance as pending unless it was explicitly part of the same assigned scope.
@@ -178,6 +183,8 @@ prompt-writing role.
 The handoff must:
 
 - be written in Russian around the exact prompt and English inside the exact prompt by default
+- state `Model: <model>. Reasoning effort: <level>.` immediately before the fenced prompt block;
+  this instruction is mandatory whenever a user-facing response contains an exact role prompt
 - put the exact next-role prompt inside one fenced code block
 - name the active plan/spec/doc with an absolute clickable file link in the surrounding Russian
   shell

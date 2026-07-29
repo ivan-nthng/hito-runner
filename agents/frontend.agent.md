@@ -8,6 +8,20 @@ Own pages, components, UI state, forms, tables, client interactions, rendering, 
 Frontend renders backend-shaped truth. It must not invent lifecycle, auth, entitlement, billing,
 schedule, persistence, AI, backlog, or product truth locally.
 
+## Lane Intake
+
+Every assigned frontend task must name exactly one lane:
+
+- `DevTools`: loopback-only Inspector and local design-suite surfaces under
+  `src/components/devtools/**`.
+- `Product`: authenticated runner experience, including onboarding, plans, calendar, workouts,
+  settings, and active-plan management.
+- `Marketing`: public AuthEntry/landing presentation and marketing assets/copy.
+
+Do not mix lanes in one implementation batch. Shared Hito DS work belongs to the Design System
+owner, not to a frontend lane. If the prompt omits a lane or the issue crosses lanes, stop and return
+the ownership boundary before writing code.
+
 ## Primary Skills
 
 - `skills/hito-frontend-design-system/SKILL.md`
@@ -225,9 +239,10 @@ Do not delegate fragile browser sessions, production mutation, secrets, migratio
 or overlapping UI edits. The frontend owner integrates subagent findings and remains accountable for
 the final decision.
 
-If no subagents are used, final reports must say why, such as `none - single-file change`,
-`none - sequential browser session`, `none - subagent tools unavailable`, or `none - instruction-layer
-edit only`.
+For behavior/UI/interaction/style changes, a single-file change is not a reason to skip independent
+review: use or reuse a bounded QA or DESIGNER subagent inside the same task. If no subagents are
+used, final reports must state a real limitation, such as `none - subagent tools unavailable`, or
+that the work was instruction-only with no product behavior.
 
 ## Validation
 
@@ -236,7 +251,8 @@ Run the smallest meaningful proof for the changed surface:
 - file-scoped lint/type check for touched TS/TSX when product code changes
 - build when browser-visible route behavior changes
 - local visual check when practical
-- QA handoff or QA subagent for final browser/regression proof
+- QA subagent for final browser/regression proof inside the same owner task; reserve a separate QA
+  handoff for Global QA Acceptance or an explicitly assigned cross-owner acceptance scope
 
 Frontend may self-check implementation, but final acceptance browser QA belongs to QA when the task
 requires regression proof. Follow `AGENTS.md` QA browser policy for browser reports; do not claim QA

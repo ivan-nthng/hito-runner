@@ -95,8 +95,14 @@ Classify each item by:
 - issue category: `bug`, `improvement`, `design`, `copy`, `backend`, `qa`, `research`, `question`
 - severity: `blocker`, `high`, `medium`, `low`
 - human priority: `now`, `next`, `later`, `parking-lot`
-- owner: `PRODUCT`, `ARCHITECT`, `FRONTEND`, `BACKEND`, `QA`, `DESIGNER`, `COPY`, `RUNNING COACH`
-- human status: `new`, `triaged`, `ready`, `blocked`, `done`, `archived`
+- owner: one accountable project role
+- lifecycle status: use only the canonical `Status` contract in `AGENTS.md` section 5.5
+- optional `Batch`: group only items with the same owner, canonical boundary, risk class, and
+  validation story; never use a generic date-only bucket
+
+When a compatible batch reaches three or four confirmed bounded items, report that it is ready for
+Product discussion. Do not dispatch implementation solely because it reached the threshold. Urgent
+or release-gating defects bypass batching after their root-cause evidence is captured.
 
 ### 5) Handoff
 
@@ -107,6 +113,8 @@ Classify each item by:
 ## Must Do
 
 - create or update backlog markdown files when asked to capture backlog work
+- keep ideas and feature requests in normal Product discussion until the user asks to retain them or
+  jointly decides to defer them; do not turn ordinary conversation into automatic backlog intake
 - keep backlog items specific and executable
 - investigate enough source context to avoid vague tickets like "fix this screen"
 - ask a clarifying question if the desired change, affected surface, or expected behavior is unclear
@@ -133,9 +141,13 @@ Classify each item by:
 ```md
 # <Short Title>
 
+## Work Item ID
+
+YYYY-MM-DD-<short-slug>
+
 ## Status
 
-backlog
+backlog | ready | in_progress | blocked | completed | closed | archived
 
 ## Type
 
@@ -157,13 +169,25 @@ low | medium | high | urgent
 
 now | next | later | parking-lot
 
-## Human Status
-
-new | triaged | ready | blocked | done | archived
-
 ## Owner
 
-PRODUCT | ARCHITECT | FRONTEND | BACKEND | QA | DESIGNER | COPY | RUNNING COACH
+<accountable project role>
+
+## Scope
+
+<service-domain slug from docs/current-functional-map.md>
+
+## Batch
+
+<optional batch/workstream slug>
+
+## Frontend Lane
+
+<product | devtools | marketing; include only for frontend-owned work>
+
+## Archive Intent
+
+retain_in_place | archive_when_closed
 
 ## Reported
 
@@ -210,7 +234,7 @@ YYYY-MM-DD
 
 ## Next Recommended Role
 
-<role>
+<required for ready/in_progress; conditional for blocked; omit when terminal and no handoff remains>
 
 ## Exact Handoff Prompt
 
@@ -226,6 +250,9 @@ STAGE:
 ...
 ```
 ```
+
+Omit `Batch` and `Frontend Lane` when they do not apply. Preserve a meaningful old handoff on
+terminal records, but do not create one merely to fill the template.
 
 ## Output
 

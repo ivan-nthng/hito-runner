@@ -1,8 +1,12 @@
 # Manual Authoring Bug Stack
 
+## Work Item ID
+
+2026-06-13-manual-authoring-bug-stack
+
 ## Status
 
-in_progress
+backlog
 
 ## Type
 
@@ -12,9 +16,17 @@ bug
 
 medium
 
-## Next Recommended Role
+## Owner
 
 product
+
+## Scope
+
+manual-workout-authoring
+
+## Archive Intent
+
+retain_in_place
 
 ## Task
 
@@ -23,9 +35,9 @@ reported.
 
 ## Stage
 
-PRODUCT backlog intake / manual authoring bug stack maintenance.
+PRODUCT backlog index / no active intake or implementation gate selected.
 
-## Exact Handoff Prompt
+## Historical Exact Handoff Prompt
 
 ```text
 ROLE: PRODUCT
@@ -47,7 +59,7 @@ likely owner, validation expectations, and one exact next-role prompt.
 
 high
 
-## Owner
+## Tracker Owner
 
 PRODUCT
 

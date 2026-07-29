@@ -1,8 +1,12 @@
 # Bug 03: Copy/Paste Review Raw Error Leak
 
+## Work Item ID
+
+2026-06-13-manual-authoring-bug-03-copy-paste-review-error
+
 ## Status
 
-in_progress
+closed
 
 ## Type
 
@@ -12,20 +16,31 @@ bug
 
 high
 
-## Next Recommended Role
+## Owner
 
-qa
+frontend
+
+## Scope
+
+manual-workout-authoring
+
+## Archive Intent
+
+retain_in_place
+
+## Frontend Lane
+
+product
 
 ## Task
 
-Validate the manual workout copy/paste review lifecycle fix on a disposable manual active-plan
-fixture.
+Record the superseded copy/paste review error after acceptance of direct backend-owned Copy/Paste.
 
 ## Stage
 
-QA validation / copy-paste review fix.
+Closed / superseded by accepted direct backend-owned Copy/Paste behavior.
 
-## Exact Handoff Prompt
+## Historical Exact Handoff Prompt
 
 ```text
 ROLE: QA
@@ -46,7 +61,7 @@ blocked states. Prove the browser flow and DB boundaries on a disposable manual-
 
 high
 
-## Owner
+## Historical QA Owner
 
 QA
 
@@ -65,8 +80,9 @@ The runner copied a workout and then could not paste it. The UI showed:
 
 - Screenshot:
   [paste-review-failed.png](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/assets/2026-06-13-manual-authoring-bug-03-copy-paste-review-error/paste-review-failed.png)
-- Recent frontend report says a guarded result-handling fix was implemented in
-  `src/components/manual-workout/ManualWorkoutAuthoringControls.tsx` and is awaiting QA proof.
+- A historical frontend report said a guarded result-handling fix was implemented in
+  `src/components/manual-workout/ManualWorkoutAuthoringControls.tsx`. That standalone QA gate is
+  superseded by the accepted direct backend-owned Copy/Paste path.
 
 ## Observed Behavior
 
@@ -93,10 +109,10 @@ Paste review should:
 
 Frontend async result handling assumed a shaped response and leaked raw error state into runner UI.
 
-## Recommended Fix Direction
+## Historical Fix Direction
 
-Treat this item as QA-ready unless QA proves the true failure is still present or the backend
-response shape is wrong.
+The former recommendation was to validate the frontend guard. It is retained only as historical
+context and is no longer an active QA instruction.
 
 ## What Not To Touch
 
@@ -105,7 +121,7 @@ response shape is wrong.
 - unrelated move interaction bugs
 - constructor template submenu work
 
-## Validation Expectations
+## Historical Validation Expectations
 
 - copy an eligible manual workout
 - paste into an eligible future day

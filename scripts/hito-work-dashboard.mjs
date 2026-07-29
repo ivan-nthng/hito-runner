@@ -6,6 +6,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { parseCanonicalMarkdown } from "./admin-backlog-import/markdown.ts";
 
 const execFileAsync = promisify(execFile);
 const scriptPath = fileURLToPath(import.meta.url);
@@ -20,60 +21,63 @@ const shouldApply = args.has("--apply");
 const skipAdmin = args.has("--no-admin");
 const shouldHelp = args.has("--help") || args.has("-h");
 
-if (shouldHelp) {
-  printHelp();
-  process.exit(0);
+if (isMainModule()) {
+  await main();
 }
 
-if (shouldApply && skipAdmin) {
-  throw new Error("Use either --apply or --no-admin, not both.");
+async function main() {
+  if (shouldHelp) {
+    printHelp();
+    return;
+  }
+
+  if (shouldApply && skipAdmin) {
+    throw new Error("Use either --apply or --no-admin, not both.");
+  }
+
+  const generatedAt = new Date().toISOString();
+  const adminResults = [];
+
+  if (!skipAdmin) {
+    const importArgs = shouldApply
+      ? ["run", "import-admin-backlog-work-items", "--", "--timeout-ms", "30000"]
+      : ["run", "import-admin-backlog-work-items", "--", "--dry-run", "--timeout-ms", "30000"];
+
+    adminResults.push(
+      await runCommand({
+        label: shouldApply ? "Admin backlog live sync" : "Admin backlog dry-run",
+        command: "npm",
+        args: importArgs,
+      }),
+    );
+
+    adminResults.push(
+      await runCommand({
+        label: "Admin backlog validator",
+        command: "npm",
+        args: ["run", "validate-admin-capture-backlog"],
+      }),
+    );
+  }
+
+  const activePlans = await readActivePlans();
+  const dashboard = renderDashboard({
+    generatedAt,
+    mode: skipAdmin ? "dashboard-only" : shouldApply ? "live-admin-sync" : "safe-dry-run",
+    adminResults,
+    activePlans,
+  });
+
+  await writeDashboardFile(dashboard);
+
+  console.log(dashboard);
+  if (adminResults.some((result) => result.status === "failed")) {
+    process.exitCode = 1;
+  }
 }
 
-const generatedAt = new Date().toISOString();
-const adminResults = [];
-
-if (!skipAdmin) {
-  const importArgs = shouldApply
-    ? ["run", "import-admin-backlog-work-items", "--", "--timeout-ms", "30000"]
-    : [
-        "run",
-        "import-admin-backlog-work-items",
-        "--",
-        "--dry-run",
-        "--timeout-ms",
-        "30000",
-      ];
-
-  adminResults.push(
-    await runCommand({
-      label: shouldApply ? "Admin backlog live sync" : "Admin backlog dry-run",
-      command: "npm",
-      args: importArgs,
-    }),
-  );
-
-  adminResults.push(
-    await runCommand({
-      label: "Admin backlog validator",
-      command: "npm",
-      args: ["run", "validate-admin-capture-backlog"],
-    }),
-  );
-}
-
-const activePlans = await readActivePlans();
-const dashboard = renderDashboard({
-  generatedAt,
-  mode: skipAdmin ? "dashboard-only" : shouldApply ? "live-admin-sync" : "safe-dry-run",
-  adminResults,
-  activePlans,
-});
-
-await writeDashboardFile(dashboard);
-
-console.log(dashboard);
-if (adminResults.some((result) => result.status === "failed")) {
-  process.exitCode = 1;
+function isMainModule() {
+  return Boolean(process.argv[1] && path.resolve(process.argv[1]) === scriptPath);
 }
 
 function printHelp() {
@@ -90,7 +94,7 @@ Usage:
     Dashboard-only refresh: do not call Admin scripts; only refresh docs/work-dashboard.md from active plans.
 
 Direct node fallback:
-  node scripts/hito-work-dashboard.mjs [--no-admin|--apply]
+  node --import tsx scripts/hito-work-dashboard.mjs [--no-admin|--apply]
 `);
 }
 
@@ -99,28 +103,46 @@ async function readActivePlans() {
     return [];
   }
 
-  const filenames = (await readdir(activePlansDir))
-    .filter((name) => name.endsWith(".md"))
-    .sort();
+  const filenames = (await readdir(activePlansDir)).filter((name) => name.endsWith(".md")).sort();
 
   const plans = [];
   for (const filename of filenames) {
     const absolutePath = path.join(activePlansDir, filename);
     const content = await readFile(absolutePath, "utf8");
-    plans.push({
-      title: truncate(extractTitle(content) ?? filename),
-      file: `<${absolutePath}>`,
-      status: truncate(extractHeadingBlock(content, "Status") ?? "unknown"),
-      nextRole: truncate(
-        extractHeadingBlock(content, "Next Recommended Role") ?? "unknown",
-      ),
-      task: truncate(extractHeadingBlock(content, "Task") ?? "unknown"),
-      stage: truncate(extractHeadingBlock(content, "Stage") ?? "unknown"),
-      latest: truncate(extractLatestNote(content) ?? "No latest note found"),
-    });
+    plans.push(projectActivePlanMarkdown({ filename, absolutePath, content }));
   }
 
   return plans;
+}
+
+export function projectActivePlanMarkdown({ filename, absolutePath, content }) {
+  const parsed = parseCanonicalMarkdown(content);
+  const diagnostics = [...parsed.missingRequiredFields, ...parsed.invalidRequiredFields];
+  const metadataState =
+    parsed.metadataState === "complete"
+      ? "canonical metadata"
+      : parsed.metadataState === "legacy_debt"
+        ? "legacy metadata debt"
+        : `malformed metadata${diagnostics.length ? `: ${diagnostics.join(", ")}` : ""}`;
+
+  return {
+    title: truncate(extractTitle(content) ?? filename),
+    file: `<${absolutePath}>`,
+    workItemId: truncate(parsed.workItemId ?? "legacy metadata debt"),
+    status: truncate(parsed.status ?? parsed.raw.Status ?? "unknown"),
+    owner: truncate(parsed.owner ?? parsed.raw.Owner ?? "legacy metadata debt"),
+    scope: truncate(parsed.scope ?? parsed.raw.Scope ?? "legacy metadata debt"),
+    archiveIntent: truncate(
+      parsed.archiveIntent ?? parsed.raw["Archive Intent"] ?? "legacy metadata debt",
+    ),
+    batch: truncate(parsed.batch ?? parsed.raw.Batch ?? "none"),
+    frontendLane: truncate(parsed.frontendLane ?? parsed.raw["Frontend Lane"] ?? "none"),
+    metadataState,
+    nextRole: truncate(parsed.nextRole ?? parsed.raw["Next Recommended Role"] ?? "unknown"),
+    task: truncate(parsed.task ?? "unknown"),
+    stage: truncate(parsed.stage ?? "unknown"),
+    latest: truncate(extractLatestNote(content) ?? "No latest note found"),
+  };
 }
 
 function extractTitle(content) {
@@ -128,25 +150,16 @@ function extractTitle(content) {
   return match?.[1]?.trim() ?? null;
 }
 
-function extractHeadingBlock(content, heading) {
-  const pattern = new RegExp(`^##\\s+${escapeRegExp(heading)}\\s*$`, "m");
-  const match = pattern.exec(content);
-  if (!match) {
-    return null;
-  }
-
-  const bodyStart = match.index + match[0].length;
-  const rest = content.slice(bodyStart);
-  const nextHeading = rest.search(/\n##\s+/);
-  const body = nextHeading === -1 ? rest : rest.slice(0, nextHeading);
-  return normalizeInline(body);
-}
-
 function extractLatestNote(content) {
   const ignored = new Set([
+    "Work Item ID",
     "Status",
     "Type",
     "Priority",
+    "Scope",
+    "Archive Intent",
+    "Batch",
+    "Frontend Lane",
     "Next Recommended Role",
     "Task",
     "Stage",
@@ -195,19 +208,12 @@ function truncate(value) {
   return `${normalized.slice(0, maxCellLength - 1)}...`;
 }
 
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 function escapeMarkdown(value) {
   return String(value).replaceAll("[", "\\[").replaceAll("]", "\\]");
 }
 
 function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
+  return String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
 function technicalLabel(value) {
@@ -247,9 +253,7 @@ async function runCommand({ label, command, args }) {
 }
 
 function renderCommand(command, args) {
-  return [command, ...args.map((arg) => (/\s/.test(arg) ? JSON.stringify(arg) : arg))].join(
-    " ",
-  );
+  return [command, ...args.map((arg) => (/\s/.test(arg) ? JSON.stringify(arg) : arg))].join(" ");
 }
 
 function summarizeCommandOutput(output) {
@@ -263,8 +267,7 @@ function summarizeCommandOutput(output) {
           (sum, value) => sum + Number(value ?? 0),
           0,
         );
-        const missingMetadataCount =
-          report.markdownQuality?.missingMetadataExamples?.length ?? 0;
+        const missingMetadataCount = report.metadataQuality?.examples?.length ?? 0;
         return truncate(
           `${report.mode}: eligible ${eligibleTotal}; created ${report.results.created}; updated ${report.results.updated}; skipped ${report.results.skipped}; duplicates ${report.results.duplicateCount}; stale mirrors ${report.results.staleActiveRepoMirrorCount}; metadata examples ${missingMetadataCount}`,
         );
@@ -289,7 +292,7 @@ function summarizeCommandOutput(output) {
   return truncate((interesting.length ? interesting : lines).slice(-6).join(" / ") || "No output");
 }
 
-function renderDashboard({ generatedAt, mode, adminResults, activePlans }) {
+export function renderDashboard({ generatedAt, mode, adminResults, activePlans }) {
   const adminBlock = adminResults.length
     ? adminResults
         .map(
@@ -300,9 +303,7 @@ function renderDashboard({ generatedAt, mode, adminResults, activePlans }) {
     : "- Skipped by `--no-admin`.";
 
   const activeWorkBlock = activePlans.length
-    ? activePlans
-        .map((plan, index) => renderActivePlanCard(plan, index))
-        .join("\n\n---\n\n")
+    ? activePlans.map((plan, index) => renderActivePlanCard(plan, index)).join("\n\n---\n\n")
     : "_No active plans found._";
 
   return `# Hito Work Dashboard
@@ -326,8 +327,8 @@ npm run work:dashboard:no-admin
 npm run work:dashboard:apply
 
 # Direct node fallback, if npm scripts are unavailable
-node scripts/hito-work-dashboard.mjs
-node scripts/hito-work-dashboard.mjs --no-admin
+node --import tsx scripts/hito-work-dashboard.mjs
+node --import tsx scripts/hito-work-dashboard.mjs --no-admin
 \`\`\`
 
 ## Admin Commands
@@ -378,9 +379,29 @@ ${activeWorkBlock}
 function renderActivePlanCard(plan, index) {
   return `### ${index + 1}. [${escapeMarkdown(plan.title)}](${plan.file})
 
+${technicalLabel("WORK ITEM ID")}
+
+${technicalValue(plan.workItemId)}
+
 ${technicalLabel("STATUS")}
 
 ${technicalValue(plan.status)}
+
+${technicalLabel("OWNER / SCOPE")}
+
+${technicalValue(`${plan.owner} / ${plan.scope}`)}
+
+${technicalLabel("BATCH / FRONTEND LANE")}
+
+${technicalValue(`${plan.batch} / ${plan.frontendLane}`)}
+
+${technicalLabel("ARCHIVE INTENT")}
+
+${technicalValue(plan.archiveIntent)}
+
+${technicalLabel("METADATA STATE")}
+
+${technicalValue(plan.metadataState)}
 
 #### Task
 ${plan.task}

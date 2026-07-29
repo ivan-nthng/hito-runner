@@ -22,7 +22,7 @@ import {
   inferWorkItemStatus,
   jsonValuesEqual,
   mapMarkdownTypeToAdminItemType,
-  mapWorkItemStatusToAdminStatus,
+  mapMirroredWorkItemStatusToAdminStatus,
   normalizeMetadata,
   normalizeSourcePath,
   parseCanonicalMarkdown,
@@ -30,16 +30,26 @@ import {
   stripMarkdown,
   titleFromFilename,
   truncate,
+  workItemIdentityKey,
   type AdminItemType,
   type AdminPriority,
   type AdminStatus,
+  type CanonicalMetadataState,
   type CanonicalMarkdownField,
   type TargetRole,
   type WorkItemStatus,
 } from "./admin-backlog-import/markdown";
+import {
+  buildCurrentRepoMirrorKeys,
+  buildExistingRepoMirrorIndex,
+  countRepoMirrorIdentityDuplicates,
+  findDuplicateWorkItemIds,
+  findExistingRepoMirrorRow,
+  type DuplicateWorkItemId,
+} from "./admin-backlog-import/identity";
 import type { Database, Json } from "../src/lib/supabase/database";
 
-const IMPORT_VERSION = "repo-work-items-v1";
+const IMPORT_VERSION = "repo-work-items-v2";
 const IMPORTER_USER_ID = "repo-work-item-importer";
 const IMPORTER_LABEL = "Repo work item importer";
 const MAX_TITLE_LENGTH = 160;
@@ -47,6 +57,8 @@ const MAX_EXISTING_ROWS = 10_000;
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MIN_TIMEOUT_MS = 1_000;
 const IMPORT_METADATA_COMPARE_KEYS = [
+  "work_item_id",
+  "work_item_id_declared",
   "source_path",
   "source_type",
   "work_item_kind",
@@ -57,6 +69,11 @@ const IMPORT_METADATA_COMPARE_KEYS = [
   "import_version",
   "work_item_status",
   "work_item_status_source",
+  "work_item_owner",
+  "work_item_scope",
+  "archive_intent",
+  "work_item_batch",
+  "frontend_lane",
   "markdown_status",
   "markdown_type",
   "markdown_priority",
@@ -66,6 +83,7 @@ const IMPORT_METADATA_COMPARE_KEYS = [
   "markdown_prompt_source",
   "markdown_exact_handoff_prompt_present",
   "markdown_metadata_complete",
+  "markdown_metadata_state",
   "missing_required_fields",
   "invalid_required_fields",
   "fallback_work_item_status",
@@ -100,6 +118,8 @@ type SourceConfig = {
 };
 
 type RepoWorkItem = {
+  workItemId: string | null;
+  workItemIdDeclared: boolean;
   sourcePath: string;
   sourceType: SourceType;
   itemType: AdminItemType;
@@ -143,6 +163,10 @@ type ImportStats = {
   updated: number;
   skipped: number;
   duplicateCount: number;
+  duplicateWorkItemIdCount: number;
+  duplicateWorkItemIdExamples: DuplicateWorkItemId[];
+  malformedCanonicalItemCount: number;
+  malformedCanonicalItemExamples: MissingMetadataExample[];
   repoDerivedInReviewCount: number;
   staleActiveRepoMirrorCount: number;
   staleActiveRepoMirrorCountAfterCleanup: number | null;
@@ -161,6 +185,7 @@ type ImportStats = {
 
 type ExampleItem = {
   title: string;
+  workItemId: string | null;
   sourcePath: string;
   sourceType: SourceType;
   workItemKind: AdminRepoWorkItemKind;
@@ -168,11 +193,19 @@ type ExampleItem = {
   sourceGroup: string;
   sourceLabel: string;
   status: WorkItemStatus;
+  metadataState: CanonicalMetadataState;
+  owner: string | null;
+  scope: string | null;
+  archiveIntent: string | null;
+  batch: string | null;
+  frontendLane: string | null;
   targetRole: TargetRole;
 };
 
 type MissingMetadataExample = {
   sourcePath: string;
+  workItemId: string | null;
+  metadataState: CanonicalMetadataState;
   missingRequiredFields: CanonicalMarkdownField[];
   invalidRequiredFields: CanonicalMarkdownField[];
 };
@@ -238,6 +271,8 @@ async function main() {
   const scan = await scanRepoWorkItems(process.cwd());
   setPhase("prepare_import_report", `${scan.items.length} eligible repo items`);
   const items = scan.items;
+  const duplicateWorkItemIds = findDuplicateWorkItemIds(items);
+  const malformedCanonicalItems = findMalformedCanonicalItems(items);
   const stats: ImportStats = {
     discoveredBySourceType: scan.discoveredBySourceType,
     eligibleBySourceType: countBySourceType(items),
@@ -249,6 +284,10 @@ async function main() {
     updated: 0,
     skipped: args.dryRun ? items.length : 0,
     duplicateCount: 0,
+    duplicateWorkItemIdCount: duplicateWorkItemIds.length,
+    duplicateWorkItemIdExamples: duplicateWorkItemIds.slice(0, 12),
+    malformedCanonicalItemCount: malformedCanonicalItems.length,
+    malformedCanonicalItemExamples: malformedCanonicalItems.slice(0, 12),
     repoDerivedInReviewCount: countRepoDerivedInReviewItems(items),
     staleActiveRepoMirrorCount: 0,
     staleActiveRepoMirrorCountAfterCleanup: null,
@@ -268,9 +307,7 @@ async function main() {
       frontendSpec: findExample(items, "frontend_spec"),
     },
   };
-  const currentSourceKeys = new Set(
-    items.map((item) => sourceKey(item.sourceType, item.sourcePath)),
-  );
+  const currentMirrorKeys = buildCurrentRepoMirrorKeys(items);
 
   if (args.dryRun) {
     if (args.archiveStale) {
@@ -279,11 +316,11 @@ async function main() {
       setPhase("load_existing_admin_capture_rows", "dry-run stale mirror check");
       const existingRows = await loadAdminCaptureRows(supabase);
       setPhase("analyze_stale_repo_mirror_rows", "dry-run stale mirror check");
-      const staleRows = findStaleActiveRepoMirrorRows(existingRows, currentSourceKeys);
+      const staleRows = findStaleActiveRepoMirrorRows(existingRows, currentMirrorKeys);
 
       stats.manualRowCountBefore = countManualRows(existingRows);
       stats.manualRowCountAfter = stats.manualRowCountBefore;
-      stats.duplicateCount = countImportedDuplicates(existingRows);
+      stats.duplicateCount = countRepoMirrorIdentityDuplicates(existingRows);
       stats.repoDerivedInReviewCount = countRepoDerivedInReviewRows(existingRows);
       stats.staleActiveRepoMirrorCount = staleRows.length;
       stats.staleActiveRepoMirrorCountAfterCleanup = staleRows.length;
@@ -292,12 +329,38 @@ async function main() {
 
     printReport({
       mode: "dry_run",
-      ok: true,
+      ok: duplicateWorkItemIds.length === 0 && malformedCanonicalItems.length === 0,
       stats,
       refreshTriage: args.refreshTriage,
       archiveStale: args.archiveStale,
-      message: "Dry run scanned repo markdown and did not write Supabase.",
+      message:
+        duplicateWorkItemIds.length > 0
+          ? "Dry run refused duplicate Work Item IDs and did not write Supabase."
+          : malformedCanonicalItems.length > 0
+            ? "Dry run refused malformed canonical work items and did not write Supabase."
+            : "Dry run scanned repo markdown and did not write Supabase.",
     });
+
+    if (duplicateWorkItemIds.length > 0 || malformedCanonicalItems.length > 0) {
+      process.exitCode = 1;
+    }
+
+    return;
+  }
+
+  if (duplicateWorkItemIds.length > 0 || malformedCanonicalItems.length > 0) {
+    printReport({
+      mode: "live_upsert",
+      ok: false,
+      stats,
+      refreshTriage: args.refreshTriage,
+      archiveStale: args.archiveStale,
+      message:
+        duplicateWorkItemIds.length > 0
+          ? "Live import refused duplicate Work Item IDs before creating a Supabase client."
+          : "Live import refused malformed canonical work items before creating a Supabase client.",
+    });
+    process.exitCode = 1;
     return;
   }
 
@@ -306,10 +369,25 @@ async function main() {
   setPhase("load_existing_admin_capture_rows", "before live import");
   const beforeRows = await loadAdminCaptureRows(supabase);
   stats.manualRowCountBefore = countManualRows(beforeRows);
-  const existingBySource = mapExistingImportedRows(beforeRows);
+  stats.duplicateCount = countRepoMirrorIdentityDuplicates(beforeRows);
+
+  if (stats.duplicateCount > 0) {
+    printReport({
+      mode: "live_upsert",
+      ok: false,
+      stats,
+      refreshTriage: args.refreshTriage,
+      archiveStale: args.archiveStale,
+      message: "Live import refused ambiguous existing repo mirrors before any write.",
+    });
+    process.exitCode = 1;
+    return;
+  }
+
+  const existingRepoMirrors = buildExistingRepoMirrorIndex(beforeRows);
 
   for (const item of items) {
-    const existing = existingBySource.get(sourceKey(item.sourceType, item.sourcePath));
+    const existing = findExistingRepoMirrorRow(existingRepoMirrors, item);
     setPhase(
       existing ? "refresh_existing_admin_capture_item" : "create_admin_capture_item",
       item.sourcePath,
@@ -323,7 +401,7 @@ async function main() {
 
   setPhase("load_existing_admin_capture_rows", "after live upsert");
   const afterUpsertRows = await loadAdminCaptureRows(supabase);
-  const staleRows = findStaleActiveRepoMirrorRows(afterUpsertRows, currentSourceKeys);
+  const staleRows = findStaleActiveRepoMirrorRows(afterUpsertRows, currentMirrorKeys);
   stats.staleActiveRepoMirrorCount = staleRows.length;
   stats.staleRepoMirrorExamples = summarizeStaleRepoMirrorRows(staleRows);
   stats.staleRepoMirrorAction = args.archiveStale ? "archived" : "reported";
@@ -339,11 +417,11 @@ async function main() {
   setPhase("load_existing_admin_capture_rows", "after stale cleanup");
   const afterRows = await loadAdminCaptureRows(supabase);
   stats.manualRowCountAfter = countManualRows(afterRows);
-  stats.duplicateCount = countImportedDuplicates(afterRows);
+  stats.duplicateCount = countRepoMirrorIdentityDuplicates(afterRows);
   stats.repoDerivedInReviewCount = countRepoDerivedInReviewRows(afterRows);
   stats.staleActiveRepoMirrorCountAfterCleanup = findStaleActiveRepoMirrorRows(
     afterRows,
-    currentSourceKeys,
+    currentMirrorKeys,
   ).length;
 
   printReport({
@@ -435,7 +513,10 @@ async function normalizeMarkdownFile(
   const lastUpdated = extractSectionText(content, "Last Updated");
   const fallbackWorkItemStatus = inferWorkItemStatus(sourceType, sourceStatusText, content);
   const workItemStatus = canonical.status ?? fallbackWorkItemStatus;
-  const adminStatus = mapWorkItemStatusToAdminStatus(workItemStatus);
+  const adminStatus = mapMirroredWorkItemStatusToAdminStatus(
+    workItemStatus,
+    canonical.metadataState,
+  );
   const targetRole =
     canonical.nextRole ?? inferTargetRole(sourceType, sourcePath, `${title}\n${content}`);
   const itemType =
@@ -455,6 +536,8 @@ async function normalizeMarkdownFile(
   });
   const titleSource = taskTitle ? "markdown_task" : extractTitle(content) ? "h1" : "filename";
   const metadata: RepoWorkItem["metadata"] = {
+    work_item_id: canonical.workItemId ?? undefined,
+    work_item_id_declared: Boolean(canonical.raw["Work Item ID"]),
     source_path: sourcePath,
     source_type: sourceType,
     work_item_kind: sourceMetadata.workItemKind,
@@ -466,6 +549,11 @@ async function normalizeMarkdownFile(
     import_version: IMPORT_VERSION,
     work_item_status: workItemStatus,
     work_item_status_source: canonical.status ? "markdown" : "fallback",
+    work_item_owner: canonical.owner ?? undefined,
+    work_item_scope: canonical.scope ?? undefined,
+    archive_intent: canonical.archiveIntent ?? undefined,
+    work_item_batch: canonical.batch ?? undefined,
+    frontend_lane: canonical.frontendLane ?? undefined,
     markdown_status: canonical.status ?? undefined,
     markdown_type: canonical.itemType ?? undefined,
     markdown_priority: canonical.priority ?? undefined,
@@ -480,6 +568,7 @@ async function normalizeMarkdownFile(
     markdown_exact_handoff_prompt_present: Boolean(canonical.exactHandoffPrompt),
     markdown_metadata_complete:
       canonical.missingRequiredFields.length === 0 && canonical.invalidRequiredFields.length === 0,
+    markdown_metadata_state: canonical.metadataState,
     missing_required_fields:
       canonical.missingRequiredFields.length > 0 ? canonical.missingRequiredFields : undefined,
     invalid_required_fields:
@@ -501,6 +590,8 @@ async function normalizeMarkdownFile(
   };
 
   return {
+    workItemId: canonical.workItemId,
+    workItemIdDeclared: Boolean(canonical.raw["Work Item ID"]),
     sourcePath,
     sourceType,
     itemType,
@@ -596,6 +687,15 @@ async function refreshExistingItem(
   item: RepoWorkItem,
 ): Promise<ImportAction> {
   const metadata = normalizeMetadata(existing.metadata);
+  const existingWorkItemId =
+    typeof metadata.work_item_id === "string" ? metadata.work_item_id : null;
+
+  if (existingWorkItemId && existingWorkItemId !== item.workItemId) {
+    throw new Error(
+      `Could not refresh ${item.sourcePath}: Work Item ID ${existingWorkItemId} is immutable.`,
+    );
+  }
+
   const nextStatus = item.adminStatus;
   const nextPriority = item.priority;
   const nextTargetRole = item.targetRole;
@@ -654,46 +754,6 @@ async function loadAdminCaptureRows(
   return (data ?? []) as ExistingRow[];
 }
 
-function mapExistingImportedRows(rows: ExistingRow[]) {
-  const map = new Map<string, ExistingRow>();
-
-  for (const row of rows) {
-    const metadata = normalizeMetadata(row.metadata);
-    const sourcePath = typeof metadata.source_path === "string" ? metadata.source_path : null;
-    const sourceType = typeof metadata.source_type === "string" ? metadata.source_type : null;
-
-    if (metadata.imported_from_repo === true && sourcePath && sourceType) {
-      map.set(sourceKey(sourceType, sourcePath), row);
-    }
-  }
-
-  return map;
-}
-
-function countImportedDuplicates(rows: ExistingRow[]) {
-  const counts = new Map<string, number>();
-
-  for (const row of rows) {
-    const metadata = normalizeMetadata(row.metadata);
-
-    if (metadata.imported_from_repo !== true) {
-      continue;
-    }
-
-    const sourcePath = typeof metadata.source_path === "string" ? metadata.source_path : null;
-    const sourceType = typeof metadata.source_type === "string" ? metadata.source_type : null;
-
-    if (!sourcePath || !sourceType) {
-      continue;
-    }
-
-    const key = sourceKey(sourceType, sourcePath);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-
-  return Array.from(counts.values()).filter((count) => count > 1).length;
-}
-
 function countRepoDerivedInReviewItems(items: RepoWorkItem[]) {
   return items.filter((item) => item.adminStatus === "in_review").length;
 }
@@ -732,6 +792,12 @@ function findMissingMetadataExamples(items: RepoWorkItem[]): MissingMetadataExam
   return items
     .map((item) => ({
       sourcePath: item.sourcePath,
+      workItemId:
+        typeof item.metadata.work_item_id === "string" ? item.metadata.work_item_id : null,
+      metadataState:
+        typeof item.metadata.markdown_metadata_state === "string"
+          ? (item.metadata.markdown_metadata_state as CanonicalMetadataState)
+          : "legacy_debt",
       missingRequiredFields: readRequiredFieldArray(item.metadata.missing_required_fields),
       invalidRequiredFields: readRequiredFieldArray(item.metadata.invalid_required_fields),
     }))
@@ -740,6 +806,21 @@ function findMissingMetadataExamples(items: RepoWorkItem[]): MissingMetadataExam
         example.missingRequiredFields.length > 0 || example.invalidRequiredFields.length > 0,
     )
     .slice(0, 8);
+}
+
+function findMalformedCanonicalItems(items: RepoWorkItem[]): MissingMetadataExample[] {
+  return items
+    .filter(
+      (item) => item.workItemIdDeclared && item.metadata.markdown_metadata_state === "malformed",
+    )
+    .map((item) => ({
+      sourcePath: item.sourcePath,
+      workItemId:
+        typeof item.metadata.work_item_id === "string" ? item.metadata.work_item_id : null,
+      metadataState: "malformed",
+      missingRequiredFields: readRequiredFieldArray(item.metadata.missing_required_fields),
+      invalidRequiredFields: readRequiredFieldArray(item.metadata.invalid_required_fields),
+    }));
 }
 
 function readRequiredFieldArray(input: Json | undefined): CanonicalMarkdownField[] {
@@ -758,10 +839,11 @@ function countManualRows(rows: ExistingRow[]) {
 
 export function findStaleActiveRepoMirrorRows(
   rows: ExistingRow[],
-  currentSourceKeys: ReadonlySet<string>,
+  currentMirrorKeys: ReadonlySet<string>,
 ) {
   return rows.filter((row) => {
     const metadata = normalizeMetadata(row.metadata);
+    const workItemId = typeof metadata.work_item_id === "string" ? metadata.work_item_id : null;
     const sourcePath = typeof metadata.source_path === "string" ? metadata.source_path : null;
     const sourceType = typeof metadata.source_type === "string" ? metadata.source_type : null;
 
@@ -777,7 +859,10 @@ export function findStaleActiveRepoMirrorRows(
       return false;
     }
 
-    return !currentSourceKeys.has(sourceKey(sourceType, sourcePath));
+    return !(
+      currentMirrorKeys.has(sourceKey(sourceType, sourcePath)) ||
+      (workItemId && currentMirrorKeys.has(workItemIdentityKey(workItemId, sourceType, sourcePath)))
+    );
   });
 }
 
@@ -881,15 +966,10 @@ function emptySourceCounts(): Record<SourceType, number> {
 }
 
 function emptyRequiredFieldCounts(): Record<CanonicalMarkdownField, number> {
-  return {
-    Status: 0,
-    Type: 0,
-    Priority: 0,
-    "Next Recommended Role": 0,
-    Task: 0,
-    Stage: 0,
-    "Exact Handoff Prompt": 0,
-  };
+  return Object.fromEntries(CANONICAL_MARKDOWN_FIELDS.map((field) => [field, 0])) as Record<
+    CanonicalMarkdownField,
+    number
+  >;
 }
 
 function countBySourceType(items: RepoWorkItem[]): Record<SourceType, number> {
@@ -983,6 +1063,7 @@ function findExample(items: RepoWorkItem[], sourceType: SourceType): ExampleItem
 
   return {
     title: item.title,
+    workItemId: typeof item.metadata.work_item_id === "string" ? item.metadata.work_item_id : null,
     sourcePath: item.sourcePath,
     sourceType: item.sourceType,
     workItemKind: String(item.metadata.work_item_kind ?? "backlog_item") as AdminRepoWorkItemKind,
@@ -992,6 +1073,17 @@ function findExample(items: RepoWorkItem[], sourceType: SourceType): ExampleItem
     sourceGroup: String(item.metadata.source_group ?? "backlog"),
     sourceLabel: String(item.metadata.source_label ?? item.sourceType),
     status: item.workItemStatus,
+    metadataState:
+      typeof item.metadata.markdown_metadata_state === "string"
+        ? (item.metadata.markdown_metadata_state as CanonicalMetadataState)
+        : "legacy_debt",
+    owner: typeof item.metadata.work_item_owner === "string" ? item.metadata.work_item_owner : null,
+    scope: typeof item.metadata.work_item_scope === "string" ? item.metadata.work_item_scope : null,
+    archiveIntent:
+      typeof item.metadata.archive_intent === "string" ? item.metadata.archive_intent : null,
+    batch: typeof item.metadata.work_item_batch === "string" ? item.metadata.work_item_batch : null,
+    frontendLane:
+      typeof item.metadata.frontend_lane === "string" ? item.metadata.frontend_lane : null,
     targetRole: item.targetRole,
   };
 }
@@ -1145,6 +1237,10 @@ function printReport(report: {
           updated: report.stats.updated,
           skipped: report.stats.skipped,
           duplicateCount: report.stats.duplicateCount,
+          duplicateWorkItemIdCount: report.stats.duplicateWorkItemIdCount,
+          duplicateWorkItemIdExamples: report.stats.duplicateWorkItemIdExamples,
+          malformedCanonicalItemCount: report.stats.malformedCanonicalItemCount,
+          malformedCanonicalItemExamples: report.stats.malformedCanonicalItemExamples,
           repoDerivedInReviewCount: report.stats.repoDerivedInReviewCount,
           staleActiveRepoMirrorCount: report.stats.staleActiveRepoMirrorCount,
           staleActiveRepoMirrorCountAfterCleanup:
@@ -1167,7 +1263,8 @@ function printReport(report: {
         },
         examples: report.stats.examples,
         idempotency: {
-          upsertKey: "metadata.source_type + metadata.source_path",
+          upsertKey:
+            "metadata.work_item_id, with metadata.source_type + metadata.source_path for legacy rows",
           duplicatesAfterRun: report.stats.duplicateCount,
           manualAdminRowsUntouched:
             report.stats.manualRowCountBefore === null

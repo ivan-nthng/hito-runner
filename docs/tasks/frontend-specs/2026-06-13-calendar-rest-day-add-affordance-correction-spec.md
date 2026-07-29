@@ -1,8 +1,12 @@
 # Hito Calendar Rest-Day Add Affordance Correction Spec
 
+## Work Item ID
+
+2026-06-13-calendar-rest-day-add-affordance-correction-spec
+
 ## Status
 
-in_progress
+backlog
 
 ## Type
 
@@ -12,19 +16,28 @@ frontend_spec
 
 high
 
-## Next Recommended Role
+## Owner
 
-frontend
+design_system
+
+## Scope
+
+active-plan-lifecycle-calendar-planned-workouts
+
+## Archive Intent
+
+retain_in_place
 
 ## Task
 
-Restore and normalize `Add activity` affordances on future editable calendar days so rest days remain editable and visually consistent with the Hito calendar day contract.
+Retain the calendar rest-day Add-affordance correction as backlog for a later selected product/DS
+batch.
 
 ## Stage
 
-DESIGN SYSTEM audit / product calendar correction spec
+PRODUCT backlog / no active implementation gate selected.
 
-## Exact Handoff Prompt
+## Historical Exact Handoff Prompt
 
 ```text
 ROLE: FRONTEND
@@ -42,7 +55,7 @@ backend editability and protected-history truth; do not change manual authoring 
 generated-plan behavior, or unrelated calendar actions.
 ```
 
-## Owner
+## Spec Owner
 
 Design System
 
@@ -223,7 +236,7 @@ If the playground currently binds Add only to `empty`, Frontend should correct t
 - verify Add menu still offers `Start from scratch`, `Choose template`, and `Add rest day`
 - if `/hitoDS` specimen is touched, inspect `/hitoDS#calendar-workout-playground`
 
-## Exact Handoff Prompt
+## Historical Detailed Handoff Prompt
 
 ```text
 ROLE: FRONTEND

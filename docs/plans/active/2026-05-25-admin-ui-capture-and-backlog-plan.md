@@ -2,7 +2,7 @@
 
 ## Status
 
-in_progress
+backlog
 
 ## Type
 
@@ -14,19 +14,37 @@ high
 
 ## Next Recommended Role
 
-DESIGNER
+PRODUCT
 
 ## Task
 
-Define the portable Hito Debugger overlay and capture API contract.
+Decide whether to reopen the deferred Admin capture overlay as a distinct workstream from the accepted Local Inspector.
 
 ## Stage
 
-ARCHITECT / DESIGNER spec / portable debugger overlay, API boundary, and Hito DS interaction layer
+PRODUCT decision / Admin route-spanning capture overlay remains deferred; the accepted Local Inspector is local-only and does not persist to Admin.
 
 ## Last Updated
 
-2026-07-02
+2026-07-24
+
+## Exact Handoff Prompt
+
+```text
+ROLE: PRODUCT
+
+Task:
+Decide whether the deferred Admin route-spanning capture overlay should be reopened as a distinct workstream from the accepted Local Inspector.
+
+Stage:
+PRODUCT decision / no Admin persistence or route-spanning capture implementation is currently accepted.
+
+Context:
+`/admin/capture` and the deterministic Markdown mirror are implemented. The Local Inspector is an accepted local-only, non-persistent prompt-drafting tool. A future Admin overlay must not be inferred from that separate capability.
+
+Required outcome:
+Either retain this plan in backlog or define one bounded product contract with a canonical persistence and privacy owner. Do not reopen accepted Admin queue, importer, or Inspector behavior by default.
+```
 
 ## Current Truth
 
@@ -53,7 +71,10 @@ client capability, even for admins.
   retired from the active contract.
 - `/admin/capture` Backlog v1 lists, filters, opens, triages, and copies deterministic prompts.
 - Repo-authored markdown work items can be imported as read-only mirrors with canonical metadata:
-  `Status`, `Type`, `Priority`, `Next Recommended Role`, `Task`, `Stage`, and `Exact Handoff Prompt`.
+  immutable `Work Item ID`, lifecycle, type/priority, owner, scope, archive intent, optional
+  batch/frontend lane, next role, task, stage, and exact handoff.
+- Same-ID source moves update one mirror; source path/type is retained only as legacy fallback and
+  duplicate IDs fail before writes.
 - Stale repo-derived mirrors can be detected and archived only through explicit importer flags.
 - Repo-derived rows are read-only in admin; markdown remains the canonical editable source.
 - Manual quick notes are scratchpad/intake records and can be deleted; repo-derived mirrors and captured
@@ -151,7 +172,7 @@ readback, prompt copy, no auto-dispatch, mobile behavior, and no normal-runner v
 - Overlay collision with the exact UI being reviewed.
 - False precision from best-effort source/component mapping.
 
-## Exact Handoff Prompt
+## Historical Deferred Prompt (2026-07-02)
 
 ```text
 ROLE: DESIGNER

@@ -23,7 +23,13 @@ import type { AdminAccessContext, AdminAccessResult } from "@/lib/admin-access.s
 import { requireAdminAccessForCurrentRequest } from "@/lib/admin-access.server";
 import {
   getAdminRepoWorkItemMetadata,
+  isAdminRepoWorkItemArchiveIntent,
+  isAdminRepoWorkItemFrontendLane,
+  isAdminRepoWorkItemOwner,
+  isAdminRepoWorkItemPriority,
   isAdminRepoWorkItemSourceType,
+  isAdminRepoWorkItemStatus,
+  isAdminRepoWorkItemType,
   isAdminWorkItemSourceGroup,
 } from "@/lib/admin-work-items";
 import type { Database, Json } from "@/lib/supabase/database";
@@ -839,6 +845,8 @@ function stripRepoImportMetadata(input: unknown): Json {
   const metadata = normalizeJsonObject(input);
 
   delete metadata.imported_from_repo;
+  delete metadata.work_item_id;
+  delete metadata.work_item_id_declared;
   delete metadata.source_path;
   delete metadata.source_type;
   delete metadata.work_item_kind;
@@ -847,6 +855,14 @@ function stripRepoImportMetadata(input: unknown): Json {
   delete metadata.source_group_label;
   delete metadata.source_label;
   delete metadata.work_item_status;
+  delete metadata.work_item_owner;
+  delete metadata.work_item_scope;
+  delete metadata.archive_intent;
+  delete metadata.work_item_batch;
+  delete metadata.frontend_lane;
+  delete metadata.markdown_metadata_state;
+  delete metadata.missing_required_fields;
+  delete metadata.invalid_required_fields;
   delete metadata.import_version;
   delete metadata.admin_capture_status;
   delete metadata.admin_capture_priority;
@@ -917,6 +933,7 @@ function mapRepoWorkItemView(metadata: Json): AdminCaptureItemView["repoWorkItem
       : fallback.sourceGroup;
 
   return {
+    workItemId: readBoundedMetadataString(metadata.work_item_id, 160),
     sourcePath: sourcePath.slice(0, 300),
     sourceType,
     workItemKind:
@@ -937,8 +954,54 @@ function mapRepoWorkItemView(metadata: Json): AdminCaptureItemView["repoWorkItem
         ? metadata.source_label.slice(0, 80)
         : fallback.sourceLabel,
     workItemStatus:
-      typeof metadata.work_item_status === "string" ? metadata.work_item_status.slice(0, 80) : null,
+      typeof metadata.work_item_status === "string" &&
+      isAdminRepoWorkItemStatus(metadata.work_item_status)
+        ? metadata.work_item_status
+        : null,
+    workItemType:
+      typeof metadata.markdown_type === "string" && isAdminRepoWorkItemType(metadata.markdown_type)
+        ? metadata.markdown_type
+        : null,
+    workItemPriority:
+      typeof metadata.markdown_priority === "string" &&
+      isAdminRepoWorkItemPriority(metadata.markdown_priority)
+        ? metadata.markdown_priority
+        : null,
+    owner:
+      typeof metadata.work_item_owner === "string" &&
+      isAdminRepoWorkItemOwner(metadata.work_item_owner)
+        ? metadata.work_item_owner
+        : null,
+    scope: readBoundedMetadataString(metadata.work_item_scope, 160),
+    archiveIntent:
+      typeof metadata.archive_intent === "string" &&
+      isAdminRepoWorkItemArchiveIntent(metadata.archive_intent)
+        ? metadata.archive_intent
+        : null,
+    batch: readBoundedMetadataString(metadata.work_item_batch, 160),
+    frontendLane:
+      typeof metadata.frontend_lane === "string" &&
+      isAdminRepoWorkItemFrontendLane(metadata.frontend_lane)
+        ? metadata.frontend_lane
+        : null,
+    metadataState:
+      metadata.markdown_metadata_state === "complete" ||
+      metadata.markdown_metadata_state === "malformed"
+        ? metadata.markdown_metadata_state
+        : "legacy_debt",
+    missingRequiredFields: readMetadataStringArray(metadata.missing_required_fields),
+    invalidRequiredFields: readMetadataStringArray(metadata.invalid_required_fields),
   };
+}
+
+function readBoundedMetadataString(value: Json | undefined, maxLength: number) {
+  return typeof value === "string" ? value.slice(0, maxLength) : null;
+}
+
+function readMetadataStringArray(value: Json | undefined) {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string").slice(0, 20)
+    : [];
 }
 
 function formatMetadataValue(key: string, value: Json | undefined): string {

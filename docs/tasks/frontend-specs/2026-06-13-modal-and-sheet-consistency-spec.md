@@ -1,8 +1,12 @@
 # Hito Modal And Sheet Consistency Spec
 
+## Work Item ID
+
+2026-06-13-modal-and-sheet-consistency-spec
+
 ## Status
 
-in_progress
+backlog
 
 ## Type
 
@@ -12,19 +16,27 @@ frontend_spec
 
 high
 
-## Next Recommended Role
+## Owner
 
-frontend
+design_system
+
+## Scope
+
+hito-ds-reference-figma-export-surface
+
+## Archive Intent
+
+retain_in_place
 
 ## Task
 
-Audit Hito modal and sheet behavior, then normalize one canonical overlay and window contract across `/hitoDS` and product surfaces.
+Retain modal and sheet consistency work as backlog for a later selected Hito DS batch.
 
 ## Stage
 
-DESIGN SYSTEM audit / modal consistency specification
+PRODUCT backlog / no active implementation gate selected.
 
-## Exact Handoff Prompt
+## Historical Exact Handoff Prompt
 
 ```text
 ROLE: FRONTEND
@@ -44,9 +56,9 @@ scoped overlay/window patterns selected by the current plan.
 
 ## Spec Status
 
-Ready for Frontend implementation.
+Backlog reference; no implementation gate is currently selected.
 
-## Owner
+## Spec Owner
 
 Design System
 
@@ -483,7 +495,7 @@ Sheet confirmation:
 - verify background is visibly dimmed/blurred and non-interactive while open
 - Safari QA required after implementation
 
-## Exact Handoff Prompt
+## Historical Detailed Handoff Prompt
 
 ```text
 ROLE: FRONTEND

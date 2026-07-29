@@ -36,6 +36,10 @@ FRONTEND
 
 2026-07-22
 
+## Track Tags
+
+`local-inspector`, `local-design-suite`, `devtool`
+
 ## Root Cause And Canonical Owner
 
 The former Inspector held one ephemeral target and could overstate token/component certainty. The

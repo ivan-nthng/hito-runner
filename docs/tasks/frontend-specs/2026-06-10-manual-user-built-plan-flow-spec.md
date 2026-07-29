@@ -1,8 +1,12 @@
 # Manual User-Built Plan Flow Spec
 
+## Work Item ID
+
+2026-06-10-manual-user-built-plan-flow-spec
+
 ## Status
 
-in_progress
+completed
 
 ## Type
 
@@ -12,19 +16,27 @@ frontend_spec
 
 high
 
-## Next Recommended Role
+## Owner
 
-frontend
+designer
+
+## Scope
+
+manual-workout-authoring
+
+## Archive Intent
+
+retain_in_place
 
 ## Task
 
-Use the manual user-built plan flow spec when implementing scoped manual authoring UI follow-ups.
+Record the accepted manual user-built plan flow and its implementation boundaries.
 
 ## Stage
 
-FRONTEND spec / manual user-built active-plan flow.
+Completed / retained as the accepted manual-authoring flow reference.
 
-## Exact Handoff Prompt
+## Historical Exact Handoff Prompt
 
 ```text
 ROLE: FRONTEND
@@ -43,10 +55,10 @@ compress or rewrite the spec body during metadata hygiene.
 
 ## Spec Status
 
-Draft, implementation-driving after architecture checkpoint. Updated with no-active-plan onboarding
-IA simplification and manual workout constructor UI contract.
+Completed and retained as the accepted manual-authoring flow reference after implementation and
+owner-level acceptance.
 
-## Owner
+## Spec Owner
 DESIGNER
 
 ## Last Updated
@@ -1336,10 +1348,10 @@ These must not be presented as available in this slice:
 - Future-only recurrence/template persistence is not faked.
 - Mobile flow is touch-reachable and does not rely on hover.
 
-## Next Recommended Role
+## Historical Next Recommended Role
 FRONTEND
 
-## Suggested Next Step
+## Historical Suggested Next Step
 Refactor the no-active-plan onboarding IA so manual, quick, advanced, and future talk are rendered as
 one Hito DS-native setup-mode family. Keep product behavior backend-shaped, reuse existing controls,
 and do not change calendar/product persistence logic beyond the approved manual authoring seams.

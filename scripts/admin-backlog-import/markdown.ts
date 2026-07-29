@@ -3,37 +3,77 @@ import {
   adminCaptureTargetRoles,
   type AdminCaptureTargetRole,
 } from "../../src/lib/admin-capture-roles";
-import type { AdminRepoWorkItemSourceType } from "../../src/lib/admin-work-items";
+import {
+  isAdminRepoWorkItemArchiveIntent,
+  isAdminRepoWorkItemFrontendLane,
+  isAdminRepoWorkItemOwner,
+  isAdminRepoWorkItemPriority,
+  isAdminRepoWorkItemStatus,
+  isAdminRepoWorkItemType,
+  type AdminRepoWorkItemArchiveIntent,
+  type AdminRepoWorkItemFrontendLane,
+  type AdminRepoWorkItemMetadataState,
+  type AdminRepoWorkItemOwner,
+  type AdminRepoWorkItemPriority,
+  type AdminRepoWorkItemSourceType,
+  type AdminRepoWorkItemStatus,
+  type AdminRepoWorkItemType,
+} from "../../src/lib/admin-work-items";
 import type { Json } from "../../src/lib/supabase/database";
 
 const MAX_NOTE_LENGTH = 3900;
 
 export const CANONICAL_MARKDOWN_FIELDS = [
+  "Work Item ID",
   "Status",
   "Type",
   "Priority",
-  "Next Recommended Role",
+  "Owner",
+  "Scope",
+  "Archive Intent",
   "Task",
+  "Batch",
+  "Frontend Lane",
+  "Next Recommended Role",
   "Stage",
   "Exact Handoff Prompt",
 ] as const;
 
+const CORE_CANONICAL_MARKDOWN_FIELDS = [
+  "Work Item ID",
+  "Status",
+  "Type",
+  "Priority",
+  "Owner",
+  "Scope",
+  "Archive Intent",
+  "Task",
+] as const satisfies readonly CanonicalMarkdownField[];
+
 export type AdminItemType = "bug" | "change_request" | "context_capture";
 export type AdminStatus = "new" | "in_review" | "ready_for_codex" | "done" | "archived";
-export type AdminPriority = "low" | "medium" | "high" | "urgent";
-export type MarkdownItemType = AdminItemType | "plan" | "frontend_spec" | "product_brief";
+export type AdminPriority = AdminRepoWorkItemPriority;
+export type MarkdownItemType = AdminRepoWorkItemType;
 export type TargetRole = AdminCaptureTargetRole;
-export type WorkItemStatus = "backlog" | "in_progress" | "completed" | "closed" | "archived";
+export type WorkItemStatus = AdminRepoWorkItemStatus;
 export type CanonicalMarkdownField = (typeof CANONICAL_MARKDOWN_FIELDS)[number];
+export type CanonicalMetadataState = AdminRepoWorkItemMetadataState;
 
 export type ParsedCanonicalMarkdown = {
+  workItemId: string | null;
   status: WorkItemStatus | null;
   itemType: MarkdownItemType | null;
   priority: AdminPriority | null;
+  owner: AdminRepoWorkItemOwner | null;
+  scope: string | null;
+  archiveIntent: AdminRepoWorkItemArchiveIntent | null;
+  batch: string | null;
+  frontendLane: AdminRepoWorkItemFrontendLane | null;
   nextRole: TargetRole | null;
   task: string | null;
   stage: string | null;
   exactHandoffPrompt: string | null;
+  metadataState: CanonicalMetadataState;
   missingRequiredFields: CanonicalMarkdownField[];
   invalidRequiredFields: CanonicalMarkdownField[];
   raw: Partial<Record<CanonicalMarkdownField, string>>;
@@ -187,7 +227,9 @@ export function inferItemType(
 export function mapWorkItemStatusToAdminStatus(status: WorkItemStatus): AdminStatus {
   switch (status) {
     case "backlog":
+    case "blocked":
       return "new";
+    case "ready":
     case "in_progress":
       return "ready_for_codex";
     case "completed":
@@ -197,6 +239,17 @@ export function mapWorkItemStatusToAdminStatus(status: WorkItemStatus): AdminSta
     case "archived":
       return "archived";
   }
+}
+
+export function mapMirroredWorkItemStatusToAdminStatus(
+  status: WorkItemStatus,
+  metadataState: CanonicalMetadataState,
+): AdminStatus {
+  const mapped = mapWorkItemStatusToAdminStatus(status);
+
+  return metadataState === "complete" || mapped === "done" || mapped === "archived"
+    ? mapped
+    : "new";
 }
 
 export function buildRepoMirrorNote(input: {
@@ -263,7 +316,7 @@ export function parseCanonicalMarkdown(markdown: string): ParsedCanonicalMarkdow
   const invalidRequiredFields: CanonicalMarkdownField[] = [];
   const sections = parseLeadMarkdownMetadataSections(markdown);
 
-  for (const field of CANONICAL_MARKDOWN_FIELDS) {
+  for (const field of CORE_CANONICAL_MARKDOWN_FIELDS) {
     const value = sections.get(field);
 
     if (!value) {
@@ -273,12 +326,34 @@ export function parseCanonicalMarkdown(markdown: string): ParsedCanonicalMarkdow
     }
   }
 
+  for (const field of CANONICAL_MARKDOWN_FIELDS) {
+    const value = sections.get(field);
+
+    if (value) {
+      raw[field] = value;
+    }
+  }
+
+  const workItemId = normalizeSlug(firstMeaningfulLine(raw["Work Item ID"] ?? null));
   const status = normalizeMarkdownStatus(firstMeaningfulLine(raw.Status ?? null));
   const itemType = normalizeMarkdownItemType(firstMeaningfulLine(raw.Type ?? null));
   const priority = normalizeMarkdownPriority(firstMeaningfulLine(raw.Priority ?? null));
+  const owner = normalizeMarkdownOwner(firstMeaningfulLine(raw.Owner ?? null));
+  const scope = normalizeSlug(firstMeaningfulLine(raw.Scope ?? null));
+  const archiveIntent = normalizeMarkdownArchiveIntent(
+    firstMeaningfulLine(raw["Archive Intent"] ?? null),
+  );
+  const batch = normalizeSlug(firstMeaningfulLine(raw.Batch ?? null));
+  const frontendLane = normalizeMarkdownFrontendLane(
+    firstMeaningfulLine(raw["Frontend Lane"] ?? null),
+  );
   const nextRole = normalizeCanonicalMarkdownRole(
     firstMeaningfulLine(raw["Next Recommended Role"] ?? null),
   );
+
+  if (raw["Work Item ID"] && !workItemId) {
+    invalidRequiredFields.push("Work Item ID");
+  }
 
   if (raw.Status && !status) {
     invalidRequiredFields.push("Status");
@@ -292,6 +367,26 @@ export function parseCanonicalMarkdown(markdown: string): ParsedCanonicalMarkdow
     invalidRequiredFields.push("Priority");
   }
 
+  if (raw.Owner && !owner) {
+    invalidRequiredFields.push("Owner");
+  }
+
+  if (raw.Scope && !scope) {
+    invalidRequiredFields.push("Scope");
+  }
+
+  if (raw["Archive Intent"] && !archiveIntent) {
+    invalidRequiredFields.push("Archive Intent");
+  }
+
+  if (raw.Batch && !batch) {
+    invalidRequiredFields.push("Batch");
+  }
+
+  if (raw["Frontend Lane"] && !frontendLane) {
+    invalidRequiredFields.push("Frontend Lane");
+  }
+
   if (raw["Next Recommended Role"] && !nextRole) {
     invalidRequiredFields.push("Next Recommended Role");
   }
@@ -299,21 +394,80 @@ export function parseCanonicalMarkdown(markdown: string): ParsedCanonicalMarkdow
   const task = raw.Task ? truncate(stripInlineMarkdown(raw.Task), 1200) : null;
   const stage = raw.Stage ? truncate(stripInlineMarkdown(raw.Stage), 240) : null;
   const exactHandoffPrompt = raw["Exact Handoff Prompt"]
-    ? truncate(stripOuterCodeFence(raw["Exact Handoff Prompt"]), MAX_NOTE_LENGTH)
+    ? extractFencedPrompt(raw["Exact Handoff Prompt"])
     : null;
+  const requiresExecutionHandoff = status === "ready" || status === "in_progress";
+  const requiresBlockedStage = status === "blocked";
+  const requiresFrontendLane = owner === "frontend" || nextRole === "frontend";
+
+  if (requiresExecutionHandoff) {
+    addMissingField(missingRequiredFields, raw, "Next Recommended Role");
+    addMissingField(missingRequiredFields, raw, "Stage");
+    addMissingField(missingRequiredFields, raw, "Exact Handoff Prompt");
+  } else if (requiresBlockedStage) {
+    addMissingField(missingRequiredFields, raw, "Stage");
+
+    if (Boolean(nextRole) !== Boolean(exactHandoffPrompt)) {
+      invalidRequiredFields.push(nextRole ? "Exact Handoff Prompt" : "Next Recommended Role");
+    }
+  }
+
+  if (requiresFrontendLane) {
+    addMissingField(missingRequiredFields, raw, "Frontend Lane");
+  }
+
+  if (exactHandoffPrompt) {
+    const promptRole = extractPromptRole(exactHandoffPrompt);
+
+    if (!promptRole || (nextRole && promptRole !== nextRole)) {
+      invalidRequiredFields.push("Exact Handoff Prompt");
+    }
+  } else if (raw["Exact Handoff Prompt"]) {
+    invalidRequiredFields.push("Exact Handoff Prompt");
+  }
+
+  const uniqueMissingFields = uniqueFields(missingRequiredFields);
+  const uniqueInvalidFields = uniqueFields(invalidRequiredFields);
+  const metadataState: CanonicalMetadataState =
+    uniqueInvalidFields.length > 0 || (workItemId && uniqueMissingFields.length > 0)
+      ? "malformed"
+      : uniqueMissingFields.length > 0
+        ? "legacy_debt"
+        : "complete";
 
   return {
+    workItemId,
     status,
     itemType,
     priority,
+    owner,
+    scope,
+    archiveIntent,
+    batch,
+    frontendLane,
     nextRole,
     task,
     stage,
     exactHandoffPrompt,
-    missingRequiredFields,
-    invalidRequiredFields,
+    metadataState,
+    missingRequiredFields: uniqueMissingFields,
+    invalidRequiredFields: uniqueInvalidFields,
     raw,
   };
+}
+
+function addMissingField(
+  fields: CanonicalMarkdownField[],
+  raw: Partial<Record<CanonicalMarkdownField, string>>,
+  field: CanonicalMarkdownField,
+) {
+  if (!raw[field]) {
+    fields.push(field);
+  }
+}
+
+function uniqueFields(fields: CanonicalMarkdownField[]) {
+  return Array.from(new Set(fields));
 }
 
 function parseLeadMarkdownMetadataSections(markdown: string) {
@@ -506,25 +660,12 @@ export function firstMeaningfulLine(input: string | null | undefined) {
 function normalizeMarkdownStatus(input: string | null): WorkItemStatus | null {
   const normalized = normalizeScalarToken(input);
 
-  if (["backlog", "in_progress", "completed", "closed", "archived"].includes(normalized)) {
-    return normalized as WorkItemStatus;
-  }
-
-  return null;
+  return isAdminRepoWorkItemStatus(normalized) ? normalized : null;
 }
 
 function normalizeMarkdownItemType(input: string | null): MarkdownItemType | null {
   const normalized = normalizeScalarToken(input);
-
-  if (
-    ["bug", "change_request", "context_capture", "plan", "frontend_spec", "product_brief"].includes(
-      normalized,
-    )
-  ) {
-    return normalized as MarkdownItemType;
-  }
-
-  return null;
+  return isAdminRepoWorkItemType(normalized) ? normalized : null;
 }
 
 export function mapMarkdownTypeToAdminItemType(
@@ -546,12 +687,24 @@ export function mapMarkdownTypeToAdminItemType(
 
 function normalizeMarkdownPriority(input: string | null): AdminPriority | null {
   const normalized = normalizeScalarToken(input);
+  return isAdminRepoWorkItemPriority(normalized) ? normalized : null;
+}
 
-  if (["low", "medium", "high", "urgent"].includes(normalized)) {
-    return normalized as AdminPriority;
-  }
+function normalizeMarkdownOwner(input: string | null): AdminRepoWorkItemOwner | null {
+  const normalized = normalizeScalarToken(input);
+  return isAdminRepoWorkItemOwner(normalized) ? normalized : null;
+}
 
-  return null;
+function normalizeMarkdownArchiveIntent(
+  input: string | null,
+): AdminRepoWorkItemArchiveIntent | null {
+  const normalized = normalizeScalarToken(input);
+  return isAdminRepoWorkItemArchiveIntent(normalized) ? normalized : null;
+}
+
+function normalizeMarkdownFrontendLane(input: string | null): AdminRepoWorkItemFrontendLane | null {
+  const normalized = normalizeScalarToken(input);
+  return isAdminRepoWorkItemFrontendLane(normalized) ? normalized : null;
 }
 
 function normalizeCanonicalMarkdownRole(input: string | null): TargetRole | null {
@@ -562,6 +715,20 @@ function normalizeCanonicalMarkdownRole(input: string | null): TargetRole | null
   }
 
   return null;
+}
+
+function normalizeSlug(input: string | null) {
+  const value = stripInlineMarkdown(input ?? "").trim();
+  return /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) ? value : null;
+}
+
+function extractPromptRole(prompt: string): TargetRole | null {
+  const firstLine = prompt
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean);
+  const match = firstLine?.match(/^ROLE:\s*([a-z][a-z _-]*)$/i);
+  return match ? normalizeRole(match[1]) : null;
 }
 
 function normalizeScalarToken(input: string | null) {
@@ -575,10 +742,10 @@ function normalizeScalarToken(input: string | null) {
     .replace(/[\s-]+/g, "_");
 }
 
-function stripOuterCodeFence(input: string) {
+function extractFencedPrompt(input: string) {
   const trimmed = input.trim();
   const match = trimmed.match(/^(`{3,}|~{3,})[a-zA-Z0-9_-]*\s*\n([\s\S]*?)\n\1$/);
-  return (match ? match[2] : trimmed).trim();
+  return match ? truncate(match[2].trim(), MAX_NOTE_LENGTH) : null;
 }
 
 function formatMarkdownRole(role: TargetRole) {
@@ -643,6 +810,14 @@ export function normalizeMetadata(value: Json | undefined): Record<string, Json 
 
 export function sourceKey(sourceType: string, sourcePath: string) {
   return `${sourceType}:${sourcePath}`;
+}
+
+export function workItemIdentityKey(
+  workItemId: string | null | undefined,
+  sourceType: string,
+  sourcePath: string,
+) {
+  return workItemId ? `work-item-id:${workItemId}` : sourceKey(sourceType, sourcePath);
 }
 
 export function truncate(input: string, maxLength: number) {

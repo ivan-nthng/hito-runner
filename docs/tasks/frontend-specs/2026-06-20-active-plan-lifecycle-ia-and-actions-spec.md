@@ -1,8 +1,12 @@
 # Active-Plan Lifecycle IA And Plan Actions Spec
 
+## Work Item ID
+
+2026-06-20-active-plan-lifecycle-ia-and-actions-spec
+
 ## Status
 
-in_progress
+backlog
 
 ## Type
 
@@ -12,20 +16,28 @@ frontend_spec
 
 high
 
-## Next Recommended Role
+## Owner
 
-qa
+designer
+
+## Scope
+
+active-plan-lifecycle-calendar-planned-workouts
+
+## Archive Intent
+
+retain_in_place
 
 ## Task
 
-Define the active-plan lifecycle IA for runners who already have a manual active plan and want to
-start a generated or preset plan, while making plan-management actions easier to find.
+Retain the active-plan lifecycle IA as backlog without reopening the accepted backend transition
+contract.
 
 ## Stage
 
-BACKEND implemented / reviewed active-plan transition pending QA.
+PRODUCT backlog / no active frontend or standalone QA gate selected.
 
-## Exact Handoff Prompt
+## Historical Exact Handoff Prompt
 
 ```text
 ROLE: BACKEND
@@ -804,7 +816,7 @@ For the future implementation slice:
 - `git diff --check`.
 - Targeted lint/build as required for touched files.
 
-## Suggested Next Step
+## Historical Suggested Next Step
 
-Route to Backend to implement the reviewed active-plan transition seam before Frontend wires the
-live generated-plan apply path.
+The former next step routed Backend implementation. That transition seam is accepted; this record
+is now backlog and has no selected implementation or standalone QA owner.

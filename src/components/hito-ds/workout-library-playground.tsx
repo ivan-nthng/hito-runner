@@ -67,10 +67,9 @@ export function WorkoutLibraryPlayground() {
     <HitoDsPlayground
       id="workout-library-playground"
       label="Workout taxonomy appendix"
-      title="Canonical workout identities on shared primitives."
-      body="One static Running Coach specimen per canonical workout identity. Coverage is checked against the shared canonical identity list; calendar ownership stays with the shared calendar primitive specimen above."
       status={`${WORKOUT_LIBRARY_IDENTITY_COUNT} of ${WORKOUT_LIBRARY_CANONICAL_IDENTITY_COUNT} canonical identities`}
       statusTone="neutral"
+      usedIn="Running Coach taxonomy review after the primary calendar specimen."
       controls={<ControlsBody state={state} setField={setField} />}
       preview={
         <WorkoutLibraryPreview
@@ -81,20 +80,6 @@ export function WorkoutLibraryPlayground() {
           onSelect={setSelectedIdentity}
         />
       }
-      caption={[
-        {
-          label: "Proves",
-          body: "Workout identity labels, glyphs, result markers, provider overlays, and detail readback across the taxonomy.",
-        },
-        {
-          label: "Does not imply",
-          body: "Saved plans, real provider sync, uploaded FIT/Strava data, AI insight, comparison rows, manual workout CRUD, or plan mutation.",
-        },
-        {
-          label: "Used in",
-          body: "Static taxonomy review after the primary HitoCalendarDayCell / HitoWorkoutDayRow specimen.",
-        },
-      ]}
     />
   );
 }

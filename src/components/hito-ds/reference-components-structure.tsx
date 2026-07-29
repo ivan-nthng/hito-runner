@@ -25,10 +25,17 @@ export function HitoDsComponentStructure() {
       <HitoDsPlayground
         id="rows"
         label="Rows & disclosure"
-        title="Rows before boxes, disclosure before loud secondary actions."
-        body="Rows carry support content and utilities. Expert or destructive paths sit behind quieter disclosure unless they are the primary task."
         status="Pattern"
         statusTone="signal"
+        usedIn={
+          <ProductLinks
+            links={[
+              { href: "/", label: "/" },
+              { href: "/settings", label: "/settings" },
+              { href: "/admin/analytics", label: "/admin/analytics" },
+            ]}
+          />
+        }
         demo={
           <div className="grid min-w-0 gap-5">
             <div className="hito-row-group min-w-0">
@@ -194,37 +201,21 @@ export function HitoDsComponentStructure() {
             />
           </div>
         }
-        caption={[
-          {
-            label: "Use for",
-            body: "Support content, utility menus, metric rows, shell menus, settings rows, and rare secondary actions.",
-          },
-          {
-            label: "Does not imply",
-            body: "A card for every line item, loud secondary CTAs, or hidden destructive actions without disclosure.",
-          },
-          {
-            label: "Used in",
-            body: (
-              <ProductLinks
-                links={[
-                  { href: "/", label: "/" },
-                  { href: "/settings", label: "/settings" },
-                  { href: "/admin/analytics", label: "/admin/analytics" },
-                ]}
-              />
-            ),
-          },
-        ]}
       />
 
       <HitoDsPlayground
         id="shell"
         label="Shell navigation"
-        title="Product shell rows are owned by Hito."
-        body="Runner navigation, mobile navigation, profile triggers, sidebar width, and shell menu rows use one calm family instead of route-local spacing, width, and hover rules."
         status="Pattern"
         statusTone="signal"
+        usedIn={
+          <ProductLinks
+            links={[
+              { href: "/", label: "/" },
+              { href: "/admin/analytics", label: "/admin/analytics" },
+            ]}
+          />
+        }
         demo={
           <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,260px)_minmax(0,1fr)]">
             <div className="hito-surface-flat min-w-0 p-4">
@@ -360,31 +351,6 @@ export function HitoDsComponentStructure() {
             />
           </div>
         }
-        caption={[
-          {
-            label: "Use for",
-            body: "Global product navigation, profile/account triggers, mobile shell rows, and admin or runner workspace navigation.",
-          },
-          {
-            label: "Does not imply",
-            body: "Section-local actions, page headers, cards, or duplicated workspace identity inside content.",
-          },
-          {
-            label: "Width owner",
-            body: "Runner sidebar and profile, plan, and account menus use named shell width presets instead of route-local width utilities.",
-          },
-          {
-            label: "Used in",
-            body: (
-              <ProductLinks
-                links={[
-                  { href: "/", label: "/" },
-                  { href: "/admin/analytics", label: "/admin/analytics" },
-                ]}
-              />
-            ),
-          },
-        ]}
       />
 
       <DropdownFamilyPlayground />

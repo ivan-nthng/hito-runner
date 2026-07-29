@@ -98,9 +98,7 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                 >
                   <SheetHeader className="border-b border-hairline px-5 py-4 pr-14">
                     <SheetTitle>Browse DS pages</SheetTitle>
-                    <SheetDescription>
-                      Jump to a Hito DS reference page or section.
-                    </SheetDescription>
+                    <SheetDescription>Find a page or component.</SheetDescription>
                   </SheetHeader>
                   <div id="hito-ds-mobile-jump-nav" className="hito-ds-mobile-jump-nav">
                     <HitoDsNestedNav
@@ -119,7 +117,6 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
               <header className="hito-page-header border-t border-hairline pt-8">
                 <p className="hito-label hito-label-signal">Hito design system</p>
                 <h1 className="hito-page-title">{currentPage.label}.</h1>
-                <p className="hito-page-copy max-w-2xl">{currentPage.body}</p>
               </header>
             ) : null}
 

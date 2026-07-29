@@ -6,14 +6,7 @@ import { useHitoTabs } from "@/components/ui/hito-tabs";
 type PlaygroundStatusTone = "signal" | "neutral" | "warning" | "destructive" | "rollout";
 type HitoDsWorkbenchTab = "demo" | "variants";
 
-export type HitoDsPlaygroundCaptionItem = {
-  label: string;
-  body: ReactNode;
-};
-
 export function HitoDsPlayground({
-  body,
-  caption,
   controls,
   defaultTab = "demo",
   demo,
@@ -22,11 +15,9 @@ export function HitoDsPlayground({
   preview,
   status,
   statusTone = "neutral",
-  title,
+  usedIn,
   variants,
 }: {
-  body: string;
-  caption?: Array<HitoDsPlaygroundCaptionItem>;
   controls: ReactNode;
   defaultTab?: HitoDsWorkbenchTab;
   demo?: ReactNode;
@@ -35,7 +26,7 @@ export function HitoDsPlayground({
   preview?: ReactNode;
   status?: string;
   statusTone?: PlaygroundStatusTone;
-  title: string;
+  usedIn?: ReactNode;
   variants?: ReactNode;
 }) {
   const hasWorkbenchTabs = demo !== undefined && variants !== undefined;
@@ -51,9 +42,14 @@ export function HitoDsPlayground({
     <section id={id} className="ds-section hito-ds-playground-section">
       <div className="hito-specimen-header">
         <div className="max-w-3xl">
-          <p className="hito-label hito-label-signal">{label}</p>
-          <h2 className="hito-section-title mt-3">{title}</h2>
-          <p className="hito-support-copy mt-3 max-w-2xl">{body}</p>
+          <p className="hito-micro-label">Component</p>
+          <h2 className="hito-section-title mt-2">{label}</h2>
+          {usedIn ? (
+            <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <span className="hito-micro-label">Used in</span>
+              <div className="hito-list-row-copy">{usedIn}</div>
+            </div>
+          ) : null}
         </div>
         {status ? <HitoMetadataTag tone={statusTone}>{status}</HitoMetadataTag> : null}
       </div>
@@ -64,7 +60,7 @@ export function HitoDsPlayground({
             <div
               className="hito-tabs hito-tabs-simple"
               {...workbenchTabs.tabListProps}
-              aria-label={`${title} specimen modes`}
+              aria-label={`${label} specimen modes`}
             >
               {(["demo", "variants"] as const).map((tab) => {
                 const selected = activeTab === tab;
@@ -99,21 +95,11 @@ export function HitoDsPlayground({
           <aside
             className="hito-ds-playground-controls"
             data-mode={workbenchMode}
-            aria-label={`${title} controls`}
+            aria-label={`${label} details`}
           >
             {controls}
           </aside>
         </div>
-        {caption && caption.length > 0 ? (
-          <div className="hito-ds-playground-caption" aria-label={`${title} notes`}>
-            {caption.map((item) => (
-              <div key={item.label} className="hito-ds-playground-caption-item">
-                <p className="hito-micro-label">{item.label}</p>
-                <div className="hito-list-row-copy">{item.body}</div>
-              </div>
-            ))}
-          </div>
-        ) : null}
       </div>
     </section>
   );

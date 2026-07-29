@@ -68,10 +68,9 @@ export function DropdownFamilyPlayground() {
     <HitoDsPlayground
       id="dropdowns"
       label="Dropdowns"
-      title="One dropdown and list-item family."
-      body="Dropdowns, selects, and list-item-like triggers share one Hito menu surface and row grammar. The specimen separates the live component demo from static anatomy coverage so interactive behavior and state documentation do not compete."
       status="Documented family"
       statusTone="signal"
+      usedIn="Calendar actions, admin filters, profile menus, compact controls, and export boards."
       demo={<DropdownFamilyStage mode="demo" settings={settings} />}
       variants={<DropdownFamilyStage mode="variants" settings={settings} />}
       controls={
@@ -84,24 +83,6 @@ export function DropdownFamilyPlayground() {
           settings={settings}
         />
       }
-      caption={[
-        {
-          label: "Proves",
-          body: "The interactive tab opens the real Radix-backed DropdownMenu. The anatomy tab keeps every important menu row state visible without relying on hover-only or portal-only screenshots.",
-        },
-        {
-          label: "Does not imply",
-          body: "New product actions, route-local menu state, or a second menu framework.",
-        },
-        {
-          label: "Used in",
-          body: "Manual calendar actions, admin filters, profile/account menus, compact controls, and Figma export menu boards.",
-        },
-        {
-          label: "Mobile escalation",
-          body: "Desktop and tablet menus stay anchored. On mobile, simple action menus may escalate to a bottom sheet, while dense, nested, or page-switching menus use a full-height navigation surface.",
-        },
-      ]}
     />
   );
 }
@@ -217,6 +198,10 @@ function DropdownSettingsPanel({
         <AnatomyRow label="Surface" body="hito-ui-menu-surface" />
         <AnatomyRow label="Item" body="hito-ui-menu-item" />
         <AnatomyRow label="Select parity" body="SelectContent / SelectItem" />
+        <AnatomyRow
+          label="Mobile"
+          body="Simple actions may use a bottom sheet; dense navigation uses a full-height surface."
+        />
       </div>
     </div>
   );

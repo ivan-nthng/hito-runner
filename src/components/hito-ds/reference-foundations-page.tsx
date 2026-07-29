@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import loginDesertHorizon from "@/assets/marketing/hero-background/login-desert-horizon.jpg";
 import { HitoLogo, HitoLogoMark } from "@/components/ui/hito-logo";
@@ -9,6 +9,9 @@ import { HITO_ICON_META, HITO_ICON_SIZES, Icon, type HitoIconSize } from "@/comp
 import { HitoDsLightPaletteReference } from "@/components/hito-ds/light-palette-reference";
 import { ChoiceSelector } from "@/components/hito-ds/specimen-previews";
 import { ReferenceListRow, SectionIntro } from "@/components/hito-ds/reference";
+import { TypographyControlRow } from "@/components/devtools/LocalUiTypographyControls";
+import type { InlineChangeTargetInput } from "@/components/devtools/local-inline-change-target-utils";
+import { inspectLocalUiTarget } from "@/components/devtools/local-ui-inspector-targets";
 import {
   WORKOUT_COLOR_SHADE_STEPS,
   WORKOUT_COLOR_STATE_SLOTS,
@@ -457,11 +460,7 @@ export function HitoDsFoundationsPage() {
   return (
     <>
       <section id="brand" className="ds-section">
-        <SectionIntro
-          label="Brand"
-          title="The Hito wordmark and mark are primitives, not icons."
-          body="Use HitoLogo for true wordmark placements and HitoLogoMark for compact brand marks. Both inherit currentColor, size through logo CSS variables, and keep product variants like Admin or DS as separate text."
-        />
+        <SectionIntro label="Brand" title="The Hito wordmark and mark are primitives, not icons." />
 
         <div className="grid gap-5">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -525,7 +524,6 @@ export function HitoDsFoundationsPage() {
         <SectionIntro
           label="Gradient and overlay rules"
           title="Atmosphere is allowed only when it has a job."
-          body="Hito keeps one small gradient and alpha-overlay family for canvas depth, photo readability, launch surfaces, state washes, and editorial signal washes. Ordinary controls stay flat and semantic."
         />
 
         <div className="grid gap-8">
@@ -621,11 +619,7 @@ export function HitoDsFoundationsPage() {
       </section>
 
       <section id="foundations" className="ds-section">
-        <SectionIntro
-          label="Foundations"
-          title="Raw primitives before product semantics."
-          body="Hito now names the first layer of color and spacing so product surfaces can compose from semantic tokens instead of re-inventing local values."
-        />
+        <SectionIntro label="Foundations" title="Raw primitives before product semantics." />
 
         <div className="grid min-w-0 grid-cols-1 gap-8">
           <div className="grid min-w-0 grid-cols-1 gap-5">
@@ -787,11 +781,7 @@ export function HitoDsFoundationsPage() {
       </section>
 
       <section id="typography" className="ds-section">
-        <SectionIntro
-          label="Typography"
-          title="Shared roles, not route-local guesses."
-          body="Display is scarce, UI text stays operational, and mono values carry measured truth. Use these classes before adding route-local text utilities."
-        />
+        <SectionIntro label="Typography" title="Shared roles, not route-local guesses." />
         <div className="grid gap-5">
           <div className="hito-reference-note">
             <p className="hito-label">Font ownership</p>
@@ -816,6 +806,8 @@ export function HitoDsFoundationsPage() {
               Matching computed values without provenance remain Custom.
             </p>
           </div>
+
+          <TypographyInspectorPickerSpecimen />
 
           <div className="hito-reference-list">
             {HITO_TYPOGRAPHY_ROLES.map((role) => (
@@ -844,11 +836,7 @@ export function HitoDsFoundationsPage() {
       </section>
 
       <section id="icons" className="ds-section">
-        <SectionIntro
-          label="Icons"
-          title="One Hito registry, Tabler underneath."
-          body="Product surfaces use the Hito Icon primitive and stable product names. Tabler is the glyph backend; raw SVG folders and direct icon-family imports are not a design-system source of truth."
-        />
+        <SectionIntro label="Icons" title="One Hito registry, Tabler underneath." />
 
         <div className="grid gap-5">
           <div className="hito-reference-note flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -1412,6 +1400,122 @@ function RadiusPrimitiveRow({ radius }: { radius: (typeof RADIUS_PRIMITIVES)[num
           style={{ borderRadius: `var(${radius.token})` } satisfies CSSProperties}
         />
         <p className="hito-caption">{radius.use}</p>
+      </div>
+    </div>
+  );
+}
+
+type InspectorTypographyEvidence = NonNullable<InlineChangeTargetInput["typography"]>;
+
+function TypographyInspectorPickerSpecimen() {
+  const inheritedRef = useRef<HTMLSpanElement>(null);
+  const componentRef = useRef<HTMLButtonElement>(null);
+  const customRef = useRef<HTMLParagraphElement>(null);
+  const [inheritedTypography, setInheritedTypography] =
+    useState<InspectorTypographyEvidence | null>(null);
+  const [componentTypography, setComponentTypography] =
+    useState<InspectorTypographyEvidence | null>(null);
+  const [customTypography, setCustomTypography] = useState<InspectorTypographyEvidence | null>(
+    null,
+  );
+  const [inheritedDesiredRoleId, setInheritedDesiredRoleId] = useState<string | null>(null);
+  const [componentDesiredRoleId, setComponentDesiredRoleId] = useState<string | null>(null);
+  const [customDesiredRoleId, setCustomDesiredRoleId] = useState<string | null>(null);
+
+  useLayoutEffect(() => {
+    setInheritedTypography(
+      inheritedRef.current ? (inspectLocalUiTarget(inheritedRef.current).typography ?? null) : null,
+    );
+    setComponentTypography(
+      componentRef.current ? (inspectLocalUiTarget(componentRef.current).typography ?? null) : null,
+    );
+    setCustomTypography(
+      customRef.current ? (inspectLocalUiTarget(customRef.current).typography ?? null) : null,
+    );
+  }, []);
+
+  return (
+    <div className="hito-reference-note grid gap-4" data-hito-ds-typography-inspector-specimen="">
+      <div>
+        <p className="hito-label">Inspector typography picker</p>
+        <p className="hito-body-small mt-2 max-w-3xl">
+          The first option previews the selected element&apos;s computed typography. Component roles
+          can be recognized without becoming replacement choices, and a computed preview never
+          establishes provenance.
+        </p>
+      </div>
+
+      <div className="hito-row-group">
+        <div
+          className="hito-list-row grid gap-3"
+          data-hito-ds-typography-picker-case="inherited"
+          data-hito-ds-typography-picker-current-role={
+            inheritedTypography?.currentRole?.id ?? "pending"
+          }
+        >
+          <div className="hito-body">
+            <span ref={inheritedRef}>Inherited body typography from a shared Hito owner.</span>
+          </div>
+          {inheritedTypography ? (
+            <TypographyControlRow
+              desiredRoleId={inheritedDesiredRoleId}
+              onDesiredRoleChange={setInheritedDesiredRoleId}
+              typography={inheritedTypography}
+            />
+          ) : null}
+        </div>
+
+        <div
+          className="hito-list-row grid gap-3"
+          data-hito-ds-typography-picker-case="component"
+          data-hito-ds-typography-picker-current-role={
+            componentTypography?.currentRole?.id ?? "pending"
+          }
+        >
+          <button
+            ref={componentRef}
+            type="button"
+            className="hito-button hito-button-secondary hito-button-sm justify-self-start"
+          >
+            Component-owned button typography
+          </button>
+          {componentTypography ? (
+            <TypographyControlRow
+              desiredRoleId={componentDesiredRoleId}
+              onDesiredRoleChange={setComponentDesiredRoleId}
+              typography={componentTypography}
+            />
+          ) : null}
+        </div>
+
+        <div
+          className="hito-list-row grid gap-3"
+          data-hito-ds-typography-picker-case="custom"
+          data-hito-ds-typography-picker-current-role={
+            customTypography?.currentRole?.id ?? "custom"
+          }
+        >
+          <p
+            ref={customRef}
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: "1.0625rem",
+              fontStyle: "italic",
+              fontWeight: 500,
+              letterSpacing: "0.015em",
+              lineHeight: 1.4,
+            }}
+          >
+            Unresolved custom typography remains observational.
+          </p>
+          {customTypography ? (
+            <TypographyControlRow
+              desiredRoleId={customDesiredRoleId}
+              onDesiredRoleChange={setCustomDesiredRoleId}
+              typography={customTypography}
+            />
+          ) : null}
+        </div>
       </div>
     </div>
   );

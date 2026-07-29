@@ -28,8 +28,9 @@ type SelectionControlKind = "checkbox" | "radio" | "toggle";
 type SelectionBinarySize = "sm" | "md";
 type ModalSizeMode = "compact" | "standard" | "wide" | "workflow" | "review";
 type ModalBodyMode = "content-fit" | "scroll-fill";
-type ModalHeaderMode = "compact" | "large";
+type ModalHeaderMode = "title-only" | "with-description";
 type ModalFooterMode = "none" | "actions" | "note-actions";
+type ModalPreviewPresentation = "live" | "static";
 type DataTableSortDirection = "asc" | "desc";
 type DataTableSpecimenSortKey = "preview" | "none";
 
@@ -182,6 +183,7 @@ export function ModalWindowPreview({
   showStatusPill,
   destructive,
   longContent,
+  presentation,
 }: {
   sizeMode: ModalSizeMode;
   bodyMode: ModalBodyMode;
@@ -190,6 +192,7 @@ export function ModalWindowPreview({
   showStatusPill: boolean;
   destructive: boolean;
   longContent: boolean;
+  presentation: ModalPreviewPresentation;
 }) {
   const rows = longContent
     ? [
@@ -247,23 +250,21 @@ export function ModalWindowPreview({
     <>
       <DialogHeader className="hito-product-dialog-header">
         <div>
-          <p className="hito-label hito-label-signal">
-            {sizeMode} ·{" "}
-            {headerMode === "large" ? "large header + close" : "compact header + close"}
-          </p>
           {live ? (
             <>
-              <DialogTitle className="hito-modal-title mt-2">{title}</DialogTitle>
+              <DialogTitle className="hito-modal-title">{title}</DialogTitle>
               <DialogDescription
-                className={headerMode === "large" ? "hito-body mt-2 max-w-lg" : "sr-only"}
+                className={
+                  headerMode === "with-description" ? "hito-body mt-2 max-w-lg" : "sr-only"
+                }
               >
                 {description}
               </DialogDescription>
             </>
           ) : (
             <>
-              <h3 className="hito-modal-title mt-2">{title}</h3>
-              {headerMode === "large" ? (
+              <h3 className="hito-modal-title">{title}</h3>
+              {headerMode === "with-description" ? (
                 <p className="hito-body mt-2 max-w-lg">{description}</p>
               ) : null}
             </>
@@ -311,10 +312,7 @@ export function ModalWindowPreview({
           </button>
           <button
             type="button"
-            className={cn(
-              "hito-button hito-button-md",
-              destructive ? "hito-button-outlined" : "hito-button-primary",
-            )}
+            className={cn("hito-button hito-button-md", "hito-button-primary")}
             data-tone={destructive ? "error" : undefined}
           >
             {destructive ? "Archive" : "Continue"}
@@ -324,26 +322,21 @@ export function ModalWindowPreview({
     </>
   );
 
+  if (presentation === "static") {
+    return <article className={contentClassName}>{renderModalContents(false)}</article>;
+  }
+
   return (
-    <div className="grid gap-4">
-      <article className={contentClassName}>{renderModalContents(false)}</article>
-      <div className="flex flex-wrap items-center gap-3">
-        <Dialog>
-          <DialogTrigger asChild>
-            <button type="button" className="hito-button hito-button-primary hito-button-md">
-              Open live modal
-            </button>
-          </DialogTrigger>
-          <DialogContent className={contentClassName} overlayClassName="hito-dialog-overlay-stable">
-            {renderModalContents(true)}
-          </DialogContent>
-        </Dialog>
-        <p className="hito-caption max-w-md">
-          Live modal uses the same overlay, focus trap, close behavior, and internal body-scroll
-          contract as product dialogs.
-        </p>
-      </div>
-    </div>
+    <Dialog>
+      <DialogTrigger asChild>
+        <button type="button" className="hito-button hito-button-primary hito-button-md">
+          Open selected modal
+        </button>
+      </DialogTrigger>
+      <DialogContent className={contentClassName} overlayClassName="hito-dialog-overlay-stable">
+        {renderModalContents(true)}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -351,24 +344,13 @@ export function InfoWindowPreview() {
   const contentClassName =
     "hito-dialog-stable hito-window hito-window-content-fit hito-info-window";
 
-  const renderInfoWindowContents = (live: boolean) => (
+  const renderInfoWindowContents = () => (
     <>
       <DialogHeader className="hito-info-window-header">
-        {live ? (
-          <>
-            <DialogTitle className="hito-info-window-title">Replace target workout?</DialogTitle>
-            <DialogDescription className="hito-info-window-copy">
-              This will replace the workout currently on the target day.
-            </DialogDescription>
-          </>
-        ) : (
-          <>
-            <h3 className="hito-info-window-title">Replace target workout?</h3>
-            <p className="hito-info-window-copy">
-              This will replace the workout currently on the target day.
-            </p>
-          </>
-        )}
+        <h3 className="hito-info-window-title">Replace target workout?</h3>
+        <p className="hito-info-window-copy">
+          This will replace the workout currently on the target day.
+        </p>
       </DialogHeader>
       <DialogFooter className="hito-info-window-footer">
         <button type="button" className="hito-button hito-button-secondary hito-button-sm">
@@ -381,30 +363,7 @@ export function InfoWindowPreview() {
     </>
   );
 
-  return (
-    <div className="grid gap-4">
-      <article className={contentClassName}>{renderInfoWindowContents(false)}</article>
-      <div className="flex flex-wrap items-center gap-3">
-        <Dialog>
-          <DialogTrigger asChild>
-            <button type="button" className="hito-button hito-button-primary hito-button-md">
-              Open live info-window
-            </button>
-          </DialogTrigger>
-          <DialogContent
-            className={contentClassName}
-            overlayClassName="hito-dialog-overlay-stable hito-info-window-overlay"
-          >
-            {renderInfoWindowContents(true)}
-          </DialogContent>
-        </Dialog>
-        <p className="hito-caption max-w-md">
-          Use for one short confirmation where the runner should keep the current calendar or route
-          in view behind a light overlay.
-        </p>
-      </div>
-    </div>
-  );
+  return <article className={contentClassName}>{renderInfoWindowContents()}</article>;
 }
 
 export function ChoiceSelector<T extends string>({
@@ -466,6 +425,7 @@ export function SelectionControlPreview({
   kind,
   size,
   selected,
+  onSelectedChange,
   disabled,
   invalid,
   focusDemo,
@@ -474,52 +434,74 @@ export function SelectionControlPreview({
   kind: SelectionControlKind;
   size: ChoiceToggleSize;
   selected: boolean;
+  onSelectedChange: (selected: boolean) => void;
   disabled: boolean;
   invalid: boolean;
   focusDemo: boolean;
   cardMode: boolean;
 }) {
+  const [secondaryCheckboxSelected, setSecondaryCheckboxSelected] = useState(false);
   const binarySize = isBinarySelectionSize(size) ? size : "md";
+  const selectedChoice = selected ? "primary" : "secondary";
+  const choiceGroup = useHitoRadioGroup({
+    items: [{ value: "primary" }, { value: "secondary" }],
+    value: selectedChoice,
+  });
 
   if (kind === "toggle") {
+    const choices = cardMode
+      ? [
+          {
+            value: "primary",
+            title: "Half marathon",
+            description: "Goal distance choice",
+          },
+          {
+            value: "secondary",
+            title: "Build consistency",
+            description: "Large onboarding choice",
+          },
+        ]
+      : [
+          { value: "primary", title: "Easy pace", description: null },
+          { value: "secondary", title: "Tempo", description: null },
+        ];
+
     return (
-      <div className="grid gap-3">
-        <div className="hito-choice-toggle-group">
-          <span
-            className={cn(
-              "hito-choice-toggle pointer-events-none cursor-default",
-              cardMode ? "hito-choice-toggle-card" : `hito-choice-toggle-${size}`,
-              disabled && "opacity-50",
-            )}
-            data-selected={selected}
-            data-demo-state={focusDemo ? "focus" : undefined}
-            data-invalid={invalid || undefined}
-          >
-            {cardMode ? (
-              <span>
-                <span className="block">Goal distance</span>
-                <span className="mt-1 block text-current/70">Card display choice</span>
-              </span>
-            ) : (
-              "Preview choice"
-            )}
-          </span>
-          {!cardMode && (
-            <span
+      <div
+        className="hito-choice-toggle-group"
+        {...choiceGroup.groupProps}
+        aria-label={cardMode ? "Goal choice" : "Workout intensity"}
+      >
+        {choices.map((choice) => {
+          const isSelected = selectedChoice === choice.value;
+
+          return (
+            <button
+              key={choice.value}
+              type="button"
+              {...choiceGroup.getRadioProps(choice.value)}
               className={cn(
-                "hito-choice-toggle pointer-events-none cursor-default",
-                `hito-choice-toggle-${size}`,
+                "hito-choice-toggle",
+                cardMode ? "hito-choice-toggle-card" : `hito-choice-toggle-${size}`,
               )}
+              data-selected={isSelected || undefined}
+              data-demo-state={focusDemo && isSelected ? "focus" : undefined}
+              data-invalid={invalid || undefined}
+              disabled={disabled}
+              onClick={() => onSelectedChange(choice.value === "primary")}
             >
-              Other choice
-            </span>
-          )}
-        </div>
-        <p className="hito-caption">
-          {cardMode
-            ? "Card is reserved for large visual choice moments."
-            : `${size.toUpperCase()} toggle matches the functional button/input scale.`}
-        </p>
+              {choice.description ? (
+                <span>
+                  <span className="block">{choice.title}</span>
+                  <span className="mt-1 block text-current/70">{choice.description}</span>
+                </span>
+              ) : (
+                choice.title
+              )}
+            </button>
+          );
+        })}
       </div>
     );
   }
@@ -529,8 +511,42 @@ export function SelectionControlPreview({
     kind === "checkbox" ? `hito-checkbox-${binarySize}` : `hito-radio-${binarySize}`,
   );
 
+  if (kind === "radio") {
+    return (
+      <div className="grid gap-2" role="radiogroup" aria-label="Notification channel">
+        {[
+          { value: "primary", label: "Email summary" },
+          { value: "secondary", label: "In-app only" },
+        ].map((choice) => {
+          const isSelected = selectedChoice === choice.value;
+
+          return (
+            <label
+              key={choice.value}
+              className={cn("hito-control-label", `hito-control-label-${binarySize}`)}
+              aria-disabled={disabled || undefined}
+            >
+              <input
+                type="radio"
+                name="selection-preview-radio"
+                className={inputClassName}
+                checked={isSelected}
+                disabled={disabled}
+                aria-invalid={invalid || undefined}
+                data-state={isSelected ? "checked" : undefined}
+                data-demo-state={focusDemo && isSelected ? "focus" : undefined}
+                onChange={() => onSelectedChange(choice.value === "primary")}
+              />
+              <span>{choice.label}</span>
+            </label>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-2">
       <label
         className={cn("hito-control-label", `hito-control-label-${binarySize}`)}
         aria-disabled={disabled || undefined}
@@ -540,21 +556,30 @@ export function SelectionControlPreview({
           name={`selection-preview-${kind}`}
           className={inputClassName}
           checked={selected}
-          readOnly
           disabled={disabled}
           aria-invalid={invalid || undefined}
           data-state={selected ? "checked" : undefined}
           data-demo-state={focusDemo ? "focus" : undefined}
+          onChange={(event) => onSelectedChange(event.currentTarget.checked)}
         />
-        <span>
-          {kind === "checkbox" ? "Preview checkbox" : "Preview radio"} · {binarySize.toUpperCase()}
-        </span>
+        <span>Training reminders</span>
       </label>
-      <p className="hito-caption">
-        {kind === "checkbox"
-          ? "Checkboxes are square and support independent on/off choices."
-          : "Radios stay circular and represent one-of-many selection."}
-      </p>
+      <label
+        className={cn("hito-control-label", `hito-control-label-${binarySize}`)}
+        aria-disabled={disabled || undefined}
+      >
+        <input
+          type="checkbox"
+          name="selection-preview-secondary-checkbox"
+          className={inputClassName}
+          checked={secondaryCheckboxSelected}
+          disabled={disabled}
+          aria-invalid={invalid || undefined}
+          data-state={secondaryCheckboxSelected ? "checked" : undefined}
+          onChange={(event) => setSecondaryCheckboxSelected(event.currentTarget.checked)}
+        />
+        <span>Weekly summary</span>
+      </label>
     </div>
   );
 }

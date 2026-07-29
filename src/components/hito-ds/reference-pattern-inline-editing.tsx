@@ -45,10 +45,9 @@ export function HitoDsPatternInlineEditing() {
     <HitoDsPlayground
       id="inline-editable-text"
       label="Inline editable text"
-      title="Text edits, read-only truth, and change-task targets stay separate."
-      body="Use this pattern only where text is genuinely editable. Generated workout readback stays read-only; local task capture is non-mutating."
       status="Interaction pattern"
       statusTone="signal"
+      usedIn="Manual workout draft titles, section labels, and template names."
       demo={
         <div className="grid min-w-0 gap-5">
           <section className="hito-surface-flat grid min-w-0 gap-4 p-5">
@@ -185,20 +184,6 @@ export function HitoDsPatternInlineEditing() {
           />
         </div>
       }
-      caption={[
-        {
-          label: "Use for",
-          body: "Manual workout draft titles, section labels, template names, and other text values with a real edit owner.",
-        },
-        {
-          label: "Do not use for",
-          body: "Generated plan preview/detail rows, provider evidence, backend feasibility facts, or any surface without an edit contract.",
-        },
-        {
-          label: "Change tasks",
-          body: "Task targeting stays local-only and non-mutating unless a future accepted persistence seam owns it.",
-        },
-      ]}
     />
   );
 }

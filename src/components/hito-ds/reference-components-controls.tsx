@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { AdminMetadataMenu } from "@/components/admin/AdminOperationalComponents";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { EditableSelectValueField, EditableValueField } from "@/components/ui/editable-value-field";
 import {
   HitoDateField,
   HitoEditableDateField,
@@ -17,6 +16,7 @@ import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
 import { useHitoTabs } from "@/components/ui/hito-tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
+import { EditableValueFieldSandbox } from "@/components/hito-ds/editable-value-field-sandbox";
 import { ProductLinks, ReferenceListRow, SectionIntro } from "@/components/hito-ds/reference";
 import {
   ChoiceSelector,
@@ -63,8 +63,6 @@ type StatusTone = (typeof STATUS_TONES)[number];
 type DataTableSortDirection = (typeof DATA_TABLE_SORT_DIRECTIONS)[number];
 
 type FieldSize = (typeof FIELD_SIZES)[number];
-type ReferenceScalarField = "age" | "height" | "weight";
-type ReferenceEditableField = ReferenceScalarField | "terrain";
 type TabDemoValue = "plan" | "progress" | "updates" | "archived";
 
 export function HitoDsComponentControls() {
@@ -91,15 +89,6 @@ export function HitoDsComponentControls() {
   const [boundedDateDemo, setBoundedDateDemo] = useState("2026-05-29");
   const [timeFieldDemo, setTimeFieldDemo] = useState("3:50:00");
   const [nativeSelectDemo, setNativeSelectDemo] = useState("easy");
-  const [activeEditableField, setActiveEditableField] = useState<ReferenceEditableField | null>(
-    null,
-  );
-  const [editableValues, setEditableValues] = useState<Record<ReferenceScalarField, string>>({
-    age: "36",
-    height: "",
-    weight: "72",
-  });
-  const [editableTerrain, setEditableTerrain] = useState("road");
   const [tabStyle, setTabStyle] = useState<TabStyle>("simple");
   const [tabIcon, setTabIcon] = useState(true);
   const [tabBadge, setTabBadge] = useState(true);
@@ -125,16 +114,6 @@ export function HitoDsComponentControls() {
   const [selectionInvalid, setSelectionInvalid] = useState(false);
   const [selectionFocusDemo, setSelectionFocusDemo] = useState(false);
   const [selectionCardMode, setSelectionCardMode] = useState(false);
-  const [choiceScaleValue, setChoiceScaleValue] = useState<ChoiceToggleSize>("md");
-  const [choiceCardValue, setChoiceCardValue] = useState<"half" | "consistency">("half");
-  const choiceScaleGroup = useHitoRadioGroup({
-    items: CHOICE_TOGGLE_SIZES.map((value) => ({ value })),
-    value: choiceScaleValue,
-  });
-  const choiceCardGroup = useHitoRadioGroup({
-    items: [{ value: "half" }, { value: "consistency" }],
-    value: choiceCardValue,
-  });
   const [dataTableSortable, setDataTableSortable] = useState(true);
   const [dataTableActiveSort, setDataTableActiveSort] = useState(true);
   const [dataTableSortDirection, setDataTableSortDirection] =
@@ -148,10 +127,18 @@ export function HitoDsComponentControls() {
       <HitoDsPlayground
         id="buttons"
         label="Buttons"
-        title="Variants, sizes, icons, disabled state."
-        body="Use the builder to check CTA hierarchy and icon rhythm across the canonical button system."
         status="Core control"
         statusTone="signal"
+        usedIn={
+          <ProductLinks
+            links={[
+              { href: "/login", label: "/login" },
+              { href: "/settings", label: "/settings" },
+              { href: "/admin/analytics", label: "/admin/analytics" },
+              { href: "/hitoDS", label: "/hitoDS" },
+            ]}
+          />
+        }
         demo={
           <div className="flex min-w-0 items-center justify-center" data-hito-ds-button-preview>
             <DemoButton
@@ -298,38 +285,22 @@ export function HitoDsComponentControls() {
             </div>
           </div>
         }
-        caption={[
-          {
-            label: "Proves",
-            body: "Primary, secondary, outlined, ghost, semantic tones, size tiers, icon rhythm, disabled, and loading states share one button family.",
-          },
-          {
-            label: "Does not imply",
-            body: "Buttons are not navigation tabs, selectable values, status labels, or passive metadata.",
-          },
-          {
-            label: "Used in",
-            body: (
-              <ProductLinks
-                links={[
-                  { href: "/login", label: "/login" },
-                  { href: "/settings", label: "/settings" },
-                  { href: "/admin/analytics", label: "/admin/analytics" },
-                  { href: "/hitoDS", label: "/hitoDS" },
-                ]}
-              />
-            ),
-          },
-        ]}
       />
 
       <HitoDsPlayground
         id="tabs"
         label="Tabs"
-        title="Simple and enclosed mode switches."
-        body="Tabs organize nearby views without becoming another card system. Use simple tabs for calm page-level switches and enclosed tabs when a local control cluster needs a stronger boundary."
         status="Core control"
         statusTone="signal"
+        usedIn={
+          <ProductLinks
+            links={[
+              { href: "/settings", label: "/settings" },
+              { href: "/changelog", label: "/changelog" },
+              { href: "/admin/analytics", label: "/admin/analytics" },
+            ]}
+          />
+        }
         demo={
           <div className="max-w-full min-w-0 overflow-x-auto pb-1">
             <div
@@ -455,37 +426,21 @@ export function HitoDsComponentControls() {
             />
           </div>
         }
-        caption={[
-          {
-            label: "Proves",
-            body: "Simple and enclosed tabs cover active, inactive, hover, focus-visible, disabled, icon, badge, and dot anatomy.",
-          },
-          {
-            label: "Does not imply",
-            body: "Tabs are not value pickers for size, tone, weekday, or variant; use choice toggles for those.",
-          },
-          {
-            label: "Used in",
-            body: (
-              <ProductLinks
-                links={[
-                  { href: "/settings", label: "/settings" },
-                  { href: "/changelog", label: "/changelog" },
-                  { href: "/admin/analytics", label: "/admin/analytics" },
-                ]}
-              />
-            ),
-          },
-        ]}
       />
 
       <HitoDsPlayground
         id="data-table"
         label="Data table"
-        title="Header controls keep sorting and filtering in context."
-        body="Operational tables use one Hito header typography for sortable and non-sortable columns. Sort/filter state belongs in the header control, while static headers stay visually aligned without becoming clickable."
         status="Pattern"
         statusTone="signal"
+        usedIn={
+          <ProductLinks
+            links={[
+              { href: "/admin/analytics", label: "/admin/analytics" },
+              { href: "/hitoDS", label: "/hitoDS" },
+            ]}
+          />
+        }
         demo={
           <DataTableSpecimenPreview
             sortable={dataTableSortable}
@@ -571,36 +526,23 @@ export function HitoDsComponentControls() {
             />
           </div>
         }
-        caption={[
-          {
-            label: "Use for",
-            body: "Operational data where sorting, filtering, scanning, and horizontal overflow containment matter.",
-          },
-          {
-            label: "Does not imply",
-            body: "Marketing cards, metric summaries, form layouts, or route-local lists that do not need table semantics.",
-          },
-          {
-            label: "Used in",
-            body: (
-              <ProductLinks
-                links={[
-                  { href: "/admin/analytics", label: "/admin/analytics" },
-                  { href: "/hitoDS", label: "/hitoDS" },
-                ]}
-              />
-            ),
-          },
-        ]}
       />
 
       <HitoDsPlayground
         id="inputs"
         label="Inputs"
-        title="Variants, states, icons, and button-matched rhythm."
-        body="Text fields and buttons share size tiers. Primary fields keep the canonical bordered form behavior; secondary fields use a lower-chrome tinted surface."
         status="Core control"
         statusTone="signal"
+        usedIn={
+          <ProductLinks
+            links={[
+              { href: "/login", label: "/login" },
+              { href: "/settings", label: "/settings" },
+              { href: "/admin/login", label: "/admin/login" },
+              { href: "/hitoDS", label: "/hitoDS" },
+            ]}
+          />
+        }
         demo={
           <div className="hito-surface-flat p-5">
             <p className="hito-label">Current input</p>
@@ -1029,99 +971,25 @@ export function HitoDsComponentControls() {
             </div>
           </div>
         }
-        caption={[
-          {
-            label: "Proves",
-            body: "Text fields, textareas, validation feedback, date/time inputs, avatar actions, and Editable Value Fields share one field rhythm.",
-          },
-          {
-            label: "Does not imply",
-            body: "Status truth, selectable chips, tab navigation, or long prose display.",
-          },
-          {
-            label: "Used in",
-            body: (
-              <ProductLinks
-                links={[
-                  { href: "/login", label: "/login" },
-                  { href: "/settings", label: "/settings" },
-                  { href: "/admin/login", label: "/admin/login" },
-                  { href: "/hitoDS", label: "/hitoDS" },
-                ]}
-              />
-            ),
-          },
-        ]}
       />
 
-      <section id="editable-value-field" className="ds-section">
-        <SectionIntro
-          label="Editable Value Field"
-          title="Compact facts, one shared edit lifecycle."
-          body="Use this shared owner for compact scalar or select facts that read as values until the user explicitly edits them. Do not replace it with full form cards or normal text rows."
-        />
-        <div className="hito-reference-list">
-          <article className="hito-reference-row">
-            <div>
-              <p className="hito-list-row-title">Interactive scalar and select fields</p>
-              <p className="hito-caption mt-2">
-                These are the runtime owners. Click any empty or saved field to enter its real
-                editing state. Height holds the deterministic hover specimen.
-              </p>
-            </div>
-            <div className="hito-editable-value-field-group">
-              {(
-                [
-                  ["age", "Age", "36", 12, 110, 1, "numeric", undefined],
-                  ["height", "Height", "175", 80, 250, 1, "numeric", "cm"],
-                  ["weight", "Weight", "72", 25, 350, 0.1, "decimal", "kg"],
-                ] as const
-              ).map(([fieldKey, label, placeholder, min, max, step, inputMode, unit]) => (
-                <EditableValueField
-                  key={fieldKey}
-                  fieldKey={fieldKey}
-                  label={label}
-                  value={editableValues[fieldKey]}
-                  setValue={(value) =>
-                    setEditableValues((current) => ({ ...current, [fieldKey]: value }))
-                  }
-                  activeEditableKey={activeEditableField}
-                  setActiveEditableKey={setActiveEditableField}
-                  placeholder={placeholder}
-                  min={min}
-                  max={max}
-                  step={step}
-                  inputMode={inputMode}
-                  unit={unit}
-                  demoState={fieldKey === "height" ? "hover" : undefined}
-                />
-              ))}
-              <EditableSelectValueField
-                activeEditableKey={activeEditableField}
-                emptyLabel="Add terrain"
-                fieldKey="terrain"
-                label="Terrain"
-                options={[
-                  { value: "road", label: "Road" },
-                  { value: "trail", label: "Trail" },
-                  { value: "mixed", label: "Mixed" },
-                ]}
-                setActiveEditableKey={setActiveEditableField}
-                setValue={setEditableTerrain}
-                value={editableTerrain}
-              />
-            </div>
-          </article>
-        </div>
-      </section>
+      <EditableValueFieldSandbox />
 
       <HitoDsPlayground
         id="status"
         label="Status"
-        title="Short truth labels and compact markers."
-        body="Status chips and markers identify product state. They stay concise, semantic, and separate from headings, buttons, or editorial tags."
         status="Core feedback"
         statusTone="signal"
+        usedIn={
+          <ProductLinks
+            links={[
+              { href: "/", label: "/" },
+              { href: "/settings", label: "/settings" },
+              { href: "/workout/2026-05-24", label: "/workout/$date" },
+              { href: "/admin/analytics", label: "/admin/analytics" },
+            ]}
+          />
+        }
         demo={
           <div className="grid min-w-0 gap-5">
             <p className="hito-label">Current status</p>
@@ -1263,45 +1131,29 @@ export function HitoDsComponentControls() {
             />
           </div>
         }
-        caption={[
-          {
-            label: "Use for",
-            body: "Short state identifiers such as active plan, pro feature, saved, warning, and feedback-ready states.",
-          },
-          {
-            label: "Does not imply",
-            body: "Clickable actions, marketing badges, changelog editorial highlights, or long explanations.",
-          },
-          {
-            label: "Used in",
-            body: (
-              <ProductLinks
-                links={[
-                  { href: "/", label: "/" },
-                  { href: "/settings", label: "/settings" },
-                  { href: "/workout/2026-05-24", label: "/workout/$date" },
-                  { href: "/admin/analytics", label: "/admin/analytics" },
-                ]}
-              />
-            ),
-          },
-        ]}
       />
 
       <HitoDsPlayground
         id="selection-controls"
         label="Selection controls"
-        title="Signal-selected, never browser-native."
-        body="Checkboxes, radios, and toggle radios share Hito focus, disabled, invalid, and signal-selected states. Destructive confirmation uses warning copy and destructive buttons; the selected checkbox itself stays signal."
         status="Core control"
         statusTone="signal"
+        usedIn={
+          <ProductLinks
+            links={[
+              { href: "/", label: "Calendar" },
+              { href: "/settings", label: "/settings" },
+              { href: "/hitoDS/components#inputs", label: "DS builders" },
+            ]}
+          />
+        }
         demo={
-          <div className="grid min-w-0 gap-4">
-            <p className="hito-label">Current selection control</p>
+          <div className="grid min-w-0">
             <SelectionControlPreview
               kind={selectionKind}
               size={selectionSize}
               selected={selectionSelected}
+              onSelectedChange={setSelectionSelected}
               disabled={selectionDisabled}
               invalid={selectionInvalid}
               focusDemo={selectionFocusDemo}
@@ -1310,7 +1162,7 @@ export function HitoDsComponentControls() {
           </div>
         }
         variants={
-          <div className="grid min-w-0 gap-6">
+          <div className="grid min-w-0 gap-6" inert>
             <div className="border-t border-hairline pt-5">
               <p className="hito-label">Required states</p>
               <div className="mt-4 grid gap-3">
@@ -1391,17 +1243,15 @@ export function HitoDsComponentControls() {
                 </p>
                 <div
                   className="hito-choice-toggle-group mt-4 items-center"
-                  {...choiceScaleGroup.groupProps}
                   aria-label="Toggle radio size scale"
                 >
                   {CHOICE_TOGGLE_SIZES.map((item) => (
                     <button
                       key={item}
                       type="button"
-                      {...choiceScaleGroup.getRadioProps(item)}
                       className={cn("hito-choice-toggle uppercase", `hito-choice-toggle-${item}`)}
-                      data-selected={choiceScaleValue === item ? "true" : undefined}
-                      onClick={() => setChoiceScaleValue(item)}
+                      data-selected={item === "md" ? "true" : undefined}
+                      tabIndex={-1}
                     >
                       {item}
                     </button>
@@ -1416,6 +1266,7 @@ export function HitoDsComponentControls() {
                           "hito-button hito-button-secondary uppercase",
                           `hito-button-${item}`,
                         )}
+                        tabIndex={-1}
                       >
                         {item}
                       </button>
@@ -1432,6 +1283,7 @@ export function HitoDsComponentControls() {
                         type="button"
                         className={cn("hito-choice-toggle uppercase", `hito-choice-toggle-${item}`)}
                         data-selected={item === "md"}
+                        tabIndex={-1}
                       >
                         {item}
                       </button>
@@ -1448,15 +1300,13 @@ export function HitoDsComponentControls() {
                 </p>
                 <div
                   className="hito-choice-toggle-group mt-4"
-                  {...choiceCardGroup.groupProps}
                   aria-label="Card toggle radio example"
                 >
                   <button
                     type="button"
-                    {...choiceCardGroup.getRadioProps("half")}
                     className="hito-choice-toggle hito-choice-toggle-card"
-                    data-selected={choiceCardValue === "half" ? "true" : undefined}
-                    onClick={() => setChoiceCardValue("half")}
+                    data-selected="true"
+                    tabIndex={-1}
                   >
                     <span>
                       <span className="block">Half marathon</span>
@@ -1465,10 +1315,8 @@ export function HitoDsComponentControls() {
                   </button>
                   <button
                     type="button"
-                    {...choiceCardGroup.getRadioProps("consistency")}
                     className="hito-choice-toggle hito-choice-toggle-card"
-                    data-selected={choiceCardValue === "consistency" ? "true" : undefined}
-                    onClick={() => setChoiceCardValue("consistency")}
+                    tabIndex={-1}
                   >
                     <span>
                       <span className="block">Build consistency</span>
@@ -1500,12 +1348,14 @@ export function HitoDsComponentControls() {
                     className="hito-checkbox hito-checkbox-sm"
                     defaultChecked
                     data-state="checked"
+                    tabIndex={-1}
                   />
                   <span>I understand this keeps history archived.</span>
                 </label>
                 <button
                   type="button"
                   className="hito-button hito-button-secondary hito-button-sm justify-self-start"
+                  tabIndex={-1}
                 >
                   Clear upcoming schedule
                 </button>
@@ -1573,28 +1423,6 @@ export function HitoDsComponentControls() {
             </div>
           </div>
         }
-        caption={[
-          {
-            label: "Proves",
-            body: "Checkboxes, radios, choice toggles, size scales, selected/invalid/focus/disabled states, and destructive confirmation context stay in one selection family.",
-          },
-          {
-            label: "Does not imply",
-            body: "Selection controls are not panel navigation, decorative tags, status chips, or destructive meaning by themselves.",
-          },
-          {
-            label: "Used in",
-            body: (
-              <ProductLinks
-                links={[
-                  { href: "/", label: "Calendar" },
-                  { href: "/settings", label: "/settings" },
-                  { href: "/hitoDS/components#inputs", label: "DS builders" },
-                ]}
-              />
-            ),
-          },
-        ]}
       />
     </>
   );

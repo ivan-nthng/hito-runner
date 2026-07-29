@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 
 const MODAL_SIZE_MODES = ["compact", "standard", "wide", "workflow", "review"] as const;
 const MODAL_BODY_MODES = ["content-fit", "scroll-fill"] as const;
-const MODAL_HEADER_MODES = ["compact", "large"] as const;
+const MODAL_HEADER_MODES = ["title-only", "with-description"] as const;
 const MODAL_FOOTER_MODES = ["none", "actions", "note-actions"] as const;
 type ModalSizeMode = (typeof MODAL_SIZE_MODES)[number];
 type ModalBodyMode = (typeof MODAL_BODY_MODES)[number];
@@ -27,7 +27,7 @@ const HITO_DS_TOAST_ID = "hito-ds-async-action-toast";
 export function HitoDsComponentOverlays() {
   const [modalSizeMode, setModalSizeMode] = useState<ModalSizeMode>("standard");
   const [modalBodyMode, setModalBodyMode] = useState<ModalBodyMode>("content-fit");
-  const [modalHeaderMode, setModalHeaderMode] = useState<ModalHeaderMode>("compact");
+  const [modalHeaderMode, setModalHeaderMode] = useState<ModalHeaderMode>("with-description");
   const [modalFooterMode, setModalFooterMode] = useState<ModalFooterMode>("actions");
   const [modalStatusPill, setModalStatusPill] = useState(true);
   const [modalDestructive, setModalDestructive] = useState(false);
@@ -86,10 +86,18 @@ export function HitoDsComponentOverlays() {
       <HitoDsPlayground
         id="modals"
         label="Modals"
-        title="Bounded panel, explicit body mode, reachable footer."
-        body="Product dialogs share one stable overlay, backdrop, panel chrome, size preset, and body mode. Short content fits naturally; tall workflows scroll internally."
         status="Core overlay"
         statusTone="signal"
+        usedIn={
+          <ProductLinks
+            links={[
+              { href: "/", label: "Edit schedule" },
+              { href: "/settings", label: "Import plan" },
+              { href: "/workout/2026-05-18", label: "Body notes" },
+              { href: "/admin/login", label: "/admin/login" },
+            ]}
+          />
+        }
         demo={
           <ModalWindowPreview
             sizeMode={modalSizeMode}
@@ -99,16 +107,13 @@ export function HitoDsComponentOverlays() {
             showStatusPill={modalStatusPill}
             destructive={modalDestructive}
             longContent={modalLongContent}
+            presentation="live"
           />
         }
         variants={
           <div className="grid min-w-0 gap-6">
             <div className="border-t border-hairline pt-5">
               <p className="hito-label">Compact info-window</p>
-              <p className="hito-caption mt-1">
-                Short confirmations stay small, keep the route visible, and avoid review-card
-                anatomy.
-              </p>
               <div className="mt-4">
                 <InfoWindowPreview />
               </div>
@@ -116,65 +121,62 @@ export function HitoDsComponentOverlays() {
 
             <div className="border-t border-hairline pt-5">
               <p className="hito-label">Body mode matrix</p>
-              <p className="hito-caption mt-1">
-                Short task dialogs fit to content; tall workflows and reviews keep footer actions
-                reachable with internal body scroll.
-              </p>
               <div className="mt-4 grid min-w-0 gap-5 xl:grid-cols-2">
                 <ModalWindowPreview
                   sizeMode="standard"
                   bodyMode="content-fit"
-                  headerMode="compact"
+                  headerMode="title-only"
                   footerMode="actions"
                   showStatusPill
                   destructive={false}
                   longContent={false}
+                  presentation="static"
                 />
                 <ModalWindowPreview
                   sizeMode="workflow"
                   bodyMode="scroll-fill"
-                  headerMode="large"
+                  headerMode="with-description"
                   footerMode="note-actions"
                   showStatusPill
                   destructive={false}
                   longContent
+                  presentation="static"
                 />
                 <ModalWindowPreview
                   sizeMode="review"
                   bodyMode="scroll-fill"
-                  headerMode="large"
+                  headerMode="with-description"
                   footerMode="actions"
                   showStatusPill
                   destructive={false}
                   longContent
+                  presentation="static"
                 />
               </div>
             </div>
 
             <div className="border-t border-hairline pt-5">
               <p className="hito-label">Footer and destructive modes</p>
-              <p className="hito-caption mt-1">
-                Footer variants stay inside the same shell. Destructive meaning lives in copy and
-                the final action tone, not a separate modal family.
-              </p>
               <div className="mt-4 grid min-w-0 gap-5 xl:grid-cols-2">
                 <ModalWindowPreview
                   sizeMode="compact"
                   bodyMode="content-fit"
-                  headerMode="large"
+                  headerMode="with-description"
                   footerMode="none"
                   showStatusPill={false}
                   destructive={false}
                   longContent={false}
+                  presentation="static"
                 />
                 <ModalWindowPreview
                   sizeMode="wide"
                   bodyMode="content-fit"
-                  headerMode="compact"
+                  headerMode="title-only"
                   footerMode="actions"
                   showStatusPill
                   destructive
                   longContent={false}
+                  presentation="static"
                 />
               </div>
             </div>
@@ -196,7 +198,10 @@ export function HitoDsComponentOverlays() {
                 label="Body mode"
                 value={modalBodyMode}
                 options={MODAL_BODY_MODES}
-                onChange={setModalBodyMode}
+                onChange={(nextMode) => {
+                  setModalBodyMode(nextMode);
+                  setModalLongContent(nextMode === "scroll-fill");
+                }}
                 textTransform="none"
               />
             </div>
@@ -206,6 +211,7 @@ export function HitoDsComponentOverlays() {
                 value={modalHeaderMode}
                 options={MODAL_HEADER_MODES}
                 onChange={setModalHeaderMode}
+                textTransform="none"
               />
             </div>
             <div className="hito-list-row items-start">
@@ -227,45 +233,37 @@ export function HitoDsComponentOverlays() {
               active={modalDestructive}
               onToggle={() => setModalDestructive((v) => !v)}
             />
-            <ToggleRow
-              label="Long content"
-              active={modalLongContent}
-              onToggle={() => setModalLongContent((v) => !v)}
-            />
+            {modalBodyMode === "scroll-fill" ? (
+              <ToggleRow
+                label="Long content"
+                active={modalLongContent}
+                onToggle={() => setModalLongContent((v) => !v)}
+              />
+            ) : null}
+            <div className="hito-list-row items-start">
+              <div>
+                <p className="hito-list-row-title">Content-fit</p>
+                <p className="hito-list-row-copy">Natural height for bounded tasks.</p>
+              </div>
+            </div>
+            <div className="hito-list-row items-start">
+              <div>
+                <p className="hito-list-row-title">Scroll-fill</p>
+                <p className="hito-list-row-copy">
+                  Bounded middle region; header and footer stay put.
+                </p>
+              </div>
+            </div>
           </div>
         }
-        caption={[
-          {
-            label: "Proves",
-            body: "The same stable overlay, centered product dialog shell, internal body scroll, and reachable footer used by review-before-apply flows, imports, body notes, and calendar utilities.",
-          },
-          {
-            label: "Does not imply",
-            body: "Global navigation, passive page sections, dashboard cards, or silent mutations. Use inline state when the task does not need interruption.",
-          },
-          {
-            label: "Used in",
-            body: (
-              <ProductLinks
-                links={[
-                  { href: "/", label: "Edit schedule" },
-                  { href: "/settings", label: "Import plan" },
-                  { href: "/workout/2026-05-18", label: "Body notes" },
-                  { href: "/admin/login", label: "/admin/login" },
-                ]}
-              />
-            ),
-          },
-        ]}
       />
 
       <HitoDsPlayground
         id="async-actions"
         label="Async action toasts"
-        title="Progress without taking over."
-        body="Use this pattern for long-running actions that need global progress and a short outcome while validation and review stay inline."
         status="Primitive"
         statusTone="signal"
+        usedIn="Global progress and outcome feedback for bounded async actions."
         demo={
           <div className="grid min-w-0 gap-4">
             <span className="hito-status-pill justify-self-start" data-tone="signal">
@@ -442,20 +440,6 @@ export function HitoDsComponentOverlays() {
             </div>
           </div>
         }
-        caption={[
-          {
-            label: "Proves",
-            body: "One active async toast, DS-owned dismiss chrome, working-to-result replacement, and distinct info/success/error states.",
-          },
-          {
-            label: "Does not imply",
-            body: "Cancellation, fake percentages, mutation authority, or replacing inline validation/review states.",
-          },
-          {
-            label: "Used in",
-            body: "Global progress and outcome feedback for bounded async actions.",
-          },
-        ]}
       />
     </>
   );

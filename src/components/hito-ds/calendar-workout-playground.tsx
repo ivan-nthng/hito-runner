@@ -19,6 +19,7 @@ import {
   OVERLAY_OPTIONS,
   RESULT_OPTIONS,
   TITLE_STRESS_OPTIONS,
+  VIEW_MODE_OPTIONS,
   WORKOUT_IDENTITIES,
   WORKOUT_IDENTITY_OPTIONS,
   getNonWorkoutTitle,
@@ -47,27 +48,12 @@ export function CalendarWorkoutPlayground() {
     <HitoDsPlayground
       id="calendar-workout-playground"
       label="Calendar primitive"
-      title="Shared calendar-day cells and workout rows."
-      body="The primary calendar specimen renders the same HitoCalendarDayCell and HitoWorkoutDayRow primitives consumed by the product calendar."
       status="Shared primitive"
       statusTone="signal"
+      usedIn="Product calendar day cells and mobile workout rows."
       controls={<ControlsBody state={state} setField={setField} />}
       demo={<CalendarDemoStage state={state} title={previewTitle} workout={workout} />}
       variants={<CalendarVariantsStage state={state} title={previewTitle} workout={workout} />}
-      caption={[
-        {
-          label: "Proves",
-          body: "Shared product day-cell and mobile-row anatomy, marker hierarchy, density stress, and add/more affordance placement.",
-        },
-        {
-          label: "Does not imply",
-          body: "Workout creation, copy/paste, recurrence, protected-history decisions, schedule rules, or persistence.",
-        },
-        {
-          label: "Used in",
-          body: "Static /hitoDS reference and the product calendar rendering seam.",
-        },
-      ]}
     />
   );
 }
@@ -84,9 +70,18 @@ function ControlsBody({
   return (
     <div className="grid gap-5">
       <ControlGroup
-        body="Pick the day state and overlay that both desktop and row specimens should mirror."
-        title="Specimen state"
+        body="Switch the live specimen between the two product renderers."
+        title="Preview"
       >
+        <ChoiceControl
+          label="Responsive context"
+          options={VIEW_MODE_OPTIONS}
+          value={state.viewMode}
+          onChange={setField("viewMode")}
+        />
+      </ControlGroup>
+
+      <ControlGroup body="Pick the day state and interaction overlay." title="Specimen state">
         <ChoiceControl
           label="Base date state"
           options={BASE_STATE_OPTIONS}
@@ -185,75 +180,53 @@ function CalendarDemoStage({
   const supportCopy = getSpecimenSupportCopy(state);
   const action = getActionVisual(state);
 
+  if (state.viewMode === "mobile") {
+    return (
+      <div className="mx-auto w-full max-w-xl">
+        <HitoWorkoutDayRow
+          action={action}
+          ariaLabel="Calendar specimen mobile row"
+          date={{ eyebrow: "Jun", day: "18", meta: "Thu" }}
+          feedback={state.feedback}
+          focused={state.overlay === "focused"}
+          interactive={state.baseState !== "outside-month"}
+          muted={state.baseState === "outside-month"}
+          result={state.result}
+          selected={state.overlay === "selected"}
+          state={state.baseState}
+          stateLabel={state.baseState === "empty" ? "No workout" : undefined}
+          supportingText={supportCopy}
+          title={titleForState}
+          today={state.overlay === "today"}
+          workout={workout}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="grid min-w-0 gap-5">
-      <div className="flex min-w-0 flex-wrap items-end justify-between gap-3 border-b border-hairline pb-3">
-        <div className="min-w-0">
-          <p className="hito-label">Demo</p>
-          <h3 className="hito-list-row-title mt-1">Product day and row primitives together</h3>
-          <p className="hito-caption mt-1 max-w-2xl">
-            One desktop day cell and one mobile row reflect the same controlled state. This keeps
-            the specimen close to product rhythm without pretending to be a full calendar route.
-          </p>
-        </div>
-        <span className="hito-status-pill" data-tone="neutral">
-          Static display only
-        </span>
-      </div>
-
-      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(10rem,14rem)_minmax(0,1fr)]">
-        <div className="grid min-w-0 content-start gap-2">
-          <p className="hito-label text-muted-foreground">Desktop day cell</p>
-          <div className="hito-calendar-grid-container min-w-0 overflow-hidden rounded-xl border border-hairline bg-background/25">
-            <HitoCalendarDayCell
-              action={action}
-              ariaLabel="Calendar specimen desktop day"
-              className="border-0"
-              day="18"
-              dense={state.density === "dense"}
-              feedback={state.feedback}
-              focused={state.overlay === "focused"}
-              interactive={state.baseState !== "outside-month"}
-              muted={state.baseState === "outside-month"}
-              result={state.result}
-              selected={state.overlay === "selected"}
-              state={state.baseState}
-              stateLabel={state.baseState === "empty" ? "No workout" : undefined}
-              supportingText={supportCopy}
-              title={titleForState}
-              today={state.overlay === "today"}
-              weekday="Thu"
-              workout={workout}
-            />
-          </div>
-        </div>
-
-        <div className="grid min-w-0 content-start gap-2">
-          <p className="hito-label text-muted-foreground">Workout day row</p>
-          <HitoWorkoutDayRow
-            action={action}
-            ariaLabel="Calendar specimen mobile row"
-            date={{ eyebrow: "Jun", day: "18", meta: "Thu" }}
-            feedback={state.feedback}
-            focused={state.overlay === "focused"}
-            interactive={state.baseState !== "outside-month"}
-            muted={state.baseState === "outside-month"}
-            result={state.result}
-            selected={state.overlay === "selected"}
-            state={state.baseState}
-            stateLabel={state.baseState === "empty" ? "No workout" : undefined}
-            supportingText={supportCopy}
-            title={titleForState}
-            today={state.overlay === "today"}
-            workout={workout}
-          />
-        </div>
-      </div>
-
-      <div className="hito-row-group border-0">
-        <AnatomyRow label="Desktop" body="HitoCalendarDayCell" />
-        <AnatomyRow label="Mobile" body="HitoWorkoutDayRow" />
-        <AnatomyRow label="Source" body="Product calendar rendering seam" />
+    <div className="mx-auto w-full max-w-56">
+      <div className="hito-calendar-grid-container min-w-0 overflow-hidden rounded-xl border border-hairline bg-background/25">
+        <HitoCalendarDayCell
+          action={action}
+          ariaLabel="Calendar specimen desktop day"
+          className="border-0"
+          day="18"
+          dense={state.density === "dense"}
+          feedback={state.feedback}
+          focused={state.overlay === "focused"}
+          interactive={state.baseState !== "outside-month"}
+          muted={state.baseState === "outside-month"}
+          result={state.result}
+          selected={state.overlay === "selected"}
+          state={state.baseState}
+          stateLabel={state.baseState === "empty" ? "No workout" : undefined}
+          supportingText={supportCopy}
+          title={titleForState}
+          today={state.overlay === "today"}
+          weekday="Thu"
+          workout={workout}
+        />
       </div>
     </div>
   );
@@ -270,53 +243,10 @@ function CalendarVariantsStage({
 }) {
   const variants = buildCalendarVariants(state, workout, title);
 
-  return (
-    <div className="grid min-w-0 gap-5">
-      <div className="flex min-w-0 flex-wrap items-end justify-between gap-3 border-b border-hairline pb-3">
-        <div className="min-w-0">
-          <p className="hito-label">Variants</p>
-          <h3 className="hito-list-row-title mt-1">Calendar primitive state coverage</h3>
-          <p className="hito-caption mt-1 max-w-2xl">
-            A compact state matrix for the shared day and row primitives. These are specimens, not a
-            replacement for the product calendar route.
-          </p>
-        </div>
-        <span className="hito-status-pill" data-tone="neutral">
-          State coverage
-        </span>
-      </div>
-
-      <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+  if (state.viewMode === "mobile") {
+    return (
+      <div className="mx-auto grid w-full max-w-xl min-w-0 gap-2">
         {variants.map((variant) => (
-          <div key={variant.label} className="grid min-w-0 content-start gap-2">
-            <p className="hito-label text-muted-foreground">{variant.label}</p>
-            <div className="hito-calendar-grid-container min-w-0 overflow-hidden rounded-xl border border-hairline bg-background/25">
-              <HitoCalendarDayCell
-                action={getActionVisual(variant.state)}
-                ariaLabel={`Calendar variant ${variant.label}`}
-                className="border-0"
-                day={variant.day}
-                dense={variant.state.density === "dense"}
-                feedback={variant.state.feedback}
-                focused={variant.state.overlay === "focused"}
-                interactive={variant.state.baseState !== "outside-month"}
-                muted={variant.state.baseState === "outside-month"}
-                result={variant.state.result}
-                selected={variant.state.overlay === "selected"}
-                state={variant.state.baseState}
-                stateLabel={variant.state.baseState === "empty" ? "No workout" : undefined}
-                supportingText={getSpecimenSupportCopy(variant.state)}
-                title={getNonWorkoutAwareTitle(variant.state, variant.workout, variant.title)}
-                today={variant.state.overlay === "today"}
-                workout={variant.workout}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid min-w-0 gap-2">
-        {variants.slice(0, 3).map((variant) => (
           <HitoWorkoutDayRow
             key={`${variant.label}-row`}
             action={getActionVisual(variant.state)}
@@ -337,6 +267,37 @@ function CalendarVariantsStage({
           />
         ))}
       </div>
+    );
+  }
+
+  return (
+    <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3">
+      {variants.map((variant) => (
+        <div key={variant.label} className="min-w-0">
+          <div className="hito-calendar-grid-container min-w-0 overflow-hidden rounded-xl border border-hairline bg-background/25">
+            <HitoCalendarDayCell
+              action={getActionVisual(variant.state)}
+              ariaLabel={`Calendar variant ${variant.label}`}
+              className="border-0"
+              day={variant.day}
+              dense={variant.state.density === "dense"}
+              feedback={variant.state.feedback}
+              focused={variant.state.overlay === "focused"}
+              interactive={variant.state.baseState !== "outside-month"}
+              muted={variant.state.baseState === "outside-month"}
+              result={variant.state.result}
+              selected={variant.state.overlay === "selected"}
+              state={variant.state.baseState}
+              stateLabel={variant.state.baseState === "empty" ? "No workout" : undefined}
+              supportingText={getSpecimenSupportCopy(variant.state)}
+              title={getNonWorkoutAwareTitle(variant.state, variant.workout, variant.title)}
+              today={variant.state.overlay === "today"}
+              weekday={variant.weekday}
+              workout={variant.workout}
+            />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -368,6 +329,20 @@ function buildCalendarVariants(
 
   return [
     {
+      day: "17",
+      label: "Previous completed workout",
+      state: {
+        ...base,
+        baseState: "workout",
+        feedback: "evidence_attached",
+        identity: "easy",
+        result: "completed",
+      },
+      title: getWorkoutTitle(WORKOUT_IDENTITIES.easy, "short"),
+      weekday: "Wed",
+      workout: WORKOUT_IDENTITIES.easy,
+    },
+    {
       day: "18",
       label: "Selected workout",
       state: { ...state, action: resolveSpecimenAction(state.baseState, state.action) },
@@ -377,33 +352,11 @@ function buildCalendarVariants(
     },
     {
       day: "19",
-      label: "Rest with Add",
+      label: "Next rest day",
       state: { ...base, baseState: "rest", action: "add-activity" },
       title: "Rest day",
       weekday: "Fri",
       workout: WORKOUT_IDENTITIES.recovery,
-    },
-    {
-      day: "20",
-      label: "Completed long",
-      state: {
-        ...base,
-        baseState: "workout",
-        feedback: "evidence_attached",
-        identity: "long",
-        result: "completed",
-      },
-      title: getWorkoutTitle(WORKOUT_IDENTITIES.long, "short"),
-      weekday: "Sat",
-      workout: WORKOUT_IDENTITIES.long,
-    },
-    {
-      day: "21",
-      label: "More actions",
-      state: { ...base, baseState: "workout", action: "more-menu", identity: "tempo" },
-      title: getWorkoutTitle(WORKOUT_IDENTITIES.tempo, "short"),
-      weekday: "Sun",
-      workout: WORKOUT_IDENTITIES.tempo,
     },
   ];
 }
@@ -421,15 +374,6 @@ function getSpecimenSupportCopy(state: CalendarPlaygroundState) {
   if (state.baseState === "rest") return "Calm editable rest state";
   if (state.baseState === "empty") return "No-workout authorable day";
   return "Outside the current month";
-}
-
-function AnatomyRow({ body, label }: { body: string; label: string }) {
-  return (
-    <div className="hito-list-row py-3">
-      <span className="hito-list-row-title">{label}</span>
-      <code className="hito-technical-mono text-xs text-muted-foreground">{body}</code>
-    </div>
-  );
 }
 
 function resolveSpecimenAction(

@@ -1034,6 +1034,7 @@
   }
 
   .hito-list-row-copy {
+    --hito-typography-role: body-small;
     margin-top: 0.25rem;
     font-size: 0.8125rem;
     line-height: 1.5;

@@ -1,5 +1,6 @@
 @layer components {
   .hito-shell-brand-kicker {
+    --hito-typography-role: label;
     margin-top: 0.5rem;
     font-size: 0.75rem;
     font-weight: 600;

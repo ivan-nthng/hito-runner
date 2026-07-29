@@ -191,6 +191,7 @@
   }
 
   .hito-page-copy {
+    --hito-typography-role: body;
     margin-top: 1rem;
     max-width: 40rem;
     font-size: 0.875rem;
@@ -236,6 +237,7 @@
   }
 
   .hito-section-subtitle {
+    --hito-typography-role: micro-label;
     font-size: 0.6875rem;
     font-weight: 500;
     letter-spacing: 0.18em;
@@ -245,6 +247,7 @@
   }
 
   .hito-support-copy {
+    --hito-typography-role: body;
     font-size: 0.875rem;
     line-height: 1.58;
     color: var(--color-muted-foreground);

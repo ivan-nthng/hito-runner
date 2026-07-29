@@ -6,7 +6,6 @@ export type HitoTypographyRole = {
   label: string;
   sample: string;
   spec: string;
-  technicalDetails: string;
   use: string;
 };
 
@@ -20,7 +19,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     label: "Display title",
     sample: "A running plan that stays honest.",
     spec: "Fraunces · clamp(3.5rem, 7vw, 5rem) · 400 · -0.02em · lh 1",
-    technicalDetails: "Fraunces · clamp(3.5rem, 7vw, 5rem) · 400 · lh 1 · -0.02em",
     use: "Rare editorial emphasis for auth or top-tier entry moments.",
   },
   {
@@ -30,7 +28,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     label: "Page title",
     sample: "Profile details that follow your training.",
     spec: "Fraunces · clamp(3rem, 6vw, 4.5rem) · 400 · -0.02em · lh 1",
-    technicalDetails: "Fraunces · clamp(3rem, 6vw, 4.5rem) · 400 · lh 1 · -0.02em",
     use: "Top-level route title or major state heading.",
   },
   {
@@ -40,7 +37,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     label: "Modal title",
     sample: "Edit schedule",
     spec: "Fraunces · 1.75-2rem · 400 · -0.02em · lh 1.1",
-    technicalDetails: "Fraunces · clamp(1.75rem, 5vw, 2rem) · 400 · lh 1.1 · -0.02em",
     use: "Primary heading inside bounded product dialogs.",
   },
   {
@@ -50,7 +46,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     label: "Section title",
     sample: "Body data",
     spec: "Fraunces · 1.5rem · 400 · -0.02em · lh 1.15",
-    technicalDetails: "Fraunces · 1.5rem · 400 · lh 1.15 · -0.02em",
     use: "Section-level orientation within an open surface.",
   },
   {
@@ -60,7 +55,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     label: "Panel title",
     sample: "Plan vs run",
     spec: "Fraunces · 1.25-1.375rem · 400 · -0.015em · lh 1.18",
-    technicalDetails: "Fraunces · clamp(1.25rem, 3vw, 1.375rem) · 400 · lh 1.18 · -0.015em",
     use: "Compact internal panels, review modules, and feedback sections.",
   },
   {
@@ -70,7 +64,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     label: "List row title",
     sample: "Same typography, no click",
     spec: "Poppins · 0.875rem · 400 · lh 1.35",
-    technicalDetails: "Poppins · 0.875rem · 400 · lh 1.35",
     use: "Primary label inside list rows and compact repeated row anatomy.",
   },
   {
@@ -80,7 +73,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     label: "Body",
     sample: "This compares the planned workout with the uploaded run.",
     spec: "Poppins · 0.875rem · 400 · lh 1.58",
-    technicalDetails: "Poppins · 0.875rem · 400 · lh 1.58",
     use: "Default readable paragraph for page, modal, and section support.",
   },
   {
@@ -90,7 +82,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     label: "Body small",
     sample: "Saved workout history stays preserved.",
     spec: "Poppins · 0.8125rem · 400 · lh 1.5",
-    technicalDetails: "Poppins · 0.8125rem · 400 · lh 1.5",
     use: "Dense secondary explanations, row support, and metadata.",
   },
   {
@@ -100,7 +91,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     label: "Helper",
     sample: "Nothing changes until you choose Apply update.",
     spec: "Poppins · 0.75rem · 400 · lh 1.45",
-    technicalDetails: "Poppins · 0.75rem · 400 · lh 1.45",
     use: "Field-adjacent or control-adjacent operational guidance.",
   },
   {
@@ -110,7 +100,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     label: "Caption",
     sample: "Extracted activity: morning-run.fit",
     spec: "Poppins · 0.6875rem · 400 · lh 1.45",
-    technicalDetails: "Poppins · 0.6875rem · 400 · lh 1.45",
     use: "Tertiary detail, legends, tiny footnotes, and timestamps.",
   },
   {
@@ -120,7 +109,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     label: "Label",
     sample: "Current plan",
     spec: "Poppins · 0.75rem · 600 · 0.01em · normal case · lh 1.25",
-    technicalDetails: "Poppins · 0.75rem · 600 · lh 1.25 · 0.01em",
     use: "Micro orientation, never a substitute for a heading.",
   },
   {
@@ -130,7 +118,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     label: "Form label",
     sample: "Start training",
     spec: "Poppins · 0.75rem · 600 · 0.01em · normal case · lh 1.25",
-    technicalDetails: "Poppins · 0.75rem · 600 · lh 1.25 · 0.01em",
     use: "Explicit ownership label for fields and controls.",
   },
   {
@@ -140,7 +127,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     label: "Micro label",
     sample: "Saved mode",
     spec: "Poppins · 0.6875rem · 500 · 0.18em · uppercase · lh 1.2",
-    technicalDetails: "Poppins · 0.6875rem · 500 · lh 1.2 · 0.18em",
     use: "Tiny uppercase route chrome and compact status metadata, not ordinary shell labels.",
   },
   {
@@ -150,7 +136,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     label: "Technical mono",
     sample: "training-plan-v2",
     spec: "JetBrains Mono · 0.75rem · tabular nums · lh 1.45",
-    technicalDetails: "JetBrains Mono · 0.75rem · 400 · lh 1.45",
     use: "Measured or fixed-format truth only.",
   },
   {
@@ -161,7 +146,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     label: "Button",
     sample: "Generate proposal",
     spec: "Poppins · tiered 0.6875-0.9375rem · 500 · lh 1",
-    technicalDetails: "Poppins · tiered 0.6875-0.9375rem · 500 · lh 1",
     use: "Action text tuned by shared Hito button size tiers.",
   },
   {
@@ -172,7 +156,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     label: "Nav / menu",
     sample: "User settings",
     spec: "Poppins · 0.8125-0.875rem · 500 · lh 1-1.3",
-    technicalDetails: "Poppins · 0.8125-0.875rem · 500 · lh 1-1.3",
     use: "Shell navigation, dropdown rows, and utility menu text.",
   },
   {
@@ -183,7 +166,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     label: "Metric",
     sample: "42.2 km",
     spec: "JetBrains Mono · 1rem · 500 · tabular · lh 1.1",
-    technicalDetails: "JetBrains Mono · 1rem · 500 · tabular · lh 1.1",
     use: "Measured truth: distance, duration, pace, counts, and dates.",
   },
   {
@@ -194,7 +176,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     label: "Status",
     sample: "Ready",
     spec: "Poppins · 0.625rem · 500 · normal case · rounded rectangle",
-    technicalDetails: "Poppins · 0.625rem · 500 · normal case",
     use: "Semantic state identifier, never a heading.",
   },
   {
@@ -205,7 +186,6 @@ export const HITO_TYPOGRAPHY_ROLES: HitoTypographyRole[] = [
     label: "Error / success",
     sample: "User settings saved.",
     spec: "Poppins · 0.875rem · 500 · lh 1.45",
-    technicalDetails: "Poppins · 0.875rem · 500 · lh 1.45",
     use: "Bounded action feedback near the relevant control family.",
   },
 ];

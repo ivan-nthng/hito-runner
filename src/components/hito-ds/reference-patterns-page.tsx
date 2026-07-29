@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { WorkoutLibraryPlayground } from "@/components/hito-ds/workout-library-playground";
 import { HitoDsPatternInlineEditing } from "@/components/hito-ds/reference-pattern-inline-editing";
-import { ProductLinks, ReferenceListRow, SectionIntro } from "@/components/hito-ds/reference";
+import { ReferenceListRow, SectionIntro } from "@/components/hito-ds/reference";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -62,30 +62,11 @@ const CALENDAR_TYPE_EXAMPLES: ReadonlyArray<{
 export function HitoDsPatternsPage() {
   return (
     <>
-      <section className="hito-reference-note" aria-labelledby="nested-pattern-index-title">
-        <p className="hito-label hito-label-signal">On this page</p>
-        <h2 id="nested-pattern-index-title" className="hito-section-title mt-3">
-          Nested shared state owners.
-        </h2>
-        <p className="hito-support-copy mt-3 max-w-2xl">
-          Skeleton and Tooltip are live owners inside the broader States grammar. These links land
-          on their actual specimens.
-        </p>
-        <div className="hito-list-row-copy mt-4">
-          <ProductLinks
-            links={[
-              { href: "#skeleton", label: "Skeleton" },
-              { href: "#tooltip", label: "Tooltip" },
-            ]}
-          />
-        </div>
-      </section>
       <HitoDsPatternInlineEditing />
       <section id="editorial-patterns" className="ds-section">
         <SectionIntro
           label="Editorial patterns"
           title="Changelog rhythm, promoted into the system."
-          body="These classes preserve the current public changelog look: compact serif date rails, warm text highlights with backdrop, text with editorial backdrop, glowing timeline dots, and calm inline code chips."
         />
 
         <div className="grid gap-8">
@@ -170,11 +151,7 @@ export function HitoDsPatternsPage() {
         </div>
       </section>
       <section id="surfaces" className="ds-section">
-        <SectionIntro
-          label="Composition"
-          title="Open rhythm before containers."
-          body="Route sections should breathe with spacing, section titles, and hairline dividers. Framed surfaces are reserved for stateful interaction or payload ownership."
-        />
+        <SectionIntro label="Composition" title="Open rhythm before containers." />
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(280px,0.85fr)]">
           <article className="border-t border-hairline pt-5">
             <div className="hito-section-header">
@@ -209,11 +186,7 @@ export function HitoDsPatternsPage() {
         </div>
       </section>
       <section id="states" className="ds-section">
-        <SectionIntro
-          label="States"
-          title="Markers, route states, tooltips, and severity."
-          body="Use compact markers for status truth, one state-surface family for loading, empty, success, and error routes, one tooltip shell for chart-adjacent hints, and one scale pattern for body-note severity."
-        />
+        <SectionIntro label="States" title="Markers, route states, tooltips, and severity." />
         <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
           <div className="hito-row-group self-start">
             {STATUS_MARKER_EXAMPLES.map(({ label, tone, icon }) => (
@@ -408,11 +381,7 @@ export function HitoDsPatternsPage() {
       <WorkoutLibraryPlayground />
 
       <section id="analytics" className="ds-section">
-        <SectionIntro
-          label="Summary truth"
-          title="Small summaries, not dashboards."
-          body="Progress now leads with one compact saved-truth summary, then uses charts only when current data makes them useful."
-        />
+        <SectionIntro label="Summary truth" title="Small summaries, not dashboards." />
         <div className="hito-row-group">
           <div className="hito-list-row items-start lg:items-end">
             <div className="max-w-md">

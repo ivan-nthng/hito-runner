@@ -10,76 +10,99 @@ export const HITO_DS_PAGES = [
     id: "overview",
     label: "Overview",
     path: HITO_DS_PAGE_ROUTES.overview,
-    body: "Source hierarchy, reading guidance, Figma bridge, and known gaps.",
-    sections: [{ id: "overview", label: "Start here" }],
+    sections: [
+      { id: "overview", label: "Start here", keywords: ["catalog", "search", "browse"] },
+      { id: "figma-bridge", label: "Figma export", keywords: ["capture", "html.to.design"] },
+      { id: "shared-wrappers", label: "Wrapper notes", keywords: ["radix", "compatibility"] },
+      { id: "backlog", label: "Known gaps", keywords: ["exceptions", "local"] },
+    ],
   },
   {
     id: "foundations",
     label: "Foundations",
     path: HITO_DS_PAGE_ROUTES.foundations,
-    body: "Brand, tokens, type, atmosphere, and icon foundations.",
     sections: [
-      { id: "brand", label: "Brand" },
-      { id: "gradient-overlays", label: "Gradients" },
-      { id: "foundations", label: "Tokens" },
-      { id: "typography", label: "Typography" },
-      { id: "icons", label: "Icons" },
+      { id: "brand", label: "Brand", keywords: ["logo", "lockup"] },
+      { id: "gradient-overlays", label: "Gradients", keywords: ["overlay", "alpha", "wash"] },
+      { id: "foundations", label: "Tokens", keywords: ["color", "spacing", "radius"] },
+      { id: "typography", label: "Typography", keywords: ["type", "font", "text roles"] },
+      { id: "icons", label: "Icons", keywords: ["tabler", "symbol"] },
     ],
   },
   {
     id: "components",
     label: "Components",
     path: HITO_DS_PAGE_ROUTES.components,
-    body: "Shared controls and primitives using the accepted Demo / Variants workbench.",
     sections: [
-      { id: "buttons", label: "Buttons" },
-      { id: "tabs", label: "Tabs" },
-      { id: "data-table", label: "Tables" },
-      { id: "inputs", label: "Inputs" },
-      { id: "editable-value-field", label: "Editable Value Field" },
-      { id: "status", label: "Status" },
-      { id: "selection-controls", label: "Selection" },
-      { id: "modals", label: "Modals" },
-      { id: "async-actions", label: "Async toasts" },
-      { id: "calendar-workout-playground", label: "Calendar" },
-      { id: "rows", label: "Rows" },
-      { id: "shell", label: "Shell nav" },
-      { id: "dropdowns", label: "Dropdowns" },
+      { id: "buttons", label: "Buttons", keywords: ["action", "icon button"] },
+      { id: "tabs", label: "Tabs", keywords: ["segmented", "switcher"] },
+      { id: "data-table", label: "Tables", keywords: ["data", "sort", "filter"] },
+      {
+        id: "inputs",
+        label: "Inputs",
+        keywords: ["field", "textarea", "native select", "date", "time", "avatar"],
+      },
+      {
+        id: "editable-value-field",
+        label: "Editable Value Field",
+        keywords: ["inline value", "scalar", "select"],
+      },
+      { id: "status", label: "Status", keywords: ["pill", "badge", "metadata tag"] },
+      { id: "selection-controls", label: "Selection", keywords: ["checkbox", "radio", "switch"] },
+      { id: "modals", label: "Modals", keywords: ["dialog", "sheet", "overlay"] },
+      { id: "async-actions", label: "Async toasts", keywords: ["toast", "loading", "feedback"] },
+      {
+        id: "calendar-workout-playground",
+        label: "Calendar",
+        keywords: ["workout day", "rest day", "add"],
+      },
+      { id: "rows", label: "Rows", keywords: ["list row", "metric row", "disclosure"] },
+      { id: "shell", label: "Shell nav", keywords: ["sidebar", "mobile navigation"] },
+      {
+        id: "dropdowns",
+        label: "Dropdowns",
+        keywords: ["menu", "select", "list item", "popover"],
+      },
     ],
   },
   {
     id: "patterns",
     label: "Patterns",
     path: HITO_DS_PAGE_ROUTES.patterns,
-    body: "Composed product patterns built from the component/foundation owners.",
     sections: [
-      { id: "inline-editable-text", label: "Inline editing" },
-      { id: "editorial-patterns", label: "Editorial" },
-      { id: "surfaces", label: "Composition" },
-      { id: "states", label: "States" },
-      { id: "workout-library-playground", label: "Workout taxonomy" },
-      { id: "analytics", label: "Summary truth" },
+      { id: "inline-editable-text", label: "Inline editing", keywords: ["read", "edit"] },
+      { id: "editorial-patterns", label: "Editorial", keywords: ["timeline", "changelog"] },
+      { id: "surfaces", label: "Composition", keywords: ["surface", "row group"] },
+      {
+        id: "states",
+        label: "States",
+        keywords: ["empty", "error", "loading", "skeleton", "tooltip"],
+      },
+      {
+        id: "workout-library-playground",
+        label: "Workout taxonomy",
+        keywords: ["training", "workout type"],
+      },
+      { id: "analytics", label: "Summary truth", keywords: ["metrics", "admin"] },
     ],
   },
 ] as const;
 
-export const SUPPORT_SECTIONS = [
-  { id: "figma-bridge", label: "Figma export", pageId: "overview" },
-  { id: "shared-wrappers", label: "Wrapper notes", pageId: "overview" },
-  { id: "backlog", label: "Known gaps", pageId: "overview" },
-] as const;
-
-const SECTIONS = [
-  ...HITO_DS_PAGES.flatMap((group) => group.sections),
-  ...SUPPORT_SECTIONS.map(({ id, label }) => ({ id, label })),
-];
-
 export type HitoDsPageId = (typeof HITO_DS_PAGES)[number]["id"];
-export type SectionId = (typeof SECTIONS)[number]["id"];
+export type SectionId = (typeof HITO_DS_PAGES)[number]["sections"][number]["id"];
+type HitoDsPage = (typeof HITO_DS_PAGES)[number];
+
+const HITO_DS_PAGE_LIST = HITO_DS_PAGES as ReadonlyArray<
+  HitoDsPage & {
+    sections: ReadonlyArray<{ id: SectionId }>;
+  }
+>;
 
 export function getSectionIdFromHash(hash: string): SectionId | null {
   const hashSectionId = hash.replace("#", "");
-  return SECTIONS.some((section) => section.id === hashSectionId)
+  return HITO_DS_PAGE_LIST.some((page) =>
+    page.sections.some((section) => section.id === hashSectionId),
+  )
     ? (hashSectionId as SectionId)
     : null;
 }
@@ -89,16 +112,9 @@ export function getHitoDsPage(pageId: HitoDsPageId) {
 }
 
 export function getHitoDsPageForSection(sectionId: SectionId) {
-  const page = HITO_DS_PAGES.find((candidate) =>
+  return HITO_DS_PAGE_LIST.find((candidate) =>
     candidate.sections.some((section) => section.id === sectionId),
   );
-
-  if (page) {
-    return page;
-  }
-
-  const supportSection = SUPPORT_SECTIONS.find((section) => section.id === sectionId);
-  return supportSection ? getHitoDsPage(supportSection.pageId) : null;
 }
 
 export function getHitoDsPageIndex(pageId: HitoDsPageId) {

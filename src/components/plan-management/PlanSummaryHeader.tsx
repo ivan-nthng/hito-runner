@@ -1,6 +1,10 @@
 import type { PlanMeta } from "@/lib/training";
 import { formatDate } from "@/lib/training";
 import { Icon } from "@/components/ui/icon";
+import {
+  fixedRestDaysReadback,
+  weeklyRunningCeilingReadback,
+} from "@/components/onboarding/training-preference-readback";
 
 export function PlanSummaryHeader({
   planMeta,
@@ -60,7 +64,42 @@ export function PlanSummaryHeader({
           </div>
           <Icon name="calendar" size="sm" className="text-muted-foreground" />
         </div>
+        {planMeta?.schedulePreferences ? (
+          <div className="hito-list-row items-start">
+            <div className="grid flex-1 gap-3 sm:grid-cols-3">
+              <PlanPreferenceFact
+                label="Weekly ceiling"
+                value={weeklyRunningCeilingReadback(
+                  planMeta.schedulePreferences.maxRunningDaysPerWeek,
+                )}
+              />
+              <PlanPreferenceFact
+                label="Fixed rest"
+                value={fixedRestDaysReadback(planMeta.schedulePreferences.fixedRestDays)}
+              />
+              <PlanPreferenceFact
+                label="Authored rhythm"
+                value={
+                  planMeta.schedulePreferences.runningDaysPerWeek == null
+                    ? "Not available"
+                    : `${planMeta.schedulePreferences.runningDaysPerWeek} run${
+                        planMeta.schedulePreferences.runningDaysPerWeek === 1 ? "" : "s"
+                      }/week`
+                }
+              />
+            </div>
+          </div>
+        ) : null}
       </div>
     </section>
+  );
+}
+
+function PlanPreferenceFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="hito-micro-label">{label}</p>
+      <p className="hito-list-row-title mt-1">{value}</p>
+    </div>
   );
 }

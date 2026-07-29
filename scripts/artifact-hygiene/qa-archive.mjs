@@ -2,20 +2,40 @@ import { mkdir, rename, writeFile } from "node:fs/promises";
 import { dirname, relative, resolve } from "node:path";
 
 import { LOCAL_ARTIFACT_ARCHIVE_ROOT, QA_FOLDER_ROOT } from "./policy.mjs";
-import { isSafeQaDeleteAfterExpiryArchiveCandidate } from "./qa-folder-manifest.mjs";
+import { isSafeQaDeleteAfterExpiryArchiveCandidate } from "./qa-evidence-package-selection.mjs";
 import { formatBytes } from "./utils.mjs";
 
 export async function applyQaDeleteAfterExpiryArchive(rootDir, qaFolderManifest, options = {}) {
-  if (!qaFolderManifest?.entries) {
+  if (!qaFolderManifest?.entries || !qaFolderManifest.ownerSelection) {
     throw new Error("QA folder manifest is required before archive apply.");
   }
 
-  const selectedOwner = options.qaArchiveOwner ?? null;
+  const selectedOwner = options.qaOwner;
+  const reviewedSelectionId = options.qaSelectionId;
+  const selection = qaFolderManifest.ownerSelection;
 
-  const deleteAfterExpiryEntries = qaFolderManifest.entries.filter(
-    (entry) =>
-      entry.candidateRetentionClass === "delete-after-expiry" &&
-      (selectedOwner === null || entry.inferredFlags?.inferredOwner === selectedOwner),
+  if (!selectedOwner || !reviewedSelectionId) {
+    throw new Error(
+      "Archive apply requires one reviewed --qa-owner and --qa-selection-id dry-run boundary.",
+    );
+  }
+  if (selection.owner !== selectedOwner) {
+    throw new Error(
+      `Refusing archive apply because manifest owner ${selection.owner} does not match ${selectedOwner}.`,
+    );
+  }
+  if (selection.selectionIdentity !== reviewedSelectionId) {
+    throw new Error(
+      `Refusing archive apply because reviewed selection ${reviewedSelectionId} drifted to ${selection.selectionIdentity}.`,
+    );
+  }
+  if (selection.retentionUnit !== "whole_evidence_package") {
+    throw new Error("Refusing archive apply because the selection is not package-atomic.");
+  }
+
+  const selectedPaths = new Set(selection.selectedPackages.map((entry) => entry.path));
+  const deleteAfterExpiryEntries = qaFolderManifest.entries.filter((entry) =>
+    selectedPaths.has(entry.path),
   );
   const unsafeDeleteAfterExpiryEntries = deleteAfterExpiryEntries.filter(
     (entry) => !isSafeQaDeleteAfterExpiryArchiveCandidate(entry),
@@ -29,10 +49,11 @@ export async function applyQaDeleteAfterExpiryArchive(rootDir, qaFolderManifest,
 
   if (deleteAfterExpiryEntries.length === 0) {
     throw new Error(
-      selectedOwner
-        ? `Refusing archive apply because no delete-after-expiry folders are present for owner ${selectedOwner}.`
-        : "Refusing archive apply because no delete-after-expiry folders are present.",
+      `Refusing archive apply because no reviewed delete-after-expiry packages are present for owner ${selectedOwner}.`,
     );
+  }
+  if (deleteAfterExpiryEntries.length !== selection.selectedPackageCount) {
+    throw new Error("Refusing archive apply because the reviewed package selection is incomplete.");
   }
 
   const archivePath = buildQaArchivePath(rootDir, selectedOwner);
@@ -48,8 +69,14 @@ export async function applyQaDeleteAfterExpiryArchive(rootDir, qaFolderManifest,
     archiveRoot: archiveRelativePath,
     selectedRetentionClass: "delete-after-expiry",
     selectedInferredOwner: selectedOwner,
+    reviewedSelectionId,
+    retentionUnit: selection.retentionUnit,
+    restoreBoundary: selection.restoreBoundary,
+    partialRestoreAllowed: false,
     selectedFolders: deleteAfterExpiryEntries.map((entry) => ({
       path: entry.path,
+      packageIdentity: entry.packageIdentity,
+      contentIdentity: entry.contentIdentity,
       files: entry.files,
       bytes: entry.bytes,
       humanSize: entry.humanSize,
@@ -71,15 +98,17 @@ export async function applyQaDeleteAfterExpiryArchive(rootDir, qaFolderManifest,
       "securityAuthAdminSensitive must be false",
       "failedOrBlocked must be false",
       "unknownOwnership must be false",
+      "ambiguousOwnership must be false",
+      "generatedVendorResidue must be false",
+      "unscopedEvidencePackage must be false",
       "manuallyMarkedKeep must be false",
       "localQaArtifactsOnly must be true",
       "tracked docs evidence roots are excluded",
-      selectedOwner
-        ? `inferredOwner must be exactly ${selectedOwner}`
-        : "all inferred owners may be selected when no owner filter is supplied",
+      `inferredOwner must be exactly ${selectedOwner}`,
+      `selectionIdentity must remain exactly ${reviewedSelectionId}`,
     ],
     restoreInstructions:
-      "To restore, move each archived folder back from archiveRoot to its original path under qa-artifacts/. Do not partially restore without reviewing this manifest.",
+      "Restore each complete evidence package from archiveRoot to its exact original path under qa-artifacts/. Partial package restore is not allowed without manual review.",
   };
 
   const plannedManifestPath = resolve(archivePath, "manifest.json");
@@ -109,6 +138,9 @@ export async function applyQaDeleteAfterExpiryArchive(rootDir, qaFolderManifest,
     manifestPath: relative(rootDir, plannedManifestPath),
     selectedRetentionClass: "delete-after-expiry",
     selectedInferredOwner: selectedOwner,
+    reviewedSelectionId,
+    retentionUnit: "whole_evidence_package",
+    partialRestoreAllowed: false,
     movedFolderCount: movedFolders.length,
     movedFileCount: movedFolders.reduce((sum, entry) => sum + entry.files, 0),
     movedBytes: movedFolders.reduce((sum, entry) => sum + entry.bytes, 0),

@@ -9,11 +9,20 @@ import {
   QA_FAILED_BLOCKED_TOKEN_RE,
   QA_FOLDER_ROOT,
   QA_MANUAL_KEEP_MARKER_RE,
+  QA_COMPRESSION_GENERATED_VENDOR_PATH_RE,
   QA_REFERENCE_SCAN_ROOTS,
   QA_REFERENCE_SKIP_DIRS,
   QA_REFERENCE_TEXT_EXTENSIONS,
   QA_SENSITIVE_TOKEN_RE,
 } from "./policy.mjs";
+import {
+  buildQaEvidencePackageContentIdentity,
+  buildQaEvidenceRelativePackageIdentity,
+  buildQaOwnerArchiveSelection,
+  inferQaFolderOwnership,
+  QA_EVIDENCE_DATE_SEGMENT_RE,
+  QA_EVIDENCE_EXACT_DATE_SEGMENT_RE,
+} from "./qa-evidence-package-selection.mjs";
 import { summarizePath } from "./target-report.mjs";
 import { ageDays, formatBytes, safeLstat } from "./utils.mjs";
 
@@ -46,6 +55,9 @@ export async function buildQaFolderManifestReport(rootDir, options = {}) {
   for (const candidateFolder of candidateFolders) {
     entries.push(await buildQaFolderManifestEntry(rootDir, candidateFolder, referenceCorpus));
   }
+  const ownerSelection = options.qaOwner
+    ? buildQaOwnerArchiveSelection(entries, options.qaOwner)
+    : null;
 
   return {
     enabled: true,
@@ -75,81 +87,107 @@ export async function buildQaFolderManifestReport(rootDir, options = {}) {
       skippedRoots: referenceCorpus.skippedRoots,
     },
     totals: summarizeQaFolderManifestEntries(entries),
+    ownerSelection,
     deletionAllowedByThisTool: false,
     compressionAllowedByThisTool: false,
     entries,
   };
 }
 
-export function isSafeQaDeleteAfterExpiryArchiveCandidate(entry) {
-  const flags = entry.inferredFlags ?? {};
-
-  return (
-    entry.path.startsWith(`${QA_FOLDER_ROOT}/`) &&
-    entry.candidateRetentionClass === "delete-after-expiry" &&
-    entry.directReferenceHits === 0 &&
-    flags.localQaArtifactsOnly === true &&
-    flags.activePlanLinked === false &&
-    flags.securityAuthAdminSensitive === false &&
-    flags.failedOrBlocked === false &&
-    flags.unknownOwnership === false &&
-    flags.manuallyMarkedKeep === false
-  );
-}
-
 async function collectQaArtifactCandidateFolders(rootDir, qaRootPath) {
   const candidates = [];
-  await collectQaArtifactCandidateFolder(rootDir, qaRootPath, qaRootPath, candidates);
+  for (const entry of await readdir(qaRootPath)) {
+    const childPath = resolve(qaRootPath, entry);
+    const childStat = await safeLstat(childPath);
+
+    if (!childStat?.isDirectory()) {
+      continue;
+    }
+
+    const datedPackageCount = await collectDatedQaEvidencePackages(rootDir, childPath, candidates);
+    if (datedPackageCount === 0 && (await hasQaEvidenceContent(childPath))) {
+      candidates.push(buildQaEvidencePackageCandidate(rootDir, childPath, "unscoped_residue"));
+    }
+  }
+
   return candidates.sort((a, b) => a.path.localeCompare(b.path));
 }
 
-async function collectQaArtifactCandidateFolder(rootDir, qaRootPath, absolutePath, candidates) {
-  const entries = await readdir(absolutePath);
-  let hasFilesInSubtree = false;
-  let childCandidateCount = 0;
+async function collectDatedQaEvidencePackages(rootDir, absolutePath, candidates) {
+  const currentName = basename(absolutePath);
+  const entries = await readQaDirectoryEntries(absolutePath);
 
-  for (const entry of entries) {
-    const childPath = resolve(absolutePath, entry);
-    const childStat = await safeLstat(childPath);
+  if (QA_EVIDENCE_DATE_SEGMENT_RE.test(currentName)) {
+    const directContent = entries.some(({ stat }) => stat.isFile() || stat.isSymbolicLink());
+    const childDirectories = entries.filter(({ stat }) => stat.isDirectory());
 
-    if (!childStat) {
-      continue;
+    if (
+      !QA_EVIDENCE_EXACT_DATE_SEGMENT_RE.test(currentName) ||
+      directContent ||
+      childDirectories.length === 0
+    ) {
+      if (await hasQaEvidenceContent(absolutePath)) {
+        candidates.push(buildQaEvidencePackageCandidate(rootDir, absolutePath, "dated_package"));
+        return 1;
+      }
+
+      return 0;
     }
 
-    if (childStat.isDirectory()) {
-      const childResult = await collectQaArtifactCandidateFolder(
-        rootDir,
-        qaRootPath,
-        childPath,
-        candidates,
-      );
-      hasFilesInSubtree = hasFilesInSubtree || childResult.hasFilesInSubtree;
-      childCandidateCount += childResult.candidateCount;
-      continue;
+    let packageCount = 0;
+    for (const child of childDirectories) {
+      if (await hasQaEvidenceContent(child.path)) {
+        candidates.push(buildQaEvidencePackageCandidate(rootDir, child.path, "dated_package"));
+        packageCount += 1;
+      }
     }
 
-    if (childStat.isFile() || childStat.isSymbolicLink()) {
-      hasFilesInSubtree = true;
+    return packageCount;
+  }
+
+  let packageCount = 0;
+  for (const child of entries.filter(({ stat }) => stat.isDirectory())) {
+    packageCount += await collectDatedQaEvidencePackages(rootDir, child.path, candidates);
+  }
+
+  return packageCount;
+}
+
+async function readQaDirectoryEntries(absolutePath) {
+  const entries = [];
+
+  for (const name of await readdir(absolutePath)) {
+    const path = resolve(absolutePath, name);
+    const stat = await safeLstat(path);
+    if (stat) {
+      entries.push({ name, path, stat });
     }
   }
 
-  const isQaRoot = absolutePath === qaRootPath;
-  const isLeafEvidenceFolder = hasFilesInSubtree && childCandidateCount === 0;
+  return entries;
+}
 
-  if (!isQaRoot && isLeafEvidenceFolder) {
-    candidates.push({
-      absolutePath,
-      path: relative(rootDir, absolutePath),
-    });
-    return {
-      hasFilesInSubtree: true,
-      candidateCount: 1,
-    };
+async function hasQaEvidenceContent(absolutePath) {
+  for (const { path, stat } of await readQaDirectoryEntries(absolutePath)) {
+    if (stat.isFile() || stat.isSymbolicLink()) {
+      return true;
+    }
+    if (stat.isDirectory() && (await hasQaEvidenceContent(path))) {
+      return true;
+    }
   }
+
+  return false;
+}
+
+function buildQaEvidencePackageCandidate(rootDir, absolutePath, layout) {
+  const path = relative(rootDir, absolutePath);
 
   return {
-    hasFilesInSubtree,
-    candidateCount: childCandidateCount,
+    absolutePath,
+    path,
+    layout,
+    packageIdentity: buildQaEvidenceRelativePackageIdentity(path),
   };
 }
 
@@ -160,11 +198,16 @@ async function buildQaFolderManifestEntry(rootDir, candidateFolder, referenceCor
   });
   const filePaths = summary.manifestEntries.map((entry) => entry.path);
   const referenceHits = findQaReferenceHits(candidateFolder.path, filePaths, referenceCorpus);
-  const flags = buildQaFolderFlags(candidateFolder.path, summary, referenceHits);
+  const flags = buildQaFolderFlags(candidateFolder, summary, referenceHits);
   const retention = classifyQaFolderRetention(summary, referenceHits, flags);
+  const contentIdentity = buildQaEvidencePackageContentIdentity(summary.manifestEntries);
 
   return {
     path: candidateFolder.path,
+    packageIdentity: candidateFolder.packageIdentity,
+    packageLayout: candidateFolder.layout,
+    retentionUnit: "whole_evidence_package",
+    contentIdentity,
     files: summary.files,
     directories: summary.directories,
     symlinks: summary.symlinks,
@@ -186,60 +229,34 @@ async function buildQaFolderManifestEntry(rootDir, candidateFolder, referenceCor
   };
 }
 
-function buildQaFolderFlags(folderPath, summary, referenceHits) {
-  const owner = inferQaFolderOwner(folderPath);
+function buildQaFolderFlags(candidateFolder, summary, referenceHits) {
+  const ownership = inferQaFolderOwnership(candidateFolder.packageIdentity);
+  const evidencePaths = [
+    candidateFolder.packageIdentity,
+    ...summary.manifestEntries.map((entry) => entry.path),
+  ];
+  const generatedVendorResidue = summary.manifestEntries.some((entry) =>
+    QA_COMPRESSION_GENERATED_VENDOR_PATH_RE.test(entry.path),
+  );
 
   return {
     localQaArtifactsOnly:
-      folderPath === QA_FOLDER_ROOT || folderPath.startsWith(`${QA_FOLDER_ROOT}/`),
+      candidateFolder.path === QA_FOLDER_ROOT ||
+      candidateFolder.path.startsWith(`${QA_FOLDER_ROOT}/`),
     activePlanLinked: referenceHits.some((hit) => hit.path.startsWith("docs/plans/active/")),
     directlyReferenced: referenceHits.length > 0,
-    securityAuthAdminSensitive: QA_SENSITIVE_TOKEN_RE.test(folderPath),
-    failedOrBlocked: QA_FAILED_BLOCKED_TOKEN_RE.test(folderPath),
-    unknownOwnership: owner === "unknown",
+    securityAuthAdminSensitive: evidencePaths.some((path) => QA_SENSITIVE_TOKEN_RE.test(path)),
+    failedOrBlocked: evidencePaths.some((path) => QA_FAILED_BLOCKED_TOKEN_RE.test(path)),
+    unknownOwnership: ownership.owner === "unknown",
+    ambiguousOwnership: ownership.signals.length > 1,
+    ownershipSignals: ownership.signals,
+    generatedVendorResidue,
+    unscopedEvidencePackage: candidateFolder.layout === "unscoped_residue",
     manuallyMarkedKeep: summary.manifestEntries.some((entry) =>
       QA_MANUAL_KEEP_MARKER_RE.test(basename(entry.path)),
     ),
-    inferredOwner: owner,
+    inferredOwner: ownership.owner,
   };
-}
-
-function inferQaFolderOwner(folderPath) {
-  const normalized = folderPath.toLowerCase();
-
-  if (/(?:^|[-_/])admin(?:$|[-_/])|backlog/.test(normalized)) {
-    return "admin";
-  }
-
-  if (
-    /hito[-_/]?ds|design[-_/]?system|modal|dropdown|calendar[-_/]?workout[-_/]?playground/.test(
-      normalized,
-    )
-  ) {
-    return "hito_ds";
-  }
-
-  if (/manual|workout[-_/]?authoring|copy|move|clear|delete|restore/.test(normalized)) {
-    return "manual_workout_authoring";
-  }
-
-  if (
-    /onboarding|first[-_/]?plan|plan[-_/]?creation|selected[-_/]?plan|preset|long[-_/]?horizon|review[-_/]?copy/.test(
-      normalized,
-    )
-  ) {
-    return "plan_creation";
-  }
-
-  if (/running[-_/]?coach|coach[-_/]?review|plan[-_/]?engine|scenario/.test(normalized)) {
-    return "running_plan_engine";
-  }
-
-  if (/qa[-_/]?server|build|nitro|artifact|log/.test(normalized)) {
-    return "devtools";
-  }
-
-  return "unknown";
 }
 
 function classifyQaFolderRetention(summary, referenceHits, flags) {
@@ -293,6 +310,30 @@ function classifyQaFolderRetention(summary, referenceHits, flags) {
       "unknown/manual-review",
       "failed_or_blocked_evidence_path",
       "Manual review required because failed or blocked QA evidence can be diagnostically important.",
+    );
+  }
+
+  if (flags.generatedVendorResidue) {
+    return qaFolderRetention(
+      "unknown/manual-review",
+      "generated_or_vendor_residue_inside_package",
+      "Manual review required; generated or vendor residue is excluded from ordinary owner-scoped archive selection.",
+    );
+  }
+
+  if (flags.unscopedEvidencePackage) {
+    return qaFolderRetention(
+      "unknown/manual-review",
+      "unscoped_qa_artifact_residue",
+      "Manual review required because the path does not establish a dated QA evidence package.",
+    );
+  }
+
+  if (flags.ambiguousOwnership) {
+    return qaFolderRetention(
+      "unknown/manual-review",
+      "ambiguous_package_ownership",
+      "Manual review required because the package identity matches more than one owner.",
     );
   }
 
@@ -452,13 +493,18 @@ function findQaReferenceHits(folderPath, filePaths, referenceCorpus) {
     return [];
   }
 
-  const needles = [folderPath, `${folderPath}/`, ...filePaths];
+  const directNeedles = [folderPath, `${folderPath}/`, ...filePaths];
+  const parentPaths = buildQaPackageReferencePaths(folderPath).filter(
+    (path) => path !== folderPath,
+  );
   const hits = [];
 
   for (const file of referenceCorpus.files) {
     for (let lineIndex = 0; lineIndex < file.lines.length; lineIndex += 1) {
       const line = file.lines[lineIndex];
-      const matchedNeedle = needles.find((needle) => needle && line.includes(needle));
+      const matchedNeedle =
+        directNeedles.find((needle) => needle && line.includes(needle)) ??
+        parentPaths.find((path) => lineReferencesExactQaPath(line, path));
 
       if (matchedNeedle) {
         hits.push({
@@ -471,4 +517,39 @@ function findQaReferenceHits(folderPath, filePaths, referenceCorpus) {
   }
 
   return hits;
+}
+
+function lineReferencesExactQaPath(line, path) {
+  for (const candidate of [path, `${path}/`]) {
+    let fromIndex = 0;
+
+    while (fromIndex < line.length) {
+      const index = line.indexOf(candidate, fromIndex);
+      if (index === -1) {
+        break;
+      }
+
+      const nextCharacter = line[index + candidate.length];
+      if (!nextCharacter || /[\s`'")\],.:;]/.test(nextCharacter)) {
+        return true;
+      }
+      fromIndex = index + candidate.length;
+    }
+  }
+
+  return false;
+}
+
+function buildQaPackageReferencePaths(folderPath) {
+  const segments = folderPath.split(/[\\/]+/);
+  const paths = [folderPath];
+
+  for (let length = segments.length - 1; length > 1; length -= 1) {
+    const candidate = segments.slice(0, length).join("/");
+    if (segments.slice(0, length).some((segment) => QA_EVIDENCE_DATE_SEGMENT_RE.test(segment))) {
+      paths.push(candidate);
+    }
+  }
+
+  return Array.from(new Set(paths));
 }

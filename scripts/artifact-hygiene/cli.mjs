@@ -1,9 +1,7 @@
 export function buildNotes(options) {
   const notes = [
     options.applyQaDeleteAfterExpiryArchive
-      ? options.qaArchiveOwner
-        ? `Apply mode is scoped to archive/quarantine for manifest-safe delete-after-expiry qa-artifacts/ folders owned by ${options.qaArchiveOwner}.`
-        : "Apply mode is scoped to archive/quarantine for manifest-safe delete-after-expiry qa-artifacts/ folders."
+      ? `Apply mode is bound to reviewed selection ${options.qaSelectionId} for whole evidence packages owned by ${options.qaOwner}.`
       : options.applyQaImageCompression
         ? "Apply mode is scoped to manifest-safe manual-workout PNG evidence: rollback copies are written before WebP q82 replacement."
         : "Dry-run only: this command does not delete, compress, archive, or mutate files.",
@@ -18,7 +16,9 @@ export function buildNotes(options) {
 
   if (options.qaFolderManifest && !options.applyQaDeleteAfterExpiryArchive) {
     notes.push(
-      "QA folder manifest mode is dry-run only and classifies local qa-artifacts/ folders without enabling apply, deletion, or compression.",
+      options.qaOwner
+        ? `QA package manifest mode is dry-run only and reports the exact archive-safe selection for owner ${options.qaOwner}.`
+        : "QA package manifest mode is dry-run only and classifies complete local qa-artifacts/ evidence packages without enabling apply, deletion, or compression.",
     );
   }
 
@@ -42,9 +42,7 @@ export function buildNotes(options) {
 
   if (options.applyQaDeleteAfterExpiryArchive) {
     notes.push(
-      options.qaArchiveOwner
-        ? `Apply mode is scoped to archive/quarantine only for current manifest-safe delete-after-expiry qa-artifacts/ folders owned by ${options.qaArchiveOwner}.`
-        : "Apply mode is scoped to archive/quarantine only for current manifest-safe delete-after-expiry qa-artifacts/ folders.",
+      `Apply mode refuses unless owner ${options.qaOwner} and reviewed selection ${options.qaSelectionId} exactly match the fresh package manifest.`,
     );
   }
 
@@ -70,9 +68,19 @@ export function validateOptionCombinations(options) {
     throw new Error("Use only one apply mode per artifact:hygiene invocation.");
   }
 
-  if (options.qaArchiveOwner && !options.applyQaDeleteAfterExpiryArchive) {
+  if (options.qaOwner && !options.qaFolderManifest) {
     throw new Error(
-      "--qa-archive-owner can only be used with --apply-delete-after-expiry-archive.",
+      "--qa-owner requires --qa-folder-manifest or --apply-delete-after-expiry-archive.",
+    );
+  }
+
+  if (options.qaSelectionId && !options.applyQaDeleteAfterExpiryArchive) {
+    throw new Error("--qa-selection-id can only be used with --apply-delete-after-expiry-archive.");
+  }
+
+  if (options.applyQaDeleteAfterExpiryArchive && (!options.qaOwner || !options.qaSelectionId)) {
+    throw new Error(
+      "--apply-delete-after-expiry-archive requires --qa-owner and --qa-selection-id from a reviewed dry-run.",
     );
   }
 
@@ -96,7 +104,8 @@ export function parseArgs(args) {
     manifest: false,
     qaFolderManifest: false,
     applyQaDeleteAfterExpiryArchive: false,
-    qaArchiveOwner: null,
+    qaOwner: null,
+    qaSelectionId: null,
     qaCompressionEstimate: false,
     qaCompressionApplySafetyDryRun: false,
     applyQaImageCompression: false,
@@ -138,22 +147,43 @@ export function parseArgs(args) {
       continue;
     }
 
-    if (arg === "--qa-archive-owner") {
+    if (arg === "--qa-owner") {
       const value = args[index + 1];
       if (!value || value.startsWith("--")) {
-        throw new Error("Missing value for --qa-archive-owner.");
+        throw new Error("Missing value for --qa-owner.");
       }
-      options.qaArchiveOwner = value;
+      options.qaFolderManifest = true;
+      options.qaOwner = value;
       index += 1;
       continue;
     }
 
-    if (arg.startsWith("--qa-archive-owner=")) {
-      const value = arg.slice("--qa-archive-owner=".length).trim();
+    if (arg.startsWith("--qa-owner=")) {
+      const value = arg.slice("--qa-owner=".length).trim();
       if (!value) {
-        throw new Error("Missing value for --qa-archive-owner.");
+        throw new Error("Missing value for --qa-owner.");
       }
-      options.qaArchiveOwner = value;
+      options.qaFolderManifest = true;
+      options.qaOwner = value;
+      continue;
+    }
+
+    if (arg === "--qa-selection-id") {
+      const value = args[index + 1];
+      if (!value || value.startsWith("--")) {
+        throw new Error("Missing value for --qa-selection-id.");
+      }
+      options.qaSelectionId = value;
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--qa-selection-id=")) {
+      const value = arg.slice("--qa-selection-id=".length).trim();
+      if (!value) {
+        throw new Error("Missing value for --qa-selection-id.");
+      }
+      options.qaSelectionId = value;
       continue;
     }
 
@@ -283,8 +313,8 @@ export function buildHelpText() {
   npm run artifact:hygiene -- --include-qa-artifacts
   npm run artifact:hygiene -- --manifest --include-qa-artifacts
   npm run artifact:hygiene -- --qa-folder-manifest
-  npm run artifact:hygiene -- --qa-folder-manifest --apply-delete-after-expiry-archive
-  npm run artifact:hygiene -- --qa-folder-manifest --apply-delete-after-expiry-archive --qa-archive-owner manual_workout_authoring
+  npm run artifact:hygiene -- --qa-folder-manifest --qa-owner manual_workout_authoring
+  npm run artifact:hygiene -- --apply-delete-after-expiry-archive --qa-owner manual_workout_authoring --qa-selection-id <reviewed-selection-id>
   npm run artifact:hygiene -- --qa-compression-estimate --qa-compression-class compress-after-policy --qa-compression-owner manual_workout_authoring
   npm run artifact:hygiene -- --qa-compression-apply-safety-dry-run --qa-compression-class compress-after-policy --qa-compression-owner manual_workout_authoring
   npm run artifact:hygiene -- --apply-qa-image-compression --qa-compression-class compress-after-policy --qa-compression-owner manual_workout_authoring
@@ -293,10 +323,11 @@ export function buildHelpText() {
   npm run artifact:hygiene -- --write-e4-compression-samples --sample-output-dir /tmp/hito-e4-compression-samples
   node ./scripts/report-local-artifact-hygiene.mjs --root /tmp/hito-artifact-fixture
 
-This is a dry-run reporter only. It inventories logs/, test-results/, and build-output residues.
+This command defaults to dry-run reporting for logs/, test-results/, build output, and QA evidence packages.
 Pass --manifest to include per-file dry-run classification for top-level targets.
-Pass --qa-folder-manifest to add folder-level local qa-artifacts/ TTL/reference/sensitivity classification.
-Pass --apply-delete-after-expiry-archive with --qa-folder-manifest to move only current manifest-safe delete-after-expiry qa-artifacts/ folders into .local-artifact-archive/. Pass --qa-archive-owner to limit that archive/quarantine apply to one inferred owner.
+Pass --qa-folder-manifest to classify whole local qa-artifacts/ evidence packages by TTL, references, sensitivity, and ownership.
+Pass --qa-owner with --qa-folder-manifest for an exact non-mutating owner selection and stable selection ID.
+Pass --apply-delete-after-expiry-archive with the same --qa-owner and reviewed --qa-selection-id to archive only an unchanged package selection into .local-artifact-archive/.
 Pass --qa-compression-estimate with --qa-compression-class and --qa-compression-owner to estimate WebP q82 savings for manifest-selected qa-artifacts/ folders.
 Pass --qa-compression-apply-safety-dry-run to produce an image-only manifest with checksums, rollback copy plan, and restore instructions without writing evidence.
 Pass --apply-qa-image-compression to replace only manifest-safe manual-workout PNG evidence with WebP q82 siblings after writing rollback copies to .local-artifact-archive/.

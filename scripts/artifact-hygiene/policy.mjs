@@ -55,7 +55,7 @@ export const QA_FAILED_BLOCKED_TOKEN_RE =
   /(?:^|[-_/])(failed|failure|blocked|blocker|regression|broken)(?:$|[-_/])/i;
 export const QA_COMPRESSION_IMAGE_EXTENSIONS = new Set([".jpeg", ".jpg", ".png"]);
 export const QA_COMPRESSION_GENERATED_VENDOR_PATH_RE =
-  /(?:^|\/)(?:pw\/)?node_modules(?:\/|$)|(?:^|\/)playwright-core\/lib\/(?:server|tools)(?:\/|$)/;
+  /(?:^|\/)(?:pw\/)?node_modules(?:\/|$)|(?:^|\/)playwright-output(?:\/|$)|(?:^|\/)playwright-core\/lib\/(?:server|tools)(?:\/|$)/;
 export const STALE_REPO_LOCAL_QA_RUNTIME_RETENTION = "stale_repo_local_qa_runtime_residue";
 export const STALE_REPO_LOCAL_QA_RUNTIME_PATHS = new Set([
   "logs/qa-local-server.log",

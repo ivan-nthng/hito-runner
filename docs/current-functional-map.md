@@ -41,7 +41,7 @@ Product-contract references:
 - [universal selected-distance no-dead-end taxonomy](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/product-briefs/2026-06-11-universal-selected-distance-no-dead-end-ux-taxonomy.md)
 - [manual user-built plan flow spec](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/frontend-specs/2026-06-10-manual-user-built-plan-flow-spec.md)
 - [manual workout constructor taxonomy](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-09-manual-workout-constructor-taxonomy-and-template-library.md)
-- [Marathon Completion selected-plan family contract](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-11-marathon-completion-selected-plan-family-contract.md)
+- [watch execution primary-target doctrine](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-07-20-watch-execution-primary-target-doctrine.md)
 
 Cleanup rule:
 
@@ -110,7 +110,7 @@ The current runtime should keep one canonical calendar pipeline:
 | Manual authoring/templates/copy | Manual constructor, built-in catalog visibility, personal save/reuse/delete, copy/paste, persisted reviewed edit | `runner_manual_workout_templates`, `runner_profiles.hidden_manual_workout_template_keys`, reviewed draft metadata, manual reconstruction metadata | Backend owns catalog/visibility and lossless manual/AI reconstruction; the picker consumes backend-shaped catalog truth. |
 | Workout detail/completion/FIT | Log result, Garmin/FIT/ZIP upload, comparison, AI insight | `workout_logs`, `workout_result_assets`, `workout_actual_metrics`, `workout_comparisons`, `workout_ai_insights` | FIT upload is actual evidence, not plan creation or planned-workout truth. |
 | Generated plan engine | AI-authored plan-first Quick setup and selected-plan transition | rich workout fields, `plan_preferences`, plan-first review metadata, source status | Keep one provider/local-fixture -> compiler -> review -> confirm path; no deterministic replacement planner. |
-| Admin/backlog import | Admin capture and repo-derived work items | `admin_capture_items`, markdown source path/type/status metadata | Repo markdown remains canonical for repo-derived rows; cleanup only through importer-safe Admin slices. |
+| Admin/backlog import | Admin capture and repo-derived work items | `admin_capture_items`, immutable Markdown work-item identity, lifecycle, owner/scope/batch/lane/archive metadata, legacy source path/type fallback | Repo Markdown remains canonical; same-ID moves retain one read-only mirror, and cleanup stays behind explicit importer-safe Admin gates. |
 
 | Entity / metadata group | Classification | Reason |
 | --- | --- | --- |

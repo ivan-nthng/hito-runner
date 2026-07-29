@@ -2,18 +2,17 @@
 
 Date: 2026-06-10
 Owner: Running Coach
-Status: Proposed source-of-truth for Backend beginner Half Marathon auto-extension
+Status: historical deterministic bridge specialization; superseded by AI-authored plan-first truth
 Plan: `/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-08-running-plan-creation-engine-rebuild.md`
 
 ## Scope Note
 
-This artifact is now a family-specific specialization under the global doctrine:
+This artifact preserves the original beginner Half Marathon bridge problem and dated deterministic
+detail. Its fixed horizons, builder directives, and backend-authorship language are historical and
+cannot override current product/system truth or the current Running Coach digest.
 
-- `/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-10-running-plan-universal-no-dead-end-doctrine.md`
-
-Use the global doctrine for eligibility law and blocking logic.
-
-Use this artifact only for Half-specific bridge shape, duration details, and workout-pattern boundaries.
+Current orientation:
+[Running Coach Doctrine Digest](running-coach-doctrine-digest.md).
 
 ## Accepted Decision
 
@@ -37,15 +36,16 @@ That root cause is now owned by duration and composition, not by the frontend CT
 
 ## Canonical Constraints To Preserve
 
-- Hito engine authors the normal plan, not AI.
+- AI authors the full plan; backend validates, compiles, reviews, confirms, persists, and reads it
+  back without substituting coaching.
 - Watch/app execution remains assumed.
-- No fake precise pace.
-- No fake personal HR.
-- Default HR guidance may be editable/advisory only.
-- Numeric structure stays primary.
-- Cues and RPE remain secondary.
+- Every runnable leaf has one numeric pace or accepted-profile BPM command.
+- Benchmark-informed and AI-estimated pace must retain honest provenance.
+- Accepted estimated or personal BPM must remain an exact immutable profile snapshot; unsupported
+  personal BPM is forbidden.
+- Cues and RPE remain supplemental.
 - `Half Marathon` must still end with exact `21100m` endpoint truth.
-- This slice does not change `Marathon Base`.
+- Historical Marathon Base references in this file are not current product-family truth.
 
 ## 1. Eligibility And Auto-Extended Horizon
 

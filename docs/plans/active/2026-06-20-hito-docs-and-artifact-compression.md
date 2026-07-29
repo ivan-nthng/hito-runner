@@ -2,7 +2,7 @@
 
 ## Status
 
-in_progress
+backlog
 
 ## Type
 
@@ -22,7 +22,7 @@ Hold docs/artifact cleanup after QA-passed E13/E14 manual-workout QA image compr
 
 ## Stage
 
-ARCHITECT holding / post-apply closeout and next-gate safety review.
+ARCHITECT evidence-gated hold / no material same-owner cleanup candidate is currently selected.
 
 ## Exact Handoff Prompt
 

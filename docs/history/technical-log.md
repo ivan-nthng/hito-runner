@@ -1,7 +1,7 @@
 # Hito Technical Log
 
 Status: active internal ledger
-Last Updated: 2026-07-23
+Last Updated: 2026-07-26
 Owner: PRODUCT
 
 ## Purpose And Source Boundary
@@ -29,6 +29,15 @@ Entry format:
 
 Every accepted implementation, QA acceptance gate, source-cleanup batch, or durable process repair
 must either add an entry here or explicitly state why it is not technical-log material.
+
+## 2026-07-26
+
+- BACKEND + QA / entitlement export-surface cleanup — removed the unconsumed
+  `capabilityLockedResponse` adapter, its dedicated response type, and type import after two
+  independent reachability reviews; preserved `checkRunnerCapability`, its Garmin dynamic consumer,
+  and locked-capability behavior. Evidence:
+  `docs/plans/active/2026-06-30-hito-source-size-governance-and-cleanup-plan.md`. Boundary: no API
+  response, entitlement policy, provider, persistence, UI, or Supabase contract changed.
 
 ## 2026-07-23
 

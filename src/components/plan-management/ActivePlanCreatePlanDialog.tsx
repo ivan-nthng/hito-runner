@@ -66,6 +66,7 @@ export function ActivePlanCreatePlanDialog({
   const previousOpenRef = useRef(open);
   const initialStateKeyRef = useRef<string | null>(null);
   const previewReturnFocusRef = useRef<HTMLElement | null>(null);
+  const planGoalFocusRef = useRef<HTMLButtonElement | null>(null);
 
   const [settingsDefaults, setSettingsDefaults] = useState<UserSettingsSummary | null>(null);
   const [settingsStatus, setSettingsStatus] = useState<"idle" | "loading">("idle");
@@ -230,6 +231,23 @@ export function ActivePlanCreatePlanDialog({
     }
 
     selectedPlanPreview.clearSelectedPreview();
+  };
+
+  const clearGeneratedPlanSetup = () => {
+    selectedPlanPreview.clearSelectedPreview();
+    setRecent5kTime(initialState.recent5kTime);
+    setRecent5kPace(initialState.recent5kPace);
+    setFixedRestDays(initialState.fixedRestDays);
+    setMaxRunningDaysPerWeek(initialState.maxRunningDaysPerWeek);
+    setPreferredLongRunDay(initialState.preferredLongRunDay);
+    setStartDate(initialState.startDate);
+    setPlanGoalChoice(initialState.planGoalChoice);
+    setPlanGoalCustomDistanceKm(initialState.planGoalCustomDistanceKm);
+    setPlanGoalCustomDistanceLabel(initialState.planGoalCustomDistanceLabel);
+    setPlanGoalFinishTime(initialState.planGoalFinishTime);
+    setPlanGoalTargetDate(initialState.planGoalTargetDate);
+    setRunnerComment(initialState.runnerComment);
+    window.requestAnimationFrame(() => planGoalFocusRef.current?.focus());
   };
 
   useEffect(() => {
@@ -583,6 +601,7 @@ export function ActivePlanCreatePlanDialog({
                   previewDialogPrimaryActionLabel="Review plan change"
                   previewDialogPrimaryActionPendingLabel="Reviewing change..."
                   previewReturnFocusRef={previewReturnFocusRef}
+                  planGoalFocusRef={planGoalFocusRef}
                   previewDialogExtraNotice={
                     transitionReviewResult && !transitionReviewResult.ok ? (
                       <TransitionBlockedNotice result={transitionReviewResult} />
@@ -612,32 +631,51 @@ export function ActivePlanCreatePlanDialog({
 
           <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
             <div className="min-w-0 flex-1">
-              <p className={footerHint.tone === "error" ? "hito-field-error" : "hito-field-helper"}>
+              <p
+                className={footerHint.tone === "error" ? "hito-field-error" : "hito-field-helper"}
+                role={
+                  selectedPreviewIsReady && !selectedPlanPreview.previewOpen ? "status" : undefined
+                }
+              >
                 {footerHint.message}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => onOpenChange(false)}
-              className="hito-button hito-button-secondary hito-button-md"
-              disabled={transitionStatus !== "idle"}
-            >
-              Close
-            </button>
-            <button
-              type="button"
-              className="hito-button hito-button-primary hito-button-md"
-              disabled={footerButtonDisabled}
-              aria-busy={
-                (selectedPlanPreview.status === "previewing_plan" && !pendingPreviewCanReopen) ||
-                undefined
-              }
-              onClick={(event) => handleCreatePlanClick(event.currentTarget)}
-            >
-              {selectedPlanPreview.status === "previewing_plan"
-                ? "Creating preview..."
-                : "Create plan"}
-            </button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                className="hito-button hito-button-secondary hito-button-md"
+                disabled={transitionStatus !== "idle"}
+              >
+                Close
+              </button>
+              {selectedPreviewIsReady && !selectedPlanPreview.previewOpen ? (
+                <button
+                  type="button"
+                  className="hito-button hito-button-secondary hito-button-md"
+                  disabled={isBusy}
+                  onClick={clearGeneratedPlanSetup}
+                >
+                  Clear plan
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="hito-button hito-button-primary hito-button-md"
+                disabled={footerButtonDisabled}
+                aria-busy={
+                  (selectedPlanPreview.status === "previewing_plan" && !pendingPreviewCanReopen) ||
+                  undefined
+                }
+                onClick={(event) => handleCreatePlanClick(event.currentTarget)}
+              >
+                {selectedPlanPreview.status === "previewing_plan"
+                  ? "Creating preview..."
+                  : selectedPreviewIsReady && !selectedPlanPreview.previewOpen
+                    ? "Review plan"
+                    : "Create plan"}
+              </button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -734,7 +772,7 @@ function activePlanCreateFooterHint({
 
   if (previewIsReady) {
     return {
-      message: "Preview is ready. Open it to continue.",
+      message: "Plan draft ready for review. Not saved.",
       tone: "muted",
     };
   }

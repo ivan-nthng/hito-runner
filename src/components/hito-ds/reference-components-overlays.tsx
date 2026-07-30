@@ -285,7 +285,7 @@ export function HitoDsComponentOverlays() {
                   size="sm"
                   className={cn(
                     "mt-1 text-muted-foreground",
-                    toastDemoState === "working" && "animate-spin",
+                    toastDemoState === "working" && "hito-motion-spinner",
                     toastDemoState === "success" && "text-success",
                     toastDemoState === "error" && "text-destructive",
                   )}
@@ -336,7 +336,7 @@ export function HitoDsComponentOverlays() {
                           <Icon
                             name={iconName}
                             size="sm"
-                            className={state === "working" ? "animate-spin" : undefined}
+                            className={state === "working" ? "hito-motion-spinner" : undefined}
                           />
                         </div>
                         <div data-content="">
@@ -366,7 +366,7 @@ export function HitoDsComponentOverlays() {
                   className="hito-button hito-button-primary hito-button-md"
                   disabled
                 >
-                  <Icon name="loader" size="sm" className="animate-spin" />
+                  <Icon name="loader" size="sm" className="hito-motion-spinner" />
                   Saving
                 </button>
                 <button type="button" className="hito-button hito-button-secondary hito-button-md">
@@ -397,7 +397,11 @@ export function HitoDsComponentOverlays() {
                   className="hito-button hito-button-secondary hito-button-sm"
                   onClick={() => showDemoToast("working")}
                 >
-                  <Icon name="loader" size="sm" className="animate-spin text-muted-foreground" />
+                  <Icon
+                    name="loader"
+                    size="sm"
+                    className="hito-motion-spinner text-muted-foreground"
+                  />
                   Working
                 </button>
                 <button

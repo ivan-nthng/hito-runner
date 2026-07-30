@@ -155,10 +155,15 @@ export function SelectedRunningPlanPreviewDialog({
         )}
         overlayClassName="hito-dialog-overlay-stable"
         showCloseButton={!loadingExperienceVisible}
-        onOpenAutoFocus={() => {
+        onOpenAutoFocus={(event) => {
           const activeElement = document.activeElement;
           fallbackReturnFocusRef.current =
             activeElement instanceof HTMLElement ? activeElement : null;
+
+          if (reviewReady) {
+            event.preventDefault();
+            readyFocusTargetRef.current?.focus();
+          }
         }}
         onCloseAutoFocus={(event) => {
           const returnTarget = returnFocusRef?.current ?? fallbackReturnFocusRef.current;

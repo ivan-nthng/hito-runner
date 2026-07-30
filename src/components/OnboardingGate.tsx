@@ -37,6 +37,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const runningPlanCreateInFlightRef = useRef(false);
   const manualCreateInFlightRef = useRef(false);
   const previewReturnFocusRef = useRef<HTMLElement | null>(null);
+  const planGoalFocusRef = useRef<HTMLButtonElement | null>(null);
 
   const [age, setAge] = useState(() => (defaults?.age != null ? String(defaults.age) : ""));
   const [weightKg, setWeightKg] = useState(() =>
@@ -184,6 +185,28 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     }
 
     selectedPlanPreview.clearSelectedPreview();
+  };
+
+  const clearGeneratedPlanSetup = () => {
+    selectedPlanPreview.clearSelectedPreview();
+    setRecent5kTime("");
+    setRecent5kPace("");
+    setFixedRestDays(defaults?.trainingPreferences?.blocked_days ?? []);
+    setMaxRunningDaysPerWeek(
+      defaults?.trainingPreferences?.max_running_days_per_week != null
+        ? String(defaults.trainingPreferences.max_running_days_per_week)
+        : "",
+    );
+    setPreferredLongRunDay(defaults?.trainingPreferences?.preferred_long_run_day ?? "");
+    setStartDate("");
+    setPlanGoalChoice("");
+    setPlanGoalCustomDistanceKm("");
+    setPlanGoalCustomDistanceLabel("");
+    setPlanGoalFinishTime("");
+    setPlanGoalTargetDate("");
+    setRunnerComment("");
+    setAdvancedSettingsOpen(false);
+    window.requestAnimationFrame(() => planGoalFocusRef.current?.focus());
   };
 
   const toggleAdvancedSettings = () => {
@@ -450,6 +473,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
             void confirmSelectedRunningPlan();
           }}
           previewReturnFocusRef={previewReturnFocusRef}
+          planGoalFocusRef={planGoalFocusRef}
         />
 
         <div className="flex justify-center">
@@ -527,19 +551,38 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
       <div className="hito-onboarding-submit-footer">
         <div className="hito-onboarding-submit-footer-inner">
           <div className="min-w-0">
-            <p className={footerHint.tone === "error" ? "hito-field-error" : "hito-field-helper"}>
+            <p
+              className={footerHint.tone === "error" ? "hito-field-error" : "hito-field-helper"}
+              role={
+                selectedPreviewIsReady && !selectedPlanPreview.previewOpen ? "status" : undefined
+              }
+            >
               {footerHint.message}
             </p>
           </div>
-          <button
-            type="button"
-            className="hito-button hito-button-primary hito-button-lg shrink-0"
-            disabled={generatedCreateDisabled}
-            aria-busy={(isBusy && !pendingPreviewCanReopen) || undefined}
-            onClick={(event) => handleCreatePlanClick(event.currentTarget)}
-          >
-            Create plan
-          </button>
+          <div className="flex shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+            {selectedPreviewIsReady && !selectedPlanPreview.previewOpen ? (
+              <button
+                type="button"
+                className="hito-button hito-button-secondary hito-button-lg"
+                disabled={isBusy}
+                onClick={clearGeneratedPlanSetup}
+              >
+                Clear plan
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="hito-button hito-button-primary hito-button-lg"
+              disabled={generatedCreateDisabled}
+              aria-busy={(isBusy && !pendingPreviewCanReopen) || undefined}
+              onClick={(event) => handleCreatePlanClick(event.currentTarget)}
+            >
+              {selectedPreviewIsReady && !selectedPlanPreview.previewOpen
+                ? "Review plan"
+                : "Create plan"}
+            </button>
+          </div>
         </div>
       </div>
     </section>
@@ -599,7 +642,7 @@ function generatedCreateFooterHint({
 
   if (previewIsReady) {
     return {
-      message: "Review the generated preview, then confirm it.",
+      message: "Plan draft ready for review. Not saved.",
       tone: "neutral",
     };
   }

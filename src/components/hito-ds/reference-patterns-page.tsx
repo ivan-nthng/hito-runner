@@ -202,7 +202,11 @@ export function HitoDsPatternsPage() {
             <article id="skeleton" className="hito-state-surface" aria-busy="true">
               <p className="hito-label">Skeleton / loading</p>
               <h3 className="hito-section-title mt-3 flex items-center gap-2">
-                <Icon name="loader" size="sm" className="animate-spin text-muted-foreground" />
+                <Icon
+                  name="loader"
+                  size="sm"
+                  className="hito-motion-spinner text-muted-foreground"
+                />
                 Loading your plan.
               </h3>
               <p className="hito-support-copy mt-3">

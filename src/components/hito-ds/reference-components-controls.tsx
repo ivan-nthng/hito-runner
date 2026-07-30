@@ -32,6 +32,16 @@ import { cn } from "@/lib/utils";
 const BUTTON_VARIANTS = ["primary", "secondary", "outlined", "ghost"] as const;
 const BUTTON_TONES = ["default", "success", "error"] as const;
 const BUTTON_SIZES = ["xs", "sm", "md", "lg", "xl"] as const;
+const BUTTON_MOTION_STATES = [
+  "default",
+  "loading",
+  "success",
+  "error",
+  "pressed",
+  "disabled",
+  "timed-progress",
+] as const;
+const BUTTON_PROGRESS_VALUES = ["25%", "50%", "75%", "100%"] as const;
 const INPUT_VARIANTS = ["primary", "secondary"] as const;
 const FIELD_SIZES = ["xs", "sm", "md", "lg", "xl"] as const;
 const INPUT_STATES = ["default", "hover", "focus", "disabled", "readonly"] as const;
@@ -52,6 +62,8 @@ const STATUS_MARKER_EXAMPLES = [
 type ButtonVariant = (typeof BUTTON_VARIANTS)[number];
 type ButtonTone = (typeof BUTTON_TONES)[number];
 type ButtonSize = (typeof BUTTON_SIZES)[number];
+type ButtonMotionState = (typeof BUTTON_MOTION_STATES)[number];
+type ButtonProgressValue = (typeof BUTTON_PROGRESS_VALUES)[number];
 type InputVariant = (typeof INPUT_VARIANTS)[number];
 type InputState = (typeof INPUT_STATES)[number];
 type InputFeedback = (typeof INPUT_FEEDBACK)[number];
@@ -71,8 +83,8 @@ export function HitoDsComponentControls() {
   const [size, setSize] = useState<ButtonSize>("lg");
   const [leftIcon, setLeftIcon] = useState(true);
   const [rightIcon, setRightIcon] = useState(true);
-  const [disabled, setDisabled] = useState(false);
-  const [buttonLoading, setButtonLoading] = useState(false);
+  const [buttonMotionState, setButtonMotionState] = useState<ButtonMotionState>("default");
+  const [buttonProgress, setButtonProgress] = useState<ButtonProgressValue>("75%");
   const [inputVariant, setInputVariant] = useState<InputVariant>("primary");
   const [inputSize, setInputSize] = useState<FieldSize>("md");
   const [inputLeftIcon, setInputLeftIcon] = useState(true);
@@ -147,13 +159,13 @@ export function HitoDsComponentControls() {
               size={size}
               leftIcon={leftIcon}
               rightIcon={rightIcon}
-              disabled={disabled || buttonLoading}
-              loading={buttonLoading}
+              motionState={buttonMotionState}
+              progress={Number.parseInt(buttonProgress, 10) / 100}
             />
           </div>
         }
         variants={
-          <div className="grid gap-6">
+          <div className="grid gap-6" inert>
             <div className="border-t border-hairline pt-5">
               <p className="hito-label">State matrix</p>
               <p className="hito-caption mt-1">
@@ -200,6 +212,15 @@ export function HitoDsComponentControls() {
                   disabled
                 />
                 <DemoButton variant={variant} tone={buttonTone} size={size} loading disabled />
+                <DemoButton variant={variant} tone={buttonTone} size={size} motionState="success" />
+                <DemoButton variant={variant} tone={buttonTone} size={size} motionState="error" />
+                <DemoButton
+                  variant={variant}
+                  tone={buttonTone}
+                  size={size}
+                  motionState="timed-progress"
+                  progress={0.64}
+                />
               </div>
             </div>
             <div className="border-t border-hairline pt-5">
@@ -245,18 +266,28 @@ export function HitoDsComponentControls() {
                 active={rightIcon}
                 onToggle={() => setRightIcon((v) => !v)}
               />
-              <ToggleRow
-                label="Disabled"
-                active={disabled}
-                onToggle={() => setDisabled((v) => !v)}
-              />
-              <ToggleRow
-                label="Loading"
-                active={buttonLoading}
-                onToggle={() => setButtonLoading((v) => !v)}
-              />
             </div>
             <div className="hito-row-group border-0">
+              <div className="hito-list-row items-start">
+                <ChoiceSelector
+                  label="Motion state"
+                  value={buttonMotionState}
+                  options={BUTTON_MOTION_STATES}
+                  onChange={setButtonMotionState}
+                  textTransform="none"
+                />
+              </div>
+              {buttonMotionState === "timed-progress" ? (
+                <div className="hito-list-row items-start">
+                  <ChoiceSelector
+                    label="Product progress"
+                    value={buttonProgress}
+                    options={BUTTON_PROGRESS_VALUES}
+                    onChange={setButtonProgress}
+                    textTransform="none"
+                  />
+                </div>
+              ) : null}
               <div className="hito-list-row items-start">
                 <ChoiceSelector
                   label="Variant"

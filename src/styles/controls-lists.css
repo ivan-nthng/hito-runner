@@ -10,12 +10,12 @@
     font-weight: 500;
     line-height: 1;
     transition:
-      background-color 160ms ease,
-      border-color 160ms ease,
-      color 160ms ease,
-      opacity 160ms ease,
-      transform 160ms ease,
-      box-shadow 160ms ease;
+      background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      border-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      opacity var(--hito-motion-duration-100) var(--hito-motion-ease-out),
+      transform var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      box-shadow var(--hito-motion-duration-140) var(--hito-motion-ease-out);
   }
 
   .hito-button:hover,
@@ -39,6 +39,63 @@
     cursor: not-allowed;
     opacity: 0.58;
     transform: none;
+  }
+
+  .hito-button[aria-pressed="true"] {
+    transform: translateY(0) scale(0.985);
+  }
+
+  .hito-button[data-state="loading"] {
+    cursor: progress;
+  }
+
+  .hito-button[data-state="loading"]:disabled {
+    opacity: 0.78;
+  }
+
+  .hito-button[data-state="success"] {
+    border-color: color-mix(in oklch, var(--color-success) 34%, transparent);
+    background: color-mix(in oklch, var(--color-success) 20%, var(--color-background));
+    color: var(--color-success);
+  }
+
+  .hito-button[data-state="success"]:hover {
+    background: color-mix(in oklch, var(--color-success) 24%, var(--color-background));
+  }
+
+  .hito-button[data-state="error"] {
+    border-color: color-mix(in oklch, var(--color-destructive) 34%, transparent);
+    background: color-mix(in oklch, var(--color-destructive) 18%, var(--color-background));
+    color: var(--color-destructive);
+  }
+
+  .hito-button[data-state="error"]:hover {
+    background: color-mix(in oklch, var(--color-destructive) 22%, var(--color-background));
+  }
+
+  .hito-button-state-icon {
+    animation: hito-motion-feedback-enter var(--hito-motion-duration-180)
+      var(--hito-motion-ease-out) both;
+  }
+
+  .hito-button-progress-track {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    overflow: hidden;
+    background: color-mix(in oklch, currentColor 14%, transparent);
+    pointer-events: none;
+  }
+
+  .hito-button-progress-fill {
+    width: 100%;
+    height: 100%;
+    background: currentColor;
+    transform: scaleX(clamp(0, var(--hito-progress-value, 0), 1));
+    transform-origin: left center;
+    transition: transform var(--hito-motion-duration-100) var(--hito-motion-ease-linear);
   }
 
   .hito-button-xs {
@@ -431,11 +488,11 @@
     color: var(--color-muted-foreground);
     white-space: nowrap;
     transition:
-      background-color 160ms ease,
-      border-color 160ms ease,
-      box-shadow 160ms ease,
-      color 160ms ease,
-      opacity 160ms ease;
+      background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      border-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      box-shadow var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      opacity var(--hito-motion-duration-100) var(--hito-motion-ease-out);
   }
 
   .hito-tab:hover,
@@ -608,9 +665,9 @@
     line-height: 1.45;
     cursor: pointer;
     transition:
-      background-color 160ms ease,
-      color 160ms ease,
-      opacity 160ms ease;
+      background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      opacity var(--hito-motion-duration-100) var(--hito-motion-ease-out);
   }
 
   .hito-control-label-sm {
@@ -650,10 +707,10 @@
     color: var(--color-signal-foreground);
     cursor: pointer;
     transition:
-      background-color 160ms ease,
-      border-color 160ms ease,
-      box-shadow 160ms ease,
-      opacity 160ms ease;
+      background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      border-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      box-shadow var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      opacity var(--hito-motion-duration-100) var(--hito-motion-ease-out);
   }
 
   .hito-checkbox {
@@ -729,8 +786,8 @@
   input.hito-checkbox[data-state="checked"],
   input.hito-checkbox.hito-checkbox-checked {
     transition:
-      box-shadow 160ms ease,
-      opacity 160ms ease;
+      box-shadow var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      opacity var(--hito-motion-duration-100) var(--hito-motion-ease-out);
   }
 
   .hito-checkbox:checked:hover:not(:disabled),
@@ -820,11 +877,11 @@
     white-space: nowrap;
     cursor: pointer;
     transition:
-      background-color 160ms ease,
-      border-color 160ms ease,
-      box-shadow 160ms ease,
-      color 160ms ease,
-      opacity 160ms ease;
+      background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      border-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      box-shadow var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      opacity var(--hito-motion-duration-100) var(--hito-motion-ease-out);
   }
 
   .hito-choice-toggle-xs {
@@ -966,7 +1023,7 @@
 
   .hito-backlog-list > article {
     border-top: 1px solid var(--color-hairline);
-    transition: background-color 160ms ease;
+    transition: background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out);
   }
 
   .hito-backlog-list > article:first-child {
@@ -1001,7 +1058,7 @@
     border-radius: 0;
     padding: 0.95rem 0;
     background: transparent;
-    transition: color 160ms ease;
+    transition: color var(--hito-motion-duration-140) var(--hito-motion-ease-out);
   }
 
   .hito-backlog-row-summary {
@@ -1046,7 +1103,8 @@
     background: transparent;
     padding: 0.25rem 0 1rem;
     min-width: 0;
-    animation: hito-backlog-detail-rise 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: hito-backlog-detail-rise var(--hito-motion-duration-220) var(--hito-motion-ease-out)
+      both;
     transform-origin: top;
   }
 
@@ -1076,9 +1134,9 @@
   .hito-metadata-tag[data-interactive="true"] {
     cursor: pointer;
     transition:
-      border-color 160ms ease,
-      background-color 160ms ease,
-      color 160ms ease;
+      border-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      color var(--hito-motion-duration-140) var(--hito-motion-ease-out);
   }
 
   .hito-metadata-tag[data-interactive="true"]:hover {
@@ -1332,5 +1390,33 @@
 
   .hito-dual-range[data-disabled="true"] .hito-dual-range-input::-moz-range-thumb {
     cursor: not-allowed;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hito-button,
+    .hito-tab,
+    .hito-control-label,
+    .hito-checkbox,
+    .hito-radio,
+    .hito-choice-toggle,
+    .hito-metadata-tag[data-interactive="true"] {
+      transition-duration: 0.01ms !important;
+    }
+
+    .hito-button:hover,
+    .hito-button:active,
+    .hito-button[aria-pressed="true"],
+    .hito-button[data-demo-state="hover"],
+    .hito-button[data-demo-state="active"] {
+      transform: none;
+    }
+
+    .hito-button-state-icon {
+      animation: none;
+    }
+
+    .hito-button-progress-fill {
+      transition: none;
+    }
   }
 }

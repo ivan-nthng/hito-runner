@@ -44,7 +44,6 @@ import {
 import { buildImportedPlanSeed } from "../src/lib/imported-plan";
 import { buildReviewedFirstPlanImportedSeed } from "../src/lib/active-plan-persistence";
 import {
-  buildReviewedAiGeneratedRunningPlanPreview as buildReviewedAiGeneratedRunningPlanPreviewRuntime,
   confirmRunningPlanDraftForUser,
   runningPlanConfirmInputSchema,
   runningPlanPreviewInputSchema,
@@ -66,7 +65,11 @@ import {
   resolveDirectCanaryTimeoutPolicy,
 } from "./ai-first-plan-draft-ops/cli";
 import { validatePlanFirstHeartRateTargetContract } from "./plan-first-heart-rate-target-proof";
-import { validatePlanFirstProviderRepresentationContract } from "./plan-first-provider-representation-proof";
+import {
+  buildAiGeneratedRunningPlanAuthoringInput,
+  buildReviewedAiGeneratedRunningPlanPreview,
+  validatePlanFirstProviderRepresentationContract,
+} from "./plan-first-provider-representation-proof";
 import {
   buildProofPersonalRunnerProfileSnapshot,
   buildProofRunnerProfileSnapshot,
@@ -147,28 +150,11 @@ const scenarios = [
   expectedNonRepeatTempo?: boolean;
 }>;
 
-function buildAiGeneratedRunningPlanAuthoringInput(
-  input: RunningPlanPreviewActionInput,
-  profileSnapshot = buildProofRunnerProfileSnapshot(input),
-) {
-  return buildAiGeneratedRunningPlanAuthoringInputRuntime(input, profileSnapshot);
-}
-
 function buildAiGeneratedRunningPlanPreview(
   input: RunningPlanPreviewActionInput,
   options: Parameters<typeof buildAiGeneratedRunningPlanPreviewRuntime>[1] = {},
 ) {
   return buildAiGeneratedRunningPlanPreviewRuntime(input, {
-    ...options,
-    runnerProfileSnapshot: options.runnerProfileSnapshot ?? buildProofRunnerProfileSnapshot(input),
-  });
-}
-
-function buildReviewedAiGeneratedRunningPlanPreview(
-  input: RunningPlanPreviewActionInput,
-  options: Parameters<typeof buildReviewedAiGeneratedRunningPlanPreviewRuntime>[1] = {},
-) {
-  return buildReviewedAiGeneratedRunningPlanPreviewRuntime(input, {
     ...options,
     runnerProfileSnapshot: options.runnerProfileSnapshot ?? buildProofRunnerProfileSnapshot(input),
   });

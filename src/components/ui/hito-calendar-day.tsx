@@ -15,7 +15,7 @@ export type HitoCalendarWorkoutIdentity = {
   glyph: WorkoutGlyphKind;
 };
 
-type HitoCalendarActionVisual = {
+export type HitoCalendarActionVisual = {
   label: string;
   icon?: HitoIconName;
   trailingIcon?: HitoIconName;
@@ -23,6 +23,8 @@ type HitoCalendarActionVisual = {
   button?: "secondary" | "ghost" | "icon-ghost" | "outlined";
   visual?: "pill" | "button";
   visualButton?: "secondary" | "ghost";
+  motionState?: "timed-progress";
+  progress?: number;
   disabled?: boolean;
   ariaLabel?: string;
   focusDemo?: boolean;
@@ -582,7 +584,7 @@ function PendingMarker({ label }: { label: string }) {
       className="hito-label inline-flex items-center gap-1 text-muted-foreground"
       aria-label={label}
     >
-      <Icon name="loader" size="xs" className="animate-spin text-muted-foreground/80" />
+      <Icon name="loader" size="xs" className="hito-motion-spinner text-muted-foreground/80" />
       <span>{label}</span>
     </span>
   );
@@ -596,6 +598,7 @@ function ActionVisual({
   compact?: boolean;
 }) {
   const label = compact && !action.trailingIcon && !action.showCompactLabel ? null : action.label;
+  const timedProgress = action.motionState === "timed-progress";
 
   if (action.button) {
     const iconOnly = action.button === "icon-ghost";
@@ -607,14 +610,17 @@ function ActionVisual({
           "hito-button hito-button-xs",
           iconOnly ? "hito-button-ghost aspect-square p-0" : `hito-button-${action.button}`,
           compact && !iconOnly && "px-2",
+          timedProgress && "relative overflow-hidden",
         )}
         aria-label={action.ariaLabel ?? action.label}
         data-demo-state={action.focusDemo ? "focus" : undefined}
+        data-state={action.motionState}
         disabled={action.disabled}
       >
         {action.icon ? <Icon name={action.icon} size="xs" /> : null}
         {!iconOnly ? label : action.icon ? null : action.label}
         {!iconOnly && action.trailingIcon ? <Icon name={action.trailingIcon} size="xs" /> : null}
+        <ActionProgress action={action} />
       </button>
     );
   }
@@ -628,15 +634,18 @@ function ActionVisual({
           "hito-button hito-button-xs pointer-events-none",
           buttonVisual === "ghost" ? "hito-button-ghost" : "hito-button-secondary",
           compact && "px-2",
+          timedProgress && "relative overflow-hidden",
         )}
         aria-hidden="true"
         data-demo-state={action.focusDemo ? "focus" : undefined}
         data-hito-calendar-action-button={buttonVisual}
+        data-state={action.motionState}
         data-tone={action.tone}
       >
         {action.icon ? <Icon name={action.icon} size="xs" /> : null}
         {label}
         {action.trailingIcon ? <Icon name={action.trailingIcon} size="xs" /> : null}
+        <ActionProgress action={action} />
       </span>
     );
   }
@@ -645,6 +654,18 @@ function ActionVisual({
     <span className="hito-status-pill" data-tone={action.tone ?? "muted"}>
       {action.icon ? <Icon name={action.icon} size="xs" /> : null}
       {action.label}
+    </span>
+  );
+}
+
+function ActionProgress({ action }: { action: HitoCalendarActionVisual }) {
+  if (action.motionState !== "timed-progress") return null;
+
+  const progress = Math.min(1, Math.max(0, action.progress ?? 0));
+
+  return (
+    <span className="hito-button-progress-track" aria-hidden="true">
+      <span className="hito-button-progress-fill" style={{ "--hito-progress-value": progress }} />
     </span>
   );
 }

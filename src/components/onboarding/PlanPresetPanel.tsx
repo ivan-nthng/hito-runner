@@ -68,6 +68,7 @@ interface PlanPresetPanelProps {
   previewDialogPrimaryActionPendingLabel?: string;
   previewDialogExtraNotice?: ReactNode;
   previewReturnFocusRef?: RefObject<HTMLElement | null>;
+  planGoalFocusRef?: RefObject<HTMLButtonElement | null>;
   planGoalChoice: PlanGoalChoice;
   planGoalCustomDistanceKm: string;
   planGoalCustomDistanceLabel: string;
@@ -112,6 +113,7 @@ export function PlanPresetPanel({
   previewDialogPrimaryActionLabel,
   previewDialogPrimaryActionPendingLabel,
   previewReturnFocusRef,
+  planGoalFocusRef,
   planGoalChoice,
   planGoalCustomDistanceKm,
   planGoalCustomDistanceLabel,
@@ -154,6 +156,7 @@ export function PlanPresetPanel({
           customDistanceLabel={planGoalCustomDistanceLabel}
           finishTime={planGoalFinishTime}
           targetDate={planGoalTargetDate}
+          focusRef={planGoalFocusRef}
           onGoalChoiceChange={onPlanGoalChoiceChange}
           onCustomDistanceKmChange={onPlanGoalCustomDistanceKmChange}
           onCustomDistanceLabelChange={onPlanGoalCustomDistanceLabelChange}
@@ -211,6 +214,7 @@ export function PlanPresetPanel({
 function PlanGoalIntentControls({
   customDistanceKm,
   customDistanceLabel,
+  focusRef,
   finishTime,
   goalChoice,
   onCustomDistanceKmChange,
@@ -223,6 +227,7 @@ function PlanGoalIntentControls({
   goalChoice: PlanGoalChoice;
   customDistanceKm: string;
   customDistanceLabel: string;
+  focusRef?: RefObject<HTMLButtonElement | null>;
   finishTime: string;
   targetDate: string;
   onGoalChoiceChange: (value: PlanGoalChoice) => void;
@@ -273,6 +278,7 @@ function PlanGoalIntentControls({
           <PlanGoalCard
             key={choice.value}
             active={goalChoice === choice.value}
+            buttonRef={choice.value === "10k" ? focusRef : undefined}
             radioProps={goalGroup.getRadioProps(choice.value)}
             distance={choice.distance}
             label={choice.label}
@@ -358,6 +364,7 @@ function PlanGoalIntentControls({
 
 function PlanGoalCard({
   active,
+  buttonRef,
   copy,
   distance,
   label,
@@ -365,6 +372,7 @@ function PlanGoalCard({
   radioProps,
 }: {
   active: boolean;
+  buttonRef?: RefObject<HTMLButtonElement | null>;
   copy: string;
   distance: string;
   label: string;
@@ -373,6 +381,7 @@ function PlanGoalCard({
 }) {
   return (
     <button
+      ref={buttonRef}
       type="button"
       {...radioProps}
       data-selected={active ? "true" : undefined}

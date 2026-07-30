@@ -77,7 +77,7 @@ const canonicalWireCoverage = {
   repeatChildHeartRate: false,
 };
 
-function buildAiGeneratedRunningPlanAuthoringInput(
+export function buildAiGeneratedRunningPlanAuthoringInput(
   input: RunningPlanPreviewActionInput,
   profileSnapshot = buildProofRunnerProfileSnapshot(input),
 ) {
@@ -94,7 +94,7 @@ function requireAuthoringInput(input: RunningPlanPreviewActionInput) {
   return result.authoringInput;
 }
 
-function buildReviewedAiGeneratedRunningPlanPreview(
+export function buildReviewedAiGeneratedRunningPlanPreview(
   input: RunningPlanPreviewActionInput,
   options: Parameters<typeof buildReviewedAiGeneratedRunningPlanPreviewRuntime>[1] = {},
 ) {

@@ -31,7 +31,7 @@ const Toaster = ({
           close: <Icon name="close" size="xs" />,
           error: <Icon name="x-circle" size="sm" />,
           info: <Icon name="warning" size="sm" />,
-          loading: <Icon name="loader" size="sm" className="animate-spin" />,
+          loading: <Icon name="loader" size="sm" className="hito-motion-spinner" />,
           success: <Icon name="check-circle" size="sm" />,
           ...icons,
         }}
@@ -88,7 +88,7 @@ function HitoWorkingToastViewport() {
       >
         <div className="hito-toast-custom-body">
           <div data-icon="" className="hito-toast-icon">
-            <Icon name="loader" size="sm" className="animate-spin" />
+            <Icon name="loader" size="sm" className="hito-motion-spinner" />
           </div>
           <div data-content="">
             <div data-title="" className="hito-toast-title">

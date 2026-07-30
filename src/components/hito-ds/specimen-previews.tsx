@@ -20,6 +20,14 @@ import { cn } from "@/lib/utils";
 type ButtonVariant = "primary" | "secondary" | "outlined" | "ghost";
 type ButtonTone = "default" | "success" | "error";
 type ButtonSize = "xs" | "sm" | "md" | "lg" | "xl";
+type ButtonMotionState =
+  | "default"
+  | "loading"
+  | "success"
+  | "error"
+  | "pressed"
+  | "disabled"
+  | "timed-progress";
 type InputVariant = "primary" | "secondary";
 type InputState = "default" | "hover" | "focus" | "disabled" | "readonly";
 type InputFeedback = "neutral" | "error" | "success";
@@ -701,6 +709,8 @@ export function DemoButton({
   rightIcon,
   disabled = false,
   loading = false,
+  motionState = "default",
+  progress = 0.64,
   demoState,
 }: {
   variant: ButtonVariant;
@@ -711,32 +721,71 @@ export function DemoButton({
   rightIcon?: boolean;
   disabled?: boolean;
   loading?: boolean;
+  motionState?: ButtonMotionState;
+  progress?: number;
   demoState?: "hover" | "focus" | "active";
 }) {
+  const state = loading ? "loading" : motionState;
+  const isDisabled = disabled || state === "disabled" || state === "loading";
+  const stateIcon =
+    state === "loading"
+      ? "loader"
+      : state === "success"
+        ? "check"
+        : state === "error"
+          ? "warning"
+          : null;
+  const buttonLabel =
+    state === "loading"
+      ? "Loading"
+      : state === "success"
+        ? "Saved"
+        : state === "error"
+          ? "Try again"
+          : state === "timed-progress"
+            ? "Undo"
+            : variant;
+
   return (
     <button
       type="button"
-      disabled={disabled}
-      aria-busy={loading || undefined}
-      aria-label={iconOnly ? `${loading ? "Loading " : ""}${tone} ${variant} action` : undefined}
+      disabled={isDisabled}
+      aria-busy={state === "loading" || undefined}
+      aria-pressed={state === "pressed" || undefined}
+      aria-label={
+        iconOnly ? `${state === "loading" ? "Loading " : ""}${tone} ${variant} action` : undefined
+      }
       className={cn(
-        "hito-button w-fit max-w-full shrink-0 justify-self-start whitespace-nowrap capitalize",
+        "hito-button relative w-fit max-w-full shrink-0 justify-self-start overflow-hidden whitespace-nowrap capitalize",
         `hito-button-${variant}`,
         `hito-button-${size}`,
         iconOnly && "hito-button-icon",
       )}
       data-tone={tone === "default" ? undefined : tone}
+      data-state={state === "default" ? undefined : state}
       data-demo-state={demoState}
     >
-      {loading ? (
-        <Icon name="loader" size="xs" className="animate-spin" />
+      {stateIcon ? (
+        <Icon
+          name={stateIcon}
+          size="xs"
+          className={cn("hito-button-state-icon", state === "loading" && "hito-motion-spinner")}
+        />
       ) : iconOnly ? (
         <Icon name="check" size={size === "xs" || size === "sm" ? "xs" : "sm"} />
       ) : (
         leftIcon && <Icon name="circle" size="xs" />
       )}
-      {iconOnly ? null : loading ? "Loading" : variant}
-      {!iconOnly && !loading && rightIcon && <Icon name="arrow-right" size="xs" />}
+      {iconOnly ? null : buttonLabel}
+      {!iconOnly && state === "default" && rightIcon && <Icon name="arrow-right" size="xs" />}
+      {state === "timed-progress" ? (
+        <span className="hito-button-progress-track" aria-hidden="true">
+          <span
+            className="hito-button-progress-fill"
+            style={{ "--hito-progress-value": Math.min(1, Math.max(0, progress)) }}
+          />
+        </span>
+      ) : null}
     </button>
   );
 }

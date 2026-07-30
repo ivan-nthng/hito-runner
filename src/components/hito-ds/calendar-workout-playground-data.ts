@@ -22,7 +22,8 @@ export type WorkoutIdentityKey =
   | "run_walk";
 export type TitleStress = "short" | "normal" | "long" | "extreme";
 export type DensityMode = "normal" | "dense";
-export type FutureActionState = "none" | "add-activity" | "more-menu";
+export type CalendarActionState = "none" | "add-activity" | "more-menu" | "timed-undo";
+export type UndoProgressState = "25" | "50" | "75" | "100";
 
 export type Option<T extends string> = {
   value: T;
@@ -43,7 +44,8 @@ export type CalendarPlaygroundState = {
   identity: WorkoutIdentityKey;
   titleStress: TitleStress;
   density: DensityMode;
-  action: FutureActionState;
+  action: CalendarActionState;
+  undoProgress: UndoProgressState;
 };
 
 export const VIEW_MODE_OPTIONS: Array<Option<CalendarPreviewMode>> = [
@@ -90,10 +92,18 @@ export const DENSITY_OPTIONS: Array<Option<DensityMode>> = [
   { value: "dense", label: "Dense" },
 ];
 
-export const ACTION_OPTIONS: Array<Option<FutureActionState>> = [
+export const ACTION_OPTIONS: Array<Option<CalendarActionState>> = [
   { value: "none", label: "None" },
   { value: "add-activity", label: "Add activity" },
   { value: "more-menu", label: "More menu" },
+  { value: "timed-undo", label: "Timed Undo" },
+];
+
+export const UNDO_PROGRESS_OPTIONS: Array<Option<UndoProgressState>> = [
+  { value: "25", label: "25%" },
+  { value: "50", label: "50%" },
+  { value: "75", label: "75%" },
+  { value: "100", label: "100%" },
 ];
 
 export const WORKOUT_IDENTITIES: Record<WorkoutIdentityKey, WorkoutIdentity> = {
@@ -205,6 +215,7 @@ export const DEFAULT_PLAYGROUND_STATE: CalendarPlaygroundState = {
   titleStress: "normal",
   density: "normal",
   action: "more-menu",
+  undoProgress: "50",
 };
 
 export function getWorkoutTitle(workout: WorkoutIdentity, titleStress: TitleStress) {

@@ -1,5 +1,7 @@
 @layer components {
   .hito-ui-overlay {
+    --tw-animation-duration: var(--hito-motion-duration-180);
+    --tw-ease: var(--hito-motion-ease-out);
     background: color-mix(in oklch, var(--color-background) 78%, black 18%);
     backdrop-filter: blur(6px);
   }
@@ -14,10 +16,19 @@
   }
 
   .hito-ui-dialog-surface {
+    --tw-animation-duration: var(--hito-motion-duration-220);
+    --tw-ease: var(--hito-motion-ease-out);
     border-radius: var(--radius-2xl);
   }
 
+  .hito-ui-sheet-surface {
+    --tw-animation-duration: var(--hito-motion-duration-260);
+    --tw-ease: var(--hito-motion-ease-out);
+  }
+
   .hito-ui-popover-surface {
+    --tw-animation-duration: var(--hito-motion-duration-180);
+    --tw-ease: var(--hito-motion-ease-out);
     max-width: min(
       calc(100vw - (var(--space-3) * 2)),
       var(--radix-popover-content-available-width)
@@ -41,9 +52,9 @@
     border-radius: var(--radius-md);
     color: var(--color-muted-foreground);
     transition:
-      background-color 160ms ease,
-      border-color 160ms ease,
-      color 160ms ease;
+      background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      border-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      color var(--hito-motion-duration-140) var(--hito-motion-ease-out);
   }
 
   .hito-ui-dialog-close:hover,
@@ -95,12 +106,19 @@
   }
 
   .hito-ui-menu-surface {
+    --tw-animation-duration: var(--hito-motion-duration-180);
+    --tw-ease: var(--hito-motion-ease-out);
     border: 1px solid var(--color-hairline);
     border-radius: var(--radius-lg);
     background: color-mix(in oklch, var(--color-background) 96%, transparent);
     color: var(--color-foreground);
     box-shadow: 0 18px 44px color-mix(in oklch, black 34%, transparent);
     backdrop-filter: blur(18px);
+  }
+
+  .hito-tooltip {
+    --tw-animation-duration: var(--hito-motion-duration-140);
+    --tw-ease: var(--hito-motion-ease-out);
   }
 
   .hito-ui-menu-item {
@@ -110,6 +128,9 @@
     font-size: 0.8125rem;
     font-weight: 500;
     line-height: 1.3;
+    transition:
+      background-color var(--hito-motion-duration-100) var(--hito-motion-ease-out),
+      color var(--hito-motion-duration-100) var(--hito-motion-ease-out);
   }
 
   .hito-ui-menu-item:focus,
@@ -172,9 +193,9 @@
     font-size: 0.875rem;
     line-height: 1;
     transition:
-      border-color 160ms ease,
-      background-color 160ms ease,
-      box-shadow 160ms ease;
+      border-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      box-shadow var(--hito-motion-duration-140) var(--hito-motion-ease-out);
   }
 
   .hito-ui-select-trigger-sm {
@@ -233,6 +254,10 @@
       color-mix(in oklch, var(--color-background) 72%, transparent)
     );
     padding: 1.5rem;
+    transition:
+      background-color var(--hito-motion-duration-180) var(--hito-motion-ease-out),
+      border-color var(--hito-motion-duration-180) var(--hito-motion-ease-out),
+      color var(--hito-motion-duration-180) var(--hito-motion-ease-out);
   }
 
   .hito-state-surface[data-tone="signal"],
@@ -519,10 +544,10 @@
     border-radius: var(--radius-md);
     color: var(--color-muted-foreground);
     transition:
-      background-color 160ms ease,
-      border-color 160ms ease,
-      color 160ms ease,
-      box-shadow 160ms ease;
+      background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      border-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      box-shadow var(--hito-motion-duration-140) var(--hito-motion-ease-out);
   }
 
   .hito-window-close:hover {
@@ -608,6 +633,8 @@
     opacity: 1 !important;
     pointer-events: auto !important;
     transform: none !important;
+    animation: hito-motion-feedback-enter var(--hito-motion-duration-220)
+      var(--hito-motion-ease-out) both;
   }
 
   .hito-toaster [data-sonner-toast][data-visible="true"][data-removed="false"] {
@@ -642,6 +669,8 @@
     gap: 0.75rem !important;
     width: min(calc(100vw - 2rem), 27rem) !important;
     min-height: 0 !important;
+    transition-duration: var(--hito-motion-duration-220) !important;
+    transition-timing-function: var(--hito-motion-ease-out) !important;
   }
 
   .hito-toast [data-icon] {
@@ -736,7 +765,8 @@
     height: 2px;
     border-radius: 999px;
     background: color-mix(in oklch, var(--color-muted-foreground) 72%, transparent);
-    animation: hito-toast-indeterminate 1.45s ease-in-out infinite;
+    animation: hito-toast-indeterminate calc(var(--hito-motion-duration-260) * 6)
+      var(--hito-motion-ease-out) infinite;
   }
 
   .hito-toast-close,
@@ -764,9 +794,9 @@
     pointer-events: auto !important;
     transform: none !important;
     transition:
-      background-color 160ms ease,
-      color 160ms ease,
-      border-color 160ms ease !important;
+      background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      border-color var(--hito-motion-duration-140) var(--hito-motion-ease-out) !important;
   }
 
   .hito-toast-close:hover,
@@ -810,5 +840,40 @@
     animation: none !important;
     opacity: 0 !important;
     pointer-events: none !important;
+  }
+
+  .hito-ui-overlay[data-state="closed"],
+  .hito-ui-dialog-surface[data-state="closed"],
+  .hito-ui-sheet-surface[data-state="closed"],
+  .hito-ui-popover-surface[data-state="closed"],
+  .hito-ui-menu-surface[data-state="closed"],
+  .hito-tooltip[data-state="closed"] {
+    pointer-events: none !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hito-ui-overlay,
+    .hito-ui-dialog-surface,
+    .hito-ui-sheet-surface,
+    .hito-ui-popover-surface,
+    .hito-ui-menu-surface,
+    .hito-tooltip,
+    .hito-toast,
+    .hito-working-toast-viewport .hito-toast {
+      animation: none !important;
+      transition-duration: 0.01ms !important;
+    }
+
+    .hito-ui-dialog-close,
+    .hito-ui-sheet-close,
+    .hito-ui-menu-item,
+    .hito-ui-select-trigger,
+    .hito-window-close,
+    .hito-toast-close,
+    .hito-toast-dismiss-action,
+    .hito-state-surface,
+    .hito-surface-wash {
+      transition-duration: 0.01ms !important;
+    }
   }
 }

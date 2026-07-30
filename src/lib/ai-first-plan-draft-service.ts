@@ -188,7 +188,7 @@ export async function generateAiFirstPlanDraftPreview({
   const authoringInput = authoringInputResult.authoringInput;
   const startedAt = Date.now();
   const resolvedModel = model ?? DEFAULT_OPENAI_PLAN_MODEL;
-  const prompt = buildOpenAiFirstPlanContractPrompt({
+  const prompt = buildAiAuthoredPlanFirstPrompt({
     authoringInput,
     today,
   });
@@ -510,7 +510,7 @@ async function requestOpenAiFirstPlanDraft({
   fetchImpl: typeof fetch;
   signal?: AbortSignal;
   generationLedger?: AiPlanGenerationLedgerOptions;
-  prompt: ReturnType<typeof buildOpenAiFirstPlanContractPrompt>;
+  prompt: ReturnType<typeof buildAiAuthoredPlanFirstPrompt>;
   transcriptRedactedValues: readonly string[];
   generationTrace: AiPlanGenerationLedgerTrace | null;
 }) {
@@ -867,19 +867,6 @@ async function requestOpenAiFirstPlanDraft({
   } finally {
     signal?.removeEventListener("abort", cancelRequest);
   }
-}
-
-function buildOpenAiFirstPlanContractPrompt({
-  authoringInput,
-  today,
-}: {
-  authoringInput: StructuredPlanAuthoringInput;
-  today: string | undefined;
-}) {
-  return buildAiAuthoredPlanFirstPrompt({
-    authoringInput,
-    today,
-  });
 }
 
 function buildNotStartedDebug({

@@ -19,13 +19,14 @@ import {
   OVERLAY_OPTIONS,
   RESULT_OPTIONS,
   TITLE_STRESS_OPTIONS,
+  UNDO_PROGRESS_OPTIONS,
   VIEW_MODE_OPTIONS,
   WORKOUT_IDENTITIES,
   WORKOUT_IDENTITY_OPTIONS,
   getNonWorkoutTitle,
   getWorkoutTitle,
+  type CalendarActionState,
   type CalendarPlaygroundState,
-  type FutureActionState,
   type Option,
   type WorkoutIdentity,
 } from "./calendar-workout-playground-data";
@@ -43,6 +44,20 @@ export function CalendarWorkoutPlayground() {
     (value: CalendarPlaygroundState[Key]) => {
       setState((current) => ({ ...current, [key]: value }));
     };
+  const setAction = (action: CalendarActionState) => {
+    setState((current) => ({
+      ...current,
+      action,
+      baseState: action === "timed-undo" ? "rest" : current.baseState,
+    }));
+  };
+  const setBaseState = (baseState: CalendarPlaygroundState["baseState"]) => {
+    setState((current) => ({
+      ...current,
+      baseState,
+      action: current.action === "timed-undo" && baseState !== "rest" ? "none" : current.action,
+    }));
+  };
 
   return (
     <HitoDsPlayground
@@ -51,7 +66,14 @@ export function CalendarWorkoutPlayground() {
       status="Shared primitive"
       statusTone="signal"
       usedIn="Product calendar day cells and mobile workout rows."
-      controls={<ControlsBody state={state} setField={setField} />}
+      controls={
+        <ControlsBody
+          state={state}
+          setAction={setAction}
+          setBaseState={setBaseState}
+          setField={setField}
+        />
+      }
       demo={<CalendarDemoStage state={state} title={previewTitle} workout={workout} />}
       variants={<CalendarVariantsStage state={state} title={previewTitle} workout={workout} />}
     />
@@ -60,9 +82,13 @@ export function CalendarWorkoutPlayground() {
 
 function ControlsBody({
   state,
+  setAction,
+  setBaseState,
   setField,
 }: {
   state: CalendarPlaygroundState;
+  setAction: (value: CalendarActionState) => void;
+  setBaseState: (value: CalendarPlaygroundState["baseState"]) => void;
   setField: <Key extends keyof CalendarPlaygroundState>(
     key: Key,
   ) => (value: CalendarPlaygroundState[Key]) => void;
@@ -86,7 +112,7 @@ function ControlsBody({
           label="Base date state"
           options={BASE_STATE_OPTIONS}
           value={state.baseState}
-          onChange={setField("baseState")}
+          onChange={setBaseState}
         />
         <ChoiceControl
           label="Interaction overlay"
@@ -137,11 +163,19 @@ function ControlsBody({
           onChange={setField("density")}
         />
         <SelectControl
-          label="Future action"
+          label="Action"
           options={ACTION_OPTIONS}
           value={state.action}
-          onChange={setField("action")}
+          onChange={setAction}
         />
+        {state.action === "timed-undo" ? (
+          <ChoiceControl
+            label="External progress"
+            options={UNDO_PROGRESS_OPTIONS}
+            value={state.undoProgress}
+            onChange={setField("undoProgress")}
+          />
+        ) : null}
       </ControlGroup>
     </div>
   );
@@ -245,7 +279,7 @@ function CalendarVariantsStage({
 
   if (state.viewMode === "mobile") {
     return (
-      <div className="mx-auto grid w-full max-w-xl min-w-0 gap-2">
+      <div className="mx-auto grid w-full max-w-xl min-w-0 gap-2" inert>
         {variants.map((variant) => (
           <HitoWorkoutDayRow
             key={`${variant.label}-row`}
@@ -271,7 +305,7 @@ function CalendarVariantsStage({
   }
 
   return (
-    <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3">
+    <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3" inert>
       {variants.map((variant) => (
         <div key={variant.label} className="min-w-0">
           <div className="hito-calendar-grid-container min-w-0 overflow-hidden rounded-xl border border-hairline bg-background/25">
@@ -378,9 +412,9 @@ function getSpecimenSupportCopy(state: CalendarPlaygroundState) {
 
 function resolveSpecimenAction(
   baseState: CalendarPlaygroundState["baseState"],
-  requestedAction: FutureActionState,
-  explicitAction?: FutureActionState,
-): FutureActionState {
+  requestedAction: CalendarActionState,
+  explicitAction?: CalendarActionState,
+): CalendarActionState {
   if (explicitAction) return explicitAction;
 
   if (requestedAction === "more-menu" && (baseState === "workout" || baseState === "rest")) {
@@ -389,6 +423,10 @@ function resolveSpecimenAction(
 
   if (requestedAction === "add-activity" && (baseState === "empty" || baseState === "rest")) {
     return "add-activity";
+  }
+
+  if (requestedAction === "timed-undo" && baseState === "rest") {
+    return "timed-undo";
   }
 
   return "none";
@@ -429,6 +467,26 @@ function getActionVisual(state: CalendarPlaygroundState) {
       button: "icon-ghost",
       ariaLabel: "More activity actions",
     };
+  }
+
+  if (state.action === "timed-undo") {
+    if (state.baseState !== "rest") return null;
+
+    const progress = Number(state.undoProgress) / 100;
+    const secondsRemaining = Math.max(0, Math.ceil(7 * (1 - progress)));
+
+    return {
+      label: `Undo ${secondsRemaining}`,
+      icon: "refresh",
+      tone: "signal",
+      visual: "button",
+      visualButton: "ghost",
+      motionState: "timed-progress",
+      progress,
+      alwaysVisible: true,
+      showCompactLabel: true,
+      ariaLabel: `Undo move. ${secondsRemaining} seconds remaining.`,
+    } as const;
   }
 
   return null;

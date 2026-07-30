@@ -27,8 +27,10 @@
     ],
     "segment_rules": [
       "Every workout must have a non-empty segments array.",
-      "Use segment_type values already supported by Hito: warmup, main, cooldown, recovery, rest, mobility, mobility_optional, strength, activation, drills, strides, recovery_jog, fueling, tempo_block, interval_block.",
+      "Use segment_type values already supported by Hito: warmup, main, finish, cooldown, recovery, rest, mobility, mobility_optional, strength, activation, drills, strides, recovery_jog, fueling, tempo_block, interval_block.",
       "For simple time or distance segments, set duration_min or distance_km directly.",
+      "finish is a runnable unit segment and must use duration_min or distance_km rather than a Repeat prescription.",
+      "fueling is the imported form of a visible Hydration checkpoint: it is non-runnable, targetless, distinct from Rest, and must not carry duration_min, distance_km, or Repeat children.",
       "For interval_block, strides, or repeated tempo_block segments, prefer prescription.mode = repeats with repeat_count and children[].",
       "Repeat children are the ordered list repeated N times. Work + Recover is one valid pattern, but Run + Walk or multi-part child sequences are also valid when supported.",
       "Repeat set parents are structural only; child blocks own role, structure, target, and readback semantics.",
@@ -37,8 +39,8 @@
     "target_rules": [
       "Target is for user-facing training cues only.",
       "Prefer canonical keys like intensity, rpe, cue, and hint when benchmark or HR-zone truth is absent.",
-      "Use pace_min_per_km_range only when watch/app execution and usable benchmark truth exist.",
-      "Use hr_bpm_range only when real runner HR-zone/profile truth exists.",
+      "Use pace_min_per_km_range only when the authoring context supports a truthful benchmark-informed or explicitly estimated range; never present an estimate as measured.",
+      "Use hr_bpm_range only when an accepted estimated or personal HR profile is available; preserve its source provenance.",
       "If extra structured target metadata is helpful, put it under target.extra as scalar key/value pairs only.",
       "Do not place nested objects or arrays inside target.extra."
     ],
@@ -118,7 +120,7 @@
         "guidance": "effort",
         "pace_targets_allowed": false,
         "hr_targets_allowed": false,
-        "reason": "Template uses effort cues; add pace only with watch/app plus usable benchmark truth."
+        "reason": "Template uses effort cues; add pace only when a truthful benchmark-informed or explicitly estimated range is available."
       },
       "title": "Easy aerobic run",
       "summary": "50 min easy with calm aerobic control",
@@ -206,7 +208,7 @@
         "guidance": "effort",
         "pace_targets_allowed": false,
         "hr_targets_allowed": false,
-        "reason": "Template quality work uses effort cues until benchmark or HR-zone truth exists."
+        "reason": "Template quality work uses effort cues until truthful benchmark-informed, estimated pace, or accepted HR-profile truth is available."
       },
       "title": "Half marathon threshold durability",
       "summary": "Controlled threshold touch without racing the workout",
@@ -286,7 +288,7 @@
         "guidance": "effort",
         "pace_targets_allowed": false,
         "hr_targets_allowed": false,
-        "reason": "Template long run uses effort cues; numeric targets require runner-specific truth."
+        "reason": "Template long run uses effort cues; numeric targets require truthful runner context or explicit estimated provenance."
       },
       "title": "Long aerobic run",
       "summary": "60 min easy aerobic durability",

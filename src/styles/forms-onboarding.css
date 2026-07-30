@@ -8,9 +8,9 @@
     color: var(--color-foreground);
     width: 100%;
     transition:
-      border-color 160ms ease,
-      background-color 160ms ease,
-      box-shadow 160ms ease;
+      border-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      box-shadow var(--hito-motion-duration-140) var(--hito-motion-ease-out);
   }
 
   .hito-field-primary {
@@ -1584,10 +1584,10 @@
     gap: var(--hito-inline-header-gap, var(--space-3));
     text-align: left;
     transition:
-      background-color 160ms ease,
-      border-color 160ms ease,
-      box-shadow 160ms ease,
-      color 160ms ease;
+      background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      border-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      box-shadow var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      color var(--hito-motion-duration-140) var(--hito-motion-ease-out);
   }
 
   .hito-field-header-sm,
@@ -2237,6 +2237,14 @@
 
     .hito-plan-schedule-edit .hito-choice-toggle-sm {
       padding-inline: 0.625rem;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hito-field,
+    .hito-inline-header-input-trigger,
+    .hito-inline-header-input-readonly {
+      transition-duration: 0.01ms !important;
     }
   }
 }

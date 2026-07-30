@@ -52,6 +52,11 @@ export const HITO_DS_PAGES = [
       { id: "modals", label: "Modals", keywords: ["dialog", "sheet", "overlay"] },
       { id: "async-actions", label: "Async toasts", keywords: ["toast", "loading", "feedback"] },
       {
+        id: "motion",
+        label: "Motion",
+        keywords: ["animation", "transition", "reduced motion", "timed progress"],
+      },
+      {
         id: "calendar-workout-playground",
         label: "Calendar",
         keywords: ["workout day", "rest day", "add"],

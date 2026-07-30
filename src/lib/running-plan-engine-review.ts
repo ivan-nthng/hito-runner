@@ -158,7 +158,7 @@ async function validateRunningPlanReviewExactnessAgainstVerifiedToken(input: {
   const { draft, reviewChecksum, selfContainedReview } = input;
 
   if (
-    !sameJson(
+    !stableJsonEqual(
       stripRunningPlanReviewProof(selfContainedReview.draft),
       stripRunningPlanReviewProof(draft),
     )
@@ -205,8 +205,8 @@ async function validateRunningPlanReviewExactnessAgainstVerifiedToken(input: {
   }
 
   if (
-    !sameJson(selfContainedReview.canonicalPlan, canonicalPlan) ||
-    !sameJson(selfContainedReview.reviewPayload, reviewPayload)
+    !stableJsonEqual(selfContainedReview.canonicalPlan, canonicalPlan) ||
+    !stableJsonEqual(selfContainedReview.reviewPayload, reviewPayload)
   ) {
     return {
       ok: false,
@@ -597,10 +597,6 @@ function collectDistanceGoalEndpointExactnessIssues(
 
 async function signRunningPlanReviewPayload(payload: unknown) {
   return signStableJsonPayload(payload, serverEnv.supabaseServiceRoleKey);
-}
-
-function sameJson(left: unknown, right: unknown) {
-  return stableJsonEqual(left, right);
 }
 
 function toJson(value: unknown): Json {

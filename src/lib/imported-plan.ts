@@ -396,6 +396,23 @@ const v2SegmentSchema = z
       });
     }
 
+    if (
+      segment.segment_type === "fueling" &&
+      (segment.duration_min ||
+        segment.distance_km ||
+        segment.prescription?.duration_min ||
+        segment.prescription?.distance_km ||
+        segment.prescription?.repeat_count ||
+        segment.prescription?.children?.length)
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["prescription"],
+        message:
+          "fueling segments are non-runnable Hydration checkpoints and cannot own duration, distance, or Repeat truth.",
+      });
+    }
+
     if (segment.prescription) {
       if (
         segment.prescription.mode === "repeats" &&

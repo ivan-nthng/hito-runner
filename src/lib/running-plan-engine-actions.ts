@@ -278,7 +278,7 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
     });
   }
 
-  if (!sameJson(request.previewInput, exactness.draft.previewInput)) {
+  if (!stableJsonEqual(request.previewInput, exactness.draft.previewInput)) {
     return buildConfirmFailure({
       reason: "stale_review",
       message:
@@ -302,7 +302,10 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
 
   if (
     !currentProfileSnapshot ||
-    !sameJson(currentProfileSnapshot, exactness.draft.normalizedInputSummary.runnerProfileSnapshot)
+    !stableJsonEqual(
+      currentProfileSnapshot,
+      exactness.draft.normalizedInputSummary.runnerProfileSnapshot,
+    )
   ) {
     return buildConfirmFailure({
       reason: "stale_review",
@@ -510,5 +513,3 @@ function isLocalQaFixtureReviewedDraft(draft: AiGeneratedRunningPlanPreviewDraft
     isAiGeneratedRunningPlanDevFixtureModel(draft.aiGeneration.model)
   );
 }
-
-const sameJson = stableJsonEqual;

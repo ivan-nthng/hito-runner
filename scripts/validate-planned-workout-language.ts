@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   buildManualWorkoutUserBuiltTrainingPlan,
   reviewManualWorkoutDraft,
@@ -25,6 +26,7 @@ import {
 import {
   buildImportedPlanSeed,
   importedPlanSchema,
+  validateImportedPlanJson,
   type TrainingPlanV2,
 } from "../src/lib/imported-plan";
 import { buildPersistedWorkoutInsertRows } from "../src/lib/persisted-plan-replacement";
@@ -63,6 +65,7 @@ const INTERNAL_IDENTITIES = [
 ] as const;
 
 async function main() {
+  validateDownloadableTrainingPlanTemplateContract();
   validateAcceptedRunnerFacingTypesAreDerivable();
   validateManualAndGeneratedRowsUseTheSameLanguage();
   validateUnifiedRepeatReducerOwnsChildFirstCompatibility();
@@ -74,6 +77,30 @@ async function main() {
   validateComparisonUsesCanonicalPlannedTruthOnly();
 
   console.log("Planned workout language read-model contract passed.");
+}
+
+function validateDownloadableTrainingPlanTemplateContract() {
+  const raw = readFileSync(
+    new URL("../public/templates/hito-training-plan-v2-template.json", import.meta.url),
+    "utf8",
+  );
+  const validation = validateImportedPlanJson(raw);
+
+  assert.ok(validation?.success, "the downloadable manual-AI template must parse canonically");
+  assert.doesNotThrow(() => buildImportedPlanSeed(validation.data));
+
+  const invalidHydration = structuredClone(validation.data);
+  invalidHydration.planned_workouts[0]!.segments = [
+    {
+      segment_type: "fueling",
+      duration_min: 5,
+    },
+  ];
+  assert.equal(
+    validateImportedPlanJson(JSON.stringify(invalidHydration))?.success,
+    false,
+    "non-runnable Hydration must reject duration truth before normalization can discard it",
+  );
 }
 
 function validateAcceptedRunnerFacingTypesAreDerivable() {

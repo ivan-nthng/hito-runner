@@ -87,6 +87,12 @@
   --spacing-hito-6: var(--space-6);
   --spacing-hito-8: var(--space-8);
   --spacing-hito-10: var(--space-10);
+  --duration-hito-100: var(--hito-motion-duration-100);
+  --duration-hito-140: var(--hito-motion-duration-140);
+  --duration-hito-180: var(--hito-motion-duration-180);
+  --duration-hito-220: var(--hito-motion-duration-220);
+  --duration-hito-260: var(--hito-motion-duration-260);
+  --ease-hito-out: var(--hito-motion-ease-out);
   --font-sans: "Poppins", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Fraunces", "Times New Roman", serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -95,6 +101,15 @@
 
 :root {
   --radius: 8px;
+
+  /* Raw motion primitives. Components choose the shortest duration that keeps origin legible. */
+  --hito-motion-duration-100: 100ms;
+  --hito-motion-duration-140: 140ms;
+  --hito-motion-duration-180: 180ms;
+  --hito-motion-duration-220: 220ms;
+  --hito-motion-duration-260: 260ms;
+  --hito-motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --hito-motion-ease-linear: linear;
 
   /* Raw color primitives. Semantic product tokens map from this layer. */
   --stone-950: oklch(0.14 0.005 60);
@@ -1309,7 +1324,58 @@
   }
 }
 
+@keyframes hito-motion-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes hito-motion-skeleton {
+  0%,
+  100% {
+    opacity: 0.48;
+  }
+
+  50% {
+    opacity: 0.86;
+  }
+}
+
+@keyframes hito-motion-feedback-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.25rem) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@layer utilities {
+  .hito-motion-spinner {
+    animation: hito-motion-spin calc(var(--hito-motion-duration-260) * 4)
+      var(--hito-motion-ease-linear) infinite;
+  }
+
+  .hito-motion-skeleton {
+    animation: hito-motion-skeleton calc(var(--hito-motion-duration-260) * 6)
+      var(--hito-motion-ease-out) infinite;
+  }
+
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .hito-motion-spinner,
+  .hito-motion-skeleton {
+    animation: none !important;
+  }
+
+  .hito-motion-skeleton {
+    opacity: 0.68;
+  }
+
   .hito-toast-loading::before {
     animation: none;
     opacity: 0.72;

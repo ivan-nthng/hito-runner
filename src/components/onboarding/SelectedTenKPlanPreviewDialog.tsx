@@ -61,6 +61,7 @@ interface SelectedRunningPlanPreviewDialogProps {
   status: SelectedRunningPlanPreviewStatus;
   error: string | null;
   goalLabel: string;
+  onCancel: () => void;
   onRefresh: () => void;
   onCreate: () => void;
   description?: string;
@@ -75,6 +76,7 @@ export function SelectedRunningPlanPreviewDialog({
   createStatus,
   error,
   goalLabel,
+  onCancel,
   onCreate,
   onOpenChange,
   onRefresh,
@@ -108,6 +110,7 @@ export function SelectedRunningPlanPreviewDialog({
   const refreshing = loading && reviewVisible;
   const failedPreview = Boolean(error || unavailable);
   const unavailableIsCorrectable = unavailable?.previewOutcome === "invalid_structural_input";
+  const interactionLocked = initialLoading;
 
   useEffect(() => {
     if (loadingExperienceVisible) {
@@ -136,7 +139,16 @@ export function SelectedRunningPlanPreviewDialog({
   }, [loadingExperienceVisible, reviewVisible]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && interactionLocked) {
+          return;
+        }
+
+        onOpenChange(nextOpen);
+      }}
+    >
       <DialogContent
         ref={dialogContentRef}
         className={cn(
@@ -147,6 +159,16 @@ export function SelectedRunningPlanPreviewDialog({
         )}
         overlayClassName="hito-dialog-overlay-stable"
         showCloseButton={!loadingExperienceVisible}
+        onEscapeKeyDown={(event) => {
+          if (interactionLocked) {
+            event.preventDefault();
+          }
+        }}
+        onInteractOutside={(event) => {
+          if (interactionLocked) {
+            event.preventDefault();
+          }
+        }}
         onOpenAutoFocus={(event) => {
           const activeElement = document.activeElement;
           fallbackReturnFocusRef.current =
@@ -242,12 +264,12 @@ export function SelectedRunningPlanPreviewDialog({
           {!loadingExperienceVisible ? extraNotice : null}
         </div>
 
-        {loadingExperienceVisible ? (
+        {initialLoading ? (
           <DialogFooter className="hito-product-dialog-footer hito-product-dialog-footer-center sm:space-x-0">
             <button
               type="button"
               className="hito-button hito-button-secondary hito-button-md"
-              onClick={() => onOpenChange(false)}
+              onClick={onCancel}
             >
               Cancel
             </button>

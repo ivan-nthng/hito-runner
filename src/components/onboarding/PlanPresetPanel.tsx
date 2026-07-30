@@ -61,6 +61,7 @@ interface PlanPresetPanelProps {
   requiredBasicsCopy?: string;
   previewOpen: boolean;
   onPreviewOpenChange: (open: boolean) => void;
+  onCancelPreview: () => void;
   onRefreshPreview: () => void;
   onCreatePlan: () => void;
   previewDialogDescription?: string;
@@ -103,6 +104,7 @@ export function PlanPresetPanel({
   error,
   hasRequiredPlanBasics,
   requiredBasicsCopy = "Age, height, and weight are required before Hito can prepare a reviewed plan.",
+  onCancelPreview,
   onCreatePlan,
   onPreviewOpenChange,
   onRefreshPreview,
@@ -199,6 +201,7 @@ export function PlanPresetPanel({
         status={status}
         error={error}
         goalLabel={previewGoalLabel}
+        onCancel={onCancelPreview}
         onRefresh={onRefreshPreview}
         onCreate={onCreatePlan}
         description={previewDialogDescription}

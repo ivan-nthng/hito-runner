@@ -37,11 +37,14 @@ export function useSelectedPlanPresetPreviewController({
   toastId,
 }: SelectedPlanPresetPreviewControllerOptions) {
   const previewRunningPlanDraftFn = useServerFn(previewRunningPlanDraft);
-  const activePreviewRequestKeyRef = useRef<string | null>(null);
+  const activePreviewRequestRef = useRef<{
+    abortController: AbortController;
+  } | null>(null);
   const postDispatchInputFingerprintRef = useRef<string | null>(null);
   const [status, setStatus] = useState<"idle" | "previewing_plan">("idle");
   const [selectedGoalId, setSelectedGoalId] = useState<PlanGoalSelectionId | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [previewOpen, setPreviewOpenState] = useState(false);
   const previewOpenRef = useRef(false);
   const [previewResult, setPreviewResult] = useState<RunningPlanPreviewActionResult | null>(null);
@@ -69,30 +72,58 @@ export function useSelectedPlanPresetPreviewController({
     onPreviewDispatch?.();
   });
 
+  const abortActivePreviewRequest = useCallback(() => {
+    const activeRequest = activePreviewRequestRef.current;
+    activePreviewRequestRef.current = null;
+
+    if (activeRequest && !activeRequest.abortController.signal.aborted) {
+      activeRequest.abortController.abort("generated_plan_preview_cancelled");
+    }
+  }, []);
+
   const resetPreviewState = useCallback(() => {
+    abortActivePreviewRequest();
     setStatus("idle");
     setSelectedGoalId(null);
     setError(null);
+    setNotice(null);
     setPreviewOpen(false);
     setPreviewResult(null);
     setPreviewInput(null);
-    activePreviewRequestKeyRef.current = null;
     postDispatchInputFingerprintRef.current = null;
-  }, [setPreviewOpen]);
+  }, [abortActivePreviewRequest, setPreviewOpen]);
 
   const clearSelectedPreview = useCallback(() => {
+    abortActivePreviewRequest();
+    setStatus("idle");
     setSelectedGoalId(null);
     setError(null);
+    setNotice(null);
     setPreviewOpen(false);
     setPreviewResult(null);
     setPreviewInput(null);
-    activePreviewRequestKeyRef.current = null;
     postDispatchInputFingerprintRef.current = null;
     resetExternalState();
-  }, [resetExternalState, setPreviewOpen]);
+  }, [abortActivePreviewRequest, resetExternalState, setPreviewOpen]);
+
+  const cancelPreview = useCallback(() => {
+    if (!activePreviewRequestRef.current) {
+      return;
+    }
+
+    abortActivePreviewRequest();
+    postDispatchInputFingerprintRef.current = null;
+    setStatus("idle");
+    setError(null);
+    setNotice("Plan preparation request cancelled. Nothing was created or saved.");
+    setPreviewOpen(false);
+    setPreviewResult(null);
+    setPreviewInput(null);
+    resetExternalState();
+  }, [abortActivePreviewRequest, resetExternalState, setPreviewOpen]);
 
   async function refreshPreview(goalIdOverride?: PlanGoalSelectionId) {
-    if (activePreviewRequestKeyRef.current) {
+    if (activePreviewRequestRef.current) {
       setPreviewOpen(true);
       return;
     }
@@ -106,6 +137,7 @@ export function useSelectedPlanPresetPreviewController({
       setPreviewInput(null);
       postDispatchInputFingerprintRef.current = null;
       resetExternalState();
+      setNotice(null);
       setError(requiredBasicsMessage);
       return;
     }
@@ -116,6 +148,7 @@ export function useSelectedPlanPresetPreviewController({
       setPreviewInput(null);
       postDispatchInputFingerprintRef.current = null;
       resetExternalState();
+      setNotice(null);
       setError("Choose a goal before previewing it.");
       return;
     }
@@ -129,32 +162,37 @@ export function useSelectedPlanPresetPreviewController({
       setPreviewInput(null);
       postDispatchInputFingerprintRef.current = null;
       resetExternalState();
+      setNotice(null);
       setError(inputResult.error);
       return;
     }
 
-    const inputKey = `${previewContextKey}:${JSON.stringify(inputResult.input)}`;
-    activePreviewRequestKeyRef.current = inputKey;
+    const activeRequest = {
+      abortController: new AbortController(),
+    };
+    activePreviewRequestRef.current = activeRequest;
     postDispatchInputFingerprintRef.current = `${previewContextKey}:${JSON.stringify({
       ...inputResult.input,
       runnerComment: undefined,
     })}`;
     setError(null);
+    setNotice(null);
     resetExternalState();
     setStatus("previewing_plan");
 
     try {
       const previewRequest = previewRunningPlanDraftFn({
         data: inputResult.input,
+        signal: activeRequest.abortController.signal,
       });
       clearTransientPreviewInput();
       const result = await previewRequest;
 
-      if (activePreviewRequestKeyRef.current !== inputKey) {
+      if (activePreviewRequestRef.current !== activeRequest) {
         return;
       }
 
-      activePreviewRequestKeyRef.current = null;
+      activePreviewRequestRef.current = null;
       postDispatchInputFingerprintRef.current = null;
       setPreviewResult(result);
       setPreviewInput(result.ok ? result.draft.previewInput : null);
@@ -173,11 +211,11 @@ export function useSelectedPlanPresetPreviewController({
         });
       }
     } catch {
-      if (activePreviewRequestKeyRef.current !== inputKey) {
+      if (activePreviewRequestRef.current !== activeRequest) {
         return;
       }
 
-      activePreviewRequestKeyRef.current = null;
+      activePreviewRequestRef.current = null;
       postDispatchInputFingerprintRef.current = null;
       setPreviewResult(null);
       setPreviewInput(null);
@@ -189,7 +227,7 @@ export function useSelectedPlanPresetPreviewController({
   }
 
   function selectPlanPreview(goalId: PlanGoalSelectionId) {
-    if (activePreviewRequestKeyRef.current) {
+    if (activePreviewRequestRef.current) {
       setPreviewOpen(true);
       return;
     }
@@ -202,6 +240,7 @@ export function useSelectedPlanPresetPreviewController({
       setPreviewInput(null);
       postDispatchInputFingerprintRef.current = null;
       resetExternalState();
+      setNotice(null);
       setError(requiredBasicsMessage);
       return;
     }
@@ -211,6 +250,7 @@ export function useSelectedPlanPresetPreviewController({
     setPreviewInput(null);
     postDispatchInputFingerprintRef.current = null;
     resetExternalState();
+    setNotice(null);
 
     const inputResult = buildRunningPlanPreviewInput(state, goalId);
 
@@ -237,25 +277,30 @@ export function useSelectedPlanPresetPreviewController({
     previousPreviewInputFingerprintRef.current = previewInputFingerprint;
 
     if (
-      activePreviewRequestKeyRef.current &&
+      activePreviewRequestRef.current &&
       postDispatchInputFingerprintRef.current === previewInputFingerprint
     ) {
       return;
     }
 
-    activePreviewRequestKeyRef.current = null;
+    abortActivePreviewRequest();
     postDispatchInputFingerprintRef.current = null;
     setStatus("idle");
     setPreviewResult(null);
     setPreviewInput(null);
     setError(null);
+    setNotice(null);
     resetExternalState();
-  }, [previewInputFingerprint, resetExternalState, resetOnInputChange]);
+  }, [abortActivePreviewRequest, previewInputFingerprint, resetExternalState, resetOnInputChange]);
+
+  useEffect(() => abortActivePreviewRequest, [abortActivePreviewRequest]);
 
   return {
+    cancelPreview,
     clearSelectedPreview,
     error,
     isBusy: status !== "idle",
+    notice,
     previewInput,
     previewOpen,
     previewResult,

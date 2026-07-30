@@ -39,7 +39,15 @@ import {
   normalizeAcceptedHeartRateProfileForStorage,
   personalHeartRateProfileInputSchema,
 } from "../src/lib/heart-rate-zones";
-import { runnerBaselineSaveInputSchema } from "../src/lib/user-settings-actions";
+import {
+  buildRunnerSettingsPersistenceError,
+  HEART_RATE_GUIDANCE_SAVE_ERROR,
+  RUNNER_SETTINGS_LOAD_ERROR,
+  RUNNER_SETTINGS_SAVE_ERROR,
+  RUNNER_SETTINGS_STALE_ERROR,
+  runnerBaselineSaveInputSchema,
+  saveRunnerBaselineForUserId,
+} from "../src/lib/user-settings-actions";
 import {
   assertSelectedDistanceEndpointProof,
   tamperReviewToken,
@@ -146,6 +154,7 @@ async function main() {
   assertRemovedDeterministicPreviewEntrypoints();
   validateRunnerBaselineBounds();
   validatePersonalHeartRateGuidanceBandContract();
+  await validateRunnerSettingsPersistenceErrorBoundary();
 
   const reviewedDrafts = [];
   for (const scenario of scenarios) {
@@ -431,6 +440,62 @@ function validatePersonalHeartRateGuidanceBandContract() {
     })),
     historicalProfile.zones,
     "Historical personal guidance must remain readable without clamp or rewrite.",
+  );
+}
+
+async function validateRunnerSettingsPersistenceErrorBoundary() {
+  const rawDatabaseMessage =
+    'new row for relation "runner_profiles" violates check constraint "runner_profiles_heart_rate_profile_object_check"';
+  const cases = [
+    {
+      error: { code: "23514", message: rawDatabaseMessage },
+      operation: "write" as const,
+      expected: RUNNER_SETTINGS_SAVE_ERROR,
+    },
+    {
+      error: { code: "PGRST116", message: "JSON object requested, multiple (or no) rows returned" },
+      operation: "write" as const,
+      expected: RUNNER_SETTINGS_STALE_ERROR,
+    },
+    {
+      error: { code: "42501", message: "permission denied for table runner_profiles" },
+      operation: "write" as const,
+      expected: RUNNER_SETTINGS_SAVE_ERROR,
+    },
+    {
+      error: { code: "42P01", message: 'relation "runner_profiles" does not exist' },
+      operation: "read" as const,
+      expected: RUNNER_SETTINGS_LOAD_ERROR,
+    },
+  ];
+
+  for (const testCase of cases) {
+    const result = buildRunnerSettingsPersistenceError(testCase.error, testCase.operation);
+    assert.equal(result.message, testCase.expected);
+    assert.doesNotMatch(result.message, /runner_profiles|constraint|relation|PostgREST|PGRST|SQL/i);
+  }
+
+  await assert.rejects(
+    () =>
+      saveRunnerBaselineForUserId("validation-stops-before-database", {
+        age: 36,
+        weightKg: 74,
+        heightCm: 178,
+        fitnessLevel: "running_regularly",
+        heartRateProfile: {
+          zones: [
+            { reference: "Z1", minBpm: 59, maxBpm: 110 },
+            { reference: "Z2", minBpm: 115, maxBpm: 130 },
+            { reference: "Z3", minBpm: 135, maxBpm: 145 },
+            { reference: "Z4", minBpm: 150, maxBpm: 160 },
+            { reference: "Z5", minBpm: 165, maxBpm: 180 },
+          ],
+        },
+      }),
+    (error: unknown) =>
+      error instanceof Error &&
+      error.message === HEART_RATE_GUIDANCE_SAVE_ERROR &&
+      !/runner_profiles|constraint|relation|PostgREST|PGRST|SQL/i.test(error.message),
   );
 }
 

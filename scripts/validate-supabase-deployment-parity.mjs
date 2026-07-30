@@ -1,11 +1,12 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const SUPABASE_CLI_VERSION = "2.109.1";
 const PRODUCTION_SUPABASE_PROJECT_REF = "dltfjwexyctmihclcjqj";
 const REQUIRED_PROFILE_COLUMNS = ["baseline_revision", "fitness_level", "heart_rate_profile"];
 const REQUIRED_REVIEW_RPC = "apply_reviewed_plan_persistence_with_profile_revision";
+const REQUIRED_MIGRATION_HISTORY_RPC = "list_hito_applied_migration_versions";
 const args = new Set(process.argv.slice(2));
 const vercelBuild = args.has("--vercel-build");
 const checkLinkedMigrations = args.has("--linked");
@@ -159,15 +160,75 @@ async function validateApiSchema(url, options) {
     (column) => !Object.prototype.hasOwnProperty.call(profileProperties, column),
   );
   const rpcPath = `/rpc/${REQUIRED_REVIEW_RPC}`;
-  if (missingColumns.length > 0 || !openApi.paths?.[rpcPath]) {
+  const migrationHistoryRpcPath = `/rpc/${REQUIRED_MIGRATION_HISTORY_RPC}`;
+  if (
+    missingColumns.length > 0 ||
+    !openApi.paths?.[rpcPath] ||
+    !openApi.paths?.[migrationHistoryRpcPath]
+  ) {
     throw new Error(
       `Supabase OpenAPI contract is incomplete: columns=${missingColumns.join(",") || "ok"}, rpc=${
         openApi.paths?.[rpcPath] ? "ok" : "missing"
-      }.`,
+      }, migrationHistoryRpc=${openApi.paths?.[migrationHistoryRpcPath] ? "ok" : "missing"}.`,
     );
   }
 
-  return { access: "server", columns: REQUIRED_PROFILE_COLUMNS, rpc: REQUIRED_REVIEW_RPC };
+  const migrationHistoryResponse = await fetch(
+    new URL(`rest/v1/rpc/${REQUIRED_MIGRATION_HISTORY_RPC}`, withTrailingSlash(url)),
+    {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: "{}",
+    },
+  );
+  if (!migrationHistoryResponse.ok) {
+    throw new Error(
+      `Supabase migration-history contract request failed (${migrationHistoryResponse.status}).`,
+    );
+  }
+
+  const appliedMigrationRows = await migrationHistoryResponse.json();
+  const appliedMigrations = Array.isArray(appliedMigrationRows)
+    ? appliedMigrationRows
+        .map((row) => row?.version)
+        .filter((version) => typeof version === "string")
+    : [];
+  const repositoryMigrations = listRepositoryMigrationVersions();
+  const missingHostedMigrations = repositoryMigrations.filter(
+    (version) => !appliedMigrations.includes(version),
+  );
+  const unknownHostedMigrations = appliedMigrations.filter(
+    (version) => !repositoryMigrations.includes(version),
+  );
+  if (
+    appliedMigrations.length === 0 ||
+    missingHostedMigrations.length > 0 ||
+    unknownHostedMigrations.length > 0
+  ) {
+    throw new Error(
+      `Hosted migration history is not at repository parity: missingHosted=${
+        missingHostedMigrations.join(",") || "none"
+      }, unknownHosted=${unknownHostedMigrations.join(",") || "none"}.`,
+    );
+  }
+
+  return {
+    access: "server",
+    columns: REQUIRED_PROFILE_COLUMNS,
+    rpc: REQUIRED_REVIEW_RPC,
+    migrations: appliedMigrations.length,
+  };
+}
+
+function listRepositoryMigrationVersions() {
+  const versions = readdirSync(resolve("supabase/migrations"), { withFileTypes: true })
+    .filter((entry) => entry.isFile() && /^\d{14}_.+\.sql$/.test(entry.name))
+    .map((entry) => entry.name.slice(0, 14))
+    .sort();
+  if (versions.length === 0 || new Set(versions).size !== versions.length) {
+    throw new Error("Repository migration history is empty or contains duplicate versions.");
+  }
+  return versions;
 }
 
 function parseMigrationList(stdout) {

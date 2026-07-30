@@ -169,6 +169,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     error: selectedPlanPreview.error,
     hasRequiredPlanBasics,
     hasAcceptedRunnerBaseline,
+    notice: selectedPlanPreview.notice,
     planGoalChoice,
     previewGate: selectedPlanGoalPreviewGate,
     previewIsOpen: selectedPlanPreview.previewOpen,
@@ -453,6 +454,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
           hasRequiredPlanBasics={hasAcceptedRunnerBaseline}
           requiredBasicsCopy="Save your runner baseline and accept the BPM guidance before Hito prepares a reviewed plan."
           previewOpen={selectedPlanPreview.previewOpen}
+          onCancelPreview={selectedPlanPreview.cancelPreview}
           onPreviewOpenChange={selectedPlanPreview.setPreviewOpen}
           planGoalChoice={planGoalChoice}
           planGoalCustomDistanceKm={planGoalCustomDistanceKm}
@@ -593,6 +595,7 @@ function generatedCreateFooterHint({
   error,
   hasAcceptedRunnerBaseline,
   hasRequiredPlanBasics,
+  notice,
   planGoalChoice,
   previewGate,
   previewIsOpen,
@@ -602,6 +605,7 @@ function generatedCreateFooterHint({
   error: string | null;
   hasAcceptedRunnerBaseline: boolean;
   hasRequiredPlanBasics: boolean;
+  notice: string | null;
   planGoalChoice: StructuredConstructorState["planGoalChoice"];
   previewGate: ReturnType<typeof resolveSelectedPlanGoalPreviewGate>;
   previewIsOpen: boolean;
@@ -610,6 +614,10 @@ function generatedCreateFooterHint({
 }): { message: string; tone: "error" | "neutral" } {
   if (error) {
     return { message: error, tone: "error" };
+  }
+
+  if (notice) {
+    return { message: notice, tone: "neutral" };
   }
 
   if (!hasRequiredPlanBasics) {

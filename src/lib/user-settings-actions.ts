@@ -27,6 +27,14 @@ import type { TrainingSnapshot } from "@/lib/training";
 
 export type RunnerTrainingPreferences = RunnerTrainingPreferencesStorage;
 
+export const HEART_RATE_GUIDANCE_SAVE_ERROR =
+  "Heart-rate guidance could not be saved. Use five ordered whole-BPM ranges from 60 to 200.";
+export const RUNNER_SETTINGS_SAVE_ERROR =
+  "Your runner settings could not be saved. Check the values and try again.";
+export const RUNNER_SETTINGS_LOAD_ERROR = "Your runner settings could not be loaded. Try again.";
+export const RUNNER_SETTINGS_STALE_ERROR =
+  "Your runner settings changed while saving. Reload and try again.";
+
 export interface UserSettingsSummary {
   firstName: string | null;
   lastName: string | null;
@@ -103,7 +111,7 @@ export async function loadSettingsRouteData({
 }
 
 export const saveUserSettings = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => userSettingsInputSchema.parse(value))
+  .inputValidator(parseUserSettingsInput)
   .handler(async ({ data }) => {
     const auth = getRequestAuthContext();
     const userId = await requirePersistedUserIdForCurrentRequest();
@@ -119,7 +127,7 @@ export const saveUserSettings = createServerFn({ method: "POST" })
   });
 
 export const saveRunnerBaseline = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => runnerBaselineSaveInputSchema.parse(value))
+  .inputValidator(parseRunnerBaselineInput)
   .handler(async ({ data }) => {
     const auth = getRequestAuthContext();
     const userId = await requirePersistedUserIdForCurrentRequest();
@@ -137,7 +145,7 @@ export async function saveRunnerBaselineForUserId(
   input: RunnerBaselineSaveInput,
   email: string | null = null,
 ) {
-  const data = runnerBaselineSaveInputSchema.parse(input);
+  const data = parseRunnerBaselineInput(input);
   const current = await getUserSettingsForUserId(userId, email);
 
   return updateUserSettingsForUserId(
@@ -195,7 +203,7 @@ export async function updateUserSettingsForUserId(
   input: UserSettingsInput,
   email: string | null = null,
 ): Promise<UserSettingsSummary> {
-  const data = userSettingsInputSchema.parse(input);
+  const data = parseUserSettingsInput(input);
   const supabase = createAdminSupabaseClient();
   const currentProfile = await getSettingsProfileRow(userId);
   const fitnessLevel = data.fitnessLevel ?? parseFitnessLevel(currentProfile?.fitness_level);
@@ -271,7 +279,7 @@ export async function updateUserSettingsForUserId(
         .single();
 
   if (updatedProfile.error) {
-    throw new Error(updatedProfile.error.message);
+    throw buildRunnerSettingsPersistenceError(updatedProfile.error, "write");
   }
 
   return {
@@ -363,6 +371,46 @@ function parseFitnessLevel(value: unknown): RunnerFitnessLevel | null {
     : null;
 }
 
+export function buildRunnerSettingsPersistenceError(
+  error: { code?: string | null },
+  operation: "read" | "write",
+) {
+  if (operation === "write" && error.code === "23514") {
+    return new Error(RUNNER_SETTINGS_SAVE_ERROR);
+  }
+  if (operation === "write" && error.code === "PGRST116") {
+    return new Error(RUNNER_SETTINGS_STALE_ERROR);
+  }
+
+  return new Error(operation === "read" ? RUNNER_SETTINGS_LOAD_ERROR : RUNNER_SETTINGS_SAVE_ERROR);
+}
+
+function parseRunnerBaselineInput(value: unknown): RunnerBaselineSaveInput {
+  const parsed = runnerBaselineSaveInputSchema.safeParse(value);
+  if (parsed.success) {
+    return parsed.data;
+  }
+
+  throw new Error(
+    parsed.error.issues.some((issue) => issue.path[0] === "heartRateProfile")
+      ? HEART_RATE_GUIDANCE_SAVE_ERROR
+      : "Add a valid age, height, weight, and running level before saving.",
+  );
+}
+
+function parseUserSettingsInput(value: unknown): UserSettingsInput {
+  const parsed = userSettingsInputSchema.safeParse(value);
+  if (parsed.success) {
+    return parsed.data;
+  }
+
+  throw new Error(
+    parsed.error.issues.some((issue) => issue.path[0] === "heartRateProfile")
+      ? HEART_RATE_GUIDANCE_SAVE_ERROR
+      : RUNNER_SETTINGS_SAVE_ERROR,
+  );
+}
+
 function sameJson(left: Json | null, right: Json | null) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
@@ -376,7 +424,7 @@ async function getSettingsProfileRow(userId: string) {
     .maybeSingle();
 
   if (profileResult.error) {
-    throw new Error(profileResult.error.message);
+    throw buildRunnerSettingsPersistenceError(profileResult.error, "read");
   }
 
   return profileResult.data;

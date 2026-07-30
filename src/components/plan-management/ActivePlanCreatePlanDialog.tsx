@@ -208,6 +208,7 @@ export function ActivePlanCreatePlanDialog({
     hasActivePlan,
     hasAcceptedRunnerBaseline,
     hasRequiredPlanBasics,
+    notice: selectedPlanPreview.notice,
     planGoalChoice,
     previewGate: selectedPlanGoalPreviewGate,
     previewIsOpen: selectedPlanPreview.previewOpen,
@@ -573,6 +574,7 @@ export function ActivePlanCreatePlanDialog({
                   hasRequiredPlanBasics={hasAcceptedRunnerBaseline}
                   requiredBasicsCopy="Save your runner baseline and accept the BPM guidance before Hito prepares a reviewed plan."
                   previewOpen={selectedPlanPreview.previewOpen}
+                  onCancelPreview={selectedPlanPreview.cancelPreview}
                   planGoalChoice={planGoalChoice}
                   planGoalCustomDistanceKm={planGoalCustomDistanceKm}
                   planGoalCustomDistanceLabel={planGoalCustomDistanceLabel}
@@ -704,6 +706,7 @@ function activePlanCreateFooterHint({
   hasActivePlan,
   hasAcceptedRunnerBaseline,
   hasRequiredPlanBasics,
+  notice,
   planGoalChoice,
   previewGate,
   previewIsOpen,
@@ -714,6 +717,7 @@ function activePlanCreateFooterHint({
   hasActivePlan: boolean;
   hasAcceptedRunnerBaseline: boolean;
   hasRequiredPlanBasics: boolean;
+  notice: string | null;
   planGoalChoice: StructuredConstructorState["planGoalChoice"];
   previewGate: ReturnType<typeof resolveSelectedPlanGoalPreviewGate>;
   previewIsOpen: boolean;
@@ -722,6 +726,10 @@ function activePlanCreateFooterHint({
 }): { message: string; tone: "muted" | "error" } {
   if (error) {
     return { message: error, tone: "error" };
+  }
+
+  if (notice) {
+    return { message: notice, tone: "muted" };
   }
 
   if (!hasActivePlan) {

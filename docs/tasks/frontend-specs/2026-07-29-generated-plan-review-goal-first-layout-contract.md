@@ -2,7 +2,7 @@
 
 ## Status
 
-ready_for_frontend
+current_product_contract
 
 ## Owner
 
@@ -10,7 +10,7 @@ designer
 
 ## Last Updated
 
-2026-07-29
+2026-07-30
 
 ## Plan File
 
@@ -21,8 +21,8 @@ unavailable, refresh, and confirm lifecycle remains owned by
 ## Task
 
 Replace the ready generated-plan review Dialog's two large metadata groups with one open,
-goal-first header while retaining the reviewed calendar, exact workout disclosure, refresh,
-explicit confirm, and truthful unsaved boundary.
+goal-first header while retaining the reviewed calendar, compact day summary, refresh, explicit
+confirm, and truthful unsaved boundary.
 
 ## Stage
 
@@ -79,7 +79,7 @@ reviewed draft exists. It is not the ready-review goal authority.
 2. Open goal/start summary in the header, without a card or bordered fact grid.
 3. Calendar heading and short interaction instruction.
 4. Existing calendar and legend.
-5. Existing exact workout disclosure opened from a day.
+5. Compact workout summary opened from a day.
 6. Stable Dialog footer with unsaved copy, Refresh, and Create.
 
 ### Header hierarchy
@@ -91,8 +91,8 @@ Use one open header composition inside the existing `hito-product-dialog-header`
 - primary companion fact: `Starts {formatted date}`, using `hito-section-title`;
 - secondary range line: `{N} weeks · Ends {formatted date}`, using `hito-body-small`;
 - optional goal modifiers: supplied race date and/or finish time, using `hito-body-small`;
-- description: one short `hito-body` sentence explaining that the calendar and exact workouts are
-  being reviewed before creation.
+- description: one short `hito-body` sentence explaining that the calendar and workout overview
+  are being reviewed before creation.
 
 Goal and start date are the only dominant facts. Duration, end date, race date, and finish time
 must not become equal-sized metric tiles.
@@ -118,12 +118,30 @@ Do not add a header card, gradient panel, metric grid, badge row, or new summary
 Use an open section header:
 
 - title: `Plan calendar`, using `hito-section-title` or the existing compact section-heading role;
-- support copy: `Select a day to review the exact workout structure.`, using `hito-body-small`;
+- support copy: `Select a day to view the workout overview.`, using `hito-body-small`;
 - no `{N} runs` pill;
 - no card or extra divider beyond the existing Dialog header/body separation.
 
-The existing calendar cells, workout identity legend, popover/detail behavior, focus behavior, and
-exact `WorkoutDocumentReadback` remain unchanged.
+The existing calendar cells, workout identity legend, Popover behavior, and focus behavior remain
+unchanged. The ready-preview Popover is intentionally not a workout editor or full executable
+readback.
+
+### Day Summary Disclosure
+
+For a non-rest day, the Popover shows only:
+
+- formatted date;
+- runner-facing workout type/title;
+- total duration and/or distance when available;
+- block count; and
+- an optional non-interactive 4px structure strip.
+
+For a rest day, show only its date and `Rest day`.
+
+Do not show pace, heart-rate ranges, individual steps, Repeat children, cues, notes, provenance,
+source labels, or editing controls in the generated-plan preview. These details are intentionally
+available only from the saved workout detail after explicit Create/confirm. The summary must never
+claim to be an executable prescription or hide a backend goal/workout mismatch.
 
 ### Footer
 
@@ -182,7 +200,7 @@ This is rendering deletion only. Do not delete or reshape the underlying draft f
 | Schedule constraints and authored rhythm | `normalizedInputSummary`, canonical plan/preferences metadata, signed review, persistence, saved schedule/editor flows |
 | Distance, race date, finish time, outcome pace, assumptions | `planGoalIntent`, signed review payload, persistence metadata, export/readback owners |
 | Metric policy and workout target truth | canonical workout documents, validation/review seams, saved workout detail and export |
-| Exact plan rows and workout structure | calendar rows, workout documents, canonical plan, exact workout disclosure |
+| Exact plan rows and workout structure | calendar rows, workout documents, canonical plan, saved workout detail, export |
 | Review integrity | review token/checksum and confirm action |
 | Non-persisted preview state | Dialog footer copy and explicit Create boundary |
 
@@ -210,7 +228,7 @@ metadata, export, plan editor, or saved workout detail.
   calendar classes.
 - Keep the footer viewport-reachable. Unsaved copy sits above the action row; Create remains the
   final and strongest action.
-- The selected-day disclosure remains viewport-contained through the existing popover contract.
+- The selected-day summary remains viewport-contained through the existing Popover contract.
 
 ## Other Preview States
 
@@ -239,7 +257,7 @@ Reuse:
   `hito-body-small`, and `hito-caption`;
 - existing hairline divider, spacing, color, and responsive tokens;
 - existing Secondary and Primary buttons;
-- existing `HitoCalendarDayCell`, calendar legend, Popover, and `WorkoutDocumentReadback`;
+- existing `HitoCalendarDayCell`, calendar legend, Popover, and compact generated-plan workout summary;
 - existing `formatDate` helper.
 
 No Hito DS gap is demonstrated. Do not create a metadata-grid component, plan-summary card,
@@ -253,6 +271,7 @@ One Product Frontend slice may:
 - remove the two obsolete preview-only metadata render branches and their now-unused local
   formatting helpers/imports;
 - remove the calendar run-count pill;
+- keep the selected-day preview summary constrained to its approved information boundary;
 - preserve all reviewed data and existing state/action behavior;
 - keep the already-large Dialog owner focused by extracting only a small presentational
   goal-summary helper if the existing file-size gate requires it.
@@ -270,7 +289,7 @@ or end dates, or if a displayed goal/workout mismatch requires fixture/provider 
    guidance, assumptions, and derived pace are absent from this Dialog.
 6. `Ready to review` and `{N} runs` pills are absent.
 7. Unsaved truth remains as quiet footer copy.
-8. Calendar, legend, exact workout disclosure, Refresh, Create, and review/confirm gating work as
+8. Calendar, legend, compact day summary disclosure, Refresh, Create, and review/confirm gating work as
    before.
 9. No canonical draft, signed review, persistence, export, editor, or saved-workout data is removed.
 10. Desktop and exact 375px show no header overflow, clipped optional metadata, unreachable footer,
@@ -289,7 +308,7 @@ or end dates, or if a displayed goal/workout mismatch requires fixture/provider 
 - long custom goal label;
 - refresh and confirm-pending while review content remains visible;
 - desktop and exact 375px in light and dark themes;
-- keyboard traversal, selected-day disclosure, close/focus return, no overflow, and footer reach;
+- keyboard traversal, selected-day summary disclosure, close/focus return, no overflow, and footer reach;
 - targeted lint, production build, build integrity, runtime health, and scoped diff hygiene;
 - independent QA subagent evidence integrated by the Product Frontend owner.
 

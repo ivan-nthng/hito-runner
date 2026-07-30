@@ -13,6 +13,7 @@ import {
   workoutDuration,
 } from "@/lib/training";
 import type { WorkoutResultFeedbackSummary } from "@/lib/workout-result-import/types";
+import { HitoSlider } from "@/components/ui/hito-slider";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
 import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
 import {
@@ -348,7 +349,7 @@ export function CompletionPanel({
             </div>
 
             {plannedRepeats > 0 && (
-              <div className="hito-surface-flat mt-4 p-3">
+              <div className="mt-4">
                 <div className="hito-label mb-2">Intervals completed</div>
                 <div
                   className="hito-choice-toggle-group flex-nowrap"
@@ -381,12 +382,15 @@ export function CompletionPanel({
           </div>
 
           <div className="grid gap-5 sm:grid-cols-1">
-            <ScaleControl
+            <HitoSlider
               label="Effort (RPE)"
               value={form.rpe}
+              min={1}
               max={10}
-              onChange={(value) => updateForm((current) => ({ ...current, rpe: value }))}
-              hint={`${form.rpe}/10`}
+              step={1}
+              onValueChange={(value) => updateForm((current) => ({ ...current, rpe: value }))}
+              valueLabel={`${form.rpe}/10`}
+              ariaValueText={`Effort ${form.rpe} out of 10`}
             />
           </div>
         </>
@@ -1288,7 +1292,7 @@ function NumField({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="hito-surface-flat grid gap-2 p-3">
+    <label className="grid gap-2">
       <div className="flex items-center justify-between gap-3">
         <span className="hito-form-label">{label}</span>
         <span className="hito-caption font-mono-num">plan {planned}</span>
@@ -1310,50 +1314,5 @@ function NumField({
         </span>
       </span>
     </label>
-  );
-}
-
-function ScaleControl({
-  label,
-  value,
-  max,
-  onChange,
-  hint,
-}: {
-  label: string;
-  value: number;
-  max: number;
-  onChange: (value: number) => void;
-  hint: string;
-}) {
-  const scaleValues = Array.from({ length: max }, (_, index) => String(index + 1));
-  const scaleGroup = useHitoRadioGroup({
-    items: scaleValues.map((scaleValue) => ({ value: scaleValue })),
-    value: String(value),
-  });
-
-  return (
-    <div>
-      <div className="hito-label flex items-center justify-between">
-        <span>{label}</span>
-        <span className="text-foreground/80">{hint}</span>
-      </div>
-      <div className="hito-scale-control mt-3" {...scaleGroup.groupProps} aria-label={label}>
-        {scaleValues.map((scaleValue) => (
-          <button
-            key={scaleValue}
-            type="button"
-            {...scaleGroup.getRadioProps(scaleValue)}
-            aria-label={`${scaleValue} of ${max}`}
-            data-active={Number(scaleValue) <= value ? "true" : undefined}
-            data-level={Math.ceil(Number(scaleValue) / Math.max(1, max / 5))}
-            onClick={() => onChange(Number(scaleValue))}
-            className="hito-scale-button"
-          >
-            {scaleValue}
-          </button>
-        ))}
-      </div>
-    </div>
   );
 }

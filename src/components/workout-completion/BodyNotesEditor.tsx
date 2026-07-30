@@ -23,6 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icon";
+import { HitoSlider } from "@/components/ui/hito-slider";
 import { useHitoTabs } from "@/components/ui/hito-tabs";
 import { HitoNativeSelectField } from "@/components/ui/native-select-field";
 
@@ -274,24 +275,17 @@ function BodyNoteEditorCard({
         />
       </div>
 
-      <div>
-        <Label>Severity</Label>
-        <div className="mt-3 hito-scale-control">
-          {[1, 2, 3, 4, 5].map((level) => (
-            <button
-              key={level}
-              type="button"
-              onClick={() => onChange({ severity: level as BodyNote["severity"] })}
-              data-active={level <= bodyNote.severity ? "true" : undefined}
-              data-level={level}
-              className="hito-scale-button"
-            >
-              {level}
-            </button>
-          ))}
-        </div>
-        <p className="hito-field-helper mt-2">1 is light discomfort. 5 is the strongest note.</p>
-      </div>
+      <HitoSlider
+        label="Severity"
+        min={1}
+        max={5}
+        step={1}
+        value={bodyNote.severity}
+        valueLabel={`${bodyNote.severity}/5`}
+        ariaValueText={`Severity ${bodyNote.severity} out of 5`}
+        helper="1 is light discomfort. 5 is the strongest note."
+        onValueChange={(value) => onChange({ severity: value as BodyNote["severity"] })}
+      />
 
       <div>
         <Label>Detail</Label>

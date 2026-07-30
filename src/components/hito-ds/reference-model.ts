@@ -49,6 +49,7 @@ export const HITO_DS_PAGES = [
       },
       { id: "status", label: "Status", keywords: ["pill", "badge", "metadata tag"] },
       { id: "selection-controls", label: "Selection", keywords: ["checkbox", "radio", "switch"] },
+      { id: "slider", label: "Slider", keywords: ["range", "numeric", "rpe", "severity"] },
       { id: "modals", label: "Modals", keywords: ["dialog", "sheet", "overlay"] },
       { id: "async-actions", label: "Async toasts", keywords: ["toast", "loading", "feedback"] },
       {

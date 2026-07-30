@@ -258,27 +258,7 @@ export function HitoDsPatternsPage() {
             </article>
           </div>
         </div>
-        <div className="mt-5 grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
-          <article className="hito-row-group">
-            <div className="hito-list-row items-start">
-              <div className="w-full">
-                <p className="hito-label">Severity scale</p>
-                <div className="hito-scale-control mt-3">
-                  {[1, 2, 3, 4, 5].map((level) => (
-                    <button
-                      key={level}
-                      type="button"
-                      className="hito-scale-button"
-                      data-active={level <= 3}
-                      data-level={level}
-                    >
-                      {level}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </article>
+        <div className="mt-5">
           <article className="hito-row-group">
             <div className="hito-list-row">
               <div>

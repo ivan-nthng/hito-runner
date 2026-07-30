@@ -252,7 +252,7 @@ function WorkoutPage() {
           <div
             className={cn(
               "relative",
-              surfaceModel.activeSurface === "complete" && "hito-surface overflow-hidden p-6",
+              surfaceModel.activeSurface === "complete" && "overflow-hidden p-1",
               surfaceModel.activeSurface === "feedback" && "p-1",
             )}
             {...(surfaceModel.tabs.length > 1

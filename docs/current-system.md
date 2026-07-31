@@ -459,8 +459,8 @@
   `workout_actual_metrics` for normalized actual workout metrics and structured actual step payload
 - uploaded Garmin result truth now also persists one additive deterministic comparison table:
   `workout_comparisons` stores the latest backend-owned planned-vs-actual comparison for each normalized Garmin result
-- uploaded Garmin feedback truth now also persists one additive interpretation table:
-  `workout_ai_insights` stores one backend-generated bounded interpretation and next-workout recommendation linked to a deterministic comparison row
+- historical Garmin feedback may include one additive interpretation table:
+  `workout_ai_insights` retains previously saved AI interpretations linked to deterministic comparison rows; upload never creates or changes them
 - the first slice stores the original asset in the private `workout-result-assets` Supabase bucket, extracts FIT deterministically, parses with a deterministic FIT parser, and normalizes summary metrics plus lap and step payload without invoking AI on raw binary data
 - the second Garmin slice now computes deterministic planned-vs-actual comparison immediately after normalized Garmin metrics are written, using only backend truth from:
   planned workout date
@@ -477,14 +477,10 @@
   session-summary facts, a deterministic support matrix, an ordered step-summary block, and warm-up/main/cooldown-style segment-group summaries when ordered per-step duration comparison is trustworthy
   explicit unsupported states for pace and heart-rate comparison until planned targets and Garmin metrics share one normalized comparable unit
   instead of AI verdict prose
-- the next Garmin slice now adds one bounded AI layer on top of those persisted facts only:
-  `workout_ai_insights` is generated from planned workout truth, normalized actual metrics, deterministic comparison payload, week context, next-workout summary, and optional saved workout-scoped body-note context
-  it never parses raw FIT binary, never replaces deterministic comparison, and treats body notes only as bounded caution context rather than diagnosis or medical advice
-  generated runner-facing text passes through a small backend quality gate before persistence, so malformed fragments or non-English artifacts fall back to stable deterministic copy instead of surfacing in `Feedback`
-  `garmin_ai_interpretation` entitlement gates only this AI insight generation step; Garmin upload, parsing, normalized actual metrics, deterministic comparison, and feedback persistence stay available when AI interpretation is locked
+- Garmin upload performs no AI interpretation: it ends after deterministic parsing, normalized actual metrics, and planned-versus-actual comparison; a future explicit paid verdict is a separate contract
 - current workout-detail `Feedback` readback now exposes the latest Garmin asset, latest normalized actual metrics, latest deterministic comparison, and latest bounded AI interpretation in a dedicated evidence surface separate from manual completion logging
 - Garmin feedback readback now lives outside the Node-only FIT/ZIP ingest module:
-  `src/lib/workout-result-import/read-workout-result-feedback.ts` owns latest-feedback and calendar-marker read queries, while `src/lib/workout-result-import/ingest-garmin-result.ts` remains the server-only upload, storage, extraction, parsing, comparison, and AI-interpretation write path
+  `src/lib/workout-result-import/read-workout-result-feedback.ts` owns latest-feedback and calendar-marker read queries, while `src/lib/workout-result-import/ingest-garmin-result.ts` remains the server-only upload, storage, extraction, parsing, and deterministic-comparison write path
 - that `Feedback` surface now uses a flatter divided layout with plain-language section framing:
   upload explains why it helps
   attached Garmin evidence now shows the live file state and supports explicit removal through the same saved-mode seam

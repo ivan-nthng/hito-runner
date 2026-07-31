@@ -2,7 +2,7 @@
 
 Status: current orientation digest
 Owner: Running Coach
-Last updated: 2026-07-25
+Last updated: 2026-07-30
 
 ## Source Hierarchy
 
@@ -66,6 +66,7 @@ Canonical detail:
 
 - [First-session adaptation doctrine](2026-07-19-first-session-adaptation-doctrine.md)
 - [Watch-execution primary-target doctrine](2026-07-20-watch-execution-primary-target-doctrine.md)
+- [Runner profile constitution](2026-07-30-hito-runner-profile-constitution.md)
 - [Manual workout constructor taxonomy](2026-06-09-manual-workout-constructor-taxonomy-and-template-library.md)
 
 ## Goal And Workout Quality

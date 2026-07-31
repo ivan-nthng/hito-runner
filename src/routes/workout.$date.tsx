@@ -82,7 +82,11 @@ function WorkoutPage() {
   const router = useRouter();
   const tab = search.tab as WorkoutDetailSearchTab;
   const lifecycle = workout ? workoutDetailLifecycleFor(workout, snapshot, feedback) : "rest_day";
-  const surfaceModel = workoutDetailSurfaceModelFor(lifecycle, tab);
+  const surfaceModel = workoutDetailSurfaceModelFor(
+    lifecycle,
+    tab,
+    workout ? canOpenGarminFeedback(workout, snapshot) : false,
+  );
   const workoutTabs = useHitoTabs({
     items: surfaceModel.tabs.map((item) => ({ value: item.id })),
     value: surfaceModel.activeSurface,
@@ -263,10 +267,10 @@ function WorkoutPage() {
               <>
                 <Overview snapshot={snapshot} workout={workout} />
                 {lifecycle === "today_planned" && (
-                  <CompletionActionPanel workout={workout} variant="today" />
+                  <CompletionActionPanel snapshot={snapshot} workout={workout} variant="today" />
                 )}
                 {lifecycle === "past_unlogged" && (
-                  <CompletionActionPanel workout={workout} variant="past" />
+                  <CompletionActionPanel snapshot={snapshot} workout={workout} variant="past" />
                 )}
               </>
             )}
@@ -535,11 +539,12 @@ function hasWorkoutEvidence(
 function workoutDetailSurfaceModelFor(
   lifecycle: WorkoutDetailLifecycleState,
   requestedTab: WorkoutDetailSearchTab,
+  canOpenFeedback: boolean,
 ): {
   activeSurface: WorkoutDetailSurface;
   tabs: Array<{ id: WorkoutDetailSurface; label: string }>;
 } {
-  if (lifecycle === "completed_with_evidence") {
+  if (lifecycle === "completed_with_evidence" || lifecycle === "completed_with_manual_result") {
     const tabs = [
       { id: "complete", label: "Result" },
       { id: "feedback", label: "Feedback" },
@@ -555,18 +560,27 @@ function workoutDetailSurfaceModelFor(
     return { activeSurface: "overview", tabs: [] };
   }
 
-  if (lifecycle === "completed_with_manual_result") {
-    return { activeSurface: "complete", tabs: [] };
-  }
-
   if (lifecycle === "today_planned" || lifecycle === "past_unlogged") {
     return {
-      activeSurface: requestedTab === "complete" ? "complete" : "overview",
+      activeSurface:
+        requestedTab === "feedback" && canOpenFeedback
+          ? "feedback"
+          : requestedTab === "complete"
+            ? "complete"
+            : "overview",
       tabs: [],
     };
   }
 
   return { activeSurface: "overview", tabs: [] };
+}
+
+function canOpenGarminFeedback(workout: Workout, snapshot: TrainingSnapshot): boolean {
+  return (
+    snapshot.source === "persisted" &&
+    workout.type !== "rest" &&
+    workout.date <= snapshot.currentDate
+  );
 }
 
 function WorkoutDetailTopBar({
@@ -641,13 +655,16 @@ function WorkoutDetailTopBar({
 }
 
 function CompletionActionPanel({
+  snapshot,
   workout,
   variant,
 }: {
+  snapshot: TrainingSnapshot;
   workout: Workout;
   variant: "today" | "past";
 }) {
   const isToday = variant === "today";
+  const canUploadGarmin = canOpenGarminFeedback(workout, snapshot);
 
   return (
     <section className="hito-row-group mt-8">
@@ -663,19 +680,32 @@ function CompletionActionPanel({
           </p>
           <p className="hito-list-row-copy">
             {isToday
-              ? "Log this workout after you run it. Feedback unlocks after a real result or Garmin evidence exists."
+              ? "Add a result or activity file after you run it. Both update this planned workout."
               : "This past workout is treated as unlogged until you add a real result."}
           </p>
         </div>
-        <Link
-          to="/workout/$date"
-          params={{ date: workout.date }}
-          search={{ tab: "complete" } as never}
-          className="hito-button hito-button-primary hito-button-md shrink-0"
-        >
-          <Icon name={isToday ? "check" : "edit"} size="xs" />
-          {isToday ? "Mark as done" : "Add result"}
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            to="/workout/$date"
+            params={{ date: workout.date }}
+            search={{ tab: "complete" } as never}
+            className="hito-button hito-button-primary hito-button-md shrink-0"
+          >
+            <Icon name={isToday ? "check" : "edit"} size="xs" />
+            Add result
+          </Link>
+          {canUploadGarmin ? (
+            <Link
+              to="/workout/$date"
+              params={{ date: workout.date }}
+              search={{ tab: "feedback" } as never}
+              className="hito-button hito-button-secondary hito-button-md shrink-0"
+            >
+              <Icon name="file-up" size="xs" />
+              Add activity file
+            </Link>
+          ) : null}
+        </div>
       </div>
     </section>
   );

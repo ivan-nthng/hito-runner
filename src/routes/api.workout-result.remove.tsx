@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
-import { WorkoutResultImportError } from "@/lib/workout-result-import/types";
+import {
+  runnerSafeWorkoutResultMessage,
+  WorkoutResultImportError,
+} from "@/lib/workout-result-import/types";
 
 export const Route = createFileRoute("/api/workout-result/remove")({
   server: {
@@ -39,7 +42,7 @@ export const Route = createFileRoute("/api/workout-result/remove")({
               {
                 ok: false,
                 code: error.code,
-                message: error.message,
+                message: runnerSafeWorkoutResultMessage(error),
               },
               { status: error.status },
             );
@@ -63,10 +66,7 @@ export const Route = createFileRoute("/api/workout-result/remove")({
             {
               ok: false,
               code: "persistence_failed",
-              message:
-                error instanceof Error
-                  ? error.message
-                  : "The Garmin evidence could not be changed in this environment.",
+              message: runnerSafeWorkoutResultMessage(error),
             },
             { status: 500 },
           );

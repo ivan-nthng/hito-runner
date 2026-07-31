@@ -176,7 +176,11 @@ export function resultAssetRowToSummary(
     parseStatus: row.parse_status as WorkoutResultAssetSummary["parseStatus"],
     primaryFileKind: row.primary_file_kind as WorkoutResultAssetSummary["primaryFileKind"],
     primaryFileName: row.primary_file_name,
-    parseError: row.parse_error,
+    // Older failed rows may contain parser internals; never return those to the runner.
+    parseError:
+      row.parse_status === "failed"
+        ? "We could not read that Garmin activity. Remove it and choose another FIT file."
+        : null,
     createdAt: row.created_at,
   };
 }

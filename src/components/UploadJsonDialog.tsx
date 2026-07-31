@@ -6,6 +6,7 @@ import {
   type ImportedPlan,
   validateImportedPlanJson,
 } from "@/lib/imported-plan";
+import { addDaysIso, todayIso } from "@/lib/training";
 import type { FirstDayResolution } from "@/lib/plan-apply-policy";
 import { completeOnboarding } from "@/lib/plan-replacement-actions";
 import {
@@ -31,7 +32,7 @@ export function UploadJsonDialog({
 }) {
   const completeOnboardingFn = useServerFn(completeOnboarding);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const resolvedDefaultStartDate = defaultStartDate ?? todayLocalIso();
+  const resolvedDefaultStartDate = defaultStartDate ?? todayIso();
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [jsonDraft, setJsonDraft] = useState("");
   const [importedPlan, setImportedPlan] = useState<ImportedPlan | null>(null);
@@ -458,27 +459,4 @@ function isReplaceBlockedError(message: string | null) {
       message,
     ),
   );
-}
-
-function todayLocalIso() {
-  const date = new Date();
-  return toLocalIso(date);
-}
-
-function addDaysIso(iso: string, days: number) {
-  const date = parseIsoDate(iso);
-  date.setDate(date.getDate() + days);
-  return toLocalIso(date);
-}
-
-function parseIsoDate(iso: string) {
-  const [year, month, day] = iso.split("-").map(Number);
-  return new Date(year, month - 1, day);
-}
-
-function toLocalIso(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }

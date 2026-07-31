@@ -5,10 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/AppShell";
 import { TrainingPreferenceFields } from "@/components/onboarding/TrainingPreferenceFields";
 import { ThemePreferenceSection } from "@/components/settings/ThemePreferenceSection";
-import {
-  isPositiveRecent5kTime,
-  type WeekdayName,
-} from "@/components/onboarding/onboarding-form-model";
+import { type WeekdayName } from "@/components/onboarding/onboarding-form-model";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { EditableValueField } from "@/components/ui/editable-value-field";
 import { Icon } from "@/components/ui/icon";
@@ -47,7 +44,6 @@ type SettingsFormState = {
   preferredLongRunDay: WeekdayName | "";
   maxRunningDaysPerWeek: string;
   fitnessLevel: RunnerFitnessLevel;
-  recent5kTime: string;
 };
 
 type SettingsTab = "personal" | "training" | "appearance";
@@ -124,12 +120,6 @@ function SettingsPage() {
   };
 
   const saveTrainingPreferences = async () => {
-    if (form.fitnessLevel === "custom" && !isPositiveRecent5kTime(form.recent5kTime)) {
-      setError("Use a positive recent 5K time such as 25:00.");
-      setMessage(null);
-      return;
-    }
-
     setIsSaving(true);
     setError(null);
     setMessage(null);
@@ -480,13 +470,10 @@ function SettingsPage() {
                 setForm((current) => ({
                   ...current,
                   fitnessLevel: value,
-                  recent5kTime: value === "custom" ? current.recent5kTime : "",
                 }))
               }
-              recent5kTime={form.recent5kTime}
-              onRecent5kTimeChange={(value) =>
-                setForm((current) => ({ ...current, recent5kTime: value }))
-              }
+              allowCustomFitnessLevelSelection={settings?.fitnessLevel === "custom"}
+              fitnessBenchmarkHelper="Recent 5K details are added per plan. Settings can preserve an existing custom level or switch to a standard level."
               preferredLongRunMode="default-sunday"
               fixedRestDaysHelper="Optional. Choose only weekdays Hito must keep clear in future plans."
               maxRunningDaysHelper="Optional. This is an upper ceiling for future plans, not a target workout count."
@@ -579,7 +566,6 @@ function buildSettingsFormState(settings: UserSettingsSummary | null): SettingsF
         ? String(settings.trainingPreferences.max_running_days_per_week)
         : "",
     fitnessLevel: settings?.fitnessLevel ?? "running_regularly",
-    recent5kTime: "",
   };
 }
 

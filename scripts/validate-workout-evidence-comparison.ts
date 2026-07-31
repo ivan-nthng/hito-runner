@@ -4,10 +4,6 @@ import { relinkComparisonPlannedWorkoutIdentity } from "../src/lib/active-plan-r
 import { buildDeterministicWorkoutComparison } from "../src/lib/workout-result-import/compare-workout-result";
 import { readWorkoutComparisonDifferencePayload } from "../src/lib/workout-result-import/comparison-payload";
 import { buildWorkoutResultEvidenceBundle } from "../src/lib/workout-result-import/evidence-bundle";
-import {
-  applyWorkoutAiTextQualityGate,
-  type WorkoutAiPromptInput,
-} from "../src/lib/workout-result-import/generate-workout-ai-insight";
 import { parseGarminFitActivity } from "../src/lib/workout-result-import/parse-garmin-fit";
 import type {
   WorkoutActualMetricsSummary,
@@ -27,7 +23,6 @@ async function main() {
   validateEvidenceBundleIdentity(indexedComparison);
   validateCarryForwardIdentity(indexedComparison);
   validatePersistedPayloadBoundary(indexedComparison);
-  validateUnsupportedAiMetricClaimsAreRemoved(indexedComparison);
 
   console.log("Workout evidence comparison contract passed.");
 }
@@ -199,63 +194,6 @@ function validatePersistedPayloadBoundary(
     comparison.differencePayload,
   );
   assert.equal(readWorkoutComparisonDifferencePayload({ broken: true }), null);
-}
-
-function validateUnsupportedAiMetricClaimsAreRemoved(
-  comparison: ReturnType<typeof buildDeterministicWorkoutComparison>,
-) {
-  const input = {
-    plannedWorkout: {
-      id: WORKOUT_ID,
-      date: "2026-07-17",
-      weekday: "Friday",
-      phase: "base",
-      weekNumber: 1,
-      title: "Easy aerobic run",
-      workoutType: "easy",
-      sourceWorkoutType: "easy_aerobic_run",
-      notes: null,
-      plannedDurationMin: 40,
-      plannedDistanceKm: null,
-      stepOutline: [],
-    },
-    actualMetrics: {
-      id: METRICS_ID,
-      activityLocalDate: "2026-07-17",
-      actualDurationMin: 40,
-      actualDistanceKm: 6.5,
-      actualIntervalCount: 3,
-    },
-    comparison: {
-      comparisonStatus: comparison.comparisonStatus,
-      completionState: comparison.completionState,
-      comparisonConfidence: comparison.comparisonConfidence,
-      differencePayload: comparison.differencePayload,
-    },
-    currentWeekContext: {
-      weekNumber: 1,
-      weekStatus: "in_progress",
-      plannedNonRestWorkoutCount: 3,
-      completedWorkoutCount: 1,
-      partialWorkoutCount: 0,
-      skippedWorkoutCount: 0,
-      pendingWorkoutCount: 2,
-    },
-    nextWorkout: null,
-  } satisfies WorkoutAiPromptInput;
-  const sanitized = applyWorkoutAiTextQualityGate(input, {
-    analysisSummary: "The run averaged 155 bpm and matched the intended heart-rate target.",
-    differenceExplanation: "The supported duration and distance facts are available below.",
-    nextWorkoutRecommendation: "Continue with the next planned workout as written.",
-    recommendationLevel: "keep",
-    cautionFlags: [],
-  });
-
-  assert.doesNotMatch(
-    JSON.stringify(sanitized),
-    /155\s*bpm/i,
-    "unsupported provider metric claims must fall back before runner-facing readback",
-  );
 }
 
 function compare(

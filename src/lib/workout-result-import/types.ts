@@ -65,6 +65,31 @@ export class WorkoutResultImportError extends Error {
   }
 }
 
+/** The only error copy that may leave the workout-result server boundary. */
+export function runnerSafeWorkoutResultMessage(error: unknown): string {
+  if (!(error instanceof WorkoutResultImportError)) {
+    return "The Garmin result could not be processed. Your planned workout is unchanged.";
+  }
+
+  const messages: Record<WorkoutResultImportError["code"], string> = {
+    auth_required: "Sign in again before changing Garmin evidence.",
+    invalid_upload: "Choose a Garmin .fit file or a .zip archive before uploading.",
+    unsupported_file_type:
+      "Only Garmin .fit files or .zip archives containing one FIT activity are supported.",
+    file_too_large: "Choose a Garmin file smaller than 25 MB.",
+    planned_workout_not_found: "That planned workout is no longer available for this upload.",
+    rest_day_not_supported: "Garmin activity evidence can only be attached to a planned workout.",
+    zip_missing_fit: "This ZIP does not contain a usable Garmin FIT activity file.",
+    zip_multiple_fit: "This ZIP contains more than one FIT file. Upload one Garmin activity only.",
+    fit_parse_failed:
+      "We could not read that Garmin activity. Choose the original FIT activity file and try again.",
+    storage_failed: "We could not store that Garmin file. Try again shortly.",
+    persistence_failed: "The Garmin result could not be saved. Your planned workout is unchanged.",
+  };
+
+  return messages[error.code];
+}
+
 export interface ExtractedGarminFitFile {
   primaryFileKind: "fit";
   primaryFileName: string;

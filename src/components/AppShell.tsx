@@ -349,10 +349,22 @@ export function AppShell({
                       className="hito-shell-menu hito-shell-menu-plan"
                     >
                       <DropdownMenuLabel>Current Plan</DropdownMenuLabel>
-                      <DropdownMenuItem className="hito-shell-menu-item" onSelect={openCreatePlan}>
-                        <Icon name="sparkles" size="sm" />
-                        Create New Plan
-                      </DropdownMenuItem>
+                      {planAvailable ? (
+                        <DropdownMenuItem
+                          className="hito-shell-menu-item"
+                          onSelect={openCreatePlan}
+                        >
+                          <Icon name="sparkles" size="sm" />
+                          Create New Plan
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem className="hito-shell-menu-item" asChild>
+                          <Link to="/" reloadDocument>
+                            <Icon name="sparkles" size="sm" />
+                            Create Plan
+                          </Link>
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem className="hito-shell-menu-item" onSelect={openImportJson}>
                         <Icon name="import" size="sm" />
                         Import JSON
@@ -469,14 +481,26 @@ export function AppShell({
               <div className="hito-shell-plan-sheet-body">
                 {showPlanHeaderActions ? (
                   <div className="hito-row-group">
-                    <MobilePlanActionButton
-                      icon="sparkles"
-                      label="Create New Plan"
-                      onClick={() => {
-                        closeMobilePlanActions();
-                        openCreatePlan();
-                      }}
-                    />
+                    {planAvailable ? (
+                      <MobilePlanActionButton
+                        icon="sparkles"
+                        label="Create New Plan"
+                        onClick={() => {
+                          closeMobilePlanActions();
+                          openCreatePlan();
+                        }}
+                      />
+                    ) : (
+                      <Link
+                        to="/"
+                        reloadDocument
+                        className="hito-list-row"
+                        onClick={closeMobilePlanActions}
+                      >
+                        <Icon name="sparkles" size="sm" />
+                        <span className="hito-list-row-title">Create Plan</span>
+                      </Link>
+                    )}
                     <MobilePlanActionButton
                       icon="import"
                       label="Import JSON"

@@ -28,6 +28,8 @@ interface TrainingPreferenceFieldsProps {
   recent5kPace?: string;
   onRecent5kPaceChange?: (value: string) => void;
   showFitnessBenchmark?: boolean;
+  allowCustomFitnessLevelSelection?: boolean;
+  fitnessBenchmarkHelper?: string;
   fixedRestDaysHelper?: string;
   runningDaysLabel?: string;
   maxRunningDaysHelper?: string;
@@ -51,6 +53,8 @@ export function TrainingPreferenceFields({
   recent5kPace = "",
   onRecent5kPaceChange,
   showFitnessBenchmark = false,
+  allowCustomFitnessLevelSelection = true,
+  fitnessBenchmarkHelper,
   fixedRestDaysHelper,
   runningDaysLabel,
   maxRunningDaysHelper,
@@ -59,7 +63,8 @@ export function TrainingPreferenceFields({
   runningDaysMode = "ceiling",
 }: TrainingPreferenceFieldsProps) {
   const allowedRunningDayCount = WEEKDAY_OPTIONS.length - fixedRestDays.length;
-  const canShowFitnessBenchmark = showFitnessBenchmark;
+  const canShowFitnessBenchmark =
+    showFitnessBenchmark && Boolean(fitnessLevel && onFitnessLevelChange);
   const canSelectMoreRestDays = fixedRestDays.length < WEEKDAY_OPTIONS.length - 1;
   const preferredLongRunGroup = useHitoRadioGroup({
     items: [
@@ -72,7 +77,10 @@ export function TrainingPreferenceFields({
     value: preferredLongRunDay,
   });
   const fitnessBenchmarkGroup = useHitoRadioGroup({
-    items: FITNESS_LEVEL_OPTIONS.map((option) => ({ value: option.value })),
+    items: FITNESS_LEVEL_OPTIONS.map((option) => ({
+      value: option.value,
+      disabled: option.value === "custom" && !allowCustomFitnessLevelSelection,
+    })),
     value: fitnessLevel,
   });
 
@@ -198,12 +206,8 @@ export function TrainingPreferenceFields({
         </div>
       </TrainingPreferenceField>
 
-      {canShowFitnessBenchmark &&
-      fitnessLevel &&
-      onFitnessLevelChange &&
-      onRecent5kTimeChange &&
-      onRecent5kPaceChange ? (
-        <TrainingPreferenceField label="Fitness benchmark">
+      {canShowFitnessBenchmark && fitnessLevel && onFitnessLevelChange ? (
+        <TrainingPreferenceField label="Fitness benchmark" helper={fitnessBenchmarkHelper}>
           <div
             className="grid gap-2"
             {...fitnessBenchmarkGroup.groupProps}
@@ -216,6 +220,7 @@ export function TrainingPreferenceFields({
                   key={option.value}
                   type="button"
                   {...fitnessBenchmarkGroup.getRadioProps(option.value)}
+                  disabled={option.value === "custom" && !allowCustomFitnessLevelSelection}
                   className="hito-choice-toggle hito-choice-toggle-card min-h-14 w-full justify-between whitespace-normal text-left"
                   data-selected={active}
                   onClick={() => onFitnessLevelChange(option.value)}
@@ -231,7 +236,7 @@ export function TrainingPreferenceFields({
             })}
           </div>
 
-          {fitnessLevel === "custom" ? (
+          {fitnessLevel === "custom" && onRecent5kTimeChange && onRecent5kPaceChange ? (
             <RecentFiveKBenchmarkFields
               className="mt-2"
               required

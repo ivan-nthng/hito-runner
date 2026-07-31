@@ -776,6 +776,36 @@ is incomplete unless it includes one of:
 - `none — subagent tools unavailable`, plus a note that the agent still completed safe local
   sequential audits instead of asking the user to copy-paste micro-prompts
 
+### Approval-Resilient Execution (Mandatory)
+
+The user's standing instruction is that routine project work is authorized. Agents must not pause
+for another Product or user decision merely because a tool displays, has displayed, or may display a
+system approval surface.
+
+- Treat a Codex, sandbox, browser, or operating-system approval as an execution-environment gate,
+  not as missing Product permission. The agent cannot silently bypass it and must not claim that an
+  earlier "Always approve" choice guarantees a different command, host, thread, or sandbox class.
+- Before requesting an approval, first look for an existing safe path: workspace-local source and
+  logs, a managed loopback runtime, named local QA testers, read-only inspection, an already
+  approved command prefix, or a fixture-backed replay. Prefer that path when it proves the same
+  claim.
+- Never ask for approval merely to inspect source, read local artifacts, run a safe scoped check,
+  or continue independent analysis. Keep progressing on all work that does not require the gated
+  action while a gate is unresolved.
+- If a privileged operation is genuinely indispensable, request it once, concisely, and only after
+  naming why the safe alternatives cannot complete the remaining proof. Consolidate compatible
+  privileged actions instead of prompting one command at a time.
+- Do not turn an environment approval into a user relay task. The execution owner remains
+  responsible for choosing the least-privileged viable command and for completing the rest of its
+  bounded task.
+- A final report that remains blocked by an approval must identify the exact command or capability,
+  the proof it prevents, the safe checks that still ran, and the product-risk consequence. It must
+  not call an approval-gated task accepted.
+
+Product approval is required only for a genuine product, data, billing, destructive, or scope
+decision that the active plan has not already authorized. It is not required for routine local
+implementation, local QA, source review, fixture use, or ordinary validation.
+
 Good default subagent work:
 
 - read-only source/import/reference audits

@@ -1,47 +1,23 @@
 import "@tanstack/react-start/server-only";
-import { parseBodyNotesValue } from "@/lib/body-notes";
 import type { Database, Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
-import { collectRowsForIdBatches } from "@/lib/supabase/batched-in-filter";
-import {
-  deriveWeekStatus,
-  deriveWorkoutRichModel,
-  inferWorkoutStatus,
-  weekOf,
-  workoutDistanceKm,
-  workoutDuration,
-  type Step,
-  type Workout,
-  type WorkoutLog,
-} from "@/lib/training";
-import { readWorkoutDocumentSections } from "@/lib/workout-document";
 import { buildDeterministicWorkoutComparison } from "@/lib/workout-result-import/compare-workout-result";
 import { buildWorkoutResultEvidenceBundle } from "@/lib/workout-result-import/evidence-bundle";
-import {
-  buildWorkoutAiBodyNoteContext,
-  clampWorkoutAiInsight,
-  generateWorkoutAiInsight,
-  type WorkoutAiPromptInput,
-} from "@/lib/workout-result-import/generate-workout-ai-insight";
 import {
   actualMetricsRowToSummary,
   comparisonRowToSummary,
   getLatestWorkoutResultFeedback,
   resultAssetRowToSummary,
-  workoutAiInsightRowToSummary,
 } from "@/lib/workout-result-import/read-workout-result-feedback";
 import {
   type ExtractedGarminFitFile,
   MAX_WORKOUT_RESULT_UPLOAD_BYTES,
   WORKOUT_RESULT_STORAGE_BUCKET,
   type WorkoutResultAssetKind,
+  runnerSafeWorkoutResultMessage,
   WorkoutResultImportError,
 } from "@/lib/workout-result-import/types";
 
-type PersistedWorkoutActualMetricsRow =
-  Database["public"]["Tables"]["workout_actual_metrics"]["Row"];
-type PersistedWorkoutComparisonRow = Database["public"]["Tables"]["workout_comparisons"]["Row"];
-type PersistedWorkoutLogRow = Database["public"]["Tables"]["workout_logs"]["Row"];
 type OwnedPlannedWorkoutRow = Pick<
   Database["public"]["Tables"]["planned_workouts"]["Row"],
   | "id"
@@ -260,19 +236,13 @@ export async function ingestGarminWorkoutResult(params: {
       );
     }
 
-    const latestAiInsight = await tryPersistWorkoutAiInsight({
-      userId,
-      plannedWorkout,
-      actualMetrics: metricsInsert.data,
-      comparison: comparisonInsert.data,
-    });
     const latestAsset = resultAssetRowToSummary(assetUpdate.data);
     const latestActualMetrics = actualMetricsRowToSummary(metricsInsert.data);
     const feedback = buildWorkoutResultEvidenceBundle({
       latestAsset,
       latestActualMetrics,
       latestComparison,
-      latestAiInsight,
+      latestAiInsight: null,
     });
 
     return {
@@ -285,12 +255,7 @@ export async function ingestGarminWorkoutResult(params: {
       ...feedback,
     };
   } catch (error) {
-    const message =
-      error instanceof WorkoutResultImportError
-        ? error.message
-        : error instanceof Error
-          ? error.message
-          : "The Garmin result could not be parsed.";
+    const message = runnerSafeWorkoutResultMessage(error);
 
     await supabase
       .from("workout_result_assets")
@@ -636,245 +601,4 @@ function normalizeMimeType(mimeType: string, assetKind: WorkoutResultAssetKind) 
   }
 
   return assetKind === "garmin_zip" ? "application/zip" : "application/octet-stream";
-}
-
-async function tryPersistWorkoutAiInsight(args: {
-  userId: string;
-  plannedWorkout: OwnedPlannedWorkoutRow;
-  actualMetrics: PersistedWorkoutActualMetricsRow;
-  comparison: PersistedWorkoutComparisonRow;
-}) {
-  const { userId, plannedWorkout, actualMetrics, comparison } = args;
-
-  try {
-    const { checkRunnerCapability } = await import("@/lib/entitlements/check-runner-capability");
-    const capabilityCheck = await checkRunnerCapability({
-      userId,
-      capabilityKey: "garmin_ai_interpretation",
-    });
-
-    if (!capabilityCheck.allowed) {
-      return null;
-    }
-
-    const promptInput = await buildWorkoutAiPromptInput(args);
-    const generated = await generateWorkoutAiInsight(promptInput);
-    const boundedOutput = clampWorkoutAiInsight(promptInput, generated.output);
-    const supabase = createAdminSupabaseClient();
-    const insertResult = await supabase
-      .from("workout_ai_insights")
-      .insert({
-        user_id: userId,
-        planned_workout_id: plannedWorkout.id,
-        actual_metrics_id: actualMetrics.id,
-        comparison_id: comparison.id,
-        model: generated.model,
-        response_id: generated.responseId,
-        status: "final",
-        analysis_summary: boundedOutput.analysisSummary,
-        difference_explanation: boundedOutput.differenceExplanation,
-        next_workout_recommendation: boundedOutput.nextWorkoutRecommendation,
-        recommendation_level: boundedOutput.recommendationLevel,
-        caution_flags: boundedOutput.cautionFlags,
-      })
-      .select("*")
-      .single();
-
-    if (insertResult.error) {
-      throw new Error(insertResult.error.message);
-    }
-
-    const supersedeResult = await supabase
-      .from("workout_ai_insights")
-      .update({ status: "superseded" })
-      .eq("planned_workout_id", plannedWorkout.id)
-      .eq("status", "final")
-      .neq("id", insertResult.data.id);
-
-    if (supersedeResult.error) {
-      console.error("Failed to supersede prior workout AI insights", supersedeResult.error);
-    }
-
-    return workoutAiInsightRowToSummary(insertResult.data);
-  } catch (error) {
-    console.error("Workout AI insight generation failed", {
-      plannedWorkoutId: plannedWorkout.id,
-      actualMetricsId: actualMetrics.id,
-      comparisonId: comparison.id,
-      error,
-    });
-    return null;
-  }
-}
-
-async function buildWorkoutAiPromptInput(args: {
-  userId: string;
-  plannedWorkout: OwnedPlannedWorkoutRow;
-  actualMetrics: PersistedWorkoutActualMetricsRow;
-  comparison: PersistedWorkoutComparisonRow;
-}): Promise<WorkoutAiPromptInput> {
-  const { userId, plannedWorkout, actualMetrics, comparison } = args;
-  const supabase = createAdminSupabaseClient();
-  const workoutsResult = await supabase
-    .from("planned_workouts")
-    .select(
-      "id, plan_cycle_id, user_id, workout_date, weekday, week_number, phase, workout_type, source_workout_type, workout_family, workout_identity, calendar_icon_key, goal_context, metric_mode, title, notes, steps, display_order",
-    )
-    .eq("plan_cycle_id", plannedWorkout.plan_cycle_id)
-    .eq("user_id", userId)
-    .order("workout_date", { ascending: true })
-    .order("display_order", { ascending: true });
-
-  if (workoutsResult.error) {
-    throw new Error(workoutsResult.error.message);
-  }
-
-  const workoutIds = workoutsResult.data.map((row) => row.id);
-  const logs = await collectRowsForIdBatches(workoutIds, (ids) =>
-    supabase.from("workout_logs").select("*").in("planned_workout_id", ids),
-  );
-
-  const logsByWorkoutId = new Map(logs.map((log) => [log.planned_workout_id, log]));
-  const contextDate = plannedWorkout.workout_date;
-  const workouts = workoutsResult.data.map((row) =>
-    persistedWorkoutRowToView(row, logsByWorkoutId.get(row.id) ?? null, contextDate),
-  );
-  const currentWorkout =
-    workouts.find((workout) => workout.id === plannedWorkout.id) ??
-    persistedWorkoutRowToView(
-      plannedWorkout,
-      logsByWorkoutId.get(plannedWorkout.id) ?? null,
-      contextDate,
-    );
-
-  const weekWorkouts = weekOf(workouts, plannedWorkout.workout_date).filter(
-    (workout) => workout.type !== "rest",
-  );
-  const nextWorkout = workouts.find(
-    (workout) =>
-      workout.type !== "rest" &&
-      (workout.date > plannedWorkout.workout_date ||
-        (workout.date === plannedWorkout.workout_date && workout.id !== plannedWorkout.id)),
-  );
-  const comparisonSummary = comparisonRowToSummary(comparison);
-
-  if (!comparisonSummary) {
-    throw new Error("Workout comparison payload is unavailable for AI insight.");
-  }
-
-  const comparisonPayload = comparisonSummary.differencePayload;
-  const bodyNoteContext = buildWorkoutAiBodyNoteContext(currentWorkout.log?.bodyNotes ?? []);
-
-  return {
-    plannedWorkout: {
-      id: currentWorkout.id,
-      date: currentWorkout.date,
-      weekday: currentWorkout.weekday,
-      phase: currentWorkout.phase,
-      weekNumber: currentWorkout.week,
-      title: currentWorkout.title,
-      workoutType: currentWorkout.type,
-      sourceWorkoutType: currentWorkout.sourceWorkoutType ?? null,
-      notes: currentWorkout.notes,
-      plannedDurationMin:
-        comparisonPayload?.plannedWorkout.plannedDurationMin ?? workoutDuration(currentWorkout),
-      plannedDistanceKm: comparisonPayload?.plannedWorkout.explicitPlannedDistanceKm ?? null,
-      stepOutline: currentWorkout.steps.map((step, index) => ({
-        sequence: step.sequence ?? index + 1,
-        type: step.type,
-        label: step.label ?? null,
-        durationMin: step.duration_min ?? null,
-        distanceKm: step.distance_km ?? null,
-        repeats: step.repeats ?? null,
-      })),
-    },
-    actualMetrics: {
-      id: actualMetrics.id,
-      activityLocalDate: actualMetrics.activity_local_date,
-      actualDurationMin: actualMetrics.actual_duration_min,
-      actualDistanceKm: actualMetrics.actual_distance_km,
-      actualIntervalCount: actualMetrics.actual_interval_count,
-    },
-    comparison: {
-      comparisonStatus: comparisonSummary.comparisonStatus,
-      completionState: comparisonSummary.completionState,
-      comparisonConfidence: comparisonSummary.comparisonConfidence,
-      differencePayload: comparisonPayload,
-    },
-    currentWeekContext: {
-      weekNumber: currentWorkout.week,
-      weekStatus: deriveWeekStatus(workouts, plannedWorkout.workout_date),
-      plannedNonRestWorkoutCount: weekWorkouts.length,
-      completedWorkoutCount: weekWorkouts.filter((workout) => workout.status === "completed")
-        .length,
-      partialWorkoutCount: weekWorkouts.filter((workout) => workout.status === "partial").length,
-      skippedWorkoutCount: weekWorkouts.filter((workout) => workout.status === "skipped").length,
-      pendingWorkoutCount: weekWorkouts.filter(
-        (workout) => workout.status === "today" || workout.status === "upcoming",
-      ).length,
-    },
-    nextWorkout: nextWorkout
-      ? {
-          date: nextWorkout.date,
-          title: nextWorkout.title,
-          workoutType: nextWorkout.type,
-          sourceWorkoutType: nextWorkout.sourceWorkoutType ?? null,
-          plannedDurationMin: workoutDuration(nextWorkout),
-          plannedDistanceKm: workoutDistanceKm(nextWorkout),
-          notes: nextWorkout.notes,
-        }
-      : null,
-    ...(bodyNoteContext ? { bodyNoteContext } : {}),
-  };
-}
-
-function persistedWorkoutRowToView(
-  workout: OwnedPlannedWorkoutRow,
-  log: PersistedWorkoutLogRow | null,
-  currentDate: string,
-): Workout {
-  const mappedLog = log ? persistedWorkoutLogToView(log) : null;
-  const steps = readWorkoutDocumentSections(workout.steps);
-
-  return {
-    id: workout.id,
-    date: workout.workout_date,
-    weekday: workout.weekday,
-    week: workout.week_number,
-    phase: workout.phase,
-    type: workout.workout_type,
-    sourceWorkoutType: workout.source_workout_type,
-    ...deriveWorkoutRichModel({
-      type: workout.workout_type,
-      sourceWorkoutType: workout.source_workout_type,
-      workoutFamily: workout.workout_family,
-      workoutIdentity: workout.workout_identity,
-      calendarIconKey: workout.calendar_icon_key,
-      goalContext: workout.goal_context,
-      metricMode: workout.metric_mode,
-      title: workout.title,
-      steps,
-    }),
-    title: workout.title,
-    notes: workout.notes,
-    steps,
-    feedbackMarker: null,
-    sourceEditing: null,
-    log: mappedLog,
-    status: inferWorkoutStatus(workout.workout_type, workout.workout_date, currentDate, mappedLog),
-  };
-}
-
-function persistedWorkoutLogToView(log: PersistedWorkoutLogRow): WorkoutLog {
-  return {
-    id: log.id,
-    outcome: log.outcome,
-    actualDistanceKm: log.actual_distance_km,
-    actualDurationMin: log.actual_duration_min,
-    rpe: log.rpe,
-    notes: log.notes,
-    intervalsCompleted: log.intervals_completed,
-    bodyNotes: parseBodyNotesValue(log.body_notes),
-    loggedAt: log.logged_at,
-  };
 }

@@ -32,15 +32,17 @@ import {
   type ManualCalendarActionState,
 } from "@/components/calendar/manual-calendar-actions";
 import {
+  addDaysIso,
   displayWorkoutTargetReadbackEntries,
   formatDistanceKm,
   formatDurationMin,
+  formatDate,
+  startOfWeekIso,
   workoutDuration,
   workoutDistanceKm,
   workoutStatusLabel,
   workoutTypeMeta,
   weekdayShort,
-  formatDate,
   type TrainingSnapshot,
   type Workout,
 } from "@/lib/training";
@@ -66,7 +68,7 @@ const TOOLTIP_ANCHOR_GAP = 10;
 export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
   const router = useRouter();
   const [view, setView] = useState<View>("month");
-  const [cursor, setCursor] = useState(() => new Date(`${snapshot.currentDate}T00:00:00`));
+  const [cursor, setCursor] = useState(snapshot.currentDate);
   const [tooltipAnchor, setTooltipAnchor] = useState<TooltipAnchor | null>(null);
   const { manualCalendarActionState, manualMoveControllerProps } = useManualCalendarActions(
     snapshot,
@@ -78,7 +80,7 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
 
   const cells = useMemo(() => buildMonth(cursor), [cursor]);
   const mobileMonthDates = useMemo(() => buildMonthDays(cursor), [cursor]);
-  const monthLabel = cursor.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const monthLabel = formatDate(cursor, { month: "long", year: "numeric" });
   const tooltipWorkout = tooltipAnchor
     ? (resolveCalendarMoveDateRender(
         snapshot.workouts,
@@ -87,23 +89,13 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
       ).workout ?? null)
     : null;
 
-  const weekCells = useMemo(() => {
-    const date = new Date(cursor);
-    const day = (date.getDay() + 6) % 7;
-    const monday = new Date(date);
-    monday.setDate(date.getDate() - day);
-    return Array.from({ length: 7 }, (_, index) => {
-      const current = new Date(monday);
-      current.setDate(monday.getDate() + index);
-      return current.toISOString().slice(0, 10);
-    });
-  }, [cursor]);
+  const weekCells = useMemo(
+    () => Array.from({ length: 7 }, (_, index) => addDaysIso(startOfWeekIso(cursor), index)),
+    [cursor],
+  );
 
   function shift(amount: number) {
-    const date = new Date(cursor);
-    if (view === "month") date.setMonth(date.getMonth() + amount);
-    else date.setDate(date.getDate() + amount * 7);
-    setCursor(date);
+    setCursor(view === "month" ? shiftMonth(cursor, amount) : addDaysIso(cursor, amount * 7));
     setTooltipAnchor(null);
   }
 
@@ -145,7 +137,7 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
           </button>
           <button
             onClick={() => {
-              setCursor(new Date(`${snapshot.currentDate}T00:00:00`));
+              setCursor(snapshot.currentDate);
               setTooltipAnchor(null);
             }}
             className="hito-button hito-button-secondary hito-button-sm"
@@ -174,9 +166,7 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
                 <DayCell
                   key={index}
                   iso={iso}
-                  inMonth={
-                    iso ? new Date(`${iso}T00:00:00`).getMonth() === cursor.getMonth() : false
-                  }
+                  inMonth={iso ? iso.slice(0, 7) === cursor.slice(0, 7) : false}
                   manualCalendarActionState={manualCalendarActionState}
                   onTooltipChange={setTooltipAnchor}
                   snapshot={snapshot}
@@ -299,12 +289,15 @@ function MobileMonthList({
   );
 }
 
-function buildMonthDays(cursor: Date): string[] {
-  const daysInMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
-  return Array.from({ length: daysInMonth }, (_, index) => {
-    const date = new Date(cursor.getFullYear(), cursor.getMonth(), index + 1);
-    return date.toISOString().slice(0, 10);
-  });
+function buildMonthDays(cursor: string): string[] {
+  const month = cursor.slice(0, 7);
+  const dates: string[] = [];
+
+  for (let date = `${month}-01`; date.slice(0, 7) === month; date = addDaysIso(date, 1)) {
+    dates.push(date);
+  }
+
+  return dates;
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -326,30 +319,31 @@ function tooltipAnchorFromElement(iso: string, element: HTMLElement): TooltipAnc
   };
 }
 
-function buildMonth(cursor: Date): (string | null)[] {
-  const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
-  const startOffset = (first.getDay() + 6) % 7;
-  const daysInMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
-  const cells: (string | null)[] = [];
+function buildMonth(cursor: string): string[] {
+  const month = cursor.slice(0, 7);
+  const cells: string[] = [];
+  let date = startOfWeekIso(`${month}-01`);
 
-  for (let index = startOffset; index > 0; index -= 1) {
-    const date = new Date(first);
-    date.setDate(first.getDate() - index);
-    cells.push(date.toISOString().slice(0, 10));
-  }
-
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    const date = new Date(cursor.getFullYear(), cursor.getMonth(), day);
-    cells.push(date.toISOString().slice(0, 10));
-  }
-
-  while (cells.length % 7 !== 0) {
-    const last = new Date(`${cells[cells.length - 1]}T00:00:00`);
-    last.setDate(last.getDate() + 1);
-    cells.push(last.toISOString().slice(0, 10));
-  }
+  do {
+    cells.push(date);
+    date = addDaysIso(date, 1);
+  } while (date.slice(0, 7) === month || cells.length % 7 !== 0);
 
   return cells;
+}
+
+function shiftMonth(cursor: string, amount: number): string {
+  const dayIndex = Number(cursor.slice(8, 10)) - 1;
+  let monthStart = `${cursor.slice(0, 7)}-01`;
+
+  for (let index = 0; index < Math.abs(amount); index += 1) {
+    monthStart =
+      amount > 0
+        ? `${addDaysIso(monthStart, 31).slice(0, 7)}-01`
+        : `${addDaysIso(monthStart, -1).slice(0, 7)}-01`;
+  }
+
+  return addDaysIso(monthStart, dayIndex);
 }
 
 function DayCell({

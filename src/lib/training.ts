@@ -1483,15 +1483,18 @@ export function statsTotals(snapshot: TrainingSnapshot) {
 }
 
 export function formatDate(iso: string, opts?: Intl.DateTimeFormatOptions): string {
-  return dateFromIso(iso).toLocaleDateString("en-US", opts ?? { month: "short", day: "numeric" });
+  return dateFromIso(iso).toLocaleDateString("en-US", {
+    ...(opts ?? { month: "short", day: "numeric" }),
+    timeZone: "UTC",
+  });
 }
 
 export function weekdayShort(iso: string): string {
-  return dateFromIso(iso).toLocaleDateString("en-US", { weekday: "short" });
+  return dateFromIso(iso).toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
 }
 
 export function weekdayLong(iso: string): string {
-  return dateFromIso(iso).toLocaleDateString("en-US", { weekday: "long" });
+  return dateFromIso(iso).toLocaleDateString("en-US", { weekday: "long", timeZone: "UTC" });
 }
 
 export function inferWorkoutStatus(
@@ -1509,7 +1512,7 @@ export function inferWorkoutStatus(
 
 export function addDaysIso(iso: string, days: number) {
   const date = dateFromIso(iso);
-  date.setDate(date.getDate() + days);
+  date.setUTCDate(date.getUTCDate() + days);
   return toIsoDate(date);
 }
 
@@ -1520,8 +1523,8 @@ export function diffDaysIso(a: string, b: string) {
 
 export function startOfWeekIso(iso: string) {
   const date = dateFromIso(iso);
-  const weekday = (date.getDay() + 6) % 7;
-  date.setDate(date.getDate() - weekday);
+  const weekday = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - weekday);
   return toIsoDate(date);
 }
 
@@ -1535,7 +1538,7 @@ export function todayIso() {
 }
 
 function dateFromIso(iso: string) {
-  return new Date(`${iso}T00:00:00`);
+  return new Date(`${iso}T00:00:00Z`);
 }
 
 function toIsoDate(date: Date) {

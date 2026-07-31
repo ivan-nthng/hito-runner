@@ -19,6 +19,14 @@ import {
   normalizePlanGoalIntent,
   type NormalizedPlanGoalIntent,
 } from "../src/lib/plan-creation-engine/plan-goal-intent";
+import {
+  addDaysIso,
+  diffDaysIso,
+  formatDate,
+  startOfWeekIso,
+  weekdayLong,
+  weekdayShort,
+} from "../src/lib/training";
 import type { TrainingPlanV2 } from "../src/lib/imported-plan";
 import { buildProofRunnerProfileSnapshot } from "./runner-profile-snapshot-proof-helpers";
 
@@ -36,11 +44,33 @@ const baseInput = {
 } satisfies RunningPlanPreviewActionInput;
 
 async function main() {
+  validateDateOnlyContract();
   validateActionSchemaBoundary();
   validatePlanGoalIntentNormalizer();
   await validateSelectedPlanReviewAndReadback();
 
   console.log("Plan goal intent contract validator passed.");
+}
+
+function validateDateOnlyContract() {
+  assert.equal(addDaysIso("2026-08-01", 1), "2026-08-02");
+  assert.equal(addDaysIso("2026-08-01", -1), "2026-07-31");
+  assert.equal(addDaysIso("2026-03-29", 1), "2026-03-30", "DST must not alter day arithmetic.");
+  assert.equal(addDaysIso("2026-01-31", 1), "2026-02-01", "Month rollover must be exact.");
+  assert.equal(
+    addDaysIso("2026-03-01", -1),
+    "2026-02-28",
+    "Negative month rollover must be exact.",
+  );
+  assert.equal(addDaysIso("2024-02-28", 1), "2024-02-29", "Leap-day arithmetic must be exact.");
+  assert.equal(addDaysIso("2024-02-29", 1), "2024-03-01");
+  assert.equal(addDaysIso("2026-12-31", 1), "2027-01-01");
+  assert.equal(diffDaysIso("2026-08-02", "2026-08-01"), 1);
+  assert.equal(diffDaysIso("2026-03-30", "2026-03-29"), 1, "DST must not change day difference.");
+  assert.equal(weekdayLong("2026-08-01"), "Saturday");
+  assert.equal(weekdayShort("2026-08-01"), "Sat");
+  assert.equal(startOfWeekIso("2026-08-01"), "2026-07-27");
+  assert.equal(formatDate("2026-08-01"), "Aug 1");
 }
 
 function validateActionSchemaBoundary() {

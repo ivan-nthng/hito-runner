@@ -36,9 +36,9 @@ type CompletionFormState = {
   outcome: Outcome;
   actualKm: string;
   actualMin: string;
-  rpe: number;
+  rpe: number | null;
   notes: string;
-  intervalsCompleted: number;
+  intervalsCompleted: number | null;
   bodyNotes: BodyNoteDraft[];
 };
 const EMPTY_SAVED_BODY_NOTES: BodyNote[] = [];
@@ -98,11 +98,11 @@ export function CompletionPanel({
     [savedPayloadFromWorkout],
   );
   const syncedFormState = useMemo(
-    () => buildInitialFormState(savedPayloadFromWorkout, plannedKm, plannedMin, plannedRepeats),
-    [plannedKm, plannedMin, plannedRepeats, savedPayloadFromWorkout],
+    () => buildInitialFormState(savedPayloadFromWorkout),
+    [savedPayloadFromWorkout],
   );
   const [form, setForm] = useState<CompletionFormState>(() =>
-    buildInitialFormState(savedPayloadFromWorkout, plannedKm, plannedMin, plannedRepeats),
+    buildInitialFormState(savedPayloadFromWorkout),
   );
   const outcomeGroup = useHitoRadioGroup({
     items: [{ value: "completed" }, { value: "partial" }, { value: "skipped" }],
@@ -111,7 +111,7 @@ export function CompletionPanel({
   const intervalValues = Array.from({ length: plannedRepeats }, (_, index) => String(index + 1));
   const intervalGroup = useHitoRadioGroup({
     items: intervalValues.map((value) => ({ value })),
-    value: String(form.intervalsCompleted),
+    value: form.intervalsCompleted == null ? "" : String(form.intervalsCompleted),
   });
   const formRef = useRef<CompletionFormState>(form);
   const [savedBaselineKey, setSavedBaselineKey] = useState(savedPayloadKey);
@@ -328,72 +328,7 @@ export function CompletionPanel({
           </p>
         </div>
       ) : (
-        <>
-          <div>
-            <Label>Planned vs actual</Label>
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <NumField
-                label="Distance"
-                suffix="km"
-                planned={plannedKm.toString()}
-                value={form.actualKm}
-                onChange={(value) => updateForm((current) => ({ ...current, actualKm: value }))}
-              />
-              <NumField
-                label="Duration"
-                suffix="min"
-                planned={plannedMin.toString()}
-                value={form.actualMin}
-                onChange={(value) => updateForm((current) => ({ ...current, actualMin: value }))}
-              />
-            </div>
-
-            {plannedRepeats > 0 && (
-              <div className="mt-4">
-                <div className="hito-label mb-2">Intervals completed</div>
-                <div
-                  className="hito-choice-toggle-group flex-nowrap"
-                  {...intervalGroup.groupProps}
-                  aria-label="Intervals completed"
-                >
-                  {intervalValues.map((intervalValue) => (
-                    <button
-                      key={intervalValue}
-                      type="button"
-                      {...intervalGroup.getRadioProps(intervalValue)}
-                      data-selected={
-                        form.intervalsCompleted === Number(intervalValue) ? "true" : undefined
-                      }
-                      onClick={() =>
-                        updateForm((current) => ({
-                          ...current,
-                          intervalsCompleted: Number(intervalValue),
-                        }))
-                      }
-                      className="hito-choice-toggle hito-choice-toggle-sm min-w-0 flex-1 font-mono-num"
-                    >
-                      {intervalValue}
-                    </button>
-                  ))}
-                </div>
-                <p className="hito-field-helper mt-2">Tap to mark how many reps were completed.</p>
-              </div>
-            )}
-          </div>
-
-          <div className="grid gap-5 sm:grid-cols-1">
-            <HitoSlider
-              label="Effort (RPE)"
-              value={form.rpe}
-              min={1}
-              max={10}
-              step={1}
-              onValueChange={(value) => updateForm((current) => ({ ...current, rpe: value }))}
-              valueLabel={`${form.rpe}/10`}
-              ariaValueText={`Effort ${form.rpe} out of 10`}
-            />
-          </div>
-        </>
+        <LogResultFeedbackBridge workout={workout} snapshot={snapshot} feedback={feedback} />
       )}
 
       <div>
@@ -401,23 +336,106 @@ export function CompletionPanel({
           <BodyNotesSummaryRow bodyNotes={form.bodyNotes} onOpen={openBodyNotesModal} />
         )}
 
-        <div className={cn(!isSkipped ? "mt-6 border-t border-hairline pt-5" : "")}>
-          <Label>Notes</Label>
-          <textarea
-            rows={3}
-            value={form.notes}
-            onChange={(event) =>
-              updateForm((current) => ({ ...current, notes: event.target.value }))
-            }
-            placeholder="Felt strong on the climb, slight tightness in right calf at km 6…"
-            className="hito-field hito-textarea-md mt-3 min-h-28 resize-none"
-          />
-          <p className="hito-caption mt-3">
-            {snapshot.source === "persisted"
-              ? "This saves your workout result. Garmin uploads live in Feedback."
-              : "Preview only. Results entered here are not saved."}
-          </p>
-        </div>
+        <details className={cn("hito-disclosure", !isSkipped && "mt-6")}>
+          <summary className="hito-disclosure-summary">
+            <span className="hito-list-row-title">Manually add details</span>
+            <Icon name="chevron-down" className="hito-disclosure-chevron" />
+          </summary>
+          <div className="hito-disclosure-body">
+            {!isSkipped ? (
+              <>
+                <div>
+                  <Label>Planned vs actual</Label>
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <NumField
+                      label="Distance"
+                      suffix="km"
+                      planned={plannedKm.toString()}
+                      value={form.actualKm}
+                      onChange={(value) =>
+                        updateForm((current) => ({ ...current, actualKm: value }))
+                      }
+                    />
+                    <NumField
+                      label="Duration"
+                      suffix="min"
+                      planned={plannedMin.toString()}
+                      value={form.actualMin}
+                      onChange={(value) =>
+                        updateForm((current) => ({ ...current, actualMin: value }))
+                      }
+                    />
+                  </div>
+
+                  {plannedRepeats > 0 && (
+                    <div className="mt-4">
+                      <div className="hito-label mb-2">Intervals completed</div>
+                      <div
+                        className="hito-choice-toggle-group flex-nowrap"
+                        {...intervalGroup.groupProps}
+                        aria-label="Intervals completed"
+                      >
+                        {intervalValues.map((intervalValue) => (
+                          <button
+                            key={intervalValue}
+                            type="button"
+                            {...intervalGroup.getRadioProps(intervalValue)}
+                            data-selected={
+                              form.intervalsCompleted === Number(intervalValue) ? "true" : undefined
+                            }
+                            onClick={() =>
+                              updateForm((current) => ({
+                                ...current,
+                                intervalsCompleted: Number(intervalValue),
+                              }))
+                            }
+                            className="hito-choice-toggle hito-choice-toggle-sm min-w-0 flex-1 font-mono-num"
+                          >
+                            {intervalValue}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="hito-field-helper mt-2">
+                        Tap to mark how many reps were completed.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <HitoSlider
+                  label="Effort (RPE)"
+                  value={form.rpe ?? 6}
+                  min={1}
+                  max={10}
+                  step={1}
+                  onValueChange={(value) => updateForm((current) => ({ ...current, rpe: value }))}
+                  valueLabel={form.rpe == null ? "Not recorded" : `${form.rpe}/10`}
+                  ariaValueText={
+                    form.rpe == null ? "Effort not recorded" : `Effort ${form.rpe} out of 10`
+                  }
+                />
+              </>
+            ) : null}
+
+            <div>
+              <Label>Notes</Label>
+              <textarea
+                rows={3}
+                value={form.notes}
+                onChange={(event) =>
+                  updateForm((current) => ({ ...current, notes: event.target.value }))
+                }
+                placeholder="Felt strong on the climb, slight tightness in right calf at km 6…"
+                className="hito-field hito-textarea-md mt-3 min-h-28 resize-none"
+              />
+              <p className="hito-caption mt-3">
+                {snapshot.source === "persisted"
+                  ? "This saves your workout result. Garmin uploads live in Feedback."
+                  : "Preview only. Results entered here are not saved."}
+              </p>
+            </div>
+          </div>
+        </details>
       </div>
 
       {!isSkipped ? (
@@ -437,7 +455,9 @@ export function CompletionPanel({
         />
       ) : null}
 
-      <LogResultFeedbackBridge workout={workout} snapshot={snapshot} feedback={feedback} />
+      {isSkipped ? (
+        <LogResultFeedbackBridge workout={workout} snapshot={snapshot} feedback={feedback} />
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-hairline">
         <button
@@ -456,12 +476,7 @@ export function CompletionPanel({
             try {
               const nextPayload = buildSavePayload(workout, formRef.current);
               await saveWorkoutLogFn({ data: nextPayload });
-              const reconciledFormState = buildInitialFormState(
-                nextPayload,
-                plannedKm,
-                plannedMin,
-                plannedRepeats,
-              );
+              const reconciledFormState = buildInitialFormState(nextPayload);
               const reconciledPayloadKey = serializePayload(
                 buildSavePayload(workout, reconciledFormState),
               );
@@ -611,7 +626,7 @@ export function WorkoutFeedbackPanel({
             <p className="hito-body mt-2">
               {attachedGarminAsset
                 ? "Your Garmin file and review live here."
-                : "Add a Garmin file if you want a deeper review."}
+                : "Add an activity file if you want a deeper review."}
             </p>
           </div>
           {headerPill ? (
@@ -657,7 +672,7 @@ export function WorkoutFeedbackPanel({
                 method: "POST",
                 body: formData,
               });
-              const payload = (await response.json()) as
+              const payload = await readWorkoutResultResponse<
                 | {
                     ok: true;
                     marker: NonNullable<WorkoutResultFeedbackSummary>["marker"];
@@ -666,11 +681,12 @@ export function WorkoutFeedbackPanel({
                     latestComparison: NonNullable<WorkoutResultFeedbackSummary>["latestComparison"];
                     latestAiInsight: NonNullable<WorkoutResultFeedbackSummary>["latestAiInsight"];
                   }
-                | { ok: false; message?: string };
+                | { ok: false; message?: string }
+              >(response, "The Garmin result upload could not be completed.");
 
               if (!response.ok || !payload.ok) {
-                throw new Error(
-                  "message" in payload && payload.message
+                throw new RunnerSafeWorkoutResultClientError(
+                  "message" in payload && typeof payload.message === "string"
                     ? payload.message
                     : "The Garmin result upload could not be completed.",
                 );
@@ -691,7 +707,7 @@ export function WorkoutFeedbackPanel({
               }
             } catch (uploadFailure) {
               setUploadError(
-                uploadFailure instanceof Error
+                uploadFailure instanceof RunnerSafeWorkoutResultClientError
                   ? uploadFailure.message
                   : "The Garmin result upload could not be completed.",
               );
@@ -739,16 +755,17 @@ export function WorkoutFeedbackPanel({
                     }),
                   });
 
-                  const payload = (await response.json()) as
+                  const payload = await readWorkoutResultResponse<
                     | {
                         ok: true;
                         feedback: WorkoutResultFeedbackSummary;
                       }
-                    | { ok: false; message?: string };
+                    | { ok: false; message?: string }
+                  >(response, "The Garmin evidence could not be removed.");
 
                   if (!response.ok || !payload.ok) {
-                    throw new Error(
-                      "message" in payload && payload.message
+                    throw new RunnerSafeWorkoutResultClientError(
+                      "message" in payload && typeof payload.message === "string"
                         ? payload.message
                         : "The Garmin evidence could not be removed.",
                     );
@@ -763,7 +780,7 @@ export function WorkoutFeedbackPanel({
                   }
                 } catch (removalFailure) {
                   setRemoveError(
-                    removalFailure instanceof Error
+                    removalFailure instanceof RunnerSafeWorkoutResultClientError
                       ? removalFailure.message
                       : "The Garmin evidence could not be removed.",
                   );
@@ -779,14 +796,15 @@ export function WorkoutFeedbackPanel({
                   <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-hairline bg-surface/40">
                     <Icon name="file-up" size="md" className="text-foreground/82" />
                   </div>
-                  <div className="hito-label">Upload Garmin file</div>
+                  <div className="hito-label">Upload activity file</div>
                   <h3 className="hito-panel-title mt-3">
-                    Add a Garmin run to compare it with the plan.
+                    Add an activity file to compare it with the plan.
                   </h3>
                   <p className="hito-body mt-3 max-w-xl">
-                    Use one Garmin <span className="hito-technical-mono">.fit</span> file or one{" "}
-                    <span className="hito-technical-mono">.zip</span> archive with exactly one FIT
-                    activity. That unlocks the comparison below.
+                    Hito currently accepts one Garmin{" "}
+                    <span className="hito-technical-mono">.fit</span> activity or one{" "}
+                    <span className="hito-technical-mono">.zip</span> archive containing exactly one
+                    FIT activity. That unlocks the comparison below.
                   </p>
                   <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
                     <button
@@ -803,7 +821,7 @@ export function WorkoutFeedbackPanel({
                       )}
                     >
                       <Icon name="file-up" size="sm" />
-                      {isUploading ? "Uploading file..." : "Upload Garmin file"}
+                      {isUploading ? "Uploading file..." : "Upload activity file"}
                     </button>
                   </div>
                 </div>
@@ -877,30 +895,16 @@ export function WorkoutFeedbackPanel({
 
 function buildInitialFormState(
   savedPayload: ReturnType<typeof buildSavedPayload>,
-  plannedKm: number,
-  plannedMin: number,
-  plannedRepeats: number,
 ): CompletionFormState {
   const outcome = savedPayload.outcome;
 
   return {
     outcome,
-    actualKm:
-      savedPayload.actualDistanceKm != null
-        ? savedPayload.actualDistanceKm.toString()
-        : outcome === "skipped"
-          ? ""
-          : plannedKm.toString(),
-    actualMin:
-      savedPayload.actualDurationMin != null
-        ? savedPayload.actualDurationMin.toString()
-        : outcome === "skipped"
-          ? ""
-          : plannedMin.toString(),
-    rpe: savedPayload.rpe ?? 6,
+    actualKm: savedPayload.actualDistanceKm?.toString() ?? "",
+    actualMin: savedPayload.actualDurationMin?.toString() ?? "",
+    rpe: savedPayload.rpe,
     notes: savedPayload.notes ?? "",
-    intervalsCompleted:
-      savedPayload.intervalsCompleted ?? (outcome === "skipped" ? 0 : plannedRepeats),
+    intervalsCompleted: savedPayload.intervalsCompleted,
     bodyNotes: savedPayload.bodyNotes.map((bodyNote) => ({
       area: bodyNote.area,
       severity: bodyNote.severity,
@@ -1026,6 +1030,9 @@ function AttachedEvidenceReadback({
           <div className="hito-label">Attached file</div>
           <p className="hito-list-row-title mt-2">{asset.originalFileName}</p>
           <p className="hito-caption mt-2">{metadata.join(" · ")}</p>
+          <p className="hito-caption mt-1">
+            Remove this file before uploading a replacement. Your manual result stays as it is.
+          </p>
           {asset.primaryFileName && asset.primaryFileName !== asset.originalFileName ? (
             <p className="hito-caption mt-1">Extracted activity: {asset.primaryFileName}</p>
           ) : null}
@@ -1052,6 +1059,19 @@ function AttachedEvidenceReadback({
       </div>
     </div>
   );
+}
+
+class RunnerSafeWorkoutResultClientError extends Error {}
+
+async function readWorkoutResultResponse<T>(
+  response: Response,
+  fallbackMessage: string,
+): Promise<T> {
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new RunnerSafeWorkoutResultClientError(fallbackMessage);
+  }
 }
 
 function getFeedbackUploadSummary({
@@ -1267,9 +1287,9 @@ function getFeedbackInviteState(
   }
 
   return {
-    label: "Add a Garmin file for deeper review",
+    label: "Add an activity file for deeper review",
     body: "Optional: compare the planned workout with the actual run in Feedback.",
-    cta: "Add Garmin file",
+    cta: "Add activity file",
     pill: null,
   };
 }

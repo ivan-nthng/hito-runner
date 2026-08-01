@@ -5,7 +5,11 @@ import {
 } from "@/lib/admin-access.server";
 import { resolveLocalAuthSession } from "@/lib/local-auth";
 import { resolveRuntimeAppBaseUrl } from "@/lib/supabase/env";
-import { createRequestSupabaseClient, mergeResponseHeaders } from "@/lib/supabase/server";
+import {
+  createRequestSupabaseClient,
+  mergeResponseHeaders,
+  resolveRequestSupabaseAuth,
+} from "@/lib/supabase/server";
 import { hasSupabaseBrowserEnv } from "@/lib/supabase/env";
 import {
   createLocalRuntimeRequestContext,
@@ -110,18 +114,7 @@ const authMiddleware = createMiddleware().server(
     const responseHeaders = new Headers();
     const supabase = createRequestSupabaseClient(request, responseHeaders);
 
-    let userId: string | null = null;
-    let email: string | null = null;
-
-    const userResult = await supabase.auth.getUser();
-
-    if (userResult.error) {
-      await supabase.auth.signOut();
-    } else {
-      const user = userResult.data.user;
-      userId = user?.id ?? null;
-      email = user?.email ?? null;
-    }
+    const { userId, email } = await resolveRequestSupabaseAuth(supabase);
 
     const result = await next({
       context: {

@@ -45,6 +45,42 @@ export function createAdminSupabaseClient(): SupabaseClient<Database> {
   });
 }
 
+export async function resolveRequestSupabaseAuth(supabase: Pick<SupabaseClient<Database>, "auth">) {
+  let userResult: Awaited<ReturnType<SupabaseClient<Database>["auth"]["getUser"]>>;
+
+  try {
+    userResult = await supabase.auth.getUser();
+  } catch {
+    // A transport failure cannot authenticate this request, but must not destroy a valid cookie.
+    return { userId: null, email: null };
+  }
+
+  if (userResult.error) {
+    // @supabase/ssr already clears a missing session through its cookie storage.
+    // Only clear cookies here when Auth has conclusively rejected their contents.
+    if (shouldClearRejectedSupabaseSession(userResult.error)) {
+      await supabase.auth.signOut();
+    }
+
+    return { userId: null, email: null };
+  }
+
+  return {
+    userId: userResult.data.user?.id ?? null,
+    email: userResult.data.user?.email ?? null,
+  };
+}
+
+export function shouldClearRejectedSupabaseSession(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const authError = error as { code?: unknown; status?: unknown };
+
+  return authError.code === "invalid_jwt" || authError.status === 401 || authError.status === 403;
+}
+
 export function mergeResponseHeaders(baseResponse: Response, extraHeaders: Headers) {
   const merged = new Headers(baseResponse.headers);
 

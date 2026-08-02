@@ -65,6 +65,13 @@ export class WorkoutResultImportError extends Error {
   }
 }
 
+/** Safe metadata for loopback request attribution; never includes parser or database details. */
+export const WORKOUT_RESULT_OBSERVABILITY_OUTCOME_HEADER = "x-hito-workout-result-outcome";
+
+export function workoutResultErrorResponseHeaders(code: WorkoutResultImportError["code"]) {
+  return { [WORKOUT_RESULT_OBSERVABILITY_OUTCOME_HEADER]: code };
+}
+
 /** The only error copy that may leave the workout-result server boundary. */
 export function runnerSafeWorkoutResultMessage(error: unknown): string {
   if (!(error instanceof WorkoutResultImportError)) {

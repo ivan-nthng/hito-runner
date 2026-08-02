@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
 import {
   runnerSafeWorkoutResultMessage,
+  workoutResultErrorResponseHeaders,
   WorkoutResultImportError,
 } from "@/lib/workout-result-import/types";
 
@@ -44,7 +45,7 @@ export const Route = createFileRoute("/api/workout-result/remove")({
                 code: error.code,
                 message: runnerSafeWorkoutResultMessage(error),
               },
-              { status: error.status },
+              { status: error.status, headers: workoutResultErrorResponseHeaders(error.code) },
             );
           }
 
@@ -58,7 +59,7 @@ export const Route = createFileRoute("/api/workout-result/remove")({
                 code: "auth_required",
                 message: "Sign in again before changing Garmin evidence.",
               },
-              { status: 401 },
+              { status: 401, headers: workoutResultErrorResponseHeaders("auth_required") },
             );
           }
 
@@ -68,7 +69,10 @@ export const Route = createFileRoute("/api/workout-result/remove")({
               code: "persistence_failed",
               message: runnerSafeWorkoutResultMessage(error),
             },
-            { status: 500 },
+            {
+              status: 500,
+              headers: workoutResultErrorResponseHeaders("persistence_failed"),
+            },
           );
         }
       },

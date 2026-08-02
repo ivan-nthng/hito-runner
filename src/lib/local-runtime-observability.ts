@@ -1,11 +1,31 @@
 import { getGlobalStartContext } from "@tanstack/react-start";
 import { isLoopbackRuntimeUrl } from "@/lib/supabase/env";
+import { WORKOUT_RESULT_OBSERVABILITY_OUTCOME_HEADER } from "@/lib/workout-result-import/types";
 
 export const LOCAL_RUNTIME_OBSERVABILITY_ROOT_ENV = "HITO_LOCAL_RUNTIME_OBSERVABILITY_ROOT";
 export const LOCAL_RUNTIME_URL_ENV = "HITO_LOCAL_RUNTIME_URL";
 export const LOCAL_RUNTIME_OBSERVABILITY_ENABLED_ENV = "HITO_LOCAL_RUNTIME_OBSERVABILITY";
 export const LOCAL_RUNTIME_ACTIVE_CALENDAR_DAYS = 3;
 export const LOCAL_PROVIDER_TRANSCRIPT_CATEGORY = "provider-transcripts";
+
+const LOCAL_RUNTIME_API_OPERATIONS = {
+  "/api/workout-result/upload": "workout_result_upload",
+  "/api/workout-result/remove": "workout_result_remove",
+} as const;
+
+const ALLOWLISTED_WORKOUT_RESULT_FAILURE_CODES = new Set([
+  "auth_required",
+  "invalid_upload",
+  "unsupported_file_type",
+  "file_too_large",
+  "planned_workout_not_found",
+  "rest_day_not_supported",
+  "zip_missing_fit",
+  "zip_multiple_fit",
+  "fit_parse_failed",
+  "storage_failed",
+  "persistence_failed",
+]);
 
 export type LocalProviderTranscriptOutcome =
   | "completed"
@@ -21,6 +41,7 @@ export type LocalProviderTranscriptOutcome =
 
 export type LocalRuntimeEventCategory = "request" | "action" | "plan_generation";
 export type LocalRuntimeEventStatus = "started" | "success" | "failure" | "blocked";
+export type LocalRuntimeApiOperation = "workout_result_upload" | "workout_result_remove";
 export type LocalRuntimeEventPhase =
   | "request"
   | "action"
@@ -35,6 +56,7 @@ export interface LocalRuntimeRequestContext {
   requestId: string;
   runtimeUrl: string;
   route: string;
+  operation: LocalRuntimeApiOperation | null;
   method: string;
   serverFunctionId: string | null;
 }
@@ -49,6 +71,7 @@ export interface LocalRuntimeEventInput {
   requestId?: string | null;
   generationId?: string | null;
   route?: string | null;
+  operation?: LocalRuntimeApiOperation | null;
   method?: string | null;
   serverFunctionId?: string | null;
   httpStatus?: number | null;
@@ -73,6 +96,7 @@ export interface LocalRuntimeEvent {
   requestId: string | null;
   generationId: string | null;
   route: string | null;
+  operation: LocalRuntimeApiOperation | null;
   method: string | null;
   serverFunctionId: string | null;
   httpStatus: number | null;
@@ -103,6 +127,7 @@ export interface LocalRuntimeEventQuery {
   generationId?: string | null;
   providerResponseId?: string | null;
   route?: string | null;
+  operation?: LocalRuntimeApiOperation | null;
   outcomeCode?: string | null;
   limit?: number;
 }
@@ -128,10 +153,12 @@ export function createLocalRuntimeRequestContext(input: {
   pathname: string;
   serverFunctionId?: string | null;
 }): LocalRuntimeRequestContext {
+  const operation = resolveLocalRuntimeApiOperation(input.request.method, input.request.url);
   return {
     requestId: createCorrelationId(),
     runtimeUrl: safeOrigin(input.request.url) ?? input.request.url,
     route: sanitizeRoute(input.pathname),
+    operation,
     method: sanitizeCode(input.request.method, 12),
     serverFunctionId: sanitizeNullableCode(input.serverFunctionId, 160),
   };
@@ -154,6 +181,9 @@ export async function recordLocalRuntimeRequestOutcome(input: {
   startedAtMs: number;
 }) {
   const failure = input.response.status >= 400;
+  const failureCode = failure
+    ? readAllowlistedApiFailureCode(input.response, input.context.operation)
+    : null;
 
   return writeLocalRuntimeEvent(
     {
@@ -161,14 +191,14 @@ export async function recordLocalRuntimeRequestOutcome(input: {
       event: failure ? "request_failed" : "request_completed",
       status: failure ? "failure" : "success",
       phase: "request",
-      outcomeCode:
-        input.response.status >= 500
-          ? "http_server_error"
-          : input.response.status >= 400
-            ? "http_client_error"
-            : "request_completed",
+      outcomeCode: resolveRequestOutcomeCode({
+        status: input.response.status,
+        operation: input.context.operation,
+        failureCode,
+      }),
       requestId: input.context.requestId,
       route: input.context.route,
+      operation: input.context.operation,
       method: input.context.method,
       serverFunctionId: input.context.serverFunctionId,
       httpStatus: input.response.status,
@@ -192,6 +222,7 @@ export async function recordLocalRuntimeRequestFailure(input: {
       outcomeCode: "unhandled_request_error",
       requestId: input.context.requestId,
       route: input.context.route,
+      operation: input.context.operation,
       method: input.context.method,
       serverFunctionId: input.context.serverFunctionId,
       elapsedMs: Date.now() - input.startedAtMs,
@@ -219,6 +250,7 @@ export async function recordLocalRuntimeActionOutcome(input: {
       outcomeCode: outcome.code,
       requestId: requestContext?.requestId,
       route: requestContext?.route,
+      operation: requestContext?.operation,
       method: input.method,
       serverFunctionId: input.serverFunctionId,
       elapsedMs: Date.now() - input.startedAtMs,
@@ -244,6 +276,7 @@ export async function recordLocalRuntimeActionFailure(input: {
       outcomeCode: "action_threw",
       requestId: requestContext?.requestId,
       route: requestContext?.route,
+      operation: requestContext?.operation,
       method: input.method,
       serverFunctionId: input.serverFunctionId,
       elapsedMs: Date.now() - input.startedAtMs,
@@ -714,6 +747,7 @@ function sanitizeLocalRuntimeEvent(input: LocalRuntimeEventInput): LocalRuntimeE
       input.route == null && currentRequest?.route == null
         ? null
         : sanitizeRoute(input.route ?? currentRequest?.route ?? "/"),
+    operation: sanitizeLocalRuntimeApiOperation(input.operation ?? currentRequest?.operation),
     method: sanitizeNullableCode(input.method ?? currentRequest?.method, 12),
     serverFunctionId: sanitizeNullableCode(
       input.serverFunctionId ?? currentRequest?.serverFunctionId,
@@ -765,6 +799,51 @@ function classifyActionOutcome(result: unknown) {
   );
 
   return { failed: true, code: code ?? "action_failed" };
+}
+
+function resolveLocalRuntimeApiOperation(
+  method: string,
+  requestUrl: string,
+): LocalRuntimeApiOperation | null {
+  if (method.toUpperCase() !== "POST") return null;
+
+  try {
+    const pathname = new URL(requestUrl).pathname;
+    const operation =
+      LOCAL_RUNTIME_API_OPERATIONS[pathname as keyof typeof LOCAL_RUNTIME_API_OPERATIONS];
+    return operation ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeLocalRuntimeApiOperation(
+  value: LocalRuntimeApiOperation | null | undefined,
+): LocalRuntimeApiOperation | null {
+  return value && Object.values(LOCAL_RUNTIME_API_OPERATIONS).includes(value) ? value : null;
+}
+
+function readAllowlistedApiFailureCode(
+  response: Response,
+  operation: LocalRuntimeApiOperation | null,
+) {
+  if (!operation) return null;
+
+  const value = response.headers.get(WORKOUT_RESULT_OBSERVABILITY_OUTCOME_HEADER);
+  return value && ALLOWLISTED_WORKOUT_RESULT_FAILURE_CODES.has(value) ? value : null;
+}
+
+function resolveRequestOutcomeCode(input: {
+  status: number;
+  operation: LocalRuntimeApiOperation | null;
+  failureCode: string | null;
+}) {
+  if (input.operation && input.failureCode) return input.failureCode;
+  return input.status >= 500
+    ? "http_server_error"
+    : input.status >= 400
+      ? "http_client_error"
+      : "request_completed";
 }
 
 function sanitizeRoute(value: string) {
@@ -819,6 +898,7 @@ function parseLocalRuntimeEvent(line: string): LocalRuntimeEvent | null {
     }
     return {
       ...(parsed as LocalRuntimeEvent),
+      operation: sanitizeLocalRuntimeApiOperation(parsed.operation),
       rawArtifactPath: isSafeArtifactLocator(parsed.rawArtifactPath)
         ? parsed.rawArtifactPath!
         : null,
@@ -837,6 +917,9 @@ function localRuntimeEventMatches(event: LocalRuntimeEvent, query: LocalRuntimeE
     return false;
   }
   if (query.route && event.route !== sanitizeRoute(query.route)) return false;
+  if (query.operation && event.operation !== sanitizeLocalRuntimeApiOperation(query.operation)) {
+    return false;
+  }
   if (query.outcomeCode && event.outcomeCode !== sanitizeCode(query.outcomeCode, 120)) return false;
   return true;
 }

@@ -21,6 +21,7 @@ const query: LocalRuntimeEventQuery = {
   generationId: readOption("--generation-id"),
   providerResponseId: readOption("--provider-response-id"),
   route: readOption("--route"),
+  operation: readOperationOption(),
   outcomeCode: readOption("--outcome"),
   limit: readIntegerOption("--limit"),
 };
@@ -91,6 +92,15 @@ function readIntegerOption(name: string) {
   return parsed;
 }
 
+function readOperationOption(): LocalRuntimeEventQuery["operation"] {
+  const value = readOption("--operation");
+  if (!value) return null;
+  if (value === "workout_result_upload" || value === "workout_result_remove") {
+    return value;
+  }
+  throw new Error("--operation must be workout_result_upload or workout_result_remove.");
+}
+
 function printHelp() {
   console.log(`Usage: npm run local:logs -- [filters]
 
@@ -103,6 +113,7 @@ Filters:
   --generation-id <id>
   --provider-response-id <id>
   --route <pathname>
+  --operation <allowlisted operation>
   --outcome <safe outcome code>
   --limit <1-1000>
   --include-archive

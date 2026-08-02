@@ -23,6 +23,7 @@ import {
   writeLocalRuntimeEvent,
   type LocalRuntimeEvent,
 } from "../src/lib/local-runtime-observability";
+import { WORKOUT_RESULT_OBSERVABILITY_OUTCOME_HEADER } from "../src/lib/workout-result-import/types";
 
 const root = await mkdtemp(join(tmpdir(), "hito-local-runtime-observability-"));
 const blockedRoot = `${root}-blocked`;
@@ -80,6 +81,57 @@ try {
     context: handledFailureContext,
     response: new Response(null, { status: 422 }),
     startedAtMs: Date.now() - 8,
+  });
+
+  const uploadFailureContext = createLocalRuntimeRequestContext({
+    request: new Request("http://127.0.0.1:3000/api/workout-result/upload?file=private.fit", {
+      method: "POST",
+    }),
+    pathname: "/api/:segment/:segment",
+    serverFunctionId: null,
+  });
+  await recordLocalRuntimeRequestOutcome({
+    context: uploadFailureContext,
+    response: Response.json(
+      {
+        ok: false,
+        code: "invalid_upload",
+        message: privacyCanaries.error,
+      },
+      {
+        status: 400,
+        headers: { [WORKOUT_RESULT_OBSERVABILITY_OUTCOME_HEADER]: "invalid_upload" },
+      },
+    ),
+    startedAtMs: Date.now() - 7,
+  });
+
+  const removeSuccessContext = createLocalRuntimeRequestContext({
+    request: new Request("http://127.0.0.1:3000/api/workout-result/remove", { method: "POST" }),
+    pathname: "/api/:segment/:segment",
+    serverFunctionId: null,
+  });
+  await recordLocalRuntimeRequestOutcome({
+    context: removeSuccessContext,
+    response: Response.json({ ok: true }),
+    startedAtMs: Date.now() - 6,
+  });
+
+  const unlistedApiFailureContext = createLocalRuntimeRequestContext({
+    request: new Request("http://127.0.0.1:3000/api/private-route", { method: "POST" }),
+    pathname: "/api/:segment",
+    serverFunctionId: null,
+  });
+  await recordLocalRuntimeRequestOutcome({
+    context: unlistedApiFailureContext,
+    response: Response.json(
+      { code: "invalid_upload", message: privacyCanaries.error },
+      {
+        status: 400,
+        headers: { [WORKOUT_RESULT_OBSERVABILITY_OUTCOME_HEADER]: "invalid_upload" },
+      },
+    ),
+    startedAtMs: Date.now() - 5,
   });
 
   const thrownFailureContext = createLocalRuntimeRequestContext({
@@ -205,6 +257,32 @@ try {
   });
   assert.equal(routeEvents.length, 1);
   assert.equal(routeEvents[0]?.httpStatus, 422);
+
+  const uploadEvents = await queryLocalRuntimeEvents({
+    root,
+    operation: "workout_result_upload",
+    outcomeCode: "invalid_upload",
+  });
+  assert.equal(uploadEvents.length, 1);
+  assert.equal(uploadEvents[0]?.route, "/api/:segment/:segment");
+  assert.equal(uploadEvents[0]?.operation, "workout_result_upload");
+  assert.deepEqual(uploadEvents[0]?.diagnosticCodes, []);
+
+  const removeEvents = await queryLocalRuntimeEvents({
+    root,
+    operation: "workout_result_remove",
+    outcomeCode: "request_completed",
+  });
+  assert.equal(removeEvents.length, 1);
+  assert.equal(removeEvents[0]?.operation, "workout_result_remove");
+
+  const unlistedApiEvents = await queryLocalRuntimeEvents({
+    root,
+    requestId: unlistedApiFailureContext.requestId,
+  });
+  assert.equal(unlistedApiEvents.length, 1);
+  assert.equal(unlistedApiEvents[0]?.operation, null);
+  assert.equal(unlistedApiEvents[0]?.outcomeCode, "http_client_error");
 
   const failureEvents = await queryLocalRuntimeEvents({
     root,
@@ -333,6 +411,7 @@ async function seedRotationProof(observabilityRoot: string) {
     requestId: null,
     generationId: null,
     route: "/",
+    operation: null,
     method: "get",
     serverFunctionId: null,
     httpStatus: 500,

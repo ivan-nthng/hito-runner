@@ -25,11 +25,12 @@ import {
 } from "@/components/workout-completion/BodyNotesEditor";
 import {
   DeterministicComparisonReadback,
-  humanizePrimaryComparisonVerdict,
-  toneForComparison,
+  getComparisonCoverageMeta,
+  RunCapturedReadback,
 } from "@/components/workout-completion/WorkoutComparisonReadback";
 import { WorkoutAiInsightReadback } from "@/components/workout-completion/WorkoutAiInsightReadback";
 import { formatWorkoutFeedbackTimestamp } from "@/components/workout-completion/workout-feedback-time";
+import { buildLocalActivityFileDesignFixture } from "@/lib/local-activity-file-design-fixture";
 
 type Outcome = "completed" | "partial" | "skipped";
 type CompletionFormState = {
@@ -47,10 +48,12 @@ export function CompletionPanel({
   workout,
   snapshot,
   feedback,
+  onOpenActivityFile,
 }: {
   workout: Workout;
   snapshot: TrainingSnapshot;
   feedback: WorkoutResultFeedbackSummary | null;
+  onOpenActivityFile?: () => void;
 }) {
   const router = useRouter();
   const saveWorkoutLogFn = useServerFn(saveWorkoutLog);
@@ -328,7 +331,12 @@ export function CompletionPanel({
           </p>
         </div>
       ) : (
-        <LogResultFeedbackBridge workout={workout} snapshot={snapshot} feedback={feedback} />
+        <LogResultFeedbackBridge
+          workout={workout}
+          snapshot={snapshot}
+          feedback={feedback}
+          onOpenActivityFile={onOpenActivityFile}
+        />
       )}
 
       <div>
@@ -510,10 +518,12 @@ function LogResultFeedbackBridge({
   workout,
   snapshot,
   feedback,
+  onOpenActivityFile,
 }: {
   workout: Workout;
   snapshot: TrainingSnapshot;
   feedback: WorkoutResultFeedbackSummary | null;
+  onOpenActivityFile?: () => void;
 }) {
   const state = getFeedbackInviteState(snapshot, feedback);
 
@@ -535,16 +545,27 @@ function LogResultFeedbackBridge({
           </div>
           <p className="hito-body-small mt-1 max-w-xl">{state.body}</p>
         </div>
-        <Link
-          to="/workout/$date"
-          params={{ date: workout.date }}
-          search={{ tab: "feedback" } as never}
-          className="hito-button hito-button-secondary hito-button-sm shrink-0"
-        >
-          <Icon name="file-up" size="xs" />
-          {state.cta}
-          <Icon name="arrow-up-right" size="xs" />
-        </Link>
+        {onOpenActivityFile ? (
+          <button
+            type="button"
+            onClick={onOpenActivityFile}
+            className="hito-button hito-button-secondary hito-button-sm shrink-0"
+          >
+            <Icon name="file-up" size="xs" />
+            {state.cta}
+          </button>
+        ) : (
+          <Link
+            to="/workout/$date"
+            params={{ date: workout.date }}
+            search={{ tab: "feedback" } as never}
+            className="hito-button hito-button-secondary hito-button-sm shrink-0"
+          >
+            <Icon name="file-up" size="xs" />
+            {state.cta}
+            <Icon name="arrow-up-right" size="xs" />
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -554,20 +575,36 @@ export function WorkoutFeedbackPanel({
   workout,
   snapshot,
   feedback,
+  localActivityFileDesignFixtureEnabled = false,
+  localFixturePreviewActive = false,
+  onLocalFixturePreviewChange,
+  onUploadInProgressChange,
+  onUploadSucceeded,
 }: {
   workout: Workout;
   snapshot: TrainingSnapshot;
   feedback: WorkoutResultFeedbackSummary | null;
+  localActivityFileDesignFixtureEnabled?: boolean;
+  localFixturePreviewActive?: boolean;
+  onLocalFixturePreviewChange?: (feedback: WorkoutResultFeedbackSummary | null) => void;
+  onUploadInProgressChange?: (isUploading: boolean) => void;
+  onUploadSucceeded?: (notice: string) => void;
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [operationNotice, setOperationNotice] = useState<string | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
   const [feedbackState, setFeedbackState] = useState<WorkoutResultFeedbackSummary | null>(feedback);
+  const [localFixturePreviewIsActive, setLocalFixturePreviewIsActive] =
+    useState(localFixturePreviewActive);
   const canUploadResult = snapshot.source === "persisted" && workout.type !== "rest";
   const attachedGarminAsset = feedbackState?.latestAsset ?? null;
+  const latestActualMetrics = feedbackState?.latestActualMetrics ?? null;
+  const latestComparison = feedbackState?.latestComparison ?? null;
+  const latestAiInsight = feedbackState?.latestAiInsight ?? null;
   const uploadSummary = getFeedbackUploadSummary({
     canUploadResult,
     isUploading,
@@ -599,10 +636,16 @@ export function WorkoutFeedbackPanel({
         };
   const showUploadSummaryInEmptyState =
     !attachedGarminAsset && Boolean(isUploading || uploadError || !canUploadResult);
+  const hasPlanRunReadback = Boolean(latestComparison || latestActualMetrics);
 
   useEffect(() => {
     setFeedbackState(feedback);
-  }, [feedback]);
+    setLocalFixturePreviewIsActive(localFixturePreviewActive);
+  }, [feedback, localFixturePreviewActive]);
+
+  useEffect(() => {
+    onUploadInProgressChange?.(isUploading);
+  }, [isUploading, onUploadInProgressChange]);
 
   if (workout.type === "rest") {
     return (
@@ -618,6 +661,11 @@ export function WorkoutFeedbackPanel({
 
   return (
     <div className="space-y-8 max-w-4xl">
+      {operationNotice ? (
+        <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {operationNotice}
+        </p>
+      ) : null}
       <header className="space-y-3 max-w-3xl">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -649,12 +697,31 @@ export function WorkoutFeedbackPanel({
               return;
             }
 
+            if (localActivityFileDesignFixtureEnabled) {
+              const fixtureNotice =
+                "Local activity file preview is ready. Nothing was uploaded or saved.";
+              const fixtureFeedback = buildLocalActivityFileDesignFixture(
+                workout,
+                selectedFile.name,
+              );
+              setUploadError(null);
+              setRemoveError(null);
+              setOperationNotice(fixtureNotice);
+              setFeedbackState(fixtureFeedback);
+              setLocalFixturePreviewIsActive(true);
+              onLocalFixturePreviewChange?.(fixtureFeedback);
+              event.target.value = "";
+              onUploadSucceeded?.(fixtureNotice);
+              return;
+            }
+
             const selectedFileName = selectedFile.name.toLowerCase();
             const isSupportedGarminFile =
               selectedFileName.endsWith(".fit") || selectedFileName.endsWith(".zip");
 
             if (!isSupportedGarminFile) {
               setUploadError("Choose one Garmin .fit file or .zip archive.");
+              setOperationNotice(null);
               event.target.value = "";
               return;
             }
@@ -662,6 +729,7 @@ export function WorkoutFeedbackPanel({
             setIsUploading(true);
             setUploadError(null);
             setRemoveError(null);
+            setOperationNotice("Uploading activity file.");
 
             try {
               const formData = new FormData();
@@ -700,12 +768,34 @@ export function WorkoutFeedbackPanel({
                 latestAiInsight: payload.latestAiInsight ?? null,
               });
 
+              if (payload.latestAsset?.parseStatus === "failed") {
+                setOperationNotice(null);
+
+                try {
+                  await router.invalidate();
+                } catch {
+                  // Keep the runner-safe parse failure visible even if route refresh lags.
+                }
+
+                return;
+              }
+
+              const successNotice = payload.latestComparison
+                ? "Activity file uploaded. Plan versus run is ready to review."
+                : payload.latestActualMetrics
+                  ? "Activity file uploaded. Run captured; plan comparison is unavailable."
+                  : "Activity file uploaded.";
+              setOperationNotice(successNotice);
+
               try {
                 await router.invalidate();
               } catch {
                 // Keep the successful upload state visible even if route refresh lags.
               }
+
+              onUploadSucceeded?.(successNotice);
             } catch (uploadFailure) {
+              setOperationNotice(null);
               setUploadError(
                 uploadFailure instanceof RunnerSafeWorkoutResultClientError
                   ? uploadFailure.message
@@ -727,8 +817,27 @@ export function WorkoutFeedbackPanel({
               actualMetrics={feedbackState?.latestActualMetrics ?? null}
               summary={uploadSummary}
               isRemoving={isRemoving}
+              localFixture={localFixturePreviewIsActive}
               onRemove={async () => {
                 if (!canUploadResult || isRemoving) {
+                  return;
+                }
+
+                if (localFixturePreviewIsActive) {
+                  const confirmed = window.confirm(
+                    "Clear this local design preview? No file was uploaded or saved.",
+                  );
+
+                  if (!confirmed) {
+                    return;
+                  }
+
+                  setFeedbackState(null);
+                  setLocalFixturePreviewIsActive(false);
+                  onLocalFixturePreviewChange?.(null);
+                  setOperationNotice(
+                    "Local activity file preview cleared. Nothing was uploaded or saved.",
+                  );
                   return;
                 }
 
@@ -743,6 +852,7 @@ export function WorkoutFeedbackPanel({
                 setIsRemoving(true);
                 setRemoveError(null);
                 setUploadError(null);
+                setOperationNotice("Removing activity file.");
 
                 try {
                   const response = await fetch("/api/workout-result/remove", {
@@ -772,6 +882,9 @@ export function WorkoutFeedbackPanel({
                   }
 
                   setFeedbackState(payload.feedback);
+                  setOperationNotice(
+                    "Activity file removed. Your manual workout log is unchanged.",
+                  );
 
                   try {
                     await router.invalidate();
@@ -779,6 +892,7 @@ export function WorkoutFeedbackPanel({
                     // Keep the local cleared state even if route refresh lags.
                   }
                 } catch (removalFailure) {
+                  setOperationNotice(null);
                   setRemoveError(
                     removalFailure instanceof RunnerSafeWorkoutResultClientError
                       ? removalFailure.message
@@ -806,12 +920,19 @@ export function WorkoutFeedbackPanel({
                     <span className="hito-technical-mono">.zip</span> archive containing exactly one
                     FIT activity. That unlocks the comparison below.
                   </p>
+                  {localActivityFileDesignFixtureEnabled ? (
+                    <p className="hito-caption mt-3 max-w-xl text-muted-foreground">
+                      Local design fixture. Choose any file to preview deterministic activity
+                      readback; nothing is uploaded or saved.
+                    </p>
+                  ) : null}
                   <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
                     <button
                       type="button"
                       onClick={() => {
                         setUploadError(null);
                         setRemoveError(null);
+                        setOperationNotice(null);
                         fileInputRef.current?.click();
                       }}
                       disabled={!canUploadResult || isUploading}
@@ -833,61 +954,48 @@ export function WorkoutFeedbackPanel({
                 ) : null}
               </div>
 
-              {uploadError ? <p className="hito-field-error mt-3">{uploadError}</p> : null}
+              {uploadError ? (
+                <p className="hito-field-error mt-3" role="alert">
+                  {uploadError}
+                </p>
+              ) : null}
             </>
           )}
 
-          {removeError ? <p className="hito-field-error mt-3">{removeError}</p> : null}
+          {removeError ? (
+            <p className="hito-field-error mt-3" role="alert">
+              {removeError}
+            </p>
+          ) : null}
         </section>
 
-        <section className="border-t border-hairline pt-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="max-w-3xl">
+        {hasPlanRunReadback ? (
+          <section className="border-t border-hairline pt-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <h3 className="hito-panel-title">Plan vs run</h3>
-              {!feedbackState?.latestComparison ? (
-                <p className="hito-body mt-2 max-w-2xl">
-                  This compares the planned workout with the uploaded run.
-                </p>
+              {latestComparison ? (
+                <span
+                  className="hito-status-pill"
+                  data-tone={getComparisonCoverageMeta(latestComparison).tone}
+                >
+                  {getComparisonCoverageMeta(latestComparison).label}
+                </span>
               ) : null}
             </div>
-            {feedbackState?.latestComparison ? (
-              <span
-                className="hito-status-pill"
-                data-tone={toneForComparison(feedbackState.latestComparison)}
-              >
-                {humanizePrimaryComparisonVerdict(feedbackState.latestComparison)}
-              </span>
+            {latestComparison ? (
+              <DeterministicComparisonReadback comparison={latestComparison} />
+            ) : latestActualMetrics ? (
+              <RunCapturedReadback actual={latestActualMetrics} />
             ) : null}
-          </div>
-          {feedbackState?.latestComparison ? (
-            <DeterministicComparisonReadback comparison={feedbackState.latestComparison} />
-          ) : (
-            <p className="hito-body mt-4 max-w-2xl">
-              No comparison yet. Once the Garmin file is processed, it will show up here.
-            </p>
-          )}
-        </section>
+          </section>
+        ) : null}
 
-        <section className="border-t border-hairline pt-6">
-          <div className="max-w-3xl">
-            <h3 className="hito-panel-title">Next step</h3>
-            {!feedbackState?.latestAiInsight ? (
-              <p className="hito-body mt-2 max-w-2xl">
-                A short note based on the comparison above.
-              </p>
-            ) : null}
-          </div>
-          {feedbackState?.latestAiInsight ? (
-            <WorkoutAiInsightReadback
-              insight={feedbackState.latestAiInsight}
-              comparison={feedbackState.latestComparison ?? null}
-            />
-          ) : (
-            <p className="hito-body mt-4 max-w-2xl">
-              No next-step note yet. After a successful Garmin upload, it can appear here.
-            </p>
-          )}
-        </section>
+        {latestAiInsight ? (
+          <section className="border-t border-hairline pt-6">
+            <h3 className="hito-panel-title">Saved coach note</h3>
+            <WorkoutAiInsightReadback insight={latestAiInsight} comparison={latestComparison} />
+          </section>
+        ) : null}
       </div>
     </div>
   );
@@ -1009,12 +1117,14 @@ function AttachedEvidenceReadback({
   actualMetrics,
   summary,
   isRemoving,
+  localFixture = false,
   onRemove,
 }: {
   asset: NonNullable<WorkoutResultFeedbackSummary>["latestAsset"];
   actualMetrics: NonNullable<WorkoutResultFeedbackSummary>["latestActualMetrics"] | null;
   summary: ReturnType<typeof getFeedbackUploadSummary>;
   isRemoving: boolean;
+  localFixture?: boolean;
   onRemove: () => Promise<void>;
 }) {
   const metadata = [
@@ -1025,13 +1135,15 @@ function AttachedEvidenceReadback({
 
   return (
     <div className="group rounded-xl bg-background/16 px-4 py-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
           <div className="hito-label">Attached file</div>
           <p className="hito-list-row-title mt-2">{asset.originalFileName}</p>
           <p className="hito-caption mt-2">{metadata.join(" · ")}</p>
           <p className="hito-caption mt-1">
-            Remove this file before uploading a replacement. Your manual result stays as it is.
+            {localFixture
+              ? "Local design fixture only. No file was uploaded or saved."
+              : "Remove this file before uploading a replacement. Your manual result stays as it is."}
           </p>
           {asset.primaryFileName && asset.primaryFileName !== asset.originalFileName ? (
             <p className="hito-caption mt-1">Extracted activity: {asset.primaryFileName}</p>
@@ -1043,14 +1155,17 @@ function AttachedEvidenceReadback({
             void onRemove();
           }}
           disabled={isRemoving}
-          className="hito-button hito-button-secondary hito-button-md shrink-0 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus-visible:opacity-100"
+          className="hito-button hito-button-secondary hito-button-md w-full shrink-0 opacity-100 transition-opacity sm:w-auto sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus-visible:opacity-100"
         >
           <Icon name="trash" size="sm" />
-          {isRemoving ? "Removing..." : "Remove file"}
+          {isRemoving ? "Removing..." : localFixture ? "Clear local preview" : "Remove file"}
         </button>
       </div>
 
-      <div className="mt-4 border-t border-hairline pt-4">
+      <div
+        className="mt-4 border-t border-hairline pt-4"
+        role={summary.tone === "destructive" ? "alert" : undefined}
+      >
         <div className="flex flex-wrap items-center gap-2">
           <p className="hito-list-row-title">{summary.label}</p>
         </div>
@@ -1130,7 +1245,7 @@ function getFeedbackUploadSummary({
         latestAsset?.parseError ??
         "The last Garmin file did not finish processing. Your manual workout log is unchanged.",
       detailLine: latestAsset
-        ? `${assetLabel} attached · comparison not ready · next step not ready.`
+        ? `${assetLabel} attached · comparison not ready.`
         : "Try another Garmin FIT or ZIP file.",
       pill: {
         label: "Retry",
@@ -1143,10 +1258,10 @@ function getFeedbackUploadSummary({
   if (latestAiInsight && latestComparison && latestActualMetrics) {
     return {
       label: "Your run is ready to review",
-      body: "The comparison is ready, and the next-step note is available.",
+      body: "The comparison and saved coach note are ready to review.",
       detailLine: actualSnapshot
-        ? `${actualSnapshot} · Plan vs run and next step are ready.`
-        : `${assetLabel} processed · Plan vs run and next step are ready.`,
+        ? `${actualSnapshot} · Plan vs run is ready.`
+        : `${assetLabel} processed · Plan vs run is ready.`,
       pill: {
         label: "Ready",
         tone: "success" as const,
@@ -1160,7 +1275,7 @@ function getFeedbackUploadSummary({
       label: "Your run is ready to compare",
       body: "The comparison is ready below.",
       detailLine: actualSnapshot
-        ? `${actualSnapshot} · Plan vs run is ready; next step is still being prepared.`
+        ? `${actualSnapshot} · Plan vs run is ready.`
         : `${assetLabel} processed · Plan vs run is ready.`,
       pill: {
         label: "Plan vs run ready",
@@ -1172,13 +1287,13 @@ function getFeedbackUploadSummary({
 
   if (latestActualMetrics) {
     return {
-      label: "Your run was processed",
-      body: "The run summary is ready. The comparison is not ready yet.",
+      label: "Run captured",
+      body: "The activity is ready to review. A plan comparison is unavailable.",
       detailLine: actualSnapshot
         ? `${actualSnapshot} · comparison not ready yet.`
         : `${assetLabel} processed · comparison not ready yet.`,
       pill: {
-        label: "Run summary ready",
+        label: "Run captured",
         tone: "signal" as const,
       },
       tone: "success" as const,

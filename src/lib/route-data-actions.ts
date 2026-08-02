@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { canUseMagicLinkForRequest, isLocalAuthBypassEnabledForRequest } from "@/lib/auth-actions";
 import { getRequestAuthContext } from "@/lib/backend/auth";
+import { isLocalActivityFileDesignFixtureEnabled } from "@/lib/local-activity-file-design-fixture";
 import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
+import { isLoopbackRuntimeUrl } from "@/lib/supabase/env";
 import { findWorkout, type TrainingSnapshot, type Workout } from "@/lib/training";
 import { getUserSettingsForUserId } from "@/lib/user-settings-actions";
 import type { WorkoutResultFeedbackSummary } from "@/lib/workout-result-import/types";
@@ -44,6 +46,11 @@ export async function loadWorkoutRouteData(
   { loadSnapshot, loadViewer, loadFeedback }: WorkoutRouteDataLoaders,
 ) {
   const snapshot = await loadSnapshot();
+  const auth = getRequestAuthContext();
+  const localActivityFileDesignFixtureEnabled =
+    auth.provider === "local" &&
+    isLoopbackRuntimeUrl(auth.appBaseUrl) &&
+    isLocalActivityFileDesignFixtureEnabled();
 
   if (snapshot.mode === "onboarding") {
     return {
@@ -53,6 +60,7 @@ export async function loadWorkoutRouteData(
       prev: null as Workout | null,
       next: null as Workout | null,
       feedback: null as WorkoutResultFeedbackSummary | null,
+      localActivityFileDesignFixtureEnabled,
     };
   }
 
@@ -73,6 +81,7 @@ export async function loadWorkoutRouteData(
         ? snapshot.workouts[workoutIndex + 1]
         : null,
     feedback,
+    localActivityFileDesignFixtureEnabled,
   };
 }
 

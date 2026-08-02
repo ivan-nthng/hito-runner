@@ -545,7 +545,12 @@ Feedback surface:
   - attached file first when evidence exists
   - `Plan vs run` as the strongest section
   - deterministic comparison primary
-  - recommendation secondary
+  - no empty recommendation or `being prepared` state after upload
+- The detailed visual, responsive, evidence-coverage, and removal-state owner for the factual
+  comparison is
+  `docs/tasks/frontend-specs/2026-07-31-post-upload-plan-vs-run-comparison-experience.md`.
+- A previously persisted AI insight may remain a separate secondary readback when it exists. Upload
+  itself must not imply or dispatch AI; any future explicit verdict action requires its own contract.
 - If no evidence exists, prefer a secondary continuation action from `Result` over a live empty
   `Feedback` tab.
 

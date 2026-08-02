@@ -6,6 +6,7 @@ import {
   workoutStructureTimelineSummary,
 } from "@/components/workout-structure/workout-structure-timeline-items";
 import { CompletionPanel, WorkoutFeedbackPanel } from "@/components/CompletionPanel";
+import { WorkoutActivityFileDialog } from "@/components/workout-completion/WorkoutActivityFileDialog";
 import { ManualWorkoutPersistedEditDialog } from "@/components/manual-workout/ManualWorkoutPersistedEditControls";
 import { ManualWorkoutDocumentPreview } from "@/components/manual-workout/ManualWorkoutDocumentPreview";
 import { workoutDocumentSectionsToManualReadbackEntries } from "@/components/manual-workout/ManualWorkoutTrainingBlockGrammar.model";
@@ -76,10 +77,12 @@ export const Route = createFileRoute("/workout/$date")({
 });
 
 function WorkoutPage() {
-  const { workout, snapshot, viewer, prev, next, feedback } = Route.useLoaderData();
+  const { workout, snapshot, viewer, prev, next, feedback, localActivityFileDesignFixtureEnabled } =
+    Route.useLoaderData();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const router = useRouter();
+  const [activityFileDialogOpen, setActivityFileDialogOpen] = useState(false);
   const tab = search.tab as WorkoutDetailSearchTab;
   const lifecycle = workout ? workoutDetailLifecycleFor(workout, snapshot, feedback) : "rest_day";
   const surfaceModel = workoutDetailSurfaceModelFor(
@@ -267,18 +270,42 @@ function WorkoutPage() {
               <>
                 <Overview snapshot={snapshot} workout={workout} />
                 {lifecycle === "today_planned" && (
-                  <CompletionActionPanel snapshot={snapshot} workout={workout} variant="today" />
+                  <CompletionActionPanel
+                    snapshot={snapshot}
+                    workout={workout}
+                    variant="today"
+                    onOpenActivityFile={() => setActivityFileDialogOpen(true)}
+                  />
                 )}
                 {lifecycle === "past_unlogged" && (
-                  <CompletionActionPanel snapshot={snapshot} workout={workout} variant="past" />
+                  <CompletionActionPanel
+                    snapshot={snapshot}
+                    workout={workout}
+                    variant="past"
+                    onOpenActivityFile={() => setActivityFileDialogOpen(true)}
+                  />
                 )}
               </>
             )}
             {surfaceModel.activeSurface === "complete" && (
-              <CompletionPanel workout={workout} snapshot={snapshot} feedback={feedback} />
+              <CompletionPanel
+                workout={workout}
+                snapshot={snapshot}
+                feedback={feedback}
+                onOpenActivityFile={
+                  canOpenGarminFeedback(workout, snapshot)
+                    ? () => setActivityFileDialogOpen(true)
+                    : undefined
+                }
+              />
             )}
             {surfaceModel.activeSurface === "feedback" && (
-              <WorkoutFeedbackPanel workout={workout} snapshot={snapshot} feedback={feedback} />
+              <WorkoutFeedbackPanel
+                workout={workout}
+                snapshot={snapshot}
+                feedback={feedback}
+                localActivityFileDesignFixtureEnabled={localActivityFileDesignFixtureEnabled}
+              />
             )}
           </div>
 
@@ -398,6 +425,15 @@ function WorkoutPage() {
             </SidebarPanel>
           </aside>
         </div>
+
+        <WorkoutActivityFileDialog
+          feedback={feedback}
+          localActivityFileDesignFixtureEnabled={localActivityFileDesignFixtureEnabled}
+          onOpenChange={setActivityFileDialogOpen}
+          open={activityFileDialogOpen}
+          snapshot={snapshot}
+          workout={workout}
+        />
 
         <div className="mt-12 grid sm:grid-cols-2 gap-3">
           {prev && <NavCard direction="prev" date={prev.date} title={prev.title} />}
@@ -658,10 +694,12 @@ function CompletionActionPanel({
   snapshot,
   workout,
   variant,
+  onOpenActivityFile,
 }: {
   snapshot: TrainingSnapshot;
   workout: Workout;
   variant: "today" | "past";
+  onOpenActivityFile: () => void;
 }) {
   const isToday = variant === "today";
   const canUploadGarmin = canOpenGarminFeedback(workout, snapshot);
@@ -695,15 +733,14 @@ function CompletionActionPanel({
             Add result
           </Link>
           {canUploadGarmin ? (
-            <Link
-              to="/workout/$date"
-              params={{ date: workout.date }}
-              search={{ tab: "feedback" } as never}
+            <button
+              type="button"
+              onClick={onOpenActivityFile}
               className="hito-button hito-button-secondary hito-button-md shrink-0"
             >
               <Icon name="file-up" size="xs" />
               Add activity file
-            </Link>
+            </button>
           ) : null}
         </div>
       </div>

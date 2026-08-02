@@ -26,6 +26,9 @@ Completed / Runner Core freeze and first design-polish closure.
 
 ## Decision
 
+This completed plan is retained in place because four repository locations still link to its frozen
+boundary. It is supporting history, not an active task; operational work requires a backlog item.
+
 Freeze applies to the **runner core**, not the whole repository: profile persistence, plan
 creation, signed review/confirm, today/future workout editing, logging, settings, calendar/detail
 readback, export/import, and local observability. Admin backlog work and explicitly new product

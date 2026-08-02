@@ -46,6 +46,8 @@ Target selection:
 - If the prompt gives a file path, write there.
 - If the artifact belongs to an active plan or spec, update that named plan/spec.
 - If no path is supplied, create `docs/tasks/running-coach/YYYY-MM-DD-<short-slug>.md`.
+- When the coaching artifact requests implementation or later validation, link it from one
+  canonical `docs/tasks/backlog/` item; doctrine files never become an operational queue.
 
 For training-plan matrices, prefer a table with:
 

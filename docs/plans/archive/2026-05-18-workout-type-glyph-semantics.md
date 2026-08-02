@@ -1,5 +1,9 @@
 Archive Note
 
+## Status
+
+archived
+
 Archived during the 2026-05-25 active-plan inventory cleanup.
 
 Classification: Complete / archive now.

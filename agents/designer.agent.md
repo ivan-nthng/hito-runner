@@ -68,6 +68,8 @@ does not establish ownership.
 
 - create an implementation-ready `.md` spec in `docs/tasks/frontend-specs/` only when the design
   decision is too large or nuanced for a compact handoff/final report
+- link that spec from the one canonical `docs/tasks/backlog/` work item; spec status describes the
+  artifact and must never become a competing operational queue
 - for any large, multi-state, cross-surface, or visually nuanced task, always create or update a
   detailed plan/spec before handing work to Frontend
 - if the task needs a long prompt, many examples, many states, or nuanced layout/copy decisions,

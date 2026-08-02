@@ -166,12 +166,12 @@ For Figma bridge work, also read the relevant official Figma documentation befor
   descriptions
 - the Figma plugin skills named above before using any Figma MCP or Plugin API workflow
 
-Useful current DS references:
+Useful historical DS references:
 
-- `docs/plans/active/2026-05-10-hito-design-system-spec-and-rollout-plan.md`
-- `docs/plans/active/2026-05-10-hito-component-system-spec.md`
-- `docs/plans/active/2026-05-18-full-ds-consistency-audit.md`
-- `docs/plans/active/2026-05-19-architecture-cleanup-plan.md`
+- `docs/plans/archive/2026-05-10-hito-design-system-spec-and-rollout-plan.md`
+- `docs/plans/archive/2026-05-10-hito-component-system-spec.md`
+- `docs/plans/archive/2026-05-18-full-ds-consistency-audit.md`
+- `docs/plans/archive/2026-05-19-architecture-cleanup-plan.md`
 
 ## Canonical Source Hierarchy
 

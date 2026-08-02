@@ -1,7 +1,7 @@
 # Hito DS Component Adoption And Custom UI Audit
 
 ## Status
-ready_for_handoff
+closed
 
 ## Type
 frontend_spec
@@ -16,7 +16,7 @@ DESIGNER
 2026-06-23
 
 ## Next Recommended Role
-ARCHITECT
+none
 
 ## Task
 Run a service-wide Hito DS component-adoption audit and define the component ownership gaps that still create custom UI drift risk.
@@ -24,40 +24,14 @@ Run a service-wide Hito DS component-adoption audit and define the component own
 ## Stage
 DESIGNER audit / service-wide DS component ownership, adoption gaps, and exception-policy spec
 
+## Operational Lifecycle Boundary
+
+The audit is a completed supporting record. Any implementation selected from it requires one
+canonical backlog item; this document cannot dispatch work independently.
+
 ## Exact Handoff Prompt
-```text
-ROLE: ARCHITECT
 
-Task: Select the first implementation batch for Hito DS component adoption cleanup.
-
-Stage: ARCHITECT cleanup planning / component ownership batch selection.
-
-Use this designer audit as the source spec:
-docs/tasks/frontend-specs/2026-06-23-hito-ds-component-adoption-and-custom-ui-audit.md
-
-Root-cause requirement:
-- Do not reopen the completed primitive-token cleanup lane.
-- Treat the visible symptom as route-local component anatomy and uneven shared-component ownership.
-- Select the first bounded batch that removes custom UI drift by reusing or extracting existing Hito DS/admin primitives.
-
-Required decisions:
-1. Choose exactly one first implementation batch.
-2. Prefer the highest-leverage batch that is safe to validate without product behavior changes.
-3. Define target files/components.
-4. Define what must be reused from existing Hito DS primitives.
-5. Define which new shared component wrappers are allowed, if any.
-6. Define what must remain an intentional domain exception.
-7. Provide one execution-ready FRONTEND prompt.
-
-Do not:
-- redesign product flows
-- change backend, persistence, auth, admin data, OpenAI, or provider behavior
-- add a broad component library
-- create one-off route-local replacements
-- touch unrelated visual polish outside the selected batch
-
-Report using the standard Architecture / Cleanup / Plan Report format.
-```
+None. This supporting audit is closed; a canonical backlog item is required before any follow-up.
 
 ## Context
 The primitive-token consistency track is already complete. The current problem is narrower: several product/admin surfaces still compose UI locally even when Hito DS already owns the primitive language. This creates a future drift risk because a developer can copy a local component shape instead of the shared Hito owner.

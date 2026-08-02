@@ -27,7 +27,10 @@ Permanent current docs still own broad product and system truth:
 - [docs/current-state.md](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/current-state.md)
 - [docs/history/changelog.md](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/history/changelog.md)
 
-Active execution plans remain the source for in-progress gates:
+The operational queue and current execution status live only in
+[the Hito backlog](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/README.md).
+The documents below are retained supporting contracts and history; their location under
+`docs/plans/active/` does not independently make them active work:
 
 - [admin UI capture and backlog plan](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-05-25-admin-ui-capture-and-backlog-plan.md)
 - [manual workout authoring plan](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-09-manual-workout-authoring-and-user-built-plans.md)
@@ -67,7 +70,7 @@ stays in `docs/current-product.md`; implementation ownership and deletion safety
 | Local devtools and inspector | Local-only DS audit and prompt generation | `src/components/devtools/*`, `src/components/ui/inline-editable-text.tsx`, `/hitoDS/patterns#inline-editable-text` | Local-only, no live UI mutation, no backend/Admin/Supabase/Work Items persistence. |
 | Admin work items, capture, analytics | Internal admin capture/backlog, repo-derived work-item mirror, analytics, test accounts | `src/routes/admin.*.tsx`, `src/components/admin/*`, `src/lib/admin-capture*`, `src/lib/admin-work-items.ts`, `src/lib/admin-analytics.ts`, `scripts/import-repo-work-items-to-admin-backlog.ts` | Repo markdown remains canonical for repo-derived rows; imported rows are read-only mirrors. |
 | Scripts, validators, QA infrastructure | Non-runtime proof, source-size ledger, local QA runtime, artifact hygiene | `scripts/*`, `scripts/**`, `docs/metrics/line-count-ledger.jsonl`, local QA server/build-output scripts, `qa-artifacts/` | Validators prove contracts; QA artifacts are protected evidence, not product runtime or cleanup targets. |
-| Docs and source-of-truth | Current product/system/functional truth, active gates, shipped history | `docs/current-*.md`, `docs/plans/active/*`, `docs/tasks/*`, `docs/history/changelog.md`, `docs/work-dashboard.md` | Current docs describe implemented truth; active plans guide next work; avoid transcript-like Markdown growth. |
+| Docs and source-of-truth | Current product/system/functional truth, operational queue, supporting contracts, shipped history | `docs/current-*.md`, `docs/tasks/backlog/*`, supporting `docs/plans/*` and `docs/tasks/*`, `docs/history/changelog.md`, `docs/work-dashboard.md` | Current docs describe implemented truth; backlog metadata alone owns work lifecycle; plans/specs/doctrine provide linked context; avoid transcript-like Markdown growth. |
 | Running coach doctrine and workout identity | Sports-quality policy, workout taxonomy, target honesty | `docs/tasks/running-coach/*`, `src/lib/rich-workout-model.ts`, `src/lib/planned-workout-language.ts`, `src/lib/planned-workout-block-contract.ts`, running-plan doctrine validators | Coach doctrine informs backend policy but does not create a second workout language. |
 
 ## Current Business Model
@@ -230,8 +233,8 @@ Do not use these future ideas to justify keeping or adding runtime code as shipp
 - Do not use stale line-count tables from old cleanup ledgers as current truth. Use the active
   [source-size governance plan](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-30-hito-source-size-governance-and-cleanup-plan.md)
   and fresh non-mutating source scans for cleanup selection.
-- `docs/work-dashboard.md` is generated. If dashboard truth must change, update the owning plan/docs
-  and run the approved dashboard command instead of hand-editing the dashboard.
+- `docs/work-dashboard.md` is a legacy plan projection during the queue migration. It must not be
+  used for lifecycle decisions; canonical status comes from `docs/tasks/backlog/*` metadata.
 - `logs/`, `qa-artifacts/`, `test-results/`, `node_modules/`, build/cache roots, and coverage roots
   are generated/proof/vendor surfaces. Keep them out of product-code size claims unless the task
   explicitly scopes local artifact hygiene.
@@ -243,10 +246,8 @@ historical context. They should not live in this current functional map as activ
 Use archived plans and the active source-size governance plan for cleanup history and measured
 source-size tracking.
 
-## Immediate Next Gate
+## Operational Work Boundary
 
-Runner Core is formally code-frozen. The immediate runner-facing gate is one bounded DESIGNER audit
-under the
-[Runner Core freeze plan](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-07-20-runner-core-freeze-and-design-polish-plan.md),
-followed by a separately accepted frontend polish slice. Hosted external-user release remains a
-separate operations boundary; broad source-size cleanup remains on evidence-gated hold.
+Runner Core remains formally code-frozen. Current and next execution gates are resolved only from
+the canonical metadata in `docs/tasks/backlog/`; completed plans linked above are retained supporting
+history and cannot dispatch work. Hosted external-user release remains a separate operations boundary.

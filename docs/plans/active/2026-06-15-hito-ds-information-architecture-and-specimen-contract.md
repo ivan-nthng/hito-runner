@@ -30,6 +30,11 @@ FRONTEND reference-truth implementation and integrated QA / completed.
 None. The bounded conformance sequence is complete; future product or DS work requires a new
 source-proved task outside this plan.
 
+## Operational Lifecycle Boundary
+
+Completed and retained in place because 27 repository locations still link to this canonical DS
+record. It is supporting history, not an active task; operational work requires a backlog item.
+
 ## Owner
 
 ARCHITECT / DESIGNER / FRONTEND / QA

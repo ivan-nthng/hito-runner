@@ -93,7 +93,20 @@
   it exposes only the admin server functions used by the current backlog route: backlog list, text-only quick-note create, triage updates, note append, quick-note-only deletion, and deterministic copy-prompt generation; `src/lib/admin-capture.server.ts` verifies the existing admin session boundary before every operation, reads/writes only through the service/admin Supabase seam, keeps item lookup internal to prompt/readback shaping, caps captured text and metadata, redacts secret-like metadata keys/values before prompt output, stores quick-note history in bounded item metadata, rejects title/body/status/type/priority/target-role mutation attempts for repo-derived imported rows with `repo_derived_read_only`, and returns frontend-ready view models rather than local mock state; route-spanning UI capture, screenshot upload, and automatic Codex dispatch are not implemented
 - `scripts/import-repo-work-items-to-admin-backlog.ts`
   owns the explicit repo-work mirror into the admin Backlog:
-  it scans markdown only from `docs/tasks/backlog`, `docs/tasks/product-briefs`, `docs/tasks/frontend-specs`, `docs/plans/active`, and `docs/plans/archive`; skips README policy docs; parses the canonical lifecycle, immutable `Work Item ID`, owner, scope, archive intent, optional batch, conditional frontend lane, task, stage, next role, and exact handoff; uses the first meaningful `Task` line as the Backlog title; mirrors that truth through the existing `admin_capture_items.metadata` envelope; marks legacy documents with explicit missing/invalid metadata diagnostics; never maps repo-derived rows to `in_review`; uses `Work Item ID` as primary mirror identity and source type/path only as legacy fallback; refuses duplicate IDs before writes; updates one mirror across a source move with the same ID; treats a mirror as stale only when no approved source or same-ID replacement exists; archives stale mirrors only through explicit `--archive-stale`; and leaves admin-created quick notes/capture rows untouched while normal admin mutations keep repo-derived rows read-only
+  `docs/tasks/backlog` is the only operational queue; the importer also scans
+  `docs/tasks/product-briefs`, `docs/tasks/frontend-specs`, `docs/plans/active`, and
+  `docs/plans/archive` as explicitly grouped supporting/history sources, skips README policy docs,
+  and does not scan `docs/tasks/running-coach` directly. It parses the canonical lifecycle,
+  immutable `Work Item ID`, owner, scope, archive intent, optional batch, conditional frontend
+  lane, task, stage, next role, and exact handoff; uses the first meaningful `Task` line as the
+  Backlog title; mirrors that truth through the existing `admin_capture_items.metadata` envelope;
+  marks legacy documents with explicit missing/invalid metadata diagnostics; never maps
+  repo-derived rows to `in_review`; uses `Work Item ID` as primary mirror identity and source
+  type/path only as legacy fallback; refuses duplicate IDs before writes; updates one mirror across
+  a source move with the same ID; treats a mirror as stale only when no approved source or same-ID
+  replacement exists; archives stale mirrors only through explicit `--archive-stale`; and leaves
+  admin-created quick notes/capture rows untouched while normal admin mutations keep repo-derived
+  rows read-only
 - `src/routes/admin.capture.tsx`
   owns the first visible admin capture backlog route:
   `/admin/capture` is an admin-only standalone workbench sibling to `/admin/analytics`; one canonical backlog read returns the selected status/filter page plus complete status-tab counts independent of the page limit, and validated search state is a loader dependency so SPA tab/filter navigation cannot retain stale rows; the route renders backend-shaped backlog items with status tabs, compact search/filter controls, inline item detail, triage controls, quick-note creation, note append, archive-by-status, and deterministic copy-prompt clipboard actions while leaving admin access, storage, prompt shaping, lifecycle validation, screenshots, live UI capture, and any Codex dispatch on backend/future seams

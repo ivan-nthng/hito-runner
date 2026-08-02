@@ -2,11 +2,16 @@
 
 ## Status
 
-current_product_contract
+completed
 
 ## Owner
 
 designer
+
+## Operational Lifecycle Boundary
+
+This accepted layout contract remains supporting product/design history. It is not a live task and
+cannot dispatch follow-up work without a canonical backlog item.
 
 ## Last Updated
 

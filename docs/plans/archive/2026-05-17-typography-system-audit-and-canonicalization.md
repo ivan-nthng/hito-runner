@@ -2,7 +2,7 @@
 
 ## Status
 
-Complete / archived after first bounded typography implementation slice
+archived
 
 ## Type
 

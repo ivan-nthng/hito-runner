@@ -64,9 +64,10 @@ tell the agent how to code it?` Keep the former and remove the latter.
 
 ## Active Task Continuity Gate
 
-Before a handoff or progress response, reconstruct the live task from the active plan, relevant
-current documentation, the latest report, and the preceding acceptance/failure gates. The most recent
-report is evidence about the active task, not a replacement for the task itself.
+Before a handoff or progress response, reconstruct the live task from its canonical backlog item,
+relevant current documentation, any linked supporting plan/spec, the latest report, and the preceding
+acceptance/failure gates. The most recent report is evidence about the active task, not a replacement
+for the task itself.
 
 The user-facing shell must make four things explicit before any prompt:
 
@@ -75,9 +76,9 @@ The user-facing shell must make four things explicit before any prompt:
 - what has already passed and must not be reopened; and
 - the one remaining gate or blocker.
 
-When the active plan header is stale, say so plainly and use the latest validated evidence for the
-live stage. Do not silently edit product-plan documentation from routing work; route that source-of-
-truth update only when it is the next actual task.
+When supporting plan/spec metadata is stale, say so plainly and use the canonical backlog item plus
+latest validated evidence for the live stage. Do not silently promote a supporting artifact into a
+task; reconcile it only when that documentation correction is the bounded work.
 
 If the user asks where the work stands and the immediate next owner is known, answer with this
 continuity context and include exactly one execution-ready prompt for that owner. Omit a prompt only
@@ -100,12 +101,15 @@ Assign the outcome and evidence; leave the execution design to the receiving rol
 1. `docs/context.md`
 2. `docs/glossary.md`
 3. relevant `docs/current-*.md`
-4. relevant active plan
-5. latest implementation/QA/checkpoint report
+4. canonical item in `docs/tasks/backlog/`
+5. any linked supporting plan/spec
+6. latest implementation/QA/checkpoint report
 
 ## Workflow
 
-1. Identify the owning plan/spec/doc file. If it exists, render it as a clickable markdown link with an absolute workspace path. If none exists, say `Plan file: none`.
+1. Identify the canonical backlog item and any linked supporting plan/spec/doc. Render the backlog
+   item first as a clickable Markdown link with an absolute workspace path. A supporting artifact
+   never replaces the operational item.
 2. Identify the current task and stage.
 3. Decide exactly one next recommended role.
 4. Include required reading order.

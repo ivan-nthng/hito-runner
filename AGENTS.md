@@ -167,6 +167,67 @@ Default response shape for orchestration, prior-agent review, and handoff reques
 
 This shape is mandatory when analyzing another agent's work, preparing the next prompt, or reporting progress on a task. Do not start with only the prompt. Casual questions, open-ended thinking, or simple Q&A may use a lighter conversational answer.
 
+### Status Before Dispatch (Mandatory)
+
+For every Product routing action, the six-part response above must be visible to the user **before**
+the task is sent or queued. The summary must plainly name the demonstrated problem, what is already
+working, the one current gate, the receiving existing role/thread, and whether the task is being
+sent now or merely proposed. A routing response is incomplete if it says only that work has started.
+
+Every execution prompt and final report must additionally state:
+
+- `Approval policy` — routine local inspection, implementation, fixture QA, and validation proceed
+  under the standing authorization; the owner must seek a safe alternative before surfacing an
+  environment gate.
+- `Dispatch status` — `not sent`, `queued on <existing role>`, or `active in <existing role>`.
+
+Do not create a new role chat when an existing matching role is available. Queue a subsequent task
+there and do not interrupt an active task unless the user explicitly supersedes it.
+
+### Explicit Dispatch Consent (Mandatory)
+
+Writing an execution prompt and sending an execution prompt are separate actions. Product must not
+send, queue, resume, or continue work in another role solely because a next owner is obvious, a
+prior task was active, or a general standing authorization exists. It may dispatch only after the
+user gives a current explicit command such as `send`, `dispatch`, `start`, or `run it`.
+
+- Until that command, provide exactly one final, execution-ready prompt and label it `not sent`.
+- The displayed prompt and any later dispatched prompt must be byte-for-byte identical except for
+  transport metadata; do not show a shortened or rewritten version after sending another one.
+- If Product dispatches without current consent, it must immediately stop the receiving role, state
+  the mistake plainly, and report whether any action occurred.
+
+### Active Task Queue Discipline (Mandatory)
+
+Before Product sends any message to an execution role, it must inspect that role's current task
+status and latest turn. A role with an active or in-progress task is unavailable for a new prompt,
+continuation, clarification, or validation instruction unless the user explicitly tells Product to
+stop, supersede, or interrupt it.
+
+- Do not send a "queued" prompt into an active role thread. That message is an interruption, not a
+  queue entry.
+- Keep the next bounded task in Product's pending queue and expose it to the user as `queued, not
+  sent`; dispatch only after the active role reports completion or the user explicitly interrupts.
+- A new report about the same capability is evidence for the current task by default, not authority
+  to start another task or alter its instructions.
+- When a task completes, Product must check the role status again before dispatching the queued
+  item. Never infer idleness from a report alone.
+
+### QA Capability Exhaustion (Mandatory)
+
+QA must not end a local acceptance task as `Failed` or `Blocked` solely because its first browser
+binding, browser bridge, or automation method cannot perform one interaction. Before closing, QA
+must exhaust the available safe local paths, including an independent QA subagent and another
+supported browser/control surface when it can prove the same contract.
+
+- A confirmed Product defect remains a failure until its owner fixes it.
+- A passed Product discriminator plus an unavailable test capability is an evidence gap, not a new
+  Product failure. Report it separately with the exact missing proof and release-risk consequence.
+- Never fabricate DOM state, mutate CSS at runtime, or use an API bypass to replace the missing
+  interaction proof.
+- Return to the user only after that capability exhaustion, cleanup, and a clear distinction between
+  product behavior, QA-environment limitation, and the next actual owner.
+
 ## 2.1) Active Task Continuity Gate (Mandatory)
 
 Before summarizing a report, declaring a next step, or writing a handoff prompt, the orchestration
@@ -641,7 +702,8 @@ Architecture rules:
   systems without replacing real repeated drift.
 - Documentation follows implementation:
   `docs/current-system.md` and `docs/current-product.md` describe implemented behavior only;
-  active plans describe next work; archived plans are history.
+  `docs/tasks/backlog/` owns operational next work; linked plans/specs provide supporting detail;
+  archived plans are history.
 
 Default architectural bias:
 
@@ -1027,7 +1089,7 @@ Read in this order for non-trivial work:
    - `docs/current-system.md`
    - `docs/current-product.md`
    - `docs/current-state.md`
-4. related execution plan in `docs/plans/active/`
+4. canonical backlog item in `docs/tasks/backlog/`, then any linked supporting plan/spec
 5. `docs/README.md`
 
 ## 4) Delivery Workflow (Plan, Implement, Validate)
@@ -1038,7 +1100,9 @@ another role's delivery workflow directly.
 
 Plan discipline:
 
-- Create/update a plan in `docs/plans/active/` for multi-step, risky, cross-surface, migration, or workflow changes.
+- Create/update the canonical backlog item first. Add a linked supporting plan in
+  `docs/plans/active/` only for multi-step, risky, cross-surface, migration, or workflow detail;
+  the plan must not carry a competing operational lifecycle.
 - Small isolated edits may proceed without a formal plan.
 
 New or substantially reworked active plans should include at minimum:
@@ -1054,7 +1118,8 @@ the full plan structure unless that structure is missing and needed for executio
 
 Execution discipline:
 
-- Keep plan status aligned with real progress.
+- Keep the canonical backlog-item status aligned with real progress. Supporting plan/spec status
+  records artifact maturity only and must not compete with the backlog lifecycle.
 - For failures/bugs, investigate in order:
   1. logs
   2. exact failing entity or route
@@ -1083,20 +1148,54 @@ Completion gate:
   changelog material.
 - Keep future plans, backlog-only intake, unimplemented specs, and reopened visual/specimen work out
   of the changelog until they are complete and QA-passed.
-- When work completes, archive plans from `docs/plans/active/` to `docs/plans/archive/`.
+- When work completes, close the canonical backlog item. Archive a linked plan from
+  `docs/plans/active/` to `docs/plans/archive/` only after its inbound links are reconciled; a
+  retained completed plan is supporting history, never an active queue entry.
 
 ## 5.5) Repo-Derived Admin Backlog Import Contract
 
 Markdown is canonical for repo-authored work items. Admin Supabase is a deterministic, read-only
 mirror of that truth; it is not a second editable task system.
 
-The importer scans these canonical roots:
+### Single Operational Task Source
 
-- `docs/tasks/backlog`
+`docs/tasks/backlog/` is the single operational queue for Hito work. Every retained product request,
+reported defect, investigation, implementation slice, QA acceptance, cleanup, or design change must
+have exactly one backlog work item before it is dispatched or marked active. Its lifecycle metadata is
+the only current answer to “what is in progress, ready, blocked, or complete.”
+
+`docs/tasks/frontend-specs/`, `docs/tasks/product-briefs/`, `docs/tasks/running-coach/`,
+`docs/plans/active/`, and `docs/plans/archive/` are supporting decision, specification, and historical
+documents. They may be linked by a backlog item, but they must not independently represent new active
+work. A legacy document that still says `in_progress` is migration debt, not permission to dispatch.
+
+Product creates or updates the one backlog item for every non-trivial user work request before
+handoff. Simple factual questions, status lookups, and casual discussion do not create work items unless
+the user asks to retain them. A task may have several supporting documents, but never several live task
+records. Bugs stay individual until Product deliberately assigns a compatible `Batch`; a batch links
+the individual reports and never replaces their evidence or ownership.
+
+Before dispatch Product must verify that the item is `ready` or `in_progress`, that its owner is idle,
+and that the exact handoff prompt is recorded in that item. Dispatch changes the item to `in_progress`.
+The receiving report updates that same item to `completed`, `blocked`, `ready`, or another truthful
+lifecycle state before any next task is chosen. Queued work has a backlog item but no message sent to an
+active role.
+
+The importer scans the operational queue plus legacy history during the migration:
+
+- `docs/tasks/backlog` — the only source for current operational status and new work.
 - `docs/tasks/product-briefs`
 - `docs/tasks/frontend-specs`
 - `docs/plans/active`
 - `docs/plans/archive`
+
+Legacy roots remain mirrorable for history and link continuity. Their nonterminal metadata is reported
+as migration debt and must be normalized into a backlog item before it is resumed; it must not create a
+second active queue.
+
+`docs/tasks/running-coach/` remains a supporting doctrine/evidence root and is audited for lifecycle
+drift, but the current importer does not mirror it directly. Any executable coaching request must use
+one canonical backlog item that links the doctrine artifact.
 
 ### Canonical Metadata
 

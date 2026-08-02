@@ -6,7 +6,7 @@
 
 ## Status
 
-backlog
+closed
 
 ## Type
 
@@ -30,8 +30,13 @@ retain_in_place
 
 ## Task
 
-Retain the active-plan lifecycle IA as backlog without reopening the accepted backend transition
-contract.
+Retain the accepted active-plan lifecycle IA as supporting historical context without reopening the
+backend transition contract.
+
+## Operational Lifecycle Boundary
+
+This spec is not an operational backlog item. The remaining replacement/refresh request, if resumed,
+is tracked only by `docs/tasks/backlog/2026-06-07-plan-preset-active-plan-replacement-refresh.md`.
 
 ## Stage
 

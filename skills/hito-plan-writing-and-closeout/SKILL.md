@@ -18,7 +18,8 @@ final report or a compact active-plan note is sufficient.
 
 ## Active Plan Rules
 
-Use `docs/plans/active/` for live work that still guides execution.
+Use `docs/plans/active/` for supporting detail that still guides an open canonical backlog item.
+The linked item under `docs/tasks/backlog/` is the only operational lifecycle owner.
 
 When reporting, handing off, or summarizing plan work, render every referenced plan, task, backlog
 item, frontend spec, archive doc, QA report, or current-doc path as a clickable Markdown link with an
@@ -44,7 +45,8 @@ to restate every section. Keep them to the compact facts needed by the next role
 
 ## Repo-Derived Admin Backlog Mirror Compatibility
 
-Plans under `docs/plans/active/` and `docs/plans/archive/` are mirrored into the admin Backlog.
+Plans under `docs/plans/active/` and `docs/plans/archive/` are mirrored as supporting/history groups,
+not as the operational queue.
 Every new or materially updated plan must follow the single lifecycle, identity, scope, frontend-lane,
 and archival contract in `AGENTS.md` section 5.5. Do not maintain a second field or status list here.
 
@@ -70,7 +72,8 @@ When a track is complete:
   changelog
 - if a completed track is internal-only, ops-only, docs-only, or specimen-only, either add a clearly
   bounded changelog entry or explicitly record why it is not shipped-history material
-- archive from `docs/plans/active/` to `docs/plans/archive/` only when the plan no longer guides active/future execution
+- archive from `docs/plans/active/` to `docs/plans/archive/` only when the plan no longer guides an
+  open backlog item and inbound links have been reconciled
 
 ## Compact Cleanup Ledger Rules
 

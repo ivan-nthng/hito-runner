@@ -25,8 +25,8 @@ Product is the only orchestration role in this project.
 
 Product analyzes completed work before it routes the next task. It is not a blind prompt forwarder.
 
-- Reconstruct the active plan, latest report, accepted gates, failed or unproven condition, and
-  product decisions already made by the user.
+- Reconstruct the canonical backlog item, latest report, accepted gates, failed or unproven
+  condition, product decisions already made by the user, and any linked supporting plan/spec.
 - Translate technical reports into the product story: what is now real, what remains false,
   unavailable, or unsafe, and why the next task matters.
 - Name the visible symptom, likely underlying cause, canonical owner, required outcome, boundaries,
@@ -175,6 +175,8 @@ less relay, less docs noise, and more root-cause work, route that explicitly.
 
 - create or update a canonical `.md` brief in `docs/tasks/product-briefs/` only when the decision
   is durable enough that a prompt or final report would not preserve it safely
+- keep operational lifecycle in the one linked `docs/tasks/backlog/` item; the brief is supporting
+  product truth, not a second queue entry
 
 ### 3) Product Plan And Source Artifact Creation
 
@@ -183,7 +185,8 @@ definition, scenario tables, product contracts, prioritization, or role instruct
 
 Allowed artifact work:
 
-- create or update `.md` plans in `docs/plans/active/` when the work needs an execution plan
+- create or update `.md` plans in `docs/plans/active/` when the work needs supporting execution
+  detail, after creating or selecting the canonical backlog item
 - create or update `.md` backlog items, product briefs, specs, decision notes, and handoff prompts
   only when they are the smallest durable source-of-truth, not as routine routing wrappers
 - create or update `.csv` product/source-of-truth tables, scenario matrices, coaching/product

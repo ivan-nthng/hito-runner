@@ -1,8 +1,12 @@
 # Post-Workout Analysis And AI Verdict Contract
 
-**Status:** backlog, high priority after authenticated Garmin FIT upload is available
+**Status:** completed
 
 **Owner sequence:** Product -> Architect -> Backend -> Frontend Product -> QA -> Running Coach
+
+**Operational lifecycle boundary:** This brief is accepted supporting product truth, not an active
+task. Any implementation beyond the current deterministic comparison flow requires one canonical
+item in `docs/tasks/backlog/`.
 
 ## Purpose
 
@@ -111,4 +115,3 @@ AI insight boundaries before FRONTEND renders a new verdict surface. QA must exe
 comparison, explicit AI dispatch, privacy/redaction, no-plan-mutation, reload/readback, remove, and
 desktop/mobile states. Running Coach reviews editorial usefulness only after the deterministic facts
 are proven.
-

@@ -2,11 +2,16 @@
 
 ## Status
 
-ready_for_frontend_correction
+completed
 
 ## Owner
 
 DESIGNER / Hito DS
+
+## Operational Lifecycle Boundary
+
+This accepted design contract is supporting history. Future theme or palette changes require a
+canonical backlog item and must not be dispatched from this spec status.
 
 ## Last Updated
 

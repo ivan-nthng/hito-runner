@@ -6,7 +6,7 @@
 
 ## Status
 
-in_progress
+backlog
 
 ## Type
 
@@ -39,7 +39,9 @@ hosted delivery once approved SMTP credentials and sender identity are available
 
 ## Stage
 
-DESIGNER template direction and versioned email source / hosted delivery prerequisites pending.
+Backlog; no designer task is currently dispatched. The non-secret template direction may be resumed
+only through this backlog item, while hosted delivery remains separately dependent on sender and SMTP
+prerequisites.
 
 ## Exact Handoff Prompt
 
@@ -123,7 +125,7 @@ Stage:
 DESIGNER template direction and versioned email source / hosted delivery prerequisites pending.
 
 Plan:
-/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-07-21-hito-branded-auth-email-delivery.md
+/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/2026-07-21-hito-branded-auth-email-delivery.md
 
 Root cause and architecture fit:
 The Supabase Auth callback already works, but the email delivery surface is still generic. The

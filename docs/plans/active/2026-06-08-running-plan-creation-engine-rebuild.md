@@ -30,6 +30,11 @@ ARCHITECT source-of-truth closeout / engine and post-confirm ownership accepted.
 None. This rebuild is complete; independent provider, evidence, release, or product work must be
 selected outside this plan.
 
+## Operational Lifecycle Boundary
+
+Completed and retained in place because 15 repository locations still link to this durable engine
+record. It is supporting history, not an active task; operational work requires a backlog item.
+
 ## Current Source Of Truth
 
 Generated plan creation now follows one backend-owned path for visible Quick setup goals. Preset

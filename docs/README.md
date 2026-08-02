@@ -7,8 +7,9 @@ Use this order for project context:
 3. `docs/current-system.md`
 4. `docs/current-product.md`
 5. `docs/current-state.md`
-6. relevant file in `docs/plans/active/`
-7. `docs/history/changelog.md`
+6. canonical item in `docs/tasks/backlog/`
+7. any linked supporting plan/spec/brief/doctrine
+8. `docs/history/changelog.md`
 
 ## Folder Purposes
 
@@ -19,7 +20,7 @@ Use this order for project context:
 - `docs/current-product.md`
     - implemented product behavior only
 - `docs/current-state.md`
-    - current phase / what is active now
+    - implemented-state and release-boundary summary; operational status stays in backlog metadata
 - `docs/future-roadmap.md`
     - not-yet-implemented direction only
 - `docs/glossary.md`
@@ -27,12 +28,14 @@ Use this order for project context:
 - `docs/history/changelog.md`
     - completed implementation history
 - `docs/plans/active/`
-    - live execution plans
+    - supporting execution detail and retained completed records; not an operational queue
 - `docs/plans/archive/`
     - closed or superseded plans
 - `docs/tasks/product-briefs/`
-    - canonical product-definition artifacts
+    - supporting product-definition artifacts
 - `docs/tasks/frontend-specs/`
-    - implementation-facing design specs
+    - supporting implementation-facing design specs
+- `docs/tasks/backlog/`
+    - the only operational queue and lifecycle authority
 - `docs/process/`
     - reusable workflow rules

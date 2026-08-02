@@ -119,6 +119,8 @@ Figma bridge ownership rules:
   work, or already-scoped active-plan slices; those should use compact plan notes or final reports.
 - Prefer `docs/tasks/frontend-specs/` for implementation-ready UI specs; use an active plan only
   when the work is multi-slice, risky, or cross-role.
+- Treat either artifact as supporting detail linked from one canonical backlog item; neither owns
+  current execution status independently.
 - Do not compress complex design direction into a short chat answer. The document should be detailed
   enough that Frontend can implement without inventing layout, state, or copy behavior.
 - Include user flow, screen anatomy, component/state inventory, Hito DS primitives to reuse,

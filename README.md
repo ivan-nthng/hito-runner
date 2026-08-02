@@ -47,4 +47,5 @@ Hito Running currently contains an imported TanStack Start frontend baseline plu
 - `docs/current-system.md`
 - `docs/current-product.md`
 - `docs/current-state.md`
-- `docs/plans/active/2026-05-05-full-baseline-import-and-stabilization-plan.md`
+- historical baseline record:
+  `docs/plans/archive/2026-05-05-full-baseline-import-and-stabilization-plan.md`

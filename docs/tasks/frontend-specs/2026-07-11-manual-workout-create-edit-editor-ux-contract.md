@@ -2,11 +2,16 @@
 
 ## Status
 
-ready_for_frontend
+completed
 
 ## Owner
 
 DESIGNER / Hito DS
+
+## Operational Lifecycle Boundary
+
+This implemented contract is supporting history. New manual-editor work requires a canonical backlog
+item rather than reactivating this spec.
 
 ## Last Updated
 

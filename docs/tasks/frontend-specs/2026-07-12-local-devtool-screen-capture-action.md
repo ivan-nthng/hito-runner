@@ -2,11 +2,16 @@
 
 ## Status
 
-ready_for_frontend
+completed
 
 ## Owner
 
 DESIGNER / Hito DS
+
+## Operational Lifecycle Boundary
+
+This implemented local-devtool contract is supporting history. Further Inspector work requires a
+canonical backlog item and must preserve the local-only boundary.
 
 ## Last Updated
 

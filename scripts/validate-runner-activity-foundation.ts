@@ -4,8 +4,8 @@ import { readFile } from "node:fs/promises";
 import { crc32 } from "node:zlib";
 import { createClient } from "@supabase/supabase-js";
 import { readLocalAuthAccountsFile } from "../src/lib/local-auth";
-import { backfillWorkoutResultActivities } from "../src/lib/runner-activity/backfill-workout-result-activities";
 import { deleteRunnerActivityFromHistory } from "../src/lib/runner-activity/garmin-fit-source";
+import { isLoopbackRuntimeUrl } from "../src/lib/supabase/env";
 import {
   ingestGarminWorkoutResult,
   removeWorkoutResultEvidence,
@@ -32,6 +32,9 @@ if (!supabaseUrl || !serviceRoleKey) {
     "Local Supabase URL and service role key are required for the activity foundation proof.",
   );
 }
+if (!isLoopbackRuntimeUrl(supabaseUrl)) {
+  throw new Error("The activity foundation proof requires a loopback Supabase target.");
+}
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 if (!publishableKey) {
   throw new Error(
@@ -49,28 +52,25 @@ const runtimeUrl = process.argv
 async function main() {
   const plannedUser = await ensurePoolUser("provider-engine");
   const unplannedUser = await ensurePoolUser("baseline-no-plan");
-  await resetQaPoolUserData({ supabase, userId: plannedUser.id });
-  await resetQaPoolUserData({ supabase, userId: unplannedUser.id });
+  await resetQaUsers([plannedUser.id, unplannedUser.id]);
 
   try {
     await proveProjectionRegressionDiscriminators({
       plannedUserId: plannedUser.id,
       unplannedUserId: unplannedUser.id,
     });
-    await resetQaPoolUserData({ supabase, userId: plannedUser.id });
-    await resetQaPoolUserData({ supabase, userId: unplannedUser.id });
+    await resetQaUsers([plannedUser.id, unplannedUser.id]);
     await proveUnplannedLifecycle({
       userId: unplannedUser.id,
       otherUserRole: "provider-engine",
     });
-    await provePlannedProjectionAndBackfill(plannedUser.id);
+    await provePlannedProjectionLifecycle(plannedUser.id);
     if (runtimeUrl) {
       await resetQaPoolUserData({ supabase, userId: plannedUser.id });
       await proveRuntimeUploadProjection({ userId: plannedUser.id, runtimeUrl });
     }
   } finally {
-    await resetQaPoolUserData({ supabase, userId: plannedUser.id });
-    await resetQaPoolUserData({ supabase, userId: unplannedUser.id });
+    await resetQaUsers([plannedUser.id, unplannedUser.id]);
   }
 
   const [plannedCounts, unplannedCounts] = await Promise.all([
@@ -81,9 +81,28 @@ async function main() {
   assert.equal(unplannedCounts.runner_activities, 0);
   await assertWorkoutResultStorageEmpty(plannedUser.id);
   await assertWorkoutResultStorageEmpty(unplannedUser.id);
-  const globalBackfill = await backfillWorkoutResultActivities();
-  assert.deepEqual(globalBackfill.linkedAssetIds, []);
+  await assertLegacyBackfillRetirementComplete();
   console.log("Runner activity foundation contract passed.");
+}
+
+async function resetQaUsers(userIds: string[]) {
+  const results = await Promise.allSettled(
+    userIds.map((userId) => resetQaPoolUserData({ supabase, userId })),
+  );
+  const errors = results.flatMap((result) => (result.status === "rejected" ? [result.reason] : []));
+  if (errors.length > 0) {
+    throw new AggregateError(errors, "Runner activity foundation cleanup failed.");
+  }
+}
+
+async function assertLegacyBackfillRetirementComplete() {
+  const result = await supabase
+    .from("workout_result_assets")
+    .select("id", { count: "exact", head: true })
+    .eq("parse_status", "parsed")
+    .is("activity_source_revision_id", null);
+  if (result.error) throw new Error(result.error.message);
+  assert.equal(result.count, 0, "Parsed workout-result assets must use canonical activity truth.");
 }
 
 async function assertWorkoutResultStorageEmpty(userId: string) {
@@ -177,9 +196,9 @@ async function proveProjectionRegressionDiscriminators(input: {
       run: () => proveProjectionSupersession(input.plannedUserId),
     },
     {
-      label: "ordinary intake does not traverse historical backfill",
+      label: "ordinary intake leaves unrelated legacy projection data untouched",
       userId: input.unplannedUserId,
-      run: () => proveOrdinaryIntakeDoesNotBackfill(input.unplannedUserId),
+      run: () => proveOrdinaryIntakeDoesNotMutateLegacyProjection(input.unplannedUserId),
     },
     {
       label: "projection write failures preserve canonical activity and converge on retry",
@@ -550,11 +569,11 @@ async function proveProjectionFailureInjectionIsLoopbackOnly(userId: string) {
   }
 }
 
-async function proveOrdinaryIntakeDoesNotBackfill(userId: string) {
+async function proveOrdinaryIntakeDoesNotMutateLegacyProjection(userId: string) {
   const fixture = await readFitFixture();
   const parsed = await parseGarminFitActivity(fixture);
   const [plannedWorkoutId, legacyWorkoutId] = await createProofWorkouts(userId);
-  const legacyAssetId = await insertLegacyAsset({
+  const legacyAssetId = await insertLegacyProjectionAsset({
     userId,
     plannedWorkoutId: legacyWorkoutId,
     fixture,
@@ -570,11 +589,13 @@ async function proveOrdinaryIntakeDoesNotBackfill(userId: string) {
 
   const legacyAsset = await supabase
     .from("workout_result_assets")
-    .select("activity_source_revision_id")
+    .select("activity_source_revision_id, storage_bucket, storage_path")
     .eq("id", legacyAssetId)
     .single();
   if (legacyAsset.error) throw new Error(legacyAsset.error.message);
   assert.equal(legacyAsset.data.activity_source_revision_id, null);
+  assert.equal(legacyAsset.data.storage_bucket, WORKOUT_RESULT_STORAGE_BUCKET);
+  assert.ok(legacyAsset.data.storage_path);
 }
 
 async function assertCompletePlannedProjection(input: {
@@ -698,9 +719,9 @@ async function proveCrossRunnerReadDenied(input: {
   assert.deepEqual(read.data, []);
 }
 
-async function provePlannedProjectionAndBackfill(userId: string) {
+async function provePlannedProjectionLifecycle(userId: string) {
   const fixture = await readFitFixture();
-  const [firstWorkoutId, secondWorkoutId, thirdWorkoutId] = await createProofWorkouts(userId);
+  const [firstWorkoutId, secondWorkoutId] = await createProofWorkouts(userId);
   const first = await ingestGarminWorkoutResult({
     userId,
     plannedWorkoutId: firstWorkoutId,
@@ -763,29 +784,6 @@ async function provePlannedProjectionAndBackfill(userId: string) {
   if (match.error) throw new Error(match.error.message);
   assert.equal(match.data?.planned_workout_id, secondWorkoutId);
 
-  const parsed = await parseGarminFitActivity(fixture);
-  const legacyAssetId = await insertLegacyAsset({
-    userId,
-    plannedWorkoutId: secondWorkoutId,
-    fixture,
-    parsed,
-  });
-
-  const firstBackfill = await backfillWorkoutResultActivities({ userId });
-  assert.deepEqual(firstBackfill.linkedAssetIds, [legacyAssetId]);
-  const secondBackfill = await backfillWorkoutResultActivities({ userId });
-  assert.deepEqual(secondBackfill.linkedAssetIds, []);
-
-  const conflictingAssetId = await insertLegacyAsset({
-    userId,
-    plannedWorkoutId: thirdWorkoutId,
-    fixture,
-    parsed,
-  });
-  const conflictingBackfill = await backfillWorkoutResultActivities({ userId });
-  assert.deepEqual(conflictingBackfill.linkedAssetIds, []);
-  assert.deepEqual(conflictingBackfill.skippedAssetIds, [conflictingAssetId]);
-
   const sourceLinks = await supabase
     .from("workout_result_assets")
     .select("activity_source_revision_id")
@@ -796,7 +794,7 @@ async function provePlannedProjectionAndBackfill(userId: string) {
   const sourceRevisionIds = (sourceLinks.data ?? [])
     .map((row) => row.activity_source_revision_id)
     .filter((id): id is string => Boolean(id));
-  assert.equal(sourceRevisionIds.length, 2);
+  assert.equal(sourceRevisionIds.length, 1);
 
   await removeWorkoutResultEvidence({ userId, plannedWorkoutId: secondWorkoutId });
   const rawStates = await supabase
@@ -805,7 +803,10 @@ async function provePlannedProjectionAndBackfill(userId: string) {
     .eq("user_id", userId)
     .in("id", sourceRevisionIds);
   if (rawStates.error) throw new Error(rawStates.error.message);
-  assert.deepEqual(rawStates.data?.map((row) => row.raw_state).sort(), ["removed", "removed"]);
+  assert.deepEqual(
+    rawStates.data?.map((row) => row.raw_state),
+    ["removed"],
+  );
 }
 
 async function ensurePoolUser(role: keyof typeof QA_TESTER_POOL) {
@@ -845,7 +846,7 @@ async function createProofWorkouts(userId: string): Promise<[string, string, str
   return [firstWorkoutId, secondWorkoutId, thirdWorkoutId];
 }
 
-async function insertLegacyAsset(input: {
+async function insertLegacyProjectionAsset(input: {
   userId: string;
   plannedWorkoutId: string;
   fixture: Buffer;
@@ -857,6 +858,7 @@ async function insertLegacyAsset(input: {
     .from(WORKOUT_RESULT_STORAGE_BUCKET)
     .upload(storagePath, input.fixture, { contentType: "application/octet-stream" });
   if (storage.error) throw new Error(storage.error.message);
+
   const asset = await supabase
     .from("workout_result_assets")
     .insert({
@@ -876,6 +878,7 @@ async function insertLegacyAsset(input: {
     .select("id")
     .single();
   if (asset.error) throw new Error(asset.error.message);
+
   const metrics = await supabase.from("workout_actual_metrics").insert({
     user_id: input.userId,
     planned_workout_id: input.plannedWorkoutId,

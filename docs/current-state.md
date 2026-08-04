@@ -6,18 +6,18 @@ Active
 
 ## Last Updated
 
-2026-08-03
+2026-08-04
 
 ## Where We Are Now
 
-- Runner Activity Intelligence Gates 1-4 are functionally accepted on the current dirty working
-  revision: canonical activity/source/revision truth, paginated History, immutable factual Progress,
-  context-specific whole-activity records, session-RPE load, retryable raw-source removal, activity
-  deletion freshness, desktop/exact-375px browser lifecycle, RLS/privacy, build/integrity, and fixture
-  cleanup passed Global QA. Source-control release integration remains pending under the exact
-  manifest in the canonical foundation backlog item. Gate 5 normalized streams/aerobic metrics and
-  provider sync remain future work; `normalized_stream_not_persisted` is still the truthful Gate 5
-  state.
+- Runner Activity Intelligence Gates 1-4 and the canonical planned-workout projection reconciliation
+  are released on `main`: canonical activity/source/revision truth, paginated History, immutable
+  factual Progress, context-specific whole-activity records, session-RPE load, retryable raw-source
+  removal, activity deletion freshness, RLS/privacy, build/integrity, fixture cleanup, and idempotent
+  Plan-vs-Run projection are accepted baseline. The Backend optimization plan now records completed
+  Slice 1 and the locally validated Slice 1b source-hygiene boundary separately from release
+  integration. Gate 5 normalized streams/aerobic metrics and provider sync remain future work;
+  `normalized_stream_not_persisted` is still the truthful Gate 5 state.
 - Production runner-baseline schema parity is owned by the versioned Supabase migration history and deployment parity validator: hosted migration history must match the repository, while the Vercel build reads that same history through a service-role-only RPC and refuses to publish application output until the migration set and baseline Data API contract both match.
 - Runner baseline and heart-rate truth remediation is accepted and closed: authenticated runners
   can save age, height, weight, fitness, and accepted estimated/personal BPM provenance without

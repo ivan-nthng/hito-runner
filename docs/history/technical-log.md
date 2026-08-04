@@ -1,7 +1,7 @@
 # Hito Technical Log
 
 Status: active internal ledger
-Last Updated: 2026-08-03
+Last Updated: 2026-08-04
 Owner: PRODUCT
 
 ## Purpose And Source Boundary
@@ -29,6 +29,18 @@ Entry format:
 
 Every accepted implementation, QA acceptance gate, source-cleanup batch, or durable process repair
 must either add an entry here or explicitly state why it is not technical-log material.
+
+## 2026-08-04
+
+- BACKEND + QA + ARCHITECT / Runner Activity Backend Optimization Slice 3 — measured factual and
+  Gate 4 fingerprint reconciliation with the canonical 30-activity fixture and retained the current
+  implementation: reconciliation misses remained bounded, hits performed zero writes, and immutable
+  RPE invalidation created only one new observation and metric snapshot while factual freshness
+  stayed independent. Evidence:
+  `docs/tasks/backlog/2026-08-03-runner-activity-backend-simplification-and-metric-scalability.md`
+  and `scripts/validate-runner-activity-read-models.ts`. Boundary: no runtime source, migration,
+  materialized store, cache, provider, Frontend, or Gate 5 behavior changed; Global QA remains
+  separate.
 
 ## 2026-08-03
 

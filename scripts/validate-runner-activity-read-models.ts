@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { readLocalAuthAccountsFile } from "../src/lib/local-auth";
+import { recordRunnerActivitySessionRpeForUser } from "../src/lib/runner-activity/activity-evidence";
 import { getRunnerActivityProgressFactsForUser } from "../src/lib/runner-activity/fact-snapshots";
 import {
   deleteRunnerActivityFromHistory,
@@ -9,17 +10,21 @@ import {
   removeRunnerActivityOriginalFilesForActivity,
 } from "../src/lib/runner-activity/garmin-fit-source";
 import { listRunnerActivityHistoryForUser } from "../src/lib/runner-activity/history-read-model";
+import { getRunnerActivityProgressForUser } from "../src/lib/runner-activity/read-model";
 import { createRunnerActivityPlannedWorkoutMatch } from "../src/lib/runner-activity/garmin-fit-source";
 import type { ParsedGarminWorkout } from "../src/lib/workout-result-import/types";
 import { WORKOUT_RESULT_STORAGE_BUCKET } from "../src/lib/workout-result-import/types";
 import { addDaysIso, todayIso, weekdayLong } from "../src/lib/training";
 import {
   QA_TESTER_POOL,
+  acquireQaPoolLease,
   assertQaPoolAuthUser,
   ensureQaPoolAuthUser,
   getQaUserOwnedCounts,
+  releaseQaPoolLease,
   resetQaPoolUserData,
 } from "./lib/qa-test-user-lifecycle.mjs";
+import { seedRunnerActivityProgressReviewFixture } from "./lib/runner-activity-progress-review-fixture";
 
 const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
@@ -39,6 +44,20 @@ const AS_OF_DATE = todayIso();
 const runtimeUrl = process.env.RUNNER_ACTIVITY_RUNTIME_URL?.trim() || null;
 
 async function main() {
+  const leases: Array<Awaited<ReturnType<typeof acquireQaPoolLease>>> = [];
+  try {
+    for (const role of ["provider-engine", "isolation-a"] as const) {
+      leases.push(await acquireQaPoolLease({ role }));
+    }
+    await runValidation();
+  } finally {
+    for (const lease of leases.reverse()) {
+      await releaseQaPoolLease(lease);
+    }
+  }
+}
+
+async function runValidation() {
   const runtimeSession = runtimeUrl ? await prepareRuntimePoolIdentity(runtimeUrl) : null;
   const owner = await ensurePoolUser("provider-engine");
   const other = await ensurePoolUser("isolation-a");
@@ -208,7 +227,200 @@ async function main() {
   assert.equal(ownerCounts.runner_activity_fact_snapshots, 0);
   assert.equal(otherCounts.runner_activities, 0);
   assert.equal(otherCounts.runner_activity_fact_snapshots, 0);
+  const measurement = await measureSnapshotReconciliation(owner.id);
+  console.log(JSON.stringify({ snapshotReconciliationMeasurement: measurement }));
   console.log("Runner activity Gate 2 read-model contract passed.");
+}
+
+async function measureSnapshotReconciliation(userId: string) {
+  try {
+    await seedRunnerActivityProgressReviewFixture({ supabase, userId, asOfDate: AS_OF_DATE });
+    await clearDerivedMetricRows(userId);
+
+    const beforeMiss = await getQaUserOwnedCounts(supabase, userId);
+    const reconciliationMiss = await measureProgressRead(userId);
+    const afterMiss = await getQaUserOwnedCounts(supabase, userId);
+    const warm = await measureProgressRead(userId);
+    const afterWarm = await getQaUserOwnedCounts(supabase, userId);
+
+    assert.equal(reconciliationMiss.progress.status, "current");
+    assert.equal(reconciliationMiss.progress.advancedMetrics.status, "current");
+    assert.equal(reconciliationMiss.writeCount, 9);
+    assert.equal(reconciliationMiss.readCount, 17);
+    assert.equal(afterMiss.runner_activity_fact_snapshots, 7);
+    assert.equal(afterMiss.runner_activity_metric_snapshots, 1);
+    assert.equal(afterMiss.runner_activity_metric_observations, 31);
+    assert.equal(warm.writeCount, 0);
+    assert.equal(warm.readCount, 16);
+    assert.equal(
+      warm.progress.rolling28Day.current.id,
+      reconciliationMiss.progress.rolling28Day.current.id,
+    );
+    assert.equal(
+      warm.progress.advancedMetrics.status === "current"
+        ? warm.progress.advancedMetrics.snapshotId
+        : null,
+      reconciliationMiss.progress.advancedMetrics.status === "current"
+        ? reconciliationMiss.progress.advancedMetrics.snapshotId
+        : null,
+    );
+    assert.deepEqual(snapshotRowCounts(afterWarm), snapshotRowCounts(afterMiss));
+
+    const mutationTarget = await supabase
+      .from("runner_activities")
+      .select("id, current_revision_id")
+      .eq("user_id", userId)
+      .eq("local_date", addDaysIso(AS_OF_DATE, -2))
+      .single();
+    if (mutationTarget.error) throw new Error(mutationTarget.error.message);
+    assert.ok(mutationTarget.data.current_revision_id);
+    const previousMetricSnapshotId =
+      reconciliationMiss.progress.advancedMetrics.status === "current"
+        ? reconciliationMiss.progress.advancedMetrics.snapshotId
+        : null;
+    assert.ok(previousMetricSnapshotId);
+
+    const mutation = await recordRunnerActivitySessionRpeForUser(userId, {
+      activityId: mutationTarget.data.id,
+      activityRevisionId: mutationTarget.data.current_revision_id,
+      rpe: 6,
+      outcome: "completed",
+      expectedEvidenceRevisionId: null,
+    });
+    assert.equal(mutation.progress.status, "current");
+    assert.equal(mutation.progress.advancedMetrics.status, "current");
+    if (mutation.progress.advancedMetrics.status !== "current") {
+      throw new Error("Expected current Gate 4 readback after RPE mutation.");
+    }
+    assert.notEqual(mutation.progress.advancedMetrics.snapshotId, previousMetricSnapshotId);
+    assert.equal(
+      mutation.progress.rolling28Day.current.id,
+      reconciliationMiss.progress.rolling28Day.current.id,
+    );
+    const afterMutation = await getQaUserOwnedCounts(supabase, userId);
+    assert.equal(afterMutation.runner_activity_fact_snapshots, 7);
+    assert.equal(afterMutation.runner_activity_metric_snapshots, 2);
+    assert.equal(afterMutation.runner_activity_metric_observations, 32);
+
+    const postMutationWarm = await measureProgressRead(userId);
+    assert.equal(postMutationWarm.writeCount, 0);
+    assert.equal(postMutationWarm.readCount, 16);
+    assert.equal(postMutationWarm.progress.advancedMetrics.status, "current");
+    if (postMutationWarm.progress.advancedMetrics.status !== "current") {
+      throw new Error("Expected current Gate 4 warm readback.");
+    }
+    assert.equal(
+      postMutationWarm.progress.advancedMetrics.snapshotId,
+      mutation.progress.advancedMetrics.snapshotId,
+    );
+
+    return {
+      fixtureActivityCount: 30,
+      reconciliationMiss: measurementReceipt(reconciliationMiss),
+      warm: measurementReceipt(warm),
+      postMutationWarm: measurementReceipt(postMutationWarm),
+      reconciliationMissRowDelta: {
+        factSnapshots:
+          afterMiss.runner_activity_fact_snapshots - beforeMiss.runner_activity_fact_snapshots,
+        metricSnapshots:
+          afterMiss.runner_activity_metric_snapshots - beforeMiss.runner_activity_metric_snapshots,
+        metricObservations:
+          afterMiss.runner_activity_metric_observations -
+          beforeMiss.runner_activity_metric_observations,
+      },
+      mutationRowDelta: {
+        factSnapshots:
+          afterMutation.runner_activity_fact_snapshots - afterWarm.runner_activity_fact_snapshots,
+        metricSnapshots:
+          afterMutation.runner_activity_metric_snapshots -
+          afterWarm.runner_activity_metric_snapshots,
+        metricObservations:
+          afterMutation.runner_activity_metric_observations -
+          afterWarm.runner_activity_metric_observations,
+      },
+      mutationProducedFreshMetricSnapshot: true,
+      factualSnapshotRemainedCurrent: true,
+    };
+  } finally {
+    await resetQaPoolUserData({ supabase, userId });
+    const afterCleanup = await getQaUserOwnedCounts(supabase, userId);
+    assert.ok(Object.values(afterCleanup).every((count) => count === 0));
+  }
+}
+
+async function clearDerivedMetricRows(userId: string) {
+  for (const table of [
+    "runner_activity_fact_snapshots",
+    "runner_activity_metric_snapshots",
+    "runner_activity_metric_observations",
+  ] as const) {
+    const result = await supabase.from(table).delete().eq("user_id", userId);
+    if (result.error) throw new Error(result.error.message);
+  }
+}
+
+async function measureProgressRead(userId: string) {
+  const requests: Array<{ method: string; table: string }> = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const requestUrl = new URL(input instanceof Request ? input.url : String(input));
+    const method = (
+      init?.method ?? (input instanceof Request ? input.method : "GET")
+    ).toUpperCase();
+    if (
+      requestUrl.origin === new URL(supabaseUrl).origin &&
+      requestUrl.pathname.startsWith("/rest/v1/")
+    ) {
+      requests.push({ method, table: requestUrl.pathname.slice("/rest/v1/".length) });
+    }
+    return originalFetch(input, init);
+  };
+  const startedAt = performance.now();
+  try {
+    const progress = await getRunnerActivityProgressForUser({ userId, asOfDate: AS_OF_DATE });
+    return {
+      progress,
+      elapsedMs: Number((performance.now() - startedAt).toFixed(2)),
+      readCount: requests.filter((request) => isReadMethod(request.method)).length,
+      writeCount: requests.filter((request) => !isReadMethod(request.method)).length,
+      operations: requestCounts(requests),
+    };
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+function isReadMethod(method: string) {
+  return method === "GET" || method === "HEAD";
+}
+
+function requestCounts(requests: Array<{ method: string; table: string }>) {
+  return Object.fromEntries(
+    Array.from(
+      requests.reduce((counts, request) => {
+        const key = `${request.method} ${request.table}`;
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+        return counts;
+      }, new Map<string, number>()),
+    ).sort(([left], [right]) => left.localeCompare(right)),
+  );
+}
+
+function measurementReceipt(read: Awaited<ReturnType<typeof measureProgressRead>>) {
+  return {
+    elapsedMs: read.elapsedMs,
+    readCount: read.readCount,
+    writeCount: read.writeCount,
+    operations: read.operations,
+  };
+}
+
+function snapshotRowCounts(counts: Awaited<ReturnType<typeof getQaUserOwnedCounts>>) {
+  return {
+    factSnapshots: counts.runner_activity_fact_snapshots,
+    metricSnapshots: counts.runner_activity_metric_snapshots,
+    metricObservations: counts.runner_activity_metric_observations,
+  };
 }
 
 async function proveEmptyHistoryAndProgress(userId: string) {

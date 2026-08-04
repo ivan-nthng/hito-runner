@@ -52,41 +52,36 @@ export type WorkoutSectionColorRole = Exclude<RunnerFacingBlockType, "repeat_set
 export const WORKOUT_PRIMITIVE_PALETTE_FAMILIES: ReadonlyArray<{
   id: WorkoutPrimitivePaletteId;
   label: string;
-  base: string;
   tokenPrefix: `--hito-workout-${WorkoutPrimitivePaletteId}`;
 }> = [
-  { id: "slate", label: "Slate", base: "#6B7280", tokenPrefix: "--hito-workout-slate" },
-  { id: "ice-blue", label: "Ice Blue", base: "#BEE9FF", tokenPrefix: "--hito-workout-ice-blue" },
-  { id: "maya-blue", label: "Maya Blue", base: "#7CC3FF", tokenPrefix: "--hito-workout-maya-blue" },
-  { id: "azure", label: "Azure", base: "#5C95FF", tokenPrefix: "--hito-workout-azure" },
+  { id: "slate", label: "Slate", tokenPrefix: "--hito-workout-slate" },
+  { id: "ice-blue", label: "Ice Blue", tokenPrefix: "--hito-workout-ice-blue" },
+  { id: "maya-blue", label: "Maya Blue", tokenPrefix: "--hito-workout-maya-blue" },
+  { id: "azure", label: "Azure", tokenPrefix: "--hito-workout-azure" },
   {
     id: "deep-indigo",
     label: "Deep Indigo",
-    base: "#4164FF",
     tokenPrefix: "--hito-workout-deep-indigo",
   },
-  { id: "orchid", label: "Orchid", base: "#7B61FF", tokenPrefix: "--hito-workout-orchid" },
+  { id: "orchid", label: "Orchid", tokenPrefix: "--hito-workout-orchid" },
   {
     id: "tiger-flame",
     label: "Tiger Flame",
-    base: "#FE6237",
     tokenPrefix: "--hito-workout-tiger-flame",
   },
-  { id: "coral", label: "Coral", base: "#FF5A3D", tokenPrefix: "--hito-workout-coral" },
+  { id: "coral", label: "Coral", tokenPrefix: "--hito-workout-coral" },
   {
     id: "burnt-orange",
     label: "Burnt Orange",
-    base: "#FF8A2C",
     tokenPrefix: "--hito-workout-burnt-orange",
   },
   {
     id: "sunflower-gold",
     label: "Sunflower Gold",
-    base: "#FFB62E",
     tokenPrefix: "--hito-workout-sunflower-gold",
   },
-  { id: "mint", label: "Mint", base: "#68D391", tokenPrefix: "--hito-workout-mint" },
-  { id: "lavender", label: "Lavender", base: "#B39DFF", tokenPrefix: "--hito-workout-lavender" },
+  { id: "mint", label: "Mint", tokenPrefix: "--hito-workout-mint" },
+  { id: "lavender", label: "Lavender", tokenPrefix: "--hito-workout-lavender" },
 ] as const;
 
 const WORKOUT_TYPE_TOKEN_NAMES: Record<RunnerFacingWorkoutType, string> = {

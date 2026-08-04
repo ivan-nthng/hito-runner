@@ -3,6 +3,7 @@ import { canLoadLocalDevtool } from "@/components/devtools/local-devtool-boundar
 
 export const LOCAL_UI_INSPECTOR_STORAGE_KEY = "hito.localUiInspector.enabled";
 export const LOCAL_UI_INSPECTOR_TOGGLE_EVENT = "hito:local-ui-inspector-toggle";
+const CANONICAL_MANAGED_QA_ORIGIN = "http://127.0.0.1:3000";
 
 export function canUseLocalUiInspector(hostname?: string) {
   return canLoadLocalDevtool(hostname);
@@ -10,17 +11,17 @@ export function canUseLocalUiInspector(hostname?: string) {
 
 export function readLocalUiInspectorEnabled() {
   if (typeof window === "undefined" || !canUseLocalUiInspector()) return false;
-  return window.localStorage.getItem(LOCAL_UI_INSPECTOR_STORAGE_KEY) === "true";
+
+  const storedPreference = window.localStorage.getItem(LOCAL_UI_INSPECTOR_STORAGE_KEY);
+  if (storedPreference != null) return storedPreference === "true";
+
+  return window.location.origin === CANONICAL_MANAGED_QA_ORIGIN;
 }
 
 export function writeLocalUiInspectorEnabled(enabled: boolean) {
   if (typeof window === "undefined" || !canUseLocalUiInspector()) return;
 
-  if (enabled) {
-    window.localStorage.setItem(LOCAL_UI_INSPECTOR_STORAGE_KEY, "true");
-  } else {
-    window.localStorage.removeItem(LOCAL_UI_INSPECTOR_STORAGE_KEY);
-  }
+  window.localStorage.setItem(LOCAL_UI_INSPECTOR_STORAGE_KEY, String(enabled));
 
   window.dispatchEvent(new Event(LOCAL_UI_INSPECTOR_TOGGLE_EVENT));
 }

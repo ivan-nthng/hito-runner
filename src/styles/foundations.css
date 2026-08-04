@@ -9,6 +9,7 @@
  */
 
 @theme inline {
+  /* @hito-export-start primitive-radius */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -16,6 +17,7 @@
   --radius-2xl: calc(var(--radius) + 4px);
   --radius-3xl: calc(var(--radius) + 8px);
   --radius-4xl: calc(var(--radius) + 12px);
+  /* @hito-export-end primitive-radius */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -56,10 +58,6 @@
   --color-signal-foreground: var(--signal-foreground);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
-  --color-easy: var(--easy);
-  --color-long: var(--long);
-  --color-quality: var(--quality);
-  --color-rest: var(--rest);
   --color-workout-rest: var(--hito-workout-type-rest-base);
   --color-workout-recovery: var(--hito-workout-type-recovery-base);
   --color-workout-easy: var(--hito-workout-type-easy-base);
@@ -103,6 +101,7 @@
   --radius: 8px;
 
   /* Raw motion primitives. Components choose the shortest duration that keeps origin legible. */
+  /* @hito-export-start primitive-motion */
   --hito-motion-duration-100: 100ms;
   --hito-motion-duration-140: 140ms;
   --hito-motion-duration-180: 180ms;
@@ -110,8 +109,10 @@
   --hito-motion-duration-260: 260ms;
   --hito-motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --hito-motion-ease-linear: linear;
+  /* @hito-export-end primitive-motion */
 
   /* Raw color primitives. Semantic product tokens map from this layer. */
+  /* @hito-export-start primitive-color */
   --stone-950: oklch(0.14 0.005 60);
   --stone-900: oklch(0.16 0.005 60);
   --stone-850: oklch(0.19 0.005 60);
@@ -134,6 +135,31 @@
   --green-500: oklch(0.72 0.13 155);
   --orange-500: oklch(0.75 0.15 50);
   --red-500: oklch(0.62 0.18 25);
+
+  /* Accepted light analog primitives. Light semantics alias these without changing values. */
+  --warm-white: oklch(0.997 0.003 82);
+  --linen-50: oklch(0.988 0.006 82);
+  --linen-75: oklch(0.982 0.008 80);
+  --linen-100: oklch(0.972 0.01 78);
+  --linen-160: oklch(0.946 0.009 77);
+  --linen-180: oklch(0.94 0.012 76);
+  --linen-220: oklch(0.912 0.014 74);
+  --ink-950: oklch(0.14 0.006 58);
+  --ink-900: oklch(0.18 0.01 60);
+  --ink-850: oklch(0.22 0.012 62);
+  --ink-800: oklch(0.24 0.012 64);
+  --taupe-650: oklch(0.4 0.014 62);
+  --taupe-alpha-32: oklch(0.72 0.014 70 / 32%);
+  --taupe-alpha-34: oklch(0.72 0.014 70 / 34%);
+  --taupe-alpha-52: oklch(0.72 0.014 70 / 52%);
+  --orange-650: oklch(0.66 0.15 62);
+  --orange-700: oklch(0.62 0.14 60);
+  --green-700: oklch(0.44 0.125 150);
+  --amber-750: oklch(0.5 0.14 55);
+  --red-700: oklch(0.48 0.18 28);
+  --blue-700: oklch(0.46 0.095 205);
+
+  /* @hito-export-end primitive-color */
 
   /* Dedicated workout primitive palettes. Product semantics map from these scales. */
   --hito-workout-slate-base: #6b7280;
@@ -892,8 +918,8 @@
     transparent
   );
   --hito-workout-section-cooldown-foreground: var(--stone-950);
-
   /* Spacing primitives. Keep the scale compact and map component rhythm from it. */
+  /* @hito-export-start primitive-spacing */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -902,8 +928,10 @@
   --space-6: 1.5rem;
   --space-8: 2rem;
   --space-10: 2.5rem;
+  /* @hito-export-end primitive-spacing */
 
   /* Semantic color tokens */
+  /* @hito-export-start semantic-color-dark */
   --background: var(--stone-900);
   --foreground: var(--sand-100);
   --surface: var(--stone-850);
@@ -930,17 +958,14 @@
   --signal-foreground: var(--background);
   --info: var(--blue-500);
   --info-foreground: var(--stone-950);
-  --easy: var(--hito-workout-type-easy-base);
-  --long: var(--hito-workout-type-long-run-base);
-  --quality: var(--hito-workout-type-tempo-base);
-  --rest: var(--hito-workout-type-rest-base);
   --warn: var(--orange-500);
   --success: var(--green-500);
   --success-foreground: var(--stone-950);
-  --hito-shadow-soft: 0 14px 38px oklch(0 0 0 / 32%);
+  /* @hito-export-end semantic-color-dark */
+
   --chart-1: var(--signal);
-  --chart-2: var(--easy);
-  --chart-3: var(--quality);
+  --chart-2: var(--hito-workout-type-easy-base);
+  --chart-3: var(--hito-workout-type-tempo-base);
   --chart-4: var(--success);
   --chart-5: var(--sand-500);
   --sidebar: var(--stone-950);
@@ -951,35 +976,8 @@
   --sidebar-accent-foreground: var(--foreground);
   --sidebar-border: var(--hairline);
   --sidebar-ring: var(--ring);
-  --hito-mobile-bottom-nav-height: 3.75rem;
-  --hito-shell-sidebar-width: 15rem;
-  --hito-shell-menu-width-profile: 13rem;
-  --hito-shell-menu-width-plan: 14rem;
-  --hito-shell-menu-width-account: 14rem;
-  --hito-menu-width-standard: 14rem;
-  --hito-admin-quick-note-panel-width: min(36rem, calc(100vw - 2.5rem));
-  --hito-route-support-sidebar-width: 20rem;
-  --hito-route-panel-skeleton-calendar-height: 26.25rem;
-  --hito-route-panel-skeleton-detail-height: 28.75rem;
-  --hito-form-section-label-width: 13.75rem;
-  --hito-form-section-avatar-width: 7rem;
-  --hito-readback-value-width: 12rem;
-  --hito-readback-value-compact-width: 11rem;
-  --hito-data-table-code-width-sm: 14rem;
-  --hito-data-table-code-width-md: 18rem;
-  --hito-data-table-code-width-lg: 20rem;
-  --hito-data-table-action-width: 18rem;
-  --hito-data-table-note-width: 16rem;
-  --hito-tooltip-width-lg: 18rem;
-  --hito-manual-workout-title-min-width: 14rem;
-  --hito-manual-workout-step-summary-min-width: 12rem;
-  --hito-manual-workout-menu-width-add: min(20rem, calc(100vw - 2rem));
-  --hito-manual-workout-menu-width-step: min(22rem, calc(100vw - 2rem));
-  --hito-manual-workout-menu-width-template: min(15.5rem, calc(100vw - 2rem));
-  --hito-manual-workout-menu-max-height-template: min(
-    32rem,
-    var(--radix-dropdown-menu-content-available-height)
-  );
+
+  --hito-shadow-soft: 0 14px 38px oklch(0 0 0 / 32%);
 }
 
 .dark {
@@ -994,44 +992,53 @@
 
 [data-hito-theme="light"] {
   color-scheme: light;
-  --background: oklch(0.972 0.01 78);
-  --foreground: oklch(0.18 0.01 60);
-  --surface: oklch(0.988 0.006 82);
-  --surface-elevated: oklch(0.997 0.003 82);
+  /* @hito-export-start semantic-color-light */
+  --background: var(--linen-100);
+  --foreground: var(--ink-900);
+  --surface: var(--linen-50);
+  --surface-elevated: var(--warm-white);
   --card: var(--surface);
   --card-foreground: var(--foreground);
   --popover: var(--surface-elevated);
   --popover-foreground: var(--foreground);
   --primary: var(--foreground);
-  --primary-foreground: oklch(0.988 0.006 82);
-  --secondary: oklch(0.94 0.012 76);
-  --secondary-foreground: oklch(0.24 0.012 64);
-  --muted: oklch(0.946 0.009 77);
-  --muted-foreground: oklch(0.4 0.014 62);
-  --accent: oklch(0.912 0.014 74);
+  --primary-foreground: var(--linen-50);
+  --secondary: var(--linen-180);
+  --secondary-foreground: var(--ink-800);
+  --muted: var(--linen-160);
+  --muted-foreground: var(--taupe-650);
+  --accent: var(--linen-220);
   --accent-foreground: var(--foreground);
-  --border: oklch(0.72 0.014 70 / 52%);
-  --hairline: oklch(0.72 0.014 70 / 32%);
-  --input: oklch(0.94 0.012 76);
-  --ring: oklch(0.62 0.14 60);
-  --signal: oklch(0.66 0.15 62);
-  --signal-foreground: oklch(0.14 0.006 58);
-  --success: oklch(0.44 0.125 150);
-  --success-foreground: oklch(0.988 0.006 82);
-  --warn: oklch(0.5 0.14 55);
-  --destructive: oklch(0.48 0.18 28);
-  --destructive-foreground: oklch(0.988 0.006 82);
-  --info: oklch(0.46 0.095 205);
-  --info-foreground: oklch(0.988 0.006 82);
-  --hito-shadow-soft: 0 12px 34px oklch(0 0 0 / 14%);
-  --sidebar: oklch(0.982 0.008 80);
-  --sidebar-foreground: oklch(0.22 0.012 62);
+  --border: var(--taupe-alpha-52);
+  --hairline: var(--taupe-alpha-32);
+  --input: var(--linen-180);
+  --ring: var(--orange-700);
+  --signal: var(--orange-650);
+  --signal-foreground: var(--ink-950);
+  --success: var(--green-700);
+  --success-foreground: var(--linen-50);
+  --warn: var(--amber-750);
+  --destructive: var(--red-700);
+  --destructive-foreground: var(--linen-50);
+  --info: var(--blue-700);
+  --info-foreground: var(--linen-50);
+  /* @hito-export-end semantic-color-light */
+
+  --chart-1: var(--signal);
+  --chart-2: var(--hito-workout-type-easy-base);
+  --chart-3: var(--hito-workout-type-tempo-base);
+  --chart-4: var(--success);
+  --chart-5: var(--sand-500);
+  --sidebar: var(--linen-75);
+  --sidebar-foreground: var(--ink-850);
   --sidebar-primary: var(--signal);
   --sidebar-primary-foreground: var(--signal-foreground);
   --sidebar-accent: color-mix(in oklch, var(--signal) 13%, var(--surface) 87%);
   --sidebar-accent-foreground: var(--foreground);
-  --sidebar-border: oklch(0.72 0.014 70 / 34%);
+  --sidebar-border: var(--taupe-alpha-34);
   --sidebar-ring: var(--ring);
+
+  --hito-shadow-soft: 0 12px 34px oklch(0 0 0 / 14%);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-surface: var(--surface);
@@ -1164,8 +1171,16 @@
   [data-hito-theme="light"] .canvas-grain,
   [data-hito-theme="light"] .hito-canvas-atmosphere {
     background-image:
-      radial-gradient(ellipse at top, color-mix(in oklch, var(--color-signal) 10%, transparent), transparent 58%),
-      radial-gradient(ellipse at bottom, color-mix(in oklch, var(--color-accent) 68%, transparent), transparent 56%);
+      radial-gradient(
+        ellipse at top,
+        color-mix(in oklch, var(--color-signal) 10%, transparent),
+        transparent 58%
+      ),
+      radial-gradient(
+        ellipse at bottom,
+        color-mix(in oklch, var(--color-accent) 68%, transparent),
+        transparent 56%
+      );
   }
 
   [data-hito-theme="light"] .auth-hero-image {
@@ -1175,7 +1190,11 @@
   [data-hito-theme="light"] .auth-hero-overlay,
   [data-hito-theme="light"] .hito-auth-photo-overlay {
     background:
-      radial-gradient(ellipse at 20% 35%, color-mix(in oklch, var(--color-signal) 14%, transparent), transparent 54%),
+      radial-gradient(
+        ellipse at 20% 35%,
+        color-mix(in oklch, var(--color-signal) 14%, transparent),
+        transparent 54%
+      ),
       linear-gradient(
         90deg,
         color-mix(in oklch, var(--color-background) 92%, transparent) 0%,
@@ -1291,7 +1310,11 @@
           color-mix(in oklch, var(--color-background) 82%, transparent) 48%,
           color-mix(in oklch, var(--color-background) 94%, transparent) 100%
         ),
-        radial-gradient(ellipse at top, color-mix(in oklch, var(--color-signal) 10%, transparent), transparent 58%);
+        radial-gradient(
+          ellipse at top,
+          color-mix(in oklch, var(--color-signal) 10%, transparent),
+          transparent 58%
+        );
     }
   }
 
@@ -1363,7 +1386,6 @@
     animation: hito-motion-skeleton calc(var(--hito-motion-duration-260) * 6)
       var(--hito-motion-ease-out) infinite;
   }
-
 }
 
 @media (prefers-reduced-motion: reduce) {

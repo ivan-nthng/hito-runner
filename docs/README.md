@@ -28,14 +28,28 @@ Use this order for project context:
 - `docs/history/changelog.md`
     - completed implementation history
 - `docs/plans/active/`
-    - supporting execution detail and retained completed records; not an operational queue
+    - supporting execution detail and retained completed records; not an operational queue; any
+      lifecycle or prompt text is inert unless one canonical backlog item links and owns it
 - `docs/plans/archive/`
     - closed or superseded plans
 - `docs/tasks/product-briefs/`
-    - supporting product-definition artifacts
+    - supporting product-definition artifacts; legacy `backlog` metadata is artifact context only
 - `docs/tasks/frontend-specs/`
-    - supporting implementation-facing design specs
+    - supporting implementation-facing design specs; a spec cannot dispatch without one linked
+      canonical backlog item
 - `docs/tasks/backlog/`
     - the only operational queue and lifecycle authority
 - `docs/process/`
     - reusable workflow rules
+
+## Operational Classification Rule
+
+Only item metadata under `docs/tasks/backlog/` can answer whether work is `ready`, `in_progress`,
+`blocked`, or terminal. A `Status`, `Task`, `Stage`, `Next Recommended Role`, `Suggested Next Step`,
+or role prompt anywhere else describes artifact maturity or retained history and cannot dispatch
+work. If a non-backlog document has no single topical backlog link, it is explicit legacy migration
+debt until Product creates or selects one; do not infer a task from it.
+
+`/admin/capture` is a capture inbox and read-only repository mirror surface. Editable Admin-created
+row states are intake/triage state, not the operational lifecycle. Retained work must resolve to one
+Markdown backlog item before dispatch.

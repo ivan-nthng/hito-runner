@@ -150,7 +150,7 @@ export async function validateManualWorkoutDisposablePersistenceProof({
   const supabase = createAdminSupabaseClient();
   const disposableUser = await acquireQaPoolSupabaseUser({
     supabase,
-    poolRole: "saved-plan-readback",
+    poolRole: "provider-engine",
     creationErrorMessage: "Disposable manual workout user creation failed.",
   });
   let proof: {
@@ -613,7 +613,7 @@ async function validateImportedWorkoutEditAtomicPersistence(input: {
 }) {
   const disposableUser = await acquireQaPoolSupabaseUser({
     supabase: input.supabase,
-    poolRole: "saved-plan-readback",
+    poolRole: "provider-engine",
     creationErrorMessage: "Disposable imported workout edit user creation failed.",
   });
   let proof: {
@@ -1020,7 +1020,7 @@ async function validateReplacementCarryForwardPersistence(input: {
 }) {
   const disposableUser = await acquireQaPoolSupabaseUser({
     supabase: input.supabase,
-    poolRole: "saved-plan-readback",
+    poolRole: "provider-engine",
     creationErrorMessage: "Disposable plan replacement user creation failed.",
   });
   let cleanup: ManualDisposableCleanupProof | null = null;
@@ -1203,7 +1203,7 @@ async function validateClearBeforeImportAtomicPersistence(input: {
 }) {
   const disposableUser = await acquireQaPoolSupabaseUser({
     supabase: input.supabase,
-    poolRole: "saved-plan-readback",
+    poolRole: "provider-engine",
     creationErrorMessage: "Disposable clear-before-import user creation failed.",
   });
   let cleanup: ManualDisposableCleanupProof | null = null;
@@ -1462,7 +1462,7 @@ async function validateCanonicalOriginWorkoutEditPersistence(input: {
   for (const origin of origins) {
     const disposableUser = await acquireQaPoolSupabaseUser({
       supabase: input.supabase,
-      poolRole: "saved-plan-readback",
+      poolRole: "provider-engine",
       creationErrorMessage: `Disposable ${origin.label} workout edit user creation failed.`,
     });
     let proof: Omit<CanonicalOriginEditProof, "cleanup"> | null = null;

@@ -1337,7 +1337,7 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
 ) {
   const disposableUser = await acquireQaPoolSupabaseUser({
     supabase,
-    poolRole: "saved-plan-readback",
+    poolRole: "provider-engine",
     creationErrorMessage: "Disposable atomic plan-creation user creation failed.",
   });
   const planId = crypto.randomUUID();

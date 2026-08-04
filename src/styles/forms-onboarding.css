@@ -1,179 +1,12 @@
+:root {
+  /* Manual-workout geometry is domain composition, not a global exportable token family. */
+  --hito-manual-workout-title-min-width: 14rem;
+  --hito-manual-workout-step-summary-min-width: 12rem;
+  --hito-manual-workout-menu-width-add: min(20rem, calc(100vw - 2rem));
+  --hito-manual-workout-menu-width-step: min(22rem, calc(100vw - 2rem));
+}
+
 @layer components {
-  .hito-field {
-    display: block;
-    cursor: text;
-    border: 1px solid var(--color-hairline);
-    border-radius: var(--radius-lg);
-    background: color-mix(in oklch, var(--color-background) 62%, transparent);
-    color: var(--color-foreground);
-    width: 100%;
-    transition:
-      border-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
-      background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
-      box-shadow var(--hito-motion-duration-140) var(--hito-motion-ease-out);
-  }
-
-  .hito-field-primary {
-    border-color: var(--color-hairline);
-    background: color-mix(in oklch, var(--color-background) 62%, transparent);
-  }
-
-  .hito-field-secondary {
-    border-color: transparent;
-    background: color-mix(in oklch, var(--color-muted) 54%, transparent);
-  }
-
-  .hito-field::placeholder {
-    color: color-mix(in oklch, var(--color-muted-foreground) 72%, transparent);
-  }
-
-  .hito-field:hover:not(:disabled):not([readonly]),
-  .hito-field[data-demo-state="hover"] {
-    border-color: color-mix(in oklch, var(--color-foreground) 20%, transparent);
-    background: color-mix(in oklch, var(--color-background) 72%, transparent);
-  }
-
-  .hito-field-secondary:hover:not(:disabled):not([readonly]),
-  .hito-field-secondary[data-demo-state="hover"] {
-    border-color: transparent;
-    background: color-mix(in oklch, var(--color-muted) 64%, transparent);
-  }
-
-  .hito-field:focus,
-  .hito-field[data-demo-state="focus"] {
-    border-color: color-mix(in oklch, var(--color-foreground) 32%, transparent);
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 16%, transparent);
-    outline: none;
-  }
-
-  .hito-field-secondary:focus,
-  .hito-field-secondary[data-demo-state="focus"] {
-    border-color: transparent;
-    background: color-mix(in oklch, var(--color-muted) 64%, transparent);
-  }
-
-  .hito-field-feedback-error,
-  .hito-field-feedback-error:hover:not(:disabled):not([readonly]),
-  .hito-field-feedback-error[data-demo-state="hover"] {
-    border-color: color-mix(in oklch, var(--color-destructive) 46%, transparent);
-    background: color-mix(in oklch, var(--color-destructive) 7%, var(--color-background));
-  }
-
-  .hito-field-feedback-error:focus,
-  .hito-field-feedback-error[data-demo-state="focus"] {
-    border-color: color-mix(in oklch, var(--color-destructive) 58%, transparent);
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-destructive) 16%, transparent);
-    outline: none;
-  }
-
-  .hito-field-feedback-success,
-  .hito-field-feedback-success:hover:not(:disabled):not([readonly]),
-  .hito-field-feedback-success[data-demo-state="hover"] {
-    border-color: color-mix(in oklch, var(--color-success) 44%, transparent);
-    background: color-mix(in oklch, var(--color-success) 7%, var(--color-background));
-  }
-
-  .hito-field-feedback-success:focus,
-  .hito-field-feedback-success[data-demo-state="focus"] {
-    border-color: color-mix(in oklch, var(--color-success) 56%, transparent);
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-success) 16%, transparent);
-    outline: none;
-  }
-
-  .hito-field:disabled,
-  .hito-field[data-demo-state="disabled"] {
-    background: color-mix(in oklch, var(--color-muted) 26%, transparent);
-    color: color-mix(in oklch, var(--color-foreground) 78%, transparent);
-    cursor: not-allowed;
-  }
-
-  .hito-field[readonly],
-  .hito-field[data-demo-state="readonly"] {
-    background: color-mix(in oklch, var(--color-muted) 26%, transparent);
-    color: color-mix(in oklch, var(--color-foreground) 78%, transparent);
-    cursor: default;
-  }
-
-  select.hito-field,
-  button.hito-field,
-  [role="button"].hito-field {
-    cursor: pointer;
-  }
-
-  .hito-field:-webkit-autofill {
-    -webkit-text-fill-color: var(--color-foreground);
-    caret-color: var(--color-foreground);
-    box-shadow: 0 0 0 1000px color-mix(in oklch, var(--color-background) 74%, transparent) inset;
-  }
-
-  .hito-field[type="number"] {
-    appearance: textfield;
-    -moz-appearance: textfield;
-  }
-
-  .hito-field[type="number"]::-webkit-inner-spin-button,
-  .hito-field[type="number"]::-webkit-outer-spin-button {
-    margin: 0;
-    -webkit-appearance: none;
-  }
-
-  .hito-compound-range-field {
-    display: grid;
-    min-width: 0;
-    gap: var(--space-2);
-  }
-
-  .hito-compound-range-control {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
-    align-items: center;
-    min-width: 0;
-    overflow: hidden;
-  }
-
-  .hito-compound-range-control:focus-within {
-    border-color: transparent;
-    background: color-mix(in oklch, var(--color-muted) 64%, transparent);
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 16%, transparent);
-  }
-
-  .hito-compound-range-control[data-invalid="true"] {
-    border-color: color-mix(in oklch, var(--color-destructive) 46%, transparent);
-    background: color-mix(in oklch, var(--color-destructive) 7%, var(--color-background));
-  }
-
-  .hito-compound-range-control[data-invalid="true"]:focus-within {
-    border-color: color-mix(in oklch, var(--color-destructive) 58%, transparent);
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-destructive) 16%, transparent);
-  }
-
-  .hito-compound-range-control[data-disabled="true"] {
-    background: color-mix(in oklch, var(--color-muted) 26%, transparent);
-    color: color-mix(in oklch, var(--color-foreground) 78%, transparent);
-  }
-
-  .hito-compound-range-input,
-  .hito-compound-range-input:hover:not(:disabled),
-  .hito-compound-range-input:focus {
-    min-width: 0;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    box-shadow: none;
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .hito-compound-range-separator,
-  .hito-compound-range-unit {
-    color: var(--color-muted-foreground);
-    white-space: nowrap;
-  }
-
-  .hito-compound-range-unit {
-    padding-inline-end: var(--space-3);
-  }
-
   .hito-onboarding-surface {
     max-width: 64rem;
     margin-inline: auto;
@@ -1414,13 +1247,6 @@
     padding: var(--space-2);
   }
 
-  .hito-manual-workout-menu-template {
-    width: var(--hito-manual-workout-menu-width-template);
-    max-height: var(--hito-manual-workout-menu-max-height-template);
-    overflow-y: auto;
-    padding: var(--space-2);
-  }
-
   @media (min-width: 768px) {
     .hito-manual-workout-block-fields {
       grid-template-columns: minmax(12rem, 0.9fr) minmax(18rem, 1.1fr);
@@ -1488,14 +1314,6 @@
     gap: 0.5rem;
   }
 
-  .hito-onboarding-option-row-button {
-    width: 100%;
-    min-height: 3.5rem;
-    justify-content: space-between;
-    text-align: left;
-    white-space: normal;
-  }
-
   @media (min-width: 640px) {
     .hito-onboarding-option-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1532,12 +1350,6 @@
     min-height: 2.75rem;
     padding: 0 1rem;
     font-size: 0.875rem;
-  }
-
-  .hito-field-xl {
-    min-height: 3.25rem;
-    padding: 0 1.125rem;
-    font-size: 0.9375rem;
   }
 
   .hito-field-header,

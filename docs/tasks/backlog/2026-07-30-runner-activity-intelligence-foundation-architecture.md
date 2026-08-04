@@ -6,7 +6,7 @@
 
 ## Status
 
-ready
+completed
 
 ## Type
 
@@ -32,24 +32,23 @@ runner-activity-intelligence-foundation
 
 retain_in_place
 
-## Next Recommended Role
-
-architect
-
 ## Task
 
-Integrate the functionally accepted Gates 1-4 source bundle into source control using the exact
-manifest in this item. Gate 5 remains a separate later Backend slice that depends on persisted
-normalized sample-set revisions.
+Retain the accepted and released Gates 1-4 architecture, ownership, lifecycle, formula, and release
+receipt without treating Gate 5 or provider sync as implemented work.
 
 ## Stage
 
-Gates 1-4 implementation and functional Global QA Acceptance passed on the current dirty working
-revision. Source-control release integration is pending and no file has been staged. No Gate 5
-advanced metric is implemented. The current source scope remains manual Garmin FIT/ZIP intake only;
-provider sync and multi-source reconciliation are future gates.
+Completed / Gates 1-4 functional Global QA Acceptance passed and the exact 50-file release bundle
+shipped on `main` as `550f602f11c207b56be0a0c71779be26ced0e003`. The separate canonical
+planned-workout projection reconciliation shipped as
+`329f45c27ff25928c4daad963f24f967e197200c`. Gate 5 advanced metrics, provider sync, and
+multi-source reconciliation remain future work.
 
-## Exact Handoff Prompt
+## Historical Release Handoff Prompt
+
+The prompt below is retained only as the pre-release receipt. It is satisfied and cannot dispatch
+new work.
 
 ```text
 ROLE: ARCHITECT
@@ -91,20 +90,21 @@ Dispatch status:
 not sent
 ```
 
-## Dispatch
+## Release Closeout
 
-Release integration handoff is ready and not sent. No staging, commit, push, deployment, hosted
-mutation, or provider call has been performed. Gate 5 remains a separate backlog slice.
+The exact 50-file bundle below was committed and pushed on `main` as
+`550f602f11c207b56be0a0c71779be26ced0e003`. The four excluded concurrent paths remained outside
+that release. No deployment, hosted mutation, provider call, Gate 5 implementation, or provider-sync
+work was part of the release.
 
-## Source-Control Release Integration Manifest (2026-08-03)
+## Released Source-Control Manifest (2026-08-03)
 
-This is the exact file-level manifest for the functionally accepted Gates 1-4 working revision. It
-does not authorize staging. A release owner must stop on any path-set or mixed-hunk drift rather than
-expand the bundle by inference.
+This is the historical exact file-level manifest for the released Gates 1-4 revision. It does not
+authorize a new staging or release action.
 
 ### Accepted Gates 1-4 release bundle
 
-Stage these 50 paths together when staging is explicitly authorized:
+These 50 paths shipped together in `550f602f11c207b56be0a0c71779be26ced0e003`:
 
 ```text
 docs/current-product.md
@@ -223,13 +223,17 @@ The reusable browser fixture remains package-reachable through
 `local:activity-review:reset`. The final Global QA receipt records all required validators, build,
 build-integrity, targeted lint, diff hygiene and fixture cleanup as passed on this dirty revision.
 
-### Remaining release prerequisites
+These command names are retained above only as the accepted Gates 1-4 release receipt. The current
+single feature-QA owner is `runner_design_profile_v1`, reached through
+`local:design-profile:seed`, `local:design-profile:status`, and `local:design-profile:reset`; the
+activity-only aliases and source module were retired on 2026-08-04.
 
-1. Recheck that the dirty path set is exactly the 50 accepted paths plus the four preserved paths.
-2. Obtain explicit authorization for staging; this audit does not grant it.
-3. Stage only the 50 accepted paths and verify the index path set exactly matches this manifest.
-4. Treat commit, push, deployment, hosted migration and provider calls as separate explicit gates.
-5. Keep Gate 5 `normalized_stream_not_persisted` and provider sync future-only.
+### Release prerequisite closeout
+
+The path-set, mixed-hunk, index-parity, validation, commit, push, and remote-parity gates were
+satisfied by `550f602f11c207b56be0a0c71779be26ced0e003`. Deployment, hosted migration, and provider
+calls were not part of that source-control release. Gate 5 remains truthfully
+`normalized_stream_not_persisted`, and provider sync remains future-only.
 
 ## Architecture Status
 
@@ -247,9 +251,9 @@ own operational status or dispatch.
 
 Current implementation boundary:
 
-- Gates 1-4: **implemented locally; functional Global QA Acceptance passed on the current dirty
-  working revision**;
-- source-control release integration for Gates 1-4: **pending**;
+- Gates 1-4: **implemented, functionally accepted, and released on `main` as
+  `550f602f11c207b56be0a0c71779be26ced0e003`**;
+- source-control release integration for Gates 1-4: **completed**;
 - Gate 5 normalized streams/aerobic metrics: **not implemented**;
 - provider connections and cross-source reconciliation: **not implemented**;
 - Gate 7 for the selected Gates 1-4 functional bundle: **passed**.
@@ -833,7 +837,7 @@ ambiguous-link refusal, official-result correction/withdrawal, activity-revision
 formula-version historical readback, fresh-read pending state, independent factual/advanced-metric
 freshness, deletion/raw-removal discrimination, RLS, bounded recomputation, and regression of Gates
 1-3. Passing owner-level proof is `Implementation DoD: Passed`; functional Global QA for the
-selected Gates 1-4 bundle subsequently passed, while source-control integration remains pending.
+selected Gates 1-4 bundle subsequently passed, and the bundle was released in `550f602`.
 
 #### Gate 5 Backend owner - sample normalization and stream-derived profile computation
 
@@ -881,8 +885,7 @@ The accepted decisions are recorded in [Accepted Product Lifecycle Decisions](#a
 
 **Owner:** Backend
 **Dependency:** Gate 0
-**Status:** functional Global QA passed for the selected Gates 1-4 bundle; source-control integration
-pending
+**Status:** functional Global QA passed and released in `550f602`
 
 Implement one authenticated runner-owned activity/source/revision boundary using the existing local
 FIT/ZIP path as the only input adapter. The accepted outcome must:
@@ -902,8 +905,7 @@ policy. Temporary dual-write requires an explicit removal gate.
 **Owner:** Backend with Running Coach review
 **Dependency:** accepted Gate 1 owner-level contract and implementation evidence. Gate 7 Global QA
 is not a prerequisite.
-**Status:** functional Global QA passed for the selected Gates 1-4 bundle; source-control integration
-pending
+**Status:** functional Global QA passed and released in `550f602`
 
 Deliver the first useful profile computation from summary-level truth without claiming fitness:
 
@@ -920,8 +922,7 @@ HR-at-pace, durability, or an overall fitness score in this gate.
 
 **Owner:** Frontend Product
 **Dependency:** Gate 2
-**Status:** functional Global QA passed for the selected Gates 1-4 bundle; source-control integration
-pending
+**Status:** functional Global QA passed and released in `550f602`
 
 Render backend-owned activity history and compact profile truth with provenance, confidence,
 excluded/unavailable states, and source/correction affordances. Do not compute metrics, infer
@@ -931,8 +932,7 @@ duplicates, or introduce provider-specific profile UI.
 
 **Owner:** Backend runner-activity evidence/profile computation, with Running Coach review
 **Dependency:** accepted Gates 1-3 plus the formula-policy and Architecture readiness amendments
-**Status:** functional Global QA passed for the selected Gates 1-4 bundle; source-control integration
-pending
+**Status:** functional Global QA passed and released in `550f602`
 
 Implement only the bounded activity-assertion and summary-derived task defined in
 [Two non-overlapping Backend tasks](#two-non-overlapping-backend-tasks). Calculated best efforts
@@ -969,7 +969,7 @@ The old Strava-specific backlog item cannot execute independently of this gate.
 **Owner:** QA
 **Dependency:** all release-selected gates
 
-**Status for selected Gates 1-4 bundle:** passed on 2026-08-03; source-control integration pending
+**Status for selected Gates 1-4 bundle:** passed on 2026-08-03 and released in `550f602`
 
 Run the cross-source, privacy, persistence, formula parity, historical readback, responsive UI, and
 cleanup matrix for the selected release boundary. Owner-level Implementation DoD does not imply
@@ -1058,9 +1058,9 @@ Each implementation owner reports:
 
 Implementation DoD requires affected migrations, RLS/persistence, deterministic fixtures,
 readback/export where changed, lint/build-integrity, scoped diff hygiene, and independent QA review.
-Functional Global QA for the selected Gates 1-4 bundle passed on the current dirty working revision.
-The source-control boundary remains pending until the exact manifest above is integrated; Gate 5 and
-provider work retain their own future acceptance gates.
+Functional Global QA for the selected Gates 1-4 bundle passed on the accepted release revision, and
+the exact manifest above shipped in `550f602`. Gate 5 and provider work retain their own future
+acceptance gates.
 
 ## Explicit Non-Goals
 

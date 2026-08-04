@@ -1,7 +1,19 @@
-import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import {
+  AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_DELAY_MS_ENV,
+  AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV,
+  AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
+  AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV,
+  AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV,
+  AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID,
+  buildAiGeneratedRunningPlanQaFixtureAuthoringInput,
+} from "../../src/lib/ai-generated-running-plan-dev-fixture";
+import {
+  buildReviewedAiGeneratedRunningPlanPreviewForUser,
+  confirmRunningPlanDraftForUser,
+} from "../../src/lib/running-plan-engine-actions";
 import {
   createRunnerActivityPlannedWorkoutMatch,
   persistGarminFitActivitySource,
@@ -10,16 +22,19 @@ import {
 import { recordRunnerActivitySessionRpeForUser } from "../../src/lib/runner-activity/activity-evidence";
 import { listRunnerActivityHistoryForUser } from "../../src/lib/runner-activity/history-read-model";
 import { getRunnerActivityProgressForUser } from "../../src/lib/runner-activity/read-model";
-import { addDaysIso, startOfWeekIso, todayIso, weekdayLong } from "../../src/lib/training";
+import { addDaysIso, startOfWeekIso, todayIso } from "../../src/lib/training";
 import { isLoopbackRuntimeUrl } from "../../src/lib/supabase/env";
+import {
+  buildFirstTimeRunnerBaselineReadback,
+  updateUserSettingsForUserId,
+} from "../../src/lib/user-settings-actions";
 import { parseGarminFitActivity } from "../../src/lib/workout-result-import/parse-garmin-fit";
 import { WORKOUT_RESULT_STORAGE_BUCKET } from "../../src/lib/workout-result-import/types";
 import { markRunnerActivitySourceRemovalPendingForFixture } from "./runner-activity-gate-4-fixture";
 
-export const RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_VERSION =
-  "runner_activity_progress_review_v3" as const;
-export const RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_ROLE = "saved-plan-readback" as const;
-export const RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_STORAGE_BUCKET = WORKOUT_RESULT_STORAGE_BUCKET;
+export const RUNNER_DESIGN_PROFILE_FIXTURE_VERSION = "runner_design_profile_v1" as const;
+export const RUNNER_DESIGN_PROFILE_FIXTURE_ROLE = "saved-plan-readback" as const;
+export const RUNNER_DESIGN_PROFILE_FIXTURE_STORAGE_BUCKET = WORKOUT_RESULT_STORAGE_BUCKET;
 
 type FixtureActivitySpec = {
   key: string;
@@ -91,55 +106,141 @@ const ACTIVITY_SPECS = Object.freeze<FixtureActivitySpec[]>([
   activity("w1-long", 0, "Long run", 100, 105, 16.2, 145, 96, true, "available", 5),
 ]);
 
-export async function seedRunnerActivityProgressReviewFixture(input: {
+export async function createRunnerDesignProfilePlan(input: {
   supabase: SupabaseClient;
   userId: string;
   asOfDate?: string;
 }) {
   const asOfDate = normalizeAsOfDate(input.asOfDate);
-  const planCycleId = randomUUID();
-  const planStartDate = addDaysIso(asOfDate, -55);
-  const plan = await input.supabase.from("plan_cycles").insert({
-    id: planCycleId,
-    user_id: input.userId,
-    status: "archived",
-    title: "Activity review fixture",
-    goal_summary: "Local factual Activity History and Progress review",
-    source_template: RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_VERSION,
-    start_date: planStartDate,
-    end_date: asOfDate,
+  const authoringInput = buildAiGeneratedRunningPlanQaFixtureAuthoringInput(asOfDate);
+  const baseline = buildFirstTimeRunnerBaselineReadback({
+    age: 36,
+    weightKg: 72,
+    heightCm: 178,
+    fitnessLevel: "running_regularly",
   });
-  if (plan.error) throw new Error(plan.error.message);
+  await updateUserSettingsForUserId(input.userId, {
+    firstName: "QA",
+    lastName: "Runner",
+    displayName: "QA Saved Plan",
+    age: baseline.age,
+    weightKg: baseline.weightKg,
+    heightCm: baseline.heightCm,
+    fitnessLevel: baseline.fitnessLevel!,
+    heartRateProfile: {
+      zones: baseline.heartRateZones.zones.map(({ reference, minBpm, maxBpm }) => ({
+        reference,
+        minBpm,
+        maxBpm,
+      })),
+    },
+  });
 
-  const plannedSpecs = ACTIVITY_SPECS.filter((spec) => spec.planned);
-  const plannedRows = plannedSpecs.map((spec, index) => {
-    const workoutDate = addDaysIso(asOfDate, -spec.daysAgo);
-    return {
-      id: randomUUID(),
-      plan_cycle_id: planCycleId,
-      user_id: input.userId,
-      workout_date: workoutDate,
-      weekday: weekdayLong(workoutDate),
-      week_number: Math.floor((55 - spec.daysAgo) / 7) + 1,
-      phase: "Local review fixture",
-      workout_type: "easy" as const,
-      title: spec.title,
-      notes: null,
-      steps: [],
-      display_order: index,
-    };
+  let providerDispatchCount = 0;
+  const reviewed = await withLocalDesignFixtureEnv(async () =>
+    buildReviewedAiGeneratedRunningPlanPreviewForUser(
+      input.userId,
+      {
+        age: 36,
+        heightCm: 178,
+        weightKg: 72,
+        runnerLevel: "runs_a_lot",
+        daysPerWeek: 4,
+        fixedRestDays: ["Wednesday", "Friday", "Sunday"],
+        preferredLongRunDay: "Saturday",
+        startDate: authoringInput.schedule.startDate,
+        benchmark: { kind: "recent_5k_pace", recent5kPace: "5:30" },
+        runnerComment: undefined,
+        planGoalIntent: { distance: { kind: "preset", preset: "10K" } },
+      },
+      {
+        qaFixtureAuthorized: true,
+        aiPreview: {
+          apiKey: "local-design-profile-provider-tripwire",
+          model: "local-design-profile-provider-tripwire",
+          fetchImpl: async () => {
+            providerDispatchCount += 1;
+            throw new Error("Runner design profile reached a paid provider transport.");
+          },
+          generationLedger: { disabled: true },
+        },
+      },
+    ),
+  );
+  assert.equal(reviewed.ok, true, reviewed.ok ? "" : reviewed.unavailable.error.message);
+  if (!reviewed.ok) throw new Error(reviewed.unavailable.error.message);
+  assert.equal(reviewed.draft.callsOpenAi, false);
+  assert.equal(reviewed.draft.aiGeneration.model, AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL);
+  assert.equal(
+    reviewed.draft.aiGeneration.responseId,
+    AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID,
+  );
+  assert.equal(providerDispatchCount, 0);
+
+  const confirmed = await withLocalDesignFixtureEnv(() =>
+    confirmRunningPlanDraftForUser(
+      input.userId,
+      {
+        previewInput: reviewed.draft.previewInput,
+        sourceKind: reviewed.draft.sourceKind,
+        reviewToken: reviewed.draft.reviewToken,
+        reviewChecksum: reviewed.draft.reviewChecksum,
+      },
+      { allowLocalQaFixture: true },
+    ),
+  );
+  assert.equal(confirmed.ok, true, JSON.stringify(confirmed));
+  if (!confirmed.ok) throw new Error(confirmed.message);
+  assert.equal(providerDispatchCount, 0);
+
+  const activePlan = await input.supabase
+    .from("plan_cycles")
+    .select("id, start_date, end_date, goal_metadata")
+    .eq("user_id", input.userId)
+    .eq("status", "active")
+    .single();
+  if (activePlan.error) throw new Error(activePlan.error.message);
+  const workouts = await input.supabase
+    .from("planned_workouts")
+    .select("id, workout_date, workout_type")
+    .eq("user_id", input.userId)
+    .eq("plan_cycle_id", activePlan.data.id)
+    .order("workout_date", { ascending: true });
+  if (workouts.error) throw new Error(workouts.error.message);
+
+  return {
+    planId: activePlan.data.id,
+    startDate: activePlan.data.start_date,
+    endDate: activePlan.data.end_date,
+    reviewChecksum: reviewed.draft.reviewChecksum,
+    canonicalRowCount: reviewed.draft.canonicalRowCount,
+    providerDispatchCount,
+    workouts: workouts.data,
+  };
+}
+
+export async function seedRunnerDesignProfileFixture(input: {
+  supabase: SupabaseClient;
+  userId: string;
+  asOfDate?: string;
+}) {
+  const asOfDate = normalizeAsOfDate(input.asOfDate);
+  const planReceipt = await createRunnerDesignProfilePlan({
+    supabase: input.supabase,
+    userId: input.userId,
+    asOfDate,
   });
-  const planned = await input.supabase.from("planned_workouts").insert(plannedRows);
-  if (planned.error) throw new Error(planned.error.message);
-  const plannedWorkoutIdByKey = new Map(
-    plannedSpecs.map((spec, index) => [spec.key, plannedRows[index].id]),
+  const plannedWorkoutIdByDate = new Map(
+    planReceipt.workouts
+      .filter((workout) => workout.workout_type !== "rest")
+      .map((workout) => [workout.workout_date, workout.id]),
   );
 
   const receipts: FixtureSeedReceipt[] = [];
   for (const spec of ACTIVITY_SPECS) {
     const localDate = addDaysIso(asOfDate, -spec.daysAgo);
     const fileBuffer = buildFixtureSource(spec, localDate);
-    const storagePath = `${input.userId}/${RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_VERSION}/${spec.key}.fit`;
+    const storagePath = `${input.userId}/${RUNNER_DESIGN_PROFILE_FIXTURE_VERSION}/${spec.key}.fit`;
     const stored = await input.supabase.storage
       .from(WORKOUT_RESULT_STORAGE_BUCKET)
       .upload(storagePath, fileBuffer, {
@@ -163,7 +264,7 @@ export async function seedRunnerActivityProgressReviewFixture(input: {
         fileBuffer,
         parsedWorkout,
         sourceCapabilities: {
-          fixture_class: RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_VERSION,
+          fixture_class: RUNNER_DESIGN_PROFILE_FIXTURE_VERSION,
           generated_local_qa_fit: true,
           reprocessable: true,
           normalized_samples_persisted: false,
@@ -180,7 +281,7 @@ export async function seedRunnerActivityProgressReviewFixture(input: {
       key: spec.key,
     });
 
-    const plannedWorkoutId = plannedWorkoutIdByKey.get(spec.key);
+    const plannedWorkoutId = spec.planned ? plannedWorkoutIdByDate.get(localDate) : null;
     if (plannedWorkoutId) {
       await createRunnerActivityPlannedWorkoutMatch({
         userId: input.userId,
@@ -225,14 +326,14 @@ export async function seedRunnerActivityProgressReviewFixture(input: {
     });
   }
 
-  return readRunnerActivityProgressReviewFixture({
+  return readRunnerDesignProfileFixture({
     supabase: input.supabase,
     userId: input.userId,
     asOfDate,
   });
 }
 
-export async function readRunnerActivityProgressReviewFixture(input: {
+export async function readRunnerDesignProfileFixture(input: {
   supabase: SupabaseClient;
   userId: string;
   asOfDate?: string;
@@ -261,9 +362,19 @@ export async function readRunnerActivityProgressReviewFixture(input: {
   if (sourceRevisions.error) throw new Error(sourceRevisions.error.message);
   const planCycles = await input.supabase
     .from("plan_cycles")
-    .select("status, source_template")
+    .select("id, status, source_template, source_kind, start_date, end_date, goal_metadata")
     .eq("user_id", input.userId);
   if (planCycles.error) throw new Error(planCycles.error.message);
+  const activePlans = planCycles.data.filter((plan) => plan.status === "active");
+  assert.equal(activePlans.length, 1, "The design profile requires exactly one active plan.");
+  const activePlan = activePlans[0]!;
+  const plannedWorkouts = await input.supabase
+    .from("planned_workouts")
+    .select("id, workout_date, workout_type, workout_family, workout_identity, steps")
+    .eq("user_id", input.userId)
+    .eq("plan_cycle_id", activePlan.id)
+    .order("workout_date", { ascending: true });
+  if (plannedWorkouts.error) throw new Error(plannedWorkouts.error.message);
 
   const expected = expectedFixtureSummary(asOfDate);
   const actual = {
@@ -287,19 +398,76 @@ export async function readRunnerActivityProgressReviewFixture(input: {
       .length,
     sourceAvailableCount: items.filter((item) => item.source.rawState === "available").length,
   };
-  assert.deepEqual(actual, expected.history);
+  assert.deepEqual(actual, {
+    ...expected.history,
+    plannedCount: actual.plannedCount,
+    unplannedCount: actual.unplannedCount,
+  });
+  assert.ok(actual.plannedCount >= 10, "The design profile requires substantial matched history.");
+  assert.equal(actual.plannedCount + actual.unplannedCount, ACTIVITY_SPECS.length);
   const retryableRemoval = items.find((item) => item.source.rawState === "removal_pending");
   assert.ok(retryableRemoval);
   assert.equal(retryableRemoval.source.originalRetained, false);
   assert.equal(retryableRemoval.source.reprocessingAvailable, false);
   assert.equal(retryableRemoval.quality.updating, false);
   assert.equal(retryableRemoval.capabilities.canRemoveOriginalFile, true);
-  assert.deepEqual(planCycles.data, [
-    {
-      status: "archived",
-      source_template: RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_VERSION,
-    },
-  ]);
+  assert.equal(activePlan.source_kind, "ai_authored_plan_first_v1");
+  assert.equal(
+    readFixtureResponseId(activePlan.goal_metadata),
+    AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID,
+  );
+  assert.ok(activePlan.start_date < asOfDate);
+  assert.ok(activePlan.end_date > asOfDate);
+  const workoutTypes = new Set(plannedWorkouts.data.map((workout) => workout.workout_type));
+  const workoutFamilies = new Set(
+    plannedWorkouts.data.flatMap((workout) =>
+      workout.workout_family ? [workout.workout_family] : [],
+    ),
+  );
+  const workoutIdentities = new Set(
+    plannedWorkouts.data.flatMap((workout) =>
+      workout.workout_identity ? [workout.workout_identity] : [],
+    ),
+  );
+  for (const expectedType of ["rest", "easy", "quality", "long_run"]) {
+    assert.ok(
+      workoutTypes.has(expectedType),
+      `Missing design-profile workout type ${expectedType}.`,
+    );
+  }
+  for (const expectedFamily of [
+    "rest",
+    "easy",
+    "recovery",
+    "intervals",
+    "tempo",
+    "hills",
+    "long",
+  ]) {
+    assert.ok(
+      workoutFamilies.has(expectedFamily),
+      `Missing design-profile workout family ${expectedFamily}.`,
+    );
+  }
+  for (const expectedIdentity of [
+    "easy_run_with_strides",
+    "distance_intervals",
+    "uphill_repeats",
+    "long_aerobic_run",
+  ]) {
+    assert.ok(
+      workoutIdentities.has(expectedIdentity),
+      `Missing design-profile workout identity ${expectedIdentity}.`,
+    );
+  }
+  assert.ok(plannedWorkouts.data.some((workout) => workout.workout_date < asOfDate));
+  assert.ok(plannedWorkouts.data.some((workout) => workout.workout_date > asOfDate));
+  assert.equal(
+    plannedWorkouts.data
+      .filter((workout) => workout.workout_type !== "rest")
+      .every((workout) => Array.isArray(workout.steps) && workout.steps.length > 0),
+    true,
+  );
   assert.equal(sourceRevisions.data.length, ACTIVITY_SPECS.length);
   assert.equal(
     sourceRevisions.data.every(
@@ -344,7 +512,7 @@ export async function readRunnerActivityProgressReviewFixture(input: {
   assert.equal(progress.interpretation.unavailableReason, "later_gate_metric_contract_required");
   assert.equal(progress.advancedMetrics.status, "current");
   if (progress.advancedMetrics.status !== "current") {
-    throw new Error("Activity review fixture expected current advanced metrics.");
+    throw new Error("Runner design profile expected current advanced metrics.");
   }
   const currentLoad = progress.advancedMetrics.sessionRpeLoad.rolling28Day.current.metric;
   const previousLoad = progress.advancedMetrics.sessionRpeLoad.rolling28Day.previous.metric;
@@ -385,13 +553,19 @@ export async function readRunnerActivityProgressReviewFixture(input: {
   );
 
   return {
-    fixtureVersion: RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_VERSION,
+    fixtureVersion: RUNNER_DESIGN_PROFILE_FIXTURE_VERSION,
     asOfDate,
     userId: input.userId,
-    role: RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_ROLE,
+    role: RUNNER_DESIGN_PROFILE_FIXTURE_ROLE,
     planState: {
-      activePlanCount: 0,
-      archivedPlanCount: 1,
+      activePlanCount: activePlans.length,
+      archivedPlanCount: planCycles.data.filter((plan) => plan.status === "archived").length,
+      startDate: activePlan.start_date,
+      endDate: activePlan.end_date,
+      workoutCount: plannedWorkouts.data.length,
+      workoutTypes: [...workoutTypes].sort(),
+      workoutFamilies: [...workoutFamilies].sort(),
+      workoutIdentities: [...workoutIdentities].sort(),
     },
     history: actual,
     progress: {
@@ -423,7 +597,7 @@ export async function readRunnerActivityProgressReviewFixture(input: {
   };
 }
 
-export async function verifyRunnerActivityProgressReviewFixtureRuntime(input: {
+export async function verifyRunnerDesignProfileFixtureRuntime(input: {
   runtimeUrl: string;
   username: string;
   password: string;
@@ -750,11 +924,60 @@ function isFixtureCapabilities(value: unknown) {
     value &&
     typeof value === "object" &&
     !Array.isArray(value) &&
-    (value as Record<string, unknown>).fixture_class ===
-      RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_VERSION &&
+    (value as Record<string, unknown>).fixture_class === RUNNER_DESIGN_PROFILE_FIXTURE_VERSION &&
     (value as Record<string, unknown>).generated_local_qa_fit === true &&
     (value as Record<string, unknown>).reprocessable === true,
   );
+}
+
+function readFixtureResponseId(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const engine = (value as Record<string, unknown>).selected_plan_engine;
+  if (!engine || typeof engine !== "object" || Array.isArray(engine)) return null;
+  const generation = (engine as Record<string, unknown>).ai_generation;
+  if (!generation || typeof generation !== "object" || Array.isArray(generation)) return null;
+  const responseId = (generation as Record<string, unknown>).response_id;
+  return typeof responseId === "string" ? responseId : null;
+}
+
+async function withLocalDesignFixtureEnv<T>(run: () => Promise<T>) {
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ??
+    process.env.VITE_SUPABASE_URL ??
+    process.env.SUPABASE_URL;
+  if (!supabaseUrl || !isLoopbackRuntimeUrl(supabaseUrl)) {
+    throw new Error("Runner design profile fixture requires loopback Supabase.");
+  }
+  const envKeys = [
+    AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV,
+    AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV,
+    AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_DELAY_MS_ENV,
+    AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV,
+    "LOCAL_AUTH_BYPASS_ENABLED",
+    "LOCAL_AUTH_BYPASS_ACCOUNTS_FILE",
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "VERCEL",
+    "CI",
+  ] as const;
+  const previous = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
+  try {
+    process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV] = "true";
+    process.env[AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV] = "qa_fixture";
+    process.env.LOCAL_AUTH_BYPASS_ENABLED = "true";
+    process.env.LOCAL_AUTH_BYPASS_ACCOUNTS_FILE = "scripts/fixtures/local-auth-users.json";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = supabaseUrl;
+    delete process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_DELAY_MS_ENV];
+    delete process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV];
+    delete process.env.VERCEL;
+    delete process.env.CI;
+    return await run();
+  } finally {
+    for (const key of envKeys) {
+      const value = previous[key];
+      if (value == null) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
 }
 
 type FitField = {

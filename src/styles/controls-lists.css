@@ -129,13 +129,6 @@
     font-size: 0.875rem;
   }
 
-  .hito-button-xl {
-    --hito-button-control-size: 3.25rem;
-    min-height: var(--hito-button-control-size);
-    padding: 0 1.25rem;
-    font-size: 0.9375rem;
-  }
-
   .hito-button-icon {
     width: var(--hito-button-control-size);
     min-width: var(--hito-button-control-size);
@@ -900,25 +893,11 @@
     letter-spacing: 0.01em;
   }
 
-  .hito-choice-toggle-md {
-    min-height: 2.5rem;
-    border-radius: var(--radius-md);
-    padding: 0 0.875rem;
-    font-size: 0.875rem;
-  }
-
   .hito-choice-toggle-lg {
     min-height: 2.75rem;
     border-radius: var(--radius-md);
     padding: 0 1rem;
     font-size: 0.875rem;
-  }
-
-  .hito-choice-toggle-xl {
-    min-height: 3.25rem;
-    border-radius: var(--radius-md);
-    padding: 0 1.25rem;
-    font-size: 0.9375rem;
   }
 
   .hito-choice-toggle-card {

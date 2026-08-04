@@ -6,7 +6,7 @@
 
 ## Status
 
-ready
+backlog
 
 ## Type
 
@@ -32,20 +32,26 @@ retain_in_place
 
 marketing
 
-## Next Recommended Role
-
-frontend
-
 ## Task
 
-Extend the existing unauthenticated `AuthEntryScreen` into one scroll-based public Hito entry:
-immediate real authentication in the first viewport, followed by a truthful product narrative.
+Retain the accepted public-auth and landing specification as supporting detail until Product creates
+or links one canonical operational backlog item.
 
 ## Stage
 
-FRONTEND implementation / accepted designer specification ready with integrated QA.
+Supporting specification / orphaned migration debt. No canonical backlog item currently owns an
+implementation or QA gate.
 
-## Exact Handoff Prompt
+## Operational Classification
+
+This document is supporting design detail, not an operational queue entry. Its former `ready`
+status and Frontend prompt did not have a matching item under `docs/tasks/backlog/`; they therefore
+cannot authorize dispatch. Product must create or select exactly one canonical backlog item before
+this proposal can be resumed.
+
+## Historical Handoff Prompt
+
+The prompt below is retained as design-history context only and is not executable from this spec.
 
 ```text
 ROLE: FRONTEND

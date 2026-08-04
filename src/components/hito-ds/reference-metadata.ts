@@ -1,3 +1,5 @@
+import { HITO_BUTTON_SIZES, HITO_BUTTON_VARIANTS } from "@/components/ui/hito-control-contract";
+
 export type HitoDsReferenceKind = "component" | "pattern";
 
 export type HitoDsTokenRecipe = {
@@ -251,10 +253,10 @@ function resolveButtonOwnership(element: Element) {
   const tagName = element.tagName.toLowerCase();
   const isInteractiveHost =
     tagName === "button" || tagName === "a" || element.getAttribute("role") === "button";
-  const hasVariant = ["primary", "secondary", "outlined", "ghost"].some((variant) =>
+  const hasVariant = HITO_BUTTON_VARIANTS.some((variant) =>
     element.classList.contains(`hito-button-${variant}`),
   );
-  const hasSize = ["xs", "sm", "md", "lg", "xl"].some((size) =>
+  const hasSize = HITO_BUTTON_SIZES.some((size) =>
     element.classList.contains(`hito-button-${size}`),
   );
 

@@ -96,6 +96,14 @@ not sent
 Executed in the existing BACKEND task. Frontend browser acceptance remains a separate Product-owned
 slice.
 
+## Supersession
+
+As of 2026-08-04, the activity-only command and source names recorded below are historical release
+evidence. Their 30-activity corpus now belongs to the single
+[`runner_design_profile_v1`](2026-08-04-canonical-local-runner-design-profile-fixture.md) lifecycle,
+reached through `local:design-profile:seed`, `local:design-profile:status`, and
+`local:design-profile:reset`. No runtime alias for the retired activity-only commands remains.
+
 ## Accepted Implementation
 
 - `npm run local:activity-review:seed` resets and reuses the metadata-owned

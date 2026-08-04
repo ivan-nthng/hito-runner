@@ -155,10 +155,22 @@ product rules rather than source-based editability exceptions.
   local admins in local-auth bypass runtime can list tester/admin entries from the local accounts file, see only those local plaintext test passwords, inspect linked Supabase identity status, and delete tester accounts only after exact email confirmation while protected admin accounts remain blocked; this is not production credential or user management
 - `/admin/analytics` now renders Phase 1 internal analytics from the backend view model:
   Overview, Funnel & Usage, Feedback, AI & Entitlements, and Users tabs summarize existing Supabase truth without adding telemetry tables, inventing charts, exposing sensitive raw payloads, or replacing the local-only Test accounts section; backend-owned classification now keeps local, admin, QA, disposable, and suspected test accounts out of real-user product counts and the Users table, while Test accounts shows those excluded rows in Hito table controls with collapsed search, active-filter summary, DS-owned sortable/non-sortable header states, header sort/filter menus, and contained horizontal scrolling
-- `/admin/capture` now provides the first visible admin capture backlog:
-  verified admin sessions can review text-only captured items and quick notes, filter/search by backend fields, open inline detail, update status/type/priority/target role, append notes, archive items by status, create/delete manual quick notes, and copy deterministic manual Codex handoff prompts; normal runner/tester/public sessions cannot access backlog truth, screenshot upload and route-spanning capture overlay remain later slices without a dormant server capability, and no item is automatically sent to Codex
-- repo-authored Hito work can now be explicitly mirrored into the same admin Backlog:
-  `npm run import-admin-backlog-work-items` scans approved markdown task/spec/brief/plan folders and mirrors bounded indexed rows into `admin_capture_items`; canonical lifecycle, stable work-item identity, owner, scope, archive intent, optional batch/lane, task, stage, next role, and exact handoff drive the read-only mirror, while legacy records retain explicit metadata-debt diagnostics; a same-ID source move updates one mirror, duplicate IDs are refused, and stale rows can be archived only through explicit reconciliation after no approved source or replacement remains; markdown stays canonical for repo-authored work, Supabase stays canonical for admin-created quick notes/captures, and there is no automatic two-way sync or Codex dispatch
+- `/admin/capture` now provides a visible admin capture inbox and review workbench:
+  verified admin sessions can review text-only captures and quick notes, filter/search by backend
+  fields, update intake metadata, append notes, archive intake rows, create/delete manual quick notes,
+  and copy deterministic draft prompts. Those editable Admin states are capture/triage state only;
+  they are not Hito's operational work-item lifecycle. Retained work must be created or linked in
+  `docs/tasks/backlog/` before dispatch, and no Admin row is automatically sent to Codex. Normal
+  runner/tester/public sessions cannot access the inbox; screenshot upload and route-spanning capture
+  remain later slices without a dormant server capability
+- repo-authored Hito work can now be explicitly mirrored into the same Admin review surface:
+  `npm run import-admin-backlog-work-items` scans approved markdown task/spec/brief/plan folders and
+  mirrors bounded indexed rows into `admin_capture_items`; only `docs/tasks/backlog/` owns current
+  operational status, while specs, briefs, and plans remain grouped supporting/history sources even
+  when legacy status or prompt text is mirrored for audit. A same-ID source move updates one mirror,
+  duplicate IDs are refused, and stale rows can be archived only through explicit reconciliation
+  after no approved source or replacement remains. There is no automatic two-way sync or Codex
+  dispatch
 - `/admin/login` now provides a dedicated owner admin sign-in page:
   local/dev admin login can still use the protected local fixture, but both local fixture and deployed/runtime admin login now create signed admin-only `hito_admin_session` access for admin surfaces; valid tester/product credentials are refused with an admin-specific error instead of creating a normal product session, redirects stay limited to sanitized admin paths, admin surfaces use explicit `/api/admin/auth/logout`, and normal `/login`, Magic Link, product local-login, and runner/product logout behavior remain separate; `/admin/analytics` admin-required states now point to this admin login path
 - onboarding keeps Manual setup and Quick setup as the visible creation paths, with structured review

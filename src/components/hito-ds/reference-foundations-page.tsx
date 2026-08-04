@@ -12,6 +12,7 @@ import { ReferenceListRow, SectionIntro } from "@/components/hito-ds/reference";
 import { TypographyControlRow } from "@/components/devtools/LocalUiTypographyControls";
 import type { InlineChangeTargetInput } from "@/components/devtools/local-inline-change-target-utils";
 import { inspectLocalUiTarget } from "@/components/devtools/local-ui-inspector-targets";
+import { HITO_DS_MANIFEST } from "@/generated/hito-ds-manifest";
 import {
   WORKOUT_COLOR_SHADE_STEPS,
   WORKOUT_COLOR_STATE_SLOTS,
@@ -27,7 +28,7 @@ import {
   type WorkoutPrimitivePaletteId,
   type WorkoutSectionColorRole,
 } from "@/lib/workout-color-tokens";
-import { HITO_TYPOGRAPHY_ROLES, type HitoTypographyRole } from "@/lib/hito-typography-roles";
+import { HITO_TYPOGRAPHY_GROUPS, type HitoTypographyRole } from "@/lib/hito-typography-roles";
 import { cn } from "@/lib/utils";
 
 const COLOR_TABS = ["semantic", "primitive"] as const;
@@ -39,9 +40,6 @@ type PrimitiveColorSwatch = {
   step: string;
   token: string;
   value: string;
-  contrast: string;
-  hex?: string;
-  copyValue?: string;
 };
 
 type PrimitiveColorGroupData = {
@@ -50,192 +48,44 @@ type PrimitiveColorGroupData = {
   colors: readonly PrimitiveColorSwatch[];
 };
 
-const WORKOUT_PRIMITIVE_CONTRAST: Record<(typeof WORKOUT_COLOR_SHADE_STEPS)[number], string> = {
-  "50": "dark on tint",
-  "100": "dark on tint",
-  "200": "dark on tint",
-  "300": "dark on tint",
-  "400": "dark on tint",
-  "500": "role dependent",
-  "600": "light on shade",
-  "700": "light on shade",
-  "800": "light on shade",
-  "900": "light on shade",
-  "950": "light on shade",
-};
+const PRIMITIVE_COLOR_PRESENTATION = [
+  { title: "Stone", meta: "Primitive / dark neutral", prefixes: ["stone-"] },
+  { title: "Sand", meta: "Primitive / light neutral", prefixes: ["sand-"] },
+  {
+    title: "Signal and feedback",
+    meta: "Primitive / product emphasis and status",
+    prefixes: ["amber-", "blue-", "terracotta-", "green-", "orange-", "red-"],
+  },
+  {
+    title: "Light theme analogs",
+    meta: "Primitive / light surfaces, text, and alpha",
+    prefixes: ["warm-white", "linen-", "ink-", "taupe-"],
+  },
+] as const;
+
+const GENERAL_PRIMITIVE_COLOR_GROUPS: readonly PrimitiveColorGroupData[] =
+  PRIMITIVE_COLOR_PRESENTATION.map((group) => ({
+    title: group.title,
+    meta: group.meta,
+    colors: HITO_DS_MANIFEST.collections.primitiveColor
+      .filter((token) => group.prefixes.some((prefix) => token.id.startsWith(prefix)))
+      .map((token) => ({
+        step: token.id.split("-").slice(1).join("-") || "base",
+        token: token.cssVariable,
+        value: `var(${token.cssVariable})`,
+      })),
+  }));
 
 const WORKOUT_PRIMITIVE_COLOR_GROUPS: readonly PrimitiveColorGroupData[] =
   WORKOUT_PRIMITIVE_PALETTE_FAMILIES.map((palette) => ({
     title: palette.label,
-    meta: `Workout primitive scale / base ${palette.base}`,
+    meta: `Workout domain primitive / ${palette.tokenPrefix}-base`,
     colors: WORKOUT_COLOR_SHADE_STEPS.map((step) => ({
       step,
       token: `${palette.tokenPrefix}-${step}`,
       value: workoutPrimitiveColorVar(palette.id, step),
-      copyValue: workoutPrimitiveColorVar(palette.id, step),
-      contrast: WORKOUT_PRIMITIVE_CONTRAST[step],
     })),
   }));
-
-const RAW_COLOR_PRIMITIVES: readonly PrimitiveColorGroupData[] = [
-  {
-    title: "Stone",
-    meta: "Primitive / neutral dark",
-    colors: [
-      {
-        step: "950",
-        token: "--stone-950",
-        value: "var(--stone-950)",
-        hex: "#0B0907",
-        contrast: "light 17.6:1",
-      },
-      {
-        step: "900",
-        token: "--stone-900",
-        value: "var(--stone-900)",
-        hex: "#0F0D0B",
-        contrast: "light 17.2:1",
-      },
-      {
-        step: "850",
-        token: "--stone-850",
-        value: "var(--stone-850)",
-        hex: "#161312",
-        contrast: "light 16.4:1",
-      },
-      {
-        step: "825",
-        token: "--stone-825",
-        value: "var(--stone-825)",
-        hex: "#1A1816",
-        contrast: "light 15.7:1",
-      },
-      {
-        step: "800",
-        token: "--stone-800",
-        value: "var(--stone-800)",
-        hex: "#1D1A18",
-        contrast: "light 15.4:1",
-      },
-      {
-        step: "750",
-        token: "--stone-750",
-        value: "var(--stone-750)",
-        hex: "#211F1C",
-        contrast: "light 14.6:1",
-      },
-      {
-        step: "700",
-        token: "--stone-700",
-        value: "var(--stone-700)",
-        hex: "#272320",
-        contrast: "light 13.8:1",
-      },
-      {
-        step: "500",
-        token: "--stone-500",
-        value: "var(--stone-500)",
-        hex: "#75716B",
-        contrast: "light 4.3:1",
-      },
-    ],
-  },
-  {
-    title: "Sand",
-    meta: "Primitive / neutral light",
-    colors: [
-      {
-        step: "50",
-        token: "--sand-50",
-        value: "var(--sand-50)",
-        hex: "#FAF8F5",
-        contrast: "dark 18.3:1",
-      },
-      {
-        step: "100",
-        token: "--sand-100",
-        value: "var(--sand-100)",
-        hex: "#F3F1EE",
-        contrast: "dark 17.2:1",
-      },
-      {
-        step: "200",
-        token: "--sand-200",
-        value: "var(--sand-200)",
-        hex: "#E6E4E1",
-        contrast: "dark 15.3:1",
-      },
-      {
-        step: "500",
-        token: "--sand-500",
-        value: "var(--sand-500)",
-        hex: "#8A8580",
-        contrast: "dark 5.3:1",
-      },
-    ],
-  },
-  {
-    title: "Signal",
-    meta: "Primitive / brand and corporate accent",
-    colors: [
-      {
-        step: "500",
-        token: "--amber-500",
-        value: "var(--amber-500)",
-        hex: "#F4A34B",
-        contrast: "dark 9.4:1",
-      },
-      {
-        step: "600",
-        token: "--amber-600",
-        value: "var(--amber-600)",
-        hex: "#D58B4B",
-        contrast: "dark 7.0:1",
-      },
-    ],
-  },
-  {
-    title: "Workout and feedback bases",
-    meta: "Primitive / purposeful base tones",
-    colors: [
-      {
-        step: "blue-500",
-        token: "--blue-500",
-        value: "var(--blue-500)",
-        hex: "#6DB2B6",
-        contrast: "dark 8.0:1",
-      },
-      {
-        step: "terracotta-500",
-        token: "--terracotta-500",
-        value: "var(--terracotta-500)",
-        hex: "#F2716A",
-        contrast: "dark 6.8:1",
-      },
-      {
-        step: "green-500",
-        token: "--green-500",
-        value: "var(--green-500)",
-        hex: "#57BC80",
-        contrast: "dark 8.2:1",
-      },
-      {
-        step: "orange-500",
-        token: "--orange-500",
-        value: "var(--orange-500)",
-        hex: "#F88F4F",
-        contrast: "dark 8.3:1",
-      },
-      {
-        step: "red-500",
-        token: "--red-500",
-        value: "var(--red-500)",
-        hex: "#DE4E4B",
-        contrast: "dark 4.9:1",
-      },
-    ],
-  },
-] as const;
 
 type SemanticColorTokenData = {
   name: string;
@@ -244,50 +94,16 @@ type SemanticColorTokenData = {
   group: string;
 };
 
-const WORKOUT_SEMANTIC_COLOR_TOKENS: readonly SemanticColorTokenData[] = [
-  ...WORKOUT_TYPE_COLOR_ROLES.map((role) => ({
-    name: `workout/${role.label}`,
-    value: workoutTypeColorVar(role.type),
-    mapsTo: `${role.primitive}-500`,
-    group: "workout type",
-  })),
-  ...WORKOUT_SECTION_COLOR_ROLES.map((role) => ({
-    name: `section/${role.label}`,
-    value: workoutSectionColorVar(role.type),
-    mapsTo: `${role.primitive}-500`,
-    group: "workout section",
-  })),
-];
-
 const SEMANTIC_COLOR_TOKENS: readonly SemanticColorTokenData[] = [
-  { name: "background", value: "var(--background)", mapsTo: "stone-900", group: "canvas" },
-  { name: "foreground", value: "var(--foreground)", mapsTo: "sand-100", group: "text" },
-  { name: "surface", value: "var(--surface)", mapsTo: "stone-850", group: "surface" },
-  {
-    name: "surface-elevated",
-    value: "var(--surface-elevated)",
-    mapsTo: "stone-800",
-    group: "surface",
-  },
-  { name: "card", value: "var(--card)", mapsTo: "surface", group: "surface" },
-  { name: "popover", value: "var(--popover)", mapsTo: "stone-825", group: "surface" },
-  { name: "border", value: "var(--border)", mapsTo: "sand-alpha-08", group: "border / alpha" },
-  { name: "hairline", value: "var(--hairline)", mapsTo: "sand-alpha-06", group: "border / alpha" },
-  { name: "input", value: "var(--input)", mapsTo: "sand-alpha-10", group: "interactive / alpha" },
-  { name: "ring", value: "var(--ring)", mapsTo: "amber-600", group: "interactive" },
-  { name: "muted", value: "var(--muted)", mapsTo: "stone-800", group: "surface" },
-  { name: "muted-foreground", value: "var(--muted-foreground)", mapsTo: "sand-500", group: "text" },
-  { name: "accent", value: "var(--accent)", mapsTo: "stone-700", group: "interactive" },
-  { name: "signal", value: "var(--signal)", mapsTo: "amber-500", group: "accent" },
-  { name: "success", value: "var(--success)", mapsTo: "green-500", group: "status" },
-  { name: "warn", value: "var(--warn)", mapsTo: "orange-500", group: "status" },
-  { name: "info", value: "var(--info)", mapsTo: "blue-500", group: "status" },
-  { name: "destructive", value: "var(--destructive)", mapsTo: "red-500", group: "status" },
-  { name: "easy", value: "var(--easy)", mapsTo: "workout/Easy", group: "compat workout" },
-  { name: "long", value: "var(--long)", mapsTo: "workout/Long Run", group: "compat workout" },
-  { name: "quality", value: "var(--quality)", mapsTo: "workout/Tempo", group: "compat workout" },
-  { name: "rest", value: "var(--rest)", mapsTo: "workout/Rest", group: "compat workout" },
-  ...WORKOUT_SEMANTIC_COLOR_TOKENS,
+  ...HITO_DS_MANIFEST.collections.semanticColor.map((token) => ({
+    name: token.id,
+    value: `var(${token.cssVariable})`,
+    mapsTo: [
+      `dark: ${token.modes.dark.alias ?? token.modes.dark.value}`,
+      `light: ${token.modes.light.alias ?? token.modes.light.value}`,
+    ].join(" / "),
+    group: semanticColorGroup(token.id),
+  })),
   {
     name: "canvas atmosphere",
     value: "hito-canvas-atmosphere",
@@ -306,58 +122,50 @@ const SEMANTIC_COLOR_TOKENS: readonly SemanticColorTokenData[] = [
     mapsTo: "signal alpha wash",
     group: "gradient / overlay",
   },
-] as const;
+];
 
-const SPACING_PRIMITIVES = [
-  { name: "space-1", value: "0.25rem", use: "Tiny internal offsets" },
-  { name: "space-2", value: "0.5rem", use: "XS control inset and tight pairs" },
-  { name: "space-3", value: "0.75rem", use: "Small control inset and compact row gaps" },
-  { name: "space-4", value: "1rem", use: "Default control inset and compact panel padding" },
-  { name: "space-5", value: "1.25rem", use: "Emphasized panel padding" },
-  { name: "space-6", value: "1.5rem", use: "Section and grouped-route rhythm" },
-  { name: "space-8", value: "2rem", use: "Open page section rhythm" },
-  { name: "space-10", value: "2.5rem", use: "Hero/top-level route moments only" },
-] as const;
+const SPACING_USAGE: Record<string, string> = {
+  "space-1": "Tiny internal offsets",
+  "space-2": "XS control inset and tight pairs",
+  "space-3": "Small control inset and compact row gaps",
+  "space-4": "Default control inset and compact panel padding",
+  "space-5": "Emphasized panel padding",
+  "space-6": "Section and grouped-route rhythm",
+  "space-8": "Open page section rhythm",
+  "space-10": "Hero/top-level route moments only",
+};
 
-const RADIUS_PRIMITIVES = [
-  {
-    name: "radius-sm",
-    token: "--radius-sm",
-    value: "4px",
-    use: "Micro tags and compact inspector details",
-  },
-  {
-    name: "radius-md",
-    token: "--radius-md",
-    value: "6px",
-    use: "Small controls, inputs, and menu rows",
-  },
-  { name: "radius-lg", token: "--radius-lg", value: "8px", use: "Default controls and menus" },
-  {
-    name: "radius-xl",
-    token: "--radius-xl",
-    value: "10px",
-    use: "Cards, day rows, and compact panels",
-  },
-  {
-    name: "radius-2xl",
-    token: "--radius-2xl",
-    value: "12px",
-    use: "Dialogs and emphasized surfaces",
-  },
-  {
-    name: "radius-3xl",
-    token: "--radius-3xl",
-    value: "16px",
-    use: "Rare large editorial or product surfaces",
-  },
-  {
-    name: "radius-4xl",
-    token: "--radius-4xl",
-    value: "20px",
-    use: "Reserved oversized surfaces",
-  },
-] as const;
+const SPACING_PRIMITIVES = HITO_DS_MANIFEST.collections.primitiveSpacing.map((token) => ({
+  name: token.id,
+  value: token.value,
+  use: SPACING_USAGE[token.id] ?? "Canonical spacing primitive",
+}));
+
+const RADIUS_USAGE: Record<string, string> = {
+  "radius-sm": "Micro tags and compact inspector details",
+  "radius-md": "Small controls, inputs, and menu rows",
+  "radius-lg": "Default controls and menus",
+  "radius-xl": "Cards, day rows, and compact panels",
+  "radius-2xl": "Dialogs and emphasized surfaces",
+  "radius-3xl": "Rare large editorial or product surfaces",
+  "radius-4xl": "Reserved oversized surfaces",
+};
+
+const RADIUS_PRIMITIVES = HITO_DS_MANIFEST.collections.primitiveRadius.map((token) => ({
+  name: token.id,
+  token: token.cssVariable,
+  value: token.value,
+  use: RADIUS_USAGE[token.id] ?? "Canonical radius primitive",
+}));
+
+function semanticColorGroup(id: string) {
+  if (id.includes("foreground")) return "text";
+  if (["surface", "surface-elevated", "card", "popover", "muted"].includes(id)) return "surface";
+  if (["border", "hairline", "input"].includes(id)) return "boundary";
+  if (["success", "warn", "destructive", "info"].includes(id)) return "status";
+  if (["primary", "secondary", "accent", "ring", "signal"].includes(id)) return "interactive";
+  return "canvas";
+}
 
 const TYPOGRAPHY_FAMILIES = [
   {
@@ -687,9 +495,11 @@ export function HitoDsFoundationsPage() {
                     colors.
                   </p>
                 </div>
-                {RAW_COLOR_PRIMITIVES.map((group) => (
-                  <PrimitiveColorGroup key={group.title} group={group} onCopy={copyColorValue} />
-                ))}
+                {[...GENERAL_PRIMITIVE_COLOR_GROUPS, ...WORKOUT_PRIMITIVE_COLOR_GROUPS].map(
+                  (group) => (
+                    <PrimitiveColorGroup key={group.title} group={group} onCopy={copyColorValue} />
+                  ),
+                )}
               </div>
             )}
           </div>
@@ -781,57 +591,46 @@ export function HitoDsFoundationsPage() {
       </section>
 
       <section id="typography" className="ds-section">
-        <SectionIntro label="Typography" title="Shared roles, not route-local guesses." />
-        <div className="grid gap-5">
+        <SectionIntro label="Typography" title="Shared typography roles." />
+        <div className="grid gap-8">
+          <div className="grid gap-8">
+            {HITO_TYPOGRAPHY_GROUPS.map((group) => (
+              <section key={group.id} className="grid gap-3" aria-labelledby={`type-${group.id}`}>
+                <div>
+                  <h3 id={`type-${group.id}`} className="hito-label">
+                    {group.label}
+                  </h3>
+                  <p className="hito-caption mt-1">{group.description}</p>
+                </div>
+                <div className="hito-reference-list">
+                  {group.roles.map((role) => (
+                    <TypographyRoleCard key={role.id} role={role} />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+
           <div className="hito-reference-note">
-            <p className="hito-label">Font ownership</p>
-            <p className="hito-body-small mt-2 max-w-3xl">
-              Fraunces owns display, page, modal, section, and panel titles. Poppins owns
-              operational UI, labels, body, actions, navigation, and feedback. JetBrains Mono owns
-              measured or fixed-format truth only.
-            </p>
-            <div className="hito-body-small mt-3" data-hito-typography-provenance-specimen="">
+            <p className="hito-label">Provenance</p>
+            <div className="hito-body-small mt-2" data-hito-typography-provenance-specimen="">
               <span data-hito-typography-provenance-case="inherited">
-                Nested text inherits the nearest confirmed role.
+                Nested text inherits a confirmed role.
               </span>{" "}
               <span className="hito-caption" data-hito-typography-provenance-case="nested-override">
-                A nested canonical role overrides it.
+                A nested role may override it.
               </span>
             </div>
             <p
-              className="mt-3"
+              className="mt-2"
               data-hito-typography-provenance-case="unresolved-lookalike"
               style={{ fontSize: "0.875rem", fontWeight: 400, lineHeight: 1.58 }}
             >
-              Matching computed values without provenance remain Custom.
+              Matching values without provenance remain Custom.
             </p>
           </div>
 
           <TypographyInspectorPickerSpecimen />
-
-          <div className="hito-reference-list">
-            {HITO_TYPOGRAPHY_ROLES.map((role) => (
-              <TypographyRoleCard key={role.id} role={role} />
-            ))}
-          </div>
-
-          <div className="hito-row-group">
-            <ReferenceListRow
-              label="Avoid"
-              title="Oversized compact headings"
-              body="Use panel title inside dense feedback, import, and proposal modules instead of route-local display sizes."
-            />
-            <ReferenceListRow
-              label="Avoid"
-              title="Stacked uppercase micro labels"
-              body="Labels orient a block once. Repeating them turns support copy into noise."
-            />
-            <ReferenceListRow
-              label="Avoid"
-              title="Helper text as body copy"
-              body="Use helper only beside controls; use body or body small for normal explanations."
-            />
-          </div>
         </div>
       </section>
 
@@ -964,7 +763,7 @@ function PrimitiveColorGroup({
   group,
   onCopy,
 }: {
-  group: (typeof RAW_COLOR_PRIMITIVES)[number];
+  group: PrimitiveColorGroupData;
   onCopy: (value: string, label: string) => void;
 }) {
   return (
@@ -1213,34 +1012,22 @@ function PrimitiveColorSwatchButton({
   color: PrimitiveColorSwatch;
   onCopy: (value: string, label: string) => void;
 }) {
-  const copyValue = color.copyValue ?? color.hex ?? color.value;
-  const foreground = color.contrast.startsWith("light") ? "var(--sand-100)" : "var(--stone-900)";
-
   return (
     <button
       type="button"
-      className="group grid min-h-36 min-w-0 content-between rounded-2xl border border-hairline p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-signal/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      style={
-        {
-          background: color.value,
-          color: foreground,
-        } satisfies CSSProperties
-      }
-      onClick={() => onCopy(copyValue, color.token)}
+      className="group hito-surface-flat grid min-h-36 min-w-0 overflow-hidden text-left transition hover:-translate-y-0.5 hover:border-signal/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      onClick={() => onCopy(color.value, color.token)}
       aria-label={`Copy ${color.token}`}
     >
-      <span className="flex items-start justify-between gap-3">
-        <span className="hito-technical-mono text-lg">{color.step}</span>
-        <span className="rounded-full bg-black/20 px-2 py-1 text-[0.625rem] font-medium uppercase tracking-[0.12em] backdrop-blur-sm">
-          {color.contrast}
-        </span>
-      </span>
-      <span className="flex min-w-0 items-center justify-between gap-3">
+      <span
+        aria-hidden="true"
+        className="min-h-20 border-b border-hairline"
+        style={{ background: color.value } satisfies CSSProperties}
+      />
+      <span className="flex min-w-0 items-center justify-between gap-3 p-4">
         <span className="min-w-0 flex-1">
-          <span className="block truncate hito-technical-mono" title={color.hex ?? copyValue}>
-            {color.hex ?? copyValue}
-          </span>
-          <span className="mt-1 block truncate text-[0.7rem] opacity-80" title={color.token}>
+          <span className="block hito-technical-mono">{color.step}</span>
+          <span className="mt-1 block truncate hito-caption" title={color.token}>
             {color.token}
           </span>
         </span>

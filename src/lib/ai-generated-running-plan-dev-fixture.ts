@@ -12,7 +12,7 @@ import { normalizePlanGoalIntent } from "@/lib/plan-creation-engine/plan-goal-in
 import type { StructuredPlanAuthoringInput } from "@/lib/structured-plan-authoring-schema";
 import { structuredPlanAuthoringInputSchema } from "@/lib/structured-plan-authoring-schema";
 import { isLoopbackRuntimeUrl } from "@/lib/supabase/env";
-import { addDaysIso, startOfWeekIso } from "@/lib/training";
+import { addDaysIso, startOfWeekIso, todayIso } from "@/lib/training";
 import { WEEKDAY_NAMES, type WeekdayName } from "@/lib/weekday-rest-invariants";
 import {
   WORKOUT_DOCUMENT_HYDRATION_CUE,
@@ -34,8 +34,8 @@ export const AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID =
 
 const MAX_AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_DELAY_MS = 10 * 60 * 1000;
 const NON_REPEAT_TEMPO_FIXTURE_SCENARIO = "non_repeat_tempo" as const;
-const DEFAULT_FIXTURE_HORIZON_DAYS = 28;
-const QA_FIXTURE_START_DATE = "2026-07-06";
+const DEFAULT_FIXTURE_HORIZON_DAYS = 56;
+const QA_FIXTURE_PAST_WEEKS = 6;
 
 type RuntimeEnv = Record<string, string | undefined>;
 export type AiGeneratedRunningPlanProviderMode = "real" | "qa_fixture";
@@ -79,7 +79,10 @@ export function buildAiGeneratedRunningPlanDevFixturePreviewOptions(input: {
   };
 }
 
-export function buildAiGeneratedRunningPlanQaFixtureAuthoringInput(): StructuredPlanAuthoringInput {
+export function buildAiGeneratedRunningPlanQaFixtureAuthoringInput(
+  asOfDate: string = todayIso(),
+): StructuredPlanAuthoringInput {
+  const startDate = addDaysIso(startOfWeekIso(asOfDate), -7 * QA_FIXTURE_PAST_WEEKS);
   const heartRateProfile = buildEffectiveRunnerHeartRateProfile({ age: 36 });
   if (!heartRateProfile) {
     throw new Error("Local QA fixture could not build its fixed heart-rate profile.");
@@ -89,7 +92,7 @@ export function buildAiGeneratedRunningPlanQaFixtureAuthoringInput(): Structured
     rawIntent: {
       distance: { kind: "preset", preset: "10K" },
     },
-    startDate: QA_FIXTURE_START_DATE,
+    startDate,
   });
   if (!planGoalIntent.ok || !planGoalIntent.intent.distance) {
     throw new Error("Local QA fixture could not build its fixed distance goal.");
@@ -97,7 +100,7 @@ export function buildAiGeneratedRunningPlanQaFixtureAuthoringInput(): Structured
 
   return structuredPlanAuthoringInputSchema.parse({
     schedule: {
-      startDate: QA_FIXTURE_START_DATE,
+      startDate,
     },
     runnerFacts: {
       age: 36,
@@ -367,39 +370,32 @@ function buildFixtureWorkoutDays(input: {
       days.set(qualityDate, buildQuality(qualityDate, input.targetContext));
     }
   } else {
-    const candidates = [
-      { offset: 0, build: buildEasyFixtureDay },
-      {
-        offset: 2,
-        build: (date: string) =>
-          input.fixtureScenario === NON_REPEAT_TEMPO_FIXTURE_SCENARIO
-            ? buildTempoFixtureDay(date, input.targetContext)
-            : buildRepeatFixtureDay(date, input.targetContext),
-      },
-      {
-        offset: 6,
-        build: (date: string) => buildLongRunFixtureDay(date, input.targetContext),
-      },
-      { offset: 9, build: buildEasyFixtureDay },
-      ...(input.fixtureScenario === NON_REPEAT_TEMPO_FIXTURE_SCENARIO
-        ? [
-            {
-              offset: 16,
-              build: (date: string) => buildRepeatFixtureDay(date, input.targetContext),
-            },
-          ]
-        : []),
-    ];
+    const weekCount = Math.ceil(
+      (Date.parse(`${input.endDate}T00:00:00Z`) -
+        Date.parse(`${input.startDate}T00:00:00Z`) +
+        86_400_000) /
+        (7 * 86_400_000),
+    );
+    for (let weekIndex = 0; weekIndex < weekCount; weekIndex += 1) {
+      const weekStart = addDaysIso(input.startDate, weekIndex * 7);
+      const weekEnd = earlierIso(addDaysIso(weekStart, 6), input.endDate);
+      const candidates = buildStandardFixtureWeekCandidates({
+        weekIndex,
+        fixtureScenario: input.fixtureScenario,
+        targetContext: input.targetContext,
+      });
 
-    for (const candidate of candidates) {
-      const date = findAvailableDateOnOrAfter(
-        addDaysIso(input.startDate, candidate.offset),
-        input.endDate,
-        input.fixedRestDays,
-      );
-      if (!date || date === input.endpointDate) continue;
-      if (!canAddWorkout(days, date, input.maxWorkoutsPerWeek)) continue;
-      days.set(date, candidate.build(date, input.targetContext));
+      for (const candidate of candidates) {
+        const date = findSchedulableFixtureDate({
+          candidate: addDaysIso(weekStart, candidate.offset),
+          endDate: weekEnd,
+          endpointDate: input.endpointDate,
+          days,
+          maxWorkoutsPerWeek: input.maxWorkoutsPerWeek,
+          fixedRestDays: input.fixedRestDays,
+        });
+        if (date) days.set(date, candidate.build(date));
+      }
     }
   }
 
@@ -447,6 +443,7 @@ function findSchedulableFixtureDate(input: {
   for (let date = input.candidate; date <= input.endDate; date = addDaysIso(date, 1)) {
     if (
       date !== input.endpointDate &&
+      !input.days.has(date) &&
       !input.fixedRestDays.includes(weekdayForDate(date)) &&
       canAddWorkout(input.days, date, input.maxWorkoutsPerWeek)
     ) {
@@ -454,6 +451,27 @@ function findSchedulableFixtureDate(input: {
     }
   }
   return null;
+}
+
+function buildStandardFixtureWeekCandidates(input: {
+  weekIndex: number;
+  fixtureScenario: AiGeneratedRunningPlanDevFixtureScenario;
+  targetContext: ProviderFixtureTargetContext;
+}) {
+  const qualityBuilders =
+    input.fixtureScenario === NON_REPEAT_TEMPO_FIXTURE_SCENARIO
+      ? [buildTempoFixtureDay, buildDistanceIntervalsFixtureDay, buildUphillRepeatsFixtureDay]
+      : [buildRepeatFixtureDay, buildDistanceIntervalsFixtureDay, buildUphillRepeatsFixtureDay];
+  const firstBuilders = [buildEasyFixtureDay, buildStridesFixtureDay, buildEasyFixtureDay];
+  const quality = qualityBuilders[input.weekIndex % qualityBuilders.length]!;
+  const first = firstBuilders[input.weekIndex % firstBuilders.length]!;
+
+  return [
+    { offset: 0, build: (date: string) => first(date, input.targetContext) },
+    { offset: 1, build: (date: string) => quality(date, input.targetContext) },
+    { offset: 3, build: (date: string) => buildRecoveryFixtureDay(date, input.targetContext) },
+    { offset: 5, build: (date: string) => buildLongRunFixtureDay(date, input.targetContext) },
+  ];
 }
 
 function buildEasyFixtureDay(date: string, context: ProviderFixtureTargetContext) {
@@ -587,6 +605,85 @@ function buildRepeatFixtureDay(date: string, context: ProviderFixtureTargetConte
       ],
     },
     unitSection("cooldown", "Cool Down", timePrescription(10), paceTarget("7:15-7:45/km", context)),
+  ]);
+}
+
+function buildDistanceIntervalsFixtureDay(date: string, context: ProviderFixtureTargetContext) {
+  return workoutDay(date, "distance_intervals", "Distance Intervals", [
+    unitSection("warmup", "Warm Up", timePrescription(10), paceTarget("6:45-7:15/km", context)),
+    {
+      kind: "repeat",
+      segment_type: "interval_block",
+      label: "400 m repeats",
+      cue: "Run each repeat evenly and keep the recovery relaxed.",
+      rounds: 5,
+      children: [
+        repeatChild(
+          "work",
+          "400 m",
+          distancePrescription(0.4),
+          paceTarget("4:45-4:55/km", context),
+        ),
+        repeatChild(
+          "recover",
+          "Easy recovery",
+          timePrescription(1.5),
+          paceTarget("7:15-8:00/km", context),
+        ),
+      ],
+    },
+    unitSection("cooldown", "Cool Down", timePrescription(10), paceTarget("7:00-7:30/km", context)),
+  ]);
+}
+
+function buildUphillRepeatsFixtureDay(date: string, context: ProviderFixtureTargetContext) {
+  return workoutDay(date, "uphill_repeats", "Uphill Repeats", [
+    unitSection("warmup", "Warm Up", timePrescription(12), paceTarget("6:45-7:15/km", context)),
+    {
+      kind: "repeat",
+      segment_type: "interval_block",
+      label: "Uphill set",
+      cue: "Run tall uphill, then jog back down under control.",
+      rounds: 6,
+      children: [
+        repeatChild("work", "Uphill", timePrescription(1), paceTarget("5:00-5:20/km", context)),
+        repeatChild(
+          "recover",
+          "Jog down",
+          timePrescription(1.5),
+          paceTarget("7:30-8:15/km", context),
+        ),
+      ],
+    },
+    unitSection("cooldown", "Cool Down", timePrescription(10), paceTarget("7:00-7:30/km", context)),
+  ]);
+}
+
+function buildStridesFixtureDay(date: string, context: ProviderFixtureTargetContext) {
+  return workoutDay(date, "easy_run_with_strides", "Easy Run with Strides", [
+    unitSection(
+      "warmup",
+      "Easy running",
+      timePrescription(25),
+      paceTarget("6:35-7:05/km", context),
+    ),
+    {
+      kind: "repeat",
+      segment_type: "strides",
+      label: "Relaxed strides",
+      cue: "Accelerate smoothly without sprinting.",
+      rounds: 4,
+      children: [
+        repeatChild("work", "Stride", timePrescription(0.33), paceTarget("4:20-4:40/km", context)),
+        repeatChild(
+          "recover",
+          "Easy reset",
+          timePrescription(1),
+          paceTarget("7:15-8:00/km", context),
+        ),
+      ],
+    },
+    unitSection("cooldown", "Cool Down", timePrescription(5), paceTarget("7:00-7:30/km", context)),
   ]);
 }
 
@@ -807,4 +904,8 @@ function slugify(value: string) {
 
 function laterIso(left: string, right: string) {
   return left >= right ? left : right;
+}
+
+function earlierIso(left: string, right: string) {
+  return left <= right ? left : right;
 }

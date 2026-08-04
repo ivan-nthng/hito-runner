@@ -153,12 +153,7 @@ export function parseDisposableSupabaseTarget(url: string): DisposableSupabaseTa
 
 export async function acquireQaPoolSupabaseUser(input: {
   supabase: SupabaseAdminLike;
-  poolRole:
-    | "baseline-no-plan"
-    | "saved-plan-readback"
-    | "provider-engine"
-    | "isolation-a"
-    | "isolation-b";
+  poolRole: "baseline-no-plan" | "provider-engine" | "isolation-a" | "isolation-b";
   password?: string;
   creationErrorMessage: string;
 }) {

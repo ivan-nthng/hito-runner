@@ -213,12 +213,6 @@
     letter-spacing: 0.12em;
   }
 
-  .hito-calendar-mobile-date-main {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-  }
-
   .hito-calendar-mobile-date strong {
     color: var(--color-foreground);
     font-size: 1.125rem;

@@ -6,6 +6,18 @@ import {
   IconOnlyButtonMatrix,
 } from "@/components/hito-ds/specimen-previews";
 import { EditableValueField } from "@/components/ui/editable-value-field";
+import {
+  HITO_BUTTON_SIZES,
+  HITO_BUTTON_TONES,
+  HITO_BUTTON_VARIANTS,
+  HITO_FIELD_SIZES,
+  HITO_FIELD_VARIANTS,
+  type HitoButtonSize,
+  type HitoButtonTone,
+  type HitoButtonVariant,
+  type HitoFieldSize,
+  type HitoFieldVariant,
+} from "@/components/ui/hito-control-contract";
 import { HitoMetadataTag } from "@/components/ui/metadata-tag";
 import {
   HITO_ICON_META,
@@ -17,110 +29,54 @@ import {
 } from "@/components/ui/icon";
 import { InlineEditableText, InlineReadOnlyText } from "@/components/ui/inline-editable-text";
 import { HitoValueTag } from "@/components/ui/value-tag";
-import {
-  WORKOUT_PRIMITIVE_PALETTE_FAMILIES,
-  WORKOUT_SECTION_COLOR_ROLES,
-  WORKOUT_TYPE_COLOR_ROLES,
-  workoutSectionColorToken,
-  workoutTypeColorToken,
-} from "@/lib/workout-color-tokens";
-import { HITO_TYPOGRAPHY_ROLES } from "@/lib/hito-typography-roles";
+import { HITO_DS_MANIFEST } from "@/generated/hito-ds-manifest";
 import { cn } from "@/lib/utils";
 
-type ButtonVariant = "primary" | "secondary" | "outlined" | "ghost";
-type ButtonTone = "default" | "success" | "error";
-type ButtonSize = "xs" | "sm" | "md" | "lg" | "xl";
-type InputVariant = "primary" | "secondary";
-type InputSize = ButtonSize;
+type ButtonVariant = HitoButtonVariant;
+type ButtonTone = HitoButtonTone;
+type ButtonSize = HitoButtonSize;
+type InputVariant = HitoFieldVariant;
+type InputSize = HitoFieldSize;
 type InputState = "default" | "hover" | "focus" | "disabled" | "readonly";
 type InputFeedback = "neutral" | "error" | "success";
 
-const BUTTON_VARIANTS: ButtonVariant[] = ["primary", "secondary", "outlined", "ghost"];
-const BUTTON_TONES: ButtonTone[] = ["default", "success", "error"];
-const BUTTON_SIZES: ButtonSize[] = ["xs", "sm", "md", "lg", "xl"];
-const INPUT_VARIANTS: InputVariant[] = ["primary", "secondary"];
-const INPUT_SIZES: InputSize[] = ["xs", "sm", "md", "lg", "xl"];
+const BUTTON_VARIANTS = HITO_BUTTON_VARIANTS;
+const BUTTON_TONES = HITO_BUTTON_TONES;
+const BUTTON_SIZES = HITO_BUTTON_SIZES;
+const INPUT_VARIANTS = HITO_FIELD_VARIANTS;
+const INPUT_SIZES = HITO_FIELD_SIZES;
 const STATUS_TONES = ["neutral", "signal", "success", "warning", "destructive", "rollout", "muted"];
 
 type TokenGridItem = { name: string; token: string; note: string };
 
-const WORKOUT_RAW_COLOR_TOKENS: readonly TokenGridItem[] = WORKOUT_PRIMITIVE_PALETTE_FAMILIES.map(
-  (palette) => ({
-    name: `${palette.label} 500`,
-    token: `${palette.tokenPrefix}-500`,
-    note: `Workout primitive base ${palette.base}`,
+const RAW_COLOR_TOKENS: readonly TokenGridItem[] = HITO_DS_MANIFEST.collections.primitiveColor.map(
+  (token) => ({
+    name: token.id,
+    token: token.cssVariable,
+    note: token.value,
   }),
 );
 
-const RAW_COLOR_TOKENS: readonly TokenGridItem[] = [
-  { name: "stone-950", token: "--stone-950", note: "Deepest shell background" },
-  { name: "stone-900", token: "--stone-900", note: "App background" },
-  { name: "stone-850", token: "--stone-850", note: "Base surface" },
-  { name: "stone-800", token: "--stone-800", note: "Elevated muted surface" },
-  { name: "sand-50", token: "--sand-50", note: "Bright foreground reserve" },
-  { name: "sand-100", token: "--sand-100", note: "Primary text" },
-  { name: "sand-200", token: "--sand-200", note: "Secondary foreground" },
-  { name: "amber-500", token: "--amber-500", note: "Hito signal" },
-  { name: "blue-500", token: "--blue-500", note: "Information" },
-  { name: "terracotta-500", token: "--terracotta-500", note: "Destructive/error" },
-  { name: "green-500", token: "--green-500", note: "Success" },
-  { name: "orange-500", token: "--orange-500", note: "Workout accent" },
-  { name: "red-500", token: "--red-500", note: "Critical destructive" },
-  ...WORKOUT_RAW_COLOR_TOKENS,
-];
+const SEMANTIC_COLOR_TOKENS: readonly TokenGridItem[] =
+  HITO_DS_MANIFEST.collections.semanticColor.map((token) => ({
+    name: token.id,
+    token: token.cssVariable,
+    note: `Dark: ${token.modes.dark.alias ?? token.modes.dark.value} / Light: ${
+      token.modes.light.alias ?? token.modes.light.value
+    }`,
+  }));
 
-const WORKOUT_SEMANTIC_COLOR_TOKENS: readonly TokenGridItem[] = [
-  ...WORKOUT_TYPE_COLOR_ROLES.map((role) => ({
-    name: `workout ${role.label}`,
-    token: workoutTypeColorToken(role.type),
-    note: `Maps to ${role.primitive}`,
-  })),
-  ...WORKOUT_SECTION_COLOR_ROLES.map((role) => ({
-    name: `section ${role.label}`,
-    token: workoutSectionColorToken(role.type),
-    note: `Maps to ${role.primitive}`,
-  })),
-];
+const SPACING_TOKENS = HITO_DS_MANIFEST.collections.primitiveSpacing.map((token) => ({
+  name: token.id,
+  token: token.cssVariable,
+  value: token.value,
+}));
 
-const SEMANTIC_COLOR_TOKENS: readonly TokenGridItem[] = [
-  { name: "background", token: "--background", note: "Route canvas" },
-  { name: "foreground", token: "--foreground", note: "Primary text" },
-  { name: "surface", token: "--surface", note: "Base panel" },
-  { name: "surface-elevated", token: "--surface-elevated", note: "Raised panel" },
-  { name: "muted", token: "--muted", note: "Quiet controls" },
-  { name: "muted-foreground", token: "--muted-foreground", note: "Support copy" },
-  { name: "hairline", token: "--hairline", note: "Dividers and outlines" },
-  { name: "signal", token: "--signal", note: "Primary Hito action" },
-  { name: "success", token: "--success", note: "Completed/saved" },
-  { name: "warn", token: "--warn", note: "Caution" },
-  { name: "destructive", token: "--destructive", note: "Delete/error" },
-  { name: "easy", token: "--easy", note: "Compatibility alias for workout Easy" },
-  { name: "long", token: "--long", note: "Compatibility alias for workout Long Run" },
-  { name: "quality", token: "--quality", note: "Compatibility alias for workout Tempo" },
-  { name: "rest", token: "--rest", note: "Compatibility alias for workout Rest" },
-  ...WORKOUT_SEMANTIC_COLOR_TOKENS,
-];
-
-const SPACING_TOKENS = [
-  { name: "space-1", token: "--space-1", value: "0.25rem" },
-  { name: "space-2", token: "--space-2", value: "0.5rem" },
-  { name: "space-3", token: "--space-3", value: "0.75rem" },
-  { name: "space-4", token: "--space-4", value: "1rem" },
-  { name: "space-5", token: "--space-5", value: "1.25rem" },
-  { name: "space-6", token: "--space-6", value: "1.5rem" },
-  { name: "space-8", token: "--space-8", value: "2rem" },
-  { name: "space-10", token: "--space-10", value: "2.5rem" },
-] as const;
-
-const RADIUS_TOKENS = [
-  { name: "radius-sm", token: "--radius-sm", value: "4px" },
-  { name: "radius-md", token: "--radius-md", value: "6px" },
-  { name: "radius-lg", token: "--radius-lg", value: "8px" },
-  { name: "radius-xl", token: "--radius-xl", value: "10px" },
-  { name: "radius-2xl", token: "--radius-2xl", value: "12px" },
-  { name: "radius-3xl", token: "--radius-3xl", value: "16px" },
-  { name: "radius-4xl", token: "--radius-4xl", value: "20px" },
-] as const;
+const RADIUS_TOKENS = HITO_DS_MANIFEST.collections.primitiveRadius.map((token) => ({
+  name: token.id,
+  token: token.cssVariable,
+  value: token.value,
+}));
 
 const BUTTON_STATES: Array<{
   label: string;
@@ -163,7 +119,7 @@ const SELECT_TRIGGER_STATES = [
   { label: "Selected", value: "Quality workout" },
 ] as const;
 
-const DROPDOWN_TRIGGER_SIZES: ButtonSize[] = ["xs", "sm", "md", "lg", "xl"];
+const DROPDOWN_TRIGGER_SIZES = HITO_BUTTON_SIZES;
 const INLINE_HEADER_SIZES = ["sm", "md", "lg"] as const;
 
 const BUTTON_ICON_TREATMENTS = [
@@ -213,8 +169,8 @@ export function HitoFigmaExportBoard() {
           <div className="grid gap-3">
             <h1 className="hito-display-title max-w-5xl">Figma export surface</h1>
             <p className="hito-body max-w-3xl">
-              Code-owned Hito DS matrices for html.to.design capture/import. This page renders
-              visible states explicitly and does not generate `.h2d` directly.
+              Code-owned Hito DS matrices for html.to.design capture/import. Foundation tokens and
+              reusable text roles render from the generated one-way manifest.
             </p>
           </div>
         </header>
@@ -411,9 +367,15 @@ function SpacingRadiusGrid() {
 function TypographyGrid() {
   return (
     <div className="grid gap-3">
-      <h3 className="hito-label">Typography roles</h3>
+      <div>
+        <h3 className="hito-label">Reusable text styles</h3>
+        <p className="hito-caption mt-1">
+          Component-bound typography stays with its component family and is not exported as a text
+          style.
+        </p>
+      </div>
       <div className="grid gap-3 rounded-2xl border border-hairline bg-background/55 p-4">
-        {HITO_TYPOGRAPHY_ROLES.map((role) => (
+        {HITO_DS_MANIFEST.textStyles.map((role) => (
           <div key={role.id} className="grid gap-2 border-b border-hairline pb-3 last:border-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="hito-caption">{role.label}</span>

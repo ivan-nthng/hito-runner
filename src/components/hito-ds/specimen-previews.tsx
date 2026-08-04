@@ -13,25 +13,32 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { HitoButton } from "@/components/ui/button";
+import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
+import {
+  HITO_BUTTON_SIZES,
+  HITO_BUTTON_TONES,
+  HITO_BUTTON_VARIANTS,
+  HITO_CHOICE_TOGGLE_SIZES,
+  type HitoButtonSize,
+  type HitoButtonState,
+  type HitoButtonTone,
+  type HitoButtonVariant,
+  type HitoChoiceToggleSize,
+} from "@/components/ui/hito-control-contract";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
+import { Input } from "@/components/ui/input";
 import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
 import { cn } from "@/lib/utils";
 
-type ButtonVariant = "primary" | "secondary" | "outlined" | "ghost";
-type ButtonTone = "default" | "success" | "error";
-type ButtonSize = "xs" | "sm" | "md" | "lg" | "xl";
-type ButtonMotionState =
-  | "default"
-  | "loading"
-  | "success"
-  | "error"
-  | "pressed"
-  | "disabled"
-  | "timed-progress";
+type ButtonVariant = HitoButtonVariant;
+type ButtonTone = HitoButtonTone;
+type ButtonSize = HitoButtonSize;
+type ButtonMotionState = HitoButtonState;
 type InputVariant = "primary" | "secondary";
 type InputState = "default" | "hover" | "focus" | "disabled" | "readonly";
 type InputFeedback = "neutral" | "error" | "success";
-type ChoiceToggleSize = "xs" | "sm" | "md" | "lg" | "xl";
+type ChoiceToggleSize = HitoChoiceToggleSize | SelectionBinarySize;
 type SelectionControlKind = "checkbox" | "radio" | "toggle";
 type SelectionBinarySize = "sm" | "md";
 type ModalSizeMode = "compact" | "standard" | "wide" | "workflow" | "review";
@@ -42,9 +49,9 @@ type ModalPreviewPresentation = "live" | "static";
 type DataTableSortDirection = "asc" | "desc";
 type DataTableSpecimenSortKey = "preview" | "none";
 
-const BUTTON_VARIANTS: ButtonVariant[] = ["primary", "secondary", "outlined", "ghost"];
-const BUTTON_TONES: ButtonTone[] = ["default", "success", "error"];
-const BUTTON_SIZES: ButtonSize[] = ["xs", "sm", "md", "lg", "xl"];
+const BUTTON_VARIANTS = HITO_BUTTON_VARIANTS;
+const BUTTON_TONES = HITO_BUTTON_TONES;
+const BUTTON_SIZES = HITO_BUTTON_SIZES;
 
 export function DataTableSpecimenPreview({
   sortable,
@@ -450,6 +457,12 @@ export function SelectionControlPreview({
 }) {
   const [secondaryCheckboxSelected, setSecondaryCheckboxSelected] = useState(false);
   const binarySize = isBinarySelectionSize(size) ? size : "md";
+  const toggleSize = HITO_CHOICE_TOGGLE_SIZES.includes(size as HitoChoiceToggleSize)
+    ? (size as HitoChoiceToggleSize)
+    : "sm";
+  const togglePresentation = cardMode
+    ? ({ presentation: "card" } as const)
+    : ({ presentation: "inline", size: toggleSize } as const);
   const selectedChoice = selected ? "primary" : "secondary";
   const choiceGroup = useHitoRadioGroup({
     items: [{ value: "primary" }, { value: "secondary" }],
@@ -485,15 +498,11 @@ export function SelectionControlPreview({
           const isSelected = selectedChoice === choice.value;
 
           return (
-            <button
+            <HitoChoiceToggle
               key={choice.value}
-              type="button"
               {...choiceGroup.getRadioProps(choice.value)}
-              className={cn(
-                "hito-choice-toggle",
-                cardMode ? "hito-choice-toggle-card" : `hito-choice-toggle-${size}`,
-              )}
-              data-selected={isSelected || undefined}
+              {...togglePresentation}
+              selected={isSelected}
               data-demo-state={focusDemo && isSelected ? "focus" : undefined}
               data-invalid={invalid || undefined}
               disabled={disabled}
@@ -507,7 +516,7 @@ export function SelectionControlPreview({
               ) : (
                 choice.title
               )}
-            </button>
+            </HitoChoiceToggle>
           );
         })}
       </div>
@@ -604,16 +613,9 @@ export function ToggleRow({
   return (
     <div className="hito-list-row">
       <span className="hito-list-row-title">{label}</span>
-      <button
-        type="button"
-        onClick={onToggle}
-        className={cn(
-          "hito-button hito-button-sm",
-          active ? "hito-button-primary" : "hito-button-secondary",
-        )}
-      >
+      <HitoButton size="sm" variant={active ? "primary" : "secondary"} onClick={onToggle}>
         {active ? "On" : "Off"}
-      </button>
+      </HitoButton>
     </div>
   );
 }
@@ -639,12 +641,6 @@ export function DemoInput({
 }) {
   const simulatedState = state === "default" ? undefined : state;
   const iconSize = size === "xs" || size === "sm" ? "xs" : "sm";
-  const feedbackClass =
-    feedback === "error"
-      ? "hito-field-feedback-error"
-      : feedback === "success"
-        ? "hito-field-feedback-success"
-        : undefined;
   const feedbackTone =
     feedback === "error"
       ? "text-destructive"
@@ -669,15 +665,14 @@ export function DemoInput({
           <Icon name="search" size={iconSize} />
         </span>
       ) : null}
-      <input
+      <Input
         className={cn(
-          "hito-field",
-          `hito-field-${variant}`,
-          `hito-field-${size}`,
-          feedbackClass,
           leftIcon && "hito-field-has-left-icon",
           rightIcon && "hito-field-has-right-icon",
         )}
+        variant={variant}
+        size={size}
+        feedback={feedback}
         data-demo-state={simulatedState}
         disabled={state === "disabled"}
         readOnly={state === "readonly"}
@@ -746,23 +741,26 @@ export function DemoButton({
             ? "Undo"
             : variant;
 
+  const iconAccessibility = iconOnly
+    ? {
+        "aria-label": `${state === "loading" ? "Loading " : ""}${tone} ${variant} action`,
+        iconOnly: true as const,
+      }
+    : { iconOnly: false as const };
+
   return (
-    <button
+    <HitoButton
       type="button"
       disabled={isDisabled}
-      aria-busy={state === "loading" || undefined}
       aria-pressed={state === "pressed" || undefined}
-      aria-label={
-        iconOnly ? `${state === "loading" ? "Loading " : ""}${tone} ${variant} action` : undefined
-      }
-      className={cn(
-        "hito-button relative w-fit max-w-full shrink-0 justify-self-start overflow-hidden whitespace-nowrap capitalize",
-        `hito-button-${variant}`,
-        `hito-button-${size}`,
-        iconOnly && "hito-button-icon",
-      )}
-      data-tone={tone === "default" ? undefined : tone}
-      data-state={state === "default" ? undefined : state}
+      className="relative w-fit max-w-full shrink-0 justify-self-start overflow-hidden whitespace-nowrap capitalize"
+      variant={variant}
+      tone={tone}
+      size={size}
+      loading={state === "loading"}
+      feedback={state === "success" || state === "error" ? state : undefined}
+      timedProgress={state === "timed-progress" ? progress : undefined}
+      {...iconAccessibility}
       data-demo-state={demoState}
     >
       {stateIcon ? (
@@ -778,15 +776,7 @@ export function DemoButton({
       )}
       {iconOnly ? null : buttonLabel}
       {!iconOnly && state === "default" && rightIcon && <Icon name="arrow-right" size="xs" />}
-      {state === "timed-progress" ? (
-        <span className="hito-button-progress-track" aria-hidden="true">
-          <span
-            className="hito-button-progress-fill"
-            style={{ "--hito-progress-value": Math.min(1, Math.max(0, progress)) }}
-          />
-        </span>
-      ) : null}
-    </button>
+    </HitoButton>
   );
 }
 

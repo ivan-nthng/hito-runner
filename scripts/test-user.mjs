@@ -27,13 +27,13 @@ const { createFirstPlanFromReviewedCanonicalPlanForUser } = await tsImport(
 );
 const { isLoopbackRuntimeUrl } = await tsImport("../src/lib/supabase/env.ts", import.meta.url);
 const {
-  RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_ROLE,
-  RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_STORAGE_BUCKET,
-  RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_VERSION,
-  readRunnerActivityProgressReviewFixture,
-  seedRunnerActivityProgressReviewFixture,
-  verifyRunnerActivityProgressReviewFixtureRuntime,
-} = await tsImport("./lib/runner-activity-progress-review-fixture.ts", import.meta.url);
+  RUNNER_DESIGN_PROFILE_FIXTURE_ROLE,
+  RUNNER_DESIGN_PROFILE_FIXTURE_STORAGE_BUCKET,
+  RUNNER_DESIGN_PROFILE_FIXTURE_VERSION,
+  readRunnerDesignProfileFixture,
+  seedRunnerDesignProfileFixture,
+  verifyRunnerDesignProfileFixtureRuntime,
+} = await tsImport("./lib/runner-design-profile-fixture.ts", import.meta.url);
 
 const DEFAULT_ACCOUNTS_FILE = ".tanstack/hito-running-local-accounts.json";
 
@@ -50,17 +50,16 @@ if (
     "cleanup-manifest",
     "cleanup-apply",
     "pool-ensure",
-    "pool-plan-readback",
     "pool-reset-plan",
     "pool-reset",
     "pool-delete",
-    "activity-review-seed",
-    "activity-review-status",
-    "activity-review-reset",
+    "design-profile-seed",
+    "design-profile-status",
+    "design-profile-reset",
   ].includes(command)
 ) {
   throw new Error(
-    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-plan-readback|pool-reset-plan|pool-reset|pool-delete|activity-review-seed|activity-review-status|activity-review-reset|create|reset-plan|reset|delete> [options]",
+    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-reset-plan|pool-reset|pool-delete|design-profile-seed|design-profile-status|design-profile-reset|create|reset-plan|reset|delete> [options]",
   );
 }
 
@@ -80,20 +79,18 @@ if (command === "inventory") {
   await handleCleanupApply();
 } else if (command === "pool-ensure") {
   await handlePoolEnsure();
-} else if (command === "pool-plan-readback") {
-  await handlePoolPlanReadback();
 } else if (command === "pool-reset-plan") {
   await handlePoolReset({ preserveProfile: true });
 } else if (command === "pool-reset") {
   await handlePoolReset();
 } else if (command === "pool-delete") {
   await handlePoolDelete();
-} else if (command === "activity-review-seed") {
-  await handleActivityReviewSeed();
-} else if (command === "activity-review-status") {
-  await handleActivityReviewStatus();
-} else if (command === "activity-review-reset") {
-  await handleActivityReviewReset();
+} else if (command === "design-profile-seed") {
+  await handleDesignProfileSeed();
+} else if (command === "design-profile-status") {
+  await handleDesignProfileStatus();
+} else if (command === "design-profile-reset") {
+  await handleDesignProfileReset();
 } else if (command === "create") {
   await handleCreate();
 } else if (command === "reset-plan") {
@@ -213,32 +210,6 @@ async function handlePoolEnsure() {
   );
 }
 
-async function handlePoolPlanReadback() {
-  const role = requireQaPoolRole(options.role);
-  const definition = QA_TESTER_POOL[role];
-  const authUser = await findAuthUserByEmail(definition.email);
-
-  if (!authUser) {
-    throw new Error(`QA pool user ${definition.email} was not found.`);
-  }
-
-  await assertQaPoolAuthUser({ supabase, role, userId: authUser.id });
-  const persisted = await readImportedPlanForUser(authUser.id);
-  if (!persisted.planCycle.id || persisted.workoutCount <= 0) {
-    throw new Error("Persisted plan readback evidence requires one plan and non-empty workouts.");
-  }
-
-  const evidence = {
-    artifactKind: "qa_pool_persisted_plan_readback_v1",
-    environment: "local",
-    role,
-    userId: authUser.id,
-    ...persisted,
-  };
-  await writeOptionalEvidenceFile(options.output, evidence);
-  console.log(JSON.stringify(evidence, null, 2));
-}
-
 async function handlePoolReset({ preserveProfile = false } = {}) {
   const role = requireQaPoolRole(options.role);
   await assertPoolRoleIsNotLeased(role);
@@ -325,14 +296,14 @@ async function handlePoolDelete() {
   );
 }
 
-async function handleActivityReviewSeed() {
-  await withActivityReviewLease(async () => {
-    const authUser = await ensureActivityReviewPoolUser();
+async function handleDesignProfileSeed() {
+  await withDesignProfileLease(async () => {
+    const authUser = await ensureDesignProfilePoolUser();
     const beforeCounts = await getQaUserOwnedCounts(supabase, authUser.id);
     await resetQaPoolUserData({ supabase, userId: authUser.id });
     let fixture;
     try {
-      fixture = await seedRunnerActivityProgressReviewFixture({
+      fixture = await seedRunnerDesignProfileFixture({
         supabase,
         userId: authUser.id,
       });
@@ -344,10 +315,10 @@ async function handleActivityReviewSeed() {
       JSON.stringify(
         {
           ok: true,
-          action: "activity-review-seed",
+          action: "design-profile-seed",
           localOnly: true,
           login: {
-            username: QA_TESTER_POOL[RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_ROLE].username,
+            username: QA_TESTER_POOL[RUNNER_DESIGN_PROFILE_FIXTURE_ROLE].username,
             path: "http://127.0.0.1:3000/login",
           },
           beforeCounts,
@@ -361,19 +332,19 @@ async function handleActivityReviewSeed() {
   });
 }
 
-async function handleActivityReviewStatus() {
-  await withActivityReviewLease(async () => {
-    const definition = QA_TESTER_POOL[RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_ROLE];
+async function handleDesignProfileStatus() {
+  await withDesignProfileLease(async () => {
+    const definition = QA_TESTER_POOL[RUNNER_DESIGN_PROFILE_FIXTURE_ROLE];
     const authUser = await findAuthUserByEmail(definition.email);
     if (!authUser) {
-      throw new Error(`Activity review QA identity ${definition.email} was not found.`);
+      throw new Error(`Runner design profile identity ${definition.email} was not found.`);
     }
     await assertQaPoolAuthUser({
       supabase,
-      role: RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_ROLE,
+      role: RUNNER_DESIGN_PROFILE_FIXTURE_ROLE,
       userId: authUser.id,
     });
-    const fixture = await readRunnerActivityProgressReviewFixture({
+    const fixture = await readRunnerDesignProfileFixture({
       supabase,
       userId: authUser.id,
     });
@@ -383,7 +354,7 @@ async function handleActivityReviewStatus() {
       throw new Error(`Local login account ${definition.email} was not found.`);
     }
     const runtime = options["runtime-url"]
-      ? await verifyRunnerActivityProgressReviewFixtureRuntime({
+      ? await verifyRunnerDesignProfileFixtureRuntime({
           runtimeUrl: options["runtime-url"],
           username: localAccount.username,
           password: localAccount.password,
@@ -393,7 +364,7 @@ async function handleActivityReviewStatus() {
       JSON.stringify(
         {
           ok: true,
-          action: "activity-review-status",
+          action: "design-profile-status",
           localOnly: true,
           fixture,
           runtime,
@@ -406,35 +377,35 @@ async function handleActivityReviewStatus() {
   });
 }
 
-async function handleActivityReviewReset() {
-  await withActivityReviewLease(async () => {
-    const definition = QA_TESTER_POOL[RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_ROLE];
+async function handleDesignProfileReset() {
+  await withDesignProfileLease(async () => {
+    const definition = QA_TESTER_POOL[RUNNER_DESIGN_PROFILE_FIXTURE_ROLE];
     const authUser = await findAuthUserByEmail(definition.email);
     if (!authUser) {
-      throw new Error(`Activity review QA identity ${definition.email} was not found.`);
+      throw new Error(`Runner design profile identity ${definition.email} was not found.`);
     }
     await assertQaPoolAuthUser({
       supabase,
-      role: RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_ROLE,
+      role: RUNNER_DESIGN_PROFILE_FIXTURE_ROLE,
       userId: authUser.id,
     });
     const beforeCounts = await getQaUserOwnedCounts(supabase, authUser.id);
     const afterCounts = await resetQaPoolUserData({ supabase, userId: authUser.id });
     if (Object.values(afterCounts).some((count) => count !== 0)) {
-      throw new Error("Activity review fixture reset left canonical QA-owned rows behind.");
+      throw new Error("Runner design profile reset left canonical QA-owned rows behind.");
     }
     const retainedStorage = await supabase.storage
-      .from(RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_STORAGE_BUCKET)
-      .list(`${authUser.id}/${RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_VERSION}`);
+      .from(RUNNER_DESIGN_PROFILE_FIXTURE_STORAGE_BUCKET)
+      .list(`${authUser.id}/${RUNNER_DESIGN_PROFILE_FIXTURE_VERSION}`);
     if (retainedStorage.error) throw new Error(retainedStorage.error.message);
     if (retainedStorage.data.length !== 0) {
-      throw new Error("Activity review fixture reset left raw storage objects behind.");
+      throw new Error("Runner design profile reset left raw storage objects behind.");
     }
     console.log(
       JSON.stringify(
         {
           ok: true,
-          action: "activity-review-reset",
+          action: "design-profile-reset",
           localOnly: true,
           authUserPreserved: true,
           authUserId: authUser.id,
@@ -449,8 +420,8 @@ async function handleActivityReviewReset() {
   });
 }
 
-async function ensureActivityReviewPoolUser() {
-  const role = RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_ROLE;
+async function ensureDesignProfilePoolUser() {
+  const role = RUNNER_DESIGN_PROFILE_FIXTURE_ROLE;
   const definition = QA_TESTER_POOL[role];
   const accounts = await loadLocalAccounts();
   const existingLocalAccount =
@@ -464,9 +435,9 @@ async function ensureActivityReviewPoolUser() {
   return authUser;
 }
 
-async function withActivityReviewLease(action) {
+async function withDesignProfileLease(action) {
   const lease = await acquireQaPoolLease({
-    role: RUNNER_ACTIVITY_PROGRESS_REVIEW_FIXTURE_ROLE,
+    role: RUNNER_DESIGN_PROFILE_FIXTURE_ROLE,
   });
   try {
     return await action();

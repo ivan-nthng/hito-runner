@@ -12,6 +12,7 @@ import {
   AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID,
   buildAiGeneratedRunningPlanDevFixtureOpenAiFetch,
   buildAiGeneratedRunningPlanDevFixturePreviewOptions,
+  buildAiGeneratedRunningPlanQaFixtureAuthoringInput,
   isAiGeneratedRunningPlanDevFixtureEnabled,
   resolveAiGeneratedRunningPlanDevFixtureDelayMs,
 } from "../src/lib/ai-generated-running-plan-dev-fixture";
@@ -1639,12 +1640,19 @@ async function validateLocalDevFixtureAvailabilityGating() {
       result.draft.aiGeneration.responseId,
       AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID,
     );
-    assert.equal(result.draft.normalizedInputSummary.startDate, "2026-07-06");
+    const qaFixtureAuthoringInput = buildAiGeneratedRunningPlanQaFixtureAuthoringInput();
+    assert.equal(
+      result.draft.normalizedInputSummary.startDate,
+      qaFixtureAuthoringInput.schedule.startDate,
+    );
     assert.equal(
       result.draft.normalizedInputSummary.planGoalIntent.distance?.distanceMeters,
       10_000,
     );
-    assert.equal(result.draft.endpointProof.finalDate, "2026-08-01");
+    assert.equal(
+      result.draft.endpointProof.finalDate,
+      addDaysIso(qaFixtureAuthoringInput.schedule.startDate, 54),
+    );
     assert.equal(result.draft.endpointProof.endpointMainDistanceMeters, 10_000);
     assert.equal(result.draft.persisted, false);
     assert.equal(result.draft.mutates, false);

@@ -71,7 +71,9 @@ Design System
 - [src/components/Calendar.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/Calendar.tsx:1)
 - [src/components/ui/hito-calendar-day.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/ui/hito-calendar-day.tsx:1)
 - [src/components/manual-workout/ManualWorkoutAuthoringControls.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/manual-workout/ManualWorkoutAuthoringControls.tsx:694)
-- [src/components/onboarding/ManualUserBuiltPlanPanel.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/onboarding/ManualUserBuiltPlanPanel.tsx:503)
+- Historical source `src/components/onboarding/ManualUserBuiltPlanPanel.tsx` was removed during the
+  accepted onboarding decomposition; this reference is retained as history rather than linked to a
+  replacement owner.
 - [docs/current-product.md](</Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/current-product.md>)
 
 ## Problem Statement
@@ -221,9 +223,10 @@ If the playground currently binds Add only to `empty`, Frontend should correct t
 
 - [src/components/manual-workout/ManualWorkoutAuthoringControls.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/manual-workout/ManualWorkoutAuthoringControls.tsx:694)
 
-### Existing no-plan/manual-builder demo calendar
+### Historical no-plan/manual-builder demo calendar
 
-- [src/components/onboarding/ManualUserBuiltPlanPanel.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/onboarding/ManualUserBuiltPlanPanel.tsx:503)
+- `src/components/onboarding/ManualUserBuiltPlanPanel.tsx` was the source at specification time and
+  has since been removed; this historical note does not identify a current implementation owner.
 
 ## Validation Requirements
 

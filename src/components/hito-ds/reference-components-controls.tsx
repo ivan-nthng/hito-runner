@@ -8,7 +8,28 @@ import {
 } from "@/components/ui/hito-date-time-input";
 import { HitoCompoundRangeField } from "@/components/ui/hito-compound-range-field";
 import { HitoDualRange } from "@/components/ui/hito-dual-range";
+import { HitoButton } from "@/components/ui/button";
+import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
+import {
+  HITO_BUTTON_SIZES,
+  HITO_BUTTON_STATES,
+  HITO_BUTTON_TONES,
+  HITO_BUTTON_VARIANTS,
+  HITO_CHOICE_TOGGLE_SIZES,
+  HITO_FIELD_FEEDBACK,
+  HITO_FIELD_SIZES,
+  HITO_FIELD_VARIANTS,
+  type HitoButtonSize,
+  type HitoButtonState,
+  type HitoButtonTone,
+  type HitoButtonVariant,
+  type HitoChoiceToggleSize,
+  type HitoFieldFeedback,
+  type HitoFieldSize,
+  type HitoFieldVariant,
+} from "@/components/ui/hito-control-contract";
 import { Icon } from "@/components/ui/icon";
+import { Input } from "@/components/ui/input";
 import { InlineEditableText } from "@/components/ui/inline-editable-text";
 import { HitoMetadataTag } from "@/components/ui/metadata-tag";
 import { HitoNativeSelectField } from "@/components/ui/native-select-field";
@@ -29,24 +50,16 @@ import {
 } from "@/components/hito-ds/specimen-previews";
 import { cn } from "@/lib/utils";
 
-const BUTTON_VARIANTS = ["primary", "secondary", "outlined", "ghost"] as const;
-const BUTTON_TONES = ["default", "success", "error"] as const;
-const BUTTON_SIZES = ["xs", "sm", "md", "lg", "xl"] as const;
-const BUTTON_MOTION_STATES = [
-  "default",
-  "loading",
-  "success",
-  "error",
-  "pressed",
-  "disabled",
-  "timed-progress",
-] as const;
+const BUTTON_VARIANTS = HITO_BUTTON_VARIANTS;
+const BUTTON_TONES = HITO_BUTTON_TONES;
+const BUTTON_SIZES = HITO_BUTTON_SIZES;
+const BUTTON_MOTION_STATES = HITO_BUTTON_STATES;
 const BUTTON_PROGRESS_VALUES = ["25%", "50%", "75%", "100%"] as const;
-const INPUT_VARIANTS = ["primary", "secondary"] as const;
-const FIELD_SIZES = ["xs", "sm", "md", "lg", "xl"] as const;
+const INPUT_VARIANTS = HITO_FIELD_VARIANTS;
+const FIELD_SIZES = HITO_FIELD_SIZES;
 const INPUT_STATES = ["default", "hover", "focus", "disabled", "readonly"] as const;
-const INPUT_FEEDBACK = ["neutral", "error", "success"] as const;
-const CHOICE_TOGGLE_SIZES = ["xs", "sm", "md", "lg", "xl"] as const;
+const INPUT_FEEDBACK = HITO_FIELD_FEEDBACK;
+const CHOICE_TOGGLE_SIZES = HITO_CHOICE_TOGGLE_SIZES;
 const SELECTION_CONTROL_KINDS = ["checkbox", "radio", "toggle"] as const;
 const SELECTION_BINARY_SIZES = ["sm", "md"] as const;
 const TAB_STYLES = ["simple", "enclosed"] as const;
@@ -59,22 +72,22 @@ const STATUS_MARKER_EXAMPLES = [
   { label: "Neutral", tone: "muted", icon: "minus" },
 ] as const;
 
-type ButtonVariant = (typeof BUTTON_VARIANTS)[number];
-type ButtonTone = (typeof BUTTON_TONES)[number];
-type ButtonSize = (typeof BUTTON_SIZES)[number];
-type ButtonMotionState = (typeof BUTTON_MOTION_STATES)[number];
+type ButtonVariant = HitoButtonVariant;
+type ButtonTone = HitoButtonTone;
+type ButtonSize = HitoButtonSize;
+type ButtonMotionState = HitoButtonState;
 type ButtonProgressValue = (typeof BUTTON_PROGRESS_VALUES)[number];
-type InputVariant = (typeof INPUT_VARIANTS)[number];
+type InputVariant = HitoFieldVariant;
 type InputState = (typeof INPUT_STATES)[number];
-type InputFeedback = (typeof INPUT_FEEDBACK)[number];
-type ChoiceToggleSize = (typeof CHOICE_TOGGLE_SIZES)[number];
+type InputFeedback = HitoFieldFeedback;
+type ChoiceToggleSize = HitoChoiceToggleSize | SelectionBinarySize;
 type SelectionControlKind = (typeof SELECTION_CONTROL_KINDS)[number];
 type SelectionBinarySize = (typeof SELECTION_BINARY_SIZES)[number];
 type TabStyle = (typeof TAB_STYLES)[number];
 type StatusTone = (typeof STATUS_TONES)[number];
 type DataTableSortDirection = (typeof DATA_TABLE_SORT_DIRECTIONS)[number];
 
-type FieldSize = (typeof FIELD_SIZES)[number];
+type FieldSize = HitoFieldSize;
 type TabDemoValue = "plan" | "progress" | "updates" | "archived";
 
 export function HitoDsComponentControls() {
@@ -120,7 +133,7 @@ export function HitoDsComponentControls() {
   const [statusLongLabel, setStatusLongLabel] = useState(false);
   const [metadataState, setMetadataState] = useState("reviewed");
   const [selectionKind, setSelectionKind] = useState<SelectionControlKind>("toggle");
-  const [selectionSize, setSelectionSize] = useState<ChoiceToggleSize>("md");
+  const [selectionSize, setSelectionSize] = useState<ChoiceToggleSize>("sm");
   const [selectionSelected, setSelectionSelected] = useState(true);
   const [selectionDisabled, setSelectionDisabled] = useState(false);
   const [selectionInvalid, setSelectionInvalid] = useState(false);
@@ -1261,7 +1274,7 @@ export function HitoDsComponentControls() {
               <ReferenceListRow
                 label="Class naming"
                 title="Base, structural variant, size, runtime state."
-                body="Use hito-choice-toggle as the base, hito-choice-toggle-card only for display/card choices, and hito-choice-toggle-xs|sm|md|lg|xl for functional size. Runtime truth belongs in data-selected or ARIA state; min-w-0, flex-1, and grid utilities stay local to the layout that needs them."
+                body="Use the shared Choice Toggle API for xs, sm, or lg functional sizes and the separate card presentation for large visual choices. Runtime truth belongs in data-selected or ARIA state; min-w-0, flex-1, and grid utilities stay local to the layout that needs them."
               />
             </div>
 
@@ -1277,47 +1290,44 @@ export function HitoDsComponentControls() {
                   aria-label="Toggle radio size scale"
                 >
                   {CHOICE_TOGGLE_SIZES.map((item) => (
-                    <button
+                    <HitoChoiceToggle
                       key={item}
-                      type="button"
-                      className={cn("hito-choice-toggle uppercase", `hito-choice-toggle-${item}`)}
-                      data-selected={item === "md" ? "true" : undefined}
+                      className="uppercase"
+                      size={item}
+                      selected={item === "sm"}
                       tabIndex={-1}
                     >
                       {item}
-                    </button>
+                    </HitoChoiceToggle>
                   ))}
                 </div>
                 <div className="mt-5 grid gap-2">
                   {CHOICE_TOGGLE_SIZES.map((item) => (
                     <div key={item} className="flex min-w-0 flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        className={cn(
-                          "hito-button hito-button-secondary uppercase",
-                          `hito-button-${item}`,
-                        )}
+                      <HitoButton
+                        variant="secondary"
+                        size={item}
+                        className="uppercase"
                         tabIndex={-1}
                       >
                         {item}
-                      </button>
-                      <input
+                      </HitoButton>
+                      <Input
                         readOnly
                         value={item}
                         aria-label={`${item} field alignment`}
-                        className={cn(
-                          "hito-field hito-field-secondary uppercase max-w-24",
-                          `hito-field-${item}`,
-                        )}
+                        variant="secondary"
+                        size={item}
+                        className="max-w-24 uppercase"
                       />
-                      <button
-                        type="button"
-                        className={cn("hito-choice-toggle uppercase", `hito-choice-toggle-${item}`)}
-                        data-selected={item === "md"}
+                      <HitoChoiceToggle
+                        className="uppercase"
+                        size={item}
+                        selected={item === "sm"}
                         tabIndex={-1}
                       >
                         {item}
-                      </button>
+                      </HitoChoiceToggle>
                     </div>
                   ))}
                 </div>
@@ -1333,27 +1343,18 @@ export function HitoDsComponentControls() {
                   className="hito-choice-toggle-group mt-4"
                   aria-label="Card toggle radio example"
                 >
-                  <button
-                    type="button"
-                    className="hito-choice-toggle hito-choice-toggle-card"
-                    data-selected="true"
-                    tabIndex={-1}
-                  >
+                  <HitoChoiceToggle presentation="card" selected tabIndex={-1}>
                     <span>
                       <span className="block">Half marathon</span>
                       <span className="mt-1 block text-current/70">Goal distance choice</span>
                     </span>
-                  </button>
-                  <button
-                    type="button"
-                    className="hito-choice-toggle hito-choice-toggle-card"
-                    tabIndex={-1}
-                  >
+                  </HitoChoiceToggle>
+                  <HitoChoiceToggle presentation="card" tabIndex={-1}>
                     <span>
                       <span className="block">Build consistency</span>
                       <span className="mt-1 block text-current/70">Large onboarding choice</span>
                     </span>
-                  </button>
+                  </HitoChoiceToggle>
                 </div>
               </article>
             </div>
@@ -1404,7 +1405,12 @@ export function HitoDsComponentControls() {
                   options={SELECTION_CONTROL_KINDS}
                   onChange={(nextKind) => {
                     setSelectionKind(nextKind);
-                    if (nextKind !== "toggle" && !isBinarySelectionSize(selectionSize)) {
+                    if (
+                      nextKind === "toggle" &&
+                      !HITO_CHOICE_TOGGLE_SIZES.includes(selectionSize as HitoChoiceToggleSize)
+                    ) {
+                      setSelectionSize("sm");
+                    } else if (nextKind !== "toggle" && !isBinarySelectionSize(selectionSize)) {
                       setSelectionSize("md");
                     }
                   }}

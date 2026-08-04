@@ -411,35 +411,31 @@ When this matrix is first exercised, start with:
 
 Browser QA must use the built-in Codex app/browser first whenever it can cover the task. Safari is fallback unless Safari-specific verification is required or the built-in browser is blocked.
 
-## Disposable Saved-Mode Rich Workout Fixture
+## Canonical Local Runner Design Profile
 
-Use this local/test-only fixture when QA needs to browser-verify stored rich workout fields without waiting for OpenAI rich drafting.
+Use the loopback-only design profile when QA needs one persisted rich calendar and canonical
+FIT-backed Activity History without waiting for OpenAI.
 
-Fixture account:
-
-- Username: `qa-rich-workout`
-- Email: `qa-rich-workout@local.test`
-- Password: `qa-rich-workout-pass-20260525`
-- Display name: `Rich Workout QA`
-
-Seed/reset command:
+Seed or reseed the named `saved-plan-readback` runner through the canonical lifecycle:
 
 ```bash
-npm run test-user -- create --username qa-rich-workout --email qa-rich-workout@local.test --password qa-rich-workout-pass-20260525 --display-name "Rich Workout QA" --plan scripts/fixtures/rich-workout-saved-mode-fixture.json
+npm run local:design-profile:seed
 ```
 
-Cleanup command:
+Read the persisted plan, paginated History, and factual Progress through the managed loopback runtime:
 
 ```bash
-npm run test-user -- delete --email qa-rich-workout@local.test --confirm-email qa-rich-workout@local.test
+npm run local:design-profile:status -- --runtime-url http://127.0.0.1:3000
 ```
 
-Expected fixture content:
+Deliberate cleanup preserves the named Auth identity but returns all owned rows and raw objects to
+zero:
 
-- Exactly one active saved-mode plan titled `QA Rich Workout Saved-Mode Fixture`.
-- Stored rich workout rows for `steady_aerobic_run`, `rolling_hills_session`, and `technical_trail_easy`.
-- One compact-only `Controlled tempo session` row with no stored rich/source fields so old-plan fallback remains checkable.
-- Segment guidance/cue/hint exists on every fixture segment.
-- No stored pace, HR, cadence, fueling, transcript, prompt, or production auth truth.
+```bash
+npm run local:design-profile:reset
+```
 
-Browser verification should use the built-in Codex browser first, then Safari only if the built-in browser cannot cover the flow. Verify calendar labels/glyphs for Steady, Hills, and Trail come from stored rich fields, workout detail shows exact identity plus backend segment guidance, and cleanup/reset restores the disposable account safely.
+The loaded profile must have one current two-month plan, rich supported workout documents, explicit
+rest days, 30 parsed local FIT activities, matched and unplanned history, source-removal states,
+session-RPE load, and the truthful Gate 5 unavailable state. Browser verification should use the
+built-in Codex browser first, then Safari only if the built-in browser cannot cover the flow.

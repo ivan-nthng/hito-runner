@@ -1,16 +1,34 @@
 import * as React from "react";
 
+import {
+  hitoFieldClasses,
+  type HitoFieldFeedback,
+  type HitoFieldSize,
+  type HitoFieldVariant,
+} from "@/components/ui/hito-control-contract";
 import { cn } from "@/lib/utils";
 
-const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, type, ...props }, ref) => {
+export interface InputProps extends Omit<React.ComponentProps<"input">, "size"> {
+  feedback?: HitoFieldFeedback;
+  size?: HitoFieldSize;
+  variant?: HitoFieldVariant;
+}
+
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ className, feedback = "neutral", size = "sm", type, variant = "primary", ...props }, ref) => {
     return (
       <input
         type={type}
-        className={cn(
-          "hito-field hito-field-primary hito-field-sm file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground",
-          className,
-        )}
+        className={hitoFieldClasses({
+          className: cn(
+            "file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground",
+            className,
+          ),
+          feedback,
+          size,
+          variant,
+        })}
+        data-hito-component="input"
         ref={ref}
         {...props}
       />

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { HitoButton } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Icon } from "@/components/ui/icon";
+import { Input } from "@/components/ui/input";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import {
   formatHitoDurationInput,
@@ -98,7 +100,7 @@ export function HitoDateField({
       >
         <PopoverAnchor asChild>
           <div className="hito-date-field-control">
-            <input
+            <Input
               ref={inputRef}
               id={id}
               name={name}
@@ -147,10 +149,10 @@ export function HitoDateField({
               onChange={(event) => onChange(event.target.value)}
               placeholder={placeholder}
               maxLength={10}
-              className={cn(
-                "hito-field hito-field-primary hito-field-md hito-field-has-right-icon min-w-0",
-                error && "hito-field-feedback-error",
-              )}
+              className="hito-field-has-right-icon min-w-0"
+              feedback={error ? "error" : "neutral"}
+              size="md"
+              variant="primary"
               data-state={open ? "open" : undefined}
             />
             <span className="hito-date-field-icon" aria-hidden="true">
@@ -271,8 +273,10 @@ export function HitoEditableDateField({
     return (
       <div className="grid gap-2">
         <div ref={frameRef} className="hito-editable-value-field-frame">
-          <button
+          <HitoButton
             type="button"
+            size="md"
+            variant="secondary"
             aria-label={hasSavedValue ? `Edit ${label.toLowerCase()}` : `Add ${label}`}
             onClick={() => {
               const nextDraft =
@@ -281,7 +285,7 @@ export function HitoEditableDateField({
               setDraftValue(nextDraft);
               setIsEditing(true);
             }}
-            className="hito-button hito-button-secondary hito-button-md hito-editable-value-field"
+            className="hito-editable-value-field"
             data-state={hasSavedValue ? "saved" : "empty"}
           >
             {hasSavedValue ? null : (
@@ -304,7 +308,7 @@ export function HitoEditableDateField({
                 className="hito-editable-value-field-icon hito-editable-value-field-edit-icon"
               />
             ) : null}
-          </button>
+          </HitoButton>
         </div>
         {error ? <span className="hito-field-error">{error}</span> : null}
         {!error && helper ? <span className="hito-field-helper">{helper}</span> : null}
@@ -323,9 +327,10 @@ export function HitoEditableDateField({
           error={draftValue && !canSave ? "Use YYYY-MM-DD." : null}
         />
         <div className="flex flex-wrap gap-2">
-          <button
+          <HitoButton
             type="button"
-            className="hito-button hito-button-primary hito-button-sm"
+            size="sm"
+            variant="primary"
             disabled={!canSave}
             onClick={() => {
               onChange(draftValue);
@@ -334,21 +339,23 @@ export function HitoEditableDateField({
           >
             <Icon name="check" size="sm" />
             Save
-          </button>
-          <button
+          </HitoButton>
+          <HitoButton
             type="button"
-            className="hito-button hito-button-secondary hito-button-sm"
+            size="sm"
+            variant="secondary"
             onClick={() => {
               setDraftValue(value);
               setIsEditing(false);
             }}
           >
             Cancel
-          </button>
+          </HitoButton>
           {hasSavedValue ? (
-            <button
+            <HitoButton
               type="button"
-              className="hito-button hito-button-secondary hito-button-sm"
+              size="sm"
+              variant="secondary"
               onClick={() => {
                 onChange("");
                 setDraftValue("");
@@ -356,7 +363,7 @@ export function HitoEditableDateField({
               }}
             >
               Clear
-            </button>
+            </HitoButton>
           ) : null}
         </div>
       </div>
@@ -385,7 +392,7 @@ export function HitoMaskedTimeField({
   return (
     <div className="grid gap-2">
       <span className="hito-form-label">{label}</span>
-      <input
+      <Input
         id={id}
         type="text"
         inputMode="numeric"
@@ -396,10 +403,9 @@ export function HitoMaskedTimeField({
         value={value}
         onChange={(event) => onChange(formatHitoDurationInput(event.target.value))}
         placeholder={placeholder}
-        className={cn(
-          "hito-field hito-field-primary hito-field-md",
-          error && "hito-field-feedback-error",
-        )}
+        feedback={error ? "error" : "neutral"}
+        size="md"
+        variant="primary"
       />
       {error ? <span className="hito-field-error">{error}</span> : null}
       {!error && helper ? <span className="hito-field-helper">{helper}</span> : null}

@@ -1,0 +1,874 @@
+{
+  "schemaVersion": 1,
+  "direction": "code-to-figma",
+  "sourceDigest": "sha256:dc7dd213b99bcff0bab5c872ef24fe1a4173caaacb8144fe8c6558dd97b52008",
+  "sourceOfTruth": {
+    "tokens": "src/styles/foundations.css",
+    "typography": "src/lib/hito-typography-roles.ts"
+  },
+  "downstreamScope": {
+    "figmaVariables": true,
+    "figmaTextStyles": true,
+    "figmaComponents": false,
+    "bidirectionalSync": false,
+    "excluded": [
+      "component families",
+      "workout domain colors",
+      "visualization geometry",
+      "gradients and shadows"
+    ]
+  },
+  "collections": {
+    "primitiveColor": [
+      {
+        "id": "stone-950",
+        "cssVariable": "--stone-950",
+        "value": "oklch(0.14 0.005 60)",
+        "alias": null
+      },
+      {
+        "id": "stone-900",
+        "cssVariable": "--stone-900",
+        "value": "oklch(0.16 0.005 60)",
+        "alias": null
+      },
+      {
+        "id": "stone-850",
+        "cssVariable": "--stone-850",
+        "value": "oklch(0.19 0.005 60)",
+        "alias": null
+      },
+      {
+        "id": "stone-825",
+        "cssVariable": "--stone-825",
+        "value": "oklch(0.21 0.006 60)",
+        "alias": null
+      },
+      {
+        "id": "stone-800",
+        "cssVariable": "--stone-800",
+        "value": "oklch(0.22 0.006 60)",
+        "alias": null
+      },
+      {
+        "id": "stone-750",
+        "cssVariable": "--stone-750",
+        "value": "oklch(0.24 0.006 60)",
+        "alias": null
+      },
+      {
+        "id": "stone-700",
+        "cssVariable": "--stone-700",
+        "value": "oklch(0.26 0.008 60)",
+        "alias": null
+      },
+      {
+        "id": "sand-50",
+        "cssVariable": "--sand-50",
+        "value": "oklch(0.98 0.005 80)",
+        "alias": null
+      },
+      {
+        "id": "sand-100",
+        "cssVariable": "--sand-100",
+        "value": "oklch(0.96 0.005 80)",
+        "alias": null
+      },
+      {
+        "id": "sand-200",
+        "cssVariable": "--sand-200",
+        "value": "oklch(0.92 0.005 80)",
+        "alias": null
+      },
+      {
+        "id": "sand-500",
+        "cssVariable": "--sand-500",
+        "value": "oklch(0.62 0.01 70)",
+        "alias": null
+      },
+      {
+        "id": "sand-alpha-06",
+        "cssVariable": "--sand-alpha-06",
+        "value": "oklch(1 0 0 / 6%)",
+        "alias": null
+      },
+      {
+        "id": "sand-alpha-08",
+        "cssVariable": "--sand-alpha-08",
+        "value": "oklch(1 0 0 / 8%)",
+        "alias": null
+      },
+      {
+        "id": "sand-alpha-10",
+        "cssVariable": "--sand-alpha-10",
+        "value": "oklch(1 0 0 / 10%)",
+        "alias": null
+      },
+      {
+        "id": "amber-500",
+        "cssVariable": "--amber-500",
+        "value": "oklch(0.78 0.14 65)",
+        "alias": null
+      },
+      {
+        "id": "amber-600",
+        "cssVariable": "--amber-600",
+        "value": "oklch(0.7 0.12 60)",
+        "alias": null
+      },
+      {
+        "id": "blue-500",
+        "cssVariable": "--blue-500",
+        "value": "oklch(0.72 0.07 200)",
+        "alias": null
+      },
+      {
+        "id": "green-500",
+        "cssVariable": "--green-500",
+        "value": "oklch(0.72 0.13 155)",
+        "alias": null
+      },
+      {
+        "id": "orange-500",
+        "cssVariable": "--orange-500",
+        "value": "oklch(0.75 0.15 50)",
+        "alias": null
+      },
+      {
+        "id": "red-500",
+        "cssVariable": "--red-500",
+        "value": "oklch(0.62 0.18 25)",
+        "alias": null
+      },
+      {
+        "id": "warm-white",
+        "cssVariable": "--warm-white",
+        "value": "oklch(0.997 0.003 82)",
+        "alias": null
+      },
+      {
+        "id": "linen-50",
+        "cssVariable": "--linen-50",
+        "value": "oklch(0.988 0.006 82)",
+        "alias": null
+      },
+      {
+        "id": "linen-100",
+        "cssVariable": "--linen-100",
+        "value": "oklch(0.972 0.01 78)",
+        "alias": null
+      },
+      {
+        "id": "linen-160",
+        "cssVariable": "--linen-160",
+        "value": "oklch(0.946 0.009 77)",
+        "alias": null
+      },
+      {
+        "id": "linen-180",
+        "cssVariable": "--linen-180",
+        "value": "oklch(0.94 0.012 76)",
+        "alias": null
+      },
+      {
+        "id": "linen-220",
+        "cssVariable": "--linen-220",
+        "value": "oklch(0.912 0.014 74)",
+        "alias": null
+      },
+      {
+        "id": "ink-950",
+        "cssVariable": "--ink-950",
+        "value": "oklch(0.14 0.006 58)",
+        "alias": null
+      },
+      {
+        "id": "ink-900",
+        "cssVariable": "--ink-900",
+        "value": "oklch(0.18 0.01 60)",
+        "alias": null
+      },
+      {
+        "id": "ink-800",
+        "cssVariable": "--ink-800",
+        "value": "oklch(0.24 0.012 64)",
+        "alias": null
+      },
+      {
+        "id": "taupe-650",
+        "cssVariable": "--taupe-650",
+        "value": "oklch(0.4 0.014 62)",
+        "alias": null
+      },
+      {
+        "id": "taupe-alpha-32",
+        "cssVariable": "--taupe-alpha-32",
+        "value": "oklch(0.72 0.014 70 / 32%)",
+        "alias": null
+      },
+      {
+        "id": "taupe-alpha-52",
+        "cssVariable": "--taupe-alpha-52",
+        "value": "oklch(0.72 0.014 70 / 52%)",
+        "alias": null
+      },
+      {
+        "id": "orange-650",
+        "cssVariable": "--orange-650",
+        "value": "oklch(0.66 0.15 62)",
+        "alias": null
+      },
+      {
+        "id": "orange-700",
+        "cssVariable": "--orange-700",
+        "value": "oklch(0.62 0.14 60)",
+        "alias": null
+      },
+      {
+        "id": "green-700",
+        "cssVariable": "--green-700",
+        "value": "oklch(0.44 0.125 150)",
+        "alias": null
+      },
+      {
+        "id": "amber-750",
+        "cssVariable": "--amber-750",
+        "value": "oklch(0.5 0.14 55)",
+        "alias": null
+      },
+      {
+        "id": "red-700",
+        "cssVariable": "--red-700",
+        "value": "oklch(0.48 0.18 28)",
+        "alias": null
+      },
+      {
+        "id": "blue-700",
+        "cssVariable": "--blue-700",
+        "value": "oklch(0.46 0.095 205)",
+        "alias": null
+      }
+    ],
+    "semanticColor": [
+      {
+        "id": "background",
+        "cssVariable": "--background",
+        "modes": {
+          "dark": { "value": "var(--stone-900)", "alias": "stone-900" },
+          "light": { "value": "var(--linen-100)", "alias": "linen-100" }
+        }
+      },
+      {
+        "id": "foreground",
+        "cssVariable": "--foreground",
+        "modes": {
+          "dark": { "value": "var(--sand-100)", "alias": "sand-100" },
+          "light": { "value": "var(--ink-900)", "alias": "ink-900" }
+        }
+      },
+      {
+        "id": "surface",
+        "cssVariable": "--surface",
+        "modes": {
+          "dark": { "value": "var(--stone-850)", "alias": "stone-850" },
+          "light": { "value": "var(--linen-50)", "alias": "linen-50" }
+        }
+      },
+      {
+        "id": "surface-elevated",
+        "cssVariable": "--surface-elevated",
+        "modes": {
+          "dark": { "value": "var(--stone-800)", "alias": "stone-800" },
+          "light": { "value": "var(--warm-white)", "alias": "warm-white" }
+        }
+      },
+      {
+        "id": "card",
+        "cssVariable": "--card",
+        "modes": {
+          "dark": { "value": "var(--surface)", "alias": "surface" },
+          "light": { "value": "var(--surface)", "alias": "surface" }
+        }
+      },
+      {
+        "id": "card-foreground",
+        "cssVariable": "--card-foreground",
+        "modes": {
+          "dark": { "value": "var(--foreground)", "alias": "foreground" },
+          "light": { "value": "var(--foreground)", "alias": "foreground" }
+        }
+      },
+      {
+        "id": "popover",
+        "cssVariable": "--popover",
+        "modes": {
+          "dark": { "value": "var(--stone-825)", "alias": "stone-825" },
+          "light": { "value": "var(--surface-elevated)", "alias": "surface-elevated" }
+        }
+      },
+      {
+        "id": "popover-foreground",
+        "cssVariable": "--popover-foreground",
+        "modes": {
+          "dark": { "value": "var(--foreground)", "alias": "foreground" },
+          "light": { "value": "var(--foreground)", "alias": "foreground" }
+        }
+      },
+      {
+        "id": "primary",
+        "cssVariable": "--primary",
+        "modes": {
+          "dark": { "value": "var(--foreground)", "alias": "foreground" },
+          "light": { "value": "var(--foreground)", "alias": "foreground" }
+        }
+      },
+      {
+        "id": "primary-foreground",
+        "cssVariable": "--primary-foreground",
+        "modes": {
+          "dark": { "value": "var(--background)", "alias": "background" },
+          "light": { "value": "var(--linen-50)", "alias": "linen-50" }
+        }
+      },
+      {
+        "id": "secondary",
+        "cssVariable": "--secondary",
+        "modes": {
+          "dark": { "value": "var(--stone-750)", "alias": "stone-750" },
+          "light": { "value": "var(--linen-180)", "alias": "linen-180" }
+        }
+      },
+      {
+        "id": "secondary-foreground",
+        "cssVariable": "--secondary-foreground",
+        "modes": {
+          "dark": { "value": "var(--sand-200)", "alias": "sand-200" },
+          "light": { "value": "var(--ink-800)", "alias": "ink-800" }
+        }
+      },
+      {
+        "id": "muted",
+        "cssVariable": "--muted",
+        "modes": {
+          "dark": { "value": "var(--stone-800)", "alias": "stone-800" },
+          "light": { "value": "var(--linen-160)", "alias": "linen-160" }
+        }
+      },
+      {
+        "id": "muted-foreground",
+        "cssVariable": "--muted-foreground",
+        "modes": {
+          "dark": { "value": "var(--sand-500)", "alias": "sand-500" },
+          "light": { "value": "var(--taupe-650)", "alias": "taupe-650" }
+        }
+      },
+      {
+        "id": "accent",
+        "cssVariable": "--accent",
+        "modes": {
+          "dark": { "value": "var(--stone-700)", "alias": "stone-700" },
+          "light": { "value": "var(--linen-220)", "alias": "linen-220" }
+        }
+      },
+      {
+        "id": "accent-foreground",
+        "cssVariable": "--accent-foreground",
+        "modes": {
+          "dark": { "value": "var(--foreground)", "alias": "foreground" },
+          "light": { "value": "var(--foreground)", "alias": "foreground" }
+        }
+      },
+      {
+        "id": "destructive",
+        "cssVariable": "--destructive",
+        "modes": {
+          "dark": { "value": "var(--red-500)", "alias": "red-500" },
+          "light": { "value": "var(--red-700)", "alias": "red-700" }
+        }
+      },
+      {
+        "id": "destructive-foreground",
+        "cssVariable": "--destructive-foreground",
+        "modes": {
+          "dark": { "value": "var(--sand-50)", "alias": "sand-50" },
+          "light": { "value": "var(--linen-50)", "alias": "linen-50" }
+        }
+      },
+      {
+        "id": "border",
+        "cssVariable": "--border",
+        "modes": {
+          "dark": { "value": "var(--sand-alpha-08)", "alias": "sand-alpha-08" },
+          "light": { "value": "var(--taupe-alpha-52)", "alias": "taupe-alpha-52" }
+        }
+      },
+      {
+        "id": "hairline",
+        "cssVariable": "--hairline",
+        "modes": {
+          "dark": { "value": "var(--sand-alpha-06)", "alias": "sand-alpha-06" },
+          "light": { "value": "var(--taupe-alpha-32)", "alias": "taupe-alpha-32" }
+        }
+      },
+      {
+        "id": "input",
+        "cssVariable": "--input",
+        "modes": {
+          "dark": { "value": "var(--sand-alpha-10)", "alias": "sand-alpha-10" },
+          "light": { "value": "var(--linen-180)", "alias": "linen-180" }
+        }
+      },
+      {
+        "id": "ring",
+        "cssVariable": "--ring",
+        "modes": {
+          "dark": { "value": "var(--amber-600)", "alias": "amber-600" },
+          "light": { "value": "var(--orange-700)", "alias": "orange-700" }
+        }
+      },
+      {
+        "id": "signal",
+        "cssVariable": "--signal",
+        "modes": {
+          "dark": { "value": "var(--amber-500)", "alias": "amber-500" },
+          "light": { "value": "var(--orange-650)", "alias": "orange-650" }
+        }
+      },
+      {
+        "id": "signal-foreground",
+        "cssVariable": "--signal-foreground",
+        "modes": {
+          "dark": { "value": "var(--background)", "alias": "background" },
+          "light": { "value": "var(--ink-950)", "alias": "ink-950" }
+        }
+      },
+      {
+        "id": "info",
+        "cssVariable": "--info",
+        "modes": {
+          "dark": { "value": "var(--blue-500)", "alias": "blue-500" },
+          "light": { "value": "var(--blue-700)", "alias": "blue-700" }
+        }
+      },
+      {
+        "id": "info-foreground",
+        "cssVariable": "--info-foreground",
+        "modes": {
+          "dark": { "value": "var(--stone-950)", "alias": "stone-950" },
+          "light": { "value": "var(--linen-50)", "alias": "linen-50" }
+        }
+      },
+      {
+        "id": "warn",
+        "cssVariable": "--warn",
+        "modes": {
+          "dark": { "value": "var(--orange-500)", "alias": "orange-500" },
+          "light": { "value": "var(--amber-750)", "alias": "amber-750" }
+        }
+      },
+      {
+        "id": "success",
+        "cssVariable": "--success",
+        "modes": {
+          "dark": { "value": "var(--green-500)", "alias": "green-500" },
+          "light": { "value": "var(--green-700)", "alias": "green-700" }
+        }
+      },
+      {
+        "id": "success-foreground",
+        "cssVariable": "--success-foreground",
+        "modes": {
+          "dark": { "value": "var(--stone-950)", "alias": "stone-950" },
+          "light": { "value": "var(--linen-50)", "alias": "linen-50" }
+        }
+      }
+    ],
+    "primitiveSpacing": [
+      { "id": "space-1", "cssVariable": "--space-1", "value": "0.25rem", "alias": null },
+      { "id": "space-2", "cssVariable": "--space-2", "value": "0.5rem", "alias": null },
+      { "id": "space-3", "cssVariable": "--space-3", "value": "0.75rem", "alias": null },
+      { "id": "space-4", "cssVariable": "--space-4", "value": "1rem", "alias": null },
+      { "id": "space-5", "cssVariable": "--space-5", "value": "1.25rem", "alias": null },
+      { "id": "space-6", "cssVariable": "--space-6", "value": "1.5rem", "alias": null },
+      { "id": "space-8", "cssVariable": "--space-8", "value": "2rem", "alias": null },
+      { "id": "space-10", "cssVariable": "--space-10", "value": "2.5rem", "alias": null }
+    ],
+    "primitiveRadius": [
+      {
+        "id": "radius-sm",
+        "cssVariable": "--radius-sm",
+        "value": "calc(var(--radius) - 4px)",
+        "alias": null
+      },
+      {
+        "id": "radius-md",
+        "cssVariable": "--radius-md",
+        "value": "calc(var(--radius) - 2px)",
+        "alias": null
+      },
+      {
+        "id": "radius-lg",
+        "cssVariable": "--radius-lg",
+        "value": "var(--radius)",
+        "alias": "radius"
+      },
+      {
+        "id": "radius-xl",
+        "cssVariable": "--radius-xl",
+        "value": "calc(var(--radius) + 2px)",
+        "alias": null
+      },
+      {
+        "id": "radius-2xl",
+        "cssVariable": "--radius-2xl",
+        "value": "calc(var(--radius) + 4px)",
+        "alias": null
+      },
+      {
+        "id": "radius-3xl",
+        "cssVariable": "--radius-3xl",
+        "value": "calc(var(--radius) + 8px)",
+        "alias": null
+      },
+      {
+        "id": "radius-4xl",
+        "cssVariable": "--radius-4xl",
+        "value": "calc(var(--radius) + 12px)",
+        "alias": null
+      }
+    ],
+    "primitiveMotion": [
+      {
+        "id": "hito-motion-duration-100",
+        "cssVariable": "--hito-motion-duration-100",
+        "value": "100ms",
+        "alias": null
+      },
+      {
+        "id": "hito-motion-duration-140",
+        "cssVariable": "--hito-motion-duration-140",
+        "value": "140ms",
+        "alias": null
+      },
+      {
+        "id": "hito-motion-duration-180",
+        "cssVariable": "--hito-motion-duration-180",
+        "value": "180ms",
+        "alias": null
+      },
+      {
+        "id": "hito-motion-duration-220",
+        "cssVariable": "--hito-motion-duration-220",
+        "value": "220ms",
+        "alias": null
+      },
+      {
+        "id": "hito-motion-duration-260",
+        "cssVariable": "--hito-motion-duration-260",
+        "value": "260ms",
+        "alias": null
+      },
+      {
+        "id": "hito-motion-ease-out",
+        "cssVariable": "--hito-motion-ease-out",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "alias": null
+      },
+      {
+        "id": "hito-motion-ease-linear",
+        "cssVariable": "--hito-motion-ease-linear",
+        "value": "linear",
+        "alias": null
+      }
+    ]
+  },
+  "collectionContract": {
+    "primitiveColor": { "figmaType": "COLOR", "modes": ["Value"] },
+    "semanticColor": { "figmaType": "COLOR", "modes": ["Dark", "Light"] },
+    "primitiveSpacing": { "figmaType": "FLOAT", "unit": "rem" },
+    "primitiveRadius": { "figmaType": "FLOAT", "unit": "px", "preserveCssExpression": true },
+    "primitiveMotion": {
+      "durationType": "FLOAT",
+      "durationUnit": "ms",
+      "easingType": "STRING",
+      "easingUsage": "code-only"
+    }
+  },
+  "textStyles": [
+    {
+      "id": "display-title",
+      "label": "Display title",
+      "className": "hito-display-title",
+      "sample": "A running plan that stays honest.",
+      "description": "Largest display heading used for hero-level product names.",
+      "use": "Rare editorial emphasis for auth or top-tier entry moments.",
+      "cssSpec": "Fraunces · clamp(3.5rem, 7vw, 5rem) · 400 · -0.02em · lh 1",
+      "sourcePath": "src/styles/layout-typography.css",
+      "responsive": true,
+      "figmaStatus": "descriptor-only",
+      "properties": {
+        "font-family": "var(--font-display)",
+        "font-size": "clamp(3.5rem, 7vw, 5rem)",
+        "font-weight": "400",
+        "line-height": "1",
+        "letter-spacing": "-0.02em",
+        "font-feature-settings": "\"ss01\"",
+        "text-wrap": "balance"
+      }
+    },
+    {
+      "id": "page-title",
+      "label": "Page title",
+      "className": "hito-page-title",
+      "sample": "Profile details that follow your training.",
+      "description": "Primary page title role.",
+      "use": "Top-level route title or major state heading.",
+      "cssSpec": "Fraunces · clamp(3rem, 6vw, 4.5rem) · 400 · -0.02em · lh 1",
+      "sourcePath": "src/styles/layout-typography.css",
+      "responsive": true,
+      "figmaStatus": "descriptor-only",
+      "properties": {
+        "font-family": "var(--font-display)",
+        "font-size": "clamp(3rem, 6vw, 4.5rem)",
+        "line-height": "1",
+        "letter-spacing": "-0.02em",
+        "font-feature-settings": "\"ss01\"",
+        "text-wrap": "balance",
+        "font-weight": "400"
+      }
+    },
+    {
+      "id": "modal-title",
+      "label": "Modal title",
+      "className": "hito-modal-title",
+      "sample": "Edit schedule",
+      "description": "Primary heading inside bounded product dialogs.",
+      "use": "Primary heading inside bounded product dialogs.",
+      "cssSpec": "Fraunces · 1.75-2rem · 400 · -0.02em · lh 1.1",
+      "sourcePath": "src/styles/layout-typography.css",
+      "responsive": true,
+      "figmaStatus": "descriptor-only",
+      "properties": {
+        "font-family": "var(--font-display)",
+        "font-size": "clamp(1.75rem, 5vw, 2rem)",
+        "font-weight": "400",
+        "line-height": "1.1",
+        "letter-spacing": "-0.02em",
+        "font-feature-settings": "\"ss01\"",
+        "text-wrap": "balance"
+      }
+    },
+    {
+      "id": "section-title",
+      "label": "Section title",
+      "className": "hito-section-title",
+      "sample": "Body data",
+      "description": "Section-level title role.",
+      "use": "Section-level orientation within an open surface.",
+      "cssSpec": "Fraunces · 1.5rem · 400 · -0.02em · lh 1.15",
+      "sourcePath": "src/styles/layout-typography.css",
+      "responsive": false,
+      "figmaStatus": "ready",
+      "properties": {
+        "font-family": "var(--font-display)",
+        "font-size": "1.5rem",
+        "line-height": "1.15",
+        "letter-spacing": "-0.02em",
+        "font-feature-settings": "\"ss01\"",
+        "font-weight": "400"
+      }
+    },
+    {
+      "id": "panel-title",
+      "label": "Panel title",
+      "className": "hito-panel-title",
+      "sample": "Plan vs run",
+      "description": "Compact panel or card title role.",
+      "use": "Compact internal panels, review modules, and feedback sections.",
+      "cssSpec": "Fraunces · 1.25-1.375rem · 400 · -0.015em · lh 1.18",
+      "sourcePath": "src/styles/layout-typography.css",
+      "responsive": true,
+      "figmaStatus": "descriptor-only",
+      "properties": {
+        "font-family": "var(--font-display)",
+        "font-size": "clamp(1.25rem, 3vw, 1.375rem)",
+        "font-weight": "400",
+        "line-height": "1.18",
+        "letter-spacing": "-0.015em",
+        "font-feature-settings": "\"ss01\"",
+        "text-wrap": "balance"
+      }
+    },
+    {
+      "id": "list-row-title",
+      "label": "List row title",
+      "className": "hito-list-row-title",
+      "sample": "Same typography, no click",
+      "description": "Primary label inside list-row anatomy.",
+      "use": "Primary label inside list rows and compact repeated row anatomy.",
+      "cssSpec": "Poppins · 0.875rem · 400 · lh 1.35",
+      "sourcePath": "src/styles/controls-lists.css",
+      "responsive": false,
+      "figmaStatus": "ready",
+      "properties": {
+        "font-size": "0.875rem",
+        "line-height": "1.35",
+        "font-family": "var(--font-sans)",
+        "font-weight": "400"
+      }
+    },
+    {
+      "id": "body",
+      "label": "Body",
+      "className": "hito-body",
+      "sample": "This compares the planned workout with the uploaded run.",
+      "description": "Default body copy role.",
+      "use": "Default readable paragraph for page, modal, and section support.",
+      "cssSpec": "Poppins · 0.875rem · 400 · lh 1.58",
+      "sourcePath": "src/styles/layout-typography.css",
+      "responsive": false,
+      "figmaStatus": "ready",
+      "properties": {
+        "font-size": "0.875rem",
+        "font-weight": "400",
+        "line-height": "1.58",
+        "text-wrap": "pretty",
+        "font-family": "var(--font-sans)"
+      }
+    },
+    {
+      "id": "body-small",
+      "label": "Body small",
+      "className": "hito-body-small",
+      "sample": "Saved workout history stays preserved.",
+      "description": "Small supporting body copy role.",
+      "use": "Dense secondary explanations, row support, and metadata.",
+      "cssSpec": "Poppins · 0.8125rem · 400 · lh 1.5",
+      "sourcePath": "src/styles/layout-typography.css",
+      "responsive": false,
+      "figmaStatus": "ready",
+      "properties": {
+        "font-size": "0.8125rem",
+        "font-weight": "400",
+        "line-height": "1.5",
+        "text-wrap": "pretty",
+        "font-family": "var(--font-sans)"
+      }
+    },
+    {
+      "id": "helper",
+      "label": "Helper",
+      "className": "hito-field-helper",
+      "sample": "Nothing changes until you choose Apply update.",
+      "description": "Field-adjacent helper copy role.",
+      "use": "Field-adjacent or control-adjacent operational guidance.",
+      "cssSpec": "Poppins · 0.75rem · 400 · lh 1.45",
+      "sourcePath": "src/styles/forms-onboarding.css",
+      "responsive": false,
+      "figmaStatus": "ready",
+      "properties": {
+        "font-size": "0.75rem",
+        "line-height": "1.45",
+        "font-family": "var(--font-sans)",
+        "font-weight": "400"
+      }
+    },
+    {
+      "id": "caption",
+      "label": "Caption",
+      "className": "hito-caption",
+      "sample": "Extracted activity: morning-run.fit",
+      "description": "Quiet caption and secondary metadata role.",
+      "use": "Tertiary detail, legends, tiny footnotes, and timestamps.",
+      "cssSpec": "Poppins · 0.6875rem · 400 · lh 1.45",
+      "sourcePath": "src/styles/layout-typography.css",
+      "responsive": false,
+      "figmaStatus": "ready",
+      "properties": {
+        "font-size": "0.6875rem",
+        "line-height": "1.45",
+        "font-family": "var(--font-sans)",
+        "font-weight": "400"
+      }
+    },
+    {
+      "id": "label",
+      "label": "Label",
+      "className": "hito-label",
+      "sample": "Current plan",
+      "description": "Compact field or metadata label role.",
+      "use": "Micro orientation, never a substitute for a heading.",
+      "cssSpec": "Poppins · 0.75rem · 600 · 0.01em · normal case · lh 1.25",
+      "sourcePath": "src/styles/layout-typography.css",
+      "responsive": false,
+      "figmaStatus": "ready",
+      "properties": {
+        "font-size": "0.75rem",
+        "font-weight": "600",
+        "line-height": "1.25",
+        "letter-spacing": "0.01em",
+        "text-transform": "none",
+        "font-family": "var(--font-sans)"
+      }
+    },
+    {
+      "id": "form-label",
+      "label": "Form label",
+      "className": "hito-form-label",
+      "sample": "Start training",
+      "description": "Explicit ownership label for fields and controls.",
+      "use": "Explicit ownership label for fields and controls.",
+      "cssSpec": "Poppins · 0.75rem · 600 · 0.01em · normal case · lh 1.25",
+      "sourcePath": "src/styles/layout-typography.css",
+      "responsive": false,
+      "figmaStatus": "ready",
+      "properties": {
+        "font-size": "0.75rem",
+        "font-weight": "600",
+        "line-height": "1.25",
+        "letter-spacing": "0.01em",
+        "text-transform": "none",
+        "font-family": "var(--font-sans)"
+      }
+    },
+    {
+      "id": "micro-label",
+      "label": "Micro label",
+      "className": "hito-micro-label",
+      "sample": "Saved mode",
+      "description": "Tiny uppercase route chrome and compact status metadata.",
+      "use": "Tiny uppercase route chrome and compact status metadata, not ordinary shell labels.",
+      "cssSpec": "Poppins · 0.6875rem · 500 · 0.18em · uppercase · lh 1.2",
+      "sourcePath": "src/styles/layout-typography.css",
+      "responsive": false,
+      "figmaStatus": "ready",
+      "properties": {
+        "font-size": "0.6875rem",
+        "font-weight": "500",
+        "line-height": "1.2",
+        "letter-spacing": "0.18em",
+        "text-transform": "uppercase",
+        "font-family": "var(--font-sans)"
+      }
+    },
+    {
+      "id": "technical-mono",
+      "label": "Technical mono",
+      "className": "hito-technical-mono",
+      "sample": "training-plan-v2",
+      "description": "Technical monospace readback role.",
+      "use": "Measured or fixed-format truth only.",
+      "cssSpec": "JetBrains Mono · 0.75rem · tabular nums · lh 1.45",
+      "sourcePath": "src/styles/layout-typography.css",
+      "responsive": false,
+      "figmaStatus": "ready",
+      "properties": {
+        "font-family": "var(--font-mono)",
+        "font-size": "0.75rem",
+        "line-height": "1.45",
+        "font-variant-numeric": "tabular-nums",
+        "font-weight": "400"
+      }
+    }
+  ]
+}

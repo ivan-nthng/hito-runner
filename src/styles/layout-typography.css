@@ -1,3 +1,14 @@
+:root {
+  /* Layout composition geometry stays with its component owner and is not exportable DS foundation. */
+  --hito-route-support-sidebar-width: 20rem;
+  --hito-route-panel-skeleton-calendar-height: 26.25rem;
+  --hito-route-panel-skeleton-detail-height: 28.75rem;
+  --hito-form-section-label-width: 13.75rem;
+  --hito-form-section-avatar-width: 7rem;
+  --hito-readback-value-width: 12rem;
+  --hito-readback-value-compact-width: 11rem;
+}
+
 @layer components {
   .hito-label {
     --hito-typography-role: label;

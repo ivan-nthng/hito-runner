@@ -3,42 +3,29 @@ import type { CSSProperties } from "react";
 import { HitoValueTag } from "@/components/ui/value-tag";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
+import { HITO_DS_MANIFEST } from "@/generated/hito-ds-manifest";
 
-type LightSemanticToken = {
-  name: string;
-  token: string;
-  role: string;
-};
+const LIGHT_SEMANTIC_TOKENS = HITO_DS_MANIFEST.collections.semanticColor.map((token) => ({
+  name: token.id,
+  token: token.cssVariable,
+  role: lightSemanticRole(token.id),
+}));
 
-type LightStatusToken = {
-  label: string;
-  token: string;
-};
+const LIGHT_STATUS_TOKENS = HITO_DS_MANIFEST.collections.semanticColor
+  .filter((token) => ["success", "warn", "destructive", "info"].includes(token.id))
+  .map((token) => ({
+    label: token.id === "warn" ? "Warn" : token.id[0].toUpperCase() + token.id.slice(1),
+    token: token.cssVariable,
+  }));
 
-const LIGHT_SEMANTIC_TOKENS: readonly LightSemanticToken[] = [
-  { name: "background", token: "--background", role: "page canvas" },
-  { name: "surface", token: "--surface", role: "standard surface" },
-  { name: "surface-elevated", token: "--surface-elevated", role: "card / sheet" },
-  { name: "popover", token: "--popover", role: "floating layer" },
-  { name: "foreground", token: "--foreground", role: "primary text" },
-  { name: "muted-foreground", token: "--muted-foreground", role: "secondary text" },
-  { name: "border", token: "--border", role: "component edge" },
-  { name: "hairline", token: "--hairline", role: "quiet divider" },
-  { name: "input", token: "--input", role: "field fill" },
-  { name: "signal", token: "--signal", role: "Hito action" },
-  { name: "ring", token: "--ring", role: "focus outline" },
-  { name: "sidebar", token: "--sidebar", role: "light shell" },
-  { name: "sidebar-foreground", token: "--sidebar-foreground", role: "shell text" },
-  { name: "sidebar-accent", token: "--sidebar-accent", role: "nav hover / active" },
-  { name: "sidebar-border", token: "--sidebar-border", role: "shell divider" },
-];
-
-const LIGHT_STATUS_TOKENS: readonly LightStatusToken[] = [
-  { label: "Success", token: "--success" },
-  { label: "Warn", token: "--warn" },
-  { label: "Destructive", token: "--destructive" },
-  { label: "Info", token: "--info" },
-];
+function lightSemanticRole(id: string) {
+  if (id.includes("foreground")) return "text";
+  if (["surface", "surface-elevated", "card", "popover", "muted"].includes(id)) return "surface";
+  if (["border", "hairline", "input"].includes(id)) return "boundary";
+  if (["success", "warn", "destructive", "info"].includes(id)) return "status";
+  if (["primary", "secondary", "accent", "ring", "signal"].includes(id)) return "interactive";
+  return "canvas";
+}
 
 function swatchStyle(token: string): CSSProperties {
   return {

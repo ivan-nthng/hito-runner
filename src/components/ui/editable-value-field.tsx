@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
+import { HitoButton } from "@/components/ui/button";
+import { hitoFieldClasses } from "@/components/ui/hito-control-contract";
 import { Icon } from "@/components/ui/icon";
+import { Input } from "@/components/ui/input";
 
 type EditableValueInputMode = "numeric" | "decimal";
 type EditableSelectValueFieldOption = {
@@ -182,8 +185,11 @@ export function EditableValueField<Key extends string = string>({
   if (!isEditing) {
     return (
       <div className="hito-editable-value-field-frame" data-hito-component="editable-value-field">
-        <button
+        <HitoButton
           type="button"
+          size="sm"
+          variant="secondary"
+          tone={hasInvalidValue ? "error" : "default"}
           aria-label={
             hasInvalidValue
               ? `Edit ${label.toLowerCase()}, invalid value ${value}`
@@ -192,11 +198,10 @@ export function EditableValueField<Key extends string = string>({
                 : `Add ${label.toLowerCase()}`
           }
           onClick={lifecycle.openEditing}
-          className="hito-button hito-button-secondary hito-button-sm hito-editable-value-field"
+          className="hito-editable-value-field"
           data-editable-value-key={fieldKey}
           data-demo-state={demoState}
           data-state={hasSavedValue ? "saved" : hasInvalidValue ? "invalid" : "empty"}
-          data-tone={hasInvalidValue ? "error" : undefined}
           aria-invalid={hasInvalidValue || undefined}
         >
           {!hasValue ? (
@@ -224,7 +229,7 @@ export function EditableValueField<Key extends string = string>({
               className="hito-editable-value-field-icon hito-editable-value-field-edit-icon"
             />
           ) : null}
-        </button>
+        </HitoButton>
       </div>
     );
   }
@@ -238,7 +243,7 @@ export function EditableValueField<Key extends string = string>({
       onBlur={lifecycle.handleFrameBlur}
     >
       <div className="hito-editable-value-field-input-shell">
-        <input
+        <Input
           ref={lifecycle.controlRef}
           id={fieldId}
           type="text"
@@ -253,30 +258,36 @@ export function EditableValueField<Key extends string = string>({
           aria-invalid={hasInvalidDraft || undefined}
           aria-describedby={hasInvalidDraft ? errorId : undefined}
           placeholder={placeholder}
-          className={`hito-field hito-field-secondary hito-field-sm hito-field-has-right-icon hito-editable-value-field-input ${
-            hasInvalidDraft ? "hito-field-feedback-error" : ""
-          }`}
+          className="hito-field-has-right-icon hito-editable-value-field-input"
+          feedback={hasInvalidDraft ? "error" : "neutral"}
+          size="sm"
+          variant="secondary"
         />
         {hasDraftValue || hasValue ? (
-          <button
+          <HitoButton
             type="button"
-            className="hito-button hito-button-ghost hito-button-xs hito-button-icon hito-editable-value-field-clear"
+            className="hito-editable-value-field-clear"
+            iconOnly
+            size="xs"
+            variant="ghost"
             onClick={() => lifecycle.clearValue()}
             aria-label={`Clear ${label.toLowerCase()}`}
           >
             <Icon name="close" size="xs" />
-          </button>
+          </HitoButton>
         ) : null}
       </div>
-      <button
+      <HitoButton
         type="button"
         disabled={!canSave}
         onClick={() => lifecycle.commitValidDraft(canSave)}
-        className="hito-button hito-button-primary hito-button-sm hito-button-icon"
+        iconOnly
+        size="sm"
+        variant="primary"
         aria-label={`Save ${label.toLowerCase()}`}
       >
         <Icon name="check" size="xs" />
-      </button>
+      </HitoButton>
       {hasInvalidDraft ? (
         <span id={errorId} className="hito-editable-value-field-error" role="alert">
           {editableValueErrorMessage({ min, max, step, unit })}
@@ -322,11 +333,13 @@ export function EditableSelectValueField<Key extends string = string>({
   if (!isEditing) {
     return (
       <div className="hito-editable-value-field-frame" data-hito-component="editable-value-field">
-        <button
+        <HitoButton
           type="button"
+          size="sm"
+          variant="secondary"
           aria-label={hasSavedValue ? `Edit ${label.toLowerCase()} result` : emptyLabel}
           onClick={lifecycle.openEditing}
-          className="hito-button hito-button-secondary hito-button-sm hito-editable-value-field"
+          className="hito-editable-value-field"
           data-editable-value-key={fieldKey}
           data-state={hasSavedValue ? "saved" : "empty"}
         >
@@ -350,7 +363,7 @@ export function EditableSelectValueField<Key extends string = string>({
               className="hito-editable-value-field-icon hito-editable-value-field-edit-icon"
             />
           ) : null}
-        </button>
+        </HitoButton>
       </div>
     );
   }
@@ -372,7 +385,12 @@ export function EditableSelectValueField<Key extends string = string>({
           onChange={(event) => setDraftValue(event.target.value)}
           onKeyDown={(event) => lifecycle.handleControlKeyDown(event, canSave)}
           aria-label={label}
-          className="hito-field hito-field-secondary hito-field-sm hito-field-has-right-icon hito-editable-value-field-input hito-editable-value-field-select"
+          className={hitoFieldClasses({
+            className:
+              "hito-field-has-right-icon hito-editable-value-field-input hito-editable-value-field-select",
+            size: "sm",
+            variant: "secondary",
+          })}
         >
           {options.map((option) => (
             <option key={option.value || option.label} value={option.value}>
@@ -381,25 +399,30 @@ export function EditableSelectValueField<Key extends string = string>({
           ))}
         </select>
         {draftValue.trim().length > 0 || hasSavedValue ? (
-          <button
+          <HitoButton
             type="button"
             onClick={() => lifecycle.clearValue(onClear)}
-            className="hito-button hito-button-ghost hito-button-xs hito-button-icon hito-editable-value-field-clear"
+            className="hito-editable-value-field-clear"
+            iconOnly
+            size="xs"
+            variant="ghost"
             aria-label={`Clear ${label.toLowerCase()} result`}
           >
             <Icon name="close" size="xs" />
-          </button>
+          </HitoButton>
         ) : null}
       </div>
-      <button
+      <HitoButton
         type="button"
         disabled={!canSave}
         onClick={() => lifecycle.commitValidDraft(canSave)}
-        className="hito-button hito-button-primary hito-button-sm hito-button-icon"
+        iconOnly
+        size="sm"
+        variant="primary"
         aria-label={`Save ${label.toLowerCase()} result`}
       >
         <Icon name="check" size="xs" />
-      </button>
+      </HitoButton>
     </div>
   );
 }

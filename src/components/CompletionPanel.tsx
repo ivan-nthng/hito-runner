@@ -814,7 +814,6 @@ export function WorkoutFeedbackPanel({
           {attachedGarminAsset ? (
             <AttachedEvidenceReadback
               asset={attachedGarminAsset}
-              actualMetrics={feedbackState?.latestActualMetrics ?? null}
               summary={uploadSummary}
               isRemoving={isRemoving}
               localFixture={localFixturePreviewIsActive}
@@ -1114,24 +1113,18 @@ function FeedbackUploadSummary({
 
 function AttachedEvidenceReadback({
   asset,
-  actualMetrics,
   summary,
   isRemoving,
   localFixture = false,
   onRemove,
 }: {
   asset: NonNullable<WorkoutResultFeedbackSummary>["latestAsset"];
-  actualMetrics: NonNullable<WorkoutResultFeedbackSummary>["latestActualMetrics"] | null;
   summary: ReturnType<typeof getFeedbackUploadSummary>;
   isRemoving: boolean;
   localFixture?: boolean;
   onRemove: () => Promise<void>;
 }) {
-  const metadata = [
-    asset.assetKind === "garmin_zip" ? "Garmin ZIP" : "Garmin FIT",
-    `Added ${formatWorkoutFeedbackTimestamp(asset.createdAt)}`,
-    actualMetrics?.activityLocalDate ? `Run date ${actualMetrics.activityLocalDate}` : null,
-  ].filter(Boolean);
+  const fileTypeLabel = asset.assetKind === "garmin_zip" ? "Garmin ZIP" : "Garmin FIT";
 
   return (
     <div className="group rounded-xl bg-background/16 px-4 py-4">
@@ -1139,7 +1132,7 @@ function AttachedEvidenceReadback({
         <div className="min-w-0 flex-1">
           <div className="hito-label">Attached file</div>
           <p className="hito-list-row-title mt-2">{asset.originalFileName}</p>
-          <p className="hito-caption mt-2">{metadata.join(" · ")}</p>
+          <p className="hito-caption mt-2">{fileTypeLabel}</p>
           <p className="hito-caption mt-1">
             {localFixture
               ? "Local design fixture only. No file was uploaded or saved."
@@ -1335,7 +1328,6 @@ function describeActualSnapshot(feedback: WorkoutResultFeedbackSummary | null) {
     actual.actualDistanceKm != null ? `${actual.actualDistanceKm.toFixed(2)} km` : null,
     actual.actualDurationMin != null ? formatDurationMin(actual.actualDurationMin) : null,
     actual.actualIntervalCount != null ? `${actual.actualIntervalCount} structured steps` : null,
-    actual.activityLocalDate ?? null,
   ].filter(Boolean);
 
   return details.join(" · ");

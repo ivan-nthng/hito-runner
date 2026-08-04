@@ -237,13 +237,6 @@
     background: color-mix(in oklch, var(--color-signal) 82%, transparent);
   }
 
-  .hito-ui-card {
-    border: 1px solid var(--color-hairline);
-    border-radius: var(--radius-xl);
-    background: color-mix(in oklch, var(--color-background) 48%, transparent);
-    color: var(--color-foreground);
-  }
-
   .hito-state-surface,
   .hito-surface-wash {
     border: 1px solid var(--color-hairline);
@@ -298,11 +291,6 @@
       color-mix(in oklch, var(--color-destructive) 10%, transparent),
       color-mix(in oklch, var(--color-background) 78%, transparent)
     );
-  }
-
-  .hito-ui-sidebar-panel {
-    border-color: var(--color-hairline);
-    background: color-mix(in oklch, var(--color-sidebar) 96%, transparent);
   }
 
   @media (min-width: 768px) {
@@ -510,102 +498,6 @@
 
   .hito-window-content-fit {
     grid-template-rows: auto auto auto;
-  }
-
-  .hito-window-scroll-fill {
-    grid-template-rows: auto minmax(0, 1fr) auto;
-  }
-
-  .hito-window-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    border-bottom: 1px solid var(--color-hairline);
-    text-align: left;
-  }
-
-  .hito-window-header-compact {
-    padding: 1rem 1.25rem;
-  }
-
-  .hito-window-header-large {
-    padding: 1.25rem 1.5rem;
-  }
-
-  .hito-window-close {
-    display: inline-flex;
-    width: 2rem;
-    height: 2rem;
-    flex: 0 0 auto;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid transparent;
-    border-radius: var(--radius-md);
-    color: var(--color-muted-foreground);
-    transition:
-      background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
-      border-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
-      color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
-      box-shadow var(--hito-motion-duration-140) var(--hito-motion-ease-out);
-  }
-
-  .hito-window-close:hover {
-    border-color: var(--color-hairline);
-    background: color-mix(in oklch, var(--color-foreground) 6%, transparent);
-    color: var(--color-foreground);
-  }
-
-  .hito-window-close:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 20%, transparent);
-  }
-
-  .hito-window-body {
-    min-height: 0;
-    padding: 1.25rem 1.5rem;
-  }
-
-  .hito-window-body-scroll {
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
-
-  .hito-window-footer {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    border-top: 1px solid var(--color-hairline);
-    padding: 1rem 1.5rem;
-  }
-
-  .hito-window-footer-actions {
-    display: flex;
-    flex-direction: column-reverse;
-    gap: 0.75rem;
-  }
-
-  .hito-window-footer-note {
-    font-size: 0.75rem;
-    line-height: 1.45;
-    color: var(--color-muted-foreground);
-  }
-
-  @media (min-width: 640px) {
-    .hito-window-footer {
-      flex-direction: row;
-      align-items: center;
-      justify-content: flex-end;
-    }
-
-    .hito-window-footer[data-variant="note-actions"] {
-      justify-content: space-between;
-    }
-
-    .hito-window-footer-actions {
-      flex-direction: row;
-      justify-content: flex-end;
-    }
   }
 
   .hito-toaster[data-sonner-toaster] {
@@ -868,7 +760,6 @@
     .hito-ui-sheet-close,
     .hito-ui-menu-item,
     .hito-ui-select-trigger,
-    .hito-window-close,
     .hito-toast-close,
     .hito-toast-dismiss-action,
     .hito-state-surface,

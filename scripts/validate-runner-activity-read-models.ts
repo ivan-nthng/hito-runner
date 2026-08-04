@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { readLocalAuthAccountsFile } from "../src/lib/local-auth";
+import { clearUpcomingScheduleForUser } from "../src/lib/active-plan-lifecycle-actions";
 import { recordRunnerActivitySessionRpeForUser } from "../src/lib/runner-activity/activity-evidence";
 import { getRunnerActivityProgressFactsForUser } from "../src/lib/runner-activity/fact-snapshots";
 import {
@@ -11,6 +12,7 @@ import {
 } from "../src/lib/runner-activity/garmin-fit-source";
 import { listRunnerActivityHistoryForUser } from "../src/lib/runner-activity/history-read-model";
 import { getRunnerActivityProgressForUser } from "../src/lib/runner-activity/read-model";
+import { getPersistedSnapshot } from "../src/lib/training-api";
 import { createRunnerActivityPlannedWorkoutMatch } from "../src/lib/runner-activity/garmin-fit-source";
 import type { ParsedGarminWorkout } from "../src/lib/workout-result-import/types";
 import { WORKOUT_RESULT_STORAGE_BUCKET } from "../src/lib/workout-result-import/types";
@@ -24,7 +26,11 @@ import {
   releaseQaPoolLease,
   resetQaPoolUserData,
 } from "./lib/qa-test-user-lifecycle.mjs";
-import { seedRunnerActivityProgressReviewFixture } from "./lib/runner-activity-progress-review-fixture";
+import {
+  createRunnerDesignProfilePlan,
+  readRunnerDesignProfileFixture,
+  seedRunnerDesignProfileFixture,
+} from "./lib/runner-design-profile-fixture";
 
 const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
@@ -234,7 +240,7 @@ async function runValidation() {
 
 async function measureSnapshotReconciliation(userId: string) {
   try {
-    await seedRunnerActivityProgressReviewFixture({ supabase, userId, asOfDate: AS_OF_DATE });
+    await seedRunnerDesignProfileFixture({ supabase, userId, asOfDate: AS_OF_DATE });
     await clearDerivedMetricRows(userId);
 
     const beforeMiss = await getQaUserOwnedCounts(supabase, userId);
@@ -265,6 +271,27 @@ async function measureSnapshotReconciliation(userId: string) {
         : null,
     );
     assert.deepEqual(snapshotRowCounts(afterWarm), snapshotRowCounts(afterMiss));
+
+    const cleared = await clearUpcomingScheduleForUser(userId, getPersistedSnapshot, AS_OF_DATE);
+    assert.equal(cleared.status, "cleared");
+    assert.equal(cleared.snapshot.planMeta, null);
+    const historyAfterClear = await listRunnerActivityHistoryForUser({ userId });
+    assert.equal(historyAfterClear.items.length, 20);
+    assert.ok(historyAfterClear.nextCursor);
+    const recreatedPlan = await createRunnerDesignProfilePlan({
+      supabase,
+      userId,
+      asOfDate: AS_OF_DATE,
+    });
+    assert.equal(recreatedPlan.providerDispatchCount, 0);
+    const recreatedProfile = await readRunnerDesignProfileFixture({
+      supabase,
+      userId,
+      asOfDate: AS_OF_DATE,
+    });
+    assert.equal(recreatedProfile.planState.activePlanCount, 1);
+    assert.equal(recreatedProfile.planState.archivedPlanCount, 1);
+    assert.equal(recreatedProfile.history.activityCount, 30);
 
     const mutationTarget = await supabase
       .from("runner_activities")
@@ -340,6 +367,12 @@ async function measureSnapshotReconciliation(userId: string) {
       },
       mutationProducedFreshMetricSnapshot: true,
       factualSnapshotRemainedCurrent: true,
+      planLifecycle: {
+        clearedPlanId: cleared.archivedPlanId,
+        activityCountAfterClear: recreatedProfile.history.activityCount,
+        recreatedPlanId: recreatedPlan.planId,
+        providerDispatchCount: recreatedPlan.providerDispatchCount,
+      },
     };
   } finally {
     await resetQaPoolUserData({ supabase, userId });

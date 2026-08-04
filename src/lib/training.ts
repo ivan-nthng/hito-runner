@@ -1431,57 +1431,6 @@ function segmentToneForKind(kind: string, target?: StepTarget): SegmentTone {
   return "run";
 }
 
-export function weeklyMileage(snapshot: TrainingSnapshot) {
-  const buckets = new Map<string, { km: number; planned: number }>();
-
-  for (const workout of snapshot.workouts) {
-    const weekStart = startOfWeekIso(workout.date);
-    const bucket = buckets.get(weekStart) ?? { km: 0, planned: 0 };
-    const km = workoutDistanceKm(workout) ?? 0;
-
-    bucket.planned += km;
-
-    if (workout.status === "completed") bucket.km += km;
-    if (workout.status === "partial") bucket.km += km * 0.6;
-
-    buckets.set(weekStart, bucket);
-  }
-
-  return [...buckets.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([weekStart, value]) => ({ weekStart, ...value }));
-}
-
-export function statsTotals(snapshot: TrainingSnapshot) {
-  const past = snapshot.workouts.filter(
-    (workout) => workout.date <= snapshot.currentDate && workout.type !== "rest",
-  );
-  const completed = past.filter((workout) => workout.status === "completed").length;
-  const total = past.length;
-  const longest = Math.max(
-    ...snapshot.workouts
-      .filter((workout) => workout.date <= snapshot.currentDate && workout.status === "completed")
-      .map((workout) => workoutDistanceKm(workout) ?? 0),
-    0,
-  );
-  const totalKm = snapshot.workouts
-    .filter((workout) => workout.date <= snapshot.currentDate)
-    .reduce((sum, workout) => {
-      const km = workoutDistanceKm(workout) ?? 0;
-      if (workout.status === "completed") return sum + km;
-      if (workout.status === "partial") return sum + km * 0.6;
-      return sum;
-    }, 0);
-
-  return {
-    completionPct: total ? Math.round((completed / total) * 100) : 0,
-    completed,
-    total,
-    longestKm: +longest.toFixed(1),
-    totalKm: +totalKm.toFixed(0),
-  };
-}
-
 export function formatDate(iso: string, opts?: Intl.DateTimeFormatOptions): string {
   return dateFromIso(iso).toLocaleDateString("en-US", {
     ...(opts ?? { month: "short", day: "numeric" }),

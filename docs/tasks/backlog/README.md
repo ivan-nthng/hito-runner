@@ -4,6 +4,11 @@ This folder is the single operational source of truth for Hito work. It holds th
 retained future work. A status in any spec, brief, or plan is context or history; the matching backlog
 item is the authoritative current status.
 
+The same rule applies to role prompts and next-step sections: an `Exact Handoff Prompt`, `ROLE:`,
+`Next Recommended Role`, or `Suggested Next Step` outside this folder is supporting or historical
+text only. It cannot be copied or dispatched unless one item in this folder links that document,
+owns the current lifecycle, and is itself truthfully `ready` or `in_progress` with complete metadata.
+
 Use this folder for every retained non-trivial request:
 
 - user-reported bugs
@@ -25,6 +30,10 @@ individual canonical records. Admin may project the same metadata after an expli
 
 Completed and archival plans remain linked from their historical documents until a link-safe archive
 normalization pass moves them. They are not active work.
+
+Admin-created captures and quick notes are intake records, not a parallel live queue. If they are
+retained for execution, Product creates or links exactly one canonical item here before dispatch;
+the Admin row may then remain capture evidence or a mirror pointer.
 
 ## File Convention
 

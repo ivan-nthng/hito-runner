@@ -93,8 +93,18 @@
 - `src/lib/admin-auth-actions.ts`
   owns the dedicated admin-login contract for `/admin/login` UI:
   it exposes the admin-only redirect sanitizer and route data contract, while `src/lib/admin-auth-actions.server.ts` verifies local/dev fixture credentials only on loopback local runtimes, verifies the deployed owner admin against server-only `HITO_ADMIN_PASSWORD_HASH` plus `HITO_ADMIN_SESSION_SECRET` outside local fixtures, rejects tester credentials without creating a session, and sets only signed admin-only session truth after admin verification; `src/lib/admin-access.server.ts` is the shared admin resolver/facade for route/server-function eligibility, signed admin session resolution, Supabase app-metadata compatibility, and `AdminAccessContext` capabilities for capture, analytics, and local Test Accounts; ordinary tester/product accounts are never accepted by `/admin/login`
-- `src/lib/admin-capture.ts` owns the backend contract for the current `/admin/capture` backlog:
-  it exposes only the admin server functions used by the current backlog route: backlog list, text-only quick-note create, triage updates, note append, quick-note-only deletion, and deterministic copy-prompt generation; `src/lib/admin-capture.server.ts` verifies the existing admin session boundary before every operation, reads/writes only through the service/admin Supabase seam, keeps item lookup internal to prompt/readback shaping, caps captured text and metadata, redacts secret-like metadata keys/values before prompt output, stores quick-note history in bounded item metadata, rejects title/body/status/type/priority/target-role mutation attempts for repo-derived imported rows with `repo_derived_read_only`, and returns frontend-ready view models rather than local mock state; route-spanning UI capture, screenshot upload, and automatic Codex dispatch are not implemented
+- `src/lib/admin-capture.ts` owns the backend contract for the current `/admin/capture` inbox:
+  it exposes only the admin server functions used by the current review route: inbox list, text-only
+  quick-note create, triage updates, note append, quick-note-only deletion, and deterministic
+  copy-prompt generation; `src/lib/admin-capture.server.ts` verifies the existing admin session
+  boundary before every operation, reads/writes only through the service/admin Supabase seam, keeps
+  item lookup internal to prompt/readback shaping, caps captured text and metadata, redacts
+  secret-like metadata keys/values before prompt output, stores quick-note history in bounded item
+  metadata, rejects mutation attempts for repo-derived imported rows with
+  `repo_derived_read_only`, and returns frontend-ready view models rather than local mock state.
+  Admin-created statuses are capture/triage state only; retained executable work must resolve to one
+  canonical item under `docs/tasks/backlog/` before dispatch. Route-spanning UI capture, screenshot
+  upload, and automatic Codex dispatch are not implemented
 - `scripts/import-repo-work-items-to-admin-backlog.ts`
   owns the explicit repo-work mirror into the admin Backlog:
   `docs/tasks/backlog` is the only operational queue; the importer also scans
@@ -112,8 +122,13 @@
   admin-created quick notes/capture rows untouched while normal admin mutations keep repo-derived
   rows read-only
 - `src/routes/admin.capture.tsx`
-  owns the first visible admin capture backlog route:
-  `/admin/capture` is an admin-only standalone workbench sibling to `/admin/analytics`; one canonical backlog read returns the selected status/filter page plus complete status-tab counts independent of the page limit, and validated search state is a loader dependency so SPA tab/filter navigation cannot retain stale rows; the route renders backend-shaped backlog items with status tabs, compact search/filter controls, inline item detail, triage controls, quick-note creation, note append, archive-by-status, and deterministic copy-prompt clipboard actions while leaving admin access, storage, prompt shaping, lifecycle validation, screenshots, live UI capture, and any Codex dispatch on backend/future seams
+  owns the first visible admin capture inbox route:
+  `/admin/capture` is an admin-only standalone workbench sibling to `/admin/analytics`; one inbox
+  read returns the selected status/filter page plus complete independent status-tab counts, and
+  validated search state is a loader dependency so SPA navigation cannot retain stale rows. The
+  route renders backend-shaped intake and mirror rows with triage controls and deterministic
+  prompt-copy actions, but it does not own operational work-item lifecycle or dispatch; that
+  authority remains in `docs/tasks/backlog/`
 - Quick setup goal cards are UI shortcuts into `planGoalIntent.distanceMeters`, not backend Plan
   Preset programs:
   selected running-plan preview/create is owned by `src/lib/running-plan-engine-actions.ts` and
@@ -240,7 +255,12 @@
   adds `runner_profiles.training_preferences jsonb` for bounded runner-level training defaults using plan-preference-compatible keys such as `blocked_days`, `preferred_long_run_day`, and `max_running_days_per_week`
 - `supabase/migrations/20260528190000_admin_capture_backlog.sql`
   adds the first admin capture backlog storage foundation:
-  RLS-enabled `admin_capture_items` storage for text/metadata capture truth; the earlier unused screenshot asset table is removed by `supabase/migrations/20260601110000_remove_admin_capture_assets.sql`, and the empty `admin-capture-assets` bucket is removed through the Supabase Storage API because direct storage catalog deletion is not allowed, so runner/public clients cannot directly read or write backlog truth and all current access goes through admin-verified service-role server seams
+  RLS-enabled `admin_capture_items` storage for text/metadata capture and mirror truth; the earlier
+  unused screenshot asset table is removed by
+  `supabase/migrations/20260601110000_remove_admin_capture_assets.sql`, and the empty
+  `admin-capture-assets` bucket is removed through the Supabase Storage API because direct storage
+  catalog deletion is not allowed. Runner/public clients cannot directly read or write the Admin
+  inbox, and this storage does not supersede the Markdown operational queue
 - `scripts/validate-admin-capture-backlog.ts`
   owns the backend proof harness for the capture backlog:
   the default deterministic mode verifies admin create/list/read/update, non-admin rejection, deterministic prompt generation, archived-list behavior, metadata redaction, quick-note-only deletion, repo-derived read-only behavior, and stale repo-derived mirror cleanup policy; `--live-supabase` / `npm run validate-admin-capture-backlog:live` probes the linked Supabase project for item-table availability, absence of the retired asset table/bucket, service-role operations, publishable-key RLS blocking, and disposable-row cleanup without printing secrets
@@ -514,6 +534,7 @@
 - saved-mode home and calendar now render that `feedbackMarker` as a bounded secondary evidence indicator that links directly into the existing workout-detail `Feedback` tab without replacing completion-state truth
 - screenshot OCR, Garmin sync, Strava sync, and any plan-adjustment automation are still later slices
 - the first Hito design-system implementation slices now exist in shared CSS primitives for canonical typography roles, low-card surfaces, tiered buttons, tiered fields, textareas, helper/error text, tabs, labels, captions, dividers, grouped rows, metric rows, compact status pills, compact status markers, setup/empty/error state surfaces, compact summary metrics, chart legends, chart notes, comparison-bar chrome, tooltip shells, editorial timeline date rails, highlight tags, editorial backdrops, timeline entries, timeline dots, inline code chips, canvas/auth/launch/state/editorial overlay recipes, Hito-owned shared wrapper defaults for dialog, sheet, dropdown menu, and select, Hito progress/card/sidebar chrome recipes, internal workbench shell/sidebar/topbar/quick-link/summary-grid recipes, body severity scales, body severity summaries, shell navigation rows, shell profile triggers, shell dropdown rows, and disclosure; those primitives are applied to auth, onboarding, advanced import, shell chrome, home/calendar support surfaces, workout-detail grouped/status/metric surfaces, deeper workout-structure and completion micro-surfaces, route-level state surfaces, progress summary surfaces, body severity micro-UI, preserved integration utility rows, public changelog rendering, launcher/admin/auth atmospheric shells, shared interaction wrappers, `/admin/analytics`, and the internal `/hitoDS` reference page
+- the shared control contract now lives in `src/components/ui/hito-control-contract.ts`: normal Hito Button, Field, and Choice primitives consume one typed size/variant vocabulary; `HitoButton` owns loading/busy/disabled truth and accessible icon-only use; `controls-fields.css` owns the reusable Field base while `forms-onboarding.css` retains Product/domain composition; `/hitoDS`, Inspector metadata, and the downstream capture board consume the same supported arrays; `scripts/validate-hito-ds-component-contracts.ts` rejects retired control tiers and shared-contract leakage. Product routes still using manual Hito class assembly remain a separate Frontend Product migration, and `src/components/ui/calendar.tsx` retains the documented legacy CVA Button compatibility seam.
 - `/hitoDS#calendar-workout-playground` now documents static calendar/workout day specimens for desktop month cells, mobile workout rows, dense month-grid stress, workout/rest/no-workout/outside-plan states, result/evidence markers, title overflow, and manual-authoring visual states; `src/components/ui/hito-calendar-day.tsx` owns the shared presentational `HitoCalendarDayCell` / `HitoWorkoutDayRow` anatomy, product `Calendar.tsx` maps real backend-shaped `TrainingSnapshot` / `Workout` truth into display props and keeps product links/tooltips/feedback routing, and `/hitoDS` maps controls/specimen state into the same display props without wiring CRUD, recurrence, backend mutations, persistence, generation, row-count, or product calendar semantics. Shipped manual-plan editing belongs to the product calendar and backend manual authoring seams, not to `/hitoDS`.
 - the first Hito DS foundations cleanup slice now adds a raw color primitive layer underneath the existing semantic product tokens, exposes compact `--space-*` primitives plus Tailwind-facing Hito spacing aliases, and documents color through `/hitoDS#foundations` Semantic Colors and Primitive tabs: semantic cards copy token/recipe code, primitive swatches copy existing Hito hex values, and alpha/gradient recipes stay semantic rather than becoming generated primitive palettes; typography families, semantic tone rules, workout-color boundaries, and spacing rhythm remain documented without changing runner-facing screen behavior
 - the accepted workout color-token DS contract now lives in the Hito DS token/rendering layer: `src/styles.css` owns primitive workout scales and semantic workout/section slots, `src/lib/workout-color-tokens.ts` owns shared workout color helpers, `/hitoDS` documents the workout roles Rest, Recovery, Easy, Steady, Long Run, Progression, Tempo, Intervals, Hills, and Run/Walk plus section roles Warm-up, Run, Work, Recover, Finish, and Cooldown, and Repeat set remains structural-only with no standalone semantic color token

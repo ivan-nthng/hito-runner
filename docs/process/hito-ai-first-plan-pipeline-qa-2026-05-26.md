@@ -2,7 +2,7 @@
 
 ## 1. Task
 
-Run QA validation for [2026-05-26-ai-authored-first-plan-pipeline.md](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-05-26-ai-authored-first-plan-pipeline.md).
+Run QA validation for [2026-05-26-ai-authored-first-plan-pipeline.md](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/archive/2026-05-26-ai-authored-first-plan-pipeline.md).
 
 ## 2. Stage
 

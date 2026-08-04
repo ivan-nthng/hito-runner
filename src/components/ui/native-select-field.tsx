@@ -1,5 +1,11 @@
 import { useId, type ComponentPropsWithoutRef, type ChangeEvent } from "react";
 
+import {
+  hitoFieldClasses,
+  type HitoFieldFeedback,
+  type HitoFieldSize,
+  type HitoFieldVariant,
+} from "@/components/ui/hito-control-contract";
 import { cn } from "@/lib/utils";
 
 export type HitoNativeSelectFieldOption = {
@@ -19,17 +25,23 @@ type HitoNativeSelectFieldProps = Omit<
   onValueChange?: (value: string) => void;
   options: HitoNativeSelectFieldOption[];
   selectClassName?: string;
+  feedback?: HitoFieldFeedback;
+  size?: HitoFieldSize;
+  variant?: HitoFieldVariant;
 };
 
 export function HitoNativeSelectField({
   className,
   helper,
+  feedback = "neutral",
   id,
   label,
   labelClassName,
   onValueChange,
   options,
   selectClassName,
+  size = "md",
+  variant = "primary",
   "aria-describedby": ariaDescribedBy,
   ...selectProps
 }: HitoNativeSelectFieldProps) {
@@ -49,7 +61,8 @@ export function HitoNativeSelectField({
         {...selectProps}
         id={selectId}
         aria-describedby={describedBy}
-        className={cn("hito-field hito-field-md", selectClassName)}
+        className={hitoFieldClasses({ className: selectClassName, feedback, size, variant })}
+        data-hito-component="native-select-field"
         onChange={onValueChange ? handleChange : undefined}
       >
         {options.map((option) => (

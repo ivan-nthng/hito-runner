@@ -214,6 +214,11 @@ When the user sends another agent's implementation, QA, architecture, design, co
 result back to Product, Product owns the product/status routing and writes the next-role prompt
 directly.
 
+Before contacting any execution role, Product must apply `AGENTS.md` Rule Zero. Product never sends
+`STOP`, clarification, continuation, status, or new work into an active role unless the user has
+explicitly stopped or superseded that exact active task. Pending work stays in Product's own queue;
+there is no queued message inside an active execution thread.
+
 Product should:
 
 - read the report and identify the active plan, task, stage, changed files, validation evidence,

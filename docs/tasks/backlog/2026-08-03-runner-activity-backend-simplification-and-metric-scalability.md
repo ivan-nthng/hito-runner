@@ -66,6 +66,9 @@ Slices 1b, 2, and 3 are complete in Backend and integrated in local commit `a6c5
 remains a `backlog` optimization program rather than a release-readiness status; completed and future
 slices are recorded explicitly below. Push and deployment remain separate release actions.
 
+Central execution-ownership policy was integrated separately in `0633bdf` and formatting-only
+normalization in `2dac928`; neither commit is part of the eight-path Backend release boundary.
+
 ## Source-Control Integration Manifest (2026-08-04; integrated locally as `a6c5f44`)
 
 ### Audit anchor and verdict
@@ -131,6 +134,15 @@ receipt. Those hunks, the deleted worktree copy of
 `scripts/lib/runner-design-profile-fixture.ts` remain untouched and unstaged. The accepted validator
 blob imports the tracked progress-review fixture from `HEAD`, so this separation requires no fixture
 change and creates no missing dependency in the release commit.
+
+### Post-integration concurrent-work reconciliation
+
+Design System work continued after the 60-path manifest audit and added further dirty/untracked
+paths. That drift should have triggered a renewed excluded-inventory review before integration. The
+independent post-commit review confirmed that none of those later Design System, Product UI, package,
+generated, or fixture paths entered `a6c5f44`; the eight accepted path/blob states remained exact.
+The commit-specific boundary is therefore retained, while the earlier 60-path count is historical
+audit evidence rather than a claim about the later live worktree.
 
 ### Exact excluded path inventory
 

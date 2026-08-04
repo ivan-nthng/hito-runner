@@ -112,7 +112,7 @@ Every task has one active role. The active role is real execution authority, not
   execution assignment for that matching role. The role must read its role file and execute the work
   inside its defined authority.
 - A role-prefixed prompt pasted into its matching role task is never a handoff artifact. `ROLE:
-  BACKEND` in a Backend task means Backend implements; `ROLE: QA` in a QA task means QA validates;
+BACKEND` in a Backend task means Backend implements; `ROLE: QA` in a QA task means QA validates;
   the same rule applies to every project role.
 - `PRODUCT` is the sole orchestration role. Product defines work, routes it, and writes handoffs; it
   does not execute BACKEND, FRONTEND, QA, DESIGNER, or other role-owned product work.
@@ -243,7 +243,7 @@ that exact current task.
   discovered priority authorize dispatch only to an **idle** role. They never imply permission to
   interrupt an active task.
 - Only an unambiguous current user command such as `stop the current Backend task`, `interrupt the
-  active Frontend task`, or `supersede <named task>` authorizes an interruption. Product must not
+active Frontend task`, or `supersede <named task>` authorizes an interruption. Product must not
   infer that permission from intent, frustration, urgency, or a belief that the active task is wrong.
 - If the role is active and no such explicit stop command exists, Product records the next bounded
   task in its pending queue, tells the user it is queued and not sent, and sends nothing to that role.
@@ -260,7 +260,7 @@ stop, supersede, or interrupt it.
 - Do not send a "queued" prompt into an active role thread. That message is an interruption, not a
   queue entry.
 - Keep the next bounded task in Product's pending queue and expose it to the user as `queued, not
-  sent`; dispatch only after the active role reports completion or the user explicitly interrupts.
+sent`; dispatch only after the active role reports completion or the user explicitly interrupts.
 - A new report about the same capability is evidence for the current task by default, not authority
   to start another task or alter its instructions.
 - When a task completes, Product must check the role status again before dispatching the queued
@@ -1398,7 +1398,7 @@ Import inference may keep legacy history visible, but it must not silently upgra
      keeps explicit legacy metadata debt rather than receiving invented prompts or decisions.
   3. A separate release/admin gate runs the dry-run, reviews identity moves and stale mirrors, then
      explicitly approves live sync or stale-mirror archive.
-  Do not combine these phases in one batch.
+     Do not combine these phases in one batch.
 - Dashboard adoption remains a projection change, not a new workflow: show the canonical lifecycle,
   owner, scope, optional batch/lane, and archive intent for active-plan rows, while continuing to
   derive every row from Markdown.

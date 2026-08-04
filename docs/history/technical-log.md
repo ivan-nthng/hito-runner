@@ -122,7 +122,7 @@ must either add an entry here or explicitly state why it is not technical-log ma
   required check prevents Definition-of-Done completion until fix-forward and revalidation. The
   policy applies only to implementation, debugging, and validation; debugging inventory must also
   distinguish the root cause from the visible symptom. It now distinguishes `Implementation DoD:
-  Passed` from later independent `Global QA Acceptance`, so an owner cannot mistake bounded proof for
+Passed` from later independent `Global QA Acceptance`, so an owner cannot mistake bounded proof for
   release readiness. The shared rule lives in `AGENTS.md`, the coding role files, and
   handoff/backend/frontend/QA skills. Boundary: no product behavior, test infrastructure, or runtime
   validation command changed.
@@ -654,7 +654,7 @@ wording when older final reports or QA artifact references were not present in t
 - HISTORICAL / migrated public changelog mirror — Cleaned up runner-facing workout target display
   grammar: saved calendar and workout structure surfaces now show bounded durations such as `46 min`
   and `9 min 24 sec` instead of raw floats or decimal-prime shorthand, hide internal `Structure-only
-  executable target` labels, and preserve concrete structure-only prescriptions without fake pace or
+executable target` labels, and preserve concrete structure-only prescriptions without fake pace or
   fake personal HR. Browser QA proved the saved-plan fixture, workout detail, interval readback,
   mobile no-overflow, and disposable cleanup. Evidence: `docs/history/changelog.md` section
   `2026-06-11`. Boundary: migrated from historical public highlights; finer role/stage/proof
@@ -682,7 +682,7 @@ wording when older final reports or QA artifact references were not present in t
 
 - HISTORICAL / migrated public changelog mirror — Added the first manual user-built plan creation
   path: no-active-plan runners can choose `Build my plan myself`, create and review an `Easy aerobic
-  run`, then persist a `manual_user_built_plan_v1` active plan through backend review token/checksum
+run`, then persist a `manual_user_built_plan_v1` active plan through backend review token/checksum
   confirmation and the existing active-plan persistence seam. Disposable browser QA proved the
   create-click flow, exact one-row readback, strict structure-only metric truth, mobile no-overflow,
   and cleanup. Evidence: `docs/history/changelog.md` section `2026-06-10`. Boundary: migrated from
@@ -721,7 +721,7 @@ wording when older final reports or QA artifact references were not present in t
 
 - HISTORICAL / migrated public changelog mirror — Shipped Plan Presets for no-active-plan creation:
   runners can start from backend-owned `10K Foundation`, `Half Marathon Balanced`, or `Marathon
-  Base` cards with backend-shaped eligibility, duration, start/end dates, workout mix, metric
+Base` cards with backend-shaped eligibility, duration, start/end dates, workout mix, metric
   honesty, and fit summaries, review the non-mutating draft, then create an exact canonical active
   plan through the existing persistence seam. Final QA proved the browser setup -> card -> review ->
   confirm -> saved-plan flow, exact half-marathon row persistence, mobile no-overflow, Advanced
@@ -776,7 +776,7 @@ wording when older final reports or QA artifact references were not present in t
   dates before a plan start display as muted outside-plan cells instead of rest/workout
   placeholders, with no rest labels, glyphs, status markers, feedback markers, tooltips, or workout
   links before the start date; mobile now collapses the pre-start range into a quiet `Before plan
-  starts` row while in-plan rest and workout days keep normal schedule semantics. Evidence:
+starts` row while in-plan rest and workout days keep normal schedule semantics. Evidence:
   `docs/history/changelog.md` section `2026-06-04`. Boundary: migrated from historical public
   highlights; finer role/stage/proof metadata may be unavailable in the preserved source entry.
 
@@ -813,8 +813,8 @@ wording when older final reports or QA artifact references were not present in t
   plus admin backlog recovery path: `npm run build` and `npx vercel build --yes` now pass without
   the missing `.nitro/vite/server-output` failure, Vercel output artifacts are present, a newer
   production deployment inspected as `Ready`, admin capture live/local validators returned `ok:
-  true`, and browser proof showed `/admin/capture` loads for an authenticated admin without `Capture
-  load failed`, `Backlog unavailable`, or an auth loop. Evidence: `docs/history/changelog.md`
+true`, and browser proof showed `/admin/capture` loads for an authenticated admin without `Capture
+load failed`, `Backlog unavailable`, or an auth loop. Evidence: `docs/history/changelog.md`
   section `2026-06-01`. Boundary: migrated from historical public highlights; finer role/stage/proof
   metadata may be unavailable in the preserved source entry.
 - HISTORICAL / migrated public changelog mirror — Retired the unused admin capture screenshot
@@ -839,7 +839,7 @@ wording when older final reports or QA artifact references were not present in t
   review title source cleanup, recovery-first post-long-run sequencing, phase-aware extension
   richness, beginner run/walk adaptation, beginner/recreational cadence, and supported half/marathon
   specificity all passed QA while production still stays on the blueprint contract and `ai-first-
-  plan-envelope-v1` remains non-production. Evidence: `docs/history/changelog.md` section
+plan-envelope-v1` remains non-production. Evidence: `docs/history/changelog.md` section
   `2026-06-01`. Boundary: migrated from historical public highlights; finer role/stage/proof
   metadata may be unavailable in the preserved source entry.
 - HISTORICAL / migrated public changelog mirror — Added supported half-marathon and marathon goal-
@@ -891,15 +891,15 @@ wording when older final reports or QA artifact references were not present in t
 - HISTORICAL / migrated public changelog mirror — Fixed first-plan review title source-of-truth so
   the review modal derives runner-facing display titles from structured setup state instead of raw
   AI/generated plan names; long-horizon marathon target-time review now shows `Marathon 3:50 Target
-  Plan` and no longer exposes misleading `16-Week`, `Opening Blueprint`, or `Base and Build Plan for
-  New Runner` wording, without changing backend generation or persisted plan names. Evidence:
+Plan` and no longer exposes misleading `16-Week`, `Opening Blueprint`, or `Base and Build Plan for
+New Runner` wording, without changing backend generation or persisted plan names. Evidence:
   `docs/history/changelog.md` section `2026-05-30`. Boundary: migrated from historical public
   highlights; finer role/stage/proof metadata may be unavailable in the preserved source entry.
 
 ## 2026-05-29
 
 - HISTORICAL / migrated public changelog mirror — Added bounded long-horizon `ai-first-plan-
-  blueprint-v1` authoring for target-date structured first plans: OpenAI authors only the safe
+blueprint-v1` authoring for target-date structured first plans: OpenAI authors only the safe
   opening window, backend extends remaining weeks from validated setup truth, final review opens
   only after full-horizon slot/rest/long-run validation, trace metadata exposes requested/AI-
   authored/backend-extended week counts, and invalid, timeout, or partial responses remain non-
@@ -918,7 +918,7 @@ wording when older final reports or QA artifact references were not present in t
   foundation beside the production blueprint path: envelope schema/decode/expand/trace support can
   expand mock envelopes into canonical `training-plan-v2` rows for ops comparison, invalid/live-
   unavailable envelope modes fail bounded, production first-plan generation still uses `ai-first-
-  plan-blueprint-v1`, and no envelope draft is persisted or runner-facing. Evidence:
+plan-blueprint-v1`, and no envelope draft is persisted or runner-facing. Evidence:
   `docs/history/changelog.md` section `2026-05-29`. Boundary: migrated from historical public
   highlights; finer role/stage/proof metadata may be unavailable in the preserved source entry.
 
@@ -932,7 +932,7 @@ wording when older final reports or QA artifact references were not present in t
   metadata may be unavailable in the preserved source entry.
 - HISTORICAL / migrated public changelog mirror — Updated the repo work-item admin Backlog importer
   to use canonical markdown metadata: explicit `Status`, `Type`, `Priority`, `Next Recommended
-  Role`, `Task`, `Stage`, and `Exact Handoff Prompt` sections now drive mirrored admin fields and
+Role`, `Task`, `Stage`, and `Exact Handoff Prompt` sections now drive mirrored admin fields and
   copy prompts, older docs report missing/invalid metadata, and repo-derived rows are never imported
   as `in_review`. Evidence: `docs/history/changelog.md` section `2026-05-28`. Boundary: migrated
   from historical public highlights; finer role/stage/proof metadata may be unavailable in the
@@ -976,7 +976,7 @@ wording when older final reports or QA artifact references were not present in t
   action trace artifacts for AI first-plan review attempts, capturing sanitized
   request/setup/authoring summaries, effective first-plan model/timeout/token/env source, cadence
   slots, validation issue codes, normalized identities, and failure layer under ignored `qa-
-  artifacts/debug/...` without prompts, secrets, or raw OpenAI payloads. Evidence:
+artifacts/debug/...` without prompts, secrets, or raw OpenAI payloads. Evidence:
   `docs/history/changelog.md` section `2026-05-28`. Boundary: migrated from historical public
   highlights; finer role/stage/proof metadata may be unavailable in the preserved source entry.
 - HISTORICAL / migrated public changelog mirror — Added a reproducible saved blueprint visual QA
@@ -1028,7 +1028,7 @@ wording when older final reports or QA artifact references were not present in t
   the preserved source entry.
 - HISTORICAL / migrated public changelog mirror — Wired the AI-authored blueprint planner into
   structured first-plan review: `generateStructuredFirstPlanDraft` now attempts `ai-first-plan-
-  blueprint-v1`, exposes bounded source/fallback/repair/debug metadata, signs the reviewed canonical
+blueprint-v1`, exposes bounded source/fallback/repair/debug metadata, signs the reviewed canonical
   plan, and `confirmStructuredFirstPlanDraft` persists that exact reviewed plan without calling
   OpenAI or regenerating. Evidence: `docs/history/changelog.md` section `2026-05-27`. Boundary:
   migrated from historical public highlights; finer role/stage/proof metadata may be unavailable in
@@ -1098,7 +1098,7 @@ wording when older final reports or QA artifact references were not present in t
   unavailable in the preserved source entry.
 - HISTORICAL / migrated public changelog mirror — Repaired the non-mutating AI first-plan blueprint
   expander so compact AI-authored workout identities now become identity-aware executable `training-
-  plan-v2` segments for tempo/threshold, intervals, hills, trail, ultra, long-run, cutback/taper,
+plan-v2` segments for tempo/threshold, intervals, hills, trail, ultra, long-run, cutback/taper,
   recovery, easy, and steady workouts without wiring onboarding, saving plans, or weakening metric
   gates. Evidence: `docs/history/changelog.md` section `2026-05-26`. Boundary: migrated from
   historical public highlights; finer role/stage/proof metadata may be unavailable in the preserved
@@ -1126,7 +1126,7 @@ wording when older final reports or QA artifact references were not present in t
 - HISTORICAL / migrated public changelog mirror — Added the non-mutating AI-authored first-plan
   draft ops seam: backend can now call the `ai-first-plan-draft-v1` OpenAI contract from structured
   authoring/onboarding input, normalize only through Hito validation into canonical `training-
-  plan-v2`, and report bounded `ai_authored`/`repaired_ai_draft`/`deterministic_fallback` metadata
+plan-v2`, and report bounded `ai_authored`/`repaired_ai_draft`/`deterministic_fallback` metadata
   through `npm run author-ai-first-plan-draft` without changing onboarding or saving anything..
   Evidence: `docs/history/changelog.md` section `2026-05-26`. Boundary: migrated from historical
   public highlights; finer role/stage/proof metadata may be unavailable in the preserved source
@@ -1220,7 +1220,7 @@ wording when older final reports or QA artifact references were not present in t
   highlights; finer role/stage/proof metadata may be unavailable in the preserved source entry.
 - HISTORICAL / migrated public changelog mirror — Added a disposable saved-mode rich-workout QA
   fixture: `npm run test-user -- create ... --plan scripts/fixtures/rich-workout-saved-mode-
-  fixture.json` now seeds one local tester with a stored rich Steady/Hills/Trail plan plus one
+fixture.json` now seeds one local tester with a stored rich Steady/Hills/Trail plan plus one
   compact fallback row so browser QA can verify calendar/detail readback before OpenAI rich drafting
   begins. Evidence: `docs/history/changelog.md` section `2026-05-25`. Boundary: migrated from
   historical public highlights; finer role/stage/proof metadata may be unavailable in the preserved
@@ -1402,7 +1402,7 @@ wording when older final reports or QA artifact references were not present in t
 - HISTORICAL / migrated public changelog mirror — Promoted the public changelog editorial timeline
   look into Hito DS: date rails, title-adjacent text highlights with backdrop, timeline entries,
   glow dots, and inline code chips now have canonical classes documented in `/hitoDS#editorial-
-  patterns` while `/changelog` keeps the same source-backed Highlights and Technical log behavior..
+patterns` while `/changelog` keeps the same source-backed Highlights and Technical log behavior..
   Evidence: `docs/history/changelog.md` section `2026-05-24`. Boundary: migrated from historical
   public highlights; finer role/stage/proof metadata may be unavailable in the preserved source
   entry.
@@ -1701,7 +1701,7 @@ wording when older final reports or QA artifact references were not present in t
   source entry.
 - HISTORICAL / migrated public changelog mirror — Extracted advanced JSON/imported-plan replacement
   and saved-mode text replacement action ownership from `training-api.ts` into `src/lib/plan-
-  replacement-actions.ts`, preserving the same public action names, authenticated persisted-user
+replacement-actions.ts`, preserving the same public action names, authenticated persisted-user
   checks, start-date handling, first-day semantics, and canonical apply sequencing. Evidence:
   `docs/history/changelog.md` section `2026-05-19`. Boundary: migrated from historical public
   highlights; finer role/stage/proof metadata may be unavailable in the preserved source entry.
@@ -1768,7 +1768,7 @@ wording when older final reports or QA artifact references were not present in t
   Boundary: migrated from historical public highlights; finer role/stage/proof metadata may be
   unavailable in the preserved source entry.
 - HISTORICAL / migrated public changelog mirror — Refined Dictate-to-Plan into a compact Pro `AI
-  setup` assist above the manual structured constructor: runners paste/type transcript text, review
+setup` assist above the manual structured constructor: runners paste/type transcript text, review
   a clearer non-mutating setup verdict, and create only through explicit `Yes, create plan`, while
   Advanced JSON remains demoted. Evidence: `docs/history/changelog.md` section `2026-05-18`.
   Boundary: migrated from historical public highlights; finer role/stage/proof metadata may be
@@ -1846,7 +1846,7 @@ wording when older final reports or QA artifact references were not present in t
   and strength choices use compact row selectors, availability asks only for fixed rest days while
   sending a conservative hidden running-day count, target and terrain controls are conditional,
   mountain running implies mountain terrain, the optional field is labeled `Comment`, and `Create
-  plan` is pinned in a sticky disabled-until-valid footer. Evidence: `docs/history/changelog.md`
+plan` is pinned in a sticky disabled-until-valid footer. Evidence: `docs/history/changelog.md`
   section `2026-05-18`. Boundary: migrated from historical public highlights; finer role/stage/proof
   metadata may be unavailable in the preserved source entry.
 - HISTORICAL / migrated public changelog mirror — Tightened the structured first-plan onboarding
@@ -1920,7 +1920,7 @@ wording when older final reports or QA artifact references were not present in t
 - HISTORICAL / migrated public changelog mirror — Added the first Hito icon-system slice: product
   icon usage now flows through one Tabler-backed Hito `Icon` primitive with stable names and four
   canonical sizes, `/hitoDS` documents the approved icon gallery and examples, and the raw `icons-
-  line`, `icons-fill`, and `icons-multy` SVG folders were removed instead of becoming a second
+line`, `icons-fill`, and `icons-multy` SVG folders were removed instead of becoming a second
   source of truth. Evidence: `docs/history/changelog.md` section `2026-05-17`. Boundary: migrated
   from historical public highlights; finer role/stage/proof metadata may be unavailable in the
   preserved source entry.
@@ -1952,7 +1952,7 @@ wording when older final reports or QA artifact references were not present in t
 - HISTORICAL / migrated public changelog mirror — Promoted the async toast work into a Hito design-
   system primitive: `/hitoDS` now documents and exercises info, working, success, and error toast
   variants with Safari-stable visible state, while `Open plan` proposal generation and `Apply
-  update` consume the shared helper instead of direct Sonner calls. Evidence:
+update` consume the shared helper instead of direct Sonner calls. Evidence:
   `docs/history/changelog.md` section `2026-05-17`. Boundary: migrated from historical public
   highlights; finer role/stage/proof metadata may be unavailable in the preserved source entry.
 - HISTORICAL / migrated public changelog mirror — Fixed the live Sonner working-toast dismiss
@@ -2000,7 +2000,7 @@ wording when older final reports or QA artifact references were not present in t
   preserved source entry.
 - HISTORICAL / migrated public changelog mirror — Added the first runner-facing active-plan refresh
   confirm/apply slice: `Open plan` proposal review now offers explicit `Apply update` and `Keep
-  current plan`, calls the backend apply seam with stale/off-day revalidation, returns to the
+current plan`, calls the backend apply seam with stale/off-day revalidation, returns to the
   refreshed active-plan view after success, and keeps stale proposal recovery honest. Evidence:
   `docs/history/changelog.md` section `2026-05-16`. Boundary: migrated from historical public
   highlights; finer role/stage/proof metadata may be unavailable in the preserved source entry.
@@ -2088,14 +2088,14 @@ wording when older final reports or QA artifact references were not present in t
   metadata may be unavailable in the preserved source entry.
 - HISTORICAL / migrated public changelog mirror — Replaced the heavy inline workout body-note editor
   with the first modal flow in `Log result`: the page now shows a compact summary row plus `Add body
-  note` / `Edit body notes`, the workout-scoped modal saves the same bounded schema fields, and
+note` / `Edit body notes`, the workout-scoped modal saves the same bounded schema fields, and
   bounded body-map area selection ships inside the modal without reviving `/body`. Evidence:
   `docs/history/changelog.md` section `2026-05-15`. Boundary: migrated from historical public
   highlights; finer role/stage/proof metadata may be unavailable in the preserved source entry.
 - HISTORICAL / migrated public changelog mirror — Retired the legacy `/body` route cleanly: the app
   now redirects `/body` to `/` instead of falling through to a raw 404, permanent docs no longer
   describe `/body` as a quiet utility surface, and `/hitoDS` menu examples now reflect `User
-  settings` instead of `Body notes`. Evidence: `docs/history/changelog.md` section `2026-05-15`.
+settings` instead of `Body notes`. Evidence: `docs/history/changelog.md` section `2026-05-15`.
   Boundary: migrated from historical public highlights; finer role/stage/proof metadata may be
   unavailable in the preserved source entry.
 - HISTORICAL / migrated public changelog mirror — Fixed the remaining workout body-note reveal bug
@@ -2137,7 +2137,7 @@ wording when older final reports or QA artifact references were not present in t
   `docs/history/changelog.md` section `2026-05-15`. Boundary: migrated from historical public
   highlights; finer role/stage/proof metadata may be unavailable in the preserved source entry.
 - HISTORICAL / migrated public changelog mirror — Implemented the saved-mode `Clear upcoming
-  schedule` frontend slice: `Open plan` now exposes a confirmed secondary clear-schedule action,
+schedule` frontend slice: `Open plan` now exposes a confirmed secondary clear-schedule action,
   tall plan-management/import dialogs scroll internally, and later-starting JSON imports can
   explicitly clear the previous upcoming schedule before applying the new plan through the backend
   seam. Evidence: `docs/history/changelog.md` section `2026-05-15`. Boundary: migrated from
@@ -2168,7 +2168,7 @@ wording when older final reports or QA artifact references were not present in t
 - HISTORICAL / migrated public changelog mirror — Implemented the first saved-mode plan-management
   UI slice: `Open plan` now opens a compact active-plan modal with plan summary, primary text-first
   replacement, secondary JSON import using a runner-chosen start day, and backend-wired `Delete
-  plan` archival action; the existing saved-mode JSON import dialog also sends
+plan` archival action; the existing saved-mode JSON import dialog also sends
   `requestedStartDate`. Evidence: `docs/history/changelog.md` section `2026-05-14`. Boundary:
   migrated from historical public highlights; finer role/stage/proof metadata may be unavailable in
   the preserved source entry.
@@ -2383,7 +2383,7 @@ wording when older final reports or QA artifact references were not present in t
   saved-mode workout detail now accepts one Garmin `.fit` file or one `.zip` archive with exactly
   one FIT activity file, stores the original asset in Supabase storage, normalizes parsed actual
   metrics into canonical backend tables, and shows a compact parsed summary in the existing `Log
-  result` surface without yet claiming deterministic comparison, AI analysis, screenshot OCR, or
+result` surface without yet claiming deterministic comparison, AI analysis, screenshot OCR, or
   provider sync. Evidence: `docs/history/changelog.md` section `2026-05-11`. Boundary: migrated
   from historical public highlights; finer role/stage/proof metadata may be unavailable in the
   preserved source entry.
@@ -2642,7 +2642,7 @@ wording when older final reports or QA artifact references were not present in t
   migrated from historical public highlights; finer role/stage/proof metadata may be unavailable in
   the preserved source entry.
 - HISTORICAL / migrated public changelog mirror — Simplified the text-first onboarding and `Upload
-  JSON` surfaces by removing nested card chrome, flattening the advanced import layout, swapping the
+JSON` surfaces by removing nested card chrome, flattening the advanced import layout, swapping the
   no-plan header CTA to `Create a Plan`, and removing the visible backend label from the home shell
   status area. Evidence: `docs/history/changelog.md` section `2026-05-07`. Boundary: migrated from
   historical public highlights; finer role/stage/proof metadata may be unavailable in the preserved
@@ -2664,7 +2664,7 @@ wording when older final reports or QA artifact references were not present in t
   slice: the service now accepts one bounded structured input contract, generates canonical
   `training-plan-v2` plan data server-side, persists it through the same Supabase `plan_cycles` plus
   `planned_workouts` seam as JSON import, and exposes a narrow `npm run author-structured-plan --
-  --email <tester-email> --input-file <absolute-json-path>` ops path for validation before the
+--email <tester-email> --input-file <absolute-json-path>` ops path for validation before the
   frontend wizard exists. Evidence: `docs/history/changelog.md` section `2026-05-07`. Boundary:
   migrated from historical public highlights; finer role/stage/proof metadata may be unavailable in
   the preserved source entry.
@@ -2731,7 +2731,7 @@ wording when older final reports or QA artifact references were not present in t
 - HISTORICAL / migrated public changelog mirror — Added `npm run test-user -- ...` as the canonical
   tester-account lifecycle path, including create, reset, optional plan seeding, and delete against
   the real Supabase auth/data model, and documented the exact contract in `docs/process/test-user-
-  lifecycle.md`. Evidence: `docs/history/changelog.md` section `2026-05-06`. Boundary: migrated
+lifecycle.md`. Evidence: `docs/history/changelog.md` section `2026-05-06`. Boundary: migrated
   from historical public highlights; finer role/stage/proof metadata may be unavailable in the
   preserved source entry.
 - HISTORICAL / migrated public changelog mirror — Tightened the saved-mode shell and workout detail
@@ -2781,7 +2781,7 @@ wording when older final reports or QA artifact references were not present in t
   Boundary: migrated from historical public highlights; finer role/stage/proof metadata may be
   unavailable in the preserved source entry.
 - HISTORICAL / migrated public changelog mirror — Fixed a local auth regression where `npm run
-  start` did not load `.env.local`, causing the built server path to miss the temporary admin
+start` did not load `.env.local`, causing the built server path to miss the temporary admin
   credentials even though `vite dev` still worked. Evidence: `docs/history/changelog.md` section
   `2026-05-06`. Boundary: migrated from historical public highlights; finer role/stage/proof
   metadata may be unavailable in the preserved source entry.

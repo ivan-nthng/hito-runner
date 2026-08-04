@@ -18,7 +18,7 @@ high
 
 ## Owner
 
-backend
+architect
 
 ## Scope
 
@@ -34,64 +34,202 @@ retain_in_place
 
 ## Next Recommended Role
 
-backend
+architect
 
 ## Task
 
-Implement the bounded runner-activity foundation through the current manual Garmin FIT intake,
-using the accepted activity-retention and correction policy.
+Integrate the functionally accepted Gates 1-4 source bundle into source control using the exact
+manifest in this item. Gate 5 remains a separate later Backend slice that depends on persisted
+normalized sample-set revisions.
 
 ## Stage
 
-ARCHITECT plan and Product lifecycle decisions are complete. Backend implementation and Global QA
-Acceptance are not started. The current scope is manual Garmin FIT/ZIP intake only; provider sync
-and multi-source reconciliation remain future gates.
+Gates 1-4 implementation and functional Global QA Acceptance passed on the current dirty working
+revision. Source-control release integration is pending and no file has been staged. No Gate 5
+advanced metric is implemented. The current source scope remains manual Garmin FIT/ZIP intake only;
+provider sync and multi-source reconciliation are future gates.
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: BACKEND
+ROLE: ARCHITECT
 
 Task:
-Implement Gate 1 of the runner-activity foundation through the existing manual Garmin FIT/ZIP
-intake.
+Apply source-control release integration for the accepted Runner Activity Intelligence Gates 1-4
+bundle.
 
 Stage:
-BACKEND implementation with integrated QA.
+ARCHITECT release integration.
 
 Canonical plan:
 /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/2026-07-30-runner-activity-intelligence-foundation-architecture.md
 
-Accepted Product decisions:
-1. The only current input is a runner-uploaded Garmin FIT file or ZIP containing one FIT file. Do
-   not implement provider OAuth, Garmin Sync, other devices, or cross-source reconciliation.
-2. Normalized activity facts and provenance are retained indefinitely unless the runner explicitly
-   deletes the activity from history. They are eligible to contribute to the runner profile under
-   the accepted metric contracts.
-3. Raw FIT/ZIP evidence is private and retained indefinitely by default so future normalizers and
-   features can reprocess it. `Remove original file` deletes only that raw source asset; normalized
-   activity facts remain and the UI must state that reprocessing from the original will no longer be
-   possible.
-4. `Delete activity from history` removes the canonical activity, its normalized observations,
-   comparisons, and profile contribution. A separate self-reported completion remains a manual log,
-   not measured evidence. This manual-only scope needs no tombstone or multi-source deduplication
-   machinery.
-5. Existing workout-scoped FIT evidence may be backfilled automatically, idempotently, with source
-   provenance and normalizer/formula versions. Do not fabricate fields unavailable in the source.
-6. A future provider disconnect preserves imported history until the runner deletes it. If a future
-   sync and a prior manual FIT refer to one run, Hito must ask before replacing or merging sources;
-   it must never overwrite automatically. That interaction is out of this gate.
+Accepted evidence:
+/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/qa-artifacts/screenshots/2026-08-03/runner-activity-gates-1-4-global-qa-final/proof.json
 
 Required outcome:
-Establish one authenticated runner-owned activity/source/revision boundary from the current Garmin
-FIT/ZIP intake. Preserve current feedback/comparison behavior and do not introduce provider sync,
-cross-source deduplication, activity/profile UI, or new coaching formulas.
+Stage exactly the files under `Accepted Gates 1-4 release bundle` in the canonical plan and no other
+dirty or untracked path. Preserve every path under `Concurrent work to preserve`. Recheck worktree
+drift, migration order, validator reachability, generated route/database ownership, and scoped diff
+hygiene before staging. Do not reopen functional QA without new evidence and do not include ignored
+QA artifacts, stale local credential registry entries, Gate 5, provider sync, or the Backend
+Optimization Plan.
 
 Definition of Done:
-The activity foundation implements these accepted lifecycle rules without a competing activity
-truth, and integrated QA proves privacy, idempotency, readback, deletion semantics, and safe
-backfill on local data.
+The staged path set exactly equals the accepted manifest, excluded work remains unstaged and
+unchanged, all three migrations remain ordered, every validator/fixture entrypoint is present, and
+the staged diff contains no Gate 5, provider, optimization-plan, credential-registry, or unrelated
+Frontend work. Report any drift as a named owner ambiguity instead of guessing. Commit or push only
+when separately and explicitly authorized.
+
+Approval policy:
+Routine local inspection and validation proceed under standing authorization. Staging, commit, push,
+deployment, hosted mutation, and provider calls require explicit authorization and are not implied by
+this handoff.
+
+Dispatch status:
+not sent
 ```
+
+## Dispatch
+
+Release integration handoff is ready and not sent. No staging, commit, push, deployment, hosted
+mutation, or provider call has been performed. Gate 5 remains a separate backlog slice.
+
+## Source-Control Release Integration Manifest (2026-08-03)
+
+This is the exact file-level manifest for the functionally accepted Gates 1-4 working revision. It
+does not authorize staging. A release owner must stop on any path-set or mixed-hunk drift rather than
+expand the bundle by inference.
+
+### Accepted Gates 1-4 release bundle
+
+Stage these 50 paths together when staging is explicitly authorized:
+
+```text
+docs/current-product.md
+docs/current-state.md
+docs/current-system.md
+docs/history/technical-log.md
+docs/tasks/backlog/2026-07-30-runner-activity-intelligence-foundation-architecture.md
+docs/tasks/backlog/2026-08-02-runner-activity-gate-dependency-reconciliation.md
+docs/tasks/backlog/2026-08-02-runner-activity-history-and-explainable-progress-experience.md
+docs/tasks/backlog/2026-08-02-runner-activity-progress-review-fixture.md
+docs/tasks/frontend-specs/2026-08-02-runner-activity-history-and-explainable-progress-experience.md
+docs/tasks/running-coach/2026-07-30-hito-runner-profile-constitution.md
+docs/tasks/running-coach/2026-08-02-runner-activity-intelligence-formula-policy-amendment.md
+package.json
+scripts/lib/qa-test-user-lifecycle.mjs
+scripts/lib/runner-activity-gate-4-fixture.ts
+scripts/lib/runner-activity-progress-review-fixture.ts
+scripts/test-user.mjs
+scripts/validate-runner-activity-foundation.ts
+scripts/validate-runner-activity-gate-4.ts
+scripts/validate-runner-activity-read-models.ts
+scripts/validate-workout-evidence-comparison.ts
+src/components/progress/ActivityHistoryPanel.tsx
+src/components/progress/FactualProgressPanel.tsx
+src/components/progress/RunnerActivityProgressExperience.tsx
+src/components/progress/runner-activity-progress-types.ts
+src/components/progress/runner-activity-progress-view-model.ts
+src/lib/runner-activity/activity-evidence.ts
+src/lib/runner-activity/backfill-workout-result-activities.ts
+src/lib/runner-activity/fact-snapshots.ts
+src/lib/runner-activity/garmin-fit-source.ts
+src/lib/runner-activity/history-read-model.ts
+src/lib/runner-activity/metric-formulas.ts
+src/lib/runner-activity/metric-snapshots.ts
+src/lib/runner-activity/read-model-types.ts
+src/lib/runner-activity/read-model.ts
+src/lib/supabase/database.ts
+src/lib/workout-result-import/ingest-garmin-result.ts
+src/lib/workout-result-import/parse-garmin-fit.ts
+src/lib/workout-result-import/read-workout-result-feedback.ts
+src/lib/workout-result-import/types.ts
+src/routeTree.gen.ts
+src/routes/api.runner-activities.$activityId.source.tsx
+src/routes/api.runner-activities.$activityId.tsx
+src/routes/api.runner-activities.tsx
+src/routes/api.runner-activity-progress.tsx
+src/routes/api.workout-result.remove.tsx
+src/routes/api.workout-result.upload.tsx
+src/routes/progress.tsx
+supabase/migrations/20260802190244_runner_activity_foundation_gate_1.sql
+supabase/migrations/20260802223149_runner_activity_history_and_fact_snapshots.sql
+supabase/migrations/20260803134149_runner_activity_gate_4_metrics.sql
+```
+
+The bundle has four canonical owners without overlapping truth:
+
+| Surface | Canonical owner | Included responsibility |
+| --- | --- | --- |
+| Activity/source/revision, factual and Gate 4 metric persistence | Backend runner-activity domain | Migrations, ingestion projection, immutable evidence/observations/snapshots, read models and APIs |
+| Runner-facing History and Progress | Frontend Product | Backend-shaped rendering, source/deletion lifecycle, records/load, truthful Gate 5 unavailable |
+| Deterministic proof and disposable local fixture lifecycle | Backend/QA tooling | Validators, fixture seed/status/reset, owned-row/storage cleanup |
+| Operational status and release boundary | Architect | This manifest, canonical backlog/current-state reconciliation and technical-log receipt |
+
+No accepted file contains a demonstrated unrelated hunk. Generated `src/routeTree.gen.ts` contains
+only the new runner-activity routes, and generated `src/lib/supabase/database.ts` contains only the
+runner-activity schema/RPC additions required by these migrations.
+
+### Concurrent work to preserve
+
+Do not stage, edit, delete, reset, or otherwise absorb these four paths into this bundle:
+
+| Path | Classification | Named owner |
+| --- | --- | --- |
+| `AGENTS.md` | Unrelated project execution-policy work | Product/project policy owner |
+| `docs/tasks/backlog/2026-08-02-hide-attached-activity-file-dates.md` | Separate accepted Frontend copy cleanup | Frontend Product |
+| `src/components/CompletionPanel.tsx` | Implementation for the separate attached-file-date task; no Gates 1-4 hunk | Frontend Product |
+| `docs/tasks/backlog/2026-08-03-runner-activity-backend-simplification-and-metric-scalability.md` | Future Backend Optimization Plan explicitly excluded from this release | Architect/Backend future work |
+
+There is no unresolved changed-file ambiguity after independent Backend and Frontend inspection. If
+the working tree changes after this manifest, the release owner must reclassify the new or modified
+path with its canonical owner before staging.
+
+### Evidence-only and local audit findings
+
+The accepted functional receipt is
+`qa-artifacts/screenshots/2026-08-03/runner-activity-gates-1-4-global-qa-final/proof.json`.
+`qa-artifacts/` is gitignored protected evidence and is not part of the staging manifest. The two
+sibling `global-qa` and `global-qa-rerun` receipts are failed pre-fix evidence, not the final verdict.
+
+The current loopback QA credential registry has one stale entry and three tester-ID drift entries,
+with zero cleanup candidates, zero owned product rows, and no active leases. The canonical owner is
+the Backend test-user lifecycle. Its drift-checked cleanup apply can remove the single stale entry
+when the manifest has zero candidates, and role-scoped `pool-ensure` can reconcile the three reusable
+tester IDs without touching runner-owned product rows. Those local QA-identity mutations remain a
+separate Backend-owned cleanup action, not Architect release work. All four registry findings remain
+non-blocking audit findings here; no credential or product data belongs in this release bundle and
+no cleanup is authorized by this manifest.
+
+### Migration and validator reachability
+
+| Order | Migration | Dependency proof |
+| --- | --- | --- |
+| 1 | `20260802190244_runner_activity_foundation_gate_1.sql` | Creates canonical activity, source, source-revision, activity-revision and planned-match truth |
+| 2 | `20260802223149_runner_activity_history_and_fact_snapshots.sql` | Adds factual snapshots and History/delete RPCs over Gate 1 tables |
+| 3 | `20260803134149_runner_activity_gate_4_metrics.sql` | Adds immutable evidence, observations and metric snapshots over Gate 1 revisions and replaces the Gate 2 delete RPC |
+
+The deterministic validators remain direct top-level entrypoints:
+
+- `node --import tsx ./scripts/validate-runner-activity-foundation.ts`;
+- `node --import tsx ./scripts/validate-runner-activity-read-models.ts`;
+- `node --import tsx ./scripts/validate-runner-activity-gate-4.ts`;
+- `node --import tsx ./scripts/validate-workout-evidence-comparison.ts`.
+
+The reusable browser fixture remains package-reachable through
+`local:activity-review:seed`, `local:activity-review:status`, and
+`local:activity-review:reset`. The final Global QA receipt records all required validators, build,
+build-integrity, targeted lint, diff hygiene and fixture cleanup as passed on this dirty revision.
+
+### Remaining release prerequisites
+
+1. Recheck that the dirty path set is exactly the 50 accepted paths plus the four preserved paths.
+2. Obtain explicit authorization for staging; this audit does not grant it.
+3. Stage only the 50 accepted paths and verify the index path set exactly matches this manifest.
+4. Treat commit, push, deployment, hosted migration and provider calls as separate explicit gates.
+5. Keep Gate 5 `normalized_stream_not_persisted` and provider sync future-only.
 
 ## Architecture Status
 
@@ -99,14 +237,22 @@ This plan is linked to the accepted
 [Hito Runner Profile Constitution](../running-coach/2026-07-30-hito-runner-profile-constitution.md).
 The constitution owns metric meaning, eligibility, confidence, and formula amendments. This plan
 owns the provider-neutral system boundaries needed to implement that meaning.
+The supporting
+[Runner Activity Intelligence Formula Policy Amendment](../running-coach/2026-08-02-runner-activity-intelligence-formula-policy-amendment.md)
+resolves the Gate 4/5 metric formulas, evidence thresholds, cohorts, unavailable states, and
+invalidation rules. The readiness amendment in this canonical backlog item owns the normalized
+sample-set, activity/RPE/official-result, observation/snapshot, and re-baseline consequence
+boundaries needed for implementation. The formula-policy document supplies doctrine; it does not
+own operational status or dispatch.
 
-This is future architecture, not current product behavior:
+Current implementation boundary:
 
-- implementation: **not started**;
-- migrations and backfill: **not started**;
-- provider connections: **not started**;
-- runner-facing activity/profile UI: **not started**;
-- Global QA Acceptance: **not started**.
+- Gates 1-4: **implemented locally; functional Global QA Acceptance passed on the current dirty
+  working revision**;
+- source-control release integration for Gates 1-4: **pending**;
+- Gate 5 normalized streams/aerobic metrics: **not implemented**;
+- provider connections and cross-source reconciliation: **not implemented**;
+- Gate 7 for the selected Gates 1-4 functional bundle: **passed**.
 
 The existing
 [Provider Activity Ingestion And Comparison Contract](../product-briefs/2026-06-09-provider-activity-ingestion-and-comparison-contract.md)
@@ -139,17 +285,19 @@ Strava, and other provider connections are future work and must not add scope to
    Hito asks the runner before replacing or merging source evidence; no automatic overwrite or
    cross-source reconciliation is part of the current manual-upload scope.
 
-## Root Cause And Architecture Decision
+## Pre-Implementation Root Cause And Architecture Decision
 
 ### Visible need
 
-Hito can attach one Garmin FIT/ZIP result to a saved workout and show actual metrics, deterministic
-comparison, and bounded feedback. It cannot yet build a trustworthy longitudinal runner profile or
-count one run once when multiple providers report it.
+At plan acceptance, Hito could attach one Garmin FIT/ZIP result to a saved workout and show actual
+metrics, deterministic comparison, and bounded feedback. It could not build a trustworthy
+longitudinal runner profile or count one run once when multiple providers report it. Gates 1-4 have
+since implemented the manual-FIT activity/profile slice; cross-provider reconciliation remains
+future Gate 6 work.
 
 ### Demonstrated underlying cause
 
-Current result truth is workout-scoped:
+At plan acceptance, result truth was workout-scoped:
 
 - `workout_result_assets.planned_workout_id` is required;
 - `workout_actual_metrics.planned_workout_id` is required;
@@ -176,9 +324,12 @@ All metrics and snapshots consume only that canonical activity truth. A planned 
 optional relation, not activity identity. Provider adapters translate source facts; they do not own
 metrics, deduplication policy, profile meaning, or runner-visible conclusions.
 
-## Current State Versus Target State
+## Pre-Implementation State Versus Accepted Target
 
-| Concern | Current state | Target state |
+The target is implemented for the bounded Gates 1-4 manual-FIT scope except where a row explicitly
+describes Gate 5 streams or future multi-provider behavior.
+
+| Concern | State at plan acceptance | Accepted target |
 | --- | --- | --- |
 | FIT upload | Local FIT/ZIP attached to one planned workout | FIT is one source adapter into canonical activity truth |
 | Activity identity | Result asset and actual metrics are identified through a planned workout | Stable runner-owned canonical activity independent of plan assignment |
@@ -362,13 +513,13 @@ version; historical published snapshots remain attributable.
 | Sessions, frequency, time, distance | Canonical completed running activity; local date/timezone; timer duration and/or distance | One canonical activity once; exclude deleted/invalid/wrong-sport truth | Available without HR; name missing distance/elevation rather than infer |
 | Planned completion | Eligible planned workout plus corrected plan match and completion state | Distinguish completed/partial/skipped/cancelled/plan-changed; exclude Rest and workouts removed before due date | Unavailable for unmatched activities; never reinterpret activity quality |
 | Elevation and longest run | Canonical distance/duration; elevation evidence for elevation totals | No elevation total without evidence; longest distance and duration shown separately | Field-specific source confidence |
-| Personal best | Timestamped cumulative distance and elapsed timestamps, or user-confirmed official result | No moving-time shortcut, recording gaps, teleports, or implausible jumps; separate race/training/provider/manual | Summary-only provider best remains attributed; otherwise unavailable; implementation waits for versioned gap/interpolation policy |
-| Aerobic efficiency | Eligible steady segment; distance; HR with sample durations | Apply constitution gates for intent, continuity, pauses, terrain, sensor, and structure | V1 remains stream-only until Running Coach resolves how a summary fallback can prove the required coverage/pause gates |
+| Personal best | Timestamped cumulative distance and elapsed timestamps, or user-confirmed official result | No moving-time shortcut, recording gaps, teleports, or implausible jumps; separate race/training/provider/manual | Summary-only provider best remains attributed; otherwise use the formula-policy unavailable reason; Gate 4 excludes within-activity segment calculation |
+| Aerobic efficiency | Eligible steady segment; distance; HR with sample durations | Apply formula-policy gates for intent, continuity, pauses, terrain, sensor, and structure | Gate 5 is stream-only; there is no summary/lap/mean-HR fallback |
 | Pace at comparable HR | Eligible samples, fixed reference HR series, at least 10 cumulative minutes inside +/-3 BPM | No extrapolation; terrain class and reference bucket fixed within series | Requires qualifying baseline/current windows and per-metric evidence level |
 | HR at comparable pace | Repeated eligible aerobic running and fixed observed personal pace bucket | Pace comes from observations, not finish-time goal; context classes remain comparable | Unavailable until repeated matching pace evidence exists |
 | Durability / decoupling | Eligible continuous main segment at least 40 minutes with HR and speed/distance | Exclude intervals, progression, races, deliberate fast finish, run/walk; separate terrain classes | Context-sensitive; one session cannot establish a trend |
 | Controlled aerobic duration | Continuous eligible samples in the fixed reference-HR series | Stop at material pace collapse, gap, or quality failure | Unavailable until a stable reference series exists |
-| Session load | Whole-session duration and runner RPE 0-10 | Same-runner descriptive arbitrary units only | Unavailable without RPE; duration basis and partial/stopped handling require a formula decision before implementation |
+| Session load | Canonical observed duration and activity-attributed runner RPE 1-10 | Same-runner descriptive arbitrary units only; partial uses observed duration; skipped has no load | Unavailable without immutable activity-linked RPE evidence; use the formula-policy amendment |
 | Body/context trends | Runner-approved time series with source and measurement method | Never fold into a fitness/readiness score | Separate contextual series; missing remains missing |
 | 28-day snapshots | Canonical activities, eligibility results, metric observations, cutoff/window, formula set | Reproducible source revisions; no carry-forward of stale aerobic value | Volume may be available while aerobic metrics are unavailable |
 
@@ -385,27 +536,25 @@ Each metric returns one of:
 Unavailable is product truth, not an error to repair. The Backend must not substitute provider
 VO2max, estimated pace, planned targets, age-based HR guidance, or an older snapshot.
 
-### Formula-policy decisions still required
+### Formula-policy decisions and remaining lifecycle boundaries
 
 Canonical activity persistence does not depend on these decisions, but the relevant metrics remain
 unavailable until their owner resolves them:
 
 - **Product / Running Coach:** define the qualifying period for streaks and the planned-completion
   denominator, including partial, stopped, cancelled, and plan-changed states.
-- **Product / Architect:** decide when a manual workout log is also a canonical activity rather than
-  only a planned-workout result.
-- **Running Coach:** define time-weighted baseline median HR, stable-sample treatment, deterministic
-  warm-up extraction, and classification of an unstructured run as steady aerobic.
-- **Running Coach:** resolve the summary-only aerobic fallback against the mandatory 90% stream
-  coverage and pause gates. Until then, v1 aerobic efficiency is stream-only.
-- **Running Coach / Product:** define reference-pace bucket width and evidence minimum for
-  HR-at-comparable-pace.
-- **Running Coach:** define deterministic confidence downgrades and personal variability thresholds
-  for `stable`, `mixed`, and `improving`.
-- **Running Coach / Product:** define explicit re-baseline semantics, baseline/current window
-  overlap, and the duration basis for session-RPE load.
-- **Running Coach / Backend:** define versioned PB interpolation, recording-gap, and GPS plausibility
-  thresholds.
+- **Explicit later Product decision:** decide when a manual workout log or standalone official result
+  is itself a canonical activity rather than evidence attached to an existing recorded activity.
+- **Resolved by Running Coach amendment:** baseline/reference arithmetic, stable-sample treatment,
+  deterministic unstructured-run analysis, stream-only aerobic truth, reference buckets, evidence
+  thresholds, confidence interpretation, non-overlapping windows, session-RPE duration, and PB
+  interpolation/gap/plausibility rules.
+- **Resolved by this Architecture amendment:** official-result confirmation/correction/withdrawal,
+  immutable activity-linked RPE attribution, normalized sample-set lifecycle, shared metric
+  observation/snapshot lifecycle, truthful freshness, and evidence-change reference-series repair.
+- **Explicit later Product decision:** define the runner-facing trigger, confirmation, and copy for
+  intentional re-baseline without changing the amendment's fixed-series arithmetic or rewriting
+  historical series. Automatic evidence-change repair is already defined here.
 
 ### Confidence
 
@@ -472,7 +621,8 @@ prior attributable version for audit and historical readback.
 
 ## Storage And Ownership Boundaries
 
-The implementation must choose schema details later, but storage responsibilities are fixed:
+Backend chose bounded Gates 1-4 schema details under these fixed storage responsibilities. Gate 5
+must preserve the same ownership when it later adds normalized sample-set revisions:
 
 | Storage class | Canonical owner | Lifecycle |
 | --- | --- | --- |
@@ -502,6 +652,222 @@ canonical activity boundary or define a bounded migration/removal condition befo
 | Future integration adapter | Provider auth/acquisition and translation into source observations only |
 | AI | Explain supplied accepted truth; never calculate or persist a competing profile |
 
+## Gates 4 And 5 Implementation Readiness Amendment (2026-08-03)
+
+### Authority and reuse rule
+
+This section is the canonical Architecture lifecycle amendment for Gates 4 and 5. The Running Coach
+formula-policy amendment remains authoritative for metric meaning; this backlog item remains the
+only operational task/status owner. Backend chooses schema, API, and module shapes during its own
+implementation preflight.
+
+Gates 4 and 5 extend the implemented pipeline instead of creating another one:
+
+`canonical activity revision -> accepted evidence revision -> immutable metric observation -> formula-versioned profile snapshot -> Backend read model`
+
+Gate 4 establishes the shared observation, snapshot, invalidation, recomputation, and readback seam.
+Gate 5 reuses that seam after adding persisted normalized sample-set revisions. Gate 5 must not add
+a parallel metric store or a second Progress read model.
+
+### Canonical lifecycle owners
+
+| Truth | Canonical owner | Required lifecycle | Must not become |
+| --- | --- | --- | --- |
+| Activity and source revisions | Existing Backend activity ingestion domain | Existing immutable revision/current-pointer, raw-retention, correction, and deletion rules | RPE, official-result, or metric storage |
+| Runner session-RPE report and attribution | Gate 4 Backend activity-evidence domain | Immutable report revision plus immutable attribution to one activity revision; supersession and ambiguity are explicit | A mutable `workout_logs.rpe` profile field |
+| Runner-confirmed official result | Gate 4 Backend activity-evidence domain | Immutable runner assertion against one activity revision; correction supersedes and withdrawal removes current contribution | Device-observed truth or a standalone activity |
+| Normalized sample set | Gate 5 Backend activity-normalization domain | Immutable source/activity-linked revision, quality/provenance, current/superseded state, reprocessing, retention, and deletion | Raw payload copy, route store, or read-time parser output |
+| Metric observation | Backend profile computation; introduced by Gate 4 and reused by Gate 5 | Immutable evidence/formula attribution plus current, invalidated, and superseded selection | Mutable runner-profile column |
+| Reference series | Gate 5 Backend profile computation | Fixed baseline references, predecessor/closure cause, and evidence-change replacement | Frontend or AI baseline state |
+| Profile snapshot and Progress composition | Existing Backend profile computation/read-model boundary | Immutable compatible observations, formula versions, historical readback, replacement lineage, and truthful freshness | A second activity or frontend metric model |
+| Runner-initiated re-baseline interaction | Product, then Frontend Product over a Backend contract | Explicit future purpose, confirmation, and copy decision | A hidden Gate 5 side effect |
+
+### Immutable session-RPE attribution
+
+1. A Gate 4 RPE report is runner-authored whole-session evidence: integer `1-10`, the accepted
+   completed/partial outcome, capture time, actor, and origin provenance. It stores no competing
+   activity distance or duration.
+2. The report revision and its attribution are immutable. The attribution pins one runner, one
+   canonical activity ID, and one exact activity revision. Editing RPE or outcome appends a new
+   report/attribution revision and supersedes the prior current attribution; it never overwrites the
+   historical value used by an older snapshot.
+3. Existing mutable workout-log RPE is intake provenance only. Gate 4 backfills it only when one
+   current workout log, one accepted planned-workout match, and one canonical activity revision form
+   an exact same-runner relation. An absent or ambiguous link stays unavailable; Backend must not
+   choose by date, title, distance, or nearest time.
+4. A new canonical activity revision invalidates the current load observation. Backend may create a
+   successor attribution only when the canonical activity identity and accepted match remain exact
+   and unambiguous; the successor records its predecessor and re-attribution cause. Otherwise use
+   `activity_rpe_link_missing` or `activity_rpe_link_ambiguous` after any pending recomputation state.
+5. Skipped has no RPE load, no zero observation, and no activity fabrication. Planned duration,
+   mutable manual completion duration, HR, pace, AI effort, and planned RPE never substitute for the
+   canonical observed duration plus runner report required by the formula policy.
+6. Deleting the canonical activity removes its current RPE contribution and triggers recomputation
+   from remaining activities. Removing only the raw file does not invalidate a valid RPE attribution.
+
+### Runner-confirmed official-result lifecycle
+
+Gate 4 v1 accepts an official result only as a runner assertion attached to an existing canonical
+activity revision. This keeps official-result provenance separate from measured activity truth and
+does not decide that a manual workout completion or a result with no activity is a canonical
+activity.
+
+- Confirmation pins runner, canonical activity revision, exact standard distance, elapsed result
+  time, event date, runner-confirmed provenance, capture time, and actor. Optional event/source
+  context may be retained, but runner confirmation alone is never relabelled independently verified.
+- Correction appends a new assertion revision and supersedes the prior current assertion. It does
+  not rewrite the canonical activity's observed distance, duration, or source provenance.
+- Withdrawal closes the current assertion without inventing a replacement value. Current record
+  observations and snapshots recompute from remaining eligible evidence; older attributable
+  snapshots remain historical while the activity exists.
+- A canonical activity revision change does not silently carry an official assertion forward. The
+  current result becomes unavailable until the runner confirms or corrects it against the new
+  revision. Activity deletion removes the assertion and dependent history under the accepted
+  explicit-delete boundary; raw-file removal alone does not.
+- Provider-attributed records remain labelled source facts. Whole-activity exact-distance records
+  remain Hito-observed activity facts. Neither becomes `runner_confirmed_official_result` without
+  the runner assertion lifecycle above.
+
+Supporting a standalone official result with no canonical activity is an explicit future Product
+decision. It does not block the bounded Gate 4 result-against-existing-activity capability and must
+not be improvised by Backend.
+
+### Persisted normalized sample-set revisions
+
+1. Gate 5 persists an immutable normalized sample-set revision linked to one source revision, one
+   canonical activity revision, and one normalizer version. It preserves ordered time/offset,
+   cumulative distance, observed HR where available, timer/pause/missing state, field provenance,
+   quality flags, and only the additional context allowed by the formula policy.
+2. Exact route coordinates remain outside the normalized v1 contract. Sample persistence is
+   purpose-limited to Gate 5 record/aerobic evidence, not a general stream warehouse.
+3. Reprocessing an available retained raw source creates a new sample-set revision. It becomes the
+   current eligible set only after complete validation; the old set remains attributable for
+   historical readback while the activity exists. Sample-only reprocessing may retain the existing
+   source and activity revisions. If normalized summary facts or source capabilities/normalizer
+   attribution change, the existing ingestion owner atomically appends a successor source revision
+   and its matching successor activity revision, then pins the new sample set to those successors;
+   the sample set never becomes a competing summary or an orphan revision.
+4. Sample correction never edits a current set in place. It produces a successor revision, invalidates
+   only dependent observations/reference series/snapshots, and records the correction or normalizer
+   cause. Reprocessing/backfill must be bounded, idempotent, resumable, and must not run full history
+   inside a request.
+5. `Remove original file` retains an already accepted sample set and its provenance, so dependent
+   metrics remain valid. If no normalized set existed before removal, the truthful state stays
+   `normalized_stream_not_persisted`; it is not `updating` and cannot be repaired without new raw
+   evidence.
+6. `Delete activity from history` removes its sample sets and current/historical metric contribution,
+   then recomputes affected records, windows, and reference series from remaining activities. The
+   explicit activity-delete privacy boundary is the exception to ordinary historical retention.
+7. Metric reads consume the persisted current sample-set revision. They never reparse a raw FIT file,
+   lap payload, summary HR, or record count at read time.
+
+### Metric observations, snapshots, and truthful freshness
+
+- Every observation pins the exact evidence revisions required by its formula: activity revision,
+  RPE/official-result revision for Gate 4 where applicable, source/sample-set revision for Gate 5,
+  eligibility/exclusions, formula version, cohort/reference series, confidence, calculation time,
+  and unavailable reason when no value is emitted.
+- Observations and snapshots are immutable. A current selector may advance only to a compatible,
+  fully calculated replacement. Historical readback addresses the pinned snapshot/formula/evidence
+  version; current readback never blends formula versions or silently returns an older value.
+- The existing factual snapshot family remains factual. Gate 4 extends the single profile-
+  computation owner with metric observations and compatible profile snapshots, but must not duplicate
+  Gate 2 facts or create another runner profile. Gate 5 reuses the same composition/readback owner.
+- Existing Gate 1-3 History and factual Progress literals remain backward-compatible. Advanced
+  metrics enter as a separate Backend-shaped metric family/state within the one Progress composition
+  owner; Frontend must not reinterpret factual `current` or mutation-only `updating` as metric truth.
+- Fresh authenticated readback, not only the response to a mutation, must expose each advanced
+  metric's current, updating, or unavailable state. Factual volume may remain current while one
+  advanced metric is updating or unavailable; activity/source `quality.updating` is not a proxy for
+  metric recomputation.
+
+| Readback state | Meaning | Required behavior |
+| --- | --- | --- |
+| `current` | All returned values/unavailable reasons match current accepted evidence and formula versions | Values may be rendered with their provenance, window, confidence, and exclusions |
+| `updating` | A known evidence/formula change invalidated current contribution and bounded recomputation is pending | Return no stale value as current; include a stable pending reason and retry/readback semantics |
+| `unavailable` | Required evidence is absent, ineligible, invalid, or insufficient and no recomputation is expected to fix it now | Return the first stable formula-policy reason, not an error or fallback value |
+| historical version | A caller explicitly requests an older snapshot/series that still exists | Return it as historical with pinned evidence/formula attribution, never as current |
+
+`updating` is temporary lifecycle truth, not a synonym for missing data. When recomputation completes,
+the state becomes `current` with a value or truthful unavailable reason. A failed bounded recomputation
+keeps current readback non-stale and reports an operational failure separately; it does not restore
+the invalidated value.
+
+### Evidence-change consequences for fixed reference series
+
+An activity correction, sample correction, or activity deletion that invalidates a baseline
+observation closes the affected reference series. Backend first exposes `updating`, then creates a
+successor series from the remaining eligible evidence in the same accepted baseline window and
+formula version. The successor pins its predecessor and replacement cause; the old reference is
+never silently reused. If the remaining evidence cannot establish a reference, current truth becomes
+unavailable with `reference_series_not_established` or the more precise formula-policy reason.
+
+This automatic evidence-repair lifecycle is not a runner-initiated re-baseline. Product still owns
+whether, when, and how a runner may intentionally start a new baseline, including confirmation and
+copy. Gate 5 must not expose or execute that user mutation until Product accepts it. Neither evidence
+repair nor a future intentional re-baseline may rewrite a confirmed plan, mutate coaching targets,
+or present the new series as continuous with the old one.
+
+### Two non-overlapping Backend tasks
+
+#### Gate 4 Backend owner - activity assertions and summary-derived profile computation
+
+The smallest owner is the Backend runner-activity evidence/profile-computation boundary. It reuses
+canonical activities/revisions, exact planned-workout matches, existing factual snapshot/readback
+patterns, and the formula policy. It owns:
+
+- immutable session-RPE report revisions and exact activity-revision attribution;
+- runner-confirmed official-result confirmation, correction, withdrawal, and provenance;
+- session-RPE load, whole-activity exact-distance records, and supported attributed record facts;
+- the shared immutable metric-observation, formula-versioned snapshot, invalidation, recomputation,
+  current/updating/unavailable, and historical-readback seam that Gate 5 will consume.
+
+Gate 4 does not persist normalized samples, calculate a best segment inside a longer activity,
+compute an aerobic metric, infer a manual activity, add provider sync, implement UI, or decide the
+runner-initiated re-baseline interaction. It remains open if RPE/result evidence cannot be pinned
+unambiguously, current readback can expose stale values, or the implementation needs one of those
+cross-owner decisions.
+
+Required owner proof includes the formula-policy Gate 4 fixtures plus immutable edit history,
+ambiguous-link refusal, official-result correction/withdrawal, activity-revision invalidation,
+formula-version historical readback, fresh-read pending state, independent factual/advanced-metric
+freshness, deletion/raw-removal discrimination, RLS, bounded recomputation, and regression of Gates
+1-3. Passing owner-level proof is `Implementation DoD: Passed`; functional Global QA for the
+selected Gates 1-4 bundle subsequently passed, while source-control integration remains pending.
+
+#### Gate 5 Backend owner - sample normalization and stream-derived profile computation
+
+The separate owner is the Backend runner-activity sample-normalization/reprocessing boundary working
+through the Gate 4 observation/snapshot/readback seam. It owns:
+
+- purpose-limited normalized sample-set revisions, raw-source reprocessing, correction, retention,
+  current selection, deletion, and provenance/quality;
+- calculated best efforts inside longer activities and the accepted stream-dependent aerobic
+  observations, fixed reference series, comparisons, and interpretation;
+- affected observation/reference/snapshot invalidation and recomputation without summary fallback.
+
+Gate 5 depends on Gate 4's shared computation/readback seam and on persisted eligible sample sets per
+activity. It does not change RPE/official-result lifecycle, duplicate Gate 2 facts, add a provider,
+implement Frontend, create route-coordinate analytics, or add runner-initiated re-baseline behavior.
+Activities without valid samples remain truthful unavailable; they do not block eligible activities.
+
+Required owner proof includes all formula-policy stream fixtures plus raw-available reprocessing,
+raw-removed retention, no-stream refusal, sample correction/supersession, baseline-evidence repair,
+activity deletion, old/new formula and sample-set readback, RLS/privacy, bounded resumable backfill,
+Gate 4 seam reuse, and Gates 1-4 regression. Gate 5 stays open if any metric reads raw evidence on
+demand, uses summary/lap fallback, mixes formula/sample revisions, or serves a stale reference series.
+
+### Explicit Product decisions that remain outside both Backend tasks
+
+- whether a manual workout completion or a standalone official result with no recorded canonical
+  activity creates a canonical activity;
+- the runner-facing trigger, confirmation, and copy for an intentional re-baseline;
+- any future provider connection/disconnection or cross-source merge interaction.
+
+These decisions are explicit non-goals, not hidden Backend defaults. Gate 4 is implemented under the
+bounded existing-activity/manual-FIT scope. Gate 5 remains a separate future slice after persisted
+normalized sample-set prerequisites exist.
+
 ## Phased Delivery Plan
 
 ### Gate 0 - Product lifecycle decisions
@@ -515,6 +881,8 @@ The accepted decisions are recorded in [Accepted Product Lifecycle Decisions](#a
 
 **Owner:** Backend
 **Dependency:** Gate 0
+**Status:** functional Global QA passed for the selected Gates 1-4 bundle; source-control integration
+pending
 
 Implement one authenticated runner-owned activity/source/revision boundary using the existing local
 FIT/ZIP path as the only input adapter. The accepted outcome must:
@@ -532,7 +900,10 @@ policy. Temporary dual-write requires an explicit removal gate.
 ### Gate 2 - Trustworthy 28-day running facts
 
 **Owner:** Backend with Running Coach review
-**Dependency:** Gate 1
+**Dependency:** accepted Gate 1 owner-level contract and implementation evidence. Gate 7 Global QA
+is not a prerequisite.
+**Status:** functional Global QA passed for the selected Gates 1-4 bundle; source-control integration
+pending
 
 Deliver the first useful profile computation from summary-level truth without claiming fitness:
 
@@ -549,6 +920,8 @@ HR-at-pace, durability, or an overall fitness score in this gate.
 
 **Owner:** Frontend Product
 **Dependency:** Gate 2
+**Status:** functional Global QA passed for the selected Gates 1-4 bundle; source-control integration
+pending
 
 Render backend-owned activity history and compact profile truth with provenance, confidence,
 excluded/unavailable states, and source/correction affordances. Do not compute metrics, infer
@@ -556,22 +929,29 @@ duplicates, or introduce provider-specific profile UI.
 
 ### Gate 4 - Records and runner-reported load
 
-**Owner:** Backend with Running Coach review
-**Dependency:** Gate 2 and the relevant formula-policy decisions
+**Owner:** Backend runner-activity evidence/profile computation, with Running Coach review
+**Dependency:** accepted Gates 1-3 plus the formula-policy and Architecture readiness amendments
+**Status:** functional Global QA passed for the selected Gates 1-4 bundle; source-control integration
+pending
 
-Add personal best efforts and session-RPE load only after elapsed-segment/gap/GPS rules,
-user-confirmed official-result provenance, duration basis, partial/stopped handling, and snapshot
-coverage are versioned. Planned completion and streaks remain separate until their Product meaning
-is accepted.
+Implement only the bounded activity-assertion and summary-derived task defined in
+[Two non-overlapping Backend tasks](#two-non-overlapping-backend-tasks). Calculated best efforts
+inside longer activities and all stream-dependent metrics remain unavailable. Planned completion and
+streaks remain separate until their Product meaning is accepted.
 
 ### Gate 5 - Stream-dependent aerobic metrics
 
-**Owner:** Backend with Running Coach review
-**Dependency:** stable Gate 1 sample evidence and Gate 2 snapshots
+**Owner:** Backend runner-activity sample normalization/reprocessing and profile computation, with
+Running Coach review
+**Dependency:** accepted Gate 4 shared observation/snapshot/readback seam plus persisted eligible
+normalized sample-set revisions
+**Status:** backlog; separate after Gate 4; not dispatchable as part of Gate 4
 
-Add comparable-aerobic eligibility, aerobic efficiency, pace-at-HR, HR-at-pace, durability, and
-controlled aerobic duration exactly under constitution formula versions. No metric ships until its
-minimum evidence, exclusion, context, and reproducibility fixtures pass.
+Implement the separate sample/stream-derived task defined in
+[Two non-overlapping Backend tasks](#two-non-overlapping-backend-tasks). Add calculated best efforts,
+comparable-aerobic eligibility, aerobic efficiency, pace-at-HR, HR-at-pace, durability, and controlled
+aerobic duration exactly under the formula-policy versions. No metric ships until its minimum
+evidence, exclusion, context, lifecycle, and reproducibility fixtures pass.
 
 ### Gate 6 - First connected provider
 
@@ -588,6 +968,8 @@ The old Strava-specific backlog item cannot execute independently of this gate.
 
 **Owner:** QA
 **Dependency:** all release-selected gates
+
+**Status for selected Gates 1-4 bundle:** passed on 2026-08-03; source-control integration pending
 
 Run the cross-source, privacy, persistence, formula parity, historical readback, responsive UI, and
 cleanup matrix for the selected release boundary. Owner-level Implementation DoD does not imply
@@ -632,18 +1014,22 @@ Global QA Acceptance.
 
 ## Validation Strategy
 
-### Gate 1 Backend inventory
+### Completed Gate 1 manual-FIT Backend inventory
 
 - exact FIT re-upload is idempotent;
-- same run with one and then two sources contributes once;
 - unplanned activity persists without creating a plan/workout;
 - optional planned-workout match supports current comparison;
-- source update/delete/supersession follows Gate 0 policy;
-- wrong merge can split and wrong assignment can unassign;
+- raw-file removal preserves canonical activity truth and activity deletion removes it;
+- removed raw evidence can be restored only through a new attributable source/activity revision;
 - RLS denies cross-runner reads/writes;
-- source correction invalidates only dependent metrics/snapshots;
 - existing Garmin feedback upload/remove/readback remains exact;
 - migration reset and backfill are reproducible.
+
+The following are future Gate 6/cross-source acceptance, not evidence for completed Gate 1:
+
+- the same real-world run arriving from two different sources contributes once;
+- provider source update/delete/supersession follows its accepted connection policy;
+- a wrong cross-source merge can split and a wrong source assignment can unassign.
 
 ### Metric fixtures
 
@@ -672,7 +1058,9 @@ Each implementation owner reports:
 
 Implementation DoD requires affected migrations, RLS/persistence, deterministic fixtures,
 readback/export where changed, lint/build-integrity, scoped diff hygiene, and independent QA review.
-Global QA remains `Not started` until Gate 7 is explicitly assigned.
+Functional Global QA for the selected Gates 1-4 bundle passed on the current dirty working revision.
+The source-control boundary remains pending until the exact manifest above is integrated; Gate 5 and
+provider work retain their own future acceptance gates.
 
 ## Explicit Non-Goals
 

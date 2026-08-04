@@ -33,6 +33,18 @@ export async function getLatestWorkoutResultFeedback(plannedWorkoutId: string) {
     throw new Error(assetResult.error.message);
   }
 
+  const sourceRevisionResult = assetResult.data?.activity_source_revision_id
+    ? await supabase
+        .from("runner_activity_source_revisions")
+        .select("raw_state")
+        .eq("id", assetResult.data.activity_source_revision_id)
+        .maybeSingle()
+    : { data: null, error: null };
+
+  if (sourceRevisionResult.error) {
+    throw new Error(sourceRevisionResult.error.message);
+  }
+
   const metricsResult = assetResult.data
     ? await supabase
         .from("workout_actual_metrics")
@@ -75,7 +87,12 @@ export async function getLatestWorkoutResultFeedback(plannedWorkoutId: string) {
     throw new Error(aiInsightResult.error.message);
   }
 
-  const latestAsset = assetResult.data ? resultAssetRowToSummary(assetResult.data) : null;
+  const latestAsset = assetResult.data
+    ? resultAssetRowToSummary(
+        assetResult.data,
+        rawStateFromDatabase(sourceRevisionResult.data?.raw_state),
+      )
+    : null;
   const latestActualMetrics = metricsResult.data
     ? actualMetricsRowToSummary(metricsResult.data)
     : null;
@@ -94,6 +111,10 @@ export async function getLatestWorkoutResultFeedback(plannedWorkoutId: string) {
   });
 }
 
+function rawStateFromDatabase(value: string | undefined) {
+  return value === "available" || value === "removal_pending" || value === "removed" ? value : null;
+}
+
 export async function getWorkoutFeedbackMarkerMap(plannedWorkoutIds: string[]) {
   const uniqueWorkoutIds = Array.from(new Set(plannedWorkoutIds.filter(Boolean)));
 
@@ -110,7 +131,11 @@ export async function getWorkoutFeedbackMarkerMap(plannedWorkoutIds: string[]) {
       .order("created_at", { ascending: false }),
   );
 
-  const latestAssetByWorkoutId = newestByPlannedWorkoutId(assetRows);
+  const latestAssetByWorkoutId = newestByPlannedWorkoutId(
+    assetRows.filter((row): row is typeof row & { planned_workout_id: string } =>
+      Boolean(row.planned_workout_id),
+    ),
+  );
   const latestAssetIds = Array.from(latestAssetByWorkoutId.values(), (row) => row.id);
   const metricRows = await collectRowsForIdBatches(latestAssetIds, (ids) =>
     supabase
@@ -159,6 +184,7 @@ export async function getWorkoutFeedbackMarkerMap(plannedWorkoutIds: string[]) {
 
 export function resultAssetRowToSummary(
   row: PersistedWorkoutResultAssetRow,
+  rawState: "available" | "removal_pending" | "removed" | null = null,
 ): WorkoutResultAssetSummary {
   if (
     (row.asset_kind !== "garmin_fit" && row.asset_kind !== "garmin_zip") ||
@@ -181,6 +207,8 @@ export function resultAssetRowToSummary(
       row.parse_status === "failed"
         ? "We could not read that Garmin activity. Remove it and choose another FIT file."
         : null,
+    rawFileAvailable: rawState ? rawState === "available" : Boolean(row.storage_path),
+    reprocessingAvailable: rawState ? rawState === "available" : Boolean(row.storage_path),
     createdAt: row.created_at,
   };
 }

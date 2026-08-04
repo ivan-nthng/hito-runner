@@ -29,11 +29,27 @@ export const Route = createFileRoute("/api/workout-result/remove")({
             userId,
             plannedWorkoutId,
           });
+          const { findRunnerActivityForPlannedWorkout } =
+            await import("@/lib/runner-activity/garmin-fit-source");
+          const activityId = await findRunnerActivityForPlannedWorkout({
+            userId,
+            plannedWorkoutId,
+          });
+          const activityReadback = activityId
+            ? await (
+                await import("@/lib/runner-activity/read-model")
+              ).readRunnerActivityMutationReadback({
+                userId,
+                activityId,
+                creationCause: "source_removal",
+              })
+            : null;
 
           return Response.json(
             {
               ok: true,
               feedback,
+              activityReadback,
             },
             { status: 200 },
           );

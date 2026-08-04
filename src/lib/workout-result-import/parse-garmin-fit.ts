@@ -11,7 +11,7 @@ export async function parseGarminFitActivity(fileBuffer: Buffer): Promise<Parsed
   const parser = new FitParser({
     force: true,
     speedUnit: "km/h",
-    lengthUnit: "km",
+    lengthUnit: "m",
     temperatureUnit: "celsius",
     elapsedRecordField: true,
     mode: "both",
@@ -54,6 +54,12 @@ export async function parseGarminFitActivity(fileBuffer: Buffer): Promise<Parsed
   const activityMetricsSummary = activityMetrics[0] ?? null;
   const providerLocalTimestamp =
     dateTimeOrNull(activity?.local_timestamp) ?? dateTimeOrNull(firstSession.local_timestamp);
+  const totalTimerDurationMin = secondsToRoundedMinutes(
+    numberOrNull(firstSession.total_timer_time),
+  );
+  const totalElapsedDurationMin = secondsToRoundedMinutes(
+    numberOrNull(firstSession.total_elapsed_time),
+  );
 
   return {
     sourceKind: "garmin_fit",
@@ -62,10 +68,10 @@ export async function parseGarminFitActivity(fileBuffer: Buffer): Promise<Parsed
       dateTimeOrNull(activity?.timestamp) ??
       dateTimeOrNull(firstSession.timestamp),
     activityLocalDate: toIsoDate(providerLocalTimestamp),
-    totalDistanceKm: roundNumber(numberOrNull(firstSession.total_distance), 2),
-    totalDurationMin: secondsToRoundedMinutes(
-      numberOrNull(firstSession.total_timer_time) ?? numberOrNull(firstSession.total_elapsed_time),
-    ),
+    totalDistanceKm: metersToKilometers(firstSession.total_distance),
+    totalTimerDurationMin,
+    totalElapsedDurationMin,
+    totalDurationMin: totalTimerDurationMin ?? totalElapsedDurationMin,
     avgHeartRate:
       integerOrNull(firstSession.avg_heart_rate) ??
       integerOrNull(activityMetricsSummary?.avg_heart_rate),
@@ -109,7 +115,7 @@ function normalizeLap(lap: Record<string, unknown>, index: number): ParsedActual
     durationMin: secondsToRoundedMinutes(
       numberOrNull(lap.total_timer_time) ?? numberOrNull(lap.total_elapsed_time),
     ),
-    distanceKm: roundNumber(numberOrNull(lap.total_distance), 2),
+    distanceKm: metersToKilometers(lap.total_distance),
     avgHeartRate: integerOrNull(lap.avg_heart_rate),
     maxHeartRate: integerOrNull(lap.max_heart_rate),
     avgPower: integerOrNull(lap.avg_power),
@@ -220,7 +226,11 @@ function buildSummaryPayload(args: {
       startTime: dateTimeOrNull(firstSession.start_time),
       localStartTime: providerLocalTimestamp,
       localDateSource: providerLocalTimestamp ? "provider_local_timestamp" : null,
-      totalDistanceKm: roundNumber(numberOrNull(firstSession.total_distance), 2),
+      totalDistanceKm: metersToKilometers(firstSession.total_distance),
+      totalTimerDurationMin: secondsToRoundedMinutes(numberOrNull(firstSession.total_timer_time)),
+      totalElapsedDurationMin: secondsToRoundedMinutes(
+        numberOrNull(firstSession.total_elapsed_time),
+      ),
       totalDurationMin: secondsToRoundedMinutes(
         numberOrNull(firstSession.total_timer_time) ??
           numberOrNull(firstSession.total_elapsed_time),
@@ -296,6 +306,11 @@ function roundNumber(value: number | null, digits: number) {
 
   const factor = 10 ** digits;
   return Math.round(value * factor) / factor;
+}
+
+function metersToKilometers(value: unknown) {
+  const meters = numberOrNull(value);
+  return meters == null ? null : roundNumber(meters / 1000, 4);
 }
 
 function sumRounded(values: Array<number | null>) {

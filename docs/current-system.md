@@ -58,7 +58,11 @@
 - `src/routes/workout.$date.tsx`
   renders workout detail for preview or persisted data, derives the main surface from backend-shaped lifecycle truth instead of one static tab family, preserves compatibility search handling such as `tab=complete`, safely falls back when an invalid tab requests an unavailable surface, logs results through the canonical backend mutation when saved mode is active, keeps rest-day detail sparse with one grouped right-side context panel, reads backend-owned workout family, exact identity, calendar icon, metric mode, goal context, segment guidance, target cue, and target hint instead of route-local generic coaching advice, and preserves the three-block page structure with richer surface treatment, result-state badges, and progress-driven week status
 - `src/routes/progress.tsx`
-  renders a compact progress summary using preview or persisted aggregates from the same data seam, with completion, volume, weekly planned-vs-actual mileage, and recent workout consistency kept intentionally small instead of presenting a full analytics dashboard; sparse zero-volume states show short honest copy instead of an empty chart frame
+  renders authenticated canonical `Activity history` and `Progress` tabs: History consumes
+  runner-owned activity/source/revision truth with cursor pagination and source/deletion lifecycle,
+  while Progress consumes immutable factual snapshots plus Gate 4 record and session-RPE readback;
+  Gate 5 stream-dependent metrics remain explicitly unavailable as
+  `normalized_stream_not_persisted`
 - `src/routes/body.tsx`
   exists only as a legacy route guard and redirects `/body` to `/`, so older links no longer fall through to a raw 404 after body-note ownership moved into workout logging
 - `src/routes/integrations.tsx`
@@ -535,7 +539,9 @@
 - temporary local-bypass sessions are trusted only as a local account-backed identity bridge into the same Supabase-backed saved mode and remain a removal target
 - the temporary local login path now resolves the runner into a Supabase auth user by email and reads the canonical plan, workouts, and logs from Supabase
 - signed-out preview mode remains untrusted and clearly labeled as preview
-- `/progress` and `/integrations` still preserve shell breadth without claiming provider, AI, OCR, weather, or readiness truth
+- `/progress` is trusted only for authenticated canonical activity, factual snapshot, and accepted
+  Gate 4 readback; `/integrations` remains a quiet status utility, and neither surface claims
+  provider sync, OCR, weather, readiness, or Gate 5 aerobic truth
 
 ## Persistence And Storage Rules
 

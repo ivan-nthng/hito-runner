@@ -40,6 +40,9 @@
     "validate-manual-workout-authoring": "node --import tsx ./scripts/validate-manual-workout-authoring.ts",
     "import-admin-backlog-work-items": "node --env-file=.env.local --import tsx ./scripts/import-repo-work-items-to-admin-backlog.ts",
     "test-user": "node --env-file=.env.local ./scripts/test-user.mjs",
+    "local:activity-review:seed": "node --env-file=.env.local ./scripts/test-user.mjs activity-review-seed",
+    "local:activity-review:status": "node --env-file=.env.local ./scripts/test-user.mjs activity-review-status",
+    "local:activity-review:reset": "node --env-file=.env.local ./scripts/test-user.mjs activity-review-reset",
     "validate-test-user-lifecycle": "node ./scripts/validate-qa-test-user-lifecycle.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."

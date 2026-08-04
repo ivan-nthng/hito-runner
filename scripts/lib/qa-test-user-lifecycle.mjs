@@ -46,6 +46,15 @@ export const QA_TEST_USER_OWNED_TABLES = Object.freeze([
   "workout_actual_metrics",
   "workout_comparisons",
   "workout_ai_insights",
+  "runner_activity_fact_snapshots",
+  "runner_activity_metric_snapshots",
+  "runner_activity_metric_observations",
+  "runner_activity_evidence_revisions",
+  "runner_activity_planned_workout_matches",
+  "runner_activity_revisions",
+  "runner_activity_source_revisions",
+  "runner_activity_sources",
+  "runner_activities",
   "runner_manual_workout_templates",
   "runner_entitlements",
   "runner_capability_usage",
@@ -319,29 +328,56 @@ export async function assertQaPoolAuthUser({ supabase, role, userId }) {
 }
 
 export async function resetQaPoolUserData({ supabase, userId, preserveProfile = false }) {
-  const assets = await supabase
-    .from("workout_result_assets")
-    .select("storage_bucket, storage_path")
-    .eq("user_id", userId);
+  const [assets, activitySourceRevisions] = await Promise.all([
+    supabase
+      .from("workout_result_assets")
+      .select("storage_bucket, storage_path")
+      .eq("user_id", userId),
+    supabase
+      .from("runner_activity_source_revisions")
+      .select("raw_storage_bucket, raw_storage_path")
+      .eq("user_id", userId),
+  ]);
 
   if (assets.error) {
     throw new Error(assets.error.message);
   }
+  if (activitySourceRevisions.error) {
+    throw new Error(activitySourceRevisions.error.message);
+  }
 
   const assetsByBucket = new Map();
   for (const asset of assets.data ?? []) {
+    if (!asset.storage_bucket || !asset.storage_path) {
+      continue;
+    }
     const paths = assetsByBucket.get(asset.storage_bucket) ?? [];
     paths.push(asset.storage_path);
     assetsByBucket.set(asset.storage_bucket, paths);
   }
+  for (const revision of activitySourceRevisions.data ?? []) {
+    if (!revision.raw_storage_bucket || !revision.raw_storage_path) {
+      continue;
+    }
+    const paths = assetsByBucket.get(revision.raw_storage_bucket) ?? [];
+    paths.push(revision.raw_storage_path);
+    assetsByBucket.set(revision.raw_storage_bucket, paths);
+  }
   for (const [bucket, paths] of assetsByBucket) {
-    const removed = await supabase.storage.from(bucket).remove(paths);
+    const removed = await supabase.storage.from(bucket).remove(Array.from(new Set(paths)));
     if (removed.error) {
       throw new Error(`Unable to remove QA storage assets: ${removed.error.message}`);
     }
   }
 
   for (const table of [
+    // Unplanned Garmin intake is not deleted by a plan-cycle cascade.
+    "workout_result_assets",
+    "runner_activity_metric_snapshots",
+    "runner_activity_metric_observations",
+    "runner_activity_evidence_revisions",
+    "runner_activity_fact_snapshots",
+    "runner_activities",
     "plan_cycles",
     "runner_manual_workout_templates",
     "runner_capability_usage",

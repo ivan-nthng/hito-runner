@@ -1,7 +1,7 @@
 # Hito Technical Log
 
 Status: active internal ledger
-Last Updated: 2026-07-26
+Last Updated: 2026-08-03
 Owner: PRODUCT
 
 ## Purpose And Source Boundary
@@ -29,6 +29,20 @@ Entry format:
 
 Every accepted implementation, QA acceptance gate, source-cleanup batch, or durable process repair
 must either add an entry here or explicitly state why it is not technical-log material.
+
+## 2026-08-03
+
+- BACKEND + FRONTEND Product + QA + ARCHITECT / Runner Activity Intelligence Gates 1-4 — accepted
+  canonical activity/source/revision truth, paginated Activity History, immutable factual Progress,
+  context-specific whole-activity records, session-RPE load, retryable raw-source removal, activity
+  deletion freshness, and runner-facing desktop/exact-375px lifecycle. Deterministic validators,
+  local persistence/RLS, build/integrity, browser flows, privacy, and fixture cleanup passed.
+  Evidence:
+  `qa-artifacts/screenshots/2026-08-03/runner-activity-gates-1-4-global-qa-final/proof.json` and
+  `docs/tasks/backlog/2026-07-30-runner-activity-intelligence-foundation-architecture.md`.
+  Boundary: source-control integration remains pending; Gate 5 normalized streams/aerobic metrics,
+  provider sync, deployment, hosted mutation, and the Backend Optimization Plan were not accepted or
+  started.
 
 ## 2026-07-26
 

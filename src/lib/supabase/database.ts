@@ -415,8 +415,465 @@ export type Database = {
         };
         Relationships: [];
       };
+      runner_activities: {
+        Row: {
+          created_at: string;
+          current_revision_id: string | null;
+          distance_km: number | null;
+          elapsed_duration_min: number | null;
+          historical_timezone: string | null;
+          id: string;
+          local_date: string | null;
+          quality_state: string;
+          recording_kind: string;
+          sport: string;
+          started_at: string | null;
+          timer_duration_min: number | null;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          current_revision_id?: string | null;
+          distance_km?: number | null;
+          elapsed_duration_min?: number | null;
+          historical_timezone?: string | null;
+          id?: string;
+          local_date?: string | null;
+          quality_state?: string;
+          recording_kind: string;
+          sport: string;
+          started_at?: string | null;
+          timer_duration_min?: number | null;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          current_revision_id?: string | null;
+          distance_km?: number | null;
+          elapsed_duration_min?: number | null;
+          historical_timezone?: string | null;
+          local_date?: string | null;
+          quality_state?: string;
+          recording_kind?: string;
+          sport?: string;
+          started_at?: string | null;
+          timer_duration_min?: number | null;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      runner_activity_sources: {
+        Row: {
+          activity_id: string;
+          created_at: string;
+          current_revision_id: string | null;
+          id: string;
+          source_fingerprint_sha256: string;
+          source_kind: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          activity_id: string;
+          created_at?: string;
+          current_revision_id?: string | null;
+          id?: string;
+          source_fingerprint_sha256: string;
+          source_kind: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          activity_id?: string;
+          current_revision_id?: string | null;
+          source_fingerprint_sha256?: string;
+          source_kind?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      runner_activity_source_revisions: {
+        Row: {
+          capabilities: Json;
+          created_at: string;
+          id: string;
+          normalizer_version: string;
+          observed_at: string | null;
+          raw_asset_kind: string;
+          raw_file_size_bytes: number;
+          raw_mime_type: string;
+          raw_original_file_name: string;
+          raw_state: string;
+          raw_storage_bucket: string | null;
+          raw_storage_path: string | null;
+          revision_number: number;
+          source_id: string;
+          user_id: string;
+        };
+        Insert: {
+          capabilities: Json;
+          created_at?: string;
+          id?: string;
+          normalizer_version: string;
+          observed_at?: string | null;
+          raw_asset_kind: string;
+          raw_file_size_bytes: number;
+          raw_mime_type: string;
+          raw_original_file_name: string;
+          raw_state: string;
+          raw_storage_bucket?: string | null;
+          raw_storage_path?: string | null;
+          revision_number: number;
+          source_id: string;
+          user_id: string;
+        };
+        Update: {
+          capabilities?: Json;
+          normalizer_version?: string;
+          observed_at?: string | null;
+          raw_asset_kind?: string;
+          raw_file_size_bytes?: number;
+          raw_mime_type?: string;
+          raw_original_file_name?: string;
+          raw_state?: string;
+          raw_storage_bucket?: string | null;
+          raw_storage_path?: string | null;
+          revision_number?: number;
+          source_id?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      runner_activity_revisions: {
+        Row: {
+          activity_id: string;
+          activity_local_date: string | null;
+          activity_started_at: string | null;
+          created_at: string;
+          field_provenance: Json;
+          id: string;
+          normalized_summary: Json;
+          normalizer_version: string;
+          revision_number: number;
+          source_revision_id: string;
+          total_distance_km: number | null;
+          total_elapsed_duration_min: number | null;
+          total_timer_duration_min: number | null;
+          user_id: string;
+        };
+        Insert: {
+          activity_id: string;
+          activity_local_date?: string | null;
+          activity_started_at?: string | null;
+          created_at?: string;
+          field_provenance: Json;
+          id?: string;
+          normalized_summary: Json;
+          normalizer_version: string;
+          revision_number: number;
+          source_revision_id: string;
+          total_distance_km?: number | null;
+          total_elapsed_duration_min?: number | null;
+          total_timer_duration_min?: number | null;
+          user_id: string;
+        };
+        Update: {
+          activity_id?: string;
+          activity_local_date?: string | null;
+          activity_started_at?: string | null;
+          field_provenance?: Json;
+          normalized_summary?: Json;
+          normalizer_version?: string;
+          revision_number?: number;
+          source_revision_id?: string;
+          total_distance_km?: number | null;
+          total_elapsed_duration_min?: number | null;
+          total_timer_duration_min?: number | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      runner_activity_planned_workout_matches: {
+        Row: {
+          activity_id: string;
+          created_at: string;
+          id: string;
+          match_method: string;
+          planned_workout_id: string | null;
+          source_revision_id: string;
+          user_id: string;
+        };
+        Insert: {
+          activity_id: string;
+          created_at?: string;
+          id?: string;
+          match_method: string;
+          planned_workout_id?: string | null;
+          source_revision_id: string;
+          user_id: string;
+        };
+        Update: {
+          activity_id?: string;
+          match_method?: string;
+          planned_workout_id?: string | null;
+          source_revision_id?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      runner_activity_fact_snapshots: {
+        Row: {
+          calculation_status: string;
+          cutoff_date: string;
+          created_at: string;
+          creation_cause: string;
+          exclusions: Json;
+          facts: Json;
+          formula_version: string;
+          id: string;
+          input_activity_revisions: Json;
+          input_fingerprint_sha256: string;
+          missing_field_reasons: Json;
+          snapshot_family: string;
+          user_id: string;
+          window_end: string;
+          window_start: string;
+          window_timezone_basis: string;
+        };
+        Insert: {
+          calculation_status?: string;
+          cutoff_date: string;
+          created_at?: string;
+          creation_cause: string;
+          exclusions: Json;
+          facts: Json;
+          formula_version: string;
+          id?: string;
+          input_activity_revisions: Json;
+          input_fingerprint_sha256: string;
+          missing_field_reasons: Json;
+          snapshot_family: string;
+          user_id: string;
+          window_end: string;
+          window_start: string;
+          window_timezone_basis?: string;
+        };
+        Update: {
+          calculation_status?: string;
+          cutoff_date?: string;
+          created_at?: string;
+          creation_cause?: string;
+          exclusions?: Json;
+          facts?: Json;
+          formula_version?: string;
+          id?: string;
+          input_activity_revisions?: Json;
+          input_fingerprint_sha256?: string;
+          missing_field_reasons?: Json;
+          snapshot_family?: string;
+          user_id?: string;
+          window_end?: string;
+          window_start?: string;
+          window_timezone_basis?: string;
+        };
+        Relationships: [];
+      };
+      runner_activity_evidence_revisions: {
+        Row: {
+          activity_id: string;
+          activity_revision_id: string;
+          actor_user_id: string;
+          captured_at: string;
+          change_reason: string;
+          completion_outcome: string | null;
+          created_at: string;
+          evidence_kind: string;
+          id: string;
+          lifecycle_state: string;
+          official_context: string | null;
+          official_distance_m: number | null;
+          official_elapsed_seconds: number | null;
+          official_event_date: string | null;
+          origin: string;
+          predecessor_revision_id: string | null;
+          revision_number: number;
+          session_rpe: number | null;
+          user_id: string;
+          workout_log_id: string | null;
+        };
+        Insert: {
+          activity_id: string;
+          activity_revision_id: string;
+          actor_user_id: string;
+          captured_at: string;
+          change_reason: string;
+          completion_outcome?: string | null;
+          created_at?: string;
+          evidence_kind: string;
+          id?: string;
+          lifecycle_state: string;
+          official_context?: string | null;
+          official_distance_m?: number | null;
+          official_elapsed_seconds?: number | null;
+          official_event_date?: string | null;
+          origin: string;
+          predecessor_revision_id?: string | null;
+          revision_number: number;
+          session_rpe?: number | null;
+          user_id: string;
+          workout_log_id?: string | null;
+        };
+        Update: {
+          activity_id?: string;
+          activity_revision_id?: string;
+          actor_user_id?: string;
+          captured_at?: string;
+          change_reason?: string;
+          completion_outcome?: string | null;
+          created_at?: string;
+          evidence_kind?: string;
+          id?: string;
+          lifecycle_state?: string;
+          official_context?: string | null;
+          official_distance_m?: number | null;
+          official_elapsed_seconds?: number | null;
+          official_event_date?: string | null;
+          origin?: string;
+          predecessor_revision_id?: string | null;
+          revision_number?: number;
+          session_rpe?: number | null;
+          user_id?: string;
+          workout_log_id?: string | null;
+        };
+        Relationships: [];
+      };
+      runner_activity_metric_observations: {
+        Row: {
+          activity_id: string;
+          activity_revision_id: string;
+          analyzed_bounds: Json;
+          availability: string;
+          calculated_at: string;
+          comparability_cohort: string | null;
+          confidence: string;
+          eligibility: Json;
+          evidence_revision_id: string | null;
+          exclusions: Json;
+          id: string;
+          metric_formula_version: string;
+          metric_key: string;
+          metric_variant: string;
+          observation_count: number;
+          input_fingerprint_sha256: string;
+          source_revision_id: string;
+          unit: string;
+          unavailable_reason: string | null;
+          user_id: string;
+          value: number | null;
+        };
+        Insert: {
+          activity_id: string;
+          activity_revision_id: string;
+          analyzed_bounds: Json;
+          availability: string;
+          calculated_at?: string;
+          comparability_cohort?: string | null;
+          confidence: string;
+          eligibility: Json;
+          evidence_revision_id?: string | null;
+          exclusions: Json;
+          id?: string;
+          metric_formula_version: string;
+          metric_key: string;
+          metric_variant: string;
+          observation_count?: number;
+          input_fingerprint_sha256: string;
+          source_revision_id: string;
+          unit: string;
+          unavailable_reason?: string | null;
+          user_id: string;
+          value?: number | null;
+        };
+        Update: {
+          activity_id?: string;
+          activity_revision_id?: string;
+          analyzed_bounds?: Json;
+          availability?: string;
+          calculated_at?: string;
+          comparability_cohort?: string | null;
+          confidence?: string;
+          eligibility?: Json;
+          evidence_revision_id?: string | null;
+          exclusions?: Json;
+          id?: string;
+          input_fingerprint_sha256?: string;
+          metric_formula_version?: string;
+          metric_key?: string;
+          metric_variant?: string;
+          observation_count?: number;
+          source_revision_id?: string;
+          unavailable_reason?: string | null;
+          unit?: string;
+          user_id?: string;
+          value?: number | null;
+        };
+        Relationships: [];
+      };
+      runner_activity_metric_snapshots: {
+        Row: {
+          as_of_date: string;
+          calculation_status: string;
+          created_at: string;
+          creation_cause: string;
+          formula_set_version: string;
+          formula_versions: Json;
+          id: string;
+          input_activity_revisions: Json;
+          input_evidence_revisions: Json;
+          input_fingerprint_sha256: string;
+          metric_payload: Json;
+          observation_ids: Json;
+          user_id: string;
+        };
+        Insert: {
+          as_of_date: string;
+          calculation_status?: string;
+          created_at?: string;
+          creation_cause: string;
+          formula_set_version: string;
+          formula_versions: Json;
+          id?: string;
+          input_activity_revisions: Json;
+          input_evidence_revisions: Json;
+          input_fingerprint_sha256: string;
+          metric_payload: Json;
+          observation_ids: Json;
+          user_id: string;
+        };
+        Update: {
+          as_of_date?: string;
+          calculation_status?: string;
+          created_at?: string;
+          creation_cause?: string;
+          formula_set_version?: string;
+          formula_versions?: Json;
+          id?: string;
+          input_activity_revisions?: Json;
+          input_evidence_revisions?: Json;
+          input_fingerprint_sha256?: string;
+          metric_payload?: Json;
+          observation_ids?: Json;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       workout_actual_metrics: {
         Row: {
+          activity_id: string | null;
+          activity_revision_id: string | null;
           activity_local_date: string | null;
           activity_started_at: string | null;
           actual_avg_cadence: number | null;
@@ -434,7 +891,7 @@ export type Database = {
           created_at: string;
           id: string;
           lap_payload: Json | null;
-          planned_workout_id: string;
+          planned_workout_id: string | null;
           result_asset_id: string;
           source_kind: string;
           status: string;
@@ -444,6 +901,8 @@ export type Database = {
           workout_log_id: string | null;
         };
         Insert: {
+          activity_id?: string | null;
+          activity_revision_id?: string | null;
           activity_local_date?: string | null;
           activity_started_at?: string | null;
           actual_avg_cadence?: number | null;
@@ -471,6 +930,8 @@ export type Database = {
           workout_log_id?: string | null;
         };
         Update: {
+          activity_id?: string | null;
+          activity_revision_id?: string | null;
           activity_local_date?: string | null;
           activity_started_at?: string | null;
           actual_avg_cadence?: number | null;
@@ -601,6 +1062,7 @@ export type Database = {
         Row: {
           actual_metrics_id: string;
           comparison_confidence: number;
+          comparison_formula_version: string;
           comparison_status: string;
           completion_state: string;
           created_at: string;
@@ -612,6 +1074,7 @@ export type Database = {
         Insert: {
           actual_metrics_id: string;
           comparison_confidence: number;
+          comparison_formula_version?: string;
           comparison_status: string;
           completion_state: string;
           created_at?: string;
@@ -623,6 +1086,7 @@ export type Database = {
         Update: {
           actual_metrics_id?: string;
           comparison_confidence?: number;
+          comparison_formula_version?: string;
           comparison_status?: string;
           completion_state?: string;
           created_at?: string;
@@ -703,6 +1167,7 @@ export type Database = {
       };
       workout_result_assets: {
         Row: {
+          activity_source_revision_id: string | null;
           asset_kind: string;
           created_at: string;
           file_size_bytes: number;
@@ -714,13 +1179,14 @@ export type Database = {
           planned_workout_id: string;
           primary_file_kind: string | null;
           primary_file_name: string | null;
-          storage_bucket: string;
-          storage_path: string;
+          storage_bucket: string | null;
+          storage_path: string | null;
           updated_at: string;
           user_id: string;
           workout_log_id: string | null;
         };
         Insert: {
+          activity_source_revision_id?: string | null;
           asset_kind: string;
           created_at?: string;
           file_size_bytes: number;
@@ -729,16 +1195,17 @@ export type Database = {
           original_file_name: string;
           parse_error?: string | null;
           parse_status: string;
-          planned_workout_id: string;
+          planned_workout_id?: string | null;
           primary_file_kind?: string | null;
           primary_file_name?: string | null;
-          storage_bucket: string;
-          storage_path: string;
+          storage_bucket?: string | null;
+          storage_path?: string | null;
           updated_at?: string;
           user_id: string;
           workout_log_id?: string | null;
         };
         Update: {
+          activity_source_revision_id?: string | null;
           asset_kind?: string;
           created_at?: string;
           file_size_bytes?: number;
@@ -747,11 +1214,11 @@ export type Database = {
           original_file_name?: string;
           parse_error?: string | null;
           parse_status?: string;
-          planned_workout_id?: string;
+          planned_workout_id?: string | null;
           primary_file_kind?: string | null;
           primary_file_name?: string | null;
-          storage_bucket?: string;
-          storage_path?: string;
+          storage_bucket?: string | null;
+          storage_path?: string | null;
           updated_at?: string;
           user_id?: string;
           workout_log_id?: string | null;
@@ -864,6 +1331,81 @@ export type Database = {
           p_user_id: string;
         };
         Returns: Json;
+      };
+      persist_runner_activity_garmin_source: {
+        Args: {
+          p_activity_revision: Json;
+          p_source_fingerprint_sha256: string;
+          p_source_revision: Json;
+          p_user_id: string;
+        };
+        Returns: {
+          activity_id: string;
+          activity_revision_id: string;
+          raw_state: string;
+          raw_storage_bucket: string | null;
+          raw_storage_path: string | null;
+          reused_exact_source: boolean;
+          source_id: string;
+          source_revision_id: string;
+        }[];
+      };
+      list_runner_activity_history_page: {
+        Args: {
+          p_cursor_activity_id?: string | null;
+          p_cursor_sort_date?: string | null;
+          p_cursor_sort_started_at?: string | null;
+          p_page_size: number;
+          p_user_id: string;
+        };
+        Returns: {
+          activity_id: string;
+          created_at: string;
+          current_revision_id: string | null;
+          distance_km: number | null;
+          elapsed_duration_min: number | null;
+          historical_timezone: string | null;
+          local_date: string | null;
+          quality_state: string;
+          recording_kind: string;
+          sort_date: string;
+          sort_started_at: string;
+          sport: string;
+          started_at: string | null;
+          timer_duration_min: number | null;
+        }[];
+      };
+      append_runner_activity_evidence_revision: {
+        Args: {
+          p_activity_id: string;
+          p_captured_at?: string;
+          p_change_reason?: string;
+          p_completion_outcome?: string | null;
+          p_evidence_kind: string;
+          p_expected_activity_revision_id: string;
+          p_expected_predecessor_id?: string | null;
+          p_lifecycle_state: string;
+          p_official_context?: string | null;
+          p_official_distance_m?: number | null;
+          p_official_elapsed_seconds?: number | null;
+          p_official_event_date?: string | null;
+          p_origin?: string;
+          p_session_rpe?: number | null;
+          p_user_id: string;
+          p_workout_log_id?: string | null;
+        };
+        Returns: {
+          evidence_revision_id: string;
+          reused_exact_evidence: boolean;
+          revision_number: number;
+        }[];
+      };
+      delete_runner_activity_from_history: {
+        Args: {
+          p_activity_id: string;
+          p_user_id: string;
+        };
+        Returns: boolean;
       };
     };
     Enums: {

@@ -6,10 +6,18 @@ Active
 
 ## Last Updated
 
-2026-07-21
+2026-08-03
 
 ## Where We Are Now
 
+- Runner Activity Intelligence Gates 1-4 are functionally accepted on the current dirty working
+  revision: canonical activity/source/revision truth, paginated History, immutable factual Progress,
+  context-specific whole-activity records, session-RPE load, retryable raw-source removal, activity
+  deletion freshness, desktop/exact-375px browser lifecycle, RLS/privacy, build/integrity, and fixture
+  cleanup passed Global QA. Source-control release integration remains pending under the exact
+  manifest in the canonical foundation backlog item. Gate 5 normalized streams/aerobic metrics and
+  provider sync remain future work; `normalized_stream_not_persisted` is still the truthful Gate 5
+  state.
 - Production runner-baseline schema parity is owned by the versioned Supabase migration history and deployment parity validator: hosted migration history must match the repository, while the Vercel build reads that same history through a service-role-only RPC and refuses to publish application output until the migration set and baseline Data API contract both match.
 - Runner baseline and heart-rate truth remediation is accepted and closed: authenticated runners
   can save age, height, weight, fitness, and accepted estimated/personal BPM provenance without
@@ -128,8 +136,10 @@ unavailable`, or an auth loop.
   `/changelog` keeps its public editorial timeline design and behavior, but its date typography, title-adjacent text highlight/backdrop treatment, timeline entry cards, glow dots, and inline code chips now use canonical Hito DS classes documented in `/hitoDS#editorial-patterns`.
 - The shared interaction wrapper DS rollout slice is implemented:
   Radix/shadcn-derived dialog, sheet, dropdown menu, and select wrappers now default to Hito DS chrome while preserving existing exports, semantics, keyboard behavior, and product call sites; unused generic progress/card/sidebar wrapper residue was later retired once product surfaces moved to Hito DS CSS primitives.
-- The progress visualization chrome DS rollout slice is implemented:
-  `/progress` keeps the same loader data, aggregate calculations, weekly-volume geometry, and recent-consistency geometry, but its chart section dividers, compact notes, planned/actual fills, and result-status fills now use Hito DS classes documented in `/hitoDS#analytics`.
+- Historical: the earlier progress visualization chrome DS rollout preserved planned/log aggregate
+  charts. That route contract was later superseded by canonical Activity History, factual Progress,
+  and Gate 4 readback; the shared Hito DS primitives remain valid, but the old aggregate geometry is
+  no longer current `/progress` truth.
 - The internal workbench responsive shell is implemented:
   `/hitoDS` and `/admin/analytics` now share Hito DS workbench shell, sidebar, sticky topbar, current-location, quick-link rail, and summary-grid classes so desktop keeps the left navigation while tablet/mobile switch to contained top navigation without page-level table or rail overflow.
 - The Hito DS calendar/workout playground is implemented:
@@ -522,12 +532,9 @@ unavailable`, or an auth loop.
   month cells no longer carry inline metric/dashboard clutter,
   the duplicate calendar-level week-status treatment is removed,
   and feedback markers remain as small secondary cues behind completion truth.
-- The third app-wide simplification slice is now implemented:
-  `/progress` is reduced to a compact summary route with one aggregate summary group,
-  smaller weekly planned-vs-actual volume,
-  honest sparse weekly-volume empty copy,
-  recent consistency,
-  and no static placeholder trend chart or heavy explanatory support frame.
+- Historical: the third app-wide simplification slice reduced the former plan/log `/progress`
+  aggregate surface. The current route has since been replaced by canonical Activity History,
+  factual snapshots, and Gate 4 record/session-RPE readback; Gate 5 remains unavailable.
 - The fourth app-wide simplification slice is now implemented:
   `/body` is now retired from the product,
   older `/body` links redirect quietly to `/`,

@@ -138,6 +138,15 @@ function validateEvidenceBundleIdentity(
   assert.equal(linked.latestActualMetrics?.resultAssetId, asset.id);
   assert.equal(linked.latestComparison?.actualMetricsId, actualMetrics.id);
 
+  const rawRemoved = buildWorkoutResultEvidenceBundle({
+    latestAsset: { ...asset, rawFileAvailable: false, reprocessingAvailable: false },
+    latestActualMetrics: actualMetrics,
+    latestComparison: comparison,
+    latestAiInsight: null,
+  });
+  assert.equal(rawRemoved.marker?.state, "feedback_ready");
+  assert.equal(rawRemoved.latestActualMetrics?.id, actualMetrics.id);
+
   const mismatched = buildWorkoutResultEvidenceBundle({
     latestAsset: { ...asset, id: "10000000-0000-4000-8000-000000000099" },
     latestActualMetrics: actualMetrics,
@@ -243,6 +252,8 @@ function buildAssetSummary(): WorkoutResultAssetSummary {
     primaryFileKind: "fit",
     primaryFileName: "run.fit",
     parseError: null,
+    rawFileAvailable: true,
+    reprocessingAvailable: true,
     createdAt: "2026-07-17T12:00:00.000Z",
   };
 }

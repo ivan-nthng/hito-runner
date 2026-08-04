@@ -23,17 +23,21 @@ import { Route as WorkoutDateRouteImport } from './routes/workout.$date'
 import { Route as HitoDSPatternsRouteImport } from './routes/hitoDS_.patterns'
 import { Route as HitoDSFoundationsRouteImport } from './routes/hitoDS_.foundations'
 import { Route as HitoDSComponentsRouteImport } from './routes/hitoDS_.components'
+import { Route as ApiRunnerActivityProgressRouteImport } from './routes/api.runner-activity-progress'
+import { Route as ApiRunnerActivitiesRouteImport } from './routes/api.runner-activities'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminCaptureRouteImport } from './routes/admin.capture'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 import { Route as HitoDSExportFigmaRouteImport } from './routes/hitoDS_.export.figma'
 import { Route as ApiWorkoutResultUploadRouteImport } from './routes/api.workout-result.upload'
 import { Route as ApiWorkoutResultRemoveRouteImport } from './routes/api.workout-result.remove'
+import { Route as ApiRunnerActivitiesActivityIdRouteImport } from './routes/api.runner-activities.$activityId'
 import { Route as ApiProfileAvatarUploadRouteImport } from './routes/api.profile-avatar.upload'
 import { Route as ApiPlanExportRouteImport } from './routes/api.plan.export'
 import { Route as ApiAuthLogoutRouteImport } from './routes/api.auth.logout'
 import { Route as ApiAuthLocalLoginRouteImport } from './routes/api.auth.local-login'
 import { Route as ApiAuthConfirmRouteImport } from './routes/api.auth.confirm'
+import { Route as ApiRunnerActivitiesActivityIdSourceRouteImport } from './routes/api.runner-activities.$activityId.source'
 import { Route as ApiAdminAuthLogoutRouteImport } from './routes/api.admin.auth.logout'
 import { Route as ApiAdminAuthLoginRouteImport } from './routes/api.admin.auth.login'
 
@@ -107,6 +111,17 @@ const HitoDSComponentsRoute = HitoDSComponentsRouteImport.update({
   path: '/hitoDS/components',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiRunnerActivityProgressRoute =
+  ApiRunnerActivityProgressRouteImport.update({
+    id: '/api/runner-activity-progress',
+    path: '/api/runner-activity-progress',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiRunnerActivitiesRoute = ApiRunnerActivitiesRouteImport.update({
+  id: '/api/runner-activities',
+  path: '/api/runner-activities',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminLoginRoute = AdminLoginRouteImport.update({
   id: '/admin/login',
   path: '/admin/login',
@@ -137,6 +152,12 @@ const ApiWorkoutResultRemoveRoute = ApiWorkoutResultRemoveRouteImport.update({
   path: '/api/workout-result/remove',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiRunnerActivitiesActivityIdRoute =
+  ApiRunnerActivitiesActivityIdRouteImport.update({
+    id: '/$activityId',
+    path: '/$activityId',
+    getParentRoute: () => ApiRunnerActivitiesRoute,
+  } as any)
 const ApiProfileAvatarUploadRoute = ApiProfileAvatarUploadRouteImport.update({
   id: '/api/profile-avatar/upload',
   path: '/api/profile-avatar/upload',
@@ -162,6 +183,12 @@ const ApiAuthConfirmRoute = ApiAuthConfirmRouteImport.update({
   path: '/api/auth/confirm',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiRunnerActivitiesActivityIdSourceRoute =
+  ApiRunnerActivitiesActivityIdSourceRouteImport.update({
+    id: '/source',
+    path: '/source',
+    getParentRoute: () => ApiRunnerActivitiesActivityIdRoute,
+  } as any)
 const ApiAdminAuthLogoutRoute = ApiAdminAuthLogoutRouteImport.update({
   id: '/api/admin/auth/logout',
   path: '/api/admin/auth/logout',
@@ -187,6 +214,8 @@ export interface FileRoutesByFullPath {
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/capture': typeof AdminCaptureRoute
   '/admin/login': typeof AdminLoginRoute
+  '/api/runner-activities': typeof ApiRunnerActivitiesRouteWithChildren
+  '/api/runner-activity-progress': typeof ApiRunnerActivityProgressRoute
   '/hitoDS/components': typeof HitoDSComponentsRoute
   '/hitoDS/foundations': typeof HitoDSFoundationsRoute
   '/hitoDS/patterns': typeof HitoDSPatternsRoute
@@ -196,11 +225,13 @@ export interface FileRoutesByFullPath {
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/plan/export': typeof ApiPlanExportRoute
   '/api/profile-avatar/upload': typeof ApiProfileAvatarUploadRoute
+  '/api/runner-activities/$activityId': typeof ApiRunnerActivitiesActivityIdRouteWithChildren
   '/api/workout-result/remove': typeof ApiWorkoutResultRemoveRoute
   '/api/workout-result/upload': typeof ApiWorkoutResultUploadRoute
   '/hitoDS/export/figma': typeof HitoDSExportFigmaRoute
   '/api/admin/auth/login': typeof ApiAdminAuthLoginRoute
   '/api/admin/auth/logout': typeof ApiAdminAuthLogoutRoute
+  '/api/runner-activities/$activityId/source': typeof ApiRunnerActivitiesActivityIdSourceRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -216,6 +247,8 @@ export interface FileRoutesByTo {
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/capture': typeof AdminCaptureRoute
   '/admin/login': typeof AdminLoginRoute
+  '/api/runner-activities': typeof ApiRunnerActivitiesRouteWithChildren
+  '/api/runner-activity-progress': typeof ApiRunnerActivityProgressRoute
   '/hitoDS/components': typeof HitoDSComponentsRoute
   '/hitoDS/foundations': typeof HitoDSFoundationsRoute
   '/hitoDS/patterns': typeof HitoDSPatternsRoute
@@ -225,11 +258,13 @@ export interface FileRoutesByTo {
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/plan/export': typeof ApiPlanExportRoute
   '/api/profile-avatar/upload': typeof ApiProfileAvatarUploadRoute
+  '/api/runner-activities/$activityId': typeof ApiRunnerActivitiesActivityIdRouteWithChildren
   '/api/workout-result/remove': typeof ApiWorkoutResultRemoveRoute
   '/api/workout-result/upload': typeof ApiWorkoutResultUploadRoute
   '/hitoDS/export/figma': typeof HitoDSExportFigmaRoute
   '/api/admin/auth/login': typeof ApiAdminAuthLoginRoute
   '/api/admin/auth/logout': typeof ApiAdminAuthLogoutRoute
+  '/api/runner-activities/$activityId/source': typeof ApiRunnerActivitiesActivityIdSourceRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -246,6 +281,8 @@ export interface FileRoutesById {
   '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/capture': typeof AdminCaptureRoute
   '/admin/login': typeof AdminLoginRoute
+  '/api/runner-activities': typeof ApiRunnerActivitiesRouteWithChildren
+  '/api/runner-activity-progress': typeof ApiRunnerActivityProgressRoute
   '/hitoDS_/components': typeof HitoDSComponentsRoute
   '/hitoDS_/foundations': typeof HitoDSFoundationsRoute
   '/hitoDS_/patterns': typeof HitoDSPatternsRoute
@@ -255,11 +292,13 @@ export interface FileRoutesById {
   '/api/auth/logout': typeof ApiAuthLogoutRoute
   '/api/plan/export': typeof ApiPlanExportRoute
   '/api/profile-avatar/upload': typeof ApiProfileAvatarUploadRoute
+  '/api/runner-activities/$activityId': typeof ApiRunnerActivitiesActivityIdRouteWithChildren
   '/api/workout-result/remove': typeof ApiWorkoutResultRemoveRoute
   '/api/workout-result/upload': typeof ApiWorkoutResultUploadRoute
   '/hitoDS_/export/figma': typeof HitoDSExportFigmaRoute
   '/api/admin/auth/login': typeof ApiAdminAuthLoginRoute
   '/api/admin/auth/logout': typeof ApiAdminAuthLogoutRoute
+  '/api/runner-activities/$activityId/source': typeof ApiRunnerActivitiesActivityIdSourceRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -277,6 +316,8 @@ export interface FileRouteTypes {
     | '/admin/analytics'
     | '/admin/capture'
     | '/admin/login'
+    | '/api/runner-activities'
+    | '/api/runner-activity-progress'
     | '/hitoDS/components'
     | '/hitoDS/foundations'
     | '/hitoDS/patterns'
@@ -286,11 +327,13 @@ export interface FileRouteTypes {
     | '/api/auth/logout'
     | '/api/plan/export'
     | '/api/profile-avatar/upload'
+    | '/api/runner-activities/$activityId'
     | '/api/workout-result/remove'
     | '/api/workout-result/upload'
     | '/hitoDS/export/figma'
     | '/api/admin/auth/login'
     | '/api/admin/auth/logout'
+    | '/api/runner-activities/$activityId/source'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -306,6 +349,8 @@ export interface FileRouteTypes {
     | '/admin/analytics'
     | '/admin/capture'
     | '/admin/login'
+    | '/api/runner-activities'
+    | '/api/runner-activity-progress'
     | '/hitoDS/components'
     | '/hitoDS/foundations'
     | '/hitoDS/patterns'
@@ -315,11 +360,13 @@ export interface FileRouteTypes {
     | '/api/auth/logout'
     | '/api/plan/export'
     | '/api/profile-avatar/upload'
+    | '/api/runner-activities/$activityId'
     | '/api/workout-result/remove'
     | '/api/workout-result/upload'
     | '/hitoDS/export/figma'
     | '/api/admin/auth/login'
     | '/api/admin/auth/logout'
+    | '/api/runner-activities/$activityId/source'
   id:
     | '__root__'
     | '/'
@@ -335,6 +382,8 @@ export interface FileRouteTypes {
     | '/admin/analytics'
     | '/admin/capture'
     | '/admin/login'
+    | '/api/runner-activities'
+    | '/api/runner-activity-progress'
     | '/hitoDS_/components'
     | '/hitoDS_/foundations'
     | '/hitoDS_/patterns'
@@ -344,11 +393,13 @@ export interface FileRouteTypes {
     | '/api/auth/logout'
     | '/api/plan/export'
     | '/api/profile-avatar/upload'
+    | '/api/runner-activities/$activityId'
     | '/api/workout-result/remove'
     | '/api/workout-result/upload'
     | '/hitoDS_/export/figma'
     | '/api/admin/auth/login'
     | '/api/admin/auth/logout'
+    | '/api/runner-activities/$activityId/source'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -365,6 +416,8 @@ export interface RootRouteChildren {
   AdminAnalyticsRoute: typeof AdminAnalyticsRoute
   AdminCaptureRoute: typeof AdminCaptureRoute
   AdminLoginRoute: typeof AdminLoginRoute
+  ApiRunnerActivitiesRoute: typeof ApiRunnerActivitiesRouteWithChildren
+  ApiRunnerActivityProgressRoute: typeof ApiRunnerActivityProgressRoute
   HitoDSComponentsRoute: typeof HitoDSComponentsRoute
   HitoDSFoundationsRoute: typeof HitoDSFoundationsRoute
   HitoDSPatternsRoute: typeof HitoDSPatternsRoute
@@ -481,6 +534,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HitoDSComponentsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/runner-activity-progress': {
+      id: '/api/runner-activity-progress'
+      path: '/api/runner-activity-progress'
+      fullPath: '/api/runner-activity-progress'
+      preLoaderRoute: typeof ApiRunnerActivityProgressRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/runner-activities': {
+      id: '/api/runner-activities'
+      path: '/api/runner-activities'
+      fullPath: '/api/runner-activities'
+      preLoaderRoute: typeof ApiRunnerActivitiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/login': {
       id: '/admin/login'
       path: '/admin/login'
@@ -523,6 +590,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiWorkoutResultRemoveRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/runner-activities/$activityId': {
+      id: '/api/runner-activities/$activityId'
+      path: '/$activityId'
+      fullPath: '/api/runner-activities/$activityId'
+      preLoaderRoute: typeof ApiRunnerActivitiesActivityIdRouteImport
+      parentRoute: typeof ApiRunnerActivitiesRoute
+    }
     '/api/profile-avatar/upload': {
       id: '/api/profile-avatar/upload'
       path: '/api/profile-avatar/upload'
@@ -558,6 +632,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthConfirmRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/runner-activities/$activityId/source': {
+      id: '/api/runner-activities/$activityId/source'
+      path: '/source'
+      fullPath: '/api/runner-activities/$activityId/source'
+      preLoaderRoute: typeof ApiRunnerActivitiesActivityIdSourceRouteImport
+      parentRoute: typeof ApiRunnerActivitiesActivityIdRoute
+    }
     '/api/admin/auth/logout': {
       id: '/api/admin/auth/logout'
       path: '/api/admin/auth/logout'
@@ -575,6 +656,33 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ApiRunnerActivitiesActivityIdRouteChildren {
+  ApiRunnerActivitiesActivityIdSourceRoute: typeof ApiRunnerActivitiesActivityIdSourceRoute
+}
+
+const ApiRunnerActivitiesActivityIdRouteChildren: ApiRunnerActivitiesActivityIdRouteChildren =
+  {
+    ApiRunnerActivitiesActivityIdSourceRoute:
+      ApiRunnerActivitiesActivityIdSourceRoute,
+  }
+
+const ApiRunnerActivitiesActivityIdRouteWithChildren =
+  ApiRunnerActivitiesActivityIdRoute._addFileChildren(
+    ApiRunnerActivitiesActivityIdRouteChildren,
+  )
+
+interface ApiRunnerActivitiesRouteChildren {
+  ApiRunnerActivitiesActivityIdRoute: typeof ApiRunnerActivitiesActivityIdRouteWithChildren
+}
+
+const ApiRunnerActivitiesRouteChildren: ApiRunnerActivitiesRouteChildren = {
+  ApiRunnerActivitiesActivityIdRoute:
+    ApiRunnerActivitiesActivityIdRouteWithChildren,
+}
+
+const ApiRunnerActivitiesRouteWithChildren =
+  ApiRunnerActivitiesRoute._addFileChildren(ApiRunnerActivitiesRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BodyRoute: BodyRoute,
@@ -589,6 +697,8 @@ const rootRouteChildren: RootRouteChildren = {
   AdminAnalyticsRoute: AdminAnalyticsRoute,
   AdminCaptureRoute: AdminCaptureRoute,
   AdminLoginRoute: AdminLoginRoute,
+  ApiRunnerActivitiesRoute: ApiRunnerActivitiesRouteWithChildren,
+  ApiRunnerActivityProgressRoute: ApiRunnerActivityProgressRoute,
   HitoDSComponentsRoute: HitoDSComponentsRoute,
   HitoDSFoundationsRoute: HitoDSFoundationsRoute,
   HitoDSPatternsRoute: HitoDSPatternsRoute,

@@ -1,6 +1,15 @@
 import "@tanstack/react-start/server-only";
 import type { Database, Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
+import {
+  createRunnerActivityPlannedWorkoutMatch,
+  findRunnerActivityPlanMatch,
+  linkWorkoutResultAssetToRunnerActivity,
+  persistGarminFitActivitySource,
+  readRunnerActivityProjection,
+  removeRunnerActivityOriginalFilesForWorkout,
+} from "@/lib/runner-activity/garmin-fit-source";
+import { backfillWorkoutResultActivities } from "@/lib/runner-activity/backfill-workout-result-activities";
 import { buildDeterministicWorkoutComparison } from "@/lib/workout-result-import/compare-workout-result";
 import { buildWorkoutResultEvidenceBundle } from "@/lib/workout-result-import/evidence-bundle";
 import {
@@ -42,10 +51,11 @@ type OwnedPlannedWorkoutRow = Pick<
 
 export async function ingestGarminWorkoutResult(params: {
   userId: string;
-  plannedWorkoutId: string;
+  plannedWorkoutId?: string | null;
   file: File;
 }) {
-  const { userId, plannedWorkoutId, file } = params;
+  const { userId, file } = params;
+  const plannedWorkoutId = params.plannedWorkoutId?.trim() || null;
   const originalFileName = file.name.trim();
 
   if (!originalFileName) {
@@ -70,8 +80,11 @@ export async function ingestGarminWorkoutResult(params: {
   const assetKind = classifyWorkoutResultUpload(originalFileName);
   const fileBuffer = Buffer.from(await file.arrayBuffer());
   const supabase = createAdminSupabaseClient();
-  const plannedWorkout = await getOwnedPlannedWorkout(userId, plannedWorkoutId);
-  const existingLog = await getExistingWorkoutLog(plannedWorkoutId);
+  const plannedWorkout = plannedWorkoutId
+    ? await getOwnedPlannedWorkout(userId, plannedWorkoutId)
+    : null;
+  const existingLog = plannedWorkoutId ? await getExistingWorkoutLog(plannedWorkoutId) : null;
+  await backfillWorkoutResultActivities({ userId });
   const assetId = generateAssetId();
   const storagePath = buildStoragePath({
     userId,
@@ -115,6 +128,7 @@ export async function ingestGarminWorkoutResult(params: {
   }
 
   let insertedMetricsId: string | null = null;
+  let candidateAssetDiscarded = false;
 
   try {
     const primaryFile =
@@ -137,32 +151,122 @@ export async function ingestGarminWorkoutResult(params: {
       .eq("id", assetId);
 
     const parsedWorkout = await parseGarminFitActivityForServer(primaryFile.fileBuffer);
+    const activitySource = await persistGarminFitActivitySource({
+      userId,
+      assetKind,
+      storageBucket: WORKOUT_RESULT_STORAGE_BUCKET,
+      storagePath,
+      originalFileName,
+      mimeType: normalizeMimeType(file.type, assetKind),
+      fileSizeBytes: file.size,
+      fileBuffer,
+      parsedWorkout,
+    });
+    const existingPlanMatch = await findRunnerActivityPlanMatch({
+      userId,
+      activityId: activitySource.activityId,
+    });
+
+    if (activitySource.reusedExactSource && existingPlanMatch === plannedWorkoutId) {
+      candidateAssetDiscarded = true;
+      await discardCandidateUpload({ userId, assetId, storagePath });
+
+      return {
+        ok: true as const,
+        runnerActivity: runnerActivityReceipt(activitySource),
+        ...(plannedWorkout
+          ? {
+              plannedWorkout: plannedWorkoutReceipt(plannedWorkout),
+              ...(await getLatestWorkoutResultFeedback(plannedWorkout.id)),
+            }
+          : {}),
+      };
+    }
+
+    if (
+      activitySource.reusedExactSource &&
+      existingPlanMatch &&
+      existingPlanMatch !== plannedWorkoutId
+    ) {
+      candidateAssetDiscarded = true;
+      await discardCandidateUpload({ userId, assetId, storagePath });
+      throw new WorkoutResultImportError(
+        "activity_already_recorded",
+        "That Garmin activity is already attached to another workout.",
+        409,
+      );
+    }
+
+    if (activitySource.reusedExactSource) {
+      candidateAssetDiscarded = true;
+      await discardCandidateUpload({ userId, assetId, storagePath });
+    }
+
+    const activityProjection = await readRunnerActivityProjection({
+      userId,
+      activityId: activitySource.activityId,
+      activityRevisionId: activitySource.activityRevisionId,
+    });
+
+    if (!plannedWorkout) {
+      await linkWorkoutResultAssetToRunnerActivity({
+        userId,
+        assetId,
+        sourceRevisionId: activitySource.sourceRevisionId,
+      });
+      const assetUpdate = await supabase
+        .from("workout_result_assets")
+        .update({
+          parse_status: "parsed",
+          storage_bucket: activitySource.rawStorageBucket,
+          storage_path: activitySource.rawStoragePath,
+          primary_file_kind: primaryFile.primaryFileKind,
+          primary_file_name: primaryFile.primaryFileName,
+          parse_error: null,
+        })
+        .eq("id", assetId)
+        .select("*")
+        .single();
+      if (assetUpdate.error) {
+        throw new WorkoutResultImportError("persistence_failed", assetUpdate.error.message, 500);
+      }
+      return { ok: true as const, runnerActivity: runnerActivityReceipt(activitySource) };
+    }
+
+    await createRunnerActivityPlannedWorkoutMatch({
+      userId,
+      activityId: activitySource.activityId,
+      sourceRevisionId: activitySource.sourceRevisionId,
+      plannedWorkoutId: plannedWorkout.id,
+    });
 
     const metricsInsert = await supabase
       .from("workout_actual_metrics")
       .insert({
+        activity_id: activitySource.activityId,
+        activity_revision_id: activitySource.activityRevisionId,
         user_id: userId,
-        planned_workout_id: plannedWorkoutId,
+        planned_workout_id: plannedWorkout.id,
         workout_log_id: existingLog?.id ?? null,
         result_asset_id: assetId,
-        source_kind: parsedWorkout.sourceKind,
+        source_kind: "garmin_fit",
         status: "normalized",
-        activity_started_at: parsedWorkout.activityStartAt,
-        activity_local_date: parsedWorkout.activityLocalDate,
-        actual_duration_min: parsedWorkout.totalDurationMin,
-        actual_distance_km: parsedWorkout.totalDistanceKm,
-        actual_avg_hr: parsedWorkout.avgHeartRate,
-        actual_max_hr: parsedWorkout.maxHeartRate,
-        actual_avg_power: parsedWorkout.avgPower,
-        actual_max_power: parsedWorkout.maxPower,
-        actual_avg_cadence: parsedWorkout.avgCadence,
-        actual_calories: parsedWorkout.totalCalories,
-        actual_elevation_gain_m: parsedWorkout.totalAscentM,
-        actual_elevation_loss_m: parsedWorkout.totalDescentM,
-        actual_interval_count: parsedWorkout.actualIntervalCount,
-        actual_step_payload: parsedWorkout.actualStepPayload,
-        lap_payload: parsedWorkout.lapPayload,
-        summary_payload: parsedWorkout.summaryPayload,
+        activity_started_at: activityProjection.activityStartedAt,
+        activity_local_date: activityProjection.activityLocalDate,
+        actual_duration_min: activityProjection.totalDurationMin,
+        actual_distance_km: activityProjection.totalDistanceKm,
+        actual_avg_hr: activityProjection.avgHeartRate,
+        actual_max_hr: activityProjection.maxHeartRate,
+        actual_avg_power: activityProjection.avgPower,
+        actual_max_power: activityProjection.maxPower,
+        actual_avg_cadence: activityProjection.avgCadence,
+        actual_calories: activityProjection.totalCalories,
+        actual_elevation_gain_m: activityProjection.totalAscentM,
+        actual_elevation_loss_m: activityProjection.totalDescentM,
+        actual_interval_count: activityProjection.actualIntervalCount,
+        actual_step_payload: activityProjection.actualStepPayload,
+        lap_payload: activityProjection.lapPayload,
+        summary_payload: activityProjection.summaryPayload,
       })
       .select("*")
       .single();
@@ -181,8 +285,9 @@ export async function ingestGarminWorkoutResult(params: {
       .from("workout_comparisons")
       .insert({
         user_id: userId,
-        planned_workout_id: plannedWorkoutId,
+        planned_workout_id: plannedWorkout.id,
         actual_metrics_id: metricsInsert.data.id,
+        comparison_formula_version: "deterministic_workout_comparison_v1",
         comparison_status: comparison.comparisonStatus,
         completion_state: comparison.completionState,
         difference_payload: comparison.differencePayload as unknown as Json,
@@ -209,6 +314,8 @@ export async function ingestGarminWorkoutResult(params: {
       .from("workout_result_assets")
       .update({
         parse_status: "parsed",
+        storage_bucket: activitySource.rawStorageBucket,
+        storage_path: activitySource.rawStoragePath,
         primary_file_kind: primaryFile.primaryFileKind,
         primary_file_name: primaryFile.primaryFileName,
         parse_error: null,
@@ -221,10 +328,16 @@ export async function ingestGarminWorkoutResult(params: {
       throw new WorkoutResultImportError("persistence_failed", assetUpdate.error.message, 500);
     }
 
+    await linkWorkoutResultAssetToRunnerActivity({
+      userId,
+      assetId,
+      sourceRevisionId: activitySource.sourceRevisionId,
+    });
+
     const supersedeExisting = await supabase
       .from("workout_actual_metrics")
       .update({ status: "superseded" })
-      .eq("planned_workout_id", plannedWorkoutId)
+      .eq("planned_workout_id", plannedWorkout.id)
       .neq("id", metricsInsert.data.id)
       .neq("status", "superseded");
 
@@ -247,23 +360,22 @@ export async function ingestGarminWorkoutResult(params: {
 
     return {
       ok: true as const,
-      plannedWorkout: {
-        id: plannedWorkout.id,
-        workoutDate: plannedWorkout.workout_date,
-        workoutType: plannedWorkout.workout_type,
-      },
+      plannedWorkout: plannedWorkoutReceipt(plannedWorkout),
+      runnerActivity: runnerActivityReceipt(activitySource),
       ...feedback,
     };
   } catch (error) {
     const message = runnerSafeWorkoutResultMessage(error);
 
-    await supabase
-      .from("workout_result_assets")
-      .update({
-        parse_status: "failed",
-        parse_error: message,
-      })
-      .eq("id", assetId);
+    if (!candidateAssetDiscarded) {
+      await supabase
+        .from("workout_result_assets")
+        .update({
+          parse_status: "failed",
+          parse_error: message,
+        })
+        .eq("id", assetId);
+    }
 
     if (insertedMetricsId) {
       await supabase
@@ -277,6 +389,29 @@ export async function ingestGarminWorkoutResult(params: {
   }
 }
 
+async function discardCandidateUpload(input: {
+  userId: string;
+  assetId: string;
+  storagePath: string;
+}) {
+  const supabase = createAdminSupabaseClient();
+  const assetDelete = await supabase
+    .from("workout_result_assets")
+    .delete()
+    .eq("id", input.assetId)
+    .eq("user_id", input.userId);
+  if (assetDelete.error) {
+    throw new WorkoutResultImportError("persistence_failed", assetDelete.error.message, 500);
+  }
+
+  const storageRemoval = await supabase.storage
+    .from(WORKOUT_RESULT_STORAGE_BUCKET)
+    .remove([input.storagePath]);
+  if (storageRemoval.error) {
+    throw new WorkoutResultImportError("storage_failed", storageRemoval.error.message, 500);
+  }
+}
+
 export async function removeWorkoutResultEvidence(params: {
   userId: string;
   plannedWorkoutId: string;
@@ -285,6 +420,17 @@ export async function removeWorkoutResultEvidence(params: {
   await getOwnedPlannedWorkout(userId, plannedWorkoutId);
 
   const supabase = createAdminSupabaseClient();
+  const removedCanonicalSources = await removeRunnerActivityOriginalFilesForWorkout({
+    userId,
+    plannedWorkoutId,
+  });
+
+  // Gate 1 sources own valid raw evidence. Removing an original file never erases
+  // its normalized activity, feedback projection, or comparison.
+  if (removedCanonicalSources.removedSourceRevisionIds.length > 0) {
+    return getLatestWorkoutResultFeedback(plannedWorkoutId);
+  }
+
   const assetResult = await supabase
     .from("workout_result_assets")
     .select("id, storage_bucket, storage_path")
@@ -302,7 +448,10 @@ export async function removeWorkoutResultEvidence(params: {
   }
 
   const storagePaths = assets
-    .filter((asset) => asset.storage_bucket === WORKOUT_RESULT_STORAGE_BUCKET)
+    .filter(
+      (asset): asset is typeof asset & { storage_path: string } =>
+        asset.storage_bucket === WORKOUT_RESULT_STORAGE_BUCKET && Boolean(asset.storage_path),
+    )
     .map((asset) => asset.storage_path);
 
   if (storagePaths.length > 0) {
@@ -379,12 +528,37 @@ async function getExistingWorkoutLog(plannedWorkoutId: string) {
 
 function buildStoragePath(args: {
   userId: string;
-  plannedWorkoutId: string;
+  plannedWorkoutId: string | null;
   assetId: string;
   originalFileName: string;
 }) {
   const ext = fileExtension(args.originalFileName) || ".bin";
-  return `${args.userId}/${args.plannedWorkoutId}/${args.assetId}/original${ext}`;
+  return `${args.userId}/${args.plannedWorkoutId ?? "unmatched"}/${args.assetId}/original${ext}`;
+}
+
+function plannedWorkoutReceipt(plannedWorkout: OwnedPlannedWorkoutRow) {
+  return {
+    id: plannedWorkout.id,
+    workoutDate: plannedWorkout.workout_date,
+    workoutType: plannedWorkout.workout_type,
+  };
+}
+
+function runnerActivityReceipt(activity: {
+  activityId: string;
+  activityRevisionId: string;
+  sourceId: string;
+  sourceRevisionId: string;
+  rawState: "available" | "removal_pending" | "removed";
+}) {
+  return {
+    id: activity.activityId,
+    revisionId: activity.activityRevisionId,
+    sourceId: activity.sourceId,
+    sourceRevisionId: activity.sourceRevisionId,
+    rawFileAvailable: activity.rawState === "available",
+    reprocessingAvailable: activity.rawState === "available",
+  };
 }
 
 function classifyWorkoutResultUpload(fileName: string): WorkoutResultAssetKind {
@@ -408,7 +582,7 @@ function classifyWorkoutResultUpload(fileName: string): WorkoutResultAssetKind {
 async function extractPrimaryFitFromArchiveForServer(
   zipBuffer: Buffer,
 ): Promise<ExtractedGarminFitFile> {
-  if (!import.meta.env.SSR) {
+  if (typeof window !== "undefined") {
     throw new WorkoutResultImportError(
       "invalid_upload",
       "Garmin ZIP parsing is available only on the server.",
@@ -562,7 +736,7 @@ async function extractPrimaryFitFromArchiveForServer(
 }
 
 async function parseGarminFitActivityForServer(fileBuffer: Buffer) {
-  if (!import.meta.env.SSR) {
+  if (typeof window !== "undefined") {
     throw new WorkoutResultImportError(
       "fit_parse_failed",
       "Garmin FIT parsing is available only on the server.",

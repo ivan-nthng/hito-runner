@@ -1,7 +1,8 @@
 # Hito Runner Profile Constitution
 
 **Date:** 2026-07-30  
-**Version:** 1.0  
+**Version:** 1.1
+**Amended:** 2026-08-02
 **Owner:** Running Coach for athlete-profile and progress meaning; Architect for system boundaries;
 Backend for canonical computation  
 **Status:** Canonical normative contract for athlete-profile and progress semantics; future
@@ -27,6 +28,11 @@ The constitution governs the athlete-profile and progress meaning consumed by:
 Backend and Frontend must not introduce alternative progress formulas or redefine a profile metric
 locally. A material change to a formula, eligibility rule, progress-source use, or runner-facing
 meaning requires a versioned amendment to this constitution.
+
+The
+[Runner Activity Intelligence Formula Policy Amendment](2026-08-02-runner-activity-intelligence-formula-policy-amendment.md)
+is the canonical v1 formula contract for personal bests, session-RPE load, and stream-dependent
+aerobic metrics. It supersedes any less-specific or conflicting formula language below.
 
 This document does not define a database schema, API shape, UI layout, medical assessment, or
 training-plan algorithm.
@@ -180,9 +186,9 @@ class may be retained without exposing a home or exact route.
 
 ### 5.4 Runner-reported result
 
-Hito should request after a completed session:
+Hito should request after a completed or partial recorded session:
 
-- whole-session RPE on a stable `0-10` scale;
+- whole-session RPE on a stable integer `1-10` scale; `0` is not a completed-run RPE;
 - completion state: completed, partial, stopped, or skipped;
 - optional short feeling/note;
 - explicit correction when the imported activity is the wrong sport or incorrectly matched.
@@ -286,16 +292,10 @@ aerobic_efficiency_m_per_beat =
   segment_distance_m / estimated_heartbeats
 ```
 
-If only summary evidence exists:
-
-```text
-aerobic_efficiency_m_per_beat =
-  segment_distance_m / (mean_heart_rate_bpm * segment_duration_minutes)
-```
-
-The stream-integrated formula is preferred. The summary formula must be labelled lower confidence.
-A higher personal value means the runner covered more distance per observed heartbeat in that
-eligible context.
+V1 requires the stream-integrated formula and the quality gates in the formula-policy amendment.
+Summary-only evidence is unavailable because it cannot prove coverage, pauses, stable intent, or
+within-session behavior. A higher personal value means the runner covered more distance per
+observed heartbeat in that eligible context.
 
 Runner-facing wording:
 
@@ -409,7 +409,7 @@ HR, or both.
 When whole-session RPE exists, Hito may calculate session-RPE load:
 
 ```text
-session_load_au = session_duration_minutes * session_rpe_0_to_10
+session_load_au = actual_observed_duration_minutes * runner_reported_session_rpe_1_to_10
 ```
 
 This is an arbitrary-unit internal-load estimate. It is useful for comparing the same runner's
@@ -491,7 +491,7 @@ Every derived metric has its own confidence; the profile does not have one unive
 
 Reduce confidence for:
 
-- summary-only rather than record-stream calculation;
+- attributed/manual evidence rather than normalized source evidence, where the metric permits it;
 - mixed optical and chest-strap HR sources;
 - materially different terrain, temperature, or elevation;
 - substantial GPS smoothing or stream downsampling;

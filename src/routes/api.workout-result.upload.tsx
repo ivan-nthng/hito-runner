@@ -14,8 +14,8 @@ export const Route = createFileRoute("/api/workout-result/upload")({
           const formData = await request.formData();
           const plannedWorkoutId =
             typeof formData.get("plannedWorkoutId") === "string"
-              ? (formData.get("plannedWorkoutId") as string)
-              : "";
+              ? (formData.get("plannedWorkoutId") as string).trim() || null
+              : null;
           const fileEntry = formData.get("file");
 
           if (!(fileEntry instanceof File)) {
@@ -33,10 +33,20 @@ export const Route = createFileRoute("/api/workout-result/upload")({
             plannedWorkoutId,
             file: fileEntry,
           });
-
-          return Response.json(result, {
-            status: 200,
+          const { readRunnerActivityMutationReadback } =
+            await import("@/lib/runner-activity/read-model");
+          const activityReadback = await readRunnerActivityMutationReadback({
+            userId,
+            activityId: result.runnerActivity.id,
+            creationCause: "ingestion",
           });
+
+          return Response.json(
+            { ...result, activityReadback },
+            {
+              status: 200,
+            },
+          );
         } catch (error) {
           if (error instanceof WorkoutResultImportError) {
             return Response.json(

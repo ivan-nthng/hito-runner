@@ -28,7 +28,11 @@ The first Basic/Pro entitlement foundation is backend-owned but pre-billing:
 - workout detail `/workout/$date`
   shows workout structure, logging controls, and week-status context using preview or persisted truth through one shared contract, with calmer rest-day presentation, a tighter grouped right-side panel, richer workout surfaces, and visible result-state markers for completed, partial, and skipped truth
 - progress `/progress`
-  is now a smaller summary route, reading persisted completion and volume aggregates when saved mode is active while keeping weekly volume and recent consistency visible without implying a mature analytics dashboard
+  now opens canonical `Activity history` and factual `Progress` tabs for authenticated runners;
+  History covers recorded planned/unplanned activities and source/deletion lifecycle, while Progress
+  shows Backend-owned 28-day facts, context-specific whole-activity records, and session-RPE load
+  when evidence exists. Gate 5 aerobic metrics remain unavailable without normalized streams, and
+  the route does not present a readiness or universal fitness score
 - integrations `/integrations`
   stays a preserved status/reference utility, but no longer appears as a primary runner navigation destination; it remains reachable through quieter shell access and uses honest live/later wording: the live Garmin-enabled workout feedback path points to workout-detail `Feedback`, while screenshot import and broader plan adjustments remain clearly later
 - login `/login`
@@ -296,7 +300,8 @@ product rules rather than source-based editability exceptions.
   the calendar overflow now includes `Edit schedule`, where runners see active-plan scheduling preferences when available and can review fixed rest-day, running-day, and long-run day changes before applying; same-frequency changes apply only through the reviewed backend token, while frequency/fit changes must not silently regenerate the plan
 - the first Hito design-system toast primitive supports long-running reviewed plan actions:
   `/hitoDS` defines info, working, success, and error toast variants with Safari-stable top-center visibility, inside-toast dismiss anatomy, dismiss-only indeterminate progress for working state, and in-place working-to-success/error resolution
-- week status shown in home, workout detail, and progress is derived from workout logs and current plan state
+- week status shown in home and workout detail is derived from workout logs and current plan state;
+  canonical `/progress` now has its separate activity/snapshot contract
 - signed-in surfaces now expose one quiet `Export JSON` utility in the calendar overflow
   it downloads the active saved plan as canonical JSON or readable Markdown from the same backend-owned export truth
   PDF remains deferred

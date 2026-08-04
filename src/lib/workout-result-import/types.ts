@@ -53,6 +53,7 @@ export class WorkoutResultImportError extends Error {
     | "zip_missing_fit"
     | "zip_multiple_fit"
     | "fit_parse_failed"
+    | "activity_already_recorded"
     | "storage_failed"
     | "persistence_failed";
   status: number;
@@ -90,6 +91,8 @@ export function runnerSafeWorkoutResultMessage(error: unknown): string {
     zip_multiple_fit: "This ZIP contains more than one FIT file. Upload one Garmin activity only.",
     fit_parse_failed:
       "We could not read that Garmin activity. Choose the original FIT activity file and try again.",
+    activity_already_recorded:
+      "This Garmin activity is already attached to another workout. Choose the matching workout instead.",
     storage_failed: "We could not store that Garmin file. Try again shortly.",
     persistence_failed: "The Garmin result could not be saved. Your planned workout is unchanged.",
   };
@@ -142,6 +145,8 @@ export interface ParsedGarminWorkout {
   activityStartAt: string | null;
   activityLocalDate: string | null;
   totalDistanceKm: number | null;
+  totalTimerDurationMin: number | null;
+  totalElapsedDurationMin: number | null;
   totalDurationMin: number | null;
   avgHeartRate: number | null;
   maxHeartRate: number | null;
@@ -163,13 +168,15 @@ export interface ParsedGarminWorkout {
 
 export interface WorkoutResultAssetSummary {
   id: string;
-  plannedWorkoutId: string;
+  plannedWorkoutId: string | null;
   assetKind: WorkoutResultAssetKind;
   originalFileName: string;
   parseStatus: WorkoutResultParseStatus;
   primaryFileKind: "fit" | null;
   primaryFileName: string | null;
   parseError: string | null;
+  rawFileAvailable: boolean;
+  reprocessingAvailable: boolean;
   createdAt: string;
 }
 

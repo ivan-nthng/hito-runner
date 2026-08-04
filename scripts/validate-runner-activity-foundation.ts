@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { crc32 } from "node:zlib";
 import { createClient } from "@supabase/supabase-js";
+import { readLocalAuthAccountsFile } from "../src/lib/local-auth";
 import { backfillWorkoutResultActivities } from "../src/lib/runner-activity/backfill-workout-result-activities";
 import { deleteRunnerActivityFromHistory } from "../src/lib/runner-activity/garmin-fit-source";
 import {
   ingestGarminWorkoutResult,
   removeWorkoutResultEvidence,
+  type WorkoutResultProjectionFailurePointForQa,
 } from "../src/lib/workout-result-import/ingest-garmin-result";
 import { parseGarminFitActivity } from "../src/lib/workout-result-import/parse-garmin-fit";
 import { WORKOUT_RESULT_STORAGE_BUCKET } from "../src/lib/workout-result-import/types";
@@ -39,6 +42,9 @@ if (!publishableKey) {
 const supabase = createClient(supabaseUrl, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
+const runtimeUrl = process.argv
+  .find((arg) => arg.startsWith("--runtime-url="))
+  ?.slice("--runtime-url=".length);
 
 async function main() {
   const plannedUser = await ensurePoolUser("provider-engine");
@@ -47,11 +53,21 @@ async function main() {
   await resetQaPoolUserData({ supabase, userId: unplannedUser.id });
 
   try {
+    await proveProjectionRegressionDiscriminators({
+      plannedUserId: plannedUser.id,
+      unplannedUserId: unplannedUser.id,
+    });
+    await resetQaPoolUserData({ supabase, userId: plannedUser.id });
+    await resetQaPoolUserData({ supabase, userId: unplannedUser.id });
     await proveUnplannedLifecycle({
       userId: unplannedUser.id,
       otherUserRole: "provider-engine",
     });
     await provePlannedProjectionAndBackfill(plannedUser.id);
+    if (runtimeUrl) {
+      await resetQaPoolUserData({ supabase, userId: plannedUser.id });
+      await proveRuntimeUploadProjection({ userId: plannedUser.id, runtimeUrl });
+    }
   } finally {
     await resetQaPoolUserData({ supabase, userId: plannedUser.id });
     await resetQaPoolUserData({ supabase, userId: unplannedUser.id });
@@ -63,9 +79,557 @@ async function main() {
   ]);
   assert.equal(plannedCounts.runner_activities, 0);
   assert.equal(unplannedCounts.runner_activities, 0);
+  await assertWorkoutResultStorageEmpty(plannedUser.id);
+  await assertWorkoutResultStorageEmpty(unplannedUser.id);
   const globalBackfill = await backfillWorkoutResultActivities();
   assert.deepEqual(globalBackfill.linkedAssetIds, []);
   console.log("Runner activity foundation contract passed.");
+}
+
+async function assertWorkoutResultStorageEmpty(userId: string) {
+  const result = await supabase.storage
+    .from(WORKOUT_RESULT_STORAGE_BUCKET)
+    .list(userId, { limit: 100 });
+  if (result.error) throw new Error(result.error.message);
+  assert.deepEqual(result.data, []);
+}
+
+async function proveRuntimeUploadProjection(input: { userId: string; runtimeUrl: string }) {
+  const baseUrl = new URL(input.runtimeUrl);
+  assert.ok(["127.0.0.1", "localhost", "::1"].includes(baseUrl.hostname));
+  const accounts = await readLocalAuthAccountsFile(
+    process.env.LOCAL_AUTH_BYPASS_ACCOUNTS_FILE ?? ".tanstack/hito-running-local-accounts.json",
+  );
+  const account = accounts.find((candidate) => candidate.username === "qa-provider-engine");
+  assert.ok(account, "The named provider-engine account must exist in the local auth registry.");
+
+  const loginBody = new FormData();
+  loginBody.set("identifier", account.username);
+  loginBody.set("password", account.password);
+  loginBody.set("next", "/");
+  const login = await fetch(new URL("/api/auth/local-login", baseUrl), {
+    method: "POST",
+    body: loginBody,
+    redirect: "manual",
+  });
+  assert.equal(login.status, 302);
+  const setCookie = login.headers.get("set-cookie");
+  assert.ok(setCookie);
+  const cookie = setCookie.split(";", 1)[0];
+  const [plannedWorkoutId] = await createProofWorkouts(input.userId);
+  const fixture = await readFitFixture();
+
+  const upload = async (name: string) => {
+    const body = new FormData();
+    body.set("plannedWorkoutId", plannedWorkoutId);
+    body.set("file", new File([fixture], name, { type: "application/octet-stream" }));
+    const response = await fetch(new URL("/api/workout-result/upload", baseUrl), {
+      method: "POST",
+      headers: { cookie },
+      body,
+    });
+    assert.equal(response.status, 200);
+    return response.json();
+  };
+
+  const first = await upload("runtime-projection.fit");
+  const retried = await upload("runtime-projection-retry.fit");
+  assert.equal(first.ok, true);
+  assert.equal(first.activityReadback.status, "current");
+  assert.equal(first.latestAsset.id, retried.latestAsset.id);
+  assert.equal(first.latestActualMetrics.id, retried.latestActualMetrics.id);
+  assert.equal(first.latestComparison.id, retried.latestComparison.id);
+  assert.ok(
+    first.activityReadback.history.items.some(
+      (activity: { id: string }) => activity.id === first.runnerActivity.id,
+    ),
+  );
+  const responseText = JSON.stringify(retried);
+  for (const privateField of [
+    "storage_bucket",
+    "storage_path",
+    "raw_storage_bucket",
+    "raw_storage_path",
+  ]) {
+    assert.equal(responseText.includes(privateField), false);
+  }
+}
+
+async function proveProjectionRegressionDiscriminators(input: {
+  plannedUserId: string;
+  unplannedUserId: string;
+}) {
+  const failures: Error[] = [];
+  const checks = [
+    {
+      label: "exact-source retry repairs an incomplete planned projection",
+      userId: input.plannedUserId,
+      run: () => proveIncompleteExactSourceRetry(input.plannedUserId),
+    },
+    {
+      label: "reused unplanned source retains a valid planned projection asset",
+      userId: input.unplannedUserId,
+      run: () => proveReusedUnplannedSourceProjection(input.unplannedUserId),
+    },
+    {
+      label: "a newer source supersedes only the older workout projection",
+      userId: input.plannedUserId,
+      run: () => proveProjectionSupersession(input.plannedUserId),
+    },
+    {
+      label: "ordinary intake does not traverse historical backfill",
+      userId: input.unplannedUserId,
+      run: () => proveOrdinaryIntakeDoesNotBackfill(input.unplannedUserId),
+    },
+    {
+      label: "projection write failures preserve canonical activity and converge on retry",
+      userId: input.plannedUserId,
+      run: () => proveProjectionFailureBoundaries(input.plannedUserId),
+    },
+  ];
+
+  for (const check of checks) {
+    try {
+      await check.run();
+    } catch (error) {
+      failures.push(
+        new Error(`${check.label}: ${error instanceof Error ? error.message : String(error)}`, {
+          cause: error,
+        }),
+      );
+    } finally {
+      await resetQaPoolUserData({ supabase, userId: check.userId });
+    }
+  }
+
+  if (failures.length > 0) {
+    throw new AggregateError(failures, "Runner activity projection regression proof failed.");
+  }
+}
+
+async function proveIncompleteExactSourceRetry(userId: string) {
+  const fixture = await readFitFixture();
+  const [plannedWorkoutId] = await createProofWorkouts(userId);
+  const first = await ingestGarminWorkoutResult({
+    userId,
+    plannedWorkoutId,
+    file: new File([fixture], "incomplete-projection.fit", {
+      type: "application/octet-stream",
+    }),
+  });
+  assert.ok(first.latestComparison?.id);
+
+  const comparisonDelete = await supabase
+    .from("workout_comparisons")
+    .delete()
+    .eq("id", first.latestComparison.id);
+  if (comparisonDelete.error) throw new Error(comparisonDelete.error.message);
+
+  const retried = await ingestGarminWorkoutResult({
+    userId,
+    plannedWorkoutId,
+    file: new File([fixture], "incomplete-projection-retry.fit", {
+      type: "application/octet-stream",
+    }),
+  });
+  assert.equal(retried.runnerActivity.id, first.runnerActivity.id);
+  assert.ok(retried.latestAsset?.id);
+  assert.ok(retried.latestActualMetrics?.id);
+  assert.ok(retried.latestComparison?.id);
+  await assertCompletePlannedProjection({
+    userId,
+    plannedWorkoutId,
+    activityId: retried.runnerActivity.id,
+    activityRevisionId: retried.runnerActivity.revisionId,
+    sourceRevisionId: retried.runnerActivity.sourceRevisionId,
+    assetId: retried.latestAsset.id,
+    metricsId: retried.latestActualMetrics.id,
+    comparisonId: retried.latestComparison.id,
+  });
+
+  const matchDelete = await supabase
+    .from("runner_activity_planned_workout_matches")
+    .delete()
+    .eq("activity_id", retried.runnerActivity.id);
+  if (matchDelete.error) throw new Error(matchDelete.error.message);
+  const matchRepaired = await ingestGarminWorkoutResult({
+    userId,
+    plannedWorkoutId,
+    file: new File([fixture], "missing-match-retry.fit", { type: "application/octet-stream" }),
+  });
+  assert.ok(matchRepaired.latestComparison?.id);
+
+  const metricsDelete = await supabase
+    .from("workout_actual_metrics")
+    .delete()
+    .eq("id", matchRepaired.latestActualMetrics?.id ?? "");
+  if (metricsDelete.error) throw new Error(metricsDelete.error.message);
+  const metricsRepaired = await ingestGarminWorkoutResult({
+    userId,
+    plannedWorkoutId,
+    file: new File([fixture], "missing-metrics-retry.fit", { type: "application/octet-stream" }),
+  });
+  assert.ok(metricsRepaired.latestActualMetrics?.id);
+  assert.ok(metricsRepaired.latestComparison?.id);
+  await assertCompletePlannedProjection({
+    userId,
+    plannedWorkoutId,
+    activityId: metricsRepaired.runnerActivity.id,
+    activityRevisionId: metricsRepaired.runnerActivity.revisionId,
+    sourceRevisionId: metricsRepaired.runnerActivity.sourceRevisionId,
+    assetId: metricsRepaired.latestAsset?.id ?? "",
+    metricsId: metricsRepaired.latestActualMetrics.id,
+    comparisonId: metricsRepaired.latestComparison.id,
+  });
+}
+
+async function proveReusedUnplannedSourceProjection(userId: string) {
+  const fixture = await readFitFixture();
+  const zipFixture = buildStoredZip(fixture, "activity.fit");
+  const [plannedWorkoutId] = await createProofWorkouts(userId);
+  const unplanned = await ingestGarminWorkoutResult({
+    userId,
+    file: new File([zipFixture], "reused-unplanned.zip", { type: "application/zip" }),
+  });
+
+  const planned = await ingestGarminWorkoutResult({
+    userId,
+    plannedWorkoutId,
+    file: new File([zipFixture], "reused-unplanned-planned.zip", { type: "application/zip" }),
+  });
+  assert.equal(planned.runnerActivity.id, unplanned.runnerActivity.id);
+  assert.ok(planned.latestAsset?.id);
+  assert.ok(planned.latestActualMetrics?.id);
+  assert.ok(planned.latestComparison?.id);
+  await assertCompletePlannedProjection({
+    userId,
+    plannedWorkoutId,
+    activityId: planned.runnerActivity.id,
+    activityRevisionId: planned.runnerActivity.revisionId,
+    sourceRevisionId: planned.runnerActivity.sourceRevisionId,
+    assetId: planned.latestAsset.id,
+    metricsId: planned.latestActualMetrics.id,
+    comparisonId: planned.latestComparison.id,
+  });
+
+  const [linkedAsset, sourceRevision] = await Promise.all([
+    supabase
+      .from("workout_result_assets")
+      .select("id, activity_source_revision_id, storage_bucket, storage_path")
+      .eq("id", planned.latestAsset.id)
+      .eq("activity_source_revision_id", planned.runnerActivity.sourceRevisionId)
+      .single(),
+    supabase
+      .from("runner_activity_source_revisions")
+      .select("raw_storage_bucket, raw_storage_path")
+      .eq("id", planned.runnerActivity.sourceRevisionId)
+      .single(),
+  ]);
+  if (linkedAsset.error) throw new Error(linkedAsset.error.message);
+  if (sourceRevision.error) throw new Error(sourceRevision.error.message);
+  assert.equal(linkedAsset.data.id, planned.latestAsset.id);
+  assert.equal(linkedAsset.data.storage_bucket, null);
+  assert.equal(linkedAsset.data.storage_path, null);
+  assert.ok(sourceRevision.data.raw_storage_bucket);
+  assert.ok(sourceRevision.data.raw_storage_path);
+}
+
+function buildStoredZip(content: Buffer, fileName: string) {
+  const name = Buffer.from(fileName, "utf8");
+  const checksum = crc32(content) >>> 0;
+  const local = Buffer.alloc(30);
+  local.writeUInt32LE(0x04034b50, 0);
+  local.writeUInt16LE(20, 4);
+  local.writeUInt32LE(checksum, 14);
+  local.writeUInt32LE(content.length, 18);
+  local.writeUInt32LE(content.length, 22);
+  local.writeUInt16LE(name.length, 26);
+
+  const central = Buffer.alloc(46);
+  central.writeUInt32LE(0x02014b50, 0);
+  central.writeUInt16LE(20, 4);
+  central.writeUInt16LE(20, 6);
+  central.writeUInt32LE(checksum, 16);
+  central.writeUInt32LE(content.length, 20);
+  central.writeUInt32LE(content.length, 24);
+  central.writeUInt16LE(name.length, 28);
+
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(1, 8);
+  end.writeUInt16LE(1, 10);
+  end.writeUInt32LE(central.length + name.length, 12);
+  end.writeUInt32LE(local.length + name.length + content.length, 16);
+  return Buffer.concat([local, name, content, central, name, end]);
+}
+
+async function proveProjectionSupersession(userId: string) {
+  const fixture = await readFitFixture();
+  const [plannedWorkoutId] = await createProofWorkouts(userId);
+  const first = await ingestGarminWorkoutResult({
+    userId,
+    plannedWorkoutId,
+    file: new File([fixture], "superseded-first.fit", { type: "application/octet-stream" }),
+  });
+  const secondFixture = Buffer.concat([fixture, Buffer.from([0])]);
+  const second = await ingestGarminWorkoutResult({
+    userId,
+    plannedWorkoutId,
+    file: new File([secondFixture], "superseding-second.fit", {
+      type: "application/octet-stream",
+    }),
+  });
+  assert.notEqual(second.runnerActivity.id, first.runnerActivity.id);
+
+  const metrics = await supabase
+    .from("workout_actual_metrics")
+    .select("id, status")
+    .eq("user_id", userId)
+    .eq("planned_workout_id", plannedWorkoutId)
+    .order("created_at", { ascending: true });
+  if (metrics.error) throw new Error(metrics.error.message);
+  assert.equal(metrics.data.length, 2);
+  assert.deepEqual(
+    metrics.data.map((row) => row.status),
+    ["superseded", "normalized"],
+  );
+  assert.equal(metrics.data[1]?.id, second.latestActualMetrics?.id);
+
+  const firstActivity = await supabase
+    .from("runner_activities")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("id", first.runnerActivity.id)
+    .maybeSingle();
+  if (firstActivity.error) throw new Error(firstActivity.error.message);
+  assert.equal(firstActivity.data?.id, first.runnerActivity.id);
+
+  const retriedFirst = await ingestGarminWorkoutResult({
+    userId,
+    plannedWorkoutId,
+    file: new File([fixture], "superseded-first-retry.fit", {
+      type: "application/octet-stream",
+    }),
+  });
+  assert.equal(retriedFirst.latestAsset?.id, second.latestAsset?.id);
+  assert.equal(retriedFirst.latestActualMetrics?.id, second.latestActualMetrics?.id);
+  assert.equal(retriedFirst.latestComparison?.id, second.latestComparison?.id);
+
+  const afterOlderRetry = await supabase
+    .from("workout_actual_metrics")
+    .select("id, status")
+    .eq("user_id", userId)
+    .eq("planned_workout_id", plannedWorkoutId)
+    .order("created_at", { ascending: true });
+  if (afterOlderRetry.error) throw new Error(afterOlderRetry.error.message);
+  assert.deepEqual(afterOlderRetry.data, metrics.data);
+}
+
+async function proveProjectionFailureBoundaries(userId: string) {
+  await proveProjectionFailureInjectionIsLoopbackOnly(userId);
+  const fixture = await readFitFixture();
+  const failurePoints: WorkoutResultProjectionFailurePointForQa[] = [
+    "candidate_cleanup",
+    "asset_link",
+    "match",
+    "metrics",
+    "comparison",
+    "supersession",
+  ];
+
+  for (const [index, failurePoint] of failurePoints.entries()) {
+    await resetQaPoolUserData({ supabase, userId });
+    const [plannedWorkoutId] = await createProofWorkouts(userId);
+    const sourceFixture = Buffer.concat([fixture, Buffer.from([index + 11])]);
+
+    if (failurePoint === "candidate_cleanup") {
+      const complete = await ingestGarminWorkoutResult({
+        userId,
+        plannedWorkoutId,
+        file: new File([sourceFixture], "candidate-cleanup-complete.fit", {
+          type: "application/octet-stream",
+        }),
+      });
+      assert.ok(complete.latestAsset?.id);
+      await assert.rejects(
+        ingestGarminWorkoutResult({
+          userId,
+          plannedWorkoutId,
+          file: new File([sourceFixture], "candidate-cleanup-failure.fit", {
+            type: "application/octet-stream",
+          }),
+          projectionFailurePointForQa: failurePoint,
+        }),
+      );
+      const preservedAsset = await supabase
+        .from("workout_result_assets")
+        .select("parse_status")
+        .eq("id", complete.latestAsset.id)
+        .single();
+      if (preservedAsset.error) throw new Error(preservedAsset.error.message);
+      assert.equal(preservedAsset.data.parse_status, "parsed");
+    } else if (failurePoint === "supersession") {
+      await ingestGarminWorkoutResult({
+        userId,
+        plannedWorkoutId,
+        file: new File([fixture], "supersession-boundary-first.fit", {
+          type: "application/octet-stream",
+        }),
+      });
+      await assert.rejects(
+        ingestGarminWorkoutResult({
+          userId,
+          plannedWorkoutId,
+          file: new File([sourceFixture], "supersession-boundary-second.fit", {
+            type: "application/octet-stream",
+          }),
+          projectionFailurePointForQa: failurePoint,
+        }),
+      );
+    } else {
+      await assert.rejects(
+        ingestGarminWorkoutResult({
+          userId,
+          plannedWorkoutId,
+          file: new File([sourceFixture], `${failurePoint}-boundary.fit`, {
+            type: "application/octet-stream",
+          }),
+          projectionFailurePointForQa: failurePoint,
+        }),
+      );
+    }
+
+    const canonicalActivity = await supabase
+      .from("runner_activities")
+      .select("id")
+      .eq("user_id", userId);
+    if (canonicalActivity.error) throw new Error(canonicalActivity.error.message);
+    assert.ok(canonicalActivity.data.length >= 1);
+
+    const repaired = await ingestGarminWorkoutResult({
+      userId,
+      plannedWorkoutId,
+      file: new File([sourceFixture], `${failurePoint}-retry.fit`, {
+        type: "application/octet-stream",
+      }),
+    });
+    assert.ok(repaired.latestAsset?.id);
+    assert.ok(repaired.latestActualMetrics?.id);
+    assert.ok(repaired.latestComparison?.id);
+    await assertCompletePlannedProjection({
+      userId,
+      plannedWorkoutId,
+      activityId: repaired.runnerActivity.id,
+      activityRevisionId: repaired.runnerActivity.revisionId,
+      sourceRevisionId: repaired.runnerActivity.sourceRevisionId,
+      assetId: repaired.latestAsset.id,
+      metricsId: repaired.latestActualMetrics.id,
+      comparisonId: repaired.latestComparison.id,
+    });
+  }
+}
+
+async function proveProjectionFailureInjectionIsLoopbackOnly(userId: string) {
+  const keys = ["NEXT_PUBLIC_SUPABASE_URL", "VITE_SUPABASE_URL", "SUPABASE_URL"] as const;
+  const original = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  try {
+    for (const key of keys) process.env[key] = "https://example.supabase.co";
+    await assert.rejects(
+      ingestGarminWorkoutResult({
+        userId,
+        file: new File([Buffer.from([0])], "deployed-fault-injection.fit"),
+        projectionFailurePointForQa: "asset_link",
+      }),
+      /requires loopback Supabase/,
+    );
+  } finally {
+    for (const key of keys) {
+      if (original[key] === undefined) delete process.env[key];
+      else process.env[key] = original[key];
+    }
+  }
+}
+
+async function proveOrdinaryIntakeDoesNotBackfill(userId: string) {
+  const fixture = await readFitFixture();
+  const parsed = await parseGarminFitActivity(fixture);
+  const [plannedWorkoutId, legacyWorkoutId] = await createProofWorkouts(userId);
+  const legacyAssetId = await insertLegacyAsset({
+    userId,
+    plannedWorkoutId: legacyWorkoutId,
+    fixture,
+    parsed,
+  });
+
+  const result = await ingestGarminWorkoutResult({
+    userId,
+    plannedWorkoutId,
+    file: new File([fixture], "ordinary-intake.fit", { type: "application/octet-stream" }),
+  });
+  assert.ok(result.latestComparison?.id);
+
+  const legacyAsset = await supabase
+    .from("workout_result_assets")
+    .select("activity_source_revision_id")
+    .eq("id", legacyAssetId)
+    .single();
+  if (legacyAsset.error) throw new Error(legacyAsset.error.message);
+  assert.equal(legacyAsset.data.activity_source_revision_id, null);
+}
+
+async function assertCompletePlannedProjection(input: {
+  userId: string;
+  plannedWorkoutId: string;
+  activityId: string;
+  activityRevisionId: string;
+  sourceRevisionId: string;
+  assetId: string;
+  metricsId: string;
+  comparisonId: string;
+}) {
+  const [asset, activeMetrics, comparison, match] = await Promise.all([
+    supabase
+      .from("workout_result_assets")
+      .select("id, planned_workout_id, activity_source_revision_id, parse_status")
+      .eq("id", input.assetId)
+      .eq("user_id", input.userId)
+      .single(),
+    supabase
+      .from("workout_actual_metrics")
+      .select("id, result_asset_id, activity_revision_id")
+      .eq("user_id", input.userId)
+      .eq("planned_workout_id", input.plannedWorkoutId)
+      .neq("status", "superseded"),
+    supabase
+      .from("workout_comparisons")
+      .select("id, planned_workout_id, actual_metrics_id")
+      .eq("id", input.comparisonId)
+      .eq("user_id", input.userId)
+      .single(),
+    supabase
+      .from("runner_activity_planned_workout_matches")
+      .select("planned_workout_id")
+      .eq("activity_id", input.activityId)
+      .eq("user_id", input.userId)
+      .single(),
+  ]);
+  for (const result of [asset, activeMetrics, comparison, match]) {
+    if (result.error) throw new Error(result.error.message);
+  }
+  assert.equal(asset.data.id, input.assetId);
+  assert.equal(asset.data.planned_workout_id, input.plannedWorkoutId);
+  assert.equal(asset.data.activity_source_revision_id, input.sourceRevisionId);
+  assert.equal(asset.data.parse_status, "parsed");
+  assert.deepEqual(activeMetrics.data, [
+    {
+      id: input.metricsId,
+      result_asset_id: input.assetId,
+      activity_revision_id: input.activityRevisionId,
+    },
+  ]);
+  assert.equal(comparison.data.planned_workout_id, input.plannedWorkoutId);
+  assert.equal(comparison.data.actual_metrics_id, input.metricsId);
+  assert.equal(match.data.planned_workout_id, input.plannedWorkoutId);
 }
 
 async function proveUnplannedLifecycle(input: {

@@ -190,24 +190,34 @@ export async function createRunnerActivityPlannedWorkoutMatch(input: {
   sourceRevisionId: string;
   plannedWorkoutId: string;
 }) {
-  const existingPlanMatch = await findRunnerActivityPlanMatch({
-    userId: input.userId,
-    activityId: input.activityId,
-  });
-  if (existingPlanMatch && existingPlanMatch !== input.plannedWorkoutId) {
+  const supabase = createAdminSupabaseClient();
+  const existing = await supabase
+    .from("runner_activity_planned_workout_matches")
+    .select("id, planned_workout_id")
+    .eq("user_id", input.userId)
+    .eq("activity_id", input.activityId)
+    .limit(1)
+    .maybeSingle();
+  if (existing.error) throw new Error(existing.error.message);
+  if (existing.data?.planned_workout_id === input.plannedWorkoutId) return;
+  if (existing.data?.planned_workout_id) {
     throw new Error("A runner activity cannot be attached to more than one planned workout.");
   }
-  if (existingPlanMatch === input.plannedWorkoutId) return;
 
-  const result = await createAdminSupabaseClient()
-    .from("runner_activity_planned_workout_matches")
-    .insert({
-      user_id: input.userId,
-      activity_id: input.activityId,
-      source_revision_id: input.sourceRevisionId,
-      planned_workout_id: input.plannedWorkoutId,
-      match_method: "runner_selected",
-    });
+  const values = {
+    user_id: input.userId,
+    activity_id: input.activityId,
+    source_revision_id: input.sourceRevisionId,
+    planned_workout_id: input.plannedWorkoutId,
+    match_method: "runner_selected" as const,
+  };
+  const result = existing.data
+    ? await supabase
+        .from("runner_activity_planned_workout_matches")
+        .update(values)
+        .eq("id", existing.data.id)
+        .eq("user_id", input.userId)
+    : await supabase.from("runner_activity_planned_workout_matches").insert(values);
   if (result.error) throw new Error(result.error.message);
 }
 

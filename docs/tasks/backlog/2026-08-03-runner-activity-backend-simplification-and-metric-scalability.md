@@ -53,20 +53,20 @@ single eligible hosted legacy
 asset into the canonical activity/source/revision graph, proved zero remaining eligible candidates,
 and removed the now-unreachable backfill module. Slice 3 is complete: the current factual and Gate 4
 reconciliation remained bounded, warm reads wrote nothing, and exact mutation invalidation preserved
-historical truth. The exact eight-path source-control boundary for Slices 1b, 2, and 3 is now audited
-against `329f45c27ff25928c4daad963f24f967e197200c`; one accepted Slice 3 validator blob must be placed
-in the index instead of staging its later mixed worktree content. No release action has occurred.
+historical truth. The exact eight-path source-control boundary for Slices 1b, 2, and 3 was audited
+against `329f45c27ff25928c4daad963f24f967e197200c` and integrated locally as commit `a6c5f44`: the
+accepted Slice 3 validator blob was committed instead of its later mixed worktree content. The
+commit has not been pushed or deployed.
 Gate 5, provider sync, the service-role environment-contract correction, and raw-removal fallback
 retirement remain separate future work.
 
 ## Dispatch
 
-Slices 1b, 2, and 3 are complete in Backend and their release manifest is prepared but not staged.
-A later release owner may integrate only the exact index state below after repeating its parity
-checks. The work item remains a `backlog` optimization program rather than a release-readiness
-status; completed and future slices are recorded explicitly below.
+Slices 1b, 2, and 3 are complete in Backend and integrated in local commit `a6c5f44`. The work item
+remains a `backlog` optimization program rather than a release-readiness status; completed and future
+slices are recorded explicitly below. Push and deployment remain separate release actions.
 
-## Source-Control Integration Manifest (2026-08-04; not staged)
+## Source-Control Integration Manifest (2026-08-04; integrated locally as `a6c5f44`)
 
 ### Audit anchor and verdict
 

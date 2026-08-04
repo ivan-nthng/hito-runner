@@ -63,6 +63,35 @@ confirm that every included behavior-changing slice has its receipt and no `Bloc
 `Pending` gate is represented as accepted. Documentation-only work remains proportionate and does
 not need runtime receipts.
 
+## 0.2) No Routine Approval Or User-Relay Rule (Mandatory)
+
+Routine local work is already authorized. Agents must execute it autonomously and must not ask the
+user to approve, relay, copy a command, choose a browser path, or manually continue ordinary work.
+
+Standing authorization includes local source inspection and edits, local build/runtime control,
+loopback fixture setup, disposable local test data and cleanup, local browser QA, validators,
+subagent use within the concurrent-subagent cap, and non-hosted observability.
+
+- Before surfacing an approval or environment gate, exhaust safe local alternatives available in the
+  current role and task scope. A routine shell-command, browser-control, fixture, or test-data
+  confirmation is not a user decision.
+- Do not repeatedly ask for the same approval. If a platform-enforced permission dialog is genuinely
+  unavoidable after safe alternatives are exhausted, report it once with the exact blocked action,
+  the alternatives attempted, and the coverage consequence. Continue every independent part of the
+  task that remains safe.
+- User confirmation is required only for a genuine Product decision or a materially external or
+  irreversible boundary: hosted/production mutation, paid provider call, deployment, production
+  data deletion, creating a new role chat, staging/commit/push, or another action the user has
+  explicitly reserved.
+- A task may not be called `Blocked` merely because the agent preferred to ask first. The owner must
+  either complete the local work under this standing authorization or name the concrete platform or
+  cross-owner boundary that prevents further progress.
+- Do not use raw `rm`, `rm -rf`, or an ad hoc `/tmp` proof script as routine QA cleanup when a
+  repeatable validator, fixture lifecycle, or existing project cleanup seam can own the proof.
+  Promote a recurring discriminator into its existing validator and let that owner clean its own
+  disposable data. A host permission dialog for raw shell deletion is a tooling limitation to avoid,
+  never a user-facing task approval or a reason to stop validation.
+
 ## 1) Mission And Non-Negotiables
 
 - Protect pipeline integrity.
@@ -179,7 +208,10 @@ Every execution prompt and final report must additionally state:
 - `Approval policy` — routine local inspection, implementation, fixture QA, and validation proceed
   under the standing authorization; the owner must seek a safe alternative before surfacing an
   environment gate.
-- `Dispatch status` — `not sent`, `queued on <existing role>`, or `active in <existing role>`.
+
+`Dispatch status` is Product-to-user routing metadata, not execution-task context. Product must
+state whether a prompt is `not sent`, queued, or active in its own user-facing status shell, but
+must not include that field in execution prompts or execution-role final reports.
 
 Do not create a new role chat when an existing matching role is available. Queue a subsequent task
 there and do not interrupt an active task unless the user explicitly supersedes it.
@@ -199,6 +231,27 @@ user gives a current explicit command such as `send`, `dispatch`, `start`, or `r
 
 ### Active Task Queue Discipline (Mandatory)
 
+### Rule Zero: Never Interrupt A Working Role
+
+This is the first check before every Product action that could contact another role. A working role
+keeps ownership of its task until it reports completion or the user personally and explicitly stops
+that exact current task.
+
+- Before sending **any** message, including a `STOP`, clarification, status request, continuation,
+  or handoff, Product must freshly inspect the role's current status and latest turn.
+- `send`, `start`, `continue`, `fix it now`, `clean it up`, urgency, a new report, or a newly
+  discovered priority authorize dispatch only to an **idle** role. They never imply permission to
+  interrupt an active task.
+- Only an unambiguous current user command such as `stop the current Backend task`, `interrupt the
+  active Frontend task`, or `supersede <named task>` authorizes an interruption. Product must not
+  infer that permission from intent, frustration, urgency, or a belief that the active task is wrong.
+- If the role is active and no such explicit stop command exists, Product records the next bounded
+  task in its pending queue, tells the user it is queued and not sent, and sends nothing to that role.
+  There is no "queued message" inside an active role thread.
+- If Product cannot inspect the live role status, it must not send. If it violates this rule, it must
+  stop sending new work, obtain the interrupted task's closeout, report exactly what was changed,
+  and wait for the user's next explicit instruction before routing again.
+
 Before Product sends any message to an execution role, it must inspect that role's current task
 status and latest turn. A role with an active or in-progress task is unavailable for a new prompt,
 continuation, clarification, or validation instruction unless the user explicitly tells Product to
@@ -212,6 +265,27 @@ stop, supersede, or interrupt it.
   to start another task or alter its instructions.
 - When a task completes, Product must check the role status again before dispatching the queued
   item. Never infer idleness from a report alone.
+
+### Subagent Boundaries And Closure (Mandatory)
+
+Subagents are a bounded execution aid, not a substitute for task ownership or an unbounded work
+queue.
+
+- An execution task may run up to **six active subagents at once** when their work is genuinely
+  independent and materially advances the same bounded outcome.
+- Every subagent must have one named purpose, a bounded scope, and an explicit read-only or
+  disjoint write boundary before it starts. The parent must be able to state why that work is not
+  being duplicated locally or by another subagent.
+- A subagent must not spawn further subagents. Parallelism belongs to the primary owner, which is
+  responsible for the complete dependency graph and integration.
+- Reuse an existing relevant subagent when safe. Do not create speculative, duplicate, or
+  open-ended exploratory workers merely to make progress appear active.
+- The primary owner integrates each result, closes the subagent when its purpose is complete, and
+  reports the resulting evidence. An incomplete, stale, or failed subagent does not justify
+  opening replacement workers indefinitely.
+- If more than six concurrent subagents would appear useful, stop spawning and return a concrete
+  decomposition or a genuine cross-owner boundary to the user. Do not exceed the cap by creating
+  additional chats, nested workers, or unmanaged background tasks.
 
 ### QA Capability Exhaustion (Mandatory)
 

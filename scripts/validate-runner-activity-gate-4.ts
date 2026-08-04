@@ -47,15 +47,13 @@ import {
   type Gate4SyntheticActivity,
 } from "./lib/runner-activity-gate-4-fixture";
 
-const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
-const serviceRoleKey =
-  process.env.SUPABASE_SECRET_KEY ??
-  process.env.SUPABASE_SERVICE_ROLE_KEY ??
-  process.env.SUPABASE_SERVICE_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SECRET_KEY;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 if (!supabaseUrl || !serviceRoleKey || !publishableKey) {
-  throw new Error("Local Supabase URL, publishable key, and service role key are required.");
+  throw new Error(
+    "NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, and SUPABASE_SECRET_KEY are required.",
+  );
 }
 
 const supabase = createClient(supabaseUrl, serviceRoleKey, {

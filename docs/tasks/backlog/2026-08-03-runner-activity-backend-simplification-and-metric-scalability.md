@@ -56,15 +56,19 @@ reconciliation remained bounded, warm reads wrote nothing, and exact mutation in
 historical truth. The exact eight-path source-control boundary for Slices 1b, 2, and 3 was audited
 against `329f45c27ff25928c4daad963f24f967e197200c` and integrated locally as commit `a6c5f44`: the
 accepted Slice 3 validator blob was committed instead of its later mixed worktree content. The
-commit has not been pushed or deployed.
-Gate 5, provider sync, the service-role environment-contract correction, and raw-removal fallback
-retirement remain separate future work.
+integration is present in the published `main` lineage at `4edfdda`.
+The Supabase environment-contract cleanup is implemented in the current Backend slice: active
+runtime, deployment-parity, Runner Activity proof, and design-profile consumers now accept only
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY`.
+Legacy names remain only as explicit local-env cleanup keys, negative regression evidence, or
+historical evidence. Gate 5, provider sync, and raw-removal fallback retirement remain separate
+future work.
 
 ## Dispatch
 
-Slices 1b, 2, and 3 are complete in Backend and integrated in local commit `a6c5f44`. The work item
+Slices 1b, 2, and 3 are complete in Backend and integrated in the published `main` lineage. The work item
 remains a `backlog` optimization program rather than a release-readiness status; completed and future
-slices are recorded explicitly below. Push and deployment remain separate release actions.
+slices are recorded explicitly below. Deployment remains a separate release action.
 
 Central execution-ownership policy was integrated separately in `0633bdf` and formatting-only
 normalization in `2dac928`; neither commit is part of the eight-path Backend release boundary.

@@ -109,11 +109,8 @@ function validateLinkedMigrations(expectedRef) {
 }
 
 async function validateApiSchema(url, options) {
-  const publishableKey =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
-  const serverKey =
-    process.env.SUPABASE_SECRET_KEY?.trim() || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
+  const serverKey = process.env.SUPABASE_SECRET_KEY?.trim();
   const bearerToken = process.env.HITO_SUPABASE_SCHEMA_BEARER_TOKEN?.trim() || serverKey;
   const apiKey = serverKey || publishableKey;
   if (!apiKey) {

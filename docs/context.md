@@ -47,7 +47,7 @@ Signed-out preview mode remains intentionally outside the trusted product bounda
 - seam:
   one canonical data seam in `src/lib/training.ts` with backend loading through `src/lib/training-api.ts`
 - env:
-  `.env.example` now defines the Phase 2 contract for public Supabase config and server-only base URL and service-role access, with `NEXT_PUBLIC_*` as the preferred public naming and legacy `VITE_*` aliases still supported
+  `.env.example` defines the Supabase contract with `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and server-only `SUPABASE_SECRET_KEY`; legacy aliases are not accepted
 
 ## Important Constraints
 

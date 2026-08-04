@@ -35,10 +35,7 @@ export function assertProjectionFailurePointIsLocal(
   failurePoint: WorkoutResultProjectionFailurePointForQa | undefined,
 ) {
   if (!failurePoint) return;
-  const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL ??
-    process.env.VITE_SUPABASE_URL ??
-    process.env.SUPABASE_URL;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!isLoopbackRuntimeUrl(supabaseUrl)) {
     throw new Error("Workout-result projection fault injection requires loopback Supabase.");
   }

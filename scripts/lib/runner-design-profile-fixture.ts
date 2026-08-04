@@ -941,10 +941,7 @@ function readFixtureResponseId(value: unknown) {
 }
 
 async function withLocalDesignFixtureEnv<T>(run: () => Promise<T>) {
-  const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL ??
-    process.env.VITE_SUPABASE_URL ??
-    process.env.SUPABASE_URL;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!supabaseUrl || !isLoopbackRuntimeUrl(supabaseUrl)) {
     throw new Error("Runner design profile fixture requires loopback Supabase.");
   }

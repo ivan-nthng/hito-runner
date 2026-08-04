@@ -21,15 +21,11 @@ import {
   resetQaPoolUserData,
 } from "./lib/qa-test-user-lifecycle.mjs";
 
-const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
-const serviceRoleKey =
-  process.env.SUPABASE_SECRET_KEY ??
-  process.env.SUPABASE_SERVICE_ROLE_KEY ??
-  process.env.SUPABASE_SERVICE_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SECRET_KEY;
 if (!supabaseUrl || !serviceRoleKey) {
   throw new Error(
-    "Local Supabase URL and service role key are required for the activity foundation proof.",
+    "NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY are required for the activity foundation proof.",
   );
 }
 if (!isLoopbackRuntimeUrl(supabaseUrl)) {
@@ -552,11 +548,23 @@ async function proveProjectionFailureInjectionIsLoopbackOnly(userId: string) {
   const keys = ["NEXT_PUBLIC_SUPABASE_URL", "VITE_SUPABASE_URL", "SUPABASE_URL"] as const;
   const original = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
   try {
-    for (const key of keys) process.env[key] = "https://example.supabase.co";
+    process.env.NEXT_PUBLIC_SUPABASE_URL = "https://example.supabase.co";
+    process.env.VITE_SUPABASE_URL = "http://127.0.0.1:54321";
+    process.env.SUPABASE_URL = "http://127.0.0.1:54321";
     await assert.rejects(
       ingestGarminWorkoutResult({
         userId,
         file: new File([Buffer.from([0])], "deployed-fault-injection.fit"),
+        projectionFailurePointForQa: "asset_link",
+      }),
+      /requires loopback Supabase/,
+    );
+
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    await assert.rejects(
+      ingestGarminWorkoutResult({
+        userId,
+        file: new File([Buffer.from([0])], "legacy-env-fault-injection.fit"),
         projectionFailurePointForQa: "asset_link",
       }),
       /requires loopback Supabase/,

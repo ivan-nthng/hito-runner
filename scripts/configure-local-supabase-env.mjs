@@ -11,6 +11,7 @@ const MANAGED_ENV_KEYS = new Set([
   "SUPABASE_SECRET_KEY",
   "LOCAL_AUTH_BYPASS_ENABLED",
   "LOCAL_AUTH_BYPASS_ACCOUNTS_FILE",
+  // Keep retired aliases here only so configure removes them from .env.local.
   "VITE_SUPABASE_URL",
   "VITE_SUPABASE_ANON_KEY",
   "SUPABASE_SERVICE_ROLE_KEY",

@@ -3,14 +3,13 @@ import { Icon } from "@/components/ui/icon";
 import { HitoButton } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type {
-  RunnerActivityAdvancedMetricsCurrent,
-  RunnerActivityAdvancedMetricsReadModel,
-  RunnerActivityFactMetric,
-  RunnerActivityFactSnapshot,
-  RunnerActivityProgressReadModel,
-  RunnerActivityRecordItem,
-  RunnerActivitySessionLoadWindow,
-} from "@/lib/runner-activity/read-model-types";
+  RunnerActivityProgressProductAdvancedMetrics,
+  RunnerActivityProgressProductFactMetric,
+  RunnerActivityProgressProductModel,
+  RunnerActivityProgressProductRecord,
+  RunnerActivityProgressProductSessionLoadWindow,
+  RunnerActivityProgressProductSnapshot,
+} from "@/lib/runner-activity/product-contract";
 import { formatDate } from "@/lib/training";
 import type { ProgressState } from "./runner-activity-progress-types";
 import {
@@ -73,7 +72,7 @@ export function FactualProgressPanel({
   );
 }
 
-function ProgressReadback({ progress }: { progress: RunnerActivityProgressReadModel }) {
+function ProgressReadback({ progress }: { progress: RunnerActivityProgressProductModel }) {
   const current = progress.rolling28Day.current;
   const previous = progress.rolling28Day.previous;
   const summary = formatRollingSummary(current);
@@ -96,7 +95,7 @@ function ProgressReadback({ progress }: { progress: RunnerActivityProgressReadMo
           {summary}
         </h2>
         <p className="hito-caption mt-2">
-          {formatWindow(current)} · {current.evidence.eligibleActivityCount} recorded activities
+          {formatWindow(current)} · {current.eligibleActivityCount} recorded activities
         </p>
       </section>
 
@@ -133,7 +132,10 @@ function ProgressReadback({ progress }: { progress: RunnerActivityProgressReadMo
           <div className="hito-disclosure-body">
             <ul className="hito-row-group">
               {progress.calendarWeeks.map((week) => (
-                <li key={week.id} className="hito-list-row !items-start">
+                <li
+                  key={`${week.window.startDate}:${week.window.endDate}`}
+                  className="hito-list-row !items-start"
+                >
                   <div>
                     <p className="hito-list-row-title">{formatWindow(week)}</p>
                     <p className="hito-list-row-copy">
@@ -154,7 +156,7 @@ function ProgressReadback({ progress }: { progress: RunnerActivityProgressReadMo
 function Gate4Readback({
   advancedMetrics,
 }: {
-  advancedMetrics: RunnerActivityAdvancedMetricsReadModel;
+  advancedMetrics: RunnerActivityProgressProductAdvancedMetrics;
 }) {
   if (advancedMetrics.status === "updating") {
     return (
@@ -206,14 +208,12 @@ function Gate4Readback({
   );
 }
 
-function RecordsReadback({ metrics }: { metrics: RunnerActivityAdvancedMetricsCurrent }) {
-  const unavailableReasons = [
-    ...new Set(
-      [metrics.records.unavailableReason, ...metrics.records.unavailableReasons].filter(
-        (reason): reason is string => Boolean(reason),
-      ),
-    ),
-  ];
+function RecordsReadback({
+  metrics,
+}: {
+  metrics: Extract<RunnerActivityProgressProductAdvancedMetrics, { status: "current" }>;
+}) {
+  const unavailableReasons = [...new Set(metrics.records.unavailableReasons)];
 
   return (
     <section aria-labelledby="activity-records-title">
@@ -229,7 +229,7 @@ function RecordsReadback({ metrics }: { metrics: RunnerActivityAdvancedMetricsCu
       {metrics.records.items.length > 0 ? (
         <ul className="hito-row-group mt-4">
           {metrics.records.items.map((record) => (
-            <RecordRow key={record.observationId} record={record} />
+            <RecordRow key={record.id} record={record} />
           ))}
         </ul>
       ) : (
@@ -246,7 +246,7 @@ function RecordsReadback({ metrics }: { metrics: RunnerActivityAdvancedMetricsCu
   );
 }
 
-function RecordRow({ record }: { record: RunnerActivityRecordItem }) {
+function RecordRow({ record }: { record: RunnerActivityProgressProductRecord }) {
   const context = formatRecordContext(record.context);
   return (
     <li className="hito-list-row !items-start gap-4">
@@ -270,7 +270,11 @@ function RecordRow({ record }: { record: RunnerActivityRecordItem }) {
   );
 }
 
-function SessionLoadReadback({ metrics }: { metrics: RunnerActivityAdvancedMetricsCurrent }) {
+function SessionLoadReadback({
+  metrics,
+}: {
+  metrics: Extract<RunnerActivityProgressProductAdvancedMetrics, { status: "current" }>;
+}) {
   const current = metrics.sessionRpeLoad.rolling28Day.current;
   const previous = metrics.sessionRpeLoad.rolling28Day.previous;
 
@@ -329,7 +333,7 @@ function SessionLoadReadback({ metrics }: { metrics: RunnerActivityAdvancedMetri
 
           <div className="mt-5 border-t border-hairline pt-4">
             <p className="hito-technical-mono text-xs text-muted-foreground">
-              Formula {metrics.formulaVersions.sessionRpeLoad}
+              Formula {metrics.sessionRpeLoad.formulaVersion}
             </p>
           </div>
         </div>
@@ -343,7 +347,7 @@ function SessionLoadWindow({
   window,
 }: {
   label: string;
-  window: RunnerActivitySessionLoadWindow;
+  window: RunnerActivityProgressProductSessionLoadWindow;
 }) {
   const reasons = [...new Set(window.metric.unavailableReasons)];
   return (
@@ -367,7 +371,11 @@ function SessionLoadWindow({
   );
 }
 
-function Gate5UnavailableReadback({ metrics }: { metrics: RunnerActivityAdvancedMetricsCurrent }) {
+function Gate5UnavailableReadback({
+  metrics,
+}: {
+  metrics: Extract<RunnerActivityProgressProductAdvancedMetrics, { status: "current" }>;
+}) {
   return (
     <section aria-labelledby="detailed-progress-title" className="border-t border-hairline pt-6">
       <h3 id="detailed-progress-title" className="hito-section-title">
@@ -378,7 +386,7 @@ function Gate5UnavailableReadback({ metrics }: { metrics: RunnerActivityAdvanced
         longer runs or compare pace, heart rate, aerobic efficiency, and durability.
       </p>
       <p className="hito-caption mt-2">
-        {advancedUnavailableReasonLabel(metrics.streamDependentMetrics.aerobicEfficiency.reason)}
+        {advancedUnavailableReasonLabel(metrics.detailedMetrics.reason)}
       </p>
     </section>
   );
@@ -392,8 +400,8 @@ function ProgressFactDisclosure({
 }: {
   factKey: ProgressFactKey;
   label: string;
-  current: RunnerActivityFactSnapshot;
-  previous: RunnerActivityFactSnapshot;
+  current: RunnerActivityProgressProductSnapshot;
+  previous: RunnerActivityProgressProductSnapshot;
 }) {
   const currentMetric = current.facts[factKey];
   const previousMetric = previous.facts[factKey];
@@ -426,8 +434,8 @@ function FactWindow({
   metric,
 }: {
   label: string;
-  snapshot: RunnerActivityFactSnapshot;
-  metric: RunnerActivityFactMetric;
+  snapshot: RunnerActivityProgressProductSnapshot;
+  metric: RunnerActivityProgressProductFactMetric;
 }) {
   return (
     <div>
@@ -442,8 +450,8 @@ function FactEvidence({
   metric,
   snapshot,
 }: {
-  metric: RunnerActivityFactMetric;
-  snapshot: RunnerActivityFactSnapshot;
+  metric: RunnerActivityProgressProductFactMetric;
+  snapshot: RunnerActivityProgressProductSnapshot;
 }) {
   const missingReasons = [...new Set(metric.missingReasons)];
   return (

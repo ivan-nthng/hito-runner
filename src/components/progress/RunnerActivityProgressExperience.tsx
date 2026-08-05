@@ -2,11 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { useHitoTabs } from "@/components/ui/hito-tabs";
 import type {
-  RunnerActivityHistoryItem,
-  RunnerActivityHistoryPage,
-  RunnerActivityMutationReadback,
-  RunnerActivityProgressReadModel,
-} from "@/lib/runner-activity/read-model-types";
+  RunnerActivityHistoryProductItem,
+  RunnerActivityHistoryProductPage,
+  RunnerActivityMutationProductReadback,
+  RunnerActivityProgressProductModel,
+} from "@/lib/runner-activity/product-contract";
 import {
   ActivityActionConfirmation,
   ActivityDetailOverlay,
@@ -45,7 +45,9 @@ export function RunnerActivityProgressExperience({
     data: null,
     error: null,
   });
-  const [selectedActivity, setSelectedActivity] = useState<RunnerActivityHistoryItem | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<RunnerActivityHistoryProductItem | null>(
+    null,
+  );
   const [pendingAction, setPendingAction] = useState<PendingActivityAction | null>(null);
   const [mutationPending, setMutationPending] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
@@ -64,7 +66,9 @@ export function RunnerActivityProgressExperience({
     try {
       const url = new URL("/api/runner-activities", window.location.origin);
       if (cursor) url.searchParams.set("cursor", cursor);
-      const nextPage = await requestJson<{ ok: true; history: RunnerActivityHistoryPage }>(url);
+      const nextPage = await requestJson<{ ok: true; history: RunnerActivityHistoryProductPage }>(
+        url,
+      );
       setHistory((current) => ({
         status: "ready",
         data:
@@ -92,7 +96,7 @@ export function RunnerActivityProgressExperience({
     try {
       const result = await requestJson<{
         ok: true;
-        progress: RunnerActivityProgressReadModel;
+        progress: RunnerActivityProgressProductModel;
       }>(new URL("/api/runner-activity-progress", window.location.origin));
       setProgress({ status: "ready", data: result.progress, error: null });
     } catch (error) {
@@ -109,7 +113,7 @@ export function RunnerActivityProgressExperience({
     if (activeTab === "progress" && progress.status === "idle") void loadProgress();
   }, [activeTab, history.status, loadHistory, loadProgress, progress.status]);
 
-  const openActivity = (activity: RunnerActivityHistoryItem, trigger: HTMLElement) => {
+  const openActivity = (activity: RunnerActivityHistoryProductItem, trigger: HTMLElement) => {
     detailReturnFocusRef.current = trigger;
     setSelectedActivity(activity);
     setMutationError(null);
@@ -117,7 +121,7 @@ export function RunnerActivityProgressExperience({
 
   const requestAction = (
     action: ActivityAction,
-    activity: RunnerActivityHistoryItem,
+    activity: RunnerActivityHistoryProductItem,
     trigger?: HTMLElement,
   ) => {
     if (trigger) confirmationReturnFocusRef.current = trigger;
@@ -137,10 +141,10 @@ export function RunnerActivityProgressExperience({
         completedAction.action === "remove-source"
           ? `/api/runner-activities/${completedAction.activity.id}/source`
           : `/api/runner-activities/${completedAction.activity.id}`;
-      const result = await requestJson<{ ok: true; readback: RunnerActivityMutationReadback }>(
-        new URL(endpoint, window.location.origin),
-        { method: "DELETE" },
-      );
+      const result = await requestJson<{
+        ok: true;
+        readback: RunnerActivityMutationProductReadback;
+      }>(new URL(endpoint, window.location.origin), { method: "DELETE" });
 
       setPendingAction(null);
       setSelectedActivity(null);
@@ -281,7 +285,10 @@ async function requestJson<T extends object>(url: URL, init?: RequestInit): Prom
   return body as T;
 }
 
-function mergeActivities(current: RunnerActivityHistoryItem[], next: RunnerActivityHistoryItem[]) {
+function mergeActivities(
+  current: RunnerActivityHistoryProductItem[],
+  next: RunnerActivityHistoryProductItem[],
+) {
   const seen = new Set(current.map((activity) => activity.id));
   return [...current, ...next.filter((activity) => !seen.has(activity.id))];
 }

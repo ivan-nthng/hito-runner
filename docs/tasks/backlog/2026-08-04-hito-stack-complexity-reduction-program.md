@@ -41,27 +41,29 @@ evidence-gated.
 
 ## Stage
 
-Architecture current-stack, dependency, reuse, and proof-surface audit is complete. Existing
-Backend simplification is locally implemented but not yet release-integrated; the first new code
-slice remains gated on that boundary.
+Slice 5 is completed by the atomic release commit containing this receipt: explicit Product-facing
+Progress and generated-preview DTOs replace accidental internal serialization, and Product receives
+one `signals` comparison truth with strict historical normalization. The parent program remains
+`in_progress` because `/hitoDS` representation reduction requires a separate Product decision and
+documentation compression remains later documentation-only hygiene.
 
 ## Next Recommended Role
 
-architect
+product
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: ARCHITECT
+ROLE: PRODUCT
 
-Continue the canonical Hito Stack Complexity Reduction Program. Preserve all accepted and
-concurrent work, confirm that the current Backend simplification and package/build changes are
-release-integrated, then admit exactly one smallest owner-scoped implementation slice from this
-plan. Do not create another cleanup plan, framework migration, proof framework, or source of truth.
+Decide whether `/hitoDS` remains a production-shipped reference surface in the canonical Hito Stack
+Complexity Reduction Program. Slices 1-5 are complete, but `/hitoDS` remains statically shipped and
+linked from the Hub while current documentation also describes it as internal. Record one truthful
+production role and the resulting Architecture/Design System admission boundary without implementing
+the route or generated-manifest change in this Product decision slice.
 
-Approval policy: Routine local inspection, documentation reconciliation, reachability checks, and
-bounded read-only validation proceed under standing authorization. Do not stage, commit, push,
-deploy, mutate hosted data, or call providers without explicit authority.
+Approval policy: Routine source inspection and Product documentation proceed under standing
+authorization. Implementation and external mutation remain separately owned.
 ```
 
 ## Target Stack
@@ -161,9 +163,26 @@ paths, or compatibility behavior from size, age, or a stale document claim alone
 
 ## Next Admission
 
-The current Architecture audit is complete and the program is active. The immediate gate is not a
-new implementation: the already modified Backend/package/proof bundle must first achieve truthful
-inventory, independent QA, and exact source-control integration so its untracked canonical helpers
-are reproducible from Git. Architecture then admits Slice 3, Lovable wrapper convergence, as the
-first new code slice. Slice 4 follows only after the concurrent TanStack manual-workout migration is
-integrated. No broad rewrite, new framework, or deletion from line count is admitted.
+Slice 5 is closed by its atomic release receipt. The next boundary is the explicit Product decision
+for Slice 6: whether `/hitoDS` remains a production-shipped reference surface. No Design System route
+or generated-representation implementation is admitted before that decision. Documentation hygiene
+remains later work; no broad rewrite, framework migration, new queue, or line-count deletion is admitted.
+
+## Slice 5 Closure Receipt
+
+- Backend now projects explicit Product DTOs at the existing Activity History, factual Progress,
+  activity-mutation, and generated-preview response owners; canonical lineage and reviewed-plan
+  truth remain internal to their existing owners.
+- Product consumers use those DTOs directly. Generated preview no longer receives the full canonical
+  reviewed draft, Progress no longer imports the internal read model, and workout comparison has no
+  live `facts` fallback.
+- New comparison writes and Product readback use `signals` only. The evidenced exact historical dual
+  representation normalizes to `signals`; facts-only, contradictory, duplicate, malformed, and
+  extra-key forms reject without repair or hosted-data rewriting.
+- Provider-shaped preview, signed review/confirm, local persistence/RLS, representative and
+  3,000-activity read models, Gate 4, comparison carry-forward, payload/privacy, production build,
+  Vercel parity, built loopback runtime, desktop and exact 375px light/dark Product QA,
+  keyboard/focus, failure/retry, and independent source review passed. Provider calls and hosted
+  data/schema mutations were neither required nor performed.
+- The exact atomic release excludes concurrent `AGENTS.md` and build-finalizer work. Global QA
+  remains separate; this receipt closes only the Slice 5 owner-level and integrated release boundary.

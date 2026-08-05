@@ -322,13 +322,6 @@ export interface WorkoutComparisonDifferencePayload {
     actualStructuredStepCount: number | null;
   };
   signals: WorkoutComparisonSignal[];
-  facts: {
-    activityType: WorkoutComparisonSignal;
-    dateAlignment: WorkoutComparisonSignal;
-    duration: WorkoutComparisonSignal;
-    distance: WorkoutComparisonSignal;
-    structuredStepCount: WorkoutComparisonSignal;
-  };
   supportMatrix: WorkoutComparisonSupportMatrix;
   stepSummary: WorkoutComparisonStepSummary;
   segmentSummary: WorkoutComparisonSegmentSummary;

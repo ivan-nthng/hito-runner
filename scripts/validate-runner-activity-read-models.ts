@@ -10,6 +10,11 @@ import {
   removeRunnerActivityOriginalFilesForActivity,
 } from "../src/lib/runner-activity/garmin-fit-source";
 import { listRunnerActivityHistoryForUser } from "../src/lib/runner-activity/history-read-model";
+import {
+  projectRunnerActivityHistoryForProduct,
+  projectRunnerActivityMutationReadbackForProduct,
+  projectRunnerActivityProgressForProduct,
+} from "../src/lib/runner-activity/product-contract";
 import { getRunnerActivityProgressForUser } from "../src/lib/runner-activity/read-model";
 import { getPersistedSnapshot } from "../src/lib/training-api";
 import { WORKOUT_RESULT_STORAGE_BUCKET } from "../src/lib/workout-result-import/types";
@@ -47,6 +52,15 @@ async function main() {
 }
 
 async function runValidation() {
+  assertProductMutationReadback(
+    projectRunnerActivityMutationReadbackForProduct({
+      activityId: "00000000-0000-4000-8000-000000000001",
+      status: "updating",
+      history: null,
+      progress: null,
+      reason: "read_model_recalculation_pending",
+    }),
+  );
   const runtimeSessions = runtimeUrl
     ? {
         owner: await prepareRuntimePoolIdentity(runtimeUrl, "provider-engine"),
@@ -258,6 +272,8 @@ async function measureSnapshotReconciliation(userId: string, activityCount: numb
 
     assert.equal(reconciliationMiss.progress.status, "current");
     assert.equal(reconciliationMiss.progress.advancedMetrics.status, "current");
+    const productProgress = projectRunnerActivityProgressForProduct(reconciliationMiss.progress);
+    assertProductProgressProjection(reconciliationMiss.progress, productProgress);
     if (activityCount === 30) {
       assert.equal(reconciliationMiss.writeCount, 9);
       assert.equal(reconciliationMiss.readCount, 15);
@@ -350,7 +366,8 @@ async function measureSnapshotReconciliation(userId: string, activityCount: numb
       },
       mutationProducedFreshMetricSnapshot: true,
       factualSnapshotRemainedCurrent: true,
-      currentPayloadBytes: Buffer.byteLength(JSON.stringify(reconciliationMiss.progress), "utf8"),
+      internalPayloadBytes: Buffer.byteLength(JSON.stringify(reconciliationMiss.progress), "utf8"),
+      productPayloadBytes: Buffer.byteLength(JSON.stringify(productProgress), "utf8"),
       planLifecycle,
     };
   } finally {
@@ -624,6 +641,11 @@ async function proveRuntimeRoutes(input: {
   assert.equal(historyBody.ok, true);
   assert.equal(historyBody.history.items.length, 2);
   assert.ok(historyBody.history.nextCursor);
+  assertProductHistoryProjection(historyBody.history);
+  assert.doesNotMatch(
+    JSON.stringify(historyBody.history),
+    /activityRevisionId|normalizerVersion|dateBasis|recordingKind/,
+  );
 
   const invalidCursor = await fetch(
     new URL("/api/runner-activities?cursor=not-a-cursor", baseUrl),
@@ -638,9 +660,14 @@ async function proveRuntimeRoutes(input: {
   assert.equal(progressResponse.status, 200);
   const progressBody = await progressResponse.json();
   assert.equal(progressBody.ok, true);
+  assertProductProgressShape(progressBody.progress);
   assert.equal(
     progressBody.progress.rolling28Day.current.formulaVersion,
     "runner_activity_facts_v1",
+  );
+  assert.doesNotMatch(
+    JSON.stringify(progressBody.progress),
+    /snapshotId|activityRevisionId|sourceRevisionId|evidenceRevisionId|observationId|creationCause|formulaSetVersion/,
   );
 
   const sourceRemoveResponse = await fetch(
@@ -651,6 +678,11 @@ async function proveRuntimeRoutes(input: {
   const sourceRemoveBody = await sourceRemoveResponse.json();
   assert.equal(sourceRemoveBody.ok, true);
   assert.equal(sourceRemoveBody.readback.status, "current");
+  assertProductMutationReadback(sourceRemoveBody.readback);
+  assert.doesNotMatch(
+    JSON.stringify(sourceRemoveBody.readback),
+    /snapshotId|activityRevisionId|sourceRevisionId|evidenceRevisionId|observationId|creationCause|normalizerVersion/,
+  );
   assert.equal(
     sourceRemoveBody.readback.history.items.find(
       (item: { id: string }) => item.id === routeSource.receipt.activityId,
@@ -666,6 +698,11 @@ async function proveRuntimeRoutes(input: {
   const deleteBody = await deleteResponse.json();
   assert.equal(deleteBody.ok, true);
   assert.equal(deleteBody.readback.status, "current");
+  assertProductMutationReadback(deleteBody.readback);
+  assert.doesNotMatch(
+    JSON.stringify(deleteBody.readback),
+    /snapshotId|activityRevisionId|sourceRevisionId|evidenceRevisionId|observationId|creationCause|normalizerVersion/,
+  );
   assert.equal(
     deleteBody.readback.history.items.some(
       (item: { id: string }) => item.id === routeDelete.receipt.activityId,
@@ -717,10 +754,181 @@ async function proveHistoryPagination(input: {
   assert.equal(elapsedOnly?.pace?.basis, "elapsed");
   const serialized = JSON.stringify(items);
   assert.doesNotMatch(serialized, /storage_path|raw_original_file_name|fingerprint|\.fit/i);
+  const productHistory = projectRunnerActivityHistoryForProduct({ items, nextCursor: null });
+  assert.equal(productHistory.items.length, items.length);
+  assertProductHistoryProjection(productHistory);
+  assert.doesNotMatch(
+    JSON.stringify(productHistory),
+    /activityRevisionId|normalizerVersion|dateBasis|recordingKind/,
+  );
   await assert.rejects(
     listRunnerActivityHistoryForUser({ userId: input.userId, cursor: "not-a-cursor" }),
     /cursor is invalid/i,
   );
+}
+
+function assertProductProgressProjection(
+  internal: Awaited<ReturnType<typeof getRunnerActivityProgressForUser>>,
+  product: ReturnType<typeof projectRunnerActivityProgressForProduct>,
+) {
+  assertProductProgressShape(product);
+  assert.doesNotMatch(
+    JSON.stringify(product),
+    /snapshotId|activityRevisionId|sourceRevisionId|evidenceRevisionId|observationId|creationCause|formulaSetVersion/,
+  );
+  assert.ok(
+    Buffer.byteLength(JSON.stringify(product), "utf8") <
+      Buffer.byteLength(JSON.stringify(internal), "utf8"),
+    "Product Progress projection must be smaller than the internal read model.",
+  );
+}
+
+function assertProductProgressShape(
+  product: ReturnType<typeof projectRunnerActivityProgressForProduct>,
+) {
+  assertExactKeys(product, [
+    "advancedMetrics",
+    "asOfDate",
+    "calendarWeeks",
+    "rolling28Day",
+    "status",
+  ]);
+  assertExactKeys(product.rolling28Day, ["current", "previous"]);
+  assertProductSnapshot(product.rolling28Day.current);
+  assertProductSnapshot(product.rolling28Day.previous);
+  product.calendarWeeks.forEach(assertProductSnapshot);
+  assertProductAdvancedMetrics(product.advancedMetrics);
+}
+
+function assertProductHistoryProjection(
+  history: ReturnType<typeof projectRunnerActivityHistoryForProduct>,
+) {
+  assertExactKeys(history, ["items", "nextCursor"]);
+  for (const item of history.items) {
+    assertExactKeys(item, [
+      "capabilities",
+      "distanceKm",
+      "duration",
+      "historicalTime",
+      "id",
+      "identity",
+      "observedHeartRate",
+      "pace",
+      "plannedWorkout",
+      "quality",
+      "source",
+    ]);
+    assertExactKeys(item.identity, ["label"]);
+    assertExactKeys(item.historicalTime, ["localDate", "startedAt", "timezone"]);
+    if (item.duration) assertExactKeys(item.duration, ["basis", "minutes"]);
+    if (item.pace) assertExactKeys(item.pace, ["basis", "secondsPerKm"]);
+    if (item.observedHeartRate) assertExactKeys(item.observedHeartRate, ["averageBpm"]);
+    if (item.plannedWorkout) assertExactKeys(item.plannedWorkout, ["id", "title", "workoutDate"]);
+    assertExactKeys(item.source, ["kind", "originalRetained", "rawState", "reprocessingAvailable"]);
+    assertExactKeys(item.quality, ["updating"]);
+    assertExactKeys(item.capabilities, ["canRemoveOriginalFile"]);
+  }
+}
+
+function assertProductSnapshot(
+  snapshot: ReturnType<typeof projectRunnerActivityProgressForProduct>["rolling28Day"]["current"],
+) {
+  assertExactKeys(snapshot, ["eligibleActivityCount", "facts", "formulaVersion", "window"]);
+  assertExactKeys(snapshot.window, [
+    "cutoffDate",
+    "endDate",
+    "startDate",
+    "timezoneBasis",
+    "weekStartsOn",
+  ]);
+  assertExactKeys(snapshot.facts, [
+    "distance",
+    "elevationGain",
+    "longestDistance",
+    "longestDuration",
+    "runningTime",
+    "sessions",
+  ]);
+  Object.values(snapshot.facts).forEach((metric) =>
+    assertExactKeys(metric, [
+      "availability",
+      "confidence",
+      "includedActivityCount",
+      "missingActivityCount",
+      "missingReasons",
+      "unit",
+      "value",
+    ]),
+  );
+}
+
+function assertProductAdvancedMetrics(
+  metrics: ReturnType<typeof projectRunnerActivityProgressForProduct>["advancedMetrics"],
+) {
+  if (metrics.status === "updating") {
+    assertExactKeys(metrics, ["asOfDate", "reason", "staleValuesReturned", "status"]);
+    return;
+  }
+
+  assertExactKeys(metrics, [
+    "asOfDate",
+    "detailedMetrics",
+    "historical",
+    "records",
+    "sessionRpeLoad",
+    "status",
+  ]);
+  assertExactKeys(metrics.sessionRpeLoad, ["calendarWeeks", "formulaVersion", "rolling28Day"]);
+  assertExactKeys(metrics.sessionRpeLoad.rolling28Day, ["current", "previous"]);
+  [
+    metrics.sessionRpeLoad.rolling28Day.current,
+    metrics.sessionRpeLoad.rolling28Day.previous,
+    ...metrics.sessionRpeLoad.calendarWeeks,
+  ].forEach((window) => {
+    assertExactKeys(window, ["endDate", "metric", "startDate"]);
+    assertExactKeys(window.metric, [
+      "availability",
+      "confidence",
+      "displayValue",
+      "includedObservationCount",
+      "unavailableObservationCount",
+      "unavailableReasons",
+      "unit",
+      "value",
+    ]);
+  });
+  assertExactKeys(metrics.records, ["availability", "items", "unavailableReasons"]);
+  metrics.records.items.forEach((record) =>
+    assertExactKeys(record, [
+      "confidence",
+      "context",
+      "distanceKey",
+      "distanceMeters",
+      "elapsedSeconds",
+      "eventDate",
+      "id",
+      "provenance",
+      "recordClass",
+    ]),
+  );
+  assertExactKeys(metrics.detailedMetrics, ["reason", "status"]);
+}
+
+function assertProductMutationReadback(
+  readback: ReturnType<typeof projectRunnerActivityMutationReadbackForProduct>,
+) {
+  if (readback.status === "updating") {
+    assertExactKeys(readback, ["activityId", "history", "progress", "reason", "status"]);
+    return;
+  }
+
+  assertExactKeys(readback, ["activityId", "history", "progress", "status"]);
+  assertProductHistoryProjection(readback.history);
+  assertProductProgressShape(readback.progress);
+}
+
+function assertExactKeys(value: object, expected: string[]) {
+  assert.deepEqual(Object.keys(value).sort(), [...expected].sort());
 }
 
 async function proveFactSnapshots(userId: string) {

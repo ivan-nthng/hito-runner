@@ -46,6 +46,7 @@ import { DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE } from "../src/lib/local-auth-account-
 import { buildReviewedFirstPlanImportedSeed } from "../src/lib/active-plan-persistence";
 import {
   confirmRunningPlanDraftForUser,
+  projectRunningPlanPreviewResultForProduct,
   runningPlanConfirmInputSchema,
   runningPlanPreviewInputSchema,
   type RunningPlanPreviewActionInput,
@@ -499,6 +500,8 @@ async function validatePlanFirstPreviewScenarios() {
         : `${scenario.name} failed: ${result.unavailable.error.message}`,
     );
     if (!result.ok) throw new Error(result.unavailable.error.message);
+
+    assertProductPreviewProjection(scenario.name, result);
 
     const canonicalPlan = await assertReviewedDraftExactness({
       scenarioName: scenario.name,
@@ -1258,6 +1261,7 @@ async function validateTypedPlanFirstFailureOutcomes() {
     assert.equal(notConfigured.unavailable.previewOutcome, "provider_runtime_failure");
     assert.equal(notConfigured.unavailable.debug.generationTrace?.provider.kind, "not_started");
     assert.equal(notConfigured.unavailable.debug.generationTrace?.provider.paidProviderCall, false);
+    assertProductUnavailableProjection(notConfigured);
 
     const cases = [
       {
@@ -1311,6 +1315,7 @@ async function validateTypedPlanFirstFailureOutcomes() {
       if (result.ok) throw new Error(`${scenarioCase.expected} unexpectedly produced a draft.`);
       assert.equal(result.unavailable.previewOutcome, scenarioCase.expected);
       assert.equal(result.unavailable.persisted, false);
+      assertProductUnavailableProjection(result);
     }
   } finally {
     if (originalFixtureFlag === undefined) {
@@ -1319,6 +1324,68 @@ async function validateTypedPlanFirstFailureOutcomes() {
       process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV] = originalFixtureFlag;
     }
   }
+}
+
+function assertProductPreviewProjection(
+  scenarioName: string,
+  result: Extract<
+    Awaited<ReturnType<typeof buildReviewedAiGeneratedRunningPlanPreview>>,
+    { ok: true }
+  >,
+) {
+  const product = projectRunningPlanPreviewResultForProduct(result);
+  assert.equal(product.ok, true);
+  if (!product.ok) throw new Error(`${scenarioName} Product projection unexpectedly failed.`);
+
+  assert.deepEqual(Object.keys(product.draft).sort(), [
+    "calendarRows",
+    "goal",
+    "previewInput",
+    "previewOutcome",
+    "reviewChecksum",
+    "reviewToken",
+    "schedule",
+    "sourceKind",
+    "workoutDocuments",
+  ]);
+  assert.deepEqual(Object.keys(product.draft.goal).sort(), [
+    "distanceLabel",
+    "targetDate",
+    "targetFinishTime",
+  ]);
+  assert.deepEqual(Object.keys(product.draft.schedule).sort(), ["endDate", "startDate"]);
+  assert.equal(product.draft.reviewToken, result.draft.reviewToken);
+  assert.equal(product.draft.reviewChecksum, result.draft.reviewChecksum);
+  assert.deepEqual(product.draft.previewInput, result.draft.previewInput);
+  assert.deepEqual(product.draft.workoutDocuments, result.draft.workoutDocuments);
+  assert.deepEqual(Object.keys(product.draft.calendarRows[0] ?? {}).sort(), [
+    "date",
+    "endpointDistanceMeters",
+    "isRestDay",
+    "rowId",
+    "title",
+    "weekNumber",
+    "weekday",
+  ]);
+  assert.ok(
+    Buffer.byteLength(JSON.stringify(product), "utf8") <
+      Buffer.byteLength(JSON.stringify(result), "utf8"),
+    `${scenarioName} Product preview must be smaller than the internal reviewed draft.`,
+  );
+}
+
+function assertProductUnavailableProjection(
+  result: Extract<
+    Awaited<ReturnType<typeof buildReviewedAiGeneratedRunningPlanPreview>>,
+    { ok: false }
+  >,
+) {
+  const product = projectRunningPlanPreviewResultForProduct(result);
+  assert.deepEqual(Object.keys(product).sort(), ["ok", "unavailable"]);
+  assert.equal(product.ok, false);
+  if (product.ok) throw new Error("Unavailable Product projection unexpectedly became ready.");
+  assert.deepEqual(Object.keys(product.unavailable).sort(), ["error", "previewOutcome"]);
+  assert.deepEqual(Object.keys(product.unavailable.error).sort(), ["code", "message"]);
 }
 
 function assertUnavailableLifecycleResult(

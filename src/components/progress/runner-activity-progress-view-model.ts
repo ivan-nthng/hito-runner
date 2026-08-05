@@ -1,15 +1,14 @@
 import type {
-  RunnerActivityAdvancedMetricConfidence,
-  RunnerActivityFactMetric,
-  RunnerActivityFactSnapshot,
-  RunnerActivityHistoryItem,
-  RunnerActivityRecordItem,
-  RunnerActivitySessionLoadMetric,
-  RunnerActivitySessionLoadWindow,
-} from "@/lib/runner-activity/read-model-types";
+  RunnerActivityHistoryProductItem,
+  RunnerActivityProgressProductFactMetric,
+  RunnerActivityProgressProductRecord,
+  RunnerActivityProgressProductSessionLoadMetric,
+  RunnerActivityProgressProductSessionLoadWindow,
+  RunnerActivityProgressProductSnapshot,
+} from "@/lib/runner-activity/product-contract";
 import { formatDate } from "@/lib/training";
 
-export type ProgressFactKey = keyof RunnerActivityFactSnapshot["facts"];
+export type ProgressFactKey = keyof RunnerActivityProgressProductSnapshot["facts"];
 
 export const PROGRESS_FACTS: Array<{ key: ProgressFactKey; label: string }> = [
   { key: "sessions", label: "Runs" },
@@ -20,7 +19,7 @@ export const PROGRESS_FACTS: Array<{ key: ProgressFactKey; label: string }> = [
   { key: "longestDuration", label: "Longest duration" },
 ];
 
-export function activityDisplayDate(activity: RunnerActivityHistoryItem) {
+export function activityDisplayDate(activity: RunnerActivityHistoryProductItem) {
   const localDate = activity.historicalTime.localDate;
   if (!localDate) return "Date unavailable";
 
@@ -33,7 +32,7 @@ export function activityDisplayDate(activity: RunnerActivityHistoryItem) {
   });
 }
 
-export function activityDateRail(activity: RunnerActivityHistoryItem) {
+export function activityDateRail(activity: RunnerActivityHistoryProductItem) {
   const localDate = activity.historicalTime.localDate;
   if (!localDate) return { day: "--", month: "Date" };
 
@@ -43,14 +42,14 @@ export function activityDateRail(activity: RunnerActivityHistoryItem) {
   };
 }
 
-export function activityPrimaryFacts(activity: RunnerActivityHistoryItem) {
+export function activityPrimaryFacts(activity: RunnerActivityHistoryProductItem) {
   return [
     activity.distanceKm == null ? null : `${formatDecimal(activity.distanceKm)} km`,
     activity.duration == null ? null : formatMinutes(activity.duration.minutes),
   ].filter((value): value is string => value !== null);
 }
 
-export function activitySupportingFacts(activity: RunnerActivityHistoryItem) {
+export function activitySupportingFacts(activity: RunnerActivityHistoryProductItem) {
   return [
     activity.pace == null ? null : `${formatPace(activity.pace.secondsPerKm)} /km`,
     activity.observedHeartRate == null
@@ -59,7 +58,7 @@ export function activitySupportingFacts(activity: RunnerActivityHistoryItem) {
   ].filter((value): value is string => value !== null);
 }
 
-export function activityDisclosureLabel(activity: RunnerActivityHistoryItem) {
+export function activityDisclosureLabel(activity: RunnerActivityHistoryProductItem) {
   return [
     activityDisplayDate(activity),
     activity.identity.label,
@@ -67,7 +66,7 @@ export function activityDisclosureLabel(activity: RunnerActivityHistoryItem) {
   ].join(", ");
 }
 
-export function formatStartedTime(activity: RunnerActivityHistoryItem) {
+export function formatStartedTime(activity: RunnerActivityHistoryProductItem) {
   if (!activity.historicalTime.startedAt) return null;
 
   try {
@@ -87,7 +86,7 @@ export function formatStartedTime(activity: RunnerActivityHistoryItem) {
   }
 }
 
-export function formatFact(metric: RunnerActivityFactMetric) {
+export function formatFact(metric: RunnerActivityProgressProductFactMetric) {
   if (metric.availability !== "available" || metric.value == null) return "Not available";
 
   switch (metric.unit) {
@@ -102,7 +101,7 @@ export function formatFact(metric: RunnerActivityFactMetric) {
   }
 }
 
-export function formatRollingSummary(snapshot: RunnerActivityFactSnapshot) {
+export function formatRollingSummary(snapshot: RunnerActivityProgressProductSnapshot) {
   const facts = [snapshot.facts.sessions, snapshot.facts.runningTime, snapshot.facts.distance]
     .filter((metric) => metric.availability === "available" && metric.value != null)
     .map(formatFact);
@@ -110,11 +109,11 @@ export function formatRollingSummary(snapshot: RunnerActivityFactSnapshot) {
   return facts.length > 0 ? facts.join(" · ") : null;
 }
 
-export function formatWindow(snapshot: RunnerActivityFactSnapshot) {
+export function formatWindow(snapshot: RunnerActivityProgressProductSnapshot) {
   return `${formatDate(snapshot.window.startDate)} to ${formatDate(snapshot.window.endDate)}`;
 }
 
-export function confidenceLabel(metric: RunnerActivityFactMetric) {
+export function confidenceLabel(metric: RunnerActivityProgressProductFactMetric) {
   if (metric.confidence === "complete") return "Complete evidence";
   if (metric.confidence === "partial") return "Partial evidence";
   return "Unavailable";
@@ -132,16 +131,18 @@ export function missingReasonLabel(reason: string) {
   return labels[reason] ?? reason.replaceAll("_", " ");
 }
 
-export function formatSessionLoad(metric: RunnerActivitySessionLoadMetric) {
+export function formatSessionLoad(metric: RunnerActivityProgressProductSessionLoadMetric) {
   if (metric.availability !== "available" || metric.displayValue == null) return "Not available";
   return `${Math.round(metric.displayValue)} AU`;
 }
 
-export function formatAdvancedWindow(window: RunnerActivitySessionLoadWindow) {
+export function formatAdvancedWindow(window: RunnerActivityProgressProductSessionLoadWindow) {
   return `${formatDate(window.startDate)} to ${formatDate(window.endDate)}`;
 }
 
-export function advancedConfidenceLabel(confidence: RunnerActivityAdvancedMetricConfidence) {
+export function advancedConfidenceLabel(
+  confidence: RunnerActivityProgressProductSessionLoadMetric["confidence"],
+) {
   if (confidence === "complete") return "Complete evidence";
   if (confidence === "partial") return "Partial evidence";
   return "Unavailable";
@@ -166,7 +167,7 @@ export function advancedUnavailableReasonLabel(reason: string) {
   return labels[reason] ?? "Required activity evidence is not available";
 }
 
-export function recordDistanceLabel(record: RunnerActivityRecordItem) {
+export function recordDistanceLabel(record: RunnerActivityProgressProductRecord) {
   const [amount, unit] = record.distanceKey.split("_");
   if (record.distanceKey === "half_marathon") return "Half marathon";
   if (record.distanceKey === "marathon") return "Marathon";
@@ -175,13 +176,13 @@ export function recordDistanceLabel(record: RunnerActivityRecordItem) {
   return `${formatDecimal(record.distanceMeters / 1000)} km`;
 }
 
-export function recordClassLabel(record: RunnerActivityRecordItem) {
+export function recordClassLabel(record: RunnerActivityProgressProductRecord) {
   return record.recordClass === "runner_confirmed_official_result"
     ? "Official result entered by you"
     : "Hito-observed whole activity";
 }
 
-export function recordConfidenceLabel(record: RunnerActivityRecordItem) {
+export function recordConfidenceLabel(record: RunnerActivityProgressProductRecord) {
   return record.confidence === "complete" ? "Complete evidence" : "Partial evidence";
 }
 

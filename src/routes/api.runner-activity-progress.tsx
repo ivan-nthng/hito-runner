@@ -9,7 +9,11 @@ export const Route = createFileRoute("/api/runner-activity-progress")({
           const userId = await requirePersistedUserIdForCurrentRequest();
           const { getRunnerActivityProgressForUser } =
             await import("@/lib/runner-activity/read-model");
-          const progress = await getRunnerActivityProgressForUser({ userId });
+          const { projectRunnerActivityProgressForProduct } =
+            await import("@/lib/runner-activity/product-contract");
+          const progress = projectRunnerActivityProgressForProduct(
+            await getRunnerActivityProgressForUser({ userId }),
+          );
           return Response.json({ ok: true, progress }, { status: 200 });
         } catch (error) {
           if (

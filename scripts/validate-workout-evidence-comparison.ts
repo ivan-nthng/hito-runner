@@ -12,6 +12,9 @@ import { comparisonRowToSummary } from "../src/lib/workout-result-import/read-wo
 import type { Database, Json } from "../src/lib/supabase/database";
 import type {
   WorkoutActualMetricsSummary,
+  WorkoutAiInsightSummary,
+  WorkoutComparisonDifferencePayload,
+  WorkoutComparisonSignal,
   WorkoutComparisonSummary,
   WorkoutResultAssetSummary,
 } from "../src/lib/workout-result-import/types";
@@ -142,13 +145,19 @@ function validateActivityTypeBoundary() {
 
   assert.equal(cycling.comparisonStatus, "insufficient_data");
   assert.equal(cycling.completionState, "unclear");
-  assert.equal(cycling.differencePayload.facts.activityType.status, "mismatch");
-  assert.equal(cycling.differencePayload.facts.duration.status, "not_applicable");
-  assert.equal(cycling.differencePayload.facts.distance.status, "not_applicable");
-  assert.equal(cycling.differencePayload.facts.structuredStepCount.status, "not_applicable");
+  assert.equal(signalByKey(cycling.differencePayload, "activity_type").status, "mismatch");
+  assert.equal(signalByKey(cycling.differencePayload, "duration").status, "not_applicable");
+  assert.equal(signalByKey(cycling.differencePayload, "distance").status, "not_applicable");
+  assert.equal(
+    signalByKey(cycling.differencePayload, "structured_step_count").status,
+    "not_applicable",
+  );
 
   const missingSport = compare({ summary_payload: { session: {} } });
-  assert.equal(missingSport.differencePayload.facts.activityType.status, "missing_actual");
+  assert.equal(
+    signalByKey(missingSport.differencePayload, "activity_type").status,
+    "missing_actual",
+  );
   assert.equal(missingSport.comparisonStatus, "insufficient_data");
 }
 
@@ -158,16 +167,18 @@ function validateEvidenceBundleIdentity(
   const asset = buildAssetSummary();
   const actualMetrics = buildActualMetricsSummary();
   const comparison = buildComparisonSummary(comparisonResult);
+  const aiInsight = buildAiInsightSummary();
   const linked = buildWorkoutResultEvidenceBundle({
     latestAsset: asset,
     latestActualMetrics: actualMetrics,
     latestComparison: comparison,
-    latestAiInsight: null,
+    latestAiInsight: aiInsight,
   });
 
   assert.equal(linked.marker?.state, "feedback_ready");
   assert.equal(linked.latestActualMetrics?.resultAssetId, asset.id);
   assert.equal(linked.latestComparison?.actualMetricsId, actualMetrics.id);
+  assert.equal(linked.latestAiInsight?.comparisonId, comparison.id);
 
   const rawRemoved = buildWorkoutResultEvidenceBundle({
     latestAsset: { ...asset, rawFileAvailable: false, reprocessingAvailable: false },
@@ -201,6 +212,21 @@ function validateEvidenceBundleIdentity(
   assert.equal(failedAttempt.latestComparison, null);
 }
 
+function buildAiInsightSummary(): WorkoutAiInsightSummary {
+  return {
+    id: "10000000-0000-4000-8000-000000000006",
+    comparisonId: COMPARISON_ID,
+    actualMetricsId: METRICS_ID,
+    status: "final",
+    analysisSummary: "Sanitized historical insight",
+    differenceExplanation: "Sanitized deterministic association proof",
+    nextWorkoutRecommendation: "Keep the reviewed plan unchanged",
+    recommendationLevel: "keep",
+    cautionFlags: [],
+    createdAt: "2026-07-17T08:01:00.000Z",
+  };
+}
+
 function validateCarryForwardIdentity(
   comparisonResult: ReturnType<typeof buildDeterministicWorkoutComparison>,
 ) {
@@ -213,6 +239,16 @@ function validateCarryForwardIdentity(
 
   assert.equal(
     (relinked.plannedWorkout as { plannedWorkoutId?: unknown }).plannedWorkoutId,
+    nextWorkoutId,
+  );
+  const historicalRelinked = relinkComparisonPlannedWorkoutIdentity(
+    buildHistoricalDualPayload(comparisonResult.differencePayload) as unknown as Json,
+    WORKOUT_ID,
+    nextWorkoutId,
+  ) as Record<string, Json | undefined>;
+  assert.equal("facts" in historicalRelinked, false);
+  assert.equal(
+    (historicalRelinked.plannedWorkout as { plannedWorkoutId?: unknown }).plannedWorkoutId,
     nextWorkoutId,
   );
   assert.throws(
@@ -235,15 +271,40 @@ function validatePersistedPayloadBoundary(
   );
   assert.equal(readWorkoutComparisonDifferencePayload({ broken: true }), null);
 
-  const contradictory = structuredClone(comparison.differencePayload);
+  const historicalDual = buildHistoricalDualPayload(comparison.differencePayload);
+  assert.deepEqual(
+    readWorkoutComparisonDifferencePayload(historicalDual as unknown as Json),
+    comparison.differencePayload,
+    "An exact historical dual row must normalize to the canonical signals-only Product truth.",
+  );
+
+  const factsOnly = structuredClone(historicalDual) as unknown as Record<string, Json | undefined>;
+  delete factsOnly.signals;
+  assert.equal(
+    readWorkoutComparisonDifferencePayload(factsOnly),
+    null,
+    "Historical facts-only rows have no accepted canonical comparison truth.",
+  );
+
+  const contradictory = structuredClone(historicalDual);
   contradictory.facts.duration = {
     ...contradictory.facts.duration,
     status: contradictory.facts.duration.status === "matched" ? "mismatch" : "matched",
   };
   assert.equal(
-    readWorkoutComparisonDifferencePayload(contradictory),
+    readWorkoutComparisonDifferencePayload(contradictory as unknown as Json),
     null,
     "Contradictory signals/facts metadata must reject instead of silently preferring one wire form.",
+  );
+
+  const extraHistoricalFact = structuredClone(historicalDual) as typeof historicalDual & {
+    facts: HistoricalComparisonFacts & { extra: Json };
+  };
+  extraHistoricalFact.facts.extra = { status: "matched" };
+  assert.equal(
+    readWorkoutComparisonDifferencePayload(extraHistoricalFact as unknown as Json),
+    null,
+    "Historical dual metadata must have the exact canonical facts keyset.",
   );
 
   const duplicateSignal = structuredClone(comparison.differencePayload);
@@ -253,6 +314,38 @@ function validatePersistedPayloadBoundary(
     null,
     "Duplicate or additional signals must not create another accepted comparison truth.",
   );
+}
+
+type HistoricalComparisonFacts = {
+  activityType: WorkoutComparisonSignal;
+  dateAlignment: WorkoutComparisonSignal;
+  duration: WorkoutComparisonSignal;
+  distance: WorkoutComparisonSignal;
+  structuredStepCount: WorkoutComparisonSignal;
+};
+
+function buildHistoricalDualPayload(
+  payload: WorkoutComparisonDifferencePayload,
+): WorkoutComparisonDifferencePayload & { facts: HistoricalComparisonFacts } {
+  return {
+    ...structuredClone(payload),
+    facts: {
+      activityType: signalByKey(payload, "activity_type"),
+      dateAlignment: signalByKey(payload, "date_alignment"),
+      duration: signalByKey(payload, "duration"),
+      distance: signalByKey(payload, "distance"),
+      structuredStepCount: signalByKey(payload, "structured_step_count"),
+    },
+  };
+}
+
+function signalByKey(
+  payload: WorkoutComparisonDifferencePayload,
+  key: WorkoutComparisonSignal["key"],
+) {
+  const signal = payload.signals.find((candidate) => candidate.key === key);
+  assert.ok(signal, `Expected canonical ${key} comparison signal.`);
+  return signal;
 }
 
 function compare(

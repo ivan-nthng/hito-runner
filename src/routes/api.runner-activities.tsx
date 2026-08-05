@@ -14,7 +14,12 @@ export const Route = createFileRoute("/api/runner-activities")({
           const { listRunnerActivityHistoryForUser } =
             await import("@/lib/runner-activity/history-read-model");
           const history = await listRunnerActivityHistoryForUser({ userId, cursor, pageSize });
-          return Response.json({ ok: true, history }, { status: 200 });
+          const { projectRunnerActivityHistoryForProduct } =
+            await import("@/lib/runner-activity/product-contract");
+          return Response.json(
+            { ok: true, history: projectRunnerActivityHistoryForProduct(history) },
+            { status: 200 },
+          );
         } catch (error) {
           if (
             error instanceof Error &&

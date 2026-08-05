@@ -50,7 +50,7 @@ type SelectedRunningPlanPreviewStatus = "idle" | "previewing_plan";
 type RunningPlanCreateStatus = "idle" | "creating";
 
 function reviewedGoalLabel(draft: SelectedRunningPlanPreviewDraft) {
-  return draft.normalizedInputSummary.planGoalIntent.distance?.label ?? "Distance unavailable";
+  return draft.goal.distanceLabel;
 }
 
 interface SelectedRunningPlanPreviewDialogProps {
@@ -332,11 +332,10 @@ function GeneratedPlanReadyReviewHeader({
   description: string;
   draft: SelectedRunningPlanPreviewDraft;
 }) {
-  const startDate = draft.canonicalPlan.start_date;
-  const endDate = draft.canonicalPlan.planned_workouts.at(-1)?.date ?? startDate;
-  const goalIntent = draft.normalizedInputSummary.planGoalIntent;
-  const raceDate = goalIntent.targetDate;
-  const finishTime = goalIntent.targetFinishTime?.label;
+  const startDate = draft.schedule.startDate;
+  const endDate = draft.schedule.endDate;
+  const raceDate = draft.goal.targetDate;
+  const finishTime = draft.goal.targetFinishTime;
   const durationWeeks = groupRowsByWeek(draft.calendarRows).length;
   const header = buildGeneratedPlanReviewHeaderModel({
     durationWeeks,
@@ -452,6 +451,15 @@ function PreviewUnavailableState({ result }: { result: SelectedRunningPlanPrevie
           <PreviewFact label="Saved plan" value="Nothing was created or saved." />
         </div>
       </div>
+    </div>
+  );
+}
+
+function PreviewFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="hito-label">{label}</p>
+      <p className="hito-list-row-copy mt-1">{value}</p>
     </div>
   );
 }

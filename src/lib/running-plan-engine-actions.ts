@@ -111,14 +111,57 @@ export const runningPlanConfirmInputSchema = z
   })
   .strict();
 
-type RunningPlanPreviewActionReadyResult = {
+type RunningPlanReviewedPreviewReadyResult = {
   ok: true;
   draft: RunningPlanReviewedPreviewDraft<AiGeneratedRunningPlanPreviewDraft>;
 };
 
-export type RunningPlanPreviewActionResult =
-  | RunningPlanPreviewActionReadyResult
+type RunningPlanReviewedPreviewResult =
+  | RunningPlanReviewedPreviewReadyResult
   | { ok: false; unavailable: AiGeneratedRunningPlanPreviewUnavailable };
+
+type InternalPreviewCalendarRow = AiGeneratedRunningPlanPreviewDraft["calendarRows"][number];
+
+export type RunningPlanPreviewProductCalendarRow = {
+  rowId: InternalPreviewCalendarRow["rowId"];
+  date: InternalPreviewCalendarRow["date"];
+  weekNumber: InternalPreviewCalendarRow["weekNumber"];
+  weekday: InternalPreviewCalendarRow["weekday"];
+  isRestDay: InternalPreviewCalendarRow["isRestDay"];
+  title: InternalPreviewCalendarRow["title"];
+  endpointDistanceMeters: InternalPreviewCalendarRow["endpointDistanceMeters"];
+};
+
+export type RunningPlanPreviewProductDraft = {
+  sourceKind: AiGeneratedRunningPlanPreviewDraft["sourceKind"];
+  previewOutcome: "preview_ready";
+  previewInput: AiGeneratedRunningPlanPreviewDraft["previewInput"];
+  goal: {
+    distanceLabel: string;
+    targetDate: string | null;
+    targetFinishTime: string | null;
+  };
+  schedule: {
+    startDate: string;
+    endDate: string;
+  };
+  calendarRows: readonly RunningPlanPreviewProductCalendarRow[];
+  workoutDocuments: AiGeneratedRunningPlanPreviewDraft["workoutDocuments"];
+  reviewToken: string;
+  reviewChecksum: string;
+};
+
+export type RunningPlanPreviewProductUnavailable = {
+  previewOutcome: AiGeneratedRunningPlanPreviewUnavailable["previewOutcome"];
+  error: {
+    code: AiGeneratedRunningPlanPreviewUnavailable["error"]["code"];
+    message: string;
+  };
+};
+
+export type RunningPlanPreviewActionResult =
+  | { ok: true; draft: RunningPlanPreviewProductDraft }
+  | { ok: false; unavailable: RunningPlanPreviewProductUnavailable };
 export type RunningPlanPreviewActionInput = z.output<typeof runningPlanPreviewInputSchema>;
 export type RunningPlanConfirmActionInput = z.output<typeof runningPlanConfirmInputSchema>;
 
@@ -174,10 +217,12 @@ export const previewRunningPlanDraft = createServerFn({ method: "POST" })
       persistedUserId = null;
     }
 
-    return buildReviewedAiGeneratedRunningPlanPreviewForUser(persistedUserId, data, {
-      aiPreview: { signal: getRequest().signal },
-      qaFixtureAuthorized: isLocalQaFixtureSessionAuthorized(auth),
-    });
+    return projectRunningPlanPreviewResultForProduct(
+      await buildReviewedAiGeneratedRunningPlanPreviewForUser(persistedUserId, data, {
+        aiPreview: { signal: getRequest().signal },
+        qaFixtureAuthorized: isLocalQaFixtureSessionAuthorized(auth),
+      }),
+    );
   });
 
 export const confirmRunningPlanDraft = createServerFn({ method: "POST" })
@@ -413,7 +458,7 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
 export async function buildReviewedAiGeneratedRunningPlanPreview(
   data: RunningPlanPreviewActionInput,
   options: BuildAiGeneratedRunningPlanPreviewOptions = {},
-): Promise<RunningPlanPreviewActionResult> {
+): Promise<RunningPlanReviewedPreviewResult> {
   const result = await buildAiGeneratedRunningPlanPreview(data, options);
 
   if (!result.ok) {
@@ -461,14 +506,14 @@ export async function buildReviewedAiGeneratedRunningPlanPreview(
         generationTrace,
       },
     },
-  } as RunningPlanPreviewActionResult;
+  };
 }
 
 export async function buildReviewedAiGeneratedRunningPlanPreviewForUser(
   userId: string | null,
   data: RunningPlanPreviewActionInput,
   options: BuildAiGeneratedRunningPlanPreviewOptions = {},
-): Promise<RunningPlanPreviewActionResult> {
+): Promise<RunningPlanReviewedPreviewResult> {
   let runnerProfileSnapshot: Awaited<
     ReturnType<typeof getRunnerPlanAuthoringProfileSnapshotForUserId>
   > = null;
@@ -484,6 +529,57 @@ export async function buildReviewedAiGeneratedRunningPlanPreviewForUser(
     ...options,
     ...(runnerProfileSnapshot ? { runnerProfileSnapshot } : {}),
   });
+}
+
+export function projectRunningPlanPreviewResultForProduct(
+  result: RunningPlanReviewedPreviewResult,
+): RunningPlanPreviewActionResult {
+  if (!result.ok) {
+    return {
+      ok: false,
+      unavailable: {
+        previewOutcome: result.unavailable.previewOutcome,
+        error: {
+          code: result.unavailable.error.code,
+          message: result.unavailable.error.message,
+        },
+      },
+    };
+  }
+
+  const draft = result.draft;
+  const goalIntent = draft.normalizedInputSummary.planGoalIntent;
+  const startDate = draft.canonicalPlan.start_date;
+
+  return {
+    ok: true,
+    draft: {
+      sourceKind: draft.sourceKind,
+      previewOutcome: draft.previewOutcome,
+      previewInput: draft.previewInput,
+      goal: {
+        distanceLabel: goalIntent.distance?.label ?? "Distance unavailable",
+        targetDate: goalIntent.targetDate,
+        targetFinishTime: goalIntent.targetFinishTime?.label ?? null,
+      },
+      schedule: {
+        startDate,
+        endDate: draft.canonicalPlan.planned_workouts.at(-1)?.date ?? startDate,
+      },
+      calendarRows: draft.calendarRows.map((row) => ({
+        rowId: row.rowId,
+        date: row.date,
+        weekNumber: row.weekNumber,
+        weekday: row.weekday,
+        isRestDay: row.isRestDay,
+        title: row.title,
+        endpointDistanceMeters: row.endpointDistanceMeters,
+      })),
+      workoutDocuments: draft.workoutDocuments,
+      reviewToken: draft.reviewToken,
+      reviewChecksum: draft.reviewChecksum,
+    },
+  };
 }
 
 function buildConfirmFailure(input: {

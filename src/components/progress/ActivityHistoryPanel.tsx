@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
-import type { RunnerActivityHistoryItem } from "@/lib/runner-activity/read-model-types";
+import type { RunnerActivityHistoryProductItem } from "@/lib/runner-activity/product-contract";
 import { cn } from "@/lib/utils";
 import type {
   ActivityAction,
@@ -52,10 +52,10 @@ export function ActivityHistoryPanel({
   state: HistoryState;
   onRetry: () => void;
   onLoadMore: () => void;
-  onOpenActivity: (activity: RunnerActivityHistoryItem, trigger: HTMLElement) => void;
+  onOpenActivity: (activity: RunnerActivityHistoryProductItem, trigger: HTMLElement) => void;
   onRequestAction: (
     action: ActivityAction,
-    activity: RunnerActivityHistoryItem,
+    activity: RunnerActivityHistoryProductItem,
     trigger?: HTMLElement,
   ) => void;
 }) {
@@ -117,11 +117,11 @@ function ActivityHistoryRow({
   onOpenActivity,
   onRequestAction,
 }: {
-  activity: RunnerActivityHistoryItem;
-  onOpenActivity: (activity: RunnerActivityHistoryItem, trigger: HTMLElement) => void;
+  activity: RunnerActivityHistoryProductItem;
+  onOpenActivity: (activity: RunnerActivityHistoryProductItem, trigger: HTMLElement) => void;
   onRequestAction: (
     action: ActivityAction,
-    activity: RunnerActivityHistoryItem,
+    activity: RunnerActivityHistoryProductItem,
     trigger?: HTMLElement,
   ) => void;
 }) {
@@ -241,12 +241,12 @@ export function ActivityDetailOverlay({
   onOpenChange,
   onRequestAction,
 }: {
-  activity: RunnerActivityHistoryItem | null;
+  activity: RunnerActivityHistoryProductItem | null;
   returnFocusRef: RefObject<HTMLElement | null>;
   onOpenChange: (open: boolean) => void;
   onRequestAction: (
     action: ActivityAction,
-    activity: RunnerActivityHistoryItem,
+    activity: RunnerActivityHistoryProductItem,
     trigger?: HTMLElement,
   ) => void;
 }) {
@@ -312,10 +312,10 @@ function ActivityDetailContent({
   activity,
   onRequestAction,
 }: {
-  activity: RunnerActivityHistoryItem;
+  activity: RunnerActivityHistoryProductItem;
   onRequestAction: (
     action: ActivityAction,
-    activity: RunnerActivityHistoryItem,
+    activity: RunnerActivityHistoryProductItem,
     trigger?: HTMLElement,
   ) => void;
 }) {

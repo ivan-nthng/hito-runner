@@ -200,13 +200,6 @@ export function buildDeterministicWorkoutComparison(params: {
       actualStructuredStepCount: params.actualMetrics.actual_interval_count,
     },
     signals,
-    facts: {
-      activityType,
-      dateAlignment,
-      duration,
-      distance,
-      structuredStepCount,
-    },
     supportMatrix,
     stepSummary,
     segmentSummary,

@@ -162,32 +162,6 @@ function comparison({
         actualStructuredStepCount: 3,
       },
       signals,
-      facts: {
-        activityType:
-          signals.find((entry) => entry.key === "activity_type") ??
-          signal("activity_type", "missing_actual", "running", null),
-        dateAlignment:
-          signals.find((entry) => entry.key === "date_alignment") ??
-          signal("date_alignment", "missing_actual", "2026-07-29", null),
-        duration:
-          signals.find((entry) => entry.key === "duration") ??
-          signal("duration", "missing_actual", 45, null),
-        distance:
-          signals.find((entry) => entry.key === "distance") ??
-          signal("distance", "not_applicable", null, null),
-        structuredStepCount:
-          signals.find((entry) => entry.key === "structured_step_count") ??
-          signal("structured_step_count", "not_applicable", null, null),
-      },
-      sessionSummary: {
-        dateDeltaDays: 0,
-        durationDeltaMin: 3,
-        durationDeltaPct: 3 / 45,
-        distanceDeltaKm: 0.4,
-        distanceDeltaPct: 0.4 / 7,
-        plannedStructuredStepCount: 3,
-        actualStructuredStepCount: 3,
-      },
       supportMatrix: {
         signals: [
           { key: "pace", label: "Pace", status: "unsupported", reason: null },

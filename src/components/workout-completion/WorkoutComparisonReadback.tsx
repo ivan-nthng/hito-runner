@@ -477,21 +477,7 @@ function getComparisonPayload(
 
 function getComparisonSignals(comparison: WorkoutComparisonSummary) {
   const payload = getComparisonPayload(comparison);
-
-  if (Array.isArray(payload?.signals) && payload.signals.length > 0) {
-    return payload.signals.filter(isComparisonSignal);
-  }
-
-  const facts = payload?.facts;
-  return facts
-    ? [
-        facts.activityType,
-        facts.dateAlignment,
-        facts.duration,
-        facts.distance,
-        facts.structuredStepCount,
-      ]
-    : [];
+  return Array.isArray(payload?.signals) ? payload.signals.filter(isComparisonSignal) : [];
 }
 
 function isComparisonSignal(value: unknown): value is WorkoutComparisonSignal {

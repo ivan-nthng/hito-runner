@@ -26,6 +26,9 @@ const CANONICAL_SIGNAL_FACT_ENTRIES = [
   ["distance", "distance"],
   ["structured_step_count", "structuredStepCount"],
 ] as const;
+const CANONICAL_FACT_KEYS = new Set<string>(
+  CANONICAL_SIGNAL_FACT_ENTRIES.map(([, factKey]) => factKey),
+);
 
 export const WORKOUT_COMPARISON_FORMULA_VERSION = "deterministic_workout_comparison_v1";
 
@@ -38,9 +41,7 @@ export function readWorkoutComparisonDifferencePayload(
     !payload ||
     !isPlannedWorkoutPayload(payload.plannedWorkout) ||
     !isActualMetricsPayload(payload.actualMetrics) ||
-    !isSignalArray(payload.signals) ||
-    !isFactsPayload(payload.facts) ||
-    !factsMatchSignals(payload.facts, payload.signals) ||
+    !isCanonicalSignalArray(payload.signals) ||
     !isSupportMatrixPayload(payload.supportMatrix) ||
     !isStepSummaryPayload(payload.stepSummary) ||
     !isSegmentSummaryPayload(payload.segmentSummary) ||
@@ -49,7 +50,23 @@ export function readWorkoutComparisonDifferencePayload(
     return null;
   }
 
-  return value as unknown as WorkoutComparisonDifferencePayload;
+  if (
+    payload.facts !== undefined &&
+    (!isFactsPayload(payload.facts) || !factsMatchSignals(payload.facts, payload.signals))
+  ) {
+    return null;
+  }
+
+  // Historical exact-dual rows remain readable, but Product receives one signals-only truth.
+  return {
+    plannedWorkout: payload.plannedWorkout,
+    actualMetrics: payload.actualMetrics,
+    signals: payload.signals,
+    supportMatrix: payload.supportMatrix,
+    stepSummary: payload.stepSummary,
+    segmentSummary: payload.segmentSummary,
+    summary: payload.summary,
+  } as unknown as WorkoutComparisonDifferencePayload;
 }
 
 function factsMatchSignals(factsValue: Json | undefined, signalsValue: Json | undefined) {
@@ -101,6 +118,8 @@ function isFactsPayload(value: Json | undefined) {
   const facts = recordOrNull(value);
   return (
     facts != null &&
+    Object.keys(facts).length === CANONICAL_FACT_KEYS.size &&
+    Object.keys(facts).every((key) => CANONICAL_FACT_KEYS.has(key)) &&
     isSignal(facts.activityType) &&
     isSignal(facts.dateAlignment) &&
     isSignal(facts.duration) &&
@@ -109,8 +128,22 @@ function isFactsPayload(value: Json | undefined) {
   );
 }
 
-function isSignalArray(value: Json | undefined) {
-  return Array.isArray(value) && value.every(isSignal);
+function isCanonicalSignalArray(value: Json | undefined) {
+  if (!Array.isArray(value) || value.length !== CANONICAL_SIGNAL_FACT_ENTRIES.length) {
+    return false;
+  }
+
+  const keys = value.flatMap((candidate) => {
+    const signal = recordOrNull(candidate);
+    return isSignal(candidate) && typeof signal?.key === "string" ? [signal.key] : [];
+  });
+  const canonicalKeys = new Set<string>(CANONICAL_SIGNAL_FACT_ENTRIES.map(([key]) => key));
+
+  return (
+    keys.length === canonicalKeys.size &&
+    new Set(keys).size === keys.length &&
+    keys.every((key) => canonicalKeys.has(key))
+  );
 }
 
 function isSignal(value: Json | undefined) {

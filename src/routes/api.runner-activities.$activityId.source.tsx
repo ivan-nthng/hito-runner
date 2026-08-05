@@ -13,7 +13,12 @@ export const Route = createFileRoute("/api/runner-activities/$activityId/source"
             userId,
             activityId: params.activityId,
           });
-          return Response.json({ ok: true, readback }, { status: 200 });
+          const { projectRunnerActivityMutationReadbackForProduct } =
+            await import("@/lib/runner-activity/product-contract");
+          return Response.json(
+            { ok: true, readback: projectRunnerActivityMutationReadbackForProduct(readback) },
+            { status: 200 },
+          );
         } catch (error) {
           if (
             error instanceof Error &&

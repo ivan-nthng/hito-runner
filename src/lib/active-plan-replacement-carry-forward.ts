@@ -7,6 +7,7 @@ import {
 import type { Database, Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { collectRowsForIdBatches } from "@/lib/supabase/batched-in-filter";
+import { readWorkoutComparisonDifferencePayload } from "@/lib/workout-result-import/comparison-payload";
 
 type SupabaseAdminClient = ReturnType<typeof createAdminSupabaseClient>;
 
@@ -323,30 +324,27 @@ export function relinkComparisonPlannedWorkoutIdentity(
   sourceWorkoutId: string,
   nextWorkoutId: string,
 ) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  const payload = readWorkoutComparisonDifferencePayload(value);
+
+  if (!payload) {
     throw new Error("Comparison evidence payload is malformed and cannot be carried forward.");
   }
 
-  const plannedWorkout = value.plannedWorkout;
+  const plannedWorkout = payload.plannedWorkout;
 
-  if (
-    !plannedWorkout ||
-    typeof plannedWorkout !== "object" ||
-    Array.isArray(plannedWorkout) ||
-    plannedWorkout.plannedWorkoutId !== sourceWorkoutId
-  ) {
+  if (plannedWorkout.plannedWorkoutId !== sourceWorkoutId) {
     throw new Error(
       "Comparison evidence payload does not match its source workout and cannot be carried forward.",
     );
   }
 
   return {
-    ...value,
+    ...payload,
     plannedWorkout: {
       ...plannedWorkout,
       plannedWorkoutId: nextWorkoutId,
     },
-  };
+  } as unknown as Json;
 }
 
 function normalizeReplacementWorkoutOrder(workouts: ImportedPlanSeed["workouts"]) {

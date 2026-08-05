@@ -268,7 +268,6 @@ const sourceFiles = (
     collectSourceFiles(path.join(rootDir, "src/lib")),
     collectSourceFiles(path.join(rootDir, "src/routes")),
     collectSourceFiles(path.join(rootDir, "src/styles")),
-    collectSourceFiles(path.join(rootDir, "scripts/fixtures")),
   ])
 ).flat();
 const controlsCss = await readFile(controlsCssPath, "utf8");

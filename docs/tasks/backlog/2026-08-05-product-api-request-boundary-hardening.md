@@ -65,6 +65,20 @@ Backend security implementation and integrated QA completed.
 - Stop condition: a required public error mapping that changes a Frontend DTO or an accepted Product
   workflow is a separate cross-owner contract decision.
 
+## Revised Execution Preflight
+
+- Evidence before code: the direct-route inventory also traced raw persistence `Error.message` values
+  through four runner mutation server functions and imported-plan confirmation into existing Product
+  error presentation.
+- Canonical owner: the existing server-function response handlers, not their shared persistence
+  owners or Product components.
+- Smallest root-cause outcome: preserve known runner-safe domain/auth errors and replace unknown
+  thrown infrastructure failures with stable operation-specific errors plus server diagnostics.
+- Required proof: source reachability for each boundary, existing mutation regression suites, fresh
+  built runtime, and independent QA.
+- Stop condition: any domain failure whose public meaning cannot be allowlisted without changing an
+  accepted Product workflow.
+
 ## Demonstrated Root Cause
 
 `/api/profile-avatar/upload` parsed multipart input before resolving the persisted runner, and it
@@ -81,19 +95,21 @@ runner-safe-error pattern.
 
 ## Completion Receipt
 
-- Completed direct Product API scope: avatar upload now authenticates before bounded multipart
-  parsing, and avatar/export retain only documented public `400`/`401`/`404` failures while mapping
-  unknown failures to stable safe `500` responses with server-side diagnostics.
+- Completed request and response scope: avatar upload now authenticates before bounded multipart
+  parsing; direct avatar/export routes retain only documented public `400`/`401`/`404` failures;
+  and five runner mutation server functions preserve allowlisted domain/auth messages while mapping
+  unknown failures to stable safe responses with server-side diagnostics.
 - Reused and consolidated: the FIT upload bounded multipart reader is now the single shared helper;
   the duplicate private FIT-only reader was deleted.
 - Regression proof: source and built loopback `qa_fixture` checks cover unauthenticated normal and
   oversized avatar bodies, authenticated oversize and malformed bodies, export `400`/`401`/`404`,
   direct error-redaction source invariants, FIT ordering, local persistence/RLS, and full Backend
   source/runtime/release suites.
-- Retained boundary: TanStack server-function error messages have a distinct source-to-Product graph
-  and require a contract-preserving action-boundary audit; they were not direct `api.*` route
-  handlers and were not changed in this isolated release.
-- Final state: `completed`; Implementation DoD passed for the direct API request-boundary scope.
+- Retained boundary: raw database errors remain available only to their lower server owners and logs;
+  they are no longer Product-facing transport values. No second error system or lower persistence
+  rewrite was added.
+- Final state: `completed`; Implementation DoD passed for direct Product API routes and the admitted
+  runner server-function response boundaries.
 
 ## Exact Handoff Prompt
 

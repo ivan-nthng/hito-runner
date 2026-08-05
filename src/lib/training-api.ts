@@ -117,28 +117,68 @@ export const requestMagicLink = createServerFn({ method: "POST" })
   });
 
 export const clearUpcomingSchedule = createServerFn({ method: "POST" }).handler(async () => {
-  return clearUpcomingScheduleForUserWithSnapshot(
-    await requirePersistedUserIdForCurrentRequest(),
-    getPersistedSnapshot,
-  );
+  try {
+    return await clearUpcomingScheduleForUserWithSnapshot(
+      await requirePersistedUserIdForCurrentRequest(),
+      getPersistedSnapshot,
+    );
+  } catch (error) {
+    throw safeRunnerServerActionError(error, {
+      action: "clear schedule",
+      publicMessage: "The schedule could not be cleared. Try again shortly.",
+      allowedMessages: [
+        "Authentication is required for this action.",
+        "There is no active schedule to clear.",
+      ],
+    });
+  }
 });
 
 export const previewActivePlanScheduleEdit = createServerFn({ method: "POST" })
   .validator(parseActivePlanScheduleEditInput)
   .handler(async ({ data }): Promise<ActivePlanScheduleEditPreview> => {
-    return previewActivePlanScheduleEditForCurrentRequestServer(data);
+    try {
+      return await previewActivePlanScheduleEditForCurrentRequestServer(data);
+    } catch (error) {
+      throw safeRunnerServerActionError(error, {
+        action: "preview schedule edit",
+        publicMessage: "The schedule edit could not be prepared. Try again shortly.",
+        allowedMessages: ["Authentication is required for this action."],
+      });
+    }
   });
 
 export const applyActivePlanScheduleReflowPreview = createServerFn({ method: "POST" })
   .validator(parseActivePlanScheduleReflowApplyInput)
   .handler(async ({ data }): Promise<ActivePlanScheduleReflowApplyResult> => {
-    return applyActivePlanScheduleReflowPreviewForCurrentRequestServer(data);
+    try {
+      return await applyActivePlanScheduleReflowPreviewForCurrentRequestServer(data);
+    } catch (error) {
+      throw safeRunnerServerActionError(error, {
+        action: "apply schedule edit",
+        publicMessage: "The schedule edit could not be applied. Try again shortly.",
+        allowedMessages: ["Authentication is required for this action."],
+      });
+    }
   });
 
 export const saveWorkoutLog = createServerFn({ method: "POST" })
   .validator((value: unknown) => workoutLogInputSchema.parse(value))
   .handler(async ({ data }) => {
-    return saveWorkoutLogForUser(await requirePersistedUserIdForCurrentRequest(), data);
+    try {
+      return await saveWorkoutLogForUser(await requirePersistedUserIdForCurrentRequest(), data);
+    } catch (error) {
+      throw safeRunnerServerActionError(error, {
+        action: "save workout log",
+        publicMessage: "The workout result could not be saved. Try again shortly.",
+        allowedMessages: [
+          "Authentication is required for this action.",
+          "Planned workout not found.",
+          "Rest days cannot be logged as completed workouts.",
+          "A matched Garmin activity cannot be saved as skipped. Delete the recorded activity first.",
+        ],
+      });
+    }
   });
 
 const previewActivePlanScheduleEditForCurrentRequestServer = createServerOnlyFn(
@@ -166,6 +206,22 @@ const applyActivePlanScheduleReflowPreviewForCurrentRequestServer = createServer
     );
   },
 );
+
+function safeRunnerServerActionError(
+  error: unknown,
+  options: {
+    action: string;
+    publicMessage: string;
+    allowedMessages: string[];
+  },
+) {
+  if (error instanceof Error && options.allowedMessages.includes(error.message)) {
+    return error;
+  }
+
+  console.error(`[server-action/${options.action}] unexpected failure`, error);
+  return new Error(options.publicMessage);
+}
 
 async function getSnapshotForRequest() {
   const auth = getRequestAuthContext();

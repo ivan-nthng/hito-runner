@@ -23,12 +23,30 @@ const onboardingInputSchema = z.object({
 export const completeOnboarding = createServerFn({ method: "POST" })
   .validator((value: unknown) => onboardingInputSchema.parse(value))
   .handler(async ({ data }) => {
-    return persistImportedPlanForCurrentRequest(
-      data.importedPlan,
-      data.firstDayResolution ?? null,
-      data.requestedStartDate ?? null,
-      data.clearBeforeImport ?? false,
-    );
+    try {
+      return await persistImportedPlanForCurrentRequest(
+        data.importedPlan,
+        data.firstDayResolution ?? null,
+        data.requestedStartDate ?? null,
+        data.clearBeforeImport ?? false,
+      );
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        [
+          "Authentication is required for this action.",
+          "A first plan cannot be created while another active plan exists.",
+          "An empty active plan cannot be created while another active plan exists.",
+          "Atomic plan replacement did not return the archived plan.",
+          "The current schedule changed before clear-before-import could be applied.",
+        ].includes(error.message)
+      ) {
+        throw error;
+      }
+
+      console.error("[server-action/complete-onboarding] unexpected failure", error);
+      throw new Error("The imported plan could not be saved. Try again shortly.");
+    }
   });
 
 async function persistImportedPlanForCurrentRequest(

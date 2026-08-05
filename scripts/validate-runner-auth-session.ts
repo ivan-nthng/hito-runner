@@ -215,9 +215,11 @@ async function assertProductApiRequestBoundary(runtimeUrl: string) {
 }
 
 async function assertPublicApiErrorRedaction() {
-  const [avatarRoute, planExportRoute] = await Promise.all([
+  const [avatarRoute, planExportRoute, trainingApi, planReplacementActions] = await Promise.all([
     readFile(new URL("../src/routes/api.profile-avatar.upload.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/routes/api.plan.export.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/training-api.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/plan-replacement-actions.ts", import.meta.url), "utf8"),
   ]);
 
   assert.ok(
@@ -240,6 +242,19 @@ async function assertPublicApiErrorRedaction() {
       planExportRoute.indexOf("function getPlanExportPublicFailure"),
     ),
     /return new Response\(error\.message/,
+  );
+  assert.equal(
+    trainingApi.match(/safeRunnerServerActionError\(error, \{/g)?.length,
+    4,
+    "All runner mutation server functions with persistence owners must map unknown errors safely.",
+  );
+  assert.match(trainingApi, /The workout result could not be saved\. Try again shortly\./);
+  assert.match(trainingApi, /The schedule could not be cleared\. Try again shortly\./);
+  assert.match(trainingApi, /The schedule edit could not be prepared\. Try again shortly\./);
+  assert.match(trainingApi, /The schedule edit could not be applied\. Try again shortly\./);
+  assert.match(
+    planReplacementActions,
+    /The imported plan could not be saved\. Try again shortly\./,
   );
 }
 

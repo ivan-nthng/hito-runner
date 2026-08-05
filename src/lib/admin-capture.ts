@@ -14,24 +14,31 @@ import {
   type AdminRepoWorkItemType,
   type AdminWorkItemSourceGroup,
 } from "@/lib/admin-work-items";
-import { adminCaptureTargetRoles, type AdminCaptureTargetRole } from "@/lib/admin-capture-roles";
+import {
+  adminCaptureActiveStatuses,
+  adminCaptureItemTypes,
+  adminCapturePriorities,
+  adminCaptureStatuses,
+  adminCaptureTargetRoles,
+  type AdminCaptureItemType,
+  type AdminCapturePriority,
+  type AdminCaptureStatus,
+  type AdminCaptureTargetRole,
+} from "@/lib/admin-capture-contract";
 import type { Json } from "@/lib/supabase/database";
 
-export { adminCaptureTargetRoles, type AdminCaptureTargetRole } from "@/lib/admin-capture-roles";
+export {
+  adminCaptureActiveStatuses,
+  adminCaptureItemTypes,
+  adminCapturePriorities,
+  adminCaptureStatuses,
+  adminCaptureTargetRoles,
+  type AdminCaptureItemType,
+  type AdminCapturePriority,
+  type AdminCaptureStatus,
+  type AdminCaptureTargetRole,
+} from "@/lib/admin-capture-contract";
 
-export const adminCaptureItemTypes = ["bug", "change_request", "context_capture"] as const;
-export const adminCaptureStatuses = [
-  "new",
-  "in_review",
-  "ready_for_codex",
-  "done",
-  "archived",
-] as const;
-export const adminCaptureActiveStatuses = ["new", "in_review", "ready_for_codex"] as const;
-export const adminCapturePriorities = ["low", "medium", "high", "urgent"] as const;
-export type AdminCaptureItemType = (typeof adminCaptureItemTypes)[number];
-export type AdminCaptureStatus = (typeof adminCaptureStatuses)[number];
-export type AdminCapturePriority = (typeof adminCapturePriorities)[number];
 export type AdminCaptureSourceGroupFilter = AdminWorkItemSourceGroup;
 
 export interface AdminCaptureRepoWorkItemView {

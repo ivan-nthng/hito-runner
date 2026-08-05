@@ -16,7 +16,7 @@ import {
   type Gate4PersistedObservation,
 } from "@/lib/runner-activity/metric-formulas";
 import type { RunnerActivityAdvancedMetricsCurrent } from "@/lib/runner-activity/read-model-types";
-import { readRunnerActivityRunningContext } from "@/lib/runner-activity/garmin-fit-source";
+import { readRunnerActivityRunningContext } from "@/lib/runner-activity/running-context";
 
 export type RunnerActivityMetricCreationCause =
   | "read_reconciliation"

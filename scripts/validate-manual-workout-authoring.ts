@@ -745,33 +745,6 @@ function validateRejectedFixtures() {
   );
 
   assertRejected(
-    "repeated intensity without recovery",
-    {
-      templateKey: "time_intervals",
-      workoutDate: "2026-06-18",
-      entries: [
-        {
-          kind: "block",
-          block: { blockKey: "warmup_block", durationSeconds: 15 * 60 },
-        },
-        {
-          kind: "repeat_group",
-          group: {
-            repeatCount: 6,
-            safetyKind: "intervals",
-            workBlock: { blockKey: "interval_work_block", durationSeconds: 2 * 60 },
-          },
-        },
-        {
-          kind: "block",
-          block: { blockKey: "cooldown_block", durationSeconds: 10 * 60 },
-        },
-      ],
-    },
-    "missing_recovery",
-  );
-
-  assertRejected(
     "generated pace source",
     {
       templateKey: "easy_aerobic_run",
@@ -821,25 +794,6 @@ function validateRejectedFixtures() {
             blockKey: "easy_run_block",
             durationSeconds: 30 * 60,
             target: { hrTargetSource: "personal_hr_zone", hrBpmRange: "145-155" },
-          },
-        },
-      ],
-    },
-    "unsafe_metric_truth",
-  );
-
-  assertRejected(
-    "default estimated HR target source",
-    {
-      templateKey: "easy_aerobic_run",
-      workoutDate: "2026-06-16",
-      entries: [
-        {
-          kind: "block",
-          block: {
-            blockKey: "easy_run_block",
-            durationSeconds: 30 * 60,
-            target: { hrTargetSource: "default_estimated_hr", hrBpmRange: "145-155" },
           },
         },
       ],

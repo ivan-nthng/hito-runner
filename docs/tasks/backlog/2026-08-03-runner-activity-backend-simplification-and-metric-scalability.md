@@ -6,7 +6,7 @@
 
 ## Status
 
-backlog
+completed
 
 ## Type
 
@@ -46,37 +46,19 @@ adding another read, write, or metric truth.
 
 ## Stage
 
-Gates 1-4 are released, and Slice 1 shipped as
-`329f45c27ff25928c4daad963f24f967e197200c`: ordinary FIT/ZIP intake no longer invokes historical
-backfill, and planned-workout projection retries reconcile complete canonical readback. Slice 1b is
-implemented and owner-level validated on the current working tree: the same projection lifecycle now
-has one focused module and the intake facade is 564 lines instead of 1,009. Slice 2 processed the
-single eligible hosted legacy
-asset into the canonical activity/source/revision graph, proved zero remaining eligible candidates,
-and removed the now-unreachable backfill module. Slice 3 is complete: the current factual and Gate 4
-reconciliation remained bounded, warm reads wrote nothing, and exact mutation invalidation preserved
-historical truth. The exact eight-path source-control boundary for Slices 1b, 2, and 3 was audited
-against `329f45c27ff25928c4daad963f24f967e197200c` and integrated locally as commit `a6c5f44`: the
-accepted Slice 3 validator blob was committed instead of its later mixed worktree content. The
-integration is present in the published `main` lineage at `4edfdda`.
-The Supabase environment-contract cleanup is implemented in the current Backend slice: active
-runtime, deployment-parity, Runner Activity proof, and design-profile consumers now accept only
-`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY`.
-Legacy names remain only as explicit local-env cleanup keys, negative regression evidence, or
-historical evidence. The final bounded cleanup retired the zero-data legacy raw-removal fallback,
-consolidated the repeated Runner Activity proof bootstrap, and extended the existing read-model
-measurement to 30, 300, and 3,000 canonical activities. Gate 5 and provider sync remain separate
-future work. The current Slice 5 worktree replaces revision-ID chunk fetches with the existing
-current-revision foreign-key projection, makes independent factual/Gate 4 reads concurrent, leases
-all shared proof identities, bounds ZIP extraction, authenticates before multipart parsing, scopes
-privileged feedback reads by runner, and adds an append-only least-privilege migration. Hosted
-migration application remains a separate release mutation gate.
+Gates 1-4 and optimization Slices 1-5 are complete in the published `main` lineage. Ordinary intake,
+projection reconciliation, finite legacy-backfill retirement, measured snapshot retention,
+raw-removal compatibility retirement, proof consolidation, current-revision query topology, and FIT
+server ownership are accepted released boundaries. The final broad-module audit moved running-context
+interpretation to one pure owner and removed its runtime cycle without changing activity/source,
+revision, read-model, or metric semantics. Gate 5, provider sync, and any later evidence-admitted
+performance work are separate future capabilities, not incomplete slices of this program.
 
-## Dispatch
+## Completion
 
-Slices 1b, 2, and 3 are complete in Backend and integrated in the published `main` lineage. The work item
-remains a `backlog` optimization program rather than a release-readiness status; completed and future
-slices are recorded explicitly below. Deployment remains a separate release action.
+Slices 1-5 and the final runtime-boundary receipt are complete. This retained work item records the
+accepted optimization history; it is not an active queue for Gate 5, provider sync, Frontend, or
+generic performance work.
 
 Central execution-ownership policy was integrated separately in `0633bdf` and formatting-only
 normalization in `2dac928`; neither commit is part of the eight-path Backend release boundary.
@@ -644,7 +626,7 @@ This planning task is complete when:
 8. architecture updates distinguish completed evidence from future gated work without claiming
    runtime acceptance.
 
-### Implementation program - active
+### Implementation program - completed
 
 Each slice passes only when every required check in its own inventory passes, every omitted check
 states its coverage consequence, disposable local data is cleaned through its canonical lifecycle,

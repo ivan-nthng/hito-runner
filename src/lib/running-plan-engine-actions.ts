@@ -122,7 +122,7 @@ type RunningPlanReviewedPreviewResult =
 
 type InternalPreviewCalendarRow = AiGeneratedRunningPlanPreviewDraft["calendarRows"][number];
 
-export type RunningPlanPreviewProductCalendarRow = {
+type RunningPlanPreviewProductCalendarRow = {
   rowId: InternalPreviewCalendarRow["rowId"];
   date: InternalPreviewCalendarRow["date"];
   weekNumber: InternalPreviewCalendarRow["weekNumber"];
@@ -132,7 +132,7 @@ export type RunningPlanPreviewProductCalendarRow = {
   endpointDistanceMeters: InternalPreviewCalendarRow["endpointDistanceMeters"];
 };
 
-export type RunningPlanPreviewProductDraft = {
+type RunningPlanPreviewProductDraft = {
   sourceKind: AiGeneratedRunningPlanPreviewDraft["sourceKind"];
   previewOutcome: "preview_ready";
   previewInput: AiGeneratedRunningPlanPreviewDraft["previewInput"];
@@ -151,7 +151,7 @@ export type RunningPlanPreviewProductDraft = {
   reviewChecksum: string;
 };
 
-export type RunningPlanPreviewProductUnavailable = {
+type RunningPlanPreviewProductUnavailable = {
   previewOutcome: AiGeneratedRunningPlanPreviewUnavailable["previewOutcome"];
   error: {
     code: AiGeneratedRunningPlanPreviewUnavailable["error"]["code"];

@@ -2,7 +2,7 @@ import path from "node:path";
 import {
   adminCaptureTargetRoles,
   type AdminCaptureTargetRole,
-} from "../../src/lib/admin-capture-roles";
+} from "../../src/lib/admin-capture-contract";
 import {
   isAdminRepoWorkItemArchiveIntent,
   isAdminRepoWorkItemFrontendLane,

@@ -8,7 +8,7 @@ export type { LocalAuthAccountConfig } from "@/lib/local-auth-account-registry.s
 const LOCAL_AUTH_COOKIE = "hito_local_auth_session";
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
 
-export interface LocalAuthSession {
+interface LocalAuthSession {
   userId: string;
   email: string;
 }

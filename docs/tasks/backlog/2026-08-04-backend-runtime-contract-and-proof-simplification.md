@@ -6,7 +6,7 @@
 
 ## Status
 
-blocked
+completed
 
 ## Type
 
@@ -46,11 +46,11 @@ surface.
 
 ## Stage
 
-Backend-owned implementation, hosted security parity, proof consolidation, broad-module audit, and
-owner-level validation are complete in this exact Backend release bundle. The remaining
-Progress/generated-preview DTO narrowing and comparison `facts` retirement are blocked on
-coordinated Frontend Product consumer adoption; Backend must not narrow those live contracts
-independently.
+All admitted Backend runtime/proof cleanup, the coordinated Progress/generated-preview DTO and
+comparison cutover, and the final broad-module boundary audit are complete. Releases through
+`5e0edd48d4d7676470d7bed4cc24ae268996ef26` remain accepted; the final audit removed two demonstrated
+runtime cycles and exact proof/public-surface duplication without reopening those contracts. Future
+feature, legacy-data, and cross-owner work is not an unfinished slice of this cleanup plan.
 
 ## Supporting Sources
 
@@ -352,9 +352,58 @@ These are evidence discovered during the Backend audit but are not to be patched
 
 All independently completable Backend-owned slices admitted by this plan have owner-level source,
 local persistence, built-runtime, privacy/RLS, hosted parity, build/integrity, and independent-review
-evidence. Program completion remains blocked only on the coordinated Frontend Product DTO and
-comparison-consumer cutover. No Product behavior, provider path, coaching policy, or second truth path
-was introduced.
+evidence. The coordinated Frontend Product DTO and comparison-consumer dependency recorded at that
+closure was subsequently released in `5e0edd48d4d7676470d7bed4cc24ae268996ef26`; it is no longer a
+blocker. No Product behavior, provider path, coaching policy, or second truth path was introduced.
+
+## 2026-08-05 Broad-Module Closure Receipt
+
+### Completed boundary reductions
+
+- A static-and-dynamic value-import graph exposed two runtime strongly connected components. Admin
+  capture shared values now live in one side-effect-free contract owner, so the server implementation
+  no longer imports runtime values from the server-function facade. The superseded roles-only module
+  was deleted.
+- Runner Activity running-context interpretation now lives in one pure module shared by Garmin
+  normalization and Gate 4 projection. The Garmin source lifecycle no longer participates in the
+  `garmin-fit-source -> read-model -> metric-snapshots -> garmin-fit-source` runtime cycle.
+- Progress reuses the existing shell route-data composition because its loader result was exactly
+  identical. The duplicate Progress helper was deleted rather than retained as an alias.
+- Five types with no external consumer are no longer exported. Their internal runtime shapes and all
+  Product DTO behavior remain unchanged.
+- Two manual-workout rejection fixtures that ran twice in the same canonical validator were removed;
+  the constructor contract proof remains their single assertion owner. The local-DB manifest now runs
+  Gate 4 before the 3,000-activity scale proof so PostgreSQL checkpoint IO cannot turn the next
+  independent contract check into a false statement-timeout failure.
+
+### Retained after reachability review
+
+- `training.ts` remains a live graph hub with 74 direct consumers. Splitting its date, workout, or
+  presentation APIs requires an atomic Backend/Product consumer migration and would currently move
+  code rather than delete a duplicate owner.
+- Active-plan legacy-log recovery remains reachable from persisted snapshot readback. Retirement
+  requires a finite target-specific inventory; no inventory was fabricated in this cleanup slice.
+- The active-plan export caller currently proves runner ownership before the lower-level
+  service-role workout read. Tightening that lower-level signature is a separate security-hardening
+  change, not a demonstrated current cross-runner read or a source deletion.
+- Public/server environment separation remains a possible hardening slice, but no secret value is
+  present in the client artifact and the change would add a boundary rather than remove duplicate
+  runtime truth.
+- Provider, FIT intake, runner/admin auth, plan persistence, and Gate 1/2/4 proofs remain semantically
+  distinct live owners. Large or test-only source was not classified as dead without reachability
+  evidence.
+
+### Complexity accounting
+
+| Class         | Net maintained-line change | Interpretation                                                                             |
+| ------------- | -------------------------: | ------------------------------------------------------------------------------------------ |
+| Runtime       |                        +20 | Two runtime cycles removed through pure owner boundaries; not presented as LOC cleanup     |
+| Proof/scripts |                        -46 | Exact duplicate manual rejection fixtures removed; unique assertions retained              |
+| Generated     |                          0 | No generated contract or artifact changed                                                  |
+| Documentation |                        +31 | Lifecycle reconciliation and evidence receipts only; excluded from source-reduction claims |
+
+The executable runtime/proof total is net `-26` lines. The architectural result is accepted because
+the two runtime cycles and one duplicate route-data owner are gone, not because a line target was met.
 
 ## Required Validation For Every Implementation Slice
 
@@ -375,7 +424,7 @@ minimum proportional inventory is:
 
 ## Program Definition Of Done
 
-This plan is complete only when:
+This plan is complete because:
 
 - one canonical Backend validation entrypoint covers the retained proof inventory;
 - no maintained validator depends on an untracked helper;

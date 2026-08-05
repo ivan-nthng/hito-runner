@@ -40,7 +40,7 @@ import {
 
 export type WorkoutType = WorkoutDocumentType;
 type VisibleWorkoutType = CanonicalWorkoutFamily | "quality";
-export type Status = "completed" | "partial" | "skipped" | "today" | "upcoming" | "rest";
+type Status = "completed" | "partial" | "skipped" | "today" | "upcoming" | "rest";
 type WeekStatus = "on_track" | "partially_off_track" | "needs_reset";
 type TrainingMode = "preview" | "onboarding" | "authenticated";
 type WorkoutOutcome = Extract<Status, "completed" | "partial" | "skipped">;

@@ -25,10 +25,10 @@ const localDatabaseChecks = [
     "--require-persistence",
   ]),
   tsCheck("runner-activity-foundation", "scripts/validate-runner-activity-foundation.ts"),
+  tsCheck("runner-activity-gate-4", "scripts/validate-runner-activity-gate-4.ts"),
   tsCheck("runner-activity-read-models", "scripts/validate-runner-activity-read-models.ts", [
     "--scale=3000",
   ]),
-  tsCheck("runner-activity-gate-4", "scripts/validate-runner-activity-gate-4.ts"),
 ];
 
 const runtimeUrl = argumentValue("--runtime-url");

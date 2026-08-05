@@ -84,10 +84,3 @@ export async function loadWorkoutRouteData(
     localActivityFileDesignFixtureEnabled,
   };
 }
-
-export async function loadProgressRouteData({ loadSnapshot, loadViewer }: RouteDataLoaders) {
-  return {
-    snapshot: await loadSnapshot(),
-    viewer: await loadViewer(),
-  };
-}

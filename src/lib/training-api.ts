@@ -13,7 +13,6 @@ import type {
 } from "@/lib/active-plan-schedule-edit-preview";
 import {
   loadHomeRouteData,
-  loadProgressRouteData,
   loadShellRouteData,
   loadWorkoutRouteData,
   workoutRouteInputSchema,
@@ -99,7 +98,7 @@ export const getWorkoutRouteData = createServerFn({ method: "POST" })
   });
 
 export const getProgressRouteData = createServerFn({ method: "GET" }).handler(async () => {
-  return loadProgressRouteData({
+  return loadShellRouteData({
     loadSnapshot: getSnapshotForRequest,
     loadViewer: getViewerForRequest,
   });

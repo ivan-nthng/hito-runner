@@ -1,23 +1,22 @@
 import "@tanstack/react-start/server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  adminCaptureActiveStatuses,
-  adminCaptureStatuses,
-  type AdminCaptureBacklogView,
-  type AdminCaptureCopyPromptView,
-  type AdminCaptureCreateInput,
-  type AdminCaptureFailureReason,
-  type AdminCaptureItemIdInput,
-  type AdminCaptureItemType,
-  type AdminCaptureItemView,
-  type AdminCaptureListInput,
-  type AdminCaptureNoteAppendInput,
-  type AdminCapturePriority,
-  type AdminCaptureResult,
-  type AdminCaptureStatus,
-  type AdminCaptureTargetRole,
-  type AdminCaptureTriageUpdateInput,
+import { adminCaptureActiveStatuses, adminCaptureStatuses } from "@/lib/admin-capture-contract";
+import type {
+  AdminCaptureBacklogView,
+  AdminCaptureCopyPromptView,
+  AdminCaptureCreateInput,
+  AdminCaptureFailureReason,
+  AdminCaptureItemIdInput,
+  AdminCaptureItemType,
+  AdminCaptureItemView,
+  AdminCaptureListInput,
+  AdminCaptureNoteAppendInput,
+  AdminCapturePriority,
+  AdminCaptureResult,
+  AdminCaptureStatus,
+  AdminCaptureTargetRole,
+  AdminCaptureTriageUpdateInput,
 } from "@/lib/admin-capture";
 import type { AdminAccessContext, AdminAccessResult } from "@/lib/admin-access.server";
 import { requireAdminAccessForCurrentRequest } from "@/lib/admin-access.server";

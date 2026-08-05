@@ -12,7 +12,8 @@ export const Route = createFileRoute("/hitoDS")({
       { title: `Hito Design System — ${APP_NAME}` },
       {
         name: "description",
-        content: "Internal Hito design-system reference for the simplified Hito product language.",
+        content:
+          "Public interactive Hito design-system reference and sandbox for live product tokens, components, and patterns.",
       },
     ],
   }),

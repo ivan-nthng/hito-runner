@@ -7,7 +7,10 @@ export function HitoDsOverviewPage() {
       <header id="overview" className="hito-page-header border-t border-hairline pt-8">
         <p className="hito-label hito-label-signal">Hito design system</p>
         <h1 className="hito-page-title">Find, try, compare.</h1>
-        <p className="hito-page-copy max-w-2xl">Browse the catalog or find a component by name.</p>
+        <p className="hito-page-copy max-w-2xl">
+          Browse and try the same live tokens and components used by Hito. Examples stay inside this
+          reference sandbox.
+        </p>
       </header>
 
       <section id="figma-bridge" className="ds-section">

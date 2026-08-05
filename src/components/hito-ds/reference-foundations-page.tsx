@@ -344,7 +344,7 @@ export function HitoDsFoundationsPage() {
               <h3 className="hito-panel-title mt-3">Route-level depth only.</h3>
               <p className="hito-body-small mt-3 text-muted-foreground">
                 Use <code className="hito-inline-code">hito-canvas-atmosphere</code> for large app
-                canvases and internal reference pages, not nested cards.
+                canvases and design-system reference pages, not nested cards.
               </p>
             </article>
 
@@ -1052,9 +1052,6 @@ function SemanticColorCard({
   onCopy: (value: string, label: string) => void;
 }) {
   const copyValue = token.value.startsWith("var(") ? token.value : token.value;
-  const previewStyle = token.value.startsWith("var(")
-    ? ({ background: token.value } satisfies CSSProperties)
-    : getSemanticRecipePreviewStyle(token.value);
 
   return (
     <button
@@ -1073,11 +1070,7 @@ function SemanticColorCard({
             maps to {token.mapsTo}
           </span>
         </span>
-        <span
-          aria-hidden="true"
-          className="h-10 w-10 shrink-0 rounded-xl border border-hairline"
-          style={previewStyle}
-        />
+        <SemanticColorPreview token={token} />
       </span>
       <span className="flex min-w-0 items-center justify-between gap-3">
         <code className="hito-technical-mono min-w-0 flex-1 truncate" title={copyValue}>
@@ -1093,29 +1086,47 @@ function SemanticColorCard({
   );
 }
 
-function getSemanticRecipePreviewStyle(value: string): CSSProperties {
-  if (value === "hito-canvas-atmosphere") {
-    return {
-      background:
-        "radial-gradient(ellipse at top, oklch(0.22 0.01 60 / 0.4), transparent 60%), radial-gradient(ellipse at bottom, oklch(0.13 0.005 60 / 0.6), transparent 50%), var(--background)",
-    };
+function SemanticColorPreview({ token }: { token: SemanticColorTokenData }) {
+  const className = "h-10 w-10 shrink-0 overflow-hidden rounded-xl border border-hairline";
+
+  if (token.value.startsWith("var(")) {
+    return (
+      <span
+        aria-hidden="true"
+        className={className}
+        style={{ background: token.value } satisfies CSSProperties}
+      />
+    );
   }
 
-  if (value === "hito-auth-photo-overlay") {
-    return {
-      background:
-        "linear-gradient(135deg, color-mix(in oklch, var(--stone-950) 92%, transparent), color-mix(in oklch, var(--stone-800) 34%, transparent))",
-    };
+  if (token.value === "hito-auth-photo-overlay") {
+    return (
+      <span aria-hidden="true" className={cn("auth-hero", className)}>
+        <span className="hito-auth-photo-overlay" />
+      </span>
+    );
   }
 
-  if (value === "hito-editorial-signal-wash") {
-    return {
-      background:
-        "linear-gradient(135deg, color-mix(in oklch, var(--signal) 22%, transparent), color-mix(in oklch, var(--surface) 82%, transparent))",
-    };
+  if (token.value === "hito-canvas-atmosphere" || token.value === "hito-editorial-signal-wash") {
+    return (
+      <span
+        aria-hidden="true"
+        className={cn(
+          className,
+          token.value === "hito-canvas-atmosphere" && "bg-background",
+          token.value,
+        )}
+      />
+    );
   }
 
-  return { background: "var(--surface-elevated)" };
+  return (
+    <span
+      aria-hidden="true"
+      className={className}
+      style={{ background: "var(--surface-elevated)" } satisfies CSSProperties}
+    />
+  );
 }
 
 function slugifyToken(value: string) {

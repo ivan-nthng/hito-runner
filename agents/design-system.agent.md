@@ -179,7 +179,7 @@ Use this hierarchy when deciding what is true:
 
 1. Implemented product behavior in current code
 2. `src/styles.css` canonical tokens, utilities, and component classes
-3. `/hitoDS` live internal reference in `src/routes/hitoDS.tsx`
+3. `/hitoDS` production-shipped public interactive reference in `src/routes/hitoDS.tsx`
 4. Implemented-behavior docs in `docs/current-product.md` and `docs/current-system.md`
 5. Active DS plans in `docs/plans/active/`
 6. Archived plans only for historical context
@@ -190,7 +190,8 @@ Figma bridge source hierarchy:
 
 1. Implemented Hito runtime code remains canonical for shipped Hito DS behavior unless an active
    plan explicitly changes the source-of-truth model.
-2. `/hitoDS` remains the live internal product reference for implemented DS behavior.
+2. `/hitoDS` remains the production-shipped public interactive reference for implemented DS
+   behavior; its sandbox state does not own Product data or lifecycle truth.
 3. Figma libraries are design-system artifacts for review, handoff, reusable design work, and
    Code/Codex synchronization; they are not proof that product behavior is shipped.
 4. Official Figma API/library documentation is canonical for what can be automated in Figma.
@@ -470,12 +471,14 @@ Scope:
 <exact files and surfaces>
 
 Requirements:
+
 - preserve product behavior and copy unless explicitly in scope
 - use existing Hito tokens/primitives first
 - delete local legacy styling only when all usages are migrated
 - update `/hitoDS` when canonical DS behavior changes
 
 Validation:
+
 - run focused static checks
 - inspect affected surfaces
 - use Safari for visible UI QA when required

@@ -35,7 +35,7 @@ const HUB_DESTINATIONS: Array<HubDestination> = [
   },
   {
     title: "Design system",
-    description: "Browse Hito tokens, components, brand, and interaction patterns.",
+    description: "Browse and try Hito's live tokens, components, and interaction patterns.",
     cta: "Open design system",
     badge: "Public",
     badgeTone: "success",

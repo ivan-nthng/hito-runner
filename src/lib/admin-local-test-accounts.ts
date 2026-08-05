@@ -90,7 +90,7 @@ export const getAdminLocalTestAccounts = createServerFn({ method: "GET" }).handl
 );
 
 export const deleteAdminLocalTestAccount = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => deleteAdminLocalTestAccountInputSchema.parse(value))
+  .validator((value: unknown) => deleteAdminLocalTestAccountInputSchema.parse(value))
   .handler(async ({ data }): Promise<DeleteAdminLocalTestAccountResult> => {
     return deleteAdminLocalTestAccountServer(data);
   });

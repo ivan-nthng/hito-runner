@@ -185,7 +185,7 @@ export type ManualWorkoutDirectCopyResult =
 export type ManualWorkoutCopyPasteDependencies = ManualWorkoutActivePlanAddDependencies;
 
 export const copyManualWorkoutWithinActivePlan = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
+  .validator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutDirectCopyResult> => {
     const userId = await getCurrentManualWorkoutAuthoringUserId();
 

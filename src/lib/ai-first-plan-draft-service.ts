@@ -81,7 +81,7 @@ export interface AiFirstPlanDraftPreviewMetadata extends AiFirstPlanDraftMetadat
   debug: AiFirstPlanDraftDebugMetadata;
 }
 
-export interface AiFirstPlanDraftDebugMetadata {
+interface AiFirstPlanDraftDebugMetadata {
   timeoutMs: number;
   maxOutputTokens: number;
   contractMode: typeof AI_FIRST_PLAN_CONTRACT_MODE;
@@ -125,7 +125,7 @@ export interface AiFirstPlanDraftDebugMetadata {
   reasoningEffortSent: boolean;
 }
 
-export interface AiFirstPlanDraftUnavailableMetadata {
+interface AiFirstPlanDraftUnavailableMetadata {
   sourceKind: typeof AI_AUTHORED_PLAN_FIRST_SOURCE_KIND;
   sourceStatus: "plan_first_unavailable";
   unavailableReason: string;
@@ -138,7 +138,7 @@ export interface AiFirstPlanDraftUnavailableMetadata {
   debug: AiFirstPlanDraftDebugMetadata;
 }
 
-export type AiFirstPlanDraftPreviewResult =
+type AiFirstPlanDraftPreviewResult =
   | {
       ok: true;
       canonicalPlan: TrainingPlanV2;

@@ -38,6 +38,7 @@ export class RunnerActivityMetricRecalculationPendingError extends Error {
 type ActivityRow = {
   id: string;
   current_revision_id: string | null;
+  current_revision: ActivityRevisionRow | null;
   local_date: string | null;
   elapsed_duration_min: number | null;
   timer_duration_min: number | null;
@@ -299,7 +300,7 @@ async function loadGate4Activities(
     supabase
       .from("runner_activities")
       .select(
-        "id, current_revision_id, local_date, elapsed_duration_min, timer_duration_min, distance_km",
+        "id, current_revision_id, local_date, elapsed_duration_min, timer_duration_min, distance_km, current_revision:runner_activity_revisions!runner_activities_current_revision_id_fkey(id, activity_id, source_revision_id, normalized_summary)",
       )
       .eq("user_id", userId)
       .eq("sport", "run")
@@ -309,20 +310,6 @@ async function loadGate4Activities(
       .order("id", { ascending: true })
       .range(from, to),
   );
-  const revisionIds = activities
-    .map((activity) => activity.current_revision_id)
-    .filter((value): value is string => Boolean(value));
-  if (revisionIds.length !== activities.length) {
-    throw new Error("Canonical runner activity is missing its current revision.");
-  }
-  const revisions = await loadRowsByIds<ActivityRevisionRow>({
-    table: "runner_activity_revisions",
-    columns: "id, activity_id, source_revision_id, normalized_summary",
-    userId,
-    ids: revisionIds,
-  });
-  const revisionById = new Map(revisions.map((revision) => [revision.id, revision]));
-
   const evidenceRows = await loadPaged<EvidenceRow>(async (from, to) =>
     supabase
       .from("runner_activity_evidence_revisions")
@@ -361,10 +348,12 @@ async function loadGate4Activities(
   const logByWorkout = new Map(logs.map((log) => [log.planned_workout_id, log]));
 
   return activities.map((activity) => {
-    const revision = activity.current_revision_id
-      ? revisionById.get(activity.current_revision_id)
-      : null;
-    if (!revision || revision.activity_id !== activity.id) {
+    const revision = activity.current_revision;
+    if (
+      !revision ||
+      revision.id !== activity.current_revision_id ||
+      revision.activity_id !== activity.id
+    ) {
       throw new Error("Canonical runner activity revision graph is inconsistent.");
     }
     const match = matchByActivity.get(activity.id);
@@ -546,17 +535,8 @@ async function loadPaged<T>(
   }
 }
 
-async function loadRowsByIds<T>(input: {
-  table: "runner_activity_revisions";
-  columns: string;
-  userId: string;
-  ids: string[];
-}) {
-  return loadRowsByValues<T>({ ...input, field: "id", values: input.ids });
-}
-
 async function loadRowsByValues<T>(input: {
-  table: "runner_activity_revisions" | "workout_logs";
+  table: "workout_logs";
   columns: string;
   userId: string;
   field: string;

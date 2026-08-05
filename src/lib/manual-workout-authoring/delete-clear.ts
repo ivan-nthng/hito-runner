@@ -249,7 +249,7 @@ type PersistManualWorkoutDeleteClearInput = {
 };
 
 export const reviewManualWorkoutDeleteClear = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
+  .validator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutDeleteClearReviewResult> => {
     const userId = await getCurrentManualWorkoutAuthoringUserId();
 
@@ -264,7 +264,7 @@ export const reviewManualWorkoutDeleteClear = createServerFn({ method: "POST" })
   });
 
 export const confirmManualWorkoutDeleteClear = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
+  .validator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutDeleteClearConfirmResult> => {
     const userId = await getCurrentManualWorkoutAuthoringUserId();
 

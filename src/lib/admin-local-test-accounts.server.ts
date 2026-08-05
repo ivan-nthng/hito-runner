@@ -1,8 +1,5 @@
-import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { z } from "zod";
 import type {
   AdminLocalTestAccountView,
   AdminLocalTestAccountsFailureReason,
@@ -16,42 +13,19 @@ import type { RequestAuthContext } from "@/lib/backend/auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database";
 import {
+  DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE,
+  readLocalAuthAccountRegistry,
+  writeLocalAuthAccountRegistry,
+  type NormalizedLocalAuthAccount,
+} from "@/lib/local-auth-account-registry.server";
+import {
   hasSupabaseServerEnv,
   isLoopbackRuntimeUrl,
   publicEnv,
   serverEnv,
 } from "@/lib/supabase/env";
 
-const DEFAULT_ACCOUNTS_FILE = ".tanstack/hito-running-local-accounts.json";
 const PAGE_SIZE = 200;
-
-const localAuthAccountSchema = z.object({
-  username: z.string().trim().min(1),
-  password: z.string().min(1),
-  email: z.string().trim().email().optional(),
-  userId: z.string().uuid().optional(),
-  role: z.enum(["admin", "tester"]).optional(),
-  displayName: z.string().trim().min(1).optional(),
-});
-
-const localAuthAccountsFileSchema = z.union([
-  z.array(localAuthAccountSchema),
-  z.object({
-    accounts: z.array(localAuthAccountSchema),
-  }),
-]);
-
-type RawLocalAuthAccount = z.infer<typeof localAuthAccountSchema>;
-
-interface NormalizedLocalAuthAccount {
-  username: string;
-  password: string;
-  email: string;
-  userId: string;
-  userIdSource: "provided" | "derived";
-  role: "admin" | "tester";
-  displayName: string;
-}
 
 interface SupabaseAuthUserSummary {
   id: string;
@@ -202,7 +176,7 @@ async function buildCurrentDependencies(): Promise<AdminLocalTestAccountDependen
   const auth = getRequestAuthContext();
   const accountsFilePath = path.resolve(
     process.cwd(),
-    serverEnv.localAuthBypassAccountsFile ?? DEFAULT_ACCOUNTS_FILE,
+    serverEnv.localAuthBypassAccountsFile ?? DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE,
   );
 
   return {
@@ -334,7 +308,7 @@ async function loadLocalAccountsSafe(
   try {
     return {
       ok: true,
-      accounts: await loadLocalAccounts(accountsFilePath),
+      accounts: await readLocalAuthAccountRegistry(accountsFilePath, { allowMissing: true }),
     };
   } catch {
     return failure(
@@ -344,43 +318,8 @@ async function loadLocalAccountsSafe(
   }
 }
 
-async function loadLocalAccounts(accountsFilePath: string): Promise<NormalizedLocalAuthAccount[]> {
-  try {
-    const raw = await readFile(accountsFilePath, "utf8");
-    const parsed = localAuthAccountsFileSchema.parse(JSON.parse(raw));
-    const rawAccounts = Array.isArray(parsed) ? parsed : parsed.accounts;
-    return rawAccounts.map(normalizeAccount);
-  } catch (error) {
-    if (isNodeError(error) && error.code === "ENOENT") {
-      return [];
-    }
-
-    throw error;
-  }
-}
-
 async function saveLocalAccounts(accountsFilePath: string, accounts: NormalizedLocalAuthAccount[]) {
-  await mkdir(path.dirname(accountsFilePath), { recursive: true });
-  await writeFile(accountsFilePath, `${JSON.stringify({ accounts }, null, 2)}\n`, {
-    encoding: "utf8",
-    mode: 0o600,
-  });
-}
-
-function normalizeAccount(account: RawLocalAuthAccount): NormalizedLocalAuthAccount {
-  const username = normalizeUsername(account.username);
-  const email = normalizeEmail(account.email ?? `${username}@local.test`);
-  const hasProvidedUserId = typeof account.userId === "string" && account.userId.trim().length > 0;
-
-  return {
-    username,
-    password: String(account.password),
-    email,
-    userId: hasProvidedUserId ? account.userId! : deriveUserId(username),
-    userIdSource: hasProvidedUserId ? "provided" : "derived",
-    role: account.role === "admin" ? "admin" : "tester",
-    displayName: account.displayName?.trim() || humanizeUsername(username),
-  };
+  await writeLocalAuthAccountRegistry(accountsFilePath, accounts);
 }
 
 function createSupabaseAdminPort(supabase: SupabaseClient<Database>): SupabaseAdminPort {
@@ -439,27 +378,6 @@ function failure<TReason extends AdminLocalTestAccountsFailureReason>(
   };
 }
 
-function deriveUserId(username: string) {
-  const hash = createHash("sha256").update(username).digest("hex");
-
-  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(
-    17,
-    20,
-  )}-${hash.slice(20, 32)}`;
-}
-
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
-}
-
-function normalizeUsername(value: string) {
-  return value.trim().toLowerCase();
-}
-
-function humanizeUsername(username: string) {
-  return username.charAt(0).toUpperCase() + username.slice(1);
-}
-
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return Boolean(error && typeof error === "object" && "code" in error);
 }

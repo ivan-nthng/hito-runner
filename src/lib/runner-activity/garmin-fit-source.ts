@@ -26,7 +26,6 @@ export type RunnerActivitySourceReceipt = {
   activityRevisionId: string;
   sourceId: string;
   sourceRevisionId: string;
-  sourceFingerprintSha256: string;
   rawState: "available" | "removal_pending" | "removed";
   rawStorageBucket: string | null;
   rawStoragePath: string | null;
@@ -60,6 +59,13 @@ type SourceRevisionRow = {
   raw_storage_bucket: string | null;
   raw_storage_path: string | null;
 };
+
+class RunnerActivityNotFoundError extends Error {
+  constructor() {
+    super("Runner activity was not found.");
+    this.name = "RunnerActivityNotFoundError";
+  }
+}
 
 /**
  * The adapter writes observed Garmin facts once through the canonical activity
@@ -118,7 +124,6 @@ export async function persistGarminFitActivitySource(input: {
     activityRevisionId: row.activity_revision_id,
     sourceId: row.source_id,
     sourceRevisionId: row.source_revision_id,
-    sourceFingerprintSha256: fingerprint,
     rawState: row.raw_state as RunnerActivitySourceReceipt["rawState"],
     rawStorageBucket: row.raw_storage_bucket,
     rawStoragePath: row.raw_storage_path,
@@ -221,19 +226,6 @@ export async function createRunnerActivityPlannedWorkoutMatch(input: {
   if (result.error) throw new Error(result.error.message);
 }
 
-export async function linkWorkoutResultAssetToRunnerActivity(input: {
-  userId: string;
-  assetId: string;
-  sourceRevisionId: string;
-}) {
-  const result = await createAdminSupabaseClient()
-    .from("workout_result_assets")
-    .update({ activity_source_revision_id: input.sourceRevisionId })
-    .eq("id", input.assetId)
-    .eq("user_id", input.userId);
-  if (result.error) throw new Error(result.error.message);
-}
-
 export async function removeRunnerActivityOriginalFilesForWorkout(input: {
   userId: string;
   plannedWorkoutId: string;
@@ -253,7 +245,6 @@ export async function removeRunnerActivityOriginalFilesForWorkout(input: {
     ),
   );
   await removeRunnerActivityOriginalFiles({ userId: input.userId, sourceRevisionIds: revisionIds });
-  return { removedSourceRevisionIds: revisionIds };
 }
 
 export async function removeRunnerActivityOriginalFilesForActivity(input: {
@@ -398,7 +389,7 @@ async function assertOwnedRunnerActivity(input: { userId: string; activityId: st
     .eq("user_id", input.userId)
     .maybeSingle();
   if (result.error) throw new Error(result.error.message);
-  if (!result.data) throw new Error("Runner activity was not found.");
+  if (!result.data) throw new RunnerActivityNotFoundError();
 }
 
 async function findRunnerActivitySourceRevisionIds(input: { userId: string; activityId: string }) {

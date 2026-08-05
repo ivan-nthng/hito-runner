@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { createClient } from "@supabase/supabase-js";
-import { readLocalAuthAccountsFile } from "../src/lib/local-auth";
 import { clearUpcomingScheduleForUser } from "../src/lib/active-plan-lifecycle-actions";
 import { recordRunnerActivitySessionRpeForUser } from "../src/lib/runner-activity/activity-evidence";
 import { getRunnerActivityProgressFactsForUser } from "../src/lib/runner-activity/fact-snapshots";
 import {
+  createRunnerActivityPlannedWorkoutMatch,
   deleteRunnerActivityFromHistory,
   persistGarminFitActivitySource,
   removeRunnerActivityOriginalFilesForActivity,
@@ -13,58 +12,49 @@ import {
 import { listRunnerActivityHistoryForUser } from "../src/lib/runner-activity/history-read-model";
 import { getRunnerActivityProgressForUser } from "../src/lib/runner-activity/read-model";
 import { getPersistedSnapshot } from "../src/lib/training-api";
-import { createRunnerActivityPlannedWorkoutMatch } from "../src/lib/runner-activity/garmin-fit-source";
-import type { ParsedGarminWorkout } from "../src/lib/workout-result-import/types";
 import { WORKOUT_RESULT_STORAGE_BUCKET } from "../src/lib/workout-result-import/types";
 import { addDaysIso, todayIso, weekdayLong } from "../src/lib/training";
 import {
   QA_TESTER_POOL,
-  acquireQaPoolLease,
-  assertQaPoolAuthUser,
-  ensureQaPoolAuthUser,
   getQaUserOwnedCounts,
-  releaseQaPoolLease,
   resetQaPoolUserData,
 } from "./lib/qa-test-user-lifecycle.mjs";
+import {
+  createRunnerActivityProofRuntime,
+  loginQaPoolToLoopbackRuntime,
+  withRunnerActivityProofLeases,
+} from "./lib/runner-activity-proof-runtime";
 import {
   createRunnerDesignProfilePlan,
   readRunnerDesignProfileFixture,
   seedRunnerDesignProfileFixture,
 } from "./lib/runner-design-profile-fixture";
+import { persistGate4SyntheticActivity } from "./lib/runner-activity-gate-4-fixture";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SECRET_KEY;
-const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-if (!supabaseUrl || !serviceRoleKey || !publishableKey) {
-  throw new Error(
-    "NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, and SUPABASE_SECRET_KEY are required.",
-  );
-}
-
-const supabase = createClient(supabaseUrl, serviceRoleKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+const { supabaseUrl, supabase, ensureUser, signedInClient } =
+  createRunnerActivityProofRuntime("gate2");
 const AS_OF_DATE = todayIso();
-const runtimeUrl = process.env.RUNNER_ACTIVITY_RUNTIME_URL?.trim() || null;
+const runtimeUrl =
+  process.argv
+    .find((argument) => argument.startsWith("--runtime-url="))
+    ?.slice("--runtime-url=".length) ??
+  process.env.RUNNER_ACTIVITY_RUNTIME_URL?.trim() ??
+  null;
+const scaleActivityCounts = parseScaleActivityCounts(process.argv.slice(2));
 
 async function main() {
-  const leases: Array<Awaited<ReturnType<typeof acquireQaPoolLease>>> = [];
-  try {
-    for (const role of ["provider-engine", "isolation-a"] as const) {
-      leases.push(await acquireQaPoolLease({ role }));
-    }
-    await runValidation();
-  } finally {
-    for (const lease of leases.reverse()) {
-      await releaseQaPoolLease(lease);
-    }
-  }
+  await withRunnerActivityProofLeases(["provider-engine", "isolation-a"], runValidation);
 }
 
 async function runValidation() {
-  const runtimeSession = runtimeUrl ? await prepareRuntimePoolIdentity(runtimeUrl) : null;
-  const owner = await ensurePoolUser("provider-engine");
-  const other = await ensurePoolUser("isolation-a");
+  const runtimeSessions = runtimeUrl
+    ? {
+        owner: await prepareRuntimePoolIdentity(runtimeUrl, "provider-engine"),
+        other: await prepareRuntimePoolIdentity(runtimeUrl, "isolation-a"),
+      }
+    : null;
+  const owner = await ensureUser("provider-engine");
+  const other = await ensureUser("isolation-a");
   await resetQaPoolUserData({ supabase, userId: owner.id });
   await resetQaPoolUserData({ supabase, userId: other.id });
 
@@ -213,11 +203,12 @@ async function runValidation() {
     assert.equal(removedSnapshot.data, null);
 
     if (runtimeUrl) {
-      assert.ok(runtimeSession);
+      assert.ok(runtimeSessions);
       await proveRuntimeRoutes({
         userId: owner.id,
         runtimeUrl,
-        cookie: runtimeSession.cookie,
+        cookie: runtimeSessions.owner.cookie,
+        otherCookie: runtimeSessions.other.cookie,
       });
     }
   } finally {
@@ -231,71 +222,69 @@ async function runValidation() {
   assert.equal(ownerCounts.runner_activity_fact_snapshots, 0);
   assert.equal(otherCounts.runner_activities, 0);
   assert.equal(otherCounts.runner_activity_fact_snapshots, 0);
-  const measurement = await measureSnapshotReconciliation(owner.id);
+  const measurement = await measureSnapshotReconciliation(owner.id, 30);
   console.log(JSON.stringify({ snapshotReconciliationMeasurement: measurement }));
+  for (const activityCount of scaleActivityCounts) {
+    const scaleMeasurement = await measureSnapshotReconciliation(owner.id, activityCount);
+    console.log(JSON.stringify({ snapshotReconciliationScaleMeasurement: scaleMeasurement }));
+  }
   console.log("Runner activity Gate 2 read-model contract passed.");
 }
 
-async function measureSnapshotReconciliation(userId: string) {
+function parseScaleActivityCounts(args: string[]) {
+  const argument = args.find((value) => value.startsWith("--scale="));
+  if (!argument) return [];
+  const counts = argument
+    .slice("--scale=".length)
+    .split(",")
+    .map((value) => Number.parseInt(value, 10));
+  assert.ok(counts.length > 0);
+  assert.ok(counts.every((value) => Number.isInteger(value) && value > 30 && value <= 3000));
+  return Array.from(new Set(counts));
+}
+
+async function measureSnapshotReconciliation(userId: string, activityCount: number) {
   try {
     await seedRunnerDesignProfileFixture({ supabase, userId, asOfDate: AS_OF_DATE });
+    await seedAdditionalSyntheticActivities({ userId, activityCount: activityCount - 30 });
     await clearDerivedMetricRows(userId);
 
     const beforeMiss = await getQaUserOwnedCounts(supabase, userId);
+    assert.equal(beforeMiss.runner_activities, activityCount);
     const reconciliationMiss = await measureProgressRead(userId);
     const afterMiss = await getQaUserOwnedCounts(supabase, userId);
-    const warm = await measureProgressRead(userId);
+    const warmReads = await measureProgressReads(userId, activityCount === 30 ? 1 : 3);
     const afterWarm = await getQaUserOwnedCounts(supabase, userId);
 
     assert.equal(reconciliationMiss.progress.status, "current");
     assert.equal(reconciliationMiss.progress.advancedMetrics.status, "current");
-    assert.equal(reconciliationMiss.writeCount, 9);
-    assert.equal(reconciliationMiss.readCount, 17);
+    if (activityCount === 30) {
+      assert.equal(reconciliationMiss.writeCount, 9);
+      assert.equal(reconciliationMiss.readCount, 15);
+    }
     assert.equal(afterMiss.runner_activity_fact_snapshots, 7);
     assert.equal(afterMiss.runner_activity_metric_snapshots, 1);
-    assert.equal(afterMiss.runner_activity_metric_observations, 31);
-    assert.equal(warm.writeCount, 0);
-    assert.equal(warm.readCount, 16);
-    assert.equal(
-      warm.progress.rolling28Day.current.id,
+    assert.equal(afterMiss.runner_activity_metric_observations, activityCount + 1);
+    assertCurrentWarmReads(
+      warmReads,
       reconciliationMiss.progress.rolling28Day.current.id,
-    );
-    assert.equal(
-      warm.progress.advancedMetrics.status === "current"
-        ? warm.progress.advancedMetrics.snapshotId
-        : null,
       reconciliationMiss.progress.advancedMetrics.status === "current"
         ? reconciliationMiss.progress.advancedMetrics.snapshotId
         : null,
+      expectedWarmReadCount(activityCount),
     );
     assert.deepEqual(snapshotRowCounts(afterWarm), snapshotRowCounts(afterMiss));
 
-    const cleared = await clearUpcomingScheduleForUser(userId, getPersistedSnapshot, AS_OF_DATE);
-    assert.equal(cleared.status, "cleared");
-    assert.equal(cleared.snapshot.planMeta, null);
-    const historyAfterClear = await listRunnerActivityHistoryForUser({ userId });
-    assert.equal(historyAfterClear.items.length, 20);
-    assert.ok(historyAfterClear.nextCursor);
-    const recreatedPlan = await createRunnerDesignProfilePlan({
-      supabase,
-      userId,
-      asOfDate: AS_OF_DATE,
-    });
-    assert.equal(recreatedPlan.providerDispatchCount, 0);
-    const recreatedProfile = await readRunnerDesignProfileFixture({
-      supabase,
-      userId,
-      asOfDate: AS_OF_DATE,
-    });
-    assert.equal(recreatedProfile.planState.activePlanCount, 1);
-    assert.equal(recreatedProfile.planState.archivedPlanCount, 1);
-    assert.equal(recreatedProfile.history.activityCount, 30);
+    const planLifecycle =
+      activityCount === 30 ? await proveDesignProfilePlanLifecycle(userId) : null;
 
     const mutationTarget = await supabase
       .from("runner_activities")
       .select("id, current_revision_id")
       .eq("user_id", userId)
       .eq("local_date", addDaysIso(AS_OF_DATE, -2))
+      .order("created_at", { ascending: false })
+      .limit(1)
       .single();
     if (mutationTarget.error) throw new Error(mutationTarget.error.message);
     assert.ok(mutationTarget.data.current_revision_id);
@@ -325,25 +314,21 @@ async function measureSnapshotReconciliation(userId: string) {
     const afterMutation = await getQaUserOwnedCounts(supabase, userId);
     assert.equal(afterMutation.runner_activity_fact_snapshots, 7);
     assert.equal(afterMutation.runner_activity_metric_snapshots, 2);
-    assert.equal(afterMutation.runner_activity_metric_observations, 32);
+    assert.equal(afterMutation.runner_activity_metric_observations, activityCount + 2);
 
-    const postMutationWarm = await measureProgressRead(userId);
-    assert.equal(postMutationWarm.writeCount, 0);
-    assert.equal(postMutationWarm.readCount, 16);
-    assert.equal(postMutationWarm.progress.advancedMetrics.status, "current");
-    if (postMutationWarm.progress.advancedMetrics.status !== "current") {
-      throw new Error("Expected current Gate 4 warm readback.");
-    }
-    assert.equal(
-      postMutationWarm.progress.advancedMetrics.snapshotId,
+    const postMutationWarmReads = await measureProgressReads(userId, activityCount === 30 ? 1 : 2);
+    assertCurrentWarmReads(
+      postMutationWarmReads,
+      reconciliationMiss.progress.rolling28Day.current.id,
       mutation.progress.advancedMetrics.snapshotId,
+      expectedWarmReadCount(activityCount),
     );
 
     return {
-      fixtureActivityCount: 30,
+      fixtureActivityCount: activityCount,
       reconciliationMiss: measurementReceipt(reconciliationMiss),
-      warm: measurementReceipt(warm),
-      postMutationWarm: measurementReceipt(postMutationWarm),
+      warm: measurementSummary(warmReads),
+      postMutationWarm: measurementSummary(postMutationWarmReads),
       reconciliationMissRowDelta: {
         factSnapshots:
           afterMiss.runner_activity_fact_snapshots - beforeMiss.runner_activity_fact_snapshots,
@@ -365,17 +350,92 @@ async function measureSnapshotReconciliation(userId: string) {
       },
       mutationProducedFreshMetricSnapshot: true,
       factualSnapshotRemainedCurrent: true,
-      planLifecycle: {
-        clearedPlanId: cleared.archivedPlanId,
-        activityCountAfterClear: recreatedProfile.history.activityCount,
-        recreatedPlanId: recreatedPlan.planId,
-        providerDispatchCount: recreatedPlan.providerDispatchCount,
-      },
+      currentPayloadBytes: Buffer.byteLength(JSON.stringify(reconciliationMiss.progress), "utf8"),
+      planLifecycle,
     };
   } finally {
     await resetQaPoolUserData({ supabase, userId });
     const afterCleanup = await getQaUserOwnedCounts(supabase, userId);
     assert.ok(Object.values(afterCleanup).every((count) => count === 0));
+  }
+}
+
+async function proveDesignProfilePlanLifecycle(userId: string) {
+  const cleared = await clearUpcomingScheduleForUser(userId, getPersistedSnapshot, AS_OF_DATE);
+  assert.equal(cleared.status, "cleared");
+  assert.equal(cleared.snapshot.planMeta, null);
+  const historyAfterClear = await listRunnerActivityHistoryForUser({ userId });
+  assert.equal(historyAfterClear.items.length, 20);
+  assert.ok(historyAfterClear.nextCursor);
+  const recreatedPlan = await createRunnerDesignProfilePlan({
+    supabase,
+    userId,
+    asOfDate: AS_OF_DATE,
+  });
+  assert.equal(recreatedPlan.providerDispatchCount, 0);
+  const recreatedProfile = await readRunnerDesignProfileFixture({
+    supabase,
+    userId,
+    asOfDate: AS_OF_DATE,
+  });
+  assert.equal(recreatedProfile.planState.activePlanCount, 1);
+  assert.equal(recreatedProfile.planState.archivedPlanCount, 1);
+  assert.equal(recreatedProfile.history.activityCount, 30);
+  return {
+    clearedPlanId: cleared.archivedPlanId,
+    activityCountAfterClear: recreatedProfile.history.activityCount,
+    recreatedPlanId: recreatedPlan.planId,
+    providerDispatchCount: recreatedPlan.providerDispatchCount,
+  };
+}
+
+function assertCurrentWarmReads(
+  reads: Array<Awaited<ReturnType<typeof measureProgressRead>>>,
+  factualSnapshotId: string,
+  metricSnapshotId: string | null,
+  expectedReadCount: number,
+) {
+  assert.ok(reads.every((read) => read.writeCount === 0));
+  assert.ok(reads.every((read) => read.readCount === expectedReadCount));
+  assert.ok(reads.every((read) => (read.operations["GET runner_activity_revisions"] ?? 0) === 0));
+  assert.ok(
+    reads.every((read) => JSON.stringify(read.operations) === JSON.stringify(reads[0]?.operations)),
+  );
+  assert.ok(reads.every((read) => read.progress.status === "current"));
+  assert.ok(reads.every((read) => read.progress.rolling28Day.current.id === factualSnapshotId));
+  assert.ok(
+    reads.every(
+      (read) =>
+        read.progress.advancedMetrics.status === "current" &&
+        read.progress.advancedMetrics.snapshotId === metricSnapshotId,
+    ),
+  );
+}
+
+function expectedWarmReadCount(activityCount: number) {
+  const activityPages = Math.floor(activityCount / 500) + 1;
+  return 12 + activityPages * 2;
+}
+
+async function seedAdditionalSyntheticActivities(input: { userId: string; activityCount: number }) {
+  const concurrency = 20;
+  for (let offset = 0; offset < input.activityCount; offset += concurrency) {
+    const batchSize = Math.min(concurrency, input.activityCount - offset);
+    await Promise.all(
+      Array.from({ length: batchSize }, (_, batchIndex) => {
+        const index = offset + batchIndex;
+        return persistSyntheticActivity({
+          userId: input.userId,
+          key: `scale-${index.toString().padStart(4, "0")}`,
+          localDate: addDaysIso(AS_OF_DATE, -(index % 56)),
+          timerDurationMin: 20 + (index % 70),
+          elapsedDurationMin: 22 + (index % 70),
+          distanceKm: 6.123 + index / 1_000_000,
+          elevationGainM: index % 4 === 0 ? null : 10 + (index % 120),
+          averageHeartRate: index % 5 === 0 ? null : 125 + (index % 35),
+        });
+      }),
+    );
   }
 }
 
@@ -421,6 +481,14 @@ async function measureProgressRead(userId: string) {
   }
 }
 
+async function measureProgressReads(userId: string, count: number) {
+  const reads = [];
+  for (let index = 0; index < count; index += 1) {
+    reads.push(await measureProgressRead(userId));
+  }
+  return reads;
+}
+
 function isReadMethod(method: string) {
   return method === "GET" || method === "HEAD";
 }
@@ -446,6 +514,19 @@ function measurementReceipt(read: Awaited<ReturnType<typeof measureProgressRead>
   };
 }
 
+function measurementSummary(reads: Array<Awaited<ReturnType<typeof measureProgressRead>>>) {
+  const elapsedMs = reads.map((read) => read.elapsedMs).sort((left, right) => left - right);
+  return {
+    samples: reads.length,
+    minElapsedMs: elapsedMs[0],
+    medianElapsedMs: elapsedMs[Math.floor(elapsedMs.length / 2)],
+    maxElapsedMs: elapsedMs.at(-1),
+    readCounts: Array.from(new Set(reads.map((read) => read.readCount))),
+    writeCounts: Array.from(new Set(reads.map((read) => read.writeCount))),
+    operations: reads[0]?.operations ?? {},
+  };
+}
+
 function snapshotRowCounts(counts: Awaited<ReturnType<typeof getQaUserOwnedCounts>>) {
   return {
     factSnapshots: counts.runner_activity_fact_snapshots,
@@ -466,27 +547,10 @@ async function proveEmptyHistoryAndProgress(userId: string) {
   assert.equal(current.facts.distance.value, null);
 }
 
-async function prepareRuntimePoolIdentity(runtimeUrl: string) {
+async function prepareRuntimePoolIdentity(runtimeUrl: string, role: keyof typeof QA_TESTER_POOL) {
   const baseUrl = new URL(runtimeUrl);
   assert.ok(["127.0.0.1", "localhost", "::1"].includes(baseUrl.hostname));
-  const accountsFile =
-    process.env.LOCAL_AUTH_BYPASS_ACCOUNTS_FILE ?? ".tanstack/hito-running-local-accounts.json";
-  const accounts = await readLocalAuthAccountsFile(accountsFile);
-  const account = accounts.find((candidate) => candidate.username === "qa-provider-engine");
-  assert.ok(account, "The named provider-engine account must exist in the local auth registry.");
-  const loginBody = new FormData();
-  loginBody.set("identifier", account.username);
-  loginBody.set("password", account.password);
-  loginBody.set("next", "/");
-  const login = await fetch(new URL("/api/auth/local-login", baseUrl), {
-    method: "POST",
-    body: loginBody,
-    redirect: "manual",
-  });
-  assert.equal(login.status, 302);
-  const setCookie = login.headers.get("set-cookie");
-  assert.ok(setCookie);
-  const cookie = setCookie.split(";", 1)[0];
+  const { cookie } = await loginQaPoolToLoopbackRuntime({ runtimeUrl, role });
 
   const provision = await fetch(new URL("/api/runner-activities", baseUrl), {
     headers: { cookie },
@@ -495,7 +559,12 @@ async function prepareRuntimePoolIdentity(runtimeUrl: string) {
   return { cookie };
 }
 
-async function proveRuntimeRoutes(input: { userId: string; runtimeUrl: string; cookie: string }) {
+async function proveRuntimeRoutes(input: {
+  userId: string;
+  runtimeUrl: string;
+  cookie: string;
+  otherCookie: string;
+}) {
   const baseUrl = new URL(input.runtimeUrl);
   assert.ok(["127.0.0.1", "localhost", "::1"].includes(baseUrl.hostname));
 
@@ -525,6 +594,27 @@ async function proveRuntimeRoutes(input: { userId: string; runtimeUrl: string; c
     elevationGainM: null,
     averageHeartRate: null,
   });
+
+  for (const path of [
+    `/api/runner-activities/${routeSource.receipt.activityId}/source`,
+    `/api/runner-activities/${routeDelete.receipt.activityId}`,
+  ]) {
+    const crossRunnerMutation = await fetch(new URL(path, baseUrl), {
+      method: "DELETE",
+      headers: { cookie: input.otherCookie },
+    });
+    assert.equal(crossRunnerMutation.status, 404);
+    const crossRunnerBody = await crossRunnerMutation.json();
+    assert.equal(crossRunnerBody.ok, false);
+    assert.equal(crossRunnerBody.code, "activity_not_found");
+  }
+  const unchangedOwnerActivities = await supabase
+    .from("runner_activities")
+    .select("id")
+    .eq("user_id", input.userId)
+    .in("id", [routeSource.receipt.activityId, routeDelete.receipt.activityId]);
+  if (unchangedOwnerActivities.error) throw new Error(unchangedOwnerActivities.error.message);
+  assert.equal(unchangedOwnerActivities.data.length, 2);
 
   const historyResponse = await fetch(new URL("/api/runner-activities?pageSize=2", baseUrl), {
     headers,
@@ -677,8 +767,8 @@ async function proveSnapshotRls(input: {
     .from("runner_activity_fact_snapshots")
     .select("id")
     .eq("id", input.snapshotId);
-  if (ownRead.error) throw new Error(ownRead.error.message);
-  assert.equal(ownRead.data.length, 1);
+  assert.equal(ownRead.error?.code, "42501");
+  assert.equal(ownRead.data, null);
   await ownerClient.auth.signOut();
 
   const otherClient = await signedInClient(input.otherRole);
@@ -686,8 +776,8 @@ async function proveSnapshotRls(input: {
     .from("runner_activity_fact_snapshots")
     .select("id")
     .eq("id", input.snapshotId);
-  if (crossRead.error) throw new Error(crossRead.error.message);
-  assert.deepEqual(crossRead.data, []);
+  assert.equal(crossRead.error?.code, "42501");
+  assert.equal(crossRead.data, null);
   const forbiddenRpc = await otherClient.rpc("list_runner_activity_history_page", {
     p_user_id: (await otherClient.auth.getUser()).data.user?.id ?? "",
     p_page_size: 10,
@@ -707,60 +797,7 @@ async function persistSyntheticActivity(input: {
   averageHeartRate: number | null;
   storageSuffix?: string;
 }) {
-  const fileBuffer = Buffer.from(`gate-2-synthetic-fit:${input.key}`, "utf8");
-  const storagePath = `${input.userId}/gate-2/${input.key}-${input.storageSuffix ?? "source"}.fit`;
-  const storage = await supabase.storage
-    .from(WORKOUT_RESULT_STORAGE_BUCKET)
-    .upload(storagePath, fileBuffer, { contentType: "application/octet-stream", upsert: false });
-  if (storage.error) throw new Error(storage.error.message);
-  const parsedWorkout = syntheticParsedWorkout(input);
-  const receipt = await persistGarminFitActivitySource({
-    userId: input.userId,
-    assetKind: "garmin_fit",
-    storageBucket: WORKOUT_RESULT_STORAGE_BUCKET,
-    storagePath,
-    originalFileName: `${input.key}.fit`,
-    mimeType: "application/octet-stream",
-    fileSizeBytes: fileBuffer.length,
-    fileBuffer,
-    parsedWorkout,
-  });
-  return { receipt, fileBuffer };
-}
-
-function syntheticParsedWorkout(input: {
-  localDate: string;
-  timerDurationMin: number | null;
-  elapsedDurationMin: number | null;
-  distanceKm: number | null;
-  elevationGainM: number | null;
-  averageHeartRate: number | null;
-}): ParsedGarminWorkout {
-  return {
-    sourceKind: "garmin_fit",
-    activityStartAt: `${input.localDate}T08:00:00Z`,
-    activityLocalDate: input.localDate,
-    totalDistanceKm: input.distanceKm,
-    totalTimerDurationMin: input.timerDurationMin,
-    totalElapsedDurationMin: input.elapsedDurationMin,
-    totalDurationMin: input.timerDurationMin ?? input.elapsedDurationMin,
-    avgHeartRate: input.averageHeartRate,
-    maxHeartRate: input.averageHeartRate == null ? null : input.averageHeartRate + 12,
-    avgPower: null,
-    maxPower: null,
-    totalCalories: null,
-    totalAscentM: input.elevationGainM,
-    totalDescentM: null,
-    avgCadence: null,
-    avgTemperatureC: null,
-    gpsPointCount: 0,
-    lapCount: 0,
-    workoutName: null,
-    actualIntervalCount: null,
-    actualStepPayload: [],
-    lapPayload: [],
-    summaryPayload: { fixture_class: "sanitized_gate_2" },
-  };
+  return persistGate4SyntheticActivity({ supabase, ...input });
 }
 
 async function createPlannedWorkout(userId: string) {
@@ -792,25 +829,6 @@ async function createPlannedWorkout(userId: string) {
   });
   if (workout.error) throw new Error(workout.error.message);
   return plannedWorkoutId;
-}
-
-async function ensurePoolUser(role: keyof typeof QA_TESTER_POOL) {
-  const password = `gate2-${role}-local-password`;
-  const user = await ensureQaPoolAuthUser({ supabase, role, password });
-  await assertQaPoolAuthUser({ supabase, role, userId: user.id });
-  return user;
-}
-
-async function signedInClient(role: keyof typeof QA_TESTER_POOL) {
-  const client = createClient(supabaseUrl, publishableKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  const signIn = await client.auth.signInWithPassword({
-    email: QA_TESTER_POOL[role].email,
-    password: `gate2-${role}-local-password`,
-  });
-  if (signIn.error) throw new Error(signIn.error.message);
-  return client;
 }
 
 await main();

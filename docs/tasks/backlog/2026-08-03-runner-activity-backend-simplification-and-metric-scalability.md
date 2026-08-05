@@ -40,7 +40,9 @@ baseline and canonical planned-workout projection reconciliation are now release
 that single projection lifecycle from the upload/parser facade without changing behavior. Slice 2
 has completed the target-specific legacy backfill and retired its executable maintenance path;
 Slice 3 measured snapshot reconciliation and retained the existing fingerprinted implementation
-because representative evidence did not admit materialization.
+because representative evidence did not admit materialization. Slice 5 then removed the demonstrated
+current-revision N+1 topology and closed the adjacent server-owned FIT security boundary without
+adding another read, write, or metric truth.
 
 ## Stage
 
@@ -61,8 +63,14 @@ The Supabase environment-contract cleanup is implemented in the current Backend 
 runtime, deployment-parity, Runner Activity proof, and design-profile consumers now accept only
 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY`.
 Legacy names remain only as explicit local-env cleanup keys, negative regression evidence, or
-historical evidence. Gate 5, provider sync, and raw-removal fallback retirement remain separate
-future work.
+historical evidence. The final bounded cleanup retired the zero-data legacy raw-removal fallback,
+consolidated the repeated Runner Activity proof bootstrap, and extended the existing read-model
+measurement to 30, 300, and 3,000 canonical activities. Gate 5 and provider sync remain separate
+future work. The current Slice 5 worktree replaces revision-ID chunk fetches with the existing
+current-revision foreign-key projection, makes independent factual/Gate 4 reads concurrent, leases
+all shared proof identities, bounds ZIP extraction, authenticates before multipart parsing, scopes
+privileged feedback reads by runner, and adds an append-only least-privilege migration. Hosted
+migration application remains a separate release mutation gate.
 
 ## Dispatch
 
@@ -266,7 +274,15 @@ measured that behavior with the canonical 30-activity fixture: a derived-row rec
 a warm local process used 17 reads and 9 writes in 56.10-84.53 ms, while a reconciliation hit used
 16 reads and zero writes in 32.15-49.50 ms. A canonical RPE mutation added exactly one observation
 and one metric snapshot while leaving the factual snapshot unchanged. This evidence does not admit a
-new materialization lifecycle.
+new materialization lifecycle. The bounded scale extension confirmed the same truth at 300 and 3,000
+activities. Across two local runs at 300, the miss used 24 reads/12 writes in 164.30-803.51 ms and
+the three warm reads used 20 reads/zero writes with 52.50-77.47 ms median latency. At 3,000, the miss
+used 117 reads/39 writes in 1,685.85-2,764.51 ms and the three warm reads used 86 reads/zero writes
+with 417.17-804.44 ms median latency. Exact RPE invalidation still added only one observation and one
+metric snapshot at both scales. The spread also confirms that these local timings are evidence, not
+an accepted SLO. The 3,000 case is a stress boundary rather than a current product admission
+threshold; without an accepted latency SLO or a stale/current failure, it does not justify a cache,
+materialized store, or second invalidation lifecycle.
 
 ## Current Technology Stack
 
@@ -296,7 +312,7 @@ in the first Backend slice.
 | ------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Activity/source/revision truth        | `src/lib/runner-activity/garmin-fit-source.ts` and Gate 1 RPC                               | Retain as the sole activity writer                                                                                                                                      |
 | Activity History and factual Progress | `history-read-model.ts`, `fact-snapshots.ts`, `read-model.ts`                               | Retain accepted API/read-model meaning                                                                                                                                  |
-| Raw-source removal                    | `removeRunnerActivityOriginalFiles`                                                         | Accepted and truthful: each revision is reconciled independently; successfully removed objects remain `removed` across a later failure                                  |
+| Raw-source removal                    | `removeRunnerActivityOriginalFiles`                                                         | Sole live owner: local and hosted target inventories had zero unlinked legacy raw assets, so the product endpoint now delegates only to canonical source revisions      |
 | Gate 4 evidence and metrics           | Gate 4 migration, `metric-formulas.ts`, `metric-snapshots.ts`                               | Already implemented; immutable evidence revisions, formula-versioned observations/snapshots, historical readback, and retryable lifecycle are baseline, not future work |
 | Gate 5 sample evidence                | No persisted normalized sample-set owner exists                                             | Preserve `normalized_samples_persisted: false` and `normalized_stream_not_persisted`; no summary fallback                                                               |
 | Workout evidence projection           | `workout_result_assets`, `workout_actual_metrics`, `workout_comparisons` and their readback | Live compatibility/product projection; simplify its writer without removing its accepted consumer contract                                                              |
@@ -310,11 +326,17 @@ documentation audit. Gate 5 and provider sync remain deliberately unimplemented 
 
 ### Migrations
 
-The accepted sequence is immutable and ordered:
+The accepted released sequence is immutable and ordered:
 
 1. `20260802190244_runner_activity_foundation_gate_1.sql`;
 2. `20260802223149_runner_activity_history_and_fact_snapshots.sql`;
 3. `20260803134149_runner_activity_gate_4_metrics.sql`.
+
+Slice 5 appends `20260804204819_restrict_runner_activity_projection_data_api.sql` and
+`20260804211346_remove_retired_runner_activity_authenticated_policies.sql`. They make raw
+activity/provenance and Workout Result projection tables server-owned, remove direct browser
+privileges, and delete the superseded authenticated policies so an accidental future grant cannot
+silently reactivate the retired Data API path.
 
 Never edit, squash, reorder, rename, or delete an accepted migration. A future schema cleanup must be
 an append-only migration with local parity, generated-type refresh, RLS/grant proof, rollback or
@@ -370,14 +392,13 @@ retained pending Slice 2 evidence.
 
 ### Measured retention and later candidates
 
-| Candidate                                              | Reachability proof                                                                  | Why it is separate                                                                                                          |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Factual snapshot write-on-GET                          | Measured cold miss creates seven immutable window snapshots; warm reads create none | Retained: current latency/write amplification did not admit another lifecycle                                               |
-| Gate 4 observation/snapshot write-on-GET               | Measured cold miss creates 31 observations and one snapshot; warm reads create none | Retained: one RPE change created only one new observation and one immutable snapshot with exact historical readback         |
-| Runner-wide factual and metric snapshot deletion       | `delete_runner_activity_from_history` deletes all current snapshots for the user    | Dependency-aware invalidation needs explicit evidence and an append-only migration if schema support is required            |
-| Legacy raw-removal fallback                            | `removeWorkoutResultEvidence` remains product-reachable through the removal API     | Separate compatibility inventory must prove no pre-Gate-1 assets remain; backfill completion cannot authorize this deletion |
-| `training.ts` unused `weeklyMileage` and `statsTotals` | No repo caller after `/progress` replacement                                        | Frontend Product owner, not Backend                                                                                         |
-| Bun artifacts and direct router-plugin dependency      | No operational source import found                                                  | Repository/dependency owner with lock/build proof, outside this plan's first slice                                          |
+| Candidate                                              | Reachability proof                                                                  | Why it is separate                                                                                                  |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Factual snapshot write-on-GET                          | Measured cold miss creates seven immutable window snapshots; warm reads create none | Retained: current latency/write amplification did not admit another lifecycle                                       |
+| Gate 4 observation/snapshot write-on-GET               | Measured cold miss creates 31 observations and one snapshot; warm reads create none | Retained: one RPE change created only one new observation and one immutable snapshot with exact historical readback |
+| Runner-wide factual and metric snapshot deletion       | `delete_runner_activity_from_history` deletes all current snapshots for the user    | Dependency-aware invalidation needs explicit evidence and an append-only migration if schema support is required    |
+| `training.ts` unused `weeklyMileage` and `statsTotals` | No repo caller after `/progress` replacement                                        | Frontend Product owner, not Backend                                                                                 |
+| Bun artifacts and direct router-plugin dependency      | No operational source import found                                                  | Repository/dependency owner with lock/build proof, outside this plan's first slice                                  |
 
 Query rewrites, new indexes, other broad file decomposition, fixture consolidation, caching, and
 external sample storage are observations only until representative measurements or exact replacement
@@ -501,20 +522,76 @@ factual/metric freshness, and truthful `current`, `updating`, or metric-specific
 without stale values. Replace coarse user-wide invalidation only with a complete dependency map and
 measured before/after cost. Any schema support uses a new append-only migration.
 
-Completion receipt: serial owner runs plus an independent QA repeat of the canonical 30-activity
-fixture produced stable operation counts. In the final owner runs, a derived-row reconciliation miss
-on a warm local process used 17 reads and 9 writes with 56.10-84.53 ms local latency;
-reconciliation hits used 16 reads and zero writes with 32.15-49.50 ms latency; post-mutation hits used
-16 reads and zero writes with 34.56-43.39 ms latency. The miss row delta was seven factual snapshots,
-one metric snapshot, and 31 observations. A canonical immutable RPE mutation added one metric
-snapshot and one observation, retained the factual snapshot identity, and never returned stale data
-as current. The separate Gate 4 validator proved immutable historical readback and Gate 5
+Completion receipt: the canonical validator now runs the same reconciliation matrix at 30 and,
+when explicitly requested, 300 and 3,000 activities. All scales produced seven factual snapshots,
+one metric snapshot, one observation per activity plus the fixture's accepted RPE observation, and
+zero writes on every warm read. One immutable RPE mutation added exactly one observation and one
+metric snapshot, retained factual snapshot identity, and never returned stale data as current. At
+300 activities the warm median was 52.50-77.47 ms across two runs; at 3,000 it was
+417.17-804.44 ms. The separate Gate 4 validator proved immutable historical readback and Gate 5
 unavailability. The current implementation is retained; no runtime source, migration, cache,
 materialized store, or invalidation owner was added.
+
+### Slice 4 - Retire raw-removal compatibility and consolidate proof ownership - completed
+
+Owner: Backend Garmin source lifecycle and Runner Activity proof boundary.
+
+Read-only local and hosted inventories found zero unlinked legacy raw assets after Slice 2. The
+product-reachable remove endpoint still exists, but its command now delegates only to canonical
+activity source revisions. The obsolete fallback query/storage-delete/asset-delete branch was
+removed, while one explicit negative regression proves that a legacy-shaped unlinked row is not
+silently mutated by the canonical endpoint.
+
+The three maintained Gates 1, 2, and 4 validators now reuse one loopback-only QA runtime/bootstrap
+owner rather than carrying independent environment, admin-client, pool-user, and signed-in RLS
+setup. The Gate-specific entrypoints and assertions remain separate. Cleanup uses stable ID-ordered
+pagination and bounded Storage deletion, and its negative compatibility proof verifies both the
+legacy-shaped row and raw-object bytes. Across the scoped maintained runtime and validator files,
+the implementation changed from 4,538 to 4,537 lines. Production runtime lost 53 lines across the
+fallback and an unused removal receipt; the shared bootstrap, deterministic scale, raw-object, and
+above-1,000 cleanup proof added 52 maintained lines. The result is a smaller live path without
+claiming that stronger evidence is free.
+
+### Slice 5 - Remove revision N+1 reads and close FIT server ownership - owner-level completed
+
+Owner: Backend Runner Activity snapshot/read-model, FIT ingestion, and Data API privilege boundary.
+
+Measured evidence established that factual and Gate 4 warm reads fetched current activity revisions
+separately in UUID chunks of 100. At 3,000 activities that produced 60 redundant revision requests
+inside the measured 86-read warm path. Both owners now use the existing
+`runner_activities_current_revision_id_fkey` relation, and Progress starts factual and Gate 4 work
+concurrently while preserving their distinct freshness and immutable snapshot owners. The maintained
+scale proof rejects any reintroduced direct `runner_activity_revisions` request and requires the
+bounded topology: 14 warm reads at 30/300 activities and 26 at 3,000, all with zero writes.
+
+The same audit closed four security and ownership defects at their first owners:
+
+- request authentication now precedes a bounded multipart-body reader, which rejects both declared
+  and streamed request bodies above the accepted upload envelope before `formData()` materializes
+  them;
+- ZIP intake rejects more than 256 entries and any FIT whose declared or streamed expanded bytes
+  exceed the existing 25 MB limit, with parser internals normalized to runner-safe errors;
+- all service-role workout feedback reads include `user_id`, and provider model/response IDs no
+  longer enter the runner summary;
+- activity/source deletion refuses foreign or missing identities with the same runner-safe `404`
+  while retaining ordinary `500` only for real lifecycle failures;
+- append-only privilege/policy migrations remove direct browser access to private activity
+  provenance and server-owned Workout Result projection tables, delete the retired authenticated
+  policies, and retain exact service-role access.
+
+Proof cleanup now has one leased Runner Activity bootstrap for Gates 1, 2, and 4; shared synthetic
+activity persistence replaces the Gate 2 copy; two zero-consumer exports and one unused receipt field
+are removed. Source implementation and local migration validation are complete. Hosted migration
+application and deployment parity remain separate explicitly authorized release actions.
 
 ### Later evidence-gated work
 
 - Optimize History queries or indexes only from representative query plans and latency evidence.
+- Decide a smaller runner-facing Progress DTO separately: the 3,000-activity response remains about
+  613 KB because it exposes immutable evidence IDs that Product does not render. Removing them needs
+  an explicit API compatibility decision; persisted lineage must remain exact.
+- Replace write-through snapshot reconciliation only after an accepted latency SLO or stale/current
+  failure admits a new lifecycle. Slice 5 query reduction does not authorize a cache or pointer.
 - Consolidate fixtures or decompose files only from exact duplication/reachability maps.
 - Route Frontend and repository/tooling candidates to their separate owners.
 - Start Gate 5 only as its separate accepted Backend gate after persisted, immutable normalized

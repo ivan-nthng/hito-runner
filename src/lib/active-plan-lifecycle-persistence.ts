@@ -5,7 +5,7 @@ type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
 type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
 type RpcPayload = { [key: string]: Json | undefined };
 
-export type ActivePlanWorkoutMutationKind = "add" | "clear" | "move";
+type ActivePlanWorkoutMutationKind = "add" | "clear" | "move";
 
 export class ActivePlanPersistenceRejection extends Error {
   constructor(

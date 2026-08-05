@@ -40,6 +40,8 @@ import {
   buildAiGeneratedRunningPlanDevFixtureOpenAiFetch,
 } from "../../src/lib/ai-generated-running-plan-dev-fixture";
 import { buildAiGeneratedRunningPlanAuthoringInput } from "../../src/lib/ai-generated-running-plan";
+import { buildDeterministicWorkoutComparison } from "../../src/lib/workout-result-import/compare-workout-result";
+import { WORKOUT_COMPARISON_FORMULA_VERSION } from "../../src/lib/workout-result-import/comparison-payload";
 import { buildHeartRateZonesSummary } from "../../src/lib/heart-rate-zones";
 import { buildSourceWorkoutFingerprint } from "../../src/lib/manual-workout-authoring/edit-workout-review-token";
 import {
@@ -1093,19 +1095,29 @@ async function validateReplacementCarryForwardPersistence(input: {
     if (metrics.error) throw new Error(metrics.error.message);
 
     const comparisonId = crypto.randomUUID();
+    const canonicalComparison = buildDeterministicWorkoutComparison({
+      plannedWorkout: sourceWorkout,
+      actualMetrics: {
+        id: metricsId,
+        source_kind: "garmin_fit",
+        activity_local_date: sourceWorkout.workout_date,
+        actual_duration_min: 35,
+        actual_distance_km: 5,
+        actual_interval_count: null,
+        actual_step_payload: null,
+        summary_payload: { session: { sport: "running" } },
+      },
+    });
     const comparison = await input.supabase.from("workout_comparisons").insert({
       id: comparisonId,
       user_id: disposableUser.userId,
       planned_workout_id: sourceWorkout.id,
       actual_metrics_id: metricsId,
-      comparison_status: "complete",
-      completion_state: "matched",
-      comparison_confidence: 1,
-      difference_payload: {
-        plannedWorkout: {
-          plannedWorkoutId: sourceWorkout.id,
-        },
-      },
+      comparison_formula_version: WORKOUT_COMPARISON_FORMULA_VERSION,
+      comparison_status: canonicalComparison.comparisonStatus,
+      completion_state: canonicalComparison.completionState,
+      comparison_confidence: canonicalComparison.comparisonConfidence,
+      difference_payload: canonicalComparison.differencePayload as unknown as Json,
     });
     if (comparison.error) throw new Error(comparison.error.message);
 

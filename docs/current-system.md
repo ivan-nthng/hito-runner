@@ -217,11 +217,6 @@
   deterministic BPM/source snapshot validation against the effective profile, canonical
   `training-plan-v2` output, and
   exact review/readback fields without semantic fallback or coaching substitution.
-- `src/lib/entitlements/*`
-  owns the first backend-only Basic/Pro entitlement foundation:
-  one canonical capability registry for `garmin_ai_interpretation`;
-  entitlement resolution that treats a missing row as effective `Pro`; capability checks with
-  bounded locked responses
 - `src/lib/local-auth.ts`
   owns the temporary local account credential contract, account discovery, and cookie session helpers
 - `src/lib/local-auth-supabase.ts`
@@ -270,9 +265,9 @@
 - signed-out users now hit a login-first entry surface on `/` and do not create trusted history
 - signed-out preview routes can still render on direct route access when real Supabase env values are absent, but they are no longer the primary entry experience
 - temporary local-bypass users may still enter saved mode through visible credentials login on loopback local runtimes only, while deploy-like runtimes expose only the real auth surface and authenticated saved-mode truth always resolves through Supabase
-- entitlement rollout is backend-owned and pre-billing:
-  if a user has no `runner_entitlements` row, the effective tier is `Pro`; an explicit active
-  `basic` row can enforce the current Pro-only `garmin_ai_interpretation` capability
+- the pre-billing entitlement tables remain available to Admin analytics and QA cleanup, but no
+  current Product action consumes a Basic/Pro enforcement runtime; a future paid capability must
+  establish its own current backend consumer before enforcement source returns
 - authenticated users without `runner_profile` are routed into setup on `/`
 - authenticated users with a saved profile but no active `plan_cycle` now also stay honestly in setup until a canonical creation path succeeds
 - Quick setup goal cards are now non-mutating distance-goal shortcuts:

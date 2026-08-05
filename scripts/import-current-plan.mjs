@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
 import { tsImport } from "tsx/esm/api";
@@ -8,8 +7,11 @@ const { applyImportedPlanForUser } = await tsImport(
   "../src/lib/active-plan-persistence.ts",
   import.meta.url,
 );
+const { DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE, readLocalAuthAccountRegistry } = await tsImport(
+  "../src/lib/local-auth-account-registry.server.ts",
+  import.meta.url,
+);
 
-const DEFAULT_ACCOUNTS_FILE = ".tanstack/hito-running-local-accounts.json";
 const LOCAL_MUTATION_FLAG = "--allow-local-supabase-mutation";
 const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 const USAGE = `Usage:
@@ -275,18 +277,16 @@ function assertApplySafety({ supabaseUrl, allowLocalSupabaseMutation }) {
 }
 
 async function loadCanonicalLocalBypassAccount() {
-  const accountsFilePath = readEnv("LOCAL_AUTH_BYPASS_ACCOUNTS_FILE") ?? DEFAULT_ACCOUNTS_FILE;
-  const fileContents = await readFile(accountsFilePath, "utf8");
-  const parsed = JSON.parse(fileContents);
-  const rawAccounts = Array.isArray(parsed) ? parsed : (parsed.accounts ?? []);
+  const accountsFilePath =
+    readEnv("LOCAL_AUTH_BYPASS_ACCOUNTS_FILE") ?? DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE;
+  const normalizedAccounts = await readLocalAuthAccountRegistry(accountsFilePath);
 
-  if (!Array.isArray(rawAccounts) || rawAccounts.length === 0) {
+  if (normalizedAccounts.length === 0) {
     throw new Error(
       `No local bypass accounts found in ${accountsFilePath}. Create one with npm run test-user or update LOCAL_AUTH_BYPASS_ACCOUNTS_FILE.`,
     );
   }
 
-  const normalizedAccounts = rawAccounts.map(normalizeLocalAccount);
   return normalizedAccounts.find((account) => account.role === "admin") ?? normalizedAccounts[0];
 }
 
@@ -393,38 +393,6 @@ function parseSupabaseTarget(url) {
 function readEnv(name) {
   const value = process.env[name];
   return typeof value === "string" && value.trim() ? value.trim() : null;
-}
-
-function normalizeLocalAccount(account) {
-  const username = String(account.username ?? "")
-    .trim()
-    .toLowerCase();
-
-  if (!username) {
-    throw new Error("Local bypass accounts file must include username for each account.");
-  }
-
-  return {
-    username,
-    email: String(account.email ?? `${username}@local.test`)
-      .trim()
-      .toLowerCase(),
-    userId: String(account.userId ?? deriveUserId(username)).trim(),
-    role: account.role === "admin" ? "admin" : "tester",
-    displayName: String(account.displayName ?? humanizeUsername(username)).trim(),
-  };
-}
-
-function deriveUserId(username) {
-  const hash = createHash("sha256").update(username).digest("hex");
-  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(
-    17,
-    20,
-  )}-${hash.slice(20, 32)}`;
-}
-
-function humanizeUsername(username) {
-  return username.charAt(0).toUpperCase() + username.slice(1);
 }
 
 function getErrorMessage(error) {

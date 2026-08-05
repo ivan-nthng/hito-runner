@@ -58,7 +58,7 @@ export interface EmptyActivePlanCreationInput {
   planMetadata?: AdditionalPlanPersistenceMetadata | null;
 }
 
-export type EmptyActivePlanCreationResult = PlanApplySuccessResult & {
+type EmptyActivePlanCreationResult = PlanApplySuccessResult & {
   planCycle: PersistedPlanCycleRow;
   workouts: [];
 };
@@ -75,7 +75,7 @@ type PreparedImportedPlanApply = PreparedPlanApplySuccess & {
   planContext: ExistingPlanContext;
 };
 
-export type ImportedPlanApplyIntent = {
+type ImportedPlanApplyIntent = {
   clearBeforeImport: boolean;
 };
 
@@ -510,7 +510,7 @@ function buildPersistedWorkoutRows(planId: string, userId: string, seed: Importe
   }));
 }
 
-export async function getPlanWorkoutsWithLogs(planCycleId: string) {
+async function getPlanWorkoutsWithLogs(planCycleId: string) {
   const workouts = await getPlanWorkouts(planCycleId);
   const supabase = createAdminSupabaseClient();
   const workoutIds = workouts.map((workout) => workout.id);

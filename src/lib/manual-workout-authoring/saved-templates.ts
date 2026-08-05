@@ -223,7 +223,7 @@ export type ManualWorkoutSavedTemplateDependencies = {
 };
 
 export const saveManualWorkoutSavedTemplate = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
+  .validator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutSavedTemplateSaveResult> => {
     const userId = await getCurrentManualWorkoutAuthoringUserId();
 
@@ -238,7 +238,7 @@ export const saveManualWorkoutSavedTemplate = createServerFn({ method: "POST" })
   });
 
 export const reviewManualWorkoutSavedTemplate = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
+  .validator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutSavedTemplateReviewResult> => {
     const userId = await getCurrentManualWorkoutAuthoringUserId();
 
@@ -253,7 +253,7 @@ export const reviewManualWorkoutSavedTemplate = createServerFn({ method: "POST" 
   });
 
 export const deleteManualWorkoutSavedTemplate = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
+  .validator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutSavedTemplateDeleteResult> => {
     const userId = await getCurrentManualWorkoutAuthoringUserId();
 

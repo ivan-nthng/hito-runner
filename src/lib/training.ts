@@ -121,7 +121,7 @@ export interface PlanSchedulePreferencesSummary {
   preferredLongRunDay: string | null;
 }
 
-export type ActivePlanWorkoutEditingOperation =
+type ActivePlanWorkoutEditingOperation =
   | "add_workout"
   | "clear_workout"
   | "move_workout"
@@ -764,7 +764,7 @@ export function formatDurationMin(
   return `${value} min`;
 }
 
-export function formatSegmentDurationMin(durationMin: number | null | undefined): string {
+function formatSegmentDurationMin(durationMin: number | null | undefined): string {
   if (durationMin == null || !Number.isFinite(durationMin)) {
     return "—";
   }

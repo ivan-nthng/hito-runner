@@ -10,6 +10,7 @@ import {
   type RunnerActivitySourceReceipt,
 } from "@/lib/runner-activity/garmin-fit-source";
 import { buildDeterministicWorkoutComparison } from "@/lib/workout-result-import/compare-workout-result";
+import { WORKOUT_COMPARISON_FORMULA_VERSION } from "@/lib/workout-result-import/comparison-payload";
 import { getLatestWorkoutResultFeedback } from "@/lib/workout-result-import/read-workout-result-feedback";
 import {
   type ExtractedGarminFitFile,
@@ -98,7 +99,10 @@ export async function reconcileWorkoutResultProjection(input: {
           storagePath: input.candidateStoragePath,
         });
         failureAssetId = null;
-        const currentReadback = await getLatestWorkoutResultFeedback(input.plannedWorkout.id);
+        const currentReadback = await getLatestWorkoutResultFeedback({
+          userId: input.userId,
+          plannedWorkoutId: input.plannedWorkout.id,
+        });
         if (
           currentReadback.marker?.state !== "feedback_ready" ||
           currentReadback.latestActualMetrics?.id !== activeMetrics.data.id ||
@@ -225,7 +229,10 @@ export async function reconcileWorkoutResultProjection(input: {
       userId: input.userId,
       assetId: projectionAsset.id,
     });
-    const persistedReadback = await getLatestWorkoutResultFeedback(input.plannedWorkout.id);
+    const persistedReadback = await getLatestWorkoutResultFeedback({
+      userId: input.userId,
+      plannedWorkoutId: input.plannedWorkout.id,
+    });
     const persistedMatch = await findRunnerActivityPlanMatch({
       userId: input.userId,
       activityId: input.activitySource.activityId,
@@ -392,7 +399,7 @@ async function reconcileWorkoutComparison(input: {
     user_id: input.userId,
     planned_workout_id: input.plannedWorkout.id,
     actual_metrics_id: input.metrics.id,
-    comparison_formula_version: "deterministic_workout_comparison_v1",
+    comparison_formula_version: WORKOUT_COMPARISON_FORMULA_VERSION,
     comparison_status: comparison.comparisonStatus,
     completion_state: comparison.completionState,
     difference_payload: comparison.differencePayload as unknown as Json,

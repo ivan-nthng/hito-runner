@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { createClient } from "@supabase/supabase-js";
 import {
   confirmRunnerActivityOfficialResultForUser,
   correctRunnerActivityOfficialResultForUser,
@@ -35,11 +34,13 @@ import type {
 import { addDaysIso, todayIso } from "../src/lib/training";
 import {
   QA_TESTER_POOL,
-  assertQaPoolAuthUser,
-  ensureQaPoolAuthUser,
   getQaUserOwnedCounts,
   resetQaPoolUserData,
 } from "./lib/qa-test-user-lifecycle.mjs";
+import {
+  createRunnerActivityProofRuntime,
+  withRunnerActivityProofLeases,
+} from "./lib/runner-activity-proof-runtime";
 import {
   createGate4LifecycleFixtures,
   markRunnerActivitySourceRemovalPendingForFixture,
@@ -47,24 +48,16 @@ import {
   type Gate4SyntheticActivity,
 } from "./lib/runner-activity-gate-4-fixture";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SECRET_KEY;
-const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-if (!supabaseUrl || !serviceRoleKey || !publishableKey) {
-  throw new Error(
-    "NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, and SUPABASE_SECRET_KEY are required.",
-  );
-}
-
-const supabase = createClient(supabaseUrl, serviceRoleKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+const { supabase, ensureUser, signedInClient } = createRunnerActivityProofRuntime("gate4");
 const AS_OF_DATE = todayIso();
 
 async function main() {
-  assertLoopback(supabaseUrl);
-  const owner = await ensurePoolUser("provider-engine");
-  const other = await ensurePoolUser("isolation-a");
+  await withRunnerActivityProofLeases(["provider-engine", "isolation-a"], runValidation);
+}
+
+async function runValidation() {
+  const owner = await ensureUser("provider-engine");
+  const other = await ensureUser("isolation-a");
   await resetQaPoolUserData({ supabase, userId: owner.id });
   await resetQaPoolUserData({ supabase, userId: other.id });
 
@@ -934,16 +927,25 @@ async function proveMetricRls(input: {
   ownerRole: keyof typeof QA_TESTER_POOL;
   otherRole: keyof typeof QA_TESTER_POOL;
 }) {
-  const owner = await signedInClient(input.ownerRole);
-  const ownEvidence = await owner
+  const ownerUser = await ensureUser(input.ownerRole);
+  const ownEvidence = await supabase
     .from("runner_activity_evidence_revisions")
     .select("id, activity_id, activity_revision_id")
+    .eq("user_id", ownerUser.id)
     .limit(1);
   if (ownEvidence.error) throw new Error(ownEvidence.error.message);
   assert.ok(ownEvidence.data.length > 0);
-  const ownSnapshots = await owner.from("runner_activity_metric_snapshots").select("id");
-  if (ownSnapshots.error) throw new Error(ownSnapshots.error.message);
-  assert.ok(ownSnapshots.data.length > 0);
+
+  const owner = await signedInClient(input.ownerRole);
+  for (const table of [
+    "runner_activity_evidence_revisions",
+    "runner_activity_metric_observations",
+    "runner_activity_metric_snapshots",
+  ] as const) {
+    const result = await owner.from(table).select("id");
+    assert.equal(result.error?.code, "42501");
+    assert.equal(result.data, null);
+  }
   const forbiddenWrite = await owner.from("runner_activity_metric_snapshots").insert({
     user_id: (await owner.auth.getUser()).data.user?.id ?? randomUUID(),
     as_of_date: AS_OF_DATE,
@@ -960,8 +962,8 @@ async function proveMetricRls(input: {
   assert.ok(forbiddenWrite.error);
   const forbiddenRpc = await owner.rpc("append_runner_activity_evidence_revision", {
     p_user_id: (await owner.auth.getUser()).data.user?.id ?? randomUUID(),
-    p_activity_id: ownEvidence.data[0].activity_id,
-    p_expected_activity_revision_id: ownEvidence.data[0].activity_revision_id,
+    p_activity_id: ownEvidence.data[0]!.activity_id,
+    p_expected_activity_revision_id: ownEvidence.data[0]!.activity_revision_id,
     p_evidence_kind: "session_rpe",
     p_lifecycle_state: "asserted",
     p_session_rpe: 5,
@@ -977,8 +979,8 @@ async function proveMetricRls(input: {
     "runner_activity_metric_snapshots",
   ] as const) {
     const result = await other.from(table).select("id");
-    if (result.error) throw new Error(result.error.message);
-    assert.deepEqual(result.data, []);
+    assert.equal(result.error?.code, "42501");
+    assert.equal(result.data, null);
   }
   await other.auth.signOut();
 }
@@ -1047,30 +1049,6 @@ function assertGate5Unavailable(metrics: RunnerActivityAdvancedMetricsCurrent) {
     assert.equal(metric.status, "unavailable");
     assert.equal(metric.reason, "normalized_stream_not_persisted");
   }
-}
-
-async function ensurePoolUser(role: keyof typeof QA_TESTER_POOL) {
-  const password = `gate4-${role}-local-password`;
-  const user = await ensureQaPoolAuthUser({ supabase, role, password });
-  await assertQaPoolAuthUser({ supabase, role, userId: user.id });
-  return user;
-}
-
-async function signedInClient(role: keyof typeof QA_TESTER_POOL) {
-  const client = createClient(supabaseUrl, publishableKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  const signIn = await client.auth.signInWithPassword({
-    email: QA_TESTER_POOL[role].email,
-    password: `gate4-${role}-local-password`,
-  });
-  if (signIn.error) throw new Error(signIn.error.message);
-  return client;
-}
-
-function assertLoopback(value: string) {
-  const hostname = new URL(value).hostname;
-  assert.ok(["127.0.0.1", "localhost", "::1"].includes(hostname));
 }
 
 await main();

@@ -111,7 +111,7 @@ export async function loadSettingsRouteData({
 }
 
 export const saveUserSettings = createServerFn({ method: "POST" })
-  .inputValidator(parseUserSettingsInput)
+  .validator(parseUserSettingsInput)
   .handler(async ({ data }) => {
     const auth = getRequestAuthContext();
     const userId = await requirePersistedUserIdForCurrentRequest();
@@ -127,7 +127,7 @@ export const saveUserSettings = createServerFn({ method: "POST" })
   });
 
 export const saveRunnerBaseline = createServerFn({ method: "POST" })
-  .inputValidator(parseRunnerBaselineInput)
+  .validator(parseRunnerBaselineInput)
   .handler(async ({ data }) => {
     const auth = getRequestAuthContext();
     const userId = await requirePersistedUserIdForCurrentRequest();

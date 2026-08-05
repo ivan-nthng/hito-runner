@@ -2,6 +2,7 @@ import type { Json } from "@/lib/supabase/database";
 
 export const WORKOUT_RESULT_STORAGE_BUCKET = "workout-result-assets";
 export const MAX_WORKOUT_RESULT_UPLOAD_BYTES = 25 * 1024 * 1024;
+export const MAX_WORKOUT_RESULT_MULTIPART_BYTES = MAX_WORKOUT_RESULT_UPLOAD_BYTES + 1024 * 1024;
 
 export type WorkoutResultAssetKind = "garmin_fit" | "garmin_zip";
 export type WorkoutResultParseStatus = "uploaded" | "extracted" | "parsed" | "failed";
@@ -328,15 +329,6 @@ export interface WorkoutComparisonDifferencePayload {
     distance: WorkoutComparisonSignal;
     structuredStepCount: WorkoutComparisonSignal;
   };
-  sessionSummary: {
-    dateDeltaDays: number | null;
-    durationDeltaMin: number | null;
-    durationDeltaPct: number | null;
-    distanceDeltaKm: number | null;
-    distanceDeltaPct: number | null;
-    plannedStructuredStepCount: number | null;
-    actualStructuredStepCount: number | null;
-  };
   supportMatrix: WorkoutComparisonSupportMatrix;
   stepSummary: WorkoutComparisonStepSummary;
   segmentSummary: WorkoutComparisonSegmentSummary;
@@ -356,8 +348,6 @@ export interface WorkoutAiInsightSummary {
   id: string;
   comparisonId: string;
   actualMetricsId: string;
-  model: string;
-  responseId: string | null;
   status: WorkoutAiInsightStatus;
   analysisSummary: string;
   differenceExplanation: string;

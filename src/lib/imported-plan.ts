@@ -37,8 +37,8 @@ import {
 
 export const FUTURE_TEMPLATE_VERSION = "training-plan-v2";
 export const FUTURE_TEMPLATE_DOWNLOAD_PATH = "/templates/hito-training-plan-v2-template.json";
-export const ML_AGENT_TEMPLATE_META_KEY = "_ml_agent_template";
-export const REMOVED_LEGACY_IMPORT_NOTICE =
+const ML_AGENT_TEMPLATE_META_KEY = "_ml_agent_template";
+const REMOVED_LEGACY_IMPORT_NOTICE =
   "Legacy week_1_preview[] JSON is no longer supported. Convert this file to training-plan-v2 before importing.";
 export const TRAINING_PLAN_V2_SEGMENT_TYPE_VALUES = [
   "warmup",
@@ -57,41 +57,6 @@ export const TRAINING_PLAN_V2_SEGMENT_TYPE_VALUES = [
   "fueling",
   "tempo_block",
   "interval_block",
-] as const;
-
-export const V2_IMPORT_ROOT_KEYS = [
-  "schema_version",
-  "plan_id",
-  "plan_name",
-  "source_kind",
-  "source_status",
-  "export_metadata",
-  "_ml_agent_template",
-  "created_at",
-  "generated_for",
-  "goal",
-  "runner_profile",
-  "start_date",
-  "preparation_horizon_weeks",
-  "preparation_horizon_months",
-  "target_date",
-  "plan_preferences",
-  "planned_workouts[]",
-] as const;
-
-export const V2_IGNORED_WORKOUT_KEYS = [
-  "status",
-  "completion_state",
-  "ai_adjustable",
-  "ai_adjustment_candidate",
-  "ai_notes",
-  "ai_recovery_recommendation",
-  "ai_risk_flags",
-  "completed_result",
-  "garmin_sync_placeholder",
-  "strava_sync_placeholder",
-  "user_feedback_placeholder",
-  "pain_tracking_placeholder",
 ] as const;
 
 const targetValueSchema = z.union([z.string(), z.number()]);
@@ -578,7 +543,7 @@ export interface ImportedPlanSeed {
   workouts: ImportedWorkoutSeed[];
 }
 
-export interface ImportedPlanSummary {
+interface ImportedPlanSummary {
   planName: string;
   generatedFor: string;
   days: number;

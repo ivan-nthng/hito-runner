@@ -316,7 +316,7 @@ type ManualWorkoutMoveResolutionOptions = {
 };
 
 export const reviewManualWorkoutMove = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
+  .validator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutMoveReviewResult> => {
     const userId = await getCurrentManualWorkoutAuthoringUserId();
 
@@ -331,7 +331,7 @@ export const reviewManualWorkoutMove = createServerFn({ method: "POST" })
   });
 
 export const confirmManualWorkoutMove = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
+  .validator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutMoveConfirmResult> => {
     const userId = await getCurrentManualWorkoutAuthoringUserId();
 
@@ -346,7 +346,7 @@ export const confirmManualWorkoutMove = createServerFn({ method: "POST" })
   });
 
 export const moveManualWorkoutWithinActivePlan = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
+  .validator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutDirectMoveResult> => {
     const userId = await getCurrentManualWorkoutAuthoringUserId();
 

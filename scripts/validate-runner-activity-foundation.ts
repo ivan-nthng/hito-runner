@@ -1,56 +1,48 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { crc32 } from "node:zlib";
-import { createClient } from "@supabase/supabase-js";
-import { readLocalAuthAccountsFile } from "../src/lib/local-auth";
+import { crc32, deflateRawSync } from "node:zlib";
 import { deleteRunnerActivityFromHistory } from "../src/lib/runner-activity/garmin-fit-source";
-import { isLoopbackRuntimeUrl } from "../src/lib/supabase/env";
 import {
   ingestGarminWorkoutResult,
   removeWorkoutResultEvidence,
   type WorkoutResultProjectionFailurePointForQa,
 } from "../src/lib/workout-result-import/ingest-garmin-result";
+import { WORKOUT_COMPARISON_FORMULA_VERSION } from "../src/lib/workout-result-import/comparison-payload";
 import { parseGarminFitActivity } from "../src/lib/workout-result-import/parse-garmin-fit";
-import { WORKOUT_RESULT_STORAGE_BUCKET } from "../src/lib/workout-result-import/types";
+import {
+  MAX_WORKOUT_RESULT_MULTIPART_BYTES,
+  MAX_WORKOUT_RESULT_UPLOAD_BYTES,
+  WORKOUT_RESULT_STORAGE_BUCKET,
+  WorkoutResultImportError,
+} from "../src/lib/workout-result-import/types";
 import {
   QA_TESTER_POOL,
-  assertQaPoolAuthUser,
-  ensureQaPoolAuthUser,
   getQaUserOwnedCounts,
   resetQaPoolUserData,
 } from "./lib/qa-test-user-lifecycle.mjs";
+import {
+  createRunnerActivityProofRuntime,
+  loginQaPoolToLoopbackRuntime,
+  withRunnerActivityProofLeases,
+} from "./lib/runner-activity-proof-runtime";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SECRET_KEY;
-if (!supabaseUrl || !serviceRoleKey) {
-  throw new Error(
-    "NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY are required for the activity foundation proof.",
-  );
-}
-if (!isLoopbackRuntimeUrl(supabaseUrl)) {
-  throw new Error("The activity foundation proof requires a loopback Supabase target.");
-}
-const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-if (!publishableKey) {
-  throw new Error(
-    "Local Supabase publishable key is required for the activity foundation RLS proof.",
-  );
-}
-
-const supabase = createClient(supabaseUrl, serviceRoleKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+const { supabase, ensureUser, signedInClient } = createRunnerActivityProofRuntime("gate1");
 const runtimeUrl = process.argv
   .find((arg) => arg.startsWith("--runtime-url="))
   ?.slice("--runtime-url=".length);
 
 async function main() {
-  const plannedUser = await ensurePoolUser("provider-engine");
-  const unplannedUser = await ensurePoolUser("baseline-no-plan");
+  await withRunnerActivityProofLeases(["provider-engine", "baseline-no-plan"], runValidation);
+}
+
+async function runValidation() {
+  const plannedUser = await ensureUser("provider-engine");
+  const unplannedUser = await ensureUser("baseline-no-plan");
   await resetQaUsers([plannedUser.id, unplannedUser.id]);
 
   try {
+    await proveZipExtractionBound(plannedUser.id);
     await proveProjectionRegressionDiscriminators({
       plannedUserId: plannedUser.id,
       unplannedUserId: unplannedUser.id,
@@ -79,6 +71,24 @@ async function main() {
   await assertWorkoutResultStorageEmpty(unplannedUser.id);
   await assertLegacyBackfillRetirementComplete();
   console.log("Runner activity foundation contract passed.");
+}
+
+async function proveZipExtractionBound(userId: string) {
+  const oversized = buildDeflatedZip(
+    Buffer.alloc(MAX_WORKOUT_RESULT_UPLOAD_BYTES + 1),
+    "oversized.fit",
+  );
+  assert.ok(oversized.length < MAX_WORKOUT_RESULT_UPLOAD_BYTES);
+  await assert.rejects(
+    ingestGarminWorkoutResult({
+      userId,
+      file: new File([oversized], "oversized.zip", { type: "application/zip" }),
+    }),
+    (error: unknown) =>
+      error instanceof WorkoutResultImportError &&
+      error.code === "file_too_large" &&
+      error.status === 413,
+  );
 }
 
 async function resetQaUsers(userIds: string[]) {
@@ -112,25 +122,46 @@ async function assertWorkoutResultStorageEmpty(userId: string) {
 async function proveRuntimeUploadProjection(input: { userId: string; runtimeUrl: string }) {
   const baseUrl = new URL(input.runtimeUrl);
   assert.ok(["127.0.0.1", "localhost", "::1"].includes(baseUrl.hostname));
-  const accounts = await readLocalAuthAccountsFile(
-    process.env.LOCAL_AUTH_BYPASS_ACCOUNTS_FILE ?? ".tanstack/hito-running-local-accounts.json",
-  );
-  const account = accounts.find((candidate) => candidate.username === "qa-provider-engine");
-  assert.ok(account, "The named provider-engine account must exist in the local auth registry.");
-
-  const loginBody = new FormData();
-  loginBody.set("identifier", account.username);
-  loginBody.set("password", account.password);
-  loginBody.set("next", "/");
-  const login = await fetch(new URL("/api/auth/local-login", baseUrl), {
+  const unauthenticatedMalformedBody = await fetch(new URL("/api/workout-result/upload", baseUrl), {
     method: "POST",
-    body: loginBody,
-    redirect: "manual",
+    body: "not multipart",
   });
-  assert.equal(login.status, 302);
-  const setCookie = login.headers.get("set-cookie");
-  assert.ok(setCookie);
-  const cookie = setCookie.split(";", 1)[0];
+  assert.equal(unauthenticatedMalformedBody.status, 401);
+  assert.equal((await unauthenticatedMalformedBody.json()).code, "auth_required");
+  const unauthenticatedRemoval = await fetch(new URL("/api/workout-result/remove", baseUrl), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: "not-json",
+  });
+  assert.equal(unauthenticatedRemoval.status, 401);
+  assert.equal((await unauthenticatedRemoval.json()).code, "auth_required");
+  const { cookie } = await loginQaPoolToLoopbackRuntime({
+    runtimeUrl: input.runtimeUrl,
+    role: "provider-engine",
+  });
+  const authenticatedMalformedRemoval = await fetch(
+    new URL("/api/workout-result/remove", baseUrl),
+    {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: "not-json",
+    },
+  );
+  assert.equal(authenticatedMalformedRemoval.status, 400);
+  assert.equal((await authenticatedMalformedRemoval.json()).code, "invalid_upload");
+  const oversizedBody = new FormData();
+  oversizedBody.set(
+    "file",
+    new File([Buffer.alloc(MAX_WORKOUT_RESULT_MULTIPART_BYTES)], "oversized.fit"),
+  );
+  const oversizedResponse = await fetch(new URL("/api/workout-result/upload", baseUrl), {
+    method: "POST",
+    headers: { cookie },
+    body: oversizedBody,
+  });
+  assert.equal(oversizedResponse.status, 413);
+  assert.equal((await oversizedResponse.json()).code, "file_too_large");
+
   const [plannedWorkoutId] = await createProofWorkouts(input.userId);
   const fixture = await readFitFixture();
 
@@ -150,13 +181,28 @@ async function proveRuntimeUploadProjection(input: { userId: string; runtimeUrl:
   const first = await upload("runtime-projection.fit");
   const retried = await upload("runtime-projection-retry.fit");
   assert.equal(first.ok, true);
-  assert.equal(first.activityReadback.status, "current");
   assert.equal(first.latestAsset.id, retried.latestAsset.id);
   assert.equal(first.latestActualMetrics.id, retried.latestActualMetrics.id);
   assert.equal(first.latestComparison.id, retried.latestComparison.id);
+  assert.deepEqual(Object.keys(first).sort(), [
+    "latestActualMetrics",
+    "latestAiInsight",
+    "latestAsset",
+    "latestComparison",
+    "marker",
+    "ok",
+  ]);
+
+  const historyResponse = await fetch(new URL("/api/runner-activities", baseUrl), {
+    headers: { cookie },
+  });
+  assert.equal(historyResponse.status, 200);
+  const historyPayload = await historyResponse.json();
+  assert.equal(historyPayload.ok, true);
   assert.ok(
-    first.activityReadback.history.items.some(
-      (activity: { id: string }) => activity.id === first.runnerActivity.id,
+    historyPayload.history.items.some(
+      (activity: { plannedWorkout: { id: string } | null }) =>
+        activity.plannedWorkout?.id === plannedWorkoutId,
     ),
   );
   const responseText = JSON.stringify(retried);
@@ -167,6 +213,28 @@ async function proveRuntimeUploadProjection(input: { userId: string; runtimeUrl:
     "raw_storage_path",
   ]) {
     assert.equal(responseText.includes(privateField), false);
+  }
+
+  const removalResponse = await fetch(new URL("/api/workout-result/remove", baseUrl), {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ plannedWorkoutId }),
+  });
+  assert.equal(removalResponse.status, 200);
+  const removalPayload = await removalResponse.json();
+  assert.deepEqual(Object.keys(removalPayload).sort(), ["feedback", "ok"]);
+  assert.equal(removalPayload.ok, true);
+  assert.equal(removalPayload.feedback.latestAsset.rawFileAvailable, false);
+  assert.equal(removalPayload.feedback.latestActualMetrics.id, first.latestActualMetrics.id);
+  assert.equal(removalPayload.feedback.latestComparison.id, first.latestComparison.id);
+  const removalText = JSON.stringify(removalPayload);
+  for (const privateField of [
+    "storage_bucket",
+    "storage_path",
+    "raw_storage_bucket",
+    "raw_storage_path",
+  ]) {
+    assert.equal(removalText.includes(privateField), false);
   }
 }
 
@@ -192,7 +260,7 @@ async function proveProjectionRegressionDiscriminators(input: {
       run: () => proveProjectionSupersession(input.plannedUserId),
     },
     {
-      label: "ordinary intake leaves unrelated legacy projection data untouched",
+      label: "ordinary intake and removal preserve unrelated legacy row and raw object",
       userId: input.unplannedUserId,
       run: () => proveOrdinaryIntakeDoesNotMutateLegacyProjection(input.unplannedUserId),
     },
@@ -350,13 +418,23 @@ async function proveReusedUnplannedSourceProjection(userId: string) {
 }
 
 function buildStoredZip(content: Buffer, fileName: string) {
+  return buildZip(content, fileName, 0);
+}
+
+function buildDeflatedZip(content: Buffer, fileName: string) {
+  return buildZip(content, fileName, 8);
+}
+
+function buildZip(content: Buffer, fileName: string, compressionMethod: 0 | 8) {
   const name = Buffer.from(fileName, "utf8");
   const checksum = crc32(content) >>> 0;
+  const payload = compressionMethod === 8 ? deflateRawSync(content) : content;
   const local = Buffer.alloc(30);
   local.writeUInt32LE(0x04034b50, 0);
   local.writeUInt16LE(20, 4);
+  local.writeUInt16LE(compressionMethod, 8);
   local.writeUInt32LE(checksum, 14);
-  local.writeUInt32LE(content.length, 18);
+  local.writeUInt32LE(payload.length, 18);
   local.writeUInt32LE(content.length, 22);
   local.writeUInt16LE(name.length, 26);
 
@@ -364,8 +442,9 @@ function buildStoredZip(content: Buffer, fileName: string) {
   central.writeUInt32LE(0x02014b50, 0);
   central.writeUInt16LE(20, 4);
   central.writeUInt16LE(20, 6);
+  central.writeUInt16LE(compressionMethod, 10);
   central.writeUInt32LE(checksum, 16);
-  central.writeUInt32LE(content.length, 20);
+  central.writeUInt32LE(payload.length, 20);
   central.writeUInt32LE(content.length, 24);
   central.writeUInt16LE(name.length, 28);
 
@@ -374,8 +453,8 @@ function buildStoredZip(content: Buffer, fileName: string) {
   end.writeUInt16LE(1, 8);
   end.writeUInt16LE(1, 10);
   end.writeUInt32LE(central.length + name.length, 12);
-  end.writeUInt32LE(local.length + name.length + content.length, 16);
-  return Buffer.concat([local, name, content, central, name, end]);
+  end.writeUInt32LE(local.length + name.length + payload.length, 16);
+  return Buffer.concat([local, name, payload, central, name, end]);
 }
 
 async function proveProjectionSupersession(userId: string) {
@@ -604,6 +683,27 @@ async function proveOrdinaryIntakeDoesNotMutateLegacyProjection(userId: string) 
   assert.equal(legacyAsset.data.activity_source_revision_id, null);
   assert.equal(legacyAsset.data.storage_bucket, WORKOUT_RESULT_STORAGE_BUCKET);
   assert.ok(legacyAsset.data.storage_path);
+  const rawBeforeRemoval = await supabase.storage
+    .from(WORKOUT_RESULT_STORAGE_BUCKET)
+    .download(legacyAsset.data.storage_path);
+  if (rawBeforeRemoval.error) throw new Error(rawBeforeRemoval.error.message);
+
+  await removeWorkoutResultEvidence({ userId, plannedWorkoutId: legacyWorkoutId });
+  const retainedLegacyAsset = await supabase
+    .from("workout_result_assets")
+    .select("activity_source_revision_id, storage_bucket, storage_path")
+    .eq("id", legacyAssetId)
+    .single();
+  if (retainedLegacyAsset.error) throw new Error(retainedLegacyAsset.error.message);
+  assert.deepEqual(retainedLegacyAsset.data, legacyAsset.data);
+  const rawAfterRemoval = await supabase.storage
+    .from(WORKOUT_RESULT_STORAGE_BUCKET)
+    .download(legacyAsset.data.storage_path);
+  if (rawAfterRemoval.error) throw new Error(rawAfterRemoval.error.message);
+  assert.deepEqual(
+    Buffer.from(await rawAfterRemoval.data.arrayBuffer()),
+    Buffer.from(await rawBeforeRemoval.data.arrayBuffer()),
+  );
 }
 
 async function assertCompletePlannedProjection(input: {
@@ -695,7 +795,7 @@ async function proveUnplannedLifecycle(input: {
     linkedAsset.data?.activity_source_revision_id,
     first.runnerActivity.sourceRevisionId,
   );
-  await proveCrossRunnerReadDenied({
+  await proveDirectActivityTableReadDenied({
     activityId: first.runnerActivity.id,
     role: input.otherUserRole,
   });
@@ -709,22 +809,15 @@ async function proveUnplannedLifecycle(input: {
   assert.equal(afterDelete.workout_result_assets, 0);
 }
 
-async function proveCrossRunnerReadDenied(input: {
+async function proveDirectActivityTableReadDenied(input: {
   activityId: string;
   role: keyof typeof QA_TESTER_POOL;
 }) {
-  const client = createClient(supabaseUrl, publishableKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  const signIn = await client.auth.signInWithPassword({
-    email: QA_TESTER_POOL[input.role].email,
-    password: `gate1-${input.role}-local-password`,
-  });
-  if (signIn.error) throw new Error(signIn.error.message);
+  const client = await signedInClient(input.role);
   const read = await client.from("runner_activities").select("id").eq("id", input.activityId);
   await client.auth.signOut();
-  if (read.error) throw new Error(read.error.message);
-  assert.deepEqual(read.data, []);
+  assert.equal(read.error?.code, "42501");
+  assert.equal(read.data, null);
 }
 
 async function provePlannedProjectionLifecycle(userId: string) {
@@ -776,7 +869,7 @@ async function provePlannedProjectionLifecycle(userId: string) {
   if (comparisonVersion.error) throw new Error(comparisonVersion.error.message);
   assert.equal(
     comparisonVersion.data.comparison_formula_version,
-    "deterministic_workout_comparison_v1",
+    WORKOUT_COMPARISON_FORMULA_VERSION,
   );
 
   const replacement = await supabase
@@ -815,16 +908,6 @@ async function provePlannedProjectionLifecycle(userId: string) {
     rawStates.data?.map((row) => row.raw_state),
     ["removed"],
   );
-}
-
-async function ensurePoolUser(role: keyof typeof QA_TESTER_POOL) {
-  const user = await ensureQaPoolAuthUser({
-    supabase,
-    role,
-    password: `gate1-${role}-local-password`,
-  });
-  await assertQaPoolAuthUser({ supabase, role, userId: user.id });
-  return user;
 }
 
 async function createProofWorkouts(userId: string): Promise<[string, string, string]> {

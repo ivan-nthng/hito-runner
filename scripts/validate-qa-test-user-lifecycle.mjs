@@ -16,6 +16,11 @@ import {
 
 const { deleteAdminLocalTestAccountForDependencies, getAdminLocalTestAccountsForDependencies } =
   await tsImport("../src/lib/admin-local-test-accounts.server.ts", import.meta.url);
+const { readLocalAuthAccountsFile } = await tsImport("../src/lib/local-auth.ts", import.meta.url);
+const { readLocalAuthAccountRegistry, writeLocalAuthAccountRegistry } = await tsImport(
+  "../src/lib/local-auth-account-registry.server.ts",
+  import.meta.url,
+);
 
 const target = { origin: "http://127.0.0.1:54321", loopback: true };
 const zeroRows = Object.fromEntries(QA_TEST_USER_OWNED_TABLES.map((table) => [table, 0]));
@@ -114,6 +119,32 @@ try {
   });
 } finally {
   await rm(leaseCwd, { recursive: true, force: true });
+}
+
+const registryCwd = await mkdtemp(path.join(os.tmpdir(), "hito-local-auth-registry-"));
+try {
+  const legacyFile = path.join(registryCwd, "legacy.json");
+  await writeAccountsFile(legacyFile, [
+    { username: " IVAN ", password: "local-only" },
+    { username: "runner", password: "local-only" },
+  ]);
+  const canonical = await readLocalAuthAccountRegistry(legacyFile);
+  const runtime = await readLocalAuthAccountsFile(legacyFile);
+  assert.deepEqual(runtime, canonical);
+  assert.equal(canonical[0].role, "admin");
+  assert.equal(canonical[0].userIdSource, "derived");
+  assert.equal(canonical[1].role, "tester");
+
+  const writtenFile = path.join(registryCwd, "written.json");
+  await writeLocalAuthAccountRegistry(writtenFile, canonical);
+  const persisted = JSON.parse(await readFile(writtenFile, "utf8"));
+  assert.equal("userIdSource" in persisted.accounts[0], false);
+
+  const invalidFile = path.join(registryCwd, "invalid.json");
+  await writeFile(invalidFile, JSON.stringify({ accounts: [{ username: "missing-password" }] }));
+  await assert.rejects(readLocalAuthAccountRegistry(invalidFile));
+} finally {
+  await rm(registryCwd, { recursive: true, force: true });
 }
 
 const adminFacadeCwd = await mkdtemp(path.join(os.tmpdir(), "hito-qa-admin-facade-"));
@@ -228,6 +259,7 @@ console.log(
       emailOnlyRemainsManualReview: true,
       manifestDriftRefused: true,
       leaseCollisionRefused: true,
+      canonicalLocalAuthRegistry: true,
       adminFacadePoolDeletionRefused: true,
       adminMetadataWinsLocalTesterConflict: true,
       randomIdentityLifecycleRemoved: true,

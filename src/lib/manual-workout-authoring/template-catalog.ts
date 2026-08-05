@@ -84,7 +84,7 @@ export const listManualWorkoutTemplateCatalog = createServerFn({ method: "GET" }
 );
 
 export const hideManualWorkoutBuiltInTemplate = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
+  .validator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutTemplateVisibilityResult> => {
     const userId = await getCurrentManualWorkoutAuthoringUserId();
     return userId
@@ -93,7 +93,7 @@ export const hideManualWorkoutBuiltInTemplate = createServerFn({ method: "POST" 
   });
 
 export const restoreManualWorkoutBuiltInTemplate = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
+  .validator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutTemplateVisibilityResult> => {
     const userId = await getCurrentManualWorkoutAuthoringUserId();
     return userId

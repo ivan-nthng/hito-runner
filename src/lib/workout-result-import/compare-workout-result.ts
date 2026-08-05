@@ -43,7 +43,7 @@ interface ActualComparisonStep {
   distanceKm: number | null;
 }
 
-export interface DeterministicWorkoutComparisonResult {
+interface DeterministicWorkoutComparisonResult {
   comparisonStatus: WorkoutComparisonStatus;
   completionState: WorkoutComparisonCompletionState;
   comparisonConfidence: number;
@@ -206,15 +206,6 @@ export function buildDeterministicWorkoutComparison(params: {
       duration,
       distance,
       structuredStepCount,
-    },
-    sessionSummary: {
-      dateDeltaDays: numberOrNull(dateAlignment.delta),
-      durationDeltaMin: numberOrNull(duration.delta),
-      durationDeltaPct: numberOrNull(duration.deltaPct),
-      distanceDeltaKm: numberOrNull(distance.delta),
-      distanceDeltaPct: numberOrNull(distance.deltaPct),
-      plannedStructuredStepCount: numberOrNull(structuredStepCount.plannedValue),
-      actualStructuredStepCount: numberOrNull(structuredStepCount.actualValue),
     },
     supportMatrix,
     stepSummary,

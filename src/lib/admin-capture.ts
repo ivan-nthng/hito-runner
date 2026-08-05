@@ -241,37 +241,37 @@ export type AdminCaptureTriageUpdateInput = z.output<typeof adminCaptureTriageUp
 export type AdminCaptureNoteAppendInput = z.output<typeof adminCaptureNoteAppendInputSchema>;
 
 export const listAdminCaptureBacklog = createServerFn({ method: "GET" })
-  .inputValidator((value: unknown) => adminCaptureListInputSchema.parse(value))
+  .validator((value: unknown) => adminCaptureListInputSchema.parse(value))
   .handler(async ({ data }): Promise<AdminCaptureResult<{ view: AdminCaptureBacklogView }>> => {
     return listAdminCaptureBacklogServer(data);
   });
 
 export const createAdminCaptureItem = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => adminCaptureCreateInputSchema.parse(value))
+  .validator((value: unknown) => adminCaptureCreateInputSchema.parse(value))
   .handler(async ({ data }): Promise<AdminCaptureResult<{ item: AdminCaptureItemView }>> => {
     return createAdminCaptureItemServer(data);
   });
 
 export const updateAdminCaptureItemTriage = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => adminCaptureTriageUpdateInputSchema.parse(value))
+  .validator((value: unknown) => adminCaptureTriageUpdateInputSchema.parse(value))
   .handler(async ({ data }): Promise<AdminCaptureResult<{ item: AdminCaptureItemView }>> => {
     return updateAdminCaptureItemTriageServer(data);
   });
 
 export const appendAdminCaptureItemNote = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => adminCaptureNoteAppendInputSchema.parse(value))
+  .validator((value: unknown) => adminCaptureNoteAppendInputSchema.parse(value))
   .handler(async ({ data }): Promise<AdminCaptureResult<{ item: AdminCaptureItemView }>> => {
     return appendAdminCaptureItemNoteServer(data);
   });
 
 export const deleteAdminCaptureQuickNote = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => adminCaptureItemIdInputSchema.parse(value))
+  .validator((value: unknown) => adminCaptureItemIdInputSchema.parse(value))
   .handler(async ({ data }): Promise<AdminCaptureResult<{ deletedId: string }>> => {
     return deleteAdminCaptureQuickNoteServer(data);
   });
 
 export const getAdminCaptureCopyPrompt = createServerFn({ method: "GET" })
-  .inputValidator((value: unknown) => adminCaptureItemIdInputSchema.parse(value))
+  .validator((value: unknown) => adminCaptureItemIdInputSchema.parse(value))
   .handler(
     async ({ data }): Promise<AdminCaptureResult<{ prompt: AdminCaptureCopyPromptView }>> => {
       return getAdminCaptureCopyPromptServer(data);

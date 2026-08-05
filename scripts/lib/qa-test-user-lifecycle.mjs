@@ -329,25 +329,17 @@ export async function assertQaPoolAuthUser({ supabase, role, userId }) {
 
 export async function resetQaPoolUserData({ supabase, userId, preserveProfile = false }) {
   const [assets, activitySourceRevisions] = await Promise.all([
-    supabase
-      .from("workout_result_assets")
-      .select("storage_bucket, storage_path")
-      .eq("user_id", userId),
-    supabase
-      .from("runner_activity_source_revisions")
-      .select("raw_storage_bucket, raw_storage_path")
-      .eq("user_id", userId),
+    listQaOwnedRows(supabase, "workout_result_assets", "storage_bucket, storage_path", userId),
+    listQaOwnedRows(
+      supabase,
+      "runner_activity_source_revisions",
+      "raw_storage_bucket, raw_storage_path",
+      userId,
+    ),
   ]);
 
-  if (assets.error) {
-    throw new Error(assets.error.message);
-  }
-  if (activitySourceRevisions.error) {
-    throw new Error(activitySourceRevisions.error.message);
-  }
-
   const assetsByBucket = new Map();
-  for (const asset of assets.data ?? []) {
+  for (const asset of assets) {
     if (!asset.storage_bucket || !asset.storage_path) {
       continue;
     }
@@ -355,7 +347,7 @@ export async function resetQaPoolUserData({ supabase, userId, preserveProfile = 
     paths.push(asset.storage_path);
     assetsByBucket.set(asset.storage_bucket, paths);
   }
-  for (const revision of activitySourceRevisions.data ?? []) {
+  for (const revision of activitySourceRevisions) {
     if (!revision.raw_storage_bucket || !revision.raw_storage_path) {
       continue;
     }
@@ -364,9 +356,11 @@ export async function resetQaPoolUserData({ supabase, userId, preserveProfile = 
     assetsByBucket.set(revision.raw_storage_bucket, paths);
   }
   for (const [bucket, paths] of assetsByBucket) {
-    const removed = await supabase.storage.from(bucket).remove(Array.from(new Set(paths)));
-    if (removed.error) {
-      throw new Error(`Unable to remove QA storage assets: ${removed.error.message}`);
+    for (const pathBatch of chunks(Array.from(new Set(paths)), 1000)) {
+      const removed = await supabase.storage.from(bucket).remove(pathBatch);
+      if (removed.error) {
+        throw new Error(`Unable to remove QA storage assets: ${removed.error.message}`);
+      }
     }
   }
 
@@ -397,6 +391,28 @@ export async function resetQaPoolUserData({ supabase, userId, preserveProfile = 
   }
 
   return getQaUserOwnedCounts(supabase, userId);
+}
+
+async function listQaOwnedRows(supabase, table, columns, userId) {
+  const rows = [];
+  const pageSize = 1000;
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await supabase
+      .from(table)
+      .select(`id, ${columns}`)
+      .eq("user_id", userId)
+      .order("id", { ascending: true })
+      .range(offset, offset + pageSize - 1);
+    if (page.error) throw new Error(page.error.message);
+    rows.push(...(page.data ?? []));
+    if ((page.data?.length ?? 0) < pageSize) return rows;
+  }
+}
+
+function chunks(values, size) {
+  return Array.from({ length: Math.ceil(values.length / size) }, (_, index) =>
+    values.slice(index * size, (index + 1) * size),
+  );
 }
 
 export async function acquireQaPoolLease({ role, cwd = process.cwd() }) {

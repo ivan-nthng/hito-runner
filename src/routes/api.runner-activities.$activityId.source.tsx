@@ -28,6 +28,16 @@ export const Route = createFileRoute("/api/runner-activities/$activityId/source"
               { status: 401 },
             );
           }
+          if (error instanceof Error && error.name === "RunnerActivityNotFoundError") {
+            return Response.json(
+              {
+                ok: false,
+                code: "activity_not_found",
+                message: "This activity is not available.",
+              },
+              { status: 404 },
+            );
+          }
           return Response.json(
             {
               ok: false,

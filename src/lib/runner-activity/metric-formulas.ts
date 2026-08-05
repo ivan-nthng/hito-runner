@@ -9,8 +9,8 @@ import type {
 
 export const RUNNER_ACTIVITY_GATE4_FORMULA_SET_VERSION =
   "runner_activity_gate4_formula_set_v3" as const;
-export const PERSONAL_BEST_FORMULA_VERSION = "personal_best_elapsed_v3" as const;
-export const SESSION_RPE_LOAD_FORMULA_VERSION = "session_rpe_load_v1" as const;
+const PERSONAL_BEST_FORMULA_VERSION = "personal_best_elapsed_v3" as const;
+const SESSION_RPE_LOAD_FORMULA_VERSION = "session_rpe_load_v1" as const;
 
 export const RUNNER_ACTIVITY_GATE4_FORMULA_VERSIONS = Object.freeze({
   personalBest: PERSONAL_BEST_FORMULA_VERSION,

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
 import {
+  MAX_WORKOUT_RESULT_MULTIPART_BYTES,
   runnerSafeWorkoutResultMessage,
   workoutResultErrorResponseHeaders,
   WorkoutResultImportError,
@@ -11,7 +12,8 @@ export const Route = createFileRoute("/api/workout-result/upload")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const formData = await request.formData();
+          const userId = await requirePersistedUserIdForCurrentRequest();
+          const formData = await readBoundedWorkoutResultFormData(request);
           const plannedWorkoutId =
             typeof formData.get("plannedWorkoutId") === "string"
               ? (formData.get("plannedWorkoutId") as string).trim() || null
@@ -25,7 +27,6 @@ export const Route = createFileRoute("/api/workout-result/upload")({
             );
           }
 
-          const userId = await requirePersistedUserIdForCurrentRequest();
           const { ingestGarminWorkoutResult } =
             await import("@/lib/workout-result-import/ingest-garmin-result");
           const result = await ingestGarminWorkoutResult({
@@ -33,16 +34,17 @@ export const Route = createFileRoute("/api/workout-result/upload")({
             plannedWorkoutId,
             file: fileEntry,
           });
-          const { readRunnerActivityMutationReadback } =
-            await import("@/lib/runner-activity/read-model");
-          const activityReadback = await readRunnerActivityMutationReadback({
-            userId,
-            activityId: result.runnerActivity.id,
-            creationCause: "ingestion",
-          });
+          const feedback = "plannedWorkout" in result ? result : null;
 
           return Response.json(
-            { ...result, activityReadback },
+            {
+              ok: true,
+              marker: feedback?.marker ?? null,
+              latestAsset: feedback?.latestAsset ?? null,
+              latestActualMetrics: feedback?.latestActualMetrics ?? null,
+              latestComparison: feedback?.latestComparison ?? null,
+              latestAiInsight: feedback?.latestAiInsight ?? null,
+            },
             {
               status: 200,
             },
@@ -90,3 +92,44 @@ export const Route = createFileRoute("/api/workout-result/upload")({
   },
   component: () => null,
 });
+
+async function readBoundedWorkoutResultFormData(request: Request) {
+  const contentLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > MAX_WORKOUT_RESULT_MULTIPART_BYTES) {
+    throw workoutResultMultipartTooLargeError();
+  }
+
+  if (!request.body) {
+    return request.formData();
+  }
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  while (true) {
+    const result = await reader.read();
+    if (result.done) break;
+    totalBytes += result.value.byteLength;
+    if (totalBytes > MAX_WORKOUT_RESULT_MULTIPART_BYTES) {
+      await reader.cancel();
+      throw workoutResultMultipartTooLargeError();
+    }
+    chunks.push(result.value);
+  }
+
+  const boundedRequest = new Request(request.url, {
+    method: request.method,
+    headers: request.headers,
+    body: new Blob(chunks),
+  });
+  return boundedRequest.formData();
+}
+
+function workoutResultMultipartTooLargeError() {
+  return new WorkoutResultImportError(
+    "file_too_large",
+    "The upload is larger than the 25 MB first-release limit.",
+    413,
+  );
+}

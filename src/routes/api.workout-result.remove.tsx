@@ -11,7 +11,8 @@ export const Route = createFileRoute("/api/workout-result/remove")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const body = (await request.json()) as { plannedWorkoutId?: unknown };
+          const userId = await requirePersistedUserIdForCurrentRequest();
+          const body = await readRemovalRequest(request);
           const plannedWorkoutId =
             typeof body?.plannedWorkoutId === "string" ? body.plannedWorkoutId : "";
 
@@ -22,34 +23,17 @@ export const Route = createFileRoute("/api/workout-result/remove")({
             );
           }
 
-          const userId = await requirePersistedUserIdForCurrentRequest();
           const { removeWorkoutResultEvidence } =
             await import("@/lib/workout-result-import/ingest-garmin-result");
           const feedback = await removeWorkoutResultEvidence({
             userId,
             plannedWorkoutId,
           });
-          const { findRunnerActivityForPlannedWorkout } =
-            await import("@/lib/runner-activity/garmin-fit-source");
-          const activityId = await findRunnerActivityForPlannedWorkout({
-            userId,
-            plannedWorkoutId,
-          });
-          const activityReadback = activityId
-            ? await (
-                await import("@/lib/runner-activity/read-model")
-              ).readRunnerActivityMutationReadback({
-                userId,
-                activityId,
-                creationCause: "source_removal",
-              })
-            : null;
 
           return Response.json(
             {
               ok: true,
               feedback,
-              activityReadback,
             },
             { status: 200 },
           );
@@ -96,3 +80,14 @@ export const Route = createFileRoute("/api/workout-result/remove")({
   },
   component: () => null,
 });
+
+async function readRemovalRequest(request: Request): Promise<{ plannedWorkoutId?: unknown }> {
+  try {
+    return (await request.json()) as { plannedWorkoutId?: unknown };
+  } catch {
+    throw new WorkoutResultImportError(
+      "invalid_upload",
+      "The Garmin evidence removal request was invalid.",
+    );
+  }
+}

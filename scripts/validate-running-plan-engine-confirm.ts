@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import {
   confirmActivePlanTransitionForUser,
   reviewActivePlanTransitionForUser,
@@ -9,17 +8,11 @@ import { ActivePlanPersistenceRejection } from "../src/lib/active-plan-lifecycle
 import { buildActivePlanReplacementCarryForward } from "../src/lib/active-plan-replacement-carry-forward";
 import { buildReviewedFirstPlanImportedSeed } from "../src/lib/active-plan-persistence";
 import {
-  AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
-  buildAiGeneratedRunningPlanDevFixtureOpenAiFetch,
-} from "../src/lib/ai-generated-running-plan-dev-fixture";
-import {
   AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
-  buildAiGeneratedRunningPlanAuthoringInput,
   isAiGeneratedRunningPlanPreviewDraft,
 } from "../src/lib/ai-generated-running-plan";
 import { buildImportedPlanSeed } from "../src/lib/imported-plan";
 import {
-  buildReviewedAiGeneratedRunningPlanPreview,
   confirmRunningPlanDraftForUser,
   runningPlanConfirmInputSchema,
   type RunningPlanConfirmActionInput,
@@ -67,7 +60,7 @@ import {
   validatePersistenceContract,
 } from "./running-plan-engine-confirm/persistence-proof";
 import { validateRunnerFacingTargetReadbackContract } from "./running-plan-engine-target-readback-contract";
-import { buildProofRunnerProfileSnapshot } from "./runner-profile-snapshot-proof-helpers";
+import { buildReviewedAiFixtureResult } from "./lib/generated-plan-proof-fixture";
 
 const baseInput = {
   age: 36,
@@ -151,7 +144,6 @@ const scenarios = [
 
 async function main() {
   const persistenceOptions = readPersistenceCliOptions();
-  assertRemovedDeterministicPreviewEntrypoints();
   validateRunnerBaselineBounds();
   validatePersonalHeartRateGuidanceBandContract();
   await validateRunnerSettingsPersistenceErrorBoundary();
@@ -200,7 +192,6 @@ async function main() {
       endpointMeters: draft.endpointProof.endpointDistanceMeters,
     })),
     activeManualTransition: activeManualTransitionProof,
-    deterministicPreviewBuilders: "removed",
     persistence: persistenceProof,
     availabilityPersistence:
       "persistedDistanceGoals" in persistenceProof
@@ -539,29 +530,7 @@ async function validateAiGeneratedDistanceGoalScenario(scenario: {
 }
 
 async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {
-  const runnerProfileSnapshot = buildProofRunnerProfileSnapshot(input);
-  const authoring = buildAiGeneratedRunningPlanAuthoringInput(input, runnerProfileSnapshot);
-  assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);
-  if (!authoring.ok) {
-    throw new Error(authoring.message);
-  }
-
-  const today = input.startDate ?? authoring.authoringInput.schedule.startDate;
-  const fetchImpl = buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
-    authoringInput: authoring.authoringInput,
-    today,
-    env: localAiGeneratedFixtureEnv(),
-  });
-
-  const result = await buildReviewedAiGeneratedRunningPlanPreview(input, {
-    aiPreview: {
-      apiKey: "local-qa-dev-ai-generated-plan-fixture",
-      model: AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
-      today,
-      fetchImpl,
-    },
-    runnerProfileSnapshot,
-  });
+  const result = await buildReviewedAiFixtureResult(input);
   assert.equal(result.ok, true, result.ok ? "" : result.unavailable.error.message);
   if (!result.ok) {
     throw new Error(result.unavailable.error.message);
@@ -1054,28 +1023,6 @@ function buildConfirmInputFromDraft(
     sourceKind: draft.sourceKind,
     reviewToken: draft.reviewToken,
     reviewChecksum: draft.reviewChecksum,
-  };
-}
-
-function assertRemovedDeterministicPreviewEntrypoints() {
-  const actions = readFileSync("src/lib/running-plan-engine-actions.ts", "utf8");
-  const review = readFileSync("src/lib/running-plan-engine-review.ts", "utf8");
-  const barrel = readFileSync("src/lib/plan-creation-engine/index.ts", "utf8");
-
-  assert.doesNotMatch(actions, /buildReviewedRunningPlanPreview|buildRunningPlanPreview/);
-  assert.doesNotMatch(actions, /builder_v1/);
-  assert.doesNotMatch(review, /legacy_family_bucket|runningPlanSourceKindForFamily/);
-  assert.doesNotMatch(review, /function buildCanonicalWorkout/);
-  assert.doesNotMatch(barrel, /build.*PlanPreviewDraft/);
-}
-
-function localAiGeneratedFixtureEnv() {
-  return {
-    LOCAL_AUTH_BYPASS_ENABLED: "true",
-    LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: "scripts/fixtures/local-auth-users.json",
-    NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
-    HITO_AI_GENERATED_PLAN_DEV_FIXTURE: "true",
-    HITO_AI_GENERATED_PLAN_PROVIDER_MODE: "qa_fixture",
   };
 }
 

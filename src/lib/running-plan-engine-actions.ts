@@ -96,7 +96,7 @@ export const runningPlanPreviewInputSchema = z
   })
   .strict();
 
-export const runningPlanSourceKindSchema = z.literal(AI_GENERATED_RUNNING_PLAN_SOURCE_KIND);
+const runningPlanSourceKindSchema = z.literal(AI_GENERATED_RUNNING_PLAN_SOURCE_KIND);
 
 const runningPlanReviewedPreviewInputSchema = runningPlanPreviewInputSchema.omit({
   runnerComment: true,
@@ -122,7 +122,7 @@ export type RunningPlanPreviewActionResult =
 export type RunningPlanPreviewActionInput = z.output<typeof runningPlanPreviewInputSchema>;
 export type RunningPlanConfirmActionInput = z.output<typeof runningPlanConfirmInputSchema>;
 
-export type RunningPlanConfirmFailureReason =
+type RunningPlanConfirmFailureReason =
   | "unauthenticated"
   | "active_plan_exists"
   | "fixture_not_authorized"
@@ -163,7 +163,7 @@ export type RunningPlanConfirmActionResult =
     };
 
 export const previewRunningPlanDraft = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => runningPlanPreviewInputSchema.parse(value))
+  .validator((value: unknown) => runningPlanPreviewInputSchema.parse(value))
   .handler(async ({ data }): Promise<RunningPlanPreviewActionResult> => {
     const auth = getRequestAuthContext();
     let persistedUserId: string | null = null;
@@ -181,7 +181,7 @@ export const previewRunningPlanDraft = createServerFn({ method: "POST" })
   });
 
 export const confirmRunningPlanDraft = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => runningPlanConfirmInputSchema.parse(value))
+  .validator((value: unknown) => runningPlanConfirmInputSchema.parse(value))
   .handler(async ({ data }): Promise<RunningPlanConfirmActionResult> => {
     const auth = getRequestAuthContext();
     if (!auth.userId) {

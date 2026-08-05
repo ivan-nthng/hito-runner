@@ -1,34 +1,12 @@
 import { parseCookieHeader, serializeCookieHeader } from "@supabase/ssr";
-import { z } from "zod";
+import { createServerOnlyFn } from "@tanstack/react-start";
 import { isDevOnlyLocalAuthRuntime, serverEnv } from "@/lib/supabase/env";
+import type { LocalAuthAccountConfig } from "@/lib/local-auth-account-registry.server";
+
+export type { LocalAuthAccountConfig } from "@/lib/local-auth-account-registry.server";
 
 const LOCAL_AUTH_COOKIE = "hito_local_auth_session";
 const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
-
-const localAuthAccountSchema = z.object({
-  username: z.string().trim().min(1),
-  password: z.string().min(1),
-  email: z.string().trim().email().optional(),
-  userId: z.string().uuid().optional(),
-  role: z.enum(["admin", "tester"]).optional(),
-  displayName: z.string().trim().min(1).optional(),
-});
-
-const localAuthAccountsSchema = z.union([
-  z.array(localAuthAccountSchema).min(1),
-  z.object({
-    accounts: z.array(localAuthAccountSchema).min(1),
-  }),
-]);
-
-export interface LocalAuthAccountConfig {
-  username: string;
-  password: string;
-  email: string;
-  userId: string;
-  role: "admin" | "tester";
-  displayName: string;
-}
 
 export interface LocalAuthSession {
   userId: string;
@@ -162,55 +140,15 @@ export function clearLocalAuthSessionCookie(headers: Headers, request: Request) 
   );
 }
 
-async function readAccountsFile(filePath: string) {
-  const { readFile } = await import("node:fs/promises");
-  const fileContents = await readFile(filePath, "utf8");
-  const parsed = localAuthAccountsSchema.parse(JSON.parse(fileContents));
-  const rawAccounts = Array.isArray(parsed) ? parsed : parsed.accounts;
-
-  return await Promise.all(rawAccounts.map(async (account) => normalizeAccount(account)));
-}
-
-async function normalizeAccount(
-  account: z.infer<typeof localAuthAccountSchema>,
-): Promise<LocalAuthAccountConfig> {
-  const username = normalizeUsername(account.username);
-  const email = account.email?.trim().toLowerCase() ?? `${username}@local.test`;
-
-  return {
-    username,
-    password: account.password,
-    email,
-    userId: account.userId ?? (await deriveUserId(username)),
-    role: account.role ?? (username === "ivan" ? "admin" : "tester"),
-    displayName: account.displayName?.trim() ?? humanizeUsername(username),
-  };
-}
+const readAccountsFile = createServerOnlyFn(async (filePath: string) => {
+  const { readLocalAuthAccountRegistry } = await import("@/lib/local-auth-account-registry.server");
+  return readLocalAuthAccountRegistry(filePath);
+});
 
 async function buildLocalAuthSessionToken(account: LocalAuthAccountConfig) {
   const input = `${account.username}:${account.password}:${account.userId}`;
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
   return toBase64Url(new Uint8Array(digest));
-}
-
-async function deriveUserId(username: string) {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(username));
-  const hex = Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(
-    17,
-    20,
-  )}-${hex.slice(20, 32)}`;
-}
-
-function normalizeUsername(value: string) {
-  return value.trim().toLowerCase();
-}
-
-function humanizeUsername(username: string) {
-  return username.charAt(0).toUpperCase() + username.slice(1);
 }
 
 function toBase64Url(bytes: Uint8Array) {

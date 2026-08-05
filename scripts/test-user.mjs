@@ -1,5 +1,5 @@
-import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { createHash, randomBytes } from "node:crypto";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { tsImport } from "tsx/esm/api";
@@ -35,7 +35,12 @@ const {
   verifyRunnerDesignProfileFixtureRuntime,
 } = await tsImport("./lib/runner-design-profile-fixture.ts", import.meta.url);
 
-const DEFAULT_ACCOUNTS_FILE = ".tanstack/hito-running-local-accounts.json";
+const {
+  DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE,
+  normalizeLocalAuthAccount,
+  readLocalAuthAccountRegistry,
+  writeLocalAuthAccountRegistry,
+} = await tsImport("../src/lib/local-auth-account-registry.server.ts", import.meta.url);
 
 const command = process.argv[2];
 const options = parseArgs(process.argv.slice(3));
@@ -674,51 +679,21 @@ function buildConfig() {
     supabaseServerKey,
     accountsFilePath: path.resolve(
       process.cwd(),
-      readEnv("LOCAL_AUTH_BYPASS_ACCOUNTS_FILE") ?? DEFAULT_ACCOUNTS_FILE,
+      readEnv("LOCAL_AUTH_BYPASS_ACCOUNTS_FILE") ?? DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE,
     ),
   };
 }
 
 async function loadLocalAccounts() {
-  try {
-    const raw = await readFile(config.accountsFilePath, "utf8");
-    const parsed = JSON.parse(raw);
-    const rawAccounts = Array.isArray(parsed) ? parsed : (parsed.accounts ?? []);
-    return rawAccounts.map(normalizeAccount);
-  } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code !== "ENOENT") {
-      throw error;
-    }
-
-    return [];
-  }
+  return readLocalAuthAccountRegistry(config.accountsFilePath, { allowMissing: true });
 }
 
 async function saveLocalAccounts(accounts) {
-  await mkdir(path.dirname(config.accountsFilePath), { recursive: true });
-  await writeFile(config.accountsFilePath, `${JSON.stringify({ accounts }, null, 2)}\n`, {
-    encoding: "utf8",
-    mode: 0o600,
-  });
-  await chmod(config.accountsFilePath, 0o600);
-}
-
-function normalizeAccount(account) {
-  const username = normalizeUsername(account.username);
-  const email = normalizeEmail(account.email ?? `${username}@local.test`);
-
-  return {
-    username,
-    password: String(account.password),
-    email,
-    userId: account.userId ?? deriveUserId(username),
-    role: account.role === "admin" ? "admin" : "tester",
-    displayName: account.displayName?.trim() || humanizeUsername(username),
-  };
+  await writeLocalAuthAccountRegistry(config.accountsFilePath, accounts);
 }
 
 function upsertLocalAccount(accounts, nextAccount) {
-  const normalized = normalizeAccount(nextAccount);
+  const normalized = normalizeLocalAuthAccount(nextAccount);
   const nextAccounts = accounts.filter(
     (account) => account.email !== normalized.email && account.username !== normalized.username,
   );
@@ -1007,13 +982,4 @@ function humanizeUsername(username) {
 
 function slugify(value) {
   return value.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "user";
-}
-
-function deriveUserId(username) {
-  const hash = createHash("sha256").update(username).digest("hex");
-
-  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(
-    17,
-    20,
-  )}-${hash.slice(20, 32)}`;
 }

@@ -206,63 +206,11 @@ export async function removeWorkoutResultEvidence(params: {
 }) {
   const { userId, plannedWorkoutId } = params;
   await getOwnedPlannedWorkout(userId, plannedWorkoutId);
-
-  const supabase = createAdminSupabaseClient();
-  const removedCanonicalSources = await removeRunnerActivityOriginalFilesForWorkout({
+  await removeRunnerActivityOriginalFilesForWorkout({
     userId,
     plannedWorkoutId,
   });
-
-  // Gate 1 sources own valid raw evidence. Removing an original file never erases
-  // its normalized activity, feedback projection, or comparison.
-  if (removedCanonicalSources.removedSourceRevisionIds.length > 0) {
-    return getLatestWorkoutResultFeedback(plannedWorkoutId);
-  }
-
-  const assetResult = await supabase
-    .from("workout_result_assets")
-    .select("id, storage_bucket, storage_path")
-    .eq("planned_workout_id", plannedWorkoutId)
-    .eq("user_id", userId);
-
-  if (assetResult.error) {
-    throw new WorkoutResultImportError("persistence_failed", assetResult.error.message, 500);
-  }
-
-  const assets = assetResult.data ?? [];
-
-  if (assets.length === 0) {
-    return getLatestWorkoutResultFeedback(plannedWorkoutId);
-  }
-
-  const storagePaths = assets
-    .filter(
-      (asset): asset is typeof asset & { storage_path: string } =>
-        asset.storage_bucket === WORKOUT_RESULT_STORAGE_BUCKET && Boolean(asset.storage_path),
-    )
-    .map((asset) => asset.storage_path);
-
-  if (storagePaths.length > 0) {
-    const storageRemoval = await supabase.storage
-      .from(WORKOUT_RESULT_STORAGE_BUCKET)
-      .remove(storagePaths);
-
-    if (storageRemoval.error) {
-      throw new WorkoutResultImportError("storage_failed", storageRemoval.error.message, 500);
-    }
-  }
-
-  const deleteResult = await supabase
-    .from("workout_result_assets")
-    .delete()
-    .eq("planned_workout_id", plannedWorkoutId)
-    .eq("user_id", userId);
-
-  if (deleteResult.error) {
-    throw new WorkoutResultImportError("persistence_failed", deleteResult.error.message, 500);
-  }
-
-  return getLatestWorkoutResultFeedback(plannedWorkoutId);
+  return getLatestWorkoutResultFeedback({ userId, plannedWorkoutId });
 }
 
 async function getOwnedPlannedWorkout(userId: string, plannedWorkoutId: string) {
@@ -376,19 +324,11 @@ async function extractPrimaryFitFromArchiveForServer(
     );
   }
 
-  const [{ mkdtemp, mkdir, open, readFile, rm }, pathModule, osModule, yauzlModule] =
-    await Promise.all([
-      import("node:fs/promises"),
-      import("node:path"),
-      import("node:os"),
-      import("yauzl"),
-    ]);
-  const path = pathModule.default;
+  const yauzlModule = await import("yauzl");
   const yauzl = yauzlModule.default;
-  const workspace = await mkdtemp(path.join(osModule.tmpdir(), "hito-fit-upload-"));
-
-  try {
-    const entries = await new Promise<string[]>((resolve, reject) => {
+  const maxArchiveEntries = 256;
+  const entries = await new Promise<Array<{ fileName: string; uncompressedSize: number }>>(
+    (resolve, reject) => {
       yauzl.fromBuffer(zipBuffer, { lazyEntries: true }, (error, zipFile) => {
         if (error || !zipFile) {
           reject(
@@ -401,11 +341,27 @@ async function extractPrimaryFitFromArchiveForServer(
           return;
         }
 
-        const names: string[] = [];
+        const values: Array<{ fileName: string; uncompressedSize: number }> = [];
+        let entryCount = 0;
 
         zipFile.on("entry", (entry) => {
+          entryCount += 1;
           if (!entry.fileName.endsWith("/")) {
-            names.push(entry.fileName);
+            values.push({
+              fileName: entry.fileName,
+              uncompressedSize: entry.uncompressedSize,
+            });
+          }
+          if (entryCount > maxArchiveEntries) {
+            zipFile.close();
+            reject(
+              new WorkoutResultImportError(
+                "invalid_upload",
+                "This ZIP contains too many files to process safely.",
+                422,
+              ),
+            );
+            return;
           }
 
           zipFile.readEntry();
@@ -413,112 +369,135 @@ async function extractPrimaryFitFromArchiveForServer(
 
         zipFile.once("end", () => {
           zipFile.close();
-          resolve(names);
+          resolve(values);
         });
-        zipFile.once("error", reject);
+        zipFile.once("error", () => reject(invalidZipArchiveError()));
         zipFile.readEntry();
       });
-    });
-    const fitEntries = entries.filter((entry) => entry.toLowerCase().endsWith(".fit"));
+    },
+  );
+  const fitEntries = entries.filter((entry) => entry.fileName.toLowerCase().endsWith(".fit"));
 
-    if (fitEntries.length === 0) {
-      throw new WorkoutResultImportError(
-        "zip_missing_fit",
-        "This ZIP does not contain a usable .fit activity file.",
-        422,
-      );
-    }
+  if (fitEntries.length === 0) {
+    throw new WorkoutResultImportError(
+      "zip_missing_fit",
+      "This ZIP does not contain a usable .fit activity file.",
+      422,
+    );
+  }
 
-    if (fitEntries.length > 1) {
-      throw new WorkoutResultImportError(
-        "zip_multiple_fit",
-        "This ZIP contains more than one .fit file. Upload a ZIP with one Garmin activity FIT file only.",
-        422,
-      );
-    }
+  if (fitEntries.length > 1) {
+    throw new WorkoutResultImportError(
+      "zip_multiple_fit",
+      "This ZIP contains more than one .fit file. Upload a ZIP with one Garmin activity FIT file only.",
+      422,
+    );
+  }
 
-    const primaryFileName = fitEntries[0]!;
-    const extractedPath = path.join(workspace, path.basename(primaryFileName));
-    await mkdir(path.dirname(extractedPath), { recursive: true });
-    const fileBuffer = await new Promise<Buffer>((resolve, reject) => {
-      yauzl.fromBuffer(zipBuffer, { lazyEntries: true }, (error, zipFile) => {
-        if (error || !zipFile) {
-          reject(
-            new WorkoutResultImportError(
-              "invalid_upload",
-              "The uploaded ZIP archive could not be read.",
-              422,
-            ),
-          );
+  const primaryEntry = fitEntries[0]!;
+  if (primaryEntry.uncompressedSize > MAX_WORKOUT_RESULT_UPLOAD_BYTES) {
+    throw new WorkoutResultImportError(
+      "file_too_large",
+      "The FIT file inside the ZIP is larger than the 25 MB first-release limit.",
+      413,
+    );
+  }
+
+  const fileBuffer = await new Promise<Buffer>((resolve, reject) => {
+    yauzl.fromBuffer(zipBuffer, { lazyEntries: true }, (error, zipFile) => {
+      if (error || !zipFile) {
+        reject(
+          new WorkoutResultImportError(
+            "invalid_upload",
+            "The uploaded ZIP archive could not be read.",
+            422,
+          ),
+        );
+        return;
+      }
+
+      let resolved = false;
+
+      zipFile.on("entry", (entry) => {
+        if (entry.fileName !== primaryEntry.fileName) {
+          zipFile.readEntry();
           return;
         }
 
-        let resolved = false;
-
-        zipFile.on("entry", (entry) => {
-          if (entry.fileName !== primaryFileName) {
-            zipFile.readEntry();
+        zipFile.openReadStream(entry, (streamError, readStream) => {
+          if (streamError || !readStream) {
+            reject(
+              new WorkoutResultImportError(
+                "invalid_upload",
+                "The FIT file inside the ZIP archive could not be read.",
+                422,
+              ),
+            );
             return;
           }
 
-          zipFile.openReadStream(entry, async (streamError, readStream) => {
-            if (streamError || !readStream) {
-              reject(
+          const chunks: Buffer[] = [];
+          let extractedBytes = 0;
+
+          readStream.on("data", (chunk) => {
+            const value = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+            extractedBytes += value.length;
+            if (extractedBytes > MAX_WORKOUT_RESULT_UPLOAD_BYTES) {
+              readStream.destroy(
                 new WorkoutResultImportError(
-                  "invalid_upload",
-                  "The FIT file inside the ZIP archive could not be read.",
-                  422,
+                  "file_too_large",
+                  "The FIT file inside the ZIP is larger than the 25 MB first-release limit.",
+                  413,
                 ),
               );
               return;
             }
-
-            const chunks: Buffer[] = [];
-
-            readStream.on("data", (chunk) => {
-              chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-            });
-            readStream.once("error", reject);
-            readStream.once("end", async () => {
-              try {
-                const extractedBuffer = Buffer.concat(chunks);
-                const fileHandle = await open(extractedPath, "w");
-                await fileHandle.writeFile(extractedBuffer);
-                await fileHandle.close();
-                resolved = true;
-                zipFile.close();
-                resolve(await readFile(extractedPath));
-              } catch (writeError) {
-                reject(writeError);
-              }
-            });
+            chunks.push(value);
+          });
+          readStream.once("error", (streamError) =>
+            reject(
+              streamError instanceof WorkoutResultImportError
+                ? streamError
+                : invalidZipArchiveError(),
+            ),
+          );
+          readStream.once("end", () => {
+            resolved = true;
+            zipFile.close();
+            resolve(Buffer.concat(chunks, extractedBytes));
           });
         });
-
-        zipFile.once("end", () => {
-          if (!resolved) {
-            reject(
-              new WorkoutResultImportError(
-                "zip_missing_fit",
-                "This ZIP does not contain a usable .fit activity file.",
-                422,
-              ),
-            );
-          }
-        });
-        zipFile.once("error", reject);
-        zipFile.readEntry();
       });
-    });
 
-    return {
-      primaryFileKind: "fit",
-      primaryFileName,
-      fileBuffer,
-    };
-  } finally {
-    await rm(workspace, { recursive: true, force: true });
-  }
+      zipFile.once("end", () => {
+        if (!resolved) {
+          reject(
+            new WorkoutResultImportError(
+              "zip_missing_fit",
+              "This ZIP does not contain a usable .fit activity file.",
+              422,
+            ),
+          );
+        }
+      });
+      zipFile.once("error", () => reject(invalidZipArchiveError()));
+      zipFile.readEntry();
+    });
+  });
+
+  return {
+    primaryFileKind: "fit",
+    primaryFileName: primaryEntry.fileName,
+    fileBuffer,
+  };
+}
+
+function invalidZipArchiveError() {
+  return new WorkoutResultImportError(
+    "invalid_upload",
+    "The uploaded ZIP archive could not be read.",
+    422,
+  );
 }
 
 async function parseGarminFitActivityForServer(fileBuffer: Buffer) {

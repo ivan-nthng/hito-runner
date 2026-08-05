@@ -174,13 +174,13 @@ export function reviewManualWorkoutDraft(
 }
 
 export const reviewManualWorkoutDraftAction = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
+  .validator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutDraftReviewResult> => {
     return reviewManualWorkoutDraft(data);
   });
 
 export const createEmptyManualActivePlan = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
+  .validator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualEmptyPlanCreateResult> => {
     const user = await resolveCurrentManualWorkoutAuthoringUser();
 
@@ -198,7 +198,7 @@ export const createEmptyManualActivePlan = createServerFn({ method: "POST" })
   });
 
 export const addManualWorkoutToActivePlan = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
+  .validator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutAddToActivePlanResult> => {
     const user = await resolveCurrentManualWorkoutAuthoringUser();
 

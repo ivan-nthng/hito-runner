@@ -55,7 +55,7 @@ export interface WorkoutDocumentTarget {
 }
 
 export type WorkoutDocumentUnitPrescription = PlannedWorkoutUnitPrescription;
-export type WorkoutDocumentRepeatChildRole = PlannedWorkoutRepeatChildRole;
+type WorkoutDocumentRepeatChildRole = PlannedWorkoutRepeatChildRole;
 export type WorkoutDocumentRepeatChildPrescription =
   PlannedWorkoutRepeatChildPrescription<WorkoutDocumentTarget>;
 
@@ -261,7 +261,7 @@ export function workoutDocumentExecutableDurationForSections(
   );
 }
 
-export function workoutDocumentRepeatChildToSection(
+function workoutDocumentRepeatChildToSection(
   child: WorkoutDocumentRepeatChildPrescription,
 ): WorkoutDocumentSection {
   const prescription = { ...child.prescription };

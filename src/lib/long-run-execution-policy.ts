@@ -1,6 +1,6 @@
 import type { CanonicalWorkoutIdentity } from "@/lib/rich-workout-model";
 
-export const LONG_RUN_ANATOMY_IDENTITY_VALUES = [
+const LONG_RUN_ANATOMY_IDENTITY_VALUES = [
   "long_aerobic_run",
   "cutback_long_run",
   "taper_long_run",
@@ -31,7 +31,7 @@ export interface LongRunExecutionStage {
   path?: string;
 }
 
-export type LongRunExecutionPolicyIssueCode =
+type LongRunExecutionPolicyIssueCode =
   | "long_run_body_missing"
   | "long_run_anatomy_missing"
   | "long_run_decorative_split"
@@ -42,7 +42,7 @@ export type LongRunExecutionPolicyIssueCode =
   | "progression_stage_count_invalid"
   | "progression_target_sequence_incomplete";
 
-export interface LongRunExecutionPolicyIssue {
+interface LongRunExecutionPolicyIssue {
   code: LongRunExecutionPolicyIssueCode;
   message: string;
   path?: string;

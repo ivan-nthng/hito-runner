@@ -3,7 +3,10 @@ import "@tanstack/react-start/server-only";
 import type { Database } from "@/lib/supabase/database";
 import { collectRowsForIdBatches } from "@/lib/supabase/batched-in-filter";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
-import { readWorkoutComparisonDifferencePayload } from "@/lib/workout-result-import/comparison-payload";
+import {
+  readWorkoutComparisonDifferencePayload,
+  WORKOUT_COMPARISON_FORMULA_VERSION,
+} from "@/lib/workout-result-import/comparison-payload";
 import { buildWorkoutResultEvidenceBundle } from "@/lib/workout-result-import/evidence-bundle";
 import type {
   WorkoutAiInsightSummary,
@@ -19,12 +22,16 @@ type PersistedWorkoutActualMetricsRow =
 type PersistedWorkoutComparisonRow = Database["public"]["Tables"]["workout_comparisons"]["Row"];
 type PersistedWorkoutAiInsightRow = Database["public"]["Tables"]["workout_ai_insights"]["Row"];
 
-export async function getLatestWorkoutResultFeedback(plannedWorkoutId: string) {
+export async function getLatestWorkoutResultFeedback(input: {
+  userId: string;
+  plannedWorkoutId: string;
+}) {
   const supabase = createAdminSupabaseClient();
   const assetResult = await supabase
     .from("workout_result_assets")
     .select("*")
-    .eq("planned_workout_id", plannedWorkoutId)
+    .eq("user_id", input.userId)
+    .eq("planned_workout_id", input.plannedWorkoutId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -37,6 +44,7 @@ export async function getLatestWorkoutResultFeedback(plannedWorkoutId: string) {
     ? await supabase
         .from("runner_activity_source_revisions")
         .select("raw_state")
+        .eq("user_id", input.userId)
         .eq("id", assetResult.data.activity_source_revision_id)
         .maybeSingle()
     : { data: null, error: null };
@@ -49,6 +57,7 @@ export async function getLatestWorkoutResultFeedback(plannedWorkoutId: string) {
     ? await supabase
         .from("workout_actual_metrics")
         .select("*")
+        .eq("user_id", input.userId)
         .eq("result_asset_id", assetResult.data.id)
         .neq("status", "superseded")
         .order("created_at", { ascending: false })
@@ -64,6 +73,7 @@ export async function getLatestWorkoutResultFeedback(plannedWorkoutId: string) {
     ? await supabase
         .from("workout_comparisons")
         .select("*")
+        .eq("user_id", input.userId)
         .eq("actual_metrics_id", metricsResult.data.id)
         .maybeSingle()
     : null;
@@ -76,6 +86,7 @@ export async function getLatestWorkoutResultFeedback(plannedWorkoutId: string) {
     ? await supabase
         .from("workout_ai_insights")
         .select("*")
+        .eq("user_id", input.userId)
         .eq("comparison_id", comparisonResult.data.id)
         .eq("status", "final")
         .order("created_at", { ascending: false })
@@ -115,8 +126,11 @@ function rawStateFromDatabase(value: string | undefined) {
   return value === "available" || value === "removal_pending" || value === "removed" ? value : null;
 }
 
-export async function getWorkoutFeedbackMarkerMap(plannedWorkoutIds: string[]) {
-  const uniqueWorkoutIds = Array.from(new Set(plannedWorkoutIds.filter(Boolean)));
+export async function getWorkoutFeedbackMarkerMap(input: {
+  userId: string;
+  plannedWorkoutIds: string[];
+}) {
+  const uniqueWorkoutIds = Array.from(new Set(input.plannedWorkoutIds.filter(Boolean)));
 
   if (uniqueWorkoutIds.length === 0) {
     return new Map<string, WorkoutFeedbackMarkerSummary>();
@@ -127,6 +141,7 @@ export async function getWorkoutFeedbackMarkerMap(plannedWorkoutIds: string[]) {
     supabase
       .from("workout_result_assets")
       .select("*")
+      .eq("user_id", input.userId)
       .in("planned_workout_id", ids)
       .order("created_at", { ascending: false }),
   );
@@ -141,6 +156,7 @@ export async function getWorkoutFeedbackMarkerMap(plannedWorkoutIds: string[]) {
     supabase
       .from("workout_actual_metrics")
       .select("*")
+      .eq("user_id", input.userId)
       .in("result_asset_id", ids)
       .neq("status", "superseded")
       .order("created_at", { ascending: false }),
@@ -152,6 +168,7 @@ export async function getWorkoutFeedbackMarkerMap(plannedWorkoutIds: string[]) {
     supabase
       .from("workout_comparisons")
       .select("*")
+      .eq("user_id", input.userId)
       .in("actual_metrics_id", ids)
       .order("created_at", { ascending: false }),
   );
@@ -249,6 +266,9 @@ export function comparisonRowToSummary(
 
   if (
     !differencePayload ||
+    row.comparison_formula_version !== WORKOUT_COMPARISON_FORMULA_VERSION ||
+    differencePayload.plannedWorkout.plannedWorkoutId !== row.planned_workout_id ||
+    differencePayload.actualMetrics.actualMetricsId !== row.actual_metrics_id ||
     !["complete", "partial", "insufficient_data"].includes(row.comparison_status) ||
     !["matched", "partially_matched", "unclear"].includes(row.completion_state)
   ) {
@@ -281,8 +301,6 @@ export function workoutAiInsightRowToSummary(
     id: row.id,
     comparisonId: row.comparison_id,
     actualMetricsId: row.actual_metrics_id,
-    model: row.model,
-    responseId: row.response_id,
     status: row.status,
     analysisSummary: row.analysis_summary,
     differenceExplanation: row.difference_explanation,

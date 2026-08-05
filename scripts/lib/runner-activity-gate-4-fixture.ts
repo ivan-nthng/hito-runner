@@ -128,8 +128,10 @@ export async function persistGate4SyntheticActivity(input: {
   key: string;
   localDate: string;
   timerDurationMin: number | null;
-  elapsedDurationMin: number;
-  distanceKm: number;
+  elapsedDurationMin: number | null;
+  distanceKm: number | null;
+  elevationGainM?: number | null;
+  averageHeartRate?: number | null;
   runningContext?: "road" | "track" | "treadmill" | "trail_mountain" | null;
   storageSuffix?: string;
 }) {
@@ -164,6 +166,8 @@ export async function persistGate4SyntheticActivity(input: {
       timerDurationMin: input.timerDurationMin,
       elapsedDurationMin: input.elapsedDurationMin,
       distanceKm: input.distanceKm,
+      elevationGainM: input.elevationGainM ?? null,
+      averageHeartRate: input.averageHeartRate ?? null,
       runningContext: input.runningContext ?? null,
     },
     fileBuffer,
@@ -178,8 +182,10 @@ async function createMatchedActivity(input: {
   key: string;
   localDate: string;
   timerDurationMin: number | null;
-  elapsedDurationMin: number;
-  distanceKm: number;
+  elapsedDurationMin: number | null;
+  distanceKm: number | null;
+  elevationGainM?: number | null;
+  averageHeartRate?: number | null;
   plannedDurationMin: number;
   outcome: "completed" | "partial";
   rpe: number;
@@ -289,12 +295,12 @@ function syntheticParsedWorkout(input: {
     totalTimerDurationMin: input.timerDurationMin,
     totalElapsedDurationMin: input.elapsedDurationMin,
     totalDurationMin: input.timerDurationMin ?? input.elapsedDurationMin,
-    avgHeartRate: null,
-    maxHeartRate: null,
+    avgHeartRate: input.averageHeartRate ?? null,
+    maxHeartRate: input.averageHeartRate == null ? null : input.averageHeartRate + 12,
     avgPower: null,
     maxPower: null,
     totalCalories: null,
-    totalAscentM: null,
+    totalAscentM: input.elevationGainM ?? null,
     totalDescentM: null,
     avgCadence: null,
     avgTemperatureC: null,

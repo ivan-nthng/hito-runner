@@ -2,9 +2,14 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { relinkComparisonPlannedWorkoutIdentity } from "../src/lib/active-plan-replacement-carry-forward";
 import { buildDeterministicWorkoutComparison } from "../src/lib/workout-result-import/compare-workout-result";
-import { readWorkoutComparisonDifferencePayload } from "../src/lib/workout-result-import/comparison-payload";
+import {
+  readWorkoutComparisonDifferencePayload,
+  WORKOUT_COMPARISON_FORMULA_VERSION,
+} from "../src/lib/workout-result-import/comparison-payload";
 import { buildWorkoutResultEvidenceBundle } from "../src/lib/workout-result-import/evidence-bundle";
 import { parseGarminFitActivity } from "../src/lib/workout-result-import/parse-garmin-fit";
+import { comparisonRowToSummary } from "../src/lib/workout-result-import/read-workout-result-feedback";
+import type { Database, Json } from "../src/lib/supabase/database";
 import type {
   WorkoutActualMetricsSummary,
   WorkoutComparisonSummary,
@@ -23,8 +28,34 @@ async function main() {
   validateEvidenceBundleIdentity(indexedComparison);
   validateCarryForwardIdentity(indexedComparison);
   validatePersistedPayloadBoundary(indexedComparison);
+  validatePersistedRowBoundary(indexedComparison);
 
   console.log("Workout evidence comparison contract passed.");
+}
+
+function validatePersistedRowBoundary(
+  comparison: ReturnType<typeof buildDeterministicWorkoutComparison>,
+) {
+  const row = {
+    id: COMPARISON_ID,
+    user_id: "10000000-0000-4000-8000-000000000005",
+    planned_workout_id: WORKOUT_ID,
+    actual_metrics_id: METRICS_ID,
+    comparison_formula_version: WORKOUT_COMPARISON_FORMULA_VERSION,
+    comparison_status: comparison.comparisonStatus,
+    completion_state: comparison.completionState,
+    difference_payload: comparison.differencePayload as unknown as Json,
+    comparison_confidence: comparison.comparisonConfidence,
+    created_at: "2026-07-17T08:00:00.000Z",
+  } satisfies Database["public"]["Tables"]["workout_comparisons"]["Row"];
+
+  assert.ok(comparisonRowToSummary(row));
+  assert.equal(
+    comparisonRowToSummary({ ...row, comparison_formula_version: "unsupported_formula" }),
+    null,
+  );
+  assert.equal(comparisonRowToSummary({ ...row, planned_workout_id: crypto.randomUUID() }), null);
+  assert.equal(comparisonRowToSummary({ ...row, actual_metrics_id: crypto.randomUUID() }), null);
 }
 
 async function validateFitParserBoundary() {
@@ -203,6 +234,25 @@ function validatePersistedPayloadBoundary(
     comparison.differencePayload,
   );
   assert.equal(readWorkoutComparisonDifferencePayload({ broken: true }), null);
+
+  const contradictory = structuredClone(comparison.differencePayload);
+  contradictory.facts.duration = {
+    ...contradictory.facts.duration,
+    status: contradictory.facts.duration.status === "matched" ? "mismatch" : "matched",
+  };
+  assert.equal(
+    readWorkoutComparisonDifferencePayload(contradictory),
+    null,
+    "Contradictory signals/facts metadata must reject instead of silently preferring one wire form.",
+  );
+
+  const duplicateSignal = structuredClone(comparison.differencePayload);
+  duplicateSignal.signals = [duplicateSignal.signals[0], ...duplicateSignal.signals];
+  assert.equal(
+    readWorkoutComparisonDifferencePayload(duplicateSignal),
+    null,
+    "Duplicate or additional signals must not create another accepted comparison truth.",
+  );
 }
 
 function compare(

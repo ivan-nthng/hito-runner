@@ -248,10 +248,11 @@ unavailable`, or an auth loop.
   workout-detail `Feedback` now shows a compact `What this review checked` support readback plus warm-up/main/cooldown-style `Workout structure` grouping when the deterministic payload includes trustworthy segment summaries, while pace and heart rate stay quiet unsupported facts rather than implied comparisons.
 - The bounded Garmin AI interpretation slice is now implemented:
   saved-mode workout detail now persists one `workout_ai_insights` row linked to the latest deterministic comparison, generated only from planned workout truth, normalized Garmin actual metrics, deterministic comparison payload, current week context, next-workout summary, and optional workout-scoped body-note context; the dedicated `Feedback` surface now reads that bounded AI interpretation back separately from the deterministic facts.
-- The first Basic/Pro entitlement backend foundation slice is now implemented:
-  additive `runner_entitlements` and `runner_capability_usage` tables exist for backend-owned tier and metered usage truth, missing entitlement rows resolve to effective `Pro`, `garmin_ai_interpretation` remains the only current Pro-only capability key, and retired plan-update/voice capability keys are not current product truth.
-  Garmin upload/parse/deterministic comparison remain available when only AI interpretation is locked.
-  The linked Supabase project has now received the entitlement migration, and local generated database types are aligned with that linked schema.
+- The pre-billing entitlement storage foundation remains implemented:
+  additive `runner_entitlements` and `runner_capability_usage` tables stay available to Admin
+  analytics and QA cleanup, and the linked Supabase project plus generated database types retain
+  that schema. No current Product action consumes the retired Basic/Pro enforcement runtime;
+  Garmin upload, parse, and deterministic comparison remain independent of entitlement state.
 - Dictate-to-Plan / voice-to-plan is retired from current product truth:
   the old `DictateToPlanPanel` UI residue, `src/lib/voice-to-plan-authoring.ts`,
   `generateVoiceToPlanDraft`, `confirmVoiceToPlanDraft`, and the `voice_to_plan` entitlement

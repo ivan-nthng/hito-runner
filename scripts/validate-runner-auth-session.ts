@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { verifyLocalAuthCredentials } from "@/lib/local-auth";
 import type { Database } from "@/lib/supabase/database";
 import { mergeResponseHeaders, resolveRequestSupabaseAuth } from "@/lib/supabase/server";
+import { loginQaPoolToLoopbackRuntime } from "./lib/runner-activity-proof-runtime";
 
 type AuthResult = {
   data: { user: { id: string; email: string | null } | null };
@@ -76,7 +78,49 @@ async function run() {
     expectedUserId: "11111111-1111-4111-8111-111111111111",
   });
 
+  const nonLoopbackLocalLogin = await verifyLocalAuthCredentials(
+    "qa-provider-engine",
+    "not-used",
+    "https://example.com",
+  );
+  assert.deepEqual(nonLoopbackLocalLogin, { ok: false, reason: "unavailable" });
+
+  const runtimeUrl = process.argv
+    .find((argument) => argument.startsWith("--runtime-url="))
+    ?.slice("--runtime-url=".length);
+  if (runtimeUrl) await assertLoopbackLocalAuthLifecycle(runtimeUrl);
+
   console.log("Runner request-auth session validation passed.");
+}
+
+async function assertLoopbackLocalAuthLifecycle(runtimeUrl: string) {
+  const { baseUrl, cookie } = await loginQaPoolToLoopbackRuntime({
+    runtimeUrl,
+    role: "provider-engine",
+  });
+
+  for (let requestIndex = 0; requestIndex < 2; requestIndex += 1) {
+    const authenticated = await fetch(new URL("/api/runner-activities", baseUrl), {
+      headers: { cookie },
+    });
+    assert.equal(authenticated.status, 200, "local runner session survives repeat navigation");
+  }
+
+  const logout = await fetch(new URL("/api/auth/logout?next=/login", baseUrl), {
+    headers: { cookie },
+    redirect: "manual",
+  });
+  assert.equal(logout.status, 302);
+  assert.equal(new URL(logout.headers.get("location") ?? "", baseUrl).pathname, "/login");
+  const clearedSetCookie = logout.headers.get("set-cookie") ?? "";
+  assert.match(clearedSetCookie, /hito_local_auth_session=;/);
+  assert.match(clearedSetCookie.toLowerCase(), /max-age=0/);
+
+  const clearedCookie = clearedSetCookie.split(";", 1)[0];
+  const afterLogout = await fetch(new URL("/api/runner-activities", baseUrl), {
+    headers: { cookie: clearedCookie },
+  });
+  assert.equal(afterLogout.status, 401, "explicit logout leaves the browser signed out");
 }
 
 async function assertAuthCase(options: {

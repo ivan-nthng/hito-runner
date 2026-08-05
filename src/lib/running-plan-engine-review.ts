@@ -23,7 +23,7 @@ import {
 import type { Json } from "@/lib/supabase/database";
 import { serverEnv } from "@/lib/supabase/env";
 
-export const RUNNING_PLAN_REVIEW_CONTRACT_VERSION = "running_plan_review_v1" as const;
+const RUNNING_PLAN_REVIEW_CONTRACT_VERSION = "running_plan_review_v1" as const;
 export const RUNNING_PLAN_CONFIRMED_SOURCE_STATUS = "confirmed_selected_plan" as const;
 const SELF_CONTAINED_RUNNING_PLAN_REVIEW_TOKEN_PREFIX = "running-plan-review-v1";
 const TRANSIENT_RUNNER_CONTEXT_FIELDS = new Set([
@@ -41,7 +41,7 @@ type SelfContainedRunningPlanReviewEnvelope = {
 
 export type RunningPlanPreviewDraft = AiGeneratedRunningPlanPreviewDraft;
 
-export type RunningPlanReviewProof = {
+type RunningPlanReviewProof = {
   reviewToken: string;
   reviewChecksum: string;
   reviewContractVersion: typeof RUNNING_PLAN_REVIEW_CONTRACT_VERSION;

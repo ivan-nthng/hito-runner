@@ -265,7 +265,7 @@ const defaultDependencies: ActivePlanTransitionDependencies = {
 };
 
 export const reviewActivePlanTransition = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => transitionReviewInputSchema.parse(value))
+  .validator((value: unknown) => transitionReviewInputSchema.parse(value))
   .handler(async ({ data }): Promise<ActivePlanTransitionReviewResult> => {
     const userId = await getCurrentPersistedUserId();
     if (!userId) {
@@ -280,7 +280,7 @@ export const reviewActivePlanTransition = createServerFn({ method: "POST" })
   });
 
 export const confirmActivePlanTransition = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => transitionConfirmInputSchema.parse(value))
+  .validator((value: unknown) => transitionConfirmInputSchema.parse(value))
   .handler(async ({ data }): Promise<ActivePlanTransitionConfirmResult> => {
     const userId = await getCurrentPersistedUserId();
     if (!userId) {

@@ -31,6 +31,7 @@ import {
 import { parseGarminFitActivity } from "../../src/lib/workout-result-import/parse-garmin-fit";
 import { WORKOUT_RESULT_STORAGE_BUCKET } from "../../src/lib/workout-result-import/types";
 import { markRunnerActivitySourceRemovalPendingForFixture } from "./runner-activity-gate-4-fixture";
+import { loginToLoopbackRuntime } from "./runner-activity-proof-runtime";
 
 export const RUNNER_DESIGN_PROFILE_FIXTURE_VERSION = "runner_design_profile_v1" as const;
 export const RUNNER_DESIGN_PROFILE_FIXTURE_ROLE = "saved-plan-readback" as const;
@@ -613,19 +614,13 @@ export async function verifyRunnerDesignProfileFixtureRuntime(input: {
   assert.equal(unauthorizedProgress.status, 401);
   assert.equal((await unauthorizedProgress.json()).code, "auth_required");
 
-  const loginBody = new FormData();
-  loginBody.set("identifier", input.username);
-  loginBody.set("password", input.password);
-  loginBody.set("next", "/progress");
-  const login = await fetch(new URL("/api/auth/local-login", baseUrl), {
-    method: "POST",
-    body: loginBody,
-    redirect: "manual",
+  const { cookie } = await loginToLoopbackRuntime({
+    runtimeUrl: input.runtimeUrl,
+    username: input.username,
+    password: input.password,
+    next: "/progress",
   });
-  assert.equal(login.status, 302);
-  const setCookie = login.headers.get("set-cookie");
-  assert.ok(setCookie);
-  const headers = { cookie: setCookie.split(";", 1)[0] };
+  const headers = { cookie };
 
   const firstResponse = await fetch(new URL("/api/runner-activities", baseUrl), { headers });
   assert.equal(firstResponse.status, 200);
@@ -717,10 +712,6 @@ export async function verifyRunnerDesignProfileFixtureRuntime(input: {
     gate5UnavailableReason: "normalized_stream_not_persisted",
     rawPrivateFieldsExposed: false,
   };
-}
-
-export function fixtureActivityCount() {
-  return ACTIVITY_SPECS.length;
 }
 
 function activity(

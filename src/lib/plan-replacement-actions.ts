@@ -22,7 +22,7 @@ const onboardingInputSchema = z.object({
 });
 
 export const completeOnboarding = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => onboardingInputSchema.parse(value))
+  .validator((value: unknown) => onboardingInputSchema.parse(value))
   .handler(async ({ data }) => {
     return persistImportedPlanForCurrentRequest(
       data.importedPlan,

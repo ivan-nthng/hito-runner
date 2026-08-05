@@ -59,7 +59,7 @@ export type CalendarIconKey = (typeof CALENDAR_ICON_KEY_VALUES)[number];
 
 export const CANONICAL_METRIC_GUIDANCE_VALUES = ["effort", "pace", "heart_rate", "mixed"] as const;
 
-export type CanonicalMetricGuidance = (typeof CANONICAL_METRIC_GUIDANCE_VALUES)[number];
+type CanonicalMetricGuidance = (typeof CANONICAL_METRIC_GUIDANCE_VALUES)[number];
 
 export const CANONICAL_EXECUTABLE_MODE_VALUES = [
   "pace_executable",
@@ -72,7 +72,7 @@ export const CANONICAL_EXECUTABLE_MODE_VALUES = [
   "unknown",
 ] as const;
 
-export type CanonicalExecutableMode = (typeof CANONICAL_EXECUTABLE_MODE_VALUES)[number];
+type CanonicalExecutableMode = (typeof CANONICAL_EXECUTABLE_MODE_VALUES)[number];
 
 export const HR_TARGET_SOURCE_VALUES = [
   "personal_hr_zone",
@@ -81,7 +81,7 @@ export const HR_TARGET_SOURCE_VALUES = [
   "effort_only",
 ] as const;
 
-export type HrTargetSource = (typeof HR_TARGET_SOURCE_VALUES)[number];
+type HrTargetSource = (typeof HR_TARGET_SOURCE_VALUES)[number];
 
 export type LegacyWorkoutType =
   | "easy"
@@ -127,14 +127,14 @@ export interface CanonicalMetricModeJson {
   reason: string;
 }
 
-export interface CanonicalWorkoutModel {
+interface CanonicalWorkoutModel {
   workoutFamily: CanonicalWorkoutFamily;
   workoutIdentity: CanonicalWorkoutIdentity;
   calendarIconKey: CalendarIconKey;
   metricMode: CanonicalMetricMode;
 }
 
-export interface CanonicalWorkoutResolutionInput {
+interface CanonicalWorkoutResolutionInput {
   workoutType: LegacyWorkoutType;
   sourceWorkoutType?: string | null;
   workoutFamily?: string | null;

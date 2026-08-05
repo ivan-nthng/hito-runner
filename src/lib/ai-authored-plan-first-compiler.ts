@@ -52,7 +52,7 @@ type TargetExecutionContext = {
 };
 
 export const AI_AUTHORED_PLAN_FIRST_SOURCE_KIND = "ai_authored_plan_first_v1" as const;
-export type AiAuthoredPlanFirstCompileResult =
+type AiAuthoredPlanFirstCompileResult =
   | {
       ok: true;
       canonicalPlan: TrainingPlanV2;

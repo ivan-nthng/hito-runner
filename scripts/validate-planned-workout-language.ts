@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  buildManualWorkoutUserBuiltTrainingPlan,
   reviewManualWorkoutDraft,
   type ManualWorkoutDraftInput,
   type ManualWorkoutDraftReviewResult,
@@ -30,23 +29,14 @@ import {
   type TrainingPlanV2,
 } from "../src/lib/imported-plan";
 import { buildPersistedWorkoutInsertRows } from "../src/lib/persisted-plan-replacement";
-import {
-  AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
-  buildAiGeneratedRunningPlanDevFixtureOpenAiFetch,
-} from "../src/lib/ai-generated-running-plan-dev-fixture";
-import {
-  AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
-  buildAiGeneratedRunningPlanAuthoringInput,
-} from "../src/lib/ai-generated-running-plan";
-import {
-  buildReviewedAiGeneratedRunningPlanPreview,
-  type RunningPlanPreviewActionInput,
-} from "../src/lib/running-plan-engine-actions";
+import { AI_GENERATED_RUNNING_PLAN_SOURCE_KIND } from "../src/lib/ai-generated-running-plan";
+import type { RunningPlanPreviewActionInput } from "../src/lib/running-plan-engine-actions";
 import { buildRunningPlanCanonicalPlan } from "../src/lib/running-plan-engine-review";
 import { buildDeterministicWorkoutComparison } from "../src/lib/workout-result-import/compare-workout-result";
 import type { Database } from "../src/lib/supabase/database";
 import type { Step, StepTarget } from "../src/lib/training";
-import { buildProofRunnerProfileSnapshot } from "./runner-profile-snapshot-proof-helpers";
+import { buildReviewedAiFixtureResult as buildReviewedAiFixture } from "./lib/generated-plan-proof-fixture";
+import { buildCanonicalPersistedPlannedWorkoutFromReview } from "./manual-workout-authoring/move-proof-fixtures";
 
 type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
 type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
@@ -203,32 +193,6 @@ async function validateGeneratedAndAiPlansUseUnifiedBlockContract() {
     "generated/AI arbitrary repeat-children fixture",
   );
   assertArbitraryRepeatChildrenRoundtrip(arbitraryRepeatPlan);
-}
-
-async function buildReviewedAiFixture(input: RunningPlanPreviewActionInput) {
-  const runnerProfileSnapshot = buildProofRunnerProfileSnapshot(input);
-  const authoring = buildAiGeneratedRunningPlanAuthoringInput(input, runnerProfileSnapshot);
-  assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);
-  if (!authoring.ok) {
-    throw new Error(authoring.message);
-  }
-
-  const today = input.startDate ?? authoring.authoringInput.schedule.startDate;
-  const fetchImpl = buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
-    authoringInput: authoring.authoringInput,
-    today,
-    env: localAiGeneratedFixtureEnv(),
-  });
-
-  return buildReviewedAiGeneratedRunningPlanPreview(input, {
-    aiPreview: {
-      apiKey: "local-qa-dev-ai-generated-plan-fixture",
-      model: AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
-      today,
-      fetchImpl,
-    },
-    runnerProfileSnapshot,
-  });
 }
 
 function assertGeneratedPlanUsesUnifiedBlockContract(
@@ -888,7 +852,7 @@ function validateExportKeepsCanonicalJsonAndRunnerFacingMarkdown() {
     workoutDate: "2026-07-02",
     title: "Threshold durability",
   });
-  const row = buildPersistedRow({
+  const row = buildCanonicalPersistedPlannedWorkoutFromReview({
     userId,
     planCycleId: planCycle.id,
     id: "99999999-9999-4999-8999-000000000701",
@@ -1012,7 +976,7 @@ function validateManualBlockContractRoundtripKeepsTargetSource() {
       },
     ],
   });
-  const row = buildPersistedRow({
+  const row = buildCanonicalPersistedPlannedWorkoutFromReview({
     userId,
     planCycleId: planCycle.id,
     id: "99999999-9999-4999-8999-000000000704",
@@ -1228,42 +1192,6 @@ function buildFakePlanCycle(userId: string): PersistedPlanCycleRow {
     plan_preferences: null,
     created_at: "2026-06-25T00:00:00.000Z",
     updated_at: "2026-06-25T00:00:00.000Z",
-  };
-}
-
-function buildPersistedRow({
-  userId,
-  planCycleId,
-  id,
-  review,
-}: {
-  userId: string;
-  planCycleId: string;
-  id: string;
-  review: Extract<ManualWorkoutDraftReviewResult, { ok: true }>;
-}): PersistedPlannedWorkoutRow {
-  const canonicalPlan = buildManualWorkoutUserBuiltTrainingPlan(review.draft);
-  const importedSeed = buildImportedPlanSeed(canonicalPlan);
-  const [insertRow] = buildPersistedWorkoutInsertRows(planCycleId, userId, importedSeed.workouts);
-
-  assert.ok(insertRow, "persisted row fixture should produce one insert row");
-
-  return {
-    id,
-    created_at: "2026-06-25T00:00:00.000Z",
-    ...insertRow,
-  };
-}
-
-function localAiGeneratedFixtureEnv() {
-  return {
-    OPENAI_API_KEY: "local-qa-dev-ai-generated-plan-fixture",
-    OPENAI_MODEL: "hito-local-qa-dev-ai-generated-plan-fixture",
-    LOCAL_AUTH_BYPASS_ENABLED: "true",
-    LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: "/tmp/hito-local-auth.json",
-    NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
-    HITO_AI_GENERATED_PLAN_DEV_FIXTURE: "true",
-    HITO_AI_GENERATED_PLAN_PROVIDER_MODE: "qa_fixture",
   };
 }
 

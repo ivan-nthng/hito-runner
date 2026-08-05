@@ -259,7 +259,7 @@ type PersistManualWorkoutEditResult =
     };
 
 export const reconstructManualWorkoutPersistedEditDraft = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
+  .validator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutPersistedEditReconstructResult> => {
     const userId = await getCurrentManualWorkoutAuthoringUserId();
 
@@ -274,7 +274,7 @@ export const reconstructManualWorkoutPersistedEditDraft = createServerFn({ metho
   });
 
 export const reviewManualWorkoutPersistedEditDraft = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
+  .validator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutPersistedEditReviewResult> => {
     const userId = await getCurrentManualWorkoutAuthoringUserId();
 
@@ -289,7 +289,7 @@ export const reviewManualWorkoutPersistedEditDraft = createServerFn({ method: "P
   });
 
 export const confirmManualWorkoutPersistedEdit = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => value)
+  .validator((value: unknown) => value)
   .handler(async ({ data }): Promise<ManualWorkoutPersistedEditConfirmResult> => {
     const userId = await getCurrentManualWorkoutAuthoringUserId();
 

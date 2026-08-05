@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const RUNNER_HEART_RATE_PROFILE_VERSION = "runner_hr_profile_v2" as const;
+const RUNNER_HEART_RATE_PROFILE_VERSION = "runner_hr_profile_v2" as const;
 export const HEART_RATE_ZONE_REFERENCE_VALUES = ["Z1", "Z2", "Z3", "Z4", "Z5"] as const;
 export const HEART_RATE_GUIDANCE_MIN_BPM = 60;
 export const HEART_RATE_GUIDANCE_MAX_BPM = 200;
@@ -8,8 +8,8 @@ export const HEART_RATE_GUIDANCE_MAX_BPM = 200;
 const HISTORICAL_HEART_RATE_GUIDANCE_MIN_BPM = 40;
 const HISTORICAL_HEART_RATE_GUIDANCE_MAX_BPM = 220;
 
-export type HeartRateZoneReference = (typeof HEART_RATE_ZONE_REFERENCE_VALUES)[number];
-export type HeartRateZoneSource = "personal" | "estimated" | "unavailable";
+type HeartRateZoneReference = (typeof HEART_RATE_ZONE_REFERENCE_VALUES)[number];
+type HeartRateZoneSource = "personal" | "estimated" | "unavailable";
 
 const personalHeartRateZoneValueObjectSchema = z
   .object({
@@ -77,7 +77,7 @@ export const personalHeartRateProfileInputSchema = z
   })
   .strict();
 
-export const storedRunnerHeartRateProfileSchema = z.discriminatedUnion("source", [
+const storedRunnerHeartRateProfileSchema = z.discriminatedUnion("source", [
   z
     .object({
       version: z.literal(RUNNER_HEART_RATE_PROFILE_VERSION),
@@ -93,7 +93,7 @@ export const storedRunnerHeartRateProfileSchema = z.discriminatedUnion("source",
     .strict(),
 ]);
 
-export const effectiveRunnerHeartRateProfileSchema = z
+const effectiveRunnerHeartRateProfileSchema = z
   .object({
     source: z.enum(["personal", "estimated"]),
     accepted: z.boolean(),
@@ -120,13 +120,13 @@ export const acceptedRunnerHeartRateProfileSchema = effectiveRunnerHeartRateProf
 });
 
 export type PersonalHeartRateProfileInput = z.output<typeof personalHeartRateProfileInputSchema>;
-export type StoredRunnerHeartRateProfile = z.output<typeof storedRunnerHeartRateProfileSchema>;
+type StoredRunnerHeartRateProfile = z.output<typeof storedRunnerHeartRateProfileSchema>;
 export type EffectiveRunnerHeartRateProfile = z.output<
   typeof effectiveRunnerHeartRateProfileSchema
 >;
 export type AcceptedRunnerHeartRateProfile = z.output<typeof acceptedRunnerHeartRateProfileSchema>;
 
-export interface HeartRateZoneReadback {
+interface HeartRateZoneReadback {
   reference: HeartRateZoneReference;
   label: string;
   rangeBpm: string;
@@ -145,7 +145,7 @@ export interface HeartRateZonesSummary {
   zones: HeartRateZoneReadback[];
 }
 
-export type DefaultEstimatedHrBandKey = "recovery" | "easy" | "longAerobic" | "steady" | "tempo";
+type DefaultEstimatedHrBandKey = "recovery" | "easy" | "longAerobic" | "steady" | "tempo";
 
 type DefaultEstimatedHrBand = {
   reference: HeartRateZoneReference;
@@ -155,8 +155,8 @@ type DefaultEstimatedHrBand = {
   range: [number, number];
 };
 
-export const DEFAULT_ESTIMATED_HR_SOURCE_NOTE = "Estimated from age; not measured zone data.";
-export const PERSONAL_HR_SOURCE_NOTE = "Saved by the runner as personal heart-rate truth.";
+const DEFAULT_ESTIMATED_HR_SOURCE_NOTE = "Estimated from age; not measured zone data.";
+const PERSONAL_HR_SOURCE_NOTE = "Saved by the runner as personal heart-rate truth.";
 
 const defaultEstimatedHrBands: DefaultEstimatedHrBand[] = [
   {
@@ -316,9 +316,7 @@ export function normalizeAcceptedHeartRateProfileForStorage(input: {
   };
 }
 
-export function parseStoredRunnerHeartRateProfile(
-  value: unknown,
-): StoredRunnerHeartRateProfile | null {
+function parseStoredRunnerHeartRateProfile(value: unknown): StoredRunnerHeartRateProfile | null {
   const parsed = storedRunnerHeartRateProfileSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
 }

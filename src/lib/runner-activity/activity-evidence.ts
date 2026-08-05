@@ -33,7 +33,7 @@ const officialResultInputSchema = activityRevisionInputSchema.extend({
 
 type EvidenceKind = "session_rpe" | "official_result";
 
-export type RunnerActivityEvidenceReceipt = {
+type RunnerActivityEvidenceReceipt = {
   activityId: string;
   activityRevisionId: string;
   evidenceRevisionId: string;

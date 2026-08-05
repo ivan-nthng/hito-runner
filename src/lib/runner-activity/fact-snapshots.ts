@@ -24,6 +24,7 @@ type SnapshotCreationCause =
 
 type ActivityRow = {
   current_revision_id: string | null;
+  current_revision: RevisionRow | null;
   id: string;
   local_date: string;
   distance_km: number | null;
@@ -99,49 +100,51 @@ export async function getRunnerActivityProgressFactsForUser(input: {
     endDate: asOfDate,
   });
   const creationCause = input.creationCause ?? "read_reconciliation";
-  const current = await readOrCreateSnapshot({
-    userId: input.userId,
-    family: "rolling_28_day",
-    startDate: currentRollingStart,
-    endDate: asOfDate,
-    cutoffDate: asOfDate,
-    activities: activities.inputs,
-    undatedActivityCount: activities.undatedActivityCount,
-    missingRevisionDates: activities.missingRevisionDates,
-    creationCause,
-  });
-  const previous = await readOrCreateSnapshot({
-    userId: input.userId,
-    family: "rolling_28_day",
-    startDate: previousRollingStart,
-    endDate: previousRollingEnd,
-    cutoffDate: previousRollingEnd,
-    activities: activities.inputs,
-    undatedActivityCount: activities.undatedActivityCount,
-    missingRevisionDates: activities.missingRevisionDates,
-    creationCause,
-  });
+  const snapshotRequests: Array<Parameters<typeof readOrCreateSnapshot>[0]> = [
+    {
+      userId: input.userId,
+      family: "rolling_28_day",
+      startDate: currentRollingStart,
+      endDate: asOfDate,
+      cutoffDate: asOfDate,
+      activities: activities.inputs,
+      undatedActivityCount: activities.undatedActivityCount,
+      missingRevisionDates: activities.missingRevisionDates,
+      creationCause,
+    },
+    {
+      userId: input.userId,
+      family: "rolling_28_day",
+      startDate: previousRollingStart,
+      endDate: previousRollingEnd,
+      cutoffDate: previousRollingEnd,
+      activities: activities.inputs,
+      undatedActivityCount: activities.undatedActivityCount,
+      missingRevisionDates: activities.missingRevisionDates,
+      creationCause,
+    },
+  ];
 
-  const calendarWeeks: RunnerActivityFactSnapshot[] = [];
   let weekStart = startOfWeekIso(currentRollingStart);
   const currentWeekStart = startOfWeekIso(asOfDate);
   while (weekStart <= currentWeekStart) {
     const weekEnd = addDaysIso(weekStart, 6);
-    calendarWeeks.push(
-      await readOrCreateSnapshot({
-        userId: input.userId,
-        family: "calendar_week",
-        startDate: weekStart,
-        endDate: weekEnd,
-        cutoffDate: weekEnd > asOfDate ? asOfDate : weekEnd,
-        activities: activities.inputs,
-        undatedActivityCount: activities.undatedActivityCount,
-        missingRevisionDates: activities.missingRevisionDates,
-        creationCause,
-      }),
-    );
+    snapshotRequests.push({
+      userId: input.userId,
+      family: "calendar_week",
+      startDate: weekStart,
+      endDate: weekEnd,
+      cutoffDate: weekEnd > asOfDate ? asOfDate : weekEnd,
+      activities: activities.inputs,
+      undatedActivityCount: activities.undatedActivityCount,
+      missingRevisionDates: activities.missingRevisionDates,
+      creationCause,
+    });
     weekStart = addDaysIso(weekStart, 7);
   }
+  const [current, previous, ...calendarWeeks] = await Promise.all(
+    snapshotRequests.map(readOrCreateSnapshot),
+  );
 
   return {
     status: "current",
@@ -163,7 +166,9 @@ async function loadSnapshotInputs(input: { userId: string; startDate: string; en
   for (let offset = 0; ; offset += pageSize) {
     const page = await supabase
       .from("runner_activities")
-      .select("id, current_revision_id, local_date, timer_duration_min, distance_km")
+      .select(
+        "id, current_revision_id, local_date, timer_duration_min, distance_km, current_revision:runner_activity_revisions!runner_activities_current_revision_id_fkey(id, activity_id, normalized_summary, field_provenance, normalizer_version)",
+      )
       .eq("user_id", input.userId)
       .eq("sport", "run")
       .eq("recording_kind", "recorded")
@@ -188,25 +193,9 @@ async function loadSnapshotInputs(input: { userId: string; startDate: string; en
     .is("local_date", null);
   if (undated.error) throw new Error(undated.error.message);
 
-  const revisionIds = activities
-    .map((activity) => activity.current_revision_id)
-    .filter((id): id is string => Boolean(id));
-  const revisions: RevisionRow[] = [];
-  for (const ids of chunks(revisionIds, 100)) {
-    const result = await supabase
-      .from("runner_activity_revisions")
-      .select("id, activity_id, normalized_summary, field_provenance, normalizer_version")
-      .eq("user_id", input.userId)
-      .in("id", ids);
-    if (result.error) throw new Error(result.error.message);
-    revisions.push(...((result.data ?? []) as RevisionRow[]));
-  }
-  const revisionById = new Map(revisions.map((revision) => [revision.id, revision]));
   const inputs = activities.flatMap((activity): SnapshotInput[] => {
-    const revision = activity.current_revision_id
-      ? revisionById.get(activity.current_revision_id)
-      : null;
-    if (!revision) return [];
+    const revision = activity.current_revision;
+    if (!revision || revision.id !== activity.current_revision_id) return [];
     return [
       {
         activityId: activity.id,
@@ -226,7 +215,8 @@ async function loadSnapshotInputs(input: { userId: string; startDate: string; en
     missingRevisionDates: activities
       .filter(
         (activity) =>
-          !activity.current_revision_id || !revisionById.has(activity.current_revision_id),
+          !activity.current_revision_id ||
+          activity.current_revision?.id !== activity.current_revision_id,
       )
       .map((activity) => activity.local_date),
   };
@@ -597,14 +587,6 @@ function maxBy<T>(values: T[], readValue: (value: T) => number): T | null {
 
 function roundMetric(value: number) {
   return Math.round(value * 1000) / 1000;
-}
-
-function chunks<T>(values: T[], size: number) {
-  const result: T[][] = [];
-  for (let index = 0; index < values.length; index += size) {
-    result.push(values.slice(index, index + size));
-  }
-  return result;
 }
 
 function parseCreationCause(value: string): SnapshotCreationCause {

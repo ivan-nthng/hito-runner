@@ -89,7 +89,7 @@ export const getLoginRouteData = createServerFn({ method: "GET" }).handler(async
 });
 
 export const getWorkoutRouteData = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => workoutRouteInputSchema.parse(value))
+  .validator((value: unknown) => workoutRouteInputSchema.parse(value))
   .handler(async ({ data }) => {
     return loadWorkoutRouteData(data, {
       loadSnapshot: getSnapshotForRequest,
@@ -113,7 +113,7 @@ export const getSettingsRouteData = createServerFn({ method: "GET" }).handler(as
 });
 
 export const requestMagicLink = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => loginInputSchema.parse(value))
+  .validator((value: unknown) => loginInputSchema.parse(value))
   .handler(async ({ data }) => {
     return requestMagicLinkForCurrentRequest(data);
   });
@@ -126,19 +126,19 @@ export const clearUpcomingSchedule = createServerFn({ method: "POST" }).handler(
 });
 
 export const previewActivePlanScheduleEdit = createServerFn({ method: "POST" })
-  .inputValidator(parseActivePlanScheduleEditInput)
+  .validator(parseActivePlanScheduleEditInput)
   .handler(async ({ data }): Promise<ActivePlanScheduleEditPreview> => {
     return previewActivePlanScheduleEditForCurrentRequestServer(data);
   });
 
 export const applyActivePlanScheduleReflowPreview = createServerFn({ method: "POST" })
-  .inputValidator(parseActivePlanScheduleReflowApplyInput)
+  .validator(parseActivePlanScheduleReflowApplyInput)
   .handler(async ({ data }): Promise<ActivePlanScheduleReflowApplyResult> => {
     return applyActivePlanScheduleReflowPreviewForCurrentRequestServer(data);
   });
 
 export const saveWorkoutLog = createServerFn({ method: "POST" })
-  .inputValidator((value: unknown) => workoutLogInputSchema.parse(value))
+  .validator((value: unknown) => workoutLogInputSchema.parse(value))
   .handler(async ({ data }) => {
     return saveWorkoutLogForUser(await requirePersistedUserIdForCurrentRequest(), data);
   });
@@ -382,7 +382,10 @@ export async function getPersistedSnapshot(userId: string): Promise<TrainingSnap
   );
   const currentDate = todayIso();
   const persistedWorkoutIds = persistedWorkouts.map((workout) => workout.id);
-  const feedbackMarkerByWorkoutId = await getWorkoutFeedbackMarkerMapForServer(persistedWorkoutIds);
+  const feedbackMarkerByWorkoutId = await getWorkoutFeedbackMarkerMapForUser(
+    userId,
+    persistedWorkoutIds,
+  );
   const evidenceWorkoutIds = await fetchManualWorkoutEvidenceWorkoutIds(
     userId,
     persistedWorkoutIds,
@@ -492,21 +495,20 @@ async function getRunnerProfileRow(userId: string) {
 
 const getLatestWorkoutResultFeedbackForServer = createServerOnlyFn(
   async (plannedWorkoutId: string) => {
+    const userId = await requirePersistedUserIdForCurrentRequest();
     const { getLatestWorkoutResultFeedback } =
       await import("@/lib/workout-result-import/read-workout-result-feedback");
 
-    return getLatestWorkoutResultFeedback(plannedWorkoutId);
+    return getLatestWorkoutResultFeedback({ userId, plannedWorkoutId });
   },
 );
 
-const getWorkoutFeedbackMarkerMapForServer = createServerOnlyFn(
-  async (plannedWorkoutIds: string[]) => {
-    const { getWorkoutFeedbackMarkerMap } =
-      await import("@/lib/workout-result-import/read-workout-result-feedback");
+async function getWorkoutFeedbackMarkerMapForUser(userId: string, plannedWorkoutIds: string[]) {
+  const { getWorkoutFeedbackMarkerMap } =
+    await import("@/lib/workout-result-import/read-workout-result-feedback");
 
-    return getWorkoutFeedbackMarkerMap(plannedWorkoutIds);
-  },
-);
+  return getWorkoutFeedbackMarkerMap({ userId, plannedWorkoutIds });
+}
 
 function dbWorkoutToView(
   workout: Database["public"]["Tables"]["planned_workouts"]["Row"],

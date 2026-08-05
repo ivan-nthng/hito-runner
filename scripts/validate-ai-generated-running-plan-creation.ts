@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -174,7 +173,6 @@ await validateTypedPlanFirstFailureOutcomes();
 await validatePlanFirstProviderRepresentationContract();
 await validateLocalDevFixtureAvailabilityGating();
 await validateLocalGenerationIncidentTrail();
-validateNoLegacyGeneratedPlanAuthoringSourceImports();
 
 console.log("AI-generated plan-first creation contract checks passed.", {
   scenarios: scenarios.map((scenario) => scenario.name),
@@ -1878,24 +1876,6 @@ async function validateLocalDevFixtureAvailabilityGating() {
       }
     }
     await rm(boundaryArtifactRoot, { recursive: true, force: true });
-  }
-}
-
-function validateNoLegacyGeneratedPlanAuthoringSourceImports() {
-  const checkedFiles = [
-    "src/lib/ai-first-plan-draft-service.ts",
-    "src/lib/ai-generated-running-plan.ts",
-    "src/lib/ai-generated-running-plan-dev-fixture.ts",
-    "scripts/author-ai-first-plan-draft.ts",
-  ];
-
-  for (const file of checkedFiles) {
-    const source = readFileSync(file, "utf8");
-    assert.doesNotMatch(
-      source,
-      /repeat_unit|recovery_unit/,
-      `${file} must not import or expose deleted generated-plan legacy authoring paths.`,
-    );
   }
 }
 

@@ -90,7 +90,7 @@ async function runValidation() {
     await proveWorkoutLogDeletionLifecycle(owner.id, fixtures.elapsedOnly);
     await proveHistoricalFormulaVersionReadback(owner.id, initial);
     await proveImmutableRpeLifecycle(owner.id, fixtures.unplanned, initial.snapshotId);
-    await proveAmbiguousWorkoutLink(owner.id, fixtures.completed, fixtures.planCycleId);
+    await proveDuplicateWorkoutLinkRejected(owner.id, fixtures.completed, fixtures.planCycleId);
     await proveRpeActivityRevisionReattribution(owner.id, fixtures.completed);
     await proveOfficialResultLifecycle(owner.id, fixtures.planned60Observed38);
     await proveRawRemovalAndRevisionInvalidation(owner.id, fixtures.half);
@@ -563,7 +563,7 @@ async function proveImmutableRpeLifecycle(
   await assert.rejects(stale, /stale/i);
 }
 
-async function proveAmbiguousWorkoutLink(
+async function proveDuplicateWorkoutLinkRejected(
   userId: string,
   completed: Gate4SyntheticActivity & { plannedWorkoutId: string },
   planCycleId: string,
@@ -577,31 +577,34 @@ async function proveAmbiguousWorkoutLink(
     elapsedDurationMin: 27,
     distanceKm: 3.5,
   });
-  await createRunnerActivityPlannedWorkoutMatch({
-    userId,
-    activityId: duplicate.receipt.activityId,
-    sourceRevisionId: duplicate.receipt.sourceRevisionId,
-    plannedWorkoutId: completed.plannedWorkoutId,
-  });
-  const ambiguous = requireCurrent(
-    await getRunnerActivityProgressForUser({ userId, asOfDate: AS_OF_DATE }),
+  await assert.rejects(
+    createRunnerActivityPlannedWorkoutMatch({
+      userId,
+      activityId: duplicate.receipt.activityId,
+      sourceRevisionId: duplicate.receipt.sourceRevisionId,
+      plannedWorkoutId: completed.plannedWorkoutId,
+    }),
+    /duplicate key value violates unique constraint/,
   );
-  assert.ok(
-    ambiguous.sessionRpeLoad.rolling28Day.current.metric.unavailableReasons.includes(
-      "activity_rpe_link_ambiguous",
-    ),
-  );
+  const matches = await supabase
+    .from("runner_activity_planned_workout_matches")
+    .select("activity_id")
+    .eq("user_id", userId)
+    .eq("planned_workout_id", completed.plannedWorkoutId);
+  if (matches.error) throw new Error(matches.error.message);
+  assert.deepEqual(matches.data, [{ activity_id: completed.receipt.activityId }]);
 
-  await deleteRunnerActivityFromHistory({ userId, activityId: duplicate.receipt.activityId });
-  const restored = requireCurrent(
+  const unambiguous = requireCurrent(
     await getRunnerActivityProgressForUser({ userId, asOfDate: AS_OF_DATE }),
   );
   assert.equal(
-    restored.sessionRpeLoad.rolling28Day.current.metric.unavailableReasons.includes(
+    unambiguous.sessionRpeLoad.rolling28Day.current.metric.unavailableReasons.includes(
       "activity_rpe_link_ambiguous",
     ),
     false,
   );
+
+  await deleteRunnerActivityFromHistory({ userId, activityId: duplicate.receipt.activityId });
   const plan = await supabase
     .from("plan_cycles")
     .select("id")

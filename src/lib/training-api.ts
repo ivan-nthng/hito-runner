@@ -41,6 +41,7 @@ import {
   getPreviewSnapshot,
   inferWorkoutStatus,
   normalizeExecutableStepInstructions,
+  projectWorkoutCompletionLog,
   todayIso,
   type ActivePlanWorkoutEditingCapabilities,
   type ActivePlanWorkoutEditingCapability,
@@ -378,10 +379,8 @@ export async function getPersistedSnapshot(userId: string): Promise<TrainingSnap
   );
   const currentDate = todayIso();
   const persistedWorkoutIds = persistedWorkouts.map((workout) => workout.id);
-  const feedbackMarkerByWorkoutId = await getWorkoutFeedbackMarkerMapForUser(
-    userId,
-    persistedWorkoutIds,
-  );
+  const { feedbackMarkerByWorkoutId, fitCompletedWorkoutIds } =
+    await getWorkoutResultReadbackForUser(userId, persistedWorkoutIds);
   const evidenceWorkoutIds = await fetchManualWorkoutEvidenceWorkoutIds(
     userId,
     persistedWorkoutIds,
@@ -393,6 +392,7 @@ export async function getPersistedSnapshot(userId: string): Promise<TrainingSnap
       currentDate,
       planCycle.source_kind,
       feedbackMarkerByWorkoutId.get(workout.id) ?? null,
+      fitCompletedWorkoutIds.has(workout.id),
       resolveActivePlanWorkoutSourceEditingCapabilities({
         activePlan: planCycle,
         workout,
@@ -499,11 +499,15 @@ const getLatestWorkoutResultFeedbackForServer = createServerOnlyFn(
   },
 );
 
-async function getWorkoutFeedbackMarkerMapForUser(userId: string, plannedWorkoutIds: string[]) {
-  const { getWorkoutFeedbackMarkerMap } =
+async function getWorkoutResultReadbackForUser(userId: string, plannedWorkoutIds: string[]) {
+  const { getFitCompletedPlannedWorkoutIds, getWorkoutFeedbackMarkerMap } =
     await import("@/lib/workout-result-import/read-workout-result-feedback");
 
-  return getWorkoutFeedbackMarkerMap({ userId, plannedWorkoutIds });
+  const [feedbackMarkerByWorkoutId, fitCompletedWorkoutIds] = await Promise.all([
+    getWorkoutFeedbackMarkerMap({ userId, plannedWorkoutIds }),
+    getFitCompletedPlannedWorkoutIds({ userId, plannedWorkoutIds }),
+  ]);
+  return { feedbackMarkerByWorkoutId, fitCompletedWorkoutIds };
 }
 
 function dbWorkoutToView(
@@ -512,9 +516,10 @@ function dbWorkoutToView(
   currentDate: string,
   sourceKind: string | null,
   feedbackMarker: Workout["feedbackMarker"],
+  hasFitCompletion: boolean,
   sourceEditing: Workout["sourceEditing"],
 ): Workout {
-  const mappedLog = log ? logRowToView(log) : null;
+  const mappedLog = projectWorkoutCompletionLog(log ? logRowToView(log) : null, hasFitCompletion);
   const steps = normalizeExecutableStepInstructions(readWorkoutDocumentSections(workout.steps));
 
   return {
@@ -543,7 +548,13 @@ function dbWorkoutToView(
     feedbackMarker,
     sourceEditing,
     log: mappedLog,
-    status: inferWorkoutStatus(workout.workout_type, workout.workout_date, currentDate, mappedLog),
+    status: inferWorkoutStatus(
+      workout.workout_type,
+      workout.workout_date,
+      currentDate,
+      mappedLog,
+      hasFitCompletion,
+    ),
   };
 }
 

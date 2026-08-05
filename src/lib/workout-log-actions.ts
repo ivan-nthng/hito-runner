@@ -6,6 +6,7 @@ import {
   type BodyNote,
 } from "@/lib/body-notes";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
+import { getFitCompletedPlannedWorkoutIds } from "@/lib/workout-result-import/read-workout-result-feedback";
 
 const bodyNoteSchema = z
   .object({
@@ -88,6 +89,18 @@ export async function saveWorkoutLogForUser(userId: string, data: WorkoutLogInpu
     throw new Error("Rest days cannot be logged as completed workouts.");
   }
 
+  const fitCompletedWorkoutIds = await getFitCompletedPlannedWorkoutIds({
+    userId,
+    plannedWorkoutIds: [data.plannedWorkoutId],
+  });
+  const hasFitCompletion = fitCompletedWorkoutIds.has(data.plannedWorkoutId);
+
+  if (hasFitCompletion && data.outcome === "skipped") {
+    throw new Error(
+      "A matched Garmin activity cannot be saved as skipped. Delete the recorded activity first.",
+    );
+  }
+
   const upsertResult = await supabase
     .from("workout_logs")
     .upsert(
@@ -95,11 +108,11 @@ export async function saveWorkoutLogForUser(userId: string, data: WorkoutLogInpu
         planned_workout_id: data.plannedWorkoutId,
         user_id: userId,
         outcome: data.outcome,
-        actual_distance_km: data.actualDistanceKm,
-        actual_duration_min: data.actualDurationMin,
+        actual_distance_km: hasFitCompletion ? null : data.actualDistanceKm,
+        actual_duration_min: hasFitCompletion ? null : data.actualDurationMin,
         rpe: data.rpe,
         notes: data.notes,
-        intervals_completed: data.intervalsCompleted,
+        intervals_completed: hasFitCompletion ? null : data.intervalsCompleted,
         body_notes: data.bodyNotes,
       },
       { onConflict: "planned_workout_id" },

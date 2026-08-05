@@ -3,6 +3,13 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { crc32, deflateRawSync } from "node:zlib";
 import { deleteRunnerActivityFromHistory } from "../src/lib/runner-activity/garmin-fit-source";
+import { getPersistedSnapshot } from "../src/lib/training-api";
+import {
+  inferWorkoutStatus,
+  projectWorkoutCompletionLog,
+  type WorkoutLog,
+} from "../src/lib/training";
+import { saveWorkoutLogForUser, workoutLogInputSchema } from "../src/lib/workout-log-actions";
 import {
   ingestGarminWorkoutResult,
   removeWorkoutResultEvidence,
@@ -10,6 +17,7 @@ import {
 } from "../src/lib/workout-result-import/ingest-garmin-result";
 import { WORKOUT_COMPARISON_FORMULA_VERSION } from "../src/lib/workout-result-import/comparison-payload";
 import { parseGarminFitActivity } from "../src/lib/workout-result-import/parse-garmin-fit";
+import { getLatestWorkoutResultFeedback } from "../src/lib/workout-result-import/read-workout-result-feedback";
 import {
   MAX_WORKOUT_RESULT_MULTIPART_BYTES,
   MAX_WORKOUT_RESULT_UPLOAD_BYTES,
@@ -37,6 +45,7 @@ async function main() {
 }
 
 async function runValidation() {
+  provePlannedWorkoutCompletionProjectionContract();
   const plannedUser = await ensureUser("provider-engine");
   const unplannedUser = await ensureUser("baseline-no-plan");
   await resetQaUsers([plannedUser.id, unplannedUser.id]);
@@ -71,6 +80,67 @@ async function runValidation() {
   await assertWorkoutResultStorageEmpty(unplannedUser.id);
   await assertLegacyBackfillRetirementComplete();
   console.log("Runner activity foundation contract passed.");
+}
+
+function provePlannedWorkoutCompletionProjectionContract() {
+  const savedSkipped = workoutLog("skipped");
+  const savedCompleted = workoutLog("completed");
+  const savedPartial = workoutLog("partial");
+
+  assert.equal(inferWorkoutStatus("easy", "2026-07-30", "2026-08-05", null), "skipped");
+  assert.equal(
+    projectWorkoutCompletionLog(null, false),
+    null,
+    "No FIT and no manual result must remain a non-persisted calendar default.",
+  );
+  assert.equal(projectWorkoutCompletionLog(savedSkipped, false)?.outcome, "skipped");
+  assert.equal(projectWorkoutCompletionLog(savedCompleted, false)?.outcome, "completed");
+  assert.equal(projectWorkoutCompletionLog(savedPartial, false)?.outcome, "partial");
+
+  const fitOnly = projectWorkoutCompletionLog(null, true);
+  assert.equal(fitOnly, null, "FIT evidence must not synthesize a manual workout log.");
+  assert.equal(inferWorkoutStatus("easy", "2026-07-30", "2026-08-05", fitOnly, true), "completed");
+
+  const fitOverSkipped = projectWorkoutCompletionLog(savedSkipped, true);
+  assert.equal(fitOverSkipped?.outcome, "completed");
+  assert.equal(fitOverSkipped?.notes, savedSkipped.notes);
+  assert.deepEqual(fitOverSkipped?.bodyNotes, savedSkipped.bodyNotes);
+
+  const explicitPartial = projectWorkoutCompletionLog(savedPartial, true);
+  assert.equal(explicitPartial?.outcome, "partial");
+  assert.equal(explicitPartial?.rpe, savedPartial.rpe);
+  assert.equal(explicitPartial?.actualDistanceKm, null);
+  assert.equal(explicitPartial?.actualDurationMin, null);
+  assert.equal(explicitPartial?.intervalsCompleted, null);
+  assert.equal(
+    inferWorkoutStatus("easy", "2026-07-30", "2026-08-05", explicitPartial, true),
+    "partial",
+  );
+
+  const incompleteEvidence = projectWorkoutCompletionLog(savedSkipped, false);
+  assert.equal(incompleteEvidence?.outcome, "skipped");
+}
+
+function workoutLog(outcome: WorkoutLog["outcome"]): WorkoutLog {
+  return {
+    id: "10000000-0000-4000-8000-000000000001",
+    outcome,
+    actualDistanceKm: 6.4,
+    actualDurationMin: 42,
+    rpe: 6,
+    notes: "Runner-authored context",
+    intervalsCompleted: 4,
+    bodyNotes: [
+      {
+        area: "L. Calf",
+        severity: 2,
+        timing: "during",
+        sensation: "Tight",
+        note: "Settled after the run",
+      },
+    ],
+    loggedAt: "2026-07-30T08:00:00.000Z",
+  };
 }
 
 async function proveZipExtractionBound(userId: string) {
@@ -260,6 +330,11 @@ async function proveProjectionRegressionDiscriminators(input: {
       run: () => proveProjectionSupersession(input.plannedUserId),
     },
     {
+      label: "reimport after raw removal refreshes current match provenance",
+      userId: input.plannedUserId,
+      run: () => proveSourceRevisionRematchAfterRawRemoval(input.plannedUserId),
+    },
+    {
       label: "ordinary intake and removal preserve unrelated legacy row and raw object",
       userId: input.unplannedUserId,
       run: () => proveOrdinaryIntakeDoesNotMutateLegacyProjection(input.unplannedUserId),
@@ -417,6 +492,59 @@ async function proveReusedUnplannedSourceProjection(userId: string) {
   assert.ok(sourceRevision.data.raw_storage_path);
 }
 
+async function proveSourceRevisionRematchAfterRawRemoval(userId: string) {
+  const fixture = await readFitFixture();
+  const [plannedWorkoutId] = await createProofWorkouts(userId);
+  const first = await ingestGarminWorkoutResult({
+    userId,
+    plannedWorkoutId,
+    file: new File([fixture], "source-revision-first.fit", {
+      type: "application/octet-stream",
+    }),
+  });
+  await removeWorkoutResultEvidence({ userId, plannedWorkoutId });
+
+  const reimported = await ingestGarminWorkoutResult({
+    userId,
+    plannedWorkoutId,
+    file: new File([fixture], "source-revision-reimport.fit", {
+      type: "application/octet-stream",
+    }),
+  });
+  assert.equal(reimported.runnerActivity.id, first.runnerActivity.id);
+  assert.notEqual(reimported.runnerActivity.revisionId, first.runnerActivity.revisionId);
+  assert.notEqual(
+    reimported.runnerActivity.sourceRevisionId,
+    first.runnerActivity.sourceRevisionId,
+  );
+  assert.notEqual(reimported.latestAsset?.id, first.latestAsset?.id);
+
+  const match = await supabase
+    .from("runner_activity_planned_workout_matches")
+    .select("activity_id, planned_workout_id, source_revision_id")
+    .eq("user_id", userId)
+    .eq("planned_workout_id", plannedWorkoutId);
+  if (match.error) throw new Error(match.error.message);
+  assert.equal(match.data.length, 1);
+  assert.equal(match.data[0]?.activity_id, reimported.runnerActivity.id);
+  assert.equal(match.data[0]?.source_revision_id, reimported.runnerActivity.sourceRevisionId);
+
+  const activeMetrics = await supabase
+    .from("workout_actual_metrics")
+    .select("id, activity_revision_id")
+    .eq("user_id", userId)
+    .eq("planned_workout_id", plannedWorkoutId)
+    .neq("status", "superseded");
+  if (activeMetrics.error) throw new Error(activeMetrics.error.message);
+  assert.deepEqual(activeMetrics.data, [
+    {
+      id: reimported.latestActualMetrics?.id,
+      activity_revision_id: reimported.runnerActivity.revisionId,
+    },
+  ]);
+  assert.equal((await readSnapshotWorkout(userId, plannedWorkoutId)).status, "completed");
+}
+
 function buildStoredZip(content: Buffer, fileName: string) {
   return buildZip(content, fileName, 0);
 }
@@ -488,6 +616,25 @@ async function proveProjectionSupersession(userId: string) {
     ["superseded", "normalized"],
   );
   assert.equal(metrics.data[1]?.id, second.latestActualMetrics?.id);
+
+  const duplicateActive = await supabase
+    .from("workout_actual_metrics")
+    .update({ status: "normalized" })
+    .eq("id", metrics.data[0]?.id ?? "");
+  assert.equal(duplicateActive.error?.code, "23505");
+
+  const matches = await supabase
+    .from("runner_activity_planned_workout_matches")
+    .select("activity_id, planned_workout_id")
+    .eq("user_id", userId)
+    .in("activity_id", [first.runnerActivity.id, second.runnerActivity.id]);
+  if (matches.error) throw new Error(matches.error.message);
+  assert.equal(matches.data.filter((row) => row.planned_workout_id === plannedWorkoutId).length, 1);
+  const duplicateMatch = await supabase
+    .from("runner_activity_planned_workout_matches")
+    .update({ planned_workout_id: plannedWorkoutId })
+    .eq("activity_id", first.runnerActivity.id);
+  assert.equal(duplicateMatch.error?.code, "23505");
 
   const firstActivity = await supabase
     .from("runner_activities")
@@ -620,6 +767,34 @@ async function proveProjectionFailureBoundaries(userId: string) {
       metricsId: repaired.latestActualMetrics.id,
       comparisonId: repaired.latestComparison.id,
     });
+
+    await assert.rejects(
+      ingestGarminWorkoutResult({
+        userId,
+        plannedWorkoutId,
+        file: new File([sourceFixture], `${failurePoint}-complete-retry-failure.fit`, {
+          type: "application/octet-stream",
+        }),
+        projectionFailurePointForQa: failurePoint,
+      }),
+    );
+    const preserved = await getLatestWorkoutResultFeedback({ userId, plannedWorkoutId });
+    assert.equal(preserved.latestAsset?.id, repaired.latestAsset.id);
+    assert.equal(preserved.latestAsset?.parseStatus, "parsed");
+    assert.equal(preserved.latestActualMetrics?.id, repaired.latestActualMetrics.id);
+    assert.equal(preserved.latestComparison?.id, repaired.latestComparison.id);
+    assert.equal((await readSnapshotWorkout(userId, plannedWorkoutId)).status, "completed");
+
+    const converged = await ingestGarminWorkoutResult({
+      userId,
+      plannedWorkoutId,
+      file: new File([sourceFixture], `${failurePoint}-complete-retry.fit`, {
+        type: "application/octet-stream",
+      }),
+    });
+    assert.equal(converged.latestAsset?.id, repaired.latestAsset.id);
+    assert.equal(converged.latestActualMetrics?.id, repaired.latestActualMetrics.id);
+    assert.equal(converged.latestComparison?.id, repaired.latestComparison.id);
   }
 }
 
@@ -822,7 +997,28 @@ async function proveDirectActivityTableReadDenied(input: {
 
 async function provePlannedProjectionLifecycle(userId: string) {
   const fixture = await readFitFixture();
-  const [firstWorkoutId, secondWorkoutId] = await createProofWorkouts(userId);
+  const [firstWorkoutId, secondWorkoutId, manualWorkoutId] = await createProofWorkouts(userId);
+  await proveNoFitManualCompletionLifecycle({ userId, plannedWorkoutId: manualWorkoutId });
+  await proveDirectWorkoutLogMutationDenied({ userId, plannedWorkoutId: manualWorkoutId });
+
+  const defaultSkipped = await readSnapshotWorkout(userId, firstWorkoutId);
+  assert.equal(defaultSkipped.status, "skipped");
+  assert.equal(defaultSkipped.log, null);
+  assert.equal(defaultSkipped.feedbackMarker, null);
+
+  await saveProofWorkoutLog({
+    userId,
+    plannedWorkoutId: firstWorkoutId,
+    outcome: "skipped",
+    notes: "Watch was unavailable before the late upload.",
+    bodyNotes: [proofBodyNote("L. Calf", "during")],
+  });
+  const savedSkipped = await readSnapshotWorkout(userId, firstWorkoutId);
+  assert.equal(savedSkipped.status, "skipped");
+  assert.equal(savedSkipped.log?.outcome, "skipped");
+  assert.equal(savedSkipped.log?.notes, "Watch was unavailable before the late upload.");
+  assert.deepEqual(savedSkipped.log?.bodyNotes, [proofBodyNote("L. Calf", "during")]);
+
   const first = await ingestGarminWorkoutResult({
     userId,
     plannedWorkoutId: firstWorkoutId,
@@ -833,6 +1029,22 @@ async function provePlannedProjectionLifecycle(userId: string) {
   assert.equal(first.latestAsset?.rawFileAvailable, true);
   assert.equal("storagePath" in (first.latestAsset ?? {}), false);
 
+  const fitCompleted = await readSnapshotWorkout(userId, firstWorkoutId);
+  assert.equal(fitCompleted.status, "completed");
+  assert.equal(fitCompleted.log?.outcome, "completed");
+  assert.equal(fitCompleted.log?.actualDistanceKm, null);
+  assert.equal(fitCompleted.log?.actualDurationMin, null);
+  assert.equal(fitCompleted.log?.intervalsCompleted, null);
+  assert.equal(fitCompleted.log?.notes, "Watch was unavailable before the late upload.");
+  assert.deepEqual(fitCompleted.log?.bodyNotes, [proofBodyNote("L. Calf", "during")]);
+  assert.equal(fitCompleted.feedbackMarker?.state, "feedback_ready");
+
+  await proveFeedbackMarkerAloneDoesNotComplete({
+    userId,
+    plannedWorkoutId: firstWorkoutId,
+    comparisonId: first.latestComparison?.id ?? "",
+  });
+
   const duplicate = await ingestGarminWorkoutResult({
     userId,
     plannedWorkoutId: firstWorkoutId,
@@ -842,6 +1054,54 @@ async function provePlannedProjectionLifecycle(userId: string) {
   const countsAfterDuplicate = await getQaUserOwnedCounts(supabase, userId);
   assert.equal(countsAfterDuplicate.runner_activities, 1);
   assert.equal(countsAfterDuplicate.workout_actual_metrics, 1);
+
+  const completedAfterRetry = await readSnapshotWorkout(userId, firstWorkoutId);
+  assert.equal(completedAfterRetry.status, "completed");
+  assert.equal(completedAfterRetry.feedbackMarker?.state, "feedback_ready");
+
+  await assert.rejects(
+    saveProofWorkoutLog({
+      userId,
+      plannedWorkoutId: firstWorkoutId,
+      outcome: "skipped",
+      notes: "Contradictory skipped attempt",
+    }),
+    /matched Garmin activity cannot be saved as skipped/,
+  );
+
+  await saveProofWorkoutLog({
+    userId,
+    plannedWorkoutId: firstWorkoutId,
+    outcome: "partial",
+    actualDistanceKm: 99,
+    actualDurationMin: 999,
+    intervalsCompleted: 99,
+    rpe: 8,
+    notes: "Stopped the planned session early.",
+    bodyNotes: [proofBodyNote("R. Knee", "after")],
+  });
+  const persistedPartial = await supabase
+    .from("workout_logs")
+    .select(
+      "outcome, actual_distance_km, actual_duration_min, intervals_completed, rpe, notes, body_notes",
+    )
+    .eq("planned_workout_id", firstWorkoutId)
+    .single();
+  if (persistedPartial.error) throw new Error(persistedPartial.error.message);
+  assert.equal(persistedPartial.data.outcome, "partial");
+  assert.equal(persistedPartial.data.actual_distance_km, null);
+  assert.equal(persistedPartial.data.actual_duration_min, null);
+  assert.equal(persistedPartial.data.intervals_completed, null);
+  assert.equal(persistedPartial.data.rpe, 8);
+  assert.equal(persistedPartial.data.notes, "Stopped the planned session early.");
+  assert.deepEqual(persistedPartial.data.body_notes, [proofBodyNote("R. Knee", "after")]);
+
+  const explicitPartial = await readSnapshotWorkout(userId, firstWorkoutId);
+  assert.equal(explicitPartial.status, "partial");
+  assert.equal(explicitPartial.log?.outcome, "partial");
+  assert.equal(explicitPartial.log?.rpe, 8);
+  assert.equal(explicitPartial.log?.actualDistanceKm, null);
+  assert.equal(explicitPartial.feedbackMarker?.state, "feedback_ready");
 
   await assert.rejects(
     ingestGarminWorkoutResult({
@@ -861,6 +1121,9 @@ async function provePlannedProjectionLifecycle(userId: string) {
   assert.equal(removed.latestAsset?.reprocessingAvailable, false);
   assert.equal(removed.latestActualMetrics?.id, first.latestActualMetrics?.id);
   assert.equal(removed.latestComparison?.id, first.latestComparison?.id);
+  const afterRawRemoval = await readSnapshotWorkout(userId, firstWorkoutId);
+  assert.equal(afterRawRemoval.status, "partial");
+  assert.equal(afterRawRemoval.feedbackMarker?.state, "feedback_ready");
   const comparisonVersion = await supabase
     .from("workout_comparisons")
     .select("comparison_formula_version")
@@ -908,6 +1171,145 @@ async function provePlannedProjectionLifecycle(userId: string) {
     rawStates.data?.map((row) => row.raw_state),
     ["removed"],
   );
+
+  await deleteRunnerActivityFromHistory({ userId, activityId: first.runnerActivity.id });
+  const afterActivityDeletion = await readSnapshotWorkout(userId, firstWorkoutId);
+  assert.equal(afterActivityDeletion.status, "partial");
+  assert.equal(afterActivityDeletion.log?.outcome, "partial");
+  assert.equal(afterActivityDeletion.feedbackMarker, null);
+}
+
+async function proveNoFitManualCompletionLifecycle(input: {
+  userId: string;
+  plannedWorkoutId: string;
+}) {
+  const cases = [
+    { outcome: "completed" as const, expectedRpe: 5 },
+    { outcome: "partial" as const, expectedRpe: 7 },
+    { outcome: "skipped" as const, expectedRpe: null },
+  ];
+
+  for (const entry of cases) {
+    await saveProofWorkoutLog({
+      ...input,
+      outcome: entry.outcome,
+      actualDistanceKm: 5.5,
+      actualDurationMin: 35,
+      intervalsCompleted: 3,
+      rpe: entry.expectedRpe ?? 7,
+      notes: `Manual ${entry.outcome} context`,
+    });
+    const workout = await readSnapshotWorkout(input.userId, input.plannedWorkoutId);
+    assert.equal(workout.status, entry.outcome);
+    assert.equal(workout.log?.outcome, entry.outcome);
+    assert.equal(workout.log?.rpe, entry.expectedRpe);
+    assert.equal(workout.feedbackMarker, null);
+  }
+}
+
+async function proveDirectWorkoutLogMutationDenied(input: {
+  userId: string;
+  plannedWorkoutId: string;
+}) {
+  const client = await signedInClient("provider-engine");
+  const update = await client
+    .from("workout_logs")
+    .update({ notes: "Direct Data API bypass" })
+    .eq("user_id", input.userId)
+    .eq("planned_workout_id", input.plannedWorkoutId);
+  await client.auth.signOut();
+  assert.equal(update.error?.code, "42501");
+}
+
+async function proveFeedbackMarkerAloneDoesNotComplete(input: {
+  userId: string;
+  plannedWorkoutId: string;
+  comparisonId: string;
+}) {
+  const comparison = await supabase
+    .from("workout_comparisons")
+    .select("difference_payload")
+    .eq("id", input.comparisonId)
+    .eq("user_id", input.userId)
+    .single();
+  if (comparison.error) throw new Error(comparison.error.message);
+
+  const originalPayload = comparison.data.difference_payload;
+  const nonRunningPayload = structuredClone(originalPayload) as {
+    actualMetrics: { activityType: string | null };
+    signals: Array<{ key: string; status: string; actualValue: string | null; reason?: string }>;
+  };
+  const activityType = nonRunningPayload.signals.find((signal) => signal.key === "activity_type");
+  assert.ok(activityType);
+  activityType.status = "mismatch";
+  activityType.actualValue = "cycling";
+  activityType.reason = "The provider activity is not a running activity.";
+  nonRunningPayload.actualMetrics.activityType = "cycling";
+
+  const markNonRunning = await supabase
+    .from("workout_comparisons")
+    .update({ difference_payload: nonRunningPayload })
+    .eq("id", input.comparisonId)
+    .eq("user_id", input.userId);
+  if (markNonRunning.error) throw new Error(markNonRunning.error.message);
+
+  const nonRunning = await readSnapshotWorkout(input.userId, input.plannedWorkoutId);
+  assert.equal(nonRunning.feedbackMarker?.state, "feedback_ready");
+  assert.equal(nonRunning.status, "skipped");
+  assert.equal(nonRunning.log?.outcome, "skipped");
+
+  const restore = await supabase
+    .from("workout_comparisons")
+    .update({ difference_payload: originalPayload })
+    .eq("id", input.comparisonId)
+    .eq("user_id", input.userId);
+  if (restore.error) throw new Error(restore.error.message);
+
+  const restored = await readSnapshotWorkout(input.userId, input.plannedWorkoutId);
+  assert.equal(restored.status, "completed");
+}
+
+async function readSnapshotWorkout(userId: string, plannedWorkoutId: string) {
+  const snapshot = await getPersistedSnapshot(userId);
+  const workout = snapshot.workouts.find((candidate) => candidate.id === plannedWorkoutId);
+  assert.ok(workout, `Snapshot must include planned workout ${plannedWorkoutId}.`);
+  return workout;
+}
+
+async function saveProofWorkoutLog(input: {
+  userId: string;
+  plannedWorkoutId: string;
+  outcome: "completed" | "partial" | "skipped";
+  actualDistanceKm?: number | null;
+  actualDurationMin?: number | null;
+  intervalsCompleted?: number | null;
+  rpe?: number | null;
+  notes?: string | null;
+  bodyNotes?: Array<ReturnType<typeof proofBodyNote>>;
+}) {
+  return saveWorkoutLogForUser(
+    input.userId,
+    workoutLogInputSchema.parse({
+      plannedWorkoutId: input.plannedWorkoutId,
+      outcome: input.outcome,
+      actualDistanceKm: input.actualDistanceKm ?? null,
+      actualDurationMin: input.actualDurationMin ?? null,
+      intervalsCompleted: input.intervalsCompleted ?? null,
+      rpe: input.rpe ?? null,
+      notes: input.notes ?? null,
+      bodyNotes: input.bodyNotes ?? [],
+    }),
+  );
+}
+
+function proofBodyNote(area: "L. Calf" | "R. Knee", timing: "during" | "after") {
+  return {
+    area,
+    severity: 2 as const,
+    timing,
+    sensation: "Tight" as const,
+    note: "Runner-authored body context",
+  };
 }
 
 async function createProofWorkouts(userId: string): Promise<[string, string, string]> {
@@ -915,6 +1317,10 @@ async function createProofWorkouts(userId: string): Promise<[string, string, str
   const firstWorkoutId = randomUUID();
   const secondWorkoutId = randomUUID();
   const thirdWorkoutId = randomUUID();
+  const profile = await supabase
+    .from("runner_profiles")
+    .upsert({ user_id: userId }, { onConflict: "user_id" });
+  if (profile.error) throw new Error(profile.error.message);
   const plan = await supabase.from("plan_cycles").insert({
     id: planCycleId,
     user_id: userId,

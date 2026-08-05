@@ -52,6 +52,7 @@ import { DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE } from "../../src/lib/local-auth-accou
 import type { Database, Json } from "../../src/lib/supabase/database";
 import { createAdminSupabaseClient } from "../../src/lib/supabase/server";
 import { addDaysIso, todayIso, weekdayLong } from "../../src/lib/training";
+import { getPersistedSnapshot } from "../../src/lib/training-api";
 import { buildReviewedAiGeneratedRunningPlanPreview } from "../../src/lib/running-plan-engine-actions";
 import { buildRunningPlanCanonicalPlan } from "../../src/lib/running-plan-engine-review";
 import {
@@ -1171,6 +1172,14 @@ async function validateReplacementCarryForwardPersistence(input: {
     assert.equal(insights.data?.[0]?.planned_workout_id, carriedWorkout.id);
     assert.equal(plans.data?.filter((plan) => plan.status === "active").length, 1);
     assert.equal(plans.data?.filter((plan) => plan.status === "archived").length, 1);
+
+    const replacementSnapshot = await getPersistedSnapshot(disposableUser.userId);
+    const carriedWorkoutReadback = replacementSnapshot.workouts.find(
+      (workout) => workout.id === carriedWorkout.id,
+    );
+    assert.equal(carriedWorkoutReadback?.status, "completed");
+    assert.equal(carriedWorkoutReadback?.log?.outcome, "completed");
+    assert.equal(carriedWorkoutReadback?.feedbackMarker?.state, "feedback_ready");
 
     return {
       activePlanId: after.plan.id,

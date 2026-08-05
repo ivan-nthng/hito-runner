@@ -1451,12 +1451,33 @@ export function inferWorkoutStatus(
   date: string,
   currentDate: string,
   log: WorkoutLog | null,
+  hasFitCompletion = false,
 ): Status {
   if (type === "rest") return "rest";
+  if (hasFitCompletion) {
+    return log?.outcome === "partial" ? "partial" : "completed";
+  }
   if (log) return log.outcome;
   if (date > currentDate) return "upcoming";
   if (date === currentDate) return "today";
   return "skipped";
+}
+
+export function projectWorkoutCompletionLog(
+  log: WorkoutLog | null,
+  hasFitCompletion: boolean,
+): WorkoutLog | null {
+  if (!log || !hasFitCompletion) {
+    return log;
+  }
+
+  return {
+    ...log,
+    outcome: log.outcome === "partial" ? "partial" : "completed",
+    actualDistanceKm: null,
+    actualDurationMin: null,
+    intervalsCompleted: null,
+  };
 }
 
 export function addDaysIso(iso: string, days: number) {

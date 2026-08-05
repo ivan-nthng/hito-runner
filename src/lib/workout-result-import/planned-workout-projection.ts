@@ -4,14 +4,16 @@ import type { Database, Json } from "@/lib/supabase/database";
 import { isLoopbackRuntimeUrl } from "@/lib/supabase/env";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import {
-  createRunnerActivityPlannedWorkoutMatch,
   findRunnerActivityPlanMatch,
   type RunnerActivityProjection,
   type RunnerActivitySourceReceipt,
 } from "@/lib/runner-activity/garmin-fit-source";
 import { buildDeterministicWorkoutComparison } from "@/lib/workout-result-import/compare-workout-result";
 import { WORKOUT_COMPARISON_FORMULA_VERSION } from "@/lib/workout-result-import/comparison-payload";
-import { getLatestWorkoutResultFeedback } from "@/lib/workout-result-import/read-workout-result-feedback";
+import {
+  getFitCompletedPlannedWorkoutIds,
+  getLatestWorkoutResultFeedback,
+} from "@/lib/workout-result-import/read-workout-result-feedback";
 import {
   type ExtractedGarminFitFile,
   WORKOUT_RESULT_STORAGE_BUCKET,
@@ -73,6 +75,8 @@ export async function reconcileWorkoutResultProjection(input: {
     const existingTargetAsset = (linkedAssets.data ?? []).find(
       (asset) => asset.planned_workout_id === plannedWorkoutId,
     );
+    const reuseExistingTargetAsset =
+      input.activitySource.reusedExactSource && existingTargetAsset ? existingTargetAsset : null;
 
     if (input.activitySource.reusedExactSource && input.plannedWorkout && existingTargetAsset) {
       const activeMetrics = await supabase
@@ -116,7 +120,7 @@ export async function reconcileWorkoutResultProjection(input: {
 
     let projectionAssetId = input.candidateAssetId;
 
-    if (existingTargetAsset) {
+    if (reuseExistingTargetAsset) {
       injectProjectionFailure(input.failurePointForQa, "candidate_cleanup");
       await discardCandidateUpload({
         userId: input.userId,
@@ -124,7 +128,7 @@ export async function reconcileWorkoutResultProjection(input: {
         storagePath: input.candidateStoragePath,
       });
       failureAssetId = null;
-      projectionAssetId = existingTargetAsset.id;
+      projectionAssetId = reuseExistingTargetAsset.id;
     }
 
     const assetUpdate = await supabase
@@ -133,7 +137,8 @@ export async function reconcileWorkoutResultProjection(input: {
         planned_workout_id: plannedWorkoutId,
         workout_log_id: input.workoutLogId,
         activity_source_revision_id: input.activitySource.sourceRevisionId,
-        parse_status: input.initialParseStatus,
+        parse_status:
+          reuseExistingTargetAsset?.parse_status === "parsed" ? "parsed" : input.initialParseStatus,
         primary_file_kind: input.primaryFile.primaryFileKind,
         primary_file_name: input.primaryFile.primaryFileName,
         parse_error: null,
@@ -185,12 +190,6 @@ export async function reconcileWorkoutResultProjection(input: {
       return null;
     }
 
-    await createRunnerActivityPlannedWorkoutMatch({
-      userId: input.userId,
-      activityId: input.activitySource.activityId,
-      sourceRevisionId: input.activitySource.sourceRevisionId,
-      plannedWorkoutId: input.plannedWorkout.id,
-    });
     injectProjectionFailure(input.failurePointForQa, "match");
 
     const metrics = await reconcileWorkoutActualMetrics({
@@ -209,59 +208,51 @@ export async function reconcileWorkoutResultProjection(input: {
     });
     injectProjectionFailure(input.failurePointForQa, "comparison");
 
-    const supersedeExisting = await supabase
-      .from("workout_actual_metrics")
-      .update({ status: "superseded" })
-      .eq("user_id", input.userId)
-      .eq("planned_workout_id", input.plannedWorkout.id)
-      .neq("id", metrics.id)
-      .neq("status", "superseded");
-    if (supersedeExisting.error) {
-      throw new WorkoutResultImportError(
-        "persistence_failed",
-        supersedeExisting.error.message,
-        500,
-      );
-    }
     injectProjectionFailure(input.failurePointForQa, "supersession");
 
-    const parsedAsset = await markProjectionAssetParsed({
-      userId: input.userId,
-      assetId: projectionAsset.id,
-    });
-    const persistedReadback = await getLatestWorkoutResultFeedback({
+    await finalizeWorkoutResultProjection({
       userId: input.userId,
       plannedWorkoutId: input.plannedWorkout.id,
+      activitySource: input.activitySource,
+      assetId: projectionAsset.id,
+      metricsId: metrics.id,
+      comparisonId: comparison.id,
     });
-    const persistedMatch = await findRunnerActivityPlanMatch({
-      userId: input.userId,
-      activityId: input.activitySource.activityId,
-    });
+    const [persistedReadback, persistedMatch, fitCompletedWorkoutIds] = await Promise.all([
+      getLatestWorkoutResultFeedback({
+        userId: input.userId,
+        plannedWorkoutId: input.plannedWorkout.id,
+      }),
+      findRunnerActivityPlanMatch({
+        userId: input.userId,
+        activityId: input.activitySource.activityId,
+      }),
+      getFitCompletedPlannedWorkoutIds({
+        userId: input.userId,
+        plannedWorkoutIds: [input.plannedWorkout.id],
+      }),
+    ]);
 
     if (
-      parsedAsset.activity_source_revision_id !== input.activitySource.sourceRevisionId ||
       persistedReadback.marker?.state !== "feedback_ready" ||
       persistedReadback.latestAsset?.id !== projectionAsset.id ||
       persistedReadback.latestActualMetrics?.id !== metrics.id ||
       persistedReadback.latestComparison?.id !== comparison.id ||
-      persistedMatch !== input.plannedWorkout.id
+      persistedMatch !== input.plannedWorkout.id ||
+      !fitCompletedWorkoutIds.has(input.plannedWorkout.id)
     ) {
       throw incompleteProjectionError();
     }
 
     return persistedReadback;
   } catch (error) {
-    if (failureAssetId) {
+    if (failureAssetId && failureAssetIsCandidate) {
       await supabase
         .from("workout_result_assets")
         .update({
-          ...(failureAssetIsCandidate
-            ? {
-                planned_workout_id: null,
-                workout_log_id: null,
-                activity_source_revision_id: null,
-              }
-            : {}),
+          planned_workout_id: null,
+          workout_log_id: null,
+          activity_source_revision_id: null,
           parse_status: "failed",
           parse_error: "Workout result projection is incomplete and can be retried.",
         })
@@ -343,6 +334,7 @@ async function reconcileWorkoutActualMetrics(input: {
     throw new WorkoutResultImportError("persistence_failed", existingByAsset.error.message, 500);
   }
 
+  const existing = existingByRevision.data ?? existingByAsset?.data ?? null;
   const values = {
     activity_id: input.activitySource.activityId,
     activity_revision_id: input.activitySource.activityRevisionId,
@@ -351,7 +343,7 @@ async function reconcileWorkoutActualMetrics(input: {
     workout_log_id: input.workoutLogId,
     result_asset_id: input.assetId,
     source_kind: "garmin_fit",
-    status: "normalized",
+    status: existing && existing.status !== "superseded" ? existing.status : "superseded",
     activity_started_at: input.activityProjection.activityStartedAt,
     activity_local_date: input.activityProjection.activityLocalDate,
     actual_duration_min: input.activityProjection.totalDurationMin,
@@ -369,7 +361,6 @@ async function reconcileWorkoutActualMetrics(input: {
     lap_payload: input.activityProjection.lapPayload,
     summary_payload: input.activityProjection.summaryPayload,
   };
-  const existing = existingByRevision.data ?? existingByAsset?.data ?? null;
   const result = existing
     ? await supabase
         .from("workout_actual_metrics")
@@ -383,6 +374,32 @@ async function reconcileWorkoutActualMetrics(input: {
     throw new WorkoutResultImportError("persistence_failed", result.error.message, 500);
   }
   return result.data;
+}
+
+async function finalizeWorkoutResultProjection(input: {
+  userId: string;
+  plannedWorkoutId: string;
+  activitySource: RunnerActivitySourceReceipt;
+  assetId: string;
+  metricsId: string;
+  comparisonId: string;
+}) {
+  const result = await createAdminSupabaseClient().rpc(
+    "finalize_runner_activity_planned_workout_projection",
+    {
+      p_user_id: input.userId,
+      p_planned_workout_id: input.plannedWorkoutId,
+      p_activity_id: input.activitySource.activityId,
+      p_activity_revision_id: input.activitySource.activityRevisionId,
+      p_source_revision_id: input.activitySource.sourceRevisionId,
+      p_asset_id: input.assetId,
+      p_metrics_id: input.metricsId,
+      p_comparison_id: input.comparisonId,
+    },
+  );
+  if (result.error) {
+    throw new WorkoutResultImportError("persistence_failed", result.error.message, 500);
+  }
 }
 
 async function reconcileWorkoutComparison(input: {

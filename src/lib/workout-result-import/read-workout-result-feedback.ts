@@ -126,6 +126,25 @@ function rawStateFromDatabase(value: string | undefined) {
   return value === "available" || value === "removal_pending" || value === "removed" ? value : null;
 }
 
+export async function getFitCompletedPlannedWorkoutIds(input: {
+  userId: string;
+  plannedWorkoutIds: string[];
+}) {
+  const uniqueWorkoutIds = Array.from(new Set(input.plannedWorkoutIds.filter(Boolean)));
+  if (uniqueWorkoutIds.length === 0) return new Set<string>();
+
+  const result = await createAdminSupabaseClient().rpc(
+    "list_runner_fit_completed_planned_workouts",
+    {
+      p_user_id: input.userId,
+      p_planned_workout_ids: uniqueWorkoutIds,
+    },
+  );
+  if (result.error) throw new Error(result.error.message);
+
+  return new Set((result.data ?? []).map((row) => row.planned_workout_id));
+}
+
 export async function getWorkoutFeedbackMarkerMap(input: {
   userId: string;
   plannedWorkoutIds: string[];

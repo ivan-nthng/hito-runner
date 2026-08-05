@@ -164,6 +164,7 @@ export async function findRunnerActivityPlanMatch(input: { userId: string; activ
   return result.data?.planned_workout_id ?? null;
 }
 
+/** Maintained fixture seam for canonical activity evidence that has no FIT projection. */
 export async function createRunnerActivityPlannedWorkoutMatch(input: {
   userId: string;
   activityId: string;
@@ -179,8 +180,10 @@ export async function createRunnerActivityPlannedWorkoutMatch(input: {
     .limit(1)
     .maybeSingle();
   if (existing.error) throw new Error(existing.error.message);
-  if (existing.data?.planned_workout_id === input.plannedWorkoutId) return;
-  if (existing.data?.planned_workout_id) {
+  if (
+    existing.data?.planned_workout_id &&
+    existing.data.planned_workout_id !== input.plannedWorkoutId
+  ) {
     throw new Error("A runner activity cannot be attached to more than one planned workout.");
   }
 

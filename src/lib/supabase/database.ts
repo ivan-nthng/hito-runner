@@ -1332,6 +1332,19 @@ export type Database = {
         };
         Returns: Json;
       };
+      finalize_runner_activity_planned_workout_projection: {
+        Args: {
+          p_activity_id: string;
+          p_activity_revision_id: string;
+          p_asset_id: string;
+          p_comparison_id: string;
+          p_metrics_id: string;
+          p_planned_workout_id: string;
+          p_source_revision_id: string;
+          p_user_id: string;
+        };
+        Returns: undefined;
+      };
       persist_runner_activity_garmin_source: {
         Args: {
           p_activity_revision: Json;
@@ -1373,6 +1386,15 @@ export type Database = {
           sport: string;
           started_at: string | null;
           timer_duration_min: number | null;
+        }[];
+      };
+      list_runner_fit_completed_planned_workouts: {
+        Args: {
+          p_planned_workout_ids: string[];
+          p_user_id: string;
+        };
+        Returns: {
+          planned_workout_id: string;
         }[];
       };
       append_runner_activity_evidence_revision: {

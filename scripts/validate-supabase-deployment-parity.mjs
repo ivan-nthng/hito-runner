@@ -10,14 +10,29 @@ const REQUIRED_MIGRATION_HISTORY_RPC = "list_hito_applied_migration_versions";
 const args = new Set(process.argv.slice(2));
 const vercelBuild = args.has("--vercel-build");
 const checkLinkedMigrations = args.has("--linked");
-const checkApiSchema = args.has("--api") || (vercelBuild && process.env.VERCEL === "1");
+const vercelBuildRuntime = vercelBuild && process.env.VERCEL === "1";
+const localVercelCliBuild =
+  vercelBuildRuntime &&
+  !process.env.VERCEL_DEPLOYMENT_ID &&
+  !process.env.VERCEL_URL &&
+  !process.env.VERCEL_GIT_COMMIT_SHA &&
+  process.env.CI !== "1";
+const remoteVercelDeployment =
+  vercelBuildRuntime && /^dpl_[A-Za-z0-9]+$/.test(process.env.VERCEL_DEPLOYMENT_ID?.trim() ?? "");
+const checkApiSchema = args.has("--api") || remoteVercelDeployment;
+
+if (vercelBuildRuntime && !localVercelCliBuild && !remoteVercelDeployment) {
+  throw new Error(
+    "Vercel build context is ambiguous; refusing to downgrade the server schema check.",
+  );
+}
 
 if (vercelBuild && process.env.VERCEL !== "1") {
   console.warn("[supabase-deployment-parity] Skipped outside Vercel build runtime.");
   process.exit(0);
 }
 
-if (!checkLinkedMigrations && !checkApiSchema) {
+if (!checkLinkedMigrations && !checkApiSchema && !localVercelCliBuild) {
   throw new Error("Pass --linked, --api, or --vercel-build to select a parity check.");
 }
 
@@ -42,7 +57,18 @@ if (checkApiSchema) {
   }
 
   assertHostedUrl(configuredUrl);
-  result.api = await validateApiSchema(configuredUrl, { requireServerKey: vercelBuild });
+  result.api = await validateApiSchema(configuredUrl, {
+    requireServerKey: remoteVercelDeployment,
+  });
+} else if (localVercelCliBuild) {
+  if (!configuredUrl) {
+    throw new Error("NEXT_PUBLIC_SUPABASE_URL is required for the local Vercel build check.");
+  }
+  assertHostedUrl(configuredUrl);
+  result.api = {
+    access: "remote-server-check-required",
+    endpoint: "validated",
+  };
 }
 
 console.log(JSON.stringify({ ok: true, projectRef: expectedProjectRef, ...result }, null, 2));
@@ -110,8 +136,12 @@ function validateLinkedMigrations(expectedRef) {
 
 async function validateApiSchema(url, options) {
   const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
-  const serverKey = process.env.SUPABASE_SECRET_KEY?.trim();
-  const bearerToken = process.env.HITO_SUPABASE_SCHEMA_BEARER_TOKEN?.trim() || serverKey;
+  // The CLI cannot materialize sensitive values locally. Only a real Vercel
+  // deployment may exercise the server-visible OpenAPI and migration checks.
+  const serverKey = options.requireServerKey ? process.env.SUPABASE_SECRET_KEY?.trim() : null;
+  const bearerToken = options.requireServerKey
+    ? process.env.HITO_SUPABASE_SCHEMA_BEARER_TOKEN?.trim() || serverKey
+    : null;
   const apiKey = serverKey || publishableKey;
   if (!apiKey) {
     throw new Error("The API-visible schema check requires a Supabase API key.");

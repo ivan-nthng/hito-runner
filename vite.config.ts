@@ -1,6 +1,9 @@
-// Keep the Lovable wrapper for local dev defaults, but disable its Cloudflare build plugin.
 // Nitro is the canonical deployment adapter for Vercel-backed TanStack Start builds.
-import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { defineConfig } from "vite";
+import tailwindcss from "@tailwindcss/vite";
+import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import react from "@vitejs/plugin-react";
+import tsconfigPaths from "vite-tsconfig-paths";
 import { nitro } from "nitro/vite";
 import type { PluginOption } from "vite";
 import { cpSync, existsSync, mkdirSync } from "node:fs";
@@ -136,19 +139,51 @@ function snapshotClientPublicOutput(): void {
 }
 
 export default defineConfig({
-  cloudflare: false,
   plugins: [
+    tailwindcss(),
+    tsconfigPaths({ projects: ["./tsconfig.json"] }),
+    tanstackStart({
+      importProtection: {
+        behavior: "error",
+        client: {
+          files: ["**/server/**"],
+          specifiers: ["server-only"],
+        },
+      },
+    }),
+    react(),
     hitoNitroPublicAssetsVirtualRestore(),
     ...nitro(),
     hitoNitroServiceOutputLifecycle(),
     hitoNitroPublicAssetsRestore(),
   ],
-  vite: {
-    cacheDir: useLocalGeneratedBuildRoot ? qaRuntimePaths.viteCacheDir : undefined,
-    nitro: localNitroConfig,
-    build: {
-      emptyOutDir: false,
-    },
-    envPrefix: ["VITE_", "NEXT_PUBLIC_"],
+  cacheDir: useLocalGeneratedBuildRoot ? qaRuntimePaths.viteCacheDir : undefined,
+  nitro: localNitroConfig,
+  build: {
+    emptyOutDir: false,
   },
+  resolve: {
+    alias: {
+      "@": resolve(rootDir, "src"),
+    },
+    dedupe: [
+      "react",
+      "react-dom",
+      "react/jsx-runtime",
+      "react/jsx-dev-runtime",
+      "@tanstack/react-query",
+      "@tanstack/query-core",
+    ],
+  },
+  server: {
+    host: "::",
+    port: 8080,
+    watch: {
+      awaitWriteFinish: {
+        stabilityThreshold: 1000,
+        pollInterval: 100,
+      },
+    },
+  },
+  envPrefix: ["VITE_", "NEXT_PUBLIC_"],
 });

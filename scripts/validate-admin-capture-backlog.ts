@@ -388,7 +388,7 @@ async function runDeterministicHarness() {
 
   const repoDerivedRow = await repository.createItem({
     item_type: "context_capture",
-    status: "ready_for_codex",
+    status: "new",
     priority: "high",
     target_role: "backend",
     title: "Imported canonical markdown mirror",
@@ -513,7 +513,7 @@ async function runDeterministicHarness() {
     }),
   );
   const repoAfterRejectedMutations = await repository.getItem(repoDerivedRow.id);
-  assert.equal(repoAfterRejectedMutations?.status, "ready_for_codex");
+  assert.equal(repoAfterRejectedMutations?.status, "new");
   assert.equal(repoAfterRejectedMutations?.item_type, "context_capture");
   assert.equal(repoAfterRejectedMutations?.priority, "high");
   assert.equal(repoAfterRejectedMutations?.target_role, "backend");
@@ -992,7 +992,7 @@ async function runLiveSupabaseProbe() {
 
     const repoDerivedRow = await repository.createItem({
       item_type: "context_capture",
-      status: "ready_for_codex",
+      status: "new",
       priority: "high",
       target_role: "backend",
       title: "Live repo-derived read-only proof",
@@ -1070,7 +1070,7 @@ async function runLiveSupabaseProbe() {
         isRepoReadOnlyRejection(repoTriageBlocked) &&
         isRepoReadOnlyRejection(repoAppendBlocked) &&
         isRepoReadOnlyRejection(repoDeleteBlocked) &&
-        repoAfterRejectedMutations?.status === "ready_for_codex" &&
+        repoAfterRejectedMutations?.status === "new" &&
         repoAfterRejectedMutations?.target_role === "backend" &&
         repoAfterRejectedMutations?.note ===
           "ROLE: BACKEND\n\nTASK:\nVerify live repo-derived metadata mirror.\n\nSTAGE:\nBACKEND validation",

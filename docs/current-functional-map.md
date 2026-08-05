@@ -233,8 +233,8 @@ Do not use these future ideas to justify keeping or adding runtime code as shipp
 - Do not use stale line-count tables from old cleanup ledgers as current truth. Use the active
   [source-size governance plan](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-30-hito-source-size-governance-and-cleanup-plan.md)
   and fresh non-mutating source scans for cleanup selection.
-- `docs/work-dashboard.md` is a legacy plan projection during the queue migration. It must not be
-  used for lifecycle decisions; canonical status comes from `docs/tasks/backlog/*` metadata.
+- `docs/work-dashboard.md` is an inbound-link tombstone only. It does not project lifecycle;
+  canonical status comes from `docs/tasks/backlog/*` metadata.
 - `logs/`, `qa-artifacts/`, `test-results/`, `node_modules/`, build/cache roots, and coverage roots
   are generated/proof/vendor surfaces. Keep them out of product-code size claims unless the task
   explicitly scopes local artifact hygiene.

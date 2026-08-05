@@ -13,7 +13,6 @@ import {
   workItemIdentityKey,
   type WorkItemStatus,
 } from "./markdown";
-import { projectActivePlanMarkdown, renderDashboard } from "../hito-work-dashboard.mjs";
 import type { Database } from "../../src/lib/supabase/database";
 
 type ExistingRow = Pick<
@@ -114,6 +113,39 @@ Blocked on verified provider access.
     assert.equal(mapWorkItemStatusToAdminStatus(status as WorkItemStatus), adminStatus);
   }
 
+  assert.equal(
+    mapMirroredWorkItemStatusToAdminStatus("ready", "complete", "backlog_doc"),
+    "ready_for_codex",
+  );
+  assert.equal(
+    mapMirroredWorkItemStatusToAdminStatus("in_progress", "complete", "backlog_doc"),
+    "ready_for_codex",
+  );
+  assert.equal(
+    mapMirroredWorkItemStatusToAdminStatus("ready", "legacy_debt", "backlog_doc"),
+    "new",
+  );
+  assert.equal(
+    mapMirroredWorkItemStatusToAdminStatus("in_progress", "malformed", "backlog_doc"),
+    "new",
+  );
+  for (const sourceType of [
+    "product_brief",
+    "frontend_spec",
+    "active_plan",
+    "archived_plan",
+  ] as const) {
+    assert.equal(mapMirroredWorkItemStatusToAdminStatus("ready", "complete", sourceType), "new");
+    assert.equal(
+      mapMirroredWorkItemStatusToAdminStatus("in_progress", "complete", sourceType),
+      "new",
+    );
+  }
+  assert.equal(
+    mapMirroredWorkItemStatusToAdminStatus("completed", "complete", "active_plan"),
+    "done",
+  );
+
   const legacy = parseCanonicalMarkdown(`# Legacy item
 
 ## Status
@@ -142,7 +174,10 @@ Keep the legacy source visible.
 \`\`\`
 `);
   assert.equal(legacy.metadataState, "legacy_debt");
-  assert.equal(mapMirroredWorkItemStatusToAdminStatus("in_progress", legacy.metadataState), "new");
+  assert.equal(
+    mapMirroredWorkItemStatusToAdminStatus("in_progress", legacy.metadataState, "active_plan"),
+    "new",
+  );
   assert.deepEqual(legacy.missingRequiredFields, [
     "Work Item ID",
     "Owner",
@@ -215,51 +250,17 @@ Keep the legacy source visible.
   assert.deepEqual(findStaleActiveRepoMirrorRows([oldMirror], movedKeys), []);
   assert.deepEqual(findStaleActiveRepoMirrorRows([oldMirror], new Set()), [oldMirror]);
 
-  const projectedPlan = projectActivePlanMarkdown({
-    filename: "admin-import-contract.md",
-    absolutePath: "/tmp/admin-import-contract.md",
-    content: canonicalWorkItemMarkdown(),
-  });
-  assert.deepEqual(
-    {
-      workItemId: projectedPlan.workItemId,
-      status: projectedPlan.status,
-      owner: projectedPlan.owner,
-      scope: projectedPlan.scope,
-      batch: projectedPlan.batch,
-      frontendLane: projectedPlan.frontendLane,
-      archiveIntent: projectedPlan.archiveIntent,
-      metadataState: projectedPlan.metadataState,
-    },
-    {
-      workItemId: "admin-import-contract",
-      status: "ready",
-      owner: "frontend",
-      scope: "admin-capture",
-      batch: "admin-contract",
-      frontendLane: "product",
-      archiveIntent: "retain_in_place",
-      metadataState: "canonical metadata",
-    },
+  const supportingPlan = parseCanonicalMarkdown(canonicalWorkItemMarkdown());
+  assert.equal(supportingPlan.status, "ready");
+  assert.equal(supportingPlan.metadataState, "complete");
+  assert.equal(
+    mapMirroredWorkItemStatusToAdminStatus(
+      supportingPlan.status,
+      supportingPlan.metadataState,
+      "active_plan",
+    ),
+    "new",
   );
-
-  const dashboard = renderDashboard({
-    generatedAt: "2026-07-24T12:00:00.000Z",
-    mode: "dashboard-only",
-    adminResults: [],
-    activePlans: [projectedPlan],
-  });
-  assert.match(dashboard, /admin-import-contract/);
-  assert.match(dashboard, /frontend \/ admin-capture/);
-  assert.match(dashboard, /admin-contract \/ product/);
-  assert.match(dashboard, /retain_in_place/);
-
-  const malformedDashboardPlan = projectActivePlanMarkdown({
-    filename: "admin-import-contract.md",
-    absolutePath: "/tmp/admin-import-contract.md",
-    content: canonicalWorkItemMarkdown().replace("\n## Frontend Lane\nproduct\n", "\n"),
-  });
-  assert.match(malformedDashboardPlan.metadataState, /^malformed metadata: Frontend Lane$/);
 }
 
 function canonicalWorkItemMarkdown() {

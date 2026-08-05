@@ -244,12 +244,15 @@ export function mapWorkItemStatusToAdminStatus(status: WorkItemStatus): AdminSta
 export function mapMirroredWorkItemStatusToAdminStatus(
   status: WorkItemStatus,
   metadataState: CanonicalMetadataState,
+  sourceType: AdminRepoWorkItemSourceType,
 ): AdminStatus {
   const mapped = mapWorkItemStatusToAdminStatus(status);
 
-  return metadataState === "complete" || mapped === "done" || mapped === "archived"
-    ? mapped
-    : "new";
+  if (mapped === "done" || mapped === "archived") {
+    return mapped;
+  }
+
+  return sourceType === "backlog_doc" && metadataState === "complete" ? mapped : "new";
 }
 
 export function buildRepoMirrorNote(input: {

@@ -32,6 +32,15 @@ must either add an entry here or explicitly state why it is not technical-log ma
 
 ## 2026-08-05
 
+- BACKEND + QA + ARCHITECT / Admin backlog lifecycle convergence (Slice 8A) — removed the deprecated
+  dashboard generator and all dashboard aliases, then made `backlog_doc` the only nonterminal source
+  permitted to dispatch Admin work. Supporting Markdown documents retain read-only historical
+  metadata but cannot become dispatchable solely from their local status. Evidence:
+  `docs/tasks/backlog/2026-08-05-admin-backlog-lifecycle-convergence.md` and
+  `scripts/validate-admin-capture-backlog.ts`. Boundary: no Admin data/schema, Product UI, runner
+  lifecycle, provider, or hosted data changed; the pre-existing local legacy storage-bucket drift
+  remains outside the affected backlog contract.
+
 - BACKEND + QA + ARCHITECT / Product API request-boundary hardening — moved runner authentication
   ahead of avatar multipart parsing, reused the FIT bounded-reader as the one multipart limit seam,
   and replaced raw caught avatar/export and runner server-function infrastructure messages with

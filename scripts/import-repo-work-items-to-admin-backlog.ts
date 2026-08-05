@@ -516,6 +516,7 @@ async function normalizeMarkdownFile(
   const adminStatus = mapMirroredWorkItemStatusToAdminStatus(
     workItemStatus,
     canonical.metadataState,
+    sourceType,
   );
   const targetRole =
     canonical.nextRole ?? inferTargetRole(sourceType, sourcePath, `${title}\n${content}`);

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { DropdownFamilyPlayground } from "@/components/hito-ds/dropdown-family-playground";
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
+import { HitoButton } from "@/components/ui/button";
 import { ProductLinks } from "@/components/hito-ds/reference";
 import { ChoiceSelector, MenuRow, ToggleRow } from "@/components/hito-ds/specimen-previews";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
@@ -104,9 +105,9 @@ export function HitoDsComponentStructure() {
                   <Icon name="chevron-down" className="hito-disclosure-chevron" />
                 </summary>
                 <div className="hito-disclosure-body">
-                  <button type="button" className="hito-button hito-button-outlined hito-button-sm">
+                  <HitoButton size="sm" variant="outlined">
                     Replace today
-                  </button>
+                  </HitoButton>
                 </div>
               </details>
             )}
@@ -163,12 +164,9 @@ export function HitoDsComponentStructure() {
                   <Icon name="chevron-down" className="hito-disclosure-chevron" />
                 </summary>
                 <div className="hito-disclosure-body">
-                  <button
-                    type="button"
-                    className="hito-button hito-button-secondary hito-button-sm"
-                  >
+                  <HitoButton size="sm" variant="secondary">
                     Open tools
-                  </button>
+                  </HitoButton>
                 </div>
               </details>
             </div>

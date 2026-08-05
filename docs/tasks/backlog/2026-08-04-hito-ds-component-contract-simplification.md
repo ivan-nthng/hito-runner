@@ -6,7 +6,7 @@
 
 ## Status
 
-in_progress
+complete
 
 ## Type
 
@@ -30,17 +30,101 @@ retain_in_place
 
 ## Task
 
-Simplify Hito DS component contracts and their product adoption without changing Hito's visual
-language, product behavior, persistence, or accessibility. Reduce only source-proven variant, size,
-API, CSS ownership, and reference-surface complexity, then migrate product consumers one component
-family at a time with shared-owner and consumer-level regression proof.
+Simplify the shared Hito DS component contracts without changing Hito's visual language, Product
+behavior, persistence, or accessibility. Reduce only source-proven variant, size, API, CSS
+ownership, and reference-surface complexity, then hand later Product consumer migration to the
+Frontend Product lane one component family at a time.
 
 ## Stage
 
-DESIGN SYSTEM shared-contract implementation and integrated QA. Slice 0 through Slice 5 shared
-owners are being completed in the accepted order. Calendar's CVA/shadcn Button boundary remains
-deferred. Product-route migrations remain Frontend Product work and are not silently absorbed by
-this owner.
+DESIGN SYSTEM shared-contract implementation and integrated QA complete. Slice 0 through Slice 5
+shared owners are accepted. Calendar's CVA/shadcn Button boundary remains deferred. Product-route
+migrations remain separate Frontend Product work and were not silently absorbed by this owner.
+
+## Shared Design System Closeout
+
+### Accepted provenance
+
+- Accepted baseline: `dec2e226387bbc71985a593cbc3dd8d3f7cd36d7` on `main`.
+- The earlier `4edfdda` is a mixed remote commit and is not claimed as a scoped Design System
+  commit. Its shared Hito Button, Field, Choice, typography, and catalog work is accepted only as
+  part of the inherited baseline.
+- The fresh Design System provenance boundary is the scoped working-tree diff relative to
+  `dec2e226`: 24 files in the DS validator/generator, generated manifest, shared Field CSS,
+  `/hitoDS` reference owners, and the shared theme-choice wrapper plus its existing Settings
+  consumer.
+- Concurrent Runner Activity / Backend work remained outside this manifest and was not staged,
+  reverted, absorbed, or contacted.
+
+### Completed shared contracts
+
+- Button: the accepted typed `HitoButton` contract retains `xs/sm/md/lg`, four hierarchies, three
+  semantic tones, native loading/disabled truth, icon-only naming, feedback, pressed, and timed
+  progress. Calendar keeps the documented legacy `Button` / `buttonVariants` compatibility seam.
+- Field: Input, Textarea, native select, date/time, inline editing, helper/feedback, and editable
+  value anatomy resolve through one Field owner. The 515-line reusable Field block moved without a
+  recipe change from `forms-onboarding.css` to `controls-fields.css`.
+- Choice: inline `xs/sm/lg` and card presentation resolve through `HitoChoiceToggle`. The shared
+  theme preference group now takes typed `size`; its remaining `buttonClassName` is layout-only.
+- Typography: one 19-role inventory remains authoritative; 14 reusable Text Styles and five
+  component-bound roles retain truthful provenance and `/hitoDS` grouping.
+- Reference: live and inert Hito DS examples use the same public Button, Field, and Choice
+  primitives as consumers. The Figma board's inert `StaticSelectTrigger` remains the sole explicit
+  export-geometry exception rather than a second live control family.
+- Conformance: the validator now protects retained matrices, retired tiers, Calendar compatibility,
+  demo-state leakage, class-resolver ownership, shared Field CSS ownership, and manual reference
+  control recipes, including `buttonClassName`. Controlled self-tests cover retired classes,
+  manual recipes, and Field-owner leakage.
+
+### Deletion and retention ledger
+
+- Retired and still absent: `hito-button-xl`, `hito-field-xl`, `hito-choice-toggle-md`, and
+  `hito-choice-toggle-xl`.
+- Deleted from the reference: direct base-class assembly for normal Button, Field, and Choice
+  specimens across components, foundations, patterns, overlays, navigation, motion, calendar,
+  workout library, and the export board.
+- Moved, not redesigned: reusable Field sizing, icon, helper/feedback, date, textarea,
+  inline-header, and editable-value declarations now live in `controls-fields.css`;
+  onboarding/domain rules remain in `forms-onboarding.css`.
+- Retained deliberately: Calendar CVA/shadcn compatibility, Product route composition, workout and
+  calendar geometry, visualization values, and the inert Figma select-trigger exception.
+
+### Integrated receipt
+
+| Check                  | Scenario / environment                                 | Result | Evidence                                                                                                              |
+| ---------------------- | ------------------------------------------------------ | ------ | --------------------------------------------------------------------------------------------------------------------- |
+| Root cause             | Baseline source graph and architecture review          | Pass   | Reusable Field CSS and reference control assembly had distributed owners; both now resolve through canonical DS seams |
+| Component contract     | `npm run validate-hito-ds-components`                  | Pass   | 4 Button sizes, 3 tones, 4 variants; 4 Field sizes, 2 variants; 3 Choice sizes; 326 files scanned                     |
+| Controlled regression  | Validator self-tests                                   | Pass   | Retired tiers, `className` / `buttonClassName` manual recipes, and Field-owner leakage are detected                   |
+| Manifest parity        | `node scripts/generate-hito-ds-manifest.mjs --check`   | Pass   | 38 primitive colors, 29 semantic colors, 14 reusable Text Styles                                                      |
+| Foundation cleanup     | `node scripts/validate-hito-ds-foundation-cleanup.mjs` | Pass   | Four retired tokens, 17 retired selectors, zero foundation geometry drift                                             |
+| Manifest provenance    | Generated JSON and TypeScript                          | Pass   | Helper role source moved truthfully to `src/styles/controls-fields.css`; token and typography values unchanged        |
+| Static quality         | Scoped ESLint and Prettier                             | Pass   | Changed DS, Settings wrapper, generator, and validator sources are clean                                              |
+| Production build       | Fresh `npm run build`                                  | Pass   | Client, SSR, Nitro, and postbuild completed successfully                                                              |
+| Build integrity        | `node scripts/validate-build-output-integrity.mjs`     | Pass   | 208 runtime MJS files and 3,255 relative MJS imports validated                                                        |
+| Runtime health         | Fresh canonical built runtime, real mode               | Pass   | Loopback server healthy; `/hitoDS/components` and `/hitoDS/foundations` return 200                                    |
+| Components             | 1470x801 and exact 375x812, light/dark                 | Pass   | No page overflow; retired DOM classes absent; shared sections remain contained                                        |
+| Interaction            | Button, Field, Choice and theme controls               | Pass   | Loading is busy/disabled; Field edits locally; pointer and Arrow-key Choice selection preserve ARIA/focus truth       |
+| Typography             | 1470x801 and exact 375x812, light/dark                 | Pass   | Six groups, 19 roles, no page overflow, provenance remains source-backed                                              |
+| Browser console        | Components and Foundations paths                       | Pass   | Independent QA observed zero warnings/errors                                                                          |
+| Calendar compatibility | Source and validator                                   | Pass   | Legacy Calendar API remains present and no `HitoButton` migration occurred                                            |
+| Independent QA         | Full pass plus focused fix-forward recheck             | Pass   | Initial manual theme-choice finding was corrected; final owner-level verdict passed                                   |
+| Diff hygiene           | Scoped diff relative to `dec2e226`                     | Pass   | DS manifest is isolated; concurrent Backend changes remain outside it                                                 |
+
+### Omissions and consequences
+
+- Safari was not run because this closeout changed no overlay, portal, focus-trap, date-picker, or
+  cross-engine-sensitive behavior. This report makes no Safari-specific claim.
+- Product-route migration and broad Product smoke were intentionally not run. Shared contracts and
+  the theme wrapper are accepted; normal Product consumers that still assemble component chrome
+  remain a separate Frontend Product rollout.
+- No hosted service, paid provider, migration, staging, commit, push, deploy, or Figma mutation was
+  performed.
+
+`Implementation DoD: Passed` for the shared Design System owner boundary.
+
+`Global QA Acceptance: Pending` until the later cross-surface Product rollout has its own acceptance
+matrix.
 
 ## Product Review Summary
 
@@ -703,49 +787,42 @@ deletion could create a parallel library or hidden dependency.
 Provides bounded independent owner-level validation inside each implementation slice. Global QA is
 separate and should run only after the selected cross-surface rollout is complete.
 
-## Definition Of Done For This Program
+## Definition Of Done For The Shared DS Owner
 
 This program is complete only when:
 
 - every retained Button, Field, and Choice size/variant/tone/state has a current consumer or an
   explicit reusable contract reason;
-- normal Product consumers use the accepted shared API rather than manual repeated component-chrome
-  recipes;
 - compatibility APIs either have documented owners/removal conditions or have been safely removed;
 - reusable control CSS and domain composition have clear source ownership;
 - the typography registry remains singular and easier to browse;
 - `/hitoDS` matches supported runtime truth and no obsolete matrix/caption path remains;
 - conformance validation prevents retired drift from returning;
-- every product migration preserves behavior, persistence, accessibility, themes, and responsive
-  layout;
-- all selected slices have `Implementation DoD: Passed` receipts;
+- the Product migration boundary and its preservation requirements are explicitly handed off;
+- all shared Design System slices have `Implementation DoD: Passed` receipts;
 - any required broader release check reports `Global QA Acceptance` separately.
 
-## Current Blockers
+## Remaining Boundaries
 
-- The exact dynamic variant/size reachability matrix is intentionally deferred to Slice 0 and must
-  precede any deletion.
-- Calendar's CVA/shadcn Button compatibility lifetime requires explicit source proof before it can be
-  changed.
+- No shared Design System blocker remains.
+- Calendar's CVA/shadcn Button compatibility lifetime remains a separate source-proof gate.
+- Product consumer adoption remains Frontend Product work and must migrate one component family at
+  a time without local compatibility recipes.
 
-## Product Review Questions
+## Product Review Decisions
 
-1. Does Product accept the eight proposed program decisions without changing visible Product
-   behavior or visual language?
-2. Should the first executable slice be the evidence-only contract/reachability baseline, as
-   recommended?
-3. Does Product want Calendar Button compatibility to remain explicitly deferred during the first
-   Button API slice?
-4. After the baseline, should Product prioritize Button migration before Field and Choice, as
-   recommended by current reachability and repeated raw class usage?
+1. The accepted program boundary preserved visible Product behavior and visual language.
+2. The shared evidence baseline and component-family contracts are complete.
+3. Calendar Button compatibility remains explicitly deferred.
+4. Product adoption proceeds through later bounded Frontend Product slices; this closeout does not
+   claim those routes migrated.
 
 ## Handoff Context
 
 ### Summary
 
-The foundation token and typography export layer is accepted. The next root-cause cleanup is the
-distributed component contract across CSS, React wrappers, Product class strings, and `/hitoDS`
-matrices. This work item defines a safe multi-slice program and does not authorize implementation.
+The foundation and shared component contracts are accepted at Design System owner level. The next
+root-cause cleanup is Product adoption where routes still assemble normal control chrome manually.
 
 ### Key Decisions
 
@@ -756,10 +833,10 @@ matrices. This work item defines a safe multi-slice program and does not authori
 
 ### Current State
 
-- Foundation manifest and reusable typography truth already exist.
-- Button, Field, and Choice contracts are broadly reused but expose a larger and noisier public
-  surface than Product use currently proves necessary.
-- No component class, size, variant, or compatibility API is approved for deletion yet.
+- Foundation manifest and reusable typography truth are parity-checked.
+- Button, Field, Choice, typography, and `/hitoDS` shared contracts have owner-level acceptance.
+- Retired tiers are validator-protected and no longer appear in source or rendered reference DOM.
+- Product route migrations and Calendar compatibility are deliberately separate.
 
 ### Constraints
 
@@ -769,15 +846,17 @@ matrices. This work item defines a safe multi-slice program and does not authori
 
 ### Risks / Open Questions
 
-- Dynamic class generation can hide reference consumers from literal scans.
+- Product manual recipes can still exist outside the shared reference-owner scan.
 - The legacy CVA Button still owns a Calendar compatibility seam.
 - A broad migration would make regressions hard to localize; rollout must stay family-bounded.
 
 ### Next Recommended Role
 
-PRODUCT
+FRONTEND, Product lane
 
 ### Suggested Next Step
 
-Review and accept or revise the seven Product decisions, then select Slice 0 as the first bounded
-execution task and add one exact Design System handoff only after explicit dispatch approval.
+Inventory normal Product Button, Field, and Choice consumers against the accepted typed APIs, then
+migrate one family and a small set of highest-drift surfaces at a time. Preserve behavior, copy,
+persistence, accessibility, Calendar compatibility, and the shared DS owner; run owner-level
+independent QA for every bounded rollout.

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
+import { HitoButton } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import {
   displayExecutableTargetEntries,
@@ -90,25 +91,23 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
           <p className="hito-support-copy mt-4 max-w-xl">{workoutSupportText}</p>
 
           <div className="mt-6 flex flex-wrap items-center gap-2">
-            <Link
-              to="/workout/$date"
-              params={{ date: snapshot.currentDate }}
-              className="hito-button hito-button-primary hito-button-sm"
-            >
-              {isRestDay ? "Open day" : "Open workout"}
-              <Icon name="arrow-up-right" size="xs" />
-            </Link>
-            {!isRestDay && (
-              <Link
-                to="/workout/$date"
-                params={{ date: snapshot.currentDate }}
-                search={{ tab: "complete" } as never}
-                className="hito-button hito-button-ghost hito-button-sm"
-                data-tone="success"
-              >
-                <Icon name={workout.log ? "check-circle" : "check"} size="xs" />
-                {resultActionLabel}
+            <HitoButton asChild size="sm" variant="primary">
+              <Link to="/workout/$date" params={{ date: snapshot.currentDate }}>
+                {isRestDay ? "Open day" : "Open workout"}
+                <Icon name="arrow-up-right" size="xs" />
               </Link>
+            </HitoButton>
+            {!isRestDay && (
+              <HitoButton asChild size="sm" tone="success" variant="ghost">
+                <Link
+                  to="/workout/$date"
+                  params={{ date: snapshot.currentDate }}
+                  search={{ tab: "complete" } as never}
+                >
+                  <Icon name={workout.log ? "check-circle" : "check"} size="xs" />
+                  {resultActionLabel}
+                </Link>
+              </HitoButton>
             )}
           </div>
 
@@ -196,18 +195,16 @@ function PlanStartsLaterHero({
 
           <div className="mt-6 flex flex-wrap items-center gap-2">
             {nextWorkout && (
-              <Link
-                to="/workout/$date"
-                params={{ date: nextWorkout.date }}
-                className="hito-button hito-button-primary hito-button-sm"
-              >
-                Open nearest workout
-                <Icon name="arrow-up-right" size="xs" />
-              </Link>
+              <HitoButton asChild size="sm" variant="primary">
+                <Link to="/workout/$date" params={{ date: nextWorkout.date }}>
+                  Open nearest workout
+                  <Icon name="arrow-up-right" size="xs" />
+                </Link>
+              </HitoButton>
             )}
-            <Link to="/progress" className="hito-button hito-button-secondary hito-button-sm">
-              Open progress
-            </Link>
+            <HitoButton asChild size="sm" variant="secondary">
+              <Link to="/progress">Open progress</Link>
+            </HitoButton>
           </div>
         </div>
 
@@ -278,14 +275,17 @@ function DismissibleSupportNote({
           </div>
           <p className="hito-list-row-copy">{children}</p>
         </div>
-        <button
+        <HitoButton
           type="button"
           onClick={() => setIsVisible(false)}
-          className="hito-button hito-button-ghost hito-button-xs aspect-square shrink-0 p-0 text-muted-foreground hover:text-foreground"
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+          iconOnly
+          size="xs"
+          variant="ghost"
           aria-label={`Dismiss ${title}`}
         >
           <Icon name="close" size="xs" />
-        </button>
+        </HitoButton>
       </div>
     </section>
   );

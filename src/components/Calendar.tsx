@@ -11,6 +11,8 @@ import {
 } from "react";
 import { Link, useRouter } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
+import { HitoButton } from "@/components/ui/button";
+import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
 import { Icon } from "@/components/ui/icon";
 import { HitoCalendarDayCell, HitoWorkoutDayRow } from "@/components/ui/hito-calendar-day";
 import {
@@ -110,46 +112,58 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
 
         <div className="flex items-center gap-2">
           <div className="hito-choice-toggle-group" aria-label="Calendar view">
-            <button
+            <HitoChoiceToggle
               type="button"
               onClick={() => setView("month")}
-              data-selected={view === "month"}
               aria-pressed={view === "month"}
-              className="hito-choice-toggle hito-choice-toggle-sm"
+              presentation="inline"
+              selected={view === "month"}
+              size="sm"
             >
               Month
-            </button>
-            <button
+            </HitoChoiceToggle>
+            <HitoChoiceToggle
               type="button"
               onClick={() => setView("week")}
-              data-selected={view === "week"}
               aria-pressed={view === "week"}
-              className="hito-choice-toggle hito-choice-toggle-sm"
+              presentation="inline"
+              selected={view === "week"}
+              size="sm"
             >
               Week
-            </button>
+            </HitoChoiceToggle>
           </div>
-          <button
+          <HitoButton
+            type="button"
             onClick={() => shift(-1)}
-            className="hito-button hito-button-secondary hito-button-sm aspect-square p-0"
+            aria-label="Previous calendar period"
+            iconOnly
+            size="sm"
+            variant="secondary"
           >
             <Icon name="chevron-left" size="sm" />
-          </button>
-          <button
+          </HitoButton>
+          <HitoButton
+            type="button"
             onClick={() => {
               setCursor(snapshot.currentDate);
               setTooltipAnchor(null);
             }}
-            className="hito-button hito-button-secondary hito-button-sm"
+            size="sm"
+            variant="secondary"
           >
             Today
-          </button>
-          <button
+          </HitoButton>
+          <HitoButton
+            type="button"
             onClick={() => shift(1)}
-            className="hito-button hito-button-secondary hito-button-sm aspect-square p-0"
+            aria-label="Next calendar period"
+            iconOnly
+            size="sm"
+            variant="secondary"
           >
             <Icon name="chevron-right" size="sm" />
-          </button>
+          </HitoButton>
         </div>
       </div>
 

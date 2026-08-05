@@ -18,6 +18,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { InlineEditableText } from "@/components/ui/inline-editable-text";
+import { HitoButton } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   type DragEvent,
   type KeyboardEvent,
@@ -513,8 +516,10 @@ export function ManualWorkoutConstructorEditor({
 
       <label className="grid gap-2">
         <span className="hito-form-label">Notes or cues</span>
-        <textarea
-          className="hito-field hito-field-primary hito-textarea-md resize-none"
+        <Textarea
+          className="resize-none"
+          size="md"
+          variant="primary"
           readOnly={readbackMode}
           rows={3}
           value={documentNotes}
@@ -1326,8 +1331,9 @@ function ManualBlockIdentityFields({
   return (
     <label className="hito-manual-workout-label-field grid gap-2">
       <span className="hito-form-label">Section name</span>
-      <input
-        className="hito-field hito-field-secondary hito-field-sm"
+      <Input
+        size="sm"
+        variant="secondary"
         disabled={disabled}
         value={block.label ?? ""}
         onChange={(event) =>
@@ -1361,8 +1367,10 @@ function ManualBlockQuantityFields({
       <div className="grid gap-3">
         <label className="grid gap-2">
           <span className="hito-form-label">{roleLabel} cue</span>
-          <textarea
-            className="hito-field hito-field-secondary hito-textarea-md resize-none"
+          <Textarea
+            className="resize-none"
+            size="md"
+            variant="secondary"
             disabled={disabled}
             rows={2}
             value={block.noteText ?? ""}
@@ -1556,8 +1564,10 @@ function ManualDistancePartsInput({
       <div className="hito-manual-workout-compound-inputs">
         <label className="hito-manual-workout-unit-field">
           <span className="hito-form-label">km</span>
-          <input
-            className="hito-field hito-field-secondary hito-field-sm hito-manual-workout-unit-input"
+          <Input
+            className="hito-manual-workout-unit-input"
+            size="sm"
+            variant="secondary"
             disabled={disabled}
             inputMode="numeric"
             min={0}
@@ -1572,9 +1582,12 @@ function ManualDistancePartsInput({
         </label>
         <label className="hito-manual-workout-unit-field">
           <span className="hito-form-label">m</span>
-          <input
+          <Input
             aria-invalid={metersInvalid || undefined}
-            className="hito-field hito-field-secondary hito-field-sm hito-manual-workout-unit-input"
+            className="hito-manual-workout-unit-input"
+            feedback={metersInvalid ? "error" : "neutral"}
+            size="sm"
+            variant="secondary"
             disabled={disabled}
             inputMode="numeric"
             max={999}
@@ -1718,13 +1731,14 @@ function ManualScratchWorkoutTypePickerDialog({
         </div>
 
         <DialogFooter className="hito-product-dialog-footer">
-          <button
+          <HitoButton
             type="button"
-            className="hito-button hito-button-secondary hito-button-sm"
+            size="sm"
+            variant="secondary"
             onClick={() => onOpenChange(false)}
           >
             Cancel
-          </button>
+          </HitoButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1893,13 +1907,14 @@ function ManualBlockTypePickerDialog({
         </div>
 
         <DialogFooter className="hito-product-dialog-footer">
-          <button
+          <HitoButton
             type="button"
-            className="hito-button hito-button-secondary hito-button-sm"
+            size="sm"
+            variant="secondary"
             onClick={() => onOpenChange(false)}
           >
             Cancel
-          </button>
+          </HitoButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1963,14 +1978,17 @@ function EntryRowActions({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
+        <HitoButton
           type="button"
-          className="hito-button hito-button-ghost hito-button-sm hito-manual-workout-row-action-button aspect-square shrink-0 p-0"
+          className="hito-manual-workout-row-action-button shrink-0"
           disabled={disabled}
           aria-label={`More actions for ${stepLabel}`}
+          iconOnly
+          size="sm"
+          variant="ghost"
         >
           <Icon name="more-horizontal" size="xs" />
-        </button>
+        </HitoButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuLabel>Section actions</DropdownMenuLabel>
@@ -2038,14 +2056,17 @@ function RepeatChildRowActions({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
+        <HitoButton
           type="button"
-          className="hito-button hito-button-ghost hito-button-sm hito-manual-workout-row-action-button aspect-square shrink-0 p-0"
+          className="hito-manual-workout-row-action-button shrink-0"
           disabled={disabled}
           aria-label={`More actions for ${stepLabel}`}
+          iconOnly
+          size="sm"
+          variant="ghost"
         >
           <Icon name="more-horizontal" size="xs" />
-        </button>
+        </HitoButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuLabel>Section actions</DropdownMenuLabel>
@@ -2172,7 +2193,7 @@ function ManualAddStepMenu({
   };
 
   const triggerClassName = [
-    "hito-button hito-button-secondary hito-button-sm hito-manual-workout-add-section-button relative z-10",
+    "hito-manual-workout-add-section-button relative z-10",
     prominent
       ? ""
       : "opacity-100 md:opacity-0 md:transition-opacity md:group-hover/add-step:opacity-100 md:group-focus-within/add-step:opacity-100 focus-visible:opacity-100",
@@ -2193,21 +2214,28 @@ function ManualAddStepMenu({
       {prominent && !insertionActive ? null : (
         <span className="hito-manual-workout-insertion-line pointer-events-none absolute inset-x-0 top-1/2" />
       )}
-      <button
+      <HitoButton
         type="button"
         className={`${triggerClassName} md:hidden`}
+        size="sm"
+        variant="secondary"
         onClick={() => setMobilePickerOpen(true)}
       >
         Add Section
         <Icon name="chevron-down" size="xs" />
-      </button>
+      </HitoButton>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button type="button" className={`${triggerClassName} hidden md:inline-flex`}>
+          <HitoButton
+            type="button"
+            className={`${triggerClassName} hidden md:inline-flex`}
+            size="sm"
+            variant="secondary"
+          >
             Add Section
             <Icon name="chevron-down" size="xs" />
-          </button>
+          </HitoButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align={prominent ? "end" : "center"}
@@ -2296,13 +2324,14 @@ function ManualAddPiecePickerDialog({
         </div>
 
         <DialogFooter className="hito-product-dialog-footer">
-          <button
+          <HitoButton
             type="button"
-            className="hito-button hito-button-secondary hito-button-sm"
+            size="sm"
+            variant="secondary"
             onClick={() => onOpenChange(false)}
           >
             Cancel
-          </button>
+          </HitoButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

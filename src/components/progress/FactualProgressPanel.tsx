@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Icon } from "@/components/ui/icon";
+import { HitoButton } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type {
   RunnerActivityAdvancedMetricsCurrent,
@@ -60,14 +61,10 @@ export function FactualProgressPanel({
             Current values will return when the backend snapshot is ready.
           </p>
           <div className="hito-state-actions">
-            <button
-              type="button"
-              className="hito-button hito-button-secondary hito-button-md"
-              onClick={onRetry}
-            >
+            <HitoButton type="button" size="md" variant="secondary" onClick={onRetry}>
               <Icon name="refresh" size="sm" />
               Check again
-            </button>
+            </HitoButton>
           </div>
         </div>
       ) : null}
@@ -492,9 +489,9 @@ function ProgressEmptyState() {
         Hito will show only facts supported by your activity evidence.
       </p>
       <div className="hito-state-actions">
-        <Link to="/" className="hito-button hito-button-primary hito-button-md">
-          Open Calendar
-        </Link>
+        <HitoButton asChild size="md" variant="primary">
+          <Link to="/">Open Calendar</Link>
+        </HitoButton>
       </div>
     </div>
   );
@@ -506,14 +503,10 @@ function ProgressError({ message, onRetry }: { message: string; onRetry: () => v
       <p className="hito-label text-destructive">Could not load running progress</p>
       <p className="hito-body mt-2">{message}</p>
       <div className="hito-state-actions">
-        <button
-          type="button"
-          className="hito-button hito-button-secondary hito-button-md"
-          onClick={onRetry}
-        >
+        <HitoButton type="button" size="md" variant="secondary" onClick={onRetry}>
           <Icon name="refresh" size="sm" />
           Try again
-        </button>
+        </HitoButton>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { Icon } from "@/components/ui/icon";
+import { HitoButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getHitoDsPageIndex, HITO_DS_PAGES, type HitoDsPageId } from "./reference-model";
 
@@ -171,21 +172,22 @@ export function HitoDsPagePager({ currentPageId }: { currentPageId: HitoDsPageId
       aria-label="Hito DS page navigation"
     >
       {previousPage ? (
-        <a href={previousPage.path} className="hito-button hito-button-secondary hito-button-md">
-          <Icon name="chevron-left" size="sm" decorative />
-          Previous: {previousPage.label}
-        </a>
+        <HitoButton asChild size="md" variant="secondary">
+          <a href={previousPage.path}>
+            <Icon name="chevron-left" size="sm" decorative />
+            Previous: {previousPage.label}
+          </a>
+        </HitoButton>
       ) : (
         <span />
       )}
       {nextPage ? (
-        <a
-          href={nextPage.path}
-          className="hito-button hito-button-primary hito-button-md sm:justify-self-end"
-        >
-          Next: {nextPage.label}
-          <Icon name="chevron-right" size="sm" decorative />
-        </a>
+        <HitoButton asChild size="md" variant="primary" className="sm:justify-self-end">
+          <a href={nextPage.path}>
+            Next: {nextPage.label}
+            <Icon name="chevron-right" size="sm" decorative />
+          </a>
+        </HitoButton>
       ) : null}
     </nav>
   );

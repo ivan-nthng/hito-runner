@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 
 import { HitoValueTag } from "@/components/ui/value-tag";
+import { HitoButton } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { HITO_DS_MANIFEST } from "@/generated/hito-ds-manifest";
@@ -118,24 +119,16 @@ export function HitoDsLightPaletteReference() {
             <div className="grid min-w-0 gap-4 sm:grid-cols-2">
               <div className="grid min-w-0 content-start gap-3">
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" className="hito-button hito-button-primary hito-button-sm">
+                  <HitoButton size="sm" variant="primary">
                     <Icon name="sparkles" size="xs" />
                     Signal
-                  </button>
-                  <button
-                    type="button"
-                    className="hito-button hito-button-secondary hito-button-sm"
-                    data-demo-state="hover"
-                  >
+                  </HitoButton>
+                  <HitoButton size="sm" variant="secondary" data-demo-state="hover">
                     Hover
-                  </button>
-                  <button
-                    type="button"
-                    className="hito-button hito-button-ghost hito-button-sm"
-                    data-demo-state="focus"
-                  >
+                  </HitoButton>
+                  <HitoButton size="sm" variant="ghost" data-demo-state="focus">
                     Focus
-                  </button>
+                  </HitoButton>
                 </div>
 
                 <div className="grid min-w-0 gap-2">
@@ -146,7 +139,7 @@ export function HitoDsLightPaletteReference() {
                     id="hito-light-palette-input"
                     readOnly
                     value="Light semantic field"
-                    className="hito-field-md"
+                    size="md"
                     data-demo-state="focus"
                   />
                 </div>
@@ -190,9 +183,9 @@ export function HitoDsLightPaletteReference() {
                 <p className="hito-label">Sheet / dialog surface</p>
                 <h4 className="hito-panel-title mt-1">Elevated light layer.</h4>
               </div>
-              <button type="button" className="hito-button hito-button-ghost hito-button-xs">
+              <HitoButton size="xs" variant="ghost">
                 Close
-              </button>
+              </HitoButton>
             </div>
             <p className="hito-body-small">
               Elevated surfaces use popover/card roles while preserving readable foreground,

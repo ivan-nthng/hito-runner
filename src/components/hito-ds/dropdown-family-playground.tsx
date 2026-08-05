@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
+import { HitoButton } from "@/components/ui/button";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
 import {
   Select,
@@ -366,12 +367,12 @@ function DropdownAnatomyDemo({ settings }: { settings: DropdownPlaygroundSetting
         footer={
           settings.showHeaderFooter ? (
             <div className="flex flex-wrap justify-end gap-2 px-2 py-2">
-              <button type="button" className="hito-button hito-button-ghost hito-button-xs">
+              <HitoButton size="xs" variant="ghost">
                 Cancel
-              </button>
-              <button type="button" className="hito-button hito-button-secondary hito-button-xs">
+              </HitoButton>
+              <HitoButton size="xs" variant="secondary">
                 Apply
-              </button>
+              </HitoButton>
             </div>
           ) : null
         }
@@ -484,9 +485,9 @@ function MobileDropdownEscalationSpecimen() {
           </div>
         </div>
         <div className="hito-product-dialog-footer flex justify-end">
-          <button type="button" className="hito-button hito-button-secondary hito-button-sm">
+          <HitoButton size="sm" variant="secondary">
             Close
-          </button>
+          </HitoButton>
         </div>
       </div>
     </div>

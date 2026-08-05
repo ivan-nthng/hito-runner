@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
+import { HitoButton } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { hitoToast } from "@/components/ui/hito-toast";
 import {
@@ -403,32 +404,37 @@ export function ManualWorkoutPersistedEditDialog({
         </div>
 
         <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
-          <button
+          <HitoButton
             type="button"
-            className="hito-button hito-button-secondary hito-button-md"
+            size="md"
+            variant="secondary"
             disabled={isBusy}
             onClick={() => onOpenChange(false)}
           >
             Close
-          </button>
+          </HitoButton>
           {readyReview ? (
-            <button
+            <HitoButton
               type="button"
-              className="hito-button hito-button-primary hito-button-md"
+              loading={status === "saving"}
+              size="md"
+              variant="primary"
               disabled={isBusy}
               onClick={() => void confirmReview()}
             >
               {status === "saving" ? "Saving edit..." : "Save edited workout"}
-            </button>
+            </HitoButton>
           ) : (
-            <button
+            <HitoButton
               type="button"
-              className="hito-button hito-button-primary hito-button-md"
+              loading={status === "reviewing"}
+              size="md"
+              variant="primary"
               disabled={!activeDraftState || isBusy}
               onClick={() => void submitReview()}
             >
               {status === "reviewing" ? "Reviewing edit..." : "Review edit"}
-            </button>
+            </HitoButton>
           )}
         </DialogFooter>
       </DialogContent>

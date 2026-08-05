@@ -2,6 +2,9 @@ import { useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import loginDesertHorizon from "@/assets/marketing/hero-background/login-desert-horizon.jpg";
 import { HitoLogo, HitoLogoMark } from "@/components/ui/hito-logo";
+import { HitoButton } from "@/components/ui/button";
+import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
+import { Input } from "@/components/ui/input";
 import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
 import { useHitoTabs } from "@/components/ui/hito-tabs";
 import { hitoToast } from "@/components/ui/hito-toast";
@@ -653,16 +656,16 @@ export function HitoDsFoundationsPage() {
               aria-label="Icon preview size"
             >
               {ICON_PREVIEW_SIZES.map((previewSize) => (
-                <button
+                <HitoChoiceToggle
                   key={previewSize}
-                  type="button"
+                  size="sm"
                   {...iconSizeGroup.getRadioProps(previewSize)}
-                  className="hito-choice-toggle hito-choice-toggle-sm uppercase"
-                  data-selected={iconPreviewSize === previewSize ? "true" : undefined}
+                  className="uppercase"
+                  selected={iconPreviewSize === previewSize}
                   onClick={() => setIconPreviewSize(previewSize)}
                 >
                   {previewSize}
-                </button>
+                </HitoChoiceToggle>
               ))}
             </div>
           </div>
@@ -698,10 +701,10 @@ export function HitoDsFoundationsPage() {
 
           <div className="hito-surface-flat grid gap-4 p-5 lg:grid-cols-5">
             <IconUsageCard label="Button">
-              <button type="button" className="hito-button hito-button-secondary hito-button-sm">
+              <HitoButton size="sm" variant="secondary">
                 <Icon name="download" size="sm" />
                 Export JSON
-              </button>
+              </HitoButton>
             </IconUsageCard>
             <IconUsageCard label="Input">
               <div className="relative">
@@ -710,7 +713,7 @@ export function HitoDsFoundationsPage() {
                   size="sm"
                   className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                 />
-                <input className="hito-field hito-field-md pl-9" placeholder="Search plans" />
+                <Input size="md" className="pl-9" placeholder="Search plans" />
               </div>
             </IconUsageCard>
             <IconUsageCard label="Nav row">
@@ -1259,13 +1262,14 @@ function TypographyInspectorPickerSpecimen() {
             componentTypography?.currentRole?.id ?? "pending"
           }
         >
-          <button
+          <HitoButton
             ref={componentRef}
-            type="button"
-            className="hito-button hito-button-secondary hito-button-sm justify-self-start"
+            size="sm"
+            variant="secondary"
+            className="justify-self-start"
           >
             Component-owned button typography
-          </button>
+          </HitoButton>
           {componentTypography ? (
             <TypographyControlRow
               desiredRoleId={componentDesiredRoleId}

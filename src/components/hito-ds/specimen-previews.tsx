@@ -25,6 +25,9 @@ import {
   type HitoButtonTone,
   type HitoButtonVariant,
   type HitoChoiceToggleSize,
+  type HitoFieldFeedback,
+  type HitoFieldSize,
+  type HitoFieldVariant,
 } from "@/components/ui/hito-control-contract";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
@@ -35,10 +38,11 @@ type ButtonVariant = HitoButtonVariant;
 type ButtonTone = HitoButtonTone;
 type ButtonSize = HitoButtonSize;
 type ButtonMotionState = HitoButtonState;
-type InputVariant = "primary" | "secondary";
+type InputVariant = HitoFieldVariant;
 type InputState = "default" | "hover" | "focus" | "disabled" | "readonly";
-type InputFeedback = "neutral" | "error" | "success";
-type ChoiceToggleSize = HitoChoiceToggleSize | SelectionBinarySize;
+type InputFeedback = HitoFieldFeedback;
+type ChoiceToggleSize = HitoChoiceToggleSize;
+type SelectionControlSize = HitoChoiceToggleSize | SelectionBinarySize;
 type SelectionControlKind = "checkbox" | "radio" | "toggle";
 type SelectionBinarySize = "sm" | "md";
 type ModalSizeMode = "compact" | "standard" | "wide" | "workflow" | "review";
@@ -322,16 +326,12 @@ export function ModalWindowPreview({
               Footer note stays short and tied to save/apply.
             </p>
           )}
-          <button type="button" className="hito-button hito-button-secondary hito-button-md">
+          <HitoButton size="md" variant="secondary">
             Cancel
-          </button>
-          <button
-            type="button"
-            className={cn("hito-button hito-button-md", "hito-button-primary")}
-            data-tone={destructive ? "error" : undefined}
-          >
+          </HitoButton>
+          <HitoButton size="md" variant="primary" tone={destructive ? "error" : "default"}>
             {destructive ? "Archive" : "Continue"}
-          </button>
+          </HitoButton>
         </DialogFooter>
       )}
     </>
@@ -344,9 +344,9 @@ export function ModalWindowPreview({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <button type="button" className="hito-button hito-button-primary hito-button-md">
+        <HitoButton size="md" variant="primary">
           Open selected modal
-        </button>
+        </HitoButton>
       </DialogTrigger>
       <DialogContent className={contentClassName} overlayClassName="hito-dialog-overlay-stable">
         {renderModalContents(true)}
@@ -368,12 +368,12 @@ export function InfoWindowPreview() {
         </p>
       </DialogHeader>
       <DialogFooter className="hito-info-window-footer">
-        <button type="button" className="hito-button hito-button-secondary hito-button-sm">
+        <HitoButton size="sm" variant="secondary">
           Cancel
-        </button>
-        <button type="button" className="hito-button hito-button-primary hito-button-sm">
+        </HitoButton>
+        <HitoButton size="sm" variant="primary">
           Replace workout
-        </button>
+        </HitoButton>
       </DialogFooter>
     </>
   );
@@ -410,21 +410,19 @@ export function ChoiceSelector<T extends string>({
         {options.map((item) => {
           const selected = value === item;
           return (
-            <button
+            <HitoChoiceToggle
               key={item}
-              type="button"
+              size={size}
               {...choiceGroup.getRadioProps(item)}
               onClick={() => onChange(item)}
-              data-selected={selected}
+              selected={selected}
               className={cn(
-                "hito-choice-toggle",
-                `hito-choice-toggle-${size}`,
                 textTransform === "capitalize" && "capitalize",
                 textTransform === "uppercase" && "uppercase",
               )}
             >
               {getLabel ? getLabel(item) : item}
-            </button>
+            </HitoChoiceToggle>
           );
         })}
       </div>
@@ -432,7 +430,7 @@ export function ChoiceSelector<T extends string>({
   );
 }
 
-function isBinarySelectionSize(size: ChoiceToggleSize): size is SelectionBinarySize {
+function isBinarySelectionSize(size: SelectionControlSize): size is SelectionBinarySize {
   return size === "sm" || size === "md";
 }
 
@@ -447,7 +445,7 @@ export function SelectionControlPreview({
   cardMode,
 }: {
   kind: SelectionControlKind;
-  size: ChoiceToggleSize;
+  size: SelectionControlSize;
   selected: boolean;
   onSelectedChange: (selected: boolean) => void;
   disabled: boolean;
@@ -631,7 +629,7 @@ export function DemoInput({
   value,
 }: {
   variant: InputVariant;
-  size: ButtonSize;
+  size: HitoFieldSize;
   leftIcon?: boolean;
   rightIcon?: boolean;
   state?: InputState;

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { KeyboardEvent } from "react";
 
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
+import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
 import {
   HitoCalendarDayCell,
   HitoWorkoutDayRow,
@@ -503,16 +504,15 @@ function ChoiceControl<T extends string>({
       <p className="hito-form-label">{label}</p>
       <div className="hito-choice-toggle-group" {...choiceGroup.groupProps} aria-label={label}>
         {options.map((option) => (
-          <button
+          <HitoChoiceToggle
             key={option.value}
-            type="button"
+            size="xs"
             {...choiceGroup.getRadioProps(option.value)}
-            className="hito-choice-toggle hito-choice-toggle-xs"
-            data-selected={value === option.value}
+            selected={value === option.value}
             onClick={() => onChange(option.value)}
           >
             {option.label}
-          </button>
+          </HitoChoiceToggle>
         ))}
       </div>
     </div>
@@ -534,7 +534,7 @@ function SelectControl<T extends string>({
     <div className="grid min-w-0 gap-2">
       <p className="hito-form-label">{label}</p>
       <Select value={value} onValueChange={(nextValue) => onChange(nextValue as T)}>
-        <SelectTrigger aria-label={label} className="hito-field-sm min-w-0">
+        <SelectTrigger aria-label={label} size="sm" className="min-w-0">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

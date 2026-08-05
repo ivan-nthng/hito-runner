@@ -13,6 +13,7 @@ import {
   startPlanExportDownload,
 } from "@/components/plan-management/plan-export-download";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { HitoButton } from "@/components/ui/button";
 import { HitoLogo } from "@/components/ui/hito-logo";
 import { hitoToast } from "@/components/ui/hito-toast";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
@@ -79,6 +80,9 @@ export function AppShell({
   const exportFrameRef = useRef<HTMLIFrameElement | null>(null);
   const exportResetTimerRef = useRef<number | null>(null);
   const headerDialogOpenTimerRef = useRef<number | null>(null);
+  const desktopPlanActionsTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const mobilePlanActionsTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const planActionReturnFocusRef = useRef<HTMLElement | null>(null);
   const loc = useLocation();
   const currentNavPath = getCurrentShellNavPath(loc.pathname);
   const nextPath = getLoginIntentPath(
@@ -120,7 +124,11 @@ export function AppShell({
       openDialog();
     }, 0);
   };
-  const openPlanActionDialog = (mode: PlanManagementDialogMode) => {
+  const openPlanActionDialog = (
+    mode: PlanManagementDialogMode,
+    returnFocusTarget: HTMLElement | null,
+  ) => {
+    planActionReturnFocusRef.current = returnFocusTarget;
     setActivePlanCreateOpen(false);
     deferHeaderDialogOpen(() => setPlanActionDialogMode(mode));
   };
@@ -198,14 +206,17 @@ export function AppShell({
                       <Icon name="plan-note" size="xs" className="text-signal" />
                       Plan note
                     </div>
-                    <button
+                    <HitoButton
                       type="button"
                       onClick={() => setShowShellPlanNote(false)}
-                      className="hito-button hito-button-ghost hito-button-xs aspect-square shrink-0 p-0 text-muted-foreground hover:text-foreground"
+                      className="shrink-0 text-muted-foreground hover:text-foreground"
+                      iconOnly
+                      size="xs"
+                      variant="ghost"
                       aria-label="Dismiss plan note"
                     >
                       <Icon name="close" size="xs" />
-                    </button>
+                    </HitoButton>
                   </div>
                   <p className="hito-list-row-copy">
                     {shellSnapshot.source === "persisted"
@@ -295,13 +306,14 @@ export function AppShell({
           </DropdownMenu>
 
           {shellSnapshot.mode === "preview" && loc.pathname !== "/login" && (
-            <Link
-              to="/login"
-              search={nextPath === DEFAULT_AUTH_REDIRECT ? undefined : { next: nextPath }}
-              className="hito-button hito-button-secondary hito-button-sm"
-            >
-              Sign in
-            </Link>
+            <HitoButton asChild size="sm" variant="secondary">
+              <Link
+                to="/login"
+                search={nextPath === DEFAULT_AUTH_REDIRECT ? undefined : { next: nextPath }}
+              >
+                Sign in
+              </Link>
+            </HitoButton>
           )}
         </div>
       </aside>
@@ -335,14 +347,16 @@ export function AppShell({
                 <div className="hidden md:block">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button
+                      <HitoButton
+                        ref={desktopPlanActionsTriggerRef}
                         type="button"
-                        className="hito-button hito-button-secondary hito-button-sm"
+                        size="sm"
+                        variant="secondary"
                       >
                         <Icon name="plan-note" size="xs" />
                         Current Plan
                         <Icon name="chevron-down" size="xs" />
-                      </button>
+                      </HitoButton>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
                       align="end"
@@ -382,7 +396,10 @@ export function AppShell({
                         className="hito-shell-menu-item"
                         disabled={!planAvailable}
                         onSelect={() => {
-                          openPlanActionDialog("edit-schedule");
+                          openPlanActionDialog(
+                            "edit-schedule",
+                            desktopPlanActionsTriggerRef.current,
+                          );
                         }}
                       >
                         <Icon name="calendar-clock" size="sm" />
@@ -393,7 +410,10 @@ export function AppShell({
                         data-tone="destructive"
                         disabled={!planAvailable}
                         onSelect={() => {
-                          openPlanActionDialog("clear-upcoming");
+                          openPlanActionDialog(
+                            "clear-upcoming",
+                            desktopPlanActionsTriggerRef.current,
+                          );
                         }}
                       >
                         <Icon name="clear-calendar" size="sm" />
@@ -403,35 +423,46 @@ export function AppShell({
                   </DropdownMenu>
                 </div>
               ) : (
-                <Link
-                  to={shellSnapshot.mode === "preview" ? "/login" : "/"}
-                  reloadDocument={shellSnapshot.mode !== "preview"}
-                  search={
-                    shellSnapshot.mode === "preview" && nextPath !== DEFAULT_AUTH_REDIRECT
-                      ? { next: nextPath }
-                      : undefined
-                  }
-                  className="hito-button hito-button-secondary hito-button-sm hidden md:inline-flex"
-                >
-                  <Icon name="activity" size="xs" />
-                  {shellSnapshot.mode === "preview" ? "Sign in to save" : "Create plan"}
-                </Link>
+                <HitoButton asChild className="hidden md:inline-flex" size="sm" variant="secondary">
+                  <Link
+                    to={shellSnapshot.mode === "preview" ? "/login" : "/"}
+                    reloadDocument={shellSnapshot.mode !== "preview"}
+                    search={
+                      shellSnapshot.mode === "preview" && nextPath !== DEFAULT_AUTH_REDIRECT
+                        ? { next: nextPath }
+                        : undefined
+                    }
+                  >
+                    <Icon name="activity" size="xs" />
+                    {shellSnapshot.mode === "preview" ? "Sign in to save" : "Create plan"}
+                  </Link>
+                </HitoButton>
               )}
-              <Link
-                to="/integrations"
+              <HitoButton
+                asChild
                 aria-label="Open Connections"
-                className="hito-button hito-button-ghost hito-button-sm aspect-square p-0 md:hidden"
+                className="md:hidden"
+                iconOnly
+                size="sm"
+                variant="ghost"
               >
-                <Icon name="connections" size="sm" />
-              </Link>
-              {showSettingsAction && (
-                <Link
-                  to="/settings"
-                  aria-label="Open profile and heart-rate settings"
-                  className="hito-button hito-button-ghost hito-button-sm aspect-square p-0 md:hidden"
-                >
-                  <Icon name="settings" size="sm" />
+                <Link to="/integrations">
+                  <Icon name="connections" size="sm" />
                 </Link>
+              </HitoButton>
+              {showSettingsAction && (
+                <HitoButton
+                  asChild
+                  aria-label="Open profile and heart-rate settings"
+                  className="md:hidden"
+                  iconOnly
+                  size="sm"
+                  variant="ghost"
+                >
+                  <Link to="/settings">
+                    <Icon name="settings" size="sm" />
+                  </Link>
+                </HitoButton>
               )}
             </div>
           </div>
@@ -459,6 +490,7 @@ export function AppShell({
           <Sheet open={mobilePlanActionsOpen} onOpenChange={setMobilePlanActionsOpen}>
             <SheetTrigger asChild>
               <button
+                ref={mobilePlanActionsTriggerRef}
                 type="button"
                 className="hito-shell-mobile-row"
                 data-active={mobilePlanActionsOpen ? "true" : undefined}
@@ -526,7 +558,7 @@ export function AppShell({
                       label="Edit Schedule"
                       onClick={() => {
                         closeMobilePlanActions();
-                        openPlanActionDialog("edit-schedule");
+                        openPlanActionDialog("edit-schedule", mobilePlanActionsTriggerRef.current);
                       }}
                     />
                     <MobilePlanActionButton
@@ -536,7 +568,7 @@ export function AppShell({
                       label="Clear Upcoming Schedule"
                       onClick={() => {
                         closeMobilePlanActions();
-                        openPlanActionDialog("clear-upcoming");
+                        openPlanActionDialog("clear-upcoming", mobilePlanActionsTriggerRef.current);
                       }}
                     />
                   </div>
@@ -579,6 +611,7 @@ export function AppShell({
         }}
         snapshot={snapshot}
         viewer={viewer}
+        returnFocusRef={planActionReturnFocusRef}
       />
       <iframe
         ref={exportFrameRef}

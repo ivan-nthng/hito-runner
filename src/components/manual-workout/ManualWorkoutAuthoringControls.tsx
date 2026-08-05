@@ -17,6 +17,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
+import { HitoButton } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { WorkoutGlyph } from "@/components/WorkoutGlyph";
 import {
   Select,
@@ -1048,14 +1050,15 @@ export function ManualWorkoutConstructorDialog({
         </div>
 
         <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
-          <button
+          <HitoButton
             type="button"
-            className="hito-button hito-button-secondary hito-button-md"
+            size="md"
+            variant="secondary"
             disabled={isBusy}
             onClick={() => onOpenChange(false)}
           >
             Close
-          </button>
+          </HitoButton>
           {readyReview ? (
             <>
               {onSaveTemplate ? (
@@ -1065,24 +1068,28 @@ export function ManualWorkoutConstructorDialog({
                   onSaveTemplate={onSaveTemplate}
                 />
               ) : null}
-              <button
+              <HitoButton
                 type="button"
-                className="hito-button hito-button-primary hito-button-md"
+                loading={status === "creating"}
+                size="md"
+                variant="primary"
                 disabled={isBusy}
                 onClick={onConfirm}
               >
                 {status === "creating" ? pendingLabel : confirmLabel}
-              </button>
+              </HitoButton>
             </>
           ) : (
-            <button
+            <HitoButton
               type="button"
-              className="hito-button hito-button-primary hito-button-md"
+              loading={status === "reviewing"}
+              size="md"
+              variant="primary"
               disabled={!canReview}
               onClick={onReview}
             >
               {status === "reviewing" ? "Reviewing workout..." : "Review workout"}
-            </button>
+            </HitoButton>
           )}
         </DialogFooter>
       </DialogContent>
@@ -1165,15 +1172,17 @@ function ManualSaveTemplateAction({
         }
       }}
     >
-      <button
+      <HitoButton
         type="button"
-        className="hito-button hito-button-secondary hito-button-md shrink-0"
+        className="shrink-0"
+        size="md"
+        variant="secondary"
         disabled={disabled}
         onClick={() => setOpen(true)}
       >
         <Icon name="workout" size="xs" />
         Save as template
-      </button>
+      </HitoButton>
       <DialogContent
         className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-compact"
         overlayClassName="hito-dialog-overlay-stable"
@@ -1188,8 +1197,9 @@ function ManualSaveTemplateAction({
         <div className="hito-product-dialog-body grid gap-4">
           <label className="grid gap-2">
             <span className="hito-form-label">Template name</span>
-            <input
-              className="hito-field hito-field-primary hito-field-md"
+            <Input
+              size="md"
+              variant="primary"
               value={displayName}
               onChange={(event) => setDisplayName(event.target.value)}
               placeholder="Easy aerobic run"
@@ -1221,22 +1231,25 @@ function ManualSaveTemplateAction({
           {error ? <p className="hito-field-error">{error}</p> : null}
         </div>
         <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
-          <button
+          <HitoButton
             type="button"
-            className="hito-button hito-button-secondary hito-button-md"
+            size="md"
+            variant="secondary"
             disabled={isSaving}
             onClick={() => setOpen(false)}
           >
             Cancel
-          </button>
-          <button
+          </HitoButton>
+          <HitoButton
             type="button"
-            className="hito-button hito-button-primary hito-button-md"
+            loading={isSaving}
+            size="md"
+            variant="primary"
             disabled={!displayName.trim() || isSaving}
             onClick={() => void submitSave()}
           >
             {isSaving ? "Saving..." : "Save template"}
-          </button>
+          </HitoButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

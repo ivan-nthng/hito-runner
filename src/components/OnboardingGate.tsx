@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { HitoButton } from "@/components/ui/button";
 import { hitoToast } from "@/components/ui/hito-toast";
 import { Icon } from "@/components/ui/icon";
 import { PlanPresetPanel } from "@/components/onboarding/PlanPresetPanel";
@@ -479,9 +480,10 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
         />
 
         <div className="flex justify-center">
-          <button
+          <HitoButton
             type="button"
-            className="hito-button hito-button-ghost hito-button-md"
+            size="md"
+            variant="ghost"
             aria-expanded={advancedSettingsOpen}
             aria-controls="advanced-generated-plan-setup"
             disabled={isBusy}
@@ -489,7 +491,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
           >
             <span>Advanced settings</span>
             <Icon name={advancedSettingsOpen ? "chevron-up" : "chevron-down"} size="xs" />
-          </button>
+          </HitoButton>
         </div>
 
         {advancedSettingsOpen ? (
@@ -533,11 +535,13 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
               </p>
               {manualCreateError ? <p className="hito-field-error">{manualCreateError}</p> : null}
             </div>
-            <button
+            <HitoButton
               type="button"
-              className="hito-button hito-button-secondary hito-button-md w-full sm:w-auto"
+              className="w-full sm:w-auto"
+              size="md"
+              variant="secondary"
               disabled={isBusy || !isManualSetupReady}
-              aria-busy={manualCreateStatus === "creating" || undefined}
+              loading={manualCreateStatus === "creating"}
               onClick={() => {
                 void createManualPlan();
               }}
@@ -545,7 +549,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
               {manualCreateStatus === "creating"
                 ? "Opening manual calendar..."
                 : "Build my plan myself"}
-            </button>
+            </HitoButton>
           </div>
         </div>
       </div>
@@ -564,26 +568,28 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
           </div>
           <div className="flex shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center">
             {selectedPreviewIsReady && !selectedPlanPreview.previewOpen ? (
-              <button
+              <HitoButton
                 type="button"
-                className="hito-button hito-button-secondary hito-button-lg"
+                size="lg"
+                variant="secondary"
                 disabled={isBusy}
                 onClick={clearGeneratedPlanSetup}
               >
                 Clear plan
-              </button>
+              </HitoButton>
             ) : null}
-            <button
+            <HitoButton
               type="button"
-              className="hito-button hito-button-primary hito-button-lg"
+              size="lg"
+              variant="primary"
               disabled={generatedCreateDisabled}
-              aria-busy={(isBusy && !pendingPreviewCanReopen) || undefined}
+              loading={isBusy && !pendingPreviewCanReopen}
               onClick={(event) => handleCreatePlanClick(event.currentTarget)}
             >
               {selectedPreviewIsReady && !selectedPlanPreview.previewOpen
                 ? "Review plan"
                 : "Create plan"}
-            </button>
+            </HitoButton>
           </div>
         </div>
       </div>

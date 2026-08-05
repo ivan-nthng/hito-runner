@@ -13,8 +13,12 @@ import {
   workoutDuration,
 } from "@/lib/training";
 import type { WorkoutResultFeedbackSummary } from "@/lib/workout-result-import/types";
+import { HitoButton } from "@/components/ui/button";
+import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
+import { Input } from "@/components/ui/input";
 import { HitoSlider } from "@/components/ui/hito-slider";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
+import { Textarea } from "@/components/ui/textarea";
 import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
 import {
   BodyNotesModal,
@@ -297,18 +301,18 @@ export function CompletionPanel({
           ).map((option) => {
             const active = outcome === option.v;
             return (
-              <button
+              <HitoChoiceToggle
                 key={option.v}
-                type="button"
+                presentation="card"
+                selected={active}
                 {...outcomeGroup.getRadioProps(option.v)}
-                data-selected={active ? "true" : undefined}
                 onClick={() =>
                   updateForm((current) => ({
                     ...current,
                     outcome: option.v,
                   }))
                 }
-                className="hito-choice-toggle hito-choice-toggle-card w-full flex-col justify-start gap-2 text-left"
+                className="w-full flex-col justify-start gap-2 text-left"
               >
                 <Icon
                   name={option.icon}
@@ -316,7 +320,7 @@ export function CompletionPanel({
                   style={{ color: active ? option.c : undefined }}
                 />
                 <span className="hito-list-row-title">{option.label}</span>
-              </button>
+              </HitoChoiceToggle>
             );
           })}
         </div>
@@ -384,23 +388,21 @@ export function CompletionPanel({
                         aria-label="Intervals completed"
                       >
                         {intervalValues.map((intervalValue) => (
-                          <button
+                          <HitoChoiceToggle
                             key={intervalValue}
-                            type="button"
+                            size="sm"
+                            selected={form.intervalsCompleted === Number(intervalValue)}
                             {...intervalGroup.getRadioProps(intervalValue)}
-                            data-selected={
-                              form.intervalsCompleted === Number(intervalValue) ? "true" : undefined
-                            }
                             onClick={() =>
                               updateForm((current) => ({
                                 ...current,
                                 intervalsCompleted: Number(intervalValue),
                               }))
                             }
-                            className="hito-choice-toggle hito-choice-toggle-sm min-w-0 flex-1 font-mono-num"
+                            className="min-w-0 flex-1 font-mono-num"
                           >
                             {intervalValue}
-                          </button>
+                          </HitoChoiceToggle>
                         ))}
                       </div>
                       <p className="hito-field-helper mt-2">
@@ -427,14 +429,16 @@ export function CompletionPanel({
 
             <div>
               <Label>Notes</Label>
-              <textarea
+              <Textarea
                 rows={3}
                 value={form.notes}
                 onChange={(event) =>
                   updateForm((current) => ({ ...current, notes: event.target.value }))
                 }
                 placeholder="Felt strong on the climb, slight tightness in right calf at km 6…"
-                className="hito-field hito-textarea-md mt-3 min-h-28 resize-none"
+                size="md"
+                variant="primary"
+                className="mt-3 min-h-28 resize-none"
               />
               <p className="hito-caption mt-3">
                 {snapshot.source === "persisted"
@@ -468,7 +472,7 @@ export function CompletionPanel({
       ) : null}
 
       <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-hairline">
-        <button
+        <HitoButton
           type="button"
           onClick={async () => {
             if (snapshot.source !== "persisted") {
@@ -501,11 +505,13 @@ export function CompletionPanel({
               setIsSaving(false);
             }
           }}
-          className="hito-button hito-button-primary hito-button-lg"
+          size="lg"
+          variant="primary"
+          loading={isSaving}
           disabled={isSaving || (hasSavedResult && !isDirty)}
         >
           {saveButtonLabel}
-        </button>
+        </HitoButton>
         <span className="hito-caption ml-auto">
           {snapshot.source === "persisted" ? "Saved to your plan." : "Preview only."}
         </span>
@@ -546,25 +552,28 @@ function LogResultFeedbackBridge({
           <p className="hito-body-small mt-1 max-w-xl">{state.body}</p>
         </div>
         {onOpenActivityFile ? (
-          <button
+          <HitoButton
             type="button"
             onClick={onOpenActivityFile}
-            className="hito-button hito-button-secondary hito-button-sm shrink-0"
+            size="sm"
+            variant="secondary"
+            className="shrink-0"
           >
             <Icon name="file-up" size="xs" />
             {state.cta}
-          </button>
+          </HitoButton>
         ) : (
-          <Link
-            to="/workout/$date"
-            params={{ date: workout.date }}
-            search={{ tab: "feedback" } as never}
-            className="hito-button hito-button-secondary hito-button-sm shrink-0"
-          >
-            <Icon name="file-up" size="xs" />
-            {state.cta}
-            <Icon name="arrow-up-right" size="xs" />
-          </Link>
+          <HitoButton asChild size="sm" variant="secondary" className="shrink-0">
+            <Link
+              to="/workout/$date"
+              params={{ date: workout.date }}
+              search={{ tab: "feedback" } as never}
+            >
+              <Icon name="file-up" size="xs" />
+              {state.cta}
+              <Icon name="arrow-up-right" size="xs" />
+            </Link>
+          </HitoButton>
         )}
       </div>
     </div>
@@ -926,7 +935,7 @@ export function WorkoutFeedbackPanel({
                     </p>
                   ) : null}
                   <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-                    <button
+                    <HitoButton
                       type="button"
                       onClick={() => {
                         setUploadError(null);
@@ -935,14 +944,14 @@ export function WorkoutFeedbackPanel({
                         fileInputRef.current?.click();
                       }}
                       disabled={!canUploadResult || isUploading}
-                      className={cn(
-                        "hito-button hito-button-primary hito-button-md",
-                        !canUploadResult && "disabled:opacity-100",
-                      )}
+                      size="md"
+                      variant="primary"
+                      loading={isUploading}
+                      className={cn(!canUploadResult && "disabled:opacity-100")}
                     >
                       <Icon name="file-up" size="sm" />
                       {isUploading ? "Uploading file..." : "Upload activity file"}
-                    </button>
+                    </HitoButton>
                   </div>
                 </div>
 
@@ -1142,17 +1151,20 @@ function AttachedEvidenceReadback({
             <p className="hito-caption mt-1">Extracted activity: {asset.primaryFileName}</p>
           ) : null}
         </div>
-        <button
+        <HitoButton
           type="button"
           onClick={() => {
             void onRemove();
           }}
           disabled={isRemoving}
-          className="hito-button hito-button-secondary hito-button-md w-full shrink-0 opacity-100 transition-opacity sm:w-auto sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus-visible:opacity-100"
+          size="md"
+          variant="secondary"
+          loading={isRemoving}
+          className="w-full shrink-0 opacity-100 transition-opacity sm:w-auto sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus-visible:opacity-100"
         >
           <Icon name="trash" size="sm" />
           {isRemoving ? "Removing..." : localFixture ? "Clear local preview" : "Remove file"}
-        </button>
+        </HitoButton>
       </div>
 
       <div
@@ -1425,13 +1437,15 @@ function NumField({
         <span className="hito-caption font-mono-num">plan {planned}</span>
       </div>
       <span className="relative block">
-        <input
+        <Input
           type="text"
           inputMode="decimal"
           autoComplete="off"
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="hito-field hito-field-primary hito-field-md pr-12 font-mono-num"
+          size="md"
+          variant="primary"
+          className="pr-12 font-mono-num"
         />
         <span
           className="hito-caption pointer-events-none absolute inset-y-0 right-3 flex items-center"

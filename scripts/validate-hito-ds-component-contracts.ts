@@ -33,6 +33,54 @@ const demoStatePrimitiveAllowlist = new Set([
   "src/components/ui/hito-calendar-day.tsx",
   "src/components/ui/inline-editable-text.tsx",
 ]);
+const sharedFieldOwnerMarkers = [
+  ".hito-field-xs",
+  ".hito-field-sm",
+  ".hito-field-md",
+  ".hito-field-lg",
+  ".hito-field-control",
+  ".hito-field-icon",
+  ".hito-field-helper",
+  ".hito-field-error",
+  ".hito-field-success",
+  ".hito-textarea-md",
+  ".hito-date-field-control",
+  ".hito-editable-value-field-group",
+] as const;
+const referenceManualRecipePatterns = [
+  {
+    family: "Button",
+    pattern: /(?:className|buttonClassName)\s*=\s*["'][^"']*\bhito-button(?=[\s"'])[^"']*["']/g,
+  },
+  {
+    family: "Button",
+    pattern:
+      /(?:className|buttonClassName)\s*=\s*\{cn\([\s\S]{0,240}?["'][^"']*\bhito-button(?=[\s"'])[^"']*["']/g,
+  },
+  {
+    family: "Choice Toggle",
+    pattern:
+      /(?:className|buttonClassName)\s*=\s*["'][^"']*\bhito-choice-toggle(?=[\s"'])[^"']*["']/g,
+  },
+  {
+    family: "Choice Toggle",
+    pattern: /buttonClassName\s*=\s*["'][^"']*\bhito-choice-toggle-(?!group)[^"']*["']/g,
+  },
+  {
+    family: "Choice Toggle",
+    pattern:
+      /(?:className|buttonClassName)\s*=\s*\{cn\([\s\S]{0,240}?["'][^"']*\bhito-choice-toggle(?=[\s"'])[^"']*["']/g,
+  },
+  {
+    family: "Field",
+    pattern: /(?:className|buttonClassName)\s*=\s*["'][^"']*\bhito-field(?=[\s"'])[^"']*["']/g,
+  },
+  {
+    family: "Field",
+    pattern:
+      /(?:className|buttonClassName)\s*=\s*\{cn\([\s\S]{0,240}?["'][^"']*\bhito-field(?=[\s"'])[^"']*["']/g,
+  },
+] as const;
 
 type SourceFile = {
   content: string;
@@ -69,6 +117,11 @@ function filesContaining(files: SourceFile[], marker: string) {
   return files.filter((file) => file.content.includes(marker));
 }
 
+function declaresSelector(css: string, selector: string) {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^\\s*${escaped}(?=\\s|\\{|,|:)`, "m").test(css);
+}
+
 function validateCssSelectors(css: string, family: string, values: readonly string[]) {
   values.forEach((value) => {
     expect(css.includes(`.${family}-${value}`), `Missing CSS contract: ${family}-${value}`);
@@ -81,6 +134,29 @@ function retiredClassFindings(files: SourceFile[]) {
   );
 }
 
+function referenceManualRecipeFindings(files: SourceFile[]) {
+  return files
+    .filter((file) => file.relativePath.startsWith("src/components/hito-ds/"))
+    .flatMap((file) => {
+      // The capture board's inert select trigger is export geometry, not a live control.
+      const content =
+        file.relativePath === "src/components/hito-ds/figma-export-board.tsx"
+          ? file.content.replace(
+              /function StaticSelectTrigger[\s\S]*?(?=\nfunction StaticMenuItem)/,
+              "",
+            )
+          : file.content;
+
+      return referenceManualRecipePatterns.flatMap(({ family, pattern }) =>
+        Array.from(content.matchAll(pattern), () => `${family} in ${file.relativePath}`),
+      );
+    });
+}
+
+function sharedFieldOwnerLeakFindings(css: string) {
+  return sharedFieldOwnerMarkers.filter((marker) => declaresSelector(css, marker));
+}
+
 function validateSelfTest() {
   const synthetic = [
     { relativePath: "synthetic/button.tsx", content: 'className="hito-button-xl"' },
@@ -90,6 +166,23 @@ function validateSelfTest() {
   ];
   const findings = retiredClassFindings(synthetic);
   expect(findings.length === 4, "Self-test failed to detect every retired control class.");
+
+  const manualFindings = referenceManualRecipeFindings([
+    {
+      relativePath: "src/components/hito-ds/synthetic.tsx",
+      content: [
+        '<button className="hito-button hito-button-primary hito-button-sm">Test</button>',
+        '<ThemeControl buttonClassName="hito-choice-toggle-xs flex-1" />',
+      ].join("\n"),
+    },
+  ]);
+  expect(manualFindings.length === 2, "Self-test failed to detect manual reference control CSS.");
+
+  const fieldLeakFindings = sharedFieldOwnerLeakFindings(".hito-field-xs { min-height: 1rem; }");
+  expect(
+    fieldLeakFindings.length === 1 && fieldLeakFindings[0] === ".hito-field-xs",
+    "Self-test failed to detect shared Field CSS in a domain owner.",
+  );
 }
 
 const sourceFiles = (
@@ -105,12 +198,27 @@ const sourceFiles = (
 const controlsCss = await readFile(controlsCssPath, "utf8");
 const fieldBaseCss = await readFile(fieldBaseCssPath, "utf8");
 const fieldExtendedCss = await readFile(fieldsCssPath, "utf8");
-const fieldsCss = `${fieldBaseCss}\n${fieldExtendedCss}`;
 
 expect(
   /^\s*\.hito-field\s*\{/m.test(fieldBaseCss) &&
     fieldBaseCss.includes(".hito-compound-range-control"),
   "Shared Field base and compound-range anatomy must stay in controls-fields.css.",
+);
+sharedFieldOwnerMarkers.forEach((marker) => {
+  expect(
+    declaresSelector(fieldBaseCss, marker),
+    `Shared Field owner is missing from controls-fields.css: ${marker}`,
+  );
+  expect(
+    declaresSelector(fieldExtendedCss, marker) === false,
+    `Shared Field owner leaked into forms-onboarding.css: ${marker}`,
+  );
+});
+expect(
+  sharedFieldOwnerLeakFindings(fieldExtendedCss).length === 0,
+  `Shared Field selectors leaked into forms-onboarding.css: ${sharedFieldOwnerLeakFindings(
+    fieldExtendedCss,
+  ).join(", ")}`,
 );
 expect(
   /^\s*\.hito-field\s*\{/m.test(fieldExtendedCss) === false,
@@ -142,12 +250,15 @@ expect(
     controlsCss.includes(".hito-button-progress-fill"),
   "Button timed progress must retain its bounded shared presentation.",
 );
-validateCssSelectors(fieldsCss, "hito-field", HITO_FIELD_VARIANTS);
-validateCssSelectors(fieldsCss, "hito-field", HITO_FIELD_SIZES);
+validateCssSelectors(fieldBaseCss, "hito-field", HITO_FIELD_VARIANTS);
+validateCssSelectors(fieldBaseCss, "hito-field", HITO_FIELD_SIZES);
 validateCssSelectors(controlsCss, "hito-choice-toggle", HITO_CHOICE_TOGGLE_SIZES);
 
 retiredClassFindings(sourceFiles).forEach((finding) => {
   errors.push(`Retired control class returned: ${finding}`);
+});
+referenceManualRecipeFindings(sourceFiles).forEach((finding) => {
+  errors.push(`Hito DS reference bypassed a shared control primitive: ${finding}`);
 });
 
 const referenceControls = sourceFiles.find(

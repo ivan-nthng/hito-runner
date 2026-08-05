@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
 import { ChoiceSelector } from "@/components/hito-ds/specimen-previews";
+import { HitoButton } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -142,9 +143,9 @@ function MotionOverlayDemo({
     return (
       <Dialog>
         <DialogTrigger asChild>
-          <button type="button" className="hito-button hito-button-primary hito-button-md">
+          <HitoButton size="md" variant="primary">
             Open dialog
-          </button>
+          </HitoButton>
         </DialogTrigger>
         <DialogContent className="hito-product-dialog hito-product-dialog-content-fit hito-dialog-size-compact">
           <DialogHeader className="hito-product-dialog-header">
@@ -157,9 +158,9 @@ function MotionOverlayDemo({
             <p className="hito-support-copy">Shared dialog motion preserves modal containment.</p>
           </div>
           <DialogFooter className="hito-product-dialog-footer">
-            <button type="button" className="hito-button hito-button-primary hito-button-md">
+            <HitoButton size="md" variant="primary">
               Confirm
-            </button>
+            </HitoButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -170,9 +171,9 @@ function MotionOverlayDemo({
     return (
       <Sheet>
         <SheetTrigger asChild>
-          <button type="button" className="hito-button hito-button-primary hito-button-md">
+          <HitoButton size="md" variant="primary">
             Open sheet
-          </button>
+          </HitoButton>
         </SheetTrigger>
         <SheetContent className="grid grid-rows-[auto_minmax(0,1fr)_auto] p-0">
           <SheetHeader className="border-b border-hairline px-5 py-4 pr-14">
@@ -183,9 +184,9 @@ function MotionOverlayDemo({
             <p className="hito-support-copy">Shared sheet content stays viewport-contained.</p>
           </div>
           <SheetFooter className="border-t border-hairline p-5">
-            <button type="button" className="hito-button hito-button-primary hito-button-md">
+            <HitoButton size="md" variant="primary">
               Continue
-            </button>
+            </HitoButton>
           </SheetFooter>
         </SheetContent>
       </Sheet>
@@ -196,9 +197,9 @@ function MotionOverlayDemo({
     return (
       <Popover>
         <PopoverTrigger asChild>
-          <button type="button" className="hito-button hito-button-secondary hito-button-md">
+          <HitoButton size="md" variant="secondary">
             Open popover
-          </button>
+          </HitoButton>
         </PopoverTrigger>
         <PopoverContent>
           <p className="hito-list-row-title">Workout detail</p>
@@ -213,14 +214,10 @@ function MotionOverlayDemo({
       <TooltipProvider delayDuration={120}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <button
-              type="button"
-              className="hito-button hito-button-secondary hito-button-md"
-              aria-label="Show motion tooltip"
-            >
+            <HitoButton size="md" variant="secondary" aria-label="Show motion tooltip">
               <Icon name="plan-note" size="sm" />
               Hover or focus
-            </button>
+            </HitoButton>
           </TooltipTrigger>
           <TooltipContent sideOffset={8}>Short contextual detail</TooltipContent>
         </Tooltip>
@@ -249,10 +246,10 @@ function MotionOverlayDemo({
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button type="button" className="hito-button hito-button-secondary hito-button-md">
+          <HitoButton size="md" variant="secondary">
             Open menu
             <Icon name="chevron-down" size="sm" />
-          </button>
+          </HitoButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="center">
           <DropdownMenuItem>
@@ -269,9 +266,9 @@ function MotionOverlayDemo({
   }
 
   return (
-    <button
-      type="button"
-      className="hito-button hito-button-secondary hito-button-md"
+    <HitoButton
+      size="md"
+      variant="secondary"
       onClick={() =>
         hitoToast.info({
           id: "hito-ds-motion-toast",
@@ -281,6 +278,6 @@ function MotionOverlayDemo({
       }
     >
       Show toast
-    </button>
+    </HitoButton>
   );
 }

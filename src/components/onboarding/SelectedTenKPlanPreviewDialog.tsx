@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { HitoButton } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import {
   HitoCalendarDayCell,
@@ -266,56 +267,57 @@ export function SelectedRunningPlanPreviewDialog({
 
         {initialLoading ? (
           <DialogFooter className="hito-product-dialog-footer hito-product-dialog-footer-center sm:space-x-0">
-            <button
-              type="button"
-              className="hito-button hito-button-secondary hito-button-md"
-              onClick={onCancel}
-            >
+            <HitoButton type="button" size="md" variant="secondary" onClick={onCancel}>
               Cancel
-            </button>
+            </HitoButton>
           </DialogFooter>
         ) : reviewVisible && draft ? (
           <DialogFooter className="hito-product-dialog-footer grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:space-x-0">
             <p className="hito-caption min-w-0">Not saved until you create the plan.</p>
             <div className="flex w-full flex-col-reverse gap-3 sm:w-auto sm:flex-row sm:items-center">
-              <button
+              <HitoButton
                 ref={readyFocusTargetRef}
                 type="button"
-                className="hito-button hito-button-secondary hito-button-md"
-                disabled={loading || creating}
+                size="md"
+                variant="secondary"
+                disabled={creating}
+                loading={loading}
                 onClick={onRefresh}
               >
                 {loading ? "Refreshing..." : "Refresh preview"}
-              </button>
-              <button
+              </HitoButton>
+              <HitoButton
                 type="button"
-                className="hito-button hito-button-primary hito-button-md"
-                disabled={!reviewReady || loading || creating}
-                aria-busy={creating || undefined}
+                size="md"
+                variant="primary"
+                disabled={!reviewReady || loading}
+                loading={creating}
                 onClick={onCreate}
               >
                 {creating ? primaryActionPendingLabel : primaryActionLabel}
-              </button>
+              </HitoButton>
             </div>
           </DialogFooter>
         ) : failedPreview ? (
           <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
             {!unavailableIsCorrectable ? (
-              <button
+              <HitoButton
                 type="button"
-                className="hito-button hito-button-secondary hito-button-md"
+                size="md"
+                variant="secondary"
                 onClick={() => onOpenChange(false)}
               >
                 Close
-              </button>
+              </HitoButton>
             ) : null}
-            <button
+            <HitoButton
               type="button"
-              className="hito-button hito-button-primary hito-button-md"
+              size="md"
+              variant="primary"
               onClick={unavailableIsCorrectable ? () => onOpenChange(false) : onRefresh}
             >
               {unavailableIsCorrectable ? "Review details" : "Try again"}
-            </button>
+            </HitoButton>
           </DialogFooter>
         ) : null}
       </DialogContent>
@@ -382,9 +384,9 @@ function CreateBlockedNotice({
           <p className="hito-list-row-copy">{view.copy}</p>
         </div>
         {view.openPlan ? (
-          <a href="/" className="hito-button hito-button-secondary hito-button-sm shrink-0">
-            Back to calendar
-          </a>
+          <HitoButton asChild className="shrink-0" size="sm" variant="secondary">
+            <a href="/">Back to calendar</a>
+          </HitoButton>
         ) : null}
       </div>
     </div>

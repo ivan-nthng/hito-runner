@@ -3,6 +3,7 @@ import { useState } from "react";
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
 import { ProductLinks } from "@/components/hito-ds/reference";
 import { EditableSelectValueField, EditableValueField } from "@/components/ui/editable-value-field";
+import { HitoButton } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -55,14 +56,16 @@ export function EditableValueFieldSandbox() {
           <TooltipProvider delayDuration={120}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  className="hito-button hito-button-ghost hito-button-xs hito-button-icon absolute right-0 top-0 z-10"
+                <HitoButton
+                  size="xs"
+                  variant="ghost"
+                  iconOnly
+                  className="absolute right-0 top-0 z-10"
                   aria-label="Reset editable value field sandbox"
                   onClick={reset}
                 >
                   <Icon name="refresh" size="xs" />
-                </button>
+                </HitoButton>
               </TooltipTrigger>
               <TooltipContent side="left" sideOffset={8}>
                 <span className="hito-tooltip-meta block">Reset sandbox</span>

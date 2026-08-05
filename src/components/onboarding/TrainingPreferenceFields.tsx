@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
   FITNESS_LEVEL_OPTIONS,
@@ -114,22 +116,23 @@ export function TrainingPreferenceFields({
         }
       >
         <div className="hito-choice-toggle-group" role="group" aria-label="Fixed rest days">
-          <button
+          <HitoChoiceToggle
             type="button"
+            size="sm"
+            selected={fixedRestDays.length === 0}
             onClick={() => commitFixedRestDays([])}
-            className="hito-choice-toggle hito-choice-toggle-sm"
-            data-selected={fixedRestDays.length === 0}
-            aria-pressed={fixedRestDays.length === 0}
           >
             {runningDaysMode === "ceiling" ? "Flexible" : "No fixed rest days"}
-          </button>
+          </HitoChoiceToggle>
           {WEEKDAY_OPTIONS.map((weekday) => {
             const active = fixedRestDays.includes(weekday.value);
             const disabled = !active && !canSelectMoreRestDays;
             return (
-              <button
+              <HitoChoiceToggle
                 key={weekday.value}
                 type="button"
+                size="sm"
+                selected={active}
                 disabled={disabled}
                 aria-disabled={disabled}
                 onClick={() => {
@@ -138,13 +141,10 @@ export function TrainingPreferenceFields({
                     : [...fixedRestDays, weekday.value];
                   commitFixedRestDays(nextRestDays);
                 }}
-                className="hito-choice-toggle hito-choice-toggle-sm"
-                data-selected={active}
-                aria-pressed={active}
                 aria-label={`${weekday.value}${active ? " fixed rest day" : ""}`}
               >
                 {weekday.label}
-              </button>
+              </HitoChoiceToggle>
             );
           })}
         </div>
@@ -176,31 +176,31 @@ export function TrainingPreferenceFields({
           aria-label="Preferred long-run day"
         >
           {preferredLongRunMode === "optional-any" || preferredLongRunMode === "default-sunday" ? (
-            <button
+            <HitoChoiceToggle
               type="button"
               {...preferredLongRunGroup.getRadioProps("")}
-              className="hito-choice-toggle hito-choice-toggle-sm"
-              data-selected={preferredLongRunDay === ""}
+              size="sm"
+              selected={preferredLongRunDay === ""}
               onClick={() => onPreferredLongRunDayChange("")}
             >
               {preferredLongRunMode === "default-sunday" ? "Use default" : "Any"}
-            </button>
+            </HitoChoiceToggle>
           ) : null}
           {WEEKDAY_OPTIONS.map((weekday) => {
             const active = preferredLongRunDay === weekday.value;
             const disabled = fixedRestDays.includes(weekday.value);
             return (
-              <button
+              <HitoChoiceToggle
                 key={weekday.value}
                 type="button"
                 {...preferredLongRunGroup.getRadioProps(weekday.value)}
+                size="sm"
+                selected={active}
                 disabled={disabled}
-                className="hito-choice-toggle hito-choice-toggle-sm"
-                data-selected={active}
                 onClick={() => onPreferredLongRunDayChange(weekday.value)}
               >
                 {weekday.label}
-              </button>
+              </HitoChoiceToggle>
             );
           })}
         </div>
@@ -216,13 +216,14 @@ export function TrainingPreferenceFields({
             {FITNESS_LEVEL_OPTIONS.map((option) => {
               const active = fitnessLevel === option.value;
               return (
-                <button
+                <HitoChoiceToggle
                   key={option.value}
                   type="button"
                   {...fitnessBenchmarkGroup.getRadioProps(option.value)}
+                  presentation="card"
+                  selected={active}
                   disabled={option.value === "custom" && !allowCustomFitnessLevelSelection}
-                  className="hito-choice-toggle hito-choice-toggle-card min-h-14 w-full justify-between whitespace-normal text-left"
-                  data-selected={active}
+                  className="min-h-14 w-full justify-between whitespace-normal text-left"
                   onClick={() => onFitnessLevelChange(option.value)}
                 >
                   <span className="min-w-0">
@@ -231,7 +232,7 @@ export function TrainingPreferenceFields({
                       {option.copy}
                     </span>
                   </span>
-                </button>
+                </HitoChoiceToggle>
               );
             })}
           </div>
@@ -301,25 +302,25 @@ export function RunningDaysPreferenceField({
         aria-label={resolvedLabel}
       >
         {mode === "ceiling" ? (
-          <button
+          <HitoChoiceToggle
             type="button"
             {...runningDaysGroup.getRadioProps("")}
-            className="hito-choice-toggle hito-choice-toggle-sm"
-            data-selected={maxRunningDaysPerWeek === ""}
+            size="sm"
+            selected={maxRunningDaysPerWeek === ""}
             onClick={() => onMaxRunningDaysPerWeekChange("")}
           >
             Flexible
-          </button>
+          </HitoChoiceToggle>
         ) : null}
         {runningDayOptions.map((count) => {
           const active = selectedRunningDays === Number(count);
           return (
-            <button
+            <HitoChoiceToggle
               key={count}
               type="button"
               {...runningDaysGroup.getRadioProps(count)}
-              className="hito-choice-toggle hito-choice-toggle-sm"
-              data-selected={active}
+              size="sm"
+              selected={active}
               aria-label={
                 mode === "ceiling"
                   ? `Up to ${count} running day${count === "1" ? "" : "s"} per week`
@@ -328,7 +329,7 @@ export function RunningDaysPreferenceField({
               onClick={() => onMaxRunningDaysPerWeekChange(count)}
             >
               {count}
-            </button>
+            </HitoChoiceToggle>
           );
         })}
       </div>
@@ -375,22 +376,24 @@ export function RecentFiveKBenchmarkFields({
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-2">
           <span className="hito-form-label">Recent 5K time</span>
-          <input
+          <Input
             value={recent5kTime}
             onChange={(event) => onRecent5kTimeChange(event.target.value)}
             placeholder="25:00"
-            className="hito-field hito-field-primary hito-field-md"
+            size="md"
+            variant="primary"
             aria-invalid={timeInvalid || (required && !hasTime && !hasPace)}
           />
         </label>
 
         <label className="grid gap-2">
           <span className="hito-form-label">Recent 5K pace</span>
-          <input
+          <Input
             value={recent5kPace}
             onChange={(event) => onRecent5kPaceChange(event.target.value)}
             placeholder="5:00/km"
-            className="hito-field hito-field-primary hito-field-md"
+            size="md"
+            variant="primary"
             aria-invalid={paceInvalid || (required && !hasTime && !hasPace)}
           />
         </label>

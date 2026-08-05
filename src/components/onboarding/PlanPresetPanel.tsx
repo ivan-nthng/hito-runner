@@ -1,5 +1,7 @@
 import { useId, type ReactNode, type RefObject } from "react";
 import { HitoDateField, HitoMaskedTimeField } from "@/components/ui/hito-date-time-input";
+import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { PlanGoalChoice } from "@/components/onboarding/onboarding-form-model";
 import { SelectedRunningPlanPreviewDialog } from "@/components/onboarding/SelectedTenKPlanPreviewDialog";
@@ -297,17 +299,16 @@ function PlanGoalIntentControls({
         <div className="hito-form-two-column-grid">
           <label className="grid gap-2">
             <span className="hito-form-label">Custom distance</span>
-            <input
+            <Input
               type="text"
               inputMode="decimal"
               autoComplete="off"
               value={customDistanceKm}
               onChange={(event) => onCustomDistanceKmChange(event.target.value)}
               placeholder="12.5"
-              className={cn(
-                "hito-field hito-field-primary hito-field-md",
-                customDistanceError && "hito-field-feedback-error",
-              )}
+              feedback={customDistanceError ? "error" : "neutral"}
+              size="md"
+              variant="primary"
             />
             {customDistanceError ? (
               <span className="hito-field-error">{customDistanceError}</span>
@@ -317,13 +318,14 @@ function PlanGoalIntentControls({
           </label>
           <label className="grid gap-2">
             <span className="hito-form-label">Goal name</span>
-            <input
+            <Input
               type="text"
               autoComplete="off"
               value={customDistanceLabel}
               onChange={(event) => onCustomDistanceLabelChange(event.target.value)}
               placeholder="City 12.5K"
-              className="hito-field hito-field-primary hito-field-md"
+              size="md"
+              variant="primary"
             />
             <span className="hito-field-helper">Optional. For example: City 12.5K.</span>
           </label>
@@ -383,13 +385,14 @@ function PlanGoalCard({
   radioProps: HitoRadioOptionProps;
 }) {
   return (
-    <button
+    <HitoChoiceToggle
       ref={buttonRef}
       type="button"
       {...radioProps}
-      data-selected={active ? "true" : undefined}
+      presentation="card"
+      selected={active}
       onClick={onClick}
-      className="hito-choice-toggle hito-choice-toggle-card min-h-32 w-full flex-col justify-between text-left"
+      className="min-h-32 w-full flex-col justify-between text-left"
     >
       <span className="flex w-full min-w-0 items-start justify-between gap-3">
         <span
@@ -414,6 +417,6 @@ function PlanGoalCard({
         <span className="font-semibold leading-tight">{label}</span>
         <span className="text-xs font-medium leading-snug opacity-80">{copy}</span>
       </span>
-    </button>
+    </HitoChoiceToggle>
   );
 }

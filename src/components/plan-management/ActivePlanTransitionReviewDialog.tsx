@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icon";
+import { HitoButton } from "@/components/ui/button";
 import type {
   ActivePlanTransitionConfirmResult,
   ActivePlanTransitionReviewResult,
@@ -67,22 +68,24 @@ export function ActivePlanTransitionReviewDialog({
         </div>
 
         <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
-          <button
+          <HitoButton
             type="button"
-            className="hito-button hito-button-secondary hito-button-md"
+            variant="secondary"
+            size="md"
             disabled={confirming}
             onClick={onKeepCurrentPlan}
           >
             Keep current plan
-          </button>
-          <button
+          </HitoButton>
+          <HitoButton
             type="button"
-            className="hito-button hito-button-primary hito-button-md"
+            variant="primary"
+            size="md"
             disabled={!review || confirming}
             onClick={onConfirm}
           >
             {confirming ? "Applying reviewed plan..." : "Apply reviewed plan"}
-          </button>
+          </HitoButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

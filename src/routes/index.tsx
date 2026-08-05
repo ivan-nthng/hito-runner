@@ -4,6 +4,7 @@ import { AuthEntryScreen } from "@/components/AuthEntryScreen";
 import { OnboardingGate } from "@/components/OnboardingGate";
 import { TodayHero } from "@/components/TodayHero";
 import { Calendar } from "@/components/Calendar";
+import { HitoButton } from "@/components/ui/button";
 import { APP_NAME } from "@/lib/app-config";
 import { getHomeRouteData } from "@/lib/training-api";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -98,16 +99,17 @@ function HomeErrorState({ reset }: { error: Error; reset: () => void }) {
             returning home will keep you in the onboarding flow.
           </p>
           <div className="hito-state-actions">
-            <button
+            <HitoButton
               type="button"
               onClick={() => {
                 reset();
                 window.location.reload();
               }}
-              className="hito-button hito-button-primary hito-button-lg"
+              size="lg"
+              variant="primary"
             >
               Try again
-            </button>
+            </HitoButton>
           </div>
         </section>
       </div>

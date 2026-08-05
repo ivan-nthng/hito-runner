@@ -9,76 +9,41 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as ProgressRouteImport } from './routes/progress'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as IntegrationsRouteImport } from './routes/integrations'
-import { Route as HubRouteImport } from './routes/hub'
-import { Route as HitoDSRouteImport } from './routes/hitoDS'
-import { Route as ChangelogRouteImport } from './routes/changelog'
-import { Route as ChangeLogRouteImport } from './routes/change-log'
-import { Route as BodyRouteImport } from './routes/body'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as WorkoutDateRouteImport } from './routes/workout.$date'
-import { Route as HitoDSPatternsRouteImport } from './routes/hitoDS_.patterns'
-import { Route as HitoDSFoundationsRouteImport } from './routes/hitoDS_.foundations'
-import { Route as HitoDSComponentsRouteImport } from './routes/hitoDS_.components'
-import { Route as ApiRunnerActivityProgressRouteImport } from './routes/api.runner-activity-progress'
-import { Route as ApiRunnerActivitiesRouteImport } from './routes/api.runner-activities'
-import { Route as AdminLoginRouteImport } from './routes/admin.login'
-import { Route as AdminCaptureRouteImport } from './routes/admin.capture'
+import { Route as BodyRouteImport } from './routes/body'
+import { Route as ChangeLogRouteImport } from './routes/change-log'
+import { Route as ChangelogRouteImport } from './routes/changelog'
+import { Route as HitoDSRouteImport } from './routes/hitoDS'
+import { Route as HubRouteImport } from './routes/hub'
+import { Route as IntegrationsRouteImport } from './routes/integrations'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as ProgressRouteImport } from './routes/progress'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
-import { Route as HitoDSExportFigmaRouteImport } from './routes/hitoDS_.export.figma'
-import { Route as ApiWorkoutResultUploadRouteImport } from './routes/api.workout-result.upload'
-import { Route as ApiWorkoutResultRemoveRouteImport } from './routes/api.workout-result.remove'
-import { Route as ApiRunnerActivitiesActivityIdRouteImport } from './routes/api.runner-activities.$activityId'
-import { Route as ApiProfileAvatarUploadRouteImport } from './routes/api.profile-avatar.upload'
-import { Route as ApiPlanExportRouteImport } from './routes/api.plan.export'
-import { Route as ApiAuthLogoutRouteImport } from './routes/api.auth.logout'
-import { Route as ApiAuthLocalLoginRouteImport } from './routes/api.auth.local-login'
+import { Route as AdminCaptureRouteImport } from './routes/admin.capture'
+import { Route as AdminLoginRouteImport } from './routes/admin.login'
+import { Route as ApiRunnerActivitiesRouteImport } from './routes/api.runner-activities'
+import { Route as ApiRunnerActivityProgressRouteImport } from './routes/api.runner-activity-progress'
+import { Route as HitoDSComponentsRouteImport } from './routes/hitoDS_.components'
+import { Route as HitoDSFoundationsRouteImport } from './routes/hitoDS_.foundations'
+import { Route as HitoDSPatternsRouteImport } from './routes/hitoDS_.patterns'
+import { Route as WorkoutDateRouteImport } from './routes/workout.$date'
 import { Route as ApiAuthConfirmRouteImport } from './routes/api.auth.confirm'
-import { Route as ApiRunnerActivitiesActivityIdSourceRouteImport } from './routes/api.runner-activities.$activityId.source'
-import { Route as ApiAdminAuthLogoutRouteImport } from './routes/api.admin.auth.logout'
+import { Route as ApiAuthLocalLoginRouteImport } from './routes/api.auth.local-login'
+import { Route as ApiAuthLogoutRouteImport } from './routes/api.auth.logout'
+import { Route as ApiPlanExportRouteImport } from './routes/api.plan.export'
+import { Route as ApiProfileAvatarUploadRouteImport } from './routes/api.profile-avatar.upload'
+import { Route as ApiRunnerActivitiesActivityIdRouteImport } from './routes/api.runner-activities.$activityId'
+import { Route as ApiWorkoutResultRemoveRouteImport } from './routes/api.workout-result.remove'
+import { Route as ApiWorkoutResultUploadRouteImport } from './routes/api.workout-result.upload'
+import { Route as HitoDSExportFigmaRouteImport } from './routes/hitoDS_.export.figma'
 import { Route as ApiAdminAuthLoginRouteImport } from './routes/api.admin.auth.login'
+import { Route as ApiAdminAuthLogoutRouteImport } from './routes/api.admin.auth.logout'
+import { Route as ApiRunnerActivitiesActivityIdSourceRouteImport } from './routes/api.runner-activities.$activityId.source'
 
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProgressRoute = ProgressRouteImport.update({
-  id: '/progress',
-  path: '/progress',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const IntegrationsRoute = IntegrationsRouteImport.update({
-  id: '/integrations',
-  path: '/integrations',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HubRoute = HubRouteImport.update({
-  id: '/hub',
-  path: '/hub',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HitoDSRoute = HitoDSRouteImport.update({
-  id: '/hitoDS',
-  path: '/hitoDS',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ChangelogRoute = ChangelogRouteImport.update({
-  id: '/changelog',
-  path: '/changelog',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ChangeLogRoute = ChangeLogRouteImport.update({
-  id: '/change-log',
-  path: '/change-log',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BodyRoute = BodyRouteImport.update({
@@ -86,29 +51,64 @@ const BodyRoute = BodyRouteImport.update({
   path: '/body',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const ChangeLogRoute = ChangeLogRouteImport.update({
+  id: '/change-log',
+  path: '/change-log',
   getParentRoute: () => rootRouteImport,
 } as any)
-const WorkoutDateRoute = WorkoutDateRouteImport.update({
-  id: '/workout/$date',
-  path: '/workout/$date',
+const ChangelogRoute = ChangelogRouteImport.update({
+  id: '/changelog',
+  path: '/changelog',
   getParentRoute: () => rootRouteImport,
 } as any)
-const HitoDSPatternsRoute = HitoDSPatternsRouteImport.update({
-  id: '/hitoDS_/patterns',
-  path: '/hitoDS/patterns',
+const HitoDSRoute = HitoDSRouteImport.update({
+  id: '/hitoDS',
+  path: '/hitoDS',
   getParentRoute: () => rootRouteImport,
 } as any)
-const HitoDSFoundationsRoute = HitoDSFoundationsRouteImport.update({
-  id: '/hitoDS_/foundations',
-  path: '/hitoDS/foundations',
+const HubRoute = HubRouteImport.update({
+  id: '/hub',
+  path: '/hub',
   getParentRoute: () => rootRouteImport,
 } as any)
-const HitoDSComponentsRoute = HitoDSComponentsRouteImport.update({
-  id: '/hitoDS_/components',
-  path: '/hitoDS/components',
+const IntegrationsRoute = IntegrationsRouteImport.update({
+  id: '/integrations',
+  path: '/integrations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProgressRoute = ProgressRouteImport.update({
+  id: '/progress',
+  path: '/progress',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
+  id: '/admin/analytics',
+  path: '/admin/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminCaptureRoute = AdminCaptureRouteImport.update({
+  id: '/admin/capture',
+  path: '/admin/capture',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/admin/login',
+  path: '/admin/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRunnerActivitiesRoute = ApiRunnerActivitiesRouteImport.update({
+  id: '/api/runner-activities',
+  path: '/api/runner-activities',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiRunnerActivityProgressRoute =
@@ -117,39 +117,49 @@ const ApiRunnerActivityProgressRoute =
     path: '/api/runner-activity-progress',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiRunnerActivitiesRoute = ApiRunnerActivitiesRouteImport.update({
-  id: '/api/runner-activities',
-  path: '/api/runner-activities',
+const HitoDSComponentsRoute = HitoDSComponentsRouteImport.update({
+  id: '/hitoDS_/components',
+  path: '/hitoDS/components',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminLoginRoute = AdminLoginRouteImport.update({
-  id: '/admin/login',
-  path: '/admin/login',
+const HitoDSFoundationsRoute = HitoDSFoundationsRouteImport.update({
+  id: '/hitoDS_/foundations',
+  path: '/hitoDS/foundations',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminCaptureRoute = AdminCaptureRouteImport.update({
-  id: '/admin/capture',
-  path: '/admin/capture',
+const HitoDSPatternsRoute = HitoDSPatternsRouteImport.update({
+  id: '/hitoDS_/patterns',
+  path: '/hitoDS/patterns',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
-  id: '/admin/analytics',
-  path: '/admin/analytics',
+const WorkoutDateRoute = WorkoutDateRouteImport.update({
+  id: '/workout/$date',
+  path: '/workout/$date',
   getParentRoute: () => rootRouteImport,
 } as any)
-const HitoDSExportFigmaRoute = HitoDSExportFigmaRouteImport.update({
-  id: '/hitoDS_/export/figma',
-  path: '/hitoDS/export/figma',
+const ApiAuthConfirmRoute = ApiAuthConfirmRouteImport.update({
+  id: '/api/auth/confirm',
+  path: '/api/auth/confirm',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiWorkoutResultUploadRoute = ApiWorkoutResultUploadRouteImport.update({
-  id: '/api/workout-result/upload',
-  path: '/api/workout-result/upload',
+const ApiAuthLocalLoginRoute = ApiAuthLocalLoginRouteImport.update({
+  id: '/api/auth/local-login',
+  path: '/api/auth/local-login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiWorkoutResultRemoveRoute = ApiWorkoutResultRemoveRouteImport.update({
-  id: '/api/workout-result/remove',
-  path: '/api/workout-result/remove',
+const ApiAuthLogoutRoute = ApiAuthLogoutRouteImport.update({
+  id: '/api/auth/logout',
+  path: '/api/auth/logout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPlanExportRoute = ApiPlanExportRouteImport.update({
+  id: '/api/plan/export',
+  path: '/api/plan/export',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProfileAvatarUploadRoute = ApiProfileAvatarUploadRouteImport.update({
+  id: '/api/profile-avatar/upload',
+  path: '/api/profile-avatar/upload',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiRunnerActivitiesActivityIdRoute =
@@ -158,29 +168,29 @@ const ApiRunnerActivitiesActivityIdRoute =
     path: '/$activityId',
     getParentRoute: () => ApiRunnerActivitiesRoute,
   } as any)
-const ApiProfileAvatarUploadRoute = ApiProfileAvatarUploadRouteImport.update({
-  id: '/api/profile-avatar/upload',
-  path: '/api/profile-avatar/upload',
+const ApiWorkoutResultRemoveRoute = ApiWorkoutResultRemoveRouteImport.update({
+  id: '/api/workout-result/remove',
+  path: '/api/workout-result/remove',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPlanExportRoute = ApiPlanExportRouteImport.update({
-  id: '/api/plan/export',
-  path: '/api/plan/export',
+const ApiWorkoutResultUploadRoute = ApiWorkoutResultUploadRouteImport.update({
+  id: '/api/workout-result/upload',
+  path: '/api/workout-result/upload',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAuthLogoutRoute = ApiAuthLogoutRouteImport.update({
-  id: '/api/auth/logout',
-  path: '/api/auth/logout',
+const HitoDSExportFigmaRoute = HitoDSExportFigmaRouteImport.update({
+  id: '/hitoDS_/export/figma',
+  path: '/hitoDS/export/figma',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAuthLocalLoginRoute = ApiAuthLocalLoginRouteImport.update({
-  id: '/api/auth/local-login',
-  path: '/api/auth/local-login',
+const ApiAdminAuthLoginRoute = ApiAdminAuthLoginRouteImport.update({
+  id: '/api/admin/auth/login',
+  path: '/api/admin/auth/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAuthConfirmRoute = ApiAuthConfirmRouteImport.update({
-  id: '/api/auth/confirm',
-  path: '/api/auth/confirm',
+const ApiAdminAuthLogoutRoute = ApiAdminAuthLogoutRouteImport.update({
+  id: '/api/admin/auth/logout',
+  path: '/api/admin/auth/logout',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiRunnerActivitiesActivityIdSourceRoute =
@@ -189,16 +199,6 @@ const ApiRunnerActivitiesActivityIdSourceRoute =
     path: '/source',
     getParentRoute: () => ApiRunnerActivitiesActivityIdRoute,
   } as any)
-const ApiAdminAuthLogoutRoute = ApiAdminAuthLogoutRouteImport.update({
-  id: '/api/admin/auth/logout',
-  path: '/api/admin/auth/logout',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiAdminAuthLoginRoute = ApiAdminAuthLoginRouteImport.update({
-  id: '/api/admin/auth/login',
-  path: '/api/admin/auth/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -436,60 +436,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/progress': {
-      id: '/progress'
-      path: '/progress'
-      fullPath: '/progress'
-      preLoaderRoute: typeof ProgressRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/integrations': {
-      id: '/integrations'
-      path: '/integrations'
-      fullPath: '/integrations'
-      preLoaderRoute: typeof IntegrationsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/hub': {
-      id: '/hub'
-      path: '/hub'
-      fullPath: '/hub'
-      preLoaderRoute: typeof HubRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/hitoDS': {
-      id: '/hitoDS'
-      path: '/hitoDS'
-      fullPath: '/hitoDS'
-      preLoaderRoute: typeof HitoDSRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/changelog': {
-      id: '/changelog'
-      path: '/changelog'
-      fullPath: '/changelog'
-      preLoaderRoute: typeof ChangelogRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/change-log': {
-      id: '/change-log'
-      path: '/change-log'
-      fullPath: '/change-log'
-      preLoaderRoute: typeof ChangeLogRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/body': {
@@ -499,67 +450,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BodyRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/change-log': {
+      id: '/change-log'
+      path: '/change-log'
+      fullPath: '/change-log'
+      preLoaderRoute: typeof ChangeLogRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/workout/$date': {
-      id: '/workout/$date'
-      path: '/workout/$date'
-      fullPath: '/workout/$date'
-      preLoaderRoute: typeof WorkoutDateRouteImport
+    '/changelog': {
+      id: '/changelog'
+      path: '/changelog'
+      fullPath: '/changelog'
+      preLoaderRoute: typeof ChangelogRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/hitoDS_/patterns': {
-      id: '/hitoDS_/patterns'
-      path: '/hitoDS/patterns'
-      fullPath: '/hitoDS/patterns'
-      preLoaderRoute: typeof HitoDSPatternsRouteImport
+    '/hitoDS': {
+      id: '/hitoDS'
+      path: '/hitoDS'
+      fullPath: '/hitoDS'
+      preLoaderRoute: typeof HitoDSRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/hitoDS_/foundations': {
-      id: '/hitoDS_/foundations'
-      path: '/hitoDS/foundations'
-      fullPath: '/hitoDS/foundations'
-      preLoaderRoute: typeof HitoDSFoundationsRouteImport
+    '/hub': {
+      id: '/hub'
+      path: '/hub'
+      fullPath: '/hub'
+      preLoaderRoute: typeof HubRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/hitoDS_/components': {
-      id: '/hitoDS_/components'
-      path: '/hitoDS/components'
-      fullPath: '/hitoDS/components'
-      preLoaderRoute: typeof HitoDSComponentsRouteImport
+    '/integrations': {
+      id: '/integrations'
+      path: '/integrations'
+      fullPath: '/integrations'
+      preLoaderRoute: typeof IntegrationsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/runner-activity-progress': {
-      id: '/api/runner-activity-progress'
-      path: '/api/runner-activity-progress'
-      fullPath: '/api/runner-activity-progress'
-      preLoaderRoute: typeof ApiRunnerActivityProgressRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/runner-activities': {
-      id: '/api/runner-activities'
-      path: '/api/runner-activities'
-      fullPath: '/api/runner-activities'
-      preLoaderRoute: typeof ApiRunnerActivitiesRouteImport
+    '/progress': {
+      id: '/progress'
+      path: '/progress'
+      fullPath: '/progress'
+      preLoaderRoute: typeof ProgressRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/admin/login': {
-      id: '/admin/login'
-      path: '/admin/login'
-      fullPath: '/admin/login'
-      preLoaderRoute: typeof AdminLoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/capture': {
-      id: '/admin/capture'
-      path: '/admin/capture'
-      fullPath: '/admin/capture'
-      preLoaderRoute: typeof AdminCaptureRouteImport
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/analytics': {
@@ -569,60 +513,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAnalyticsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/hitoDS_/export/figma': {
-      id: '/hitoDS_/export/figma'
-      path: '/hitoDS/export/figma'
-      fullPath: '/hitoDS/export/figma'
-      preLoaderRoute: typeof HitoDSExportFigmaRouteImport
+    '/admin/capture': {
+      id: '/admin/capture'
+      path: '/admin/capture'
+      fullPath: '/admin/capture'
+      preLoaderRoute: typeof AdminCaptureRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/workout-result/upload': {
-      id: '/api/workout-result/upload'
-      path: '/api/workout-result/upload'
-      fullPath: '/api/workout-result/upload'
-      preLoaderRoute: typeof ApiWorkoutResultUploadRouteImport
+    '/admin/login': {
+      id: '/admin/login'
+      path: '/admin/login'
+      fullPath: '/admin/login'
+      preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/workout-result/remove': {
-      id: '/api/workout-result/remove'
-      path: '/api/workout-result/remove'
-      fullPath: '/api/workout-result/remove'
-      preLoaderRoute: typeof ApiWorkoutResultRemoveRouteImport
+    '/api/runner-activities': {
+      id: '/api/runner-activities'
+      path: '/api/runner-activities'
+      fullPath: '/api/runner-activities'
+      preLoaderRoute: typeof ApiRunnerActivitiesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/runner-activities/$activityId': {
-      id: '/api/runner-activities/$activityId'
-      path: '/$activityId'
-      fullPath: '/api/runner-activities/$activityId'
-      preLoaderRoute: typeof ApiRunnerActivitiesActivityIdRouteImport
-      parentRoute: typeof ApiRunnerActivitiesRoute
-    }
-    '/api/profile-avatar/upload': {
-      id: '/api/profile-avatar/upload'
-      path: '/api/profile-avatar/upload'
-      fullPath: '/api/profile-avatar/upload'
-      preLoaderRoute: typeof ApiProfileAvatarUploadRouteImport
+    '/api/runner-activity-progress': {
+      id: '/api/runner-activity-progress'
+      path: '/api/runner-activity-progress'
+      fullPath: '/api/runner-activity-progress'
+      preLoaderRoute: typeof ApiRunnerActivityProgressRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/plan/export': {
-      id: '/api/plan/export'
-      path: '/api/plan/export'
-      fullPath: '/api/plan/export'
-      preLoaderRoute: typeof ApiPlanExportRouteImport
+    '/hitoDS_/components': {
+      id: '/hitoDS_/components'
+      path: '/hitoDS/components'
+      fullPath: '/hitoDS/components'
+      preLoaderRoute: typeof HitoDSComponentsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/auth/logout': {
-      id: '/api/auth/logout'
-      path: '/api/auth/logout'
-      fullPath: '/api/auth/logout'
-      preLoaderRoute: typeof ApiAuthLogoutRouteImport
+    '/hitoDS_/foundations': {
+      id: '/hitoDS_/foundations'
+      path: '/hitoDS/foundations'
+      fullPath: '/hitoDS/foundations'
+      preLoaderRoute: typeof HitoDSFoundationsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/auth/local-login': {
-      id: '/api/auth/local-login'
-      path: '/api/auth/local-login'
-      fullPath: '/api/auth/local-login'
-      preLoaderRoute: typeof ApiAuthLocalLoginRouteImport
+    '/hitoDS_/patterns': {
+      id: '/hitoDS_/patterns'
+      path: '/hitoDS/patterns'
+      fullPath: '/hitoDS/patterns'
+      preLoaderRoute: typeof HitoDSPatternsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/workout/$date': {
+      id: '/workout/$date'
+      path: '/workout/$date'
+      fullPath: '/workout/$date'
+      preLoaderRoute: typeof WorkoutDateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/auth/confirm': {
@@ -632,18 +576,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthConfirmRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/runner-activities/$activityId/source': {
-      id: '/api/runner-activities/$activityId/source'
-      path: '/source'
-      fullPath: '/api/runner-activities/$activityId/source'
-      preLoaderRoute: typeof ApiRunnerActivitiesActivityIdSourceRouteImport
-      parentRoute: typeof ApiRunnerActivitiesActivityIdRoute
+    '/api/auth/local-login': {
+      id: '/api/auth/local-login'
+      path: '/api/auth/local-login'
+      fullPath: '/api/auth/local-login'
+      preLoaderRoute: typeof ApiAuthLocalLoginRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/api/admin/auth/logout': {
-      id: '/api/admin/auth/logout'
-      path: '/api/admin/auth/logout'
-      fullPath: '/api/admin/auth/logout'
-      preLoaderRoute: typeof ApiAdminAuthLogoutRouteImport
+    '/api/auth/logout': {
+      id: '/api/auth/logout'
+      path: '/api/auth/logout'
+      fullPath: '/api/auth/logout'
+      preLoaderRoute: typeof ApiAuthLogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/plan/export': {
+      id: '/api/plan/export'
+      path: '/api/plan/export'
+      fullPath: '/api/plan/export'
+      preLoaderRoute: typeof ApiPlanExportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/profile-avatar/upload': {
+      id: '/api/profile-avatar/upload'
+      path: '/api/profile-avatar/upload'
+      fullPath: '/api/profile-avatar/upload'
+      preLoaderRoute: typeof ApiProfileAvatarUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/runner-activities/$activityId': {
+      id: '/api/runner-activities/$activityId'
+      path: '/$activityId'
+      fullPath: '/api/runner-activities/$activityId'
+      preLoaderRoute: typeof ApiRunnerActivitiesActivityIdRouteImport
+      parentRoute: typeof ApiRunnerActivitiesRoute
+    }
+    '/api/workout-result/remove': {
+      id: '/api/workout-result/remove'
+      path: '/api/workout-result/remove'
+      fullPath: '/api/workout-result/remove'
+      preLoaderRoute: typeof ApiWorkoutResultRemoveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/workout-result/upload': {
+      id: '/api/workout-result/upload'
+      path: '/api/workout-result/upload'
+      fullPath: '/api/workout-result/upload'
+      preLoaderRoute: typeof ApiWorkoutResultUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hitoDS_/export/figma': {
+      id: '/hitoDS_/export/figma'
+      path: '/hitoDS/export/figma'
+      fullPath: '/hitoDS/export/figma'
+      preLoaderRoute: typeof HitoDSExportFigmaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/admin/auth/login': {
@@ -652,6 +638,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/admin/auth/login'
       preLoaderRoute: typeof ApiAdminAuthLoginRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/auth/logout': {
+      id: '/api/admin/auth/logout'
+      path: '/api/admin/auth/logout'
+      fullPath: '/api/admin/auth/logout'
+      preLoaderRoute: typeof ApiAdminAuthLogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/runner-activities/$activityId/source': {
+      id: '/api/runner-activities/$activityId/source'
+      path: '/source'
+      fullPath: '/api/runner-activities/$activityId/source'
+      preLoaderRoute: typeof ApiRunnerActivitiesActivityIdSourceRouteImport
+      parentRoute: typeof ApiRunnerActivitiesActivityIdRoute
     }
   }
 }

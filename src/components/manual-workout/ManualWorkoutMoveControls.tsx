@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { hitoToast } from "@/components/ui/hito-toast";
+import { HitoButton } from "@/components/ui/button";
 import {
   confirmManualWorkoutMove,
   moveManualWorkoutWithinActivePlan,
@@ -414,22 +415,25 @@ function ManualWorkoutMoveReplacementDialog({
         </DialogHeader>
 
         <DialogFooter className="hito-info-window-footer">
-          <button
+          <HitoButton
             type="button"
-            className="hito-button hito-button-secondary hito-button-sm"
+            size="sm"
+            variant="secondary"
             disabled={busy}
             onClick={() => onOpenChange(false)}
           >
             Cancel
-          </button>
-          <button
+          </HitoButton>
+          <HitoButton
             type="button"
-            className="hito-button hito-button-primary hito-button-sm"
+            loading={status === "confirming"}
+            size="sm"
+            variant="primary"
             disabled={busy || !review}
             onClick={onConfirm}
           >
             {status === "confirming" ? "Replacing..." : "Replace workout"}
-          </button>
+          </HitoButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

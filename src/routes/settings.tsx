@@ -7,8 +7,10 @@ import { TrainingPreferenceFields } from "@/components/onboarding/TrainingPrefer
 import { ThemePreferenceSection } from "@/components/settings/ThemePreferenceSection";
 import { type WeekdayName } from "@/components/onboarding/onboarding-form-model";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { HitoButton } from "@/components/ui/button";
 import { EditableValueField } from "@/components/ui/editable-value-field";
 import { Icon } from "@/components/ui/icon";
+import { Input } from "@/components/ui/input";
 import { useHitoTabs } from "@/components/ui/hito-tabs";
 import {
   HeartRateProfileSection,
@@ -158,9 +160,9 @@ function SettingsPage() {
               rate settings here.
             </p>
             <div className="hito-state-actions">
-              <Link to="/login" className="hito-button hito-button-primary hito-button-lg">
-                Sign in
-              </Link>
+              <HitoButton asChild size="lg" variant="primary">
+                <Link to="/login">Sign in</Link>
+              </HitoButton>
             </div>
           </section>
           <ThemePreferenceSection />
@@ -180,13 +182,11 @@ function SettingsPage() {
               Complete setup on home first, then this page can store your profile details.
             </p>
             <div className="hito-state-actions">
-              <Link
-                to="/"
-                reloadDocument
-                className="hito-button hito-button-primary hito-button-lg"
-              >
-                Back to home
-              </Link>
+              <HitoButton asChild size="lg" variant="primary">
+                <Link to="/" reloadDocument>
+                  Back to home
+                </Link>
+              </HitoButton>
             </div>
           </section>
           <ThemePreferenceSection />
@@ -269,15 +269,17 @@ function SettingsPage() {
                 ) : null}
                 <AvatarFallback className="hito-profile-avatar-fallback">{initials}</AvatarFallback>
               </Avatar>
-              <button
+              <HitoButton
                 type="button"
-                className="hito-avatar-action hito-button hito-button-secondary hito-button-sm"
-                disabled={isUploadingAvatar}
+                className="hito-avatar-action"
+                size="sm"
+                variant="secondary"
+                loading={isUploadingAvatar}
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Icon name={settings.avatarUrl ? "edit" : "camera"} size="sm" />
                 {isUploadingAvatar ? "Uploading..." : settings.avatarUrl ? "Edit" : "Upload"}
-              </button>
+              </HitoButton>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -417,24 +419,24 @@ function SettingsPage() {
               />
 
               <div className="hito-settings-actions">
-                <button
+                <HitoButton
                   type="button"
-                  disabled={isSaving || heartRateDraftState?.canSubmit === false}
-                  className="hito-button hito-button-primary hito-button-lg"
+                  disabled={heartRateDraftState?.canSubmit === false}
+                  loading={isSaving}
+                  size="lg"
+                  variant="primary"
                   onClick={() => {
                     void savePersonalData();
                   }}
                 >
                   {isSaving ? "Saving..." : "Save personal data"}
-                </button>
-                <Link
-                  to="/"
-                  reloadDocument
-                  className="hito-button hito-button-ghost hito-button-lg"
-                >
-                  Back to calendar
-                  <Icon name="chevron-right" size="sm" />
-                </Link>
+                </HitoButton>
+                <HitoButton asChild size="lg" variant="ghost">
+                  <Link to="/" reloadDocument>
+                    Back to calendar
+                    <Icon name="chevron-right" size="sm" />
+                  </Link>
+                </HitoButton>
               </div>
             </div>
           </section>
@@ -481,16 +483,17 @@ function SettingsPage() {
             />
 
             <div className="hito-settings-actions">
-              <button
+              <HitoButton
                 type="button"
-                disabled={isSaving}
-                className="hito-button hito-button-primary hito-button-lg"
+                loading={isSaving}
+                size="lg"
+                variant="primary"
                 onClick={() => {
                   void saveTrainingPreferences();
                 }}
               >
                 {isSaving ? "Saving..." : "Save training preferences"}
-              </button>
+              </HitoButton>
             </div>
           </section>
         ) : (
@@ -521,14 +524,15 @@ function Field({
   return (
     <label className="grid gap-2">
       <span className="hito-form-label">{label}</span>
-      <input
+      <Input
         type="text"
         name={name}
         inputMode={inputMode}
         autoComplete={autoComplete}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="hito-field hito-field-md"
+        size="md"
+        variant="primary"
       />
     </label>
   );
@@ -538,14 +542,15 @@ function ReadOnlyField({ label, value }: { label: string; value: string }) {
   return (
     <label className="grid gap-2">
       <span className="hito-form-label">{label}</span>
-      <input
+      <Input
         type="email"
         name="email"
         value={value}
         readOnly
         aria-readonly="true"
         autoComplete="email"
-        className="hito-field hito-field-md"
+        size="md"
+        variant="primary"
       />
     </label>
   );

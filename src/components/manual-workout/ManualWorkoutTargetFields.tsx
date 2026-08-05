@@ -1,4 +1,5 @@
 import type { ManualWorkoutBlockInput } from "@/lib/manual-workout-authoring/schema";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -211,8 +212,9 @@ function TargetTextField({
   return (
     <label className="grid gap-2">
       <span className="hito-form-label">{label}</span>
-      <input
-        className="hito-field hito-field-secondary hito-field-sm"
+      <Input
+        size="sm"
+        variant="secondary"
         disabled={disabled}
         inputMode={inputMode}
         value={value}

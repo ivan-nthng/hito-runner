@@ -1,6 +1,7 @@
 import { type ReactNode, useMemo, useState } from "react";
 
 import { HitoCalendarDayCell, HitoWorkoutDayRow } from "@/components/ui/hito-calendar-day";
+import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
 import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
 import {
@@ -513,16 +514,15 @@ function ChoiceControl<T extends string>({
       <p className="hito-form-label">{label}</p>
       <div className="hito-choice-toggle-group" {...choiceGroup.groupProps} aria-label={label}>
         {options.map((option) => (
-          <button
+          <HitoChoiceToggle
             key={option.value}
-            type="button"
+            size="xs"
             {...choiceGroup.getRadioProps(option.value)}
-            className="hito-choice-toggle hito-choice-toggle-xs"
-            data-selected={value === option.value}
+            selected={value === option.value}
             onClick={() => onChange(option.value)}
           >
             {option.label}
-          </button>
+          </HitoChoiceToggle>
         ))}
       </div>
     </div>
@@ -544,7 +544,7 @@ function SelectControl<T extends string>({
     <div className="grid gap-2">
       <p className="hito-form-label">{label}</p>
       <Select value={value} onValueChange={(nextValue) => onChange(nextValue as T)}>
-        <SelectTrigger aria-label={label} className="hito-field-sm">
+        <SelectTrigger aria-label={label} size="sm">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

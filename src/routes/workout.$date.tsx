@@ -24,6 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { HitoButton } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { useHitoTabs } from "@/components/ui/hito-tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -122,9 +123,9 @@ function WorkoutPage() {
               </>
             )}
             <div className="hito-state-actions">
-              <Link to="/" className="hito-button hito-button-primary hito-button-lg">
-                Back to weekly plan
-              </Link>
+              <HitoButton asChild size="lg" variant="primary">
+                <Link to="/">Back to weekly plan</Link>
+              </HitoButton>
             </div>
           </section>
         </div>
@@ -488,16 +489,17 @@ function WorkoutErrorState({ reset }: { error: Error; reset: () => void }) {
             Try again. If your plan is still being set up, go back home first.
           </p>
           <div className="hito-state-actions">
-            <button
+            <HitoButton
               type="button"
               onClick={() => {
                 reset();
                 window.location.reload();
               }}
-              className="hito-button hito-button-primary hito-button-lg"
+              size="lg"
+              variant="primary"
             >
               Try again
-            </button>
+            </HitoButton>
             <Link
               to="/"
               className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
@@ -640,10 +642,12 @@ function WorkoutDetailTopBar({
 
   return (
     <div className="flex items-center justify-between gap-3">
-      <Link to="/" className="hito-button hito-button-ghost hito-button-sm -ml-2">
-        <Icon name="arrow-left" size="xs" />
-        Back to Calendar
-      </Link>
+      <HitoButton asChild className="-ml-2" size="sm" variant="ghost">
+        <Link to="/">
+          <Icon name="arrow-left" size="xs" />
+          Back to Calendar
+        </Link>
+      </HitoButton>
 
       <DropdownMenu
         onOpenChange={(nextOpen) => {
@@ -651,13 +655,15 @@ function WorkoutDetailTopBar({
         }}
       >
         <DropdownMenuTrigger asChild>
-          <button
+          <HitoButton
             type="button"
-            className="hito-button hito-button-ghost hito-button-sm aspect-square p-0"
             aria-label="Open workout actions"
+            iconOnly
+            size="sm"
+            variant="ghost"
           >
             <Icon name="more-horizontal" size="sm" />
-          </button>
+          </HitoButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="hito-menu-width-standard">
           <DropdownMenuLabel>Workout actions</DropdownMenuLabel>
@@ -723,24 +729,27 @@ function CompletionActionPanel({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Link
-            to="/workout/$date"
-            params={{ date: workout.date }}
-            search={{ tab: "complete" } as never}
-            className="hito-button hito-button-primary hito-button-md shrink-0"
-          >
-            <Icon name={isToday ? "check" : "edit"} size="xs" />
-            Add result
-          </Link>
+          <HitoButton asChild className="shrink-0" size="md" variant="primary">
+            <Link
+              to="/workout/$date"
+              params={{ date: workout.date }}
+              search={{ tab: "complete" } as never}
+            >
+              <Icon name={isToday ? "check" : "edit"} size="xs" />
+              Add result
+            </Link>
+          </HitoButton>
           {canUploadGarmin ? (
-            <button
+            <HitoButton
               type="button"
               onClick={onOpenActivityFile}
-              className="hito-button hito-button-secondary hito-button-md shrink-0"
+              className="shrink-0"
+              size="md"
+              variant="secondary"
             >
               <Icon name="file-up" size="xs" />
               Add activity file
-            </button>
+            </HitoButton>
           ) : null}
         </div>
       </div>

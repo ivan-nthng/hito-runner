@@ -15,6 +15,7 @@ const checkOnly = process.argv.includes("--check");
 const typographyStylesheets = [
   "src/styles/layout-typography.css",
   "src/styles/controls-lists.css",
+  "src/styles/controls-fields.css",
   "src/styles/forms-onboarding.css",
   "src/styles/shell-admin-analytics.css",
 ];

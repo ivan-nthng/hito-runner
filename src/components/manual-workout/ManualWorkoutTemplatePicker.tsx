@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
+import { HitoButton } from "@/components/ui/button";
 import { ManualWorkoutTemplateColorIndicator } from "@/components/manual-workout/ManualWorkoutTemplateColorIndicator";
 import {
   targetTruthModeLabel,
@@ -89,14 +90,16 @@ export function ManualTemplatePickerDialog({
                   </p>
                 </div>
                 {catalogState.status === "failed" ? (
-                  <button
+                  <HitoButton
                     type="button"
-                    className="hito-button hito-button-ghost hito-button-sm shrink-0"
+                    className="shrink-0"
+                    size="sm"
+                    variant="ghost"
                     onClick={onRefreshCatalog}
                   >
                     <Icon name="refresh" size="xs" />
                     Retry
-                  </button>
+                  </HitoButton>
                 ) : null}
               </div>
             </div>
@@ -105,15 +108,16 @@ export function ManualTemplatePickerDialog({
               <section className="grid gap-2">
                 <div className="flex items-center justify-between gap-3">
                   <p className="hito-label">My templates</p>
-                  <button
+                  <HitoButton
                     type="button"
-                    className="hito-button hito-button-ghost hito-button-sm"
+                    size="sm"
+                    variant="ghost"
                     disabled={isLoading || Boolean(catalogAction)}
                     onClick={onRefreshCatalog}
                   >
                     <Icon name="refresh" size="xs" />
                     Refresh
-                  </button>
+                  </HitoButton>
                 </div>
                 <div className="hito-row-group">
                   {catalog.personalTemplates.length === 0 ? (
@@ -195,15 +199,16 @@ export function ManualTemplatePickerDialog({
                 <section className="grid gap-2">
                   <div className="flex items-center justify-between gap-3">
                     <p className="hito-label">Hidden built-ins</p>
-                    <button
+                    <HitoButton
                       type="button"
-                      className="hito-button hito-button-ghost hito-button-sm"
+                      size="sm"
+                      variant="ghost"
                       disabled={Boolean(catalogAction)}
                       onClick={onRestoreAllBuiltInTemplates}
                     >
                       <Icon name="refresh" size="xs" />
                       Restore all
-                    </button>
+                    </HitoButton>
                   </div>
                   <div className="hito-row-group">
                     {catalog.hiddenBuiltInTemplates.map((template) => {
@@ -214,14 +219,16 @@ export function ManualTemplatePickerDialog({
                             <ManualWorkoutTemplateColorIndicator template={template} />
                             <span className="hito-list-row-title block min-w-0">{label}</span>
                           </div>
-                          <button
+                          <HitoButton
                             type="button"
-                            className="hito-button hito-button-ghost hito-button-sm shrink-0"
+                            className="shrink-0"
+                            size="sm"
+                            variant="ghost"
                             disabled={Boolean(catalogAction)}
                             onClick={() => onRestoreBuiltInTemplate(template)}
                           >
                             Restore
-                          </button>
+                          </HitoButton>
                         </div>
                       );
                     })}
@@ -252,14 +259,17 @@ function TemplateActionMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
+        <HitoButton
           type="button"
           aria-label={label}
-          className="hito-button hito-button-ghost hito-button-sm aspect-square shrink-0 p-0"
+          className="shrink-0"
           disabled={disabled}
+          iconOnly
+          size="sm"
+          variant="ghost"
         >
           <Icon name="more-horizontal" size="xs" />
-        </button>
+        </HitoButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem

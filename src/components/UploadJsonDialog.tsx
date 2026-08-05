@@ -18,6 +18,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icon";
+import { HitoButton } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 export function UploadJsonDialog({
   open,
@@ -153,15 +156,16 @@ export function UploadJsonDialog({
             />
 
             <div className="flex flex-wrap items-center gap-3">
-              <button
+              <HitoButton
                 type="button"
                 disabled={isBusy}
                 onClick={() => fileInputRef.current?.click()}
-                className="hito-button hito-button-primary hito-button-md"
+                variant="primary"
+                size="md"
               >
                 <Icon name="upload" size="sm" />
                 {selectedFileName ? "Choose another file" : "Upload file"}
-              </button>
+              </HitoButton>
               {selectedFileName && <span className="hito-body-small">{selectedFileName}</span>}
             </div>
 
@@ -172,18 +176,16 @@ export function UploadJsonDialog({
               </summary>
               <div className="hito-disclosure-body">
                 <div>
-                  <a
-                    href={FUTURE_TEMPLATE_DOWNLOAD_PATH}
-                    download
-                    className="hito-button hito-button-ghost hito-button-sm"
-                  >
-                    <Icon name="download" size="sm" className="text-signal" />
-                    Download JSON template
-                  </a>
+                  <HitoButton asChild variant="ghost" size="sm">
+                    <a href={FUTURE_TEMPLATE_DOWNLOAD_PATH} download>
+                      <Icon name="download" size="sm" className="text-signal" />
+                      Download JSON template
+                    </a>
+                  </HitoButton>
                 </div>
                 <label className="grid gap-2">
                   <span className="hito-form-label">Paste plan JSON</span>
-                  <textarea
+                  <Textarea
                     rows={10}
                     value={jsonDraft}
                     onChange={(event) => {
@@ -193,12 +195,14 @@ export function UploadJsonDialog({
                       setError(null);
                     }}
                     placeholder='{"schema_version":"training-plan-v2","plan_name":"...","generated_for":"...","start_date":"...","planned_workouts":[...]}'
-                    className="hito-field hito-textarea-md hito-technical-mono"
+                    size="md"
+                    variant="primary"
+                    className="hito-technical-mono"
                   />
                 </label>
 
                 <div className="flex flex-wrap items-center gap-3">
-                  <button
+                  <HitoButton
                     type="button"
                     disabled={isBusy || !jsonDraft.trim()}
                     onClick={() =>
@@ -209,10 +213,11 @@ export function UploadJsonDialog({
                         setStatus,
                       })
                     }
-                    className="hito-button hito-button-secondary hito-button-md"
+                    variant="secondary"
+                    size="md"
                   >
                     Check JSON
-                  </button>
+                  </HitoButton>
                   <span className="hito-field-helper">Only Hito plan JSON works here.</span>
                 </div>
               </div>
@@ -254,12 +259,12 @@ export function UploadJsonDialog({
                 <div className="hito-list-row items-start">
                   <label className="grid flex-1 gap-2">
                     <span className="hito-form-label">Start training</span>
-                    <input
+                    <Input
                       type="date"
                       min={resolvedDefaultStartDate}
                       value={requestedStartDate}
                       onChange={(event) => setRequestedStartDate(event.target.value)}
-                      className="hito-field hito-field-md"
+                      size="md"
                     />
                     <span className="hito-field-helper">
                       Hito applies this plan from the date you choose here; the JSON start date
@@ -267,27 +272,30 @@ export function UploadJsonDialog({
                     </span>
                   </label>
                   <div className="flex flex-wrap justify-end gap-2">
-                    <button
+                    <HitoButton
                       type="button"
-                      className="hito-button hito-button-ghost hito-button-xs"
+                      variant="ghost"
+                      size="xs"
                       onClick={() => setRequestedStartDate(resolvedDefaultStartDate)}
                     >
                       Today
-                    </button>
-                    <button
+                    </HitoButton>
+                    <HitoButton
                       type="button"
-                      className="hito-button hito-button-ghost hito-button-xs"
+                      variant="ghost"
+                      size="xs"
                       onClick={() => setRequestedStartDate(addDaysIso(resolvedDefaultStartDate, 1))}
                     >
                       Tomorrow
-                    </button>
-                    <button
+                    </HitoButton>
+                    <HitoButton
                       type="button"
-                      className="hito-button hito-button-ghost hito-button-xs"
+                      variant="ghost"
+                      size="xs"
                       onClick={() => setRequestedStartDate(addDaysIso(resolvedDefaultStartDate, 7))}
                     >
                       Next week
-                    </button>
+                    </HitoButton>
                   </div>
                 </div>
                 {canOfferClearBeforeImport && (
@@ -334,27 +342,29 @@ export function UploadJsonDialog({
 
         <DialogFooter className="hito-product-dialog-footer grid gap-4 sm:space-x-0">
           <div className="flex w-full flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <button
+            <HitoButton
               type="button"
               onClick={() => onOpenChange(false)}
-              className="hito-button hito-button-secondary hito-button-md"
+              variant="secondary"
+              size="md"
             >
               Cancel
-            </button>
-            <button
+            </HitoButton>
+            <HitoButton
               type="button"
               disabled={isBusy || !importedPlan || !requestedStartDate}
               onClick={() => {
                 void submitPlan(null);
               }}
-              className="hito-button hito-button-primary hito-button-md"
+              variant="primary"
+              size="md"
             >
               {status === "parsing"
                 ? "Checking JSON..."
                 : status === "applying"
                   ? "Importing plan..."
                   : "Import plan"}
-            </button>
+            </HitoButton>
           </div>
           <details className="hito-disclosure">
             <summary className="hito-disclosure-summary">
@@ -372,19 +382,20 @@ export function UploadJsonDialog({
                 </p>
               ) : null}
               <div>
-                <button
+                <HitoButton
                   type="button"
                   disabled={
                     isBusy || !importedPlan || !requestedStartDate || Boolean(replaceBlockedReason)
                   }
-                  data-tone="error"
+                  tone="error"
                   onClick={() => {
                     void submitPlan("replace_first_day");
                   }}
-                  className="hito-button hito-button-outlined hito-button-sm"
+                  variant="outlined"
+                  size="sm"
                 >
                   {status === "applying" ? "Replacing..." : "Replace start day"}
-                </button>
+                </HitoButton>
               </div>
             </div>
           </details>

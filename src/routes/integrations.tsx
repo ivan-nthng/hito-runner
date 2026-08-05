@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
+import { HitoButton } from "@/components/ui/button";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
 import { findWorkout, type Workout } from "@/lib/training";
 import { cn } from "@/lib/utils";
@@ -130,18 +131,19 @@ function Integrations() {
                       <div className="flex shrink-0 flex-col items-end gap-3">
                         <StatusChip status={i.status} />
                         {canOpenFeedback ? (
-                          <Link
-                            to="/workout/$date"
-                            params={{ date: feedbackWorkout!.date }}
-                            search={{ tab: "feedback" } as never}
-                            className="hito-button hito-button-secondary hito-button-xs"
-                          >
-                            Open feedback
-                          </Link>
+                          <HitoButton asChild size="xs" variant="secondary">
+                            <Link
+                              to="/workout/$date"
+                              params={{ date: feedbackWorkout!.date }}
+                              search={{ tab: "feedback" } as never}
+                            >
+                              Open feedback
+                            </Link>
+                          </HitoButton>
                         ) : i.id === "feedback" ? (
-                          <Link to="/" className="hito-button hito-button-secondary hito-button-xs">
-                            Open calendar
-                          </Link>
+                          <HitoButton asChild size="xs" variant="secondary">
+                            <Link to="/">Open calendar</Link>
+                          </HitoButton>
                         ) : null}
                       </div>
                     </div>

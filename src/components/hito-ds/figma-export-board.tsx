@@ -6,6 +6,9 @@ import {
   IconOnlyButtonMatrix,
 } from "@/components/hito-ds/specimen-previews";
 import { EditableValueField } from "@/components/ui/editable-value-field";
+import { HitoButton } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   HITO_BUTTON_SIZES,
   HITO_BUTTON_TONES,
@@ -628,8 +631,9 @@ function InputMatrix() {
       <MatrixPanel title="Textarea">
         <label className="grid max-w-xl gap-2">
           <span className="hito-form-label">Training note</span>
-          <textarea
-            className="hito-field hito-field-primary hito-textarea-md resize-none"
+          <Textarea
+            size="md"
+            className="resize-none"
             readOnly
             rows={4}
             value="Keep the long run easy. Use this field for longer runner-authored notes."
@@ -689,9 +693,10 @@ function InlineTextMatrix() {
           />
         </MatrixPanel>
         <MatrixPanel title="Edit field">
-          <input
+          <Input
             aria-label="Editing inline header title"
-            className="hito-field hito-field-primary hito-field-header hito-field-header-md"
+            size="md"
+            className="hito-field-header hito-field-header-md"
             readOnly
             value="Long run"
           />
@@ -810,12 +815,12 @@ function DropdownMatrix() {
             <StaticMenuItem icon="settings" label="Open settings" />
             <div className="hito-ui-menu-separator -mx-1 my-1" />
             <div className="flex flex-wrap justify-end gap-2 px-2 py-2">
-              <button type="button" className="hito-button hito-button-ghost hito-button-xs">
+              <HitoButton size="xs" variant="ghost">
                 Cancel
-              </button>
-              <button type="button" className="hito-button hito-button-secondary hito-button-xs">
+              </HitoButton>
+              <HitoButton size="xs" variant="secondary">
                 Apply
-              </button>
+              </HitoButton>
             </div>
           </div>
         </div>
@@ -929,10 +934,10 @@ function AuditControlMatrix() {
               <StaticValueChip help="8px · --radius-lg">8</StaticValueChip>
             </StaticPropertyRow>
           </div>
-          <button type="button" className="hito-button hito-button-secondary hito-button-sm w-fit">
+          <HitoButton size="sm" variant="secondary" className="w-fit">
             <Icon name="copy" size="xs" />
             Generate Prompt
-          </button>
+          </HitoButton>
         </div>
       </MatrixPanel>
     </div>

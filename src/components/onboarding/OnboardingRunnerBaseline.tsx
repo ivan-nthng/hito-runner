@@ -2,6 +2,7 @@ import {
   HeartRateProfileSection,
   type HeartRateProfileDraftState,
 } from "@/components/settings/HeartRateProfileSection";
+import { HitoButton } from "@/components/ui/button";
 import type { UserSettingsSummary } from "@/lib/user-settings-actions";
 
 export function OnboardingRunnerHeartRateProfile({
@@ -42,14 +43,16 @@ export function OnboardingRunnerHeartRateProfile({
             profile and does not create a plan.
           </p>
           <div className="hito-state-actions">
-            <button
+            <HitoButton
               type="button"
-              className="hito-button hito-button-secondary hito-button-md"
+              size="md"
+              variant="secondary"
               disabled={!canPrepare || isSaving}
+              loading={isSaving}
               onClick={() => void onPrepare()}
             >
               {isSaving ? "Saving baseline..." : "Show BPM guidance"}
-            </button>
+            </HitoButton>
           </div>
         </div>
       )}

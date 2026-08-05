@@ -3,6 +3,7 @@ import type { MutableRefObject } from "react";
 import { hitoToast } from "@/components/ui/hito-toast";
 import { Icon } from "@/components/ui/icon";
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
+import { HitoButton } from "@/components/ui/button";
 import { ProductLinks } from "@/components/hito-ds/reference";
 import {
   ChoiceSelector,
@@ -361,17 +362,13 @@ export function HitoDsComponentOverlays() {
                 and outcome feedback.
               </p>
               <div className="mt-4 flex min-w-0 flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  className="hito-button hito-button-primary hito-button-md"
-                  disabled
-                >
+                <HitoButton size="md" variant="primary" loading>
                   <Icon name="loader" size="sm" className="hito-motion-spinner" />
                   Saving
-                </button>
-                <button type="button" className="hito-button hito-button-secondary hito-button-md">
+                </HitoButton>
+                <HitoButton size="md" variant="secondary">
                   Retry
-                </button>
+                </HitoButton>
                 <span className="hito-caption max-w-sm">
                   No fake percentages. No mutation authority in the toast copy.
                 </span>
@@ -384,62 +381,38 @@ export function HitoDsComponentOverlays() {
             <div className="grid gap-3">
               <p className="hito-label">Toast variant</p>
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="hito-button hito-button-secondary hito-button-sm"
-                  onClick={() => showDemoToast("info")}
-                >
+                <HitoButton size="sm" variant="secondary" onClick={() => showDemoToast("info")}>
                   <Icon name="warning" size="sm" className="text-muted-foreground" />
                   Info
-                </button>
-                <button
-                  type="button"
-                  className="hito-button hito-button-secondary hito-button-sm"
-                  onClick={() => showDemoToast("working")}
-                >
+                </HitoButton>
+                <HitoButton size="sm" variant="secondary" onClick={() => showDemoToast("working")}>
                   <Icon
                     name="loader"
                     size="sm"
                     className="hito-motion-spinner text-muted-foreground"
                   />
                   Working
-                </button>
-                <button
-                  type="button"
-                  className="hito-button hito-button-secondary hito-button-sm"
-                  onClick={() => showDemoToast("success")}
-                >
+                </HitoButton>
+                <HitoButton size="sm" variant="secondary" onClick={() => showDemoToast("success")}>
                   <Icon name="check-circle" size="sm" className="text-success" />
                   Proposal ready
-                </button>
-                <button
-                  type="button"
-                  className="hito-button hito-button-secondary hito-button-sm"
-                  onClick={() => showDemoToast("error")}
-                >
+                </HitoButton>
+                <HitoButton size="sm" variant="secondary" onClick={() => showDemoToast("error")}>
                   <Icon name="warning" size="sm" className="text-destructive" />
                   Error
-                </button>
+                </HitoButton>
               </div>
             </div>
 
             <div className="hito-section-divider grid gap-3 pt-4">
               <p className="hito-label">Resolve in place</p>
               <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  className="hito-button hito-button-ghost hito-button-sm"
-                  onClick={() => showDemoSequence("success")}
-                >
+                <HitoButton size="sm" variant="ghost" onClick={() => showDemoSequence("success")}>
                   Working → success
-                </button>
-                <button
-                  type="button"
-                  className="hito-button hito-button-ghost hito-button-sm"
-                  onClick={() => showDemoSequence("error")}
-                >
+                </HitoButton>
+                <HitoButton size="sm" variant="ghost" onClick={() => showDemoSequence("error")}>
                   Working → error
-                </button>
+                </HitoButton>
               </div>
             </div>
           </div>

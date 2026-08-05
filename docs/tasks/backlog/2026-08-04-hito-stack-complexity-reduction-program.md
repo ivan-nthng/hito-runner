@@ -6,7 +6,7 @@
 
 ## Status
 
-backlog
+in_progress
 
 ## Type
 
@@ -18,7 +18,7 @@ medium
 
 ## Owner
 
-product
+architect
 
 ## Scope
 
@@ -41,9 +41,28 @@ evidence-gated.
 
 ## Stage
 
-Frontend residue cleanup is complete. Backend Runner Activity optimization remains an independent
-active stream and must not be interrupted by this program. The next cross-stack slice stays queued
-until its owner is explicitly dispatched while idle.
+Architecture current-stack, dependency, reuse, and proof-surface audit is complete. Existing
+Backend simplification is locally implemented but not yet release-integrated; the first new code
+slice remains gated on that boundary.
+
+## Next Recommended Role
+
+architect
+
+## Exact Handoff Prompt
+
+```text
+ROLE: ARCHITECT
+
+Continue the canonical Hito Stack Complexity Reduction Program. Preserve all accepted and
+concurrent work, confirm that the current Backend simplification and package/build changes are
+release-integrated, then admit exactly one smallest owner-scoped implementation slice from this
+plan. Do not create another cleanup plan, framework migration, proof framework, or source of truth.
+
+Approval policy: Routine local inspection, documentation reconciliation, reachability checks, and
+bounded read-only validation proceed under standing authorization. Do not stage, commit, push,
+deploy, mutate hosted data, or call providers without explicit authority.
+```
 
 ## Target Stack
 
@@ -56,6 +75,25 @@ unless a future measured requirement establishes a need.
 
 - Complexity is concentrated in broad owners, build/runtime coordination, proof tooling, and
   duplicated operational documentation, not in an excessive number of product frameworks.
+- The maintained-text baseline at `dec2e226387bbc71985a593cbc3dd8d3f7cd36d7` is 768 files and
+  233,646 lines: `src/` owns 114,251, `scripts/` 43,224, `docs/` 52,723, and `supabase/` 5,078.
+  The live dirty tree is larger, but it mixes several accepted and concurrent scopes and is not a
+  deletion manifest.
+- The application has one reachable framework chain: React -> TanStack Start/Router -> Vite ->
+  Nitro -> Vercel, with Supabase, Tailwind/Radix, and Zod. No second application framework,
+  backend, ORM, state manager, or test framework is present.
+- `@lovable.dev/vite-tanstack-config` is the only demonstrated framework-convergence candidate. Its
+  sole repository consumer is `vite.config.ts`; despite `cloudflare: false`, it owns the optional
+  Cloudflare/Wrangler/Miniflare/Workerd graph and `lovable-tagger`, which brings Tailwind 3 beside
+  canonical Tailwind 4. It may be removed only through direct-config replacement and build,
+  development, loopback-runtime, and Vercel parity proof. Nitro remains canonical.
+- A zero direct-import count is not deletion proof for compiler, generated-type, or wrapper-owned
+  packages. Direct Vite/TanStack/React/Tailwind/path plugins remain intentional inputs to a future
+  wrapper replacement.
+- Proof sprawl is custom code, not an extra test framework: the live tree has 86 script files and
+  about 43,621 lines, with 46 files using `node:assert` and no Vitest, Jest, Playwright, Cypress, or
+  Mocha dependency. Consolidate entrypoints and shared lifecycle owners before considering another
+  framework.
 - The legacy source-size plan is supporting history, not an operational queue. Its claim that
   `use-mobile.tsx` is unconsumed is stale: current Product consumers include onboarding and Progress.
 - The initial zero-consumer review is closed: `IntervalsViz`, `weeklyMileage`, `statsTotals`,
@@ -69,20 +107,50 @@ unless a future measured requirement establishes a need.
 - iCloud checkout and custom Vite/Nitro workarounds require a measured build/runtime discriminator;
   do not replace or remove them from a source-only audit.
 
+## Complexity Budget And Retirement Rule
+
+- Reuse a reachable canonical owner before adding a dependency, helper, validator, fixture,
+  generated representation, or operational document.
+- Every implementation slice must name what becomes smaller or disappears. A new permanent layer is
+  admitted only when a measured requirement cannot be met by an existing owner.
+- Count product runtime, generated code, proof tooling, and retained evidence separately. Line count
+  identifies an audit target; it never proves dead code or a defect.
+- Keep operation-specific safety contracts separate. Shared serialization, metadata, fixture,
+  runtime, and lifecycle plumbing belongs in the existing shared owner only after consumer parity is
+  proven.
+- Do not trade away persistence readback, privacy/RLS, cleanup, browser behavior, release parity, or
+  historical evidence to improve a size metric.
+
+## Verified Reuse And Retirement Inventory
+
+| Surface                 | Verified owner or finding                                                                                                                                                                                  | Decision                                                                                                                                                                                                                                                               |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend validation      | `scripts/validate-backend.mjs` is the correct thin group manifest; shared runtime, test-user, persistence, Runner Activity, and generated-plan helpers have multiple consumers.                            | Integrate the manifest and its four currently untracked canonical helpers with their importing changes before further proof cleanup. Reconcile its live 13 default / 16 local-db / 15 runtime / 16 release / 21 combined inventory against stale 18/17 receipt counts. |
+| QA server commands      | Bare `qa:server` has zero consumers and is semantically identical to documented `qa:server:status`.                                                                                                        | Retire the alias after the active package-manifest bundle is integrated and source checks reconfirm zero consumers.                                                                                                                                                    |
+| Local account fixtures  | `scripts/fixtures/` is empty, while four proofs name `scripts/fixtures/local-auth-users.json`; the canonical registry is `.tanstack/hito-running-local-accounts.json`.                                     | Prove whether the environment setting is read, then remove the dead setting or route it to the existing registry. Do not recreate a second fixture.                                                                                                                    |
+| Manual Workout metadata | `src/lib/active-plan-workout-editing/policy.ts` has ten consumers, but Add/Edit/Move/Delete repeat JSON conversion and the same manual-plan metadata shell; Copy/Edit/Move repeat `inputHasClientPayload`. | After the current TanStack server-function migration is integrated, move only shared metadata/JSON plumbing into this existing policy owner. Preserve every operation-specific review, stale, protected-history, transaction, and persisted-payload contract.          |
+| Build lifecycle         | Eight live build/QA lifecycle files retain required iCloud/Nitro coordination but repeat generated-sibling conflict helpers and PID liveness checks.                                                       | Reuse one existing tooling helper only after call-site parity; do not remove the lifecycle workaround from static inspection.                                                                                                                                          |
+| Hito DS manifests       | One generator emits a 712-line TypeScript manifest used by three runtime consumers and an 874-line JSON manifest used by one validator.                                                                    | Design System may converge to one generated representation after consumer and validator parity. This is a separate DS-owned slice.                                                                                                                                     |
+| Orphan proofs           | Two unique Frontend Product proofs and one tooling artifact-hygiene proof have no package, import, or current-doc entrypoint.                                                                              | Retain and assign them to their existing Frontend Product and Architecture/tooling validation owners before any move or deletion.                                                                                                                                      |
+| `/hitoDS` and DevTools  | DevTools is lazy and loopback-gated; `/hitoDS` is statically shipped although documentation calls it internal.                                                                                             | No deletion is admitted. Product must decide whether `/hitoDS` is a production route before Architecture can reduce this surface.                                                                                                                                      |
+
 ## Owner-Scoped Roadmap
 
-| Slice | Owner | Outcome | Required proof | Stop condition |
-| --- | --- | --- | --- | --- |
-| 1. Frontend residue | Frontend Product | **Completed:** removed `IntervalsViz`, two unused `training.ts` exports, and two direct unused dependencies. `date-fns` remains only as the required transitive dependency of `react-day-picker`. | Consumer graph, dependency reverse scan, lint, build/integrity, loopback runtime/browser smoke, and independent QA passed. | Closed without touching live consumers or concurrent Product work. |
-| 2. Build and proof surface | Architect with QA/tooling | Measure the canonical build path, decide which managed-runtime workarounds remain, and propose one small public verification command surface. | Current build traces, command-consumer inventory, independent review. | A proposal would alter the canonical runtime without a replacement proof. |
-| 3. Broad module boundaries | Respective owner | Split only a demonstrated coherent lifecycle/state owner from a broad module. | Root-cause evidence, preserved contract replay, focused browser or runtime proof. | The work becomes a line-count-driven rewrite or crosses owners. |
-| 4. Local auth and fixtures | Backend/auth | Simplify only after canonical local-auth, local Supabase, fixture, and runner-session ownership is reconciled. | Session/readback, isolation, cleanup, and browser proof. | A product-only fixture UI or second session truth would be introduced. |
-| 5. Current-truth compression | Product/docs with Architect | Keep the backlog as the operational queue and reduce overlapping current documentation. | Link/status inventory and local-link validation. | A completed receipt or active item loses discoverability. |
+| Slice                                    | Owner                          | Outcome                                                                                                                                                                                                        | Required proof                                                                                                                                               | Stop condition                                                                                                                                         |
+| ---------------------------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1. Frontend residue                      | Frontend Product               | **Completed:** removed `IntervalsViz`, two unused `training.ts` exports, and two direct unused dependencies. `date-fns` remains only as the required transitive dependency of `react-day-picker`.              | Consumer graph, dependency reverse scan, lint, build/integrity, loopback runtime/browser smoke, and independent QA passed.                                   | Closed without touching live consumers or concurrent Product work.                                                                                     |
+| 2. Backend runtime and proof convergence | Backend                        | **Implemented locally under its separate canonical backlog item:** npm-only toolchain, one Backend validation manifest, shared proof/runtime helpers, local-account registry, and selected response narrowing. | Exact source-control manifest, truthful manifest inventory, source/local-db/runtime groups, release-only parity under release authority, and independent QA. | Any untracked canonical helper, stale receipt count, missing import, failed group, or mixed concurrent hunk keeps the slice open.                      |
+| 3. Lovable wrapper convergence           | Backend/tooling                | Replace the single managed Vite wrapper with direct configuration of the already retained plugins; remove only wrapper-owned dependency residue proven absent from the regenerated graph.                      | Lockfile ownership diff, dev server, production build/integrity, built loopback runtime, Vercel parity, and independent review.                              | Do not start until active package/build changes are integrated; stop if external Lovable-editor behavior or deployment parity lacks replacement proof. |
+| 4. Manual Workout metadata reuse         | Backend                        | Consolidate only repeated metadata/JSON plumbing into the existing active-plan editing policy owner.                                                                                                           | Exact clone removal, operation-contract validator, local-DB persisted readback, build/lint, and independent QA.                                              | Do not start while Add/Copy/Edit/Move/Delete are concurrently dirty or if operation-specific safety would be generalized.                              |
+| 5. Proof and build helper retirement     | Backend/tooling with Architect | Retire the zero-consumer QA alias and dead fixture-path settings; converge repeated build lifecycle helpers without removing required iCloud/Nitro behavior.                                                   | Consumer scan, machine-listed validator groups, fixture-registry parity, build/runtime evidence, and scoped diff hygiene.                                    | Unique assertions, missing release integration, or an unproven runtime workaround remain retained and explicitly owned.                                |
+| 6. Design System representation          | Design System                  | Decide production ownership of `/hitoDS`, then converge duplicate generated manifest representations if retained consumers can use one truth.                                                                  | Product decision, route/build proof, runtime and validator consumer parity, DS QA.                                                                           | No Product route decision or loss of reference/validator behavior.                                                                                     |
+| 7. Current-truth compression             | Product/docs with Architect    | Keep the backlog as the operational queue and reduce overlapping current documentation.                                                                                                                        | Link/status inventory and local-link validation.                                                                                                             | A completed receipt or active item loses discoverability.                                                                                              |
 
 ## Existing Supporting Records
 
 - [Source-size governance and cleanup plan](../../plans/active/2026-06-30-hito-source-size-governance-and-cleanup-plan.md) remains retained supporting history; it is not an execution queue.
 - [Runner Activity Backend Optimization Plan](2026-08-03-runner-activity-backend-simplification-and-metric-scalability.md) remains the separate Backend owner for accepted Runner Activity lifecycle optimization.
+- [Backend runtime contract and proof simplification](2026-08-04-backend-runtime-contract-and-proof-simplification.md) owns the already implemented local npm/runtime/proof convergence and its release boundary; this program must not duplicate or absorb it.
 
 ## Preserved Boundaries
 
@@ -93,8 +161,9 @@ paths, or compatibility behavior from size, age, or a stale document claim alone
 
 ## Next Admission
 
-The initial Frontend candidate is complete. No broad Frontend decomposition is admitted from this
-result: `use-mobile`, `CompletionPanel`, large-module restructuring, build configuration, auth,
-fixtures, and Backend-owned work remain outside the completed slice. The next program slice is
-Architect measurement of the build/proof surface, but it remains queued until the active Backend task
-has completed and the user explicitly dispatches it.
+The current Architecture audit is complete and the program is active. The immediate gate is not a
+new implementation: the already modified Backend/package/proof bundle must first achieve truthful
+inventory, independent QA, and exact source-control integration so its untracked canonical helpers
+are reproducible from Git. Architecture then admits Slice 3, Lovable wrapper convergence, as the
+first new code slice. Slice 4 follows only after the concurrent TanStack manual-workout migration is
+integrated. No broad rewrite, new framework, or deletion from line count is admitted.

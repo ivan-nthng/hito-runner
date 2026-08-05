@@ -11,6 +11,7 @@ import {
 } from "@/components/settings/heart-rate-profile-editor-model";
 import { HitoCompoundRangeField } from "@/components/ui/hito-compound-range-field";
 import { HitoDualRange } from "@/components/ui/hito-dual-range";
+import { HitoButton } from "@/components/ui/button";
 import {
   buildHeartRateZonesSummary,
   type HeartRateZonesSummary,
@@ -143,14 +144,16 @@ export function HeartRateProfileSection({
             Adjust the BPM ranges Hito can use for future plan authoring.
           </p>
         </div>
-        <button
+        <HitoButton
           type="button"
-          className="hito-button hito-button-secondary hito-button-sm shrink-0"
+          className="shrink-0"
+          size="sm"
+          variant="secondary"
           disabled={isSaving || recommendedAge == null}
           onClick={applyRecommended}
         >
           Recommended
-        </button>
+        </HitoButton>
       </div>
 
       {canEdit ? (

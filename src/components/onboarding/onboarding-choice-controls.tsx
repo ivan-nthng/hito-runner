@@ -1,4 +1,5 @@
 import { createContext, useContext, type ReactNode } from "react";
+import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
 import { useHitoRadioGroup, type HitoRadioOptionProps } from "@/components/ui/hito-radio-group";
 
@@ -45,12 +46,13 @@ export function OptionButton({
   const radioProps = getRadioProps?.(value);
 
   return (
-    <button
+    <HitoChoiceToggle
       type="button"
       {...radioProps}
-      data-selected={active ? "true" : undefined}
+      selected={active}
+      size="lg"
       onClick={onClick}
-      className="hito-choice-toggle hito-choice-toggle-lg w-full justify-start whitespace-normal text-left"
+      className="w-full justify-start whitespace-normal text-left"
     >
       {icon ? (
         <span className="shrink-0" aria-hidden="true">
@@ -61,6 +63,6 @@ export function OptionButton({
         <span className="block font-semibold leading-tight">{label}</span>
         {copy ? <span className="mt-1 block text-current/70">{copy}</span> : null}
       </span>
-    </button>
+    </HitoChoiceToggle>
   );
 }

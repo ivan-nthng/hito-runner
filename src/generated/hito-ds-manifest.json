@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "direction": "code-to-figma",
-  "sourceDigest": "sha256:dc7dd213b99bcff0bab5c872ef24fe1a4173caaacb8144fe8c6558dd97b52008",
+  "sourceDigest": "sha256:7bcb41821cb977084448df7f6626a0ac9aa2b7260329adb58d92c480179f7c3d",
   "sourceOfTruth": {
     "tokens": "src/styles/foundations.css",
     "typography": "src/lib/hito-typography-roles.ts"
@@ -763,7 +763,7 @@
       "description": "Field-adjacent helper copy role.",
       "use": "Field-adjacent or control-adjacent operational guidance.",
       "cssSpec": "Poppins · 0.75rem · 400 · lh 1.45",
-      "sourcePath": "src/styles/forms-onboarding.css",
+      "sourcePath": "src/styles/controls-fields.css",
       "responsive": false,
       "figmaStatus": "ready",
       "properties": {

@@ -1,6 +1,7 @@
 import { TrainingPreferenceFields } from "@/components/onboarding/TrainingPreferenceFields";
 import type { WeekdayName } from "@/components/onboarding/onboarding-form-model";
 import { Icon } from "@/components/ui/icon";
+import { HitoButton } from "@/components/ui/button";
 import type { ActivePlanScheduleEditPreview } from "@/lib/active-plan-schedule-edit-preview";
 import { formatDate } from "@/lib/training";
 
@@ -147,15 +148,16 @@ export function PlanScheduleEditPanel({
           />
 
           <div className="flex flex-wrap items-center gap-3">
-            <button
+            <HitoButton
               type="button"
               disabled={isBusy || !canReview}
               onClick={onReview}
-              className="hito-button hito-button-secondary hito-button-md"
+              variant="secondary"
+              size="md"
             >
               <Icon name="calendar-clock" size="sm" />
               {previewStatus === "previewing" ? "Reviewing..." : "Review schedule changes"}
-            </button>
+            </HitoButton>
             <span className="hito-field-helper">
               Nothing changes until you apply a reviewed schedule preview.
             </span>
@@ -306,15 +308,16 @@ function ScheduleReflowReview({
             <p className="hito-list-row-title">Preview no longer current</p>
             <p className="hito-list-row-copy">{staleMessage}</p>
           </div>
-          <button
+          <HitoButton
             type="button"
-            className="hito-button hito-button-secondary hito-button-sm"
+            variant="secondary"
+            size="sm"
             disabled={isBusy}
             onClick={onReviewAgain}
           >
             <Icon name="refresh" size="sm" />
             Review again
-          </button>
+          </HitoButton>
         </div>
       ) : null}
 
@@ -326,14 +329,15 @@ function ScheduleReflowReview({
             Settings.
           </p>
         </div>
-        <button
+        <HitoButton
           type="button"
-          className="hito-button hito-button-primary hito-button-sm"
+          variant="primary"
+          size="sm"
           disabled={isBusy || Boolean(staleMessage)}
           onClick={onApply}
         >
           {isApplying ? "Applying..." : "Apply schedule changes"}
-        </button>
+        </HitoButton>
       </div>
     </div>
   );

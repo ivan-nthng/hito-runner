@@ -23,9 +23,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icon";
+import { HitoButton } from "@/components/ui/button";
 import { HitoSlider } from "@/components/ui/hito-slider";
 import { useHitoTabs } from "@/components/ui/hito-tabs";
 import { HitoNativeSelectField } from "@/components/ui/native-select-field";
+import { Textarea } from "@/components/ui/textarea";
 
 export type BodyNoteDraft = {
   area: BodyNoteArea;
@@ -77,14 +79,10 @@ export function BodyNotesSummaryRow({
             Add any pain, tightness, or discomfort that showed up during or after this run.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onOpen}
-          className="hito-button hito-button-secondary hito-button-sm"
-        >
+        <HitoButton type="button" onClick={onOpen} size="sm" variant="secondary">
           <Icon name="plus" size="sm" />
           {hasBodyNotes ? "Edit body notes" : "Add body note"}
-        </button>
+        </HitoButton>
       </div>
 
       {!hasBodyNotes ? (
@@ -153,14 +151,15 @@ export function BodyNotesModal({
                 : `${bodyNotes.length} body note${bodyNotes.length === 1 ? "" : "s"} in this workout result.`}
             </p>
             {canAddMore ? (
-              <button
+              <HitoButton
                 type="button"
                 onClick={() => onChange([...bodyNotes, createEmptyBodyNoteDraft()])}
-                className="hito-button hito-button-secondary hito-button-sm"
+                size="sm"
+                variant="secondary"
               >
                 <Icon name="plus" size="sm" />
                 Add note
-              </button>
+              </HitoButton>
             ) : null}
           </div>
 
@@ -169,14 +168,16 @@ export function BodyNotesModal({
               <p className="hito-body">
                 No body notes will be saved with this workout unless you add one here.
               </p>
-              <button
+              <HitoButton
                 type="button"
                 onClick={() => onChange([createEmptyBodyNoteDraft()])}
-                className="hito-button hito-button-secondary hito-button-sm mt-4"
+                size="sm"
+                variant="secondary"
+                className="mt-4"
               >
                 <Icon name="plus" size="sm" />
                 Add body note
-              </button>
+              </HitoButton>
             </div>
           ) : (
             <div className="mt-5 space-y-5">
@@ -199,20 +200,17 @@ export function BodyNotesModal({
               Saved fields stay bounded to area, timing, sensation, severity, and an optional note.
             </p>
             <div className="flex flex-col-reverse gap-3 sm:flex-row">
-              <button
+              <HitoButton
                 type="button"
                 onClick={() => onOpenChange(false)}
-                className="hito-button hito-button-ghost hito-button-md"
+                size="md"
+                variant="ghost"
               >
                 Cancel
-              </button>
-              <button
-                type="button"
-                onClick={onSave}
-                className="hito-button hito-button-primary hito-button-md"
-              >
+              </HitoButton>
+              <HitoButton type="button" onClick={onSave} size="md" variant="primary">
                 Save body notes
-              </button>
+              </HitoButton>
             </div>
           </div>
         </DialogFooter>
@@ -239,14 +237,10 @@ function BodyNoteEditorCard({
           <p className="hito-label">Body note {index + 1}</p>
           <p className="hito-caption mt-1">{bodyNote.area}</p>
         </div>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="hito-button hito-button-ghost hito-button-xs"
-        >
+        <HitoButton type="button" onClick={onRemove} size="xs" variant="ghost">
           <Icon name="trash" size="xs" />
           Remove
-        </button>
+        </HitoButton>
       </div>
 
       <BodyAreaMapField value={bodyNote.area} onChange={(value) => onChange({ area: value })} />
@@ -289,12 +283,14 @@ function BodyNoteEditorCard({
 
       <div>
         <Label>Detail</Label>
-        <textarea
+        <Textarea
           rows={3}
           value={bodyNote.note}
           onChange={(event) => onChange({ note: event.target.value })}
           placeholder="What did you feel, and when did it show up?"
-          className="hito-field hito-textarea-md mt-3 min-h-24 resize-none"
+          size="md"
+          variant="primary"
+          className="mt-3 min-h-24 resize-none"
         />
       </div>
     </div>

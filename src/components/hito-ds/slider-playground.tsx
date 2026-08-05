@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
+import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
 import { ProductLinks } from "@/components/hito-ds/reference";
 import { HitoSlider } from "@/components/ui/hito-slider";
 import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
@@ -93,16 +94,15 @@ export function SliderPlayground() {
               aria-label="Slider range"
             >
               {RANGE_OPTIONS.map((option) => (
-                <button
+                <HitoChoiceToggle
                   key={option.value}
-                  type="button"
+                  size="sm"
                   {...rangeGroup.getRadioProps(option.value)}
-                  className="hito-choice-toggle hito-choice-toggle-sm"
-                  data-selected={range === option.value ? "true" : undefined}
+                  selected={range === option.value}
                   onClick={() => selectRange(option.value)}
                 >
                   {option.label}
-                </button>
+                </HitoChoiceToggle>
               ))}
             </div>
           </div>

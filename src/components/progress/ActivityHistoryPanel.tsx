@@ -1,5 +1,6 @@
 import { useRef, type RefObject } from "react";
 import { Link } from "@tanstack/react-router";
+import { HitoButton } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -92,15 +93,17 @@ export function ActivityHistoryPanel({
           </ul>
           {state.data.nextCursor ? (
             <div className="mt-6 flex justify-center">
-              <button
+              <HitoButton
                 type="button"
-                className="hito-button hito-button-secondary hito-button-md"
+                size="md"
+                variant="secondary"
+                loading={state.loadingMore}
                 disabled={state.loadingMore}
                 onClick={onLoadMore}
               >
                 {state.loadingMore ? <Icon name="loader" size="sm" /> : null}
                 {state.loadingMore ? "Loading…" : "Load more"}
-              </button>
+              </HitoButton>
             </div>
           ) : null}
         </>
@@ -184,13 +187,16 @@ function ActivityHistoryRow({
       <div className="flex shrink-0 items-start px-2 py-3 sm:items-center">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button
+            <HitoButton
               type="button"
-              className="hito-button hito-button-ghost hito-button-sm h-11 w-11 p-0"
               aria-label={`Actions for ${activityDisplayDate(activity)} ${activity.identity.label}`}
+              className="h-11 w-11"
+              iconOnly
+              size="sm"
+              variant="ghost"
             >
               <Icon name="more-horizontal" size="sm" />
-            </button>
+            </HitoButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem
@@ -373,25 +379,27 @@ function ActivityDetailContent({
         <p className="hito-label">Privacy and deletion</p>
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           {activity.capabilities.canRemoveOriginalFile ? (
-            <button
+            <HitoButton
               type="button"
-              className="hito-button hito-button-secondary hito-button-md"
-              data-tone="error"
+              size="md"
+              tone="error"
+              variant="secondary"
               onClick={(event) => onRequestAction("remove-source", activity, event.currentTarget)}
             >
               <Icon name="file-text" size="sm" />
               {sourceRemovalNeedsRetry ? "Retry file removal" : "Remove original file"}
-            </button>
+            </HitoButton>
           ) : null}
-          <button
+          <HitoButton
             type="button"
-            className="hito-button hito-button-secondary hito-button-md"
-            data-tone="error"
+            size="md"
+            tone="error"
+            variant="secondary"
             onClick={(event) => onRequestAction("delete", activity, event.currentTarget)}
           >
             <Icon name="trash" size="sm" />
             Delete activity
-          </button>
+          </HitoButton>
         </div>
       </section>
     </div>
@@ -463,18 +471,21 @@ export function ActivityActionConfirmation({
           ) : null}
         </div>
         <DialogFooter className="hito-product-dialog-footer">
-          <button
+          <HitoButton
             type="button"
-            className="hito-button hito-button-secondary hito-button-md"
+            size="md"
+            variant="secondary"
             disabled={pending}
             onClick={() => onOpenChange(false)}
           >
             Cancel
-          </button>
-          <button
+          </HitoButton>
+          <HitoButton
             type="button"
-            className="hito-button hito-button-primary hito-button-md"
-            data-tone="error"
+            size="md"
+            tone="error"
+            variant="primary"
+            loading={pending}
             disabled={pending}
             onClick={onConfirm}
           >
@@ -488,7 +499,7 @@ export function ActivityActionConfirmation({
                   ? "Retry removal"
                   : "Remove file"
                 : "Delete activity"}
-          </button>
+          </HitoButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -522,9 +533,9 @@ function HistoryEmptyState() {
       <h2 className="hito-section-title mt-2">Your running history will appear here.</h2>
       <p className="hito-body mt-2">Record a run from its workout when you are ready.</p>
       <div className="hito-state-actions">
-        <Link to="/" className="hito-button hito-button-primary hito-button-md">
-          Open Calendar
-        </Link>
+        <HitoButton asChild size="md" variant="primary">
+          <Link to="/">Open Calendar</Link>
+        </HitoButton>
       </div>
     </div>
   );
@@ -548,14 +559,10 @@ function HistoryError({
       <p className="hito-label text-destructive">Could not load activity history</p>
       <p className="hito-body mt-2">{message}</p>
       <div className="hito-state-actions">
-        <button
-          type="button"
-          className="hito-button hito-button-secondary hito-button-md"
-          onClick={onRetry}
-        >
+        <HitoButton type="button" size="md" variant="secondary" onClick={onRetry}>
           <Icon name="refresh" size="sm" />
           Try again
-        </button>
+        </HitoButton>
       </div>
     </div>
   );

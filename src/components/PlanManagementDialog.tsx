@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type RefObject, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   clearUpcomingSchedule,
@@ -33,6 +33,7 @@ import {
 } from "@/components/plan-management/PlanScheduleEditPanel";
 import { PlanSummaryHeader } from "@/components/plan-management/PlanSummaryHeader";
 import { hitoToast } from "@/components/ui/hito-toast";
+import { HitoButton } from "@/components/ui/button";
 
 export type PlanManagementDialogMode = "edit-schedule" | "clear-upcoming";
 
@@ -40,12 +41,14 @@ export function PlanManagementDialog({
   mode = "edit-schedule",
   open,
   onOpenChange,
+  returnFocusRef,
   snapshot,
   viewer,
 }: {
   mode?: PlanManagementDialogMode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  returnFocusRef?: RefObject<HTMLElement | null>;
   snapshot: TrainingSnapshot | null | undefined;
   viewer: ViewerSummary | null | undefined;
 }) {
@@ -271,6 +274,16 @@ export function PlanManagementDialog({
       <DialogContent
         overlayClassName="hito-dialog-overlay-stable"
         className={dialogContentClassName}
+        onCloseAutoFocus={(event) => {
+          const returnTarget = returnFocusRef?.current;
+
+          if (!returnTarget?.isConnected) {
+            return;
+          }
+
+          event.preventDefault();
+          returnTarget.focus();
+        }}
       >
         <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-modal-title">{dialogTitle}</DialogTitle>
@@ -330,25 +343,27 @@ export function PlanManagementDialog({
         </div>
 
         <DialogFooter className={dialogFooterClassName}>
-          <button
+          <HitoButton
             type="button"
             onClick={() => onOpenChange(false)}
-            className="hito-button hito-button-secondary hito-button-md"
+            variant="secondary"
+            size="md"
           >
             Close
-          </button>
+          </HitoButton>
           {isClearUpcomingMode ? (
-            <button
+            <HitoButton
               type="button"
               disabled={isBusy || !planMeta || !clearConfirmed}
               onClick={() => {
                 void submitClearUpcomingSchedule();
               }}
-              className="hito-button hito-button-primary hito-button-md"
-              data-tone="error"
+              variant="primary"
+              size="md"
+              tone="error"
             >
               {clearStatus === "clearing" ? "Clearing..." : "Clear"}
-            </button>
+            </HitoButton>
           ) : null}
         </DialogFooter>
       </DialogContent>

@@ -928,13 +928,10 @@ export function HitoDsComponentControls() {
                     <Avatar className="hito-avatar-tile hito-profile-avatar">
                       <AvatarFallback className="hito-profile-avatar-fallback">IR</AvatarFallback>
                     </Avatar>
-                    <button
-                      type="button"
-                      className="hito-avatar-action hito-button hito-button-secondary hito-button-sm"
-                    >
+                    <HitoButton size="sm" variant="secondary" className="hito-avatar-action">
                       <Icon name="camera" size="sm" />
                       Upload
-                    </button>
+                    </HitoButton>
                   </div>
                 </article>
                 <article className="hito-reference-row">
@@ -950,13 +947,10 @@ export function HitoDsComponentControls() {
                         <Icon name="user" size="lg" />
                       </AvatarFallback>
                     </Avatar>
-                    <button
-                      type="button"
-                      className="hito-avatar-action hito-button hito-button-secondary hito-button-sm"
-                    >
+                    <HitoButton size="sm" variant="secondary" className="hito-avatar-action">
                       <Icon name="edit" size="sm" />
                       Edit
-                    </button>
+                    </HitoButton>
                   </div>
                 </article>
               </div>
@@ -1236,21 +1230,27 @@ export function HitoDsComponentControls() {
                   <span>Focus-visible radio</span>
                 </div>
                 <div className="hito-choice-toggle-group">
-                  <span
-                    className="hito-choice-toggle hito-choice-toggle-sm pointer-events-none cursor-default"
+                  <HitoChoiceToggle
+                    size="sm"
+                    className="pointer-events-none cursor-default"
                     data-demo-state="focus"
                   >
                     Focus
-                  </span>
-                  <span
-                    className="hito-choice-toggle hito-choice-toggle-sm pointer-events-none cursor-default"
+                  </HitoChoiceToggle>
+                  <HitoChoiceToggle
+                    size="sm"
+                    className="pointer-events-none cursor-default"
                     data-invalid="true"
                   >
                     Invalid
-                  </span>
-                  <span className="hito-choice-toggle hito-choice-toggle-sm pointer-events-none cursor-default opacity-50">
+                  </HitoChoiceToggle>
+                  <HitoChoiceToggle
+                    size="sm"
+                    className="pointer-events-none cursor-default"
+                    disabled
+                  >
                     Disabled
-                  </span>
+                  </HitoChoiceToggle>
                 </div>
               </div>
             </div>
@@ -1384,13 +1384,14 @@ export function HitoDsComponentControls() {
                   />
                   <span>I understand this keeps history archived.</span>
                 </label>
-                <button
-                  type="button"
-                  className="hito-button hito-button-secondary hito-button-sm justify-self-start"
+                <HitoButton
+                  size="sm"
+                  variant="secondary"
+                  className="justify-self-start"
                   tabIndex={-1}
                 >
                   Clear upcoming schedule
-                </button>
+                </HitoButton>
               </div>
             </article>
           </div>

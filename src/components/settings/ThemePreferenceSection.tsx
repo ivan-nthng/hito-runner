@@ -24,7 +24,8 @@ export function ThemePreferenceSection({
 
           <ThemePreferenceChoiceGroup
             className="mt-5"
-            buttonClassName="hito-choice-toggle-lg min-w-0 flex-1 sm:min-w-32 sm:flex-none"
+            size="lg"
+            buttonClassName="sm:min-w-32 sm:flex-none"
             label={null}
           />
         </section>

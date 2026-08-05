@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
+import { HitoButton } from "@/components/ui/button";
 import { hitoToast } from "@/components/ui/hito-toast";
 import {
   confirmManualWorkoutDeleteClear,
@@ -408,18 +409,21 @@ function ManualDeleteClearReadyDialog({
           </div>
         </div>
         <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
-          <button
+          <HitoButton
             type="button"
-            className="hito-button hito-button-secondary hito-button-md"
+            size="md"
+            variant="secondary"
             disabled={isBusy}
             onClick={() => onOpenChange(false)}
           >
             Cancel
-          </button>
-          <button
+          </HitoButton>
+          <HitoButton
             type="button"
-            className="hito-button hito-button-primary hito-button-md"
-            data-tone="error"
+            loading={status === "creating"}
+            size="md"
+            tone="error"
+            variant="primary"
             disabled={isBusy}
             onClick={onConfirm}
           >
@@ -434,7 +438,7 @@ function ManualDeleteClearReadyDialog({
                 Clear workout
               </>
             )}
-          </button>
+          </HitoButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

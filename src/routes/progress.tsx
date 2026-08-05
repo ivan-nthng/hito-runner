@@ -4,6 +4,7 @@ import {
   RunnerActivityProgressExperience,
   type RunnerProgressTab,
 } from "@/components/progress/RunnerActivityProgressExperience";
+import { HitoButton } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { APP_NAME } from "@/lib/app-config";
 import { getProgressRouteData } from "@/lib/training-api";
@@ -76,16 +77,17 @@ function ProgressErrorState({ reset }: { error: Error; reset: () => void }) {
             Try again to reopen the latest activity truth.
           </p>
           <div className="hito-state-actions">
-            <button
+            <HitoButton
               type="button"
               onClick={() => {
                 reset();
                 window.location.reload();
               }}
-              className="hito-button hito-button-primary hito-button-lg"
+              size="lg"
+              variant="primary"
             >
               Try again
-            </button>
+            </HitoButton>
           </div>
         </section>
       </div>

@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { WorkoutLibraryPlayground } from "@/components/hito-ds/workout-library-playground";
 import { HitoDsPatternInlineEditing } from "@/components/hito-ds/reference-pattern-inline-editing";
 import { ReferenceListRow, SectionIntro } from "@/components/hito-ds/reference";
+import { HitoButton } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -231,7 +232,9 @@ export function HitoDsPatternsPage() {
                 State surfaces keep route-level setup and empty states consistent.
               </p>
               <div className="hito-state-actions">
-                <button className="hito-button hito-button-primary hito-button-md">Continue</button>
+                <HitoButton size="md" variant="primary">
+                  Continue
+                </HitoButton>
               </div>
             </article>
             <article className="hito-state-surface" data-tone="success">
@@ -241,9 +244,9 @@ export function HitoDsPatternsPage() {
                 Success confirms a completed operation without becoming another card family.
               </p>
               <div className="hito-state-actions">
-                <button className="hito-button hito-button-secondary hito-button-md">
+                <HitoButton size="md" variant="secondary">
                   View calendar
-                </button>
+                </HitoButton>
               </div>
             </article>
             <article className="hito-state-surface" data-tone="destructive">
@@ -253,7 +256,9 @@ export function HitoDsPatternsPage() {
                 Error tone is reserved for real load or save failures, not normal previews.
               </p>
               <div className="hito-state-actions">
-                <button className="hito-button hito-button-secondary hito-button-md">Retry</button>
+                <HitoButton size="md" variant="secondary">
+                  Retry
+                </HitoButton>
               </div>
             </article>
           </div>
@@ -297,12 +302,9 @@ export function HitoDsPatternsPage() {
             <TooltipProvider delayDuration={120}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className="hito-button hito-button-secondary hito-button-md"
-                  >
+                  <HitoButton size="md" variant="secondary">
                     Hover or focus for context
-                  </button>
+                  </HitoButton>
                 </TooltipTrigger>
                 <TooltipContent sideOffset={8}>
                   <span className="flex items-center gap-2">

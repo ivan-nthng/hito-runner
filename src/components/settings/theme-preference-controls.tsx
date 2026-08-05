@@ -6,6 +6,8 @@ import {
 import { useId } from "react";
 import { cn } from "@/lib/utils";
 import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
+import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
+import type { HitoChoiceToggleSize } from "@/components/ui/hito-control-contract";
 import { parseHitoThemePreference } from "@/lib/theme-preference";
 import {
   HITO_THEME_PREFERENCES,
@@ -17,10 +19,12 @@ export function ThemePreferenceChoiceGroup({
   buttonClassName,
   className,
   label = "Theme",
+  size = "xs",
 }: {
   buttonClassName?: string;
   className?: string;
   label?: string | null;
+  size?: HitoChoiceToggleSize;
 }) {
   const labelId = useId();
   const { choosePreference, preference, resolvedTheme } = useHitoThemePreference();
@@ -43,20 +47,17 @@ export function ThemePreferenceChoiceGroup({
           const selected = preference === option;
 
           return (
-            <button
+            <HitoChoiceToggle
               key={option}
-              type="button"
+              size={size}
               {...themeGroup.getRadioProps(option)}
-              className={cn(
-                "hito-choice-toggle",
-                buttonClassName ?? "hito-choice-toggle-xs min-w-0 flex-1",
-              )}
-              data-selected={selected ? "true" : undefined}
+              className={cn("min-w-0 flex-1", buttonClassName)}
+              selected={selected}
               title={`${copy.description} Resolved theme: ${resolvedLabel}.`}
               onClick={() => choosePreference(option)}
             >
               {copy.label}
-            </button>
+            </HitoChoiceToggle>
           );
         })}
       </div>

@@ -16,6 +16,7 @@ import {
 } from "@/components/onboarding/selected-running-plan-flow-utils";
 import { hitoToast } from "@/components/ui/hito-toast";
 import { Icon } from "@/components/ui/icon";
+import { HitoButton } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -643,27 +644,30 @@ export function ActivePlanCreatePlanDialog({
               </p>
             </div>
             <div className="flex flex-col-reverse gap-2 sm:flex-row">
-              <button
+              <HitoButton
                 type="button"
                 onClick={() => onOpenChange(false)}
-                className="hito-button hito-button-secondary hito-button-md"
+                variant="secondary"
+                size="md"
                 disabled={transitionStatus !== "idle"}
               >
                 Close
-              </button>
+              </HitoButton>
               {selectedPreviewIsReady && !selectedPlanPreview.previewOpen ? (
-                <button
+                <HitoButton
                   type="button"
-                  className="hito-button hito-button-secondary hito-button-md"
+                  variant="secondary"
+                  size="md"
                   disabled={isBusy}
                   onClick={clearGeneratedPlanSetup}
                 >
                   Clear plan
-                </button>
+                </HitoButton>
               ) : null}
-              <button
+              <HitoButton
                 type="button"
-                className="hito-button hito-button-primary hito-button-md"
+                variant="primary"
+                size="md"
                 disabled={footerButtonDisabled}
                 aria-busy={
                   (selectedPlanPreview.status === "previewing_plan" && !pendingPreviewCanReopen) ||
@@ -676,7 +680,7 @@ export function ActivePlanCreatePlanDialog({
                   : selectedPreviewIsReady && !selectedPlanPreview.previewOpen
                     ? "Review plan"
                     : "Create plan"}
-              </button>
+              </HitoButton>
             </div>
           </DialogFooter>
         </DialogContent>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { HitoLogo, HitoLogoMark } from "@/components/ui/hito-logo";
+import { HitoButton } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { ThemePreferenceChoiceGroup } from "@/components/settings/theme-preference-controls";
 import {
@@ -55,10 +56,7 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
           <HitoDsNestedNav idPrefix="desktop" activePageId={pageId} />
 
           <div className="hito-workbench-sidebar-footer">
-            <ThemePreferenceChoiceGroup
-              buttonClassName="hito-choice-toggle-xs min-w-0 flex-1"
-              label={null}
-            />
+            <ThemePreferenceChoiceGroup label={null} />
           </div>
         </aside>
 
@@ -76,21 +74,19 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                 </div>
                 <HitoLogoMark decorative className="text-foreground [--hito-logo-height:1.65rem]" />
               </div>
-              <ThemePreferenceChoiceGroup
-                buttonClassName="hito-choice-toggle-xs min-w-0 flex-1"
-                label={null}
-              />
+              <ThemePreferenceChoiceGroup label={null} />
               <Sheet open={mobileJumpOpen} onOpenChange={setMobileJumpOpen}>
                 <SheetTrigger asChild>
-                  <button
-                    type="button"
-                    className="hito-button hito-button-secondary hito-button-sm hito-ds-jump-trigger"
+                  <HitoButton
+                    size="sm"
+                    variant="secondary"
+                    className="hito-ds-jump-trigger"
                     aria-controls="hito-ds-mobile-jump-nav"
                   >
                     <span>Browse DS pages</span>
                     <span className="hito-ds-jump-trigger-context">{currentPage.label}</span>
                     <Icon name="chevron-right" size="xs" decorative />
-                  </button>
+                  </HitoButton>
                 </SheetTrigger>
                 <SheetContent
                   side="bottom"

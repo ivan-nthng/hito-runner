@@ -15,11 +15,11 @@ import {
 import { requireAdminAccessForDependencies } from "@/lib/admin-access.server";
 import type { RequestAuthContext } from "@/lib/backend/auth";
 import { readLocalAuthAccountsFile } from "@/lib/local-auth";
+import { DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE } from "@/lib/local-auth-account-registry.server";
 import type { Database } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { hasSupabaseServerEnv, serverEnv } from "@/lib/supabase/env";
 
-const DEFAULT_ACCOUNTS_FILE = ".tanstack/hito-running-local-accounts.json";
 const PAGE_SIZE = 1000;
 const RECENT_LOG_WINDOW_DAYS = 30;
 
@@ -137,7 +137,7 @@ async function buildCurrentDependencies(): Promise<AdminAnalyticsDependencies> {
     ),
     accountsFilePath: path.resolve(
       process.cwd(),
-      serverEnv.localAuthBypassAccountsFile ?? DEFAULT_ACCOUNTS_FILE,
+      serverEnv.localAuthBypassAccountsFile ?? DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE,
     ),
     supabase: hasSupabaseServerEnv ? createAdminSupabaseClient() : null,
   };

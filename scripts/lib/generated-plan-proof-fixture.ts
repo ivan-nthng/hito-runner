@@ -8,6 +8,7 @@ import {
   buildReviewedAiGeneratedRunningPlanPreview,
   type RunningPlanPreviewActionInput,
 } from "../../src/lib/running-plan-engine-actions";
+import { DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE } from "../../src/lib/local-auth-account-registry.server";
 import { buildProofRunnerProfileSnapshot } from "../runner-profile-snapshot-proof-helpers";
 
 export async function buildReviewedAiFixtureResult(input: RunningPlanPreviewActionInput) {
@@ -38,7 +39,7 @@ const localAiGeneratedFixtureEnv = {
   OPENAI_API_KEY: "local-qa-dev-ai-generated-plan-fixture",
   OPENAI_MODEL: "hito-local-qa-dev-ai-generated-plan-fixture",
   LOCAL_AUTH_BYPASS_ENABLED: "true",
-  LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: "scripts/fixtures/local-auth-users.json",
+  LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE,
   NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
   HITO_AI_GENERATED_PLAN_DEV_FIXTURE: "true",
   HITO_AI_GENERATED_PLAN_PROVIDER_MODE: "qa_fixture",

@@ -15,7 +15,7 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
-import { readActiveBuildOutputLock } from "./lib/build-output-lock.mjs";
+import { isPidAlive, readActiveBuildOutputLock } from "./lib/build-output-lock.mjs";
 import { resolveQaRuntimePaths } from "./lib/qa-runtime-paths.mjs";
 import { validateLocalBuildOutput } from "./validate-build-output-integrity.mjs";
 
@@ -623,15 +623,6 @@ function persistState(state) {
 
 function removeState() {
   rmSync(statePath, { force: true });
-}
-
-function isPidAlive(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function terminatePidGroup(pid) {

@@ -42,6 +42,7 @@ import {
   buildAiGeneratedRunningPlanAuthoringInput as buildAiGeneratedRunningPlanAuthoringInputRuntime,
 } from "../src/lib/ai-generated-running-plan";
 import { buildImportedPlanSeed } from "../src/lib/imported-plan";
+import { DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE } from "../src/lib/local-auth-account-registry.server";
 import { buildReviewedFirstPlanImportedSeed } from "../src/lib/active-plan-persistence";
 import {
   confirmRunningPlanDraftForUser,
@@ -589,7 +590,7 @@ async function validatePlanFirstAuthoringAuthority() {
     today: ambitiousShortHorizonInput.startDate,
     env: {
       LOCAL_AUTH_BYPASS_ENABLED: "true",
-      LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: "/tmp/hito-local-auth.json",
+      LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE,
       NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
       [AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV]: "true",
       [AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV]: "qa_fixture",
@@ -931,7 +932,7 @@ async function validateFirstPlanGenerationLifecycle() {
     today: scenario.input.startDate ?? resolved.authoringInput.schedule.startDate,
     env: {
       LOCAL_AUTH_BYPASS_ENABLED: "true",
-      LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: "/tmp/hito-local-auth.json",
+      LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE,
       NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
       [AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV]: "true",
       [AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV]: "qa_fixture",
@@ -1435,7 +1436,7 @@ async function validateLocalDevFixtureAvailabilityGating() {
   const boundaryArtifactRoot = await mkdtemp(join(tmpdir(), "hito-provider-boundary-"));
   const localDevFixtureEnv = {
     LOCAL_AUTH_BYPASS_ENABLED: "true",
-    LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: "/tmp/hito-local-auth.json",
+    LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE,
     NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
     [AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV]: "true",
     [AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV]: "qa_fixture",
@@ -1522,7 +1523,7 @@ async function validateLocalDevFixtureAvailabilityGating() {
   const previousEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
   try {
     process.env.LOCAL_AUTH_BYPASS_ENABLED = "true";
-    process.env.LOCAL_AUTH_BYPASS_ACCOUNTS_FILE = "/tmp/hito-local-auth.json";
+    process.env.LOCAL_AUTH_BYPASS_ACCOUNTS_FILE = DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE;
     process.env.HITO_AI_GENERATED_PLAN_DEV_FIXTURE = "true";
     process.env[AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV] = "qa_fixture";
     process.env.NEXT_PUBLIC_SUPABASE_URL = "http://127.0.0.1:54321";
@@ -1889,7 +1890,7 @@ function buildScenarioAiPreviewOptions(
 
   const env = {
     LOCAL_AUTH_BYPASS_ENABLED: "true",
-    LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: "/tmp/hito-local-auth.json",
+    LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE,
     NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
     [AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV]: "true",
     [AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV]: "qa_fixture",

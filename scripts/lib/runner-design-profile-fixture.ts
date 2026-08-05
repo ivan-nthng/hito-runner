@@ -14,6 +14,7 @@ import {
   buildReviewedAiGeneratedRunningPlanPreviewForUser,
   confirmRunningPlanDraftForUser,
 } from "../../src/lib/running-plan-engine-actions";
+import { DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE } from "../../src/lib/local-auth-account-registry.server";
 import {
   createRunnerActivityPlannedWorkoutMatch,
   persistGarminFitActivitySource,
@@ -952,7 +953,7 @@ async function withLocalDesignFixtureEnv<T>(run: () => Promise<T>) {
     process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV] = "true";
     process.env[AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV] = "qa_fixture";
     process.env.LOCAL_AUTH_BYPASS_ENABLED = "true";
-    process.env.LOCAL_AUTH_BYPASS_ACCOUNTS_FILE = "scripts/fixtures/local-auth-users.json";
+    process.env.LOCAL_AUTH_BYPASS_ACCOUNTS_FILE = DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE;
     process.env.NEXT_PUBLIC_SUPABASE_URL = supabaseUrl;
     delete process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_DELAY_MS_ENV];
     delete process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV];

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sanitizeRedirectPath } from "@/lib/auth-redirect";
 import { verifyLocalAuthCredentials } from "@/lib/local-auth";
@@ -91,7 +92,12 @@ async function run() {
   const runtimeUrl = process.argv
     .find((argument) => argument.startsWith("--runtime-url="))
     ?.slice("--runtime-url=".length);
-  if (runtimeUrl) await assertLoopbackLocalAuthLifecycle(runtimeUrl);
+  if (runtimeUrl) {
+    await assertLoopbackLocalAuthLifecycle(runtimeUrl);
+    await assertProductApiRequestBoundary(runtimeUrl);
+  }
+
+  await assertPublicApiErrorRedaction();
 
   console.log("Runner request-auth session validation passed.");
 }
@@ -135,6 +141,106 @@ async function assertLoopbackLocalAuthLifecycle(runtimeUrl: string) {
     headers: { cookie: clearedCookie },
   });
   assert.equal(afterLogout.status, 401, "explicit logout leaves the browser signed out");
+}
+
+async function assertProductApiRequestBoundary(runtimeUrl: string) {
+  const { baseUrl, cookie } = await loginQaPoolToLoopbackRuntime({
+    runtimeUrl,
+    role: "provider-engine",
+  });
+
+  const unauthenticatedMultipart = new FormData();
+  unauthenticatedMultipart.set("probe", "unauthenticated");
+  const unauthenticatedAvatar = await fetch(new URL("/api/profile-avatar/upload", baseUrl), {
+    method: "POST",
+    body: unauthenticatedMultipart,
+  });
+  assert.equal(unauthenticatedAvatar.status, 401);
+  assert.deepEqual(await unauthenticatedAvatar.json(), {
+    ok: false,
+    message: "Sign in again before changing your avatar.",
+  });
+
+  const oversizedAvatar = new FormData();
+  oversizedAvatar.set(
+    "file",
+    new File([Buffer.alloc(5 * 1024 * 1024 + 1)], "oversized.jpg", { type: "image/jpeg" }),
+  );
+  const unauthenticatedOversizedAvatar = await fetch(
+    new URL("/api/profile-avatar/upload", baseUrl),
+    {
+      method: "POST",
+      body: oversizedAvatar,
+    },
+  );
+  assert.equal(unauthenticatedOversizedAvatar.status, 401);
+
+  const authenticatedOversizedAvatar = await fetch(new URL("/api/profile-avatar/upload", baseUrl), {
+    method: "POST",
+    headers: { cookie },
+    body: oversizedAvatar,
+  });
+  assert.equal(authenticatedOversizedAvatar.status, 413);
+  assert.deepEqual(await authenticatedOversizedAvatar.json(), {
+    ok: false,
+    message: "Choose an image under 5 MB.",
+  });
+
+  const authenticatedMalformedAvatar = await fetch(new URL("/api/profile-avatar/upload", baseUrl), {
+    method: "POST",
+    headers: { cookie },
+    body: "not multipart",
+  });
+  assert.equal(authenticatedMalformedAvatar.status, 500);
+  const malformedAvatarPayload = await authenticatedMalformedAvatar.json();
+  assert.deepEqual(malformedAvatarPayload, {
+    ok: false,
+    message: "The avatar could not be uploaded. Try again shortly.",
+  });
+  assert.doesNotMatch(JSON.stringify(malformedAvatarPayload), /formdata|content-type|parse/i);
+
+  const invalidExport = await fetch(new URL("/api/plan/export?format=csv", baseUrl));
+  assert.equal(invalidExport.status, 400);
+  assert.equal(await invalidExport.text(), "Choose a valid export format.");
+
+  const noActivePlanExport = await fetch(new URL("/api/plan/export?format=json", baseUrl), {
+    headers: { cookie },
+  });
+  assert.equal(noActivePlanExport.status, 404);
+  assert.equal(await noActivePlanExport.text(), "There is no active plan to export.");
+
+  const unauthenticatedExport = await fetch(new URL("/api/plan/export?format=json", baseUrl));
+  assert.equal(unauthenticatedExport.status, 401);
+  assert.equal(await unauthenticatedExport.text(), "Authentication is required for this action.");
+}
+
+async function assertPublicApiErrorRedaction() {
+  const [avatarRoute, planExportRoute] = await Promise.all([
+    readFile(new URL("../src/routes/api.profile-avatar.upload.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/routes/api.plan.export.tsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.ok(
+    avatarRoute.indexOf("const userId = await requirePersistedUserIdForCurrentRequest();") <
+      avatarRoute.indexOf("const formData = await readBoundedMultipartFormData("),
+    "Avatar authentication must resolve before multipart parsing.",
+  );
+  assert.match(avatarRoute, /The avatar could not be uploaded\. Try again shortly\./);
+  assert.doesNotMatch(
+    avatarRoute.slice(
+      avatarRoute.indexOf("} catch (error) {"),
+      avatarRoute.indexOf("function getAvatarUploadPublicFailure"),
+    ),
+    /message:\s*error\.message/,
+  );
+  assert.match(planExportRoute, /The active plan could not be exported\./);
+  assert.doesNotMatch(
+    planExportRoute.slice(
+      planExportRoute.indexOf("} catch (error) {"),
+      planExportRoute.indexOf("function getPlanExportPublicFailure"),
+    ),
+    /return new Response\(error\.message/,
+  );
 }
 
 async function assertAuthCase(options: {

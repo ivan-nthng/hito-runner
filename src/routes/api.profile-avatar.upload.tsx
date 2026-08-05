@@ -1,17 +1,40 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { readBoundedMultipartFormData } from "@/lib/bounded-multipart-form-data";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
 
 const PROFILE_AVATAR_STORAGE_BUCKET = "profile-avatars";
 const MAX_AVATAR_UPLOAD_BYTES = 5 * 1024 * 1024;
+const MAX_AVATAR_MULTIPART_BYTES = MAX_AVATAR_UPLOAD_BYTES + 1024 * 1024;
 const ALLOWED_AVATAR_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+class AvatarUploadRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: 400 | 413,
+  ) {
+    super(message);
+    this.name = "AvatarUploadRequestError";
+  }
+}
+
+type AvatarUploadPublicFailure = {
+  status: 400 | 401 | 413 | 500;
+  message: string;
+  report: boolean;
+};
 
 export const Route = createFileRoute("/api/profile-avatar/upload")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
-          const formData = await request.formData();
+          const userId = await requirePersistedUserIdForCurrentRequest();
+          const formData = await readBoundedMultipartFormData(
+            request,
+            MAX_AVATAR_MULTIPART_BYTES,
+            avatarMultipartTooLargeError,
+          );
           const fileEntry = formData.get("file");
 
           if (!(fileEntry instanceof File)) {
@@ -24,7 +47,7 @@ export const Route = createFileRoute("/api/profile-avatar/upload")({
             );
           }
 
-          if (fileEntry.size <= 0 || fileEntry.size > MAX_AVATAR_UPLOAD_BYTES) {
+          if (fileEntry.size <= 0) {
             return Response.json(
               {
                 ok: false,
@@ -32,6 +55,10 @@ export const Route = createFileRoute("/api/profile-avatar/upload")({
               },
               { status: 400 },
             );
+          }
+
+          if (fileEntry.size > MAX_AVATAR_UPLOAD_BYTES) {
+            throw avatarMultipartTooLargeError();
           }
 
           if (!ALLOWED_AVATAR_MIME_TYPES.has(fileEntry.type)) {
@@ -44,7 +71,6 @@ export const Route = createFileRoute("/api/profile-avatar/upload")({
             );
           }
 
-          const userId = await requirePersistedUserIdForCurrentRequest();
           const supabase = createAdminSupabaseClient();
           const profileResult = await supabase
             .from("runner_profiles")
@@ -111,28 +137,17 @@ export const Route = createFileRoute("/api/profile-avatar/upload")({
             { status: 200 },
           );
         } catch (error) {
-          if (
-            error instanceof Error &&
-            error.message === "Authentication is required for this action."
-          ) {
-            return Response.json(
-              {
-                ok: false,
-                message: "Sign in again before changing your avatar.",
-              },
-              { status: 401 },
-            );
+          const failure = getAvatarUploadPublicFailure(error);
+          if (failure.report) {
+            console.error("[api/profile-avatar/upload] unexpected avatar upload failure", error);
           }
 
           return Response.json(
             {
               ok: false,
-              message:
-                error instanceof Error
-                  ? error.message
-                  : "The avatar could not be uploaded in this environment.",
+              message: failure.message,
             },
-            { status: 500 },
+            { status: failure.status },
           );
         }
       },
@@ -140,3 +155,27 @@ export const Route = createFileRoute("/api/profile-avatar/upload")({
   },
   component: () => null,
 });
+
+function getAvatarUploadPublicFailure(error: unknown): AvatarUploadPublicFailure {
+  if (error instanceof AvatarUploadRequestError) {
+    return { status: error.status, message: error.message, report: false };
+  }
+
+  if (error instanceof Error && error.message === "Authentication is required for this action.") {
+    return {
+      status: 401,
+      message: "Sign in again before changing your avatar.",
+      report: false,
+    };
+  }
+
+  return {
+    status: 500,
+    message: "The avatar could not be uploaded. Try again shortly.",
+    report: true,
+  };
+}
+
+function avatarMultipartTooLargeError() {
+  return new AvatarUploadRequestError("Choose an image under 5 MB.", 413);
+}

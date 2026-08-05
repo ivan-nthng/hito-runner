@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { readBoundedMultipartFormData } from "@/lib/bounded-multipart-form-data";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
 import {
   MAX_WORKOUT_RESULT_MULTIPART_BYTES,
@@ -13,7 +14,11 @@ export const Route = createFileRoute("/api/workout-result/upload")({
       POST: async ({ request }) => {
         try {
           const userId = await requirePersistedUserIdForCurrentRequest();
-          const formData = await readBoundedWorkoutResultFormData(request);
+          const formData = await readBoundedMultipartFormData(
+            request,
+            MAX_WORKOUT_RESULT_MULTIPART_BYTES,
+            workoutResultMultipartTooLargeError,
+          );
           const plannedWorkoutId =
             typeof formData.get("plannedWorkoutId") === "string"
               ? (formData.get("plannedWorkoutId") as string).trim() || null
@@ -92,39 +97,6 @@ export const Route = createFileRoute("/api/workout-result/upload")({
   },
   component: () => null,
 });
-
-async function readBoundedWorkoutResultFormData(request: Request) {
-  const contentLength = Number(request.headers.get("content-length"));
-  if (Number.isFinite(contentLength) && contentLength > MAX_WORKOUT_RESULT_MULTIPART_BYTES) {
-    throw workoutResultMultipartTooLargeError();
-  }
-
-  if (!request.body) {
-    return request.formData();
-  }
-
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
-
-  while (true) {
-    const result = await reader.read();
-    if (result.done) break;
-    totalBytes += result.value.byteLength;
-    if (totalBytes > MAX_WORKOUT_RESULT_MULTIPART_BYTES) {
-      await reader.cancel();
-      throw workoutResultMultipartTooLargeError();
-    }
-    chunks.push(result.value);
-  }
-
-  const boundedRequest = new Request(request.url, {
-    method: request.method,
-    headers: request.headers,
-    body: new Blob(chunks),
-  });
-  return boundedRequest.formData();
-}
 
 function workoutResultMultipartTooLargeError() {
   return new WorkoutResultImportError(

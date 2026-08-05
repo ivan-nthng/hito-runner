@@ -32,6 +32,15 @@ must either add an entry here or explicitly state why it is not technical-log ma
 
 ## 2026-08-05
 
+- BACKEND + QA + ARCHITECT / Product API request-boundary hardening — moved runner authentication
+  ahead of avatar multipart parsing, reused the FIT bounded-reader as the one multipart limit seam,
+  and replaced raw caught avatar/export infrastructure messages with stable public failures while
+  retaining server diagnostics. Evidence:
+  `docs/tasks/backlog/2026-08-05-product-api-request-boundary-hardening.md` and
+  `scripts/validate-runner-auth-session.ts`. Boundary: direct `api.*` routes only; no Product UI,
+  DTO, schema, activity lifecycle, provider, or hosted data changed; TanStack server-function error
+  transport remains a distinct follow-up audit.
+
 - BACKEND + QA + ARCHITECT / evidence-gated Backend codebase reduction cycle — removed 467 net
   maintained code lines by deleting zero-consumer declarations and converging weekday, auth,
   entitlement, managed build-path, and proof-setup ownership; also rejected encoded backslash

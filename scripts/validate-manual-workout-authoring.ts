@@ -22,8 +22,10 @@ import {
 import { AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE } from "../src/lib/workout-document";
 import { formatReadableDate } from "../src/components/manual-workout/manual-workout-authoring-utils";
 import {
-  buildSkippedManualPersistenceResult,
-  formatManualPersistenceBlocker,
+  buildSkippedDisposablePersistenceResult,
+  formatDisposablePersistenceBlocker,
+} from "./lib/qa-pool-persistence-proof";
+import {
   readManualPersistenceCliOptions,
   resolveManualPersistencePreflight,
   validateManualWorkoutDisposablePersistenceProof,
@@ -39,7 +41,9 @@ import { validateManualMoveWorkoutContract } from "./manual-workout-authoring/mo
 import {
   assertNoFakePaceOrHr,
   assertRepeatWithRecovery,
+  flattenSteps,
   formatJsonResult,
+  hasExecutableStructure,
   readStepsForAssertion,
 } from "./manual-workout-authoring/move-proof-assertions";
 import { validateManualPersistedTodayAndFutureWorkoutEditContract } from "./manual-workout-authoring/persisted-edit-proof";
@@ -49,6 +53,7 @@ import { validateManualTemplateDefaultSkeletons } from "./manual-workout-authori
 import { validateManualWorkoutTemplateCatalogContract } from "./manual-workout-authoring/template-catalog-proof";
 import {
   assertReady,
+  buildOrderedRepeatDraftInput,
   buildFakePlanCycle,
   buildFakePlannedWorkout,
   buildFakePlannedWorkoutFromReview,
@@ -90,7 +95,12 @@ async function main() {
   const persistencePreflight = resolveManualPersistencePreflight(options);
 
   if (!persistencePreflight.shouldRun && options.requirePersistence) {
-    throw new Error(formatManualPersistenceBlocker(persistencePreflight));
+    throw new Error(
+      formatDisposablePersistenceBlocker(
+        "Manual workout confirm persistence proof",
+        persistencePreflight,
+      ),
+    );
   }
 
   const persistenceProof = persistencePreflight.shouldRun
@@ -99,7 +109,7 @@ async function main() {
         review: persistenceReview,
         preflight: persistencePreflight,
       })
-    : buildSkippedManualPersistenceResult(persistencePreflight);
+    : buildSkippedDisposablePersistenceResult(persistencePreflight);
 
   console.log("Manual workout authoring review contract invariants passed.", {
     persistence: persistenceProof,
@@ -496,38 +506,7 @@ function validateAcceptedFixtures() {
 }
 
 function validateOrderedRepeatChildrenRoundtrip() {
-  const input: ManualWorkoutDraftInput = {
-    templateKey: "controlled_tempo_session",
-    workoutDate: "2026-06-18",
-    entries: [
-      {
-        kind: "block",
-        block: { blockKey: "warmup_block", durationSeconds: 12 * 60 },
-      },
-      {
-        kind: "repeat_group",
-        group: {
-          repeatCount: 4,
-          safetyKind: "tempo_repeats",
-          groupLabel: "Tempo ladder",
-          children: [
-            { blockKey: "easy_run_block", durationSeconds: 3 * 60, label: "Settle" },
-            {
-              blockKey: "tempo_block",
-              durationSeconds: 2 * 60,
-              label: "Tempo press",
-              target: { rpe: 7, cue: "Controlled, not all-out." },
-            },
-            { blockKey: "interval_recovery_block", durationSeconds: 60, label: "Float" },
-          ],
-        },
-      },
-      {
-        kind: "block",
-        block: { blockKey: "cooldown_block", durationSeconds: 10 * 60 },
-      },
-    ],
-  };
+  const input = buildOrderedRepeatDraftInput("2026-06-18");
   const review = assertReady("ordered 3-child repeat", input);
   const children = assertOrderedRepeatChildren(review.draft.steps, "ordered 3-child repeat");
 
@@ -947,22 +926,6 @@ function assertManualUserEnteredTarget(
       `${label} HR target should preserve user-entered HR source semantics.`,
     );
   }
-}
-
-function hasExecutableStructure(step: Step) {
-  if (step.duration_min || step.distance_km) {
-    return true;
-  }
-
-  if (step.repeats && step.children?.length) {
-    return step.children.every((child) => hasExecutableStructure(child));
-  }
-
-  return false;
-}
-
-function flattenSteps(steps: Step[]): Step[] {
-  return steps.flatMap((step) => [step, ...(step.children ? flattenSteps(step.children) : [])]);
 }
 
 void main().catch((error) => {

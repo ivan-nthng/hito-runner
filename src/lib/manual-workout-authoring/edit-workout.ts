@@ -35,7 +35,6 @@ import {
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
   MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
   MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
-  MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION,
   type ManualWorkoutDraftInput,
   type ManualWorkoutDraftProcessingOptions,
   type ManualWorkoutDraftReviewResult,
@@ -75,12 +74,6 @@ export const manualWorkoutPersistedEditConfirmInputSchema =
 
 type ManualWorkoutPersistedEditSourceInput = z.output<
   typeof manualWorkoutPersistedEditSourceInputSchema
->;
-type ManualWorkoutPersistedEditReviewInput = z.output<
-  typeof manualWorkoutPersistedEditReviewInputSchema
->;
-type ManualWorkoutPersistedEditConfirmInput = z.output<
-  typeof manualWorkoutPersistedEditConfirmInputSchema
 >;
 
 export type ManualWorkoutPersistedEditFailureReason =

@@ -1248,20 +1248,6 @@ function estimateDistanceKm(steps: WorkoutDocumentSection[], workoutType: Workou
   return Number((totalDurationMin / pace).toFixed(1));
 }
 
-function estimateDurationFromDistanceKm(distanceKm: number, workoutType: WorkoutDocumentType) {
-  if (!distanceKm) {
-    return 0;
-  }
-
-  const pace = paceMinutesPerKm(workoutType);
-
-  if (!pace) {
-    return 0;
-  }
-
-  return Math.round(distanceKm * pace);
-}
-
 function paceMinutesPerKm(workoutType: WorkoutDocumentType) {
   const paceMap: Record<WorkoutDocumentType, number> = {
     easy: 7.0,

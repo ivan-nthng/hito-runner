@@ -46,7 +46,6 @@ import {
   type ActivePlanWorkoutEditingCapability,
   type RunnerProfileSummary,
   type PlanSchedulePreferencesSummary,
-  type Step,
   type TrainingSnapshot,
   type Workout,
   type WorkoutLog,
@@ -55,8 +54,7 @@ import { saveWorkoutLogForUser, workoutLogInputSchema } from "@/lib/workout-log-
 import type { Database, Json } from "@/lib/supabase/database";
 import { getRequestAuthContext } from "@/lib/backend/auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
-import { RUNNER_TRAINING_WEEKDAYS } from "@/lib/runner-training-preferences";
-import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "@/lib/manual-workout-authoring";
+import { WEEKDAY_NAMES } from "@/lib/weekday-rest-invariants";
 import { fetchManualWorkoutEvidenceWorkoutIds } from "@/lib/manual-workout-authoring/active-plan-add";
 import { readWorkoutDocumentSections } from "@/lib/workout-document";
 
@@ -329,8 +327,7 @@ function readPlanWeekdays(value: unknown): string[] {
 }
 
 function readPlanWeekday(value: unknown): string | null {
-  return typeof value === "string" &&
-    (RUNNER_TRAINING_WEEKDAYS as readonly string[]).includes(value)
+  return typeof value === "string" && (WEEKDAY_NAMES as readonly string[]).includes(value)
     ? value
     : null;
 }

@@ -16,9 +16,7 @@ export function resolveQaRuntimePaths({ rootDir = process.cwd() } = {}) {
   const nitroDevOutputDir = resolve(buildOutputRoot, "dev-output");
 
   return {
-    workspaceRoot,
     runtimeRoot,
-    runtimeParentDir,
     serverDir: resolve(runtimeRoot, "server"),
     publicDir: resolve(runtimeRoot, "public"),
     nitroManifest: resolve(runtimeRoot, "nitro.json"),
@@ -80,15 +78,6 @@ export function ensureQaBuildOutputNodeModulesLink({ rootDir = process.cwd() } =
   return linkPath;
 }
 
-export function qaRuntimeIsInsideWorkspace({ rootDir = process.cwd(), runtimeRoot } = {}) {
-  const workspaceRoot = withTrailingSeparator(resolve(rootDir));
-  const resolvedRuntimeRoot = withTrailingSeparator(
-    resolve(runtimeRoot ?? resolveQaRuntimePaths({ rootDir }).runtimeRoot),
-  );
-
-  return resolvedRuntimeRoot.startsWith(workspaceRoot);
-}
-
 function resolveQaRuntimeRoot(workspaceRoot) {
   const configuredRoot = process.env[qaRuntimeRootEnvName]?.trim();
 
@@ -113,10 +102,6 @@ function expandHome(path) {
 
 function safeWorkspaceSlug(value) {
   return value.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "workspace";
-}
-
-function withTrailingSeparator(path) {
-  return path.endsWith("/") ? path : `${path}/`;
 }
 
 function lstatIfExists(path) {

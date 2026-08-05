@@ -92,17 +92,6 @@ export function repeatChildPrescriptionHasExecutableStructure(prescription: unkn
   return false;
 }
 
-export function repeatChildrenHaveExecutableStructure(children: readonly unknown[]) {
-  const reduced = reduceRepeatChildrenToChildFirst({ children });
-
-  return (
-    reduced.children.length > 0 &&
-    reduced.children.every((child) =>
-      repeatChildPrescriptionHasExecutableStructure(child.prescription),
-    )
-  );
-}
-
 export function repeatPrescriptionHasExecutableStructure(input: {
   repeatCount?: unknown;
   children?: readonly unknown[] | null;

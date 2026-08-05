@@ -6,7 +6,6 @@ import {
 import {
   collectSelectedDistanceEndpointIssues,
   selectedDistanceEndpointMainDistanceMeters,
-  type RunningPlanPreviewCalendarRow,
 } from "@/lib/plan-creation-engine";
 import type { TrainingPlanV2 } from "@/lib/imported-plan";
 import { trainingPlanV2Schema } from "@/lib/imported-plan";

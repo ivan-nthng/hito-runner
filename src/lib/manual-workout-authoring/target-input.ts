@@ -518,14 +518,6 @@ export function manualWorkoutTargetToStepTarget(
   };
 }
 
-export function hasManualWorkoutPaceTarget(resolved: ResolvedManualWorkoutTarget) {
-  return resolved.kind === "pace";
-}
-
-export function hasManualWorkoutHrTarget(resolved: ResolvedManualWorkoutTarget) {
-  return resolved.kind === "heart_rate";
-}
-
 function validatePreservedAiPrimaryExecutionMode(
   mode: ManualWorkoutPrimaryExecutionMode | undefined,
   targetFamilies: { hasPace: boolean; hasHr: boolean; hasEffort: boolean },

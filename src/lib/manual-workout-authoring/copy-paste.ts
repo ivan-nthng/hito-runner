@@ -85,9 +85,6 @@ export const manualWorkoutDirectCopyInputSchema = z
   })
   .strict();
 
-type ManualWorkoutCopyPasteReviewInput = z.output<typeof manualWorkoutCopyPasteReviewInputSchema>;
-type ManualWorkoutCopyPasteConfirmInput = z.output<typeof manualWorkoutCopyPasteConfirmInputSchema>;
-
 type ManualWorkoutCopyPasteBlockedResult = {
   ok: false;
   status: "blocked";

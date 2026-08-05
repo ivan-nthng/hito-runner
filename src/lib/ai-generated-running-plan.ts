@@ -15,11 +15,7 @@ import {
   isAiGeneratedRunningPlanDevFixtureEnabled,
   resolveAiGeneratedRunningPlanProviderMode,
 } from "@/lib/ai-generated-running-plan-dev-fixture";
-import {
-  parseDurationSeconds,
-  parsePaceSecondsPerKm,
-  uniqueWeekdays,
-} from "@/lib/first-plan-authoring-utils";
+import { parseDurationSeconds, parsePaceSecondsPerKm } from "@/lib/first-plan-authoring-utils";
 import { buildImportedPlanSeed, type TrainingPlanV2 } from "@/lib/imported-plan";
 import {
   normalizePlanGoalIntent,
@@ -48,7 +44,7 @@ import {
   type StructuredPlanAuthoringInput,
 } from "@/lib/structured-plan-authoring-schema";
 import { todayIso, weekdayLong } from "@/lib/training";
-import { WEEKDAY_NAMES, type WeekdayName } from "@/lib/weekday-rest-invariants";
+import { WEEKDAY_NAMES, uniqueWeekdays, type WeekdayName } from "@/lib/weekday-rest-invariants";
 import type { WorkoutDocument } from "@/lib/workout-document";
 import type { RunnerPlanAuthoringProfileSnapshot } from "@/lib/user-settings-actions";
 

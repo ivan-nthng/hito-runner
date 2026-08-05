@@ -7,7 +7,7 @@ import {
 } from "../../src/lib/manual-workout-authoring";
 import { repeatChildSteps, repeatCountForStep, type Step } from "../../src/lib/training";
 import { formatJsonResult } from "./move-proof-assertions";
-import { assertReady } from "./move-proof-fixtures";
+import { assertReady, buildOrderedRepeatDraftInput } from "./move-proof-fixtures";
 
 export function validateManualConstructorSegmentTargetContract() {
   assertActiveTemplatesDoNotOfferDefaultHrTruth();
@@ -71,38 +71,10 @@ function assertRepeatDocumentShape() {
 }
 
 function assertOrderedRepeatChildrenContract() {
-  const review = assertReady("ordered repeat children canonical review", {
-    templateKey: "controlled_tempo_session",
-    workoutDate: "2026-07-02",
-    entries: [
-      {
-        kind: "block",
-        block: { blockKey: "warmup_block", durationSeconds: 12 * 60 },
-      },
-      {
-        kind: "repeat_group",
-        group: {
-          repeatCount: 4,
-          safetyKind: "tempo_repeats",
-          groupLabel: "Tempo ladder",
-          children: [
-            { blockKey: "easy_run_block", durationSeconds: 3 * 60, label: "Settle" },
-            {
-              blockKey: "tempo_block",
-              durationSeconds: 2 * 60,
-              label: "Tempo press",
-              target: { rpe: 7, cue: "Controlled, not all-out." },
-            },
-            { blockKey: "interval_recovery_block", durationSeconds: 60, label: "Float" },
-          ],
-        },
-      },
-      {
-        kind: "block",
-        block: { blockKey: "cooldown_block", durationSeconds: 10 * 60 },
-      },
-    ],
-  });
+  const review = assertReady(
+    "ordered repeat children canonical review",
+    buildOrderedRepeatDraftInput("2026-07-02"),
+  );
   const repeat = firstRepeatStep(review.draft.steps, "ordered repeat");
   const children = repeatChildSteps(repeat);
 

@@ -44,9 +44,6 @@ const recoverableGeneratedConflictRoots = [
   resolve(rootDir, "node_modules/.nitro"),
   resolve(rootDir, "logs/build-output-finalized"),
   qaRuntimePaths.buildOutputRoot,
-  qaRuntimePaths.nitroBuildDir,
-  qaRuntimePaths.nitroOutputDir,
-  qaRuntimePaths.viteCacheDir,
   qaRuntimePaths.runtimeRoot,
   qaRuntimePaths.finalizeBackupDir,
   qaRuntimePaths.finalizedPreviousDir,
@@ -299,18 +296,13 @@ async function resolveServerStatus() {
 
   return {
     state,
-    pids,
     serverPid,
     commandLine,
     loopbackListener,
-    currentRuntimeServer,
-    legacyRuntimeServer,
     compatibleServer,
     healthy,
     buildStatus,
     buildIntegrity,
-    buildFingerprint,
-    processStartMs,
     serverStatus,
   };
 }
@@ -510,7 +502,6 @@ function readBuildIntegrity() {
   if (activeBuildLock) {
     return {
       status: "locked",
-      summary: null,
       error: `Build output lifecycle is already running (owner pid ${activeBuildLock.ownerPid}, acquired at ${activeBuildLock.acquiredAt}).`,
     };
   }
@@ -518,23 +509,21 @@ function readBuildIntegrity() {
   if (!hasCompleteBuildOutput()) {
     return {
       status: "missing",
-      summary: null,
       error: null,
     };
   }
 
   try {
     cleanupRecoverableGeneratedSiblingConflicts();
+    validateLocalBuildOutput({ rootDir });
 
     return {
       status: "present",
-      summary: validateLocalBuildOutput({ rootDir }),
       error: null,
     };
   } catch (error) {
     return {
       status: "broken",
-      summary: null,
       error: formatError(error),
     };
   }

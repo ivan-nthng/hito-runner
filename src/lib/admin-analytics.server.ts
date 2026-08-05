@@ -528,17 +528,7 @@ function buildPerUserRows({
       lastWorkoutLogDate: latestDate(userLogs.map((log) => log.logged_at)),
       garminEvidenceCount: resultAssets.filter((asset) => asset.user_id === userId).length,
       aiInsightCount: aiInsights.filter((insight) => insight.user_id === userId).length,
-      entitlement: entitlement
-        ? {
-            tier: entitlement.tier,
-            status: entitlement.status,
-            source: "explicit",
-          }
-        : {
-            tier: "pro",
-            status: "effective",
-            source: "missing_row_effective_pro",
-          },
+      entitlement: resolveEntitlementReadback(entitlement),
       classification: "real",
       classificationReason: user.classification.classificationReason,
       classificationSource: user.classification.classificationSource,
@@ -586,17 +576,7 @@ function buildExcludedUserRows({
       lastWorkoutLogDate: latestDate(userLogs.map((log) => log.logged_at)),
       garminEvidenceCount: resultAssets.filter((asset) => asset.user_id === userId).length,
       aiInsightCount: aiInsights.filter((insight) => insight.user_id === userId).length,
-      entitlement: entitlement
-        ? {
-            tier: entitlement.tier,
-            status: entitlement.status,
-            source: "explicit",
-          }
-        : {
-            tier: "pro",
-            status: "effective",
-            source: "missing_row_effective_pro",
-          },
+      entitlement: resolveEntitlementReadback(entitlement),
       classification: user.classification
         .classification as AdminAnalyticsExcludedUserRow["classification"],
       classificationReason: user.classification.classificationReason,
@@ -615,6 +595,14 @@ function buildExcludedUserRows({
         : null,
     };
   });
+}
+
+function resolveEntitlementReadback(
+  entitlement: EntitlementRow | null,
+): AdminAnalyticsUserRow["entitlement"] {
+  return entitlement
+    ? { tier: entitlement.tier, status: entitlement.status, source: "explicit" }
+    : { tier: "pro", status: "effective", source: "missing_row_effective_pro" };
 }
 
 function buildCapabilityUsageCounts(rows: CapabilityUsageRow[]) {

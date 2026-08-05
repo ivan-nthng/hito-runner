@@ -815,17 +815,6 @@ function canAddWorkout(
   );
 }
 
-function findAvailableDateOnOrAfter(
-  candidate: string,
-  endDate: string,
-  fixedRestDays: readonly WeekdayName[],
-) {
-  for (let date = candidate; date <= endDate; date = addDaysIso(date, 1)) {
-    if (!fixedRestDays.includes(weekdayForDate(date))) return date;
-  }
-  return null;
-}
-
 function findAvailableDateOnOrBefore(
   candidate: string,
   startDate: string,

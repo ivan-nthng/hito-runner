@@ -25,7 +25,6 @@ import {
   manualEmptyPlanSetupInputSchema,
   MANUAL_EMPTY_PLAN_SETUP_PAYLOAD_VERSION,
   MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
-  MANUAL_WORKOUT_AUTHORING_SOURCE_STATUS,
   MANUAL_WORKOUT_REVIEW_PAYLOAD_VERSION,
   type ManualWorkoutAddToActivePlanResult,
   type ManualWorkoutCanonicalDraft,

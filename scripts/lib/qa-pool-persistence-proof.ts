@@ -136,6 +136,30 @@ export function resolveDisposablePersistencePreflight(input: {
   };
 }
 
+export function formatDisposablePersistenceBlocker(
+  label: string,
+  preflight: Extract<DisposablePersistencePreflight, { shouldRun: false }>,
+) {
+  return [
+    `${label} is blocked: ${preflight.reason}`,
+    preflight.target
+      ? `Target: ${preflight.target.url} (${preflight.target.hostname}).`
+      : "Target: none.",
+    preflight.overrideHint,
+  ].join(" ");
+}
+
+export function buildSkippedDisposablePersistenceResult(
+  preflight: Extract<DisposablePersistencePreflight, { shouldRun: false }>,
+) {
+  return {
+    mode: preflight.mode,
+    target: preflight.target,
+    reason: preflight.reason,
+    overrideHint: preflight.overrideHint,
+  };
+}
+
 export function parseDisposableSupabaseTarget(url: string): DisposableSupabaseTarget | null {
   try {
     const parsed = new URL(url);

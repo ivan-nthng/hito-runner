@@ -30,10 +30,7 @@ import {
   resolveManualWorkoutTargetInput,
 } from "@/lib/manual-workout-authoring/target-input";
 import type { ManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
-import {
-  isManualWorkoutNoteOnlyBlock,
-  manualWorkoutBlockStageRole,
-} from "@/lib/manual-workout-authoring/validator";
+import { isManualWorkoutNoteOnlyBlock } from "@/lib/manual-workout-authoring/validator";
 import { getManualWorkoutRepeatGroupChildren } from "@/lib/manual-workout-authoring/repeat-groups";
 import {
   WORKOUT_DOCUMENT_HYDRATION_CUE,

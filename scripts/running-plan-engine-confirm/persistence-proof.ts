@@ -114,29 +114,6 @@ export function resolvePersistencePreflight(
   });
 }
 
-export function formatPersistenceBlocker(
-  preflight: Extract<PersistencePreflight, { shouldRun: false }>,
-) {
-  return [
-    `Running-plan confirm persistence proof is blocked: ${preflight.reason}`,
-    preflight.target
-      ? `Target: ${preflight.target.url} (${preflight.target.hostname}).`
-      : "Target: none.",
-    preflight.overrideHint,
-  ].join(" ");
-}
-
-export function buildSkippedPersistenceResult(
-  preflight: Extract<PersistencePreflight, { shouldRun: false }>,
-) {
-  return {
-    mode: preflight.mode,
-    target: preflight.target,
-    reason: preflight.reason,
-    overrideHint: preflight.overrideHint,
-  };
-}
-
 export async function validatePersistenceContract(
   reviewedDrafts: readonly RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>[],
   preflight: Extract<PersistencePreflight, { shouldRun: true }>,

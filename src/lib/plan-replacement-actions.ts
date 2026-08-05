@@ -3,8 +3,7 @@ import { z } from "zod";
 import { applyImportedPlanForUser } from "@/lib/active-plan-persistence";
 import { importedPlanSchema } from "@/lib/imported-plan";
 import { type FirstDayResolution } from "@/lib/plan-apply-policy";
-import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
-import { requireAuthenticatedUser } from "@/lib/backend/auth";
+import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
 
 type ImportedPlanInput = z.infer<typeof importedPlanSchema>;
 
@@ -38,15 +37,8 @@ async function persistImportedPlanForCurrentRequest(
   requestedStartDate: string | null = null,
   clearBeforeImport = false,
 ) {
-  const auth = requireAuthenticatedUser();
-  const persistedUserId = await getPersistedUserIdForAuthContext(auth);
-
-  if (!persistedUserId) {
-    throw new Error("Authentication is required for this action.");
-  }
-
   return applyImportedPlanForUser(
-    persistedUserId,
+    await requirePersistedUserIdForCurrentRequest(),
     importedPlan,
     firstDayResolution,
     requestedStartDate,

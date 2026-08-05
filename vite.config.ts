@@ -163,17 +163,7 @@ export default defineConfig({
     emptyOutDir: false,
   },
   resolve: {
-    alias: {
-      "@": resolve(rootDir, "src"),
-    },
-    dedupe: [
-      "react",
-      "react-dom",
-      "react/jsx-runtime",
-      "react/jsx-dev-runtime",
-      "@tanstack/react-query",
-      "@tanstack/query-core",
-    ],
+    dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
   },
   server: {
     host: "::",

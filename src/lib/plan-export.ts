@@ -13,7 +13,6 @@ import {
   type StepRepeatChildPrescription,
   type StepUnitPrescription,
   type StepTarget,
-  type WorkoutType,
 } from "@/lib/training";
 import type { CanonicalGoalContext, CanonicalMetricMode } from "@/lib/rich-workout-model";
 import type { PlannedWorkoutLanguageReadModel } from "@/lib/planned-workout-language";
@@ -438,14 +437,6 @@ function buildSafeWorkoutExportId(row: PersistedPlannedWorkoutRow) {
   const order = Number.isFinite(row.display_order) ? row.display_order : 0;
 
   return `hito-workout-${dateSlug}-${typeSlug || "workout"}-${order}`;
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  return value as Record<string, unknown>;
 }
 
 function toExportGoalContext(goalContext: CanonicalGoalContext) {

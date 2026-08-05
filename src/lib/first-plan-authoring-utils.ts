@@ -1,37 +1,3 @@
-import { WEEKDAY_NAMES, type WeekdayName } from "@/lib/weekday-rest-invariants";
-
-export const FIRST_PLAN_GOAL_DISTANCE_VALUES = [
-  "build_consistency",
-  "5k",
-  "10k",
-  "half_marathon",
-  "marathon",
-  "ultra_marathon",
-  "mountain_running",
-] as const;
-
-export const FIRST_PLAN_GOAL_STYLE_VALUES = [
-  "relaxed",
-  "balanced",
-  "ambitious",
-  "target_time",
-] as const;
-
-export const FIRST_PLAN_TERRAIN_FOCUS_VALUES = ["standard", "rolling", "mountain"] as const;
-
-export const FIRST_PLAN_WATCH_ACCESS_VALUES = ["none", "watch_or_app", "unknown"] as const;
-
-export const FIRST_PLAN_GUIDANCE_PREFERENCE_VALUES = [
-  "effort",
-  "pace",
-  "heart_rate",
-  "mixed",
-] as const;
-
-export function uniqueWeekdays(values: readonly WeekdayName[]) {
-  return WEEKDAY_NAMES.filter((weekday) => values.includes(weekday));
-}
-
 export function isRealIsoDate(value: string) {
   const date = new Date(`${value}T00:00:00Z`);
 

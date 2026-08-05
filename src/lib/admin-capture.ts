@@ -15,7 +15,6 @@ import {
   type AdminWorkItemSourceGroup,
 } from "@/lib/admin-work-items";
 import {
-  adminCaptureActiveStatuses,
   adminCaptureItemTypes,
   adminCapturePriorities,
   adminCaptureStatuses,

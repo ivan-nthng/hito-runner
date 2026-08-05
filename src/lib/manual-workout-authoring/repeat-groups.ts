@@ -21,16 +21,6 @@ export function getManualWorkoutRepeatGroupChildren(
   );
 }
 
-export function getManualWorkoutRepeatGroupRecoveryChild(
-  group: ManualWorkoutRepeatGroupInput,
-): ManualWorkoutBlockInput | undefined {
-  return (
-    getManualWorkoutRepeatGroupChildren(group).find((block) =>
-      isManualWorkoutRepeatRecoveryBlock(block.blockKey),
-    ) ?? group.recoveryBlock
-  );
-}
-
 export function isManualWorkoutRepeatRecoveryBlock(blockKey: ManualWorkoutBlockInput["blockKey"]) {
   return REPEAT_RECOVERY_BLOCK_KEYS.has(blockKey);
 }

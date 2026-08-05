@@ -10,8 +10,6 @@ import {
 import { dirname } from "node:path";
 import { resolveQaRuntimePaths } from "./qa-runtime-paths.mjs";
 
-const lockFileName = "build-output.lock.json";
-
 export function acquireBuildOutputLock({ rootDir }) {
   const lockPath = buildOutputLockPath(rootDir);
   const ownerPid = buildOutputLifecycleOwnerPid();

@@ -125,7 +125,7 @@ export function assertNoFakePaceOrHrInSerialized(value: unknown, label: string) 
   );
 }
 
-function hasExecutableStructure(step: Step) {
+export function hasExecutableStructure(step: Step) {
   if (step.duration_min || step.distance_km) {
     return true;
   }
@@ -137,6 +137,6 @@ function hasExecutableStructure(step: Step) {
   return false;
 }
 
-function flattenSteps(steps: Step[]): Step[] {
+export function flattenSteps(steps: Step[]): Step[] {
   return steps.flatMap((step) => [step, ...(step.children ? flattenSteps(step.children) : [])]);
 }

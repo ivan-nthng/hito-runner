@@ -979,7 +979,3 @@ function normalizeUsername(value) {
 function humanizeUsername(username) {
   return username.charAt(0).toUpperCase() + username.slice(1);
 }
-
-function slugify(value) {
-  return value.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "user";
-}

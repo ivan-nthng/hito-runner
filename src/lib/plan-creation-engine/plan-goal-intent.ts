@@ -43,10 +43,6 @@ export const planGoalIntentInputSchema = z
 
 export type PlanGoalIntentInput = z.output<typeof planGoalIntentInputSchema>;
 
-export type PlanGoalIntentOutcomePaceSource =
-  | "derived_from_finish_time"
-  | "runner_entered_outcome_pace";
-
 export const normalizedPlanGoalIntentSchema = z
   .object({
     contractVersion: z.literal(PLAN_GOAL_INTENT_CONTRACT_VERSION),

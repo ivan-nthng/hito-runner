@@ -1,7 +1,7 @@
 # Hito Technical Log
 
 Status: active internal ledger
-Last Updated: 2026-08-04
+Last Updated: 2026-08-05
 Owner: PRODUCT
 
 ## Purpose And Source Boundary
@@ -29,6 +29,16 @@ Entry format:
 
 Every accepted implementation, QA acceptance gate, source-cleanup batch, or durable process repair
 must either add an entry here or explicitly state why it is not technical-log material.
+
+## 2026-08-05
+
+- BACKEND + QA + ARCHITECT / evidence-gated Backend codebase reduction cycle — removed 467 net
+  maintained code lines by deleting zero-consumer declarations and converging weekday, auth,
+  entitlement, managed build-path, and proof-setup ownership; also rejected encoded backslash
+  redirects at the canonical redirect sanitizer. Evidence:
+  `docs/tasks/backlog/2026-08-05-backend-codebase-reduction-cycle.md`. Boundary: no Product route or
+  presentation, DTO, schema, migration, provider, hosted runner data, generated artifact, or
+  lockfile contract changed; Global QA remains separate.
 
 ## 2026-08-04
 

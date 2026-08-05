@@ -61,6 +61,41 @@ export function assertReady(
   return result;
 }
 
+export function buildOrderedRepeatDraftInput(workoutDate: string): ManualWorkoutDraftInput {
+  return {
+    templateKey: "controlled_tempo_session",
+    workoutDate,
+    entries: [
+      {
+        kind: "block",
+        block: { blockKey: "warmup_block", durationSeconds: 12 * 60 },
+      },
+      {
+        kind: "repeat_group",
+        group: {
+          repeatCount: 4,
+          safetyKind: "tempo_repeats",
+          groupLabel: "Tempo ladder",
+          children: [
+            { blockKey: "easy_run_block", durationSeconds: 3 * 60, label: "Settle" },
+            {
+              blockKey: "tempo_block",
+              durationSeconds: 2 * 60,
+              label: "Tempo press",
+              target: { rpe: 7, cue: "Controlled, not all-out." },
+            },
+            { blockKey: "interval_recovery_block", durationSeconds: 60, label: "Float" },
+          ],
+        },
+      },
+      {
+        kind: "block",
+        block: { blockKey: "cooldown_block", durationSeconds: 10 * 60 },
+      },
+    ],
+  };
+}
+
 export function buildReviewConfirmInput(
   draftInput: unknown,
   review: Extract<ManualWorkoutDraftReviewResult, { ok: true }>,

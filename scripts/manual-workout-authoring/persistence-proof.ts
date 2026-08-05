@@ -69,7 +69,6 @@ import {
   releaseQaPoolSupabaseUser,
   resolveDisposablePersistencePreflight,
   type DisposablePersistencePreflight,
-  type DisposableSupabaseTarget,
   type QaPoolSupabaseCleanupProof,
 } from "../lib/qa-pool-persistence-proof";
 
@@ -87,7 +86,6 @@ type QaPoolUserLease = Awaited<ReturnType<typeof acquireQaPoolSupabaseUser>>;
 
 export const MANUAL_REQUIRE_PERSISTENCE_FLAG = DISPOSABLE_REQUIRE_PERSISTENCE_FLAG;
 
-export type ManualPersistenceTarget = DisposableSupabaseTarget;
 export type ManualPersistencePreflight = DisposablePersistencePreflight;
 
 export function readManualPersistenceCliOptions(args = process.argv.slice(2)) {
@@ -116,29 +114,6 @@ export function resolveManualPersistencePreflight(
     nonLoopbackOverrideHint:
       "Start local Supabase and run npm run supabase:local:configure before retrying.",
   });
-}
-
-export function formatManualPersistenceBlocker(
-  preflight: Extract<ManualPersistencePreflight, { shouldRun: false }>,
-) {
-  return [
-    `Manual workout confirm persistence proof is blocked: ${preflight.reason}`,
-    preflight.target
-      ? `Target: ${preflight.target.url} (${preflight.target.hostname}).`
-      : "Target: none.",
-    preflight.overrideHint,
-  ].join(" ");
-}
-
-export function buildSkippedManualPersistenceResult(
-  preflight: Extract<ManualPersistencePreflight, { shouldRun: false }>,
-) {
-  return {
-    mode: preflight.mode,
-    target: preflight.target,
-    reason: preflight.reason,
-    overrideHint: preflight.overrideHint,
-  };
 }
 
 export async function validateManualWorkoutDisposablePersistenceProof({

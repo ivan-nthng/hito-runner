@@ -1,5 +1,4 @@
 import {
-  AI_AUTHORED_PLAN_FIRST_ENDPOINT_IDENTITY,
   aiAuthoredPlanFirstCompilerDraftSchema,
   resolveAiAuthoredPaceProvenance,
   type AiAuthoredPlanFirstCompilerDraft,
@@ -29,7 +28,7 @@ import {
 } from "@/lib/long-run-execution-policy";
 import type { StructuredPlanAuthoringInput } from "@/lib/structured-plan-authoring-schema";
 import { addDaysIso, diffDaysIso, startOfWeekIso, weekdayLong } from "@/lib/training";
-import { WEEKDAY_NAMES, type WeekdayName } from "@/lib/weekday-rest-invariants";
+import { uniqueWeekdays, type WeekdayName } from "@/lib/weekday-rest-invariants";
 import {
   AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
   WORKOUT_DOCUMENT_HYDRATION_CUE,
@@ -914,8 +913,4 @@ function slugify(value: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
-}
-
-function uniqueWeekdays(values: readonly WeekdayName[]) {
-  return WEEKDAY_NAMES.filter((day) => values.includes(day));
 }

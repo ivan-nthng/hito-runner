@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { sanitizeRedirectPath } from "@/lib/auth-redirect";
 import { verifyLocalAuthCredentials } from "@/lib/local-auth";
 import type { Database } from "@/lib/supabase/database";
 import { mergeResponseHeaders, resolveRequestSupabaseAuth } from "@/lib/supabase/server";
@@ -13,6 +14,8 @@ type AuthResult = {
 await run();
 
 async function run() {
+  assertRedirectSanitization();
+
   await assertAuthCase({
     name: "transient Auth failure",
     result: { data: { user: null }, error: { status: 503, code: "temporarily_unavailable" } },
@@ -91,6 +94,17 @@ async function run() {
   if (runtimeUrl) await assertLoopbackLocalAuthLifecycle(runtimeUrl);
 
   console.log("Runner request-auth session validation passed.");
+}
+
+function assertRedirectSanitization() {
+  assert.equal(sanitizeRedirectPath("/safe/path?tab=history"), "/safe/path?tab=history");
+  assert.equal(sanitizeRedirectPath("//evil.example/path"), "/");
+  assert.equal(sanitizeRedirectPath("/\\evil.example/path"), "/");
+
+  const encodedBackslash = new URL(
+    "https://hito.run/login?next=/%5Cevil.example/path",
+  ).searchParams.get("next");
+  assert.equal(sanitizeRedirectPath(encodedBackslash), "/");
 }
 
 async function assertLoopbackLocalAuthLifecycle(runtimeUrl: string) {

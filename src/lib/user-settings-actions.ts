@@ -115,9 +115,6 @@ export const saveUserSettings = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const auth = getRequestAuthContext();
     const userId = await requirePersistedUserIdForCurrentRequest();
-    if (!userId) {
-      throw new Error("This session cannot update persisted runner settings.");
-    }
     const settings = await updateUserSettingsForUserId(userId, data, auth.email);
 
     return {
@@ -131,9 +128,6 @@ export const saveRunnerBaseline = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const auth = getRequestAuthContext();
     const userId = await requirePersistedUserIdForCurrentRequest();
-    if (!userId) {
-      throw new Error("This session cannot save a persisted runner baseline.");
-    }
 
     const settings = await saveRunnerBaselineForUserId(userId, data, auth.email);
 

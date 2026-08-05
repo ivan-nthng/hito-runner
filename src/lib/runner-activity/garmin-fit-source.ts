@@ -164,21 +164,6 @@ export async function findRunnerActivityPlanMatch(input: { userId: string; activ
   return result.data?.planned_workout_id ?? null;
 }
 
-export async function findRunnerActivityForPlannedWorkout(input: {
-  userId: string;
-  plannedWorkoutId: string;
-}) {
-  const result = await createAdminSupabaseClient()
-    .from("runner_activity_planned_workout_matches")
-    .select("activity_id")
-    .eq("user_id", input.userId)
-    .eq("planned_workout_id", input.plannedWorkoutId)
-    .limit(1)
-    .maybeSingle();
-  if (result.error) throw new Error(result.error.message);
-  return result.data?.activity_id ?? null;
-}
-
 export async function createRunnerActivityPlannedWorkoutMatch(input: {
   userId: string;
   activityId: string;
@@ -449,12 +434,6 @@ function normalizedSummaryFor(parsed: ParsedGarminWorkout) {
     lap_payload: parsed.lapPayload,
     summary_payload: parsed.summaryPayload,
   };
-}
-
-function jsonRecord(value: Json | undefined) {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, Json | undefined>)
-    : null;
 }
 
 function fieldProvenanceFor(parsed: ParsedGarminWorkout) {

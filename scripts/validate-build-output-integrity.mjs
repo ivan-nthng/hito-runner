@@ -19,9 +19,6 @@ export function validateLocalBuildOutput(options = {}) {
   validateNoGeneratedSiblingConflicts(validationRoot, [
     ...localGeneratedRoots,
     qaRuntimePaths.buildOutputRoot,
-    qaRuntimePaths.nitroBuildDir,
-    qaRuntimePaths.nitroOutputDir,
-    qaRuntimePaths.viteCacheDir,
     qaRuntimePaths.runtimeRoot,
     qaRuntimePaths.finalizeBackupDir,
     qaRuntimePaths.finalizedPreviousDir,
@@ -42,7 +39,6 @@ export function validateLocalBuildOutput(options = {}) {
   return {
     mode: "local",
     runtimeServerRoot: formatOutputPath(validationRoot, runtimeOutput.serverDir),
-    runtimeRoot: runtimeOutput.runtimeRoot,
     ...importSummary,
   };
 }
@@ -130,7 +126,6 @@ function resolveLocalRuntimeOutput(validationRoot) {
   const qaRuntimePaths = resolveQaRuntimePaths({ rootDir: validationRoot });
 
   return {
-    runtimeRoot: qaRuntimePaths.runtimeRoot,
     serverDir: qaRuntimePaths.serverDir,
     publicDir: qaRuntimePaths.publicDir,
     nitroManifest: qaRuntimePaths.nitroManifest,

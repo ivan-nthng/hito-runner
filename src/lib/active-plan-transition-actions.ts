@@ -61,7 +61,6 @@ const transitionConfirmInputSchema = z
   .strict();
 
 export type ActivePlanTransitionReviewInput = z.output<typeof transitionReviewInputSchema>;
-export type ActivePlanTransitionConfirmInput = z.output<typeof transitionConfirmInputSchema>;
 
 export type ActivePlanTransitionFailureReason =
   | "unauthenticated"

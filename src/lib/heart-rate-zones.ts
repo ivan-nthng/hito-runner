@@ -390,16 +390,6 @@ function estimatedBpmRange(
   return [lowerBpm, upperBpm];
 }
 
-function bpmRangeReadback(estimatedMaxHr: number, range: [number, number]) {
-  const [minBpm, maxBpm] = estimatedBpmRange(estimatedMaxHr, range);
-
-  return {
-    minBpm,
-    maxBpm,
-    rangeBpm: formatBpmRange(minBpm, maxBpm),
-  };
-}
-
 function formatBpmRange(minBpm: number, maxBpm: number) {
   return `${minBpm}-${maxBpm} bpm`;
 }

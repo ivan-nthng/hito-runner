@@ -17,6 +17,7 @@ import {
   assertManualBlockedResult,
   assertNoFakePaceOrHrInSerialized,
   assertRepeatWithRecovery,
+  flattenSteps,
   formatJsonResult,
 } from "./move-proof-assertions";
 import { assertReady, buildReviewConfirmInput } from "./move-proof-fixtures";
@@ -423,8 +424,4 @@ function assertUserEnteredTargetInSteps(
 
   assert.ok(target, `${label} should preserve ${key}.`);
   assert.equal(target.target_source, "user_entered", `${label} should preserve source.`);
-}
-
-function flattenSteps(steps: Step[]): Step[] {
-  return steps.flatMap((step) => [step, ...(step.children ? flattenSteps(step.children) : [])]);
 }

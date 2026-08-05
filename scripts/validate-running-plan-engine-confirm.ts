@@ -53,12 +53,14 @@ import {
   type PersistedWorkoutRow,
 } from "./running-plan-engine-confirm/manual-transition-fixtures";
 import {
-  buildSkippedPersistenceResult,
-  formatPersistenceBlocker,
   readCliOptions as readPersistenceCliOptions,
   resolvePersistencePreflight,
   validatePersistenceContract,
 } from "./running-plan-engine-confirm/persistence-proof";
+import {
+  buildSkippedDisposablePersistenceResult,
+  formatDisposablePersistenceBlocker,
+} from "./lib/qa-pool-persistence-proof";
 import { validateRunnerFacingTargetReadbackContract } from "./running-plan-engine-target-readback-contract";
 import { buildReviewedAiFixtureResult } from "./lib/generated-plan-proof-fixture";
 
@@ -170,7 +172,12 @@ async function main() {
   const persistencePreflight = resolvePersistencePreflight(persistenceOptions);
 
   if (!persistencePreflight.shouldRun && persistenceOptions.requirePersistence) {
-    throw new Error(formatPersistenceBlocker(persistencePreflight));
+    throw new Error(
+      formatDisposablePersistenceBlocker(
+        "Running-plan confirm persistence proof",
+        persistencePreflight,
+      ),
+    );
   }
 
   const persistenceAvailabilityDrafts = persistencePreflight.shouldRun
@@ -182,7 +189,7 @@ async function main() {
         persistencePreflight,
         buildConfirmInputFromDraft,
       )
-    : buildSkippedPersistenceResult(persistencePreflight);
+    : buildSkippedDisposablePersistenceResult(persistencePreflight);
 
   console.log("Running plan engine confirm contract checks passed.", {
     scenarios: reviewedDrafts.map((draft) => ({

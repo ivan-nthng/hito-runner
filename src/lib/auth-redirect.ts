@@ -7,7 +7,7 @@ export function sanitizeRedirectPath(next: string | null | undefined) {
 
   const trimmed = next.trim();
 
-  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) {
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//") || trimmed.includes("\\")) {
     return DEFAULT_AUTH_REDIRECT;
   }
 

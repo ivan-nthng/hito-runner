@@ -16,7 +16,7 @@ import {
   verifyLocalAuthCredentials,
   type LocalAuthAccountConfig,
 } from "@/lib/local-auth";
-import { isDevOnlyLocalAuthRuntime, serverEnv } from "@/lib/supabase/env";
+import { isDevOnlyLocalAuthRuntime } from "@/lib/supabase/env";
 
 export const ADMIN_USERNAME = "admin";
 export const ADMIN_SESSION_COOKIE = "hito_admin_session";
@@ -82,8 +82,6 @@ export async function loginAdminForRequest(request: Request): Promise<Response> 
   return handleAdminLoginRequestForDependencies(request, await buildCurrentDependencies(request));
 }
 
-export const loginLocalAdminForRequest = loginAdminForRequest;
-
 export function logoutAdminForRequest(request: Request): Response {
   const url = new URL(request.url);
   const next = sanitizeAdminRedirectPath(url.searchParams.get("next"));
@@ -129,15 +127,6 @@ export async function handleAdminLoginRequestForDependencies(
     status: 302,
     headers: responseHeaders,
   });
-}
-
-export async function verifyAdminLoginForCurrentRequest(
-  data: AdminLoginInput,
-  request: Request,
-): Promise<AdminLoginResult> {
-  return stripAccount(
-    await verifyAdminLoginForDependencies(data, await buildCurrentDependencies(request)),
-  );
 }
 
 export async function verifyAdminLoginForDependencies(
@@ -622,17 +611,6 @@ async function parseAdminLoginRequest(request: Request): Promise<AdminLoginInput
 function formValue(formData: FormData | null, key: string) {
   const value = formData?.get(key);
   return typeof value === "string" ? value : "";
-}
-
-function stripAccount(result: AdminLoginVerificationResult): AdminLoginResult {
-  if (!result.ok) {
-    return result;
-  }
-
-  return {
-    ok: true,
-    redirectTo: result.redirectTo,
-  };
 }
 
 function failure(

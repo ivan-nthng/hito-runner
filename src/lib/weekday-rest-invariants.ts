@@ -206,22 +206,6 @@ export function mergeWeekdayRestInvariantIntoPlanPreferences(
   } as Json;
 }
 
-export function weekdayRestInvariantToSignature(invariant: WeekdayRestInvariant) {
-  return `${invariant.source}:${invariant.blockedWeekdays.join(",")}`;
-}
-
-export function describeWeekdayRestInvariant(invariant: WeekdayRestInvariant) {
-  if (!invariant.blockedWeekdays.length) {
-    return "No fixed weekday rest-day constraint is currently resolved.";
-  }
-
-  return `Fixed rest days: ${formatWeekdayList(invariant.blockedWeekdays)}.`;
-}
-
-export function formatWeekdayList(weekdays: WeekdayName[]) {
-  return weekdays.join(", ");
-}
-
 function shiftImportedSeedToStartDate(importedSeed: ImportedPlanSeed, startDate: string) {
   const dayOffset = diffDaysIso(startDate, importedSeed.startDate);
 
@@ -361,7 +345,7 @@ function normalizeWeekday(value: unknown): WeekdayName | null {
   );
 }
 
-function uniqueWeekdays(values: WeekdayName[]) {
+export function uniqueWeekdays(values: readonly WeekdayName[]) {
   return WEEKDAY_NAMES.filter((weekday) => values.includes(weekday));
 }
 

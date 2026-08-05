@@ -8,7 +8,7 @@ import {
   buildImportedLogCarryForwardPlan,
   persistedWorkoutRowToImportedSeed as persistedWorkoutRowToImportedSeedBase,
 } from "@/lib/persisted-plan-replacement";
-import { todayIso, weekdayLong } from "@/lib/training";
+import { todayIso } from "@/lib/training";
 import type { Database } from "@/lib/supabase/database";
 import {
   assertStartDateAllowedByWeekdayRestInvariant,

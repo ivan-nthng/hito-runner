@@ -32,14 +32,6 @@ hito-stack-simplification
 
 retain_in_place
 
-## Parent
-
-[Hito Stack Complexity Reduction Program](2026-08-04-hito-stack-complexity-reduction-program.md)
-
-## Related Records
-
-[Backend Codebase Reduction Cycle](2026-08-05-backend-codebase-reduction-cycle.md)
-
 ## Task
 
 Harden Product API request ordering and public error serialization without changing successful
@@ -48,6 +40,14 @@ Product behavior, persistence lifecycle, or frontend DTOs.
 ## Stage
 
 Backend security implementation and integrated QA completed.
+
+## Parent
+
+[Hito Stack Complexity Reduction Program](2026-08-04-hito-stack-complexity-reduction-program.md)
+
+## Related Records
+
+[Backend Codebase Reduction Cycle](2026-08-05-backend-codebase-reduction-cycle.md)
 
 ## Execution Preflight
 

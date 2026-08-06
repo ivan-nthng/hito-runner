@@ -10,7 +10,7 @@ completed
 
 ## Type
 
-maintenance
+change_request
 
 ## Priority
 
@@ -24,13 +24,26 @@ frontend
 
 Product
 
-## Parent
+## Scope
 
-[Hito Stack Complexity Reduction Program](./2026-08-04-hito-stack-complexity-reduction-program.md)
+generated-plan-product-state
+
+## Archive Intent
+
+retain_in_place
+
+## Task
+
+Consolidate the duplicated generated-plan setup draft and reset state while preserving separate
+first-plan and active-plan replacement lifecycles.
 
 ## Stage
 
 Frontend Product implementation and integrated QA completed.
+
+## Parent
+
+[Hito Stack Complexity Reduction Program](./2026-08-04-hito-stack-complexity-reduction-program.md)
 
 ## Demonstrated Root Cause
 

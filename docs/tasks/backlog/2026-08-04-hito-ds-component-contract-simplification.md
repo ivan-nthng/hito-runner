@@ -6,7 +6,7 @@
 
 ## Status
 
-complete
+completed
 
 ## Type
 
@@ -91,25 +91,25 @@ migrations remain separate Frontend Product work and were not silently absorbed 
 
 ### Integrated receipt
 
-| Check                  | Scenario / environment                                 | Result | Evidence                                                                                                              |
-| ---------------------- | ------------------------------------------------------ | ------ | --------------------------------------------------------------------------------------------------------------------- |
-| Root cause             | Baseline source graph and architecture review          | Pass   | Reusable Field CSS and reference control assembly had distributed owners; both now resolve through canonical DS seams |
-| Component contract     | `npm run validate-hito-ds-components`                  | Pass   | 4 Button sizes, 3 tones, 4 variants; 4 Field sizes, 2 variants; 3 Choice sizes; 326 files scanned                     |
-| Controlled regression  | Validator self-tests                                   | Pass   | Retired tiers, `className` / `buttonClassName` manual recipes, and Field-owner leakage are detected                   |
-| Manifest parity        | `node scripts/generate-hito-ds-manifest.mjs --check`   | Pass   | 38 primitive colors, 29 semantic colors, 14 reusable Text Styles                                                      |
-| Foundation cleanup     | `npm run validate-hito-ds-components`                  | Pass   | Package-reachable integrated proof: four retired tokens, 17 retired selectors, zero foundation geometry drift        |
-| Manifest provenance    | Generated JSON and TypeScript                          | Pass   | Helper role source moved truthfully to `src/styles/controls-fields.css`; token and typography values unchanged        |
-| Static quality         | Scoped ESLint and Prettier                             | Pass   | Changed DS, Settings wrapper, generator, and validator sources are clean                                              |
-| Production build       | Fresh `npm run build`                                  | Pass   | Client, SSR, Nitro, and postbuild completed successfully                                                              |
-| Build integrity        | `node scripts/validate-build-output-integrity.mjs`     | Pass   | 208 runtime MJS files and 3,255 relative MJS imports validated                                                        |
-| Runtime health         | Fresh canonical built runtime, real mode               | Pass   | Loopback server healthy; `/hitoDS/components` and `/hitoDS/foundations` return 200                                    |
-| Components             | 1470x801 and exact 375x812, light/dark                 | Pass   | No page overflow; retired DOM classes absent; shared sections remain contained                                        |
-| Interaction            | Button, Field, Choice and theme controls               | Pass   | Loading is busy/disabled; Field edits locally; pointer and Arrow-key Choice selection preserve ARIA/focus truth       |
-| Typography             | 1470x801 and exact 375x812, light/dark                 | Pass   | Six groups, 19 roles, no page overflow, provenance remains source-backed                                              |
-| Browser console        | Components and Foundations paths                       | Pass   | Independent QA observed zero warnings/errors                                                                          |
-| Calendar compatibility | Source and validator                                   | Pass   | Legacy Calendar API remains present and no `HitoButton` migration occurred                                            |
-| Independent QA         | Full pass plus focused fix-forward recheck             | Pass   | Initial manual theme-choice finding was corrected; final owner-level verdict passed                                   |
-| Diff hygiene           | Scoped diff relative to `dec2e226`                     | Pass   | DS manifest is isolated; concurrent Backend changes remain outside it                                                 |
+| Check                  | Scenario / environment                               | Result | Evidence                                                                                                              |
+| ---------------------- | ---------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------- |
+| Root cause             | Baseline source graph and architecture review        | Pass   | Reusable Field CSS and reference control assembly had distributed owners; both now resolve through canonical DS seams |
+| Component contract     | `npm run validate-hito-ds-components`                | Pass   | 4 Button sizes, 3 tones, 4 variants; 4 Field sizes, 2 variants; 3 Choice sizes; 326 files scanned                     |
+| Controlled regression  | Validator self-tests                                 | Pass   | Retired tiers, `className` / `buttonClassName` manual recipes, and Field-owner leakage are detected                   |
+| Manifest parity        | `node scripts/generate-hito-ds-manifest.mjs --check` | Pass   | 38 primitive colors, 29 semantic colors, 14 reusable Text Styles                                                      |
+| Foundation cleanup     | `npm run validate-hito-ds-components`                | Pass   | Package-reachable integrated proof: four retired tokens, 17 retired selectors, zero foundation geometry drift         |
+| Manifest provenance    | Generated JSON and TypeScript                        | Pass   | Helper role source moved truthfully to `src/styles/controls-fields.css`; token and typography values unchanged        |
+| Static quality         | Scoped ESLint and Prettier                           | Pass   | Changed DS, Settings wrapper, generator, and validator sources are clean                                              |
+| Production build       | Fresh `npm run build`                                | Pass   | Client, SSR, Nitro, and postbuild completed successfully                                                              |
+| Build integrity        | `node scripts/validate-build-output-integrity.mjs`   | Pass   | 208 runtime MJS files and 3,255 relative MJS imports validated                                                        |
+| Runtime health         | Fresh canonical built runtime, real mode             | Pass   | Loopback server healthy; `/hitoDS/components` and `/hitoDS/foundations` return 200                                    |
+| Components             | 1470x801 and exact 375x812, light/dark               | Pass   | No page overflow; retired DOM classes absent; shared sections remain contained                                        |
+| Interaction            | Button, Field, Choice and theme controls             | Pass   | Loading is busy/disabled; Field edits locally; pointer and Arrow-key Choice selection preserve ARIA/focus truth       |
+| Typography             | 1470x801 and exact 375x812, light/dark               | Pass   | Six groups, 19 roles, no page overflow, provenance remains source-backed                                              |
+| Browser console        | Components and Foundations paths                     | Pass   | Independent QA observed zero warnings/errors                                                                          |
+| Calendar compatibility | Source and validator                                 | Pass   | Legacy Calendar API remains present and no `HitoButton` migration occurred                                            |
+| Independent QA         | Full pass plus focused fix-forward recheck           | Pass   | Initial manual theme-choice finding was corrected; final owner-level verdict passed                                   |
+| Diff hygiene           | Scoped diff relative to `dec2e226`                   | Pass   | DS manifest is isolated; concurrent Backend changes remain outside it                                                 |
 
 ### Omissions and consequences
 

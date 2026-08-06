@@ -10,7 +10,7 @@ completed
 
 ## Type
 
-maintenance
+change_request
 
 ## Priority
 
@@ -24,13 +24,26 @@ frontend
 
 Product
 
-## Parent
+## Scope
 
-[Hito Stack Complexity Reduction Program](./2026-08-04-hito-stack-complexity-reduction-program.md)
+product-module-public-seams
+
+## Archive Intent
+
+retain_in_place
+
+## Task
+
+Remove only proven zero-consumer Product export or forwarding seams while retaining every live or
+specialized consumer contract.
 
 ## Stage
 
 Frontend Product reachability audit and integrated QA completed.
+
+## Parent
+
+[Hito Stack Complexity Reduction Program](./2026-08-04-hito-stack-complexity-reduction-program.md)
 
 ## Demonstrated Root Cause
 

@@ -37,6 +37,29 @@ devtools
 Make the local-only Inspector directly usable on the canonical managed QA origin
 `http://127.0.0.1:3000` without weakening its loopback-only and non-persistent boundary.
 
+## Stage
+
+Frontend DevTools browser acceptance remains in progress. Source reachability does not replace the
+required canonical-loopback and non-loopback browser discriminators.
+
+## Next Recommended Role
+
+frontend
+
+## Exact Handoff Prompt
+
+```text
+ROLE: FRONTEND
+Frontend lane: DevTools
+
+Complete the existing Canonical Loopback Local Inspector Availability item by proving the Inspector
+is intentionally reachable and usable on http://127.0.0.1:3000 while remaining absent on a
+non-loopback origin. Preserve its lazy, local-only, non-persisting boundary and do not change Product,
+Admin, auth, provider, fixture, persistence, or Backend behavior. Keep the item in progress until the
+task-specific browser evidence and independent owner-level review pass; do not claim Global QA
+Acceptance.
+```
+
 ## Root Cause
 
 The Inspector host gate already accepts `127.0.0.1`, but its enabled state is stored in

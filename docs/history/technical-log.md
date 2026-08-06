@@ -1,7 +1,7 @@
 # Hito Technical Log
 
 Status: active internal ledger
-Last Updated: 2026-08-05
+Last Updated: 2026-08-06
 Owner: PRODUCT
 
 ## Purpose And Source Boundary
@@ -30,7 +30,46 @@ Entry format:
 Every accepted implementation, QA acceptance gate, source-cleanup batch, or durable process repair
 must either add an entry here or explicitly state why it is not technical-log material.
 
+## 2026-08-06
+
+- ARCHITECT / Hito Stack Complexity Reduction Slice 8H — replaced duplicate release chronology and
+  stale routing in `current-state.md` and `current-system.md` with compact current-truth and
+  architecture boundaries, reconciled safe canonical backlog metadata, and closed the admitted
+  8A-8H cleanup queue after ancestry, importer, links, formatting, diff, and independent review.
+  Evidence: `docs/tasks/backlog/2026-08-04-hito-stack-complexity-reduction-program.md`. Boundary:
+  documentation and task metadata only; blocked FIT Product presentation, Global QA, Product
+  behavior, runtime, schema, fixtures, generated output, `current-functional-map.md`, providers, and
+  hosted data remain unchanged.
+
 ## 2026-08-05
+
+- FRONTEND Product + QA / Product contract proof reachability (Slice 8G, `d5dccef`) — made the
+  retained heart-rate guidance and workout-comparison assertions discoverable through the existing
+  `validate-product-contracts` entrypoint without changing either contract. Evidence:
+  `docs/tasks/backlog/2026-08-05-product-contract-proof-reachability.md`. Boundary: no Product
+  runtime behavior, Backend DTO, FIT lifecycle, fixture truth, or test framework changed; Global QA
+  remains pending.
+
+- FRONTEND Product + independent review / Product module-public seam audit (Slice 8F, `6a9dc9f`) —
+  found no Product-owned zero-consumer export or forwarding facade safe to remove and retained every
+  live, dynamic, generated, validator, Design System, DevTools, Backend, and specialized consumer.
+  Evidence: `docs/tasks/backlog/2026-08-05-product-module-public-seam-reduction.md`. Boundary: this
+  accepted slice changed documentation only and made no executable-source or runtime reduction.
+
+- FRONTEND Product + QA / generated-plan setup state convergence (Slice 8E, `c850655`) — replaced
+  duplicated setup draft/setter/reset ownership with one Product state seam while first-plan and
+  active-plan replacement kept separate preview, confirm, cancellation, failure, and persistence
+  lifecycles. Evidence: `docs/tasks/backlog/2026-08-05-generated-plan-setup-state-convergence.md`.
+  Boundary: no Backend contract, shared Design System primitive, manual-plan lifecycle, or provider
+  behavior changed; Global QA remains pending.
+
+- BACKEND + QA + ARCHITECT / planned-workout FIT completion lifecycle (`e5939bd`) — made one exact
+  current parsed-running activity revision, unique planned-workout match, active metrics, and
+  canonical comparison chain the Backend-owned FIT completion discriminator while preserving manual
+  subjective evidence and activity deletion/removal semantics. Evidence:
+  `docs/tasks/backlog/2026-08-05-planned-workout-fit-completion-lifecycle.md`. Boundary: the separate
+  runner-facing Product presentation is still blocked on native browser file attachment; no Product
+  UI acceptance or Global QA is claimed.
 
 - DESIGN SYSTEM + QA + ARCHITECT / Hito DS workbench controls and validation convergence (Slice
   8D) — replaced the duplicate Calendar and Workout Library Choice/Select settings recipes and

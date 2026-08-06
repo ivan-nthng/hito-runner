@@ -43,20 +43,6 @@ public hook contracts.
 Completed Design System implementation, integrated independent QA, and exact release preparation,
 Slice 8C.
 
-## Next Recommended Role
-
-design_system
-
-## Exact Handoff Prompt
-
-```text
-ROLE: DESIGN SYSTEM
-
-Complete Slice 8C by replacing the demonstrated Tabs/Radio mechanics duplication with one small
-internal neutral owner, preserving component-specific semantics and proving the result through the
-canonical DS validator, Product/reference browser checks, independent QA, and an exact release.
-```
-
 ## Execution Preflight
 
 - Evidence: `hito-tabs.ts` and `hito-radio-group.ts` duplicate the selection-item shape, ID

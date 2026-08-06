@@ -6,7 +6,7 @@
 
 ## Status
 
-complete
+completed
 
 ## Type
 

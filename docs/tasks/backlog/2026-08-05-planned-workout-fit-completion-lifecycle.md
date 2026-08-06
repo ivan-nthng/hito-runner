@@ -10,7 +10,7 @@ completed
 
 ## Type
 
-defect
+bug
 
 ## Priority
 
@@ -23,6 +23,15 @@ backend
 ## Scope
 
 planned-workout-result-projection
+
+## Archive Intent
+
+retain_in_place
+
+## Task
+
+Make canonical FIT-backed evidence participate truthfully in planned-workout completion while
+preserving manual subjective input and the existing activity/source/revision lifecycle.
 
 ## Stage
 

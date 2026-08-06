@@ -10,7 +10,7 @@ completed
 
 ## Type
 
-maintenance
+change_request
 
 ## Priority
 
@@ -32,10 +32,6 @@ hito-stack-simplification
 
 retain_in_place
 
-## Parent
-
-[Hito Stack Complexity Reduction Program](2026-08-04-hito-stack-complexity-reduction-program.md)
-
 ## Task
 
 Run one post-release, evidence-gated Backend reduction cycle across runtime, API, auth, build/tooling,
@@ -50,6 +46,10 @@ cycle and every Backend module has a live consumer, so no whole-file deletion or
 was admitted from size alone. The completed cycle removed zero-consumer declarations, consolidated
 exact weekday, authentication, entitlement, build-path, and proof-setup ownership, and closed one
 demonstrated redirect-separator vulnerability without changing Product contracts.
+
+## Parent
+
+[Hito Stack Complexity Reduction Program](2026-08-04-hito-stack-complexity-reduction-program.md)
 
 ## Admission And Retention Rule
 

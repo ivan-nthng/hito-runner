@@ -10,7 +10,7 @@ completed
 
 ## Type
 
-maintenance
+change_request
 
 ## Priority
 
@@ -24,13 +24,26 @@ frontend
 
 Product
 
-## Parent
+## Scope
 
-[Hito Stack Complexity Reduction Program](./2026-08-04-hito-stack-complexity-reduction-program.md)
+product-contract-proof-reachability
+
+## Archive Intent
+
+retain_in_place
+
+## Task
+
+Make the retained Product contract proofs discoverable through one existing validation entrypoint
+without changing their assertions or introducing another framework.
 
 ## Stage
 
 Frontend Product proof-entrypoint convergence and integrated QA completed.
+
+## Parent
+
+[Hito Stack Complexity Reduction Program](./2026-08-04-hito-stack-complexity-reduction-program.md)
 
 ## Demonstrated Root Cause
 

@@ -83,6 +83,7 @@ export function AppShell({
   const desktopPlanActionsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const mobilePlanActionsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const planActionReturnFocusRef = useRef<HTMLElement | null>(null);
+  const activePlanCreateReturnFocusRef = useRef<HTMLElement | null>(null);
   const loc = useLocation();
   const currentNavPath = getCurrentShellNavPath(loc.pathname);
   const nextPath = getLoginIntentPath(
@@ -132,8 +133,16 @@ export function AppShell({
     setActivePlanCreateOpen(false);
     deferHeaderDialogOpen(() => setPlanActionDialogMode(mode));
   };
-  const openCreatePlan = () => {
+  const openCreatePlan = (returnFocusTarget: HTMLElement | null) => {
+    activePlanCreateReturnFocusRef.current = returnFocusTarget;
     deferHeaderDialogOpen(() => setActivePlanCreateOpen(true));
+  };
+  const setActivePlanCreateOpenWithFocusReturn = (nextOpen: boolean) => {
+    setActivePlanCreateOpen(nextOpen);
+
+    if (!nextOpen) {
+      window.requestAnimationFrame(() => activePlanCreateReturnFocusRef.current?.focus());
+    }
   };
   const openImportJson = () => {
     deferHeaderDialogOpen(() => setUploadOpen(true));
@@ -366,7 +375,7 @@ export function AppShell({
                       {planAvailable ? (
                         <DropdownMenuItem
                           className="hito-shell-menu-item"
-                          onSelect={openCreatePlan}
+                          onSelect={() => openCreatePlan(desktopPlanActionsTriggerRef.current)}
                         >
                           <Icon name="sparkles" size="sm" />
                           Create New Plan
@@ -519,7 +528,7 @@ export function AppShell({
                         label="Create New Plan"
                         onClick={() => {
                           closeMobilePlanActions();
-                          openCreatePlan();
+                          openCreatePlan(mobilePlanActionsTriggerRef.current);
                         }}
                       />
                     ) : (
@@ -598,7 +607,7 @@ export function AppShell({
       />
       <ActivePlanCreatePlanDialog
         open={activePlanCreateOpen}
-        onOpenChange={setActivePlanCreateOpen}
+        onOpenChange={setActivePlanCreateOpenWithFocusReturn}
         snapshot={snapshot}
       />
       <PlanManagementDialog

@@ -6,10 +6,10 @@ import { StructuredPlanConstructor } from "@/components/onboarding/StructuredPla
 import {
   isPresetPrimarySetupReady,
   type StructuredConstructorState,
-  type WeekdayName,
 } from "@/components/onboarding/onboarding-form-model";
 import { useSelectedPlanPresetPreviewController } from "@/components/onboarding/use-selected-plan-preset-preview-controller";
 import { useOnboardingRunnerBaseline } from "@/components/onboarding/use-onboarding-runner-baseline";
+import { useGeneratedPlanSetupState } from "@/components/onboarding/use-generated-plan-setup-state";
 import {
   resolveSelectedPlanGoalPreviewGate,
   type PlanGoalIntentDraftState,
@@ -80,34 +80,26 @@ export function ActivePlanCreatePlanDialog({
     () => buildInitialCreatePlanStateKey(initialState),
     [initialState],
   );
-  const [age, setAge] = useState(initialState.age);
-  const [weightKg, setWeightKg] = useState(initialState.weightKg);
-  const [heightCm, setHeightCm] = useState(initialState.heightCm);
-  const [fitnessLevel, setFitnessLevel] = useState<StructuredConstructorState["fitnessLevel"]>(
-    initialState.fitnessLevel,
-  );
-  const [recent5kTime, setRecent5kTime] = useState(initialState.recent5kTime);
-  const [recent5kPace, setRecent5kPace] = useState(initialState.recent5kPace);
-  const [fixedRestDays, setFixedRestDays] = useState<WeekdayName[]>(initialState.fixedRestDays);
-  const [maxRunningDaysPerWeek, setMaxRunningDaysPerWeek] = useState(
-    initialState.maxRunningDaysPerWeek,
-  );
-  const [preferredLongRunDay, setPreferredLongRunDay] = useState<WeekdayName | "">(
-    initialState.preferredLongRunDay,
-  );
-  const [startDate, setStartDate] = useState(initialState.startDate);
-  const [planGoalChoice, setPlanGoalChoice] = useState<
-    StructuredConstructorState["planGoalChoice"]
-  >(initialState.planGoalChoice);
-  const [planGoalCustomDistanceKm, setPlanGoalCustomDistanceKm] = useState(
-    initialState.planGoalCustomDistanceKm,
-  );
-  const [planGoalCustomDistanceLabel, setPlanGoalCustomDistanceLabel] = useState(
-    initialState.planGoalCustomDistanceLabel,
-  );
-  const [planGoalFinishTime, setPlanGoalFinishTime] = useState(initialState.planGoalFinishTime);
-  const [planGoalTargetDate, setPlanGoalTargetDate] = useState(initialState.planGoalTargetDate);
-  const [runnerComment, setRunnerComment] = useState(initialState.runnerComment);
+  const planSetup = useGeneratedPlanSetupState(initialState);
+  const {
+    state: constructorState,
+    constructorSetters,
+    reset: resetSetupState,
+    selectPlanGoal,
+    setPlanGoalCustomDistanceKm,
+    setPlanGoalCustomDistanceLabel,
+    setPlanGoalFinishTime,
+    setPlanGoalTargetDate,
+    setRunnerComment,
+  } = planSetup;
+  const {
+    planGoalChoice,
+    planGoalCustomDistanceKm,
+    planGoalCustomDistanceLabel,
+    planGoalFinishTime,
+    planGoalTargetDate,
+    runnerComment,
+  } = constructorState;
   const [transitionStatus, setTransitionStatus] = useState<TransitionStatus>("idle");
   const [transitionReviewInput, setTransitionReviewInput] =
     useState<ActivePlanTransitionReviewInput | null>(null);
@@ -117,44 +109,6 @@ export function ActivePlanCreatePlanDialog({
     useState<ActivePlanTransitionConfirmResult | null>(null);
   const [transitionReviewOpen, setTransitionReviewOpen] = useState(false);
 
-  const constructorState: StructuredConstructorState = useMemo(
-    () => ({
-      age,
-      weightKg,
-      heightCm,
-      fitnessLevel,
-      recent5kTime,
-      recent5kPace,
-      fixedRestDays,
-      maxRunningDaysPerWeek,
-      preferredLongRunDay,
-      startDate,
-      planGoalChoice,
-      planGoalCustomDistanceKm,
-      planGoalCustomDistanceLabel,
-      planGoalFinishTime,
-      planGoalTargetDate,
-      runnerComment,
-    }),
-    [
-      age,
-      fitnessLevel,
-      fixedRestDays,
-      heightCm,
-      maxRunningDaysPerWeek,
-      planGoalCustomDistanceKm,
-      planGoalCustomDistanceLabel,
-      planGoalFinishTime,
-      planGoalChoice,
-      planGoalTargetDate,
-      preferredLongRunDay,
-      recent5kPace,
-      recent5kTime,
-      runnerComment,
-      startDate,
-      weightKg,
-    ],
-  );
   const hasActivePlan = Boolean(snapshot?.planMeta?.id);
   const hasRequiredPlanBasics = isPresetPrimarySetupReady(constructorState);
   const runnerBaseline = useOnboardingRunnerBaseline({
@@ -225,30 +179,13 @@ export function ActivePlanCreatePlanDialog({
     (selectedPlanPreview.previewOpen && selectedPreviewIsReady);
 
   const changePlanGoalChoice = (value: StructuredConstructorState["planGoalChoice"]) => {
-    setPlanGoalChoice(value);
-
-    if (value !== "custom") {
-      setPlanGoalCustomDistanceKm("");
-      setPlanGoalCustomDistanceLabel("");
-    }
-
+    selectPlanGoal(value);
     selectedPlanPreview.clearSelectedPreview();
   };
 
   const clearGeneratedPlanSetup = () => {
     selectedPlanPreview.clearSelectedPreview();
-    setRecent5kTime(initialState.recent5kTime);
-    setRecent5kPace(initialState.recent5kPace);
-    setFixedRestDays(initialState.fixedRestDays);
-    setMaxRunningDaysPerWeek(initialState.maxRunningDaysPerWeek);
-    setPreferredLongRunDay(initialState.preferredLongRunDay);
-    setStartDate(initialState.startDate);
-    setPlanGoalChoice(initialState.planGoalChoice);
-    setPlanGoalCustomDistanceKm(initialState.planGoalCustomDistanceKm);
-    setPlanGoalCustomDistanceLabel(initialState.planGoalCustomDistanceLabel);
-    setPlanGoalFinishTime(initialState.planGoalFinishTime);
-    setPlanGoalTargetDate(initialState.planGoalTargetDate);
-    setRunnerComment(initialState.runnerComment);
+    resetSetupState(initialState);
     window.requestAnimationFrame(() => planGoalFocusRef.current?.focus());
   };
 
@@ -266,22 +203,7 @@ export function ActivePlanCreatePlanDialog({
     }
 
     initialStateKeyRef.current = initialStateKey;
-    setAge(initialState.age);
-    setWeightKg(initialState.weightKg);
-    setHeightCm(initialState.heightCm);
-    setFitnessLevel(initialState.fitnessLevel);
-    setRecent5kTime(initialState.recent5kTime);
-    setRecent5kPace(initialState.recent5kPace);
-    setFixedRestDays(initialState.fixedRestDays);
-    setMaxRunningDaysPerWeek(initialState.maxRunningDaysPerWeek);
-    setPreferredLongRunDay(initialState.preferredLongRunDay);
-    setStartDate(initialState.startDate);
-    setPlanGoalChoice(initialState.planGoalChoice);
-    setPlanGoalCustomDistanceKm(initialState.planGoalCustomDistanceKm);
-    setPlanGoalCustomDistanceLabel(initialState.planGoalCustomDistanceLabel);
-    setPlanGoalFinishTime(initialState.planGoalFinishTime);
-    setPlanGoalTargetDate(initialState.planGoalTargetDate);
-    setRunnerComment(initialState.runnerComment);
+    resetSetupState(initialState);
     resetSelectedPlanPreviewState();
     setTransitionReviewInput(null);
     setTransitionReviewResult(null);
@@ -289,7 +211,7 @@ export function ActivePlanCreatePlanDialog({
     setTransitionReviewOpen(false);
     setTransitionStatus("idle");
     transitionInFlightRef.current = false;
-  }, [initialState, initialStateKey, open, resetSelectedPlanPreviewState]);
+  }, [initialState, initialStateKey, open, resetSelectedPlanPreviewState, resetSetupState]);
 
   useEffect(() => {
     if (!open) {
@@ -548,18 +470,7 @@ export function ActivePlanCreatePlanDialog({
             <StructuredPlanConstructor
               formRef={structuredFormRef}
               state={constructorState}
-              setState={{
-                setAge,
-                setWeightKg,
-                setHeightCm,
-                setFitnessLevel,
-                setRecent5kTime,
-                setRecent5kPace,
-                setFixedRestDays,
-                setMaxRunningDaysPerWeek,
-                setPreferredLongRunDay,
-                setStartDate,
-              }}
+              setState={constructorSetters}
               isBusy={isBusy || !hasActivePlan}
               isConstructorReady={hasAcceptedRunnerBaseline}
               onSubmit={() => {

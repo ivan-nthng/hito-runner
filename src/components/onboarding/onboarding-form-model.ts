@@ -22,7 +22,6 @@ export interface StructuredConstructorState {
   maxRunningDaysPerWeek: string;
   preferredLongRunDay: WeekdayName | "";
   startDate: string;
-  targetDate: string;
   planGoalChoice: PlanGoalChoice;
   planGoalCustomDistanceKm: string;
   planGoalCustomDistanceLabel: string;

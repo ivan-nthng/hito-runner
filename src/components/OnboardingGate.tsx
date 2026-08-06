@@ -12,9 +12,11 @@ import {
   isPresetPrimarySetupReady,
   normalizePresetPrimaryFitnessLevel,
   type StructuredConstructorState,
-  type WeekdayName,
 } from "@/components/onboarding/onboarding-form-model";
-import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
+import {
+  buildOnboardingGeneratedPlanSetupState,
+  useGeneratedPlanSetupState,
+} from "@/components/onboarding/use-generated-plan-setup-state";
 import type { UserSettingsSummary } from "@/lib/user-settings-actions";
 import type { RunningPlanConfirmActionResult } from "@/lib/running-plan-engine-actions";
 import { confirmRunningPlanDraft } from "@/lib/running-plan-engine-actions";
@@ -40,37 +42,33 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const previewReturnFocusRef = useRef<HTMLElement | null>(null);
   const planGoalFocusRef = useRef<HTMLButtonElement | null>(null);
 
-  const [age, setAge] = useState(() => (defaults?.age != null ? String(defaults.age) : ""));
-  const [weightKg, setWeightKg] = useState(() =>
-    defaults?.weightKg != null ? String(defaults.weightKg) : "",
+  const initialSetupState = useMemo(
+    () => buildOnboardingGeneratedPlanSetupState(defaults),
+    [defaults],
   );
-  const [heightCm, setHeightCm] = useState(() =>
-    defaults?.heightCm != null ? String(defaults.heightCm) : "",
-  );
-  const [fitnessLevel, setFitnessLevel] = useState<RunnerFitnessLevel>(
-    () => defaults?.fitnessLevel ?? "running_regularly",
-  );
-  const [recent5kTime, setRecent5kTime] = useState("");
-  const [recent5kPace, setRecent5kPace] = useState("");
-  const [fixedRestDays, setFixedRestDays] = useState<WeekdayName[]>(
-    () => defaults?.trainingPreferences?.blocked_days ?? [],
-  );
-  const [maxRunningDaysPerWeek, setMaxRunningDaysPerWeek] = useState(() =>
-    defaults?.trainingPreferences?.max_running_days_per_week != null
-      ? String(defaults.trainingPreferences.max_running_days_per_week)
-      : "",
-  );
-  const [preferredLongRunDay, setPreferredLongRunDay] = useState<WeekdayName | "">(
-    () => defaults?.trainingPreferences?.preferred_long_run_day ?? "",
-  );
-  const [startDate, setStartDate] = useState("");
-  const [planGoalChoice, setPlanGoalChoice] =
-    useState<StructuredConstructorState["planGoalChoice"]>("");
-  const [planGoalCustomDistanceKm, setPlanGoalCustomDistanceKm] = useState("");
-  const [planGoalCustomDistanceLabel, setPlanGoalCustomDistanceLabel] = useState("");
-  const [planGoalFinishTime, setPlanGoalFinishTime] = useState("");
-  const [planGoalTargetDate, setPlanGoalTargetDate] = useState("");
-  const [runnerComment, setRunnerComment] = useState("");
+  const planSetup = useGeneratedPlanSetupState(initialSetupState);
+  const {
+    state: constructorState,
+    constructorSetters,
+    selectPlanGoal,
+    setPlanGoalCustomDistanceKm,
+    setPlanGoalCustomDistanceLabel,
+    setPlanGoalFinishTime,
+    setPlanGoalTargetDate,
+    setRunnerComment,
+  } = planSetup;
+  const {
+    age,
+    weightKg,
+    heightCm,
+    fitnessLevel,
+    planGoalChoice,
+    planGoalCustomDistanceKm,
+    planGoalCustomDistanceLabel,
+    planGoalFinishTime,
+    planGoalTargetDate,
+    runnerComment,
+  } = constructorState;
   const [manualCreateStatus, setManualCreateStatus] = useState<ManualCreateStatus>("idle");
   const [manualCreateError, setManualCreateError] = useState<string | null>(null);
   const [runningPlanConfirmResult, setRunningPlanConfirmResult] =
@@ -80,44 +78,6 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   );
   const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
 
-  const constructorState: StructuredConstructorState = useMemo(
-    () => ({
-      age,
-      weightKg,
-      heightCm,
-      fitnessLevel,
-      recent5kTime,
-      recent5kPace,
-      fixedRestDays,
-      maxRunningDaysPerWeek,
-      preferredLongRunDay,
-      startDate,
-      planGoalChoice,
-      planGoalCustomDistanceKm,
-      planGoalCustomDistanceLabel,
-      planGoalFinishTime,
-      planGoalTargetDate,
-      runnerComment,
-    }),
-    [
-      age,
-      fitnessLevel,
-      fixedRestDays,
-      heightCm,
-      maxRunningDaysPerWeek,
-      planGoalCustomDistanceKm,
-      planGoalCustomDistanceLabel,
-      planGoalFinishTime,
-      planGoalChoice,
-      planGoalTargetDate,
-      preferredLongRunDay,
-      recent5kPace,
-      recent5kTime,
-      runnerComment,
-      startDate,
-      weightKg,
-    ],
-  );
   const hasRequiredPlanBasics = isPresetPrimarySetupReady(constructorState);
   const runnerBaseline = useOnboardingRunnerBaseline({
     defaults,
@@ -179,34 +139,13 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   });
 
   const changePlanGoalChoice = (value: StructuredConstructorState["planGoalChoice"]) => {
-    setPlanGoalChoice(value);
-
-    if (value !== "custom") {
-      setPlanGoalCustomDistanceKm("");
-      setPlanGoalCustomDistanceLabel("");
-    }
-
+    selectPlanGoal(value);
     selectedPlanPreview.clearSelectedPreview();
   };
 
   const clearGeneratedPlanSetup = () => {
     selectedPlanPreview.clearSelectedPreview();
-    setRecent5kTime("");
-    setRecent5kPace("");
-    setFixedRestDays(defaults?.trainingPreferences?.blocked_days ?? []);
-    setMaxRunningDaysPerWeek(
-      defaults?.trainingPreferences?.max_running_days_per_week != null
-        ? String(defaults.trainingPreferences.max_running_days_per_week)
-        : "",
-    );
-    setPreferredLongRunDay(defaults?.trainingPreferences?.preferred_long_run_day ?? "");
-    setStartDate("");
-    setPlanGoalChoice("");
-    setPlanGoalCustomDistanceKm("");
-    setPlanGoalCustomDistanceLabel("");
-    setPlanGoalFinishTime("");
-    setPlanGoalTargetDate("");
-    setRunnerComment("");
+    planSetup.reset(buildOnboardingGeneratedPlanSetupState(defaults));
     setAdvancedSettingsOpen(false);
     window.requestAnimationFrame(() => planGoalFocusRef.current?.focus());
   };
@@ -418,18 +357,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
       <div className="mt-8 grid gap-8 pb-0 md:pb-32">
         <QuickSetupPlanSetupSections
           state={constructorState}
-          setState={{
-            setAge,
-            setWeightKg,
-            setHeightCm,
-            setFitnessLevel,
-            setRecent5kTime,
-            setRecent5kPace,
-            setFixedRestDays,
-            setMaxRunningDaysPerWeek,
-            setPreferredLongRunDay,
-            setStartDate,
-          }}
+          setState={constructorSetters}
           includeTrainingSetup={false}
           includeScheduleRhythm={false}
           heartRateProfile={
@@ -499,18 +427,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
             <StructuredPlanConstructor
               formRef={structuredFormRef}
               state={constructorState}
-              setState={{
-                setAge,
-                setWeightKg,
-                setHeightCm,
-                setFitnessLevel,
-                setRecent5kTime,
-                setRecent5kPace,
-                setFixedRestDays,
-                setMaxRunningDaysPerWeek,
-                setPreferredLongRunDay,
-                setStartDate,
-              }}
+              setState={constructorSetters}
               isBusy={isBusy}
               isConstructorReady={hasRequiredPlanBasics}
               onSubmit={() => handleCreatePlanClick()}

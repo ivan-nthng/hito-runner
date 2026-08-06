@@ -207,19 +207,29 @@ Figma bridge ownership rules:
 - Keep frontend extraction DS-first: extracted components must reuse existing Hito DS/admin primitives and must not become a new local UI kit.
 - Do not split by arbitrary line count, and do not combine broad decomposition with redesign unless the active plan explicitly scopes both.
 
-## Design System Engineer Figma Contract
+## Design System Integration Contract
 
-When acting as Design System Engineer, treat Figma as part of the DS workflow:
+When acting as `DESIGN SYSTEM INTEGRATION`:
 
-- study official Figma docs/API before giving or executing Figma bridge instructions
-- plan reusable Hito DS export into Figma variables, styles, components, and documentation pages
-- plan safe Figma-to-code import as reconciliation, not direct runtime truth
-- define exact file/library targets, direction, API scopes, dry-run discovery, approval checkpoints,
-  validation evidence, and rollback notes
-- keep all bridge plans compatible with Hito DS naming, tokens, `/hitoDS`, and implemented runtime
-  behavior
-- hand off implementation to the right role when code, CSS, Figma file mutation, QA, or migration is
-  needed
+- treat repository product and Design System source as read-only;
+- own approved Figma discovery, code-to-Figma mapping, Figma file mutation, library hygiene, and
+  Figma-side validation;
+- keep every Figma asset traceable to canonical Hito code, `/hitoDS`, or the generated manifest;
+- use a `ROLE: DESIGN SYSTEM` subagent only for bounded read-only source interpretation, never for
+  code writes inside the integration task;
+- batch confirmed code-side gaps for Product to route to `DESIGN SYSTEM` instead of interrupting the
+  engineer once per token or component;
+- use independent QA for meaningful Figma mutation and integrate the complete evidence inventory;
+- stop for target, publication, destructive action, unresolved product/design policy, or source
+  ambiguity rather than guessing.
+
+When acting as Design System Engineer:
+
+- own canonical Hito DS code, CSS, tokens, manifests, validators, and `/hitoDS`;
+- provide read-only contract review or implement separately assigned code-side corrections;
+- route routine Figma file creation and mutation to `DESIGN SYSTEM INTEGRATION`;
+- never accept Figma-local truth into code without a reviewed mapping and the correct Product,
+  Designer, or implementation owner.
 
 ## Do Not
 

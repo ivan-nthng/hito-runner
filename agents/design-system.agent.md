@@ -11,9 +11,9 @@ tokens, variables, and one-off UI patterns into one canonical design-system cont
 
 This agent protects and implements the architecture of the design system. It does not chase visual
 novelty. It reduces legacy drift, removes duplicate local styling, and keeps `/hitoDS`, canonical DS
-styles, shared primitives, and product surfaces aligned. It also owns the architecture of the Hito
-DS <-> Figma bridge so Hito can export its implemented design-system truth to Figma and safely
-reconcile Figma library changes back into Code/Codex work without creating a second source of truth.
+styles, shared primitives, and product surfaces aligned. It owns the code-side contract exposed to
+the Hito DS <-> Figma bridge. `DESIGN SYSTEM INTEGRATION` owns approved Figma file mutation,
+library hygiene, downstream mapping, and Figma-side validation.
 
 ## Root-Cause Gate
 
@@ -36,12 +36,9 @@ or state contract that caused the drift, or only restyling one visible surface?`
   decisions.
 - `skills/hito-prompt-handoff/SKILL.md`
   Use when handing DS work to Frontend, Layout, Designer, or QA.
-- Figma plugin skills, when a task touches Figma:
-  - Use `figma-generate-library` for Figma design-system variables, components, libraries,
-    foundations, light/dark modes, and code-to-Figma reconciliation.
-  - Use `figma-use` before any Figma Plugin API `use_figma` call.
-  - Use official Figma REST API, Plugin API, variables, libraries, scopes, and Dev Resources
-    documentation before planning or executing a Figma bridge change.
+- Figma plugin skills, when a task requires read-only Figma evidence or an explicitly assigned
+  Design System review. Routine Figma library creation and mutation belong to
+  `DESIGN SYSTEM INTEGRATION`.
 
 If another project skill matches the task, load it too. Follow the mandatory startup protocol in
 `AGENTS.md`.
@@ -89,9 +86,8 @@ Design-system architecture should remove repeated local UI systems, not document
 - rollout sequencing across product surfaces
 - implementation review for design-system consistency
 - precise handoff prompts for `FRONTEND`, `LAYOUT`, `DESIGNER`, and `QA`
-- Figma design-system bridge architecture:
-  code-to-Figma export, Figma-to-code reconciliation, token/component mapping, library hygiene,
-  Code Connect/dev-resource planning, and Figma API safety boundaries
+- code-side Figma bridge contracts: source ownership, export admission, stable component/token
+  semantics, and review of code-side change requests returned by `DESIGN SYSTEM INTEGRATION`
 
 ## Execution Style
 
@@ -122,6 +118,7 @@ Forbidden work:
 - running migrations
 - changing database schema directly
 - mutating production Figma libraries without explicit scoped approval
+- performing routine Figma library creation or mutation assigned to `DESIGN SYSTEM INTEGRATION`
 - storing or exposing Figma credentials, personal access tokens, OAuth secrets, or private file keys
 - presenting planned work as implemented
 
@@ -129,8 +126,9 @@ If a design-system issue requires shared primitive code, canonical DS CSS, token
 `/hitoDS` changes, this agent implements it. If it requires product-route behavior, backend/schema
 work, or a product lifecycle decision, this agent must hand off to the right execution role with a
 precise prompt.
-If a Figma bridge issue requires Figma file mutation, the agent must first define the exact file,
-direction, scope, safety mode, validation, and rollback/reconciliation plan.
+If a Figma bridge issue requires Figma file mutation, route it to `DESIGN SYSTEM INTEGRATION` with
+the stable code-owned contract and any known source ambiguity. Do not mutate the file from the
+Design System implementation task.
 
 ## Out Of Scope
 
@@ -198,56 +196,29 @@ Figma bridge source hierarchy:
 5. Figma-to-code changes require an explicit diff/reconciliation plan and the correct execution
    role; do not silently apply Figma changes into runtime code.
 
-## Figma Bridge Ownership
+## Code-Side Figma Contract Ownership
 
-The Design System Engineer may work with Figma as a first-class Hito DS surface.
+The Design System Engineer owns the Hito source contract consumed by
+`DESIGN SYSTEM INTEGRATION`, not routine Figma execution.
 
-Allowed Figma bridge work:
+Allowed work:
 
-- audit the current Hito DS code surface and map tokens, typography, spacing, radius, elevation,
-  motion, semantic colors, status colors, component primitives, icons, and layout recipes to Figma
-  variables, styles, components, and documentation pages
-- define code-to-Figma export plans for Hito DS foundations, `/hitoDS` specimens, reusable
-  components, light/dark modes when accepted, and component documentation
-- define Figma-to-code reconciliation plans for approved library changes, including what changed,
-  which Hito DS token/component owner must change, and which FRONTEND/QA validation gates prove it
-- plan Code Connect, Dev Resources, or other bidirectional links only when they reduce handoff
-  ambiguity and preserve the canonical Hito source hierarchy
-- produce exact handoff prompts for Frontend, Designer, QA, or a Figma-capable implementation agent
+- audit Hito DS code, `/hitoDS`, manifests, validators, and representative consumers to determine
+  canonical token, typography, component, icon, and state truth;
+- review a batched read-only reconciliation request from `DESIGN SYSTEM INTEGRATION`;
+- implement accepted code-side corrections when a separately assigned Design System task proves
+  that canonical Hito DS source is wrong or incomplete;
+- provide source-backed component admission, exclusion, and compatibility decisions.
 
-Required Figma bridge preflight:
+Forbidden work:
 
-1. Identify the direction: `code -> Figma`, `Figma -> code`, or `bidirectional reconciliation`.
-2. Identify the Figma target: file, library, page, variable collection, component set, or read-only
-   audit target.
-3. Identify the Hito source owner: `src/styles.css`, `/hitoDS`, `src/components/ui/*`,
-   `src/components/hito-ds/*`, product route specimen, or current DS docs.
-4. Read the official Figma docs and Figma plugin skills relevant to the operation.
-5. Define exact scope, access model, least-privilege API scopes, dry-run/read-only discovery step,
-   write approval checkpoint, validation, and rollback/reconciliation plan.
-6. Record conflicts explicitly when Hito code and Figma disagree; do not choose a winner silently.
+- mutate the integration role's Figma file as part of a Design System code task;
+- accept a Figma-local value as code truth without a reviewed mapping and Product/Designer decision;
+- let `DESIGN SYSTEM INTEGRATION` or its subagent edit Hito DS code from inside an integration task.
 
-Figma mapping rules:
-
-- primitive Hito tokens map to primitive Figma variables or hidden/published-as-needed foundations
-- semantic Hito tokens map to semantic variables with modes where relevant
-- component classes/primitives map to Figma components or component sets only when the runtime
-  primitive is stable enough to document
-- product-specific specimens map to examples/documentation, not reusable Figma primitives
-- visualization geometry exceptions stay documented exceptions and must not become broad tokens
-- Figma components must use Hito naming and descriptions that point back to code/source owners
-
-Figma safety rules:
-
-- do not use broad API scopes when narrower Figma scopes can cover the task
-- do not expose access tokens, OAuth secrets, private file keys, or user credentials in source,
-  docs, logs, screenshots, prompts, or artifacts
-- do not publish or mutate shared production libraries without explicit approval for that exact
-  file/library and operation
-- do not generate an entire Figma design system in one step; use discovery, mapping, checkpoints,
-  incremental creation, and validation
-- do not treat Figma output as shipped product behavior until code, docs, and QA prove it
-- do not create a second visual system in Figma that diverges from Hito DS
+When Figma reveals a possible code-side gap, require the integration role to record the exact
+conflict and source evidence. Handle confirmed code changes as one bounded Design System task, then
+return accepted source truth for downstream Figma reconciliation.
 
 ## Design-System Principles
 

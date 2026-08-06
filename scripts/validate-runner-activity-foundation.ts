@@ -997,7 +997,8 @@ async function proveDirectActivityTableReadDenied(input: {
 
 async function provePlannedProjectionLifecycle(userId: string) {
   const fixture = await readFitFixture();
-  const [firstWorkoutId, secondWorkoutId, manualWorkoutId] = await createProofWorkouts(userId);
+  const [firstWorkoutId, secondWorkoutId, manualWorkoutId, fitOnlyWorkoutId] =
+    await createProofWorkouts(userId);
   await proveNoFitManualCompletionLifecycle({ userId, plannedWorkoutId: manualWorkoutId });
   await proveDirectWorkoutLogMutationDenied({ userId, plannedWorkoutId: manualWorkoutId });
 
@@ -1005,6 +1006,20 @@ async function provePlannedProjectionLifecycle(userId: string) {
   assert.equal(defaultSkipped.status, "skipped");
   assert.equal(defaultSkipped.log, null);
   assert.equal(defaultSkipped.feedbackMarker, null);
+
+  const fitOnly = await ingestGarminWorkoutResult({
+    userId,
+    plannedWorkoutId: fitOnlyWorkoutId,
+    file: new File([Buffer.concat([fixture, Buffer.from([0])])], "fit-only.fit", {
+      type: "application/octet-stream",
+    }),
+  });
+  assert.equal(fitOnly.ok, true);
+  const fitOnlyCompleted = await readSnapshotWorkout(userId, fitOnlyWorkoutId);
+  assert.equal(fitOnlyCompleted.status, "completed");
+  assert.equal(fitOnlyCompleted.completionOrigin, "fit_activity");
+  assert.equal(fitOnlyCompleted.log, null, "FIT completion must not synthesize a workout log.");
+  assert.equal(fitOnlyCompleted.feedbackMarker?.state, "feedback_ready");
 
   await saveProofWorkoutLog({
     userId,
@@ -1031,6 +1046,7 @@ async function provePlannedProjectionLifecycle(userId: string) {
 
   const fitCompleted = await readSnapshotWorkout(userId, firstWorkoutId);
   assert.equal(fitCompleted.status, "completed");
+  assert.equal(fitCompleted.completionOrigin, "fit_activity");
   assert.equal(fitCompleted.log?.outcome, "completed");
   assert.equal(fitCompleted.log?.actualDistanceKm, null);
   assert.equal(fitCompleted.log?.actualDurationMin, null);
@@ -1052,8 +1068,8 @@ async function provePlannedProjectionLifecycle(userId: string) {
   });
   assert.equal(duplicate.runnerActivity.id, first.runnerActivity.id);
   const countsAfterDuplicate = await getQaUserOwnedCounts(supabase, userId);
-  assert.equal(countsAfterDuplicate.runner_activities, 1);
-  assert.equal(countsAfterDuplicate.workout_actual_metrics, 1);
+  assert.equal(countsAfterDuplicate.runner_activities, 2);
+  assert.equal(countsAfterDuplicate.workout_actual_metrics, 2);
 
   const completedAfterRetry = await readSnapshotWorkout(userId, firstWorkoutId);
   assert.equal(completedAfterRetry.status, "completed");
@@ -1098,6 +1114,7 @@ async function provePlannedProjectionLifecycle(userId: string) {
 
   const explicitPartial = await readSnapshotWorkout(userId, firstWorkoutId);
   assert.equal(explicitPartial.status, "partial");
+  assert.equal(explicitPartial.completionOrigin, "fit_activity");
   assert.equal(explicitPartial.log?.outcome, "partial");
   assert.equal(explicitPartial.log?.rpe, 8);
   assert.equal(explicitPartial.log?.actualDistanceKm, null);
@@ -1113,8 +1130,8 @@ async function provePlannedProjectionLifecycle(userId: string) {
       error instanceof Error && "code" in error && error.code === "activity_already_recorded",
   );
   const countsAfterCrossPlanRefusal = await getQaUserOwnedCounts(supabase, userId);
-  assert.equal(countsAfterCrossPlanRefusal.workout_result_assets, 1);
-  assert.equal(countsAfterCrossPlanRefusal.workout_actual_metrics, 1);
+  assert.equal(countsAfterCrossPlanRefusal.workout_result_assets, 2);
+  assert.equal(countsAfterCrossPlanRefusal.workout_actual_metrics, 2);
 
   const removed = await removeWorkoutResultEvidence({ userId, plannedWorkoutId: firstWorkoutId });
   assert.equal(removed.latestAsset?.rawFileAvailable, false);
@@ -1123,6 +1140,7 @@ async function provePlannedProjectionLifecycle(userId: string) {
   assert.equal(removed.latestComparison?.id, first.latestComparison?.id);
   const afterRawRemoval = await readSnapshotWorkout(userId, firstWorkoutId);
   assert.equal(afterRawRemoval.status, "partial");
+  assert.equal(afterRawRemoval.completionOrigin, "fit_activity");
   assert.equal(afterRawRemoval.feedbackMarker?.state, "feedback_ready");
   const comparisonVersion = await supabase
     .from("workout_comparisons")
@@ -1175,6 +1193,7 @@ async function provePlannedProjectionLifecycle(userId: string) {
   await deleteRunnerActivityFromHistory({ userId, activityId: first.runnerActivity.id });
   const afterActivityDeletion = await readSnapshotWorkout(userId, firstWorkoutId);
   assert.equal(afterActivityDeletion.status, "partial");
+  assert.equal(afterActivityDeletion.completionOrigin, undefined);
   assert.equal(afterActivityDeletion.log?.outcome, "partial");
   assert.equal(afterActivityDeletion.feedbackMarker, null);
 }
@@ -1312,11 +1331,12 @@ function proofBodyNote(area: "L. Calf" | "R. Knee", timing: "during" | "after") 
   };
 }
 
-async function createProofWorkouts(userId: string): Promise<[string, string, string]> {
+async function createProofWorkouts(userId: string): Promise<[string, string, string, string]> {
   const planCycleId = randomUUID();
   const firstWorkoutId = randomUUID();
   const secondWorkoutId = randomUUID();
   const thirdWorkoutId = randomUUID();
+  const fourthWorkoutId = randomUUID();
   const profile = await supabase
     .from("runner_profiles")
     .upsert({ user_id: userId }, { onConflict: "user_id" });
@@ -1329,7 +1349,7 @@ async function createProofWorkouts(userId: string): Promise<[string, string, str
     goal_summary: "Local activity proof",
     source_template: "qa_activity_foundation",
     start_date: "2026-08-01",
-    end_date: "2026-08-02",
+    end_date: "2026-08-04",
   });
   if (plan.error) throw new Error(plan.error.message);
   const workouts = await supabase
@@ -1338,9 +1358,10 @@ async function createProofWorkouts(userId: string): Promise<[string, string, str
       proofWorkoutRow(firstWorkoutId, planCycleId, userId, "2026-08-01", 0),
       proofWorkoutRow(secondWorkoutId, planCycleId, userId, "2026-08-02", 1),
       proofWorkoutRow(thirdWorkoutId, planCycleId, userId, "2026-08-03", 2),
+      proofWorkoutRow(fourthWorkoutId, planCycleId, userId, "2026-08-04", 3),
     ]);
   if (workouts.error) throw new Error(workouts.error.message);
-  return [firstWorkoutId, secondWorkoutId, thirdWorkoutId];
+  return [firstWorkoutId, secondWorkoutId, thirdWorkoutId, fourthWorkoutId];
 }
 
 async function insertLegacyProjectionAsset(input: {

@@ -172,16 +172,16 @@ function semanticColorGroup(id: string) {
 
 const TYPOGRAPHY_FAMILIES = [
   {
-    family: "Display",
-    font: "Fraunces",
-    roles: "display title, page title",
-    rule: "Use for scarce editorial moments and route-level identity.",
+    family: "UI titles",
+    font: "Poppins",
+    roles: "UI page, modal, section, and panel titles",
+    rule: "Use throughout the authenticated product; each role preserves the established title line box.",
   },
   {
-    family: "Title",
+    family: "Editorial titles",
     font: "Fraunces",
-    roles: "modal, section, and panel titles",
-    rule: "Use to orient product surfaces without inventing route-local serif sizes.",
+    roles: "editorial display, page, modal, section, and panel titles",
+    rule: "Use only for source-backed marketing/editorial presentation and migration compatibility.",
   },
   {
     family: "Body",
@@ -403,8 +403,22 @@ export function HitoDsFoundationsPage() {
               <p className="hito-label">Alpha overlay surface</p>
               <h3 className="hito-panel-title mt-3">Translucent only in atmospheric shells.</h3>
               <p className="hito-body-small mt-3 text-muted-foreground">
-                Alpha surfaces belong on auth/photo or launcher canvases. Use standard solid Hito
-                surfaces for normal forms, menus, inputs, and tables.
+                Alpha overlays belong on auth/photo or launcher canvases. The quiet surface below is
+                a separate functional chrome recipe, not an atmospheric overlay.
+              </p>
+            </article>
+
+            <article
+              className="hito-surface-quiet grid min-h-48 content-between gap-5 p-5"
+              data-hito-ds-pattern="quiet-surface"
+            >
+              <div>
+                <p className="hito-label">Quiet surface</p>
+                <h3 className="hito-ui-panel-title mt-3">Low-chrome functional grouping.</h3>
+              </div>
+              <p className="hito-body-small text-muted-foreground">
+                Token-derived translucent chrome without a visible border, gradient, or shadow.
+                Interactive consumers keep the same visible focus contract.
               </p>
             </article>
           </div>
@@ -412,8 +426,8 @@ export function HitoDsFoundationsPage() {
           <div className="hito-reference-list">
             <ReferenceListRow
               label="Allowed"
-              title="Five roles only"
-              body="Canvas atmosphere, auth/photo overlay, elevated launch surface, state-surface wash, and editorial signal wash are the allowed gradient/overlay roles."
+              title="Five atmospheric roles only"
+              body="Canvas atmosphere, auth/photo overlay, elevated launch surface, state-surface wash, and editorial signal wash are the allowed gradient/overlay roles. Quiet surface is functional chrome, not a sixth atmospheric recipe."
             />
             <ReferenceListRow
               label="Not default"

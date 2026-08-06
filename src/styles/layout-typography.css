@@ -172,6 +172,19 @@
     font-family: var(--font-display);
     font-size: clamp(3rem, 6vw, 4.5rem);
     font-feature-settings: "ss01";
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    text-wrap: balance;
+  }
+
+  .hito-ui-page-title {
+    --hito-typography-role: ui-page-title;
+    margin-top: 0.5rem;
+    max-width: 44rem;
+    font-family: var(--font-sans);
+    font-size: clamp(3rem, 6vw, 4.5rem);
+    font-weight: 400;
     letter-spacing: -0.02em;
     line-height: 1;
     text-wrap: balance;
@@ -189,11 +202,33 @@
     text-wrap: balance;
   }
 
+  .hito-ui-modal-title {
+    --hito-typography-role: ui-modal-title;
+    font-family: var(--font-sans);
+    font-size: clamp(1.75rem, 5vw, 2rem);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--color-foreground);
+    text-wrap: balance;
+  }
+
   .hito-panel-title {
     --hito-typography-role: panel-title;
     font-family: var(--font-display);
     font-size: clamp(1.25rem, 3vw, 1.375rem);
     font-feature-settings: "ss01";
+    font-weight: 400;
+    letter-spacing: -0.015em;
+    line-height: 1.18;
+    color: var(--color-foreground);
+    text-wrap: balance;
+  }
+
+  .hito-ui-panel-title {
+    --hito-typography-role: ui-panel-title;
+    font-family: var(--font-sans);
+    font-size: clamp(1.25rem, 3vw, 1.375rem);
     font-weight: 400;
     letter-spacing: -0.015em;
     line-height: 1.18;
@@ -224,6 +259,17 @@
     font-family: var(--font-display);
     font-size: 1.5rem;
     font-feature-settings: "ss01";
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    color: var(--color-foreground);
+  }
+
+  .hito-ui-section-title {
+    --hito-typography-role: ui-section-title;
+    font-family: var(--font-sans);
+    font-size: 1.5rem;
+    font-weight: 400;
     letter-spacing: -0.02em;
     line-height: 1.15;
     color: var(--color-foreground);

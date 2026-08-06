@@ -144,30 +144,14 @@
     width: 100%;
     align-items: center;
     gap: 0.75rem;
-    border: 1px solid var(--color-hairline);
-    border-radius: var(--radius-xl);
-    background: color-mix(in oklch, var(--color-background) 48%, transparent);
     padding: 0.75rem;
     cursor: pointer;
     text-align: left;
-    transition:
-      background-color 160ms ease,
-      border-color 160ms ease;
   }
 
   .hito-shell-profile-trigger:disabled,
   .hito-shell-profile-trigger[aria-disabled="true"] {
     cursor: not-allowed;
-  }
-
-  .hito-shell-profile-trigger:hover {
-    border-color: color-mix(in oklch, var(--color-foreground) 14%, transparent);
-    background: color-mix(in oklch, var(--color-foreground) 6%, transparent);
-  }
-
-  .hito-shell-profile-trigger:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 18%, transparent);
   }
 
   .hito-admin-account-trigger[data-variant="compact"] {

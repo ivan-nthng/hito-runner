@@ -559,6 +559,7 @@ export function LocalUiInspector() {
             position: panel.position,
             targetRect: panel.kind === "composer" ? panel.target.rect : null,
           }}
+          viewportContained={panel.kind === "review"}
         >
           {panel.kind === "composer" ? (
             <LocalUiTaskDraftPanel

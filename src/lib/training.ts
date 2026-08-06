@@ -95,6 +95,8 @@ export interface Workout {
   steps: Step[];
   feedbackMarker: WorkoutFeedbackMarkerSummary | null;
   sourceEditing: ActivePlanWorkoutSourceEditingCapabilities | null;
+  /** Persisted activity evidence projected by the canonical workout read model. */
+  completionOrigin?: "fit_activity";
   status: Status;
   log: WorkoutLog | null;
 }

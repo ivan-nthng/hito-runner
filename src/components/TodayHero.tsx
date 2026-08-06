@@ -32,7 +32,11 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
     findWorkout(weekOf(snapshot.workouts, snapshot.currentDate), snapshot.currentDate);
   if (!workout) return null;
 
-  const feedbackMeta = feedbackMarkerMeta(workout.feedbackMarker);
+  const feedbackMeta =
+    workout.completionOrigin === "fit_activity" &&
+    workout.feedbackMarker?.state === "feedback_ready"
+      ? feedbackMarkerMeta(workout.feedbackMarker)
+      : null;
   const meta = workoutTypeMeta(workout);
   const isRestDay = workout.type === "rest";
   const km = workoutDistanceKm(workout);
@@ -64,7 +68,9 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
   const workoutSupportText = isRestDay
     ? "Keep the day light unless a small recovery assignment is actually planned."
     : (workout.notes?.trim() ?? "Open the workout for segment-by-segment instructions.");
-  const resultActionLabel = workout.log ? "View result" : "Mark complete";
+  const hasResult =
+    workout.status === "completed" || workout.status === "partial" || Boolean(workout.log);
+  const resultActionLabel = hasResult ? "View result" : "Mark complete";
 
   return (
     <section className="pt-1 lg:pt-2">
@@ -104,7 +110,7 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
                   params={{ date: snapshot.currentDate }}
                   search={{ tab: "complete" } as never}
                 >
-                  <Icon name={workout.log ? "check-circle" : "check"} size="xs" />
+                  <Icon name={hasResult ? "check-circle" : "check"} size="xs" />
                   {resultActionLabel}
                 </Link>
               </HitoButton>

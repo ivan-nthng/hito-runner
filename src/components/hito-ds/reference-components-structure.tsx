@@ -239,7 +239,11 @@ export function HitoDsComponentStructure() {
               </div>
             </div>
             <div className="grid min-w-0 gap-4">
-              <button type="button" className="hito-shell-profile-trigger min-w-0">
+              <button
+                type="button"
+                className="hito-surface-quiet hito-shell-profile-trigger min-w-0"
+                data-hito-ds-pattern="quiet-surface"
+              >
                 <span className="hito-shell-avatar-fallback h-9 w-9 rounded-full">
                   {shellContext === "runner" ? "IR" : "AD"}
                 </span>
@@ -311,7 +315,11 @@ export function HitoDsComponentStructure() {
                 duplicated page identity.
               </p>
               <div className="mt-4 grid min-w-0 gap-4 xl:grid-cols-2">
-                <button type="button" className="hito-shell-profile-trigger min-w-0">
+                <button
+                  type="button"
+                  className="hito-surface-quiet hito-shell-profile-trigger min-w-0"
+                  data-hito-ds-pattern="quiet-surface"
+                >
                   <span className="hito-shell-avatar-fallback h-9 w-9 rounded-full">IR</span>
                   <span className="min-w-0 flex-1">
                     <span className="hito-menu-text block truncate">Ivan</span>

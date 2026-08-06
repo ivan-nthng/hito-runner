@@ -85,12 +85,12 @@ function WorkoutPage() {
   const router = useRouter();
   const [activityFileDialogOpen, setActivityFileDialogOpen] = useState(false);
   const tab = search.tab as WorkoutDetailSearchTab;
-  const lifecycle = workout ? workoutDetailLifecycleFor(workout, snapshot, feedback) : "rest_day";
-  const surfaceModel = workoutDetailSurfaceModelFor(
-    lifecycle,
-    tab,
-    workout ? canOpenGarminFeedback(workout, snapshot) : false,
-  );
+  const hasFitCompletion = workout?.completionOrigin === "fit_activity";
+  const hasReviewFeedback = hasFitCompletion && hasWorkoutReviewReadback(feedback);
+  const lifecycle = workout
+    ? workoutDetailLifecycleFor(workout, snapshot, hasReviewFeedback)
+    : "rest_day";
+  const surfaceModel = workoutDetailSurfaceModelFor(lifecycle, tab, hasReviewFeedback);
   const workoutTabs = useHitoTabs({
     items: surfaceModel.tabs.map((item) => ({ value: item.id })),
     value: surfaceModel.activeSurface,
@@ -313,11 +313,17 @@ function WorkoutPage() {
           <aside>
             <SidebarPanel>
               {resultMeta && (
-                <SidebarSection title="Saved result">
+                <SidebarSection
+                  title={hasReviewFeedback || hasFitCompletion ? "Result" : "Saved result"}
+                >
                   <div className="flex items-center justify-between gap-3">
                     <ResultBadge meta={resultMeta} mode="sidebar" />
                     <span className="text-xs text-muted-foreground">
-                      {snapshot.source === "persisted" ? "Saved" : "Preview"}
+                      {hasFitCompletion
+                        ? "Activity file"
+                        : snapshot.source === "persisted"
+                          ? "Saved"
+                          : "Preview"}
                     </span>
                   </div>
                 </SidebarSection>
@@ -528,13 +534,13 @@ type WorkoutDetailSearchTab = "overview" | "complete" | "feedback" | "preview";
 function workoutDetailLifecycleFor(
   workout: Workout,
   snapshot: TrainingSnapshot,
-  feedback: WorkoutResultFeedbackSummary | null,
+  hasReviewFeedback: boolean,
 ): WorkoutDetailLifecycleState {
   if (workout.type === "rest") {
     return "rest_day";
   }
 
-  if (hasWorkoutEvidence(workout, feedback)) {
+  if (hasReviewFeedback) {
     return "completed_with_evidence";
   }
 
@@ -558,38 +564,29 @@ function workoutDetailLifecycleFor(
   return "past_unlogged";
 }
 
-function hasWorkoutEvidence(
-  workout: Workout,
-  feedback: WorkoutResultFeedbackSummary | null,
-): boolean {
-  const markerState = feedback?.marker?.state ?? workout.feedbackMarker?.state ?? null;
-
-  return Boolean(
-    markerState === "evidence_attached" ||
-    markerState === "feedback_ready" ||
-    feedback?.latestAsset ||
-    feedback?.latestActualMetrics ||
-    feedback?.latestComparison ||
-    feedback?.latestAiInsight,
-  );
+function hasWorkoutReviewReadback(feedback: WorkoutResultFeedbackSummary | null): boolean {
+  return Boolean(feedback?.latestActualMetrics && feedback?.latestComparison);
 }
 
 function workoutDetailSurfaceModelFor(
   lifecycle: WorkoutDetailLifecycleState,
   requestedTab: WorkoutDetailSearchTab,
-  canOpenFeedback: boolean,
+  hasReviewFeedback: boolean,
 ): {
   activeSurface: WorkoutDetailSurface;
   tabs: Array<{ id: WorkoutDetailSurface; label: string }>;
 } {
   if (lifecycle === "completed_with_evidence" || lifecycle === "completed_with_manual_result") {
-    const tabs = [
+    const tabs: Array<{ id: WorkoutDetailSurface; label: string }> = [
       { id: "complete", label: "Result" },
-      { id: "feedback", label: "Feedback" },
-    ] satisfies Array<{ id: WorkoutDetailSurface; label: string }>;
+    ];
+
+    if (hasReviewFeedback) {
+      tabs.push({ id: "feedback", label: "Feedback" });
+    }
 
     return {
-      activeSurface: requestedTab === "feedback" ? "feedback" : "complete",
+      activeSurface: requestedTab === "feedback" && hasReviewFeedback ? "feedback" : "complete",
       tabs,
     };
   }
@@ -601,7 +598,7 @@ function workoutDetailSurfaceModelFor(
   if (lifecycle === "today_planned" || lifecycle === "past_unlogged") {
     return {
       activeSurface:
-        requestedTab === "feedback" && canOpenFeedback
+        requestedTab === "feedback" && hasReviewFeedback
           ? "feedback"
           : requestedTab === "complete"
             ? "complete"

@@ -16,6 +16,7 @@ export function LocalUiInspectorSurface({
   onInternalPointerEnd,
   onInternalPointerStart,
   placement,
+  viewportContained = false,
 }: {
   ariaLabel: string;
   children: ReactNode;
@@ -23,6 +24,7 @@ export function LocalUiInspectorSurface({
   onInternalPointerEnd: () => void;
   onInternalPointerStart: () => void;
   placement: LocalUiInspectorSurfacePlacement;
+  viewportContained?: boolean;
 }) {
   const narrow = useNarrowViewport();
 
@@ -68,6 +70,7 @@ export function LocalUiInspectorSurface({
       onInternalPointerEnd={onInternalPointerEnd}
       onInternalPointerStart={onInternalPointerStart}
       placement={placement}
+      viewportContained={viewportContained}
     >
       {children}
     </LocalUiInspectorDesktopPanel>
@@ -80,12 +83,14 @@ function LocalUiInspectorDesktopPanel({
   onInternalPointerEnd,
   onInternalPointerStart,
   placement,
+  viewportContained,
 }: {
   ariaLabel: string;
   children: ReactNode;
   onInternalPointerEnd: () => void;
   onInternalPointerStart: () => void;
   placement: LocalUiInspectorSurfacePlacement;
+  viewportContained: boolean;
 }) {
   const panelRef = useRef<HTMLElement | null>(null);
   const [clampedPosition, setClampedPosition] = useState(placement.position);
@@ -138,7 +143,11 @@ function LocalUiInspectorDesktopPanel({
       ref={panelRef}
       data-local-ui-task-panel=""
       data-local-ui-inspector-layer=""
-      className="fixed z-[91] grid max-h-[calc(100vh-2rem)] w-[min(22rem,calc(100vw-1.25rem))] gap-3 overflow-y-auto rounded-xl border border-hairline bg-background p-3 text-left shadow-soft"
+      className={`fixed z-[91] grid w-[min(22rem,calc(100vw-1.25rem))] rounded-xl border border-hairline bg-background p-3 text-left shadow-soft ${
+        viewportContained
+          ? "h-[min(34rem,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] grid-rows-[minmax(0,1fr)] overflow-hidden"
+          : "max-h-[calc(100vh-2rem)] gap-3 overflow-y-auto"
+      }`}
       style={{ left: clampedPosition.x, top: clampedPosition.y }}
       aria-label={ariaLabel}
       onClick={stopInspectorSurfaceEvent}

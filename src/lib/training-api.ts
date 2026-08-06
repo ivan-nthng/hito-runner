@@ -603,6 +603,7 @@ function dbWorkoutToView(
     steps,
     feedbackMarker,
     sourceEditing,
+    completionOrigin: hasFitCompletion ? "fit_activity" : undefined,
     log: mappedLog,
     status: inferWorkoutStatus(
       workout.workout_type,

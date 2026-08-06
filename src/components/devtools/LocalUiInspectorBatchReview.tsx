@@ -114,7 +114,7 @@ export function LocalUiInspectorBatchReview({
 
   return (
     <div
-      className="grid min-h-0 min-w-0 gap-3 max-md:h-full max-md:grid-rows-[auto_minmax(0,1fr)_auto]"
+      className="grid h-full min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-3"
       aria-labelledby={titleId}
     >
       <div className="relative min-w-0 pr-8" data-local-ui-inspector-header="">
@@ -145,11 +145,11 @@ export function LocalUiInspectorBatchReview({
       </div>
 
       <div
-        className="grid min-w-0 gap-3 max-md:min-h-0 max-md:auto-rows-max max-md:overflow-y-auto max-md:overscroll-contain max-md:pr-1"
+        className="grid min-h-0 min-w-0 auto-rows-max gap-3 overflow-y-auto overscroll-contain pr-1"
         data-local-ui-inspector-scroll-body=""
       >
         <ol
-          className="hito-row-group min-w-0"
+          className="min-w-0 border-y border-hairline"
           aria-label="Local Inspector draft items"
           data-hito-ds-pattern="row-group"
         >

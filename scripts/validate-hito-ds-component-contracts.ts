@@ -20,12 +20,16 @@ import {
   WORKOUT_LIBRARY_CANONICAL_IDENTITY_COUNT,
   WORKOUT_LIBRARY_IDENTITY_COUNT,
 } from "../src/components/hito-ds/workout-library-playground-data";
+import { HITO_TYPOGRAPHY_ROLES } from "../src/lib/hito-typography-roles";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const controlsCssPath = path.join(rootDir, "src/styles/controls-lists.css");
 const fieldBaseCssPath = path.join(rootDir, "src/styles/controls-fields.css");
 const fieldsCssPath = path.join(rootDir, "src/styles/forms-onboarding.css");
 const foundationsCssPath = path.join(rootDir, "src/styles/foundations.css");
+const typographyCssPath = path.join(rootDir, "src/styles/layout-typography.css");
+const referenceWorkbenchCssPath = path.join(rootDir, "src/styles/reference-workbench.css");
+const shellCssPath = path.join(rootDir, "src/styles/shell-admin-analytics.css");
 const generatedManifestPath = path.join(rootDir, "src/generated/hito-ds-manifest.json");
 const retiredFoundationProofPath = path.join(
   rootDir,
@@ -165,7 +169,11 @@ type GeneratedManifest = {
     [key: string]: unknown;
   };
   sourceDigest?: string;
-  textStyles: unknown[];
+  textStyles: Array<{
+    className: string;
+    id: string;
+    properties: Record<string, string>;
+  }>;
 };
 
 const errors: string[] = [];
@@ -214,6 +222,19 @@ function escapeRegExp(value: string) {
 function declaresSelector(css: string, selector: string) {
   const escaped = escapeRegExp(selector);
   return new RegExp(`^\\s*${escaped}(?=\\s|\\{|,|:)`, "m").test(css);
+}
+
+function selectorDeclarations(css: string, selector: string) {
+  const escaped = escapeRegExp(selector);
+  const match = css.match(new RegExp(`^\\s*${escaped}\\s*\\{([^}]*)\\}`, "m"));
+  if (!match) return null;
+
+  return Object.fromEntries(
+    [...match[1].matchAll(/([a-z-]+)\s*:\s*([^;]+);/gi)].map((declaration) => [
+      declaration[1],
+      declaration[2].replace(/\s+/g, " ").trim(),
+    ]),
+  );
 }
 
 function validateCssSelectors(css: string, family: string, values: readonly string[]) {
@@ -525,6 +546,9 @@ const controlsCss = await readFile(controlsCssPath, "utf8");
 const fieldBaseCss = await readFile(fieldBaseCssPath, "utf8");
 const fieldExtendedCss = await readFile(fieldsCssPath, "utf8");
 const foundationsCss = await readFile(foundationsCssPath, "utf8");
+const typographyCss = await readFile(typographyCssPath, "utf8");
+const referenceWorkbenchCss = await readFile(referenceWorkbenchCssPath, "utf8");
+const shellCss = await readFile(shellCssPath, "utf8");
 const generatedManifest = JSON.parse(
   await readFile(generatedManifestPath, "utf8"),
 ) as GeneratedManifest;
@@ -540,6 +564,83 @@ const currentReferenceDocs = await Promise.all(
 const hitoDsRoute = sourceFiles.find((file) => file.relativePath === "src/routes/hitoDS.tsx");
 const hubRoute = sourceFiles.find((file) => file.relativePath === "src/routes/hub.tsx");
 const showcaseBoundaryLeaks = showcaseBoundaryLeakFindings(sourceFiles);
+const uiTitleRoles = HITO_TYPOGRAPHY_ROLES.filter((role) => role.group === "ui-title");
+const editorialTitleRoles = HITO_TYPOGRAPHY_ROLES.filter((role) => role.group === "display");
+const typographyRolesById = new Map(HITO_TYPOGRAPHY_ROLES.map((role) => [role.id, role]));
+const titleLineBoxProperties = [
+  "font-size",
+  "font-weight",
+  "letter-spacing",
+  "line-height",
+  "text-wrap",
+] as const;
+
+expect(
+  uiTitleRoles.length === 4,
+  `Expected four canonical UI title roles, found ${uiTitleRoles.length}.`,
+);
+expect(
+  editorialTitleRoles.length === 5,
+  `Expected five retained editorial title roles, found ${editorialTitleRoles.length}.`,
+);
+expect(
+  HITO_TYPOGRAPHY_ROLES.filter((role) => role.inspectorSelectable !== false).length === 18,
+  "The Local Inspector must preserve its existing roles and add the four source-backed UI titles.",
+);
+uiTitleRoles.forEach((uiRole) => {
+  const editorialRoleId = uiRole.id.replace(/^ui-/, "");
+  const editorialRole = typographyRolesById.get(editorialRoleId);
+  const uiDeclarations = selectorDeclarations(typographyCss, `.${uiRole.className}`);
+  const editorialDeclarations = editorialRole
+    ? selectorDeclarations(typographyCss, `.${editorialRole.className}`)
+    : null;
+
+  expect(editorialRole?.group === "display", `${uiRole.id} is missing its editorial counterpart.`);
+  expect(
+    uiRole.inspectorSelectable !== false && editorialRole?.inspectorSelectable !== false,
+    `${uiRole.id} and ${editorialRoleId} must remain available for their distinct UI/editorial contexts.`,
+  );
+  expect(uiDeclarations !== null, `Missing CSS owner for ${uiRole.className}.`);
+  expect(editorialDeclarations !== null, `Missing CSS owner for ${editorialRole?.className}.`);
+  expect(
+    uiDeclarations?.["--hito-typography-role"] === uiRole.id,
+    `${uiRole.className} is missing truthful typography provenance.`,
+  );
+  expect(
+    uiDeclarations?.["font-family"] === "var(--font-sans)",
+    `${uiRole.className} must resolve through the canonical sans primitive.`,
+  );
+  expect(
+    editorialDeclarations?.["font-family"] === "var(--font-display)",
+    `${editorialRole?.className} must remain explicitly editorial serif.`,
+  );
+  titleLineBoxProperties.forEach((property) => {
+    expect(
+      (uiDeclarations?.[property] ?? null) === (editorialDeclarations?.[property] ?? null),
+      `${uiRole.className} drifted from ${editorialRole?.className} ${property}.`,
+    );
+  });
+});
+
+const shellProfileDeclarations = selectorDeclarations(shellCss, ".hito-shell-profile-trigger");
+expect(
+  referenceWorkbenchCss.includes(".hito-surface-quiet,\n  .hito-shell-profile-trigger {") &&
+    referenceWorkbenchCss.includes("var(--color-surface)") &&
+    referenceWorkbenchCss.includes("var(--color-surface-elevated)") &&
+    referenceWorkbenchCss.includes("border-radius: var(--radius-xl)") &&
+    referenceWorkbenchCss.includes(
+      '.hito-shell-profile-trigger:not(:disabled):not([aria-disabled="true"]):hover',
+    ) &&
+    referenceWorkbenchCss.includes("box-shadow: 0 0 0 2px var(--color-ring)"),
+  "Quiet surface and shell profile chrome must share one token-derived visual owner.",
+);
+expect(
+  shellProfileDeclarations?.border === undefined &&
+    shellProfileDeclarations?.["border-radius"] === undefined &&
+    shellProfileDeclarations?.background === undefined &&
+    shellProfileDeclarations?.["box-shadow"] === undefined,
+  "Shell profile chrome was duplicated outside the shared quiet-surface owner.",
+);
 
 expect(
   hitoDsRoute?.content.includes("Public interactive Hito design-system reference and sandbox") ===
@@ -650,6 +751,9 @@ const lightPaletteReference = sourceFiles.find(
 );
 const referenceMetadata = sourceFiles.find(
   (file) => file.relativePath === "src/components/hito-ds/reference-metadata.ts",
+);
+const referenceStructure = sourceFiles.find(
+  (file) => file.relativePath === "src/components/hito-ds/reference-components-structure.tsx",
 );
 const buttonSource = sourceFiles.find(
   (file) => file.relativePath === "src/components/ui/button.tsx",
@@ -787,8 +891,22 @@ expect(
   "Workout-domain colors leaked into the shared foundation manifest.",
 );
 expect(
-  generatedManifest.textStyles.length === 14,
-  `Expected 14 reusable text styles, received ${generatedManifest.textStyles.length}.`,
+  generatedManifest.textStyles.length === 18,
+  `Expected 18 reusable text styles, received ${generatedManifest.textStyles.length}.`,
+);
+uiTitleRoles.forEach((role) => {
+  const manifestRole = generatedManifest.textStyles.find((textStyle) => textStyle.id === role.id);
+  expect(
+    manifestRole?.className === role.className &&
+      manifestRole.properties["font-family"] === "var(--font-sans)",
+    `Generated manifest is missing canonical UI title ${role.id}.`,
+  );
+});
+expect(
+  foundationsPage?.content.includes("hito-surface-quiet") === true &&
+    foundationsPage.content.includes("hito-ui-panel-title") &&
+    foundationsPage.content.includes('data-hito-ds-pattern="quiet-surface"'),
+  "Foundations must show the canonical quiet surface with real UI typography.",
 );
 expect(
   generatedManifest.sourceDigest?.startsWith("sha256:") === true,
@@ -809,6 +927,18 @@ expect(
   referenceMetadata?.content.includes("HITO_BUTTON_SIZES") === true &&
     referenceMetadata.content.includes("HITO_BUTTON_VARIANTS"),
   "Inspector reference metadata must consume the central Button contract.",
+);
+expect(
+  referenceMetadata?.content.includes('id: "quiet-surface"') === true &&
+    referenceMetadata.content.includes('referencePath: "/hitoDS/foundations#gradient-overlays"') &&
+    referenceMetadata.content.includes('sourcePath: "src/styles/reference-workbench.css"'),
+  "Inspector reference metadata must resolve the canonical quiet-surface owner.",
+);
+expect(
+  (referenceStructure?.content.match(/data-hito-ds-pattern="quiet-surface"/g) ?? []).length === 2 &&
+    (referenceStructure?.content.match(/hito-surface-quiet hito-shell-profile-trigger/g) ?? [])
+      .length === 2,
+  "The shell playground must expose two interactive quiet-surface consumers with ownership markers.",
 );
 expect(
   buttonSource?.content.includes("export { Button, HitoButton, buttonVariants }") === true,
@@ -972,6 +1102,7 @@ if (errors.length > 0) {
       retiredSelectors: retiredFoundationSelectors.length,
       retiredTokens: retiredFoundationTokens.length,
       textStyles: generatedManifest.textStyles.length,
+      uiTitleRoles: uiTitleRoles.length,
     },
     reference: {
       currentDocs: currentReferenceDocs.length,

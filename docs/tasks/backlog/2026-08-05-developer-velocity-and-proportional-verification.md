@@ -6,7 +6,7 @@
 
 ## Status
 
-ready
+backlog
 
 ## Type
 
@@ -18,11 +18,11 @@ high
 
 ## Owner
 
-architect
+product
 
 ## Scope
 
-developer-experience-and-delivery-safety
+scripts-validators-qa-infrastructure
 
 ## Batch
 
@@ -34,162 +34,141 @@ retain_in_place
 
 ## Task
 
-Make ordinary Hito changes fast to navigate, implement, and verify without weakening the higher
-assurance required for persistence, auth, provider, FIT, schema, or cross-owner lifecycle changes.
-The target is not a cosmetic line-count reduction. It is one smaller ownership map, one
-proportionate verification model, and one stable local feedback loop so a bounded visual change does
-not require reconstructing the whole repository or performing a release-sized validation ceremony.
+Make ordinary Hito changes fast to navigate and verify without weakening persistence, auth,
+provider, FIT, schema, browser, or release evidence. Reuse the existing functional map, Vite,
+managed QA runtime, validators, and `AGENTS.md` policy; do not introduce a second map, runtime, test
+framework, or process layer.
 
 ## Stage
 
 The [Hito Stack Complexity Reduction Program](2026-08-04-hito-stack-complexity-reduction-program.md)
-has closed Slices 8A-8H truthfully. This Architect-owned item is now ready for its first
-evidence-and-measurement slice; no Developer Velocity implementation has started. Blocked FIT
-Product presentation and other active owners remain separate and must not be interrupted or
-absorbed.
+is complete and remains closed. Backend Slice 1, Managed QA source freshness and phase timings,
+completed at `4568f04`; Architect Slice 2, Patch Pack and Fast Visual Lane policy, is complete.
+No real evidence-backed Product visual Pack is admitted today, so this parent is retained as
+`backlog` rather than falsely ready. The blocked FIT Product presentation and its native
+file-attachment gate remain separate and uncommitted.
 
 ## Next Recommended Role
 
-architect
+product
 
-## Exact Handoff Prompt
+## Historical Slice 2 Handoff
 
 ```text
 ROLE: ARCHITECT
 
 Task:
-Admit and plan the first evidence-backed Developer Velocity And Proportional Verification slice after
-the Hito Stack Complexity Reduction Program closes Slices 8A-8H truthfully.
+Implement Developer Velocity Slice 2: the canonical Patch Pack and Fast Visual Lane operating
+contract without creating another task system, runtime, or validation framework.
 
-Canonical backlog item:
-docs/tasks/backlog/2026-08-05-developer-velocity-and-proportional-verification.md
+Stage:
+ARCHITECT documentation and execution-policy implementation with independent review.
 
-Evidence before code:
-`docs/current-functional-map.md`, Vite HMR, the managed QA server, the Backend validation groups, and
-the global proportional evidence policy already exist. Their current setup and feedback costs have
-not been measured as one workflow. Reuse those owners; do not introduce another map, runtime, test
-framework, or policy layer.
+Canonical child:
+docs/tasks/backlog/2026-08-06-developer-velocity-patch-pack-fast-visual-lane.md
 
 Required outcome:
-- Refresh the existing functional map as the concise route/owner/verifier navigation surface.
-- Measure ownership lookup, direct HMR, targeted browser, managed-runtime rebuild, and release-check
-  cost before admitting any tooling change.
-- Reconcile the risk-class matrix in this item with the existing global evidence policy and commands;
-  delete duplicated guidance only with parity.
-- Name the first smallest owner-scoped implementation slice and its before/after measure.
+Use the existing functional map, managed QA lifecycle, direct Vite iteration, and AGENTS evidence
+policy to make one bounded same-owner visual adjustment pack executable without broad rediscovery or
+weaker acceptance evidence. Keep the first real Product pack unselected until an existing
+evidence-backed item qualifies.
 
 Boundaries:
-- Do not start while the parent cleanup remains active, interrupt another owner, reopen accepted
-  releases, or make Product, schema, provider, or deployment changes in this architecture task.
-- Preserve the distinction between focused visual verification and deeper lifecycle/security proof.
-- Do not recommend a framework migration or code deletion based only on file size.
+Do not change runtime, Product behavior, APIs, schemas, fixtures, providers, deployment, or the
+blocked FIT browser-evidence task. Preserve concurrent dirty work. Do not stage, commit, push,
+deploy, mutate hosted state, or call providers.
 
 Definition of Done:
-The first implementation slice is evidence-backed, owns one clear bottleneck, names its canonical
-owner, has a proportionate required test inventory, and leaves the user with one autonomous execution
-handoff rather than a chain of manual decisions.
+One canonical same-owner visual Pack convention selects narrow proof, fixture/context reuse, and
+escalation without another task registry or a weaker acceptance boundary. The first real Product
+pilot remains unselected until an existing evidence-backed item qualifies. Global QA Acceptance is
+not claimed.
 
 Approval policy:
-Routine local inspection, source analysis, and documentation validation proceed under standing
-authorization. Do not interrupt an active role, stage, commit, push, deploy, mutate hosted data, or
-call providers in this architecture task.
+Routine local inspection, documentation edits, independent review, and validation proceed under
+standing authorization. Do not request routine approval. Do not stage, commit, push, deploy, mutate
+hosted state, or call providers.
 ```
 
-## User Outcome
+## Root Cause And Current Measurements
 
-- A small runner-facing visual or spacing change has an obvious canonical owner and a short,
-  trustworthy feedback loop.
-- A low-risk UI change is checked at the actual affected surfaces and viewports, rather than being
-  delayed by unrelated database, provider, or release validation.
-- Risky changes retain their full persistence, security, runtime, and release proof. Fast work never
-  becomes an excuse to bypass evidence.
-- Agents can find the route, component, token/CSS owner, and appropriate verifier quickly without
-  rereading broad historical material.
+The demonstrated root cause is distributed navigation plus managed-runtime freshness ambiguity, not
+framework count and not Vite/HMR performance. `AGENTS.md` already owns risk-based evidence rules;
+package scripts already expose the needed validators.
 
-## Evidence
+| Measured loop                          | Current result                                                                                                                                                                                             | Architectural consequence                                                                                                                                      |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ownership/navigation before this slice | `current-functional-map.md`: 253 lines, 13 sections, four tables, stale 2026-07-21 status, zero references to the four canonical Product/DS/Backend/dev entrypoints; `/progress` required five source hops | Refresh the one existing map; do not create another registry                                                                                                   |
+| Ownership/navigation after this slice  | 94 lines, five sections, one route/owner/verifier table and one command legend                                                                                                                             | A normal lookup starts from one row and then confirms live reachability                                                                                        |
+| Approval wait                          | The earlier reported approximately 2,462-second first render included a user-facing approval wait                                                                                                          | Invalid performance evidence; excluded from every recommendation                                                                                               |
+| Direct Vite, two no-approval starts    | Ready in 1.122 seconds and 1.024 seconds                                                                                                                                                                   | Retain Vite; no dev-framework change is justified                                                                                                              |
+| First browser render without approval  | `/hitoDS/components`: 4.031 seconds on the first measured dependency-cache state and 0.275 seconds after restart with warm cache                                                                           | Observed cache-sensitive range, not a demonstrated major bottleneck                                                                                            |
+| Normal HMR without approval            | 1.251 seconds to module update; 1.429 seconds through CSS update                                                                                                                                           | Retain direct HMR for iteration                                                                                                                                |
+| Targeted built-browser proof           | 1.454-second navigation, 0.085-second DOM snapshot, 0.031-second exact heading assertion                                                                                                                   | Reuse the managed runtime for focused acceptance; response time is not the main delay                                                                          |
+| Focused source checks                  | file ESLint 1.24 seconds; Product contract 0.48 seconds; DS contract 0.27 seconds                                                                                                                          | Run the affected owner check, not unrelated global suites                                                                                                      |
+| Backend source group                   | 13 checks in 17.57 seconds                                                                                                                                                                                 | Use affected validator first; use the group for shared source boundaries                                                                                       |
+| Higher-risk group reach                | `B:DB` 16 checks, `B:RT` 15, `B:REL` 16 by read-only manifest listing                                                                                                                                      | Retain deeper groups only when the changed contract reaches them; no duration is claimed because DB/runtime/release groups were not executed in this docs task |
+| Managed build-to-ready evidence        | Artifact mtimes show a 55.486-second build-output lower bound; recorded finalized artifact to server start is 8.544 seconds                                                                                | One truthful reuse can avoid at least 64.030 seconds; stale reuse remains forbidden                                                                            |
+| Managed status                         | 0.33 seconds in the current checkout                                                                                                                                                                       | Source-aware freshness must stay at or below 1.0 second per run                                                                                                |
 
-The repository already has the correct building blocks, but they are not one discoverable delivery
-path:
-
-- `docs/current-functional-map.md` is the existing ownership/navigation owner; it is stale, but a new
-  map would be a competing truth.
-- `scripts/validate-backend.mjs` already separates source, local-DB, runtime, and release groups.
-- `npm run dev` already provides direct Vite HMR, while the managed built QA server remains the
-  acceptance/runtime owner. A new dev framework is unnecessary.
-- Frontend Product and Design System checks are spread across task prose and several proof roots;
-  ordinary presentation work therefore lacks a concise selection rule even though the global agent
-  policy already requires proportional validation.
-- Concurrent `AGENTS.md` and `scripts/finalize-build-output.mjs` changes are separate owners and must
-  settle before their guidance or lifecycle can be changed.
-
-This is an ownership and discoverability issue, not permission to skip evidence.
-
-## Root-Cause Direction
-
-The demonstrated cause is distributed navigation and verification selection around already-existing
-canonical owners. Runtime speed itself is not yet measured. The first implementation slice must
-measure setup, HMR, targeted browser, managed-runtime rebuild, and release-check cost before changing
-tooling; a source audit cannot turn an assumed performance gain into a contract.
-
-## Admitted Sequence
-
-1. **Refresh the existing navigation owner — Architect/docs.** Shorten and update
-   `docs/current-functional-map.md` after cleanup; link routes, Product/DS/Backend owners, and their
-   verifier class. Do not create another ownership map.
-2. **Reconcile one proportional matrix — Architect with role-policy owners.** Express the risk classes
-   below through the existing global evidence/DoD policy and existing commands. Remove duplicated
-   task prose only after parity; do not create a second validation framework.
-3. **Measure and stabilize the existing local loop — Backend/tooling with Frontend Product and Design
-   System consumer review.** Measure direct Vite HMR and targeted browser feedback versus managed
-   built-runtime acceptance. Admit a tooling change only when it removes measured contention or
-   repeated setup; retain a fresh production build for integration/release.
-4. **Adopt and measure — scoped owners.** Use the refreshed map and matrix on representative
-   Product-presentation, shared-DS, Backend-source, and persistence/FIT changes; compare setup and
-   feedback cost without weakening required evidence.
+The original build figures are filesystem/recorded lower bounds, not a direct end-to-end build timer.
+[Managed QA Source Freshness And Phase Timings](2026-08-06-managed-qa-source-freshness-and-phase-timings.md)
+now provides the direct phase-timing receipt for later optimization decisions.
 
 ## Proportional Verification Matrix
 
-| Change class                             | Required owner proof                                                                                                                                                   | Checks deliberately outside the ordinary slice                        |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Documentation only                       | Metadata/importer dry-run when backlog is affected, links, formatting, scoped diff                                                                                     | Product runtime, browser, DB, provider                                |
-| Product presentation                     | Owner/source reachability, file-scoped lint/type, HMR iteration, targeted browser states/viewports, independent QA; one production build before acceptance/integration | Backend DB/provider matrices unless the changed contract reaches them |
-| Shared Design System                     | DS contract validator, manifest check when applicable, representative Product and `/hitoDS` browser proof, independent DS QA                                           | Unrelated Backend persistence/provider checks                         |
-| Backend source contract                  | Affected validator first; full Backend source matrix only for shared/release boundaries                                                                                | Browser proof when no Product behavior or public response changes     |
-| Persistence, auth, FIT, schema, provider | Targeted source plus local DB/RLS/runtime evidence; provider/deployment proof only when reached                                                                        | No evidence downgrade for speed                                       |
-| Release integration                      | Exact manifest, fresh build/integrity, required integrated runtime/browser evidence, remote parity                                                                     | No unrelated global ceremony                                          |
+This table selects existing proof; it does not replace `AGENTS.md` Definition-of-Done, independent
+review, browser, or release policy.
 
-## Boundaries
+| Change class                                               | Required first proof                                                                                                                                                               | Proof retained only when reached                                                                            |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Documentation only                                         | `DOC`: backlog metadata/importer when applicable, links, Prettier, scoped diff                                                                                                     | No Product runtime, browser, DB, provider, or build                                                         |
+| Product presentation                                       | owner/source reachability, affected-file ESLint, Vite HMR iteration, targeted states/viewports, independent QA; `PC` when its contract changes                                     | One fresh build before browser-visible acceptance/integration; no Backend DB/provider matrix unless reached |
+| Shared Design System                                       | `DS`, representative Product and `/hitoDS` browser proof, independent DS QA                                                                                                        | Manifest parity only when its source/projection changes; no unrelated Backend matrix                        |
+| Backend/public contract without persisted-lifecycle change | affected leaf validator; `B:S` for a shared source boundary; exact consumer/route proof when public output changes                                                                 | Fresh managed runtime when transport/readback changes; DB/RLS only when data access is reached              |
+| Persistence, auth, FIT, schema, provider                   | targeted source plus `B:DB` / `B:RT`, readback, RLS/privacy, isolation, and cleanup appropriate to the contract                                                                    | Provider/deployment/schema parity only when reached; no evidence downgrade for speed                        |
+| Release integration                                        | exact manifest and remote parity; add `B:REL` or equivalent fresh build/integrity plus already-required browser/runtime evidence when the manifest reaches executable/build output | Documentation-only release uses `DOC`; no unrelated global ceremony                                         |
 
-- Do not start before the parent cleanup closes or interrupt the active FIT Product owner.
-- Do not create another framework, runtime, state manager, test framework, task tracker, or second
-  source of truth.
-- Do not downgrade RLS/privacy, persistence, auth, FIT, provider, schema, review/confirm, or release
-  checks to make them faster.
-- Do not require a full Backend matrix or deployment for a presentation-only change unless the
-  changed contract actually reaches those boundaries; retain one production build before
-  acceptance/integration.
-- Preserve Hito DS token ownership: visual values continue to derive from primitives and canonical
-  semantic/component tokens rather than route-local magic numbers.
+There is no standalone canonical `typecheck` command. Do not claim file-scoped TypeScript proof;
+current integration typing is exercised by the affected validator/import boundary and required build.
 
-## Required Evidence Before Each Implementation Slice
+## Architecture Slice Receipt
 
-- Measured current setup, feedback, and validation cost for the chosen change class.
-- Current consumer and owner reachability showing what can be consolidated or bypassed safely.
-- A concrete proof that the retained fast path covers the changed contract and that omitted checks are
-  outside that contract.
-- An independent reviewer for every behavior-changing implementation slice.
+- [Current functional map](../../current-functional-map.md) now owns concise route -> presentation
+  owner -> truth owner -> verifier navigation and current service-domain slugs.
+- Historical cleanup rules, future-feature inventories, supporting-plan lists, and duplicated
+  evidence policy were removed from that map; their canonical owners remain current docs, backlog,
+  `AGENTS.md`, history, and Git.
+- Direct Vite, the managed QA server, Backend validation groups, Product/DS validators, build
+  integrity, and the single application stack are retained.
+- No runtime, API, UI, CSS, schema, migration, package, fixture, provider, deployment, or hosted-data
+  behavior changed.
+- Admin presentation ownership remains an explicit Product/Architecture decision; Backend/Admin
+  tooling remains its truth owner. Historical Scope normalization is not invented in this slice.
 
-## Definition Of Done
+## Completed Slice 1: Managed QA Source Freshness And Phase Timings
 
-The repository has a compact, discoverable owner/navigation surface; agents can select a
-proportionate validation path from the changed contract; low-risk Product/DS changes have a stable
-local feedback loop; and risky Backend/lifecycle work keeps its existing stronger proof. Each adopted
-slice demonstrates a measured reduction in setup or feedback cost without creating a new process
-layer or weakening product truth. The work item records completed slices, retained constraints, and
-remaining owner boundaries truthfully.
+Backend/tooling completed the source-aware managed QA lifecycle in `4568f04`. Its canonical receipt,
+[Managed QA Source Freshness And Phase Timings](2026-08-06-managed-qa-source-freshness-and-phase-timings.md),
+records fail-closed executable-input freshness, 0.43-second unchanged artifact reuse, 0.25-0.27
+second status runs, direct phase timings, integrity/loopback preservation, and independent QA. Vite
+remains iteration-only; the managed built runtime remains browser/runtime acceptance.
 
-## Current Boundary
+## Completed Slice 2: Patch Pack And Fast Visual Lane
 
-The parent cleanup is complete. The next Architect task refreshes and measures existing owners before
-choosing one bounded tooling change; readiness is not permission for an automatic broad rewrite or
-for changing `current-functional-map.md` outside this successor item.
+[Developer Velocity Patch Pack And Fast Visual Lane](2026-08-06-developer-velocity-patch-pack-fast-visual-lane.md)
+completed the universal operating contract and the `AGENTS.md` policy update. It establishes
+same-owner visual batching, proof selection, fixture/context reuse, Design System and Backend/FIT
+escalation, and one final build/integrity boundary. The first real Product Pack remains unselected
+until an existing evidence-backed item meets the contract. Fresh build/integrity remains mandatory at
+the completed Pack boundary when its final changed contract reaches browser-visible
+acceptance/integration or executable release output.
+
+## Program Definition Of Done
+
+The repository has one compact route/owner/verifier surface; ordinary Product/DS work uses direct
+HMR and affected proof; risky work keeps its stronger lifecycle/security evidence; and managed
+runtime reuse is both faster and source-aware. Each implementation slice must demonstrate measured
+before/after improvement without a second process layer or weaker product truth.
+
+Global QA Acceptance is not claimed by this architecture slice.

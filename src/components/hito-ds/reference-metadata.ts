@@ -45,6 +45,14 @@ const RADIUS_CONTROL_IDS = [
 
 export const HITO_DS_REFERENCE_ENTRIES: HitoDsReferenceEntry[] = [
   {
+    anchor: "gradient-overlays",
+    id: "quiet-surface",
+    kind: "pattern",
+    label: "Quiet surface",
+    referencePath: "/hitoDS/foundations#gradient-overlays",
+    sourcePath: "src/styles/reference-workbench.css",
+  },
+  {
     anchor: "buttons",
     id: "button",
     kind: "component",

@@ -70,6 +70,7 @@ export function CompletionPanel({
   const plannedKm = workoutDistanceKm(workout) ?? 0;
   const plannedMin = workoutDuration(workout);
   const plannedRepeats = workout.steps.find((step) => step.repeats)?.repeats ?? 0;
+  const isFitCompleted = workout.completionOrigin === "fit_activity";
   const hasSavedLog = snapshot.source === "persisted" && Boolean(workout.log);
   const savedLogOutcome = workout.log?.outcome ?? null;
   const savedLogDistanceKm = workout.log?.actualDistanceKm ?? null;
@@ -142,7 +143,8 @@ export function CompletionPanel({
   const currentPayload = buildSavePayload(workout, form);
   const currentPayloadKey = useMemo(() => serializePayload(currentPayload), [currentPayload]);
   const isDirty = currentPayloadKey !== savedBaselineKey;
-  const hasSavedResult = hasSavedLog || optimisticSavedPayloadKey === savedBaselineKey;
+  const hasSavedResult =
+    isFitCompleted || hasSavedLog || optimisticSavedPayloadKey === savedBaselineKey;
 
   useEffect(() => {
     if (isDirty) {
@@ -165,8 +167,13 @@ export function CompletionPanel({
   const outcome = form.outcome;
   const weekStatus = WEEK_STATUS_META[snapshot.weekStatus];
   const isSkipped = outcome === "skipped";
-  const saveButtonLabel =
-    snapshot.source !== "persisted"
+  const saveButtonLabel = isFitCompleted
+    ? isSaving
+      ? "Saving feedback..."
+      : hasSavedLog && !isDirty
+        ? "Feedback saved"
+        : "Save feedback"
+    : snapshot.source !== "persisted"
       ? "Preview result"
       : isSaving
         ? "Saving result..."
@@ -217,41 +224,55 @@ export function CompletionPanel({
     <div className="space-y-8">
       <div
         className="hito-state-surface p-4"
-        data-tone={error ? "destructive" : message || hasSavedLog ? "success" : undefined}
+        data-tone={
+          error ? "destructive" : message || isFitCompleted || hasSavedLog ? "success" : undefined
+        }
       >
         <div className="hito-label">
           {isSaving
-            ? "Saving result"
+            ? isFitCompleted
+              ? "Saving feedback"
+              : "Saving result"
             : error
               ? "Couldn't save"
               : hasSavedResult && isDirty
                 ? "Unsaved changes"
                 : message
                   ? "Saved"
-                  : snapshot.source === "persisted"
-                    ? hasSavedResult
-                      ? "Saved result"
-                      : "Ready to save"
-                    : "Preview only"}
+                  : isFitCompleted
+                    ? form.outcome === "partial"
+                      ? "Partial result"
+                      : "Completed from activity file"
+                    : snapshot.source === "persisted"
+                      ? hasSavedResult
+                        ? "Saved result"
+                        : "Ready to save"
+                      : "Preview only"}
         </div>
         <p className="hito-body mt-2">
           {isSaving
-            ? `Saving your ${outcome} result now.`
+            ? isFitCompleted
+              ? "Saving your personal feedback now."
+              : `Saving your ${outcome} result now.`
             : error
               ? error
               : hasSavedResult && isDirty
                 ? `You changed this ${outcome} result. Save to update the workout and this week's status.`
                 : message
                   ? message
-                  : snapshot.source === "persisted"
-                    ? hasSavedResult
-                      ? `This workout already has a saved ${workout.log?.outcome ?? outcome} result. ${
-                          hasSavedLog && workout.log?.loggedAt
-                            ? `Last updated ${formatWorkoutFeedbackTimestamp(workout.log.loggedAt)}.`
-                            : "This result is already saved."
-                        }`
-                      : "Save this result to update the workout and this week's status."
-                    : "You can try the form here, but preview results are not saved."}
+                  : isFitCompleted
+                    ? form.outcome === "partial"
+                      ? "Your recorded activity remains attached. This partial result is your explicit correction."
+                      : "Your recorded activity completed this workout. Distance, duration, and intervals stay with the activity file."
+                    : snapshot.source === "persisted"
+                      ? hasSavedResult
+                        ? `This workout already has a saved ${workout.log?.outcome ?? outcome} result. ${
+                            hasSavedLog && workout.log?.loggedAt
+                              ? `Last updated ${formatWorkoutFeedbackTimestamp(workout.log.loggedAt)}.`
+                              : "This result is already saved."
+                          }`
+                        : "Save this result to update the workout and this week's status."
+                      : "You can try the form here, but preview results are not saved."}
         </p>
         <div className="hito-caption mt-3 flex flex-wrap items-center gap-3">
           <span>
@@ -260,71 +281,77 @@ export function CompletionPanel({
           <span className="opacity-50">·</span>
           <span>
             {snapshot.source === "persisted"
-              ? hasSavedResult && isDirty
-                ? "Changes not saved"
-                : hasSavedResult
-                  ? "Saved"
-                  : "Ready to save"
+              ? isFitCompleted
+                ? form.outcome === "partial"
+                  ? "Partial correction"
+                  : "Activity file"
+                : hasSavedResult && isDirty
+                  ? "Changes not saved"
+                  : hasSavedResult
+                    ? "Saved"
+                    : "Ready to save"
               : "Preview"}
           </span>
         </div>
       </div>
 
-      <div>
-        <Label>How did it go?</Label>
-        <div
-          className="mt-3 grid grid-cols-3 gap-2"
-          {...outcomeGroup.groupProps}
-          aria-label="Workout outcome"
-        >
-          {(
-            [
-              {
-                v: "completed",
-                icon: "check-circle",
-                label: "Complete",
-                c: "var(--success)",
-              },
-              { v: "partial", icon: "minus", label: "Partial", c: "var(--warn)" },
-              {
-                v: "skipped",
-                icon: "x-circle",
-                label: "Skipped",
-                c: "var(--destructive)",
-              },
-            ] satisfies {
-              v: Outcome;
-              icon: HitoIconName;
-              label: string;
-              c: string;
-            }[]
-          ).map((option) => {
-            const active = outcome === option.v;
-            return (
-              <HitoChoiceToggle
-                key={option.v}
-                presentation="card"
-                selected={active}
-                {...outcomeGroup.getRadioProps(option.v)}
-                onClick={() =>
-                  updateForm((current) => ({
-                    ...current,
-                    outcome: option.v,
-                  }))
-                }
-                className="w-full flex-col justify-start gap-2 text-left"
-              >
-                <Icon
-                  name={option.icon}
-                  size="sm"
-                  style={{ color: active ? option.c : undefined }}
-                />
-                <span className="hito-list-row-title">{option.label}</span>
-              </HitoChoiceToggle>
-            );
-          })}
+      {!isFitCompleted ? (
+        <div>
+          <Label>How did it go?</Label>
+          <div
+            className="mt-3 grid grid-cols-3 gap-2"
+            {...outcomeGroup.groupProps}
+            aria-label="Workout outcome"
+          >
+            {(
+              [
+                {
+                  v: "completed",
+                  icon: "check-circle",
+                  label: "Complete",
+                  c: "var(--success)",
+                },
+                { v: "partial", icon: "minus", label: "Partial", c: "var(--warn)" },
+                {
+                  v: "skipped",
+                  icon: "x-circle",
+                  label: "Skipped",
+                  c: "var(--destructive)",
+                },
+              ] satisfies {
+                v: Outcome;
+                icon: HitoIconName;
+                label: string;
+                c: string;
+              }[]
+            ).map((option) => {
+              const active = outcome === option.v;
+              return (
+                <HitoChoiceToggle
+                  key={option.v}
+                  presentation="card"
+                  selected={active}
+                  {...outcomeGroup.getRadioProps(option.v)}
+                  onClick={() =>
+                    updateForm((current) => ({
+                      ...current,
+                      outcome: option.v,
+                    }))
+                  }
+                  className="w-full flex-col justify-start gap-2 text-left"
+                >
+                  <Icon
+                    name={option.icon}
+                    size="sm"
+                    style={{ color: active ? option.c : undefined }}
+                  />
+                  <span className="hito-list-row-title">{option.label}</span>
+                </HitoChoiceToggle>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {isSkipped ? (
         <div className="hito-surface-flat p-4">
@@ -334,98 +361,58 @@ export function CompletionPanel({
             note for context.
           </p>
         </div>
-      ) : (
+      ) : !isFitCompleted ? (
         <LogResultFeedbackBridge
           workout={workout}
           snapshot={snapshot}
           feedback={feedback}
           onOpenActivityFile={onOpenActivityFile}
         />
-      )}
+      ) : null}
 
       <div>
         {!isSkipped && (
           <BodyNotesSummaryRow bodyNotes={form.bodyNotes} onOpen={openBodyNotesModal} />
         )}
 
-        <details className={cn("hito-disclosure", !isSkipped && "mt-6")}>
-          <summary className="hito-disclosure-summary">
-            <span className="hito-list-row-title">Manually add details</span>
-            <Icon name="chevron-down" className="hito-disclosure-chevron" />
-          </summary>
-          <div className="hito-disclosure-body">
-            {!isSkipped ? (
-              <>
-                <div>
-                  <Label>Planned vs actual</Label>
-                  <div className="mt-3 grid grid-cols-2 gap-3">
-                    <NumField
-                      label="Distance"
-                      suffix="km"
-                      planned={plannedKm.toString()}
-                      value={form.actualKm}
-                      onChange={(value) =>
-                        updateForm((current) => ({ ...current, actualKm: value }))
-                      }
-                    />
-                    <NumField
-                      label="Duration"
-                      suffix="min"
-                      planned={plannedMin.toString()}
-                      value={form.actualMin}
-                      onChange={(value) =>
-                        updateForm((current) => ({ ...current, actualMin: value }))
-                      }
-                    />
-                  </div>
+        {isFitCompleted ? (
+          <div className="mt-6 space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline pb-4">
+              <div>
+                <div className="hito-label">Completion correction</div>
+                <p className="hito-body mt-1">
+                  {form.outcome === "partial"
+                    ? "This activity is recorded as partial by your choice."
+                    : "Recorded activity remains completed unless you mark it partial."}
+                </p>
+              </div>
+              <HitoButton
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() =>
+                  updateForm((current) => ({
+                    ...current,
+                    outcome: current.outcome === "partial" ? "completed" : "partial",
+                  }))
+                }
+              >
+                {form.outcome === "partial" ? "Use completed" : "Mark as partial"}
+              </HitoButton>
+            </div>
 
-                  {plannedRepeats > 0 && (
-                    <div className="mt-4">
-                      <div className="hito-label mb-2">Intervals completed</div>
-                      <div
-                        className="hito-choice-toggle-group flex-nowrap"
-                        {...intervalGroup.groupProps}
-                        aria-label="Intervals completed"
-                      >
-                        {intervalValues.map((intervalValue) => (
-                          <HitoChoiceToggle
-                            key={intervalValue}
-                            size="sm"
-                            selected={form.intervalsCompleted === Number(intervalValue)}
-                            {...intervalGroup.getRadioProps(intervalValue)}
-                            onClick={() =>
-                              updateForm((current) => ({
-                                ...current,
-                                intervalsCompleted: Number(intervalValue),
-                              }))
-                            }
-                            className="min-w-0 flex-1 font-mono-num"
-                          >
-                            {intervalValue}
-                          </HitoChoiceToggle>
-                        ))}
-                      </div>
-                      <p className="hito-field-helper mt-2">
-                        Tap to mark how many reps were completed.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <HitoSlider
-                  label="Effort (RPE)"
-                  value={form.rpe ?? 6}
-                  min={1}
-                  max={10}
-                  step={1}
-                  onValueChange={(value) => updateForm((current) => ({ ...current, rpe: value }))}
-                  valueLabel={form.rpe == null ? "Not recorded" : `${form.rpe}/10`}
-                  ariaValueText={
-                    form.rpe == null ? "Effort not recorded" : `Effort ${form.rpe} out of 10`
-                  }
-                />
-              </>
-            ) : null}
+            <HitoSlider
+              label="Effort (RPE)"
+              value={form.rpe ?? 6}
+              min={1}
+              max={10}
+              step={1}
+              onValueChange={(value) => updateForm((current) => ({ ...current, rpe: value }))}
+              valueLabel={form.rpe == null ? "Not recorded" : `${form.rpe}/10`}
+              ariaValueText={
+                form.rpe == null ? "Effort not recorded" : `Effort ${form.rpe} out of 10`
+              }
+            />
 
             <div>
               <Label>Notes</Label>
@@ -435,19 +422,119 @@ export function CompletionPanel({
                 onChange={(event) =>
                   updateForm((current) => ({ ...current, notes: event.target.value }))
                 }
-                placeholder="Felt strong on the climb, slight tightness in right calf at km 6…"
+                placeholder="Felt strong on the climb, slight tightness in right calf at km 6..."
                 size="md"
                 variant="primary"
                 className="mt-3 min-h-28 resize-none"
               />
               <p className="hito-caption mt-3">
-                {snapshot.source === "persisted"
-                  ? "This saves your workout result. Garmin uploads live in Feedback."
-                  : "Preview only. Results entered here are not saved."}
+                This saves personal feedback. Distance, duration, and intervals remain with the
+                recorded activity.
               </p>
             </div>
           </div>
-        </details>
+        ) : (
+          <details className={cn("hito-disclosure", !isSkipped && "mt-6")}>
+            <summary className="hito-disclosure-summary">
+              <span className="hito-list-row-title">Manually add details</span>
+              <Icon name="chevron-down" className="hito-disclosure-chevron" />
+            </summary>
+            <div className="hito-disclosure-body">
+              {!isSkipped ? (
+                <>
+                  <div>
+                    <Label>Planned vs actual</Label>
+                    <div className="mt-3 grid grid-cols-2 gap-3">
+                      <NumField
+                        label="Distance"
+                        suffix="km"
+                        planned={plannedKm.toString()}
+                        value={form.actualKm}
+                        onChange={(value) =>
+                          updateForm((current) => ({ ...current, actualKm: value }))
+                        }
+                      />
+                      <NumField
+                        label="Duration"
+                        suffix="min"
+                        planned={plannedMin.toString()}
+                        value={form.actualMin}
+                        onChange={(value) =>
+                          updateForm((current) => ({ ...current, actualMin: value }))
+                        }
+                      />
+                    </div>
+
+                    {plannedRepeats > 0 && (
+                      <div className="mt-4">
+                        <div className="hito-label mb-2">Intervals completed</div>
+                        <div
+                          className="hito-choice-toggle-group flex-nowrap"
+                          {...intervalGroup.groupProps}
+                          aria-label="Intervals completed"
+                        >
+                          {intervalValues.map((intervalValue) => (
+                            <HitoChoiceToggle
+                              key={intervalValue}
+                              size="sm"
+                              selected={form.intervalsCompleted === Number(intervalValue)}
+                              {...intervalGroup.getRadioProps(intervalValue)}
+                              onClick={() =>
+                                updateForm((current) => ({
+                                  ...current,
+                                  intervalsCompleted: Number(intervalValue),
+                                }))
+                              }
+                              className="min-w-0 flex-1 font-mono-num"
+                            >
+                              {intervalValue}
+                            </HitoChoiceToggle>
+                          ))}
+                        </div>
+                        <p className="hito-field-helper mt-2">
+                          Tap to mark how many reps were completed.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <HitoSlider
+                    label="Effort (RPE)"
+                    value={form.rpe ?? 6}
+                    min={1}
+                    max={10}
+                    step={1}
+                    onValueChange={(value) => updateForm((current) => ({ ...current, rpe: value }))}
+                    valueLabel={form.rpe == null ? "Not recorded" : `${form.rpe}/10`}
+                    ariaValueText={
+                      form.rpe == null ? "Effort not recorded" : `Effort ${form.rpe} out of 10`
+                    }
+                  />
+                </>
+              ) : null}
+
+              <div>
+                <Label>Notes</Label>
+                <Textarea
+                  rows={3}
+                  value={form.notes}
+                  onChange={(event) =>
+                    updateForm((current) => ({ ...current, notes: event.target.value }))
+                  }
+                  placeholder="Felt strong on the climb, slight tightness in right calf at km 6…"
+                  size="md"
+                  variant="primary"
+                  className="mt-3 min-h-28 resize-none"
+                />
+                <p className="hito-caption mt-3">
+                  {snapshot.source === "persisted"
+                    ? "This saves your workout result. Garmin uploads live in Feedback."
+                    : "Preview only. Results entered here are not saved."}
+                </p>
+              </div>
+            </div>
+          </details>
+        )}
       </div>
 
       {!isSkipped ? (
@@ -497,7 +584,11 @@ export function CompletionPanel({
               setBodyNotesDraft(cloneBodyNoteDrafts(reconciledFormState.bodyNotes));
               setSavedBaselineKey(reconciledPayloadKey);
               setOptimisticSavedPayloadKey(reconciledPayloadKey);
-              setMessage(`Saved as ${nextPayload.outcome}. This page now shows the latest result.`);
+              setMessage(
+                isFitCompleted
+                  ? "Personal feedback saved. The recorded activity remains the workout result."
+                  : `Saved as ${nextPayload.outcome}. This page now shows the latest result.`,
+              );
               void router.invalidate().catch(() => undefined);
             } catch (saveError) {
               setError(saveError instanceof Error ? saveError.message : "Could not save log.");
@@ -513,7 +604,11 @@ export function CompletionPanel({
           {saveButtonLabel}
         </HitoButton>
         <span className="hito-caption ml-auto">
-          {snapshot.source === "persisted" ? "Saved to your plan." : "Preview only."}
+          {isFitCompleted
+            ? "Personal feedback only. Run data stays with the activity file."
+            : snapshot.source === "persisted"
+              ? "Saved to your plan."
+              : "Preview only."}
         </span>
       </div>
     </div>
@@ -1060,15 +1155,19 @@ function buildSavedPayload(
 }
 
 function buildSavePayload(workout: Workout, form: CompletionFormState) {
+  const isFitCompleted = workout.completionOrigin === "fit_activity";
+
   return {
     plannedWorkoutId: workout.id,
     outcome: form.outcome,
-    actualDistanceKm: form.outcome === "skipped" ? null : parseNumberInput(form.actualKm),
-    actualDurationMin: form.outcome === "skipped" ? null : parseNumberInput(form.actualMin),
+    actualDistanceKm:
+      isFitCompleted || form.outcome === "skipped" ? null : parseNumberInput(form.actualKm),
+    actualDurationMin:
+      isFitCompleted || form.outcome === "skipped" ? null : parseNumberInput(form.actualMin),
     rpe: form.outcome === "skipped" ? null : form.rpe,
     notes: form.notes.trim() || null,
     intervalsCompleted:
-      form.outcome === "skipped" || !workout.steps.some((step) => step.repeats)
+      isFitCompleted || form.outcome === "skipped" || !workout.steps.some((step) => step.repeats)
         ? null
         : form.intervalsCompleted,
     bodyNotes:

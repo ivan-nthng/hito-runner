@@ -37,10 +37,10 @@ const vercelNitroManifest = resolve(vercelOutputDir, "nitro.json");
 const vercelConfig = resolve(vercelOutputDir, "config.json");
 
 const localRequiredOutputs = [
-  outputNitroManifest,
-  resolve(outputPublicDir, "favicon.svg"),
-  resolve(outputPublicDir, "templates/hito-training-plan-v2-template.json"),
-  resolve(outputServerDir, "index.mjs"),
+  localFinalizedNitroManifest,
+  resolve(localFinalizedPublicDir, "favicon.svg"),
+  resolve(localFinalizedPublicDir, "templates/hito-training-plan-v2-template.json"),
+  resolve(localFinalizedServerDir, "index.mjs"),
 ];
 
 const vercelRequiredOutputs = [

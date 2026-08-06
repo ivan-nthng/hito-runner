@@ -38,9 +38,10 @@ must never become a second visual-system or product-runtime authority.
 
 First Design System slice completed in the current working tree: the code-owned manifest, proven
 cleanup, token normalization, and Foundations/Figma capture-board parity are accepted at the owner
-level. This item remains `backlog` because the only next gate is a Product decision naming the target
-Figma file and initial importer scope. Figma file mutation and component-library export are not
-implicit work.
+level. Product has selected a new standalone Figma file named `Hito Running Library` and a separate
+`DESIGN SYSTEM INTEGRATION` execution boundary for downstream Figma work. This item remains
+`backlog`: the new role contract exists, but its distinct operational owner value is not yet
+supported by the repository/Admin work-item parser, and no Figma mutation has been dispatched.
 
 ## Root-Cause Evidence
 
@@ -84,13 +85,13 @@ implicit work.
 
 ## Execution Sequence
 
-| Gate | Outcome | Required proof | Stop condition |
-| --- | --- | --- | --- |
-| 1. Cleanup ledger | **Completed:** classified token, selector, size, typography, and geometry candidates. | Static consumer graph, reference reachability, and recorded ownership. | A candidate has an unresolved product or DS consumer. |
-| 2. Safe DS cleanup | **Completed:** removed only proven legacy aliases and unused selectors. | Before/after discriminator, focused DS/product browser proof, build, and independent QA. | A deletion changes a live visual or compatibility contract. |
-| 3. Token normalization | **Completed:** established light primitives, semantic aliases, spacing truth, and component geometry ownership. | Theme parity, token/readability checks, and no new global geometry export. | The work becomes a visual redesign or creates a parallel scale. |
-| 4. Manifest parity | **Completed:** generated and adopted the one-way export manifest for approved collections and reusable text styles. | Manifest validation plus Foundations and Figma-board parity. | Manifest is manually maintained or cannot express the code-owned contract. |
-| 5. Figma bridge admission | Pending Product decision: choose the target file and initial downstream import scope. | Accepted manifest, target identity, and explicit Product decision. | A Figma mutation or component export is attempted without those inputs. |
+| Gate                      | Outcome                                                                                                                                                                                                    | Required proof                                                                                       | Stop condition                                                                                            |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| 1. Cleanup ledger         | **Completed:** classified token, selector, size, typography, and geometry candidates.                                                                                                                      | Static consumer graph, reference reachability, and recorded ownership.                               | A candidate has an unresolved product or DS consumer.                                                     |
+| 2. Safe DS cleanup        | **Completed:** removed only proven legacy aliases and unused selectors.                                                                                                                                    | Before/after discriminator, focused DS/product browser proof, build, and independent QA.             | A deletion changes a live visual or compatibility contract.                                               |
+| 3. Token normalization    | **Completed:** established light primitives, semantic aliases, spacing truth, and component geometry ownership.                                                                                            | Theme parity, token/readability checks, and no new global geometry export.                           | The work becomes a visual redesign or creates a parallel scale.                                           |
+| 4. Manifest parity        | **Completed:** generated and adopted the one-way export manifest for approved collections and reusable text styles.                                                                                        | Manifest validation plus Foundations and Figma-board parity.                                         | Manifest is manually maintained or cannot express the code-owned contract.                                |
+| 5. Figma bridge admission | **Product decision accepted:** new standalone target `Hito Running Library`; downstream execution belongs to `DESIGN SYSTEM INTEGRATION`. Operational role registration and exact dispatch remain pending. | Accepted manifest, target identity, role contract, operational owner support, and explicit dispatch. | A Figma mutation or component export is attempted before the integration role is truthfully dispatchable. |
 
 ## Figma Export Scope
 
@@ -98,6 +99,25 @@ The first eligible downstream collections are `Primitive / Color`, `Semantic / C
 and `Light` modes, `Primitive / Spacing`, `Primitive / Radius`, `Primitive / Motion`, and reusable
 Figma Text Styles. Component families are excluded until their real variants and dimensions have
 passed cleanup and consumer proof.
+
+The intended program outcome is a complete reusable mirror of admitted Hito DS variables,
+typography, and component families in `Hito Running Library`. Execution remains incremental: each
+foundation or component family must have current code ownership, mapping, and Figma-side validation
+before the integration role expands the library.
+
+## Accepted Integration Boundary
+
+- `DESIGN SYSTEM INTEGRATION` owns mutation and validation inside the approved Figma target.
+- Repository product and Design System source is read-only for that role, apart from the exact
+  backlog lifecycle/receipt and compact task-owned mapping allowance.
+- `DESIGN SYSTEM` remains the sole code implementation owner for shared primitives, canonical CSS,
+  tokens, manifests, validators, and `/hitoDS`.
+- A Design System subagent may provide bounded read-only contract review inside an integration task;
+  it must not write code on behalf of the integration role.
+- Confirmed code-side gaps return as one batched Product-routed Design System task rather than
+  interrupting the engineer once per token or component.
+- The role contract lives in
+  [`agents/design-system-integration.agent.md`](../../../agents/design-system-integration.agent.md).
 
 ## First Slice Receipt
 

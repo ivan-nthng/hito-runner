@@ -63,6 +63,31 @@ confirm that every included behavior-changing slice has its receipt and no `Bloc
 `Pending` gate is represented as accepted. Documentation-only work remains proportionate and does
 not need runtime receipts.
 
+### 0.1.1) Canonical Backlog Lifecycle Update (Mandatory For Every Role)
+
+When an assigned task names a canonical work item in `docs/tasks/backlog/`, its execution owner
+maintains that item's lifecycle metadata directly. This applies to BACKEND, FRONTEND, DESIGN SYSTEM,
+DESIGNER, QA, ARCHITECT, and every other role; it is not a Product-only chore and must never be
+relayed to the user or deferred to a later documentation pass.
+
+- Before the first implementation, validation, or task-owned mutation, update the exact work item to
+  truthful `in_progress` and record the current stage when the item has a stage field. A supporting
+  plan or final report does not substitute for this update.
+- Before the final report, update the same item to its truthful terminal or waiting state: normally
+  `completed`, `blocked`, `ready`, or `backlog`. State the demonstrated outcome, remaining boundary,
+  and next owner only when each is factual.
+- A multi-slice parent item stays `in_progress` while later admitted slices remain. In that case, the
+  owner must update the exact completed slice or receipt inside that same canonical item rather than
+  falsely marking the whole program `completed`.
+- Do not leave an item `in_progress` after the owner has gone idle. A stale backlog state cannot
+  support an Implementation DoD pass, a release-completion claim, or selection of the next task.
+- Revalidate the item's canonical metadata and local links after the update, and include the work-item
+  link plus the final lifecycle state in the closure report.
+- If concurrent edits make a whole-file update unsafe, preserve them and apply only the smallest
+  task-owned hunk. A concurrent-document boundary is not permission to omit the lifecycle update;
+  obtain the current file state, make the exact metadata/receipt change, and report any genuine
+  ownership conflict precisely.
+
 ## 0.2) No Routine Approval Or User-Relay Rule (Mandatory)
 
 Routine local work is already authorized. Agents must execute it autonomously and must not ask the
@@ -141,6 +166,28 @@ rather than a fourth frontend lane. Design System owns their architecture, imple
 validation under `src/components/ui/**`, `src/components/hito-ds/**`, canonical DS CSS/tokens, and
 `/hitoDS`. A frontend lane that discovers a shared DS defect routes that owner instead of applying a
 local compatibility recipe.
+
+### Design System Integration Boundary (Mandatory)
+
+`DESIGN SYSTEM INTEGRATION` is a separate execution role activated with
+`ROLE: DESIGN SYSTEM INTEGRATION`. It owns approved Figma target discovery, code-to-Figma mapping,
+Figma file mutation, library hygiene, and Figma-side validation. It does not own Hito DS code.
+
+- Repository product and Design System source is read-only for this role. Its only routine
+  repository writes are the exact canonical backlog lifecycle/receipt and a compact task-owned
+  mapping artifact when genuinely required.
+- `DESIGN SYSTEM` remains the sole implementation owner for shared primitives, canonical CSS and
+  tokens, generated manifests, validators, and `/hitoDS`.
+- A code/Figma conflict does not authorize the integration role to edit code or to have a subagent
+  edit code on its behalf. It may use a `ROLE: DESIGN SYSTEM` subagent for bounded read-only contract
+  review, then batch confirmed code-side gaps for Product to route to the Design System owner.
+- `PRODUCT` remains the sole orchestration role. Target-file, publication, destructive Figma action,
+  source-hierarchy, and unresolved product-policy decisions return to Product.
+- Figma mutation is allowed only in the exact file/library and scope explicitly approved for the
+  active task. Legacy and production libraries remain unchanged unless separately named.
+
+This role follows `agents/design-system-integration.agent.md` and the Figma bridge workflow in
+`skills/hito-frontend-design-system/SKILL.md`.
 
 Every user-facing execution prompt addressed to `ROLE: FRONTEND` must name `Frontend lane: DevTools`,
 `Frontend lane: Product`, or `Frontend lane: Marketing` immediately after its task/stage context.
@@ -739,6 +786,45 @@ Documentation restraint is mandatory:
 - changelog/current docs should describe shipped or durable user/product meaning, not every internal
   cleanup micro-step
 
+## 2.59) Patch Pack And Fast Visual Lane (Mandatory)
+
+A Patch Pack is one bounded execution convention inside one existing canonical backlog item. It is
+not a task type, second queue, capture system, runtime, test framework, or Inspector persistence
+feature. It may group related adjustments only when they are facets of one already-evidenced outcome
+and share one owner, one Frontend Lane when applicable, one route-local presentation surface or one
+shared Hito DS surface, one risk class, and one final proof story.
+
+The canonical item records the compact adjustment list, one owner/lane, and one proof inventory;
+separate member statuses, child task records, dashboards, and ad hoc manifests are forbidden.
+
+This does not merge independently reported bugs. Their individual evidence and lifecycle remain
+under section 5.5; a `Batch` may connect compatible items but never replaces their evidence or
+ownership. A generic opportunistic cosmetic sweep is not a Patch Pack.
+
+The Fast Visual Lane applies only to an eligible Product route-local pack or a separate
+Design-System-owned pack. The owner must:
+
+- start from one `docs/current-functional-map.md` row, then confirm the immediate source and
+  consumer seam rather than reopening repository-wide discovery;
+- reuse existing Hito DS primitives, tokens, and patterns under the required reuse preflight;
+- use direct Vite/HMR only for adjustment iteration, reuse one safe existing fixture and browser
+  context, and never treat an approval wait as a required setup step or performance evidence;
+- run the affected source check, targeted final states/viewports, accessibility/focus checks when
+  affected, and the independent review already required by this policy; and
+- do not add unrelated database, provider, runtime, release, or repository-wide suites unless the
+  completed Pack reaches that contract boundary; and
+- run one fresh managed build/integrity and browser-acceptance gate after the completed pack only
+  when its final changed contract reaches browser-visible acceptance/integration or executable
+  release output. Do not rebuild after each adjustment, and do not reuse stale executable output.
+
+The lane is not a shortcut around browser, lifecycle, or release truth. Split immediately to the
+correct owner when a change reaches a shared DS primitive/token/shared CSS or `/hitoDS` surface from
+Product work; another route or Frontend Lane; a server function, API, DTO, auth, persistence, RLS,
+schema, provider, FIT/file lifecycle, or result projection; a release manifest; an unresolved Product
+decision; or an incompatible fixture/browser context. The owner records the exact split boundary and
+uses the risk-class proof already selected in the functional map. Persistent-server reuse, Vite
+exceptions, and browser-context mechanics remain governed by section 6.5.
+
 ## 2.6) Canonical Hito Architecture Approach (Mandatory)
 
 Every agent must preserve one canonical Hito architecture. Do not create parallel product systems
@@ -833,6 +919,7 @@ Mandatory startup for every project-work response:
    - `agents/architect.agent.md`
    - `agents/backend.agent.md`
    - `agents/integration-manager.agent.md`
+   - `agents/design-system-integration.agent.md`
    - `agents/frontend.agent.md`
    - `agents/qa.agent.md`
    - `agents/running-coach-agent.md`
@@ -889,7 +976,8 @@ handed to a role agent.
 
 This applies especially to agents that write code, validate behavior, inspect source, perform
 cleanup audits, investigate bugs, review artifacts, or prepare source-of-truth decisions:
-`ARCHITECT`, `BACKEND`, `FRONTEND`, `QA`, `DESIGNER`, `DESIGN SYSTEM`, `LAYOUT`,
+`ARCHITECT`, `BACKEND`, `FRONTEND`, `QA`, `DESIGNER`, `DESIGN SYSTEM`,
+`DESIGN SYSTEM INTEGRATION`, `LAYOUT`,
 `DATA QUALITY`, `BACKLOG MANAGER`, `PRODUCT`, `SYSTEM ADVISOR`, and `RUNNING COACH`.
 
 Use subagents when all of these are true:
@@ -1305,8 +1393,8 @@ Canonical values:
 - `Priority`: `low`, `medium`, `high`, or `urgent`
 - `Owner`: one of `architect`, `backend`, `frontend`, `design_system`, `designer`, `copy`, `qa`,
   `product`, or `running_coach`
-- `Next Recommended Role`: `architect`, `backend`, `frontend`, `designer`, `copy`, `qa`,
-  `product`, or `running_coach`
+- `Next Recommended Role`: `architect`, `backend`, `frontend`, `design_system`, `designer`,
+  `copy`, `qa`, `product`, or `running_coach`
 - `Archive Intent`: `retain_in_place` or `archive_when_closed`
 - `Exact Handoff Prompt`: one execution-ready fenced prompt beginning with `ROLE: <ROLE>`
 

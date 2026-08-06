@@ -11,6 +11,11 @@ import {
   HITO_FIELD_SIZES,
   HITO_FIELD_VARIANTS,
 } from "../src/components/ui/hito-control-contract";
+import {
+  getHitoSelectionTabStop,
+  moveHitoSelection,
+  sanitizeHitoSelectionIdPart,
+} from "../src/components/ui/hito-selection-mechanics";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const controlsCssPath = path.join(rootDir, "src/styles/controls-lists.css");
@@ -52,6 +57,15 @@ const sharedFieldOwnerMarkers = [
   ".hito-textarea-md",
   ".hito-date-field-control",
   ".hito-editable-value-field-group",
+] as const;
+const selectionMechanicsOwner = "src/components/ui/hito-selection-mechanics.ts";
+const selectionMechanicsImporters = new Set([
+  "src/components/ui/hito-radio-group.ts",
+  "src/components/ui/hito-tabs.ts",
+]);
+const selectionMechanicsImplementationMarkers = [
+  'value.replace(/[^a-zA-Z0-9_-]/g, "-")',
+  "const nextIndex = (startIndex + offset + enabledItems.length) % enabledItems.length;",
 ] as const;
 const referenceManualRecipePatterns = [
   {
@@ -163,6 +177,22 @@ function sharedFieldOwnerLeakFindings(css: string) {
   return sharedFieldOwnerMarkers.filter((marker) => declaresSelector(css, marker));
 }
 
+function selectionMechanicsImportFindings(files: SourceFile[]) {
+  return files
+    .filter((file) => file.content.includes("hito-selection-mechanics"))
+    .filter((file) => !selectionMechanicsImporters.has(file.relativePath));
+}
+
+function selectionMechanicsImplementationFindings(files: SourceFile[]) {
+  return files
+    .filter((file) => file.relativePath !== selectionMechanicsOwner)
+    .flatMap((file) =>
+      selectionMechanicsImplementationMarkers
+        .filter((marker) => file.content.includes(marker))
+        .map((marker) => ({ marker, relativePath: file.relativePath })),
+    );
+}
+
 function showcaseBoundaryLeakFindings(files: SourceFile[]) {
   return files.flatMap((file) => {
     const showcaseSpecifiers = Array.from(
@@ -258,6 +288,72 @@ function validateSelfTest() {
         (file) => file.relativePath === "src/routes/synthetic-relative-product.tsx",
       ),
     "Self-test failed to detect Product dependency on a showcase-only owner.",
+  );
+
+  const selectionImportLeaks = selectionMechanicsImportFindings([
+    {
+      relativePath: "src/components/product/synthetic-selection.tsx",
+      content: 'import { moveHitoSelection } from "@/components/ui/hito-selection-mechanics";',
+    },
+  ]);
+  expect(
+    selectionImportLeaks.length === 1,
+    "Self-test failed to detect a direct non-owner selection-mechanics import.",
+  );
+
+  const selectionImplementationLeaks = selectionMechanicsImplementationFindings([
+    {
+      relativePath: "src/components/ui/synthetic-selection.ts",
+      content:
+        "const nextIndex = (startIndex + offset + enabledItems.length) % enabledItems.length;",
+    },
+  ]);
+  expect(
+    selectionImplementationLeaks.length === 1,
+    "Self-test failed to detect renamed or inline selection ring duplication.",
+  );
+}
+
+function validateSelectionMechanics() {
+  const items = [
+    { value: "first" },
+    { value: "disabled", disabled: true },
+    { value: "last" },
+  ] as const;
+  const disabledItems = items.map((item) => ({ ...item, disabled: true }));
+
+  expect(
+    getHitoSelectionTabStop(items, "last") === "last" &&
+      getHitoSelectionTabStop(items, "disabled") === "first" &&
+      getHitoSelectionTabStop(items, null) === "first" &&
+      getHitoSelectionTabStop(
+        items as readonly { value: string; disabled?: boolean }[],
+        "missing",
+      ) === "first",
+    "Selection tab stop must retain an enabled current value and fall back from disabled values.",
+  );
+  expect(
+    getHitoSelectionTabStop(disabledItems, "first") === undefined &&
+      getHitoSelectionTabStop([], null) === undefined,
+    "Selection tab stop must stay absent for disabled-only and empty collections.",
+  );
+  expect(
+    moveHitoSelection(items, "first", "next") === "last" &&
+      moveHitoSelection(items, "last", "next") === "first" &&
+      moveHitoSelection(items, "first", "previous") === "last" &&
+      moveHitoSelection(items, "last", "first") === "first" &&
+      moveHitoSelection(items, "first", "last") === "last",
+    "Selection movement must skip disabled items and wrap in both directions.",
+  );
+  expect(
+    moveHitoSelection(disabledItems, "first", "next") === null &&
+      moveHitoSelection([], "first", "next") === null,
+    "Selection movement must stay inert for disabled-only and empty collections.",
+  );
+  expect(
+    sanitizeHitoSelectionIdPart(":r1:/item value") === "-r1--item-value" &&
+      sanitizeHitoSelectionIdPart("already_safe-1") === "already_safe-1",
+    "Selection IDs must preserve the established safe suffix normalization.",
   );
 }
 
@@ -398,6 +494,17 @@ const choiceSource = sourceFiles.find(
 const calendarSource = sourceFiles.find(
   (file) => file.relativePath === "src/components/ui/calendar.tsx",
 );
+const tabsSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/ui/hito-tabs.ts",
+);
+const radioGroupSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/ui/hito-radio-group.ts",
+);
+const selectionMechanicsSource = sourceFiles.find(
+  (file) => file.relativePath === selectionMechanicsOwner,
+);
+const selectionImportLeaks = selectionMechanicsImportFindings(sourceFiles);
+const selectionImplementationLeaks = selectionMechanicsImplementationFindings(sourceFiles);
 
 expect(
   referenceControls?.content.includes("HITO_BUTTON_SIZES") === true &&
@@ -458,6 +565,73 @@ expect(
   calendarSource?.content.includes("HitoButton") === false,
   "Calendar must not be migrated inside the component-contract cleanup.",
 );
+expect(
+  selectionMechanicsSource?.content.includes("moveHitoSelection") === true &&
+    tabsSource?.content.includes("hito-selection-mechanics") === true &&
+    radioGroupSource?.content.includes("hito-selection-mechanics") === true,
+  "Tabs and Radio must resolve their neutral mechanics through one internal owner.",
+);
+expect(
+  selectionImportLeaks.length === 0,
+  `Neutral selection mechanics leaked outside Tabs and Radio: ${selectionImportLeaks
+    .map((file) => file.relativePath)
+    .join(", ")}`,
+);
+expect(
+  selectionImplementationLeaks.length === 0,
+  `Neutral selection mechanics were duplicated outside their owner: ${selectionImplementationLeaks
+    .map((finding) => `${finding.relativePath} (${finding.marker})`)
+    .join(", ")}`,
+);
+expect(
+  sourceFiles.filter((file) => file.content.includes("export type HitoSelectionItem")).length ===
+    1 && selectionMechanicsSource?.content.includes("export type HitoSelectionItem") === true,
+  "The neutral selection-item type must have one declaration owner.",
+);
+expect(
+  radioGroupSource?.content.includes("@/components/ui/hito-tabs") === false,
+  "Radio must not import a component contract from Tabs.",
+);
+expect(
+  [tabsSource, radioGroupSource].every(
+    (file) =>
+      file?.content.includes("function moveSelection") === false &&
+      file?.content.includes("function safeIdPart") === false,
+  ),
+  "Tabs or Radio reintroduced duplicated neutral selection mechanics.",
+);
+expect(
+  tabsSource?.content.includes("-tab-") === true &&
+    tabsSource.content.includes("-panel-") &&
+    radioGroupSource?.content.includes("-option-") === true,
+  "Tabs and Radio must preserve their component-specific ID suffixes.",
+);
+expect(
+  tabsSource?.content.includes('role: "tablist" as const') === true &&
+    tabsSource.content.includes('role: "tab" as const') &&
+    tabsSource.content.includes('role: "tabpanel" as const') &&
+    tabsSource.content.includes('"aria-selected": value === itemValue') &&
+    tabsSource.content.includes('event.key === "ArrowRight"') &&
+    tabsSource.content.includes('event.key === "ArrowLeft"') &&
+    tabsSource.content.includes('event.key === "ArrowDown"') === false &&
+    tabsSource.content.includes('event.key === "ArrowUp"') === false,
+  "Tabs must preserve their horizontal tab roles, ARIA, and key map.",
+);
+expect(
+  radioGroupSource?.content.includes('role: "radiogroup" as const') === true &&
+    radioGroupSource.content.includes('role: "radio" as const') &&
+    radioGroupSource.content.includes('"aria-checked": value === itemValue') &&
+    radioGroupSource.content.includes('event.key === "ArrowRight" || event.key === "ArrowDown"') &&
+    radioGroupSource.content.includes('event.key === "ArrowLeft" || event.key === "ArrowUp"'),
+  "Radio must preserve its radiogroup roles, ARIA, and two-axis key map.",
+);
+expect(
+  [tabsSource, radioGroupSource].every(
+    (file) =>
+      file?.content.includes("target?.focus();") && file.content.includes("target?.click();"),
+  ),
+  "Tabs and Radio must retain their established DOM focus-and-activation contract.",
+);
 
 const productDemoStateFiles = sourceFiles.filter(
   (file) =>
@@ -490,6 +664,7 @@ expect(
 );
 
 validateSelfTest();
+validateSelectionMechanics();
 
 if (errors.length > 0) {
   console.error("[hito-ds-components] validation failed");

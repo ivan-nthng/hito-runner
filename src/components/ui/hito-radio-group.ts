@@ -1,5 +1,10 @@
 import { useId, type KeyboardEvent } from "react";
-import type { HitoSelectionItem } from "@/components/ui/hito-tabs";
+import {
+  getHitoSelectionTabStop,
+  moveHitoSelection,
+  sanitizeHitoSelectionIdPart,
+  type HitoSelectionItem,
+} from "@/components/ui/hito-selection-mechanics";
 
 export type HitoRadioOptionProps = {
   id: string;
@@ -9,28 +14,6 @@ export type HitoRadioOptionProps = {
   tabIndex: number;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
 };
-
-function safeIdPart(value: string) {
-  return value.replace(/[^a-zA-Z0-9_-]/g, "-");
-}
-
-function moveSelection<Value extends string>(
-  items: HitoSelectionItem<Value>[],
-  currentValue: Value,
-  direction: "first" | "last" | "next" | "previous",
-) {
-  const enabledItems = items.filter((item) => !item.disabled);
-  if (enabledItems.length === 0) return null;
-
-  if (direction === "first") return enabledItems[0]?.value ?? null;
-  if (direction === "last") return enabledItems.at(-1)?.value ?? null;
-
-  const currentIndex = enabledItems.findIndex((item) => item.value === currentValue);
-  const startIndex = currentIndex >= 0 ? currentIndex : 0;
-  const offset = direction === "next" ? 1 : -1;
-  const nextIndex = (startIndex + offset + enabledItems.length) % enabledItems.length;
-  return enabledItems[nextIndex]?.value ?? null;
-}
 
 export function useHitoRadioGroup<Value extends string>({
   idPrefix,
@@ -42,10 +25,10 @@ export function useHitoRadioGroup<Value extends string>({
   value?: Value | null;
 }) {
   const generatedId = useId();
-  const baseId = idPrefix ?? `hito-radio-${safeIdPart(generatedId)}`;
-  const enabledItems = items.filter((item) => !item.disabled);
-  const selectedItem = enabledItems.find((item) => item.value === value) ?? enabledItems[0];
-  const optionId = (itemValue: Value) => `${baseId}-option-${safeIdPart(itemValue)}`;
+  const baseId = idPrefix ?? `hito-radio-${sanitizeHitoSelectionIdPart(generatedId)}`;
+  const tabStopValue = getHitoSelectionTabStop(items, value);
+  const optionId = (itemValue: Value) =>
+    `${baseId}-option-${sanitizeHitoSelectionIdPart(itemValue)}`;
 
   const activate = (itemValue: Value, event: KeyboardEvent<HTMLElement>) => {
     const target = event.currentTarget.ownerDocument.getElementById(optionId(itemValue));
@@ -64,18 +47,18 @@ export function useHitoRadioGroup<Value extends string>({
         role: "radio" as const,
         "aria-checked": value === itemValue,
         "aria-disabled": disabled || undefined,
-        tabIndex: !disabled && selectedItem?.value === itemValue ? 0 : -1,
+        tabIndex: !disabled && tabStopValue === itemValue ? 0 : -1,
         onKeyDown(event: KeyboardEvent<HTMLElement>) {
           let nextValue: Value | null = null;
 
           if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-            nextValue = moveSelection(items, itemValue, "next");
+            nextValue = moveHitoSelection(items, itemValue, "next");
           }
           if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
-            nextValue = moveSelection(items, itemValue, "previous");
+            nextValue = moveHitoSelection(items, itemValue, "previous");
           }
-          if (event.key === "Home") nextValue = moveSelection(items, itemValue, "first");
-          if (event.key === "End") nextValue = moveSelection(items, itemValue, "last");
+          if (event.key === "Home") nextValue = moveHitoSelection(items, itemValue, "first");
+          if (event.key === "End") nextValue = moveHitoSelection(items, itemValue, "last");
 
           if (nextValue !== null) {
             event.preventDefault();

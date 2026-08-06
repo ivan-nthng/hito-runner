@@ -6,7 +6,7 @@
 
 ## Status
 
-ready
+in_progress
 
 ## Type
 
@@ -41,45 +41,38 @@ evidence-gated.
 
 ## Stage
 
-Slices 1-5 retain their recorded release boundaries. Slice 6 is completed by the release boundary
-ending at the commit containing its receipt: `/hitoDS` is truthfully described as a production-shipped public
-interactive Design System reference and sandbox, consumes canonical token/component owners, and
-remains isolated from Product data and lifecycle. The two generated manifest representations remain
-because TypeScript runtime and JSON validator/downstream consumers are distinct and parity-proven.
-The parent program is `ready`, not actively executing; Slice 7 remains optional documentation
-hygiene and requires a fresh Product/Architect admission rather than automatic continuation.
+Slices 8A and 8B are released at `0630edd` and `df796cc`; Slice 8C has passed its
+Design System implementation and independent owner-level QA. Slice 8D is the next Design System
+boundary after the exact 8C release. The concurrent FIT Frontend presentation remains separate and
+preserved. The parent stays `in_progress` until every admitted slice closes or is retained with
+current evidence.
 
 ## Next Recommended Role
 
-product
+design_system
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: PRODUCT
+ROLE: DESIGN SYSTEM
 
 Task:
-Reconstruct the released Hito Stack Complexity Reduction Program through Slice 6 and decide whether
-the optional Slice 7 current-truth compression should be admitted now.
+Consolidate duplicated generic Hito DS workbench settings controls and make the evergreen foundation
+proof reachable through the canonical DS validator.
 
 Stage:
-PRODUCT admission / routing.
-
-Context:
-Slices 1-6 are closed at their recorded release boundaries. Slice 7 is documentation-only hygiene,
-not an implementation continuation and not permission to reopen released Product, Backend, build,
-or Design System contracts.
+DESIGN SYSTEM implementation with integrated QA, Slice 8D.
 
 Required outcome:
-- Verify that current source and backlog status still support a bounded documentation-compression
-  slice.
-- Preserve active-task ownership, release receipts, inbound links, and historical evidence.
-- If admitted, route exactly one owner-scoped prompt to Product/docs with an ARCHITECT reviewer.
-- If not admitted, leave this parent item `ready` and do not create another queue.
+- Establish one parity-proven workbench settings owner used by Calendar and Workout Library.
+- Make foundation cleanup assertions package-reachable through the canonical DS validation owner.
+- Delete duplicate local controls and the redundant proof root after exact behavior/assertion parity.
+- Preserve Calendar geometry, the 32 workout identities, public /hitoDS, manifests, focus, width, and
+  accessibility; do not create a generic workbench framework or parallel validator.
 
-Approval policy: Routine local inspection and documentation validation proceed under standing
-authorization. Do not stage, commit, push, deploy, or interrupt another active role without current
-explicit authority.
+Approval policy: Routine local implementation, independent QA, exact-manifest release, push,
+deployment, and smoke validation proceed under standing authorization. Do not mutate hosted data or
+interrupt another active role.
 ```
 
 ## Completed Slice 6 Handoff Record
@@ -405,6 +398,17 @@ unless a future measured requirement establishes a need.
   runner-facing UI changed. Safari was not required because no cross-engine primitive behavior
   changed; Global QA remains separate and pending.
 
+## Slice 8C Closure Receipt
+
+- [Neutral Hito selection mechanics](2026-08-05-hito-ds-neutral-selection-mechanics.md) is completed.
+- One internal owner now provides the shared item shape, safe-ID normalization, enabled tab stop,
+  and wrap movement; Tabs and Radio retain separate roles, ARIA, IDs, key maps, focus, activation,
+  and controlled-state contracts.
+- Duplicate blocks, the Radio-to-Tabs type import, and one dead reference import are removed.
+- Canonical validators, Product and /hitoDS pointer/keyboard/ARIA checks, desktop and exact 375px
+  light/dark proof, build/integrity/runtime, ARCHITECT review, and independent QA passed.
+- Global QA remains separate and pending.
+
 ## Owner-Scoped Roadmap
 
 | Slice                                    | Owner                         | Operational state and outcome                                                                                                                                                                                                                                                      | Required proof                                                                                                                                                                                                                | Stop condition                                                                                                     |
@@ -435,7 +439,7 @@ document claim alone.
 
 ## Next Admission
 
-Slices 1-6 are closed by their recorded release receipts. The parent program is ready for a fresh
-Product decision, not an active Design System task. Slice 7 remains optional documentation hygiene;
-if admitted, it must preserve active ownership, current truth, release evidence, and inbound links.
-No broad rewrite, framework migration, new queue, or deletion from line count is admitted.
+Slices 8A and 8B are released at `0630edd` and `df796cc`; Slice 8C has passed owner-level
+implementation and QA and proceeds through its exact release before Slice 8D begins. Slice 8D is the
+only next executable boundary. The parent remains `in_progress`; no mixed-owner release, broad
+rewrite, framework migration, new queue, or deletion from line count is admitted.

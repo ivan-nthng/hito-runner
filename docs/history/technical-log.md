@@ -32,6 +32,15 @@ must either add an entry here or explicitly state why it is not technical-log ma
 
 ## 2026-08-05
 
+- DESIGN SYSTEM + QA + ARCHITECT / neutral Hito selection mechanics (Slice 8C) — moved the shared
+  item shape, safe-ID normalization, enabled tab stop, and wrap movement into one internal owner;
+  Tabs and Radio retain separate roles, ARIA, IDs, key maps, focus, activation, and state contracts.
+  Duplicate implementations, the Radio-to-Tabs type import, and a dead reference import are gone;
+  the canonical validator now includes behavior and negative recurrence proof. Evidence:
+  `docs/tasks/backlog/2026-08-05-hito-ds-neutral-selection-mechanics.md`. Boundary: no Product
+  lifecycle, persistence, Calendar compatibility, visual language, backend, provider, or FIT work
+  changed; Global QA remains pending.
+
 - BACKEND + QA + ARCHITECT / Admin backlog lifecycle convergence (Slice 8A) — removed the deprecated
   dashboard generator and all dashboard aliases, then made `backlog_doc` the only nonterminal source
   permitted to dispatch Admin work. Supporting Markdown documents retain read-only historical

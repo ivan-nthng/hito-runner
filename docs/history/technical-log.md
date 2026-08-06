@@ -41,6 +41,13 @@ must either add an entry here or explicitly state why it is not technical-log ma
   lifecycle, provider, or hosted data changed; the pre-existing local legacy storage-bucket drift
   remains outside the affected backlog contract.
 
+- BACKEND + QA / source-size ledger retirement (Slice 8B) — removed the 571-line line-count writer,
+  its package alias, and its 1.3 MB generated ledger after confirming the writer's self-read/write
+  loop had no external runtime, CI, fixture, build, or Product consumer. Evidence:
+  `docs/tasks/backlog/2026-08-05-source-size-ledger-retirement.md`. Boundary: Git history retains
+  historic snapshots; current cleanup selection uses fresh non-mutating source scans, with no
+  product runtime, QA fixture, provider, schema, or hosted-data change.
+
 - BACKEND + QA + ARCHITECT / Product API request-boundary hardening — moved runner authentication
   ahead of avatar multipart parsing, reused the FIT bounded-reader as the one multipart limit seam,
   and replaced raw caught avatar/export and runner server-function infrastructure messages with

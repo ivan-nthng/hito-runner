@@ -69,7 +69,7 @@ stays in `docs/current-product.md`; implementation ownership and deletion safety
 | Hito DS, reference, Figma capture | Code-owned UI primitives, tokens, specimens, downstream Figma capture | `src/styles.css`, `src/styles/*`, `src/components/ui/*`, `src/components/hito-ds/*`, `src/routes/hitoDS*.tsx` | `/hitoDS` specimens are not product CRUD; Figma capture is downstream, not source-of-truth. |
 | Local devtools and inspector | Local-only DS audit and prompt generation | `src/components/devtools/*`, `src/components/ui/inline-editable-text.tsx`, `/hitoDS/patterns#inline-editable-text` | Local-only, no live UI mutation, no backend/Admin/Supabase/Work Items persistence. |
 | Admin work items, capture, analytics | Internal admin capture/backlog, repo-derived work-item mirror, analytics, test accounts | `src/routes/admin.*.tsx`, `src/components/admin/*`, `src/lib/admin-capture*`, `src/lib/admin-work-items.ts`, `src/lib/admin-analytics.ts`, `scripts/import-repo-work-items-to-admin-backlog.ts` | Repo markdown remains canonical for repo-derived rows; imported rows are read-only mirrors. |
-| Scripts, validators, QA infrastructure | Non-runtime proof, source-size ledger, local QA runtime, artifact hygiene | `scripts/*`, `scripts/**`, `docs/metrics/line-count-ledger.jsonl`, local QA server/build-output scripts, `qa-artifacts/` | Validators prove contracts; QA artifacts are protected evidence, not product runtime or cleanup targets. |
+| Scripts, validators, QA infrastructure | Non-runtime proof, local QA runtime, artifact hygiene | `scripts/*`, `scripts/**`, local QA server/build-output scripts, `qa-artifacts/` | Validators prove contracts; QA artifacts are protected evidence, not product runtime or cleanup targets. |
 | Docs and source-of-truth | Current product/system/functional truth, operational queue, supporting contracts, shipped history | `docs/current-*.md`, `docs/tasks/backlog/*`, supporting `docs/plans/*` and `docs/tasks/*`, `docs/history/changelog.md`, `docs/work-dashboard.md` | Current docs describe implemented truth; backlog metadata alone owns work lifecycle; plans/specs/doctrine provide linked context; avoid transcript-like Markdown growth. |
 | Running coach doctrine and workout identity | Sports-quality policy, workout taxonomy, target honesty | `docs/tasks/running-coach/*`, `src/lib/rich-workout-model.ts`, `src/lib/planned-workout-language.ts`, `src/lib/planned-workout-block-contract.ts`, running-plan doctrine validators | Coach doctrine informs backend policy but does not create a second workout language. |
 
@@ -230,9 +230,9 @@ Do not use these future ideas to justify keeping or adding runtime code as shipp
 - Prefer deletion/reuse/consolidation over pure extraction.
 - Preserve accepted behavior for generated-plan gates, manual authoring, Hito DS primitives, local
   inspector local-only/no-persistence behavior, Admin Work Items, and provider evidence boundaries.
-- Do not use stale line-count tables from old cleanup ledgers as current truth. Use the active
+- Do not use historic line-count snapshots as current truth. Use the active
   [source-size governance plan](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/active/2026-06-30-hito-source-size-governance-and-cleanup-plan.md)
-  and fresh non-mutating source scans for cleanup selection.
+  and fresh non-mutating source scans for cleanup selection; Git history retains retired snapshots.
 - `docs/work-dashboard.md` is an inbound-link tombstone only. It does not project lifecycle;
   canonical status comes from `docs/tasks/backlog/*` metadata.
 - `logs/`, `qa-artifacts/`, `test-results/`, `node_modules/`, build/cache roots, and coverage roots

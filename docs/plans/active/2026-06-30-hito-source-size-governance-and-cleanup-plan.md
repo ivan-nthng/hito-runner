@@ -61,8 +61,8 @@ class, and a focused validation story.
 
 ### Read-Only Source Ledger
 
-The audit did not run `npm run metrics:lines`, so it did not append the canonical line-count ledger.
-These counts come from current files and Git objects with maintained text extensions:
+This historical audit did not retain a persistent line-count ledger. These counts came from current
+files and Git objects with maintained text extensions:
 
 | Area | `HEAD` | Current tracked | Untracked maintained work | Classification |
 | --- | ---: | ---: | ---: | --- |

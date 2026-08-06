@@ -16,6 +16,12 @@ import {
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { isPidAlive, readActiveBuildOutputLock } from "./lib/build-output-lock.mjs";
+import {
+  evaluateQaBuildFreshness,
+  fingerprintQaBuildArtifact,
+  fingerprintQaExecutableInputs,
+  writeQaBuildFreshnessReceipt,
+} from "./lib/qa-build-freshness.mjs";
 import { resolveQaRuntimePaths } from "./lib/qa-runtime-paths.mjs";
 import { validateLocalBuildOutput } from "./validate-build-output-integrity.mjs";
 
@@ -27,6 +33,7 @@ const healthUrl = `http://${host}:${port}/`;
 const logsDir = qaRuntimePaths.stateDir;
 const statePath = qaRuntimePaths.statePath;
 const logPath = qaRuntimePaths.logPath;
+const freshnessPath = qaRuntimePaths.freshnessPath;
 const finalizedOutputDir = qaRuntimePaths.runtimeRoot;
 const finalizedServerDir = resolve(finalizedOutputDir, "server");
 const finalizedPublicDir = resolve(finalizedOutputDir, "public");
@@ -100,9 +107,10 @@ async function statusCommand() {
 }
 
 async function startCommand() {
+  const lifecycleStartedAt = performance.now();
   ensureLogsDir();
   ensureBuildOutputLifecycleIsIdle();
-  await ensureBuildOutput();
+  const buildResult = await ensureBuildOutput();
   ensureBuildOutputLifecycleIsIdle();
 
   const currentBuild = readBuildFingerprint();
@@ -110,7 +118,9 @@ async function startCommand() {
     throw new Error(`Build output is missing after build. Expected ${serverEntry}.`);
   }
 
+  const statusStartedAt = performance.now();
   const status = await resolveServerStatus();
+  const initialStatusMs = elapsedMs(statusStartedAt);
   if (
     status.healthy &&
     status.serverStatus === "current" &&
@@ -127,8 +137,19 @@ async function startCommand() {
       buildFingerprint: currentBuild,
       runtimeRoot: finalizedOutputDir,
       providerMode,
+      artifactDecision: buildResult.artifactDecision,
+      lifecyclePhaseTimingsMs: withTotalTiming(
+        {
+          ...buildResult.phaseTimingsMs,
+          status: initialStatusMs,
+          serverStart: 0,
+        },
+        lifecycleStartedAt,
+      ),
     });
-    console.log(`[qa-local-server] Reusing current built QA server on ${healthUrl}`);
+    console.log(
+      `[qa-local-server] Reusing current built QA server on ${healthUrl} (artifact ${buildResult.artifactDecision}).`,
+    );
     printStatus(await resolveServerStatus());
     return;
   }
@@ -162,6 +183,7 @@ async function startCommand() {
   }
 
   rotateTransportLogIfOversized();
+  const serverStartStartedAt = performance.now();
   const launcher = spawn("npm", ["run", "serve:local"], {
     cwd: rootDir,
     detached: true,
@@ -197,6 +219,15 @@ async function startCommand() {
     buildFingerprint: currentBuild,
     runtimeRoot: finalizedOutputDir,
     providerMode,
+    artifactDecision: buildResult.artifactDecision,
+    lifecyclePhaseTimingsMs: withTotalTiming(
+      {
+        ...buildResult.phaseTimingsMs,
+        status: initialStatusMs,
+        serverStart: elapsedMs(serverStartStartedAt),
+      },
+      lifecycleStartedAt,
+    ),
   });
 
   console.log(`[qa-local-server] Started canonical built QA server on ${healthUrl}`);
@@ -237,11 +268,39 @@ async function stopCommand(options = {}) {
 }
 
 async function ensureBuildOutput() {
-  if (hasUsableBuildOutput()) {
-    return;
+  const phaseTimingsMs = {};
+  const integrityStartedAt = performance.now();
+  const integrity = readBuildIntegrity();
+  phaseTimingsMs.integrity = elapsedMs(integrityStartedAt);
+
+  const artifactStartedAt = performance.now();
+  const artifactFingerprint =
+    integrity.status === "present" ? readBuildArtifactFingerprint() : null;
+  phaseTimingsMs.artifactFingerprint = elapsedMs(artifactStartedAt);
+
+  const freshnessStartedAt = performance.now();
+  const freshness = evaluateQaBuildFreshness({
+    artifactFingerprint,
+    freshnessPath,
+    rootDir,
+  });
+  phaseTimingsMs.freshness = elapsedMs(freshnessStartedAt);
+
+  if (integrity.status === "present" && freshness.status === "fresh") {
+    return {
+      artifactDecision: "reused",
+      phaseTimingsMs: {
+        ...phaseTimingsMs,
+        build: 0,
+      },
+    };
   }
 
-  console.log("[qa-local-server] Build output is missing or broken; running npm run build.");
+  console.log(
+    `[qa-local-server] Build artifact is ${integrity.status}/${freshness.reason}; running npm run build.`,
+  );
+  const sourceBeforeBuild = freshness.sourceFingerprint;
+  const buildStartedAt = performance.now();
   const result = spawnSync("npm", ["run", "build"], {
     cwd: rootDir,
     stdio: "inherit",
@@ -251,16 +310,57 @@ async function ensureBuildOutput() {
   if (result.status !== 0) {
     throw new Error(`npm run build failed with exit code ${result.status ?? "unknown"}.`);
   }
+  phaseTimingsMs.build = elapsedMs(buildStartedAt);
 
-  const integrity = readBuildIntegrity();
-  if (integrity.status !== "present") {
+  const postBuildIntegrityStartedAt = performance.now();
+  const postBuildIntegrity = readBuildIntegrity();
+  phaseTimingsMs.postBuildIntegrity = elapsedMs(postBuildIntegrityStartedAt);
+  if (postBuildIntegrity.status !== "present") {
     throw new Error(
-      `Build output is not usable after npm run build: ${integrity.error ?? integrity.status}.`,
+      `Build output is not usable after npm run build: ${postBuildIntegrity.error ?? postBuildIntegrity.status}.`,
     );
   }
+
+  const postBuildFreshnessStartedAt = performance.now();
+  const sourceAfterBuild = fingerprintQaExecutableInputs({ rootDir });
+  if (sourceAfterBuild.digest !== sourceBeforeBuild.digest) {
+    throw new Error(
+      "Executable inputs changed while npm run build was running; refusing to mark the artifact fresh.",
+    );
+  }
+
+  const postBuildArtifactFingerprint = readBuildArtifactFingerprint();
+  if (!postBuildArtifactFingerprint) {
+    throw new Error("Build artifact fingerprint is unavailable after npm run build.");
+  }
+
+  writeQaBuildFreshnessReceipt({
+    artifactFingerprint: postBuildArtifactFingerprint,
+    freshnessPath,
+    sourceFingerprint: sourceAfterBuild,
+  });
+
+  const verifiedFreshness = evaluateQaBuildFreshness({
+    artifactFingerprint: readBuildArtifactFingerprint(),
+    freshnessPath,
+    rootDir,
+  });
+  phaseTimingsMs.postBuildFreshness = elapsedMs(postBuildFreshnessStartedAt);
+  if (verifiedFreshness.status !== "fresh") {
+    throw new Error(
+      `Build freshness receipt did not verify after npm run build: ${verifiedFreshness.reason}.`,
+    );
+  }
+
+  return {
+    artifactDecision: "rebuilt",
+    phaseTimingsMs,
+  };
 }
 
 async function resolveServerStatus() {
+  const statusStartedAt = performance.now();
+  const processStartedAt = performance.now();
   const state = readState();
   const pids = listeningPids();
   const serverPid = resolveServerPid(pids, state);
@@ -270,8 +370,24 @@ async function resolveServerStatus() {
   const legacyRuntimeServer = serverPid ? isLegacyWorkspaceRuntimeCommand(commandLine) : false;
   const compatibleServer = currentRuntimeCommand || legacyRuntimeServer;
   const currentRuntimeServer = currentRuntimeCommand && loopbackListener;
+  const processMs = elapsedMs(processStartedAt);
+  const healthStartedAt = performance.now();
   const healthy = serverPid ? await isHealthy() : false;
+  const healthMs = elapsedMs(healthStartedAt);
+  const integrityStartedAt = performance.now();
   const buildIntegrity = readBuildIntegrity();
+  const integrityMs = elapsedMs(integrityStartedAt);
+  const artifactStartedAt = performance.now();
+  const artifactFingerprint =
+    buildIntegrity.status === "present" ? readBuildArtifactFingerprint() : null;
+  const artifactFingerprintMs = elapsedMs(artifactStartedAt);
+  const freshnessStartedAt = performance.now();
+  const buildFreshness = evaluateQaBuildFreshness({
+    artifactFingerprint,
+    freshnessPath,
+    rootDir,
+  });
+  const freshnessMs = elapsedMs(freshnessStartedAt);
   const buildFingerprint = buildIntegrity.status === "present" ? readBuildFingerprint() : null;
   const buildStatus = buildIntegrity.status;
   const processStartMs = serverPid ? processStartedAtMs(serverPid) : null;
@@ -290,9 +406,11 @@ async function resolveServerStatus() {
             ? "unhealthy"
             : buildStatus !== "present" || !buildFingerprint
               ? "stale"
-              : processIsOlderThanBuild
+              : buildFreshness.status !== "fresh"
                 ? "stale"
-                : "current";
+                : processIsOlderThanBuild
+                  ? "stale"
+                  : "current";
 
   return {
     state,
@@ -303,7 +421,18 @@ async function resolveServerStatus() {
     healthy,
     buildStatus,
     buildIntegrity,
+    buildFreshness,
     serverStatus,
+    phaseTimingsMs: withTotalTiming(
+      {
+        process: processMs,
+        health: healthMs,
+        integrity: integrityMs,
+        artifactFingerprint: artifactFingerprintMs,
+        freshness: freshnessMs,
+      },
+      statusStartedAt,
+    ),
   };
 }
 
@@ -488,12 +617,15 @@ function readBuildFingerprint() {
   };
 }
 
-function hasCompleteBuildOutput() {
-  return requiredBuildArtifacts.every((artifactPath) => existsSync(artifactPath));
+function readBuildArtifactFingerprint() {
+  return fingerprintQaBuildArtifact({
+    freshnessPath,
+    runtimeRoot: finalizedOutputDir,
+  });
 }
 
-function hasUsableBuildOutput() {
-  return readBuildIntegrity().status === "present";
+function hasCompleteBuildOutput() {
+  return requiredBuildArtifacts.every((artifactPath) => existsSync(artifactPath));
 }
 
 function readBuildIntegrity() {
@@ -599,6 +731,11 @@ function readState() {
         parsed.providerMode === "qa_fixture" || parsed.providerMode === "real"
           ? parsed.providerMode
           : null,
+      artifactDecision:
+        parsed.artifactDecision === "reused" || parsed.artifactDecision === "rebuilt"
+          ? parsed.artifactDecision
+          : null,
+      lifecyclePhaseTimingsMs: normalizePhaseTimings(parsed.lifecyclePhaseTimingsMs),
     };
   } catch {
     return null;
@@ -660,6 +797,11 @@ function printStatus(status) {
     `log: ${logPath}`,
     `events: ${structuredEventsRoot}`,
     `providerMode: ${status.state?.providerMode ?? "unknown"}`,
+    `artifactFreshness: ${status.buildFreshness.status}`,
+    `freshnessReason: ${status.buildFreshness.reason}`,
+    `lastArtifactDecision: ${status.state?.artifactDecision ?? "none"}`,
+    `phaseTimingsMs: ${formatPhaseTimings(status.phaseTimingsMs)}`,
+    `lastLifecycleTimingsMs: ${formatPhaseTimings(status.state?.lifecyclePhaseTimingsMs)}`,
     "query: npm run local:logs -- --limit 50",
   ];
 
@@ -697,6 +839,38 @@ function delay(ms) {
 
 function formatError(error) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function elapsedMs(startedAt) {
+  return Math.round((performance.now() - startedAt) * 100) / 100;
+}
+
+function withTotalTiming(phaseTimingsMs, startedAt) {
+  return {
+    ...phaseTimingsMs,
+    total: elapsedMs(startedAt),
+  };
+}
+
+function normalizePhaseTimings(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const entries = Object.entries(value).filter(
+    ([key, timing]) => key.length > 0 && typeof timing === "number" && Number.isFinite(timing),
+  );
+  return entries.length > 0 ? Object.fromEntries(entries) : null;
+}
+
+function formatPhaseTimings(value) {
+  if (!value) {
+    return "none";
+  }
+
+  return Object.entries(value)
+    .map(([phase, timing]) => `${phase}=${timing}`)
+    .join(",");
 }
 
 function resolveProviderMode(args) {

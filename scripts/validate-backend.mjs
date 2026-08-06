@@ -13,6 +13,7 @@ const sourceChecks = [
   tsCheck("runner-auth", "scripts/validate-runner-auth-session.ts"),
   tsCheck("admin-auth", "scripts/validate-admin-auth-session.ts"),
   tsCheck("runtime-observability", "scripts/validate-local-runtime-observability.ts"),
+  nodeCheck("qa-build-freshness", "scripts/validate-qa-build-freshness.mjs"),
   nodeCheck("test-user-lifecycle", "scripts/validate-qa-test-user-lifecycle.mjs"),
   tsCheck("admin-capture-backlog", "scripts/validate-admin-capture-backlog.ts"),
 ];

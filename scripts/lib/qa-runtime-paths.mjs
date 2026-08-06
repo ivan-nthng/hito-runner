@@ -25,6 +25,7 @@ export function resolveQaRuntimePaths({ rootDir = process.cwd() } = {}) {
     statePath: resolve(stateDir, "qa-local-server-state.json"),
     logPath: resolve(stateDir, "qa-local-server.log"),
     lockPath: resolve(stateDir, "build-output.lock.json"),
+    freshnessPath: resolve(runtimeRoot, ".hito-build-freshness.json"),
     buildOutputRoot,
     buildOutputNodeModulesDir: resolve(buildOutputRoot, "node_modules"),
     nitroBuildDir,

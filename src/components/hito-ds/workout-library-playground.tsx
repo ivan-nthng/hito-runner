@@ -2,21 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import type { KeyboardEvent } from "react";
 
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
-import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
+import {
+  HitoDsWorkbenchChoiceControl as ChoiceControl,
+  HitoDsWorkbenchSelectControl as SelectControl,
+} from "@/components/hito-ds/workbench-settings-controls";
 import {
   HitoCalendarDayCell,
   HitoWorkoutDayRow,
   type HitoCalendarDayBaseState,
 } from "@/components/ui/hito-calendar-day";
 import { Icon } from "@/components/ui/icon";
-import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { CanonicalWorkoutIdentity } from "@/lib/rich-workout-model";
 import {
   DEFAULT_WORKOUT_LIBRARY_STATE,
@@ -30,7 +25,6 @@ import {
   WORKOUT_LIBRARY_CANONICAL_IDENTITY_COUNT,
   WORKOUT_LIBRARY_IDENTITY_COUNT,
   WORKOUT_LIBRARY_SPECIMENS,
-  type WorkoutLibraryOption,
   type WorkoutLibrarySpecimen,
   type WorkoutLibraryState,
 } from "./workout-library-playground-data";
@@ -479,72 +473,6 @@ function BoundaryNote({
         {label}
       </p>
       <p className="hito-list-row-copy mt-2">{body}</p>
-    </div>
-  );
-}
-
-function ChoiceControl<T extends string>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: Array<WorkoutLibraryOption<T>>;
-  value: T;
-  onChange: (value: T) => void;
-}) {
-  const choiceGroup = useHitoRadioGroup({
-    items: options.map((option) => ({ value: option.value })),
-    value,
-  });
-
-  return (
-    <div className="grid min-w-0 gap-2">
-      <p className="hito-form-label">{label}</p>
-      <div className="hito-choice-toggle-group" {...choiceGroup.groupProps} aria-label={label}>
-        {options.map((option) => (
-          <HitoChoiceToggle
-            key={option.value}
-            size="xs"
-            {...choiceGroup.getRadioProps(option.value)}
-            selected={value === option.value}
-            onClick={() => onChange(option.value)}
-          >
-            {option.label}
-          </HitoChoiceToggle>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SelectControl<T extends string>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: Array<WorkoutLibraryOption<T>>;
-  value: T;
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div className="grid min-w-0 gap-2">
-      <p className="hito-form-label">{label}</p>
-      <Select value={value} onValueChange={(nextValue) => onChange(nextValue as T)}>
-        <SelectTrigger aria-label={label} size="sm" className="min-w-0">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
     </div>
   );
 }

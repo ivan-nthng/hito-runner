@@ -1,16 +1,11 @@
 import { type ReactNode, useMemo, useState } from "react";
 
 import { HitoCalendarDayCell, HitoWorkoutDayRow } from "@/components/ui/hito-calendar-day";
-import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
-import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  HitoDsWorkbenchChoiceControl as ChoiceControl,
+  HitoDsWorkbenchSelectControl as SelectControl,
+} from "@/components/hito-ds/workbench-settings-controls";
 import {
   ACTION_OPTIONS,
   BASE_STATE_OPTIONS,
@@ -28,7 +23,6 @@ import {
   getWorkoutTitle,
   type CalendarActionState,
   type CalendarPlaygroundState,
-  type Option,
   type WorkoutIdentity,
 } from "./calendar-workout-playground-data";
 
@@ -491,70 +485,4 @@ function getActionVisual(state: CalendarPlaygroundState) {
   }
 
   return null;
-}
-
-function ChoiceControl<T extends string>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: Array<Option<T>>;
-  value: T;
-  onChange: (value: T) => void;
-}) {
-  const choiceGroup = useHitoRadioGroup({
-    items: options.map((option) => ({ value: option.value })),
-    value,
-  });
-
-  return (
-    <div className="grid gap-2">
-      <p className="hito-form-label">{label}</p>
-      <div className="hito-choice-toggle-group" {...choiceGroup.groupProps} aria-label={label}>
-        {options.map((option) => (
-          <HitoChoiceToggle
-            key={option.value}
-            size="xs"
-            {...choiceGroup.getRadioProps(option.value)}
-            selected={value === option.value}
-            onClick={() => onChange(option.value)}
-          >
-            {option.label}
-          </HitoChoiceToggle>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SelectControl<T extends string>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: Array<Option<T>>;
-  value: T;
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div className="grid gap-2">
-      <p className="hito-form-label">{label}</p>
-      <Select value={value} onValueChange={(nextValue) => onChange(nextValue as T)}>
-        <SelectTrigger aria-label={label} size="sm">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
 }

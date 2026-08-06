@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { access, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -16,11 +16,21 @@ import {
   moveHitoSelection,
   sanitizeHitoSelectionIdPart,
 } from "../src/components/ui/hito-selection-mechanics";
+import {
+  WORKOUT_LIBRARY_CANONICAL_IDENTITY_COUNT,
+  WORKOUT_LIBRARY_IDENTITY_COUNT,
+} from "../src/components/hito-ds/workout-library-playground-data";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const controlsCssPath = path.join(rootDir, "src/styles/controls-lists.css");
 const fieldBaseCssPath = path.join(rootDir, "src/styles/controls-fields.css");
 const fieldsCssPath = path.join(rootDir, "src/styles/forms-onboarding.css");
+const foundationsCssPath = path.join(rootDir, "src/styles/foundations.css");
+const generatedManifestPath = path.join(rootDir, "src/generated/hito-ds-manifest.json");
+const retiredFoundationProofPath = path.join(
+  rootDir,
+  "scripts/validate-hito-ds-foundation-cleanup.mjs",
+);
 const sourceExtensions = new Set([".css", ".json", ".ts", ".tsx"]);
 const retiredClasses = [
   "hito-button-xl",
@@ -67,6 +77,48 @@ const selectionMechanicsImplementationMarkers = [
   'value.replace(/[^a-zA-Z0-9_-]/g, "-")',
   "const nextIndex = (startIndex + offset + enabledItems.length) % enabledItems.length;",
 ] as const;
+const workbenchSettingsOwner = "src/components/hito-ds/workbench-settings-controls.tsx";
+const workbenchSettingsImporters = new Set([
+  "src/components/hito-ds/calendar-workout-playground-data.ts",
+  "src/components/hito-ds/calendar-workout-playground.tsx",
+  "src/components/hito-ds/workout-library-playground-data.ts",
+  "src/components/hito-ds/workout-library-playground.tsx",
+]);
+const workbenchSettingsFormerOwners = new Set([
+  "src/components/hito-ds/calendar-workout-playground.tsx",
+  "src/components/hito-ds/workout-library-playground.tsx",
+]);
+const workbenchPrimitiveBypassMarkers = [
+  "@/components/ui/hito-choice-toggle",
+  "@/components/ui/hito-radio-group",
+  "@/components/ui/select",
+  "<HitoChoiceToggle",
+  "useHitoRadioGroup(",
+  "<SelectContent",
+  "<SelectItem",
+  "<SelectTrigger",
+  "<SelectValue",
+] as const;
+const retiredFoundationTokens = ["--easy", "--long", "--quality", "--rest"] as const;
+const retiredFoundationSelectors = [
+  "hito-ui-card",
+  "hito-ui-sidebar-panel",
+  "hito-analytics-grid",
+  "hito-chart-hover-note",
+  "hito-calendar-mobile-date-main",
+  "hito-manual-workout-menu-template",
+  "hito-onboarding-option-row-button",
+  "hito-window-scroll-fill",
+  "hito-window-header",
+  "hito-window-header-compact",
+  "hito-window-header-large",
+  "hito-window-close",
+  "hito-window-body",
+  "hito-window-body-scroll",
+  "hito-window-footer",
+  "hito-window-footer-actions",
+  "hito-window-footer-note",
+] as const;
 const referenceManualRecipePatterns = [
   {
     family: "Button",
@@ -107,10 +159,28 @@ type SourceFile = {
   relativePath: string;
 };
 
+type GeneratedManifest = {
+  collections: {
+    primitiveSpacing: Array<{ cssVariable: string; id: string }>;
+    [key: string]: unknown;
+  };
+  sourceDigest?: string;
+  textStyles: unknown[];
+};
+
 const errors: string[] = [];
 
 function expect(condition: boolean, message: string) {
   if (!condition) errors.push(message);
+}
+
+async function pathExists(filePath: string) {
+  try {
+    await access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function collectSourceFiles(directory: string): Promise<SourceFile[]> {
@@ -137,8 +207,12 @@ function filesContaining(files: SourceFile[], marker: string) {
   return files.filter((file) => file.content.includes(marker));
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function declaresSelector(css: string, selector: string) {
-  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escaped = escapeRegExp(selector);
   return new RegExp(`^\\s*${escaped}(?=\\s|\\{|,|:)`, "m").test(css);
 }
 
@@ -191,6 +265,39 @@ function selectionMechanicsImplementationFindings(files: SourceFile[]) {
         .filter((marker) => file.content.includes(marker))
         .map((marker) => ({ marker, relativePath: file.relativePath })),
     );
+}
+
+function workbenchSettingsImportFindings(files: SourceFile[]) {
+  return files
+    .filter((file) => file.content.includes("hito-ds/workbench-settings-controls"))
+    .filter((file) => !workbenchSettingsImporters.has(file.relativePath));
+}
+
+function workbenchPrimitiveBypassFindings(files: SourceFile[]) {
+  return files
+    .filter((file) => workbenchSettingsFormerOwners.has(file.relativePath))
+    .flatMap((file) =>
+      workbenchPrimitiveBypassMarkers
+        .filter((marker) => file.content.includes(marker))
+        .map((marker) => ({ marker, relativePath: file.relativePath })),
+    );
+}
+
+function retiredFoundationTokenFindings(files: SourceFile[]) {
+  return retiredFoundationTokens.flatMap((token) => {
+    const pattern = new RegExp(`${escapeRegExp(token)}(?![a-z0-9-])`, "i");
+    return files
+      .filter((file) => pattern.test(file.content))
+      .map((file) => ({ relativePath: file.relativePath, token }));
+  });
+}
+
+function retiredFoundationSelectorFindings(files: SourceFile[]) {
+  return retiredFoundationSelectors.flatMap((selector) =>
+    files
+      .filter((file) => file.content.includes(selector))
+      .map((file) => ({ relativePath: file.relativePath, selector })),
+  );
 }
 
 function showcaseBoundaryLeakFindings(files: SourceFile[]) {
@@ -312,6 +419,51 @@ function validateSelfTest() {
     selectionImplementationLeaks.length === 1,
     "Self-test failed to detect renamed or inline selection ring duplication.",
   );
+
+  const workbenchImportLeaks = workbenchSettingsImportFindings([
+    {
+      relativePath: "src/routes/synthetic-workbench.tsx",
+      content:
+        'import { HitoDsWorkbenchChoiceControl } from "@/components/hito-ds/workbench-settings-controls";',
+    },
+  ]);
+  expect(
+    workbenchImportLeaks.length === 1,
+    "Self-test failed to detect a workbench settings owner leak.",
+  );
+
+  const workbenchRecipeLeaks = workbenchPrimitiveBypassFindings([
+    {
+      relativePath: "src/components/hito-ds/calendar-workout-playground.tsx",
+      content: "const AlternateChoice = () => <HitoChoiceToggle />;",
+    },
+  ]);
+  expect(
+    workbenchRecipeLeaks.length === 1,
+    "Self-test failed to detect a renamed workbench settings primitive bypass.",
+  );
+  expect(
+    workbenchPrimitiveBypassFindings([
+      {
+        relativePath: "src/routes/synthetic-product.tsx",
+        content: "function ChoiceControl<T extends string>() {}",
+      },
+    ]).length === 0,
+    "Self-test incorrectly rejected an unrelated same-name Product control.",
+  );
+
+  expect(
+    retiredFoundationTokenFindings([
+      { relativePath: "src/styles/synthetic.css", content: "color: var(--easy);" },
+    ]).length === 1,
+    "Self-test failed to detect a retired foundation token.",
+  );
+  expect(
+    retiredFoundationSelectorFindings([
+      { relativePath: "src/components/synthetic.tsx", content: 'className="hito-window-body"' },
+    ]).length === 1,
+    "Self-test failed to detect a retired foundation selector.",
+  );
 }
 
 function validateSelectionMechanics() {
@@ -366,9 +518,17 @@ const sourceFiles = (
     collectSourceFiles(path.join(rootDir, "src/styles")),
   ])
 ).flat();
+const foundationSearchFiles = (await collectSourceFiles(path.join(rootDir, "src"))).filter((file) =>
+  /\.(css|ts|tsx)$/.test(file.relativePath),
+);
 const controlsCss = await readFile(controlsCssPath, "utf8");
 const fieldBaseCss = await readFile(fieldBaseCssPath, "utf8");
 const fieldExtendedCss = await readFile(fieldsCssPath, "utf8");
+const foundationsCss = await readFile(foundationsCssPath, "utf8");
+const generatedManifest = JSON.parse(
+  await readFile(generatedManifestPath, "utf8"),
+) as GeneratedManifest;
+const redundantFoundationProofExists = await pathExists(retiredFoundationProofPath);
 const currentReferenceDocs = await Promise.all(
   ["docs/current-product.md", "docs/current-system.md", "docs/current-state.md"].map(
     async (relativePath) => ({
@@ -482,6 +642,12 @@ const referenceControls = sourceFiles.find(
 const figmaBoard = sourceFiles.find(
   (file) => file.relativePath === "src/components/hito-ds/figma-export-board.tsx",
 );
+const foundationsPage = sourceFiles.find(
+  (file) => file.relativePath === "src/components/hito-ds/reference-foundations-page.tsx",
+);
+const lightPaletteReference = sourceFiles.find(
+  (file) => file.relativePath === "src/components/hito-ds/light-palette-reference.tsx",
+);
 const referenceMetadata = sourceFiles.find(
   (file) => file.relativePath === "src/components/hito-ds/reference-metadata.ts",
 );
@@ -505,6 +671,22 @@ const selectionMechanicsSource = sourceFiles.find(
 );
 const selectionImportLeaks = selectionMechanicsImportFindings(sourceFiles);
 const selectionImplementationLeaks = selectionMechanicsImplementationFindings(sourceFiles);
+const workbenchSettingsSource = sourceFiles.find(
+  (file) => file.relativePath === workbenchSettingsOwner,
+);
+const workbenchSettingsConsumers = sourceFiles.filter((file) =>
+  file.content.includes("hito-ds/workbench-settings-controls"),
+);
+const calendarPlaygroundSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/hito-ds/calendar-workout-playground.tsx",
+);
+const workoutLibraryPlaygroundSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/hito-ds/workout-library-playground.tsx",
+);
+const workbenchImportLeaks = workbenchSettingsImportFindings(sourceFiles);
+const workbenchPrimitiveBypasses = workbenchPrimitiveBypassFindings(sourceFiles);
+const retiredFoundationTokenLeaks = retiredFoundationTokenFindings(foundationSearchFiles);
+const retiredFoundationSelectorLeaks = retiredFoundationSelectorFindings(foundationSearchFiles);
 
 expect(
   referenceControls?.content.includes("HITO_BUTTON_SIZES") === true &&
@@ -516,6 +698,112 @@ expect(
   figmaBoard?.content.includes("HITO_BUTTON_SIZES") === true &&
     figmaBoard.content.includes("HITO_FIELD_SIZES"),
   "Figma capture board must consume the central control contract.",
+);
+expect(
+  workbenchSettingsSource?.content.includes("HitoDsWorkbenchChoiceControl") === true &&
+    workbenchSettingsSource.content.includes("HitoDsWorkbenchSelectControl") &&
+    workbenchSettingsSource.content.includes("HitoChoiceToggle") &&
+    workbenchSettingsSource.content.includes("useHitoRadioGroup") &&
+    workbenchSettingsSource.content.includes('size="xs"') &&
+    workbenchSettingsSource.content.includes("selected={value === option.value}") &&
+    workbenchSettingsSource.content.includes("onClick={() => onChange(option.value)}") &&
+    workbenchSettingsSource.content.includes("aria-label={label}") &&
+    workbenchSettingsSource.content.includes(
+      "onValueChange={(nextValue) => onChange(nextValue as Value)}",
+    ) &&
+    workbenchSettingsSource.content.includes(
+      '<SelectTrigger aria-label={label} className="min-w-0" size="sm">',
+    ) &&
+    workbenchSettingsSource.content.includes('className="grid min-w-0 gap-2"'),
+  "Reference workbench settings must resolve through one layout-safe Hito primitive composition.",
+);
+expect(
+  workbenchSettingsConsumers.length === workbenchSettingsImporters.size &&
+    workbenchSettingsConsumers.every((file) => workbenchSettingsImporters.has(file.relativePath)),
+  `Reference workbench settings consumers drifted from the exact four-file owner boundary: ${workbenchSettingsConsumers
+    .map((file) => file.relativePath)
+    .join(", ")}`,
+);
+expect(
+  workbenchImportLeaks.length === 0,
+  `Workbench settings controls leaked outside their exact reference consumers: ${workbenchImportLeaks
+    .map((file) => file.relativePath)
+    .join(", ")}`,
+);
+expect(
+  workbenchPrimitiveBypasses.length === 0,
+  `A former workbench owner bypassed the shared settings composition: ${workbenchPrimitiveBypasses
+    .map((finding) => `${finding.relativePath} (${finding.marker})`)
+    .join(", ")}`,
+);
+expect(
+  [calendarPlaygroundSource, workoutLibraryPlaygroundSource].every(
+    (file) =>
+      file?.content.includes("hito-ds/workbench-settings-controls") &&
+      file.content.includes("@/components/ui/hito-choice-toggle") === false &&
+      file.content.includes("@/components/ui/hito-radio-group") === false &&
+      file.content.includes("@/components/ui/select") === false,
+  ),
+  "Calendar or Workout Library bypassed the shared reference-workbench settings owner.",
+);
+expect(
+  sourceFiles.filter((file) => file.content.includes("export type HitoDsWorkbenchOption"))
+    .length === 1,
+  "The generic workbench option shape must have one declaration owner.",
+);
+expect(
+  WORKOUT_LIBRARY_IDENTITY_COUNT === 32 &&
+    WORKOUT_LIBRARY_CANONICAL_IDENTITY_COUNT === 32 &&
+    WORKOUT_LIBRARY_IDENTITY_COUNT === WORKOUT_LIBRARY_CANONICAL_IDENTITY_COUNT,
+  "The Workout Library must retain exactly one specimen for each of its 32 canonical identities.",
+);
+expect(
+  retiredFoundationTokenLeaks.length === 0,
+  `Retired foundation tokens returned: ${retiredFoundationTokenLeaks
+    .map((finding) => `${finding.token} in ${finding.relativePath}`)
+    .join(", ")}`,
+);
+expect(
+  retiredFoundationSelectorLeaks.length === 0,
+  `Retired foundation selectors returned: ${retiredFoundationSelectorLeaks
+    .map((finding) => `${finding.selector} in ${finding.relativePath}`)
+    .join(", ")}`,
+);
+const foundationGeometryDefinitions = [
+  ...foundationsCss.matchAll(/(--hito-[a-z0-9-]*(?:width|height)[a-z0-9-]*)\s*:/gi),
+].map((match) => match[1]);
+expect(
+  foundationGeometryDefinitions.length === 0,
+  `Component geometry remains in foundations.css: ${foundationGeometryDefinitions.join(", ")}`,
+);
+expect(
+  [figmaBoard, foundationsPage, lightPaletteReference].every((file) =>
+    file?.content.includes("HITO_DS_MANIFEST"),
+  ),
+  "Figma board, Foundations page, and Light palette must consume HITO_DS_MANIFEST.",
+);
+expect(
+  JSON.stringify(generatedManifest.collections).includes("hito-workout") === false,
+  "Workout-domain colors leaked into the shared foundation manifest.",
+);
+expect(
+  generatedManifest.textStyles.length === 14,
+  `Expected 14 reusable text styles, received ${generatedManifest.textStyles.length}.`,
+);
+expect(
+  generatedManifest.sourceDigest?.startsWith("sha256:") === true,
+  "Generated manifest is missing its deterministic source digest.",
+);
+generatedManifest.collections.primitiveSpacing.forEach((spacing, index) => {
+  const expectedAlias = `--spacing-hito-${spacing.id.replace("space-", "")}: var(${spacing.cssVariable});`;
+  expect(
+    foundationsCss.includes(expectedAlias),
+    `Tailwind spacing alias mismatch at manifest index ${index}: ${expectedAlias}`,
+  );
+});
+expect(
+  redundantFoundationProofExists === false,
+  "The retired standalone foundation proof root returned beside the canonical package validator.",
 );
 expect(
   referenceMetadata?.content.includes("HITO_BUTTON_SIZES") === true &&
@@ -679,10 +967,18 @@ if (errors.length > 0) {
     },
     choice: { sizes: HITO_CHOICE_TOGGLE_SIZES.length },
     field: { sizes: HITO_FIELD_SIZES.length, variants: HITO_FIELD_VARIANTS.length },
+    foundation: {
+      geometry: foundationGeometryDefinitions.length,
+      retiredSelectors: retiredFoundationSelectors.length,
+      retiredTokens: retiredFoundationTokens.length,
+      textStyles: generatedManifest.textStyles.length,
+    },
     reference: {
       currentDocs: currentReferenceDocs.length,
       productDependencies: showcaseBoundaryLeaks.length,
       role: "public-interactive",
+      workbenchSettingsConsumers: workbenchSettingsConsumers.length,
+      workoutLibraryIdentities: WORKOUT_LIBRARY_IDENTITY_COUNT,
     },
     scannedFiles: sourceFiles.length,
   };

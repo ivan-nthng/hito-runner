@@ -3,6 +3,7 @@ import type {
   HitoCalendarFeedbackState,
   HitoCalendarWorkoutIdentity,
 } from "@/components/ui/hito-calendar-day";
+import type { HitoDsWorkbenchOption } from "@/components/hito-ds/workbench-settings-controls";
 import { buildPlannedWorkoutLanguage } from "@/lib/planned-workout-language";
 import type {
   CanonicalWorkoutFamily,
@@ -24,11 +25,6 @@ export type WorkoutLibraryDetailDensity = "compact" | "full";
 export type WorkoutLibraryViewMode = "desktop" | "mobile";
 export type WorkoutLibraryFamilyFilter = "all" | CanonicalWorkoutFamily;
 export type WorkoutLibraryTargetTruthMode = "none" | "structure_only" | "editable_default_hr";
-
-export type WorkoutLibraryOption<T extends string> = {
-  value: T;
-  label: string;
-};
 
 type WorkoutLibrarySegmentCode =
   | "WU"
@@ -111,7 +107,7 @@ const ENDPOINT_RESULT_STATES = [
   "partial",
 ] as const satisfies readonly WorkoutLibraryResultState[];
 
-export const PROVIDER_STATE_OPTIONS: Array<WorkoutLibraryOption<WorkoutLibraryProviderState>> = [
+export const PROVIDER_STATE_OPTIONS: Array<HitoDsWorkbenchOption<WorkoutLibraryProviderState>> = [
   { value: "none", label: "None" },
   { value: "garmin_evidence_attached", label: "Garmin evidence" },
   { value: "garmin_feedback_ready", label: "Garmin feedback" },
@@ -119,24 +115,24 @@ export const PROVIDER_STATE_OPTIONS: Array<WorkoutLibraryOption<WorkoutLibraryPr
   { value: "future_provider_comparison_ready", label: "Provider compare future" },
 ];
 
-export const RESULT_STATE_OPTIONS: Array<WorkoutLibraryOption<WorkoutLibraryResultState>> = [
+export const RESULT_STATE_OPTIONS: Array<HitoDsWorkbenchOption<WorkoutLibraryResultState>> = [
   { value: "planned", label: "Planned" },
   { value: "completed", label: "Completed" },
   { value: "partial", label: "Partial" },
   { value: "skipped", label: "Skipped" },
 ];
 
-export const DETAIL_DENSITY_OPTIONS: Array<WorkoutLibraryOption<WorkoutLibraryDetailDensity>> = [
+export const DETAIL_DENSITY_OPTIONS: Array<HitoDsWorkbenchOption<WorkoutLibraryDetailDensity>> = [
   { value: "compact", label: "Compact" },
   { value: "full", label: "Full segments" },
 ];
 
-export const VIEW_MODE_OPTIONS: Array<WorkoutLibraryOption<WorkoutLibraryViewMode>> = [
+export const VIEW_MODE_OPTIONS: Array<HitoDsWorkbenchOption<WorkoutLibraryViewMode>> = [
   { value: "desktop", label: "Desktop" },
   { value: "mobile", label: "Mobile" },
 ];
 
-export const FAMILY_FILTER_OPTIONS: Array<WorkoutLibraryOption<WorkoutLibraryFamilyFilter>> = [
+export const FAMILY_FILTER_OPTIONS: Array<HitoDsWorkbenchOption<WorkoutLibraryFamilyFilter>> = [
   { value: "all", label: "All families" },
   { value: "rest", label: "Rest" },
   { value: "recovery", label: "Recovery" },

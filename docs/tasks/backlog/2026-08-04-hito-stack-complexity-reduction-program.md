@@ -41,38 +41,40 @@ evidence-gated.
 
 ## Stage
 
-Slices 8A and 8B are released at `0630edd` and `df796cc`; Slice 8C has passed its
-Design System implementation and independent owner-level QA. Slice 8D is the next Design System
-boundary after the exact 8C release. The concurrent FIT Frontend presentation remains separate and
-preserved. The parent stays `in_progress` until every admitted slice closes or is retained with
-current evidence.
+Slices 8A, 8B, and 8C are released at `0630edd`, `df796cc`, and `726933f`; Slice 8D has
+completed Design System implementation and independent owner-level QA, with its exact release
+owned by the commit containing this receipt. The concurrent FIT Frontend presentation remains
+separate and preserved. The parent stays `in_progress`; Product/Architect owns admission of any
+later evidence-gated slice.
 
 ## Next Recommended Role
 
-design_system
+product
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: DESIGN SYSTEM
+ROLE: PRODUCT
 
 Task:
-Consolidate duplicated generic Hito DS workbench settings controls and make the evergreen foundation
-proof reachable through the canonical DS validator.
+Review the completed Slice 8D release receipt and admit the next evidence-gated parent-program
+boundary without interrupting active Frontend FIT work.
 
 Stage:
-DESIGN SYSTEM implementation with integrated QA, Slice 8D.
+PRODUCT sequencing after the Slice 8D exact release.
 
 Required outcome:
-- Establish one parity-proven workbench settings owner used by Calendar and Workout Library.
-- Make foundation cleanup assertions package-reachable through the canonical DS validation owner.
-- Delete duplicate local controls and the redundant proof root after exact behavior/assertion parity.
-- Preserve Calendar geometry, the 32 workout identities, public /hitoDS, manifests, focus, width, and
-  accessibility; do not create a generic workbench framework or parallel validator.
+- Keep the released Slice 8D Design System boundary closed unless a new failing discriminator
+  exists.
+- Confirm the next canonical owner is idle before dispatching any later slice.
+- Preserve the concurrent FIT work and do not start a mixed-owner release.
 
-Approval policy: Routine local implementation, independent QA, exact-manifest release, push,
-deployment, and smoke validation proceed under standing authorization. Do not mutate hosted data or
-interrupt another active role.
+Definition of Done:
+The next slice is routed only after live owner availability and current evidence are reconciled.
+Do not claim Global QA Acceptance.
+
+Approval policy: Routine local inspection and routing proceed under standing authorization; do
+not mutate hosted data, call providers, or interrupt another active role.
 ```
 
 ## Completed Slice 6 Handoff Record
@@ -409,6 +411,19 @@ unless a future measured requirement establishes a need.
   light/dark proof, build/integrity/runtime, ARCHITECT review, and independent QA passed.
 - Global QA remains separate and pending.
 
+## Slice 8D Closure Receipt
+
+- [Workbench Controls And Validation Convergence](2026-08-05-hito-ds-workbench-controls-and-validation-convergence.md)
+  is completed at the Design System owner boundary.
+- One reference-only settings owner replaces the two Calendar and two Workout Library local
+  Choice/Select implementations and their duplicate option types without adding a public
+  component API or domain variant.
+- The package-reachable component validator now owns every evergreen foundation assertion; the
+  redundant standalone proof root is deleted after parity, exact-importer, recurrence, manifest,
+  browser, build/integrity, runtime, architecture, and independent QA proof passed.
+- Calendar geometry and meaning, all 32 Workout Library identities, public `/hitoDS`, TS/JSON
+  manifest consumers, focus, width, and ARIA behavior remain intact. Global QA remains pending.
+
 ## Owner-Scoped Roadmap
 
 | Slice                                    | Owner                         | Operational state and outcome                                                                                                                                                                                                                                                      | Required proof                                                                                                                                                                                                                | Stop condition                                                                                                     |
@@ -439,7 +454,8 @@ document claim alone.
 
 ## Next Admission
 
-Slices 8A and 8B are released at `0630edd` and `df796cc`; Slice 8C has passed owner-level
-implementation and QA and proceeds through its exact release before Slice 8D begins. Slice 8D is the
-only next executable boundary. The parent remains `in_progress`; no mixed-owner release, broad
-rewrite, framework migration, new queue, or deletion from line count is admitted.
+Slices 8A, 8B, and 8C are released at `0630edd`, `df796cc`, and `726933f`; Slice 8D has
+completed owner-level implementation and QA and is released by the commit containing its closure
+receipt. The parent remains `in_progress`; this Design System receipt does not admit another
+slice, mixed-owner release, broad rewrite, framework migration, new queue, or deletion from line
+count.

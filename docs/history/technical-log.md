@@ -32,6 +32,18 @@ must either add an entry here or explicitly state why it is not technical-log ma
 
 ## 2026-08-05
 
+- DESIGN SYSTEM + QA + ARCHITECT / Hito DS workbench controls and validation convergence (Slice
+  8D) — replaced the duplicate Calendar and Workout Library Choice/Select settings recipes and
+  option types with one narrow reference-only owner, then moved every evergreen foundation-retirement
+  assertion into the package-reachable component validator and deleted the standalone proof root.
+  Exact importer, renamed-bypass, unrelated-name, 32-identity, manifest, desktop/exact-375px,
+  light/dark, keyboard/pointer/ARIA, build/integrity, runtime, architecture, and independent-QA proof
+  passed after fix-forward. Evidence:
+  `docs/tasks/backlog/2026-08-05-hito-ds-workbench-controls-and-validation-convergence.md`.
+  Boundary: no Product route, Calendar geometry/data, Workout Library identity, manifest
+  representation, backend, provider, persistence, DevTools, package, or dependency contract changed;
+  Global QA remains pending.
+
 - DESIGN SYSTEM + QA + ARCHITECT / neutral Hito selection mechanics (Slice 8C) — moved the shared
   item shape, safe-ID normalization, enabled tab stop, and wrap movement into one internal owner;
   Tabs and Radio retain separate roles, ARIA, IDs, key maps, focus, activation, and state contracts.

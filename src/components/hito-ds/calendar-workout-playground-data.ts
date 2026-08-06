@@ -3,6 +3,7 @@ import type {
   HitoCalendarFeedbackState,
   HitoCalendarWorkoutIdentity,
 } from "@/components/ui/hito-calendar-day";
+import type { HitoDsWorkbenchOption } from "@/components/hito-ds/workbench-settings-controls";
 import { workoutTypeColorVar } from "@/lib/workout-color-tokens";
 
 export type BaseDateState = HitoCalendarDayBaseState;
@@ -25,11 +26,6 @@ export type DensityMode = "normal" | "dense";
 export type CalendarActionState = "none" | "add-activity" | "more-menu" | "timed-undo";
 export type UndoProgressState = "25" | "50" | "75" | "100";
 
-export type Option<T extends string> = {
-  value: T;
-  label: string;
-};
-
 export type WorkoutIdentity = HitoCalendarWorkoutIdentity & {
   family: "easy" | "long" | "quality" | "rest";
   defaultTitle: string;
@@ -48,58 +44,58 @@ export type CalendarPlaygroundState = {
   undoProgress: UndoProgressState;
 };
 
-export const VIEW_MODE_OPTIONS: Array<Option<CalendarPreviewMode>> = [
+export const VIEW_MODE_OPTIONS: Array<HitoDsWorkbenchOption<CalendarPreviewMode>> = [
   { value: "desktop", label: "Desktop" },
   { value: "mobile", label: "Mobile" },
 ];
 
-export const BASE_STATE_OPTIONS: Array<Option<BaseDateState>> = [
+export const BASE_STATE_OPTIONS: Array<HitoDsWorkbenchOption<BaseDateState>> = [
   { value: "workout", label: "Workout" },
   { value: "rest", label: "Rest" },
   { value: "empty", label: "No workout" },
   { value: "outside-month", label: "Outside month" },
 ];
 
-export const OVERLAY_OPTIONS: Array<Option<InteractionOverlay>> = [
+export const OVERLAY_OPTIONS: Array<HitoDsWorkbenchOption<InteractionOverlay>> = [
   { value: "none", label: "None" },
   { value: "today", label: "Today" },
   { value: "selected", label: "Selected" },
   { value: "focused", label: "Focus" },
 ];
 
-export const RESULT_OPTIONS: Array<Option<ResultState>> = [
+export const RESULT_OPTIONS: Array<HitoDsWorkbenchOption<ResultState>> = [
   { value: "none", label: "None" },
   { value: "completed", label: "Done" },
   { value: "partial", label: "Partial" },
   { value: "skipped", label: "Skipped" },
 ];
 
-export const FEEDBACK_OPTIONS: Array<Option<FeedbackState>> = [
+export const FEEDBACK_OPTIONS: Array<HitoDsWorkbenchOption<FeedbackState>> = [
   { value: "none", label: "None" },
   { value: "evidence_attached", label: "Evidence" },
   { value: "feedback_ready", label: "Feedback" },
 ];
 
-export const TITLE_STRESS_OPTIONS: Array<Option<TitleStress>> = [
+export const TITLE_STRESS_OPTIONS: Array<HitoDsWorkbenchOption<TitleStress>> = [
   { value: "short", label: "Short" },
   { value: "normal", label: "Normal" },
   { value: "long", label: "Long" },
   { value: "extreme", label: "Overflow" },
 ];
 
-export const DENSITY_OPTIONS: Array<Option<DensityMode>> = [
+export const DENSITY_OPTIONS: Array<HitoDsWorkbenchOption<DensityMode>> = [
   { value: "normal", label: "Normal" },
   { value: "dense", label: "Dense" },
 ];
 
-export const ACTION_OPTIONS: Array<Option<CalendarActionState>> = [
+export const ACTION_OPTIONS: Array<HitoDsWorkbenchOption<CalendarActionState>> = [
   { value: "none", label: "None" },
   { value: "add-activity", label: "Add activity" },
   { value: "more-menu", label: "More menu" },
   { value: "timed-undo", label: "Timed Undo" },
 ];
 
-export const UNDO_PROGRESS_OPTIONS: Array<Option<UndoProgressState>> = [
+export const UNDO_PROGRESS_OPTIONS: Array<HitoDsWorkbenchOption<UndoProgressState>> = [
   { value: "25", label: "25%" },
   { value: "50", label: "50%" },
   { value: "75", label: "75%" },
@@ -181,7 +177,7 @@ export const WORKOUT_IDENTITIES: Record<WorkoutIdentityKey, WorkoutIdentity> = {
   },
 };
 
-export const WORKOUT_IDENTITY_OPTIONS: Array<Option<WorkoutIdentityKey>> = (
+export const WORKOUT_IDENTITY_OPTIONS: Array<HitoDsWorkbenchOption<WorkoutIdentityKey>> = (
   Object.keys(WORKOUT_IDENTITIES) as WorkoutIdentityKey[]
 ).map((value) => ({
   value,

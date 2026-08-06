@@ -31,6 +31,7 @@
     "validate-admin-capture-backlog:live": "node --env-file=.env.local --import tsx ./scripts/validate-admin-capture-backlog.ts --live-supabase",
     "validate-changelog-history": "node --import tsx ./scripts/validate-changelog-history-sync.ts",
     "validate-hito-ds-components": "node --import tsx ./scripts/validate-hito-ds-component-contracts.ts",
+    "validate-product-contracts": "node --import tsx ./scripts/validate-product-contracts.ts",
     "validate-local-runtime-observability": "node --import tsx ./scripts/validate-local-runtime-observability.ts",
     "validate-manual-workout-authoring": "node --import tsx ./scripts/validate-manual-workout-authoring.ts",
     "validate:backend": "node ./scripts/validate-backend.mjs",

@@ -55,7 +55,8 @@ export function findExistingRepoMirrorRow<T extends RepoMirrorRow>(
 }
 
 export function countRepoMirrorIdentityDuplicates(rows: RepoMirrorRow[]) {
-  const counts = new Map<string, number>();
+  const workItemIdCounts = new Map<string, number>();
+  const sourceCounts = new Map<string, number>();
 
   for (const row of rows) {
     const identity = readRepoMirrorIdentity(row.metadata);
@@ -64,11 +65,19 @@ export function countRepoMirrorIdentityDuplicates(rows: RepoMirrorRow[]) {
       continue;
     }
 
-    const key = workItemIdentityKey(identity.workItemId, identity.sourceType, identity.sourcePath);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
+    const sourceIdentity = sourceKey(identity.sourceType, identity.sourcePath);
+    sourceCounts.set(sourceIdentity, (sourceCounts.get(sourceIdentity) ?? 0) + 1);
+
+    if (identity.workItemId) {
+      workItemIdCounts.set(
+        identity.workItemId,
+        (workItemIdCounts.get(identity.workItemId) ?? 0) + 1,
+      );
+    }
   }
 
-  return Array.from(counts.values()).filter((count) => count > 1).length;
+  return [...workItemIdCounts.values(), ...sourceCounts.values()].filter((count) => count > 1)
+    .length;
 }
 
 export function findDuplicateWorkItemIds(

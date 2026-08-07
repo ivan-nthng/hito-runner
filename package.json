@@ -38,7 +38,7 @@
     "validate:backend:local-db": "node --env-file=.env.local ./scripts/validate-backend.mjs --local-db",
     "validate:backend:runtime": "node --env-file=.env.local ./scripts/validate-backend.mjs --runtime --runtime-url=http://127.0.0.1:3000",
     "validate:backend:release": "node ./scripts/validate-backend.mjs --release",
-    "import-admin-backlog-work-items": "node --env-file=.env.local --import tsx ./scripts/import-repo-work-items-to-admin-backlog.ts",
+    "import-admin-backlog-work-items": "node --env-file=.env.local --import tsx ./scripts/import-repo-work-items-to-admin-backlog-cli.ts",
     "test-user": "node --env-file=.env.local ./scripts/test-user.mjs",
     "local:design-profile:seed": "node --env-file=.env.local ./scripts/test-user.mjs design-profile-seed",
     "local:design-profile:status": "node --env-file=.env.local ./scripts/test-user.mjs design-profile-status",

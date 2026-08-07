@@ -1,6 +1,7 @@
 import "@tanstack/react-start/server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getRequest } from "@tanstack/react-start/server";
 import { adminCaptureActiveStatuses, adminCaptureStatuses } from "@/lib/admin-capture-contract";
 import type {
   AdminCaptureBacklogView,
@@ -32,8 +33,9 @@ import {
   isAdminWorkItemSourceGroup,
 } from "@/lib/admin-work-items";
 import type { Database, Json } from "@/lib/supabase/database";
-import { hasSupabaseServerEnv } from "@/lib/supabase/env";
+import { hasSupabaseServerEnv, publicEnv } from "@/lib/supabase/env";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
+import { createAdminRepoMirrorSynchronizer } from "@/lib/admin-repo-mirror.server";
 
 const QUICK_NOTE_PAGE_URL = "hito://admin/quick-note";
 const NOTE_HISTORY_LIMIT = 20;
@@ -77,8 +79,12 @@ export interface AdminCaptureRepository {
 export interface AdminCaptureDependencies {
   adminAccess: () => Promise<AdminAccessResult>;
   repository: AdminCaptureRepository | null;
+  synchronizeRepoMirror?: () => Promise<void>;
+  repoMirrorSyncTimeoutMs?: number;
   now?: () => Date;
 }
+
+const DEFAULT_REPO_MIRROR_SYNC_TIMEOUT_MS = 10_000;
 
 export async function listAdminCaptureBacklogForCurrentRequest(
   input: AdminCaptureListInput,
@@ -134,6 +140,7 @@ export async function listAdminCaptureBacklogForDependencies(
   }
 
   try {
+    await synchronizeRepoMirrorBeforeRead(dependencies);
     const { rows, statusCounts } = await dependencies.repository.listBacklog(input);
     const items = rows.map(mapItemView);
 
@@ -524,11 +531,46 @@ export function buildAdminCaptureCopyPrompt(
 
 async function buildCurrentDependencies(): Promise<AdminCaptureDependencies> {
   const supabase = hasSupabaseServerEnv ? createAdminSupabaseClient() : null;
+  const requestUrl = getRequest().url;
+  const synchronizeRepoMirror = supabase
+    ? createAdminRepoMirrorSynchronizer({
+        requestUrl,
+        supabaseUrl: publicEnv.supabaseUrl,
+        sourceRevision: process.env.VERCEL_GIT_COMMIT_SHA,
+        supabase,
+      })
+    : undefined;
 
   return {
     adminAccess: () => requireAdminAccessForCurrentRequest(supabase),
     repository: supabase ? createSupabaseAdminCaptureRepository(supabase) : null,
+    synchronizeRepoMirror,
   };
+}
+
+async function synchronizeRepoMirrorBeforeRead(dependencies: AdminCaptureDependencies) {
+  if (!dependencies.synchronizeRepoMirror) {
+    return;
+  }
+
+  const timeoutMs = dependencies.repoMirrorSyncTimeoutMs ?? DEFAULT_REPO_MIRROR_SYNC_TIMEOUT_MS;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    await Promise.race([
+      dependencies.synchronizeRepoMirror(),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error("Repository mirror synchronization timed out.")),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+  }
 }
 
 export function createSupabaseAdminCaptureRepository(

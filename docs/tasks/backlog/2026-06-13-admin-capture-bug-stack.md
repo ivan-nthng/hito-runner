@@ -6,7 +6,7 @@
 
 ## Status
 
-backlog
+in_progress
 
 ## Type
 
@@ -34,7 +34,23 @@ Maintain the numbered admin capture bug stack for screenshot-backed `/admin/capt
 
 ## Stage
 
-PRODUCT backlog index / no active intake or implementation gate selected.
+BACKEND main-only repository-mirror recovery passed local implementation validation; the deployed
+child remains blocked on legitimate authenticated production acceptance, and later Admin capture
+intake remains retained in this parent tracker.
+
+## Next Recommended Role
+
+backend
+
+## Exact Handoff Prompt
+
+```text
+ROLE: BACKEND
+
+Resume the deployed Admin Work Items repository-mirror child only with legitimate production Admin
+authentication, preserve the numbered tracker, and return this parent to backlog intake after hosted
+acceptance is proven.
+```
 
 ## Historical Exact Handoff Prompt
 
@@ -110,6 +126,8 @@ file.
 ## Numbered Items
 
 1. [Bug 01: Add quick note dialog dismissal and reusable product-form dialog shell](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/2026-06-13-admin-capture-bug-01-add-quick-note-dialog-dismissal-and-shell-reuse.md)
+2. [Admin Work Items Repository Mirror Synchronization](2026-08-06-admin-work-items-repository-mirror-synchronization.md)
+3. [Admin Work Items Deployed Repository Mirror Delivery](2026-08-06-admin-work-items-deployed-repository-mirror-delivery.md)
 
 ## What Not To Touch
 

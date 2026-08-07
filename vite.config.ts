@@ -12,6 +12,7 @@ import {
   ensureQaBuildOutputNodeModulesLink,
   resolveQaRuntimePaths,
 } from "./scripts/lib/qa-runtime-paths.mjs";
+import { hitoAdminRepoWorkItemsPlugin } from "./scripts/vite-admin-repo-work-items-plugin.mjs";
 
 const rootDir = process.cwd();
 const qaRuntimePaths = resolveQaRuntimePaths({ rootDir });
@@ -140,6 +141,7 @@ function snapshotClientPublicOutput(): void {
 
 export default defineConfig({
   plugins: [
+    hitoAdminRepoWorkItemsPlugin({ rootDir }),
     tailwindcss(),
     tsconfigPaths({ projects: ["./tsconfig.json"] }),
     tanstackStart({

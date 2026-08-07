@@ -1,8 +1,7 @@
 import { createHash } from "node:crypto";
-import { readdir, readFile, stat } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   adminRepoWorkItemSourceTypes,
   getAdminRepoWorkItemMetadata,
@@ -47,6 +46,7 @@ import {
   findExistingRepoMirrorRow,
   type DuplicateWorkItemId,
 } from "./admin-backlog-import/identity";
+import sourceManifest from "./admin-backlog-import/sources.json";
 import type { Database, Json } from "../src/lib/supabase/database";
 
 const IMPORT_VERSION = "repo-work-items-v2";
@@ -93,8 +93,8 @@ const IMPORT_METADATA_COMPARE_KEYS = [
   "admin_capture_status",
   "admin_capture_priority",
   "admin_capture_target_role",
-  "source_mtime",
   "content_hash",
+  "source_generation",
   "title_source",
   "source_status_text",
   "source_owner",
@@ -183,6 +183,45 @@ type ImportStats = {
   examples: Record<string, ExampleItem | null>;
 };
 
+export type AdminRepoMirrorImportReport = {
+  mode: "dry_run" | "live_upsert";
+  ok: boolean;
+  stats: ImportStats;
+  archiveStale: boolean;
+  message: string;
+};
+
+export type AdminRepoMirrorImportOptions = {
+  rootDir?: string;
+  documents?: AdminRepoWorkItemDocument[];
+  dryRun?: boolean;
+  archiveStale?: boolean;
+  debug?: boolean;
+  sourceRevision?: string;
+  sourceGeneration?: string;
+  supabase?: SupabaseClient<Database>;
+};
+
+export type AdminRepoWorkItemDocument = {
+  sourcePath: string;
+  sourceType: SourceType;
+  content: string;
+};
+
+type ImportPhase = {
+  name: string;
+  detail: string | null;
+  startedAt: string;
+};
+
+type ImportRunContext = {
+  args: ReturnType<typeof parseArgs>;
+  generatedAt: string;
+  sourceRevision: string | null;
+  sourceGeneration: string | null;
+  currentPhase: ImportPhase;
+};
+
 type ExampleItem = {
   title: string;
   workItemId: string | null;
@@ -230,35 +269,28 @@ type DuplicateConceptExample = {
   }>;
 };
 
-const SOURCE_CONFIGS: SourceConfig[] = [
-  { type: "backlog_doc", root: "docs/tasks/backlog" },
-  { type: "product_brief", root: "docs/tasks/product-briefs" },
-  { type: "frontend_spec", root: "docs/tasks/frontend-specs" },
-  { type: "active_plan", root: "docs/plans/active" },
-  { type: "archived_plan", root: "docs/plans/archive" },
-];
+const SOURCE_CONFIGS = sourceManifest.sources as SourceConfig[];
 
-const args = parseArgs(process.argv.slice(2));
-const generatedAt = new Date().toISOString();
-let currentPhase: { name: string; detail: string | null; startedAt: string } = {
-  name: "initializing",
-  detail: null,
-  startedAt: generatedAt,
-};
+export const ADMIN_REPO_WORK_ITEM_SOURCE_ROOTS = SOURCE_CONFIGS.map((source) => source.root);
 
-if (isMainModule()) {
-  await runMain();
-}
-
-function isMainModule() {
-  return Boolean(process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href);
-}
-
-async function runMain() {
-  const timeout = startImporterTimeout();
+export async function runRepoWorkItemImporterCli(argv = process.argv.slice(2)) {
+  const cliArgs = parseArgs(argv);
+  const context = createImportRunContext(cliArgs);
+  const timeout = startImporterTimeout(cliArgs, context);
 
   try {
-    await main();
+    const report = await synchronizeRepoWorkItemsWithContext(
+      {
+        rootDir: process.cwd(),
+        ...cliArgs,
+      },
+      context,
+    );
+    printReport(report);
+
+    if (!report.ok) {
+      process.exitCode = 1;
+    }
   } finally {
     if (timeout) {
       clearTimeout(timeout);
@@ -266,10 +298,23 @@ async function runMain() {
   }
 }
 
-async function main() {
-  setPhase("scan_repo_work_items", process.cwd());
-  const scan = await scanRepoWorkItems(process.cwd());
-  setPhase("prepare_import_report", `${scan.items.length} eligible repo items`);
+export async function synchronizeRepoWorkItems(
+  options: AdminRepoMirrorImportOptions = {},
+): Promise<AdminRepoMirrorImportReport> {
+  return synchronizeRepoWorkItemsWithContext(options, createImportRunContext(options));
+}
+
+async function synchronizeRepoWorkItemsWithContext(
+  options: AdminRepoMirrorImportOptions,
+  context: ImportRunContext,
+): Promise<AdminRepoMirrorImportReport> {
+  const { args, generatedAt } = context;
+  const rootDir = options.rootDir ?? process.cwd();
+  setPhase(context, "scan_repo_work_items", options.documents ? "bundled snapshot" : rootDir);
+  const scan = options.documents
+    ? await scanRepoWorkItemDocuments(options.documents, context)
+    : await scanRepoWorkItems(rootDir, context);
+  setPhase(context, "prepare_import_report", `${scan.items.length} eligible repo items`);
   const items = scan.items;
   const duplicateWorkItemIds = findDuplicateWorkItemIds(items);
   const malformedCanonicalItems = findMalformedCanonicalItems(items);
@@ -311,11 +356,11 @@ async function main() {
 
   if (args.dryRun) {
     if (args.archiveStale) {
-      setPhase("create_supabase_client", "dry-run stale mirror check");
-      const supabase = createServiceClient();
-      setPhase("load_existing_admin_capture_rows", "dry-run stale mirror check");
+      setPhase(context, "create_supabase_client", "dry-run stale mirror check");
+      const supabase = options.supabase ?? createServiceClient();
+      setPhase(context, "load_existing_admin_capture_rows", "dry-run stale mirror check");
       const existingRows = await loadAdminCaptureRows(supabase);
-      setPhase("analyze_stale_repo_mirror_rows", "dry-run stale mirror check");
+      setPhase(context, "analyze_stale_repo_mirror_rows", "dry-run stale mirror check");
       const staleRows = findStaleActiveRepoMirrorRows(existingRows, currentMirrorKeys);
 
       stats.manualRowCountBefore = countManualRows(existingRows);
@@ -327,61 +372,45 @@ async function main() {
       stats.staleRepoMirrorExamples = summarizeStaleRepoMirrorRows(staleRows);
     }
 
-    printReport({
+    return {
       mode: "dry_run",
-      ok: duplicateWorkItemIds.length === 0 && malformedCanonicalItems.length === 0,
+      ok: duplicateWorkItemIds.length === 0,
       stats,
-      refreshTriage: args.refreshTriage,
       archiveStale: args.archiveStale,
       message:
         duplicateWorkItemIds.length > 0
           ? "Dry run refused duplicate Work Item IDs and did not write Supabase."
           : malformedCanonicalItems.length > 0
-            ? "Dry run refused malformed canonical work items and did not write Supabase."
+            ? "Dry run found malformed canonical work items; live sync will mirror them as read-only diagnostics."
             : "Dry run scanned repo markdown and did not write Supabase.",
-    });
-
-    if (duplicateWorkItemIds.length > 0 || malformedCanonicalItems.length > 0) {
-      process.exitCode = 1;
-    }
-
-    return;
+    };
   }
 
-  if (duplicateWorkItemIds.length > 0 || malformedCanonicalItems.length > 0) {
-    printReport({
+  if (duplicateWorkItemIds.length > 0) {
+    return {
       mode: "live_upsert",
       ok: false,
       stats,
-      refreshTriage: args.refreshTriage,
       archiveStale: args.archiveStale,
-      message:
-        duplicateWorkItemIds.length > 0
-          ? "Live import refused duplicate Work Item IDs before creating a Supabase client."
-          : "Live import refused malformed canonical work items before creating a Supabase client.",
-    });
-    process.exitCode = 1;
-    return;
+      message: "Live import refused duplicate Work Item IDs before creating a Supabase client.",
+    };
   }
 
-  setPhase("create_supabase_client", "live import");
-  const supabase = createServiceClient();
-  setPhase("load_existing_admin_capture_rows", "before live import");
+  setPhase(context, "create_supabase_client", "live import");
+  const supabase = options.supabase ?? createServiceClient();
+  setPhase(context, "load_existing_admin_capture_rows", "before live import");
   const beforeRows = await loadAdminCaptureRows(supabase);
   stats.manualRowCountBefore = countManualRows(beforeRows);
   stats.duplicateCount = countRepoMirrorIdentityDuplicates(beforeRows);
 
   if (stats.duplicateCount > 0) {
-    printReport({
+    return {
       mode: "live_upsert",
       ok: false,
       stats,
-      refreshTriage: args.refreshTriage,
       archiveStale: args.archiveStale,
       message: "Live import refused ambiguous existing repo mirrors before any write.",
-    });
-    process.exitCode = 1;
-    return;
+    };
   }
 
   const existingRepoMirrors = buildExistingRepoMirrorIndex(beforeRows);
@@ -389,17 +418,18 @@ async function main() {
   for (const item of items) {
     const existing = findExistingRepoMirrorRow(existingRepoMirrors, item);
     setPhase(
+      context,
       existing ? "refresh_existing_admin_capture_item" : "create_admin_capture_item",
       item.sourcePath,
     );
     const action = existing
-      ? await refreshExistingItem(supabase, existing, item)
-      : await createImportedItem(supabase, item);
+      ? await refreshExistingItem(supabase, existing, item, generatedAt)
+      : await createImportedItem(supabase, item, generatedAt);
 
     stats[action] += 1;
   }
 
-  setPhase("load_existing_admin_capture_rows", "after live upsert");
+  setPhase(context, "load_existing_admin_capture_rows", "after live upsert");
   const afterUpsertRows = await loadAdminCaptureRows(supabase);
   const staleRows = findStaleActiveRepoMirrorRows(afterUpsertRows, currentMirrorKeys);
   stats.staleActiveRepoMirrorCount = staleRows.length;
@@ -408,13 +438,13 @@ async function main() {
 
   if (args.archiveStale) {
     for (const row of staleRows) {
-      setPhase("archive_stale_repo_mirror_row", row.title ?? row.id);
-      await archiveStaleRepoMirrorRow(supabase, row);
+      setPhase(context, "archive_stale_repo_mirror_row", row.title ?? row.id);
+      await archiveStaleRepoMirrorRow(supabase, row, generatedAt);
       stats.staleRepoMirrorArchivedCount += 1;
     }
   }
 
-  setPhase("load_existing_admin_capture_rows", "after stale cleanup");
+  setPhase(context, "load_existing_admin_capture_rows", "after stale cleanup");
   const afterRows = await loadAdminCaptureRows(supabase);
   stats.manualRowCountAfter = countManualRows(afterRows);
   stats.duplicateCount = countRepoMirrorIdentityDuplicates(afterRows);
@@ -424,42 +454,69 @@ async function main() {
     currentMirrorKeys,
   ).length;
 
-  printReport({
+  return {
     mode: "live_upsert",
     ok:
       stats.duplicateCount === 0 &&
       stats.repoDerivedInReviewCount === 0 &&
-      stats.staleActiveRepoMirrorCountAfterCleanup === 0 &&
+      (!args.archiveStale || stats.staleActiveRepoMirrorCountAfterCleanup === 0) &&
       (stats.manualRowCountBefore === null ||
         stats.manualRowCountBefore === stats.manualRowCountAfter),
     stats,
-    refreshTriage: args.refreshTriage,
     archiveStale: args.archiveStale,
     message:
-      "Repo markdown work items were mirrored into admin_capture_items. Markdown remains canonical.",
-  });
-
-  if (
-    stats.duplicateCount > 0 ||
-    stats.repoDerivedInReviewCount > 0 ||
-    stats.staleActiveRepoMirrorCountAfterCleanup !== 0 ||
-    (stats.manualRowCountBefore !== null &&
-      stats.manualRowCountBefore !== stats.manualRowCountAfter)
-  ) {
-    process.exitCode = 1;
-  }
+      malformedCanonicalItems.length > 0
+        ? "Repo markdown work items, including read-only malformed-source diagnostics, were mirrored into admin_capture_items. Markdown remains canonical."
+        : "Repo markdown work items were mirrored into admin_capture_items. Markdown remains canonical.",
+  };
 }
 
-async function scanRepoWorkItems(rootDir: string) {
+function createImportRunContext(
+  options: Pick<
+    AdminRepoMirrorImportOptions,
+    "dryRun" | "archiveStale" | "debug" | "sourceRevision" | "sourceGeneration"
+  >,
+): ImportRunContext {
+  const args = {
+    dryRun: options.dryRun ?? false,
+    archiveStale: options.archiveStale ?? false,
+    debug: options.debug ?? false,
+    timeoutMs: DEFAULT_TIMEOUT_MS,
+  };
+  const generatedAt = new Date().toISOString();
+
+  return {
+    args,
+    generatedAt,
+    sourceRevision: options.sourceRevision?.trim() || null,
+    sourceGeneration: normalizeSourceGeneration(options.sourceGeneration),
+    currentPhase: {
+      name: "initializing",
+      detail: null,
+      startedAt: generatedAt,
+    },
+  };
+}
+
+async function scanRepoWorkItems(rootDir: string, context: ImportRunContext) {
   const discoveredBySourceType = emptySourceCounts();
   const skippedByReason: Record<string, number> = {};
   const items: RepoWorkItem[] = [];
 
   for (const source of SOURCE_CONFIGS) {
-    setPhase("collect_markdown_files", source.root);
-    const files = await collectMarkdownFiles(path.join(rootDir, source.root));
+    setPhase(context, "collect_markdown_files", source.root);
+    const files = await collectMarkdownFiles(path.join(rootDir, source.root), context);
+    const eligibleFiles = files.filter((file) => {
+      const relativePath = normalizeSourcePath(path.relative(rootDir, file));
+      return getSkipReason(relativePath) === null;
+    });
+
+    if (eligibleFiles.length === 0) {
+      throw new Error(`Required repository work-item source is empty: ${source.root}`);
+    }
+
     discoveredBySourceType[source.type] = files.length;
-    setPhase("normalize_markdown_source", `${source.root} (${files.length} files)`);
+    setPhase(context, "normalize_markdown_source", `${source.root} (${files.length} files)`);
 
     for (const file of files) {
       const relativePath = normalizeSourcePath(path.relative(rootDir, file));
@@ -470,10 +527,10 @@ async function scanRepoWorkItems(rootDir: string) {
         continue;
       }
 
-      setPhase("read_markdown_file", relativePath);
+      setPhase(context, "read_markdown_file", relativePath);
       const content = await readFile(file, "utf8");
-      setPhase("normalize_markdown_file", relativePath);
-      const normalized = await normalizeMarkdownFile(file, relativePath, source.type, content);
+      setPhase(context, "normalize_markdown_file", relativePath);
+      const normalized = await normalizeMarkdownFile(relativePath, source.type, content, context);
 
       if (!normalized) {
         skippedByReason.unbounded_or_empty = (skippedByReason.unbounded_or_empty ?? 0) + 1;
@@ -491,11 +548,87 @@ async function scanRepoWorkItems(rootDir: string) {
   };
 }
 
+async function scanRepoWorkItemDocuments(
+  documents: AdminRepoWorkItemDocument[],
+  context: ImportRunContext,
+) {
+  const discoveredBySourceType = emptySourceCounts();
+  const skippedByReason: Record<string, number> = {};
+  const items: RepoWorkItem[] = [];
+  const seenPaths = new Set<string>();
+  const normalizedDocuments = documents
+    .map((document) => ({
+      ...document,
+      sourcePath: normalizeSourcePath(document.sourcePath),
+    }))
+    .sort((left, right) => left.sourcePath.localeCompare(right.sourcePath));
+
+  for (const source of SOURCE_CONFIGS) {
+    const sourceDocuments = normalizedDocuments.filter(
+      (document) =>
+        document.sourceType === source.type && document.sourcePath.startsWith(`${source.root}/`),
+    );
+
+    if (sourceDocuments.length === 0) {
+      throw new Error(
+        `Required bundled repository work-item source is unavailable: ${source.root}`,
+      );
+    }
+
+    discoveredBySourceType[source.type] = sourceDocuments.length;
+    setPhase(
+      context,
+      "normalize_bundled_markdown_source",
+      `${source.root} (${sourceDocuments.length} files)`,
+    );
+
+    for (const document of sourceDocuments) {
+      if (seenPaths.has(document.sourcePath)) {
+        throw new Error(
+          `Bundled repository work-item source path is duplicated: ${document.sourcePath}`,
+        );
+      }
+
+      seenPaths.add(document.sourcePath);
+      const skipReason = getSkipReason(document.sourcePath);
+
+      if (skipReason) {
+        skippedByReason[skipReason] = (skippedByReason[skipReason] ?? 0) + 1;
+        continue;
+      }
+
+      setPhase(context, "normalize_bundled_markdown_file", document.sourcePath);
+      const normalized = await normalizeMarkdownFile(
+        document.sourcePath,
+        document.sourceType,
+        document.content,
+        context,
+      );
+
+      if (!normalized) {
+        skippedByReason.unbounded_or_empty = (skippedByReason.unbounded_or_empty ?? 0) + 1;
+        continue;
+      }
+
+      items.push(normalized);
+    }
+  }
+
+  if (seenPaths.size !== normalizedDocuments.length) {
+    const unsupported = normalizedDocuments.find((document) => !seenPaths.has(document.sourcePath));
+    throw new Error(
+      `Bundled repository work-item source is outside the approved manifest: ${unsupported?.sourcePath ?? "unknown"}`,
+    );
+  }
+
+  return { discoveredBySourceType, skippedByReason, items };
+}
+
 async function normalizeMarkdownFile(
-  file: string,
   sourcePath: string,
   sourceType: SourceType,
   content: string,
+  context: ImportRunContext,
 ): Promise<RepoWorkItem | null> {
   const stripped = stripMarkdown(content);
   const title = truncate(extractTitle(content) ?? titleFromFilename(sourcePath), MAX_TITLE_LENGTH);
@@ -504,8 +637,6 @@ async function normalizeMarkdownFile(
     return null;
   }
 
-  setPhase("stat_markdown_file", sourcePath);
-  const fileStat = await stat(file);
   const contentHash = createHash("sha256").update(content).digest("hex");
   const canonical = parseCanonicalMarkdown(content);
   const sourceStatusText = extractStatusText(content);
@@ -582,8 +713,9 @@ async function normalizeMarkdownFile(
     admin_capture_priority: priority,
     admin_capture_target_role: targetRole,
     work_type: sourceType,
-    source_mtime: fileStat.mtime.toISOString(),
     content_hash: contentHash,
+    source_revision: context.sourceRevision ?? undefined,
+    source_generation: context.sourceGeneration ?? undefined,
     title_source: titleSource,
     source_status_text: sourceStatusText ?? undefined,
     source_owner: owner ?? undefined,
@@ -604,20 +736,26 @@ async function normalizeMarkdownFile(
     note,
     pageUrl: `hito://repo/${sourcePath}`,
     route: null,
-    archivedAt: adminStatus === "archived" ? generatedAt : null,
+    archivedAt: adminStatus === "archived" ? context.generatedAt : null,
     metadata,
   };
 }
 
-async function collectMarkdownFiles(directory: string): Promise<string[]> {
+async function collectMarkdownFiles(
+  directory: string,
+  context: ImportRunContext,
+): Promise<string[]> {
   let entries: Awaited<ReturnType<typeof readdir>>;
 
   try {
-    setPhase("readdir_markdown_directory", normalizeSourcePath(directory));
+    setPhase(context, "readdir_markdown_directory", normalizeSourcePath(directory));
     entries = await readdir(directory, { withFileTypes: true });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return [];
+      throw new Error(
+        `Required repository work-item source is unavailable: ${normalizeSourcePath(directory)}`,
+        { cause: error },
+      );
     }
 
     throw error;
@@ -628,7 +766,7 @@ async function collectMarkdownFiles(directory: string): Promise<string[]> {
       const entryPath = path.join(directory, entry.name);
 
       if (entry.isDirectory()) {
-        return collectMarkdownFiles(entryPath);
+        return collectMarkdownFiles(entryPath, context);
       }
 
       return entry.isFile() && entry.name.toLowerCase().endsWith(".md") ? [entryPath] : [];
@@ -655,6 +793,7 @@ function getSkipReason(sourcePath: string) {
 async function createImportedItem(
   supabase: ReturnType<typeof createServiceClient>,
   item: RepoWorkItem,
+  generatedAt: string,
 ): Promise<ImportAction> {
   const insert: ItemInsert = {
     item_type: item.itemType,
@@ -676,6 +815,25 @@ async function createImportedItem(
   const { error } = await supabase.from("admin_capture_items").insert(insert);
 
   if (error) {
+    if (error.code === "23505") {
+      const rowsAfterConflict = await loadAdminCaptureRows(supabase);
+
+      if (countRepoMirrorIdentityDuplicates(rowsAfterConflict) > 0) {
+        throw new Error(
+          `Could not reconcile concurrent import for ${item.sourcePath}: existing mirror identities are ambiguous.`,
+        );
+      }
+
+      const concurrentExisting = findExistingRepoMirrorRow(
+        buildExistingRepoMirrorIndex(rowsAfterConflict),
+        item,
+      );
+
+      if (concurrentExisting) {
+        return refreshExistingItem(supabase, concurrentExisting, item, generatedAt);
+      }
+    }
+
     throw new Error(`Could not import ${item.sourcePath}: ${error.message}`);
   }
 
@@ -686,6 +844,7 @@ async function refreshExistingItem(
   supabase: ReturnType<typeof createServiceClient>,
   existing: ExistingRow,
   item: RepoWorkItem,
+  generatedAt: string,
 ): Promise<ImportAction> {
   const metadata = normalizeMetadata(existing.metadata);
   const existingWorkItemId =
@@ -729,6 +888,26 @@ async function refreshExistingItem(
     return "skipped";
   }
 
+  const incomingGeneration =
+    typeof item.metadata.source_generation === "string" ? item.metadata.source_generation : null;
+  if (incomingGeneration) {
+    const { data, error } = await supabase
+      .from("admin_capture_items")
+      .update(patch)
+      .eq("id", existing.id)
+      .or(
+        `metadata->>source_generation.is.null,metadata->>source_generation.lte.${incomingGeneration}`,
+      )
+      .select("id")
+      .limit(1);
+
+    if (error) {
+      throw new Error(`Could not refresh ${item.sourcePath}: ${error.message}`);
+    }
+
+    return data?.length ? "updated" : "skipped";
+  }
+
   const { error } = await supabase.from("admin_capture_items").update(patch).eq("id", existing.id);
 
   if (error) {
@@ -738,18 +917,38 @@ async function refreshExistingItem(
   return "updated";
 }
 
+function normalizeSourceGeneration(value: string | undefined) {
+  const generation = value?.trim() || null;
+
+  if (generation && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(generation)) {
+    throw new Error("Repository mirror source generation must be an ISO UTC timestamp.");
+  }
+
+  return generation;
+}
+
 async function loadAdminCaptureRows(
   supabase: ReturnType<typeof createServiceClient>,
 ): Promise<ExistingRow[]> {
-  const { data, error } = await supabase
+  const { data, error, count } = await supabase
     .from("admin_capture_items")
     .select(
       "id,item_type,status,priority,target_role,title,note,page_url,route,metadata,archived_at",
+      { count: "exact" },
     )
     .limit(MAX_EXISTING_ROWS);
 
   if (error) {
     throw new Error(`Could not load existing admin backlog items: ${error.message}`);
+  }
+
+  if (
+    (count !== null && count > MAX_EXISTING_ROWS) ||
+    (count === null && data?.length === MAX_EXISTING_ROWS)
+  ) {
+    throw new Error(
+      `Admin backlog contains more than the importer safety limit of ${MAX_EXISTING_ROWS} rows.`,
+    );
   }
 
   return (data ?? []) as ExistingRow[];
@@ -870,6 +1069,7 @@ export function findStaleActiveRepoMirrorRows(
 async function archiveStaleRepoMirrorRow(
   supabase: ReturnType<typeof createServiceClient>,
   row: ExistingRow,
+  generatedAt: string,
 ) {
   const metadata = normalizeMetadata(row.metadata);
   const sourcePath = typeof metadata.source_path === "string" ? metadata.source_path : null;
@@ -877,7 +1077,7 @@ async function archiveStaleRepoMirrorRow(
   const patch: ItemUpdate = {
     status: "archived",
     archived_at: row.archived_at ?? generatedAt,
-    metadata: buildStaleRepoMirrorMetadata(metadata, sourcePath, sourceType),
+    metadata: buildStaleRepoMirrorMetadata(metadata, sourcePath, sourceType, generatedAt),
   };
   const { error } = await supabase.from("admin_capture_items").update(patch).eq("id", row.id);
 
@@ -892,17 +1092,18 @@ export function buildStaleRepoMirrorMetadata(
   metadata: Record<string, Json | undefined>,
   sourcePath: string | null,
   sourceType: string | null,
+  detectedAt = new Date().toISOString(),
 ): Json {
   return {
     ...metadata,
     stale_repo_mirror: true,
     stale_source_path: sourcePath ?? undefined,
     stale_source_type: sourceType ?? undefined,
-    stale_detected_at: generatedAt,
+    stale_detected_at: detectedAt,
     stale_cleanup_action: "archived",
     stale_cleanup_version: IMPORT_VERSION,
     stale_cleanup_reason: "metadata.source_path no longer exists in approved repo import sources",
-    refreshed_at: typeof metadata.refreshed_at === "string" ? metadata.refreshed_at : generatedAt,
+    refreshed_at: typeof metadata.refreshed_at === "string" ? metadata.refreshed_at : detectedAt,
   } as Json;
 }
 
@@ -1096,7 +1297,6 @@ function parseArgs(rawArgs: string[]) {
 
   return {
     dryRun: rawArgs.includes("--dry-run"),
-    refreshTriage: rawArgs.includes("--refresh-triage"),
     archiveStale: rawArgs.includes("--archive-stale"),
     debug: rawArgs.includes("--debug"),
     timeoutMs,
@@ -1126,8 +1326,8 @@ function parseTimeoutMs(value: string | undefined) {
   return Number.isFinite(parsed) && parsed >= MIN_TIMEOUT_MS ? parsed : DEFAULT_TIMEOUT_MS;
 }
 
-function startImporterTimeout() {
-  if (args.timeoutMs <= 0) {
+function startImporterTimeout(cliArgs: ReturnType<typeof parseArgs>, context: ImportRunContext) {
+  if (cliArgs.timeoutMs <= 0) {
     return null;
   }
 
@@ -1138,20 +1338,19 @@ function startImporterTimeout() {
       {
         ok: false,
         importVersion: IMPORT_VERSION,
-        mode: args.dryRun ? "dry_run" : "live_upsert",
+        mode: cliArgs.dryRun ? "dry_run" : "live_upsert",
         message:
           "Admin backlog importer exceeded its bounded timeout. No success was reported; inspect the phase fields to identify the hanging dependency.",
-        timeoutMs: args.timeoutMs,
+        timeoutMs: cliArgs.timeoutMs,
         elapsedMs: Date.now() - startedAtMs,
-        phase: currentPhase.name,
-        phaseDetail: currentPhase.detail,
-        phaseStartedAt: currentPhase.startedAt,
-        archiveStale: args.archiveStale,
-        refreshTriage: args.refreshTriage,
+        phase: context.currentPhase.name,
+        phaseDetail: context.currentPhase.detail,
+        phaseStartedAt: context.currentPhase.startedAt,
+        archiveStale: cliArgs.archiveStale,
         mutationSafety:
-          args.dryRun && !args.archiveStale
+          cliArgs.dryRun && !cliArgs.archiveStale
             ? "dry-run markdown scan only; no Supabase mutation attempted"
-            : args.dryRun
+            : cliArgs.dryRun
               ? "dry-run stale mirror check only; no Supabase mutation attempted"
               : "live import may have started; inspect previous logs before retrying",
       },
@@ -1160,7 +1359,7 @@ function startImporterTimeout() {
     );
     process.stderr.write(`${diagnostic}\n`, forceExitAfterTimeout);
     setTimeout(forceExitAfterTimeout, 100).unref();
-  }, args.timeoutMs);
+  }, cliArgs.timeoutMs);
 }
 
 function forceExitAfterTimeout() {
@@ -1181,16 +1380,16 @@ function forceExitAfterTimeout() {
   }, 500).unref();
 }
 
-function setPhase(name: string, detail: string | null = null) {
-  currentPhase = {
+function setPhase(context: ImportRunContext, name: string, detail: string | null = null) {
+  context.currentPhase = {
     name,
     detail,
     startedAt: new Date().toISOString(),
   };
 
-  if (args.debug) {
+  if (context.args.debug) {
     console.error(
-      `[admin-backlog-import] phase=${currentPhase.name} detail=${currentPhase.detail ?? ""}`,
+      `[admin-backlog-import] phase=${context.currentPhase.name} detail=${context.currentPhase.detail ?? ""}`,
     );
   }
 }
@@ -1213,21 +1412,13 @@ function createServiceClient() {
   });
 }
 
-function printReport(report: {
-  mode: "dry_run" | "live_upsert";
-  ok: boolean;
-  stats: ImportStats;
-  refreshTriage: boolean;
-  archiveStale: boolean;
-  message: string;
-}) {
+function printReport(report: AdminRepoMirrorImportReport) {
   console.log(
     JSON.stringify(
       {
         ok: report.ok,
         mode: report.mode,
         importVersion: IMPORT_VERSION,
-        refreshTriage: report.refreshTriage,
         archiveStale: report.archiveStale,
         message: report.message,
         scanned: report.stats.discoveredBySourceType,

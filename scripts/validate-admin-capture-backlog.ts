@@ -1,11 +1,18 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import { createClient } from "@supabase/supabase-js";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   buildStaleRepoMirrorMetadata,
   findStaleActiveRepoMirrorRows,
+  synchronizeRepoWorkItems,
+  ADMIN_REPO_WORK_ITEM_SOURCE_ROOTS,
+  type AdminRepoWorkItemDocument,
 } from "./import-repo-work-items-to-admin-backlog";
+import { countRepoMirrorIdentityDuplicates } from "./admin-backlog-import/identity";
+import { collectAdminRepoWorkItemSnapshot } from "./lib/admin-repo-work-item-snapshot.mjs";
 import { assertCanonicalMarkdownWorkItemContract } from "./admin-backlog-import/contract-proof";
 import {
   appendAdminCaptureItemNoteForDependencies,
@@ -22,6 +29,7 @@ import {
 } from "../src/lib/admin-capture.server";
 import { updateAdminCaptureItemTriageForDependencies } from "../src/lib/admin-capture.server";
 import { getAdminRepoWorkItemMetadata } from "../src/lib/admin-work-items";
+import { resolveAdminRepoMirrorSourceMode } from "../src/lib/admin-repo-mirror.server";
 import {
   adminCaptureActiveStatuses,
   adminCaptureStatuses,
@@ -204,6 +212,10 @@ async function runDeterministicHarness() {
   assertCanonicalMarkdownWorkItemContract();
   await assertCanonicalBacklogReadContract();
   await assertSingleRouteBacklogRead();
+  assertRepoMirrorSourceModeBoundary();
+  await assertBundledRepoMirrorSourceContract();
+  await assertRepoMirrorSynchronizationBoundary();
+  await assertRepoMirrorSynchronizationSafety();
 
   const repository = new MemoryAdminCaptureRepository();
   const admin = adminDependencies(repository);
@@ -535,6 +547,19 @@ async function runDeterministicHarness() {
           "page_limit_root_cause_discriminator",
           "status_archive_and_combined_filter_counts",
           "single_route_backlog_read",
+          "repo_mirror_source_mode_boundary",
+          "bundled_repo_mirror_source_contract",
+          "local_hosted_source_mode_matrix",
+          "authenticated_repo_mirror_sync_before_read",
+          "unauthenticated_repo_mirror_sync_blocked",
+          "repo_mirror_sync_failure_shape",
+          "repo_mirror_sync_timeout_shape",
+          "repo_mirror_run_context_isolation",
+          "missing_repo_root_refuses_archive",
+          "empty_repo_root_refuses_projection",
+          "repo_mirror_identity_axes_fail_closed",
+          "repo_mirror_concurrent_insert_reconciliation",
+          "repo_mirror_row_limit_fails_closed",
           "backend_unavailable_shape",
           "read_failure_shape",
           "admin_create_list_read_update",
@@ -557,6 +582,461 @@ async function runDeterministicHarness() {
       2,
     ),
   );
+}
+
+async function assertRepoMirrorSynchronizationBoundary() {
+  const repository = new MemoryAdminCaptureRepository();
+  let syncCalls = 0;
+  const admin = {
+    ...adminDependencies(repository),
+    synchronizeRepoMirror: async () => {
+      syncCalls += 1;
+    },
+  } satisfies AdminCaptureDependencies;
+
+  const result = await listAdminCaptureBacklogForDependencies(admin, {
+    status: "all",
+    sourceGroup: "all_work",
+    includeArchived: false,
+    limit: 50,
+  });
+  assert.equal(result.ok, true);
+  assert.equal(syncCalls, 1);
+  assert.equal(repository.listBacklogCalls, 1);
+
+  let rejectedSyncCalls = 0;
+  const rejected = await listAdminCaptureBacklogForDependencies(
+    {
+      ...nonAdminDependencies(repository),
+      synchronizeRepoMirror: async () => {
+        rejectedSyncCalls += 1;
+      },
+    },
+    {
+      status: "all",
+      sourceGroup: "all_work",
+      includeArchived: false,
+      limit: 50,
+    },
+  );
+  assert.equal(rejected.ok, false);
+  assert.equal(rejectedSyncCalls, 0);
+
+  const unreadRepository = new MemoryAdminCaptureRepository();
+  const failed = await listAdminCaptureBacklogForDependencies(
+    {
+      ...adminDependencies(unreadRepository),
+      synchronizeRepoMirror: async () => {
+        throw new Error("Forced repository mirror synchronization failure.");
+      },
+    },
+    {
+      status: "all",
+      sourceGroup: "all_work",
+      includeArchived: false,
+      limit: 50,
+    },
+  );
+  assert.equal(failed.ok, false);
+  if (!failed.ok) {
+    assert.equal(failed.reason, "capture_load_failed");
+  }
+  assert.equal(unreadRepository.listBacklogCalls, 0);
+
+  const timeoutRepository = new MemoryAdminCaptureRepository();
+  const timedOut = await listAdminCaptureBacklogForDependencies(
+    {
+      ...adminDependencies(timeoutRepository),
+      synchronizeRepoMirror: () => new Promise<void>(() => {}),
+      repoMirrorSyncTimeoutMs: 5,
+    },
+    {
+      status: "all",
+      sourceGroup: "all_work",
+      includeArchived: false,
+      limit: 50,
+    },
+  );
+  assert.equal(timedOut.ok, false);
+  if (!timedOut.ok) {
+    assert.equal(timedOut.reason, "capture_load_failed");
+  }
+  assert.equal(timeoutRepository.listBacklogCalls, 0);
+}
+
+async function assertRepoMirrorSynchronizationSafety() {
+  const failures: string[] = [];
+
+  for (const [name, check] of [
+    ["repo_mirror_run_context_isolation", assertRepoMirrorRunContextIsolation],
+    ["missing_repo_root_refuses_archive", assertMissingRepoRootRefusesArchive],
+    ["empty_repo_root_refuses_projection", assertEmptyRepoRootRefusesProjection],
+    ["repo_mirror_identity_axes_fail_closed", assertRepoMirrorIdentityAxes],
+    [
+      "repo_mirror_concurrent_insert_reconciliation",
+      assertConcurrentRepoMirrorInsertReconciliation,
+    ],
+    ["repo_mirror_row_limit_fails_closed", assertRepoMirrorRowLimitFailsClosed],
+  ] as const) {
+    try {
+      await check();
+    } catch (error) {
+      failures.push(`${name}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  assert.deepEqual(failures, []);
+}
+
+async function assertRepoMirrorRunContextIsolation() {
+  let releaseSecondRead = () => {};
+  let signalSecondRead = () => {};
+  const secondReadReached = new Promise<void>((resolve) => {
+    signalSecondRead = resolve;
+  });
+  const secondReadRelease = new Promise<void>((resolve) => {
+    releaseSecondRead = resolve;
+  });
+  const fake = createRepoMirrorSynchronizationSupabase({
+    beforeRead: async (readCount) => {
+      if (readCount === 2) {
+        signalSecondRead();
+        await secondReadRelease;
+      }
+    },
+  });
+  const liveRun = synchronizeRepoWorkItems({
+    rootDir: process.cwd(),
+    archiveStale: true,
+    supabase: fake.client,
+  });
+
+  await secondReadReached;
+  const overlappingDryRun = await synchronizeRepoWorkItems({
+    rootDir: process.cwd(),
+    dryRun: true,
+  });
+  releaseSecondRead();
+  const liveReport = await liveRun;
+
+  assert.equal(overlappingDryRun.archiveStale, false);
+  assert.equal(liveReport.archiveStale, true);
+  assert.equal(liveReport.stats.staleRepoMirrorAction, "archived");
+  assert.equal(fake.row.status, "archived");
+  assert.equal(fake.updateCount(), 1);
+}
+
+async function assertMissingRepoRootRefusesArchive() {
+  const fake = createRepoMirrorSynchronizationSupabase();
+
+  await assert.rejects(
+    synchronizeRepoWorkItems({
+      rootDir: `${process.cwd()}/.missing-admin-repo-mirror-source-root`,
+      archiveStale: true,
+      supabase: fake.client,
+    }),
+    /required repository work-item source/i,
+  );
+  assert.equal(fake.row.status, "ready_for_codex");
+  assert.equal(fake.readCount(), 0);
+  assert.equal(fake.updateCount(), 0);
+}
+
+async function assertEmptyRepoRootRefusesProjection() {
+  const rootDir = await mkdtemp(path.join(tmpdir(), "hito-admin-repo-root-"));
+  const emptyRoot = ADMIN_REPO_WORK_ITEM_SOURCE_ROOTS[0]!;
+  const fake = createRepoMirrorSynchronizationSupabase();
+
+  try {
+    for (const sourceRoot of ADMIN_REPO_WORK_ITEM_SOURCE_ROOTS) {
+      const directory = path.join(rootDir, sourceRoot);
+      await mkdir(directory, { recursive: true });
+
+      if (sourceRoot !== emptyRoot) {
+        await writeFile(path.join(directory, "fixture.md"), "# Repository mirror fixture\n");
+      }
+    }
+
+    await assert.rejects(
+      synchronizeRepoWorkItems({ rootDir, supabase: fake.client }),
+      /required repository work-item source is empty/i,
+    );
+    await writeFile(path.join(rootDir, emptyRoot, "README.md"), "# Policy only\n");
+    await assert.rejects(
+      synchronizeRepoWorkItems({ rootDir, supabase: fake.client }),
+      /required repository work-item source is empty/i,
+    );
+    assert.equal(fake.readCount(), 0);
+    assert.equal(fake.updateCount(), 0);
+  } finally {
+    await rm(rootDir, { recursive: true, force: true });
+  }
+}
+
+function assertRepoMirrorIdentityAxes() {
+  const sharedSource = "docs/plans/active/shared-source.md";
+  const rows = [
+    repoMirrorRow({
+      id: "77777777-7777-4777-8777-777777777777",
+      title: "First source identity",
+      sourcePath: sharedSource,
+      sourceType: "active_plan",
+      workItemId: "first-work-item",
+    }),
+    repoMirrorRow({
+      id: "88888888-8888-4888-8888-888888888888",
+      title: "Second source identity",
+      sourcePath: sharedSource,
+      sourceType: "active_plan",
+      workItemId: "second-work-item",
+    }),
+  ];
+
+  assert.equal(countRepoMirrorIdentityDuplicates(rows), 1);
+  (rows[1]!.metadata as Record<string, Json>).source_path = "docs/plans/active/other.md";
+  (rows[1]!.metadata as Record<string, Json>).work_item_id = "first-work-item";
+  assert.equal(countRepoMirrorIdentityDuplicates(rows), 1);
+}
+
+async function assertConcurrentRepoMirrorInsertReconciliation() {
+  const documents = buildMinimalBundledRepoDocuments();
+  const rows: AdminCaptureItemRow[] = [];
+  let insertCalls = 0;
+  let conflictCount = 0;
+  const client = {
+    from(table: string) {
+      assert.equal(table, "admin_capture_items");
+
+      return {
+        select() {
+          return {
+            async limit() {
+              return { data: rows.map((row) => ({ ...row })), error: null, count: rows.length };
+            },
+          };
+        },
+        async insert(input: ItemInsert) {
+          insertCalls += 1;
+          const row = adminCaptureRowFromInsert(input, randomUUID());
+
+          if (conflictCount === 0) {
+            conflictCount += 1;
+            rows.push(row);
+            return {
+              error: {
+                code: "23505",
+                message: "duplicate key value violates unique constraint",
+              },
+            };
+          }
+
+          rows.push(row);
+          return { error: null };
+        },
+        update(patch: ItemUpdate) {
+          return {
+            async eq(column: string, id: string) {
+              assert.equal(column, "id");
+              const row = rows.find((candidate) => candidate.id === id);
+              assert.ok(row);
+              Object.assign(row, patch);
+              return { error: null };
+            },
+          };
+        },
+      };
+    },
+  } as unknown as SupabaseClient<Database>;
+
+  const report = await synchronizeRepoWorkItems({
+    documents,
+    sourceRevision: "concurrent-proof",
+    archiveStale: false,
+    supabase: client,
+  });
+
+  assert.equal(report.ok, true);
+  assert.equal(conflictCount, 1);
+  assert.equal(insertCalls, documents.length);
+  assert.equal(rows.length, documents.length);
+  assert.equal(new Set(rows.map((row) => repoMirrorIdentity(row))).size, documents.length);
+}
+
+async function assertRepoMirrorRowLimitFailsClosed() {
+  let insertCalls = 0;
+  const client = {
+    from(table: string) {
+      assert.equal(table, "admin_capture_items");
+
+      return {
+        select() {
+          return {
+            async limit() {
+              return { data: [], error: null, count: 10_001 };
+            },
+          };
+        },
+        async insert() {
+          insertCalls += 1;
+          return { error: null };
+        },
+      };
+    },
+  } as unknown as SupabaseClient<Database>;
+
+  await assert.rejects(
+    synchronizeRepoWorkItems({
+      documents: buildMinimalBundledRepoDocuments(),
+      archiveStale: false,
+      supabase: client,
+    }),
+    /safety limit of 10000 rows/i,
+  );
+  assert.equal(insertCalls, 0);
+}
+
+function buildMinimalBundledRepoDocuments(
+  titlePrefix = "Concurrent projection proof",
+): AdminRepoWorkItemDocument[] {
+  const sources = [
+    ["backlog_doc", "docs/tasks/backlog/concurrent-proof.md"],
+    ["product_brief", "docs/tasks/product-briefs/concurrent-proof.md"],
+    ["frontend_spec", "docs/tasks/frontend-specs/concurrent-proof.md"],
+    ["active_plan", "docs/plans/active/concurrent-proof.md"],
+    ["archived_plan", "docs/plans/archive/concurrent-proof.md"],
+  ] as const;
+
+  return sources.map(([sourceType, sourcePath], index) => ({
+    sourceType,
+    sourcePath,
+    content: `# ${titlePrefix} ${index}
+
+## Work Item ID
+
+qa-concurrent-repo-mirror-${index}
+
+## Status
+
+backlog
+
+## Type
+
+bug
+
+## Priority
+
+low
+
+## Owner
+
+backend
+
+## Scope
+
+admin-repo-mirror-concurrency-proof
+
+## Archive Intent
+
+retain_in_place
+
+## Task
+
+${titlePrefix} for source ${index}.
+
+## Stage
+
+Deterministic validator.
+
+## Next Recommended Role
+
+backend
+`,
+  }));
+}
+
+function adminCaptureRowFromInsert(input: ItemInsert, id: string): AdminCaptureItemRow {
+  const now = "2026-08-06T12:00:00.000Z";
+
+  return {
+    id,
+    item_type: input.item_type,
+    status: input.status ?? "new",
+    priority: input.priority ?? null,
+    target_role: input.target_role ?? null,
+    title: input.title ?? null,
+    note: input.note,
+    page_url: input.page_url,
+    route: input.route ?? null,
+    created_by_user_id: input.created_by_user_id,
+    created_by_label: input.created_by_label ?? null,
+    viewport_width: input.viewport_width ?? null,
+    viewport_height: input.viewport_height ?? null,
+    element_text: input.element_text ?? null,
+    selector: input.selector ?? null,
+    dom_path: input.dom_path ?? null,
+    nearby_heading: input.nearby_heading ?? null,
+    bounding_rect: input.bounding_rect ?? null,
+    metadata: input.metadata ?? {},
+    created_at: input.created_at ?? now,
+    updated_at: input.updated_at ?? now,
+    archived_at: input.archived_at ?? null,
+  };
+}
+
+function repoMirrorIdentity(row: AdminCaptureItemRow) {
+  const metadata = row.metadata as Record<string, unknown>;
+  return `${metadata.work_item_id ?? ""}:${metadata.source_type ?? ""}:${metadata.source_path ?? ""}`;
+}
+
+function createRepoMirrorSynchronizationSupabase(options?: {
+  beforeRead?: (readCount: number) => Promise<void>;
+}) {
+  const row = repoMirrorRow({
+    id: "66666666-6666-4666-8666-666666666666",
+    title: "Stale mirror safety discriminator",
+    sourcePath: "docs/plans/active/__qa_missing_source__.md",
+    sourceType: "active_plan",
+  });
+  let reads = 0;
+  let updates = 0;
+  const client = {
+    from(table: string) {
+      assert.equal(table, "admin_capture_items");
+
+      return {
+        select() {
+          return {
+            async limit() {
+              reads += 1;
+              await options?.beforeRead?.(reads);
+              return { data: [{ ...row }], error: null, count: 1 };
+            },
+          };
+        },
+        async insert() {
+          return { error: null };
+        },
+        update(patch: Partial<AdminCaptureItemRow>) {
+          return {
+            async eq(column: string, id: string) {
+              assert.equal(column, "id");
+              assert.equal(id, row.id);
+              updates += 1;
+              Object.assign(row, patch);
+              return { error: null };
+            },
+          };
+        },
+      };
+    },
+  } as unknown as SupabaseClient<Database>;
+
+  return {
+    client,
+    row,
+    readCount: () => reads,
+    updateCount: () => updates,
+  };
 }
 
 async function assertCanonicalBacklogReadContract() {
@@ -759,6 +1239,62 @@ async function assertSingleRouteBacklogRead() {
   assert.doesNotMatch(routeSource, /countsResult|filterBacklogViewForStatus/);
 }
 
+function assertRepoMirrorSourceModeBoundary() {
+  assert.equal(
+    resolveAdminRepoMirrorSourceMode(
+      "http://127.0.0.1:3000/admin/capture",
+      "http://127.0.0.1:54321",
+    ),
+    "filesystem",
+  );
+  assert.equal(
+    resolveAdminRepoMirrorSourceMode(
+      "https://hito-runner.vercel.app/admin/capture",
+      "https://example.supabase.co",
+    ),
+    "bundle",
+  );
+  assert.equal(
+    resolveAdminRepoMirrorSourceMode(
+      "http://127.0.0.1:3000/admin/capture",
+      "https://example.supabase.co",
+    ),
+    null,
+  );
+  assert.equal(
+    resolveAdminRepoMirrorSourceMode(
+      "https://hito-runner.vercel.app/admin/capture",
+      "http://127.0.0.1:54321",
+    ),
+    null,
+  );
+}
+
+async function assertBundledRepoMirrorSourceContract() {
+  const snapshot = collectAdminRepoWorkItemSnapshot(process.cwd());
+  const report = await synchronizeRepoWorkItems({
+    documents: snapshot.documents,
+    dryRun: true,
+    sourceRevision: "snapshot-contract-proof",
+  });
+
+  assert.equal(snapshot.marker, "HITO_ADMIN_REPO_SNAPSHOT_V1");
+  assert.equal(snapshot.documents.length > 0, true);
+  assert.equal(report.ok, true);
+  assert.equal(
+    Object.values(snapshot.countsByRoot).every((count) => count > 0),
+    true,
+  );
+
+  const withoutArchivedPlans = snapshot.documents.filter(
+    (document) => !document.sourcePath.startsWith("docs/plans/archive/"),
+  );
+  await assert.rejects(
+    synchronizeRepoWorkItems({ documents: withoutArchivedPlans, dryRun: true }),
+    /required bundled repository work-item source.*docs\/plans\/archive/i,
+  );
+}
+
 function assertStaleRepoMirrorCleanupPolicy() {
   const currentRepoRow = repoMirrorRow({
     id: "11111111-1111-4111-8111-111111111111",
@@ -819,6 +1355,7 @@ function repoMirrorRow(input: {
   title: string;
   sourcePath: string;
   sourceType: string;
+  workItemId?: string;
   importedFromRepo?: boolean;
   status?: AdminCaptureItemRow["status"];
   archivedAt?: string | null;
@@ -846,6 +1383,7 @@ function repoMirrorRow(input: {
       imported_from_repo: input.importedFromRepo ?? true,
       source_path: input.sourcePath,
       source_type: input.sourceType,
+      work_item_id: input.workItemId,
     },
     created_at: "2026-06-03T12:00:00.000Z",
     updated_at: "2026-06-03T12:00:00.000Z",
@@ -878,6 +1416,67 @@ async function runLiveSupabaseProbe() {
   let repoDerivedItemId: string | null = null;
 
   if (schemaReady) {
+    const mirrorReport = await synchronizeRepoWorkItems({
+      rootDir: process.cwd(),
+      archiveStale: false,
+      supabase: serviceClient,
+    });
+    steps.push({
+      name: "canonical_repo_mirror_synchronization",
+      ok:
+        mirrorReport.ok &&
+        mirrorReport.stats.duplicateWorkItemIdCount === 0 &&
+        mirrorReport.stats.staleRepoMirrorAction === "reported" &&
+        mirrorReport.stats.staleRepoMirrorArchivedCount === 0 &&
+        mirrorReport.stats.manualRowCountBefore === mirrorReport.stats.manualRowCountAfter,
+      detail: `${mirrorReport.stats.created} created, ${mirrorReport.stats.updated} updated, ${mirrorReport.stats.skipped} unchanged, ${mirrorReport.stats.malformedCanonicalItemCount} malformed diagnostics`,
+    });
+
+    const fencedSnapshot = collectAdminRepoWorkItemSnapshot(process.cwd());
+    const fencedDocument = fencedSnapshot.documents[0];
+    assert.ok(fencedDocument);
+    const fencedSourcePath = fencedDocument.sourcePath;
+    const newerGeneration = new Date().toISOString();
+    const olderGeneration = new Date(Date.parse(newerGeneration) - 60_000).toISOString();
+    const newerRevision = `local-generation-fence-${randomUUID()}`;
+    const newerFenceReport = await synchronizeRepoWorkItems({
+      documents: fencedSnapshot.documents,
+      sourceGeneration: newerGeneration,
+      sourceRevision: newerRevision,
+      archiveStale: false,
+      supabase: serviceClient,
+    });
+    const olderDocuments = fencedSnapshot.documents.map((document: AdminRepoWorkItemDocument) =>
+      document.sourcePath === fencedSourcePath
+        ? { ...document, content: `${document.content}\nObsolete deployment replay.\n` }
+        : document,
+    );
+    const olderFenceReport = await synchronizeRepoWorkItems({
+      documents: olderDocuments,
+      sourceGeneration: olderGeneration,
+      sourceRevision: "obsolete-local-generation-fence",
+      archiveStale: false,
+      supabase: serviceClient,
+    });
+    const { data: fencedRows, error: fencedReadError } = await serviceClient
+      .from("admin_capture_items")
+      .select("metadata")
+      .eq("metadata->>source_path", fencedSourcePath);
+    const fencedMetadata = (fencedRows?.[0]?.metadata ?? {}) as Record<string, unknown>;
+    steps.push({
+      name: "cross_deployment_generation_fence",
+      ok:
+        newerFenceReport.ok &&
+        olderFenceReport.ok &&
+        !fencedReadError &&
+        fencedRows?.length === 1 &&
+        fencedMetadata.source_generation === newerGeneration &&
+        fencedMetadata.source_revision === newerRevision &&
+        fencedMetadata.content_hash ===
+          createHash("sha256").update(fencedDocument.content).digest("hex"),
+      detail: "an obsolete deployed generation could not overwrite the newer projection",
+    });
+
     const repository = createSupabaseAdminCaptureRepository(serviceClient);
     const admin = adminDependencies(repository);
     const created = await mustOk(

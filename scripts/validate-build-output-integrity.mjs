@@ -2,6 +2,7 @@ import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from "node
 import { dirname, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveQaRuntimePaths } from "./lib/qa-runtime-paths.mjs";
+import { collectAdminRepoWorkItemSnapshot } from "./lib/admin-repo-work-item-snapshot.mjs";
 
 const rootDir = process.cwd();
 const localGeneratedRoots = [
@@ -36,10 +37,16 @@ export function validateLocalBuildOutput(options = {}) {
   validateRequiredPaths(validationRoot, requiredPaths);
 
   const importSummary = validateRelativeMjsImports(runtimeOutput.serverDir);
+  const repoSnapshotSummary = validateAdminRepoSnapshotOutput({
+    validationRoot,
+    serverRoot: runtimeOutput.serverDir,
+    publicRoot: runtimeOutput.publicDir,
+  });
   return {
     mode: "local",
     runtimeServerRoot: formatOutputPath(validationRoot, runtimeOutput.serverDir),
     ...importSummary,
+    ...repoSnapshotSummary,
   };
 }
 
@@ -59,9 +66,52 @@ export function validateVercelBuildOutput(options = {}) {
   const importSummary = validateRelativeMjsImports(
     resolve(validationRoot, ".vercel/output/functions/__server.func"),
   );
+  const repoSnapshotSummary = validateAdminRepoSnapshotOutput({
+    validationRoot,
+    serverRoot: resolve(validationRoot, ".vercel/output/functions/__server.func"),
+    publicRoot: resolve(validationRoot, ".vercel/output/static"),
+  });
   return {
     mode: "vercel",
     ...importSummary,
+    ...repoSnapshotSummary,
+  };
+}
+
+function validateAdminRepoSnapshotOutput({ validationRoot, serverRoot, publicRoot }) {
+  const snapshot = collectAdminRepoWorkItemSnapshot(validationRoot);
+  const serverContents = listFiles(serverRoot).map((filePath) => readFileSync(filePath));
+  const publicContents = listFiles(publicRoot).map((filePath) => readFileSync(filePath));
+  const marker = Buffer.from(snapshot.marker);
+  const digest = Buffer.from(snapshot.digest);
+  const serverHasMarker = serverContents.some((contents) => contents.includes(marker));
+  const serverHasDigest = serverContents.some((contents) => contents.includes(digest));
+  const sourceGenerationPattern =
+    /"sourceGeneration"\s*:\s*"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z"/;
+  const serverHasSourceGeneration = serverContents.some((contents) =>
+    sourceGenerationPattern.test(contents.toString("utf8")),
+  );
+  const publicLeaksSnapshot = publicContents.some((contents) => {
+    return (
+      contents.includes(marker) ||
+      contents.includes(digest) ||
+      sourceGenerationPattern.test(contents.toString("utf8"))
+    );
+  });
+
+  if (!serverHasMarker || !serverHasDigest || !serverHasSourceGeneration) {
+    throw new Error(
+      `Build output is missing the private Admin repository snapshot marker, generation, or digest ${snapshot.digest}.`,
+    );
+  }
+
+  if (publicLeaksSnapshot) {
+    throw new Error("Build output exposes the private Admin repository snapshot in public assets.");
+  }
+
+  return {
+    adminRepoSnapshotDigest: snapshot.digest,
+    adminRepoSnapshotDocumentCount: snapshot.documents.length,
   };
 }
 
@@ -200,6 +250,27 @@ function listMjsFiles(directory) {
   return files;
 }
 
+function listFiles(directory) {
+  if (!existsSync(directory)) {
+    return [];
+  }
+
+  const files = [];
+
+  for (const entry of readdirSync(directory)) {
+    const entryPath = resolve(directory, entry);
+    const stats = statSync(entryPath);
+
+    if (stats.isDirectory()) {
+      files.push(...listFiles(entryPath));
+    } else if (stats.isFile()) {
+      files.push(entryPath);
+    }
+  }
+
+  return files;
+}
+
 function extractRelativeMjsSpecifiers(code) {
   const specifiers = new Set();
   const importPatterns = [
@@ -231,7 +302,7 @@ function runCli() {
   const summary = mode === "vercel" ? validateVercelBuildOutput() : validateLocalBuildOutput();
 
   console.log(
-    `[build-integrity] ${summary.mode} ok: runtime=${summary.runtimeServerRoot ?? "vercel"} mjsFiles=${summary.mjsFileCount}, relativeMjsImports=${summary.relativeMjsImportCount}`,
+    `[build-integrity] ${summary.mode} ok: runtime=${summary.runtimeServerRoot ?? "vercel"} mjsFiles=${summary.mjsFileCount}, relativeMjsImports=${summary.relativeMjsImportCount}, repoDocuments=${summary.adminRepoSnapshotDocumentCount}, repoDigest=${summary.adminRepoSnapshotDigest}`,
   );
 }
 

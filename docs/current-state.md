@@ -10,8 +10,10 @@ Active product; the admitted Hito stack cleanup sequence is complete through Sli
 
 ## Current Released Baseline
 
-- Runtime and Product source are released through `d5dccefc5d4c3bdba03b35399d083bb3de4f2e2e`
-  on `main` and `origin/main` before this documentation-only closeout.
+- Runtime and Product source are released through `4668190ea7735b5e643aed14367d3bad8af6ba79`
+  on `main` and `origin/main`. This includes the Admin Work Items repository-mirror recovery:
+  authenticated Admin reads refresh the one-way Markdown projection from approved filesystem sources
+  locally or a private deployed bundle.
 - Backend/security cleanup, Slices 8A-8G, and their owner-level validation are released. Their exact
   commits and receipts remain in the
   [Hito Stack Complexity Reduction Program](tasks/backlog/2026-08-04-hito-stack-complexity-reduction-program.md)
@@ -36,6 +38,9 @@ Active product; the admitted Hito stack cleanup sequence is complete through Sli
   component contracts used by Product; it is not a second Product lifecycle.
 - `/admin/capture` is an Admin capture and triage inbox. It does not own operational work-item
   lifecycle or dispatch.
+- Authenticated Admin Work Items reads automatically refresh repository-derived, read-only rows from
+  canonical Markdown. Quick Notes remain separate Supabase-owned manual rows; automatic reads do
+  not archive stale rows.
 
 Detailed runner-facing behavior belongs in [current-product.md](current-product.md). Implemented
 runtime and ownership boundaries belong in [current-system.md](current-system.md).
@@ -55,6 +60,9 @@ runtime and ownership boundaries belong in [current-system.md](current-system.md
   reachability cannot substitute for its required loopback and non-loopback browser proof.
 - Global QA remains separate from the accepted owner-level and release receipts recorded by the
   completed slices.
+- The Admin mirror's local synchronization is completed. Its released deployed path still awaits a
+  legitimate authenticated production Admin read, projection readback, unchanged second read, and
+  Global QA; the deployment child remains `blocked` until then.
 
 ## Operational Work
 

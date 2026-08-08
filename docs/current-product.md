@@ -163,13 +163,15 @@ product rules rather than source-based editability exceptions.
   `docs/tasks/backlog/` before dispatch, and no Admin row is automatically sent to Codex. Normal
   runner/tester/public sessions cannot access the inbox; screenshot upload and route-spanning capture
   remain later slices without a dormant server capability
-- repo-authored Hito work can now be explicitly mirrored into the same Admin review surface:
-  `npm run import-admin-backlog-work-items` scans approved markdown task/spec/brief/plan folders and
-  mirrors bounded indexed rows into `admin_capture_items`; only `docs/tasks/backlog/` owns current
-  operational status, while specs, briefs, and plans remain grouped supporting/history sources even
-  when legacy status or prompt text is mirrored for audit. A same-ID source move updates one mirror,
-  duplicate IDs are refused, and stale rows can be archived only through explicit reconciliation
-  after no approved source or replacement remains. There is no automatic two-way sync or Codex
+- authenticated Admin Work Items reads automatically refresh repository-authored Hito work into the same
+  Admin review surface: local filesystem reads use approved Markdown and deployed runtime uses a private
+  bundled Markdown snapshot. `npm run import-admin-backlog-work-items` remains the explicit
+  audit/recovery entrypoint. Only `docs/tasks/backlog/` owns current operational status; specs,
+  briefs, and plans remain supporting/history sources even when mirrored for audit. A same-ID source
+  move updates one read-only mirror, malformed sources remain visible diagnostics, duplicate IDs are
+  refused, and automatic reads do not archive stale rows. Quick Notes remain separate Supabase-owned
+  manual rows. The deployed path is released, but legitimate authenticated production readback,
+  unchanged-second-read proof, and Global QA remain pending. There is no two-way sync or Codex
   dispatch
 - `/admin/login` now provides a dedicated owner admin sign-in page:
   local/dev admin login can still use the protected local fixture, but both local fixture and deployed/runtime admin login now create signed admin-only `hito_admin_session` access for admin surfaces; valid tester/product credentials are refused with an admin-specific error instead of creating a normal product session, redirects stay limited to sanitized admin paths, admin surfaces use explicit `/api/admin/auth/logout`, and normal `/login`, Magic Link, product local-login, and runner/product logout behavior remain separate; `/admin/analytics` admin-required states now point to this admin login path

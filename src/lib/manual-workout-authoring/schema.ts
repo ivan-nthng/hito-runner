@@ -301,6 +301,10 @@ export const manualWorkoutDraftInputSchema = z
 export type ManualWorkoutDraftInput = z.input<typeof manualWorkoutDraftInputSchema>;
 export type ParsedManualWorkoutDraftInput = z.output<typeof manualWorkoutDraftInputSchema>;
 
+export function inputHasClientPayload(error: z.ZodError) {
+  return error.issues.some((issue) => issue.code === "unrecognized_keys");
+}
+
 export const manualWorkoutAddToActivePlanInputSchema = z
   .object({
     activePlanId: z.string().uuid().optional(),

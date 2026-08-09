@@ -88,6 +88,28 @@ export async function validateManualPersistedTodayAndFutureWorkoutEditContract()
     assert.equal(reconstruct.safety.trustedClientRows, false);
   }
 
+  const reconstructClientPayload = await reconstructManualWorkoutPersistedEditDraftForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: sourceWorkout.id,
+      workoutDate: sourceWorkout.workout_date,
+      plannedWorkout: { id: sourceWorkout.id },
+    },
+    buildFakeEditDependencies({ activePlan, workouts: [sourceWorkout, keptWorkout] }),
+  );
+  assertPersistedEditReconstructBlocked(
+    reconstructClientPayload,
+    "client_payload_rejected",
+    "persisted edit reconstruction client payload",
+  );
+  if (!reconstructClientPayload.ok) {
+    assert.equal(
+      reconstructClientPayload.message,
+      "Manual workout edit reconstruction accepts only source workout identifiers.",
+    );
+  }
+
   const editedDraftInput: ManualWorkoutDraftInput = {
     templateKey: "steady_aerobic_run",
     workoutDate: sourceWorkout.workout_date,
@@ -140,6 +162,29 @@ export async function validateManualPersistedTodayAndFutureWorkoutEditContract()
     assert.equal(editReview.safety.updatesSamePlannedWorkoutRow, true);
     assert.equal(editReview.safety.trustedClientRows, false);
     assertNoFakePaceOrHr(editReview.draftReview.draft.steps, "persisted edit review");
+  }
+
+  const reviewClientPayload = await reviewManualWorkoutPersistedEditDraftForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      plannedWorkoutId: sourceWorkout.id,
+      workoutDate: sourceWorkout.workout_date,
+      draftInput: editedDraftInput,
+      plannedWorkout: { id: sourceWorkout.id },
+    },
+    buildFakeEditDependencies({ activePlan, workouts: [sourceWorkout, keptWorkout] }),
+  );
+  assertPersistedEditReviewBlocked(
+    reviewClientPayload,
+    "client_payload_rejected",
+    "persisted edit review client payload",
+  );
+  if (!reviewClientPayload.ok) {
+    assert.equal(
+      reviewClientPayload.message,
+      "Manual workout edit review accepts only source identifiers and edited draft input.",
+    );
   }
 
   const persistedEdits: Array<{
@@ -393,6 +438,12 @@ export async function validateManualPersistedTodayAndFutureWorkoutEditContract()
     "client_payload_rejected",
     "persisted edit client payload",
   );
+  if (!clientRowsAttempt.ok) {
+    assert.equal(
+      clientRowsAttempt.message,
+      "Manual workout edit confirm accepts only source identifiers, edited draft input, and review proof.",
+    );
+  }
 
   const protectedPastSource = {
     ...sourceWorkout,

@@ -52,10 +52,10 @@ import {
   type WorkoutLog,
 } from "@/lib/training";
 import { saveWorkoutLogForUser, workoutLogInputSchema } from "@/lib/workout-log-actions";
-import type { Database, Json } from "@/lib/supabase/database";
+import type { Database } from "@/lib/supabase/database";
 import { getRequestAuthContext } from "@/lib/backend/auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
-import { WEEKDAY_NAMES } from "@/lib/weekday-rest-invariants";
+import { parseStoredRunnerTrainingPreferences } from "@/lib/runner-training-preferences";
 import { fetchManualWorkoutEvidenceWorkoutIds } from "@/lib/manual-workout-authoring/active-plan-add";
 import { readWorkoutDocumentSections } from "@/lib/workout-document";
 
@@ -315,34 +315,31 @@ function parseActivePlanScheduleEditInput(value: unknown): ActivePlanScheduleEdi
 }
 
 function buildPlanSchedulePreferencesSummary(
-  value: Json | null,
+  value: PersistedPlanCycleRow["plan_preferences"],
   workouts: readonly Workout[],
 ): PlanSchedulePreferencesSummary | null {
-  const record = asJsonRecord(value);
+  const preferences = parseStoredRunnerTrainingPreferences(value);
 
-  if (!record) {
+  if (!preferences) {
     return null;
   }
 
-  const fixedRestDays = readPlanWeekdays(record.blocked_days);
-  const maxRunningDaysPerWeek = readPositiveInteger(record.max_running_days_per_week);
   const runningDaysPerWeek = derivePeakAuthoredRunningDaysPerWeek(workouts);
-  const preferredLongRunDay = readPlanWeekday(record.preferred_long_run_day);
 
   if (
-    !fixedRestDays.length &&
-    maxRunningDaysPerWeek == null &&
+    !preferences.blocked_days.length &&
+    preferences.max_running_days_per_week == null &&
     runningDaysPerWeek == null &&
-    !preferredLongRunDay
+    !preferences.preferred_long_run_day
   ) {
     return null;
   }
 
   return {
-    fixedRestDays,
-    maxRunningDaysPerWeek,
+    fixedRestDays: preferences.blocked_days,
+    maxRunningDaysPerWeek: preferences.max_running_days_per_week,
     runningDaysPerWeek,
-    preferredLongRunDay,
+    preferredLongRunDay: preferences.preferred_long_run_day,
   };
 }
 
@@ -355,46 +352,6 @@ function derivePeakAuthoredRunningDaysPerWeek(workouts: readonly Workout[]) {
     }, new Map<number, number>());
 
   return counts.size > 0 ? Math.max(...counts.values()) : null;
-}
-
-function asJsonRecord(value: Json | null | undefined): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-
-  return value as Record<string, unknown>;
-}
-
-function readPlanWeekdays(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  const weekdays: string[] = [];
-
-  for (const item of value) {
-    const weekday = readPlanWeekday(item);
-
-    if (weekday && !weekdays.includes(weekday)) {
-      weekdays.push(weekday);
-    }
-  }
-
-  return weekdays;
-}
-
-function readPlanWeekday(value: unknown): string | null {
-  return typeof value === "string" && (WEEKDAY_NAMES as readonly string[]).includes(value)
-    ? value
-    : null;
-}
-
-function readPositiveInteger(value: unknown): number | null {
-  if (!Number.isInteger(value) || typeof value !== "number" || value < 1) {
-    return null;
-  }
-
-  return value;
 }
 
 export async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {

@@ -5,7 +5,11 @@ import {
   validateVercelBuildOutput,
 } from "./validate-build-output-integrity.mjs";
 import { releaseBuildOutputLock } from "./lib/build-output-lock.mjs";
-import { resolveQaRuntimePaths } from "./lib/qa-runtime-paths.mjs";
+import {
+  generatedSiblingConflictPaths,
+  isGeneratedSiblingConflictName,
+  resolveQaRuntimePaths,
+} from "./lib/qa-runtime-paths.mjs";
 
 const rootDir = process.cwd();
 const qaRuntimePaths = resolveQaRuntimePaths({ rootDir });
@@ -135,7 +139,7 @@ function shouldCopyGeneratedBuildPath(sourcePath) {
   const entryName = basename(sourcePath);
   // Local sync can resurrect duplicate generated dirs such as "assets 2";
   // keep the canonical sibling as the only finalized build artifact.
-  return canonicalGeneratedSiblingName(entryName) === entryName;
+  return !isGeneratedSiblingConflictName(entryName);
 }
 
 function snapshotLocalOutputForLateNitroCleanup() {
@@ -294,33 +298,4 @@ function replaceGeneratedDirectory({ destinationDir, previousDir, stagedDir }) {
 
     throw error;
   }
-}
-
-function generatedSiblingConflictPaths(path) {
-  const parentDir = dirname(path);
-  const canonicalName = basename(path);
-
-  if (!existsSync(parentDir)) {
-    return [];
-  }
-
-  return readdirSync(parentDir)
-    .filter(
-      (entry) => entry !== canonicalName && canonicalGeneratedSiblingName(entry) === canonicalName,
-    )
-    .map((entry) => resolve(parentDir, entry));
-}
-
-function canonicalGeneratedSiblingName(entryName) {
-  const extensionConflict = /^(.*) \d+(\.[^/.]+)$/.exec(entryName);
-  if (extensionConflict) {
-    return `${extensionConflict[1]}${extensionConflict[2]}`;
-  }
-
-  const bareConflict = /^(.*) \d+$/.exec(entryName);
-  return bareConflict ? bareConflict[1] : entryName;
-}
-
-function isGeneratedSiblingConflictName(entryName) {
-  return canonicalGeneratedSiblingName(entryName) !== entryName;
 }

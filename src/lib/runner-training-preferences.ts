@@ -1,16 +1,6 @@
 import { z } from "zod";
 import { WEEKDAY_NAMES, type WeekdayName } from "@/lib/weekday-rest-invariants";
 
-const RUNNER_TRAINING_WEEKDAY_ABBREVIATIONS = {
-  mon: "Monday",
-  tue: "Tuesday",
-  wed: "Wednesday",
-  thu: "Thursday",
-  fri: "Friday",
-  sat: "Saturday",
-  sun: "Sunday",
-} as const satisfies Record<string, WeekdayName>;
-
 export const FITNESS_LEVEL_VALUES = [
   "new_to_running",
   "beginner",
@@ -50,7 +40,34 @@ export const runnerTrainingPreferencesSaveInputSchema = z.unknown().transform((v
 export function parseStoredRunnerTrainingPreferences(
   value: unknown,
 ): RunnerTrainingPreferencesStorage | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  const record = asRecord(value);
+
+  if (!record || isProductPreferenceShape(record)) return null;
+
+  const blockedDays = record.blocked_days;
+  const preferredLongRunDay = record.preferred_long_run_day;
+  const maxRunningDaysPerWeek = record.max_running_days_per_week;
+
+  if (
+    (Object.hasOwn(record, "blocked_days") &&
+      (!Array.isArray(blockedDays) ||
+        blockedDays.some(
+          (weekday) =>
+            typeof weekday !== "string" || !(WEEKDAY_NAMES as readonly string[]).includes(weekday),
+        ) ||
+        JSON.stringify(blockedDays) !==
+          JSON.stringify(uniqueRunnerWeekdays(blockedDays as WeekdayName[])))) ||
+    (Object.hasOwn(record, "preferred_long_run_day") &&
+      preferredLongRunDay !== null &&
+      (typeof preferredLongRunDay !== "string" ||
+        !(WEEKDAY_NAMES as readonly string[]).includes(preferredLongRunDay))) ||
+    (Object.hasOwn(record, "max_running_days_per_week") &&
+      maxRunningDaysPerWeek !== null &&
+      (typeof maxRunningDaysPerWeek !== "number" ||
+        !Number.isInteger(maxRunningDaysPerWeek) ||
+        maxRunningDaysPerWeek < 1 ||
+        maxRunningDaysPerWeek > WEEKDAY_NAMES.length))
+  ) {
     return null;
   }
 
@@ -110,25 +127,11 @@ export function uniqueRunnerWeekdays(values: readonly WeekdayName[]) {
 }
 
 export function parseRunnerWeekday(value: unknown): WeekdayName {
-  if (typeof value !== "string") {
-    throw new Error("Training preference weekdays must be weekday names.");
+  if (typeof value !== "string" || !(WEEKDAY_NAMES as readonly string[]).includes(value)) {
+    throw new Error("Training preference weekdays must be canonical weekday names.");
   }
 
-  const normalized = value
-    .trim()
-    .toLowerCase()
-    .replace(/[_\s-]+/g, "");
-  const weekday =
-    WEEKDAY_NAMES.find((candidate) => candidate.toLowerCase() === normalized) ??
-    RUNNER_TRAINING_WEEKDAY_ABBREVIATIONS[
-      normalized as keyof typeof RUNNER_TRAINING_WEEKDAY_ABBREVIATIONS
-    ];
-
-  if (!weekday) {
-    throw new Error("Choose valid weekdays for fixed rest days.");
-  }
-
-  return weekday;
+  return value as WeekdayName;
 }
 
 function normalizeRunnerTrainingPreferences(value: unknown): RunnerTrainingPreferencesStorage {

@@ -161,315 +161,27 @@
 
   /* @hito-export-end primitive-color */
 
-  /* Dedicated workout primitive palettes. Product semantics map from these scales. */
+  /* Workout-domain foundations feed semantic roles; no public shade ramp is exposed. */
   --hito-workout-slate-base: #6b7280;
-  --hito-workout-slate-50: color-mix(in oklch, var(--hito-workout-slate-base) 12%, white);
-  --hito-workout-slate-100: color-mix(in oklch, var(--hito-workout-slate-base) 22%, white);
-  --hito-workout-slate-200: color-mix(in oklch, var(--hito-workout-slate-base) 36%, white);
-  --hito-workout-slate-300: color-mix(in oklch, var(--hito-workout-slate-base) 52%, white);
-  --hito-workout-slate-400: color-mix(in oklch, var(--hito-workout-slate-base) 74%, white);
-  --hito-workout-slate-500: var(--hito-workout-slate-base);
-  --hito-workout-slate-600: color-mix(in oklch, var(--hito-workout-slate-base) 86%, black);
-  --hito-workout-slate-700: color-mix(in oklch, var(--hito-workout-slate-base) 72%, black);
-  --hito-workout-slate-800: color-mix(in oklch, var(--hito-workout-slate-base) 58%, black);
-  --hito-workout-slate-900: color-mix(in oklch, var(--hito-workout-slate-base) 44%, black);
-  --hito-workout-slate-950: color-mix(in oklch, var(--hito-workout-slate-base) 30%, black);
   --hito-workout-ice-blue-base: #bee9ff;
-  --hito-workout-ice-blue-50: color-mix(in oklch, var(--hito-workout-ice-blue-base) 12%, white);
-  --hito-workout-ice-blue-100: color-mix(in oklch, var(--hito-workout-ice-blue-base) 22%, white);
-  --hito-workout-ice-blue-200: color-mix(in oklch, var(--hito-workout-ice-blue-base) 36%, white);
-  --hito-workout-ice-blue-300: color-mix(in oklch, var(--hito-workout-ice-blue-base) 52%, white);
-  --hito-workout-ice-blue-400: color-mix(in oklch, var(--hito-workout-ice-blue-base) 74%, white);
-  --hito-workout-ice-blue-500: var(--hito-workout-ice-blue-base);
-  --hito-workout-ice-blue-600: color-mix(in oklch, var(--hito-workout-ice-blue-base) 86%, black);
-  --hito-workout-ice-blue-700: color-mix(in oklch, var(--hito-workout-ice-blue-base) 72%, black);
-  --hito-workout-ice-blue-800: color-mix(in oklch, var(--hito-workout-ice-blue-base) 58%, black);
-  --hito-workout-ice-blue-900: color-mix(in oklch, var(--hito-workout-ice-blue-base) 44%, black);
-  --hito-workout-ice-blue-950: color-mix(in oklch, var(--hito-workout-ice-blue-base) 30%, black);
   --hito-workout-maya-blue-base: #7cc3ff;
-  --hito-workout-maya-blue-50: color-mix(in oklch, var(--hito-workout-maya-blue-base) 12%, white);
-  --hito-workout-maya-blue-100: color-mix(in oklch, var(--hito-workout-maya-blue-base) 22%, white);
-  --hito-workout-maya-blue-200: color-mix(in oklch, var(--hito-workout-maya-blue-base) 36%, white);
-  --hito-workout-maya-blue-300: color-mix(in oklch, var(--hito-workout-maya-blue-base) 52%, white);
-  --hito-workout-maya-blue-400: color-mix(in oklch, var(--hito-workout-maya-blue-base) 74%, white);
-  --hito-workout-maya-blue-500: var(--hito-workout-maya-blue-base);
-  --hito-workout-maya-blue-600: color-mix(in oklch, var(--hito-workout-maya-blue-base) 86%, black);
-  --hito-workout-maya-blue-700: color-mix(in oklch, var(--hito-workout-maya-blue-base) 72%, black);
-  --hito-workout-maya-blue-800: color-mix(in oklch, var(--hito-workout-maya-blue-base) 58%, black);
-  --hito-workout-maya-blue-900: color-mix(in oklch, var(--hito-workout-maya-blue-base) 44%, black);
-  --hito-workout-maya-blue-950: color-mix(in oklch, var(--hito-workout-maya-blue-base) 30%, black);
   --hito-workout-azure-base: #5c95ff;
-  --hito-workout-azure-50: color-mix(in oklch, var(--hito-workout-azure-base) 12%, white);
-  --hito-workout-azure-100: color-mix(in oklch, var(--hito-workout-azure-base) 22%, white);
-  --hito-workout-azure-200: color-mix(in oklch, var(--hito-workout-azure-base) 36%, white);
-  --hito-workout-azure-300: color-mix(in oklch, var(--hito-workout-azure-base) 52%, white);
-  --hito-workout-azure-400: color-mix(in oklch, var(--hito-workout-azure-base) 74%, white);
-  --hito-workout-azure-500: var(--hito-workout-azure-base);
-  --hito-workout-azure-600: color-mix(in oklch, var(--hito-workout-azure-base) 86%, black);
-  --hito-workout-azure-700: color-mix(in oklch, var(--hito-workout-azure-base) 72%, black);
-  --hito-workout-azure-800: color-mix(in oklch, var(--hito-workout-azure-base) 58%, black);
-  --hito-workout-azure-900: color-mix(in oklch, var(--hito-workout-azure-base) 44%, black);
-  --hito-workout-azure-950: color-mix(in oklch, var(--hito-workout-azure-base) 30%, black);
   --hito-workout-deep-indigo-base: #4164ff;
-  --hito-workout-deep-indigo-50: color-mix(
-    in oklch,
-    var(--hito-workout-deep-indigo-base) 12%,
-    white
-  );
-  --hito-workout-deep-indigo-100: color-mix(
-    in oklch,
-    var(--hito-workout-deep-indigo-base) 22%,
-    white
-  );
-  --hito-workout-deep-indigo-200: color-mix(
-    in oklch,
-    var(--hito-workout-deep-indigo-base) 36%,
-    white
-  );
-  --hito-workout-deep-indigo-300: color-mix(
-    in oklch,
-    var(--hito-workout-deep-indigo-base) 52%,
-    white
-  );
-  --hito-workout-deep-indigo-400: color-mix(
-    in oklch,
-    var(--hito-workout-deep-indigo-base) 74%,
-    white
-  );
-  --hito-workout-deep-indigo-500: var(--hito-workout-deep-indigo-base);
-  --hito-workout-deep-indigo-600: color-mix(
-    in oklch,
-    var(--hito-workout-deep-indigo-base) 86%,
-    black
-  );
-  --hito-workout-deep-indigo-700: color-mix(
-    in oklch,
-    var(--hito-workout-deep-indigo-base) 72%,
-    black
-  );
-  --hito-workout-deep-indigo-800: color-mix(
-    in oklch,
-    var(--hito-workout-deep-indigo-base) 58%,
-    black
-  );
-  --hito-workout-deep-indigo-900: color-mix(
-    in oklch,
-    var(--hito-workout-deep-indigo-base) 44%,
-    black
-  );
-  --hito-workout-deep-indigo-950: color-mix(
-    in oklch,
-    var(--hito-workout-deep-indigo-base) 30%,
-    black
-  );
   --hito-workout-orchid-base: #7b61ff;
-  --hito-workout-orchid-50: color-mix(in oklch, var(--hito-workout-orchid-base) 12%, white);
-  --hito-workout-orchid-100: color-mix(in oklch, var(--hito-workout-orchid-base) 22%, white);
-  --hito-workout-orchid-200: color-mix(in oklch, var(--hito-workout-orchid-base) 36%, white);
-  --hito-workout-orchid-300: color-mix(in oklch, var(--hito-workout-orchid-base) 52%, white);
-  --hito-workout-orchid-400: color-mix(in oklch, var(--hito-workout-orchid-base) 74%, white);
-  --hito-workout-orchid-500: var(--hito-workout-orchid-base);
-  --hito-workout-orchid-600: color-mix(in oklch, var(--hito-workout-orchid-base) 86%, black);
-  --hito-workout-orchid-700: color-mix(in oklch, var(--hito-workout-orchid-base) 72%, black);
-  --hito-workout-orchid-800: color-mix(in oklch, var(--hito-workout-orchid-base) 58%, black);
-  --hito-workout-orchid-900: color-mix(in oklch, var(--hito-workout-orchid-base) 44%, black);
-  --hito-workout-orchid-950: color-mix(in oklch, var(--hito-workout-orchid-base) 30%, black);
   --hito-workout-tiger-flame-base: #fe6237;
-  --hito-workout-tiger-flame-50: color-mix(
-    in oklch,
-    var(--hito-workout-tiger-flame-base) 12%,
-    white
-  );
-  --hito-workout-tiger-flame-100: color-mix(
-    in oklch,
-    var(--hito-workout-tiger-flame-base) 22%,
-    white
-  );
-  --hito-workout-tiger-flame-200: color-mix(
-    in oklch,
-    var(--hito-workout-tiger-flame-base) 36%,
-    white
-  );
-  --hito-workout-tiger-flame-300: color-mix(
-    in oklch,
-    var(--hito-workout-tiger-flame-base) 52%,
-    white
-  );
-  --hito-workout-tiger-flame-400: color-mix(
-    in oklch,
-    var(--hito-workout-tiger-flame-base) 74%,
-    white
-  );
-  --hito-workout-tiger-flame-500: var(--hito-workout-tiger-flame-base);
-  --hito-workout-tiger-flame-600: color-mix(
-    in oklch,
-    var(--hito-workout-tiger-flame-base) 86%,
-    black
-  );
-  --hito-workout-tiger-flame-700: color-mix(
-    in oklch,
-    var(--hito-workout-tiger-flame-base) 72%,
-    black
-  );
-  --hito-workout-tiger-flame-800: color-mix(
-    in oklch,
-    var(--hito-workout-tiger-flame-base) 58%,
-    black
-  );
-  --hito-workout-tiger-flame-900: color-mix(
-    in oklch,
-    var(--hito-workout-tiger-flame-base) 44%,
-    black
-  );
-  --hito-workout-tiger-flame-950: color-mix(
-    in oklch,
-    var(--hito-workout-tiger-flame-base) 30%,
-    black
-  );
   --hito-workout-coral-base: #ff5a3d;
-  --hito-workout-coral-50: color-mix(in oklch, var(--hito-workout-coral-base) 12%, white);
-  --hito-workout-coral-100: color-mix(in oklch, var(--hito-workout-coral-base) 22%, white);
-  --hito-workout-coral-200: color-mix(in oklch, var(--hito-workout-coral-base) 36%, white);
-  --hito-workout-coral-300: color-mix(in oklch, var(--hito-workout-coral-base) 52%, white);
-  --hito-workout-coral-400: color-mix(in oklch, var(--hito-workout-coral-base) 74%, white);
-  --hito-workout-coral-500: var(--hito-workout-coral-base);
-  --hito-workout-coral-600: color-mix(in oklch, var(--hito-workout-coral-base) 86%, black);
-  --hito-workout-coral-700: color-mix(in oklch, var(--hito-workout-coral-base) 72%, black);
-  --hito-workout-coral-800: color-mix(in oklch, var(--hito-workout-coral-base) 58%, black);
-  --hito-workout-coral-900: color-mix(in oklch, var(--hito-workout-coral-base) 44%, black);
-  --hito-workout-coral-950: color-mix(in oklch, var(--hito-workout-coral-base) 30%, black);
   --hito-workout-burnt-orange-base: #ff8a2c;
-  --hito-workout-burnt-orange-50: color-mix(
-    in oklch,
-    var(--hito-workout-burnt-orange-base) 12%,
-    white
-  );
-  --hito-workout-burnt-orange-100: color-mix(
-    in oklch,
-    var(--hito-workout-burnt-orange-base) 22%,
-    white
-  );
-  --hito-workout-burnt-orange-200: color-mix(
-    in oklch,
-    var(--hito-workout-burnt-orange-base) 36%,
-    white
-  );
-  --hito-workout-burnt-orange-300: color-mix(
-    in oklch,
-    var(--hito-workout-burnt-orange-base) 52%,
-    white
-  );
-  --hito-workout-burnt-orange-400: color-mix(
-    in oklch,
-    var(--hito-workout-burnt-orange-base) 74%,
-    white
-  );
-  --hito-workout-burnt-orange-500: var(--hito-workout-burnt-orange-base);
-  --hito-workout-burnt-orange-600: color-mix(
-    in oklch,
-    var(--hito-workout-burnt-orange-base) 86%,
-    black
-  );
-  --hito-workout-burnt-orange-700: color-mix(
-    in oklch,
-    var(--hito-workout-burnt-orange-base) 72%,
-    black
-  );
-  --hito-workout-burnt-orange-800: color-mix(
-    in oklch,
-    var(--hito-workout-burnt-orange-base) 58%,
-    black
-  );
-  --hito-workout-burnt-orange-900: color-mix(
-    in oklch,
-    var(--hito-workout-burnt-orange-base) 44%,
-    black
-  );
-  --hito-workout-burnt-orange-950: color-mix(
-    in oklch,
-    var(--hito-workout-burnt-orange-base) 30%,
-    black
-  );
   --hito-workout-sunflower-gold-base: #ffb62e;
-  --hito-workout-sunflower-gold-50: color-mix(
-    in oklch,
-    var(--hito-workout-sunflower-gold-base) 12%,
-    white
-  );
-  --hito-workout-sunflower-gold-100: color-mix(
-    in oklch,
-    var(--hito-workout-sunflower-gold-base) 22%,
-    white
-  );
-  --hito-workout-sunflower-gold-200: color-mix(
-    in oklch,
-    var(--hito-workout-sunflower-gold-base) 36%,
-    white
-  );
-  --hito-workout-sunflower-gold-300: color-mix(
-    in oklch,
-    var(--hito-workout-sunflower-gold-base) 52%,
-    white
-  );
-  --hito-workout-sunflower-gold-400: color-mix(
-    in oklch,
-    var(--hito-workout-sunflower-gold-base) 74%,
-    white
-  );
-  --hito-workout-sunflower-gold-500: var(--hito-workout-sunflower-gold-base);
-  --hito-workout-sunflower-gold-600: color-mix(
-    in oklch,
-    var(--hito-workout-sunflower-gold-base) 86%,
-    black
-  );
-  --hito-workout-sunflower-gold-700: color-mix(
-    in oklch,
-    var(--hito-workout-sunflower-gold-base) 72%,
-    black
-  );
-  --hito-workout-sunflower-gold-800: color-mix(
-    in oklch,
-    var(--hito-workout-sunflower-gold-base) 58%,
-    black
-  );
-  --hito-workout-sunflower-gold-900: color-mix(
-    in oklch,
-    var(--hito-workout-sunflower-gold-base) 44%,
-    black
-  );
-  --hito-workout-sunflower-gold-950: color-mix(
-    in oklch,
-    var(--hito-workout-sunflower-gold-base) 30%,
-    black
-  );
   --hito-workout-mint-base: #68d391;
-  --hito-workout-mint-50: color-mix(in oklch, var(--hito-workout-mint-base) 12%, white);
-  --hito-workout-mint-100: color-mix(in oklch, var(--hito-workout-mint-base) 22%, white);
-  --hito-workout-mint-200: color-mix(in oklch, var(--hito-workout-mint-base) 36%, white);
-  --hito-workout-mint-300: color-mix(in oklch, var(--hito-workout-mint-base) 52%, white);
-  --hito-workout-mint-400: color-mix(in oklch, var(--hito-workout-mint-base) 74%, white);
-  --hito-workout-mint-500: var(--hito-workout-mint-base);
-  --hito-workout-mint-600: color-mix(in oklch, var(--hito-workout-mint-base) 86%, black);
-  --hito-workout-mint-700: color-mix(in oklch, var(--hito-workout-mint-base) 72%, black);
-  --hito-workout-mint-800: color-mix(in oklch, var(--hito-workout-mint-base) 58%, black);
-  --hito-workout-mint-900: color-mix(in oklch, var(--hito-workout-mint-base) 44%, black);
-  --hito-workout-mint-950: color-mix(in oklch, var(--hito-workout-mint-base) 30%, black);
   --hito-workout-lavender-base: #b39dff;
-  --hito-workout-lavender-50: color-mix(in oklch, var(--hito-workout-lavender-base) 12%, white);
-  --hito-workout-lavender-100: color-mix(in oklch, var(--hito-workout-lavender-base) 22%, white);
-  --hito-workout-lavender-200: color-mix(in oklch, var(--hito-workout-lavender-base) 36%, white);
-  --hito-workout-lavender-300: color-mix(in oklch, var(--hito-workout-lavender-base) 52%, white);
-  --hito-workout-lavender-400: color-mix(in oklch, var(--hito-workout-lavender-base) 74%, white);
-  --hito-workout-lavender-500: var(--hito-workout-lavender-base);
-  --hito-workout-lavender-600: color-mix(in oklch, var(--hito-workout-lavender-base) 86%, black);
-  --hito-workout-lavender-700: color-mix(in oklch, var(--hito-workout-lavender-base) 72%, black);
-  --hito-workout-lavender-800: color-mix(in oklch, var(--hito-workout-lavender-base) 58%, black);
-  --hito-workout-lavender-900: color-mix(in oklch, var(--hito-workout-lavender-base) 44%, black);
-  --hito-workout-lavender-950: color-mix(in oklch, var(--hito-workout-lavender-base) 30%, black);
 
   /* Semantic workout type roles. Components consume these, not primitive names. */
-  --hito-workout-type-rest-base: var(--hito-workout-slate-500);
-  --hito-workout-type-rest-muted: var(--hito-workout-slate-300);
+  --hito-workout-type-rest-base: var(--hito-workout-slate-base);
+  --hito-workout-type-rest-muted: color-mix(
+    in oklch,
+    var(--hito-workout-type-rest-base) 52%,
+    white
+  );
   --hito-workout-type-rest-surface: color-mix(
     in oklch,
     var(--hito-workout-type-rest-base) 16%,
@@ -496,8 +208,12 @@
     transparent
   );
   --hito-workout-type-rest-foreground: var(--sand-50);
-  --hito-workout-type-recovery-base: var(--hito-workout-ice-blue-500);
-  --hito-workout-type-recovery-muted: var(--hito-workout-ice-blue-300);
+  --hito-workout-type-recovery-base: var(--hito-workout-ice-blue-base);
+  --hito-workout-type-recovery-muted: color-mix(
+    in oklch,
+    var(--hito-workout-type-recovery-base) 52%,
+    white
+  );
   --hito-workout-type-recovery-surface: color-mix(
     in oklch,
     var(--hito-workout-type-recovery-base) 16%,
@@ -524,8 +240,12 @@
     transparent
   );
   --hito-workout-type-recovery-foreground: var(--stone-950);
-  --hito-workout-type-easy-base: var(--hito-workout-maya-blue-500);
-  --hito-workout-type-easy-muted: var(--hito-workout-maya-blue-300);
+  --hito-workout-type-easy-base: var(--hito-workout-maya-blue-base);
+  --hito-workout-type-easy-muted: color-mix(
+    in oklch,
+    var(--hito-workout-type-easy-base) 52%,
+    white
+  );
   --hito-workout-type-easy-surface: color-mix(
     in oklch,
     var(--hito-workout-type-easy-base) 16%,
@@ -552,8 +272,12 @@
     transparent
   );
   --hito-workout-type-easy-foreground: var(--stone-950);
-  --hito-workout-type-steady-base: var(--hito-workout-azure-500);
-  --hito-workout-type-steady-muted: var(--hito-workout-azure-300);
+  --hito-workout-type-steady-base: var(--hito-workout-azure-base);
+  --hito-workout-type-steady-muted: color-mix(
+    in oklch,
+    var(--hito-workout-type-steady-base) 52%,
+    white
+  );
   --hito-workout-type-steady-surface: color-mix(
     in oklch,
     var(--hito-workout-type-steady-base) 16%,
@@ -580,8 +304,12 @@
     transparent
   );
   --hito-workout-type-steady-foreground: var(--stone-950);
-  --hito-workout-type-long-run-base: var(--hito-workout-deep-indigo-500);
-  --hito-workout-type-long-run-muted: var(--hito-workout-deep-indigo-300);
+  --hito-workout-type-long-run-base: var(--hito-workout-deep-indigo-base);
+  --hito-workout-type-long-run-muted: color-mix(
+    in oklch,
+    var(--hito-workout-type-long-run-base) 52%,
+    white
+  );
   --hito-workout-type-long-run-surface: color-mix(
     in oklch,
     var(--hito-workout-type-long-run-base) 16%,
@@ -608,8 +336,12 @@
     transparent
   );
   --hito-workout-type-long-run-foreground: var(--sand-50);
-  --hito-workout-type-progression-base: var(--hito-workout-orchid-500);
-  --hito-workout-type-progression-muted: var(--hito-workout-orchid-300);
+  --hito-workout-type-progression-base: var(--hito-workout-orchid-base);
+  --hito-workout-type-progression-muted: color-mix(
+    in oklch,
+    var(--hito-workout-type-progression-base) 52%,
+    white
+  );
   --hito-workout-type-progression-surface: color-mix(
     in oklch,
     var(--hito-workout-type-progression-base) 16%,
@@ -636,8 +368,12 @@
     transparent
   );
   --hito-workout-type-progression-foreground: var(--sand-50);
-  --hito-workout-type-tempo-base: var(--hito-workout-tiger-flame-500);
-  --hito-workout-type-tempo-muted: var(--hito-workout-tiger-flame-300);
+  --hito-workout-type-tempo-base: var(--hito-workout-tiger-flame-base);
+  --hito-workout-type-tempo-muted: color-mix(
+    in oklch,
+    var(--hito-workout-type-tempo-base) 52%,
+    white
+  );
   --hito-workout-type-tempo-surface: color-mix(
     in oklch,
     var(--hito-workout-type-tempo-base) 16%,
@@ -664,8 +400,12 @@
     transparent
   );
   --hito-workout-type-tempo-foreground: var(--stone-950);
-  --hito-workout-type-intervals-base: var(--hito-workout-coral-500);
-  --hito-workout-type-intervals-muted: var(--hito-workout-coral-300);
+  --hito-workout-type-intervals-base: var(--hito-workout-coral-base);
+  --hito-workout-type-intervals-muted: color-mix(
+    in oklch,
+    var(--hito-workout-type-intervals-base) 52%,
+    white
+  );
   --hito-workout-type-intervals-surface: color-mix(
     in oklch,
     var(--hito-workout-type-intervals-base) 16%,
@@ -692,8 +432,12 @@
     transparent
   );
   --hito-workout-type-intervals-foreground: var(--stone-950);
-  --hito-workout-type-hills-base: var(--hito-workout-burnt-orange-500);
-  --hito-workout-type-hills-muted: var(--hito-workout-burnt-orange-300);
+  --hito-workout-type-hills-base: var(--hito-workout-burnt-orange-base);
+  --hito-workout-type-hills-muted: color-mix(
+    in oklch,
+    var(--hito-workout-type-hills-base) 52%,
+    white
+  );
   --hito-workout-type-hills-surface: color-mix(
     in oklch,
     var(--hito-workout-type-hills-base) 16%,
@@ -720,8 +464,12 @@
     transparent
   );
   --hito-workout-type-hills-foreground: var(--stone-950);
-  --hito-workout-type-run-walk-base: var(--hito-workout-sunflower-gold-500);
-  --hito-workout-type-run-walk-muted: var(--hito-workout-sunflower-gold-300);
+  --hito-workout-type-run-walk-base: var(--hito-workout-sunflower-gold-base);
+  --hito-workout-type-run-walk-muted: color-mix(
+    in oklch,
+    var(--hito-workout-type-run-walk-base) 52%,
+    white
+  );
   --hito-workout-type-run-walk-surface: color-mix(
     in oklch,
     var(--hito-workout-type-run-walk-base) 16%,
@@ -750,8 +498,12 @@
   --hito-workout-type-run-walk-foreground: var(--stone-950);
 
   /* Semantic workout section roles. Repeat set stays structural and has no color token. */
-  --hito-workout-section-warm-up-base: var(--hito-workout-maya-blue-500);
-  --hito-workout-section-warm-up-muted: var(--hito-workout-maya-blue-300);
+  --hito-workout-section-warm-up-base: var(--hito-workout-maya-blue-base);
+  --hito-workout-section-warm-up-muted: color-mix(
+    in oklch,
+    var(--hito-workout-section-warm-up-base) 52%,
+    white
+  );
   --hito-workout-section-warm-up-surface: color-mix(
     in oklch,
     var(--hito-workout-section-warm-up-base) 18%,
@@ -778,8 +530,12 @@
     transparent
   );
   --hito-workout-section-warm-up-foreground: var(--stone-950);
-  --hito-workout-section-run-base: var(--hito-workout-deep-indigo-500);
-  --hito-workout-section-run-muted: var(--hito-workout-deep-indigo-300);
+  --hito-workout-section-run-base: var(--hito-workout-deep-indigo-base);
+  --hito-workout-section-run-muted: color-mix(
+    in oklch,
+    var(--hito-workout-section-run-base) 52%,
+    white
+  );
   --hito-workout-section-run-surface: color-mix(
     in oklch,
     var(--hito-workout-section-run-base) 18%,
@@ -806,8 +562,12 @@
     transparent
   );
   --hito-workout-section-run-foreground: var(--sand-50);
-  --hito-workout-section-work-base: var(--hito-workout-tiger-flame-500);
-  --hito-workout-section-work-muted: var(--hito-workout-tiger-flame-300);
+  --hito-workout-section-work-base: var(--hito-workout-tiger-flame-base);
+  --hito-workout-section-work-muted: color-mix(
+    in oklch,
+    var(--hito-workout-section-work-base) 52%,
+    white
+  );
   --hito-workout-section-work-surface: color-mix(
     in oklch,
     var(--hito-workout-section-work-base) 18%,
@@ -834,8 +594,12 @@
     transparent
   );
   --hito-workout-section-work-foreground: var(--stone-950);
-  --hito-workout-section-recover-base: var(--hito-workout-mint-500);
-  --hito-workout-section-recover-muted: var(--hito-workout-mint-300);
+  --hito-workout-section-recover-base: var(--hito-workout-mint-base);
+  --hito-workout-section-recover-muted: color-mix(
+    in oklch,
+    var(--hito-workout-section-recover-base) 52%,
+    white
+  );
   --hito-workout-section-recover-surface: color-mix(
     in oklch,
     var(--hito-workout-section-recover-base) 18%,
@@ -862,8 +626,12 @@
     transparent
   );
   --hito-workout-section-recover-foreground: var(--stone-950);
-  --hito-workout-section-finish-base: var(--hito-workout-sunflower-gold-500);
-  --hito-workout-section-finish-muted: var(--hito-workout-sunflower-gold-300);
+  --hito-workout-section-finish-base: var(--hito-workout-sunflower-gold-base);
+  --hito-workout-section-finish-muted: color-mix(
+    in oklch,
+    var(--hito-workout-section-finish-base) 52%,
+    white
+  );
   --hito-workout-section-finish-surface: color-mix(
     in oklch,
     var(--hito-workout-section-finish-base) 18%,
@@ -890,8 +658,12 @@
     transparent
   );
   --hito-workout-section-finish-foreground: var(--stone-950);
-  --hito-workout-section-cooldown-base: var(--hito-workout-lavender-500);
-  --hito-workout-section-cooldown-muted: var(--hito-workout-lavender-300);
+  --hito-workout-section-cooldown-base: var(--hito-workout-lavender-base);
+  --hito-workout-section-cooldown-muted: color-mix(
+    in oklch,
+    var(--hito-workout-section-cooldown-base) 52%,
+    white
+  );
   --hito-workout-section-cooldown-surface: color-mix(
     in oklch,
     var(--hito-workout-section-cooldown-base) 18%,

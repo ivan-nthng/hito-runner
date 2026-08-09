@@ -215,7 +215,7 @@ type ImportPhase = {
 };
 
 type ImportRunContext = {
-  args: ReturnType<typeof parseArgs>;
+  args: ReturnType<typeof parseRepoWorkItemImporterCliArgs>;
   generatedAt: string;
   sourceRevision: string | null;
   sourceGeneration: string | null;
@@ -274,7 +274,20 @@ const SOURCE_CONFIGS = sourceManifest.sources as SourceConfig[];
 export const ADMIN_REPO_WORK_ITEM_SOURCE_ROOTS = SOURCE_CONFIGS.map((source) => source.root);
 
 export async function runRepoWorkItemImporterCli(argv = process.argv.slice(2)) {
-  const cliArgs = parseArgs(argv);
+  if (argv.includes("--help") || argv.includes("-h")) {
+    console.log(buildRepoWorkItemImporterCliHelp());
+    return { action: "help" as const, exitCode: 0 };
+  }
+
+  let cliArgs: ReturnType<typeof parseRepoWorkItemImporterCliArgs>;
+  try {
+    cliArgs = parseRepoWorkItemImporterCliArgs(argv);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`${message}\n\n${buildRepoWorkItemImporterCliHelp()}`);
+    return { action: "invalid" as const, exitCode: 2, message };
+  }
+
   const context = createImportRunContext(cliArgs);
   const timeout = startImporterTimeout(cliArgs, context);
 
@@ -288,9 +301,12 @@ export async function runRepoWorkItemImporterCli(argv = process.argv.slice(2)) {
     );
     printReport(report);
 
-    if (!report.ok) {
-      process.exitCode = 1;
-    }
+    return {
+      action: "execute" as const,
+      exitCode: report.ok ? 0 : 1,
+      args: cliArgs,
+      report,
+    };
   } finally {
     if (timeout) {
       clearTimeout(timeout);
@@ -1290,43 +1306,89 @@ function findExample(items: RepoWorkItem[], sourceType: SourceType): ExampleItem
   };
 }
 
-function parseArgs(rawArgs: string[]) {
-  const timeoutMs = parseTimeoutMs(
-    readOptionValue(rawArgs, "--timeout-ms") ?? process.env.ADMIN_BACKLOG_IMPORT_TIMEOUT_MS,
-  );
+function parseRepoWorkItemImporterCliArgs(
+  rawArgs: string[],
+  environmentTimeout = process.env.ADMIN_BACKLOG_IMPORT_TIMEOUT_MS,
+) {
+  let dryRun = false;
+  let live = false;
+  let archiveStale = false;
+  let debug = false;
+  let timeoutValue: string | undefined;
+  const seen = new Set<string>();
+
+  for (let index = 0; index < rawArgs.length; index += 1) {
+    const argument = rawArgs[index];
+
+    if (["--dry-run", "--live", "--archive-stale", "--debug"].includes(argument)) {
+      if (seen.has(argument)) {
+        throw new Error(`Duplicate option: ${argument}.`);
+      }
+      seen.add(argument);
+      dryRun ||= argument === "--dry-run";
+      live ||= argument === "--live";
+      archiveStale ||= argument === "--archive-stale";
+      debug ||= argument === "--debug";
+      continue;
+    }
+
+    if (argument === "--timeout-ms" || argument.startsWith("--timeout-ms=")) {
+      if (timeoutValue !== undefined) {
+        throw new Error("Duplicate option: --timeout-ms.");
+      }
+      const inline = argument.startsWith("--timeout-ms=");
+      const value = inline ? argument.slice("--timeout-ms=".length) : rawArgs[++index];
+      if (!value || (!inline && value.startsWith("-"))) {
+        throw new Error("--timeout-ms requires an integer value.");
+      }
+      timeoutValue = value;
+      continue;
+    }
+
+    throw new Error(`Unknown importer argument: ${argument}.`);
+  }
+
+  if (dryRun === live) {
+    throw new Error("Choose exactly one import mode: --dry-run or --live.");
+  }
+
+  const timeoutSource = timeoutValue ?? environmentTimeout;
+  const timeoutMs = timeoutSource === undefined ? DEFAULT_TIMEOUT_MS : Number(timeoutSource);
+  if (
+    timeoutSource !== undefined &&
+    (!/^\d+$/.test(timeoutSource) || !Number.isSafeInteger(timeoutMs) || timeoutMs < MIN_TIMEOUT_MS)
+  ) {
+    throw new Error(`Importer timeout must be an integer of at least ${MIN_TIMEOUT_MS} ms.`);
+  }
 
   return {
-    dryRun: rawArgs.includes("--dry-run"),
-    archiveStale: rawArgs.includes("--archive-stale"),
-    debug: rawArgs.includes("--debug"),
+    dryRun,
+    archiveStale,
+    debug,
     timeoutMs,
   };
 }
 
-function readOptionValue(rawArgs: string[], option: string) {
-  const prefix = `${option}=`;
-  const inline = rawArgs.find((arg) => arg.startsWith(prefix));
+function buildRepoWorkItemImporterCliHelp() {
+  return `Usage: npm run import-admin-backlog-work-items -- (--dry-run | --live) [options]
 
-  if (inline) {
-    return inline.slice(prefix.length);
-  }
+Modes:
+  --dry-run             Scan canonical Markdown without writing Supabase.
+  --live                Explicitly authorize the Admin mirror upsert.
 
-  const index = rawArgs.indexOf(option);
+Options:
+  --archive-stale       Include explicit stale-row analysis/archive behavior for the chosen mode.
+  --timeout-ms <ms>     Bound execution to an integer of at least ${MIN_TIMEOUT_MS} ms (default ${DEFAULT_TIMEOUT_MS}).
+  --debug               Print importer phase diagnostics.
+  -h, --help            Show this help without starting the importer.
 
-  return index >= 0 ? rawArgs[index + 1] : undefined;
+No mode is selected by default. Unknown, conflicting, duplicate, or incomplete options fail before importer execution.`;
 }
 
-function parseTimeoutMs(value: string | undefined) {
-  if (!value) {
-    return DEFAULT_TIMEOUT_MS;
-  }
-
-  const parsed = Number.parseInt(value, 10);
-
-  return Number.isFinite(parsed) && parsed >= MIN_TIMEOUT_MS ? parsed : DEFAULT_TIMEOUT_MS;
-}
-
-function startImporterTimeout(cliArgs: ReturnType<typeof parseArgs>, context: ImportRunContext) {
+function startImporterTimeout(
+  cliArgs: ReturnType<typeof parseRepoWorkItemImporterCliArgs>,
+  context: ImportRunContext,
+) {
   if (cliArgs.timeoutMs <= 0) {
     return null;
   }

@@ -19,6 +19,7 @@ import {
 import {
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
   MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+  inputHasClientPayload,
   type ManualWorkoutAddToActivePlanResult,
   type ManualWorkoutDraftInput,
   type ManualWorkoutDraftReviewResult,
@@ -487,8 +488,4 @@ function buildDirectCopyMutationChecksum(input: {
     reviewChecksum: input.reviewChecksum,
     trustedClientRows: false,
   });
-}
-
-function inputHasClientPayload(error: z.ZodError) {
-  return error.issues.some((issue) => issue.code === "unrecognized_keys");
 }

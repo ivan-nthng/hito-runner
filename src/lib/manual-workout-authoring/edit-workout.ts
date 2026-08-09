@@ -30,11 +30,16 @@ import {
   persistedManualWorkoutHasUnsafeMetricTruth,
   validatePreservedAiAuthoredTargetTruth,
 } from "@/lib/manual-workout-authoring/persisted-workout-safety";
-import { buildManualWorkoutUserBuiltTrainingPlan } from "@/lib/manual-workout-authoring/persistence";
+import {
+  asJsonRecord,
+  buildManualWorkoutUserBuiltTrainingPlan,
+  toJson,
+} from "@/lib/manual-workout-authoring/persistence";
 import {
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
   MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
   MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+  inputHasClientPayload,
   type ManualWorkoutDraftInput,
   type ManualWorkoutDraftProcessingOptions,
   type ManualWorkoutDraftReviewResult,
@@ -979,22 +984,6 @@ function buildEditBlocked(input: {
     sourceKind: null,
     workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   };
-}
-
-function inputHasClientPayload(error: z.ZodError) {
-  return error.issues.some((issue) => issue.code === "unrecognized_keys");
-}
-
-function asJsonRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  return value as Record<string, unknown>;
-}
-
-function toJson(value: unknown): Json {
-  return JSON.parse(JSON.stringify(value)) as Json;
 }
 
 function readPersistedRpcRow<T extends { id: string }>(value: unknown, expectedId: string): T {

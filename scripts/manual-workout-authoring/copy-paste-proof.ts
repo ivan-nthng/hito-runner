@@ -453,6 +453,12 @@ export async function validateManualCopyPasteContract() {
     "client_payload_rejected",
     "direct copy client payload",
   );
+  if (!directClientRowsAttempt.ok) {
+    assert.equal(
+      directClientRowsAttempt.message,
+      "Manual workout direct copy accepts only source and target identifiers.",
+    );
+  }
 
   const directOccupiedTarget = await copyManualWorkoutWithinActivePlanForUser(
     userId,

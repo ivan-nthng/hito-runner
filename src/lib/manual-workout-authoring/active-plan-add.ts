@@ -32,6 +32,7 @@ import {
   type ManualWorkoutCanonicalDraft,
   type ManualWorkoutTargetTruthMode,
 } from "@/lib/manual-workout-authoring/schema";
+import { asJsonRecord, toJson } from "@/lib/manual-workout-authoring/persistence";
 import { buildPersistedWorkoutInsertRows } from "@/lib/persisted-plan-replacement";
 import { collectRowsForIdBatches } from "@/lib/supabase/batched-in-filter";
 import type { Json } from "@/lib/supabase/database";
@@ -566,16 +567,4 @@ function buildManualWorkoutAddFailure(input: {
     sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
     workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   };
-}
-
-function asJsonRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  return value as Record<string, unknown>;
-}
-
-function toJson(value: unknown): Json {
-  return JSON.parse(JSON.stringify(value)) as Json;
 }

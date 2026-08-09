@@ -26,10 +26,12 @@ import {
 } from "@/lib/manual-workout-authoring/active-plan-add";
 import { buildManualWorkoutDraftInputFromPersistedWorkout } from "@/lib/manual-workout-authoring/copy-paste-reconstruction";
 import { reviewManualWorkoutDraft } from "@/lib/manual-workout-authoring/actions";
+import { asJsonRecord, toJson } from "@/lib/manual-workout-authoring/persistence";
 import {
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
   MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
   MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+  inputHasClientPayload,
   type ManualWorkoutDraftInput,
   type ManualWorkoutDraftReviewResult,
 } from "@/lib/manual-workout-authoring/schema";
@@ -1362,10 +1364,6 @@ function resolveWorkoutSourceTemplateKey(workout: PersistedPlannedWorkoutRow) {
   return workout.workout_type;
 }
 
-function inputHasClientPayload(error: z.ZodError) {
-  return error.issues.some((issue) => issue.code === "unrecognized_keys");
-}
-
 function mapMoveDraftFailureReason(reason: string): ManualWorkoutMoveFailureReason {
   switch (reason) {
     case "source_workout_not_found":
@@ -1407,16 +1405,4 @@ function buildMoveBlocked(input: {
     sourceKind: null,
     workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   };
-}
-
-function asJsonRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  return value as Record<string, unknown>;
-}
-
-function toJson(value: unknown): Json {
-  return JSON.parse(JSON.stringify(value)) as Json;
 }

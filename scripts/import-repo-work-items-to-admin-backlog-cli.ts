@@ -1,3 +1,4 @@
 import { runRepoWorkItemImporterCli } from "./import-repo-work-items-to-admin-backlog";
 
-await runRepoWorkItemImporterCli();
+const result = await runRepoWorkItemImporterCli();
+process.exitCode = result.exitCode;

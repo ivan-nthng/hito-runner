@@ -1,8 +1,8 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, rmSync } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { rmSync } from "node:fs";
+import { resolve } from "node:path";
 import { acquireBuildOutputLock, releaseBuildOutputLock } from "./lib/build-output-lock.mjs";
-import { resolveQaRuntimePaths } from "./lib/qa-runtime-paths.mjs";
+import { generatedSiblingConflictPaths, resolveQaRuntimePaths } from "./lib/qa-runtime-paths.mjs";
 
 const isVercelBuild = process.env.VERCEL === "1" || process.env.NOW_BUILDER === "1";
 const rootDir = process.cwd();
@@ -91,29 +91,4 @@ function removeGeneratedSiblingConflicts(path) {
   for (const conflictPath of generatedSiblingConflictPaths(path)) {
     removeGeneratedPath(conflictPath);
   }
-}
-
-function generatedSiblingConflictPaths(path) {
-  const parentDir = dirname(path);
-  const canonicalName = basename(path);
-
-  if (!existsSync(parentDir)) {
-    return [];
-  }
-
-  return readdirSync(parentDir)
-    .filter(
-      (entry) => entry !== canonicalName && canonicalGeneratedSiblingName(entry) === canonicalName,
-    )
-    .map((entry) => resolve(parentDir, entry));
-}
-
-function canonicalGeneratedSiblingName(entryName) {
-  const extensionConflict = /^(.*) \d+(\.[^/.]+)$/.exec(entryName);
-  if (extensionConflict) {
-    return `${extensionConflict[1]}${extensionConflict[2]}`;
-  }
-
-  const bareConflict = /^(.*) \d+$/.exec(entryName);
-  return bareConflict ? bareConflict[1] : entryName;
 }

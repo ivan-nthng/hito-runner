@@ -1,5 +1,13 @@
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, readlinkSync, rmSync, symlinkSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readlinkSync,
+  rmSync,
+  symlinkSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, resolve } from "node:path";
 
@@ -79,6 +87,25 @@ export function ensureQaBuildOutputNodeModulesLink({ rootDir = process.cwd() } =
   return linkPath;
 }
 
+export function generatedSiblingConflictPaths(path) {
+  const parentDir = dirname(path);
+  const canonicalName = basename(path);
+
+  if (!existsSync(parentDir)) {
+    return [];
+  }
+
+  return readdirSync(parentDir)
+    .filter(
+      (entry) => entry !== canonicalName && canonicalGeneratedSiblingName(entry) === canonicalName,
+    )
+    .map((entry) => resolve(parentDir, entry));
+}
+
+export function isGeneratedSiblingConflictName(entryName) {
+  return canonicalGeneratedSiblingName(entryName) !== entryName;
+}
+
 function resolveQaRuntimeRoot(workspaceRoot) {
   const configuredRoot = process.env[qaRuntimeRootEnvName]?.trim();
 
@@ -103,6 +130,16 @@ function expandHome(path) {
 
 function safeWorkspaceSlug(value) {
   return value.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "workspace";
+}
+
+function canonicalGeneratedSiblingName(entryName) {
+  const extensionConflict = /^(.*) \d+(\.[^/.]+)$/.exec(entryName);
+  if (extensionConflict) {
+    return `${extensionConflict[1]}${extensionConflict[2]}`;
+  }
+
+  const bareConflict = /^(.*) \d+$/.exec(entryName);
+  return bareConflict ? bareConflict[1] : entryName;
 }
 
 function lstatIfExists(path) {

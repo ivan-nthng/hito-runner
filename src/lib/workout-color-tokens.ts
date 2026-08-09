@@ -5,20 +5,6 @@ import {
   type RunnerFacingWorkoutType,
 } from "@/lib/planned-workout-language";
 
-export const WORKOUT_COLOR_SHADE_STEPS = [
-  "50",
-  "100",
-  "200",
-  "300",
-  "400",
-  "500",
-  "600",
-  "700",
-  "800",
-  "900",
-  "950",
-] as const;
-
 export const WORKOUT_COLOR_STATE_SLOTS = [
   "base",
   "muted",
@@ -30,59 +16,9 @@ export const WORKOUT_COLOR_STATE_SLOTS = [
   "foreground",
 ] as const;
 
-export type WorkoutColorShadeStep = (typeof WORKOUT_COLOR_SHADE_STEPS)[number];
 export type WorkoutColorStateSlot = (typeof WORKOUT_COLOR_STATE_SLOTS)[number];
 
-export type WorkoutPrimitivePaletteId =
-  | "slate"
-  | "ice-blue"
-  | "maya-blue"
-  | "azure"
-  | "deep-indigo"
-  | "orchid"
-  | "tiger-flame"
-  | "coral"
-  | "burnt-orange"
-  | "sunflower-gold"
-  | "mint"
-  | "lavender";
-
 export type WorkoutSectionColorRole = Exclude<RunnerFacingBlockType, "repeat_set">;
-
-export const WORKOUT_PRIMITIVE_PALETTE_FAMILIES: ReadonlyArray<{
-  id: WorkoutPrimitivePaletteId;
-  label: string;
-  tokenPrefix: `--hito-workout-${WorkoutPrimitivePaletteId}`;
-}> = [
-  { id: "slate", label: "Slate", tokenPrefix: "--hito-workout-slate" },
-  { id: "ice-blue", label: "Ice Blue", tokenPrefix: "--hito-workout-ice-blue" },
-  { id: "maya-blue", label: "Maya Blue", tokenPrefix: "--hito-workout-maya-blue" },
-  { id: "azure", label: "Azure", tokenPrefix: "--hito-workout-azure" },
-  {
-    id: "deep-indigo",
-    label: "Deep Indigo",
-    tokenPrefix: "--hito-workout-deep-indigo",
-  },
-  { id: "orchid", label: "Orchid", tokenPrefix: "--hito-workout-orchid" },
-  {
-    id: "tiger-flame",
-    label: "Tiger Flame",
-    tokenPrefix: "--hito-workout-tiger-flame",
-  },
-  { id: "coral", label: "Coral", tokenPrefix: "--hito-workout-coral" },
-  {
-    id: "burnt-orange",
-    label: "Burnt Orange",
-    tokenPrefix: "--hito-workout-burnt-orange",
-  },
-  {
-    id: "sunflower-gold",
-    label: "Sunflower Gold",
-    tokenPrefix: "--hito-workout-sunflower-gold",
-  },
-  { id: "mint", label: "Mint", tokenPrefix: "--hito-workout-mint" },
-  { id: "lavender", label: "Lavender", tokenPrefix: "--hito-workout-lavender" },
-] as const;
 
 const WORKOUT_TYPE_TOKEN_NAMES: Record<RunnerFacingWorkoutType, string> = {
   rest: "rest",
@@ -97,19 +33,6 @@ const WORKOUT_TYPE_TOKEN_NAMES: Record<RunnerFacingWorkoutType, string> = {
   run_walk: "run-walk",
 };
 
-const WORKOUT_TYPE_PRIMITIVES: Record<RunnerFacingWorkoutType, WorkoutPrimitivePaletteId> = {
-  rest: "slate",
-  recovery: "ice-blue",
-  easy: "maya-blue",
-  steady: "azure",
-  long_run: "deep-indigo",
-  progression: "orchid",
-  tempo: "tiger-flame",
-  intervals: "coral",
-  hills: "burnt-orange",
-  run_walk: "sunflower-gold",
-};
-
 const WORKOUT_SECTION_TOKEN_NAMES: Record<WorkoutSectionColorRole, string> = {
   warm_up: "warm-up",
   run: "run",
@@ -120,22 +43,11 @@ const WORKOUT_SECTION_TOKEN_NAMES: Record<WorkoutSectionColorRole, string> = {
   cooldown: "cooldown",
 };
 
-const WORKOUT_SECTION_PRIMITIVES: Record<WorkoutSectionColorRole, WorkoutPrimitivePaletteId> = {
-  warm_up: "maya-blue",
-  run: "deep-indigo",
-  walk: "mint",
-  work: "tiger-flame",
-  recover: "mint",
-  finish: "sunflower-gold",
-  cooldown: "lavender",
-};
-
 export const WORKOUT_TYPE_COLOR_ROLES = (
   Object.keys(WORKOUT_TYPE_TOKEN_NAMES) as RunnerFacingWorkoutType[]
 ).map((type) => ({
   type,
   label: RUNNER_FACING_WORKOUT_TYPE_LABELS[type],
-  primitive: WORKOUT_TYPE_PRIMITIVES[type],
 }));
 
 export const WORKOUT_SECTION_COLOR_ROLES = (
@@ -143,22 +55,7 @@ export const WORKOUT_SECTION_COLOR_ROLES = (
 ).map((type) => ({
   type,
   label: RUNNER_FACING_BLOCK_TYPE_LABELS[type],
-  primitive: WORKOUT_SECTION_PRIMITIVES[type],
 }));
-
-export function workoutPrimitiveColorToken(
-  palette: WorkoutPrimitivePaletteId,
-  step: WorkoutColorShadeStep,
-) {
-  return `--hito-workout-${palette}-${step}`;
-}
-
-export function workoutPrimitiveColorVar(
-  palette: WorkoutPrimitivePaletteId,
-  step: WorkoutColorShadeStep,
-) {
-  return `var(${workoutPrimitiveColorToken(palette, step)})`;
-}
 
 export function workoutTypeColorToken(
   type: RunnerFacingWorkoutType,

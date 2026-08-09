@@ -1120,6 +1120,12 @@ export async function validateManualMoveWorkoutContract() {
     "client_payload_rejected",
     "direct move client payload",
   );
+  if (!directClientRowsAttempt.ok) {
+    assert.equal(
+      directClientRowsAttempt.message,
+      "Manual workout direct move accepts only source and target identifiers.",
+    );
+  }
 
   const directOccupiedTarget = await moveManualWorkoutWithinActivePlanForUser(
     userId,

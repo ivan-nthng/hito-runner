@@ -123,6 +123,20 @@ const retiredFoundationSelectors = [
   "hito-window-footer-actions",
   "hito-window-footer-note",
 ] as const;
+const retiredWorkoutColorApiMarkers = [
+  "WORKOUT_COLOR_SHADE_STEPS",
+  "WorkoutColorShadeStep",
+  "WorkoutPrimitivePaletteId",
+  "WORKOUT_PRIMITIVE_PALETTE_FAMILIES",
+  "workoutPrimitiveColorToken",
+  "workoutPrimitiveColorVar",
+] as const;
+const retiredWorkoutReferenceMarkers = [
+  "WORKOUT_PRIMITIVE_COLOR_GROUPS",
+  "dedicated workout shade scales",
+  "mapped to primitives",
+  "role.primitive",
+] as const;
 const referenceManualRecipePatterns = [
   {
     family: "Button",
@@ -746,6 +760,9 @@ const figmaBoard = sourceFiles.find(
 const foundationsPage = sourceFiles.find(
   (file) => file.relativePath === "src/components/hito-ds/reference-foundations-page.tsx",
 );
+const workoutColorTokensSource = sourceFiles.find(
+  (file) => file.relativePath === "src/lib/workout-color-tokens.ts",
+);
 const lightPaletteReference = sourceFiles.find(
   (file) => file.relativePath === "src/components/hito-ds/light-palette-reference.tsx",
 );
@@ -791,6 +808,14 @@ const workbenchImportLeaks = workbenchSettingsImportFindings(sourceFiles);
 const workbenchPrimitiveBypasses = workbenchPrimitiveBypassFindings(sourceFiles);
 const retiredFoundationTokenLeaks = retiredFoundationTokenFindings(foundationSearchFiles);
 const retiredFoundationSelectorLeaks = retiredFoundationSelectorFindings(foundationSearchFiles);
+const retainedWorkoutBaseDefinitions = [
+  ...foundationsCss.matchAll(/--hito-workout-(?!type-|section-)[a-z-]+-base\s*:/g),
+].map((match) => match[0]);
+const retiredWorkoutShadeDeclarations = [
+  ...foundationsCss.matchAll(
+    /--hito-workout-(?!type-|section-)[a-z-]+-(?:50|100|200|300|400|500|600|700|800|900|950)\s*:/g,
+  ),
+].map((match) => match[0]);
 
 expect(
   referenceControls?.content.includes("HITO_BUTTON_SIZES") === true &&
@@ -872,6 +897,31 @@ expect(
   `Retired foundation selectors returned: ${retiredFoundationSelectorLeaks
     .map((finding) => `${finding.selector} in ${finding.relativePath}`)
     .join(", ")}`,
+);
+expect(
+  retainedWorkoutBaseDefinitions.length === 12,
+  `Expected 12 workout-domain base colors, found ${retainedWorkoutBaseDefinitions.length}.`,
+);
+expect(
+  retiredWorkoutShadeDeclarations.length === 0,
+  `Retired workout shade declarations returned: ${retiredWorkoutShadeDeclarations.join(", ")}`,
+);
+expect(
+  workoutColorTokensSource?.content.includes("WORKOUT_COLOR_STATE_SLOTS") === true &&
+    workoutColorTokensSource.content.includes("workoutTypeColorVar") &&
+    workoutColorTokensSource.content.includes("workoutSectionColorVar") &&
+    retiredWorkoutColorApiMarkers.every(
+      (marker) => workoutColorTokensSource.content.includes(marker) === false,
+    ),
+  "Workout colors must expose only the semantic type and section TypeScript contract.",
+);
+expect(
+  foundationsPage?.content.includes('id="workout-semantic-type-colors"') === true &&
+    foundationsPage.content.includes('id="workout-semantic-section-colors"') &&
+    retiredWorkoutReferenceMarkers.every(
+      (marker) => foundationsPage.content.includes(marker) === false,
+    ),
+  "Foundations must document semantic workout roles without reviving raw shade ramps.",
 );
 const foundationGeometryDefinitions = [
   ...foundationsCss.matchAll(/(--hito-[a-z0-9-]*(?:width|height)[a-z0-9-]*)\s*:/gi),
@@ -1101,8 +1151,10 @@ if (errors.length > 0) {
       geometry: foundationGeometryDefinitions.length,
       retiredSelectors: retiredFoundationSelectors.length,
       retiredTokens: retiredFoundationTokens.length,
+      retiredWorkoutShades: retiredWorkoutShadeDeclarations.length,
       textStyles: generatedManifest.textStyles.length,
       uiTitleRoles: uiTitleRoles.length,
+      workoutDomainBases: retainedWorkoutBaseDefinitions.length,
     },
     reference: {
       currentDocs: currentReferenceDocs.length,

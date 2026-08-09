@@ -17,18 +17,14 @@ import type { InlineChangeTargetInput } from "@/components/devtools/local-inline
 import { inspectLocalUiTarget } from "@/components/devtools/local-ui-inspector-targets";
 import { HITO_DS_MANIFEST } from "@/generated/hito-ds-manifest";
 import {
-  WORKOUT_COLOR_SHADE_STEPS,
   WORKOUT_COLOR_STATE_SLOTS,
-  WORKOUT_PRIMITIVE_PALETTE_FAMILIES,
   WORKOUT_SECTION_COLOR_ROLES,
   WORKOUT_TYPE_COLOR_ROLES,
-  workoutPrimitiveColorVar,
   workoutSectionColorToken,
   workoutSectionColorVar,
   workoutTypeColorToken,
   workoutTypeColorVar,
   type WorkoutColorStateSlot,
-  type WorkoutPrimitivePaletteId,
   type WorkoutSectionColorRole,
 } from "@/lib/workout-color-tokens";
 import { HITO_TYPOGRAPHY_GROUPS, type HitoTypographyRole } from "@/lib/hito-typography-roles";
@@ -77,17 +73,6 @@ const GENERAL_PRIMITIVE_COLOR_GROUPS: readonly PrimitiveColorGroupData[] =
         token: token.cssVariable,
         value: `var(${token.cssVariable})`,
       })),
-  }));
-
-const WORKOUT_PRIMITIVE_COLOR_GROUPS: readonly PrimitiveColorGroupData[] =
-  WORKOUT_PRIMITIVE_PALETTE_FAMILIES.map((palette) => ({
-    title: palette.label,
-    meta: `Workout domain primitive / ${palette.tokenPrefix}-base`,
-    colors: WORKOUT_COLOR_SHADE_STEPS.map((step) => ({
-      step,
-      token: `${palette.tokenPrefix}-${step}`,
-      value: workoutPrimitiveColorVar(palette.id, step),
-    })),
   }));
 
 type SemanticColorTokenData = {
@@ -452,9 +437,8 @@ export function HitoDsFoundationsPage() {
               <div className="min-w-0">
                 <p className="hito-label">Color documentation</p>
                 <p className="hito-body-small mt-2 max-w-3xl">
-                  Semantic tokens are the product API. Primitive swatches document the solid Hito
-                  palette underneath them; alpha overlays and gradients stay semantic because they
-                  describe usage context.
+                  Semantic tokens are the product API. Primitive swatches document the exportable
+                  global Hito foundation; workout domain colors stay documented by semantic role.
                 </p>
               </div>
               <div
@@ -506,17 +490,14 @@ export function HitoDsFoundationsPage() {
                 <div className="hito-reference-note">
                   <p className="hito-label">Primitive</p>
                   <p className="hito-body-small mt-2 max-w-3xl">
-                    These are solid base colors and dedicated workout shade scales already defined
-                    in Hito. Click a swatch to copy the live token reference. Alpha tokens are
-                    intentionally excluded from this primitive tab and documented as semantic usage
-                    colors.
+                    These are the global primitive colors in the generated Hito DS manifest. Click a
+                    swatch to copy the live token reference. Workout domain colors and alpha recipes
+                    are documented through their semantic usage contracts instead.
                   </p>
                 </div>
-                {[...GENERAL_PRIMITIVE_COLOR_GROUPS, ...WORKOUT_PRIMITIVE_COLOR_GROUPS].map(
-                  (group) => (
-                    <PrimitiveColorGroup key={group.title} group={group} onCopy={copyColorValue} />
-                  ),
-                )}
+                {GENERAL_PRIMITIVE_COLOR_GROUPS.map((group) => (
+                  <PrimitiveColorGroup key={group.title} group={group} onCopy={copyColorValue} />
+                ))}
               </div>
             )}
           </div>
@@ -527,9 +508,8 @@ export function HitoDsFoundationsPage() {
             <div className="hito-reference-note">
               <p className="hito-label">Workout semantic roles</p>
               <p className="hito-body-small mt-2 max-w-3xl">
-                Workout types and workout sections map onto primitive palettes through state-ready
-                semantic slots. Product surfaces should consume these role tokens instead of
-                primitive palette names.
+                Workout types and sections expose state-ready semantic slots. Product surfaces use
+                these stable role tokens; raw shade ramps are not a public contract.
               </p>
             </div>
             <WorkoutSemanticRoleGrid />
@@ -807,14 +787,13 @@ function WorkoutSemanticRoleGrid() {
         <h3 id="workout-semantic-type-colors" className="hito-panel-title">
           Workout type roles
         </h3>
-        <p className="hito-caption mt-1">Runner-facing workout labels mapped to primitives.</p>
+        <p className="hito-caption mt-1">Runner-facing workout labels with reusable state slots.</p>
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {WORKOUT_TYPE_COLOR_ROLES.map((role) => (
           <SemanticRoleCard
             key={role.type}
             label={role.label}
-            primitive={role.primitive}
             tokenFor={(slot) => workoutTypeColorToken(role.type, slot)}
             valueFor={(slot) => workoutTypeColorVar(role.type, slot)}
           />
@@ -841,7 +820,6 @@ function SectionSemanticRoleGrid() {
           <SemanticRoleCard
             key={role.type}
             label={role.label}
-            primitive={role.primitive}
             tokenFor={(slot) => workoutSectionColorToken(role.type, slot)}
             valueFor={(slot) => workoutSectionColorVar(role.type, slot)}
           />
@@ -854,12 +832,10 @@ function SectionSemanticRoleGrid() {
 
 function SemanticRoleCard({
   label,
-  primitive,
   tokenFor,
   valueFor,
 }: {
   label: string;
-  primitive: WorkoutPrimitivePaletteId;
   tokenFor: (slot: WorkoutColorStateSlot) => string;
   valueFor: (slot: WorkoutColorStateSlot) => string;
 }) {
@@ -867,7 +843,7 @@ function SemanticRoleCard({
     <article className="hito-surface-flat grid min-h-56 gap-4 p-4">
       <div className="flex min-w-0 items-start justify-between gap-3">
         <span className="min-w-0">
-          <span className="hito-label">maps to {primitive}</span>
+          <span className="hito-label">semantic role</span>
           <span className="mt-2 block hito-list-row-title">{label}</span>
           <code className="mt-1 block truncate hito-technical-mono">{tokenFor("base")}</code>
         </span>

@@ -25,6 +25,7 @@ import {
   type ManualWorkoutEvidenceFetcher,
 } from "@/lib/manual-workout-authoring/active-plan-add";
 import { buildManualWorkoutDraftInputFromPersistedWorkout } from "@/lib/manual-workout-authoring/copy-paste-reconstruction";
+import { asJsonRecord, toJson } from "@/lib/manual-workout-authoring/persistence";
 import { reviewManualWorkoutDraft } from "@/lib/manual-workout-authoring/actions";
 import {
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
@@ -875,16 +876,4 @@ function buildDeleteClearBlocked(input: {
     sourceKind: null,
     workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   };
-}
-
-function asJsonRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  return value as Record<string, unknown>;
-}
-
-function toJson(value: unknown): Json {
-  return JSON.parse(JSON.stringify(value)) as Json;
 }

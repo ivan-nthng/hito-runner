@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import type {
-  ExistingPlanContext,
+  CalendarWorkoutContext,
   PersistedPlanCycleRow,
   PersistedPlannedWorkoutRow,
   PersistedWorkoutLogRow,
@@ -34,14 +34,14 @@ export function buildFakeActivePlanMutationDependencyBase(input: {
 }) {
   return {
     currentDate: "2026-06-10",
-    getExistingPlanContextForUser: async () =>
+    getCalendarWorkoutContextForUser: async () =>
       ({
-        activePlan: input.activePlan,
+        provenancePlan: input.activePlan,
         existingWorkouts: {
           workouts: input.workouts,
           logsByWorkoutId: input.logsByWorkoutId ?? new Map(),
         },
-      }) satisfies ExistingPlanContext,
+      }) satisfies CalendarWorkoutContext,
     fetchEvidenceWorkoutIds: async () => input.evidenceWorkoutIds ?? new Set(),
   };
 }
@@ -118,6 +118,7 @@ export function buildFakeAddDependencies(input: {
   onPersist?: (record: {
     workoutSeed: FakeAddPersistRecord["workoutSeed"];
     reviewMetadata: FakeAddPersistRecord["reviewMetadata"];
+    copySourceWorkout: PersistedPlannedWorkoutRow | null;
   }) => void;
 }): ManualWorkoutActivePlanAddDependencies {
   return {
@@ -131,6 +132,7 @@ export function buildFakeAddDependencies(input: {
       input.onPersist?.({
         workoutSeed: record.workoutSeed,
         reviewMetadata: record.reviewMetadata,
+        copySourceWorkout: record.copySourceWorkout,
       });
 
       return {
@@ -165,14 +167,14 @@ export function buildFakeMoveDependencies(input: {
 }): MoveDependencies {
   return {
     currentDate: "2026-06-10",
-    getExistingPlanContextForUser: async () =>
+    getCalendarWorkoutContextForUser: async () =>
       ({
-        activePlan: input.activePlan,
+        provenancePlan: input.activePlan,
         existingWorkouts: {
           workouts: input.workouts,
           logsByWorkoutId: input.logsByWorkoutId ?? new Map(),
         },
-      }) satisfies ExistingPlanContext,
+      }) satisfies CalendarWorkoutContext,
     fetchEvidenceWorkoutIds: async () => input.evidenceWorkoutIds ?? new Set(),
     persistWorkoutMove: async (record) => {
       if (input.persistError) {

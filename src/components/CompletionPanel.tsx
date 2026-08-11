@@ -407,6 +407,8 @@ export function CompletionPanel({
               min={1}
               max={10}
               step={1}
+              previousValue={syncedFormState.rpe ?? 6}
+              previousValueLabel={`Restore session effort ${syncedFormState.rpe ?? 6} out of 10`}
               onValueChange={(value) => updateForm((current) => ({ ...current, rpe: value }))}
               valueLabel={form.rpe == null ? "Not recorded" : `${form.rpe}/10`}
               ariaValueText={
@@ -504,6 +506,8 @@ export function CompletionPanel({
                     min={1}
                     max={10}
                     step={1}
+                    previousValue={syncedFormState.rpe ?? 6}
+                    previousValueLabel={`Restore session effort ${syncedFormState.rpe ?? 6} out of 10`}
                     onValueChange={(value) => updateForm((current) => ({ ...current, rpe: value }))}
                     valueLabel={form.rpe == null ? "Not recorded" : `${form.rpe}/10`}
                     ariaValueText={
@@ -541,6 +545,7 @@ export function CompletionPanel({
         <BodyNotesModal
           open={bodyNotesModalOpen}
           bodyNotes={bodyNotesDraft}
+          baselineBodyNotes={form.bodyNotes}
           onOpenChange={(nextOpen) => {
             if (!nextOpen) {
               closeBodyNotesModal();
@@ -740,7 +745,6 @@ export function WorkoutFeedbackPanel({
         };
   const showUploadSummaryInEmptyState =
     !attachedGarminAsset && Boolean(isUploading || uploadError || !canUploadResult);
-  const hasPlanRunReadback = Boolean(latestComparison || latestActualMetrics);
 
   useEffect(() => {
     setFeedbackState(feedback);
@@ -774,7 +778,7 @@ export function WorkoutFeedbackPanel({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="hito-label">Feedback</div>
-            <h2 className="hito-section-title mt-2">Compare your run with the plan.</h2>
+            <h2 className="hito-ui-section-title mt-2">Compare your run with the plan.</h2>
             <p className="hito-body mt-2">
               {attachedGarminAsset
                 ? "Your Garmin file and review live here."
@@ -1014,7 +1018,7 @@ export function WorkoutFeedbackPanel({
                     <Icon name="file-up" size="md" className="text-foreground/82" />
                   </div>
                   <div className="hito-label">Upload activity file</div>
-                  <h3 className="hito-panel-title mt-3">
+                  <h3 className="hito-ui-panel-title mt-3">
                     Add an activity file to compare it with the plan.
                   </h3>
                   <p className="hito-body mt-3 max-w-xl">
@@ -1072,30 +1076,33 @@ export function WorkoutFeedbackPanel({
           ) : null}
         </section>
 
-        {hasPlanRunReadback ? (
+        {latestActualMetrics ? (
+          <section className="border-t border-hairline pt-6">
+            <RunCapturedReadback
+              actual={latestActualMetrics}
+              comparisonAvailable={Boolean(latestComparison)}
+            />
+          </section>
+        ) : null}
+
+        {latestComparison ? (
           <section className="border-t border-hairline pt-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <h3 className="hito-panel-title">Plan vs run</h3>
-              {latestComparison ? (
-                <span
-                  className="hito-status-pill"
-                  data-tone={getComparisonCoverageMeta(latestComparison).tone}
-                >
-                  {getComparisonCoverageMeta(latestComparison).label}
-                </span>
-              ) : null}
+              <h3 className="hito-ui-panel-title">Plan vs run</h3>
+              <span
+                className="hito-status-pill"
+                data-tone={getComparisonCoverageMeta(latestComparison).tone}
+              >
+                {getComparisonCoverageMeta(latestComparison).label}
+              </span>
             </div>
-            {latestComparison ? (
-              <DeterministicComparisonReadback comparison={latestComparison} />
-            ) : latestActualMetrics ? (
-              <RunCapturedReadback actual={latestActualMetrics} />
-            ) : null}
+            <DeterministicComparisonReadback comparison={latestComparison} />
           </section>
         ) : null}
 
         {latestAiInsight ? (
           <section className="border-t border-hairline pt-6">
-            <h3 className="hito-panel-title">Saved coach note</h3>
+            <h3 className="hito-ui-panel-title">Saved coach note</h3>
             <WorkoutAiInsightReadback insight={latestAiInsight} comparison={latestComparison} />
           </section>
         ) : null}

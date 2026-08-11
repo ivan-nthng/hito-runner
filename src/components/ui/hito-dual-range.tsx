@@ -6,6 +6,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 
+import type { HitoFieldSize } from "@/components/ui/hito-control-contract";
 import { cn } from "@/lib/utils";
 
 export function HitoDualRange({
@@ -20,6 +21,8 @@ export function HitoDualRange({
   minimumBounds,
   onMaxValueChange,
   onMinValueChange,
+  previousValue,
+  size = "sm",
   step = 1,
   value,
 }: {
@@ -34,6 +37,8 @@ export function HitoDualRange({
   minimumBounds?: readonly [number, number];
   onMaxValueChange: (value: number) => void;
   onMinValueChange: (value: number) => void;
+  previousValue?: readonly [number, number];
+  size?: HitoFieldSize;
   step?: number;
   value: readonly [number, number];
 }) {
@@ -47,9 +52,25 @@ export function HitoDualRange({
   const span = Math.max(max - min, 1);
   const minimumPercent = ((value[0] - min) / span) * 100;
   const maximumPercent = ((value[1] - min) / span) * 100;
+  const previousMinimumPercent = previousValue ? ((previousValue[0] - min) / span) * 100 : 0;
+  const previousMaximumPercent = previousValue ? ((previousValue[1] - min) / span) * 100 : 0;
+  const hasPreviousMinimum =
+    previousValue != null &&
+    Number.isFinite(previousValue[0]) &&
+    previousValue[0] >= min &&
+    previousValue[0] <= max &&
+    previousValue[0] !== value[0];
+  const hasPreviousMaximum =
+    previousValue != null &&
+    Number.isFinite(previousValue[1]) &&
+    previousValue[1] >= min &&
+    previousValue[1] <= max &&
+    previousValue[1] !== value[1];
   const style = {
     "--hito-dual-range-start": `${Math.min(Math.max(minimumPercent, 0), 100)}%`,
     "--hito-dual-range-end": `${Math.min(Math.max(maximumPercent, 0), 100)}%`,
+    "--hito-dual-range-previous-min": `${Math.min(Math.max(previousMinimumPercent, 0), 100)}%`,
+    "--hito-dual-range-previous-max": `${Math.min(Math.max(previousMaximumPercent, 0), 100)}%`,
   } as CSSProperties;
   const resolvedMinimumBounds = minimumBounds ?? [min, value[1]];
   const resolvedMaximumBounds = maximumBounds ?? [value[0], max];
@@ -154,9 +175,10 @@ export function HitoDualRange({
 
   return (
     <div
-      className={cn("hito-dual-range", className)}
+      className={cn("hito-dual-range", `hito-dual-range-${size}`, className)}
       data-disabled={disabled || undefined}
       data-invalid={invalid || undefined}
+      data-size={size}
       style={style}
     >
       <div
@@ -212,6 +234,24 @@ export function HitoDualRange({
         onKeyDown={(event) => handleRangeKeyDown(event, "maximum")}
         onChange={(event) => onMaxValueChange(Math.max(Number(event.target.value), value[0]))}
       />
+      {hasPreviousMinimum ? (
+        <button
+          type="button"
+          className="hito-dual-range-previous-marker hito-dual-range-previous-marker-min"
+          disabled={disabled}
+          aria-label={`Restore previous ${minLabel}: ${previousValue[0]}`}
+          onClick={() => onMinValueChange(previousValue[0])}
+        />
+      ) : null}
+      {hasPreviousMaximum ? (
+        <button
+          type="button"
+          className="hito-dual-range-previous-marker hito-dual-range-previous-marker-max"
+          disabled={disabled}
+          aria-label={`Restore previous ${maxLabel}: ${previousValue[1]}`}
+          onClick={() => onMaxValueChange(previousValue[1])}
+        />
+      ) : null}
     </div>
   );
 }

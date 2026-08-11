@@ -1,9 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
-  ACTIVE_PLAN_USER_EDIT_MUTATION_KIND,
-  ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
-} from "@/lib/active-plan-workout-editing/policy";
+  getCalendarWorkoutMutationContext,
+  getPlanRecordForUser,
+  type PersistedPlanCycleRow,
+  type PersistedPlannedWorkoutRow,
+} from "@/lib/active-plan-persistence";
+import {
+  CalendarPersistenceRejection,
+  applyAtomicCalendarWorkoutMutation,
+} from "@/lib/active-plan-lifecycle-persistence";
+import { ACTIVE_PLAN_USER_EDIT_MUTATION_KIND } from "@/lib/active-plan-workout-editing/policy";
 import {
   addReviewedManualWorkoutToActivePlanForUser,
   type ManualWorkoutActivePlanAddDependencies,
@@ -17,7 +24,6 @@ import {
   type ManualWorkoutCopyPasteFailureReason,
 } from "@/lib/manual-workout-authoring/copy-paste-reconstruction";
 import {
-  MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
   MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   inputHasClientPayload,
   type ManualWorkoutAddToActivePlanResult,
@@ -27,6 +33,14 @@ import {
 } from "@/lib/manual-workout-authoring/schema";
 import { stableManualWorkoutChecksum64Hex } from "@/lib/manual-workout-authoring/review-exactness";
 import { getCurrentManualWorkoutAuthoringUserId } from "@/lib/manual-workout-authoring/request-auth";
+import { buildSourceWorkoutFingerprint } from "@/lib/manual-workout-authoring/edit-workout-review-token";
+import {
+  buildPersistedWorkoutInsertRows,
+  persistedWorkoutRowToImportedSeed,
+} from "@/lib/persisted-plan-replacement";
+import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
+import type { Json } from "@/lib/supabase/database";
+import { diffDaysIso, weekdayLong } from "@/lib/training";
 
 export type { ManualWorkoutCopyPasteFailureReason } from "@/lib/manual-workout-authoring/copy-paste-reconstruction";
 
@@ -79,7 +93,7 @@ export const manualWorkoutCopyPasteConfirmInputSchema = z
 
 export const manualWorkoutDirectCopyInputSchema = z
   .object({
-    activePlanId: z.string().uuid(),
+    activePlanId: z.string().uuid().optional(),
     sourceWorkoutId: z.string().uuid(),
     sourceWorkoutDate: isoDateSchema,
     targetDate: isoDateSchema,
@@ -92,7 +106,7 @@ type ManualWorkoutCopyPasteBlockedResult = {
   persisted: false;
   reason: ManualWorkoutCopyPasteFailureReason;
   message: string;
-  sourceKind: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+  sourceKind: string | null;
   workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
 };
 
@@ -101,7 +115,8 @@ export type ManualWorkoutCopyPasteReviewResult =
       ok: true;
       status: "draft_ready";
       persisted: false;
-      sourceKind: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+      sourceKind: string;
+      sourceStatus: string | null;
       workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
       activePlanId: string;
       sourceWorkoutId: string;
@@ -137,7 +152,7 @@ export type ManualWorkoutDirectCopyResult =
       ok: true;
       status: "copied";
       persisted: true;
-      sourceKind: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
+      sourceKind: string;
       sourceStatus: string | null;
       workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
       activePlanId: string;
@@ -147,16 +162,13 @@ export type ManualWorkoutDirectCopyResult =
       targetDate: string;
       targetWeekday: string;
       title: string;
-      templateKey: ManualWorkoutDraftInput["templateKey"];
+      templateKey: ManualWorkoutDraftInput["templateKey"] | null;
       mutationMode: "direct_manual_edit";
       mutationPayloadVersion: typeof MANUAL_WORKOUT_DIRECT_COPY_PAYLOAD_VERSION;
       mutationChecksum: string;
       calendarRowCount: number;
       nonRestWorkoutCount: number;
-      sourceMetadata: Extract<
-        ManualWorkoutAddToActivePlanResult,
-        { ok: true }
-      >["sourceMetadata"] & {
+      sourceMetadata: {
         mutationKind: typeof ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.copyWorkout;
         mutationMode: "direct_manual_edit";
         mutationPayloadVersion: typeof MANUAL_WORKOUT_DIRECT_COPY_PAYLOAD_VERSION;
@@ -164,23 +176,31 @@ export type ManualWorkoutDirectCopyResult =
         sourceWorkoutId: string;
         sourceWorkoutDate: string;
         targetWorkoutId: string;
+        targetDate: string;
+        prescriptionSource: "persisted_planned_workout";
       };
       safety: {
         requiresExplicitConfirm: false;
         directMutation: true;
         sourceWorkoutVerified: true;
-        reconstructedFromPersistedWorkout: true;
-        reviewedThroughManualAuthoring: true;
-        targetDayKind: "rest_day";
+        reconstructedFromPersistedWorkout: false;
+        reviewedThroughManualAuthoring: false;
+        prescriptionCopiedFromPersistedWorkout: true;
+        targetDayKind: "empty_day";
         targetDateDerivedServerSide: true;
         trustedClientRows: false;
-        serverRebuiltReview: true;
+        serverRebuiltReview: false;
         callsOpenAi: false;
       };
     }
   | ManualWorkoutCopyPasteBlockedResult;
 
 export type ManualWorkoutCopyPasteDependencies = ManualWorkoutActivePlanAddDependencies;
+
+export interface ManualWorkoutDirectCopyDependencies extends ManualWorkoutCopyPasteDependencies {
+  getPlanRecordForUser?: typeof getPlanRecordForUser;
+  persistWorkoutCopy?: typeof persistCanonicalCalendarWorkoutCopy;
+}
 
 export const copyManualWorkoutWithinActivePlan = createServerFn({ method: "POST" })
   .validator((value: unknown) => value)
@@ -227,6 +247,7 @@ export async function reviewManualWorkoutCopyPasteDraftForUser(
     return buildCopyPasteBlocked({
       reason: review.reason,
       message: review.message,
+      sourceKind: reconstruction.sourceKind,
     });
   }
 
@@ -234,7 +255,8 @@ export async function reviewManualWorkoutCopyPasteDraftForUser(
     ok: true,
     status: "draft_ready",
     persisted: false,
-    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+    sourceKind: reconstruction.sourceKind,
+    sourceStatus: reconstruction.sourceStatus,
     workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
     activePlanId: reconstruction.activePlanId,
     sourceWorkoutId: reconstruction.sourceWorkout.id,
@@ -287,20 +309,30 @@ export async function confirmManualWorkoutCopyPasteDraftForUser(
     return buildCopyPasteBlocked({
       reason: mapAddFailureReason(exactness.reason),
       message: exactness.message,
+      sourceKind: reconstruction.sourceKind,
     });
   }
 
   const addResult = await addReviewedManualWorkoutToActivePlanForUser(
     userId,
-    exactness,
+    {
+      ...exactness,
+      activePlanUserEdit: {
+        mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.copyWorkout,
+        mutationChecksum: exactness.reviewChecksum,
+        sourceWorkoutId: reconstruction.sourceWorkout.id,
+        sourceWorkoutDate: reconstruction.sourceWorkout.workout_date,
+        trustedClientRows: false,
+      },
+    },
     dependencies,
-    parsed.data.activePlanId ?? reconstruction.activePlanId,
   );
 
   if (!addResult.ok) {
     return buildCopyPasteBlocked({
       reason: addResult.reason,
       message: addResult.message,
+      sourceKind: reconstruction.sourceKind,
     });
   }
 
@@ -320,7 +352,7 @@ export async function confirmManualWorkoutCopyPasteDraftForUser(
 export async function copyManualWorkoutWithinActivePlanForUser(
   userId: string,
   input: unknown,
-  dependencies: ManualWorkoutCopyPasteDependencies = {},
+  dependencies: ManualWorkoutDirectCopyDependencies = {},
 ): Promise<ManualWorkoutDirectCopyResult> {
   const parsed = manualWorkoutDirectCopyInputSchema.safeParse(input);
 
@@ -333,70 +365,123 @@ export async function copyManualWorkoutWithinActivePlanForUser(
     });
   }
 
-  const reconstruction = await reconstructManualWorkoutCopyDraftForUser(
-    userId,
-    parsed.data,
-    dependencies,
+  const getContext =
+    dependencies.getCalendarWorkoutContextForUser ?? getCalendarWorkoutMutationContext;
+  const getPlan = dependencies.getPlanRecordForUser ?? getPlanRecordForUser;
+  const currentDate = dependencies.currentDate ?? (await getRunnerCalendarDateForUserId(userId));
+  let planContext;
+
+  try {
+    planContext = await getContext(userId);
+  } catch {
+    return buildCopyPasteBlocked({
+      reason: "persistence_failed",
+      message: "The calendar could not verify the persisted workout copy source.",
+    });
+  }
+
+  const sourceWorkout = planContext.existingWorkouts.workouts.find(
+    (workout) => workout.id === parsed.data.sourceWorkoutId,
   );
 
-  if (!reconstruction.ok) {
-    return buildCopyPasteBlocked(reconstruction);
-  }
-
-  const review = reviewManualWorkoutDraft(reconstruction.draftInput);
-
-  if (!review.ok) {
+  if (!sourceWorkout || sourceWorkout.user_id !== userId) {
     return buildCopyPasteBlocked({
-      reason: review.reason,
-      message: review.message,
+      reason: "source_workout_not_found",
+      message: "The copied source workout is no longer available.",
     });
   }
 
-  const exactness = validateManualWorkoutReviewExactness({
-    draftInput: reconstruction.draftInput,
-    reviewToken: review.reviewToken,
-    reviewChecksum: review.reviewChecksum,
-  });
-
-  if (!exactness.ok) {
+  if (sourceWorkout.workout_date !== parsed.data.sourceWorkoutDate) {
     return buildCopyPasteBlocked({
-      reason: mapAddFailureReason(exactness.reason),
-      message: exactness.message,
+      reason: "source_date_changed",
+      message: "The copied source workout moved. Copy it again from Calendar.",
     });
   }
 
-  const mutationChecksum = buildDirectCopyMutationChecksum({
-    activePlanId: reconstruction.activePlanId,
-    sourceWorkoutId: reconstruction.sourceWorkout.id,
-    sourceWorkoutDate: reconstruction.sourceWorkout.workout_date,
+  if (sourceWorkout.workout_type === "rest") {
+    return buildCopyPasteBlocked({
+      reason: "source_workout_not_supported",
+      message: "Rest rows are not workout prescriptions and cannot be copied.",
+    });
+  }
+
+  if (parsed.data.targetDate < currentDate) {
+    return buildCopyPasteBlocked({
+      reason: "protected_day",
+      message: "Copied workouts can only be pasted on today or a future empty date.",
+    });
+  }
+
+  if (
+    planContext.existingWorkouts.workouts.some(
+      (workout) => workout.workout_date === parsed.data.targetDate,
+    )
+  ) {
+    return buildCopyPasteBlocked({
+      reason: "occupied_day",
+      message: "Paste requires a truly empty date; existing workouts and Rest rows stay unchanged.",
+    });
+  }
+
+  let provenancePlan: PersistedPlanCycleRow | null;
+  try {
+    provenancePlan = await getPlan(userId, sourceWorkout.plan_cycle_id);
+  } catch {
+    provenancePlan = null;
+  }
+
+  if (!provenancePlan) {
+    return buildCopyPasteBlocked({
+      reason: "unsupported_source_metadata",
+      message: "The copied workout is missing its saved plan provenance.",
+    });
+  }
+
+  const targetWeekday = weekdayLong(parsed.data.targetDate);
+  const sourceKind = provenancePlan.source_kind ?? "unknown_plan_provenance";
+  const mutationChecksum = stableManualWorkoutChecksum64Hex({
+    version: MANUAL_WORKOUT_DIRECT_COPY_PAYLOAD_VERSION,
+    mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.copyWorkout,
+    sourceWorkoutId: sourceWorkout.id,
+    sourceWorkoutDate: sourceWorkout.workout_date,
     targetDate: parsed.data.targetDate,
-    targetWeekday: review.draft.weekday,
-    templateKey: review.draft.templateKey,
-    reviewChecksum: review.reviewChecksum,
   });
+  const workoutSeed = {
+    ...persistedWorkoutRowToImportedSeed(sourceWorkout, {
+      displayOrder: resolveNextCalendarDisplayOrder(planContext.existingWorkouts.workouts),
+      normalizeSteps: false,
+    }),
+    workoutDate: parsed.data.targetDate,
+    weekday: targetWeekday,
+    weekNumber: Math.floor(diffDaysIso(parsed.data.targetDate, provenancePlan.start_date) / 7) + 1,
+  };
+  const persistCopy = dependencies.persistWorkoutCopy ?? persistCanonicalCalendarWorkoutCopy;
+  let persisted;
 
-  const addResult = await addReviewedManualWorkoutToActivePlanForUser(
-    userId,
-    {
-      ...exactness,
-      activePlanUserEdit: {
-        mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.copyWorkout,
-        mutationMode: "direct_manual_edit",
-        mutationPayloadVersion: MANUAL_WORKOUT_DIRECT_COPY_PAYLOAD_VERSION,
-        mutationChecksum,
-        sourceWorkoutId: reconstruction.sourceWorkout.id,
-        sourceWorkoutDate: reconstruction.sourceWorkout.workout_date,
-        trustedClientRows: false,
-      },
-    },
-    dependencies,
-    parsed.data.activePlanId,
-  );
+  try {
+    persisted = await persistCopy({
+      userId,
+      currentDate,
+      provenancePlan,
+      sourceWorkout,
+      workoutSeed,
+    });
+  } catch (error) {
+    if (error instanceof CalendarPersistenceRejection) {
+      return buildCopyPasteBlocked({
+        reason:
+          error.reason === "stale_review" || error.reason === "protected_day"
+            ? error.reason
+            : "persistence_failed",
+        message: error.message,
+        sourceKind,
+      });
+    }
 
-  if (!addResult.ok) {
     return buildCopyPasteBlocked({
-      reason: addResult.reason,
-      message: addResult.message,
+      reason: "persistence_failed",
+      message: "The copied workout could not be persisted. The calendar is unchanged.",
+      sourceKind,
     });
   }
 
@@ -404,50 +489,103 @@ export async function copyManualWorkoutWithinActivePlanForUser(
     ok: true,
     status: "copied",
     persisted: true,
-    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-    sourceStatus: addResult.sourceStatus,
+    sourceKind,
+    sourceStatus: provenancePlan.status,
     workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
-    activePlanId: addResult.activePlanId,
-    sourceWorkoutId: reconstruction.sourceWorkout.id,
-    sourceWorkoutDate: reconstruction.sourceWorkout.workout_date,
-    targetWorkoutId: addResult.plannedWorkoutId,
+    activePlanId: provenancePlan.id,
+    sourceWorkoutId: sourceWorkout.id,
+    sourceWorkoutDate: sourceWorkout.workout_date,
+    targetWorkoutId: persisted.plannedWorkout.id,
     targetDate: parsed.data.targetDate,
-    targetWeekday: review.draft.weekday,
-    title: review.draft.title,
-    templateKey: review.draft.templateKey,
+    targetWeekday,
+    title: sourceWorkout.title,
+    templateKey: null,
     mutationMode: "direct_manual_edit",
     mutationPayloadVersion: MANUAL_WORKOUT_DIRECT_COPY_PAYLOAD_VERSION,
     mutationChecksum,
-    calendarRowCount: addResult.calendarRowCount,
-    nonRestWorkoutCount: addResult.nonRestWorkoutCount,
+    calendarRowCount: planContext.existingWorkouts.workouts.length + 1,
+    nonRestWorkoutCount:
+      planContext.existingWorkouts.workouts.filter((workout) => workout.workout_type !== "rest")
+        .length + 1,
     sourceMetadata: {
-      ...addResult.sourceMetadata,
       mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.copyWorkout,
       mutationMode: "direct_manual_edit",
       mutationPayloadVersion: MANUAL_WORKOUT_DIRECT_COPY_PAYLOAD_VERSION,
       mutationChecksum,
-      sourceWorkoutId: reconstruction.sourceWorkout.id,
-      sourceWorkoutDate: reconstruction.sourceWorkout.workout_date,
-      targetWorkoutId: addResult.plannedWorkoutId,
+      sourceWorkoutId: sourceWorkout.id,
+      sourceWorkoutDate: sourceWorkout.workout_date,
+      targetWorkoutId: persisted.plannedWorkout.id,
+      targetDate: parsed.data.targetDate,
+      prescriptionSource: "persisted_planned_workout",
     },
     safety: {
       requiresExplicitConfirm: false,
       directMutation: true,
       sourceWorkoutVerified: true,
-      reconstructedFromPersistedWorkout: true,
-      reviewedThroughManualAuthoring: true,
-      targetDayKind: "rest_day",
+      reconstructedFromPersistedWorkout: false,
+      reviewedThroughManualAuthoring: false,
+      prescriptionCopiedFromPersistedWorkout: true,
+      targetDayKind: "empty_day",
       targetDateDerivedServerSide: true,
       trustedClientRows: false,
-      serverRebuiltReview: true,
+      serverRebuiltReview: false,
       callsOpenAi: false,
     },
   };
 }
 
+async function persistCanonicalCalendarWorkoutCopy(input: {
+  userId: string;
+  currentDate: string;
+  provenancePlan: PersistedPlanCycleRow;
+  sourceWorkout: PersistedPlannedWorkoutRow;
+  workoutSeed: ReturnType<typeof persistedWorkoutRowToImportedSeed>;
+}) {
+  const [insertRow] = buildPersistedWorkoutInsertRows(input.provenancePlan.id, input.userId, [
+    input.workoutSeed,
+  ]);
+
+  if (!insertRow) {
+    throw new Error("Calendar workout copy did not prepare an insert row.");
+  }
+
+  const persisted = await applyAtomicCalendarWorkoutMutation({
+    userId: input.userId,
+    planId: input.provenancePlan.id,
+    expectedPlanUpdatedAt: input.provenancePlan.updated_at,
+    currentDate: input.currentDate,
+    mutationKind: "add",
+    expectedSourceWorkout: buildSourceWorkoutFingerprint(input.sourceWorkout) as unknown as Json,
+    expectedTargetWorkout: null,
+    workoutInsert: {
+      ...insertRow,
+      id: crypto.randomUUID(),
+    } as unknown as Json,
+    workoutUpdate: null,
+    planUpdate: {
+      end_date: input.provenancePlan.end_date,
+      goal_metadata: input.provenancePlan.goal_metadata,
+      plan_preferences: input.provenancePlan.plan_preferences,
+    },
+  });
+
+  if (!persisted.mutatedWorkout) {
+    throw new Error("Calendar workout copy did not return the inserted workout.");
+  }
+
+  return { plannedWorkout: persisted.mutatedWorkout };
+}
+
+function resolveNextCalendarDisplayOrder(workouts: readonly PersistedPlannedWorkoutRow[]) {
+  return workouts.length === 0
+    ? 0
+    : Math.max(...workouts.map((workout) => workout.display_order)) + 1;
+}
+
 function buildCopyPasteBlocked(input: {
   reason: ManualWorkoutCopyPasteFailureReason;
   message: string;
+  sourceKind?: string | null;
 }): ManualWorkoutCopyPasteBlockedResult {
   return {
     ok: false,
@@ -455,7 +593,7 @@ function buildCopyPasteBlocked(input: {
     persisted: false,
     reason: input.reason,
     message: input.message,
-    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+    sourceKind: input.sourceKind ?? null,
     workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   };
 }
@@ -464,28 +602,4 @@ function mapAddFailureReason(
   reason: ManualWorkoutReviewExactnessFailureReason,
 ): ManualWorkoutCopyPasteFailureReason {
   return reason;
-}
-
-function buildDirectCopyMutationChecksum(input: {
-  activePlanId: string;
-  sourceWorkoutId: string;
-  sourceWorkoutDate: string;
-  targetDate: string;
-  targetWeekday: string;
-  templateKey: ManualWorkoutDraftInput["templateKey"];
-  reviewChecksum: string;
-}) {
-  return stableManualWorkoutChecksum64Hex({
-    version: MANUAL_WORKOUT_DIRECT_COPY_PAYLOAD_VERSION,
-    sourceKind: ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
-    mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.copyWorkout,
-    activePlanId: input.activePlanId,
-    sourceWorkoutId: input.sourceWorkoutId,
-    sourceWorkoutDate: input.sourceWorkoutDate,
-    targetDate: input.targetDate,
-    targetWeekday: input.targetWeekday,
-    templateKey: input.templateKey,
-    reviewChecksum: input.reviewChecksum,
-    trustedClientRows: false,
-  });
 }

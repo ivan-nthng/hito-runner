@@ -61,7 +61,7 @@ export function ManualTemplatePickerDialog({
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-modal-title">Choose template</DialogTitle>
+          <DialogTitle className="hito-ui-modal-title">Choose template</DialogTitle>
           <DialogDescription className="hito-body">
             Choose a template, adjust the workout, then ask Hito to review it before anything is
             created.

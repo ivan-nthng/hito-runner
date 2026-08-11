@@ -90,7 +90,7 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
             <span className="text-signal">· Today</span>
           </div>
 
-          <h2 className="mt-3 max-w-2xl text-balance font-display text-4xl leading-[1.05] lg:text-5xl">
+          <h2 className="mt-3 max-w-2xl text-balance font-sans text-4xl leading-[1.05] lg:text-5xl">
             {isRestDay ? "Rest day" : workout.title}
           </h2>
 
@@ -190,7 +190,7 @@ function PlanStartsLaterHero({
             <span>No scheduled workout</span>
           </div>
 
-          <h2 className="mt-3 max-w-2xl text-balance font-display text-4xl leading-[1.05] lg:text-5xl">
+          <h2 className="mt-3 max-w-2xl text-balance font-sans text-4xl leading-[1.05] lg:text-5xl">
             Your plan starts later.
           </h2>
 

@@ -94,7 +94,7 @@ export function ManualWorkoutSourceActionMenu({
     hitoToast.success({
       id: MANUAL_COPY_PASTE_TOAST_ID,
       title: "Workout copied",
-      description: `${title} is ready to paste into a Rest or no-workout day.`,
+      description: `${title} is ready to paste into an empty day.`,
     });
   };
 
@@ -345,7 +345,7 @@ function ManualDeleteClearReadyDialog({
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-modal-title">Review clear workout</DialogTitle>
+          <DialogTitle className="hito-ui-modal-title">Review clear workout</DialogTitle>
           <DialogDescription className="hito-body">
             Confirm before Hito removes this planned workout from your active plan.
           </DialogDescription>

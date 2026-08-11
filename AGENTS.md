@@ -1,1157 +1,204 @@
-# Project Agent Operating Rules
-
-This file is the canonical execution policy for AI agents in this project template.
-
-Customize the pipeline terms below for the new project before real execution begins.
-
-## 0) Always-Visible Evidence And Root-Cause Rule
-
-Before every project-work response or action, pause and ask:
-
-`Are we fixing the root cause, or are we patching a visible symptom?`
-
-If the answer is not clearly "root cause", the agent must stop and trace the failure to the first
-incorrect owner before proposing or executing work. For a reported behavior defect, a plausible
-diagnosis is not enough: establish one artifact that supports the cause before changing code.
-
-Mandatory root-cause check:
-
-- Name the visible symptom.
-- Name the demonstrated underlying cause, or the exact query, log, fixture, or source inspection
-  still needed to establish it.
-- Name the canonical owner of that cause: backend validation, normalization, persistence, auth,
-  AI contract, import/export, route state, form serialization, async lifecycle, shared component,
-  Hito DS primitive, rendering view model, or documentation/source-of-truth.
-- Reuse the existing canonical seam owned by that layer before adding anything new.
-- If the current task can only patch the symptom, say so explicitly and route the root-cause fix to
-  the correct owner instead of presenting the symptom patch as complete.
-
-Section 2.45 defines the evidence and replay rules; Section 2.56 defines the canonical-owner fix
-discipline.
-
-## 0.1) Mandatory Execution Preflight And Closure Receipts
-
-The rules above are operational gates, not background advice. This compact receipt makes them visible
-without creating a second workflow document, task system, or evidence store.
-
-Before the first write, migration, product-data mutation, or implementation validator change in an
-implementation, debugging, or QA task, the assigned execution owner must publish this brief
-`Execution preflight` in its first work update:
-
-- `Task and bounded outcome` — the exact behavior or contract being changed.
-- `Evidence before code` — the artifact proving the cause, or the exact artifact still required.
-- `Canonical owner` — the first incorrect source-of-truth boundary to change.
-- `Smallest root-cause outcome` — what becomes true and what obsolete path should disappear.
-- `Required proof` — the risk-based validation needed for closure.
-- `Stop condition` — the boundary that would return the task to another owner or Product decision.
-
-For a design preference, copy, documentation, or reference-only task, state the accepted decision
-or source evidence instead of inventing a defect replay. If cause evidence is still obtainable, the
-owner must obtain it before writing; a likely cause is not a receipt. One preflight covers one
-bounded same-owner batch and must be revised when its owner or root cause changes.
-
-No behavior-changing task may close without matching closure receipts in its standard final report:
-
-- the root-cause discriminator or an explicit safe evidence limitation;
-- the regression proof appropriate to the risk, including a minimized replay only when deterministic;
-- every required check and every required check not run, with its coverage consequence; and
-- what replaced, was deleted, or deliberately remains and why.
-
-QA treats a missing or contradicted receipt as incomplete acceptance, not as a passing test. For a
-release or pre-commit bundle that claims finalization, the release owner or ARCHITECT must also
-confirm that every included behavior-changing slice has its receipt and no `Blocked`, `Failed`, or
-`Pending` gate is represented as accepted. Documentation-only work remains proportionate and does
-not need runtime receipts.
-
-### 0.1.1) Canonical Backlog Lifecycle Update (Mandatory For Every Role)
-
-When an assigned task names a canonical work item in `docs/tasks/backlog/`, its execution owner
-maintains that item's lifecycle metadata directly. This applies to BACKEND, FRONTEND, DESIGN SYSTEM,
-DESIGNER, QA, ARCHITECT, and every other role; it is not a Product-only chore and must never be
-relayed to the user or deferred to a later documentation pass.
-
-- Before the first implementation, validation, or task-owned mutation, update the exact work item to
-  truthful `in_progress` and record the current stage when the item has a stage field. A supporting
-  plan or final report does not substitute for this update.
-- Before the final report, update the same item to its truthful terminal or waiting state: normally
-  `completed`, `blocked`, `ready`, or `backlog`. State the demonstrated outcome, remaining boundary,
-  and next owner only when each is factual.
-- A multi-slice parent item stays `in_progress` while later admitted slices remain. In that case, the
-  owner must update the exact completed slice or receipt inside that same canonical item rather than
-  falsely marking the whole program `completed`.
-- Do not leave an item `in_progress` after the owner has gone idle. A stale backlog state cannot
-  support an Implementation DoD pass, a release-completion claim, or selection of the next task.
-- Revalidate the item's canonical metadata and local links after the update, and include the work-item
-  link plus the final lifecycle state in the closure report.
-- If concurrent edits make a whole-file update unsafe, preserve them and apply only the smallest
-  task-owned hunk. A concurrent-document boundary is not permission to omit the lifecycle update;
-  obtain the current file state, make the exact metadata/receipt change, and report any genuine
-  ownership conflict precisely.
-
-## 0.2) No Routine Approval Or User-Relay Rule (Mandatory)
-
-Routine local work is already authorized. Agents must execute it autonomously and must not ask the
-user to approve, relay, copy a command, choose a browser path, or manually continue ordinary work.
-
-Standing authorization includes local source inspection and edits, local build/runtime control,
-loopback fixture setup, disposable local test data and cleanup, local browser QA, validators,
-subagent use within the concurrent-subagent cap, and non-hosted observability.
-
-- Before surfacing an approval or environment gate, exhaust safe local alternatives available in the
-  current role and task scope. A routine shell-command, browser-control, fixture, or test-data
-  confirmation is not a user decision.
-- Do not repeatedly ask for the same approval. If a platform-enforced permission dialog is genuinely
-  unavoidable after safe alternatives are exhausted, report it once with the exact blocked action,
-  the alternatives attempted, and the coverage consequence. Continue every independent part of the
-  task that remains safe.
-- User confirmation is required only for a genuine Product decision or a materially external or
-  irreversible boundary: hosted/production mutation, paid provider call, deployment, production
-  data deletion, creating a new role chat, staging/commit/push, or another action the user has
-  explicitly reserved.
-- A task may not be called `Blocked` merely because the agent preferred to ask first. The owner must
-  either complete the local work under this standing authorization or name the concrete platform or
-  cross-owner boundary that prevents further progress.
-- Do not use raw `rm`, `rm -rf`, or an ad hoc `/tmp` proof script as routine QA cleanup when a
-  repeatable validator, fixture lifecycle, or existing project cleanup seam can own the proof.
-  Promote a recurring discriminator into its existing validator and let that owner clean its own
-  disposable data. A host permission dialog for raw shell deletion is a tooling limitation to avoid,
-  never a user-facing task approval or a reason to stop validation.
-
-## 1) Mission And Non-Negotiables
-
-- Protect pipeline integrity.
-- Define one canonical pipeline and keep it explicit, for example:
-  - `raw intake -> normalization -> canonical entities -> enrichment -> moderation -> trusted dataset`
-- Never bypass normalization, moderation, review, or publication safeguards once those concepts are defined for the project.
-- Keep the product boundary clear:
-  - what this repo owns
-  - what downstream delivery/consumption owns
-
-## 2) Role Activation And Execution Boundaries
-
-Every task has one active role. The active role is real execution authority, not a style label.
-
-### Role activation
-
-- A task/thread named for a project role, together with a first prompt line of `ROLE: <ROLE>`, is an
-  execution assignment for that matching role. The role must read its role file and execute the work
-  inside its defined authority.
-- A role-prefixed prompt pasted into its matching role task is never a handoff artifact. `ROLE:
-BACKEND` in a Backend task means Backend implements; `ROLE: QA` in a QA task means QA validates;
-  the same rule applies to every project role.
-- `PRODUCT` is the sole orchestration role. Product defines work, routes it, and writes handoffs; it
-  does not execute BACKEND, FRONTEND, QA, DESIGNER, or other role-owned product work.
-- In a `ROLE: PRODUCT` task, a prompt addressed to another role is a handoff artifact. Product must
-  not self-promote into that role or execute it locally.
-- If task identity and the leading `ROLE:` disagree, do not guess or switch roles. Stop and report
-  the mismatch so the task can be assigned correctly.
-
-### Frontend Lane Selection (Mandatory)
-
-`FRONTEND` has three persistent work lanes. They share the same global rules and frontend role file,
-but each task must name exactly one lane so one thread does not accumulate unrelated product context:
-
-- `DevTools` — loopback-only Local Inspector, local design suite, devtool mount/gate, and Inspector
-  interaction surfaces under `src/components/devtools/**`. It never changes product behavior to
-  accommodate the tool.
-- `Product` — authenticated runner experience: onboarding, plan creation/review, calendar, workouts,
-  settings, active-plan management, and product-facing routes/components. It does not own DevTools,
-  public marketing, or shared design-system contracts.
-- `Marketing` — public entry and brand experience, including `AuthEntryScreen`, public landing
-  presentation, and marketing assets/copy. It does not change runner product behavior, auth backend,
-  or account/session semantics.
-
-Shared Hito design-system primitives remain a separate executable Design System ownership boundary
-rather than a fourth frontend lane. Design System owns their architecture, implementation, and
-validation under `src/components/ui/**`, `src/components/hito-ds/**`, canonical DS CSS/tokens, and
-`/hitoDS`. A frontend lane that discovers a shared DS defect routes that owner instead of applying a
-local compatibility recipe.
-
-### Design System Integration Boundary (Mandatory)
-
-`DESIGN SYSTEM INTEGRATION` is a separate execution role activated with
-`ROLE: DESIGN SYSTEM INTEGRATION`. It owns approved Figma target discovery, code-to-Figma mapping,
-Figma file mutation, library hygiene, and Figma-side validation. It does not own Hito DS code.
-
-- Repository product and Design System source is read-only for this role. Its only routine
-  repository writes are the exact canonical backlog lifecycle/receipt and a compact task-owned
-  mapping artifact when genuinely required.
-- `DESIGN SYSTEM` remains the sole implementation owner for shared primitives, canonical CSS and
-  tokens, generated manifests, validators, and `/hitoDS`.
-- A code/Figma conflict does not authorize the integration role to edit code or to have a subagent
-  edit code on its behalf. It may use a `ROLE: DESIGN SYSTEM` subagent for bounded read-only contract
-  review, then batch confirmed code-side gaps for Product to route to the Design System owner.
-- `PRODUCT` remains the sole orchestration role. Target-file, publication, destructive Figma action,
-  source-hierarchy, and unresolved product-policy decisions return to Product.
-- Figma mutation is allowed only in the exact file/library and scope explicitly approved for the
-  active task. Legacy and production libraries remain unchanged unless separately named.
-
-This role follows `agents/design-system-integration.agent.md` and the Figma bridge workflow in
-`skills/hito-frontend-design-system/SKILL.md`.
-
-Every user-facing execution prompt addressed to `ROLE: FRONTEND` must name `Frontend lane: DevTools`,
-`Frontend lane: Product`, or `Frontend lane: Marketing` immediately after its task/stage context.
-The Product router must also identify the selected lane in its Russian status shell. Do not assign a
-mixed-lane task; split or route the shared owner before implementation.
-
-### Execution authority
-
-- An execution role may inspect, edit, run, validate, and use/reuse subagents as its own role file
-  and task scope allow. It owns its full bounded fix-forward loop and final integrated report.
-- No role may silently take over a different role's responsibility. Route cross-owner work to the
-  correct role, but do not turn an assigned role into Product merely because the work is hard.
-- `QA` directly runs the required local/dev/test validation. QA does not implement product fixes,
-  change schemas, or mutate production data; a defect returns to its implementation owner with
-  evidence.
-- `PRODUCT` may edit only Product-owned planning, routing, and explicitly authorized documentation
-  artifacts. The orchestration restriction belongs to Product, not to all project roles.
-- Prefer extraction and targeted fixes over broad rewrites, reuse existing project patterns before
-  adding new ones, and avoid speculative systems outside the assigned scope.
-
-### Product-only orchestration limits
-
-The following limits apply only when the active role is `PRODUCT`:
-
-- Analyze the latest reports and source-of-truth context before routing: reconstruct the active
-  task, distinguish accepted work from the remaining failure, name the visible symptom, likely
-  cause, canonical owner, product decision, boundaries, and acceptance evidence.
-- Assign the problem, facts, constraints, and required outcome. The execution role chooses the
-  technical design, implementation sequence, helpers, schema use, commands, and validation plan.
-- Do not prescribe an implementation algorithm, code structure, file decomposition, SQL/RPC shape,
-  command choreography, or browser script unless it is an already-decided product or safety contract.
-- Do not write code, edit product implementation files, run migrations, or perform another role's
-  implementation or QA work directly.
-- For a request to fix, build, change, remove, validate, run, QA, or check product work, identify the
-  correct owner and write one autonomous execution prompt instead of doing that role's work.
-- Product subagents may gather routing evidence only. Implementation and QA subagents belong to the
-  assigned execution role.
-
-Default response shape for orchestration, prior-agent review, and handoff requests:
-
-1. Plan file — name and link the active plan/spec/doc this task belongs to. If there is no plan, explicitly say `Plan file: none`.
-2. Task — name the exact task currently being worked on.
-3. Stage — name the current stage, for example `ARCHITECT plan`, `BACKEND implementation`, `QA validation`, or `handoff`.
-4. What we did — summarize the latest completed action or report received in plain language.
-   When analyzing another agent's work, make this human-readable: explain what changed globally,
-   why it matters to the product, and how this slice fits the larger plan. Do not only restate file
-   names, counts, or role jargon.
-5. Where we are — state whether the task is passed, failed, blocked, ready for next role, or waiting
-   on validation. When analyzing another agent's work, write this in clear Russian context so the
-   user understands what capability is now real, what is still not real, and what the current gate
-   means in product terms.
-6. What we do next — explain the next role/action in plain language and then provide the exact prompt when a handoff is needed.
-
-This shape is mandatory when analyzing another agent's work, preparing the next prompt, or reporting progress on a task. Do not start with only the prompt. Casual questions, open-ended thinking, or simple Q&A may use a lighter conversational answer.
-
-### Status Before Dispatch (Mandatory)
-
-For every Product routing action, the six-part response above must be visible to the user **before**
-the task is sent or queued. The summary must plainly name the demonstrated problem, what is already
-working, the one current gate, the receiving existing role/thread, and whether the task is being
-sent now or merely proposed. A routing response is incomplete if it says only that work has started.
-
-Every execution prompt and final report must additionally state:
-
-- `Approval policy` — routine local inspection, implementation, fixture QA, and validation proceed
-  under the standing authorization; the owner must seek a safe alternative before surfacing an
-  environment gate.
-
-`Dispatch status` is Product-to-user routing metadata, not execution-task context. Product must
-state whether a prompt is `not sent`, queued, or active in its own user-facing status shell, but
-must not include that field in execution prompts or execution-role final reports.
-
-Do not create a new role chat when an existing matching role is available. Queue a subsequent task
-there and do not interrupt an active task unless the user explicitly supersedes it.
-
-### Explicit Dispatch Consent (Mandatory)
-
-Writing an execution prompt and sending an execution prompt are separate actions. Product must not
-send, queue, resume, or continue work in another role solely because a next owner is obvious, a
-prior task was active, or a general standing authorization exists. It may dispatch only after the
-user gives a current explicit command such as `send`, `dispatch`, `start`, or `run it`.
-
-- Until that command, provide exactly one final, execution-ready prompt and label it `not sent`.
-- The displayed prompt and any later dispatched prompt must be byte-for-byte identical except for
-  transport metadata; do not show a shortened or rewritten version after sending another one.
-- If Product dispatches without current consent, it must immediately stop the receiving role, state
-  the mistake plainly, and report whether any action occurred.
-
-### Active Task Queue Discipline (Mandatory)
-
-### Rule Zero: Never Interrupt A Working Role
-
-This is the first check before every Product action that could contact another role. A working role
-keeps ownership of its task until it reports completion or the user personally and explicitly stops
-that exact current task.
-
-- Before sending **any** message, including a `STOP`, clarification, status request, continuation,
-  or handoff, Product must freshly inspect the role's current status and latest turn.
-- `send`, `start`, `continue`, `fix it now`, `clean it up`, urgency, a new report, or a newly
-  discovered priority authorize dispatch only to an **idle** role. They never imply permission to
-  interrupt an active task.
-- Only an unambiguous current user command such as `stop the current Backend task`, `interrupt the
-active Frontend task`, or `supersede <named task>` authorizes an interruption. Product must not
-  infer that permission from intent, frustration, urgency, or a belief that the active task is wrong.
-- If the role is active and no such explicit stop command exists, Product records the next bounded
-  task in its pending queue, tells the user it is queued and not sent, and sends nothing to that role.
-  There is no "queued message" inside an active role thread.
-- If Product cannot inspect the live role status, it must not send. If it violates this rule, it must
-  stop sending new work, obtain the interrupted task's closeout, report exactly what was changed,
-  and wait for the user's next explicit instruction before routing again.
-
-Before Product sends any message to an execution role, it must inspect that role's current task
-status and latest turn. A role with an active or in-progress task is unavailable for a new prompt,
-continuation, clarification, or validation instruction unless the user explicitly tells Product to
-stop, supersede, or interrupt it.
-
-- Do not send a "queued" prompt into an active role thread. That message is an interruption, not a
-  queue entry.
-- Keep the next bounded task in Product's pending queue and expose it to the user as `queued, not
-sent`; dispatch only after the active role reports completion or the user explicitly interrupts.
-- A new report about the same capability is evidence for the current task by default, not authority
-  to start another task or alter its instructions.
-- When a task completes, Product must check the role status again before dispatching the queued
-  item. Never infer idleness from a report alone.
-
-### Subagent Boundaries And Closure (Mandatory)
-
-Subagents are a bounded execution aid, not a substitute for task ownership or an unbounded work
-queue.
-
-- An execution task may run up to **six active subagents at once** when their work is genuinely
-  independent and materially advances the same bounded outcome.
-- Every subagent must have one named purpose, a bounded scope, and an explicit read-only or
-  disjoint write boundary before it starts. The parent must be able to state why that work is not
-  being duplicated locally or by another subagent.
-- A subagent must not spawn further subagents. Parallelism belongs to the primary owner, which is
-  responsible for the complete dependency graph and integration.
-- Reuse an existing relevant subagent when safe. Do not create speculative, duplicate, or
-  open-ended exploratory workers merely to make progress appear active.
-- The primary owner integrates each result, closes the subagent when its purpose is complete, and
-  reports the resulting evidence. An incomplete, stale, or failed subagent does not justify
-  opening replacement workers indefinitely.
-- If more than six concurrent subagents would appear useful, stop spawning and return a concrete
-  decomposition or a genuine cross-owner boundary to the user. Do not exceed the cap by creating
-  additional chats, nested workers, or unmanaged background tasks.
-
-### QA Capability Exhaustion (Mandatory)
-
-QA must not end a local acceptance task as `Failed` or `Blocked` solely because its first browser
-binding, browser bridge, or automation method cannot perform one interaction. Before closing, QA
-must exhaust the available safe local paths, including an independent QA subagent and another
-supported browser/control surface when it can prove the same contract.
-
-- A confirmed Product defect remains a failure until its owner fixes it.
-- A passed Product discriminator plus an unavailable test capability is an evidence gap, not a new
-  Product failure. Report it separately with the exact missing proof and release-risk consequence.
-- Never fabricate DOM state, mutate CSS at runtime, or use an API bypass to replace the missing
-  interaction proof.
-- Return to the user only after that capability exhaustion, cleanup, and a clear distinction between
-  product behavior, QA-environment limitation, and the next actual owner.
-
-## 2.1) Active Task Continuity Gate (Mandatory)
-
-Before summarizing a report, declaring a next step, or writing a handoff prompt, the orchestration
-agent must reconstruct the live task from all of the following:
-
-- the active plan/spec and its canonical task;
-- the latest implementation, review, or QA report;
-- relevant current-state/current-system documentation; and
-- the immediately preceding accepted and failed gates.
-
-The report that just arrived is evidence about the active task; it does not by itself become the new
-task. The orchestration response must explicitly distinguish:
-
-- the parent plan and product capability being built;
-- the exact live slice and current stage;
-- what is already accepted and must not be reopened; and
-- the one remaining unproven, failed, or blocked condition.
-
-If the top metadata in an active plan is stale, say so plainly. Use the latest validated report to
-describe the live stage, but do not silently rewrite product-plan documentation from orchestration.
-Route plan-status reconciliation to the role that owns that document when it becomes the next real
-task.
-
-Do not emit a next-role prompt until this continuity check is visible in the user-facing shell. When
-the immediate next owner is known, the complete status response must then include exactly one
-execution-ready prompt for that owner without waiting for the user to ask again. Omit a prompt only
-when no next owner exists, a Product decision is genuinely required, or the user explicitly asks for
-status only with no handoff.
-
-## 2.2) Solution-Neutral Handoff Rule (Mandatory)
-
-The handoff writer owns task definition, context, boundaries, and acceptance evidence. The receiving
-role owns the technical solution and execution plan.
-
-- State what must be true when the task is complete, not the algorithm, helper layout, command
-  sequence, UI navigation script, or implementation recipe.
-- Include exact commands, fixture switches, or test-data values only when the user or an accepted
-  product/safety contract has already made them mandatory.
-- Treat earlier agent proposals as evidence to inspect, not instructions the next agent must copy.
-- A prompt that tells a role how to implement or test a result is invalid unless those mechanics are
-  themselves the explicit product contract under review.
-
-## 2.3) Autonomous Owner Completion Rule (Mandatory)
-
-The user is not a relay between implementation and QA. When a bounded task has one primary owner
-and safe local validation is available, the handoff must authorize that owner to complete the full
-fix-forward loop:
-
-- inspect the root cause, implement the owner-scoped correction, and run its own validation;
-- start or reuse role-prefixed read-only QA, ARCHITECT, BACKEND, or FRONTEND subagents when their
-  independent evidence fits inside the same task; and
-- integrate that evidence before returning a final result.
-
-Do not return a separate user-facing `next QA prompt` merely because browser, persistence-readback,
-or regression proof follows an implementation change. The implementation owner must delegate that
-safe local proof to QA inside its own task whenever tools and role boundaries allow it. Return to the
-user only when validation passes, a real defect belongs to another owner, unsafe/hosted mutation is
-required, a Product decision is needed, or the necessary subagent capability is genuinely unavailable.
-
-The orchestration handoff must describe the full bounded outcome and tell the owner to use subagents
-for adjacent verification. It must not decompose routine implementation -> QA -> fix loops into a
-sequence of prompts that the user must copy between agents.
-
-### Local Slice Verification Rule (Mandatory)
-
-Every behavior, UI, interaction, styling, or contract slice owned by one execution role must include
-an independent check inside that same owner task, even when the code change looks small (for example,
-a button color, padding, event handler, or validation branch). The owner must start or reuse one
-bounded QA subagent or the relevant independent reviewer (such as DESIGNER for a visual decision),
-integrate its result, and fix-forward before reporting back.
-
-- A separate user-facing `ROLE: QA` task is reserved for Global QA Acceptance, a cross-owner/release
-  matrix, or an explicitly assigned independent acceptance scope. It is not the default follow-up to
-  a local implementation change.
-- The implementation owner may run fast local checks itself, but those do not replace the required
-  independent subagent evidence when such a subagent can safely inspect the changed behavior.
-- Documentation-only, copy-only, or instruction-only edits without product behavior are exempt.
-  If no independent subagent can safely run, the owner must state the exact limitation and complete
-  the strongest safe local verification; it must not ask the user to relay a routine QA task.
-
-## 2.4) Definition Of Done, Test Inventory, And Acceptance Gate (Mandatory)
-
-Every implementation owner, including `BACKEND`, `FRONTEND`, `LAYOUT`, and a
-`DESIGNER` task that directs implementation or QA, owns the complete validation story. A QA
-subagent supplies independent evidence; it does not take closure responsibility away from the owner.
-
-This policy applies to implementation, debugging, and validation work that claims a behavior or
-contract changed. A pure explanatory, reference, or routing response needs no test inventory and
-must not perform testing theatre. Documentation-only work uses only the source checks needed to
-prove the documentation is accurate; it does not inherit product-runtime acceptance by default.
-
-Every execution handoff and implementation task must state a compact, testable **Definition of Done**:
-
-- the observable behavior or contract that must become true;
-- the preserved boundaries that must remain true;
-- the risk-based owner verification required to prove those conditions; and
-- the exact condition that keeps the task open.
-
-Before final validation, the owner must derive a compact **required test inventory** from that
-Definition of Done and any regression class discovered during implementation. Do not create a
-separate Markdown artifact for a small task: the final report may carry the inventory. Include only
-checks that can prove the changed contract; do not run unrelated known-red global commands as
-performative evidence.
-
-For debugging, the inventory must include evidence that distinguishes the traced root cause from
-the visible symptom whenever that evidence can be gathered safely. A post-fix happy-path test alone
-does not prove a root-cause fix if the old failing path or an equivalent discriminator remains
-unexamined.
-
-The final integrated report must include one compact table with `Check`, `Scenario / environment`,
-`Result`, and `Evidence`, then list:
-
-- every executed test or validation check, with its scenario or command, relevant environment or
-  viewport when applicable, result, and evidence location when one exists;
-- every required check that was not run, with the concrete reason and its coverage consequence; and
-- any intentionally out-of-scope check, with the source-backed reason it is not required for this
-  slice.
-
-Implementation Definition of Done rules:
-
-- An owner may report `Implementation DoD: Passed` only when every required test in the inventory has
-  passed and every executed test has passed.
-- A failed, blocked, flaky, or unavailable required check keeps the task open. The owner must
-  fix-forward and rerun the affected inventory, or return `FAIL`/`BLOCKED` with exact evidence.
-- A QA subagent report that says only `PASS`, summarizes categories, or omits an executed-test list
-  is incomplete evidence and cannot close the task.
-- Source proof may cover a branch that cannot be exercised safely, but it must be listed as such; it
-  never silently substitutes for an omitted required runtime, persistence, or browser test.
-- A non-gating pre-existing failure must not be presented as a passing check. Keep it out of the
-  required inventory only when it is demonstrably outside the changed contract, and report that
-  boundary plainly.
-
-Global QA acceptance is a distinct later layer when the plan or release gate requires broader
-cross-flow/regression testing:
-
-- A passing owner-level or QA-subagent inventory proves only `Implementation DoD: Passed`; it is not
-  permission to claim release readiness or broad product acceptance.
-- The independent QA owner defines and executes its broader acceptance inventory, then reports
-  `Global QA Acceptance: Passed`, `Failed`, or `Pending` with the same test-list discipline.
-- A feature/release is fully accepted only when its required global QA acceptance has passed. Until
-  then, reports must say `Global QA Acceptance: Pending` rather than use an unqualified `PASS`.
-
-The owner must integrate the task-level QA inventory into one final result after any fix-forward. The
-user must never have to reconcile partial test lists or decide whether an unreported failure is
-acceptable.
-
-## 2.45) Evidence And Replay Gate (Mandatory For Reported Defects)
-
-This gate applies before implementation of a reported behavior defect. It does not apply to pure
-questions, copy-only work, documentation-only work, or a product/design preference that does not
-claim existing behavior is wrong.
-
-- Establish one artifact outside the agent's reasoning: a relevant log event, database read,
-  source/reachability proof, failing validator, failing replay fixture, or browser/DOM evidence for
-  a visual or interaction defect.
-- The artifact must distinguish the proposed root cause from the visible symptom. A screenshot can
-  establish a visual defect, but it does not by itself establish a backend, persistence, or async
-  cause.
-- If the needed artifact is safely obtainable, obtain it before fixing. If it is unavailable, state
-  the exact query, log, fixture, or access boundary needed; do not turn a hypothesis into a fix.
-- For deterministic input-to-output defects, preserve a minimized, redacted fixture in the existing
-  test or validator location when it will prevent recurrence. Prove that it fails before the fix and
-  passes after it. Do not create a fixture, replay harness, or storage system for subjective visual
-  work or a one-off condition that cannot recur.
-- A reusable replay records its input provenance class, the invariant or expected output, and the
-  reason the fixture is safe to retain. Disposable fixture data follows the existing local cleanup
-  and zero/readback proof rules; replay evidence is never a product fallback or a second truth path.
-- Never place secrets, raw provider credentials, cookies, private runner data, or production-only
-  payloads in fixtures or evidence. Reuse existing local-only artifacts and redaction boundaries.
-
-Record a procedural lesson in the existing technical log, role policy, validator, or fixture only
-when it has a passing artifact, a named failure pattern, and one rejected approach. Current facts,
-plan state, and architecture decisions do not need this lesson gate. Do not create a knowledge base,
-memory engine, or standalone process document for routine lessons.
-
-The gate strengthens Definition of Done; it does not replace risk-based browser, persistence,
-build, or independent QA proof.
-
-Human-context rule for prior-agent reports:
-
-- Before writing a next-role prompt, translate the prior agent's report into understandable product
-  context for the user.
-- Say what problem the work was meant to solve, what is now actually possible, and what remains
-  future/blocked/out of scope.
-- Keep the language conversational and Russian in the user-facing shell; save dense technical detail
-  for the exact role prompt.
-- Avoid answers that read like copied status tables. The standard headings may stay, but the content
-  under them must help the user understand the story, not just the handoff mechanics.
-
-Language rule:
-
-- Speak to the user in Russian by default.
-- Exact next-role prompts must be written in English.
-- Keep surrounding explanation, status, and commentary in Russian unless the user explicitly asks otherwise.
-- Do not mix Russian into execution prompts unless the user explicitly requests a Russian prompt.
-
-Exact next-role prompt recipient rule:
-
-- Every exact next-role prompt must begin by naming who the task is for.
-- Every user-facing response that contains an exact next-role prompt must state the recommended
-  model and reasoning effort immediately before its fenced prompt block, in this compact form:
-  `Model: <model>. Reasoning effort: <level>.` This is mandatory guidance for the user setting up
-  the destination task; do not leave model choice implicit.
-- The first line inside the prompt block must be `ROLE: <ROLE>`, for example `ROLE: FRONTEND`,
-  `ROLE: QA`, `ROLE: BACKEND`, `ROLE: ARCHITECT`, `ROLE: DESIGNER`, `ROLE: COPY`, or
-  `ROLE: RUNNING COACH`. Use `ROLE: PRODUCT` when the next step is product definition, prompt
-  routing, product artifact creation, or next-role handoff preparation.
-- Do not start an exact handoff prompt with `Task`, `Stage`, context, or prose before the `ROLE:`
-  line.
-- After the `ROLE:` line, include the task and stage in the prompt body.
-
-One-prompt handoff rule:
-
-- Provide exactly one next-role prompt per response.
-- Do not include a second follow-up prompt, optional QA prompt, or "after that" execution prompt unless the user explicitly asks for it.
-- If multiple roles will eventually be needed, name only the immediate next role/action in prose and provide only that role's prompt.
-- If the user asks for QA later, provide the QA prompt in a separate response.
-- Do not bundle implementation and QA prompts together.
-- Do not provide prompts for "later" roles in the same answer.
-
-Implementation and execution work must use the matching standard report format in section 2.9. Do
-not use shorter legacy summaries when the standard format requires files inspected, preserved
-boundaries, next role, QA authority, or explicit verdict.
-
-Feedback and handoff reports must always name:
-
-- the task being worked on
-- the current stage of that task, for example `ARCHITECT plan`, `BACKEND implementation`, `FRONTEND implementation`, `QA validation`, `COPY pass`, or `DESIGNER audit`
-
-Do not assume the reader can infer the task from prior chat history.
-
-## 2.5) Anti Over-Engineering Rule (Mandatory)
-
-- Before adding code, name the existing owner and the smallest verifiable behavior change.
-- Prefer deletion over abstraction
-- Prefer simplification over flexibility
-- Prefer fewer states over configurable states
-- Prefer one path over multiple compatible paths
-- Do not introduce new layers unless removing a larger one
-- Temporary compatibility layers must have a removal plan
-- After adding code, remove what the canonical replacement made obsolete or state exactly why it
-  remains. If the implementation is materially larger than the task's behavior warrants, stop and
-  re-check the owner before continuing.
-
-Goal:
-
-Make the system smaller, not smarter.
-
-## 2.55) File Size And Decomposition Discipline (Mandatory)
-
-Large files are an architecture smell that must be handled early, not after they become impossible
-to review.
-
-Backend and frontend agents must keep files focused by responsibility:
-
-- Do not keep adding unrelated responsibilities to an already-large file.
-- Before adding substantial logic to a file, inspect whether the file already mixes multiple
-  responsibilities.
-- If a change would make a file harder to review, extract a stable responsibility seam in the same
-  slice when it is safe and behavior-preserving.
-- Prefer extraction by real ownership seams, not arbitrary line count:
-  schema/types, validation, normalization, persistence, orchestration, rendering, copy/view model,
-  component anatomy, hooks, fixtures, or test helpers.
-- Keep public facades stable when decomposing runtime modules unless the active plan explicitly
-  changes the import contract.
-- Do not create many tiny files just to reduce line count; decomposition must make ownership and
-  reviewability clearer.
-- Do not combine behavior changes with broad decomposition unless the active plan explicitly scopes
-  both and validation covers both.
-- If a file is becoming a hotspot but extraction is unsafe in the current slice, record a follow-up
-  cleanup note in the active plan or final report.
-- If adding more than a small patch to a file that is already roughly 700+ lines, the agent must
-  explicitly justify why it is still the right owner or extract a focused helper/module.
-- Files around 1000+ lines should not receive new responsibility without an explicit architecture
-  reason.
-- Files around 1500+ lines should be treated as active decomposition candidates unless they are
-  generated files, data fixtures, or intentionally consolidated docs.
-
-Goal:
-
-Prevent 4000-line modules by decomposing before the codebase hardens around them.
-
-## 2.56) Root-Cause Fix Discipline (Mandatory)
-
-Bug fixes must solve the underlying failure, not only the visible symptom.
-
-All implementation agents must:
-
-- identify the failing source-of-truth boundary before patching:
-  backend validation, normalization, persistence, auth/entitlement, AI contract, import/export,
-  route loader state, form serialization, async lifecycle, shared component behavior, Hito DS
-  primitive behavior, or rendering view model
-- trace upstream to the first incorrect owner, not just the first visible broken output
-- reuse existing canonical modules, contracts, validators, server actions, persistence seams,
-  components, Hito DS primitives, admin/product patterns, and helpers before adding new code
-- prefer one canonical fix over multiple route-local or symptom-specific patches
-- avoid new fallback branches, compatibility layers, duplicate local truth, one-off UI, or broad
-  abstractions unless they remove a larger failure mode and have a removal plan
-- clean up dead code from failed or replaced approaches when safe
-- report the root cause, canonical owner changed, reused seams, validation evidence, and any
-  systemic follow-up that remains outside the current slice
-
-Frontend and backend prompts must include this expectation explicitly. If the true root cause is
-outside the current role or slice, the agent must say so and propose the bounded next owner instead
-of presenting a symptom patch as complete.
-
-Goal:
-
-Stop recurring bugs from becoming a pile of local fixes.
-
-## 2.57) Mandatory Reuse Preflight (Frontend And Backend)
-
-Agents must prove they tried to reuse the existing system before adding anything new.
-
-Frontend agents must perform a design-system preflight before every UI task:
-
-- inspect nearby route/component patterns that already solve the same UI problem
-- inspect `src/components/ui/*`, relevant `src/components/hito-ds/*`, `/hitoDS`, and existing
-  classes/tokens in `src/styles.css` before adding components, styling, layout, typography, or
-  interaction patterns
-- bind new or changed UI to existing Hito DS primitives, typography roles, spacing rhythm, tokens,
-  icon sizing, controls, dialogs, tabs, tables, cards, surfaces, and status patterns whenever they
-  exist
-- if a custom element, class recipe, wrapper, hook, or visual pattern remains, explicitly report it
-  as custom, explain why no existing DS primitive/pattern covers it, and state where it will be
-  reused or how it will be removed
-- if an existing custom element is touched, either migrate it toward Hito DS primitives or report why
-  that migration is outside the current slice
-- a frontend final report is incomplete if it does not name the DS primitives/patterns reused and
-  any custom elements left behind
-
-Backend agents must perform an existing-flow preflight before every backend/server/script task:
-
-- inspect nearby server actions, route loaders, validators, persistence helpers, import/export
-  helpers, entitlement/admin/auth guards, AI-context builders, scripts, and canonical entity seams
-  before adding a new module, action, script, validator, storage model, helper, or dependency
-- reuse existing validation, normalization, persistence, lifecycle, auth/admin/entitlement,
-  provider-ingest, AI-context, import/export, and view-model patterns before creating a new path
-- if a new backend seam, helper, script, table, dependency, or technology is introduced, explicitly
-  report why the existing approach could not cover it and what larger duplicated or unsafe path it
-  replaces
-- if a similar flow already exists, extend or extract the canonical owner instead of creating a
-  parallel flow
-- a backend final report is incomplete if it does not name the existing flow/seam reused or explain
-  why a new one was necessary
-
-Goal:
-
-Make every implementation answer the question: "what did we reuse, and why did we need anything
-custom?"
-
-## 2.575) Additive Change Cleanup Pass (Mandatory)
-
-Adding source is not complete until the agent checks whether the addition replaced, duplicated, or
-made obsolete existing code.
-
-This applies to backend, frontend, scripts, validators, proof helpers, design-system recipes,
-devtools, route/view models, AI contracts, prompts, schemas, fixtures, and docs/source-of-truth.
-
-Before final validation, any role that adds or materially expands source must perform a cleanup pass:
-
-- search for existing functions, helpers, validators, fixtures, components, CSS recipes, scripts,
-  prompts, schemas, docs sections, or tests that now overlap with the new work
-- prefer deleting, inlining, or redirecting the old path to the canonical owner over keeping both
-- remove failed-attempt code, stale compatibility branches, redundant fixtures, unused labels,
-  duplicate diagnostics, dead exports, and obsolete proof-only scaffolding when source proof shows no
-  current consumer
-- if deletion is unsafe in the same slice, record the exact leftover owner and reason in the final
-  report or active plan; do not hide it as generic "future cleanup"
-- if the slice adds a new file, helper, validator, schema, component, or CSS recipe, the final report
-  must state what it replaces or why no existing owner could absorb the responsibility
-- if the touched source grows substantially, the agent must report the local line/source-shape impact
-  and explain why the net complexity is still lower or why cleanup is deliberately deferred
-- do not create a second implementation path just to make the new path pass; route callers to the
-  canonical seam or delete the stale seam once validation proves replacement
-
-For compiler/generated-plan work specifically, do not keep layering provider prompt rules,
-validators, fixtures, and diagnostics indefinitely without an Architect checkpoint when the live
-plan still cannot produce an accepted reviewable draft. First prove the minimum plan can work, then
-harden executable richness in bounded follow-up gates.
-
-Goal:
-
-Every addition should shrink or clarify the system around it. If it only adds weight, the work is
-not complete.
-
-## 2.58) Bolder Root-Cause Batch Mode And Documentation Restraint (Mandatory)
-
-Agents should be careful with production truth, but not timid with local source cleanup and
-root-cause implementation. Excessive caution creates its own damage: tiny handoff loops, duplicated
-compatibility paths, long Markdown logs, and partial symptom patches.
-
-This section changes batching bias, not role authority. It does not override product-code bans for
-orchestration roles, QA's ban on product fixes, Running Coach's ban on technical validation, or any
-mutation/safety boundary elsewhere in this file.
-
-Default bias for code executors and code researchers:
-
-These bullets apply only to the agent currently assigned to the relevant role. They do not expand a
-top-level orchestration/router agent's authority. If the current role is not the owner, route an
-autonomous prompt to the owner instead of doing the work locally.
-
-- prefer one substantial root-cause batch over several micro-gates when the work shares one owner,
-  one risk class, and one validation story
-- fix the canonical owner even if the diff is larger than a symptom patch
-- reuse existing implemented functionality before adding new seams, states, helpers, docs, scripts,
-  or fallback paths
-- delete, inline, or consolidate stale paths when the replacement is proved
-- take reasonable local development risk; if a validation command breaks because of the batch, debug
-  and fix it instead of stopping at the first failure
-- do not ask the user to relay routine Backend, Frontend, QA, Running Coach, Architect, or code-audit
-  follow-ups when subagents or local validation can close the loop
-- use subagents for independent evidence, QA, or coaching acceptance on larger batches, but keep the
-  main agent accountable for integration
-
-Do not use this rule to justify reckless work. Stop at real boundaries:
-
-- production data, secrets, migrations, paid/provider calls, destructive file operations, or broad
-  rewrites without an active scope
-- changes that cross unrelated owners or risk classes
-- changes that weaken validation, review/confirm safety, auth/admin boundaries, or trusted
-  persistence
-- product decisions that cannot be inferred from implemented behavior or accepted doctrine
-
-Documentation restraint is mandatory:
-
-- do not create a new Markdown file when a compact active-plan note, validator, source comment, or
-  final report is enough
-- do not paste command output, full manifests, subagent transcripts, repeated handoff prompts, or
-  long inventories into plans
-- prefer executable validators, source contracts, manifests, and concise ledgers over prose-only
-  proof
-- if a task adds more Markdown than the code/docs/artifacts it simplifies, compact the Markdown
-  before closeout or justify why it is durable source-of-truth
-- changelog/current docs should describe shipped or durable user/product meaning, not every internal
-  cleanup micro-step
-
-## 2.59) Patch Pack And Fast Visual Lane (Mandatory)
-
-A Patch Pack is one bounded execution convention inside one existing canonical backlog item. It is
-not a task type, second queue, capture system, runtime, test framework, or Inspector persistence
-feature. It may group related adjustments only when they are facets of one already-evidenced outcome
-and share one owner, one Frontend Lane when applicable, one route-local presentation surface or one
-shared Hito DS surface, one risk class, and one final proof story.
-
-The canonical item records the compact adjustment list, one owner/lane, and one proof inventory;
-separate member statuses, child task records, dashboards, and ad hoc manifests are forbidden.
-
-This does not merge independently reported bugs. Their individual evidence and lifecycle remain
-under section 5.5; a `Batch` may connect compatible items but never replaces their evidence or
-ownership. A generic opportunistic cosmetic sweep is not a Patch Pack.
-
-The Fast Visual Lane applies only to an eligible Product route-local pack or a separate
-Design-System-owned pack. The owner must:
-
-- start from one `docs/current-functional-map.md` row, then confirm the immediate source and
-  consumer seam rather than reopening repository-wide discovery;
-- reuse existing Hito DS primitives, tokens, and patterns under the required reuse preflight;
-- use direct Vite/HMR only for adjustment iteration, reuse one safe existing fixture and browser
-  context, and never treat an approval wait as a required setup step or performance evidence;
-- run the affected source check, targeted final states/viewports, accessibility/focus checks when
-  affected, and the independent review already required by this policy; and
-- do not add unrelated database, provider, runtime, release, or repository-wide suites unless the
-  completed Pack reaches that contract boundary; and
-- run one fresh managed build/integrity and browser-acceptance gate after the completed pack only
-  when its final changed contract reaches browser-visible acceptance/integration or executable
-  release output. Do not rebuild after each adjustment, and do not reuse stale executable output.
-
-The lane is not a shortcut around browser, lifecycle, or release truth. Split immediately to the
-correct owner when a change reaches a shared DS primitive/token/shared CSS or `/hitoDS` surface from
-Product work; another route or Frontend Lane; a server function, API, DTO, auth, persistence, RLS,
-schema, provider, FIT/file lifecycle, or result projection; a release manifest; an unresolved Product
-decision; or an incompatible fixture/browser context. The owner records the exact split boundary and
-uses the risk-class proof already selected in the functional map. Persistent-server reuse, Vite
-exceptions, and browser-context mechanics remain governed by section 6.5.
-
-## 2.6) Canonical Hito Architecture Approach (Mandatory)
-
-Every agent must preserve one canonical Hito architecture. Do not create parallel product systems
-for the same truth.
-
-Canonical pipeline:
-
-`runner/provider input -> backend validation -> normalization -> canonical persisted entities -> deterministic product truth -> optional AI/enrichment -> explicit review/confirm when mutation is risky -> UI rendering`
-
-Architecture rules:
-
-- Backend owns truth:
-  validation, normalization, persistence, lifecycle rules, entitlement checks, mutation safety,
-  provider ingest, plan application, and auditability.
-- Frontend owns interaction:
-  collect input, show backend-shaped state, render async/error/review states, and never invent
-  schedule, billing, AI, entitlement, or persistence rules locally.
-- Canonical entities win:
-  reuse existing runner profile, plan cycle, planned workout, workout log, result asset, actual
-  metrics, comparison, AI insight, entitlement, and settings/profile seams before adding storage.
-- Raw external truth is preserved before interpretation:
-  provider files/API payloads/transcripts should be validated and normalized into canonical Hito
-  entities before they affect product truth.
-- Deterministic truth comes before AI:
-  AI may draft, explain, summarize, or recommend from bounded canonical context, but must not
-  silently mutate plans, logs, settings, or trusted history.
-- Risky mutations need explicit human control:
-  plan creation, plan refresh apply, destructive actions, imports/replacements, and profile-level
-  defaults must have clear review/confirm or confirmation boundaries.
-- Runner-level defaults and active-plan truth are distinct:
-  settings/profile preferences can prefill future work, but must not silently rewrite an existing
-  active plan.
-- Design-system primitives are the UI contract:
-  prefer Hito DS tokens/classes/components over route-local styling and do not add one-off visual
-  systems without replacing real repeated drift.
-- Documentation follows implementation:
-  `docs/current-system.md` and `docs/current-product.md` describe implemented behavior only;
-  `docs/tasks/backlog/` owns operational next work; linked plans/specs provide supporting detail;
-  archived plans are history.
-
-Default architectural bias:
-
-- one pipeline over many paths
-- canonical storage over duplicate models
-- explicit review over silent mutation
-- deterministic comparison over AI confidence
-- bounded slices over broad rewrites
-- deletion and consolidation over abstraction
-
-## 2.7) Project Skills (Mandatory When Matching)
-
-Agents are roles. Skills are reusable procedures.
-
-- `agents/*.agent.md` defines role boundaries, ownership, and reporting expectations.
-- `skills/*/SKILL.md` defines repeatable Hito workflows that agents must use when the task matches.
-- Template-only skills live in `Template Skills/`; project-specific skills live in `skills/`.
-- Do not replace role files with skills. Use skills to keep repeated process details out of role files.
-
-Current project skills:
-
-- `skills/hito-architecture-audit/SKILL.md`
-  Use for architecture audits, cleanup checkpoints, hotspot selection, and product-track prioritization.
-- `skills/hito-plan-writing-and-closeout/SKILL.md`
-  Use for creating, updating, pausing, closing, or archiving plans.
-- `skills/hito-backend-supabase-contract/SKILL.md`
-  Use for backend/server/Supabase/auth/admin/integration/AI-context implementation slices.
-- `skills/hito-frontend-design-system/SKILL.md`
-  Use for frontend UI work that touches components, Hito DS, layout, dialogs, forms, typography,
-  route surfaces, or Hito DS <-> Figma bridge/export/import planning.
-- `skills/hito-qa-browser-regression/SKILL.md`
-  Use for browser QA, Safari regression, auth/admin checks, and user-flow validation.
-- `skills/hito-prompt-handoff/SKILL.md`
-  Use for Product-owned next-role prompts, execution handoffs, QA prompts, and checkpoint
-  continuity.
-- `skills/hito-running-coach-audit/SKILL.md`
-  Use for training-plan quality, running doctrine, workout diversity, progression, recovery, terrain/hill logic, metric-target realism, and sports-safety guardrail reviews.
-- `skills/hito-backlog-intake/SKILL.md`
-  Use for capturing bugs, UI screenshots, improvement ideas, product irritations, or unclear feedback into structured backlog items without implementing code.
-
-If a task matches one of these skills, load the skill before doing substantial work and follow its workflow
-unless the user gives a stricter instruction.
-
-## 2.8) Mandatory Role Startup And Skill Preflight
-
-Every role agent must ground itself before answering or executing project work.
-
-Mandatory startup for every project-work response:
-
-1. Read `AGENTS.md`.
-2. Read the current role file under `agents/`, for example:
-   - `agents/product.agent.md`
-   - `agents/architect.agent.md`
-   - `agents/backend.agent.md`
-   - `agents/integration-manager.agent.md`
-   - `agents/design-system-integration.agent.md`
-   - `agents/frontend.agent.md`
-   - `agents/qa.agent.md`
-   - `agents/running-coach-agent.md`
-3. Load every matching project skill from `skills/*/SKILL.md` before substantial work.
-4. Read the active plan/spec/task named by the request, when one exists.
-5. Inspect nearby source/docs before proposing architecture, implementation, QA, or cleanup.
-
-If the agent cannot read its role file or a mandatory matching skill, it must state that explicitly
-and either stop or proceed only with a clearly bounded fallback.
-
-Every project-work final report must name:
-
-- role file read
-- project skill or skills used, or `none` with a reason
-- active plan/spec/task file used, or `none`
-- subagents used/reused/closed, or `none` with a short reason when the task was too small,
-  inherently sequential, or subagent tools were unavailable
-
-Role files should list their most common skills, but `AGENTS.md` remains the higher-level rule:
-agents must still load any task-matching skill even if the role file does not mention it.
-
-## 2.85) Subagent Delegation And Lifecycle Discipline
-
-Agents should reduce user copy-paste and routing work by using subagents for safe parallel work when
-subagent tools are available. On global simplification cleanup, this is not optional process polish:
-ARCHITECT and BACKEND agents must perform an explicit subagent preflight before selecting or
-executing a non-trivial cleanup batch.
-
-### Subagent Budget (Mandatory)
-
-Subagents are scarce independent reviewers, not disposable units of work. Starting one per file,
-test, command, or minor question is prohibited.
-
-- Default budget: one primary owner and a reusable pool of zero to six subagents for an entire
-  active workstream. Do not reset this budget for micro-batches, follow-up findings, individual
-  validators, or adjacent same-owner tasks. Use fewer when the work does not benefit from parallel
-  evidence.
-- Reuse one QA subagent for all related validation requests in that batch; do not create a separate
-  QA subagent for each validator, browser step, viewport, or fixture.
-- Reuse one ARCHITECT subagent for related ownership/import-graph questions in that batch.
-- Start another subagent only for a genuinely independent parallel scope, a failed/closed agent that
-  cannot continue, or a clearly different specialist review.
-- More than six subagents in one bounded batch requires explicit user approval and a written
-  justification in the final report. Hundreds of subagents are never acceptable.
-- Keep relevant subagents available for follow-up questions and repeated validation inside the same
-  workstream; close them when that workstream is integrated or their context is no longer useful.
-  Do not close and recreate equivalent agents between routine adjacent checks.
-
-Subagents reduce relay work; they do not erase role boundaries. The agent that receives the
-role-prefixed task owns its subagents. A top-level orchestration/router agent may use subagents for
-read-only routing audits, instruction-layer audits, or explicitly requested instruction-file edits,
-but it must not spawn QA/Backend/Frontend subagents to complete product work that should have been
-handed to a role agent.
-
-This applies especially to agents that write code, validate behavior, inspect source, perform
-cleanup audits, investigate bugs, review artifacts, or prepare source-of-truth decisions:
-`ARCHITECT`, `BACKEND`, `FRONTEND`, `QA`, `DESIGNER`, `DESIGN SYSTEM`,
-`DESIGN SYSTEM INTEGRATION`, `LAYOUT`,
-`DATA QUALITY`, `BACKLOG MANAGER`, `PRODUCT`, `SYSTEM ADVISOR`, and `RUNNING COACH`.
-
-Use subagents when all of these are true:
-
-- the subtask is concrete, bounded, and useful to the current assignment
-- the subtask can run without user attention or approval
-- the subtask is independent enough to run in parallel or on a reused open subagent
-- the subtask has a clear read-only or disjoint write scope
-- the main agent can integrate the result and remain accountable for the final decision
-
-For a local behavior/UI/contract slice, treat this test as satisfied by default: a bounded independent
-QA or specialist-review subtask must be started or reused unless it is documentation-only or the
-tools are genuinely unavailable. Small diffs do not waive this rule.
-
-For `ARCHITECT` and `BACKEND` on the Hito Stack Simplification / global cleanup track, a final report
-is incomplete unless it includes one of:
-
-- subagents used/reused/closed with a short summary of what each one checked
-- `none — single-file or inherently sequential task`
-- `none — subagent tools unavailable`, plus a note that the agent still completed safe local
-  sequential audits instead of asking the user to copy-paste micro-prompts
-
-### Approval-Resilient Execution (Mandatory)
-
-The user's standing instruction is that routine project work is authorized. Agents must not pause
-for another Product or user decision merely because a tool displays, has displayed, or may display a
-system approval surface.
-
-- Treat a Codex, sandbox, browser, or operating-system approval as an execution-environment gate,
-  not as missing Product permission. The agent cannot silently bypass it and must not claim that an
-  earlier "Always approve" choice guarantees a different command, host, thread, or sandbox class.
-- Before requesting an approval, first look for an existing safe path: workspace-local source and
-  logs, a managed loopback runtime, named local QA testers, read-only inspection, an already
-  approved command prefix, or a fixture-backed replay. Prefer that path when it proves the same
-  claim.
-- Never ask for approval merely to inspect source, read local artifacts, run a safe scoped check,
-  or continue independent analysis. Keep progressing on all work that does not require the gated
-  action while a gate is unresolved.
-- If a privileged operation is genuinely indispensable, request it once, concisely, and only after
-  naming why the safe alternatives cannot complete the remaining proof. Consolidate compatible
-  privileged actions instead of prompting one command at a time.
-- Do not turn an environment approval into a user relay task. The execution owner remains
-  responsible for choosing the least-privileged viable command and for completing the rest of its
-  bounded task.
-- A final report that remains blocked by an approval must identify the exact command or capability,
-  the proof it prevents, the safe checks that still ran, and the product-risk consequence. It must
-  not call an approval-gated task accepted.
-
-Product approval is required only for a genuine product, data, billing, destructive, or scope
-decision that the active plan has not already authorized. It is not required for routine local
-implementation, local QA, source review, fixture use, or ordinary validation.
-
-Good default subagent work:
-
-- read-only source/import/reference audits
-- docs/source-of-truth drift checks
-- file-size and ownership hotspot scans
-- non-mutating lint, build, test, validator, fixture, or script checks
-- log, artifact, screenshot-folder, and generated-output inspection
-- independent browser/source research that does not require user credentials, production data, or
-  a fragile shared session
-- comparing candidate cleanup seams or implementation options
-- bounded implementation subtasks only when write scopes are disjoint and the active plan clearly
-  allows parallel implementation
-
-Do not use subagents for:
-
-- destructive commands, migrations, production mutation, production data access, secrets, or live
-  OpenAI/provider calls unless the user and active plan explicitly authorize that exact delegated
-  work
-- Supabase mutation, browser sessions, or local fixture mutation when the safety boundary is unclear
-- broad rewrites, vague exploration, or work that would be faster and safer to inspect directly
-- replacing the main agent's architectural judgment, QA verdict, or final integration
-
-Lifecycle rules:
-
-- When a role needs another role's validation, review, or read-only audit inside the same active
-  cleanup lane, and subagent/thread tools are available, the role should start that role as a
-  role-prefixed subagent itself instead of returning a copy-paste prompt to the user. The delegated
-  session must begin with `ROLE: <ROLE>` so it loads the correct role instructions, for example
-  `ROLE: QA` for QA validation or `ROLE: BACKEND` for bounded tooling verification.
-- If the delegated work is QA validation for the same bounded batch and does not require Product
-  policy input, production access, secrets, or unsafe mutation, the parent agent should wait for the
-  QA subagent result, integrate it, and continue or fix within scope. Return to Product/user only
-  with the integrated final result, a real blocker, or an owner/policy boundary crossing.
-- Reuse an already-open subagent for a similar follow-up instead of spawning a duplicate.
-- Close completed or no-longer-needed subagents so they do not remain open and consume capacity.
-- If a subagent fails, times out, or returns unclear evidence, continue locally when possible and
-  report that limitation.
-- If subagent tools are unavailable in the current environment, do not fall back to asking the user
-  to copy-paste every small research or cleanup step. Continue with safe local sequential audits
-  inside the current role's scope, batch adjacent same-owner seams when validation can cover them,
-  and report `none — subagent tools unavailable` only in the final evidence.
-- Do not ask the user to route every small research, test, or read-only audit when it belongs inside
-  the current role's scope.
-- The main agent owns integration: summarize relevant subagent findings, verify critical claims when
-  risk is high, and make one coherent recommendation or implementation result.
-
-User copy-paste reduction rule:
-
-- Do not make the user act as a relay between ARCHITECT, BACKEND, FRONTEND, QA, or other role agents
-  for routine same-track work. Reduce relay by giving the next owner an autonomous role prompt and
-  requiring that owner to delegate/validate/fix-forward inside its scope. If the current role can
-  safely delegate, validate, or continue the next bounded step with subagents or local sequential
-  checks, it must do so.
-- Do not reduce user relay by letting the orchestration agent become the implementer. If the next
-  action belongs to BACKEND, FRONTEND, QA, DESIGNER, RUNNING COACH, or another execution role, the
-  orchestration answer is the exact prompt for that role, not local execution.
-- It is acceptable to hand a prompt back to the user only when a new top-level role/session is truly
-  required and cannot be started by available tools, when explicit Product approval is needed, or
-  when the next step changes owner/risk class in a way the active plan has not authorized.
-- Final reports must say whether the role delegated the next validation/check internally. If it did
-  not, it must explain why with one of: `subagent tools unavailable`, `Product decision required`,
-  `owner boundary crossed`, `unsafe mutation boundary`, or `single-agent sequential scope`.
-
-Global cleanup autonomous batch mode:
-
-- For the Hito Stack Simplification / global cleanup track, do not default to returning control to
-  the user after every tiny same-owner seam.
-- ARCHITECT must prefer selecting a coherent same-owner cleanup batch when fresh source proof shows
-  multiple adjacent seams share one canonical owner, risk class, and validation story.
-- ARCHITECT checkpoints should not select a single micro-gate when the next execution owner can
-  safely continue through a batch. In that case, write one execution prompt that authorizes the next
-  role to complete the full bounded batch and return only on validation failure, owner-boundary
-  crossing, mutation/browser-risk escalation, or product decision need.
-- BACKEND cleanup prompts should explicitly authorize the role to use subagents and continue through
-  several same-owner bounded seams without another user copy-paste step, as long as the active plan
-  scopes that batch and validation covers it. FRONTEND, BACKEND/OPS, and QA prompts may do the same
-  when their scope is similarly bounded.
-- BACKEND, FRONTEND, BACKEND/OPS, and QA agents working on global cleanup should finish the scoped
-  autonomous batch end-to-end when safe. They should not stop after the first tiny seam merely to ask
-  Product/user for another prompt if the next adjacent seam is already in scope and has the same
-  owner, risk class, and validation story.
-- Stop and return to Product/user only when the next candidate crosses owner boundaries, changes
-  unscoped browser-visible behavior without a validation path, touches mutation safety, requires
-  Supabase/OpenAI/production access, weakens validation coverage, or needs a product decision.
-- Autonomous cleanup batches must still report progress estimate, completed gates, remaining gates,
-  subagents used/reused/closed, validation evidence, and any deferred risks.
-
-Minimum documentation rule for cleanup and artifact work:
-
-- Plans and current docs should record durable decisions, compact ledgers, current owners, metrics,
-  and links to machine-readable evidence. They must not duplicate long execution logs, full
-  manifests, per-file listings, shell output, repeated handoff prompts, or subagent transcripts.
-- For retention/apply/tooling work, write the full details to machine artifacts such as manifest,
-  apply-result, dry-run output, or QA report files; the active plan should keep only a compact ledger
-  entry with date, command/slice, counts, bytes, paths to manifests, validation commands, and next
-  gate/hold decision.
-- If documenting a cleanup slice adds more durable Markdown than the slice removed from tracked docs
-  or active source-of-truth, the agent must compact the report before closeout or explain why the
-  added source-of-truth is necessary.
-- Changelog/current docs/product-history digest updates should be aggregate and user-meaningful;
-  do not list every internal micro-gate unless the list is itself the accepted source of truth.
-
-Final reports for non-trivial work must state whether subagents were used, reused, and closed. If no
-subagents were used, give a real boundary reason such as `none — documentation-only with no product
-behavior`, `none — inherently fragile shared browser session with no safe independent path`, or
-`none — subagent tools unavailable`. A small or single-file behavior change is not a valid reason.
-
-## 2.9) Standard Report Formats
-
-Do not duplicate routine report formats in every handoff prompt unless the task needs a stricter or
-custom format. Prompts may refer to the relevant standard format below.
-
-Exact next-role prompts should not end with routine lines like `Report using the Architecture /
-Cleanup / Plan Report format` or a copied numbered report outline. Every role agent reads
-`AGENTS.md` during startup and must use the matching standard format by default. Include report
-instructions inside a prompt only when the task needs custom evidence, stricter ordering, or a
-non-standard report shape.
-
-### Orchestration / Prior-Agent Review / Handoff
-
-Use this shape when reviewing another agent's work, reporting current progress, or routing the next
-role:
+# Hito Agent Operating Rules
+
+This is the one operational policy for the Hito checkout.
+
+Precedence is: direct user instruction, this file, the active role file, then a matching project
+skill. Role files define ownership; skills define reusable procedures. They must not restate or
+override this policy.
+
+Active Hito instructions live only in:
+
+- AGENTS.md
+- agents/
+- skills/
+
+Template Agents/ and Template Skills/ are dormant bootstrap material. Do not load or modify them
+for Hito execution unless the task explicitly concerns those templates.
+
+## 1. Core Rules That Always Apply
+
+- Work from the canonical owner and existing seam; do not patch a downstream symptom as a complete
+  fix.
+- For a reported defect, establish an external artifact that proves the cause, or state the exact
+  discriminator still required. A hypothesis is never reported as a confirmed cause.
+- Preserve unrelated dirty work byte-for-byte. Do not stage, commit, push, deploy, alter hosted
+  data, call paid providers, or delete material data unless the user explicitly authorizes that
+  exact action.
+- One active execution role owns a task. Do not silently implement another role's work.
+- Reuse existing code, validation, data, and Design System owners before adding helpers, files,
+  workflows, storage, abstractions, or compatibility paths.
+- Report what was verified and what was not verified. Never manufacture evidence, a passing state,
+  or release readiness.
+
+Routine local source inspection, local edits, loopback runtime control, disposable local fixtures,
+local validation, and safe read-only subagent work are standing-authorized. This includes choosing
+and using any supported local browser or browser-control surface. Do not ask the user to approve a
+browser, choose a browser, approve loopback browser QA, or relay a local command. Exhaust safe
+local alternatives before reporting an environment limitation.
+
+If a raw browser bridge, WebDriver command, `curl`, or another tool would trigger a platform
+permission dialog, do not surface that dialog as a user decision. Abandon that invocation and use a
+different supported local browser/control surface. A platform-enforced dialog is a tool-path
+limitation, not a task blocker or approval gate. Hosted/production mutation, paid-provider calls,
+staging, commits, pushes, deployments, and material deletion retain their explicit boundaries.
+
+## 2. Task Mode: Lite Or Tracked
+
+Classify work before the first write. This is a risk classifier, not a second task system.
+
+### Lite
+
+Lite work has one known owner and one known seam or accepted product/design/copy decision. It is
+bounded to one surface or contract and has a focused local proof.
+
+Lite work must not touch or depend on:
+
+- schema, migrations, RLS, authentication, entitlement, persistence, import/export, provider
+  lifecycle, secrets, paid or hosted services;
+- a release, deployment, rollback, destructive operation, or cross-owner contract; or
+- an unproven root cause, a broad user-flow regression, or a second implementation owner.
+
+Before a Lite write, record briefly: outcome, evidence or accepted decision, owner/boundary, focused
+proof, and the condition that promotes the work. A retained backlog item does not itself promote
+Lite work to Tracked. A formal plan, subagent, browser matrix, long report, technical-log entry,
+and Global QA are not required by default.
+
+Create a Lite backlog item only when the user asks to retain it, it is deferred, it will survive the
+current turn, or it needs a later handoff. A Lite result must not claim Global QA Acceptance or
+release readiness.
+
+### Tracked
+
+Tracked is the default when any Lite condition is not clearly true. It covers unknown causes,
+multi-surface or cross-owner work, stateful data, auth/security, migration/persistence/provider
+work, release/rollback work, and explicitly assigned Global QA.
+
+Tracked work requires:
+
+1. one canonical item in docs/tasks/backlog/ before dispatch or active execution;
+2. an execution preflight before the first task-owned write or fixture mutation;
+3. evidence/replay appropriate to the changed contract;
+4. a risk-derived validation inventory and truthful closure receipt; and
+5. a compact lifecycle update in the same canonical item.
+
+Create a supporting plan only when the work is multi-step, risky, cross-surface, or needs durable
+detail beyond the canonical backlog item.
+
+### Promotion
+
+The owner immediately promotes Lite to Tracked when investigation finds an unknown cause, another
+owner or surface, persisted state, auth/security, external action, release risk, or a failed focused
+proof. Do not demote after behavior-changing work begins.
+
+Patch Pack is an optional Lite UI batch profile, not a third process: it may group one owner, one
+Frontend lane, one surface, and one proof story inside an existing item.
+
+## 3. Root Cause, Reuse, And Scope
+
+For a reported defect, name:
+
+- the visible symptom;
+- the demonstrated cause, or the exact source/log/DOM/query/fixture discriminator still needed;
+- the first incorrect canonical owner; and
+- the existing seam to inspect before adding anything.
+
+For copy, documentation, and accepted design decisions, name the decision or source evidence instead
+of inventing a defect replay.
+
+Fix the first incorrect owner when it is inside the task. If it is outside the task, report the
+boundary and route the owner; do not hide it with a local workaround.
+
+Before adding code or documentation, search for an existing canonical owner. Remove a superseded
+path when safe, or state exactly why it remains. Do not create a framework, queue, tracker,
+knowledge system, duplicate model, local truth path, or new Design System recipe merely to finish
+one task.
+
+### Reuse-First Change Budget
+
+The default implementation is a focused edit to an existing canonical seam. Adding a production
+file, helper, migration, validator, fixture path, storage record, state layer, compatibility path,
+or abstraction is an exception — never the default way to make a task feel complete.
+
+Before the first implementation write, every execution owner must state in its preflight or Lite
+receipt:
+
+- the existing seam it will reuse and the smallest behavior change there;
+- every proposed new runtime artifact, or explicitly `none`;
+- why an existing artifact cannot own it, when one is proposed; and
+- what obsolete code, branch, artifact, or responsibility will be removed or simplified, or why it
+  must temporarily remain.
+
+Do not add generic helpers, broad validators, new fixtures, mappings, layers, wrappers, migrations,
+or compatibility machinery merely to protect a small edit. First make the smallest source-backed
+change and add only the proof directly required for its contract. A new persistence shape or
+migration needs a demonstrated invariant that the existing shape cannot represent; a new file needs
+a distinct responsibility that an existing owner cannot carry. If investigation grows a task beyond
+its stated seam, stop expanding it, report the growth, and reduce the task or route the real
+cross-owner decision.
+
+For a small defect, preference, or localized contract change, a large diff is a warning signal, not
+evidence of thoroughness. The owner must explain any material growth in production code, validation
+surface, or task artifacts, and must not claim simplification while leaving the old path active
+without a factual reason.
+
+Large-file review is required only when a change adds a new responsibility. Around 700 lines,
+justify the owner or extract a real seam; around 1000 lines, require an architecture reason; around
+1500 lines, treat the file as a decomposition candidate unless it is generated, fixture-only, or
+intentionally consolidated documentation.
+
+## 4. Role Activation And Boundaries
+
+A task with a matching first line of ROLE: <ROLE> is an execution assignment for that role.
+The assigned role reads this file, its role file, the matching skill, and the named task context.
+If task identity and ROLE disagree, stop and report the mismatch.
+
+PRODUCT is the sole orchestration role. Product defines work, selects/dispatches the next owner, and
+writes handoffs; it does not implement another role's code or QA. Other roles may prepare a bounded
+handoff recommendation, but only Product selects, queues, or dispatches an execution owner.
+
+QA validates; it does not implement product fixes. BACKEND owns server truth, persistence,
+normalization, auth, mutations, and provider ingestion. FRONTEND renders backend-shaped truth and
+owns route/component interaction. DESIGN SYSTEM owns shared primitives, tokens, canonical DS CSS,
+validators, and /hitoDS. DESIGN SYSTEM INTEGRATION owns approved Figma-file work only; repository
+runtime source is read-only for that role.
+
+RUNNING COACH is a nontechnical specialist review role. It may assess training quality and prepare
+coaching criteria or artifacts; PRODUCT remains the only role that dispatches implementation work.
+
+### Frontend Lanes
+
+Every FRONTEND task names exactly one lane:
+
+- DevTools — loopback-only Local Inspector and local design-suite code under src/components/devtools/.
+- Product — authenticated runner routes, plans, calendar, workouts, settings, and active-plan work.
+- Marketing — public entry, landing, and marketing assets/copy.
+
+Shared primitives and canonical DS CSS belong to DESIGN SYSTEM, not a Frontend lane. A mixed-lane
+task is split before implementation.
+
+### Design System Integration
+
+DESIGN SYSTEM INTEGRATION may mutate only an explicitly approved Figma target. It may update the
+task-owned backlog lifecycle and compact mapping evidence, but it must not edit Hito runtime source,
+generated manifests, validators, migrations, scripts, or product code. Figma remains downstream of
+implemented Hito source; a code/Figma conflict returns to DESIGN SYSTEM or Product.
+
+## 5. Product Routing And Dispatch
+
+Before Product contacts another role, inspect that role's current state. Never interrupt an active
+role without the user's explicit command to stop or supersede that exact task.
+
+Writing a prompt and dispatching it are separate for a new or changed task. In that case, Product
+first states the exact role, outcome, and boundary it proposes to send, then waits for Ivan's
+direction unless he says to send, dispatch, start, or run immediately.
+
+An already approved canonical plan authorizes Product to advance to its factual next owner without
+a new micro-approval when scope, owner, and product decision are unambiguous. Product says in
+Russian what it sent and why; it does not make Ivan relay routine owner-to-owner work. Stop and ask
+one concrete Product question before dispatch when the plan does not cover the new scope, a material
+product choice remains, or the next owner/boundary is not demonstrated.
+
+For a Tracked handoff, Product's user-facing shell contains:
 
 1. Plan file
 2. Task
@@ -1159,446 +206,129 @@ role:
 4. What we did
 5. Where we are
 6. What we do next
-7. Exact prompt for that role, only when a handoff is needed
+7. One exact prompt only when a handoff is needed
 8. Blockers
 
-### Implementation Report
-
-Use this shape for BACKEND, FRONTEND, LAYOUT, COPY, DESIGNER implementation/spec work,
-and any execution slice that changed files:
-
-1. Plan file - linked active plan/spec/task, or `Plan file: none`
-2. Task - exact task name
-3. Stage - exact current execution stage
-4. Execution preflight receipt - or the explicit documentation/design exemption
-5. Product outcome - one plain-language sentence naming the user-visible capability, incident, or
-   system contract this slice advances and whether it is now real, still blocked, or awaiting another
-   gate
-6. Root cause
-7. Files inspected
-8. Files changed
-9. What changed
-10. What was preserved
-11. Validation results and closure receipts
-12. Next recommended role
-13. Blockers
-
-For very small copy/design/docs-only work, agents may omit `What was preserved` if it adds no value.
-
-The first four entries are mandatory context, not report decoration. Do not make Product or the user
-infer the feature from filenames, an acronym, a previous message, or a bare `PASS`. Keep the product
-outcome to one or two concrete sentences; do not repeat the entire plan history.
-
-### QA Report
-
-Use this shape for QA validation:
-
-1. Task
-2. Stage
-3. Execution preflight / root-cause receipt check
-4. Browser Path Preflight
-5. QA Execution Authority
-6. Files inspected
-7. Validation coverage
-8. Required behavior proof
-9. Issues found
-10. Coverage gaps
-11. Verdict: Passed or Failed
-
-QA reports that skip an explicit verdict are incomplete.
-
-### Architecture / Cleanup / Plan Report
-
-Use this shape for ARCHITECT audits, cleanup selection, source-of-truth decisions, and execution
-plans:
-
-1. Task
-2. Stage
-3. Gate/receipt status for every slice being accepted or released
-4. Files inspected
-5. Current state
-6. Findings
-7. Decision or recommendation
-8. Selected next gate or owner
-9. What must not be touched
-10. Files changed
-11. Validation results
-12. Next recommended role
-13. Blockers
-
-### Running Coach Report
-
-Use this shape for training-plan quality, sports-safety, workout diversity, or coaching doctrine:
-
-1. Task
-2. Stage
-3. Current training quality
-4. Findings
-5. Safety concerns
-6. Recommended coaching changes
-7. Product rules to encode
-8. What not to change
-9. Next recommended role
-10. Blockers
-
-## 3) Required Context And Source Hierarchy
-
-Read in this order for non-trivial work:
-
-1. `docs/context.md`
-2. `docs/glossary.md`
-3. task-specific current doc:
-   - `docs/current-system.md`
-   - `docs/current-product.md`
-   - `docs/current-state.md`
-4. canonical backlog item in `docs/tasks/backlog/`, then any linked supporting plan/spec
-5. `docs/README.md`
-
-## 4) Delivery Workflow (Plan, Implement, Validate)
-
-The delivery workflow is executed by the role that owns the work. Orchestration/Product routing
-agents describe and hand off these responsibilities; they do not implement, validate, or close
-another role's delivery workflow directly.
-
-Plan discipline:
-
-- Create/update the canonical backlog item first. Add a linked supporting plan in
-  `docs/plans/active/` only for multi-step, risky, cross-surface, migration, or workflow detail;
-  the plan must not carry a competing operational lifecycle.
-- Small isolated edits may proceed without a formal plan.
-
-New or substantially reworked active plans should include at minimum:
-
-- `Status`
-- `Owner`
-- `Last Updated`
-- `Checklist`
-- `Exit Criteria`
-
-Routine cleanup ledger updates and metadata-only syncs should stay compact and should not restate
-the full plan structure unless that structure is missing and needed for execution.
-
-Execution discipline:
-
-- Keep the canonical backlog-item status aligned with real progress. Supporting plan/spec status
-  records artifact maturity only and must not compete with the backlog lifecycle.
-- For failures/bugs, investigate in order:
-  1. logs
-  2. exact failing entity or route
-  3. fix from observed evidence
-
-Completion gate:
-
-1. Implementation exists
-2. Relevant checks/tests were run
-3. Expected behavior was verified
-4. No known broken state remains
-5. Required docs were updated
-
-## 5) Documentation And History Rules
-
-- Keep one concept in one canonical file.
-- `docs/current-system.md` and `docs/current-product.md` must describe implemented behavior only.
-- `docs/future-roadmap.md` is for not-yet-implemented direction only.
-- `docs/glossary.md` is the canonical term source.
-- Update affected permanent docs in the same change set after significant implementation changes.
-- `docs/history/changelog.md` is the canonical shipped-history source for `/changelog`.
-- Repo-derived Backlog markdown and Supabase Backlog mirrors are not a substitute for changelog
-  entries.
-- When closing or archiving completed implementation work, update `docs/history/changelog.md` with
-  concise dated shipped-history entries, or explicitly record why the completed item is not
-  changelog material.
-- Keep future plans, backlog-only intake, unimplemented specs, and reopened visual/specimen work out
-  of the changelog until they are complete and QA-passed.
-- When work completes, close the canonical backlog item. Archive a linked plan from
-  `docs/plans/active/` to `docs/plans/archive/` only after its inbound links are reconciled; a
-  retained completed plan is supporting history, never an active queue entry.
-
-## 5.5) Repo-Derived Admin Backlog Import Contract
-
-Markdown is canonical for repo-authored work items. Admin Supabase is a deterministic, read-only
-mirror of that truth; it is not a second editable task system.
-
-### Single Operational Task Source
-
-`docs/tasks/backlog/` is the single operational queue for Hito work. Every retained product request,
-reported defect, investigation, implementation slice, QA acceptance, cleanup, or design change must
-have exactly one backlog work item before it is dispatched or marked active. Its lifecycle metadata is
-the only current answer to “what is in progress, ready, blocked, or complete.”
-
-`docs/tasks/frontend-specs/`, `docs/tasks/product-briefs/`, `docs/tasks/running-coach/`,
-`docs/plans/active/`, and `docs/plans/archive/` are supporting decision, specification, and historical
-documents. They may be linked by a backlog item, but they must not independently represent new active
-work. A legacy document that still says `in_progress` is migration debt, not permission to dispatch.
-
-Product creates or updates the one backlog item for every non-trivial user work request before
-handoff. Simple factual questions, status lookups, and casual discussion do not create work items unless
-the user asks to retain them. A task may have several supporting documents, but never several live task
-records. Bugs stay individual until Product deliberately assigns a compatible `Batch`; a batch links
-the individual reports and never replaces their evidence or ownership.
-
-Before dispatch Product must verify that the item is `ready` or `in_progress`, that its owner is idle,
-and that the exact handoff prompt is recorded in that item. Dispatch changes the item to `in_progress`.
-The receiving report updates that same item to `completed`, `blocked`, `ready`, or another truthful
-lifecycle state before any next task is chosen. Queued work has a backlog item but no message sent to an
-active role.
-
-The importer scans the operational queue plus legacy history during the migration:
-
-- `docs/tasks/backlog` — the only source for current operational status and new work.
-- `docs/tasks/product-briefs`
-- `docs/tasks/frontend-specs`
-- `docs/plans/active`
-- `docs/plans/archive`
-
-Legacy roots remain mirrorable for history and link continuity. Their nonterminal metadata is reported
-as migration debt and must be normalized into a backlog item before it is resumed; it must not create a
-second active queue.
-
-`docs/tasks/running-coach/` remains a supporting doctrine/evidence root and is audited for lifecycle
-drift, but the current importer does not mirror it directly. Any executable coaching request must use
-one canonical backlog item that links the doctrine artifact.
-
-### Canonical Metadata
-
-Every new or materially updated work item in those roots must keep one lead metadata block. Core
-fields are:
-
-- `Work Item ID` — immutable lowercase kebab-case identity, normally the filename stem; preserve it
-  across rename or active-to-archive moves.
-- `Status`
-- `Type`
-- `Priority`
-- `Owner` — the role accountable for the current state, not merely the next handoff target.
-- `Scope` — one service-domain slug from the ownership map in `docs/current-functional-map.md`.
-- `Archive Intent`
-- `Task`
-
-Conditional fields are:
-
-- `Batch` — optional stable batch/workstream slug. It groups related items but creates no parent,
-  hierarchy, registry, or new workflow.
-- `Frontend Lane` — required when the current or next implementation owner is `frontend`; allowed
-  values are `product`, `devtools`, and `marketing`. Shared Design System work omits this field
-  because it is a separate owner boundary.
-- `Next Recommended Role`, `Stage`, and `Exact Handoff Prompt` — required for `ready` and
-  `in_progress`. For `blocked`, `Stage` must name the blocker; include the next role and prompt only
-  when one bounded owner can resolve it. Preserve a meaningful historical prompt on terminal items,
-  but never invent one solely to satisfy metadata.
-
-Canonical values:
-
-- `Status`: `backlog`, `ready`, `in_progress`, `blocked`, `completed`, `closed`, or `archived`
-- `Type`: `bug`, `change_request`, `context_capture`, `plan`, `frontend_spec`, or `product_brief`
-- `Priority`: `low`, `medium`, `high`, or `urgent`
-- `Owner`: one of `architect`, `backend`, `frontend`, `design_system`, `designer`, `copy`, `qa`,
-  `product`, or `running_coach`
-- `Next Recommended Role`: `architect`, `backend`, `frontend`, `design_system`, `designer`,
-  `copy`, `qa`, `product`, or `running_coach`
-- `Archive Intent`: `retain_in_place` or `archive_when_closed`
-- `Exact Handoff Prompt`: one execution-ready fenced prompt beginning with `ROLE: <ROLE>`
-
-`Track Tags` and other free-form labels may remain for human context, but they never replace
-`Scope`, `Batch`, or `Frontend Lane`.
-
-### Small-Fix Batch Intake
-
-This is a bug-intake workflow, not the default product-conversation workflow. Ideas, feature
-requests, and open-ended product observations remain conversational until Product and the user
-decide to make or retain work. Capture an individual `backlog` work item when the user explicitly
-calls the report a bug, asks to save it to the backlog, or agrees during discussion to defer it.
-Each captured bug keeps its own evidence, expected behavior, source investigation, and owner
-boundary; do not collapse unrelated reports into a dated catch-all document.
-
-Product assigns a `Batch` only when items share all of the following:
-
-- one accountable execution owner (and one Frontend Lane when applicable);
-- one canonical source-of-truth boundary or a tightly related surface;
-- one risk class and a realistic shared validation story.
-
-Use a stable descriptive batch slug such as `2026-07-27-design-system-reference-fixes`, not a
-generic daily bucket. A batch is eligible for execution discussion when it has three or four
-confirmed, bounded items. It may run earlier only for `urgent` work, a user-blocking regression,
-privacy/security, persistence, auth, destructive behavior, or another demonstrated release gate.
-
-The threshold is a Product notification point, not automatic dispatch. When a newly captured bug
-becomes the third or fourth compatible item, Product summarizes the candidate batch, its owner,
-boundaries, and shared validation cost, then asks whether to start it. The user retains that explicit
-start decision. Do not wait for a count threshold when a confirmed P0 needs immediate root-cause
-work.
-
-Unproven reports may be batched for investigation, but they do not become an implementation batch
-until source, log, browser, database, or validator evidence establishes the owner or names the
-specific discriminator the execution owner must obtain.
-
-### Lifecycle Meaning
-
-- `backlog` — accepted or retained work that is not execution-ready.
-- `ready` — bounded work with an accountable owner and complete handoff.
-- `in_progress` — execution or acceptance is currently active.
-- `blocked` — work cannot proceed until a named decision, evidence gate, or external dependency is
-  resolved.
-- `completed` — the accepted outcome exists.
-- `closed` — canceled, superseded, rejected, or no longer needed.
-- `archived` — memory-only history under an accepted archive boundary.
-
-Repository inventory uses those values directly: `in_progress` is current active work, `ready` is
-ready work, `blocked` is blocked/approval-gated work, `completed` or `closed` is a completed
-historical record, and `archived` is archived memory. `backlog` is accepted but not execution-ready
-work. Malformed records are reported separately rather than guessed into one of those categories.
-
-An unsupported value, contradictory lifecycle metadata, or duplicate `Work Item ID` makes an item
-malformed. Missing new fields on untouched historical records remain explicit legacy metadata debt
-during transition; do not rewrite accepted history merely to satisfy the new template. Once an item
-is new, materially updated, or intentionally normalized, missing core fields make it malformed.
-Import inference may keep legacy history visible, but it must not silently upgrade it to ready work.
-
-### Archival Contract
-
-- Never archive or delete by age alone.
-- A completed item remains visible when `Archive Intent` is `retain_in_place`, it still owns current
-  reference truth, an umbrella plan still guides work, or its stable path is needed by live links.
-- A plan with `archive_when_closed` moves from `docs/plans/active` to `docs/plans/archive` only after
-  it is terminal, has no open gate or handoff, and inbound current links are reconciled. Preserve
-  `Work Item ID` and accepted history during the move.
-- Backlog items, briefs, and specs remain in their existing roots with terminal status unless a
-  separately accepted archive owner exists. Do not invent new archive folders during normalization.
-- Archived history is preserved, not rewritten to match a newer template. Add only the minimum
-  metadata needed to disambiguate identity or lifecycle when source evidence is clear.
-
-### Mirror And Compatibility Contract
-
-- New structured fields fit the existing `admin_capture_items.metadata` JSON envelope; they do not
-  require a new table, entity, registry, or task hierarchy.
-- When implemented, the importer must use `Work Item ID` as the primary mirror identity and retain
-  `source_type + source_path` only as a legacy fallback. Duplicate IDs fail the dry-run instead of
-  creating or merging ambiguous work.
-- Preserve existing Admin statuses: `backlog` and `blocked` map to `new`; `ready` and `in_progress`
-  map to `ready_for_codex`; `completed` and `closed` map to `done`; `archived` maps to `archived`.
-  Repo-derived rows never use `in_review`; exact Markdown lifecycle remains in metadata.
-- A source move with the same `Work Item ID` updates one mirror rather than creating a second work
-  item. A mirror becomes stale only when no approved source and no replacement with the same ID
-  exists. Stale mirrors may be archived only through an explicit importer action and are never
-  history-deleted.
-- Transition order is fixed:
-  1. Backend makes importer/dashboard parsing backward-compatible without live Admin mutation.
-  2. Architect classifies all sources and normalizes current actionable Markdown; untouched history
-     keeps explicit legacy metadata debt rather than receiving invented prompts or decisions.
-  3. A separate release/admin gate runs the dry-run, reviews identity moves and stale mirrors, then
-     explicitly approves live sync or stale-mirror archive.
-     Do not combine these phases in one batch.
-- Dashboard adoption remains a projection change, not a new workflow: show the canonical lifecycle,
-  owner, scope, optional batch/lane, and archive intent for active-plan rows, while continuing to
-  derive every row from Markdown.
-
-Extra human-facing sections remain valid, but they must not replace this metadata contract.
-
-## 6) Change Safety And Guardrails
-
-- Keep changes incremental and backward-safe.
-- No half-migrations; include sequencing and rollback notes for schema/workflow changes.
-- Preserve auditability for important user or system actions.
-- Avoid making hot paths heavier without evidence.
-- Prevent mixed render states in async UI updates.
-
-## 6.5) QA Browser Policy
-
-- QA must use the built-in Codex app/browser testing environment first whenever it can cover the task.
-- QA should prefer the persistent production-built local QA server over repeatedly starting
-  `npm run dev` for browser acceptance work.
-- The canonical local QA server is the built app served with `npm run serve:local` at
-  `http://127.0.0.1:3000/` / `http://localhost:3000/`.
-- Before starting a server, QA must check whether the canonical local QA server is already
-  responding and reuse it when it is healthy.
-- QA must not start duplicate local app servers for the same proof. If the server is stale, hung, or
-  serving the wrong build, restart the existing server intentionally and report that restart.
-- If source changes affect the browser-visible app, QA should rebuild before restarting the
-  persistent built server.
-- Use `npm run dev` only when the task specifically needs dev/HMR behavior or the built server
-  cannot cover the scope; state the reason in `Browser Path Preflight`.
-- Leave the persistent local QA server running after validation unless it is serving a known-bad
-  build, blocking the next task, or the user explicitly asks to stop it.
-- Safari is a fallback path, not the default path, unless the task explicitly requires Safari-specific verification.
-- When Safari is required, use Computer Use with Safari and reuse the existing Safari session whenever practical.
-- QA must preserve one browser context by default: one existing Safari window and, whenever possible,
-  one existing tab.
-- Do not open multiple Safari windows for QA.
-- Prefer navigating the current Safari tab and completing the whole validation flow in that tab.
-- Open a new Safari tab only when the test genuinely requires a separate state or navigation
-  context; if used, state why in the QA report.
-- Opening a new Safari window is prohibited unless the test explicitly requires multiple windows; if used, state why in the QA report.
-- Do not use private/incognito windows for routine QA unless the test specifically requires a clean unauthenticated session.
-- Preserve useful logged-in Safari sessions when possible so repeat QA passes do not require unnecessary username/password entry.
-- Chrome must not be used for QA browser testing unless the user explicitly requests or approves Chrome for that specific QA run.
-- Every QA browser report must include a `Browser Path Preflight` line stating:
-  - whether the built-in Codex app/browser was used first
-  - which local app server URL was used
-  - whether the existing persistent server was reused, restarted, or replaced
-  - if not, the concrete reason it could not cover the task
-  - whether Safari was used as fallback or because Safari-specific verification was explicitly required
-  - whether QA stayed in the existing Safari window/tab or why a new tab/window was required
-- A QA browser report that skips this preflight, uses Safari first without justification, opens extra
-  Safari windows, opens unnecessary tabs, or uses Chrome without explicit user approval is invalid
-  and must be redone.
-
-## 6.6) QA Screenshot Artifact Policy
-
-- This policy applies to UI-facing visual evidence. It does not require screenshots for backend,
-  source-only, docs-only, artifact-manifest, or CLI/validator QA when those checks fully prove the
-  assigned contract.
-- Routine QA screenshots must be saved under the gitignored local artifact root:
-  `qa-artifacts/screenshots/YYYY-MM-DD/<task-slug>/`
-- Do not commit `qa-artifacts/` by default.
-- In markdown QA reports, reference routine screenshot folders textually instead of embedding local-only images.
-- Promote selected screenshots into `docs/process/screenshots/<task-slug>/` only when permanent release evidence is explicitly required.
-- If screenshots are promoted into `docs/process/screenshots/`, the QA report must explain why they are permanent evidence.
-- Existing committed screenshots under `docs/process/screenshots/` are preserved unless a separate Architect cleanup slice explicitly moves or archives them.
-
-## 7) Optional Continuity Handoff Footer
-
-The long continuity footer is optional, not a routine requirement.
-
-For normal Product/orchestration prompt-routing, the standard response shell plus `Blockers` is
-enough. Do not append a large handoff footer just because the response contains a next-role prompt.
-
-Use a continuity footer only when context would otherwise be lost, for example:
-
-- task is blocked and needs a future agent to understand the blocking condition
-- task is gated and awaiting another role with context that is not already captured in the prompt
-- work is large enough that the next-step prompt/report alone cannot preserve continuity
-- the user explicitly asks for a formal handoff block
-
-When a footer is truly needed, use this format:
-
-`## Handoff Context`
-
-```md
-### Summary
-
-<short summary of what was done>
-
-### Key Decisions
-
-- <decision 1>
-- <decision 2>
-
-### Current State
-
-- <what is now true in the system>
-
-### Constraints
-
-- <important constraints for next agent>
-
-### Risks / Open Questions
-
-- <any uncertainties or risks>
-
-### Next Recommended Role
-
-<ARCHITECT / BACKEND / FRONTEND / QA / DESIGNER / DATA-QUALITY / COPY>
-
-### Suggested Next Step
-
-<clear next action>
-```
+For Product Lite work, use a concise Russian status and one bounded action. Do not create a formal
+handoff shell unless another role must actually receive the task.
+
+Handoffs describe outcome, evidence, owner, preserved boundaries, non-goals, and proof. The receiving
+role chooses implementation details. An autonomous same-owner prompt may include its own focused
+validation and safe independent review; do not turn ordinary implementation-to-QA loops into user
+copy-paste.
+
+## 6. Skills
+
+Load only the project skill that directly matches the current task. A simple status, explanation, or
+instruction-only Lite edit normally needs no skill beyond this file and the active role file.
+
+| Work                                              | Matching skill                                 |
+| ------------------------------------------------- | ---------------------------------------------- |
+| architecture, cleanup, source-of-truth audit      | skills/hito-architecture-audit/SKILL.md        |
+| backend, Supabase, auth, integration, persistence | skills/hito-backend-supabase-contract/SKILL.md |
+| UI, DS, layout, Figma bridge planning             | skills/hito-frontend-design-system/SKILL.md    |
+| browser or visual QA                              | skills/hito-qa-browser-regression/SKILL.md     |
+| backlog capture                                   | skills/hito-backlog-intake/SKILL.md            |
+| active-plan lifecycle or closeout                 | skills/hito-plan-writing-and-closeout/SKILL.md |
+| Product handoff                                   | skills/hito-prompt-handoff/SKILL.md            |
+| training-quality review                           | skills/hito-running-coach-audit/SKILL.md       |
+
+Use more than one only when the task genuinely crosses those procedures. Each final report names
+the role file, skills used or none, task artifact or none, and any subagent used or not used.
+
+## 7. Subagents
+
+Subagents are optional evidence aids, never a ceremony requirement.
+
+- Lite work uses one only when independent evidence materially increases confidence or saves real
+  rediscovery. A focused self-check is sufficient otherwise.
+- Tracked work uses subagents when independent, bounded work can reduce risk or elapsed time.
+- The primary owner remains accountable for the result and integrates every finding.
+- Use at most six active subagents per bounded workstream. They do not spawn more agents.
+- Give each a named purpose and a read-only or disjoint-write boundary. Do not delegate secrets,
+  hosted/production mutation, destructive actions, fragile shared sessions, or overlapping edits.
+- Close or reuse a completed subagent; do not create one per file, command, viewport, or minor
+  question.
+
+Global QA and cross-owner/release acceptance remain independent QA work. A same-owner implementation
+may obtain an independent QA or specialist review internally when it is genuinely needed.
+
+## 8. Validation And Acceptance
+
+Lite validation is proportional: run the smallest focused check or inspect the source/decision that
+proves the changed outcome. State any omitted proof only when it matters to the claim.
+
+Tracked work defines:
+
+- observable outcome and preserved boundaries;
+- root-cause discriminator for a defect when safely obtainable;
+- risk-derived checks, including browser, persistence, auth, or build proof only when affected; and
+- the exact condition that keeps the task open.
+
+Use a compact Check | Scenario / environment | Result | Evidence table for Tracked implementation or
+QA results. Report required checks not run and their coverage consequence.
+
+Implementation DoD proves the assigned slice. Global QA Acceptance is a separate gate and may be
+claimed only for an explicitly assigned cross-flow or release acceptance inventory. No local or
+hosted/release claim may be inferred from the other.
+
+For browser/visual QA, the owner may choose any supported local browser or browser-control surface
+(including the built-in browser, Safari, Chrome, and a non-prompting WebDriver path) without user
+approval. Prefer an existing usable session and the least disruptive path that can prove the
+contract; do not wait for a preferred browser when another supported local path works. Never ask the
+user to choose or approve a browser or loopback command. If a platform dialog appears, abandon that
+tool path and continue with another supported local path. Browser Path Preflight is required only
+for browser QA, not source-only or backend-only validation.
+
+## 9. Backlog, Plans, And History
+
+docs/tasks/backlog/ is the operational queue for retained work in either mode. A Lite item records
+only the durable decision needed to resume it; a Tracked item records Work Item ID, Status, Type,
+Priority, Owner, Scope, Archive Intent, Task, and, when ready or in progress, Stage, Next Recommended
+Role, and one exact handoff prompt. Retention never by itself changes the task mode.
+
+Status values are backlog, ready, in_progress, blocked, completed, closed, and archived. The active
+owner keeps the item truthful before final reporting. Supporting specs and plans never create a
+second active task.
+
+Use docs/plans/active/ only for multi-step or cross-surface detail. Use technical-log entries for
+accepted user-impacting, QA-acceptance, source-cleanup, local-tooling, or durable-process outcomes;
+routine Lite receipts do not need a history entry. Update the public changelog only for shipped
+user-facing highlights.
+
+## 10. Reporting
+
+Language is role-specific:
+
+- PRODUCT speaks directly with Ivan in Russian: status, explanation, blockers, and the Product
+  routing shell are Russian by default. Its exact execution prompt remains English.
+- Execution roles use Russian for their in-progress commentary and explanations when those messages
+  are visible to Ivan. Their final formal report, receipt, validation inventory/table, and canonical
+  backlog/plan update are in English, so the durable project record is readable by collaborators.
+  Use another language only when Ivan explicitly requests it for that assignment.
+- Canonical repository artifacts remain English unless a task explicitly requires product copy in
+  another language.
+
+The forms below are the canonical execution feedback format. Role files may add their domain facts
+but must not replace or translate this format.
+
+Lite final receipt:
+
+- task and mode;
+- outcome and evidence/decision;
+- files changed;
+- focused proof;
+- promotion or remaining boundary.
+
+Tracked implementation receipt:
+
+- task, stage, preflight, product outcome, root cause, files inspected/changed, preserved
+  boundaries, validation inventory, omitted-check consequences, next owner, blockers.
+
+Tracked QA receipt:
+
+- task, stage, validation layer, browser preflight only if browser work occurred, inventory,
+  issues, coverage gaps, and Verdict: Passed or Verdict: Failed.
+
+Do not append a long continuity footer unless the task is blocked, large enough that the standard
+receipt loses essential context, or the user asks for it.

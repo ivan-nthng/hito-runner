@@ -1,192 +1,43 @@
 ---
 name: hito-backlog-intake
-description: Use when capturing Hito bugs, UI screenshots, improvement ideas, product irritations, or unclear user feedback into structured backlog items without implementing code.
+description: Use when retaining a Hito bug, screenshot, improvement, or unclear request as canonical backlog work.
 ---
 
 # Hito Backlog Intake
 
-## Evidence Discipline
-
-Preserve the report's time, surface, attachment, and observed behavior. Mark a root cause as a
-hypothesis until source, log, database, validator, or browser/DOM evidence supports it. When that
-evidence is not safely available during intake, name the exact artifact the next owner must obtain;
-do not turn a screenshot, intuition, or prior prompt into a confirmed cause.
-
 ## Purpose
 
-Convert messy user feedback into a clear, investigated, evidence-backed backlog item that another
-role can execute later.
-
-## When To Use
-
-Use this skill when the user asks to:
-
-- add something to the backlog
-- capture a bug or improvement
-- save a screenshot-backed issue
-- investigate where a visible problem lives
-- prepare a future task from rough product feedback
-- triage UI, copy, backend, QA, design, or coaching backlog work
-
-## Storage Contract
-
-Backlog items live under:
-
-`docs/tasks/backlog/`
-
-Backlog item files use:
-
-`docs/tasks/backlog/YYYY-MM-DD-<short-slug>.md`
-
-Permanent backlog evidence lives under:
-
-`docs/tasks/backlog/assets/YYYY-MM-DD-<short-slug>/`
-
-Use `qa-artifacts/` only for routine QA screenshots. Use the backlog `assets/` folder when the
-screenshot or attachment is part of the backlog item itself and should travel with the task.
-
-## Admin Backlog Import Compatibility
-
-Backlog items under `docs/tasks/backlog/` are mirrored into the admin Backlog, so every new or
-materially updated backlog item must follow the single lifecycle, identity, scope, frontend-lane,
-and archival contract in `AGENTS.md` section 5.5 before any extended human-facing sections. Do not
-maintain a second field or status list here.
-
-Backlog-specific fields such as `Severity`, `Owner`, `Reported`, `Evidence`, `Observed Behavior`,
-and `Validation Expectations` remain required for human triage, but they do not replace the
-canonical import-ready block.
+Turn retained feedback into one factual, executable backlog item without implementing the fix.
 
 ## Workflow
 
-1. Read the user's report carefully and preserve the core complaint.
-2. Check whether an existing backlog item already covers the same issue.
-3. If a screenshot or attachment is provided, describe what is visible and store/reference it.
-4. Inspect relevant code/docs/routes to identify likely ownership.
-5. Separate confirmed facts from hypotheses.
-6. Decide item type, severity, priority, status, and next owner.
-7. Create or update the backlog markdown file.
-8. Include a precise handoff prompt when the item is `ready` or `in_progress`; do not fabricate one
-   for terminal history.
-9. Run `git diff --check` for markdown-only changes.
+1. Preserve the user report, attachment, time, and visible behavior.
+2. Check docs/tasks/backlog/ for an existing item before creating another.
+3. Inspect only enough source to identify an owner, source facts, and a confirmed cause or exact
+   discriminator still needed.
+4. Classify Lite or Tracked under AGENTS.md.
+5. Create/update one canonical item only when the user asks retention, the task is deferred, it
+   survives the turn, or a handoff is required.
+6. Keep user-supplied permanent evidence under docs/tasks/backlog/assets/<slug>/; keep routine QA
+   screenshots under qa-artifacts/.
 
-## Small-Fix Batching
+## Required Item Facts
 
-Use this workflow only for reports the user explicitly calls bugs, asks to save to the backlog, or
-agrees to defer after discussion. Ideas and feature requests keep the normal Product conversation:
-discuss first, then decide whether to make, defer, or discard them. For captured bugs, keep each
-report as its own work item. Do not create one broad daily "bug fixes" document: that hides different
-evidence, owners, and risk boundaries.
+Every retained item has Work Item ID, Status, Type, Priority, Owner, Scope, Archive Intent, Task,
+User Report, Evidence, Observed Behavior, Expected Behavior, Source Investigation, Likely Root Cause
+or Required Discriminator, What Not To Touch, and Validation Expectations.
 
-Assign the optional canonical `Batch` field only when reports share one execution owner, one
-canonical surface or source-of-truth boundary, and one validation story. Use a stable descriptive
-slug, for example `2026-07-27-design-system-reference-fixes`.
+Tracked ready/in-progress work also has Stage, Next Recommended Role, and one exact handoff prompt.
+Do not manufacture a future prompt for terminal history.
 
-At three or four confirmed compatible items, tell Product that the batch is ready to discuss. This
-is not permission to dispatch implementation automatically. Product presents the bounded batch and
-its shared validation cost; the user explicitly decides when to start. Bypass the threshold only
-for urgent, user-blocking, privacy/security, auth, persistence, destructive, or release-gating
-defects with demonstrated evidence.
+## Rules
 
-Items whose owner is still unknown may share an investigation batch, but they are not execution
-work until the source evidence or required discriminator is recorded.
-
-## Clarification Rule
-
-Ask a concise clarifying question before writing the backlog item when:
-
-- the expected behavior is unclear
-- the screenshot does not show the affected surface clearly
-- multiple possible fixes have different product consequences
-- the requested change could affect data, auth, payments, plan generation, or destructive actions
-- the user report lacks enough context to avoid creating a bad task
-
-Do not ask for clarification when a reasonable low-risk backlog assumption is enough; state the
-assumption in the backlog item instead.
-
-## Investigation Rules
-
-- Prefer `rg` for code search.
-- Read only the files needed to identify the likely owner and root-cause hypothesis.
-- Do not run product implementation, migrations, destructive commands, or broad QA.
-- Browser inspection is optional and only for understanding a visible surface; it is not a QA pass.
-- If runtime proof is needed, hand off to QA.
-- If data or SQL proof is needed, hand off to BACKEND.
-
-## Backlog Item Required Sections
-
-Every backlog item should include:
-
-- `Status`
-- `Type`
-- `Task`
-- `Stage`
-- `Issue Category`
-- `Severity`
-- `Priority`
-- `Human Priority`
-- `Owner`
-- `Scope`
-- `Archive Intent`
-- `Reported`
-- `User Report`
-- `Evidence`
-- `Observed Behavior`
-- `Expected Behavior`
-- `Source Investigation`
-- `Likely Root Cause`
-- `Recommended Fix Direction`
-- `What Not To Touch`
-- `Validation Expectations`
-- `Next Recommended Role` when required by `AGENTS.md` section 5.5
-- `Exact Handoff Prompt` when required by `AGENTS.md` section 5.5
-
-## Human Triage Labels
-
-These labels are for human backlog filtering only. They must not replace the canonical Admin importer
-`Status`, `Type`, or `Priority` block.
-
-Issue Category:
-
-- `bug`
-- `improvement`
-- `design`
-- `copy`
-- `backend`
-- `qa`
-- `research`
-- `question`
-
-Severity:
-
-- `blocker`
-- `high`
-- `medium`
-- `low`
-
-Human Priority:
-
-- `now`
-- `next`
-- `later`
-- `parking-lot`
-
-## Guardrails
-
-- Do not implement code.
-- Do not mutate product data.
-- Do not turn backlog intake into broad redesign.
-- Do not create vague tickets without source context.
-- Do not store secrets, passwords, tokens, sessions, private keys, or production credentials.
-- Do not duplicate existing backlog items; link or update the existing item instead.
-- Do not claim a root cause is confirmed unless source/runtime evidence supports it.
+- A screenshot proves a visible symptom, not a backend or persistence cause.
+- Keep bugs individual unless PRODUCT explicitly groups compatible evidence, owner, risk, and proof.
+- Do not run implementation, migrations, destructive commands, or broad QA.
+- Do not store credentials, tokens, sessions, secrets, or private payloads.
 
 ## Output
 
-1. Task
-2. Stage
-3. Backlog item
-4. Evidence captured
-5. Source investigation
-6. Triage
-7. Validation results
-8. Blockers / clarification needed
+Link the item, evidence, confirmed facts, remaining hypothesis/discriminator, owner, and the next
+condition for execution.

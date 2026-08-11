@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
-import { exportActivePlanForUser } from "@/lib/active-plan-export-actions";
+import { exportSavedPlanForUser } from "@/lib/active-plan-export-actions";
 
 const planExportQuerySchema = z.object({
   format: z.enum(["json", "markdown"]),
+  savedPlanId: z.string().uuid(),
 });
 
 export const Route = createFileRoute("/api/plan/export")({
@@ -13,11 +14,12 @@ export const Route = createFileRoute("/api/plan/export")({
       GET: async ({ request }) => {
         try {
           const url = new URL(request.url);
-          const { format } = planExportQuerySchema.parse({
+          const { format, savedPlanId } = planExportQuerySchema.parse({
             format: url.searchParams.get("format"),
+            savedPlanId: url.searchParams.get("savedPlanId"),
           });
           const userId = await requirePersistedUserIdForCurrentRequest();
-          const document = await exportActivePlanForUser(userId, format);
+          const document = await exportSavedPlanForUser(userId, savedPlanId, format);
 
           return new Response(document.body, {
             status: 200,
@@ -62,11 +64,11 @@ function getPlanExportPublicFailure(error: unknown): PlanExportPublicFailure {
     return { status: 401, message: error.message, report: false };
   }
 
-  if (error instanceof Error && error.message === "There is no active plan to export.") {
+  if (error instanceof Error && error.message === "The selected saved plan was not found.") {
     return { status: 404, message: error.message, report: false };
   }
 
-  return { status: 500, message: "The active plan could not be exported.", report: true };
+  return { status: 500, message: "The selected plan could not be exported.", report: true };
 }
 
 function buildAttachmentDisposition(filename: string) {

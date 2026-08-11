@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import {
@@ -10,26 +11,28 @@ import {
   AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID,
   buildAiGeneratedRunningPlanQaFixtureAuthoringInput,
 } from "../../src/lib/ai-generated-running-plan-dev-fixture";
-import {
-  buildReviewedAiGeneratedRunningPlanPreviewForUser,
-  confirmRunningPlanDraftForUser,
-} from "../../src/lib/running-plan-engine-actions";
+import { buildReviewedAiGeneratedRunningPlanPreviewForUser } from "../../src/lib/running-plan-engine-actions";
+import { materializeFirstReviewedPlanForUser } from "../../src/lib/active-plan-persistence";
+import { buildRunningPlanPersistenceMetadata } from "../../src/lib/running-plan-engine-review";
 import { DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE } from "../../src/lib/local-auth-account-registry.server";
 import {
-  createRunnerActivityPlannedWorkoutMatch,
   persistGarminFitActivitySource,
+  readRunnerActivityProjection,
   removeRunnerActivityOriginalFilesForActivity,
 } from "../../src/lib/runner-activity/garmin-fit-source";
 import { recordRunnerActivitySessionRpeForUser } from "../../src/lib/runner-activity/activity-evidence";
 import { listRunnerActivityHistoryForUser } from "../../src/lib/runner-activity/history-read-model";
 import { getRunnerActivityProgressForUser } from "../../src/lib/runner-activity/read-model";
-import { addDaysIso, startOfWeekIso, todayIso } from "../../src/lib/training";
+import { getPersistedSnapshot } from "../../src/lib/training-api";
+import { addDaysIso, diffDaysIso, startOfWeekIso, todayIso } from "../../src/lib/training";
 import { isLoopbackRuntimeUrl } from "../../src/lib/supabase/env";
 import {
   buildFirstTimeRunnerBaselineReadback,
   updateUserSettingsForUserId,
 } from "../../src/lib/user-settings-actions";
 import { parseGarminFitActivity } from "../../src/lib/workout-result-import/parse-garmin-fit";
+import { reconcileWorkoutResultProjection } from "../../src/lib/workout-result-import/planned-workout-projection";
+import { getFitCompletedPlannedWorkoutIds } from "../../src/lib/workout-result-import/read-workout-result-feedback";
 import { WORKOUT_RESULT_STORAGE_BUCKET } from "../../src/lib/workout-result-import/types";
 import { markRunnerActivitySourceRemovalPendingForFixture } from "./runner-activity-gate-4-fixture";
 import { loginToLoopbackRuntime } from "./runner-activity-proof-runtime";
@@ -61,6 +64,7 @@ type FixtureSeedReceipt = {
 };
 
 const AS_OF_DATE_SCHEMA = z.string().date();
+const MIN_MATCHED_ACTIVITY_COUNT = 11;
 
 const ACTIVITY_SPECS = Object.freeze<FixtureActivitySpec[]>([
   activity("w8-recovery", 55, "Recovery run", 30, 32, 4.8, 134, 18, true),
@@ -129,6 +133,7 @@ export async function createRunnerDesignProfilePlan(input: {
     weightKg: baseline.weightKg,
     heightCm: baseline.heightCm,
     fitnessLevel: baseline.fitnessLevel!,
+    calendarTimezone: new Intl.DateTimeFormat().resolvedOptions().timeZone,
     heartRateProfile: {
       zones: baseline.heartRateZones.zones.map(({ reference, minBpm, maxBpm }) => ({
         reference,
@@ -179,41 +184,41 @@ export async function createRunnerDesignProfilePlan(input: {
   );
   assert.equal(providerDispatchCount, 0);
 
-  const confirmed = await withLocalDesignFixtureEnv(() =>
-    confirmRunningPlanDraftForUser(
-      input.userId,
-      {
-        previewInput: reviewed.draft.previewInput,
-        sourceKind: reviewed.draft.sourceKind,
-        reviewToken: reviewed.draft.reviewToken,
-        reviewChecksum: reviewed.draft.reviewChecksum,
-      },
-      { allowLocalQaFixture: true },
-    ),
+  assert.ok(reviewed.savedPlanId, "The fixture candidate must be retained before materialization.");
+  const materialized = await materializeFirstReviewedPlanForUser(
+    input.userId,
+    reviewed.draft.canonicalPlan,
+    buildRunningPlanPersistenceMetadata({
+      draft: reviewed.draft,
+      canonicalPlan: reviewed.draft.canonicalPlan,
+      reviewChecksum: reviewed.draft.reviewChecksum,
+    }),
   );
-  assert.equal(confirmed.ok, true, JSON.stringify(confirmed));
-  if (!confirmed.ok) throw new Error(confirmed.message);
+  assert.equal(materialized.ok, true);
   assert.equal(providerDispatchCount, 0);
 
-  const activePlan = await input.supabase
+  const materializedPlan = await input.supabase
     .from("plan_cycles")
     .select("id, start_date, end_date, goal_metadata")
     .eq("user_id", input.userId)
-    .eq("status", "active")
+    .eq("status", "archived")
+    .is("saved_plan_payload", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .single();
-  if (activePlan.error) throw new Error(activePlan.error.message);
+  if (materializedPlan.error) throw new Error(materializedPlan.error.message);
   const workouts = await input.supabase
     .from("planned_workouts")
-    .select("id, workout_date, workout_type")
+    .select("id, workout_date, workout_type, source_workout_type, title, steps")
     .eq("user_id", input.userId)
-    .eq("plan_cycle_id", activePlan.data.id)
+    .eq("plan_cycle_id", materializedPlan.data.id)
     .order("workout_date", { ascending: true });
   if (workouts.error) throw new Error(workouts.error.message);
 
   return {
-    planId: activePlan.data.id,
-    startDate: activePlan.data.start_date,
-    endDate: activePlan.data.end_date,
+    planId: materializedPlan.data.id,
+    startDate: materializedPlan.data.start_date,
+    endDate: materializedPlan.data.end_date,
     reviewChecksum: reviewed.draft.reviewChecksum,
     canonicalRowCount: reviewed.draft.canonicalRowCount,
     providerDispatchCount,
@@ -232,17 +237,23 @@ export async function seedRunnerDesignProfileFixture(input: {
     userId: input.userId,
     asOfDate,
   });
-  const plannedWorkoutIdByDate = new Map(
+  const plannedWorkoutByDate = new Map(
     planReceipt.workouts
       .filter((workout) => workout.workout_type !== "rest")
-      .map((workout) => [workout.workout_date, workout.id]),
+      .map((workout) => [workout.workout_date, workout]),
   );
+  const activityDateByKey = buildFixtureActivityDateByKey({
+    asOfDate,
+    plannedWorkoutDates: plannedWorkoutByDate.keys(),
+  });
 
   const receipts: FixtureSeedReceipt[] = [];
   for (const spec of ACTIVITY_SPECS) {
-    const localDate = addDaysIso(asOfDate, -spec.daysAgo);
+    const localDate = requireFixtureActivityDate(activityDateByKey, spec.key);
     const fileBuffer = buildFixtureSource(spec, localDate);
     const storagePath = `${input.userId}/${RUNNER_DESIGN_PROFILE_FIXTURE_VERSION}/${spec.key}.fit`;
+    const plannedWorkout = spec.planned ? (plannedWorkoutByDate.get(localDate) ?? null) : null;
+    const assetId = randomUUID();
     const stored = await input.supabase.storage
       .from(WORKOUT_RESULT_STORAGE_BUCKET)
       .upload(storagePath, fileBuffer, {
@@ -250,6 +261,27 @@ export async function seedRunnerDesignProfileFixture(input: {
         upsert: true,
       });
     if (stored.error) throw new Error(stored.error.message);
+
+    const asset = await input.supabase
+      .from("workout_result_assets")
+      .insert({
+        id: assetId,
+        user_id: input.userId,
+        planned_workout_id: plannedWorkout?.id ?? null,
+        asset_kind: "garmin_fit",
+        storage_bucket: WORKOUT_RESULT_STORAGE_BUCKET,
+        storage_path: storagePath,
+        original_file_name: `${spec.key}.fit`,
+        mime_type: "application/octet-stream",
+        file_size_bytes: fileBuffer.length,
+        parse_status: "uploaded",
+      })
+      .select("id")
+      .single();
+    if (asset.error) {
+      await input.supabase.storage.from(WORKOUT_RESULT_STORAGE_BUCKET).remove([storagePath]);
+      throw new Error(asset.error.message);
+    }
 
     let receipt;
     try {
@@ -272,6 +304,26 @@ export async function seedRunnerDesignProfileFixture(input: {
           normalized_samples_persisted: false,
         },
       });
+      const activityProjection = await readRunnerActivityProjection({
+        userId: input.userId,
+        activityId: receipt.activityId,
+        activityRevisionId: receipt.activityRevisionId,
+      });
+      await reconcileWorkoutResultProjection({
+        userId: input.userId,
+        plannedWorkout,
+        workoutLogId: null,
+        activitySource: receipt,
+        activityProjection,
+        candidateAssetId: assetId,
+        candidateStoragePath: storagePath,
+        primaryFile: {
+          primaryFileKind: "fit",
+          primaryFileName: `${spec.key}.fit`,
+          fileBuffer,
+        },
+        initialParseStatus: "uploaded",
+      });
     } catch (error) {
       await input.supabase.storage.from(WORKOUT_RESULT_STORAGE_BUCKET).remove([storagePath]);
       throw error;
@@ -282,16 +334,6 @@ export async function seedRunnerDesignProfileFixture(input: {
       sourceRevisionId: receipt.sourceRevisionId,
       key: spec.key,
     });
-
-    const plannedWorkoutId = spec.planned ? plannedWorkoutIdByDate.get(localDate) : null;
-    if (plannedWorkoutId) {
-      await createRunnerActivityPlannedWorkoutMatch({
-        userId: input.userId,
-        activityId: receipt.activityId,
-        sourceRevisionId: receipt.sourceRevisionId,
-        plannedWorkoutId,
-      });
-    }
   }
 
   for (const spec of ACTIVITY_SPECS.filter((candidate) => candidate.sessionRpe != null)) {
@@ -364,21 +406,45 @@ export async function readRunnerDesignProfileFixture(input: {
   if (sourceRevisions.error) throw new Error(sourceRevisions.error.message);
   const planCycles = await input.supabase
     .from("plan_cycles")
-    .select("id, status, source_template, source_kind, start_date, end_date, goal_metadata")
+    .select(
+      "id, status, source_template, source_kind, start_date, end_date, goal_metadata, saved_plan_payload",
+    )
     .eq("user_id", input.userId);
   if (planCycles.error) throw new Error(planCycles.error.message);
-  const activePlans = planCycles.data.filter((plan) => plan.status === "active");
-  assert.equal(activePlans.length, 1, "The design profile requires exactly one active plan.");
-  const activePlan = activePlans[0]!;
+  const materializedPlans = planCycles.data.filter((plan) => plan.saved_plan_payload === null);
+  assert.equal(
+    materializedPlans.length,
+    1,
+    "The design profile requires exactly one materialized Calendar provenance record.",
+  );
+  assert.equal(
+    planCycles.data.filter((plan) => plan.status === "active").length,
+    0,
+    "The design profile must not restore active-plan authority.",
+  );
+  const materializedPlan = materializedPlans[0]!;
   const plannedWorkouts = await input.supabase
     .from("planned_workouts")
     .select("id, workout_date, workout_type, workout_family, workout_identity, steps")
     .eq("user_id", input.userId)
-    .eq("plan_cycle_id", activePlan.id)
+    .eq("plan_cycle_id", materializedPlan.id)
     .order("workout_date", { ascending: true });
   if (plannedWorkouts.error) throw new Error(plannedWorkouts.error.message);
 
-  const expected = expectedFixtureSummary(asOfDate);
+  const activityDateByKey = buildFixtureActivityDateByKey({
+    asOfDate,
+    plannedWorkoutDates: plannedWorkouts.data
+      .filter((workout) => workout.workout_type !== "rest")
+      .map((workout) => workout.workout_date),
+  });
+  const expected = expectedFixtureSummary(asOfDate, activityDateByKey);
+  const matchedWorkoutIds = new Set(
+    items.flatMap((item) => (item.plannedWorkout ? [item.plannedWorkout.id] : [])),
+  );
+  const fitCompletedWorkoutIds = await getFitCompletedPlannedWorkoutIds({
+    userId: input.userId,
+    plannedWorkoutIds: plannedWorkouts.data.map((workout) => workout.id),
+  });
   const actual = {
     activityCount: items.length,
     pageItemCounts: pages.map((page) => page.items.length),
@@ -400,26 +466,25 @@ export async function readRunnerDesignProfileFixture(input: {
       .length,
     sourceAvailableCount: items.filter((item) => item.source.rawState === "available").length,
   };
-  assert.deepEqual(actual, {
-    ...expected.history,
-    plannedCount: actual.plannedCount,
-    unplannedCount: actual.unplannedCount,
-  });
-  assert.ok(actual.plannedCount >= 10, "The design profile requires substantial matched history.");
-  assert.equal(actual.plannedCount + actual.unplannedCount, ACTIVITY_SPECS.length);
+  assert.deepEqual(actual, expected.history);
+  assert.equal(actual.plannedCount, MIN_MATCHED_ACTIVITY_COUNT);
+  assert.equal(actual.unplannedCount, ACTIVITY_SPECS.length - MIN_MATCHED_ACTIVITY_COUNT);
+  assert.equal(matchedWorkoutIds.size, MIN_MATCHED_ACTIVITY_COUNT);
+  assert.equal(plannedWorkouts.data.length, 55);
+  assert.deepEqual([...fitCompletedWorkoutIds].sort(), [...matchedWorkoutIds].sort());
   const retryableRemoval = items.find((item) => item.source.rawState === "removal_pending");
   assert.ok(retryableRemoval);
   assert.equal(retryableRemoval.source.originalRetained, false);
   assert.equal(retryableRemoval.source.reprocessingAvailable, false);
   assert.equal(retryableRemoval.quality.updating, false);
   assert.equal(retryableRemoval.capabilities.canRemoveOriginalFile, true);
-  assert.equal(activePlan.source_kind, "ai_authored_plan_first_v1");
+  assert.equal(materializedPlan.source_kind, "ai_authored_plan_first_v1");
   assert.equal(
-    readFixtureResponseId(activePlan.goal_metadata),
+    readFixtureResponseId(materializedPlan.goal_metadata),
     AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID,
   );
-  assert.ok(activePlan.start_date < asOfDate);
-  assert.ok(activePlan.end_date > asOfDate);
+  assert.ok(materializedPlan.start_date < asOfDate);
+  assert.ok(materializedPlan.end_date > asOfDate);
   const workoutTypes = new Set(plannedWorkouts.data.map((workout) => workout.workout_type));
   const workoutFamilies = new Set(
     plannedWorkouts.data.flatMap((workout) =>
@@ -464,6 +529,19 @@ export async function readRunnerDesignProfileFixture(input: {
   }
   assert.ok(plannedWorkouts.data.some((workout) => workout.workout_date < asOfDate));
   assert.ok(plannedWorkouts.data.some((workout) => workout.workout_date > asOfDate));
+  const persistedSnapshot = await getPersistedSnapshot(input.userId);
+  assert.equal(persistedSnapshot.planMeta?.id, materializedPlan.id);
+  assert.equal(persistedSnapshot.workouts.length, plannedWorkouts.data.length);
+  for (const workout of persistedSnapshot.workouts) {
+    if (matchedWorkoutIds.has(workout.id)) {
+      assert.equal(workout.status, "completed");
+      assert.equal(workout.completionOrigin, "fit_activity");
+      assert.equal(workout.feedbackMarker?.state, "feedback_ready");
+      continue;
+    }
+    assert.notEqual(workout.completionOrigin, "fit_activity");
+    if (workout.date > asOfDate) assert.notEqual(workout.status, "completed");
+  }
   assert.equal(
     plannedWorkouts.data
       .filter((workout) => workout.workout_type !== "rest")
@@ -560,16 +638,24 @@ export async function readRunnerDesignProfileFixture(input: {
     userId: input.userId,
     role: RUNNER_DESIGN_PROFILE_FIXTURE_ROLE,
     planState: {
-      activePlanCount: activePlans.length,
-      archivedPlanCount: planCycles.data.filter((plan) => plan.status === "archived").length,
-      startDate: activePlan.start_date,
-      endDate: activePlan.end_date,
+      materializedPlanCount: materializedPlans.length,
+      savedPlanCount: planCycles.data.filter((plan) => plan.saved_plan_payload !== null).length,
+      activeAuthorityCount: planCycles.data.filter((plan) => plan.status === "active").length,
+      startDate: materializedPlan.start_date,
+      endDate: materializedPlan.end_date,
       workoutCount: plannedWorkouts.data.length,
       workoutTypes: [...workoutTypes].sort(),
       workoutFamilies: [...workoutFamilies].sort(),
       workoutIdentities: [...workoutIdentities].sort(),
     },
     history: actual,
+    completionState: {
+      matchedWorkoutCount: matchedWorkoutIds.size,
+      fitCompletedWorkoutCount: fitCompletedWorkoutIds.size,
+      futureFitCompletedWorkoutCount: persistedSnapshot.workouts.filter(
+        (workout) => workout.date > asOfDate && workout.completionOrigin === "fit_activity",
+      ).length,
+    },
     progress: {
       current28Day: snapshotValues(current),
       previous28Day: snapshotValues(previous),
@@ -654,7 +740,6 @@ export async function verifyRunnerDesignProfileFixtureRuntime(input: {
   const progressBody = await progressResponse.json();
   assert.equal(progressBody.ok, true);
   assert.equal(progressBody.progress.rolling28Day.current.facts.sessions.value, 15);
-  assert.equal(progressBody.progress.interpretation.derivedCoachingMetricsAvailable, false);
   assert.equal(progressBody.progress.advancedMetrics.status, "current");
   assert.equal(
     progressBody.progress.advancedMetrics.sessionRpeLoad.rolling28Day.current.metric.availability,
@@ -686,8 +771,9 @@ export async function verifyRunnerDesignProfileFixtureRuntime(input: {
         record.context === "track",
     ),
   );
+  assert.equal(progressBody.progress.advancedMetrics.detailedMetrics.status, "unavailable");
   assert.equal(
-    progressBody.progress.advancedMetrics.streamDependentMetrics.aerobicEfficiency.reason,
+    progressBody.progress.advancedMetrics.detailedMetrics.reason,
     "normalized_stream_not_persisted",
   );
   const serialized = JSON.stringify({ firstBody, secondBody, progressBody });
@@ -747,6 +833,89 @@ function activity(
 
 function normalizeAsOfDate(value: string | undefined) {
   return AS_OF_DATE_SCHEMA.parse(value ?? todayIso());
+}
+
+function buildFixtureActivityDateByKey(input: {
+  asOfDate: string;
+  plannedWorkoutDates: Iterable<string>;
+}) {
+  const activityDateByKey = new Map(
+    ACTIVITY_SPECS.map((spec) => [spec.key, addDaysIso(input.asOfDate, -spec.daysAgo)]),
+  );
+  const plannedWorkoutDates = [...new Set(input.plannedWorkoutDates)]
+    .filter((date) => date <= input.asOfDate)
+    .sort();
+  const occupiedActivityDates = new Set(activityDateByKey.values());
+  const matchedPlanDates = new Set(
+    ACTIVITY_SPECS.flatMap((spec) => {
+      if (!spec.planned) return [];
+      const date = requireFixtureActivityDate(activityDateByKey, spec.key);
+      return plannedWorkoutDates.includes(date) ? [date] : [];
+    }),
+  );
+
+  for (const spec of ACTIVITY_SPECS) {
+    if (matchedPlanDates.size <= MIN_MATCHED_ACTIVITY_COUNT) break;
+    if (!spec.planned) continue;
+    const currentDate = requireFixtureActivityDate(activityDateByKey, spec.key);
+    if (!matchedPlanDates.has(currentDate)) continue;
+    const currentWeek = startOfWeekIso(currentDate);
+    const unplannedDate = Array.from({ length: 7 }, (_, offset) => addDaysIso(currentWeek, offset))
+      .filter(
+        (date) =>
+          date <= input.asOfDate &&
+          !plannedWorkoutDates.includes(date) &&
+          !occupiedActivityDates.has(date),
+      )
+      .sort(
+        (left, right) =>
+          Math.abs(diffDaysIso(currentDate, left)) - Math.abs(diffDaysIso(currentDate, right)) ||
+          left.localeCompare(right),
+      )[0];
+    if (!unplannedDate) continue;
+    occupiedActivityDates.delete(currentDate);
+    occupiedActivityDates.add(unplannedDate);
+    activityDateByKey.set(spec.key, unplannedDate);
+    matchedPlanDates.delete(currentDate);
+  }
+
+  for (const spec of ACTIVITY_SPECS) {
+    if (matchedPlanDates.size >= MIN_MATCHED_ACTIVITY_COUNT) break;
+    if (!spec.planned) continue;
+    const currentDate = requireFixtureActivityDate(activityDateByKey, spec.key);
+    if (matchedPlanDates.has(currentDate)) continue;
+    const currentWeek = startOfWeekIso(currentDate);
+    const alignedDate = plannedWorkoutDates
+      .filter(
+        (date) =>
+          startOfWeekIso(date) === currentWeek &&
+          !matchedPlanDates.has(date) &&
+          !occupiedActivityDates.has(date),
+      )
+      .sort(
+        (left, right) =>
+          Math.abs(diffDaysIso(currentDate, left)) - Math.abs(diffDaysIso(currentDate, right)) ||
+          left.localeCompare(right),
+      )[0];
+    if (!alignedDate) continue;
+    occupiedActivityDates.delete(currentDate);
+    occupiedActivityDates.add(alignedDate);
+    activityDateByKey.set(spec.key, alignedDate);
+    matchedPlanDates.add(alignedDate);
+  }
+
+  assert.equal(
+    matchedPlanDates.size,
+    MIN_MATCHED_ACTIVITY_COUNT,
+    `The design profile aligned ${matchedPlanDates.size} matched activities instead of ${MIN_MATCHED_ACTIVITY_COUNT}.`,
+  );
+  return activityDateByKey;
+}
+
+function requireFixtureActivityDate(activityDateByKey: ReadonlyMap<string, string>, key: string) {
+  const date = activityDateByKey.get(key);
+  if (!date) throw new Error(`Missing design-profile activity date for ${key}.`);
+  return date;
 }
 
 function buildFixtureSource(spec: FixtureActivitySpec, localDate: string) {
@@ -837,22 +1006,23 @@ function assertParsedFixtureSource(
   assert.equal(summary.session?.subSport ?? null, spec.runningContext ?? "generic");
 }
 
-function expectedFixtureSummary(asOfDate: string) {
+function expectedFixtureSummary(asOfDate: string, activityDateByKey: ReadonlyMap<string, string>) {
   const currentStartDate = addDaysIso(asOfDate, -27);
   const previousEndDate = addDaysIso(currentStartDate, -1);
   const previousStartDate = addDaysIso(previousEndDate, -27);
+  const activityDates = ACTIVITY_SPECS.map((spec) =>
+    requireFixtureActivityDate(activityDateByKey, spec.key),
+  ).sort();
   return {
     history: {
       activityCount: ACTIVITY_SPECS.length,
       pageItemCounts: [20, 10],
       uniqueActivityCount: ACTIVITY_SPECS.length,
-      firstDate: addDaysIso(asOfDate, -55),
-      lastDate: asOfDate,
-      mondayWeekCount: new Set(
-        ACTIVITY_SPECS.map((spec) => startOfWeekIso(addDaysIso(asOfDate, -spec.daysAgo))),
-      ).size,
-      plannedCount: ACTIVITY_SPECS.filter((spec) => spec.planned).length,
-      unplannedCount: ACTIVITY_SPECS.filter((spec) => !spec.planned).length,
+      firstDate: activityDates[0],
+      lastDate: activityDates.at(-1),
+      mondayWeekCount: new Set(activityDates.map((date) => startOfWeekIso(date))).size,
+      plannedCount: MIN_MATCHED_ACTIVITY_COUNT,
+      unplannedCount: ACTIVITY_SPECS.length - MIN_MATCHED_ACTIVITY_COUNT,
       elapsedDurationCount: ACTIVITY_SPECS.filter((spec) => spec.timerDurationMin == null).length,
       missingDistanceCount: ACTIVITY_SPECS.filter((spec) => spec.distanceKm == null).length,
       missingHeartRateCount: ACTIVITY_SPECS.filter((spec) => spec.averageHeartRate == null).length,
@@ -863,14 +1033,18 @@ function expectedFixtureSummary(asOfDate: string) {
       sourceAvailableCount: ACTIVITY_SPECS.filter((spec) => spec.sourceState === "available")
         .length,
     },
-    current28Day: expectedWindowSummary(currentStartDate, asOfDate, asOfDate),
-    previous28Day: expectedWindowSummary(previousStartDate, previousEndDate, asOfDate),
+    current28Day: expectedWindowSummary(currentStartDate, asOfDate, activityDateByKey),
+    previous28Day: expectedWindowSummary(previousStartDate, previousEndDate, activityDateByKey),
   };
 }
 
-function expectedWindowSummary(startDate: string, endDate: string, asOfDate: string) {
+function expectedWindowSummary(
+  startDate: string,
+  endDate: string,
+  activityDateByKey: ReadonlyMap<string, string>,
+) {
   const specs = ACTIVITY_SPECS.filter((spec) => {
-    const date = addDaysIso(asOfDate, -spec.daysAgo);
+    const date = requireFixtureActivityDate(activityDateByKey, spec.key);
     return date >= startDate && date <= endDate;
   });
   const timerSpecs = specs.filter((spec) => spec.timerDurationMin != null);

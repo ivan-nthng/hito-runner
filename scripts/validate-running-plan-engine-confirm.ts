@@ -1,11 +1,4 @@
 import assert from "node:assert/strict";
-import {
-  confirmActivePlanTransitionForUser,
-  reviewActivePlanTransitionForUser,
-  type ActivePlanTransitionDependencies,
-} from "../src/lib/active-plan-transition-actions";
-import { ActivePlanPersistenceRejection } from "../src/lib/active-plan-lifecycle-persistence";
-import { buildActivePlanReplacementCarryForward } from "../src/lib/active-plan-replacement-carry-forward";
 import { buildReviewedFirstPlanImportedSeed } from "../src/lib/active-plan-persistence";
 import {
   AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
@@ -47,11 +40,6 @@ import {
   validateAiAuthoredPrimaryExecutionGuidance,
   validateCanonicalRowsAreNumeric,
 } from "./running-plan-engine-confirm/assertions";
-import {
-  buildManualActivePlanContext,
-  buildPersistedWorkoutFromSeed,
-  type PersistedWorkoutRow,
-} from "./running-plan-engine-confirm/manual-transition-fixtures";
 import {
   readCliOptions as readPersistenceCliOptions,
   resolvePersistencePreflight,
@@ -166,9 +154,6 @@ async function main() {
     throw new Error("Missing non-10K draft for endpoint mutation proof.");
   }
   await validateFailureBoundaries(reviewedDrafts[0], nonTenKDraft);
-  const activeManualTransitionProof = await validateActiveManualPlanTransitionContract(
-    reviewedDrafts[0],
-  );
   const persistencePreflight = resolvePersistencePreflight(persistenceOptions);
 
   if (!persistencePreflight.shouldRun && persistenceOptions.requirePersistence) {
@@ -198,7 +183,6 @@ async function main() {
       nonRestRows: draft.canonicalNonRestRowCount,
       endpointMeters: draft.endpointProof.endpointDistanceMeters,
     })),
-    activeManualTransition: activeManualTransitionProof,
     persistence: persistenceProof,
     availabilityPersistence:
       "persistedDistanceGoals" in persistenceProof
@@ -751,275 +735,6 @@ function stripReviewProof(
   } = draft;
 
   return unreviewedDraft;
-}
-
-async function validateActiveManualPlanTransitionContract(
-  reviewedDraft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
-) {
-  const userId = "transition-dry-run-user";
-  const reviewInput = {
-    activePlanId: "manual-plan-1",
-    candidate: buildConfirmInputFromDraft(reviewedDraft),
-  };
-  const reviewedProfileSnapshot = reviewedDraft.normalizedInputSummary.runnerProfileSnapshot;
-  let context = buildManualActivePlanContext();
-  let currentProfileSnapshot = reviewedProfileSnapshot;
-  let persistedProfileRevision = reviewedProfileSnapshot.profileRevision;
-  let persistAttempts = 0;
-  let persistCalls = 0;
-  let persistedExpectedProfileRevision: number | null = null;
-  let persistedRows: PersistedWorkoutRow[] = [];
-  const dependencies: Partial<ActivePlanTransitionDependencies> = {
-    today: () => "2026-06-08",
-    getPlanContext: async () => context,
-    getRunnerProfileSnapshot: async () => currentProfileSnapshot,
-    loadEvidenceSummary: async () => ({
-      providerEvidenceCount: 1,
-      actualMetricCount: 1,
-      comparisonCount: 1,
-      aiInsightCount: 1,
-      evidenceBackedWorkoutIds: ["manual-workout-past"],
-    }),
-    persistTransition: async (input) => {
-      persistAttempts += 1;
-      persistedExpectedProfileRevision = input.expectedProfileRevision;
-      if (input.expectedProfileRevision !== persistedProfileRevision) {
-        throw new ActivePlanPersistenceRejection(
-          "stale_review",
-          "The runner baseline changed before the plan replacement was committed.",
-        );
-      }
-      persistCalls += 1;
-      const seed = buildImportedPlanSeed(input.reviewedPlan);
-      const carried = await buildActivePlanReplacementCarryForward({
-        userId,
-        importedSeed: seed,
-        existingWorkouts: context.existingWorkouts.workouts,
-        logsByWorkoutId: context.existingWorkouts.logsByWorkoutId,
-        replacementStartsAt: input.replacementStartsAt,
-        evidenceWorkoutIds: new Set(["manual-workout-past"]),
-      });
-      persistedRows = carried.importedSeed.workouts.map((workout, index) =>
-        buildPersistedWorkoutFromSeed(workout, index, "selected-plan-1", userId),
-      );
-
-      return {
-        archivedPlan: {
-          ...input.currentActivePlan,
-          status: "archived",
-        },
-        activePlan: {
-          ...input.currentActivePlan,
-          id: "selected-plan-1",
-          title: input.reviewedPlan.plan_name,
-          source_kind: input.reviewedPlan.source_kind,
-          source_template: input.reviewedPlan.schema_version,
-          schema_version: input.reviewedPlan.schema_version,
-          start_date: input.reviewedPlan.start_date,
-          end_date:
-            input.reviewedPlan.planned_workouts.at(-1)?.date ?? input.reviewedPlan.start_date,
-          status: "active",
-        },
-        workouts: persistedRows,
-      };
-    },
-  };
-
-  const review = await reviewActivePlanTransitionForUser(userId, reviewInput, dependencies);
-  assert.equal(review.ok, true, "Active manual transition review must be available.");
-  if (!review.ok) throw new Error(review.message);
-  assert.equal(review.safety.serverRebuiltCandidate, false);
-  assert.equal(review.metricHonesty.fakePaceAllowed, false);
-  assert.equal(review.metricHonesty.fakePersonalHrAllowed, false);
-
-  const endpointInvalidPlan = buildRunningPlanCanonicalPlan(reviewedDraft);
-  const endpointInvalidDraft = await addRunningPlanReviewProof({
-    ...stripReviewProof(reviewedDraft),
-    canonicalPlan: {
-      ...endpointInvalidPlan,
-      planned_workouts: endpointInvalidPlan.planned_workouts.map((workout) =>
-        workout.source_workout_type === "final_selected_distance_day"
-          ? {
-              ...workout,
-              segments: workout.segments.map((segment) => ({
-                ...segment,
-                prescription: {
-                  mode: "time" as const,
-                  duration_min: 5,
-                },
-              })),
-            }
-          : workout,
-      ),
-    },
-  });
-  const endpointInvalidTransitionReview = await reviewActivePlanTransitionForUser(
-    userId,
-    {
-      ...reviewInput,
-      candidate: buildConfirmInputFromDraft(endpointInvalidDraft),
-    },
-    dependencies,
-  );
-  assert.equal(
-    endpointInvalidTransitionReview.ok,
-    false,
-    "Transition must apply the same endpoint exactness gate as first-plan confirm.",
-  );
-  if (!endpointInvalidTransitionReview.ok) {
-    assert.equal(endpointInvalidTransitionReview.reason, "invalid_review");
-  }
-  assert.equal(persistCalls, 0, "Endpoint-invalid transition candidate must not persist.");
-
-  const invalidTokenConfirm = await confirmActivePlanTransitionForUser(
-    userId,
-    {
-      reviewInput,
-      transitionReviewToken: tamperReviewToken(review.transitionReviewToken),
-      transitionReviewChecksum: review.transitionReviewChecksum,
-    },
-    dependencies,
-  );
-  assert.equal(invalidTokenConfirm.ok, false);
-  if (!invalidTokenConfirm.ok) {
-    assert.equal(invalidTokenConfirm.reason, "invalid_review");
-  }
-  assert.equal(persistCalls, 0, "Invalid transition token must not persist.");
-
-  const staleChecksumConfirm = await confirmActivePlanTransitionForUser(
-    userId,
-    {
-      reviewInput,
-      transitionReviewToken: review.transitionReviewToken,
-      transitionReviewChecksum: tamperReviewToken(review.transitionReviewChecksum),
-    },
-    dependencies,
-  );
-  assert.equal(staleChecksumConfirm.ok, false);
-  if (!staleChecksumConfirm.ok) {
-    assert.equal(staleChecksumConfirm.reason, "stale_review");
-  }
-  assert.equal(persistCalls, 0, "Stale transition checksum must not persist.");
-
-  context = buildManualActivePlanContext({
-    plan: { updated_at: "2026-06-07T10:01:00Z" },
-  });
-  const staleActivePlanConfirm = await confirmActivePlanTransitionForUser(
-    userId,
-    {
-      reviewInput,
-      transitionReviewToken: review.transitionReviewToken,
-      transitionReviewChecksum: review.transitionReviewChecksum,
-    },
-    dependencies,
-  );
-  assert.equal(staleActivePlanConfirm.ok, false);
-  if (!staleActivePlanConfirm.ok) {
-    assert.equal(staleActivePlanConfirm.reason, "stale_review");
-  }
-  assert.equal(persistCalls, 0, "Changed active-plan revision must not persist.");
-
-  context = buildManualActivePlanContext();
-  currentProfileSnapshot = {
-    ...reviewedProfileSnapshot,
-    profileRevision: reviewedProfileSnapshot.profileRevision + 1,
-  };
-  const staleProfileConfirm = await confirmActivePlanTransitionForUser(
-    userId,
-    {
-      reviewInput,
-      transitionReviewToken: review.transitionReviewToken,
-      transitionReviewChecksum: review.transitionReviewChecksum,
-    },
-    dependencies,
-  );
-  assert.equal(staleProfileConfirm.ok, false);
-  if (!staleProfileConfirm.ok) {
-    assert.equal(staleProfileConfirm.reason, "stale_review");
-  }
-  assert.equal(persistAttempts, 0, "Changed runner profile revision must fail before persistence.");
-
-  currentProfileSnapshot = {
-    ...reviewedProfileSnapshot,
-    heartRateProfile: {
-      ...reviewedProfileSnapshot.heartRateProfile,
-      zones: reviewedProfileSnapshot.heartRateProfile.zones.map((zone, index) =>
-        index === 0 ? { ...zone, minBpm: zone.minBpm + 1 } : zone,
-      ),
-    },
-  };
-  const staleHeartRateConfirm = await confirmActivePlanTransitionForUser(
-    userId,
-    {
-      reviewInput,
-      transitionReviewToken: review.transitionReviewToken,
-      transitionReviewChecksum: review.transitionReviewChecksum,
-    },
-    dependencies,
-  );
-  assert.equal(staleHeartRateConfirm.ok, false);
-  if (!staleHeartRateConfirm.ok) {
-    assert.equal(staleHeartRateConfirm.reason, "stale_review");
-  }
-  assert.equal(persistAttempts, 0, "Changed accepted HR snapshot must fail before persistence.");
-
-  currentProfileSnapshot = reviewedProfileSnapshot;
-  persistedProfileRevision = reviewedProfileSnapshot.profileRevision + 1;
-  const profileRaceConfirm = await confirmActivePlanTransitionForUser(
-    userId,
-    {
-      reviewInput,
-      transitionReviewToken: review.transitionReviewToken,
-      transitionReviewChecksum: review.transitionReviewChecksum,
-    },
-    dependencies,
-  );
-  assert.equal(profileRaceConfirm.ok, false);
-  if (!profileRaceConfirm.ok) {
-    assert.equal(profileRaceConfirm.reason, "stale_review");
-  }
-  assert.equal(persistAttempts, 1, "Atomic profile race proof must reach persistence once.");
-  assert.equal(persistCalls, 0, "Atomic profile revision mismatch must not commit replacement.");
-
-  persistedProfileRevision = reviewedProfileSnapshot.profileRevision;
-  const confirm = await confirmActivePlanTransitionForUser(
-    userId,
-    {
-      reviewInput,
-      transitionReviewToken: review.transitionReviewToken,
-      transitionReviewChecksum: review.transitionReviewChecksum,
-    },
-    dependencies,
-  );
-  assert.equal(confirm.ok, true, "Active manual transition confirm must persist through deps.");
-  if (!confirm.ok) throw new Error(confirm.message);
-  assert.equal(confirm.safety.serverRebuiltCandidate, false);
-  assert.equal(confirm.safety.upcomingManualWorkoutsMerged, false);
-  assert.equal(persistAttempts, 2);
-  assert.equal(persistCalls, 1);
-  assert.equal(persistedExpectedProfileRevision, reviewedProfileSnapshot.profileRevision);
-  assert.ok(persistedRows.length > 0);
-
-  const carriedPastManual = persistedRows.find(
-    (workout) => workout.source_workout_id === "manual-workout-past",
-  );
-  assert.equal(carriedPastManual?.source_workout_type, "manual_workout");
-  assert.doesNotMatch(
-    JSON.stringify(persistedRows),
-    /pace_min_per_km_range|pace_range_min_km|pace_seconds_per_km/i,
-    "The manual transition fixture must not invent numeric pace fields.",
-  );
-
-  return {
-    reviewed: true,
-    confirmed: true,
-    oldPlanArchived: confirm.safety.oldPlanArchived,
-    serverRebuiltCandidate: false,
-    staleProfileRejected: true,
-    staleHeartRateRejected: true,
-    atomicProfileRaceRejected: true,
-    carriedRows: persistedRows.length,
-  };
 }
 
 function buildConfirmInputFromDraft(

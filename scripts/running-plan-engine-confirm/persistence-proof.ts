@@ -11,11 +11,25 @@ import type {
   RunningPlanPreviewDraft,
   RunningPlanReviewedPreviewDraft,
 } from "../../src/lib/running-plan-engine-review";
-import { buildRunningPlanCanonicalPlan } from "../../src/lib/running-plan-engine-review";
 import {
-  ActivePlanPersistenceRejection,
+  buildRunningPlanCanonicalPlan,
+  buildRunningPlanPersistenceMetadata,
+} from "../../src/lib/running-plan-engine-review";
+import {
+  CalendarPersistenceRejection,
   applyAtomicReviewedPlanPersistence,
 } from "../../src/lib/active-plan-lifecycle-persistence";
+import {
+  applySavedPlanRecordForUser,
+  getSavedPlanRecordForUser,
+  listSavedPlanLibraryForUser,
+  logicallyRemoveSavedPlanRecordForUser,
+  retainReviewedGeneratedPlanCandidateForUser,
+} from "../../src/lib/active-plan-persistence";
+import {
+  exportSavedPlanForUser,
+  savedPlanStartInputSchema,
+} from "../../src/lib/active-plan-export-actions";
 import {
   AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV,
   AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
@@ -25,8 +39,10 @@ import {
 } from "../../src/lib/ai-generated-running-plan-dev-fixture";
 import { AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID } from "../../src/lib/ai-generated-running-plan-dev-fixture";
 import { buildAiGeneratedRunningPlanAuthoringInput } from "../../src/lib/ai-generated-running-plan";
-import { buildImportedPlanSeed } from "../../src/lib/imported-plan";
+import { buildImportedPlanSeed, type TrainingPlanV2 } from "../../src/lib/imported-plan";
+import { prepareSavedPlanFutureApplyPolicy } from "../../src/lib/plan-apply-policy";
 import { DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE } from "../../src/lib/local-auth-account-registry.server";
+import { getRunnerCalendarDateForUserId } from "../../src/lib/runner-calendar-context";
 import {
   buildAiAuthoredPlanFirstProviderContext,
   type AiAuthoredPlanFirstCompilerDraft,
@@ -38,6 +54,7 @@ import {
 } from "../../src/lib/plan-export";
 import { createAdminSupabaseClient } from "../../src/lib/supabase/server";
 import { getPersistedSnapshot } from "../../src/lib/training-api";
+import { addDaysIso, startOfWeekIso, weekdayLong } from "../../src/lib/training";
 import type { Database, Json } from "../../src/lib/supabase/database";
 import {
   buildFirstTimeRunnerBaselineReadback,
@@ -225,7 +242,7 @@ export async function validatePersistenceContract(
       );
       assert.equal(duplicate.ok, false);
       if (!duplicate.ok) {
-        assert.equal(duplicate.reason, "active_plan_exists");
+        assert.equal(duplicate.reason, "replacement_required");
       }
 
       distanceGoalProof = {
@@ -262,6 +279,11 @@ export async function validatePersistenceContract(
     previewInput: reviewedDrafts[0]!.previewInput,
     buildConfirmInputForConfirm,
   });
+  const savedPlanLibrary = await validateSavedPlanLibraryPersistence({
+    supabase,
+    preflight,
+    reviewedDrafts: [reviewedDrafts[0]!, reviewedDrafts[2]!],
+  });
 
   return {
     mode: preflight.mode,
@@ -270,7 +292,778 @@ export async function validatePersistenceContract(
     creationFailureAtomic,
     qaFixtureRuntime,
     personalHeartRateProfile,
+    savedPlanLibrary,
   };
+}
+
+async function validateSavedPlanLibraryPersistence(input: {
+  supabase: ReturnType<typeof createAdminSupabaseClient>;
+  preflight: Extract<PersistencePreflight, { shouldRun: true }>;
+  reviewedDrafts: [
+    RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
+    RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
+  ];
+}) {
+  const owner = await acquireQaPoolSupabaseUser({
+    supabase: input.supabase,
+    poolRole: "provider-engine",
+    password: DISPOSABLE_TEST_PASSWORD,
+    creationErrorMessage: "Saved-plan library owner creation failed.",
+  });
+  let otherRunner: QaPoolUserLease | null = null;
+
+  try {
+    otherRunner = await acquireQaPoolSupabaseUser({
+      supabase: input.supabase,
+      poolRole: "isolation-a",
+      password: DISPOSABLE_TEST_PASSWORD,
+      creationErrorMessage: "Saved-plan library RLS runner creation failed.",
+    });
+    await persistReviewedDraftProfileSnapshot(owner.userId, input.reviewedDrafts[0]);
+
+    const savedRecords = [];
+    for (const draft of input.reviewedDrafts) {
+      savedRecords.push(
+        await retainReviewedGeneratedPlanCandidateForUser({
+          userId: owner.userId,
+          canonicalPlan: draft.canonicalPlan,
+          reviewChecksum: draft.reviewChecksum,
+          planMetadata: buildRunningPlanPersistenceMetadata({
+            draft,
+            canonicalPlan: draft.canonicalPlan,
+            reviewChecksum: draft.reviewChecksum,
+          }),
+        }),
+      );
+    }
+
+    assert.notEqual(savedRecords[0]!.id, savedRecords[1]!.id);
+    const unappliedWorkoutCount = await input.supabase
+      .from("planned_workouts")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", owner.userId);
+    assert.equal(unappliedWorkoutCount.error, null);
+    assert.equal(unappliedWorkoutCount.count, 0);
+
+    const availableByCreated = await listSavedPlanLibraryForUser(owner.userId);
+    assert.equal(availableByCreated.length, 2);
+    assert.ok(
+      availableByCreated[0]!.createdAt >= availableByCreated[1]!.createdAt,
+      "Default saved-plan ordering must be newest first.",
+    );
+    const byTitle = await listSavedPlanLibraryForUser(owner.userId, {
+      recordState: "all",
+      sort: "title",
+      direction: "asc",
+    });
+    assert.deepEqual(
+      byTitle.map((record) => record.title),
+      byTitle
+        .map((record) => record.title)
+        .slice()
+        .sort((a, b) => a.localeCompare(b)),
+    );
+    const searched = await listSavedPlanLibraryForUser(owner.userId, {
+      search: savedRecords[0]!.goal_summary,
+      recordState: "all",
+    });
+    assert.ok(searched.some((record) => record.id === savedRecords[0]!.id));
+    assert.equal(
+      (
+        await listSavedPlanLibraryForUser(owner.userId, {
+          recordState: "all",
+          sourceKind: "not_a_saved_plan_source",
+        })
+      ).length,
+      0,
+    );
+
+    const exported = await exportSavedPlanForUser(owner.userId, savedRecords[0]!.id, "json");
+    const exportedPlan = JSON.parse(exported.body) as {
+      plan_name: string;
+      planned_workouts: unknown[];
+    };
+    assert.equal(exportedPlan.plan_name, savedRecords[0]!.title);
+    assert.equal(
+      exportedPlan.planned_workouts.length,
+      input.reviewedDrafts[0].canonicalPlan.planned_workouts.length,
+    );
+    await assert.rejects(
+      exportSavedPlanForUser(otherRunner.userId, savedRecords[0]!.id, "json"),
+      /selected saved plan was not found/i,
+    );
+
+    const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    assert.ok(publishableKey, "Saved-plan library RLS proof requires a publishable key.");
+    const ownerClient = createClient<Database>(input.preflight.target.url, publishableKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const otherClient = createClient<Database>(input.preflight.target.url, publishableKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    assert.equal(
+      (
+        await ownerClient.auth.signInWithPassword({
+          email: owner.email,
+          password: DISPOSABLE_TEST_PASSWORD,
+        })
+      ).error,
+      null,
+    );
+    assert.equal(
+      (
+        await otherClient.auth.signInWithPassword({
+          email: otherRunner.email,
+          password: DISPOSABLE_TEST_PASSWORD,
+        })
+      ).error,
+      null,
+    );
+    const ownerLibraryRows = await ownerClient
+      .from("plan_cycles")
+      .select("id")
+      .not("saved_plan_payload", "is", null);
+    assert.equal(ownerLibraryRows.error, null);
+    assert.equal(ownerLibraryRows.data.length, 2);
+    const foreignLibraryRows = await otherClient
+      .from("plan_cycles")
+      .select("id")
+      .in(
+        "id",
+        savedRecords.map((record) => record.id),
+      );
+    assert.equal(foreignLibraryRows.error, null);
+    assert.equal(foreignLibraryRows.data.length, 0);
+    const directSavedPlanInsert = {
+      id: crypto.randomUUID(),
+      user_id: owner.userId,
+      status: "archived" as const,
+      title: savedRecords[0]!.title,
+      goal_summary: savedRecords[0]!.goal_summary,
+      source_template: savedRecords[0]!.source_template,
+      schema_version: savedRecords[0]!.schema_version,
+      source_kind: savedRecords[0]!.source_kind,
+      start_date: savedRecords[0]!.start_date,
+      end_date: savedRecords[0]!.end_date,
+      target_date: savedRecords[0]!.target_date,
+      goal_metadata: savedRecords[0]!.goal_metadata,
+      plan_preferences: savedRecords[0]!.plan_preferences,
+      saved_plan_payload: savedRecords[0]!.saved_plan_payload,
+      saved_plan_review_checksum: "1".repeat(64),
+      library_removed_at: null,
+    };
+    const directAuthenticatedSavedInsert = await ownerClient
+      .from("plan_cycles")
+      .insert(directSavedPlanInsert);
+    assert.notEqual(directAuthenticatedSavedInsert.error, null);
+    const activeSavedInsert = await input.supabase.from("plan_cycles").insert({
+      ...directSavedPlanInsert,
+      id: crypto.randomUUID(),
+      status: "active",
+      saved_plan_review_checksum: "2".repeat(64),
+    });
+    assert.notEqual(activeSavedInsert.error, null);
+
+    const validStartIntent = savedPlanStartInputSchema.safeParse({
+      savedPlanId: savedRecords[0]!.id,
+      intent: "replace_future_workouts",
+      requestedStartDate: "2026-08-13",
+      fixedRestDays: ["Monday", "Wednesday"],
+      preferredLongRunDay: "Sunday",
+    });
+    assert.equal(validStartIntent.success, true);
+    assert.equal(
+      savedPlanStartInputSchema.safeParse({
+        savedPlanId: savedRecords[0]!.id,
+        intent: "replace_future_workouts",
+        requestedStartDate: "2026-02-30",
+      }).success,
+      false,
+    );
+    assert.equal(
+      savedPlanStartInputSchema.safeParse({
+        savedPlanId: savedRecords[0]!.id,
+        intent: "replace_future_workouts",
+        fixedRestDays: ["Monday", "Monday"],
+      }).success,
+      false,
+    );
+    assert.equal(
+      savedPlanStartInputSchema.safeParse({
+        savedPlanId: savedRecords[0]!.id,
+        intent: "replace_future_workouts",
+        fixedRestDays: ["Sunday"],
+        preferredLongRunDay: "Sunday",
+      }).success,
+      false,
+    );
+
+    const fiveDayPlan = buildFiveDaySavedPlanFixture(input.reviewedDrafts[0].canonicalPlan);
+    assert.deepEqual([...countTrainingPlanNonRestByWeek(fiveDayPlan).values()], Array(8).fill(5));
+    const fiveDayAligned = prepareSavedPlanFutureApplyPolicy(
+      fiveDayPlan,
+      "2026-06-08",
+      {
+        blocked_days: ["Wednesday", "Saturday"],
+        preferred_long_run_day: "Sunday",
+        max_running_days_per_week: 5,
+      },
+      {
+        fixedRestDays: ["Monday", "Wednesday"],
+        preferredLongRunDay: "Sunday",
+      },
+    );
+    assert.equal(fiveDayAligned.resolvedStartDate, "2026-06-09");
+    const alignedFiveDayCounts = countImportedSeedNonRestByWeek(fiveDayAligned.importedSeed);
+    assert.equal(alignedFiveDayCounts.values().next().value, 4);
+    assert.deepEqual([...alignedFiveDayCounts.values()].slice(1), Array(7).fill(5));
+    assert.equal(
+      fiveDayAligned.importedSeed.workouts.some(
+        (workout) =>
+          workout.workoutType !== "rest" &&
+          ["Monday", "Wednesday"].includes(weekdayLong(workout.workoutDate)),
+      ),
+      false,
+    );
+    assert.equal(
+      fiveDayAligned.importedSeed.workouts.every(
+        (workout) =>
+          workout.workoutType !== "long_run" || weekdayLong(workout.workoutDate) === "Sunday",
+      ),
+      true,
+    );
+    const fiveDaySourceOrder = fiveDayPlan.planned_workouts
+      .filter((workout) => workout.workout_type !== "rest")
+      .map((workout) => workout.workout_id);
+    const fiveDayProjectedOrder = fiveDayAligned.importedSeed.workouts
+      .filter((workout) => workout.workoutType !== "rest")
+      .map((workout) => workout.sourceWorkoutId);
+    assert.deepEqual(
+      fiveDayProjectedOrder,
+      fiveDaySourceOrder.slice(fiveDaySourceOrder.indexOf(fiveDayProjectedOrder[0]!)),
+    );
+    const explicitStartAlignment = prepareSavedPlanFutureApplyPolicy(
+      fiveDayPlan,
+      "2026-06-08",
+      {
+        blocked_days: ["Wednesday", "Saturday"],
+        preferred_long_run_day: "Sunday",
+        max_running_days_per_week: 5,
+      },
+      {
+        requestedStartDate: "2026-06-11",
+        fixedRestDays: ["Monday", "Wednesday"],
+        preferredLongRunDay: "Sunday",
+      },
+    );
+    assert.equal(explicitStartAlignment.resolvedStartDate, "2026-06-11");
+    assert.ok(explicitStartAlignment.omittedLeadingDayCount > 0);
+    assert.ok(
+      explicitStartAlignment.importedSeed.workouts.every(
+        (workout) => workout.workoutDate >= "2026-06-11",
+      ),
+    );
+    assert.throws(
+      () =>
+        prepareSavedPlanFutureApplyPolicy(fiveDayPlan, "2026-06-08", {
+          blocked_days: ["Wednesday", "Saturday"],
+          preferred_long_run_day: "Sunday",
+          max_running_days_per_week: 4,
+        }),
+      /more than 4 running days/i,
+    );
+    assert.throws(
+      () =>
+        prepareSavedPlanFutureApplyPolicy(
+          fiveDayPlan,
+          "2026-06-08",
+          {
+            blocked_days: ["Wednesday", "Saturday"],
+            preferred_long_run_day: "Sunday",
+            max_running_days_per_week: 5,
+          },
+          {
+            fixedRestDays: ["Monday", "Tuesday", "Wednesday"],
+            preferredLongRunDay: "Sunday",
+          },
+        ),
+      /only 4 compatible weekdays/i,
+    );
+
+    const deterministicLeadingOmission = prepareSavedPlanFutureApplyPolicy(
+      input.reviewedDrafts[0].canonicalPlan,
+      "2026-08-12",
+      null,
+    );
+    assert.ok(deterministicLeadingOmission.omittedLeadingDayCount > 0);
+    assert.equal(deterministicLeadingOmission.resolvedStartDate, "2026-08-13");
+    assert.ok(deterministicLeadingOmission.appliedStartDate >= "2026-08-12");
+    const deterministicProjectedWorkouts =
+      deterministicLeadingOmission.importedSeed.workouts.filter(
+        (workout) => workout.workoutType !== "rest",
+      );
+    const deterministicSourceOrder = input.reviewedDrafts[0].canonicalPlan.planned_workouts
+      .filter((workout) => workout.workout_type !== "rest")
+      .map((workout) => workout.workout_id);
+    assert.deepEqual(
+      deterministicProjectedWorkouts.map((workout) => workout.sourceWorkoutId),
+      deterministicSourceOrder.slice(
+        deterministicSourceOrder.indexOf(deterministicProjectedWorkouts[0]!.sourceWorkoutId),
+      ),
+    );
+    assert.equal(
+      deterministicProjectedWorkouts.some((workout) =>
+        ["Wednesday", "Saturday"].includes(weekdayLong(workout.workoutDate)),
+      ),
+      false,
+    );
+    assert.equal(
+      deterministicProjectedWorkouts.every(
+        (workout) =>
+          workout.workoutType !== "long_run" || weekdayLong(workout.workoutDate) === "Sunday",
+      ),
+      true,
+    );
+
+    const firstRecordBeforeApply = await getSavedPlanRecordForUser(
+      owner.userId,
+      savedRecords[0]!.id,
+    );
+    const profilePreferencesBeforeApply = await input.supabase
+      .from("runner_profiles")
+      .select("training_preferences")
+      .eq("user_id", owner.userId)
+      .single();
+    assert.equal(profilePreferencesBeforeApply.error, null);
+    const runnerCurrentDate = await getRunnerCalendarDateForUserId(owner.userId);
+    const requestedStartDate = nextDateForWeekday(runnerCurrentDate, "Tuesday");
+    const calendarBeforeImpossibleStart = await input.supabase
+      .from("planned_workouts")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", owner.userId);
+    assert.equal(calendarBeforeImpossibleStart.error, null);
+    await assert.rejects(
+      applySavedPlanRecordForUser(owner.userId, savedRecords[0]!.id, "apply_if_future_empty", {
+        fixedRestDays: ["Monday", "Tuesday", "Wednesday", "Thursday"],
+        preferredLongRunDay: "Sunday",
+      }),
+      /only 3 compatible weekdays/i,
+    );
+    const calendarAfterImpossibleStart = await input.supabase
+      .from("planned_workouts")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", owner.userId);
+    assert.deepEqual(calendarAfterImpossibleStart, calendarBeforeImpossibleStart);
+    const emptyFutureApply = await applySavedPlanRecordForUser(
+      owner.userId,
+      savedRecords[0]!.id,
+      "apply_if_future_empty",
+      {
+        requestedStartDate,
+        fixedRestDays: ["Monday", "Wednesday"],
+        preferredLongRunDay: "Sunday",
+      },
+    );
+    assert.equal(emptyFutureApply.ok, true);
+    if (!emptyFutureApply.ok) {
+      throw new Error("Empty-future saved-plan apply unexpectedly required replacement.");
+    }
+    assert.equal(emptyFutureApply.callsOpenAi, false);
+    assert.equal(emptyFutureApply.resolvedStartDate, requestedStartDate);
+    const profilePreferencesAfterApply = await input.supabase
+      .from("runner_profiles")
+      .select("training_preferences")
+      .eq("user_id", owner.userId)
+      .single();
+    assert.deepEqual(profilePreferencesAfterApply, profilePreferencesBeforeApply);
+    const activeAfterEmptyApply = await input.supabase
+      .from("plan_cycles")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", owner.userId)
+      .eq("status", "active");
+    assert.equal(activeAfterEmptyApply.error, null);
+    assert.equal(activeAfterEmptyApply.count, 0);
+    const emptyApplyRows = await input.supabase
+      .from("planned_workouts")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", owner.userId)
+      .eq("plan_cycle_id", emptyFutureApply.materializedPlanId);
+    assert.equal(emptyApplyRows.error, null);
+    assert.equal(emptyApplyRows.count, emptyFutureApply.calendarRowCount);
+    const alignedCalendarRows = await input.supabase
+      .from("planned_workouts")
+      .select("workout_date, workout_type, source_workout_id")
+      .eq("user_id", owner.userId)
+      .eq("plan_cycle_id", emptyFutureApply.materializedPlanId)
+      .order("workout_date")
+      .order("display_order");
+    assert.equal(alignedCalendarRows.error, null);
+    assert.equal(
+      alignedCalendarRows.data.some(
+        (workout) =>
+          workout.workout_type !== "rest" &&
+          ["Monday", "Wednesday"].includes(weekdayLong(workout.workout_date)),
+      ),
+      false,
+    );
+    assert.equal(
+      alignedCalendarRows.data.every(
+        (workout) =>
+          workout.workout_type !== "long_run" || weekdayLong(workout.workout_date) === "Sunday",
+      ),
+      true,
+    );
+    const materializedPlanPreferences = await input.supabase
+      .from("plan_cycles")
+      .select("plan_preferences")
+      .eq("id", emptyFutureApply.materializedPlanId)
+      .single();
+    assert.equal(materializedPlanPreferences.error, null);
+    assert.deepEqual(
+      (materializedPlanPreferences.data.plan_preferences as Record<string, Json>).blocked_days,
+      ["Monday", "Wednesday"],
+    );
+    assert.equal(
+      (materializedPlanPreferences.data.plan_preferences as Record<string, Json>)
+        .preferred_long_run_day,
+      "Sunday",
+    );
+    const directAuthenticatedConversion = await ownerClient
+      .from("plan_cycles")
+      .update({
+        saved_plan_payload: savedRecords[0]!.saved_plan_payload,
+        saved_plan_review_checksum: "3".repeat(64),
+      })
+      .eq("id", emptyFutureApply.materializedPlanId);
+    assert.notEqual(directAuthenticatedConversion.error, null);
+    const serviceRoleConversion = await input.supabase
+      .from("plan_cycles")
+      .update({
+        saved_plan_payload: savedRecords[0]!.saved_plan_payload,
+        saved_plan_review_checksum: "4".repeat(64),
+      })
+      .eq("id", emptyFutureApply.materializedPlanId);
+    assert.notEqual(serviceRoleConversion.error, null);
+    assert.deepEqual(
+      await getSavedPlanRecordForUser(owner.userId, savedRecords[0]!.id),
+      firstRecordBeforeApply,
+    );
+
+    const futureBeforeRemoval = await input.supabase
+      .from("planned_workouts")
+      .select("id")
+      .eq("user_id", owner.userId)
+      .gte("workout_date", emptyFutureApply.currentDate)
+      .order("id");
+    assert.equal(futureBeforeRemoval.error, null);
+    const removed = await logicallyRemoveSavedPlanRecordForUser(owner.userId, savedRecords[0]!.id);
+    assert.equal(removed.recordState, "removed");
+    const futureAfterRemoval = await input.supabase
+      .from("planned_workouts")
+      .select("id")
+      .eq("user_id", owner.userId)
+      .gte("workout_date", emptyFutureApply.currentDate)
+      .order("id");
+    assert.deepEqual(futureAfterRemoval.data, futureBeforeRemoval.data);
+    assert.equal((await listSavedPlanLibraryForUser(owner.userId)).length, 1);
+    assert.equal(
+      (
+        await listSavedPlanLibraryForUser(owner.userId, {
+          recordState: "removed",
+        })
+      )[0]?.id,
+      savedRecords[0]!.id,
+    );
+    const immutableTitleAttempt = await ownerClient
+      .from("plan_cycles")
+      .update({ title: "Mutated saved plan" })
+      .eq("id", savedRecords[0]!.id);
+    assert.notEqual(immutableTitleAttempt.error, null);
+    const immutableIdAttempt = await input.supabase
+      .from("plan_cycles")
+      .update({ id: crypto.randomUUID() })
+      .eq("id", savedRecords[0]!.id);
+    assert.notEqual(immutableIdAttempt.error, null);
+
+    const materializedWorkout = await input.supabase
+      .from("planned_workouts")
+      .select("*")
+      .eq("user_id", owner.userId)
+      .eq("plan_cycle_id", emptyFutureApply.materializedPlanId)
+      .order("workout_date")
+      .limit(1)
+      .single();
+    assert.equal(materializedWorkout.error, null);
+    assert.ok(materializedWorkout.data);
+    const protectedWorkoutId = crypto.randomUUID();
+    const protectedLogId = crypto.randomUUID();
+    const protectedAssetId = crypto.randomUUID();
+    const protectedDate = addDaysIso(emptyFutureApply.currentDate, -1);
+    const protectedInsert = await input.supabase.from("planned_workouts").insert({
+      ...materializedWorkout.data!,
+      id: protectedWorkoutId,
+      workout_date: protectedDate,
+      weekday: weekdayLong(protectedDate),
+      source_workout_id: `protected-${protectedWorkoutId}`,
+      display_order: materializedWorkout.data!.display_order + 10_000,
+      created_at: new Date().toISOString(),
+    });
+    assert.equal(protectedInsert.error, null);
+    const protectedLog = await input.supabase.from("workout_logs").insert({
+      id: protectedLogId,
+      user_id: owner.userId,
+      planned_workout_id: protectedWorkoutId,
+      outcome: "completed",
+      notes: "Protected saved-plan apply proof",
+    });
+    assert.equal(protectedLog.error, null);
+    const protectedAsset = await input.supabase.from("workout_result_assets").insert({
+      id: protectedAssetId,
+      user_id: owner.userId,
+      planned_workout_id: protectedWorkoutId,
+      workout_log_id: protectedLogId,
+      asset_kind: "garmin_fit",
+      storage_bucket: "workout-result-assets",
+      storage_path: `local-proof/${protectedAssetId}.fit`,
+      original_file_name: "protected.fit",
+      mime_type: "application/octet-stream",
+      file_size_bytes: 128,
+      parse_status: "parsed",
+      primary_file_kind: "fit",
+      primary_file_name: "protected.fit",
+    });
+    assert.equal(protectedAsset.error, null);
+
+    const futureIdsBeforeDecline = await input.supabase
+      .from("planned_workouts")
+      .select("id")
+      .eq("user_id", owner.userId)
+      .gte("workout_date", emptyFutureApply.currentDate)
+      .order("id");
+    const declined = await applySavedPlanRecordForUser(
+      owner.userId,
+      savedRecords[1]!.id,
+      "keep_future_workouts",
+    );
+    assert.equal(declined.ok, false);
+    assert.equal(declined.status, "not_applied");
+    const replacementRequired = await applySavedPlanRecordForUser(
+      owner.userId,
+      savedRecords[1]!.id,
+      "apply_if_future_empty",
+    );
+    assert.equal(replacementRequired.ok, false);
+    assert.equal(replacementRequired.status, "replacement_required");
+    const futureIdsAfterDecline = await input.supabase
+      .from("planned_workouts")
+      .select("id")
+      .eq("user_id", owner.userId)
+      .gte("workout_date", emptyFutureApply.currentDate)
+      .order("id");
+    assert.deepEqual(futureIdsAfterDecline.data, futureIdsBeforeDecline.data);
+
+    const secondRecordBeforeApply = await getSavedPlanRecordForUser(
+      owner.userId,
+      savedRecords[1]!.id,
+    );
+    const replaced = await applySavedPlanRecordForUser(
+      owner.userId,
+      savedRecords[1]!.id,
+      "replace_future_workouts",
+    );
+    assert.equal(replaced.ok, true);
+    if (!replaced.ok) {
+      throw new Error("Explicit future replacement did not apply the selected saved plan.");
+    }
+    assert.ok(replaced.replacedFutureWorkoutCount > 0);
+    const activeAfterReplacement = await input.supabase
+      .from("plan_cycles")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", owner.userId)
+      .eq("status", "active");
+    assert.equal(activeAfterReplacement.error, null);
+    assert.equal(activeAfterReplacement.count, 0);
+    const replacementRows = await input.supabase
+      .from("planned_workouts")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", owner.userId)
+      .eq("plan_cycle_id", replaced.materializedPlanId);
+    assert.equal(replacementRows.error, null);
+    assert.equal(replacementRows.count, replaced.calendarRowCount);
+    assert.deepEqual(
+      await getSavedPlanRecordForUser(owner.userId, savedRecords[1]!.id),
+      secondRecordBeforeApply,
+    );
+    const [protectedWorkoutAfter, protectedLogAfter, protectedAssetAfter] = await Promise.all([
+      input.supabase.from("planned_workouts").select("*").eq("id", protectedWorkoutId).single(),
+      input.supabase.from("workout_logs").select("*").eq("id", protectedLogId).single(),
+      input.supabase.from("workout_result_assets").select("*").eq("id", protectedAssetId).single(),
+    ]);
+    assert.equal(protectedWorkoutAfter.error, null);
+    assert.equal(protectedLogAfter.error, null);
+    assert.equal(protectedAssetAfter.error, null);
+    assert.equal(protectedLogAfter.data.planned_workout_id, protectedWorkoutId);
+    assert.equal(protectedAssetAfter.data.planned_workout_id, protectedWorkoutId);
+    assert.equal(protectedAssetAfter.data.workout_log_id, protectedLogId);
+
+    const futureProtectedWorkout = await input.supabase
+      .from("planned_workouts")
+      .select("id")
+      .eq("user_id", owner.userId)
+      .gte("workout_date", replaced.currentDate)
+      .order("workout_date")
+      .limit(1)
+      .single();
+    assert.equal(futureProtectedWorkout.error, null);
+    assert.ok(futureProtectedWorkout.data);
+    const futureProtectedLogId = crypto.randomUUID();
+    const futureProtectedLog = await input.supabase.from("workout_logs").insert({
+      id: futureProtectedLogId,
+      user_id: owner.userId,
+      planned_workout_id: futureProtectedWorkout.data!.id,
+      outcome: "completed",
+      notes: "Protected future saved-plan apply proof",
+    });
+    assert.equal(futureProtectedLog.error, null);
+    const protectedFutureBefore = await Promise.all([
+      input.supabase
+        .from("planned_workouts")
+        .select("id, plan_cycle_id, workout_date")
+        .eq("user_id", owner.userId)
+        .order("id"),
+      input.supabase
+        .from("workout_logs")
+        .select("id, planned_workout_id")
+        .eq("user_id", owner.userId)
+        .order("id"),
+    ]);
+    await assert.rejects(
+      applySavedPlanRecordForUser(owner.userId, savedRecords[1]!.id, "replace_future_workouts"),
+      (error: unknown) =>
+        error instanceof CalendarPersistenceRejection &&
+        error.reason === "protected_future_schedule",
+    );
+    const protectedFutureAfter = await Promise.all([
+      input.supabase
+        .from("planned_workouts")
+        .select("id, plan_cycle_id, workout_date")
+        .eq("user_id", owner.userId)
+        .order("id"),
+      input.supabase
+        .from("workout_logs")
+        .select("id, planned_workout_id")
+        .eq("user_id", owner.userId)
+        .order("id"),
+    ]);
+    assert.deepEqual(protectedFutureAfter, protectedFutureBefore);
+
+    return {
+      retainedBeforeApply: 2,
+      unappliedCalendarRows: unappliedWorkoutCount.count,
+      logicalRemovalPreservedCalendar: true,
+      selectedExportIsolated: true,
+      rlsIsolation: true,
+      directSavedRecordWritesRejected: true,
+      savedRecordIdentityImmutable: true,
+      startInputStrictlyValidated: true,
+      fiveDayWeeklyCountPreserved: true,
+      oneTimeSchedulePreferencesPersistedToSettings: false,
+      scheduleAlignedRestAndLongRunDays: true,
+      impossibleScheduleWasNoOp: true,
+      emptyFutureApplied: true,
+      declineWasNoOp: true,
+      explicitFutureReplacement: true,
+      materializedProvenanceNonActive: true,
+      protectedFutureReplacementRejected: true,
+      leadingDaysOmitted: deterministicLeadingOmission.omittedLeadingDayCount,
+      protectedHistoryPreserved: true,
+      callsOpenAi: false,
+    };
+  } finally {
+    if (otherRunner) {
+      await cleanupDisposableUser(input.supabase, otherRunner);
+    }
+    await cleanupDisposableUser(input.supabase, owner);
+  }
+}
+
+function buildFiveDaySavedPlanFixture(canonicalPlan: TrainingPlanV2): TrainingPlanV2 {
+  const plan = structuredClone(canonicalPlan);
+  const workoutsByWeek = new Map<number, TrainingPlanV2["planned_workouts"]>();
+
+  for (const workout of plan.planned_workouts) {
+    const workouts = workoutsByWeek.get(workout.week_number) ?? [];
+    workouts.push(workout);
+    workoutsByWeek.set(workout.week_number, workouts);
+  }
+
+  for (const [weekNumber, workouts] of workoutsByWeek) {
+    const currentCount = workouts.filter((workout) => workout.workout_type !== "rest").length;
+    assert.equal(
+      currentCount,
+      4,
+      `Five-day proof fixture expected four source runs in week ${weekNumber}.`,
+    );
+    const sourceWorkout =
+      workouts.find((workout) => workout.workout_type === "easy") ??
+      workouts.find((workout) => workout.workout_type !== "rest");
+    const restWorkout = workouts.find(
+      (workout) => workout.workout_type === "rest" && workout.weekday !== "Sunday",
+    );
+
+    assert.ok(sourceWorkout, `Five-day proof fixture needs a source run in week ${weekNumber}.`);
+    assert.ok(
+      restWorkout,
+      `Five-day proof fixture needs a replaceable rest in week ${weekNumber}.`,
+    );
+    const { date, weekday, week_number: retainedWeekNumber } = restWorkout;
+    Object.assign(restWorkout, structuredClone(sourceWorkout), {
+      workout_id: `${sourceWorkout.workout_id}-fifth-${weekNumber}`,
+      date,
+      weekday,
+      week_number: retainedWeekNumber,
+      title: "Fifth Easy Run",
+    });
+  }
+
+  return plan;
+}
+
+function countTrainingPlanNonRestByWeek(plan: TrainingPlanV2) {
+  const countByWeek = new Map<string, number>();
+  for (const workout of plan.planned_workouts) {
+    if (workout.workout_type === "rest") {
+      continue;
+    }
+
+    const week = startOfWeekIso(workout.date);
+    countByWeek.set(week, (countByWeek.get(week) ?? 0) + 1);
+  }
+  return countByWeek;
+}
+
+function countImportedSeedNonRestByWeek(seed: ReturnType<typeof buildImportedPlanSeed>) {
+  const countByWeek = new Map<string, number>();
+  for (const workout of seed.workouts) {
+    if (workout.workoutType === "rest") {
+      continue;
+    }
+
+    const week = startOfWeekIso(workout.workoutDate);
+    countByWeek.set(week, (countByWeek.get(week) ?? 0) + 1);
+  }
+  return countByWeek;
+}
+
+function nextDateForWeekday(currentDate: string, expectedWeekday: string) {
+  for (let offset = 0; offset < 7; offset += 1) {
+    const candidate = addDaysIso(currentDate, offset);
+    if (weekdayLong(candidate) === expectedWeekday) {
+      return candidate;
+    }
+  }
+
+  throw new Error(`Could not resolve the next ${expectedWeekday} from ${currentDate}.`);
 }
 
 async function buildLargeReadbackReviewedDraft() {
@@ -788,7 +1581,7 @@ async function validatePersonalHeartRateProfilePersistence(input: {
     }
     assert.deepEqual(await loadBaselineOnlyCounts(input.supabase, owner.userId), {
       profiles: 1,
-      plans: 0,
+      plans: 1,
       workouts: 0,
     });
 
@@ -1387,15 +2180,9 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
         workouts: [
           buildAtomicCreationWorkout(firstWorkoutId, planId, disposableUser.userId, "easy"),
         ] as unknown as Json,
-        expectedActivePlanId: null,
-        expectedActivePlanUpdatedAt: null,
-        expectedHistory: buildExpectedHistory(),
-        archiveGoalMetadata: null,
-        logs: [],
-        evidenceRelinks: [],
         expectedProfileRevision: savedBaseline.profileRevision + 1,
       }),
-      (error) => error instanceof ActivePlanPersistenceRejection && error.reason === "stale_review",
+      (error) => error instanceof CalendarPersistenceRejection && error.reason === "stale_review",
     );
 
     await assert.rejects(
@@ -1412,12 +2199,6 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
             "invalid_workout_type",
           ),
         ] as unknown as Json,
-        expectedActivePlanId: null,
-        expectedActivePlanUpdatedAt: null,
-        expectedHistory: buildExpectedHistory(),
-        archiveGoalMetadata: null,
-        logs: [],
-        evidenceRelinks: [],
         expectedProfileRevision: savedBaseline.profileRevision,
       }),
     );
@@ -1450,25 +2231,28 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
     assert.equal(baselineAfter.error, null);
     assert.deepEqual(baselineAfter.data, baselineBefore.data);
 
-    const activePlanId = crypto.randomUUID();
-    const activeWorkoutId = crypto.randomUUID();
+    const materializedPlanId = crypto.randomUUID();
+    const materializedWorkoutId = crypto.randomUUID();
     const created = await applyAtomicReviewedPlanPersistence({
       userId: disposableUser.userId,
       profile: profilePayload,
-      plan: buildPlanPayload(activePlanId, "Atomic active plan proof", "atomic_active_plan_proof"),
+      plan: buildPlanPayload(
+        materializedPlanId,
+        "Atomic materialization proof",
+        "atomic_materialization_proof",
+      ),
       workouts: [
-        buildAtomicCreationWorkout(activeWorkoutId, activePlanId, disposableUser.userId, "easy"),
+        buildAtomicCreationWorkout(
+          materializedWorkoutId,
+          materializedPlanId,
+          disposableUser.userId,
+          "easy",
+        ),
       ] as unknown as Json,
-      expectedActivePlanId: null,
-      expectedActivePlanUpdatedAt: null,
-      expectedHistory: buildExpectedHistory(),
-      archiveGoalMetadata: null,
-      logs: [],
-      evidenceRelinks: [],
       expectedProfileRevision: savedBaseline.profileRevision,
     });
-    assert.equal(created.archivedPlan, null);
-    assert.equal(created.planCycle.id, activePlanId);
+    assert.equal(created.planCycle.id, materializedPlanId);
+    assert.equal(created.planCycle.status, "archived");
 
     const changedBaseline = await updateUserSettingsForUserId(disposableUser.userId, {
       firstName: null,
@@ -1482,33 +2266,27 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
     });
     assert.equal(changedBaseline.profileRevision, savedBaseline.profileRevision + 1);
 
-    const replacementPlanId = crypto.randomUUID();
+    const secondPlanId = crypto.randomUUID();
     await assert.rejects(
       applyAtomicReviewedPlanPersistence({
         userId: disposableUser.userId,
         profile: profilePayload,
         plan: buildPlanPayload(
-          replacementPlanId,
-          "Atomic replacement race proof",
-          "atomic_replacement_race_proof",
+          secondPlanId,
+          "Atomic stale baseline proof",
+          "atomic_stale_baseline_proof",
         ),
         workouts: [
           buildAtomicCreationWorkout(
             crypto.randomUUID(),
-            replacementPlanId,
+            secondPlanId,
             disposableUser.userId,
             "quality",
           ),
         ] as unknown as Json,
-        expectedActivePlanId: activePlanId,
-        expectedActivePlanUpdatedAt: created.planCycle.updated_at,
-        expectedHistory: buildExpectedHistory([activeWorkoutId]),
-        archiveGoalMetadata: null,
-        logs: [],
-        evidenceRelinks: [],
         expectedProfileRevision: savedBaseline.profileRevision,
       }),
-      (error) => error instanceof ActivePlanPersistenceRejection && error.reason === "stale_review",
+      (error) => error instanceof CalendarPersistenceRejection && error.reason === "stale_review",
     );
 
     const [plansAfterRace, workoutsAfterRace, profileAfterRace] = await Promise.all([
@@ -1526,9 +2304,9 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
     assert.equal(plansAfterRace.error, null);
     assert.equal(workoutsAfterRace.error, null);
     assert.equal(profileAfterRace.error, null);
-    assert.deepEqual(plansAfterRace.data, [{ id: activePlanId, status: "active" }]);
+    assert.deepEqual(plansAfterRace.data, [{ id: materializedPlanId, status: "archived" }]);
     assert.deepEqual(workoutsAfterRace.data, [
-      { id: activeWorkoutId, plan_cycle_id: activePlanId },
+      { id: materializedWorkoutId, plan_cycle_id: materializedPlanId },
     ]);
     assert.equal(profileAfterRace.data?.baseline_revision, changedBaseline.profileRevision);
   } finally {
@@ -1537,7 +2315,7 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
 
   return {
     creationRollback: true,
-    replacementProfileRaceRejected: true,
+    staleProfileRaceRejected: true,
   } as const;
 }
 
@@ -1590,11 +2368,13 @@ async function loadPersistedPlanForUser(
     .from("plan_cycles")
     .select("*")
     .eq("user_id", userId)
-    .eq("status", "active")
+    .is("saved_plan_payload", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .single();
 
   if (planResult.error || !planResult.data) {
-    throw new Error(planResult.error?.message ?? "Persisted active plan was not found.");
+    throw new Error(planResult.error?.message ?? "Materialized plan provenance was not found.");
   }
 
   const workoutsResult = await supabase

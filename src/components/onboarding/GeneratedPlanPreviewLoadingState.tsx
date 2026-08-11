@@ -25,7 +25,7 @@ export function GeneratedPlanPreviewLoadingState({
       </div>
 
       <div className="grid max-w-lg gap-2">
-        <p className="hito-section-title">
+        <p className="hito-ui-section-title">
           {complete ? "Plan preview ready" : `Preparing your ${goalLabel} plan`}
         </p>
       </div>

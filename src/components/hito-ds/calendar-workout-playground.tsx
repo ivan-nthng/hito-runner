@@ -12,6 +12,7 @@ import {
   DEFAULT_PLAYGROUND_STATE,
   DENSITY_OPTIONS,
   FEEDBACK_OPTIONS,
+  INTERACTION_MODE_OPTIONS,
   OVERLAY_OPTIONS,
   RESULT_OPTIONS,
   TITLE_STRESS_OPTIONS,
@@ -152,6 +153,12 @@ function ControlsBody({
         title="Behavior"
       >
         <ChoiceControl
+          label="Presentation contract"
+          options={INTERACTION_MODE_OPTIONS}
+          value={state.interaction}
+          onChange={setField("interaction")}
+        />
+        <ChoiceControl
           label="Density"
           options={DENSITY_OPTIONS}
           value={state.density}
@@ -218,7 +225,7 @@ function CalendarDemoStage({
           date={{ eyebrow: "Jun", day: "18", meta: "Thu" }}
           feedback={state.feedback}
           focused={state.overlay === "focused"}
-          interactive={state.baseState !== "outside-month"}
+          interactive={state.interaction === "interactive"}
           muted={state.baseState === "outside-month"}
           result={state.result}
           selected={state.overlay === "selected"}
@@ -244,7 +251,7 @@ function CalendarDemoStage({
           dense={state.density === "dense"}
           feedback={state.feedback}
           focused={state.overlay === "focused"}
-          interactive={state.baseState !== "outside-month"}
+          interactive={state.interaction === "interactive"}
           muted={state.baseState === "outside-month"}
           result={state.result}
           selected={state.overlay === "selected"}
@@ -283,7 +290,7 @@ function CalendarVariantsStage({
             date={{ eyebrow: "Jun", day: variant.day, meta: variant.weekday }}
             feedback={variant.state.feedback}
             focused={variant.state.overlay === "focused"}
-            interactive={variant.state.baseState !== "outside-month"}
+            interactive={variant.state.interaction === "interactive"}
             muted={variant.state.baseState === "outside-month"}
             result={variant.state.result}
             selected={variant.state.overlay === "selected"}
@@ -312,7 +319,7 @@ function CalendarVariantsStage({
               dense={variant.state.density === "dense"}
               feedback={variant.state.feedback}
               focused={variant.state.overlay === "focused"}
-              interactive={variant.state.baseState !== "outside-month"}
+              interactive={variant.state.interaction === "interactive"}
               muted={variant.state.baseState === "outside-month"}
               result={variant.state.result}
               selected={variant.state.overlay === "selected"}

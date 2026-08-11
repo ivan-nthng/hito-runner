@@ -136,7 +136,7 @@ export function HeartRateProfileSection({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           {appearance === "settings" ? (
-            <h2 className="hito-section-title">Heart-rate guidance</h2>
+            <h2 className="hito-ui-section-title">Heart-rate guidance</h2>
           ) : (
             <p className="hito-label">Guidance bands</p>
           )}
@@ -204,6 +204,10 @@ export function HeartRateProfileSection({
                       min={HEART_RATE_GUIDANCE_SCALE.min}
                       max={HEART_RATE_GUIDANCE_SCALE.max}
                       value={[zone.sliderMinBpm, zone.sliderMaxBpm]}
+                      previousValue={[
+                        summary.zones[index]?.minBpm ?? zone.sliderMinBpm,
+                        summary.zones[index]?.maxBpm ?? zone.sliderMaxBpm,
+                      ]}
                       minLabel={`${zone.label} lower bound`}
                       maxLabel={`${zone.label} upper bound`}
                       minimumBounds={minimumBounds}

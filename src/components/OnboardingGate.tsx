@@ -89,7 +89,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     state: constructorState,
     hasRequiredPlanBasics: hasAcceptedRunnerBaseline,
     toastId: STRUCTURED_REVIEW_TOAST_ID,
-    previewReadyDescription: "Review the calendar before creating the plan.",
+    previewReadyDescription: "Review the saved plan before adding its workouts to Calendar.",
     previewContextKey: runnerBaseline.previewContextKey,
     requiredBasicsMessage:
       "Save your runner baseline and accept the BPM guidance before previewing a generated plan.",
@@ -202,7 +202,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     const confirmInput = buildRunningPlanConfirmInput(
       draft,
       selectedPlanPreview.previewInput,
-      "Refresh the selected preview before creating this plan.",
+      "Refresh the saved preview before adding its workouts to Calendar.",
     );
 
     if (!confirmInput.ok) {
@@ -223,8 +223,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     selectedPlanPreview.setError(null);
     hitoToast.working({
       id: STRUCTURED_REVIEW_TOAST_ID,
-      title: "Creating plan",
-      description: "Hito is saving the plan you reviewed.",
+      title: "Adding workouts to Calendar",
+      description: "Hito is adding this saved plan's workouts to Calendar.",
     });
 
     try {
@@ -239,7 +239,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
         setRunningPlanCreateStatus("idle");
         hitoToast.error({
           id: STRUCTURED_REVIEW_TOAST_ID,
-          title: "Plan not created",
+          title: "Calendar not updated",
           description: result.message,
         });
         return;
@@ -247,8 +247,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
 
       hitoToast.success({
         id: STRUCTURED_REVIEW_TOAST_ID,
-        title: "Plan created",
-        description: "Opening your saved plan now.",
+        title: "Calendar workouts added",
+        description: "Opening Calendar now.",
         duration: 2600,
       });
       openSavedHome();
@@ -267,7 +267,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
       });
       hitoToast.error({
         id: STRUCTURED_REVIEW_TOAST_ID,
-        title: "Plan not created",
+        title: "Calendar not updated",
         description: message,
       });
     }
@@ -348,7 +348,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
         <p className="hito-micro-label" data-tone="signal">
           Create a plan
         </p>
-        <h1 className="hito-page-title mt-3">Choose how to start your plan.</h1>
+        <h1 className="hito-ui-page-title mt-3">Choose how to start your plan.</h1>
         <p className="hito-body mt-4 text-muted-foreground">
           Add the basics once, then choose a training distance or open an empty manual calendar.
         </p>
@@ -559,21 +559,21 @@ function generatedCreateFooterHint({
 
   if (status === "previewing_plan") {
     return {
-      message: "Building a reviewed preview before anything is saved.",
+      message: "Building a reviewed preview. Successful previews are saved in Plans.",
       tone: "neutral",
     };
   }
 
   if (previewIsOpen && previewIsReady) {
     return {
-      message: "Review the preview, then confirm in the dialog.",
+      message: "Review the saved plan, then add its workouts to Calendar.",
       tone: "neutral",
     };
   }
 
   if (previewIsReady) {
     return {
-      message: "Plan draft ready for review. Not saved.",
+      message: "Saved plan ready for review. Calendar workouts have not been added.",
       tone: "neutral",
     };
   }
@@ -590,7 +590,7 @@ function generatedCreateFooterHint({
   }
 
   return {
-    message: "Builds a reviewed generated-plan preview before anything is saved.",
+    message: "A successful reviewed preview is saved in Plans before Calendar workouts are added.",
     tone: "neutral",
   };
 }

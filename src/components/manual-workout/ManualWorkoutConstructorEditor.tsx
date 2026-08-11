@@ -1715,7 +1715,7 @@ function ManualScratchWorkoutTypePickerDialog({
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-modal-title">Choose workout type</DialogTitle>
+          <DialogTitle className="hito-ui-modal-title">Choose workout type</DialogTitle>
           <DialogDescription className="hito-body">
             Pick the kind of workout to build. The draft stays editable and Hito reviews it before
             anything is saved.
@@ -1891,7 +1891,7 @@ function ManualBlockTypePickerDialog({
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-modal-title">Choose {label.toLowerCase()}</DialogTitle>
+          <DialogTitle className="hito-ui-modal-title">Choose {label.toLowerCase()}</DialogTitle>
           <DialogDescription className="hito-body">
             Pick the block type. Duration, distance, and labels stay editable after selection.
           </DialogDescription>
@@ -2288,7 +2288,7 @@ function ManualAddPiecePickerDialog({
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-modal-title">Add Section</DialogTitle>
+          <DialogTitle className="hito-ui-modal-title">Add Section</DialogTitle>
           <DialogDescription className="hito-body">
             Choose one section for this manual workout. Hito reviews the full draft before anything
             is saved.

@@ -1,16 +1,16 @@
 import {
-  getExistingPlanContext,
-  type ExistingPlanContext,
+  getCalendarWorkoutMutationContext,
+  type CalendarWorkoutContext,
   type PersistedPlannedWorkoutRow,
 } from "@/lib/active-plan-persistence";
+import { resolveCalendarWorkoutEditability } from "@/lib/active-plan-workout-editing/policy";
 import {
   fetchManualWorkoutEvidenceWorkoutIds,
-  isProtectedManualWorkoutTarget,
+  isProtectedManualWorkoutCopySource,
   type ManualWorkoutActivePlanAddDependencies,
 } from "@/lib/manual-workout-authoring/active-plan-add";
 import { persistedManualWorkoutHasUnsafeMetricTruth } from "@/lib/manual-workout-authoring/persisted-workout-safety";
 import {
-  MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
   MANUAL_WORKOUT_TEMPLATE_KEY_VALUES,
   type ManualWorkoutAddToActivePlanResult,
   type ManualWorkoutBlockInput,
@@ -29,12 +29,8 @@ import {
   normalizeWorkoutFamily,
   normalizeWorkoutIdentity,
 } from "@/lib/rich-workout-model";
-import {
-  todayIso,
-  type Step,
-  type StepRepeatChildPrescription,
-  type StepTarget,
-} from "@/lib/training";
+import { type Step, type StepRepeatChildPrescription, type StepTarget } from "@/lib/training";
+import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
 import {
   AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
   AI_AUTHORED_PACE_PROVENANCE_VALUES,
@@ -70,6 +66,8 @@ export type ManualWorkoutCopyPasteReconstructionResult =
   | {
       ok: true;
       activePlanId: string;
+      sourceKind: string;
+      sourceStatus: string | null;
       sourceWorkout: PersistedPlannedWorkoutRow;
       draftInput: ManualWorkoutDraftInput;
       processingOptions: ManualWorkoutDraftProcessingOptions;
@@ -78,6 +76,7 @@ export type ManualWorkoutCopyPasteReconstructionResult =
       ok: false;
       reason: ManualWorkoutCopyPasteFailureReason;
       message: string;
+      sourceKind?: string | null;
     };
 
 export async function reconstructManualWorkoutCopyDraftForUser(
@@ -85,11 +84,12 @@ export async function reconstructManualWorkoutCopyDraftForUser(
   input: ManualWorkoutCopyPasteSourceInput,
   dependencies: ManualWorkoutActivePlanAddDependencies,
 ): Promise<ManualWorkoutCopyPasteReconstructionResult> {
-  const getContext = dependencies.getExistingPlanContextForUser ?? getExistingPlanContext;
+  const getContext =
+    dependencies.getCalendarWorkoutContextForUser ?? getCalendarWorkoutMutationContext;
   const fetchEvidence =
     dependencies.fetchEvidenceWorkoutIds ?? fetchManualWorkoutEvidenceWorkoutIds;
-  const currentDate = dependencies.currentDate ?? todayIso();
-  let planContext: ExistingPlanContext;
+  const currentDate = dependencies.currentDate ?? (await getRunnerCalendarDateForUserId(userId));
+  let planContext: CalendarWorkoutContext;
 
   try {
     planContext = await getContext(userId);
@@ -101,12 +101,12 @@ export async function reconstructManualWorkoutCopyDraftForUser(
     };
   }
 
-  const activePlan = planContext.activePlan;
+  const activePlan = planContext.provenancePlan;
   if (!activePlan) {
     return {
       ok: false,
       reason: "no_active_plan",
-      message: "Create a manual user-built active plan before copying workouts.",
+      message: "Create or open an active plan before copying workouts.",
     };
   }
 
@@ -114,15 +114,20 @@ export async function reconstructManualWorkoutCopyDraftForUser(
     return {
       ok: false,
       reason: "stale_review",
-      message: "The active manual plan changed. Refresh the calendar and review this copy again.",
+      message: "The active plan changed. Refresh the calendar and review this copy again.",
     };
   }
 
-  if (activePlan.source_kind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND) {
+  const copyEditability = resolveCalendarWorkoutEditability(activePlan, "copy_workout");
+  if (!copyEditability.ok) {
     return {
       ok: false,
-      reason: "unsupported_active_plan_source",
-      message: "Manual workout copy/paste is available only for manual user-built active plans.",
+      reason:
+        copyEditability.reason === "unsupported_source_metadata"
+          ? "unsupported_source_metadata"
+          : "unsupported_active_plan_source",
+      message: copyEditability.message,
+      sourceKind: activePlan.source_kind,
     };
   }
 
@@ -135,12 +140,12 @@ export async function reconstructManualWorkoutCopyDraftForUser(
   });
 
   if (!source.ok) {
-    return source;
+    return { ...source, sourceKind: copyEditability.sourceKind };
   }
 
   const sourceEvidenceIds = await fetchEvidence(userId, [source.workout.id]);
   if (
-    isProtectedManualWorkoutTarget(
+    isProtectedManualWorkoutCopySource(
       source.workout,
       currentDate,
       planContext.existingWorkouts.logsByWorkoutId,
@@ -151,6 +156,7 @@ export async function reconstructManualWorkoutCopyDraftForUser(
       ok: false,
       reason: "protected_day",
       message: "This source workout has protected history or evidence and cannot be copied here.",
+      sourceKind: copyEditability.sourceKind,
     };
   }
 
@@ -159,6 +165,7 @@ export async function reconstructManualWorkoutCopyDraftForUser(
       ok: false,
       reason: "source_workout_not_supported",
       message: "This source workout has metric targets that cannot be copied safely.",
+      sourceKind: copyEditability.sourceKind,
     };
   }
 
@@ -168,12 +175,14 @@ export async function reconstructManualWorkoutCopyDraftForUser(
   });
 
   if (!draft.ok) {
-    return draft;
+    return { ...draft, sourceKind: copyEditability.sourceKind };
   }
 
   return {
     ok: true,
     activePlanId: activePlan.id,
+    sourceKind: copyEditability.sourceKind,
+    sourceStatus: copyEditability.sourceStatus,
     sourceWorkout: source.workout,
     draftInput: draft.draftInput,
     processingOptions: draft.processingOptions,

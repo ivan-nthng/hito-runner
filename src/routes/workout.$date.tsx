@@ -107,7 +107,7 @@ function WorkoutPage() {
             {snapshot.mode === "onboarding" ? (
               <>
                 <p className="hito-label">Setup required</p>
-                <h1 className="hito-page-title">Finish setup before opening workouts.</h1>
+                <h1 className="hito-ui-page-title">Finish setup before opening workouts.</h1>
                 <p className="hito-page-copy">
                   Create your plan first, then your workouts will open here.
                 </p>
@@ -115,7 +115,7 @@ function WorkoutPage() {
             ) : (
               <>
                 <p className="hito-label">No workout</p>
-                <h1 className="hito-page-title">Nothing is scheduled for this day.</h1>
+                <h1 className="hito-ui-page-title">Nothing is scheduled for this day.</h1>
                 <p className="hito-page-copy">
                   There is no workout on this date in the current plan. Go back and choose another
                   day.
@@ -202,7 +202,7 @@ function WorkoutPage() {
                   <span className="text-signal">· Today</span>
                 )}
               </div>
-              <h1 className="mt-3 max-w-2xl text-balance font-display text-4xl leading-[1.05] lg:text-5xl">
+              <h1 className="mt-3 max-w-2xl text-balance font-sans text-4xl leading-[1.05] lg:text-5xl">
                 {isRestDay ? "Rest day" : workout.title}
               </h1>
               {!isRestDay && workout.notes?.trim() && (
@@ -490,7 +490,7 @@ function WorkoutErrorState({ reset }: { error: Error; reset: () => void }) {
       <div className="hito-route-gutter max-w-2xl py-20">
         <section className="hito-state-surface" data-tone="destructive">
           <p className="hito-label text-destructive">Workout unavailable</p>
-          <h1 className="hito-page-title">We couldn&apos;t load this workout.</h1>
+          <h1 className="hito-ui-page-title">We couldn&apos;t load this workout.</h1>
           <p className="hito-page-copy text-foreground/85">
             Try again. If your plan is still being set up, go back home first.
           </p>
@@ -765,7 +765,7 @@ function Overview({ snapshot, workout }: { snapshot: TrainingSnapshot; workout: 
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="hito-label">Recovery day</p>
-            <h3 className="mt-2 font-display text-3xl">Keep it light.</h3>
+            <h3 className="mt-2 font-sans text-3xl">Keep it light.</h3>
             <p className="hito-support-copy mt-4 max-w-lg">
               No distance, duration, or load is scheduled here. Let the day stay open unless a real
               recovery assignment is present.

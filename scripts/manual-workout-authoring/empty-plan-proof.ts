@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import type {
-  EmptyActivePlanCreationInput,
+  EmptyCalendarProvenanceCreationInput,
   PersistedPlanCycleRow,
 } from "../../src/lib/active-plan-persistence";
 import {
@@ -33,7 +33,7 @@ export async function validateManualEmptyActivePlanCreationContract() {
   };
   const persisted: Array<{
     userId: string;
-    input: EmptyActivePlanCreationInput;
+    input: EmptyCalendarProvenanceCreationInput;
   }> = [];
   const savedBaselines: ManualEmptyPlanSetupInput[] = [];
   const success = await createEmptyManualActivePlanForUser(
@@ -121,13 +121,6 @@ export async function validateManualEmptyActivePlanCreationContract() {
     startDate: "2026-06-12",
     endDate: "2026-06-12",
   });
-  const activePlanConflict = await createEmptyManualActivePlanForUser(
-    userId,
-    setup,
-    buildFakeEmptyPlanDependencies({ activePlan }),
-  );
-  assertEmptyPlanBlocked(activePlanConflict, "active_plan_exists", "existing active plan");
-
   const persistenceFailure = await createEmptyManualActivePlanForUser(
     userId,
     setup,
@@ -182,7 +175,7 @@ async function assertFirstAddWorksOnEmptyManualPlan(input: {
     assert.equal(result.workoutSourceKind, MANUAL_WORKOUT_AUTHORING_SOURCE_KIND);
     assert.equal(result.calendarRowCount, 1);
     assert.equal(result.nonRestWorkoutCount, 1);
-    assert.equal(result.safety.targetDayKind, "rest_day");
+    assert.equal(result.safety.targetDayKind, "empty_day");
     assert.equal(result.safety.trustedClientRows, false);
     assert.equal(result.safety.serverRebuiltReview, true);
   }
@@ -198,16 +191,14 @@ async function assertFirstAddWorksOnEmptyManualPlan(input: {
 
 function buildFakeEmptyPlanDependencies(
   input: {
-    activePlan?: PersistedPlanCycleRow | null;
     currentDate?: string;
     persistError?: Error;
-    onPersist?: (record: { userId: string; input: EmptyActivePlanCreationInput }) => void;
+    onPersist?: (record: { userId: string; input: EmptyCalendarProvenanceCreationInput }) => void;
     onSaveBaseline?: (baseline: ManualEmptyPlanSetupInput) => void;
   } = {},
 ): EmptyPlanDependencies {
   return {
     currentDate: input.currentDate ?? "2026-06-12",
-    getActivePlanForUser: async () => input.activePlan ?? null,
     saveBaselineForUser: async (_userId, baseline) => {
       input.onSaveBaseline?.({
         age: baseline.age,

@@ -5,19 +5,20 @@ import {
   ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
   appendActivePlanUserEditMetadataToRecord,
   buildActivePlanUserEditMetadata,
-  resolveActivePlanSourceStatus,
-  resolveActivePlanWorkoutEditability,
+  resolveCalendarWorkoutEditability,
+  resolvePlanProvenanceSourceStatus,
 } from "@/lib/active-plan-workout-editing/policy";
 import {
-  getExistingPlanContext,
-  type ExistingPlanContext,
+  getCalendarWorkoutMutationContext,
+  getPlanRecordForUser,
+  type CalendarWorkoutContext,
   type PersistedPlanCycleRow,
   type PersistedPlannedWorkoutRow,
   type PersistedWorkoutLogRow,
 } from "@/lib/active-plan-persistence";
 import {
-  ActivePlanPersistenceRejection,
-  applyAtomicActivePlanWorkoutMutation,
+  CalendarPersistenceRejection,
+  applyAtomicCalendarWorkoutMutation,
 } from "@/lib/active-plan-lifecycle-persistence";
 import {
   fetchManualWorkoutEvidenceWorkoutIds,
@@ -43,7 +44,7 @@ import {
 } from "@/lib/manual-workout-authoring/review-exactness";
 import { getCurrentManualWorkoutAuthoringUserId } from "@/lib/manual-workout-authoring/request-auth";
 import type { Json } from "@/lib/supabase/database";
-import { todayIso } from "@/lib/training";
+import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
 
 const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const MANUAL_WORKOUT_DELETE_REVIEW_PAYLOAD_VERSION =
@@ -109,7 +110,7 @@ export type ManualWorkoutDeleteClearFailureReason =
 
 export type ManualWorkoutDeleteClearDependencies = Pick<
   ManualWorkoutActivePlanAddDependencies,
-  "getExistingPlanContextForUser" | "currentDate"
+  "getCalendarWorkoutContextForUser" | "currentDate"
 > & {
   fetchEvidenceWorkoutIds?: ManualWorkoutEvidenceFetcher;
   persistWorkoutDelete?: typeof persistManualWorkoutDeleteClear;
@@ -234,6 +235,7 @@ type ManualWorkoutDeleteClearTarget =
       remainingWorkouts: PersistedPlannedWorkoutRow[];
       restore: ManualWorkoutDeleteRestoreAffordance;
       review: ManualWorkoutDeleteClearReview;
+      currentDate: string;
     }
   | {
       ok: false;
@@ -243,6 +245,7 @@ type ManualWorkoutDeleteClearTarget =
 
 type PersistManualWorkoutDeleteClearInput = {
   userId: string;
+  currentDate: string;
   activePlan: PersistedPlanCycleRow;
   targetWorkout: PersistedPlannedWorkoutRow;
   remainingWorkouts: readonly PersistedPlannedWorkoutRow[];
@@ -370,6 +373,7 @@ export async function confirmManualWorkoutDeleteClearForUser(
   try {
     const persisted = await persistDelete({
       userId,
+      currentDate: target.currentDate,
       activePlan: target.activePlan,
       targetWorkout: target.targetWorkout,
       remainingWorkouts: target.remainingWorkouts,
@@ -381,7 +385,7 @@ export async function confirmManualWorkoutDeleteClearForUser(
       status: "deleted",
       persisted: true,
       sourceKind: target.activePlan.source_kind ?? ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
-      sourceStatus: resolveActivePlanSourceStatus(target.activePlan),
+      sourceStatus: resolvePlanProvenanceSourceStatus(target.activePlan),
       workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
       activePlanId: persisted.planCycle.id,
       plannedWorkoutId: target.targetWorkout.id,
@@ -408,7 +412,7 @@ export async function confirmManualWorkoutDeleteClearForUser(
       },
     };
   } catch (error) {
-    if (error instanceof ActivePlanPersistenceRejection) {
+    if (error instanceof CalendarPersistenceRejection) {
       return buildDeleteClearBlocked({
         reason:
           error.reason === "stale_review" || error.reason === "protected_day"
@@ -427,16 +431,17 @@ export async function confirmManualWorkoutDeleteClearForUser(
 
 export async function persistManualWorkoutDeleteClear({
   userId,
+  currentDate,
   activePlan,
   targetWorkout,
   remainingWorkouts,
   review,
 }: PersistManualWorkoutDeleteClearInput) {
-  const persisted = await applyAtomicActivePlanWorkoutMutation({
+  const persisted = await applyAtomicCalendarWorkoutMutation({
     userId,
     planId: activePlan.id,
     expectedPlanUpdatedAt: activePlan.updated_at,
-    currentDate: todayIso(),
+    currentDate,
     mutationKind: "clear",
     expectedSourceWorkout: buildSourceWorkoutFingerprint(targetWorkout) as unknown as Json,
     expectedTargetWorkout: null,
@@ -473,11 +478,13 @@ async function resolveManualWorkoutDeleteClearTarget(
   input: ManualWorkoutDeleteClearReviewInput | ManualWorkoutDeleteClearConfirmInput,
   dependencies: ManualWorkoutDeleteClearDependencies,
 ): Promise<ManualWorkoutDeleteClearTarget> {
-  const getContext = dependencies.getExistingPlanContextForUser ?? getExistingPlanContext;
+  const getContext =
+    dependencies.getCalendarWorkoutContextForUser ?? getCalendarWorkoutMutationContext;
   const fetchEvidence =
     dependencies.fetchEvidenceWorkoutIds ?? fetchManualWorkoutEvidenceWorkoutIds;
+  const currentDate = dependencies.currentDate ?? (await getRunnerCalendarDateForUserId(userId));
 
-  let planContext: ExistingPlanContext;
+  let planContext: CalendarWorkoutContext;
   try {
     planContext = await getContext(userId);
   } catch {
@@ -488,38 +495,8 @@ async function resolveManualWorkoutDeleteClearTarget(
     };
   }
 
-  const activePlan = planContext.activePlan;
-  if (!activePlan) {
-    return {
-      ok: false,
-      reason: "no_active_plan",
-      message: "Create or open an active plan before deleting workouts.",
-    };
-  }
-
-  if (input.activePlanId && activePlan.id !== input.activePlanId) {
-    return {
-      ok: false,
-      reason: "stale_review",
-      message: "The active plan changed. Refresh the calendar and review this delete again.",
-    };
-  }
-
-  const editability = resolveActivePlanWorkoutEditability(activePlan, "clear_workout");
-  if (!editability.ok) {
-    return {
-      ok: false,
-      reason:
-        editability.reason === "unsupported_source_metadata"
-          ? "unsupported_source_metadata"
-          : "unsupported_active_plan_source",
-      message: editability.message,
-    };
-  }
-
   const target = resolveDeleteTargetWorkout({
     userId,
-    activePlanId: activePlan.id,
     workouts: planContext.existingWorkouts.workouts,
     plannedWorkoutId: input.plannedWorkoutId,
     workoutDate: input.workoutDate,
@@ -527,6 +504,37 @@ async function resolveManualWorkoutDeleteClearTarget(
 
   if (!target.ok) {
     return target;
+  }
+
+  let activePlan =
+    planContext.provenancePlan?.id === target.workout.plan_cycle_id
+      ? planContext.provenancePlan
+      : null;
+  if (!activePlan) {
+    try {
+      activePlan = await getPlanRecordForUser(userId, target.workout.plan_cycle_id);
+    } catch {
+      return {
+        ok: false,
+        reason: "persistence_failed",
+        message: "The workout provenance could not be verified.",
+      };
+    }
+  }
+  if (!activePlan) {
+    return {
+      ok: false,
+      reason: "unsupported_source_metadata",
+      message: "The workout provenance is unavailable.",
+    };
+  }
+  const editability = resolveCalendarWorkoutEditability(activePlan, "clear_workout");
+  if (!editability.ok) {
+    return {
+      ok: false,
+      reason: "unsupported_source_metadata",
+      message: editability.message,
+    };
   }
 
   if (target.workout.workout_type === "rest") {
@@ -574,12 +582,12 @@ async function resolveManualWorkoutDeleteClearTarget(
     remainingWorkouts,
     restore: restore.restore,
     review,
+    currentDate,
   };
 }
 
 function resolveDeleteTargetWorkout(input: {
   userId: string;
-  activePlanId: string;
   workouts: readonly PersistedPlannedWorkoutRow[];
   plannedWorkoutId?: string;
   workoutDate?: string;
@@ -598,12 +606,12 @@ function resolveDeleteTargetWorkout(input: {
     return {
       ok: false,
       reason: "target_workout_not_found",
-      message: "The planned workout was not found in the current active plan.",
+      message: "The planned workout was not found in the runner Calendar.",
     };
   }
 
   const workout = matches[0]!;
-  if (workout.user_id !== input.userId || workout.plan_cycle_id !== input.activePlanId) {
+  if (workout.user_id !== input.userId) {
     return {
       ok: false,
       reason: "target_workout_not_in_active_plan",

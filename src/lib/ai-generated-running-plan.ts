@@ -60,7 +60,8 @@ export type AiGeneratedRunningPlanPreviewOutcome =
   | "provider_incomplete_output"
   | "malformed_provider_output"
   | "compiler_rejection"
-  | "review_refusal";
+  | "review_refusal"
+  | "candidate_persistence_failure";
 
 export type AiGeneratedRunningPlanSourceStatus = Extract<
   AiFirstPlanDraftPreviewMetadata["status"],
@@ -121,6 +122,7 @@ export type AiGeneratedRunningPlanPreviewUnavailable = {
     | "malformed_provider_output"
     | "compiler_rejection"
     | "review_refusal"
+    | "candidate_persistence_failure"
   >;
   error: {
     code:

@@ -63,7 +63,7 @@ export function ActivityHistoryPanel({
     <section aria-labelledby="activity-history-title">
       <header className="hito-page-header">
         <p className="hito-label">Recorded running</p>
-        <h1 id="activity-history-title" className="hito-page-title" tabIndex={-1}>
+        <h1 id="activity-history-title" className="hito-ui-page-title" tabIndex={-1}>
           Activity history
         </h1>
         <p className="hito-page-copy">Your recorded runs, whether or not they matched a plan.</p>
@@ -142,7 +142,7 @@ function ActivityHistoryRow({
         onClick={(event) => onOpenActivity(activity, event.currentTarget)}
       >
         <time dateTime={localDate ?? undefined} className="text-center tabular-nums">
-          <span className="block font-display text-2xl leading-none">{dateRail.day}</span>
+          <span className="block font-sans text-2xl leading-none">{dateRail.day}</span>
           <span className="hito-caption mt-1 block">{dateRail.month}</span>
         </time>
         <span className="min-w-0">
@@ -297,7 +297,7 @@ export function ActivityDetailOverlay({
         onCloseAutoFocus={returnFocus}
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle ref={headingRef} className="hito-modal-title" tabIndex={-1}>
+          <DialogTitle ref={headingRef} className="hito-ui-modal-title" tabIndex={-1}>
             {activity?.identity.label ?? "Activity"}
           </DialogTitle>
           <DialogDescription>Recorded activity facts and source controls.</DialogDescription>
@@ -328,7 +328,7 @@ function ActivityDetailContent({
     <div className="space-y-7">
       <section>
         <p className="hito-label">Activity</p>
-        <h2 className="hito-section-title mt-2">{activityDisplayDate(activity)}</h2>
+        <h2 className="hito-ui-section-title mt-2">{activityDisplayDate(activity)}</h2>
         {startedTime ? <p className="hito-caption mt-1">Started {startedTime}</p> : null}
         <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm tabular-nums">
           {[...primaryFacts, ...supportingFacts].map((fact) => (
@@ -443,7 +443,7 @@ export function ActivityActionConfirmation({
         }}
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-modal-title">
+          <DialogTitle className="hito-ui-modal-title">
             {retriesSourceRemoval
               ? "Retry original file removal?"
               : removesSource
@@ -530,7 +530,7 @@ function HistoryEmptyState() {
   return (
     <div className="hito-state-surface">
       <p className="hito-label">No recorded activities</p>
-      <h2 className="hito-section-title mt-2">Your running history will appear here.</h2>
+      <h2 className="hito-ui-section-title mt-2">Your running history will appear here.</h2>
       <p className="hito-body mt-2">Record a run from its workout when you are ready.</p>
       <div className="hito-state-actions">
         <HitoButton asChild size="md" variant="primary">

@@ -2,10 +2,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import {
-  createFirstPlanFromReviewedCanonicalPlanForUser,
-  getActivePlan,
+  applySavedPlanRecordForUser,
+  retainReviewedGeneratedPlanCandidateForUser,
 } from "@/lib/active-plan-persistence";
-import { ActivePlanPersistenceRejection } from "@/lib/active-plan-lifecycle-persistence";
+import { CalendarPersistenceRejection } from "@/lib/active-plan-lifecycle-persistence";
 import { getRequestAuthContext } from "@/lib/backend/auth";
 import { parseDurationSeconds, parsePaceSecondsPerKm } from "@/lib/first-plan-authoring-utils";
 import {
@@ -33,6 +33,7 @@ import {
 } from "@/lib/plan-creation-engine";
 import { RUNNING_PLAN_RUNNER_LEVEL_VALUES } from "@/lib/plan-creation-engine/source-types";
 import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
+import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
 import {
   RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
   addRunningPlanReviewProof,
@@ -114,6 +115,7 @@ export const runningPlanConfirmInputSchema = z
 type RunningPlanReviewedPreviewReadyResult = {
   ok: true;
   draft: RunningPlanReviewedPreviewDraft<AiGeneratedRunningPlanPreviewDraft>;
+  savedPlanId?: string;
 };
 
 type RunningPlanReviewedPreviewResult =
@@ -147,6 +149,7 @@ type RunningPlanPreviewProductDraft = {
   };
   calendarRows: readonly RunningPlanPreviewProductCalendarRow[];
   workoutDocuments: AiGeneratedRunningPlanPreviewDraft["workoutDocuments"];
+  savedPlanId: string | null;
   reviewToken: string;
   reviewChecksum: string;
 };
@@ -167,7 +170,7 @@ export type RunningPlanConfirmActionInput = z.output<typeof runningPlanConfirmIn
 
 type RunningPlanConfirmFailureReason =
   | "unauthenticated"
-  | "active_plan_exists"
+  | "replacement_required"
   | "fixture_not_authorized"
   | "preview_unavailable"
   | "stale_review"
@@ -182,6 +185,7 @@ export type RunningPlanConfirmActionResult =
       persisted: true;
       sourceKind: RunningPlanConfirmActionInput["sourceKind"];
       sourceStatus: typeof RUNNING_PLAN_CONFIRMED_SOURCE_STATUS;
+      savedPlanId: string;
       schemaVersion: "training-plan-v2";
       effectiveStartDate: string;
       appliedStartDate: string;
@@ -359,38 +363,50 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
     });
   }
 
-  let activePlan: Awaited<ReturnType<typeof getActivePlan>> | null = null;
+  let savedPlan: Awaited<ReturnType<typeof retainReviewedGeneratedPlanCandidateForUser>>;
   try {
-    activePlan = await getActivePlan(userId);
-  } catch {
-    return buildConfirmFailure({
-      reason: "persistence_failed",
-      message:
-        "The selected running plan could not verify the current active-plan state. Try again before creating a plan.",
-      sourceKind: request.sourceKind,
-    });
-  }
-
-  if (activePlan) {
-    return buildConfirmFailure({
-      reason: "active_plan_exists",
-      message:
-        "Selected plans can create a new plan only when there is no active plan. Use Add plan from the calendar to start a reviewed plan change.",
-      sourceKind: request.sourceKind,
-    });
-  }
-
-  try {
-    const applyResult = await createFirstPlanFromReviewedCanonicalPlanForUser(
+    savedPlan = await retainReviewedGeneratedPlanCandidateForUser({
       userId,
-      exactness.canonicalPlan,
-      buildRunningPlanPersistenceMetadata({
+      canonicalPlan: exactness.canonicalPlan,
+      reviewChecksum: exactness.reviewChecksum,
+      planMetadata: buildRunningPlanPersistenceMetadata({
         draft: exactness.draft,
         canonicalPlan: exactness.canonicalPlan,
         reviewChecksum: exactness.reviewChecksum,
       }),
-      { expectedProfileRevision: currentProfileSnapshot.profileRevision },
+    });
+  } catch {
+    return buildConfirmFailure({
+      reason: "persistence_failed",
+      message: "The selected running plan could not verify its private saved record before apply.",
+      sourceKind: request.sourceKind,
+    });
+  }
+
+  if (!savedPlan || !stableJsonEqual(savedPlan.saved_plan_payload, exactness.canonicalPlan)) {
+    return buildConfirmFailure({
+      reason: "stale_review",
+      message: "The reviewed plan no longer matches its private saved record. Refresh the preview.",
+      sourceKind: request.sourceKind,
+    });
+  }
+
+  try {
+    const applyResult = await applySavedPlanRecordForUser(
+      userId,
+      savedPlan.id,
+      "apply_if_future_empty",
     );
+
+    if (!applyResult.ok) {
+      return buildConfirmFailure({
+        reason: "replacement_required",
+        message:
+          "Future Calendar workouts already exist. Apply this saved plan only after explicitly choosing Replace future workouts.",
+        sourceKind: request.sourceKind,
+      });
+    }
+
     await markAiPlanGenerationPersisted({
       trace: exactness.draft.aiGeneration.generationTrace,
     });
@@ -401,14 +417,13 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
       persisted: true,
       sourceKind: request.sourceKind,
       sourceStatus: RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
+      savedPlanId: savedPlan.id,
       schemaVersion: exactness.canonicalPlan.schema_version,
-      effectiveStartDate: applyResult.effectiveStartDate,
+      effectiveStartDate: applyResult.appliedStartDate,
       appliedStartDate: applyResult.appliedStartDate,
       workoutCount: applyResult.workoutCount,
-      calendarRowCount: exactness.canonicalPlan.planned_workouts.length,
-      nonRestWorkoutCount: exactness.canonicalPlan.planned_workouts.filter(
-        (workout) => workout.workout_type !== "rest",
-      ).length,
+      calendarRowCount: applyResult.calendarRowCount,
+      nonRestWorkoutCount: applyResult.workoutCount,
       reviewChecksum: exactness.reviewChecksum,
       safety: {
         requiresExplicitConfirm: true,
@@ -418,7 +433,7 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
       },
     };
   } catch (error) {
-    if (error instanceof ActivePlanPersistenceRejection && error.reason === "stale_review") {
+    if (error instanceof CalendarPersistenceRejection && error.reason === "stale_review") {
       await markAiPlanGenerationPersistenceFailed({
         trace: exactness.draft.aiGeneration.generationTrace,
         reason: "stale_review",
@@ -426,19 +441,6 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
       return buildConfirmFailure({
         reason: "stale_review",
         message: error.message,
-        sourceKind: request.sourceKind,
-      });
-    }
-
-    if (error instanceof Error && /active plan/i.test(error.message)) {
-      await markAiPlanGenerationPersistenceFailed({
-        trace: exactness.draft.aiGeneration.generationTrace,
-        reason: "active_plan_exists",
-      });
-      return buildConfirmFailure({
-        reason: "active_plan_exists",
-        message:
-          "Generated plans can create a new plan only when there is no active plan. Use Add plan from the calendar to start a reviewed plan change.",
         sourceKind: request.sourceKind,
       });
     }
@@ -514,6 +516,7 @@ export async function buildReviewedAiGeneratedRunningPlanPreviewForUser(
   data: RunningPlanPreviewActionInput,
   options: BuildAiGeneratedRunningPlanPreviewOptions = {},
 ): Promise<RunningPlanReviewedPreviewResult> {
+  const calendarDate = userId ? await getRunnerCalendarDateForUserId(userId) : null;
   let runnerProfileSnapshot: Awaited<
     ReturnType<typeof getRunnerPlanAuthoringProfileSnapshotForUserId>
   > = null;
@@ -525,10 +528,51 @@ export async function buildReviewedAiGeneratedRunningPlanPreviewForUser(
     runnerProfileSnapshot = null;
   }
 
-  return buildReviewedAiGeneratedRunningPlanPreview(data, {
-    ...options,
-    ...(runnerProfileSnapshot ? { runnerProfileSnapshot } : {}),
-  });
+  const reviewed = await buildReviewedAiGeneratedRunningPlanPreview(
+    calendarDate && !data.startDate?.trim() ? { ...data, startDate: calendarDate } : data,
+    {
+      ...options,
+      ...(runnerProfileSnapshot ? { runnerProfileSnapshot } : {}),
+    },
+  );
+
+  if (!userId || !reviewed.ok) {
+    return reviewed;
+  }
+
+  try {
+    const savedPlan = await retainReviewedGeneratedPlanCandidateForUser({
+      userId,
+      canonicalPlan: reviewed.draft.canonicalPlan,
+      reviewChecksum: reviewed.draft.reviewChecksum,
+      planMetadata: buildRunningPlanPersistenceMetadata({
+        draft: reviewed.draft,
+        canonicalPlan: reviewed.draft.canonicalPlan,
+        reviewChecksum: reviewed.draft.reviewChecksum,
+      }),
+    });
+
+    return { ...reviewed, savedPlanId: savedPlan.id };
+  } catch {
+    const generationTrace = await markAiPlanGenerationPersistenceFailed({
+      trace: reviewed.draft.aiGeneration.generationTrace,
+      reason: "saved_plan_candidate_persistence_failed",
+      options: options.aiPreview?.generationLedger,
+    });
+
+    return {
+      ok: false,
+      unavailable: buildAiGeneratedRunningPlanPreviewUnavailable({
+        code: "ai_generated_plan_unavailable",
+        message: "The generated plan could not be retained in the private saved-plan library.",
+        issues: ["The reviewed candidate was not returned because persistence did not complete."],
+        generationTrace,
+        input: data,
+        normalizedInputSummary: reviewed.draft.normalizedInputSummary,
+        previewOutcome: "candidate_persistence_failure",
+      }),
+    };
+  }
 }
 
 export function projectRunningPlanPreviewResultForProduct(
@@ -576,6 +620,7 @@ export function projectRunningPlanPreviewResultForProduct(
         endpointDistanceMeters: row.endpointDistanceMeters,
       })),
       workoutDocuments: draft.workoutDocuments,
+      savedPlanId: result.savedPlanId ?? null,
       reviewToken: draft.reviewToken,
       reviewChecksum: draft.reviewChecksum,
     },

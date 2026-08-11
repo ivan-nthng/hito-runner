@@ -3,9 +3,9 @@ import type {
   PersistedPlannedWorkoutRow,
   PersistedWorkoutLogRow,
 } from "@/lib/active-plan-persistence";
-import { resolveActivePlanWorkoutEditability } from "@/lib/active-plan-workout-editing/policy";
+import { resolveCalendarWorkoutEditability } from "@/lib/active-plan-workout-editing/policy";
+import { reviewManualWorkoutDraft } from "@/lib/manual-workout-authoring/actions";
 import { buildManualWorkoutDraftInputFromPersistedWorkout } from "@/lib/manual-workout-authoring/copy-paste-reconstruction";
-import { persistedManualWorkoutHasUnsafeMetricTruth } from "@/lib/manual-workout-authoring/persisted-workout-safety";
 
 export type ActivePlanWorkoutSourceEditingEligibility =
   | "eligible_past_unlogged"
@@ -40,30 +40,30 @@ export interface ActivePlanWorkoutSourceEditingCapabilities {
   message: string | null;
 }
 
-export function resolveActivePlanWorkoutSourceEditingCapabilities({
-  activePlan,
+export function resolveCalendarWorkoutSourceEditingCapabilities({
+  provenancePlan,
   currentDate,
   evidenceWorkoutIds,
   log,
   workout,
 }: {
-  activePlan: PersistedPlanCycleRow | null;
+  provenancePlan: PersistedPlanCycleRow | null;
   workout: PersistedPlannedWorkoutRow;
   log: PersistedWorkoutLogRow | null;
   evidenceWorkoutIds: ReadonlySet<string>;
   currentDate: string;
 }): ActivePlanWorkoutSourceEditingCapabilities {
-  if (!activePlan) {
+  if (!provenancePlan) {
     return blockedSourceEditing(
-      "unsupported_active_plan_source",
-      "There is no active plan for direct workout actions.",
+      "unsupported_source_metadata",
+      "This workout provenance is unavailable for direct workout actions.",
     );
   }
 
-  if (workout.user_id !== activePlan.user_id || workout.plan_cycle_id !== activePlan.id) {
+  if (workout.user_id !== provenancePlan.user_id) {
     return blockedSourceEditing(
       "unsupported_source_metadata",
-      "This workout row is not part of the current active plan.",
+      "This workout row does not belong to the current runner.",
     );
   }
 
@@ -71,35 +71,31 @@ export function resolveActivePlanWorkoutSourceEditingCapabilities({
     return blockedSourceEditing("rest_day", "Rest days cannot start direct workout actions.");
   }
 
-  const moveEditability = resolveActivePlanWorkoutEditability(activePlan, "move_workout");
-  const copyEditability = resolveActivePlanWorkoutEditability(activePlan, "copy_workout");
-  const contentEditability = resolveActivePlanWorkoutEditability(activePlan, "edit_workout");
-  const supportsManualDraftReconstruction = !persistedManualWorkoutHasUnsafeMetricTruth(workout);
-  const canAttemptManualContentReconstruction = copyEditability.ok || contentEditability.ok;
-  const reconstructableManualDraft = canAttemptManualContentReconstruction
+  const moveEditability = resolveCalendarWorkoutEditability(provenancePlan, "move_workout");
+  const contentEditability = resolveCalendarWorkoutEditability(provenancePlan, "edit_workout");
+  const reconstructedManualDraft = contentEditability.ok
     ? buildManualWorkoutDraftInputFromPersistedWorkout(
         workout,
         workout.workout_date < currentDate ? currentDate : workout.workout_date,
         {
-          activePlanId: activePlan.id,
-          activePlanSourceKind: activePlan.source_kind,
+          activePlanId: provenancePlan.id,
+          activePlanSourceKind: provenancePlan.source_kind,
         },
-      ).ok
-    : false;
-  const canCopy =
-    copyEditability.ok && supportsManualDraftReconstruction && reconstructableManualDraft;
+      )
+    : null;
+  const reconstructableManualDraft = Boolean(
+    reconstructedManualDraft?.ok &&
+    reviewManualWorkoutDraft(reconstructedManualDraft.draftInput).ok,
+  );
+  const canCopy = true;
   const canEditContent =
-    contentEditability.ok &&
-    supportsManualDraftReconstruction &&
-    reconstructableManualDraft &&
-    workout.workout_date >= currentDate;
+    contentEditability.ok && reconstructableManualDraft && workout.workout_date >= currentDate;
 
   if (!moveEditability.ok) {
     return blockedSourceEditing(
-      moveEditability.reason === "unsupported_source_metadata"
-        ? "unsupported_source_metadata"
-        : "unsupported_active_plan_source",
+      "unsupported_source_metadata",
       moveEditability.message,
+      canCopy,
       canEditContent,
     );
   }
@@ -107,7 +103,8 @@ export function resolveActivePlanWorkoutSourceEditingCapabilities({
   if (log) {
     return blockedSourceEditing(
       log.outcome === "skipped" ? "skipped_logged_workout" : "logged_workout",
-      "Logged workouts cannot be moved, cleared, copied, or dragged.",
+      "Logged workouts cannot be moved, cleared, or dragged; their prescription can still be copied.",
+      canCopy,
       canEditContent,
     );
   }
@@ -115,7 +112,8 @@ export function resolveActivePlanWorkoutSourceEditingCapabilities({
   if (evidenceWorkoutIds.has(workout.id)) {
     return blockedSourceEditing(
       "evidence_backed_workout",
-      "Evidence-backed workouts cannot be moved, cleared, copied, or dragged.",
+      "Evidence-backed workouts cannot be moved, cleared, or dragged; their prescription can still be copied.",
+      canCopy,
       canEditContent,
     );
   }
@@ -133,7 +131,7 @@ export function resolveActivePlanWorkoutSourceEditingCapabilities({
 
   return allowedSourceEditing({
     eligibility: "eligible_past_unlogged",
-    canCopy: false,
+    canCopy,
     canEditContent: false,
   });
 }
@@ -166,19 +164,20 @@ function allowedSourceEditing({
 function blockedSourceEditing(
   reason: ActivePlanWorkoutSourceEditingReason,
   message: string,
+  canCopy = false,
   canEditContent = false,
 ): ActivePlanWorkoutSourceEditingCapabilities {
   return {
     canMove: false,
     canClear: false,
-    canCopy: false,
+    canCopy,
     canEditContent,
-    canDirectCopy: false,
+    canDirectCopy: canCopy,
     canDirectMove: false,
     canDragInitiate: false,
     eligibility: "blocked",
     reason,
-    copyReason: reason,
+    copyReason: canCopy ? null : reason,
     editContentReason: canEditContent ? null : reason,
     message,
   };

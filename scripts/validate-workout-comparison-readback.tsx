@@ -109,22 +109,71 @@ const actualOnlyMarkup = renderToStaticMarkup(
         activityLocalDate: "2026-07-30",
         actualDurationMin: 42,
         actualDistanceKm: 6.8,
-        actualAvgHr: null,
-        actualMaxHr: null,
-        actualAvgPower: null,
-        actualMaxPower: null,
-        actualAvgCadence: null,
-        actualCalories: null,
-        actualElevationGainM: null,
-        actualElevationLossM: null,
-        actualIntervalCount: null,
+        actualAvgHr: 134,
+        actualMaxHr: 145,
+        actualAvgPower: 262,
+        actualMaxPower: 371,
+        actualAvgCadence: 69,
+        actualCalories: 454,
+        actualElevationGainM: 25,
+        actualElevationLossM: 33,
+        actualIntervalCount: 3,
         createdAt: "2026-07-30T07:30:00.000Z",
       } satisfies WorkoutActualMetricsSummary
     }
   />,
 );
-assert.match(actualOnlyMarkup, /Run captured/);
+assert.match(actualOnlyMarkup, /Observed run/);
 assert.match(actualOnlyMarkup, /Comparison unavailable/);
+assert.match(actualOnlyMarkup, /Workout day/);
+assert.match(actualOnlyMarkup, /Duration/);
+assert.match(actualOnlyMarkup, /Distance/);
+assert.match(actualOnlyMarkup, /Elevation gain/);
+assert.match(actualOnlyMarkup, /25 m/);
+assert.match(actualOnlyMarkup, /Elevation loss/);
+assert.match(actualOnlyMarkup, /33 m/);
+assert.match(actualOnlyMarkup, /Average heart rate/);
+assert.match(actualOnlyMarkup, /134 bpm/);
+assert.match(actualOnlyMarkup, /Maximum heart rate/);
+assert.match(actualOnlyMarkup, /145 bpm/);
+assert.match(actualOnlyMarkup, /Average power/);
+assert.match(actualOnlyMarkup, /262 W/);
+assert.match(actualOnlyMarkup, /Maximum power/);
+assert.match(actualOnlyMarkup, /371 W/);
+assert.match(actualOnlyMarkup, /Average cadence/);
+assert.match(actualOnlyMarkup, /69 spm/);
+assert.match(actualOnlyMarkup, /Calories/);
+assert.match(actualOnlyMarkup, /454 kcal/);
+assert.match(actualOnlyMarkup, /Structured intervals/);
+assert.match(actualOnlyMarkup, /3 intervals/);
+
+const observedWithComparisonMarkup = renderToStaticMarkup(
+  <RunCapturedReadback
+    actual={{
+      id: "10000000-0000-4000-8000-000000000002",
+      plannedWorkoutId: COMPLETION_ID,
+      resultAssetId: "10000000-0000-4000-8000-000000000003",
+      sourceKind: "garmin_fit",
+      activityStartedAt: null,
+      activityLocalDate: "2026-07-30",
+      actualDurationMin: 42,
+      actualDistanceKm: 6.8,
+      actualAvgHr: null,
+      actualMaxHr: null,
+      actualAvgPower: null,
+      actualMaxPower: null,
+      actualAvgCadence: null,
+      actualCalories: null,
+      actualElevationGainM: null,
+      actualElevationLossM: null,
+      actualIntervalCount: null,
+      createdAt: "2026-07-30T07:30:00.000Z",
+    }}
+    comparisonAvailable
+  />,
+);
+assert.match(observedWithComparisonMarkup, /Observed run/);
+assert.doesNotMatch(observedWithComparisonMarkup, /Comparison unavailable/);
 
 console.log("Workout comparison readback contract passed.");
 

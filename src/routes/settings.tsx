@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/AppShell";
 import { TrainingPreferenceFields } from "@/components/onboarding/TrainingPreferenceFields";
 import { ThemePreferenceSection } from "@/components/settings/ThemePreferenceSection";
+import { RunnerCalendarTimezoneSection } from "@/components/settings/RunnerCalendarTimezonePreference";
 import { type WeekdayName } from "@/components/onboarding/onboarding-form-model";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { HitoButton } from "@/components/ui/button";
@@ -154,7 +155,7 @@ function SettingsPage() {
         <div className="hito-route-gutter hito-route-stack py-20">
           <section className="hito-state-surface" data-tone="signal">
             <p className="hito-label">Sign in first</p>
-            <h1 className="hito-page-title">User settings open after sign-in.</h1>
+            <h1 className="hito-ui-page-title">User settings open after sign-in.</h1>
             <p className="hito-page-copy">
               Save a profile first, then you can manage your avatar, body data, and future heart
               rate settings here.
@@ -177,7 +178,7 @@ function SettingsPage() {
         <div className="hito-route-gutter hito-route-stack py-20">
           <section className="hito-state-surface" data-tone="signal">
             <p className="hito-label">Finish setup first</p>
-            <h1 className="hito-page-title">User settings need a saved runner profile.</h1>
+            <h1 className="hito-ui-page-title">User settings need a saved runner profile.</h1>
             <p className="hito-page-copy">
               Complete setup on home first, then this page can store your profile details.
             </p>
@@ -200,7 +201,7 @@ function SettingsPage() {
       <div className="hito-route-gutter hito-route-stack max-w-5xl py-10">
         <header className="hito-page-header">
           <p className="hito-label">User settings</p>
-          <h1 className="hito-page-title">Profile details that follow your training.</h1>
+          <h1 className="hito-ui-page-title">Profile details that follow your training.</h1>
           <p className="hito-page-copy">
             Keep your personal data and future-plan training defaults in one place. Settings update
             your runner profile, not the active plan already on your calendar.
@@ -333,7 +334,7 @@ function SettingsPage() {
               <section className="hito-settings-section">
                 <div className="flex items-center gap-2">
                   <Icon name="user" size="sm" className="text-signal" />
-                  <h2 className="hito-section-title">Identity</h2>
+                  <h2 className="hito-ui-section-title">Identity</h2>
                 </div>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <Field
@@ -361,8 +362,10 @@ function SettingsPage() {
                 </div>
               </section>
 
+              <RunnerCalendarTimezoneSection preference={settings} />
+
               <section className="hito-settings-section">
-                <h2 className="hito-section-title">Body data</h2>
+                <h2 className="hito-ui-section-title">Body data</h2>
                 <p className="hito-support-copy mt-2">
                   The same compact profile facts used during plan setup.
                 </p>
@@ -445,7 +448,7 @@ function SettingsPage() {
             <div>
               <div className="flex items-center gap-2">
                 <Icon name="calendar" size="sm" className="text-signal" />
-                <h2 className="hito-section-title">Training preferences</h2>
+                <h2 className="hito-ui-section-title">Training preferences</h2>
               </div>
               <p className="hito-support-copy mt-3 max-w-2xl">
                 Defaults for new plans only. They prefill setup but never rewrite an existing active

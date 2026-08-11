@@ -1,6 +1,6 @@
 import type { ImportedPlanSeed, ImportedWorkoutSeed } from "@/lib/imported-plan";
 import { resolveCanonicalWorkoutModel, toCanonicalMetricModeJson } from "@/lib/rich-workout-model";
-import { addDaysIso, diffDaysIso, weekdayLong } from "@/lib/training";
+import { addDaysIso, diffDaysIso, startOfWeekIso, weekdayLong } from "@/lib/training";
 import type { Json } from "@/lib/supabase/database";
 
 export const WEEKDAY_NAMES = [
@@ -103,7 +103,20 @@ export function mapImportedSeedAcrossAllowedWeekdays(
   importedSeed: ImportedPlanSeed,
   startDate: string,
   invariant: WeekdayRestInvariant,
+  options: {
+    preserveSourceWeeklyCounts?: boolean;
+    preferredLongRunDay?: WeekdayName | null;
+  } = {},
 ): ImportedPlanSeed {
+  if (options.preserveSourceWeeklyCounts) {
+    return mapImportedSeedBySourceWeek(
+      importedSeed,
+      startDate,
+      invariant,
+      options.preferredLongRunDay ?? null,
+    );
+  }
+
   if (!invariant.blockedWeekdays.length) {
     return shiftImportedSeedToStartDate(importedSeed, startDate);
   }
@@ -160,6 +173,150 @@ export function mapImportedSeedAcrossAllowedWeekdays(
     targetDate: sourceTargetOffset == null ? null : addDaysIso(startDate, sourceTargetOffset),
     workouts,
   };
+}
+
+function mapImportedSeedBySourceWeek(
+  importedSeed: ImportedPlanSeed,
+  startDate: string,
+  invariant: WeekdayRestInvariant,
+  preferredLongRunDay: WeekdayName | null,
+): ImportedPlanSeed {
+  assertStartDateAllowedByWeekdayRestInvariant(startDate, invariant);
+
+  const sourceRowsByWeek = new Map<string, ImportedWorkoutSeed[]>();
+  for (const workout of importedSeed.workouts) {
+    const weekStart = startOfWeekIso(workout.workoutDate);
+    const workouts = sourceRowsByWeek.get(weekStart) ?? [];
+    workouts.push(workout);
+    sourceRowsByWeek.set(weekStart, workouts);
+  }
+
+  if (!sourceRowsByWeek.size) {
+    return shiftImportedSeedToStartDate(importedSeed, startDate);
+  }
+
+  const workouts: ImportedWorkoutSeed[] = [];
+  for (const [weekStart, sourceRows] of sourceRowsByWeek) {
+    const sourceWorkouts = sourceRows.filter((workout) => workout.workoutType !== "rest");
+    const sourceWeekStartDate = sourceRows[0]?.workoutDate;
+    const sourceWeekEndDate = sourceRows.at(-1)?.workoutDate;
+
+    if (!sourceWeekStartDate || !sourceWeekEndDate) {
+      continue;
+    }
+
+    const requestedWeekBoundary = weekStart === startOfWeekIso(startDate) ? startDate : weekStart;
+    const weekBoundary =
+      sourceWeekStartDate > requestedWeekBoundary ? sourceWeekStartDate : requestedWeekBoundary;
+
+    const allowedDates = WEEKDAY_NAMES.map((_, index) => addDaysIso(weekStart, index)).filter(
+      (date) =>
+        date >= weekBoundary &&
+        !invariant.blockedWeekdays.includes(weekdayLong(date) as WeekdayName),
+    );
+
+    if (sourceWorkouts.length > allowedDates.length) {
+      throw new Error(
+        `This saved plan has ${sourceWorkouts.length} running workouts in the week of ${weekStart}, but only ${allowedDates.length} compatible weekdays are available.`,
+      );
+    }
+
+    const assignedDates = assignSourceWeekWorkoutDates(
+      sourceWorkouts,
+      allowedDates,
+      weekStart,
+      preferredLongRunDay,
+    );
+    const assignmentByDate = new Map(
+      assignedDates.map((date, index) => [date, sourceWorkouts[index]!] as const),
+    );
+    const lastAssignedDate = assignedDates.at(-1);
+
+    const materializedWeekEndDate =
+      lastAssignedDate && lastAssignedDate > sourceWeekEndDate
+        ? lastAssignedDate
+        : sourceWeekEndDate;
+
+    for (
+      let cursorDate = weekBoundary;
+      cursorDate <= materializedWeekEndDate;
+      cursorDate = addDaysIso(cursorDate, 1)
+    ) {
+      const sourceWorkout = assignmentByDate.get(cursorDate);
+      if (sourceWorkout) {
+        workouts.push({
+          ...sourceWorkout,
+          workoutDate: cursorDate,
+          weekday: weekdayLong(cursorDate),
+          displayOrder: workouts.length,
+        });
+        continue;
+      }
+
+      workouts.push(
+        buildInsertedRestWorkout(importedSeed, startDate, cursorDate, workouts.length, {
+          fixedRestDay: invariant.blockedWeekdays.includes(weekdayLong(cursorDate) as WeekdayName),
+        }),
+      );
+    }
+  }
+
+  const firstWorkout = workouts[0];
+  if (!firstWorkout) {
+    throw new Error("This saved plan has no remaining future workouts to apply.");
+  }
+
+  return {
+    ...importedSeed,
+    startDate: firstWorkout.workoutDate,
+    endDate: workouts.at(-1)?.workoutDate ?? firstWorkout.workoutDate,
+    workouts,
+  };
+}
+
+function assignSourceWeekWorkoutDates(
+  sourceWorkouts: ImportedWorkoutSeed[],
+  allowedDates: string[],
+  weekStart: string,
+  preferredLongRunDay: WeekdayName | null,
+) {
+  if (!preferredLongRunDay) {
+    return allowedDates.slice(0, sourceWorkouts.length);
+  }
+
+  const longRunIndexes = sourceWorkouts.flatMap((workout, index) =>
+    workout.workoutType === "long_run" ? [index] : [],
+  );
+  if (longRunIndexes.length === 0) {
+    return allowedDates.slice(0, sourceWorkouts.length);
+  }
+  if (longRunIndexes.length > 1) {
+    throw new Error(
+      `This saved plan has more than one long run in the week of ${weekStart}; a single preferred long-run day cannot preserve their order.`,
+    );
+  }
+
+  const longRunIndex = longRunIndexes[0]!;
+  const preferredDate = addDaysIso(weekStart, WEEKDAY_NAMES.indexOf(preferredLongRunDay));
+  const earlierDates = allowedDates.filter((date) => date < preferredDate);
+  const laterDates = allowedDates.filter((date) => date > preferredDate);
+  const laterWorkoutCount = sourceWorkouts.length - longRunIndex - 1;
+
+  if (
+    !allowedDates.includes(preferredDate) ||
+    earlierDates.length < longRunIndex ||
+    laterDates.length < laterWorkoutCount
+  ) {
+    throw new Error(
+      `This saved plan cannot preserve workout order and place its long run on ${preferredLongRunDay} in the week of ${weekStart}.`,
+    );
+  }
+
+  return [
+    ...earlierDates.slice(0, longRunIndex),
+    preferredDate,
+    ...laterDates.slice(0, laterWorkoutCount),
+  ];
 }
 
 export function validateWorkoutsAgainstWeekdayRestInvariant(
@@ -254,6 +411,7 @@ function buildInsertedRestWorkout(
   startDate: string,
   workoutDate: string,
   displayOrder: number,
+  options: { fixedRestDay?: boolean } = {},
 ): ImportedWorkoutSeed {
   const weekday = weekdayLong(workoutDate);
   const sourceWorkout = importedSeed.workouts[displayOrder] ?? importedSeed.workouts[0];
@@ -278,7 +436,7 @@ function buildInsertedRestWorkout(
     goalContext: sourceWorkout?.goalContext ?? null,
     metricMode: toCanonicalMetricModeJson(richWorkout.metricMode),
     title: "Rest day",
-    notes: "Fixed weekday rest day.",
+    notes: options.fixedRestDay ? "Fixed weekday rest day." : "Schedule-aligned rest day.",
     plannedRpe: null,
     estimatedFatigue: null,
     recoveryPriority: "high",
@@ -289,7 +447,9 @@ function buildInsertedRestWorkout(
         segment_type: "rest",
         label: "Rest",
         sequence: 1,
-        guidance: "No running scheduled because this weekday is reserved as rest.",
+        guidance: options.fixedRestDay
+          ? "No running scheduled because this weekday is reserved as rest."
+          : "No running is scheduled on this materialized plan day.",
       },
     ],
     displayOrder,

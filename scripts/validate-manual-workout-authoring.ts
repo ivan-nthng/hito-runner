@@ -10,9 +10,9 @@ import { buildManualWorkoutDraftInputFromPersistedWorkout } from "../src/lib/man
 import { AI_AUTHORED_PLAN_FIRST_WORKOUT_IDENTITY_VALUES } from "../src/lib/ai-authored-plan-first-provider-contract";
 import type { PersistedPlannedWorkoutRow } from "../src/lib/active-plan-persistence";
 import {
-  isEditableActivePlanSourceKind,
-  isManualContentEditableActivePlanSourceKind,
-  resolveActivePlanWorkoutEditability,
+  isContentCopyableCalendarWorkoutSourceKind,
+  isEditableCalendarWorkoutSourceKind,
+  resolveCalendarWorkoutEditability,
 } from "../src/lib/active-plan-workout-editing/policy";
 import { addDaysIso, todayIso, type Step } from "../src/lib/training";
 import {
@@ -73,7 +73,7 @@ async function main() {
   validateManualTemplateDefaultSkeletons();
   await validateManualWorkoutTemplateCatalogContract();
   validateManualDateOnlyLabels();
-  validateActivePlanLifecycleAndContentEditabilityPolicy();
+  validateCalendarWorkoutContentEditabilityPolicy();
   validateClosedAiPersistedEditorIdentitySet();
   validateAiAuthoredOrderedRepeatRoleRoundtrip();
   validateManualSourceEditingCapabilityReadback();
@@ -110,7 +110,6 @@ async function main() {
         preflight: persistencePreflight,
       })
     : buildSkippedDisposablePersistenceResult(persistencePreflight);
-
   console.log("Manual workout authoring review contract invariants passed.", {
     persistence: persistenceProof,
   });
@@ -147,7 +146,7 @@ function validateManualTitleDurationContract() {
   }
 }
 
-function validateActivePlanLifecycleAndContentEditabilityPolicy() {
+function validateCalendarWorkoutContentEditabilityPolicy() {
   const userId = "00000000-0000-4000-8000-000000000010";
   const lifecycleEditableSources = [
     MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
@@ -165,13 +164,13 @@ function validateActivePlanLifecycleAndContentEditabilityPolicy() {
     });
 
     assert.equal(
-      isEditableActivePlanSourceKind(sourceKind),
+      isEditableCalendarWorkoutSourceKind(sourceKind),
       true,
       `${sourceKind} should be an editable active-plan source`,
     );
 
     for (const operation of ["add_workout", "clear_workout", "move_workout"] as const) {
-      const editability = resolveActivePlanWorkoutEditability(activePlan, operation);
+      const editability = resolveCalendarWorkoutEditability(activePlan, operation);
       assert.equal(editability.ok, true, `${sourceKind} ${operation} editability should pass.`);
       if (editability.ok) {
         assert.equal(editability.sourceKind, sourceKind);
@@ -179,15 +178,14 @@ function validateActivePlanLifecycleAndContentEditabilityPolicy() {
       }
     }
 
-    const copyEditability = resolveActivePlanWorkoutEditability(activePlan, "copy_workout");
-    const contentEditability = resolveActivePlanWorkoutEditability(activePlan, "edit_workout");
-    const shouldAllowCopy = isManualContentEditableActivePlanSourceKind(sourceKind);
-
+    const copyEditability = resolveCalendarWorkoutEditability(activePlan, "copy_workout");
+    const contentEditability = resolveCalendarWorkoutEditability(activePlan, "edit_workout");
     assert.equal(
       copyEditability.ok,
-      shouldAllowCopy,
-      `${sourceKind} copy_workout editability should stay manual-content scoped.`,
+      true,
+      `${sourceKind} copy_workout editability should reach persisted reconstruction guards.`,
     );
+    assert.equal(isContentCopyableCalendarWorkoutSourceKind(sourceKind), true);
     assert.equal(
       contentEditability.ok,
       true,
@@ -196,9 +194,14 @@ function validateActivePlanLifecycleAndContentEditabilityPolicy() {
   }
 
   assert.equal(
-    isEditableActivePlanSourceKind("external_partner_import"),
-    false,
-    "arbitrary import-origin labels must not become active-plan capability identities",
+    isEditableCalendarWorkoutSourceKind("external_partner_import"),
+    true,
+    "plan origin is provenance and must not gate materialized workout actions",
+  );
+  assert.equal(
+    isContentCopyableCalendarWorkoutSourceKind("external_partner_import"),
+    true,
+    "every persisted non-Rest prescription remains copyable across plan origins",
   );
 
   const unknownPlan = buildFakePlanCycle({
@@ -208,18 +211,15 @@ function validateActivePlanLifecycleAndContentEditabilityPolicy() {
     startDate: "2026-06-16",
     endDate: "2026-06-30",
   });
-  const unknown = resolveActivePlanWorkoutEditability(unknownPlan, "add_workout");
-  assert.equal(unknown.ok, false, "unknown active-plan source should stay blocked");
-  if (!unknown.ok) {
-    assert.equal(unknown.reason, "unsupported_active_plan_source");
-  }
+  const unknown = resolveCalendarWorkoutEditability(unknownPlan, "add_workout");
+  assert.equal(unknown.ok, true, "unknown saved-plan provenance must not govern calendar actions");
   assert.equal(
-    resolveActivePlanWorkoutEditability(unknownPlan, "edit_workout").ok,
+    resolveCalendarWorkoutEditability(unknownPlan, "edit_workout").ok,
     true,
     "confirmed workout content editing should not inherit lifecycle source allowlists",
   );
 
-  const missingSource = resolveActivePlanWorkoutEditability(
+  const missingSource = resolveCalendarWorkoutEditability(
     buildFakePlanCycle({
       userId,
       id: "00000000-0000-4000-8000-000000000013",

@@ -115,12 +115,14 @@ export function BodyNotesSummaryRow({
 }
 
 export function BodyNotesModal({
+  baselineBodyNotes,
   open,
   bodyNotes,
   onOpenChange,
   onChange,
   onSave,
 }: {
+  baselineBodyNotes: BodyNoteDraft[];
   open: boolean;
   bodyNotes: BodyNoteDraft[];
   onOpenChange: (open: boolean) => void;
@@ -136,7 +138,7 @@ export function BodyNotesModal({
         className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-workflow hito-dialog-height-workflow-relaxed"
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-modal-title">Body notes</DialogTitle>
+          <DialogTitle className="hito-ui-modal-title">Body notes</DialogTitle>
           <DialogDescription className="hito-body max-w-2xl">
             These notes stay attached to this workout result only. Use them to mark where the run
             felt off without turning the result into a second full form.
@@ -186,6 +188,7 @@ export function BodyNotesModal({
                   key={`${bodyNote.area}-${bodyNote.timing}-${index}`}
                   bodyNote={bodyNote}
                   index={index}
+                  previousSeverity={baselineBodyNotes[index]?.severity ?? 2}
                   onChange={(patch) => onChange(updateBodyNoteDraftList(bodyNotes, index, patch))}
                   onRemove={() => onChange(bodyNotes.filter((_, noteIndex) => noteIndex !== index))}
                 />
@@ -222,11 +225,13 @@ export function BodyNotesModal({
 function BodyNoteEditorCard({
   bodyNote,
   index,
+  previousSeverity,
   onChange,
   onRemove,
 }: {
   bodyNote: BodyNoteDraft;
   index: number;
+  previousSeverity: BodyNote["severity"];
   onChange: (patch: Partial<BodyNoteDraft>) => void;
   onRemove: () => void;
 }) {
@@ -274,6 +279,8 @@ function BodyNoteEditorCard({
         min={1}
         max={5}
         step={1}
+        previousValue={previousSeverity}
+        previousValueLabel={`Restore session severity ${previousSeverity} out of 5`}
         value={bodyNote.severity}
         valueLabel={`${bodyNote.severity}/5`}
         ariaValueText={`Severity ${bodyNote.severity} out of 5`}

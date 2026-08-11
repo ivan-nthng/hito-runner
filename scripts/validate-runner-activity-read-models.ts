@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { clearUpcomingScheduleForUser } from "../src/lib/active-plan-lifecycle-actions";
 import { recordRunnerActivitySessionRpeForUser } from "../src/lib/runner-activity/activity-evidence";
 import { getRunnerActivityProgressFactsForUser } from "../src/lib/runner-activity/fact-snapshots";
 import {
@@ -17,8 +16,15 @@ import {
 } from "../src/lib/runner-activity/product-contract";
 import { getRunnerActivityProgressForUser } from "../src/lib/runner-activity/read-model";
 import { getPersistedSnapshot } from "../src/lib/training-api";
+import { updateUserSettingsForUserId } from "../src/lib/user-settings-actions";
 import { WORKOUT_RESULT_STORAGE_BUCKET } from "../src/lib/workout-result-import/types";
-import { addDaysIso, todayIso, weekdayLong } from "../src/lib/training";
+import {
+  addDaysIso,
+  diffDaysIso,
+  startOfWeekIso,
+  todayIso,
+  weekdayLong,
+} from "../src/lib/training";
 import {
   QA_TESTER_POOL,
   getQaUserOwnedCounts,
@@ -29,11 +35,7 @@ import {
   loginQaPoolToLoopbackRuntime,
   withRunnerActivityProofLeases,
 } from "./lib/runner-activity-proof-runtime";
-import {
-  createRunnerDesignProfilePlan,
-  readRunnerDesignProfileFixture,
-  seedRunnerDesignProfileFixture,
-} from "./lib/runner-design-profile-fixture";
+import { seedRunnerDesignProfileFixture } from "./lib/runner-design-profile-fixture";
 import { persistGate4SyntheticActivity } from "./lib/runner-activity-gate-4-fixture";
 
 const { supabaseUrl, supabase, ensureUser, signedInClient } =
@@ -274,11 +276,12 @@ async function measureSnapshotReconciliation(userId: string, activityCount: numb
     assert.equal(reconciliationMiss.progress.advancedMetrics.status, "current");
     const productProgress = projectRunnerActivityProgressForProduct(reconciliationMiss.progress);
     assertProductProgressProjection(reconciliationMiss.progress, productProgress);
+    const expectedCalendarWeeks = expectedCalendarWeekCount(AS_OF_DATE);
     if (activityCount === 30) {
-      assert.equal(reconciliationMiss.writeCount, 9);
-      assert.equal(reconciliationMiss.readCount, 15);
+      assert.equal(reconciliationMiss.writeCount, expectedCalendarWeeks + 4);
+      assert.equal(reconciliationMiss.readCount, expectedCalendarWeeks + 10);
     }
-    assert.equal(afterMiss.runner_activity_fact_snapshots, 7);
+    assert.equal(afterMiss.runner_activity_fact_snapshots, expectedCalendarWeeks + 2);
     assert.equal(afterMiss.runner_activity_metric_snapshots, 1);
     assert.equal(afterMiss.runner_activity_metric_observations, activityCount + 1);
     assertCurrentWarmReads(
@@ -287,12 +290,12 @@ async function measureSnapshotReconciliation(userId: string, activityCount: numb
       reconciliationMiss.progress.advancedMetrics.status === "current"
         ? reconciliationMiss.progress.advancedMetrics.snapshotId
         : null,
-      expectedWarmReadCount(activityCount),
+      expectedWarmReadCount(activityCount, AS_OF_DATE),
     );
     assert.deepEqual(snapshotRowCounts(afterWarm), snapshotRowCounts(afterMiss));
 
-    const planLifecycle =
-      activityCount === 30 ? await proveDesignProfilePlanLifecycle(userId) : null;
+    const planAuthorityRetirement =
+      activityCount === 30 ? await proveDesignProfilePlanAuthorityRetirement(userId) : null;
 
     const mutationTarget = await supabase
       .from("runner_activities")
@@ -328,7 +331,7 @@ async function measureSnapshotReconciliation(userId: string, activityCount: numb
       reconciliationMiss.progress.rolling28Day.current.id,
     );
     const afterMutation = await getQaUserOwnedCounts(supabase, userId);
-    assert.equal(afterMutation.runner_activity_fact_snapshots, 7);
+    assert.equal(afterMutation.runner_activity_fact_snapshots, expectedCalendarWeeks + 2);
     assert.equal(afterMutation.runner_activity_metric_snapshots, 2);
     assert.equal(afterMutation.runner_activity_metric_observations, activityCount + 2);
 
@@ -337,7 +340,7 @@ async function measureSnapshotReconciliation(userId: string, activityCount: numb
       postMutationWarmReads,
       reconciliationMiss.progress.rolling28Day.current.id,
       mutation.progress.advancedMetrics.snapshotId,
-      expectedWarmReadCount(activityCount),
+      expectedWarmReadCount(activityCount, AS_OF_DATE),
     );
 
     return {
@@ -368,7 +371,7 @@ async function measureSnapshotReconciliation(userId: string, activityCount: numb
       factualSnapshotRemainedCurrent: true,
       internalPayloadBytes: Buffer.byteLength(JSON.stringify(reconciliationMiss.progress), "utf8"),
       productPayloadBytes: Buffer.byteLength(JSON.stringify(productProgress), "utf8"),
-      planLifecycle,
+      planAuthorityRetirement,
     };
   } finally {
     await resetQaPoolUserData({ supabase, userId });
@@ -377,32 +380,38 @@ async function measureSnapshotReconciliation(userId: string, activityCount: numb
   }
 }
 
-async function proveDesignProfilePlanLifecycle(userId: string) {
-  const cleared = await clearUpcomingScheduleForUser(userId, getPersistedSnapshot, AS_OF_DATE);
-  assert.equal(cleared.status, "cleared");
-  assert.equal(cleared.snapshot.planMeta, null);
-  const historyAfterClear = await listRunnerActivityHistoryForUser({ userId });
-  assert.equal(historyAfterClear.items.length, 20);
-  assert.ok(historyAfterClear.nextCursor);
-  const recreatedPlan = await createRunnerDesignProfilePlan({
-    supabase,
-    userId,
-    asOfDate: AS_OF_DATE,
-  });
-  assert.equal(recreatedPlan.providerDispatchCount, 0);
-  const recreatedProfile = await readRunnerDesignProfileFixture({
-    supabase,
-    userId,
-    asOfDate: AS_OF_DATE,
-  });
-  assert.equal(recreatedProfile.planState.activePlanCount, 1);
-  assert.equal(recreatedProfile.planState.archivedPlanCount, 1);
-  assert.equal(recreatedProfile.history.activityCount, 30);
+async function proveDesignProfilePlanAuthorityRetirement(userId: string) {
+  const [snapshot, planCycles, plannedWorkouts, firstHistoryPage] = await Promise.all([
+    getPersistedSnapshot(userId),
+    supabase.from("plan_cycles").select("id, status, saved_plan_payload").eq("user_id", userId),
+    supabase.from("planned_workouts").select("id, plan_cycle_id").eq("user_id", userId),
+    listRunnerActivityHistoryForUser({ userId }),
+  ]);
+
+  if (planCycles.error) throw new Error(planCycles.error.message);
+  if (plannedWorkouts.error) throw new Error(plannedWorkouts.error.message);
+
+  const materializedPlanIds = new Set(plannedWorkouts.data.map((workout) => workout.plan_cycle_id));
+  const activeAuthorityCount = planCycles.data.filter((plan) => plan.status === "active").length;
+  const materializedProvenanceCount = planCycles.data.filter(
+    (plan) => materializedPlanIds.has(plan.id) && plan.saved_plan_payload === null,
+  ).length;
+
+  assert.equal(
+    activeAuthorityCount,
+    0,
+    "Calendar readback must not require active plan authority.",
+  );
+  assert.equal(materializedProvenanceCount, 1);
+  assert.equal(snapshot.workouts.length, 55);
+  assert.equal(firstHistoryPage.items.length, 20);
+  assert.ok(firstHistoryPage.nextCursor);
+
   return {
-    clearedPlanId: cleared.archivedPlanId,
-    activityCountAfterClear: recreatedProfile.history.activityCount,
-    recreatedPlanId: recreatedPlan.planId,
-    providerDispatchCount: recreatedPlan.providerDispatchCount,
+    activeAuthorityCount,
+    materializedProvenanceCount,
+    workoutCount: snapshot.workouts.length,
+    firstHistoryPageCount: firstHistoryPage.items.length,
   };
 }
 
@@ -429,9 +438,15 @@ function assertCurrentWarmReads(
   );
 }
 
-function expectedWarmReadCount(activityCount: number) {
+function expectedWarmReadCount(activityCount: number, asOfDate: string) {
   const activityPages = Math.floor(activityCount / 500) + 1;
-  return 12 + activityPages * 2;
+  return 7 + expectedCalendarWeekCount(asOfDate) + activityPages * 2;
+}
+
+function expectedCalendarWeekCount(asOfDate: string) {
+  const firstWeek = startOfWeekIso(addDaysIso(asOfDate, -27));
+  const lastWeek = startOfWeekIso(asOfDate);
+  return diffDaysIso(lastWeek, firstWeek) / 7 + 1;
 }
 
 async function seedAdditionalSyntheticActivities(input: { userId: string; activityCount: number }) {
@@ -1009,6 +1024,16 @@ async function persistSyntheticActivity(input: {
 }
 
 async function createPlannedWorkout(userId: string) {
+  await updateUserSettingsForUserId(userId, {
+    firstName: "QA",
+    lastName: "Runner",
+    displayName: "Gate 2 Read Model",
+    age: 36,
+    weightKg: 72,
+    heightCm: 178,
+    fitnessLevel: "running_regularly",
+    calendarTimezone: new Intl.DateTimeFormat().resolvedOptions().timeZone,
+  });
   const planCycleId = randomUUID();
   const plannedWorkoutId = randomUUID();
   const plan = await supabase.from("plan_cycles").insert({

@@ -1344,6 +1344,7 @@ function assertProductPreviewProjection(
     "previewOutcome",
     "reviewChecksum",
     "reviewToken",
+    "savedPlanId",
     "schedule",
     "sourceKind",
     "workoutDocuments",
@@ -1356,6 +1357,7 @@ function assertProductPreviewProjection(
   assert.deepEqual(Object.keys(product.draft.schedule).sort(), ["endDate", "startDate"]);
   assert.equal(product.draft.reviewToken, result.draft.reviewToken);
   assert.equal(product.draft.reviewChecksum, result.draft.reviewChecksum);
+  assert.equal(product.draft.savedPlanId, result.draft.savedPlanId ?? null);
   assert.deepEqual(product.draft.previewInput, result.draft.previewInput);
   assert.deepEqual(product.draft.workoutDocuments, result.draft.workoutDocuments);
   assert.deepEqual(Object.keys(product.draft.calendarRows[0] ?? {}).sort(), [

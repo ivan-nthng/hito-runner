@@ -4,7 +4,7 @@ import type {
   PersistedPlannedWorkoutRow,
   PersistedWorkoutLogRow,
 } from "../../src/lib/active-plan-persistence";
-import { resolveActivePlanWorkoutSourceEditingCapabilities } from "../../src/lib/active-plan-workout-editing/source-capabilities";
+import { resolveCalendarWorkoutSourceEditingCapabilities } from "../../src/lib/active-plan-workout-editing/source-capabilities";
 import { type ManualWorkoutDraftInput } from "../../src/lib/manual-workout-authoring";
 import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "../../src/lib/manual-workout-authoring/schema";
 import {
@@ -37,8 +37,8 @@ export function validateManualSourceEditingCapabilityReadback() {
     review: futureReview,
   });
 
-  const futureCapability = resolveActivePlanWorkoutSourceEditingCapabilities({
-    activePlan,
+  const futureCapability = resolveCalendarWorkoutSourceEditingCapabilities({
+    provenancePlan: activePlan,
     workout: futureWorkout,
     log: null,
     evidenceWorkoutIds: new Set(),
@@ -75,8 +75,8 @@ export function validateManualSourceEditingCapabilityReadback() {
     outcome: "skipped" as const,
   };
   assertSourceEditingBlocked(
-    resolveActivePlanWorkoutSourceEditingCapabilities({
-      activePlan,
+    resolveCalendarWorkoutSourceEditingCapabilities({
+      provenancePlan: activePlan,
       workout: futureWorkout,
       log: skippedLog,
       evidenceWorkoutIds: new Set(),
@@ -85,11 +85,12 @@ export function validateManualSourceEditingCapabilityReadback() {
     "skipped_logged_workout",
     "persisted skipped results should block direct source affordances",
     true,
+    true,
   );
 
   assertSourceEditingBlocked(
-    resolveActivePlanWorkoutSourceEditingCapabilities({
-      activePlan,
+    resolveCalendarWorkoutSourceEditingCapabilities({
+      provenancePlan: activePlan,
       workout: futureWorkout,
       log: buildFakeWorkoutLog({ userId, plannedWorkoutId: futureWorkout.id }),
       evidenceWorkoutIds: new Set(),
@@ -98,11 +99,12 @@ export function validateManualSourceEditingCapabilityReadback() {
     "logged_workout",
     "completed logged results should block direct source affordances",
     true,
+    true,
   );
 
   assertSourceEditingBlocked(
-    resolveActivePlanWorkoutSourceEditingCapabilities({
-      activePlan,
+    resolveCalendarWorkoutSourceEditingCapabilities({
+      provenancePlan: activePlan,
       workout: futureWorkout,
       log: null,
       evidenceWorkoutIds: new Set([futureWorkout.id]),
@@ -110,6 +112,7 @@ export function validateManualSourceEditingCapabilityReadback() {
     }),
     "evidence_backed_workout",
     "provider/comparison/AI evidence should block direct source affordances",
+    true,
     true,
   );
 
@@ -127,8 +130,8 @@ export function validateManualSourceEditingCapabilityReadback() {
     ],
   } satisfies PersistedPlannedWorkoutRow;
   assertSourceEditingAllowed(
-    resolveActivePlanWorkoutSourceEditingCapabilities({
-      activePlan,
+    resolveCalendarWorkoutSourceEditingCapabilities({
+      provenancePlan: activePlan,
       workout: unsafeMetricWorkout,
       log: null,
       evidenceWorkoutIds: new Set(),
@@ -136,12 +139,12 @@ export function validateManualSourceEditingCapabilityReadback() {
     }),
     {
       canClear: true,
-      canCopy: false,
+      canCopy: true,
       canEditContent: false,
       canMove: true,
       eligibility: "eligible_future_unlogged",
     },
-    "metric target truth should allow move/clear/drag but block copy/content edit",
+    "metric target truth should allow prescription copy while content edit remains blocked",
   );
 
   const unsupportedWorkout = {
@@ -151,8 +154,8 @@ export function validateManualSourceEditingCapabilityReadback() {
     workout_identity: "legacy_freeform_workout",
     workout_family: "unknown",
   } satisfies PersistedPlannedWorkoutRow;
-  const unsupportedCapability = resolveActivePlanWorkoutSourceEditingCapabilities({
-    activePlan,
+  const unsupportedCapability = resolveCalendarWorkoutSourceEditingCapabilities({
+    provenancePlan: activePlan,
     workout: unsupportedWorkout,
     log: null,
     evidenceWorkoutIds: new Set(),
@@ -162,12 +165,12 @@ export function validateManualSourceEditingCapabilityReadback() {
     unsupportedCapability,
     {
       canClear: true,
-      canCopy: false,
+      canCopy: true,
       canEditContent: false,
       canMove: true,
       eligibility: "eligible_future_unlogged",
     },
-    "unsupported source metadata should still allow row move/clear but not copy/content edit",
+    "unsupported source metadata should still allow prescription copy and row move/clear",
   );
 
   const restWorkout = buildFakePlannedWorkout({
@@ -184,8 +187,8 @@ export function validateManualSourceEditingCapabilityReadback() {
     calendarIconKey: "rest",
   });
   assertSourceEditingBlocked(
-    resolveActivePlanWorkoutSourceEditingCapabilities({
-      activePlan,
+    resolveCalendarWorkoutSourceEditingCapabilities({
+      provenancePlan: activePlan,
       workout: restWorkout,
       log: null,
       evidenceWorkoutIds: new Set(),
@@ -206,8 +209,8 @@ export function validateManualSourceEditingCapabilityReadback() {
     id: "00000000-0000-4000-8000-000000000026",
     review: missedReview,
   });
-  const missedCapability = resolveActivePlanWorkoutSourceEditingCapabilities({
-    activePlan,
+  const missedCapability = resolveCalendarWorkoutSourceEditingCapabilities({
+    provenancePlan: activePlan,
     workout: missedWorkout,
     log: null,
     evidenceWorkoutIds: new Set(),
@@ -228,9 +231,9 @@ export function validateManualSourceEditingCapabilityReadback() {
     {
       canMove: true,
       canClear: true,
-      canCopy: false,
+      canCopy: true,
       canEditContent: false,
-      canDirectCopy: false,
+      canDirectCopy: true,
       canDirectMove: true,
       canDragInitiate: true,
       eligibility: "eligible_past_unlogged",
@@ -251,8 +254,8 @@ export function validateManualSourceEditingCapabilityReadback() {
     review: oldMissedReview,
   });
   assertSourceEditingAllowed(
-    resolveActivePlanWorkoutSourceEditingCapabilities({
-      activePlan,
+    resolveCalendarWorkoutSourceEditingCapabilities({
+      provenancePlan: activePlan,
       workout: oldMissedWorkout,
       log: null,
       evidenceWorkoutIds: new Set(),
@@ -260,7 +263,7 @@ export function validateManualSourceEditingCapabilityReadback() {
     }),
     {
       canClear: true,
-      canCopy: false,
+      canCopy: true,
       canEditContent: false,
       canMove: true,
       eligibility: "eligible_past_unlogged",
@@ -279,8 +282,8 @@ export function validateManualSourceEditingCapabilityReadback() {
     id: "00000000-0000-4000-8000-000000000028",
     review: todayReview,
   });
-  const todayCapability = resolveActivePlanWorkoutSourceEditingCapabilities({
-    activePlan,
+  const todayCapability = resolveCalendarWorkoutSourceEditingCapabilities({
+    provenancePlan: activePlan,
     workout: todayWorkout,
     log: null,
     evidenceWorkoutIds: new Set(),
@@ -313,8 +316,8 @@ export function validateManualSourceEditingCapabilityReadback() {
   );
 
   assertSourceEditingBlocked(
-    resolveActivePlanWorkoutSourceEditingCapabilities({
-      activePlan,
+    resolveCalendarWorkoutSourceEditingCapabilities({
+      provenancePlan: activePlan,
       workout: todayWorkout,
       log: buildFakeWorkoutLog({ userId, plannedWorkoutId: todayWorkout.id }),
       evidenceWorkoutIds: new Set(),
@@ -323,10 +326,11 @@ export function validateManualSourceEditingCapabilityReadback() {
     "logged_workout",
     "today logged rows should preserve lifecycle protection while exposing content edit",
     true,
+    true,
   );
   assertSourceEditingBlocked(
-    resolveActivePlanWorkoutSourceEditingCapabilities({
-      activePlan,
+    resolveCalendarWorkoutSourceEditingCapabilities({
+      provenancePlan: activePlan,
       workout: todayWorkout,
       log: null,
       evidenceWorkoutIds: new Set([todayWorkout.id]),
@@ -334,6 +338,7 @@ export function validateManualSourceEditingCapabilityReadback() {
     }),
     "evidence_backed_workout",
     "today evidence-backed rows should preserve lifecycle protection while exposing content edit",
+    true,
     true,
   );
 
@@ -398,8 +403,8 @@ export function validateManualSourceEditingCapabilityReadback() {
     ] as PersistedPlannedWorkoutRow["steps"],
   } satisfies PersistedPlannedWorkoutRow;
   assertSourceEditingAllowed(
-    resolveActivePlanWorkoutSourceEditingCapabilities({
-      activePlan: presetPlan,
+    resolveCalendarWorkoutSourceEditingCapabilities({
+      provenancePlan: presetPlan,
       workout: presetWorkout,
       log: null,
       evidenceWorkoutIds: new Set(),
@@ -407,12 +412,12 @@ export function validateManualSourceEditingCapabilityReadback() {
     }),
     {
       canClear: true,
-      canCopy: false,
-      canEditContent: true,
+      canCopy: true,
+      canEditContent: false,
       canMove: true,
       eligibility: "eligible_future_unlogged",
     },
-    "generated active-plan sources should expose content edit when the row reconstructs safely",
+    "generated guidance targets copy exactly while reviewed content edit remains blocked",
   );
 
   const selectedPlan = buildFakePlanCycle({
@@ -443,8 +448,8 @@ export function validateManualSourceEditingCapabilityReadback() {
     ] as PersistedPlannedWorkoutRow["steps"],
   });
   assertSourceEditingAllowed(
-    resolveActivePlanWorkoutSourceEditingCapabilities({
-      activePlan: selectedPlan,
+    resolveCalendarWorkoutSourceEditingCapabilities({
+      provenancePlan: selectedPlan,
       workout: selectedWorkout,
       log: null,
       evidenceWorkoutIds: new Set(),
@@ -452,12 +457,12 @@ export function validateManualSourceEditingCapabilityReadback() {
     }),
     {
       canClear: true,
-      canCopy: false,
+      canCopy: true,
       canEditContent: true,
       canMove: true,
       eligibility: "eligible_future_unlogged",
     },
-    "selected-plan generated rows should expose content edit when rich identity reconstructs safely",
+    "selected-plan generated rows should expose copy and content edit when rich identity reconstructs safely",
   );
 
   const importedPlan = buildFakePlanCycle({
@@ -475,8 +480,8 @@ export function validateManualSourceEditingCapabilityReadback() {
     workout_identity: "steady_aerobic_run",
   } satisfies PersistedPlannedWorkoutRow;
   assertSourceEditingAllowed(
-    resolveActivePlanWorkoutSourceEditingCapabilities({
-      activePlan: importedPlan,
+    resolveCalendarWorkoutSourceEditingCapabilities({
+      provenancePlan: importedPlan,
       workout: importedWorkout,
       log: null,
       evidenceWorkoutIds: new Set(),
@@ -484,12 +489,12 @@ export function validateManualSourceEditingCapabilityReadback() {
     }),
     {
       canClear: true,
-      canCopy: false,
+      canCopy: true,
       canEditContent: true,
       canMove: true,
       eligibility: "eligible_future_unlogged",
     },
-    "training-plan-v2 import rows should expose content edit when workout_identity reconstructs safely",
+    "training-plan-v2 import rows should expose copy and content edit when workout_identity reconstructs safely",
   );
 
   const arbitraryOriginPlan = buildFakePlanCycle({
@@ -499,9 +504,9 @@ export function validateManualSourceEditingCapabilityReadback() {
     startDate: "2026-06-01",
     endDate: "2026-06-30",
   });
-  assertSourceEditingBlocked(
-    resolveActivePlanWorkoutSourceEditingCapabilities({
-      activePlan: arbitraryOriginPlan,
+  assertSourceEditingAllowed(
+    resolveCalendarWorkoutSourceEditingCapabilities({
+      provenancePlan: arbitraryOriginPlan,
       workout: {
         ...importedWorkout,
         id: "00000000-0000-4000-8000-000000000036",
@@ -511,9 +516,14 @@ export function validateManualSourceEditingCapabilityReadback() {
       evidenceWorkoutIds: new Set(),
       currentDate,
     }),
-    "unsupported_active_plan_source",
-    "plan origin should not grant lifecycle actions or deny date-based content edit",
-    true,
+    {
+      canClear: true,
+      canCopy: true,
+      canEditContent: true,
+      canMove: true,
+      eligibility: "eligible_future_unlogged",
+    },
+    "saved-plan origin must not govern materialized workout actions",
   );
 
   const unsupportedGeneratedWorkout = {
@@ -523,8 +533,8 @@ export function validateManualSourceEditingCapabilityReadback() {
     workout_identity: "unmapped_generated_workout",
   } satisfies PersistedPlannedWorkoutRow;
   assertSourceEditingAllowed(
-    resolveActivePlanWorkoutSourceEditingCapabilities({
-      activePlan: selectedPlan,
+    resolveCalendarWorkoutSourceEditingCapabilities({
+      provenancePlan: selectedPlan,
       workout: unsupportedGeneratedWorkout,
       log: null,
       evidenceWorkoutIds: new Set(),
@@ -532,24 +542,27 @@ export function validateManualSourceEditingCapabilityReadback() {
     }),
     {
       canClear: true,
-      canCopy: false,
+      canCopy: true,
       canEditContent: false,
       canMove: true,
       eligibility: "eligible_future_unlogged",
     },
-    "generated rows without reconstructable template identity should keep content edit blocked",
+    "generated rows without reconstructable template identity still copy their persisted prescription",
   );
 }
 
 function assertSourceEditingBlocked(
-  result: ReturnType<typeof resolveActivePlanWorkoutSourceEditingCapabilities>,
-  reason: NonNullable<
-    ReturnType<typeof resolveActivePlanWorkoutSourceEditingCapabilities>["reason"]
-  >,
+  result: ReturnType<typeof resolveCalendarWorkoutSourceEditingCapabilities>,
+  reason: NonNullable<ReturnType<typeof resolveCalendarWorkoutSourceEditingCapabilities>["reason"]>,
   label: string,
   canEditContent = false,
+  canCopy = false,
 ) {
-  assert.equal(result.canDirectCopy, false, `${label}: direct copy should be blocked`);
+  assert.equal(
+    result.canDirectCopy,
+    canCopy,
+    `${label}: direct copy capability should be truthful`,
+  );
   assert.equal(result.canDirectMove, false, `${label}: direct move should be blocked`);
   assert.equal(result.canDragInitiate, false, `${label}: drag initiation should be blocked`);
   assert.equal(result.eligibility, "blocked", `${label}: eligibility should be blocked`);
@@ -568,14 +581,14 @@ function assertSourceEditingBlocked(
 }
 
 function assertSourceEditingAllowed(
-  result: ReturnType<typeof resolveActivePlanWorkoutSourceEditingCapabilities>,
+  result: ReturnType<typeof resolveCalendarWorkoutSourceEditingCapabilities>,
   expected: {
     canClear: boolean;
     canCopy: boolean;
     canEditContent: boolean;
     canMove: boolean;
     eligibility: Exclude<
-      ReturnType<typeof resolveActivePlanWorkoutSourceEditingCapabilities>["eligibility"],
+      ReturnType<typeof resolveCalendarWorkoutSourceEditingCapabilities>["eligibility"],
       "blocked"
     >;
   },

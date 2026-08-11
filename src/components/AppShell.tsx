@@ -1,21 +1,9 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { type MutableRefObject, ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { DEFAULT_AUTH_REDIRECT, getLoginIntentPath } from "@/lib/auth-redirect";
-import { UploadJsonDialog } from "@/components/UploadJsonDialog";
-import { ActivePlanCreatePlanDialog } from "@/components/plan-management/ActivePlanCreatePlanDialog";
-import {
-  PlanManagementDialog,
-  type PlanManagementDialogMode,
-} from "@/components/PlanManagementDialog";
-import {
-  type PlanExportStatus,
-  scheduleExportStatusReset,
-  startPlanExportDownload,
-} from "@/components/plan-management/plan-export-download";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { HitoButton } from "@/components/ui/button";
 import { HitoLogo } from "@/components/ui/hito-logo";
-import { hitoToast } from "@/components/ui/hito-toast";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
 import {
   DropdownMenu,
@@ -25,16 +13,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
 import { LocalDevtoolMenuItem } from "@/components/devtools/LocalDevtoolMenuItem";
 import { ThemePreferenceMenuItems } from "@/components/settings/theme-preference-controls";
+import { RunnerCalendarTimezoneBootstrap } from "@/components/settings/RunnerCalendarTimezonePreference";
+import { DEFAULT_RUNNER_CALENDAR_TIMEZONE } from "@/lib/runner-calendar-timezone";
 import {
   WEEK_STATUS_META,
   formatDate,
@@ -47,6 +29,11 @@ const NAV: { to: string; label: string; icon: HitoIconName }[] = [
   { to: "/", label: "Calendar", icon: "calendar" },
   { to: "/progress", label: "Progress", icon: "progress" },
 ];
+
+const FALLBACK_RUNNER_CALENDAR_TIMEZONE_PREFERENCE = {
+  calendarTimezone: DEFAULT_RUNNER_CALENDAR_TIMEZONE,
+  calendarTimezoneSource: "fallback_utc",
+} as const;
 
 function getCurrentShellNavPath(pathname: string): string | null {
   if (pathname === "/" || pathname.startsWith("/workout/")) {
@@ -69,21 +56,7 @@ export function AppShell({
   snapshot?: TrainingSnapshot | null;
   viewer?: ViewerSummary | null;
 }) {
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [planActionDialogMode, setPlanActionDialogMode] = useState<PlanManagementDialogMode | null>(
-    null,
-  );
-  const [activePlanCreateOpen, setActivePlanCreateOpen] = useState(false);
-  const [mobilePlanActionsOpen, setMobilePlanActionsOpen] = useState(false);
   const [showShellPlanNote, setShowShellPlanNote] = useState(true);
-  const [exportStatus, setExportStatus] = useState<PlanExportStatus>("idle");
-  const exportFrameRef = useRef<HTMLIFrameElement | null>(null);
-  const exportResetTimerRef = useRef<number | null>(null);
-  const headerDialogOpenTimerRef = useRef<number | null>(null);
-  const desktopPlanActionsTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const mobilePlanActionsTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const planActionReturnFocusRef = useRef<HTMLElement | null>(null);
-  const activePlanCreateReturnFocusRef = useRef<HTMLElement | null>(null);
   const loc = useLocation();
   const currentNavPath = getCurrentShellNavPath(loc.pathname);
   const nextPath = getLoginIntentPath(
@@ -107,76 +80,20 @@ export function AppShell({
         : "Guest runner";
   const profileDetail = getProfileDetail(snapshot, shellSnapshot.mode);
   const profileInitials = buildInitials(profileName);
-  const showUploadAction = shellSnapshot.mode !== "preview";
   const showSettingsAction = shellSnapshot.mode !== "preview";
   const useFreshHomeRequest = shellSnapshot.mode !== "preview";
-  const showPlanHeaderActions = shellSnapshot.mode !== "preview";
-  const planAvailable = Boolean(snapshot?.planMeta);
-  const deferHeaderDialogOpen = (openDialog: () => void) => {
-    clearPlanExportResetTimer(headerDialogOpenTimerRef);
-
-    if (typeof window === "undefined") {
-      openDialog();
-      return;
-    }
-
-    headerDialogOpenTimerRef.current = window.setTimeout(() => {
-      headerDialogOpenTimerRef.current = null;
-      openDialog();
-    }, 0);
-  };
-  const openPlanActionDialog = (
-    mode: PlanManagementDialogMode,
-    returnFocusTarget: HTMLElement | null,
-  ) => {
-    planActionReturnFocusRef.current = returnFocusTarget;
-    setActivePlanCreateOpen(false);
-    deferHeaderDialogOpen(() => setPlanActionDialogMode(mode));
-  };
-  const openCreatePlan = (returnFocusTarget: HTMLElement | null) => {
-    activePlanCreateReturnFocusRef.current = returnFocusTarget;
-    deferHeaderDialogOpen(() => setActivePlanCreateOpen(true));
-  };
-  const setActivePlanCreateOpenWithFocusReturn = (nextOpen: boolean) => {
-    setActivePlanCreateOpen(nextOpen);
-
-    if (!nextOpen) {
-      window.requestAnimationFrame(() => activePlanCreateReturnFocusRef.current?.focus());
-    }
-  };
-  const openImportJson = () => {
-    deferHeaderDialogOpen(() => setUploadOpen(true));
-  };
-  const closeMobilePlanActions = () => {
-    setMobilePlanActionsOpen(false);
-  };
-  const exportJson = () => {
-    setExportStatus("exporting-json");
-
-    try {
-      startPlanExportDownload("json", exportFrameRef.current?.name);
-      scheduleExportStatusReset(exportResetTimerRef, setExportStatus);
-    } catch (exportError) {
-      setExportStatus("idle");
-      hitoToast.error({
-        title: "Export not started",
-        description:
-          exportError instanceof Error
-            ? exportError.message
-            : "Could not start the active plan download.",
-      });
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      clearPlanExportResetTimer(exportResetTimerRef);
-      clearPlanExportResetTimer(headerDialogOpenTimerRef);
-    };
-  }, []);
 
   return (
     <div className="min-h-screen flex bg-background text-foreground hito-canvas-atmosphere">
+      <RunnerCalendarTimezoneBootstrap
+        enabled={snapshot?.source === "persisted"}
+        preference={
+          snapshot?.source === "persisted"
+            ? (snapshot.profile ?? FALLBACK_RUNNER_CALENDAR_TIMEZONE_PREFERENCE)
+            : null
+        }
+        runnerKey={viewer?.email}
+      />
       <aside className="hito-shell-sidebar-width hidden shrink-0 self-start flex-col border-r border-hairline bg-sidebar/60 backdrop-blur md:sticky md:top-0 md:flex md:h-screen">
         <div className="px-6 pt-7 pb-10">
           <Link to="/" reloadDocument={useFreshHomeRequest} aria-label="Hito home">
@@ -229,7 +146,7 @@ export function AppShell({
                   </div>
                   <p className="hito-list-row-copy">
                     {shellSnapshot.source === "persisted"
-                      ? "Your saved plan and workout results show up here. Current Plan keeps reviewed plan changes, export, and future-schedule tools together."
+                      ? "Your saved workouts and results show up here."
                       : "You can browse the preview here until you sign in and save a plan."}
                   </p>
                 </div>
@@ -269,18 +186,6 @@ export function AppShell({
                 <div className="hito-menu-meta mt-1 truncate">{profileDetail}</div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator className="hito-shell-menu-separator" />
-              {showUploadAction && (
-                <DropdownMenuItem
-                  className="hito-shell-menu-item"
-                  onSelect={(event) => {
-                    event.preventDefault();
-                    setUploadOpen(true);
-                  }}
-                >
-                  <Icon name="import" size="sm" />
-                  Import plan
-                </DropdownMenuItem>
-              )}
               {showSettingsAction && (
                 <DropdownMenuItem className="hito-shell-menu-item" asChild>
                   <Link to="/settings">
@@ -352,101 +257,17 @@ export function AppShell({
               {shellSnapshot.mode === "authenticated" ? (
                 <StatusPill label="Week" value={weekStatus.label} />
               ) : null}
-              {showPlanHeaderActions ? (
-                <div className="hidden md:block">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <HitoButton
-                        ref={desktopPlanActionsTriggerRef}
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                      >
-                        <Icon name="plan-note" size="xs" />
-                        Current Plan
-                        <Icon name="chevron-down" size="xs" />
-                      </HitoButton>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="end"
-                      className="hito-shell-menu hito-shell-menu-plan"
-                    >
-                      <DropdownMenuLabel>Current Plan</DropdownMenuLabel>
-                      {planAvailable ? (
-                        <DropdownMenuItem
-                          className="hito-shell-menu-item"
-                          onSelect={() => openCreatePlan(desktopPlanActionsTriggerRef.current)}
-                        >
-                          <Icon name="sparkles" size="sm" />
-                          Create New Plan
-                        </DropdownMenuItem>
-                      ) : (
-                        <DropdownMenuItem className="hito-shell-menu-item" asChild>
-                          <Link to="/" reloadDocument>
-                            <Icon name="sparkles" size="sm" />
-                            Create Plan
-                          </Link>
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem className="hito-shell-menu-item" onSelect={openImportJson}>
-                        <Icon name="import" size="sm" />
-                        Import JSON
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="hito-shell-menu-item"
-                        disabled={!planAvailable || exportStatus !== "idle"}
-                        onSelect={exportJson}
-                      >
-                        <Icon name="download" size="sm" />
-                        {exportStatus === "exporting-json" ? "Preparing JSON..." : "Export JSON"}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator className="hito-shell-menu-separator" />
-                      <DropdownMenuItem
-                        className="hito-shell-menu-item"
-                        disabled={!planAvailable}
-                        onSelect={() => {
-                          openPlanActionDialog(
-                            "edit-schedule",
-                            desktopPlanActionsTriggerRef.current,
-                          );
-                        }}
-                      >
-                        <Icon name="calendar-clock" size="sm" />
-                        Edit Schedule
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="hito-shell-menu-item"
-                        data-tone="destructive"
-                        disabled={!planAvailable}
-                        onSelect={() => {
-                          openPlanActionDialog(
-                            "clear-upcoming",
-                            desktopPlanActionsTriggerRef.current,
-                          );
-                        }}
-                      >
-                        <Icon name="clear-calendar" size="sm" />
-                        Clear Upcoming Schedule
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              ) : (
+              {shellSnapshot.mode === "preview" ? (
                 <HitoButton asChild className="hidden md:inline-flex" size="sm" variant="secondary">
                   <Link
-                    to={shellSnapshot.mode === "preview" ? "/login" : "/"}
-                    reloadDocument={shellSnapshot.mode !== "preview"}
-                    search={
-                      shellSnapshot.mode === "preview" && nextPath !== DEFAULT_AUTH_REDIRECT
-                        ? { next: nextPath }
-                        : undefined
-                    }
+                    to="/login"
+                    search={nextPath !== DEFAULT_AUTH_REDIRECT ? { next: nextPath } : undefined}
                   >
                     <Icon name="activity" size="xs" />
-                    {shellSnapshot.mode === "preview" ? "Sign in to save" : "Create plan"}
+                    Sign in to save
                   </Link>
                 </HitoButton>
-              )}
+              ) : null}
               <HitoButton
                 asChild
                 aria-label="Open Connections"
@@ -496,151 +317,18 @@ export function AppShell({
               </Link>
             );
           })}
-          <Sheet open={mobilePlanActionsOpen} onOpenChange={setMobilePlanActionsOpen}>
-            <SheetTrigger asChild>
-              <button
-                ref={mobilePlanActionsTriggerRef}
-                type="button"
-                className="hito-shell-mobile-row"
-                data-active={mobilePlanActionsOpen ? "true" : undefined}
-                aria-label="Open current plan actions"
-              >
-                <Icon name="plan-note" className="hito-shell-nav-icon" />
-                Current Plan
-              </button>
-            </SheetTrigger>
-            <SheetContent
-              side="bottom"
-              className="inset-0 flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none border-0 p-0 sm:max-w-none"
+          {shellSnapshot.mode === "preview" ? (
+            <Link
+              to="/login"
+              search={nextPath === DEFAULT_AUTH_REDIRECT ? undefined : { next: nextPath }}
+              className="hito-shell-mobile-row"
             >
-              <SheetHeader className="border-b border-hairline px-5 py-4 pr-14">
-                <SheetTitle>Current Plan</SheetTitle>
-                <SheetDescription>
-                  Create, import, export, or manage the saved plan schedule.
-                </SheetDescription>
-              </SheetHeader>
-              <div className="hito-shell-plan-sheet-body">
-                {showPlanHeaderActions ? (
-                  <div className="hito-row-group">
-                    {planAvailable ? (
-                      <MobilePlanActionButton
-                        icon="sparkles"
-                        label="Create New Plan"
-                        onClick={() => {
-                          closeMobilePlanActions();
-                          openCreatePlan(mobilePlanActionsTriggerRef.current);
-                        }}
-                      />
-                    ) : (
-                      <Link
-                        to="/"
-                        reloadDocument
-                        className="hito-list-row"
-                        onClick={closeMobilePlanActions}
-                      >
-                        <Icon name="sparkles" size="sm" />
-                        <span className="hito-list-row-title">Create Plan</span>
-                      </Link>
-                    )}
-                    <MobilePlanActionButton
-                      icon="import"
-                      label="Import JSON"
-                      onClick={() => {
-                        closeMobilePlanActions();
-                        openImportJson();
-                      }}
-                    />
-                    <MobilePlanActionButton
-                      disabled={!planAvailable || exportStatus !== "idle"}
-                      icon="download"
-                      label={
-                        exportStatus === "exporting-json" ? "Preparing JSON..." : "Export JSON"
-                      }
-                      onClick={() => {
-                        closeMobilePlanActions();
-                        exportJson();
-                      }}
-                    />
-                    <MobilePlanActionButton
-                      disabled={!planAvailable}
-                      icon="calendar-clock"
-                      label="Edit Schedule"
-                      onClick={() => {
-                        closeMobilePlanActions();
-                        openPlanActionDialog("edit-schedule", mobilePlanActionsTriggerRef.current);
-                      }}
-                    />
-                    <MobilePlanActionButton
-                      destructive
-                      disabled={!planAvailable}
-                      icon="clear-calendar"
-                      label="Clear Upcoming Schedule"
-                      onClick={() => {
-                        closeMobilePlanActions();
-                        openPlanActionDialog("clear-upcoming", mobilePlanActionsTriggerRef.current);
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div className="hito-row-group">
-                    <Link
-                      to="/login"
-                      search={nextPath === DEFAULT_AUTH_REDIRECT ? undefined : { next: nextPath }}
-                      className="hito-list-row"
-                      onClick={closeMobilePlanActions}
-                    >
-                      <Icon name="activity" size="sm" />
-                      <span className="hito-list-row-title">Sign in to save</span>
-                    </Link>
-                  </div>
-                )}
-              </div>
-            </SheetContent>
-          </Sheet>
+              <Icon name="activity" className="hito-shell-nav-icon" />
+              Sign in to save
+            </Link>
+          ) : null}
         </nav>
       </main>
-      <UploadJsonDialog
-        open={uploadOpen}
-        onOpenChange={setUploadOpen}
-        defaultStartDate={snapshot?.currentDate}
-        hasActivePlan={Boolean(snapshot?.planMeta)}
-      />
-      <ActivePlanCreatePlanDialog
-        open={activePlanCreateOpen}
-        onOpenChange={setActivePlanCreateOpenWithFocusReturn}
-        snapshot={snapshot}
-      />
-      <PlanManagementDialog
-        mode={planActionDialogMode ?? "edit-schedule"}
-        open={planActionDialogMode !== null}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            setPlanActionDialogMode(null);
-          }
-        }}
-        snapshot={snapshot}
-        viewer={viewer}
-        returnFocusRef={planActionReturnFocusRef}
-      />
-      <iframe
-        ref={exportFrameRef}
-        name="shell-plan-export-download-frame"
-        title="Plan export download"
-        className="hidden"
-        onLoad={() => {
-          const bodyText = exportFrameRef.current?.contentDocument?.body?.textContent?.trim();
-
-          if (!bodyText) {
-            return;
-          }
-
-          setExportStatus("idle");
-          hitoToast.error({
-            title: "Export not ready",
-            description: bodyText,
-          });
-        }}
-      />
     </div>
   );
 }
@@ -656,33 +344,6 @@ function StatusPill({ label, value }: { label: string; value: string }) {
   );
 }
 
-function MobilePlanActionButton({
-  destructive = false,
-  disabled = false,
-  icon,
-  label,
-  onClick,
-}: {
-  destructive?: boolean;
-  disabled?: boolean;
-  icon: HitoIconName;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="hito-list-row w-full text-left"
-      data-tone={destructive ? "destructive" : undefined}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      <Icon name={icon} size="sm" />
-      <span className="hito-list-row-title">{label}</span>
-    </button>
-  );
-}
-
 function weekStatusTone(value: string) {
   if (/preview/i.test(value)) {
     return "neutral";
@@ -693,13 +354,6 @@ function weekStatusTone(value: string) {
   }
 
   return "success";
-}
-
-function clearPlanExportResetTimer(timerRef: MutableRefObject<number | null>) {
-  if (timerRef.current != null && typeof window !== "undefined") {
-    window.clearTimeout(timerRef.current);
-    timerRef.current = null;
-  }
 }
 
 function buildInitials(name: string) {
@@ -731,7 +385,7 @@ function getProfileDetail(
   }
 
   if (mode === "onboarding") {
-    return snapshot?.profile ? "No active plan" : "Profile setup";
+    return snapshot?.profile ? "Plan setup" : "Profile setup";
   }
 
   return "Preview only";

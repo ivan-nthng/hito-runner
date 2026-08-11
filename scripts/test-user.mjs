@@ -21,7 +21,7 @@ import {
   resetQaPoolUserData,
 } from "./lib/qa-test-user-lifecycle.mjs";
 
-const { createFirstPlanFromReviewedCanonicalPlanForUser } = await tsImport(
+const { materializeFirstReviewedPlanForUser } = await tsImport(
   "../src/lib/active-plan-persistence.ts",
   import.meta.url,
 );
@@ -773,7 +773,7 @@ async function importPlanForUser(userId, planPath) {
   const rawPlan = await readFile(path.resolve(process.cwd(), planPath), "utf8");
   const plan = JSON.parse(rawPlan);
 
-  await createFirstPlanFromReviewedCanonicalPlanForUser(userId, plan);
+  await materializeFirstReviewedPlanForUser(userId, plan);
   const appliedPlan = await readImportedPlanForUser(userId);
 
   const richWorkoutCount = appliedPlan.workouts.filter(
@@ -794,7 +794,7 @@ async function importPlanForUser(userId, planPath) {
 
   return {
     planPath: path.resolve(process.cwd(), planPath),
-    activePlanId: appliedPlan.planCycle.id,
+    materializedPlanId: appliedPlan.planCycle.id,
     title: appliedPlan.planCycle.title,
     startDate: appliedPlan.planCycle.start_date,
     endDate: appliedPlan.planCycle.end_date,
@@ -819,7 +819,8 @@ async function readImportedPlanForUser(userId) {
     .from("plan_cycles")
     .select("id, title, start_date, end_date")
     .eq("user_id", userId)
-    .eq("status", "active")
+    .eq("status", "archived")
+    .is("saved_plan_payload", null)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -828,7 +829,7 @@ async function readImportedPlanForUser(userId) {
     throw new Error(planCycle.error.message);
   }
   if (!planCycle.data) {
-    throw new Error("Persisted plan readback evidence requires one active plan.");
+    throw new Error("Persisted plan readback evidence requires materialized Calendar provenance.");
   }
 
   const workouts = await supabase

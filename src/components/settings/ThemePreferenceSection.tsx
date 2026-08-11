@@ -15,7 +15,7 @@ export function ThemePreferenceSection({
         <section className="hito-settings-section border-t-0 pt-0">
           <div className="flex items-center gap-2">
             <Icon name="settings" size="sm" className="text-signal" />
-            <h2 className="hito-section-title">Appearance</h2>
+            <h2 className="hito-ui-section-title">Appearance</h2>
           </div>
           <p className="hito-support-copy mt-3 max-w-2xl">
             Choose how Hito resolves the shared semantic color tokens on this device. The preference

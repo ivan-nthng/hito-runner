@@ -82,9 +82,9 @@ export function SelectedRunningPlanPreviewDialog({
   onOpenChange,
   onRefresh,
   open,
-  description = "Review the plan calendar before creating it.",
-  primaryActionLabel = "Create plan",
-  primaryActionPendingLabel = "Creating plan...",
+  description = "Review the saved plan before adding its workouts to Calendar.",
+  primaryActionLabel = "Add to Calendar",
+  primaryActionPendingLabel = "Adding to Calendar...",
   extraNotice,
   result,
   returnFocusRef,
@@ -204,7 +204,9 @@ export function SelectedRunningPlanPreviewDialog({
               <p className="hito-micro-label" data-tone="signal">
                 Generated plan
               </p>
-              <DialogTitle className="hito-modal-title mt-2">{goalLabel} plan preview</DialogTitle>
+              <DialogTitle className="hito-ui-modal-title mt-2">
+                {goalLabel} plan preview
+              </DialogTitle>
               <DialogDescription className="hito-body max-w-2xl">{description}</DialogDescription>
             </div>
           </DialogHeader>
@@ -241,7 +243,8 @@ export function SelectedRunningPlanPreviewDialog({
                 <div className="min-w-0">
                   <p className="hito-list-row-title">Refreshing preview</p>
                   <p className="hito-list-row-copy">
-                    Hito is preparing a new reviewed version. Nothing is being saved.
+                    Your current saved plan stays in Plans while Hito prepares a new reviewed
+                    version.
                   </p>
                 </div>
               </div>
@@ -254,8 +257,10 @@ export function SelectedRunningPlanPreviewDialog({
               role="status"
               aria-live="polite"
             >
-              <p className="hito-list-row-title">Creating your plan</p>
-              <p className="hito-list-row-copy">Hito is saving the plan you reviewed.</p>
+              <p className="hito-list-row-title">Adding workouts to Calendar</p>
+              <p className="hito-list-row-copy">
+                Hito is adding this saved plan&apos;s workouts to Calendar.
+              </p>
             </div>
           ) : null}
           {reviewVisible && draft ? <PreviewDraftView draft={draft} /> : null}
@@ -273,7 +278,9 @@ export function SelectedRunningPlanPreviewDialog({
           </DialogFooter>
         ) : reviewVisible && draft ? (
           <DialogFooter className="hito-product-dialog-footer grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:space-x-0">
-            <p className="hito-caption min-w-0">Not saved until you create the plan.</p>
+            <p className="hito-caption min-w-0">
+              Saved in Plans. Calendar workouts have not been added yet.
+            </p>
             <div className="flex w-full flex-col-reverse gap-3 sm:w-auto sm:flex-row sm:items-center">
               <HitoButton
                 ref={readyFocusTargetRef}
@@ -353,9 +360,11 @@ function GeneratedPlanReadyReviewHeader({
           <p className="hito-micro-label" data-tone="signal">
             Generated plan
           </p>
-          <DialogTitle className="hito-modal-title mt-2 break-words">{header.title}</DialogTitle>
+          <DialogTitle className="hito-ui-modal-title mt-2 break-words">{header.title}</DialogTitle>
         </div>
-        <p className="hito-section-title min-w-0 break-words sm:text-right">{header.startCopy}</p>
+        <p className="hito-ui-section-title min-w-0 break-words sm:text-right">
+          {header.startCopy}
+        </p>
       </div>
       <div className="mt-3 grid min-w-0 gap-1">
         <p className="hito-body-small break-words">{header.rangeCopy}</p>
@@ -409,7 +418,7 @@ function createBlockedView(result: Extract<RunningPlanConfirmActionResult, { ok:
     case "fixture_not_authorized":
       return {
         title: "Preview session unavailable",
-        copy: "This local preview session can no longer create the reviewed plan. Nothing was saved.",
+        copy: "This local preview session can no longer add the saved plan to Calendar. The saved record remains in Plans.",
         tone: "destructive",
       };
     case "stale_review":
@@ -418,19 +427,19 @@ function createBlockedView(result: Extract<RunningPlanConfirmActionResult, { ok:
     case "preview_unavailable":
       return {
         title: "Refresh this preview",
-        copy: "This reviewed preview is no longer current. Refresh the selected preview, then create again.",
+        copy: "This saved preview is no longer current. Refresh it before adding workouts to Calendar.",
         tone: "signal",
       };
     case "unauthenticated":
       return {
-        title: "Sign in before creating",
-        copy: "This session cannot create a selected running plan yet.",
+        title: "Sign in before adding to Calendar",
+        copy: "This session cannot add the saved plan to Calendar yet. The saved record remains in Plans.",
         tone: "destructive",
       };
     case "persistence_failed":
       return {
-        title: "Plan was not created",
-        copy: "The selected running plan could not be saved. The current plan is unchanged.",
+        title: "Calendar was not updated",
+        copy: "Hito could not add the saved plan to Calendar. The saved record remains in Plans.",
         tone: "destructive",
       };
   }
@@ -552,7 +561,7 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
     <div className="grid gap-4">
       <section className="grid gap-3">
         <div>
-          <h3 className="hito-section-title">Plan calendar</h3>
+          <h3 className="hito-ui-section-title">Plan calendar</h3>
           <p className="hito-body-small mt-1">Select a day to review the workout summary.</p>
         </div>
 

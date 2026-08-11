@@ -764,6 +764,8 @@ export function HitoDsComponentControls() {
                   max={200}
                   minLabel="Specimen minimum"
                   maxLabel="Specimen maximum"
+                  previousValue={[116, 164]}
+                  size="sm"
                   value={dualRangeValue}
                   onMinValueChange={(value) =>
                     setDualRangeValue(([currentMin, currentMax]) => [

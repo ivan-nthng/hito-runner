@@ -17,23 +17,23 @@ export const ACTIVE_PLAN_USER_EDIT_MUTATION_KIND = {
 export type ActivePlanUserEditMutationKind =
   (typeof ACTIVE_PLAN_USER_EDIT_MUTATION_KIND)[keyof typeof ACTIVE_PLAN_USER_EDIT_MUTATION_KIND];
 
-export type ActivePlanWorkoutEditOperation =
+export type CalendarWorkoutEditOperation =
   | "add_workout"
   | "clear_workout"
   | "move_workout"
   | "copy_workout"
   | "edit_workout";
 
-export type ActivePlanWorkoutEditabilityResult =
+export type CalendarWorkoutEditabilityResult =
   | {
       ok: true;
       sourceKind: string;
       sourceStatus: string | null;
-      operation: ActivePlanWorkoutEditOperation;
+      operation: CalendarWorkoutEditOperation;
     }
   | {
       ok: false;
-      reason: "no_active_plan" | "unsupported_active_plan_source" | "unsupported_source_metadata";
+      reason: "unsupported_source_metadata";
       message: string;
     };
 
@@ -91,95 +91,45 @@ export interface ActivePlanUserEditMetadata {
   trusted_client_rows?: boolean;
 }
 
-const EXPLICIT_EDITABLE_ACTIVE_PLAN_SOURCE_KINDS = new Set([
-  "manual_user_built_plan_v1",
-  "ai_authored_plan_first_v1",
-  TRAINING_PLAN_V2_IMPORT_SOURCE_KIND,
-]);
-
-const MANUAL_CONTENT_COPY_ACTIVE_PLAN_SOURCE_KINDS = new Set(["manual_user_built_plan_v1"]);
-
-export function resolveActivePlanWorkoutEditability(
-  activePlan: PersistedPlanCycleRow | null,
-  operation: ActivePlanWorkoutEditOperation,
-): ActivePlanWorkoutEditabilityResult {
-  if (!activePlan) {
+export function resolveCalendarWorkoutEditability(
+  provenancePlan: PersistedPlanCycleRow | null,
+  operation: CalendarWorkoutEditOperation,
+): CalendarWorkoutEditabilityResult {
+  if (!provenancePlan) {
     return {
       ok: false,
-      reason: "no_active_plan",
-      message: "There is no active plan to edit.",
+      reason: "unsupported_source_metadata",
+      message: "This workout provenance is unavailable.",
     };
   }
 
-  if (activePlan.status !== "active") {
-    return {
-      ok: false,
-      reason: "unsupported_active_plan_source",
-      message: "Only active plans can be edited.",
-    };
-  }
-
-  const sourceKind = activePlan.source_kind?.trim();
+  const sourceKind = provenancePlan.source_kind?.trim();
   if (!sourceKind) {
     return {
       ok: false,
       reason: "unsupported_source_metadata",
-      message: "This active plan is missing editable source metadata.",
-    };
-  }
-
-  if (!isSupportedActivePlanWorkoutEditOperation(sourceKind, operation)) {
-    return {
-      ok: false,
-      reason: "unsupported_active_plan_source",
-      message:
-        operation === "copy_workout"
-          ? "Workout copying is available only for manual user-built active plans."
-          : "This active plan source is not supported for workout editing yet.",
+      message: "This workout provenance is missing source metadata.",
     };
   }
 
   return {
     ok: true,
     sourceKind,
-    sourceStatus: resolveActivePlanSourceStatus(activePlan),
+    sourceStatus: resolvePlanProvenanceSourceStatus(provenancePlan),
     operation,
   };
 }
 
-export function isEditableActivePlanSourceKind(sourceKind: string | null | undefined) {
-  const normalizedSourceKind = sourceKind?.trim();
-
-  return Boolean(
-    normalizedSourceKind && EXPLICIT_EDITABLE_ACTIVE_PLAN_SOURCE_KINDS.has(normalizedSourceKind),
-  );
+export function isEditableCalendarWorkoutSourceKind(sourceKind: string | null | undefined) {
+  return Boolean(sourceKind?.trim());
 }
 
-export function isManualContentEditableActivePlanSourceKind(sourceKind: string | null | undefined) {
-  const normalizedSourceKind = sourceKind?.trim();
-
-  return Boolean(
-    normalizedSourceKind && MANUAL_CONTENT_COPY_ACTIVE_PLAN_SOURCE_KINDS.has(normalizedSourceKind),
-  );
+export function isContentCopyableCalendarWorkoutSourceKind(sourceKind: string | null | undefined) {
+  return Boolean(sourceKind?.trim());
 }
 
-function isSupportedActivePlanWorkoutEditOperation(
-  sourceKind: string,
-  operation: ActivePlanWorkoutEditOperation,
-) {
-  if (operation === "copy_workout") {
-    return isManualContentEditableActivePlanSourceKind(sourceKind);
-  }
-
-  if (operation === "edit_workout") {
-    return true;
-  }
-
-  return isEditableActivePlanSourceKind(sourceKind);
-}
-
-export function resolveActivePlanSourceStatus(activePlan: PersistedPlanCycleRow) {
-  const root = asRecord(activePlan.goal_metadata);
+export function resolvePlanProvenanceSourceStatus(provenancePlan: PersistedPlanCycleRow) {
+  const root = asRecord(provenancePlan.goal_metadata);
   const directStatus = readString(root.source_status);
 
   if (directStatus) {
@@ -233,7 +183,7 @@ export function buildActivePlanUserEditMetadata({
     mutation_source: ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
     mutation_kind: mutationKind,
     original_plan_source_kind: sourceKind,
-    original_plan_source_status: resolveActivePlanSourceStatus(activePlan),
+    original_plan_source_status: resolvePlanProvenanceSourceStatus(activePlan),
     original_plan_origin_source_kind: importOrigin.sourceKind ?? undefined,
     original_plan_origin_source_status: importOrigin.sourceStatus ?? undefined,
     original_workout_source_id: originalWorkoutSourceId,

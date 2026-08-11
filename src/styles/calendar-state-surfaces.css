@@ -171,7 +171,7 @@
       box-shadow 160ms ease;
   }
 
-  .hito-calendar-mobile-row:hover {
+  .hito-calendar-mobile-row[data-interactive="true"]:hover {
     border-color: color-mix(in oklch, var(--color-foreground) 18%, transparent);
     background: transparent;
   }

@@ -166,6 +166,11 @@ export interface RunnerProfileSummary {
   heightCm: number | null;
 }
 
+export interface PersistedRunnerProfileSummary extends RunnerProfileSummary {
+  calendarTimezone: string;
+  calendarTimezoneSource: "fallback_utc" | "browser" | "user";
+}
+
 export interface TrainingSnapshot {
   mode: TrainingMode;
   source: "preview" | "persisted";
@@ -173,7 +178,7 @@ export interface TrainingSnapshot {
   currentDate: string;
   weekStatus: WeekStatus;
   planMeta: PlanMeta | null;
-  profile: RunnerProfileSummary | null;
+  profile: PersistedRunnerProfileSummary | null;
   workouts: Workout[];
 }
 

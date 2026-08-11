@@ -146,9 +146,10 @@ export function PlanPresetPanel({
           <p className="hito-micro-label" data-tone="signal">
             Generated plan
           </p>
-          <h2 className="hito-panel-title mt-2">Choose your goal.</h2>
+          <h2 className="hito-ui-panel-title mt-2">Choose your goal.</h2>
           <p className="hito-helper mt-2">
-            Pick one goal, then review the generated preview before anything is created.
+            Pick one goal. A successful reviewed preview is saved in Plans before its workouts are
+            added to Calendar.
           </p>
         </div>
       </div>
@@ -397,7 +398,7 @@ function PlanGoalCard({
       <span className="flex w-full min-w-0 items-start justify-between gap-3">
         <span
           className={cn(
-            "font-display font-semibold leading-none",
+            "font-sans font-semibold leading-none",
             distance === "Custom" ? "text-2xl" : "text-3xl",
           )}
         >

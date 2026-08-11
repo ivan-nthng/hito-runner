@@ -13,6 +13,7 @@ import {
   ActivityHistoryPanel,
 } from "./ActivityHistoryPanel";
 import { FactualProgressPanel } from "./FactualProgressPanel";
+import { SavedPlanLibraryPanel } from "./SavedPlanLibraryPanel";
 import type {
   ActivityAction,
   HistoryState,
@@ -20,9 +21,13 @@ import type {
   ProgressState,
 } from "./runner-activity-progress-types";
 
-export type RunnerProgressTab = "history" | "progress";
+export type RunnerProgressTab = "history" | "progress" | "plans";
 
-const PROGRESS_TABS = [{ value: "history" }, { value: "progress" }] satisfies Array<{
+const PROGRESS_TABS = [
+  { value: "history" },
+  { value: "progress" },
+  { value: "plans" },
+] satisfies Array<{
   value: RunnerProgressTab;
 }>;
 
@@ -190,7 +195,7 @@ export function RunnerActivityProgressExperience({
         <div
           className="hito-tabs hito-tabs-simple w-full sm:w-auto"
           {...tabs.tabListProps}
-          aria-label="Running history and progress"
+          aria-label="Running history, progress, and saved plans"
         >
           <button
             type="button"
@@ -209,6 +214,15 @@ export function RunnerActivityProgressExperience({
             className="hito-tab flex-1 sm:flex-none"
           >
             Progress
+          </button>
+          <button
+            type="button"
+            {...tabs.getTabProps("plans")}
+            onClick={() => onTabChange("plans")}
+            data-active={activeTab === "plans"}
+            className="hito-tab flex-1 sm:flex-none"
+          >
+            Plans
           </button>
         </div>
       </div>
@@ -233,8 +247,10 @@ export function RunnerActivityProgressExperience({
             onOpenActivity={openActivity}
             onRequestAction={requestAction}
           />
-        ) : (
+        ) : activeTab === "progress" ? (
           <FactualProgressPanel state={progress} onRetry={() => void loadProgress()} />
+        ) : (
+          <SavedPlanLibraryPanel />
         )}
       </div>
 

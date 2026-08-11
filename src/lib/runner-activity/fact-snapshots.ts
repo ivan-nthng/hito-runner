@@ -2,7 +2,8 @@ import "@tanstack/react-start/server-only";
 
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { addDaysIso, startOfWeekIso, todayIso } from "@/lib/training";
+import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
+import { addDaysIso, startOfWeekIso } from "@/lib/training";
 import type { Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import type {
@@ -90,7 +91,7 @@ export async function getRunnerActivityProgressFactsForUser(input: {
   const asOfDate = z
     .string()
     .date()
-    .parse(input.asOfDate ?? todayIso());
+    .parse(input.asOfDate ?? (await getRunnerCalendarDateForUserId(input.userId)));
   const currentRollingStart = addDaysIso(asOfDate, -27);
   const previousRollingEnd = addDaysIso(currentRollingStart, -1);
   const previousRollingStart = addDaysIso(previousRollingEnd, -27);

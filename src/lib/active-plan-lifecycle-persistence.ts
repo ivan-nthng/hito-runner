@@ -5,24 +5,24 @@ type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
 type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
 type RpcPayload = { [key: string]: Json | undefined };
 
-type ActivePlanWorkoutMutationKind = "add" | "clear" | "move";
+type CalendarWorkoutMutationKind = "add" | "clear" | "move";
 
-export class ActivePlanPersistenceRejection extends Error {
+export class CalendarPersistenceRejection extends Error {
   constructor(
     readonly reason: string,
     message: string,
   ) {
     super(message);
-    this.name = "ActivePlanPersistenceRejection";
+    this.name = "CalendarPersistenceRejection";
   }
 }
 
-export async function applyAtomicActivePlanWorkoutMutation(input: {
+export async function applyAtomicCalendarWorkoutMutation(input: {
   userId: string;
   planId: string;
   expectedPlanUpdatedAt: string;
   currentDate: string;
-  mutationKind: ActivePlanWorkoutMutationKind;
+  mutationKind: CalendarWorkoutMutationKind;
   expectedSourceWorkout: Json;
   expectedTargetWorkout: Json;
   workoutInsert: Json;
@@ -30,7 +30,7 @@ export async function applyAtomicActivePlanWorkoutMutation(input: {
   planUpdate: Json;
 }) {
   const supabase = createAdminSupabaseClient();
-  const result = await supabase.rpc("apply_active_plan_workout_mutation", {
+  const result = await supabase.rpc("apply_calendar_workout_mutation", {
     p_user_id: input.userId,
     p_plan_id: input.planId,
     p_expected_plan_updated_at: input.expectedPlanUpdatedAt,
@@ -47,7 +47,7 @@ export async function applyAtomicActivePlanWorkoutMutation(input: {
     throw new Error(result.error.message);
   }
 
-  const payload = readRpcPayload(result.data, "Active-plan workout mutation");
+  const payload = readRpcPayload(result.data, "Calendar workout mutation");
   const planCycle = readObjectField(payload, "plan_cycle") as PersistedPlanCycleRow;
   const mutatedWorkout = readOptionalObjectField(
     payload,
@@ -70,34 +70,16 @@ export async function applyAtomicReviewedPlanPersistence(input: {
   profile: Json;
   plan: Json;
   workouts: Json;
-  expectedActivePlanId: string | null;
-  expectedActivePlanUpdatedAt: string | null;
-  expectedHistory: Json;
-  archiveGoalMetadata: Json;
-  logs: Json;
-  evidenceRelinks: Json;
   expectedProfileRevision?: number;
 }) {
   const supabase = createAdminSupabaseClient();
-  const rpcPayload = {
+  const result = await supabase.rpc("apply_reviewed_plan_persistence", {
     p_user_id: input.userId,
     p_profile: input.profile,
     p_plan: input.plan,
     p_workouts: input.workouts,
-    p_expected_active_plan_id: input.expectedActivePlanId,
-    p_expected_active_plan_updated_at: input.expectedActivePlanUpdatedAt,
-    p_expected_history: input.expectedHistory,
-    p_archive_goal_metadata: input.archiveGoalMetadata,
-    p_logs: input.logs,
-    p_evidence_relinks: input.evidenceRelinks,
-  };
-  const result =
-    input.expectedProfileRevision == null
-      ? await supabase.rpc("apply_reviewed_plan_persistence", rpcPayload)
-      : await supabase.rpc("apply_reviewed_plan_persistence_with_profile_revision", {
-          ...rpcPayload,
-          p_expected_profile_revision: input.expectedProfileRevision,
-        });
+    p_expected_profile_revision: input.expectedProfileRevision ?? null,
+  });
 
   if (result.error) {
     throw new Error(result.error.message);
@@ -105,59 +87,40 @@ export async function applyAtomicReviewedPlanPersistence(input: {
 
   const payload = readRpcPayload(result.data, "Reviewed plan persistence");
   const planCycle = readObjectField(payload, "plan_cycle") as PersistedPlanCycleRow;
-  const archivedPlan = readOptionalObjectField(
-    payload,
-    "archived_plan",
-  ) as PersistedPlanCycleRow | null;
   const workouts = readObjectArrayField(payload, "workouts") as PersistedPlannedWorkoutRow[];
 
   return {
     planCycle,
-    archivedPlan,
     workouts,
   };
 }
 
-export async function applyAtomicReviewedImportPersistence(input: {
+export async function applyAtomicReviewedFutureSchedulePersistence(input: {
   userId: string;
-  profile: Json;
   plan: Json;
   workouts: Json;
-  expectedActivePlanId: string;
-  expectedActivePlanUpdatedAt: string;
-  expectedHistory: Json;
-  archiveGoalMetadata: Json;
-  logs: Json;
-  evidenceRelinks: Json;
-  clearBeforeImport: true;
+  currentDate: string;
+  replaceFutureWorkouts: boolean;
 }) {
   const supabase = createAdminSupabaseClient();
-  const result = await supabase.rpc("apply_reviewed_import_persistence", {
+  const result = await supabase.rpc("apply_reviewed_future_schedule_persistence", {
     p_user_id: input.userId,
-    p_profile: input.profile,
     p_plan: input.plan,
     p_workouts: input.workouts,
-    p_expected_active_plan_id: input.expectedActivePlanId,
-    p_expected_active_plan_updated_at: input.expectedActivePlanUpdatedAt,
-    p_expected_history: input.expectedHistory,
-    p_archive_goal_metadata: input.archiveGoalMetadata,
-    p_logs: input.logs,
-    p_evidence_relinks: input.evidenceRelinks,
-    p_clear_before_import: input.clearBeforeImport,
+    p_current_date: input.currentDate,
+    p_replace_future_workouts: input.replaceFutureWorkouts,
   });
 
   if (result.error) {
     throw new Error(result.error.message);
   }
 
-  const payload = readRpcPayload(result.data, "Reviewed import persistence");
+  const payload = readRpcPayload(result.data, "Reviewed future schedule persistence");
   const planCycle = readObjectField(payload, "plan_cycle") as PersistedPlanCycleRow;
-  const archivedPlan = readObjectField(payload, "archived_plan") as PersistedPlanCycleRow;
   const workouts = readObjectArrayField(payload, "workouts") as PersistedPlannedWorkoutRow[];
 
   return {
     planCycle,
-    archivedPlan,
     workouts,
   };
 }
@@ -168,7 +131,7 @@ function readRpcPayload(value: Json, operation: string): RpcPayload {
   }
 
   if (value.ok !== true) {
-    throw new ActivePlanPersistenceRejection(
+    throw new CalendarPersistenceRejection(
       typeof value.reason === "string" ? value.reason : "persistence_failed",
       typeof value.message === "string"
         ? value.message

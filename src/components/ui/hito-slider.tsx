@@ -1,5 +1,6 @@
 import { useId, type CSSProperties, type ReactNode } from "react";
 
+import type { HitoFieldSize } from "@/components/ui/hito-control-contract";
 import { cn } from "@/lib/utils";
 
 export type HitoSliderProps = {
@@ -14,6 +15,9 @@ export type HitoSliderProps = {
   min: number;
   minLabel?: ReactNode;
   onValueChange: (value: number) => void;
+  previousValue?: number;
+  previousValueLabel?: string;
+  size?: HitoFieldSize;
   step?: number;
   value: number;
   valueLabel?: ReactNode;
@@ -31,6 +35,9 @@ export function HitoSlider({
   min,
   minLabel,
   onValueChange,
+  previousValue,
+  previousValueLabel,
+  size = "sm",
   step = 1,
   value,
   valueLabel,
@@ -38,15 +45,23 @@ export function HitoSlider({
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const helperId = helper ? `${inputId}-helper` : undefined;
-  const progress = Math.min(Math.max((value - min) / Math.max(max - min, Number.EPSILON), 0), 1);
+  const span = Math.max(max - min, Number.EPSILON);
+  const hasRestorablePreviousValue =
+    previousValue != null &&
+    Number.isFinite(previousValue) &&
+    previousValue >= min &&
+    previousValue <= max &&
+    previousValue !== value;
+  const previousProgress = hasRestorablePreviousValue ? (previousValue - min) / span : 0;
   const style = {
-    "--hito-slider-progress": `${progress * 100}%`,
+    "--hito-slider-previous": `${Math.min(Math.max(previousProgress, 0), 1) * 100}%`,
   } as CSSProperties;
 
   return (
     <div
-      className={cn("hito-slider", className)}
+      className={cn("hito-slider", `hito-slider-${size}`, className)}
       data-disabled={disabled || undefined}
+      data-size={size}
       style={style}
     >
       <div className="hito-slider-header">
@@ -63,9 +78,7 @@ export function HitoSlider({
       </div>
 
       <div className="hito-slider-control">
-        <div className="hito-slider-rail" aria-hidden="true">
-          <span className="hito-slider-fill" />
-        </div>
+        <div className="hito-slider-rail" aria-hidden="true" />
         <input
           id={inputId}
           className="hito-slider-input"
@@ -79,6 +92,15 @@ export function HitoSlider({
           aria-valuetext={ariaValueText}
           onInput={(event) => onValueChange(event.currentTarget.valueAsNumber)}
         />
+        {hasRestorablePreviousValue ? (
+          <button
+            type="button"
+            className="hito-slider-previous-marker"
+            disabled={disabled}
+            aria-label={previousValueLabel ?? `Restore previous value ${previousValue}`}
+            onClick={() => onValueChange(previousValue)}
+          />
+        ) : null}
       </div>
 
       <div className="hito-slider-bounds hito-caption font-mono-num" aria-hidden="true">

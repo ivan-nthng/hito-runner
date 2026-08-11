@@ -17,7 +17,7 @@ import {
 import type { CanonicalGoalContext, CanonicalMetricMode } from "@/lib/rich-workout-model";
 import type { PlannedWorkoutLanguageReadModel } from "@/lib/planned-workout-language";
 import { reduceRepeatChildrenToChildFirst } from "@/lib/planned-workout-block-contract";
-import { resolveActivePlanSourceStatus } from "@/lib/active-plan-workout-editing/policy";
+import { resolvePlanProvenanceSourceStatus } from "@/lib/active-plan-workout-editing/policy";
 import { parseStoredRunnerTrainingPreferences } from "@/lib/runner-training-preferences";
 import {
   readWorkoutDocumentSections,
@@ -113,7 +113,7 @@ export function buildActivePlanExportPayload(args: {
       effectiveEndDate: lastWorkoutDate,
       targetDate: args.planCycle.target_date,
       sourceKind: args.planCycle.source_kind,
-      sourceStatus: resolveActivePlanSourceStatus(args.planCycle),
+      sourceStatus: resolvePlanProvenanceSourceStatus(args.planCycle),
       exportedAt: args.exportedAt ?? new Date().toISOString(),
     },
     summary: {

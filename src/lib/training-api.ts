@@ -5,12 +5,6 @@ import {
   loginInputSchema,
   requestMagicLinkForCurrentRequest,
 } from "@/lib/auth-actions";
-import type {
-  ActivePlanScheduleEditInput,
-  ActivePlanScheduleEditPreview,
-  ActivePlanScheduleReflowApplyInput,
-  ActivePlanScheduleReflowApplyResult,
-} from "@/lib/active-plan-schedule-edit-preview";
 import {
   loadHomeRouteData,
   loadShellRouteData,
@@ -18,22 +12,22 @@ import {
   workoutRouteInputSchema,
 } from "@/lib/route-data-actions";
 import {
-  getActivePlan,
+  getLatestMaterializedPlanProvenance,
+  getMaterializedPlanProvenancesForUser,
   getResolvedPlanWorkoutsWithLogs,
   type PersistedPlanCycleRow,
 } from "@/lib/active-plan-persistence";
-import { clearUpcomingScheduleForUser as clearUpcomingScheduleForUserWithSnapshot } from "@/lib/active-plan-lifecycle-actions";
 import { loadSettingsRouteData } from "@/lib/user-settings-actions";
 import {
   getPersistedUserIdForAuthContext,
   requirePersistedUserIdForCurrentRequest,
 } from "@/lib/request-persisted-user";
 import {
-  resolveActivePlanWorkoutEditability,
-  type ActivePlanWorkoutEditOperation,
-  type ActivePlanWorkoutEditabilityResult,
+  resolveCalendarWorkoutEditability,
+  type CalendarWorkoutEditOperation,
+  type CalendarWorkoutEditabilityResult,
 } from "@/lib/active-plan-workout-editing/policy";
-import { resolveActivePlanWorkoutSourceEditingCapabilities } from "@/lib/active-plan-workout-editing/source-capabilities";
+import { resolveCalendarWorkoutSourceEditingCapabilities } from "@/lib/active-plan-workout-editing/source-capabilities";
 import { findLocalAuthAccountByUserId } from "@/lib/local-auth";
 import {
   deriveWeekStatus,
@@ -42,10 +36,9 @@ import {
   inferWorkoutStatus,
   normalizeExecutableStepInstructions,
   projectWorkoutCompletionLog,
-  todayIso,
   type ActivePlanWorkoutEditingCapabilities,
   type ActivePlanWorkoutEditingCapability,
-  type RunnerProfileSummary,
+  type PersistedRunnerProfileSummary,
   type PlanSchedulePreferencesSummary,
   type TrainingSnapshot,
   type Workout,
@@ -58,6 +51,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { parseStoredRunnerTrainingPreferences } from "@/lib/runner-training-preferences";
 import { fetchManualWorkoutEvidenceWorkoutIds } from "@/lib/manual-workout-authoring/active-plan-add";
 import { readWorkoutDocumentSections } from "@/lib/workout-document";
+import { buildRunnerCalendarContext } from "@/lib/runner-calendar-timezone";
 
 export interface ViewerSummary {
   name: string | null;
@@ -116,52 +110,6 @@ export const requestMagicLink = createServerFn({ method: "POST" })
     return requestMagicLinkForCurrentRequest(data);
   });
 
-export const clearUpcomingSchedule = createServerFn({ method: "POST" }).handler(async () => {
-  try {
-    return await clearUpcomingScheduleForUserWithSnapshot(
-      await requirePersistedUserIdForCurrentRequest(),
-      getPersistedSnapshot,
-    );
-  } catch (error) {
-    throw safeRunnerServerActionError(error, {
-      action: "clear schedule",
-      publicMessage: "The schedule could not be cleared. Try again shortly.",
-      allowedMessages: [
-        "Authentication is required for this action.",
-        "There is no active schedule to clear.",
-      ],
-    });
-  }
-});
-
-export const previewActivePlanScheduleEdit = createServerFn({ method: "POST" })
-  .validator(parseActivePlanScheduleEditInput)
-  .handler(async ({ data }): Promise<ActivePlanScheduleEditPreview> => {
-    try {
-      return await previewActivePlanScheduleEditForCurrentRequestServer(data);
-    } catch (error) {
-      throw safeRunnerServerActionError(error, {
-        action: "preview schedule edit",
-        publicMessage: "The schedule edit could not be prepared. Try again shortly.",
-        allowedMessages: ["Authentication is required for this action."],
-      });
-    }
-  });
-
-export const applyActivePlanScheduleReflowPreview = createServerFn({ method: "POST" })
-  .validator(parseActivePlanScheduleReflowApplyInput)
-  .handler(async ({ data }): Promise<ActivePlanScheduleReflowApplyResult> => {
-    try {
-      return await applyActivePlanScheduleReflowPreviewForCurrentRequestServer(data);
-    } catch (error) {
-      throw safeRunnerServerActionError(error, {
-        action: "apply schedule edit",
-        publicMessage: "The schedule edit could not be applied. Try again shortly.",
-        allowedMessages: ["Authentication is required for this action."],
-      });
-    }
-  });
-
 export const saveWorkoutLog = createServerFn({ method: "POST" })
   .validator((value: unknown) => workoutLogInputSchema.parse(value))
   .handler(async ({ data }) => {
@@ -180,32 +128,6 @@ export const saveWorkoutLog = createServerFn({ method: "POST" })
       });
     }
   });
-
-const previewActivePlanScheduleEditForCurrentRequestServer = createServerOnlyFn(
-  async (data: ActivePlanScheduleEditInput): Promise<ActivePlanScheduleEditPreview> => {
-    const { previewActivePlanScheduleEditForUser } =
-      await import("@/lib/active-plan-schedule-edit-preview");
-
-    return previewActivePlanScheduleEditForUser(
-      await requirePersistedUserIdForCurrentRequest(),
-      data,
-    );
-  },
-);
-
-const applyActivePlanScheduleReflowPreviewForCurrentRequestServer = createServerOnlyFn(
-  async (
-    data: ActivePlanScheduleReflowApplyInput,
-  ): Promise<ActivePlanScheduleReflowApplyResult> => {
-    const { applyActivePlanScheduleReflowPreviewForUser } =
-      await import("@/lib/active-plan-schedule-edit-preview");
-
-    return applyActivePlanScheduleReflowPreviewForUser(
-      await requirePersistedUserIdForCurrentRequest(),
-      data,
-    );
-  },
-);
 
 function safeRunnerServerActionError(
   error: unknown,
@@ -261,59 +183,6 @@ async function getViewerForRequest(): Promise<ViewerSummary | null> {
   };
 }
 
-function parseActivePlanScheduleReflowApplyInput(
-  value: unknown,
-): ActivePlanScheduleReflowApplyInput {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("Schedule apply input must be an object.");
-  }
-
-  const record = value as Record<string, unknown>;
-
-  if (typeof record.previewToken !== "string" || !record.previewToken.trim()) {
-    throw new Error("Schedule preview token is required.");
-  }
-
-  if (
-    !record.scheduleEditInput ||
-    typeof record.scheduleEditInput !== "object" ||
-    Array.isArray(record.scheduleEditInput)
-  ) {
-    throw new Error("Reviewed schedule input is required.");
-  }
-
-  return {
-    previewToken: record.previewToken,
-    scheduleEditInput:
-      record.scheduleEditInput as ActivePlanScheduleReflowApplyInput["scheduleEditInput"],
-  };
-}
-
-function parseActivePlanScheduleEditInput(value: unknown): ActivePlanScheduleEditInput {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("Schedule edit input must be an object.");
-  }
-
-  const record = value as Record<string, unknown>;
-
-  return {
-    activePlanId:
-      typeof record.activePlanId === "string" || record.activePlanId === null
-        ? record.activePlanId
-        : undefined,
-    fixedRestDays: record.fixedRestDays,
-    preferredLongRunDay: record.preferredLongRunDay,
-    runningDaysPerWeek: record.runningDaysPerWeek,
-    runningDays: record.runningDays,
-    proposedRunningDays: record.proposedRunningDays,
-    saveAsDefaultTrainingPreferences: record.saveAsDefaultTrainingPreferences,
-    intent:
-      record.intent && typeof record.intent === "object" && !Array.isArray(record.intent)
-        ? (record.intent as ActivePlanScheduleEditInput["intent"])
-        : null,
-  };
-}
-
 function buildPlanSchedulePreferencesSummary(
   value: PersistedPlanCycleRow["plan_preferences"],
   workouts: readonly Workout[],
@@ -354,15 +223,24 @@ function derivePeakAuthoredRunningDaysPerWeek(workouts: readonly Workout[]) {
   return counts.size > 0 ? Math.max(...counts.values()) : null;
 }
 
-export async function getPersistedSnapshot(userId: string): Promise<TrainingSnapshot> {
+export async function getPersistedSnapshot(
+  userId: string,
+  options: { currentDate?: string; instant?: Date } = {},
+): Promise<TrainingSnapshot> {
   const profileRow = await getRunnerProfileRow(userId);
+  const calendarContext = buildRunnerCalendarContext({
+    calendarTimezone: profileRow?.calendar_timezone,
+    calendarTimezoneSource: profileRow?.calendar_timezone_source,
+    instant: options.instant,
+  });
+  const currentDate = options.currentDate ?? calendarContext.currentDate;
 
   if (!profileRow) {
     return {
       mode: "onboarding",
       source: "persisted",
       backend: "supabase",
-      currentDate: todayIso(),
+      currentDate,
       planMeta: null,
       profile: null,
       workouts: [],
@@ -371,14 +249,14 @@ export async function getPersistedSnapshot(userId: string): Promise<TrainingSnap
   }
 
   const profile = profileRowToSummary(profileRow);
-  const planCycle = await getActivePlan(userId);
+  const planCycle = await getLatestMaterializedPlanProvenance(userId);
 
   if (!planCycle) {
     return {
       mode: "onboarding",
       source: "persisted",
       backend: "supabase",
-      currentDate: todayIso(),
+      currentDate,
       planMeta: null,
       profile,
       workouts: [],
@@ -390,7 +268,10 @@ export async function getPersistedSnapshot(userId: string): Promise<TrainingSnap
     userId,
     planCycle,
   );
-  const currentDate = todayIso();
+  const provenanceById = await getMaterializedPlanProvenancesForUser(
+    userId,
+    persistedWorkouts.map((workout) => workout.plan_cycle_id),
+  );
   const persistedWorkoutIds = persistedWorkouts.map((workout) => workout.id);
   const { feedbackMarkerByWorkoutId, fitCompletedWorkoutIds } =
     await getWorkoutResultReadbackForUser(userId, persistedWorkoutIds);
@@ -398,23 +279,24 @@ export async function getPersistedSnapshot(userId: string): Promise<TrainingSnap
     userId,
     persistedWorkoutIds,
   );
-  const workouts = persistedWorkouts.map((workout) =>
-    dbWorkoutToView(
+  const workouts = persistedWorkouts.map((workout) => {
+    const provenancePlan = provenanceById.get(workout.plan_cycle_id) ?? null;
+    return dbWorkoutToView(
       workout,
       logsByWorkoutId.get(workout.id) ?? null,
       currentDate,
-      planCycle.source_kind,
+      provenancePlan?.source_kind ?? null,
       feedbackMarkerByWorkoutId.get(workout.id) ?? null,
       fitCompletedWorkoutIds.has(workout.id),
-      resolveActivePlanWorkoutSourceEditingCapabilities({
-        activePlan: planCycle,
+      resolveCalendarWorkoutSourceEditingCapabilities({
+        provenancePlan,
         workout,
         log: logsByWorkoutId.get(workout.id) ?? null,
         evidenceWorkoutIds,
         currentDate,
       }),
-    ),
-  );
+    );
+  });
 
   return {
     mode: "authenticated",
@@ -449,26 +331,26 @@ function buildActivePlanWorkoutEditingCapabilities(
   return {
     addWorkout: mapActivePlanWorkoutEditingCapability(
       "add_workout",
-      resolveActivePlanWorkoutEditability(planCycle, "add_workout"),
+      resolveCalendarWorkoutEditability(planCycle, "add_workout"),
     ),
     clearWorkout: mapActivePlanWorkoutEditingCapability(
       "clear_workout",
-      resolveActivePlanWorkoutEditability(planCycle, "clear_workout"),
+      resolveCalendarWorkoutEditability(planCycle, "clear_workout"),
     ),
     moveWorkout: mapActivePlanWorkoutEditingCapability(
       "move_workout",
-      resolveActivePlanWorkoutEditability(planCycle, "move_workout"),
+      resolveCalendarWorkoutEditability(planCycle, "move_workout"),
     ),
     editWorkout: mapActivePlanWorkoutEditingCapability(
       "edit_workout",
-      resolveActivePlanWorkoutEditability(planCycle, "edit_workout"),
+      resolveCalendarWorkoutEditability(planCycle, "edit_workout"),
     ),
   };
 }
 
 function mapActivePlanWorkoutEditingCapability(
-  operation: ActivePlanWorkoutEditOperation,
-  editability: ActivePlanWorkoutEditabilityResult,
+  operation: Exclude<CalendarWorkoutEditOperation, "copy_workout">,
+  editability: CalendarWorkoutEditabilityResult,
 ): ActivePlanWorkoutEditingCapability {
   if (!editability.ok) {
     return {
@@ -588,7 +470,7 @@ function logRowToView(log: Database["public"]["Tables"]["workout_logs"]["Row"]):
 
 function profileRowToSummary(
   profile: Database["public"]["Tables"]["runner_profiles"]["Row"],
-): RunnerProfileSummary {
+): PersistedRunnerProfileSummary {
   return {
     goalType: profile.goal_type,
     goalLabel: profile.goal_label,
@@ -603,6 +485,11 @@ function profileRowToSummary(
     age: profile.age,
     weightKg: profile.weight_kg,
     heightCm: profile.height_cm,
+    calendarTimezone: profile.calendar_timezone,
+    calendarTimezoneSource:
+      profile.calendar_timezone_source === "browser" || profile.calendar_timezone_source === "user"
+        ? profile.calendar_timezone_source
+        : "fallback_utc",
   };
 }
 

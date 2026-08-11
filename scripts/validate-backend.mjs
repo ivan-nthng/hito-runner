@@ -8,9 +8,10 @@ const sourceChecks = [
   tsCheck("planned-workout-language", "scripts/validate-planned-workout-language.ts"),
   tsCheck("running-plan-confirm", "scripts/validate-running-plan-engine-confirm.ts"),
   tsCheck("manual-workout-authoring", "scripts/validate-manual-workout-authoring.ts"),
-  tsCheck("schedule-edit", "scripts/validate-active-plan-schedule-edit-preview.ts"),
+  tsCheck("calendar-authority-retirement", "scripts/validate-active-plan-schedule-edit-preview.ts"),
   tsCheck("workout-comparison", "scripts/validate-workout-evidence-comparison.ts"),
   tsCheck("runner-auth", "scripts/validate-runner-auth-session.ts"),
+  tsCheck("runner-calendar-context", "scripts/validate-runner-calendar-context.ts"),
   tsCheck("admin-auth", "scripts/validate-admin-auth-session.ts"),
   tsCheck("runtime-observability", "scripts/validate-local-runtime-observability.ts"),
   nodeCheck("qa-build-freshness", "scripts/validate-qa-build-freshness.mjs"),
@@ -29,6 +30,9 @@ const localDatabaseChecks = [
   tsCheck("runner-activity-gate-4", "scripts/validate-runner-activity-gate-4.ts"),
   tsCheck("runner-activity-read-models", "scripts/validate-runner-activity-read-models.ts", [
     "--scale=3000",
+  ]),
+  tsCheck("runner-calendar-context", "scripts/validate-runner-calendar-context.ts", [
+    "--require-persistence",
   ]),
 ];
 

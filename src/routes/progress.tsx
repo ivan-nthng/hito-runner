@@ -11,14 +11,14 @@ import { getProgressRouteData } from "@/lib/training-api";
 
 export const Route = createFileRoute("/progress")({
   validateSearch: (search: Record<string, unknown>): { tab: RunnerProgressTab } => ({
-    tab: search.tab === "progress" ? "progress" : "history",
+    tab: search.tab === "progress" || search.tab === "plans" ? search.tab : "history",
   }),
   head: () => ({
     meta: [
-      { title: `Activity history and progress — ${APP_NAME}` },
+      { title: `Activity history, progress, and plans — ${APP_NAME}` },
       {
         name: "description",
-        content: "Review recorded running activities and factual progress.",
+        content: "Review recorded running activities, factual progress, and saved plans.",
       },
     ],
   }),
@@ -60,7 +60,7 @@ function ProgressPendingState() {
           <Skeleton className="h-20 w-full" />
           <Skeleton className="h-20 w-full" />
         </div>
-        <span className="sr-only">Loading activity history and progress.</span>
+        <span className="sr-only">Loading activity history, progress, and saved plans.</span>
       </div>
     </AppShell>
   );
@@ -72,7 +72,7 @@ function ProgressErrorState({ reset }: { error: Error; reset: () => void }) {
       <div className="hito-route-gutter max-w-3xl py-20">
         <section className="hito-state-surface" data-tone="destructive" role="alert">
           <p className="hito-label text-destructive">Progress unavailable</p>
-          <h1 className="hito-page-title">We couldn&apos;t open this runner view.</h1>
+          <h1 className="hito-ui-page-title">We couldn&apos;t open this runner view.</h1>
           <p className="hito-page-copy text-foreground/85">
             Try again to reopen the latest activity truth.
           </p>

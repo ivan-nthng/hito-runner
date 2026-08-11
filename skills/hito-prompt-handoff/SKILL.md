@@ -1,417 +1,56 @@
 ---
 name: hito-prompt-handoff
-description: Use when writing Hito prompts for the next agent, decomposing tasks by role, preparing implementation or QA handoffs, or preserving context after a checkpoint.
+description: Use when Product prepares one Hito execution handoff after reconstructing the active task.
 ---
 
 # Hito Prompt Handoff
 
 ## Purpose
 
-Create precise next-role prompts that preserve Hito decisions and avoid scope drift.
-
-This skill is owned by Product for routine Hito routing. Product reads the prior-agent report,
-explains the current state to the user, and writes the next-role prompt directly.
-
-Prompt handoff is routing, not execution. When the next step belongs to BACKEND, FRONTEND, QA,
-DESIGNER, RUNNING COACH, or another execution role, this skill should produce one self-contained
-role prompt. It must not make the router/orchestrator run that role's commands, browser checks,
-implementation patches, or QA proof locally. Autonomy belongs inside the assigned role prompt.
-
-## Always-Visible Root-Cause Handoff Gate
-
-Before writing any next-role prompt, ask:
-
-`Is this prompt sending the next agent to fix the root cause, or only the visible symptom?`
-
-If it is only symptom-level, rewrite the handoff before sending it. The prompt must name:
-
-- the visible symptom
-- the evidence-backed underlying cause, or the exact artifact required to establish it
-- the canonical owner that should fix it
-- the existing seam/pattern that should be reused first
-- the stop condition if the true root cause belongs to another role
-
-For BACKEND and FRONTEND prompts, this gate is mandatory in the `Root cause and architecture fit`
-section. For QA prompts, this gate becomes explicit source-boundary proof and stop conditions.
-
-Every handoff that authorizes implementation, debugging, or QA must tell the assigned owner to
-publish the centralized `Execution preflight` from `AGENTS.md` section 0.1 before its first write or
-validation mutation. Do not duplicate its template in every prompt; carry only task-specific evidence
-and stop conditions.
-
-## Solution Ownership Boundary
-
-The handoff writer assigns the problem; the receiving role designs and executes the solution.
-
-Every prompt should provide:
-
-- the observed symptom and root-cause evidence;
-- for `ROLE: FRONTEND`, one explicit `Frontend lane: DevTools | Product | Marketing` label after the
-  task/stage context;
-- the canonical owner and existing seams to inspect;
-- the product outcome, hard constraints, non-goals, and acceptance evidence;
-- a compact Definition of Done: observable outcome, preserved boundaries, required owner
-  verification, and the condition that keeps the task open; and
-- decisions already made by the user or active plan.
-
-Do not prescribe a technical design, implementation algorithm, SQL shape, schema structure, helper
-layout, command sequence, or code recipe unless it is an explicit, already-decided product contract
-or safety boundary. A plausible diagnosis or previous agent suggestion is context for the receiving
-role to evaluate, not a mandated implementation.
-
-Before finalizing a prompt, ask: `Does this tell the agent what must become true, or does it try to
-tell the agent how to code it?` Keep the former and remove the latter.
-
-## Active Task Continuity Gate
-
-Before a handoff or progress response, reconstruct the live task from its canonical backlog item,
-relevant current documentation, any linked supporting plan/spec, the latest report, and the preceding
-acceptance/failure gates. The most recent report is evidence about the active task, not a replacement
-for the task itself.
-
-The user-facing shell must make four things explicit before any prompt:
-
-- the parent plan and product capability;
-- the exact live slice and current stage;
-- what has already passed and must not be reopened; and
-- the one remaining gate or blocker.
-
-When supporting plan/spec metadata is stale, say so plainly and use the canonical backlog item plus
-latest validated evidence for the live stage. Do not silently promote a supporting artifact into a
-task; reconcile it only when that documentation correction is the bounded work.
-
-If the user asks where the work stands and the immediate next owner is known, answer with this
-continuity context and include exactly one execution-ready prompt for that owner. Omit a prompt only
-when there is no next owner, a real Product decision is required, or the user explicitly asks for
-status only with no handoff.
-
-## Solution-Neutral Prompt Check
-
-Assign the outcome and evidence; leave the execution design to the receiving role.
-
-- Do not prescribe implementation algorithms, file decomposition, helper shapes, command sequences,
-  browser click paths, or test-data choreography.
-- State product decisions, safety boundaries, observed evidence, non-goals, and acceptance criteria.
-- Include a specific command, fixture value, or navigation detail only when it is an already-decided
-  product contract or a necessary safety boundary, not merely the handoff writer's preferred method.
-- Treat a previous agent's suggested fix as evidence for investigation, not as a mandatory solution.
-
-## Required Reading
-
-1. `docs/context.md`
-2. `docs/glossary.md`
-3. relevant `docs/current-*.md`
-4. canonical item in `docs/tasks/backlog/`
-5. any linked supporting plan/spec
-6. latest implementation/QA/checkpoint report
-
-## Workflow
-
-1. Identify the canonical backlog item and any linked supporting plan/spec/doc. Render the backlog
-   item first as a clickable Markdown link with an absolute workspace path. A supporting artifact
-   never replaces the operational item.
-2. Identify the current task and stage.
-3. Decide exactly one next recommended role.
-4. Include required reading order.
-5. List exact files/surfaces to inspect.
-6. Add subagent guidance when the next role can safely run independent read-only audits, tests,
-   source scans, or non-mutating validation without user attention.
-7. State product outcome, constraints, non-goals, and what not to touch without prescribing the
-   receiving role's technical solution.
-8. For an implementation, debugging, or validation task, specify the Definition of Done and the
-   risk-based owner verification inventory, not a code-level implementation recipe. Require the
-   final inventory table as `Check | Scenario / environment | Result | Evidence`; for debugging,
-   require a safe root-cause repro or discriminator. State separately when broader Global QA
-   Acceptance remains a later gate. Do not add a test inventory to a pure explanatory, reference, or
-   routing response.
-9. Rely on the standard report formats in `AGENTS.md` by default. Specify custom output only when
-   the task needs stricter evidence, unusual ordering, or a non-standard report shape.
-10. Do not include a long continuity footer by default. Use only the standard shell plus `Blockers`
-   for routine Product prompt-routing.
-
-## Bolder Autonomous Prompt Rule
-
-When the next owner can safely handle a root-cause batch, write the prompt for that batch instead of
-one micro-step.
-
-- Authorize the next role to use/reuse subagents for QA, code audit, coaching, or validation inside
-  the same lane.
-- Tell the role to continue through adjacent same-owner seams until validation fails, an owner
-  boundary is crossed, unsafe mutation appears, or a Product decision is needed.
-- Prefer prompts that require executable validators/source proof over prompts that ask for another
-  Markdown report.
-- Do not ask the user to relay routine Backend -> QA -> Backend or Frontend -> QA loops.
-- Include stop conditions, but do not turn every possible risk into a reason to avoid doing the
-  work.
-- Do not satisfy this rule by having the handoff writer run the implementation or QA itself. The
-  assigned role agent owns its own subagents and final integrated result.
-
-## Autonomous Completion, Not User Relay
-
-Write one bounded owner task that includes the implementation, Definition-of-Done verification, and
-fix-forward loop when those activities share one primary owner and safe local evidence is available.
-The user must not be asked to copy a routine implementation result into a separate QA prompt and then
-copy the QA result back to the implementing role. Independent broad Global QA Acceptance remains a
-separate later gate when the plan or release scope requires it.
-
-- Tell the assigned BACKEND or FRONTEND owner to start/reuse a role-prefixed QA subagent for browser,
-  persistence-readback, fixture, or regression proof that is adjacent to its own Definition of Done.
-- Require that local behavior, UI, styling, or contract slices use that independent subagent inside
-  the owner task even for small diffs. A standalone user-facing QA task is for Global QA Acceptance,
-  cross-owner/release coverage, or an explicitly assigned acceptance scope, not routine closeout.
-- The owner integrates the QA result and fixes any same-owner defect before returning.
-- The owner reports `Implementation DoD: Passed` only after its full required inventory passes, and
-  labels Global QA Acceptance as pending unless it was explicitly part of the same assigned scope.
-- Return to the user only with an implementation-DoD result, a genuine cross-owner defect, an unsafe
-  mutation boundary, a missing tool capability, or a Product decision.
-- Do not turn a known required browser check into a later user-facing handoff when the owner can
-  safely delegate it inside the same task.
-
-## Subagent Budget
-
-Prompts must ask the receiving owner to reuse a small set of subagents across the whole active
-workstream, not to open one per test or file. The default is a reusable pool of zero to six
-subagents: for example
-source/ownership audit, QA/browser validation, domain doctrine, focused test/proof, and one bounded
-consumer audit when those scopes are genuinely independent. More than six requires explicit user
-approval. Do not close and recreate equivalent agents between routine adjacent checks. Do not write
-prompts that encourage broad fan-out, per-command delegation, or large pools of parallel agents.
-
-## Product-Owned Direct Handoff
-
-Use this mode when Product receives another agent's result and needs to decide what happens next.
-
-Product writes the next-role prompt directly. Do not create an intermediate package for a separate
-prompt-writing role.
-
-The handoff must:
-
-- be written in Russian around the exact prompt and English inside the exact prompt by default
-- state `Model: <model>. Reasoning effort: <level>.` immediately before the fenced prompt block;
-  this instruction is mandatory whenever a user-facing response contains an exact role prompt
-- put the exact next-role prompt inside one fenced code block
-- name the active plan/spec/doc with an absolute clickable file link in the surrounding Russian
-  shell
-- translate the prior agent's report into human product context: what the work solved globally, why
-  it matters, what is now actually possible, and what remains future/blocked/out of scope
-- include the prior agent's task, stage, changed files, validation evidence, blockers, and product
-  acceptance status
-- list the source-of-truth files the next role should use
-- state the immediate next owner
-- state constraints, non-goals, and known product decisions
-- avoid optional second prompts or later-role prompts
-- avoid implementation details beyond what the next role needs to execute safely
-- end with `Blockers`; do not append a long continuity footer unless context would otherwise be lost
-
-If this routing layer would add noise for a trivial follow-up, say that directly and recommend the
-simpler one-step handoff.
-
-Recommended response shape:
-
-~~~text
-Plan file:
-<clickable absolute Markdown link, or none>
-
-Task:
-<current task>
-
-Stage:
-<current stage>
-
-What we did:
-<compact prior-agent result in human language: what changed globally and why it matters>
-
-Where we are:
-<accepted / rejected / blocked / ready for next role, explained in plain Russian product context>
-
-What we do next:
-<one immediate next action>
-
-Exact prompt for that role:
-~~~md
-ROLE: <ROLE>
-
-Task:
-<execution-ready task>
-
-Stage:
-<stage>
-
-Context:
-<self-contained context>
-
-Scope:
-<exact scope>
-
-Validation:
-<required checks>
-
-Definition of Done:
-<observable outcome, preserved boundaries, required owner verification, and whether Global QA
-Acceptance remains pending>
-~~~
-
-Blockers:
-<none or concrete blockers>
-~~~
-
-## Hito Prompt Rules
-
-- Start orchestration/review/handoff responses with: `Plan file`, `Task`, `Stage`, `What we did`, `Where we are`, `What we do next`.
-- When reviewing another agent's work, do not make `What we did` and `Where we are` feel like copied
-  tracker fields. Explain the story in Russian: what problem this slice solved, what capability is
-  now real, what is still not real, and why the next role is the right owner.
-- Write user-facing explanation/status in Russian by default.
-- Write the exact next-role execution prompt in English by default.
-- Do not mix Russian into execution prompts unless the user explicitly requests a Russian prompt.
-- Render existing `Plan file` values as clickable markdown links with absolute workspace paths, not inline code or plain text.
-- Render any referenced plan, task, backlog item, frontend spec, archive doc, QA report, or current-doc path as a clickable markdown link with an absolute workspace path.
-- Always name `Task` and `Stage`.
-- Do not assume the next agent remembers chat history.
-- Do not ask an agent to implement outside its role.
-- Do not split a bounded task across roles prematurely.
-- Provide exactly one immediate next-role prompt per response.
-- Do not include optional QA prompts, follow-up prompts, or "after that" prompts unless the user explicitly asks for that single prompt next.
-- Include a clearly labelled `Exact prompt for that role` section for any handoff response.
-- Do not output a naked prompt without the required shell.
-- Do not append `HANDOFF BLOCK` or another long continuity footer to routine Product routing
-  responses. The prompt plus `Blockers` is the default close.
-- The exact prompt must be self-contained, but it must not duplicate routine report formats from
-  `AGENTS.md`. Include report instructions only for custom evidence or stricter task-specific
-  output requirements.
-- Preserve canonical architecture rules from `AGENTS.md`.
-- Keep prompts execution-ready, not inspirational.
-- For BACKEND and FRONTEND implementation/debugging prompts, require root-cause investigation and
-  architecture-fit checks before the agent patches code.
-- Do not let BACKEND or FRONTEND prompts ask for symptom patches only. They must direct the agent to
-  find the canonical owner, reuse existing Hito seams, and fix the underlying cause when the slice can
-  safely cover it.
-- Do not ask BACKEND prompts to edit frontend-owned route/component/style/Hito DS/copy files, even
-  for "small compile-impact" updates. BACKEND may inspect frontend consumers read-only, then route a
-  FRONTEND follow-up if consumer changes are required. Conversely, do not ask FRONTEND prompts to
-  change backend contracts, persistence, schema, or server-side lifecycle truth.
-- For non-trivial prompts to agents that code, QA, audit, research, design, or route work, include
-  subagent expectations when useful: the next agent should use or reuse subagents for safe
-  independent read-only audits, tests, source scans, and non-mutating validation; close completed
-  subagents; integrate findings themselves; and avoid routing every small subtask back to the user.
-- If a prompt routes from one execution role to another role for validation or read-only proof inside
-  the same active lane, tell the parent role to start a role-prefixed subagent/session itself when
-  tools are available. The delegated prompt must begin with `ROLE: <ROLE>` so the subagent loads the
-  correct role instructions. Do not make the user copy-paste routine QA, source audit, or validation
-  prompts when the parent role can safely delegate and integrate the result.
-- This delegation instruction applies to the parent execution role that owns the batch. A top-level
-  Product/orchestration router should normally write the autonomous prompt and stop, not spawn QA or
-  implementation subagents to complete another role's work.
-- For Hito Stack Simplification prompts to ARCHITECT or BACKEND, include subagent expectations by
-  default. If you intentionally omit them, state why the task is single-file, inherently sequential,
-  or blocked by unavailable subagent tooling.
-- For global simplification cleanup, prefer an autonomous same-owner batch prompt over a micro-gate
-  prompt when source proof shows several adjacent seams can be handled by one role with one
-  validation story. The prompt must include stop conditions, progress estimate reporting, and
-  subagent expectations so the user is not forced into a copy-paste operator loop.
-- If subagent/thread tools are unavailable to the current Product router, say that briefly in the
-  user-facing shell when relevant, but do not use it as an excuse to keep producing micro-prompts.
-  Instead, write the next prompt so the execution role uses subagents where available or performs
-  safe sequential audits locally, completes the bounded batch, and returns only on validation
-  failure, owner-boundary crossing, mutation/browser-risk escalation, or product decision need.
-- When a role has already selected a same-owner/same-risk follow-up, prefer asking that role to
-  execute/delegate the follow-up autonomously over issuing a new user-facing prompt. The user should
-  receive integrated outcomes, blockers, or Product decisions, not a chain of role-to-role copy-paste
-  messages.
-- For Hito Stack Simplification routing, an ARCHITECT prompt should usually select an autonomous
-  execution batch, not merely one tiny next gate, unless fresh evidence shows only one safe seam
-  exists. If it must select only one seam, the prompt must explain the stop condition and why batching
-  would be unsafe.
-
-## Minimal Documentation For Cleanup Handoffs
-
-For cleanup, docs compression, artifact retention, or apply/tooling prompts:
-
-- Tell the execution role to keep source-of-truth docs compact. Active plans should receive ledger
-  entries, not copied terminal logs, per-file manifests, repeated handoff prompts, or full subagent
-  transcripts.
-- Tell the role to put machine-detail evidence in machine artifacts, dry-run outputs, apply-result
-  files, QA reports, or manifests, then link/summarize those artifacts from docs.
-- If the slice removes files/bytes but adds a long Markdown report, require the role to compact the
-  closeout before returning.
-- For retention/apply work, the plan entry should usually include only date, slice/command, counts,
-  bytes, affected roots, manifest/apply-result paths, validation commands, and next gate/hold.
-
-## Required Handoff Shell
-
-Use this exact shell for orchestration, prior-agent review, checkpoint, and handoff responses:
-
-1. `Plan file`
-2. `Task`
-3. `Stage`
-4. `What we did`
-5. `Where we are`
-6. `What we do next`
-7. `Exact prompt for that role`
-8. `Blockers`
-
-The shell is for the user-facing response. The exact prompt inside section 7 is for the next role.
-
-## Exact Prompt Requirements
-
-The prompt inside `Exact prompt for that role` must:
-
-- be in English by default
-- target one role only
-- start with `ROLE: <ROLE>`
-- include `Task`
-- include `Stage`
-- include context and scope
-- include `Root cause and architecture fit` for BACKEND or FRONTEND implementation/debugging prompts
-- list exact files/surfaces to inspect when relevant
-- list commands or browser policy when validation is required
-- include subagent/read-only audit guidance when independent checks can run safely inside the next
-  role's scope
-- rely on `AGENTS.md` standard report formats by default; include custom output requirements only
-  when the task needs them
-- avoid optional second prompts or later-role prompts
-
-For BACKEND and FRONTEND prompts, `Root cause and architecture fit` must tell the agent to:
-
-- investigate source-of-truth, logs/state/data flow, and nearby ownership before changing code
-- distinguish the visible symptom from the underlying cause
-- reuse existing modules, contracts, validators, server actions, persistence seams, components, Hito
-  DS/admin/product patterns, and helpers before adding anything new
-- avoid parallel product systems, duplicate frontend/backend truth, one-off custom UI, broad
-  abstractions, or compatibility layers without removal plans
-- implement the smallest safe root-cause fix in the canonical owner, or explicitly report the
-  systemic follow-up if the real fix is outside the current slice
-- clean up dead code from failed or replaced attempts when safe
-
-For QA handoffs, rely on the standard `ROLE: QA` prompt and report format in `AGENTS.md` plus
-`skills/hito-qa-browser-regression/SKILL.md`. Add only task-specific evidence, fixture, or safety
-requirements; do not duplicate a second numbered QA template here.
-
-QA handoff wording rule:
-
-- Do not write that the current role cannot perform QA inside the user-facing handoff shell or
-  inside the QA prompt.
-- Do not write variants such as "this orchestration role cannot run browser/CLI QA", "I cannot run
-  QA here", or "the correct step is QA because this role is forbidden to validate".
-- In `Where we are`, write the positive state instead: `Ready for direct QA validation.`
-- In `What we do next`, write the positive action instead: `Hand this to QA to execute the
-  validation directly using the required safe testing tools.`
-- Do not imply QA should pass validation to another agent because commands, scripts, browser checks,
-  dev servers, screenshots, or local/test fixtures are needed.
-- The exact QA prompt should explicitly say that QA may do anything necessary for testing within
-  safe local/dev/test validation boundaries, while not implementing product fixes.
+Create one solution-neutral prompt for the immediate owner without turning the user into a relay.
+
+## Before Writing
+
+Read the canonical backlog item when one exists, current docs relevant to the surface, the latest
+owner report, and the immediately preceding accepted/failed gate. Identify what is accepted, the
+one remaining condition, demonstrated cause or exact missing discriminator, canonical owner, and
+mode.
+
+## Lite Handoff
+
+Use only when another owner genuinely needs a short safe task. State outcome, evidence/decision,
+scope, focused proof, promotion trigger, and boundary. Do not inject a full plan, six-document
+reading list, subagent requirement, test matrix, or later-role prompt.
+
+## Tracked Handoff
+
+Give the owner:
+
+- task and stage;
+- canonical item and relevant sources;
+- observed symptom plus demonstrated cause or exact discriminator;
+- owner, existing seam, outcome, boundaries, non-goals, and safety constraints;
+- Definition of Done and risk-derived proof; and
+- stop conditions and autonomous same-owner validation scope.
+
+The prompt states what must become true, not how to write code, model data, use a helper, or click
+through a browser. FRONTEND prompts name one lane.
+
+## Rules
+
+- For a new or changed task, PRODUCT states the exact proposed handoff before dispatch unless Ivan
+  explicitly says to send immediately. For an already approved canonical plan with an unambiguous
+  next owner and no Product decision, PRODUCT advances the plan autonomously and reports what it
+  sent in Russian.
+- Preserve Rule Zero: never interrupt an active owner.
+- Exact prompts and execution roles' final formal reports are English by default. Their in-progress
+  commentary and explanations visible to Ivan are Russian by default; PRODUCT's direct status to
+  Ivan is also Russian by default.
+- An execution owner may integrate its own safe QA/review loop. Do not create a user-facing
+  implementation -> QA -> implementation chain.
+- Global QA remains a separate prompt only when it is explicitly the next acceptance layer.
 
 ## Output
 
-1. Plan file
-2. Task
-3. Stage
-4. What we did
-5. Where we are
-6. What we do next
-7. Exact prompt for that role
-8. Blockers
-
-Do not add a long continuity footer after `Blockers` unless the task is blocked, genuinely gated
-with context not already captured in the prompt, too large for the standard shell to preserve
-continuity, or the user explicitly requests it.
+For Tracked work use the AGENTS.md routing shell and one exact prompt. For Lite work use a concise
+status and do not add a prompt unless a role must act.

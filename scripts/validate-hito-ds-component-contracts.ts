@@ -23,6 +23,7 @@ import {
 import { HITO_TYPOGRAPHY_ROLES } from "../src/lib/hito-typography-roles";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const calendarCssPath = path.join(rootDir, "src/styles/calendar-state-surfaces.css");
 const controlsCssPath = path.join(rootDir, "src/styles/controls-lists.css");
 const fieldBaseCssPath = path.join(rootDir, "src/styles/controls-fields.css");
 const fieldsCssPath = path.join(rootDir, "src/styles/forms-onboarding.css");
@@ -556,6 +557,7 @@ const sourceFiles = (
 const foundationSearchFiles = (await collectSourceFiles(path.join(rootDir, "src"))).filter((file) =>
   /\.(css|ts|tsx)$/.test(file.relativePath),
 );
+const calendarCss = await readFile(calendarCssPath, "utf8");
 const controlsCss = await readFile(controlsCssPath, "utf8");
 const fieldBaseCss = await readFile(fieldBaseCssPath, "utf8");
 const fieldExtendedCss = await readFile(fieldsCssPath, "utf8");
@@ -576,6 +578,9 @@ const currentReferenceDocs = await Promise.all(
   ),
 );
 const hitoDsRoute = sourceFiles.find((file) => file.relativePath === "src/routes/hitoDS.tsx");
+const hitoCalendarDaySource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/ui/hito-calendar-day.tsx",
+);
 const hubRoute = sourceFiles.find((file) => file.relativePath === "src/routes/hub.tsx");
 const showcaseBoundaryLeaks = showcaseBoundaryLeakFindings(sourceFiles);
 const uiTitleRoles = HITO_TYPOGRAPHY_ROLES.filter((role) => role.group === "ui-title");
@@ -717,6 +722,57 @@ expect(
 
 validateCssSelectors(controlsCss, "hito-button", HITO_BUTTON_VARIANTS);
 validateCssSelectors(controlsCss, "hito-button", HITO_BUTTON_SIZES);
+const primaryButtonDeclarations = selectorDeclarations(controlsCss, ".hito-button-primary");
+const primaryButtonActiveDeclarations = selectorDeclarations(
+  controlsCss,
+  '.hito-button-primary[data-demo-state="active"]',
+);
+const lightPrimaryButtonDeclarations = selectorDeclarations(
+  controlsCss,
+  '[data-hito-theme="light"] .hito-button-primary',
+);
+const lightPrimaryButtonActiveDeclarations = selectorDeclarations(
+  controlsCss,
+  '[data-hito-theme="light"] .hito-button-primary[data-demo-state="active"]',
+);
+const buttonFocusDeclarations = selectorDeclarations(
+  controlsCss,
+  '.hito-button[data-demo-state="focus"]',
+);
+expect(
+  primaryButtonDeclarations !== null &&
+    primaryButtonActiveDeclarations !== null &&
+    lightPrimaryButtonDeclarations !== null &&
+    lightPrimaryButtonActiveDeclarations !== null &&
+    primaryButtonDeclarations["box-shadow"] === undefined &&
+    primaryButtonActiveDeclarations?.["box-shadow"] === undefined &&
+    lightPrimaryButtonDeclarations?.["box-shadow"] ===
+      "0 8px 18px color-mix(in oklch, var(--color-signal) 8%, transparent)" &&
+    lightPrimaryButtonActiveDeclarations?.["box-shadow"] === "none",
+  "Default primary Button rest and active states must not reintroduce perimeter chrome in either theme.",
+);
+expect(
+  buttonFocusDeclarations?.outline === "2px solid var(--color-ring)" &&
+    buttonFocusDeclarations?.["outline-offset"] === "2px",
+  "Button focus-visible must remain a distinct token-owned keyboard indication.",
+);
+const interactiveCalendarMarkers =
+  hitoCalendarDaySource?.content.match(/data-interactive=\{interactive \? "true" : undefined\}/g) ??
+  [];
+const interactiveMobileRowHoverDeclarations = selectorDeclarations(
+  calendarCss,
+  '.hito-calendar-mobile-row[data-interactive="true"]:hover',
+);
+expect(
+  interactiveCalendarMarkers.length === 2,
+  "Desktop calendar cells and mobile workout-day rows must expose the shared interactive presentation contract.",
+);
+expect(
+  interactiveMobileRowHoverDeclarations?.["border-color"] ===
+    "color-mix(in oklch, var(--color-foreground) 18%, transparent)" &&
+    selectorDeclarations(calendarCss, ".hito-calendar-mobile-row:hover") === null,
+  "Mobile calendar hover chrome must be gated by the shared interactive presentation contract.",
+);
 HITO_BUTTON_VARIANTS.forEach((variant) => {
   HITO_BUTTON_TONES_BY_VARIANT[variant]
     .filter((tone) => tone !== "default")
@@ -742,6 +798,8 @@ expect(
 );
 validateCssSelectors(fieldBaseCss, "hito-field", HITO_FIELD_VARIANTS);
 validateCssSelectors(fieldBaseCss, "hito-field", HITO_FIELD_SIZES);
+validateCssSelectors(controlsCss, "hito-slider", HITO_FIELD_SIZES);
+validateCssSelectors(controlsCss, "hito-dual-range", HITO_FIELD_SIZES);
 validateCssSelectors(controlsCss, "hito-choice-toggle", HITO_CHOICE_TOGGLE_SIZES);
 
 retiredClassFindings(sourceFiles).forEach((finding) => {
@@ -775,11 +833,32 @@ const referenceStructure = sourceFiles.find(
 const buttonSource = sourceFiles.find(
   (file) => file.relativePath === "src/components/ui/button.tsx",
 );
+const sliderSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/ui/hito-slider.tsx",
+);
+const dualRangeSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/ui/hito-dual-range.tsx",
+);
+const sliderPlaygroundSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/hito-ds/slider-playground.tsx",
+);
+const completionPanelSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/CompletionPanel.tsx",
+);
+const bodyNotesSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/workout-completion/BodyNotesEditor.tsx",
+);
+const heartRateProfileSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/settings/HeartRateProfileSection.tsx",
+);
 const choiceSource = sourceFiles.find(
   (file) => file.relativePath === "src/components/ui/hito-choice-toggle.tsx",
 );
 const calendarSource = sourceFiles.find(
   (file) => file.relativePath === "src/components/ui/calendar.tsx",
+);
+const dateTimeInputSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/ui/hito-date-time-input.tsx",
 );
 const tabsSource = sourceFiles.find(
   (file) => file.relativePath === "src/components/ui/hito-tabs.ts",
@@ -874,6 +953,12 @@ expect(
       file.content.includes("@/components/ui/select") === false,
   ),
   "Calendar or Workout Library bypassed the shared reference-workbench settings owner.",
+);
+expect(
+  calendarPlaygroundSource?.content.includes('label="Presentation contract"') === true &&
+    calendarPlaygroundSource.content.includes('state.interaction === "interactive"') &&
+    calendarPlaygroundSource.content.includes('variant.state.interaction === "interactive"'),
+  "Calendar reference must expose the shared interactive/passive presentation contract across demo and variants.",
 );
 expect(
   sourceFiles.filter((file) => file.content.includes("export type HitoDsWorkbenchOption"))
@@ -991,8 +1076,12 @@ expect(
   "The shell playground must expose two interactive quiet-surface consumers with ownership markers.",
 );
 expect(
-  buttonSource?.content.includes("export { Button, HitoButton, buttonVariants }") === true,
-  "Button owner must expose canonical HitoButton and preserve the Calendar compatibility API.",
+  buttonSource?.content.includes("export { HitoButton }") === true &&
+    buttonSource.content.includes("buttonVariants") === false &&
+    buttonSource.content.includes("const Button =") === false &&
+    buttonSource.content.includes("interface ButtonProps") === false &&
+    buttonSource.content.includes('from "class-variance-authority"') === false,
+  "Button owner must expose only the canonical HitoButton runtime API.",
 );
 expect(
   buttonSource?.content.includes("size: HitoButtonSize;") === true &&
@@ -1014,6 +1103,53 @@ expect(
   "HitoButton must not collapse native and lifecycle semantics into a generic state prop.",
 );
 expect(
+  sliderSource?.content.includes("size?: HitoFieldSize;") === true &&
+    sliderSource.content.includes('size = "sm"') &&
+    sliderSource.content.includes("previousValue?: number;") &&
+    sliderSource.content.includes('type="button"') &&
+    sliderSource.content.includes("onClick={() => onValueChange(previousValue)}"),
+  "HitoSlider must reuse the field size scale and restore an available baseline through its controlled callback.",
+);
+expect(
+  dualRangeSource?.content.includes("size?: HitoFieldSize;") === true &&
+    dualRangeSource.content.includes('size = "sm"') &&
+    dualRangeSource.content.includes("previousValue?: readonly [number, number];") &&
+    dualRangeSource.content.includes("onClick={() => onMinValueChange(previousValue[0])}") &&
+    dualRangeSource.content.includes("onClick={() => onMaxValueChange(previousValue[1])}"),
+  "HitoDualRange must reuse the field size scale and restore each baseline endpoint independently.",
+);
+expect(
+  selectorDeclarations(controlsCss, ".hito-slider-rail")?.background ===
+    "color-mix(in oklch, var(--color-foreground) 14%, transparent)" &&
+    selectorDeclarations(controlsCss, ".hito-dual-range-rail")?.background ===
+      "color-mix(in oklch, var(--color-foreground) 14%, transparent)" &&
+    controlsCss.includes(
+      "background: color-mix(in oklch, var(--hito-dual-range-accent) 44%, transparent);",
+    ) &&
+    controlsCss.includes(
+      "background: color-mix(in oklch, var(--color-foreground) 42%, transparent);",
+    ) &&
+    controlsCss.includes("height: var(--hito-range-control-height") &&
+    controlsCss.includes("background: var(--hito-slider-accent);") &&
+    controlsCss.includes("background: var(--hito-dual-range-accent);"),
+  "Slider chrome must retain alpha rail/selection/markers with full-height solid signal handles.",
+);
+expect(
+  sliderPlaygroundSource?.content.includes("HITO_FIELD_SIZES.map") === true &&
+    sliderPlaygroundSource.content.includes("HitoDualRange") &&
+    sliderPlaygroundSource.content.includes('aria-label="Slider size"') &&
+    sliderPlaygroundSource.content.includes("previousValue={previousValue}") &&
+    sliderPlaygroundSource.content.includes("previousValue={previousDualValue}"),
+  "The Slider playground must expose every shared size and interactive single/dual baseline restoration.",
+);
+expect(
+  completionPanelSource?.content.includes("previousValue={syncedFormState.rpe ?? 6}") === true &&
+    bodyNotesSource?.content.includes("baselineBodyNotes[index]?.severity ?? 2") === true &&
+    heartRateProfileSource?.content.includes("summary.zones[index]?.minBpm") === true &&
+    heartRateProfileSource.content.includes("summary.zones[index]?.maxBpm"),
+  "Every direct product slider consumer must source its baseline from existing edit-session or persisted truth.",
+);
+expect(
   choiceSource?.content.includes('{ presentation?: "inline"; size: HitoChoiceToggleSize }') ===
     true && choiceSource.content.includes('{ presentation: "card"; size?: never }'),
   "Choice Toggle must require size for inline controls and keep card as a separate presentation.",
@@ -1024,14 +1160,15 @@ expect(
   "Choice Toggle must expose truthful radio or pressed semantics from the selected state.",
 );
 expect(
-  calendarSource?.content.includes(
-    'import { Button, buttonVariants } from "@/components/ui/button"',
-  ) === true,
-  "Calendar CVA/shadcn Button compatibility boundary changed without its separate gate.",
+  calendarSource?.content.includes('import { HitoButton } from "@/components/ui/button"') ===
+    true && calendarSource.content.includes("hitoButtonClasses") === true,
+  "Calendar navigation and day controls must consume the canonical Hito control contract.",
 );
 expect(
-  calendarSource?.content.includes("HitoButton") === false,
-  "Calendar must not be migrated inside the component-contract cleanup.",
+  calendarSource?.content.includes("buttonVariants") === false &&
+    calendarSource.content.includes("buttonVariant") === false &&
+    dateTimeInputSource?.content.includes("buttonVariant") === false,
+  "Calendar and date-time input must not retain the legacy Button compatibility handoff.",
 );
 expect(
   selectionMechanicsSource?.content.includes("moveHitoSelection") === true &&
@@ -1147,6 +1284,7 @@ if (errors.length > 0) {
     },
     choice: { sizes: HITO_CHOICE_TOGGLE_SIZES.length },
     field: { sizes: HITO_FIELD_SIZES.length, variants: HITO_FIELD_VARIANTS.length },
+    slider: { kinds: 2, sizes: HITO_FIELD_SIZES.length },
     foundation: {
       geometry: foundationGeometryDefinitions.length,
       retiredSelectors: retiredFoundationSelectors.length,

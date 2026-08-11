@@ -90,7 +90,10 @@ export type Database = {
           goal_metadata: Json | null;
           goal_summary: string;
           id: string;
+          library_removed_at: string | null;
           plan_preferences: Json | null;
+          saved_plan_payload: Json | null;
+          saved_plan_review_checksum: string | null;
           schema_version: string;
           source_kind: string | null;
           source_template: string;
@@ -107,7 +110,10 @@ export type Database = {
           goal_metadata?: Json | null;
           goal_summary: string;
           id?: string;
+          library_removed_at?: string | null;
           plan_preferences?: Json | null;
+          saved_plan_payload?: Json | null;
+          saved_plan_review_checksum?: string | null;
           schema_version?: string;
           source_kind?: string | null;
           source_template: string;
@@ -124,7 +130,10 @@ export type Database = {
           goal_metadata?: Json | null;
           goal_summary?: string;
           id?: string;
+          library_removed_at?: string | null;
           plan_preferences?: Json | null;
+          saved_plan_payload?: Json | null;
+          saved_plan_review_checksum?: string | null;
           schema_version?: string;
           source_kind?: string | null;
           source_template?: string;
@@ -346,6 +355,8 @@ export type Database = {
           baseline_notes: string | null;
           baseline_revision: number;
           baseline_sessions_per_week: number | null;
+          calendar_timezone: string;
+          calendar_timezone_source: string;
           created_at: string;
           display_name: string | null;
           first_name: string | null;
@@ -371,6 +382,8 @@ export type Database = {
           baseline_notes?: string | null;
           baseline_revision?: number;
           baseline_sessions_per_week?: number | null;
+          calendar_timezone?: string;
+          calendar_timezone_source?: string;
           created_at?: string;
           display_name?: string | null;
           first_name?: string | null;
@@ -396,6 +409,8 @@ export type Database = {
           baseline_notes?: string | null;
           baseline_revision?: number;
           baseline_sessions_per_week?: number | null;
+          calendar_timezone?: string;
+          calendar_timezone_source?: string;
           created_at?: string;
           display_name?: string | null;
           first_name?: string | null;
@@ -1245,7 +1260,7 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      apply_active_plan_workout_mutation: {
+      apply_calendar_workout_mutation: {
         Args: {
           p_current_date: string;
           p_expected_plan_updated_at: string;
@@ -1260,7 +1275,7 @@ export type Database = {
         };
         Returns: Json;
       };
-      apply_active_plan_workout_content_edit: {
+      apply_calendar_workout_content_edit: {
         Args: {
           p_current_date: string;
           p_expected_plan_updated_at: string;
@@ -1276,12 +1291,7 @@ export type Database = {
       };
       apply_reviewed_plan_persistence: {
         Args: {
-          p_archive_goal_metadata: Json;
-          p_evidence_relinks: Json;
-          p_expected_active_plan_id: string | null;
-          p_expected_active_plan_updated_at: string | null;
-          p_expected_history: Json;
-          p_logs: Json;
+          p_expected_profile_revision?: number | null;
           p_plan: Json;
           p_profile: Json;
           p_user_id: string;
@@ -1289,46 +1299,13 @@ export type Database = {
         };
         Returns: Json;
       };
-      apply_reviewed_plan_persistence_with_profile_revision: {
+      apply_reviewed_future_schedule_persistence: {
         Args: {
-          p_archive_goal_metadata: Json;
-          p_evidence_relinks: Json;
-          p_expected_active_plan_id: string | null;
-          p_expected_active_plan_updated_at: string | null;
-          p_expected_history: Json;
-          p_expected_profile_revision: number;
-          p_logs: Json;
+          p_current_date: string;
           p_plan: Json;
-          p_profile: Json;
+          p_replace_future_workouts: boolean;
           p_user_id: string;
           p_workouts: Json;
-        };
-        Returns: Json;
-      };
-      apply_reviewed_import_persistence: {
-        Args: {
-          p_archive_goal_metadata: Json;
-          p_clear_before_import: boolean;
-          p_evidence_relinks: Json;
-          p_expected_active_plan_id: string;
-          p_expected_active_plan_updated_at: string;
-          p_expected_history: Json;
-          p_logs: Json;
-          p_plan: Json;
-          p_profile: Json;
-          p_user_id: string;
-          p_workouts: Json;
-        };
-        Returns: Json;
-      };
-      apply_active_plan_schedule_reflow: {
-        Args: {
-          p_applied_at: string;
-          p_expected_plan_updated_at: string;
-          p_plan_id: string;
-          p_plan_preferences: Json;
-          p_updates: Json;
-          p_user_id: string;
         };
         Returns: Json;
       };

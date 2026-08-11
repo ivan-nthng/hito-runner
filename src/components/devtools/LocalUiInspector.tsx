@@ -726,7 +726,10 @@ function resolveInspectableElement(target: EventTarget | null, point?: { x: numb
   if (preciseTarget) return preciseTarget;
 
   const control = target.closest<HTMLElement>("button, a, input, textarea, select");
-  if (control && !control.closest(INSPECTOR_LAYER_SELECTOR)) return control;
+  if (control && !control.closest(INSPECTOR_LAYER_SELECTOR)) {
+    const nestedTarget = findNestedCompositeControlTarget(target, control);
+    return nestedTarget ?? control;
+  }
 
   const directTarget = target instanceof HTMLElement ? target : target.parentElement;
   if (directTarget && isTextLikeTarget(directTarget)) return directTarget;
@@ -784,6 +787,41 @@ function findPreciseInspectableDescendant(target: Element) {
   }
 
   return null;
+}
+
+function findNestedCompositeControlTarget(target: Element, control: HTMLElement) {
+  if (target === control || control.childElementCount < 2 || !looksLikeSurface(control)) {
+    return null;
+  }
+
+  let current: Element | null = target;
+  let depth = 0;
+
+  while (current && current !== control && depth < 4) {
+    if (current.closest(INSPECTOR_LAYER_SELECTOR)) return null;
+
+    if (current instanceof HTMLElement && hasStableNestedTargetIdentity(current)) {
+      return current;
+    }
+
+    current = current.parentElement;
+    depth += 1;
+  }
+
+  return null;
+}
+
+function hasStableNestedTargetIdentity(element: HTMLElement) {
+  const className = String(element.className ?? "");
+
+  return Boolean(
+    element.id ||
+    element.getAttribute("aria-label") ||
+    element.getAttribute("data-hito-ds-pattern") ||
+    element.getAttribute("data-testid") ||
+    element.getAttribute("role") ||
+    /\bhito-[a-z0-9-]+\b/.test(className),
+  );
 }
 
 function findAuditableLayoutOwner(start: HTMLElement) {

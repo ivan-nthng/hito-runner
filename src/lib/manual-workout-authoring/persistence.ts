@@ -1,4 +1,4 @@
-import type { EmptyActivePlanCreationInput } from "@/lib/active-plan-persistence";
+import type { EmptyCalendarProvenanceCreationInput } from "@/lib/active-plan-persistence";
 import { trainingPlanV2Schema, type TrainingPlanV2 } from "@/lib/imported-plan";
 import { assertWorkoutDurationTitleContract } from "@/lib/workout-duration-title-contract";
 import {
@@ -100,7 +100,7 @@ function buildManualWorkoutTrainingPlanRow(
 export function buildManualEmptyActivePlanCreationInput(input: {
   setup: ManualEmptyPlanSetupInput;
   currentDate: string;
-}): EmptyActivePlanCreationInput {
+}): EmptyCalendarProvenanceCreationInput {
   const runningLevelLabel = formatManualSetupRunningLevel(input.setup.runningLevel);
   const baselineNotes = `Manual setup running level: ${runningLevelLabel}.`;
 
@@ -143,7 +143,7 @@ export function buildManualEmptyActivePlanCreationInput(input: {
     planPreferences: toJson({
       preferred_workout_mix: "Manual user-built plan v1",
       notes:
-        "Created from Manual setup as an empty active plan. Workouts are added only after backend review and confirmation.",
+        "Created from Manual setup as empty Calendar provenance. Workouts are added only after backend review and confirmation.",
       manual_setup: {
         setup_payload_version: MANUAL_EMPTY_PLAN_SETUP_PAYLOAD_VERSION,
         running_level: input.setup.runningLevel,

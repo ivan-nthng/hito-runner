@@ -72,7 +72,13 @@ export function DeterministicComparisonReadback({
   );
 }
 
-export function RunCapturedReadback({ actual }: { actual: WorkoutActualMetricsSummary }) {
+export function RunCapturedReadback({
+  actual,
+  comparisonAvailable = false,
+}: {
+  actual: WorkoutActualMetricsSummary;
+  comparisonAvailable?: boolean;
+}) {
   const rows = [
     actual.activityLocalDate
       ? { label: "Workout day", value: formatDateValue(actual.activityLocalDate) }
@@ -83,15 +89,47 @@ export function RunCapturedReadback({ actual }: { actual: WorkoutActualMetricsSu
     actual.actualDistanceKm != null
       ? { label: "Distance", value: formatKilometres(actual.actualDistanceKm) }
       : null,
+    actual.actualElevationGainM != null
+      ? { label: "Elevation gain", value: formatWholeNumber(actual.actualElevationGainM, "m") }
+      : null,
+    actual.actualElevationLossM != null
+      ? { label: "Elevation loss", value: formatWholeNumber(actual.actualElevationLossM, "m") }
+      : null,
+    actual.actualAvgHr != null
+      ? { label: "Average heart rate", value: formatWholeNumber(actual.actualAvgHr, "bpm") }
+      : null,
+    actual.actualMaxHr != null
+      ? { label: "Maximum heart rate", value: formatWholeNumber(actual.actualMaxHr, "bpm") }
+      : null,
+    actual.actualAvgPower != null
+      ? { label: "Average power", value: formatWholeNumber(actual.actualAvgPower, "W") }
+      : null,
+    actual.actualMaxPower != null
+      ? { label: "Maximum power", value: formatWholeNumber(actual.actualMaxPower, "W") }
+      : null,
+    actual.actualAvgCadence != null
+      ? { label: "Average cadence", value: formatWholeNumber(actual.actualAvgCadence, "spm") }
+      : null,
+    actual.actualCalories != null
+      ? { label: "Calories", value: formatWholeNumber(actual.actualCalories, "kcal") }
+      : null,
+    actual.actualIntervalCount != null
+      ? {
+          label: "Structured intervals",
+          value: `${actual.actualIntervalCount} interval${actual.actualIntervalCount === 1 ? "" : "s"}`,
+        }
+      : null,
   ].filter(notNull);
 
   return (
-    <div className="mt-4 space-y-3">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="hito-list-row-title">Run captured</p>
-        <span className="hito-status-pill" data-tone="muted">
-          Comparison unavailable
-        </span>
+        <h3 className="hito-ui-panel-title">Observed run</h3>
+        {!comparisonAvailable ? (
+          <span className="hito-status-pill" data-tone="muted">
+            Comparison unavailable
+          </span>
+        ) : null}
       </div>
       {rows.length > 0 ? (
         <dl className="hito-row-group">
@@ -103,9 +141,11 @@ export function RunCapturedReadback({ actual }: { actual: WorkoutActualMetricsSu
           ))}
         </dl>
       ) : null}
-      <p className="hito-body-small">
-        The activity was captured, but no plan comparison is available.
-      </p>
+      {!comparisonAvailable ? (
+        <p className="hito-body-small">
+          The activity was captured, but no plan comparison is available.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -549,6 +589,10 @@ function formatDateValue(value: string) {
 
 function formatKilometres(value: number) {
   return `${value.toFixed(2)} km`;
+}
+
+function formatWholeNumber(value: number, unit: string) {
+  return `${Math.round(value)} ${unit}`;
 }
 
 function humanizeValue(value: string) {

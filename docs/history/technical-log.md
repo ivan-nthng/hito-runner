@@ -1,7 +1,7 @@
 # Hito Technical Log
 
 Status: active internal ledger
-Last Updated: 2026-08-06
+Last Updated: 2026-08-10
 Owner: PRODUCT
 
 ## Purpose And Source Boundary
@@ -29,6 +29,56 @@ Entry format:
 
 Every accepted implementation, QA acceptance gate, source-cleanup batch, or durable process repair
 must either add an entry here or explicitly state why it is not technical-log material.
+
+## 2026-08-10
+
+- BACKEND + FRONTEND Product + independent QA / Personal Runner Timezone Calendar Truth — added one
+  validated persisted IANA timezone per runner, made the authenticated server derive and reuse that
+  runner's calendar date across snapshots, plan/lifecycle policy, manual authoring, and Activity
+  defaults, and added browser initialization plus explicit Settings control with stale-device CAS
+  protection. The canonical date-current fixture now also caps surplus natural plan matches to the
+  exact accepted 11/19 split across day rollover without weakening history or completion assertions.
+  Fixed-instant, DST, invalid-zone, no-profile initialization, reset/seed/reseed, local
+  persistence/RLS, 19-check local-DB, 17-check runtime, fresh build/integrity, desktop, and
+  exact-375px proof passed.
+  Evidence: `docs/tasks/backlog/2026-08-09-personal-runner-timezone-calendar-truth.md` and
+  `qa-artifacts/screenshots/2026-08-09/personal-runner-timezone-calendar-truth/`. Boundary: date-only
+  plan/activity facts, auth/RLS ownership, providers, AI, Gate 5, Design System, hosted data,
+  dependencies, deployment, and Global QA Acceptance remain unchanged or pending.
+
+- FRONTEND Product / active-plan consumer retirement — removed the authenticated AppShell Current
+  Plan desktop menu and mobile Sheet, legacy create/import/export/schedule/clear actions, their
+  state and mounts, and nine now-exclusive active-plan UI modules. Exact Frontend legacy-export and
+  orphan-import searches are empty, focused formatting/lint/diff checks passed, and the production
+  build is green, so Backend may delete the remaining authority without a Frontend compatibility
+  shim. Evidence:
+  `docs/tasks/backlog/2026-08-10-retire-active-plan-calendar-authority.md`. Boundary: first-plan
+  onboarding, saved-plan library Backend contracts, runner-owned Calendar/copy-paste, Settings,
+  auth, timezone, Design System, DevTools, hosted state, deployment, and Global QA remain preserved,
+  separate, or pending.
+
+- FRONTEND Product / saved-plan library UI and Start — added a factual Progress Plans tab over the
+  existing saved-record actions with plan-name search, four decided sorts, visibility review,
+  selected private download, logical hide, and Backend-shaped Start/Replace receipts. Managed
+  loopback browser proof covered empty-future materialization, Calendar refresh, replacement
+  cancellation with an unchanged row hash, positive replacement, retained immutable record,
+  existing Progress tabs, and exact-375px containment; focused static checks and the production
+  build passed. Evidence: `docs/tasks/backlog/2026-08-10-saved-plan-library-ui-and-start.md` and
+  `qa-artifacts/screenshots/2026-08-10/saved-plan-library-ui-and-start/`. Boundary: Backend
+  persistence/scheduling and protected-history policy, Calendar editing, Settings, providers,
+  Design System source, hosted state, deployment, release proof, and Global QA remain unchanged or
+  unclaimed.
+
+## 2026-08-09
+
+- DESIGN SYSTEM + independent QA / Hito DS primary Button perimeter chrome — removed the canonical
+  default primary Button's ordinary one-pixel rest/active ring in both themes, retained only the
+  light-theme diffuse elevation shadow, and moved keyboard focus-visible to a separate token-owned
+  outline; `/hitoDS` and the Workout `Add result` consumer inherit the shared contract without
+  route-local styling. Evidence:
+  `docs/tasks/backlog/2026-08-09-hito-ds-primary-button-perimeter-chrome.md`. Boundary: Inspector
+  highlight, success/error tone rules, Button geometry/API, Workout behavior, persistence, backend,
+  providers, Figma, deployment, and Global QA remain unchanged or unclaimed.
 
 ## 2026-08-06
 

@@ -11,6 +11,7 @@ export type InteractionOverlay = "none" | "today" | "selected" | "focused";
 export type ResultState = "none" | "completed" | "partial" | "skipped";
 export type FeedbackState = HitoCalendarFeedbackState;
 export type CalendarPreviewMode = "desktop" | "mobile";
+export type CalendarInteractionMode = "interactive" | "passive";
 export type WorkoutIdentityKey =
   | "easy"
   | "recovery"
@@ -33,6 +34,7 @@ export type WorkoutIdentity = HitoCalendarWorkoutIdentity & {
 
 export type CalendarPlaygroundState = {
   viewMode: CalendarPreviewMode;
+  interaction: CalendarInteractionMode;
   baseState: BaseDateState;
   overlay: InteractionOverlay;
   result: ResultState;
@@ -47,6 +49,11 @@ export type CalendarPlaygroundState = {
 export const VIEW_MODE_OPTIONS: Array<HitoDsWorkbenchOption<CalendarPreviewMode>> = [
   { value: "desktop", label: "Desktop" },
   { value: "mobile", label: "Mobile" },
+];
+
+export const INTERACTION_MODE_OPTIONS: Array<HitoDsWorkbenchOption<CalendarInteractionMode>> = [
+  { value: "interactive", label: "Interactive" },
+  { value: "passive", label: "Passive" },
 ];
 
 export const BASE_STATE_OPTIONS: Array<HitoDsWorkbenchOption<BaseDateState>> = [
@@ -203,6 +210,7 @@ export const DENSE_GRID_DAYS: Array<Partial<CalendarPlaygroundState> & { day: nu
 
 export const DEFAULT_PLAYGROUND_STATE: CalendarPlaygroundState = {
   viewMode: "desktop",
+  interaction: "interactive",
   baseState: "workout",
   overlay: "today",
   result: "none",

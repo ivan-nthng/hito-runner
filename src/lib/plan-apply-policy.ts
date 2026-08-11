@@ -8,14 +8,22 @@ import {
   buildImportedLogCarryForwardPlan,
   persistedWorkoutRowToImportedSeed as persistedWorkoutRowToImportedSeedBase,
 } from "@/lib/persisted-plan-replacement";
-import { todayIso } from "@/lib/training";
-import type { Database } from "@/lib/supabase/database";
+import { isRealIsoDate } from "@/lib/first-plan-authoring-utils";
+import { addDaysIso, diffDaysIso, startOfWeekIso, todayIso, weekdayLong } from "@/lib/training";
+import type { Database, Json } from "@/lib/supabase/database";
 import {
   assertStartDateAllowedByWeekdayRestInvariant,
   mapImportedSeedAcrossAllowedWeekdays,
   mergeWeekdayRestInvariantIntoPlanPreferences,
   resolveWeekdayRestInvariant,
+  type WeekdayName,
+  type WeekdayRestInvariant,
 } from "@/lib/weekday-rest-invariants";
+import {
+  normalizeRunnerTrainingPreferencesForSave,
+  parseStoredRunnerTrainingPreferences,
+  type RunnerTrainingPreferencesStorage,
+} from "@/lib/runner-training-preferences";
 
 type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
 type PersistedWorkoutLogRow = Database["public"]["Tables"]["workout_logs"]["Row"];
@@ -50,6 +58,61 @@ export interface PreparedPlanApplySuccess {
   preservationPlan: {
     ok: true;
     logs: Array<{ log: PersistedWorkoutLogRow; workoutDate: string }>;
+  };
+}
+
+export interface PreparedSavedPlanFutureApply {
+  importedSeed: ImportedPlanSeed;
+  currentDate: string;
+  resolvedStartDate: string;
+  appliedStartDate: string;
+  omittedLeadingDayCount: number;
+  workoutCount: number;
+}
+
+export interface SavedPlanStartScheduleOptions {
+  requestedStartDate?: string | null;
+  fixedRestDays?: WeekdayName[];
+  preferredLongRunDay?: WeekdayName | null;
+}
+
+export function prepareSavedPlanFutureApplyPolicy(
+  importedPlan: ImportedPlanInput,
+  currentDate: string,
+  runnerPreferences: unknown,
+  options: SavedPlanStartScheduleOptions = {},
+): PreparedSavedPlanFutureApply {
+  if (!isRealIsoDate(currentDate)) {
+    throw new Error("The runner calendar date must be a real YYYY-MM-DD date.");
+  }
+
+  const declaredSeed = buildImportedPlanSeed(importedPlan);
+  const schedule = resolveSavedPlanSchedulePreferences(importedPlan, runnerPreferences, options);
+  validateSavedPlanWeeklyCapacity(declaredSeed, schedule.preferences);
+  const aligned = resolveSavedPlanAlignedProjection(
+    declaredSeed,
+    currentDate,
+    options.requestedStartDate ?? null,
+    schedule.invariant,
+    schedule.preferences.preferred_long_run_day,
+  );
+
+  const importedSeed: ImportedPlanSeed = {
+    ...aligned.importedSeed,
+    planPreferences: buildSavedPlanMaterializationPreferences(
+      aligned.importedSeed.planPreferences,
+      schedule.preferences,
+      schedule.invariant,
+    ),
+  };
+
+  return {
+    importedSeed,
+    currentDate,
+    resolvedStartDate: aligned.resolvedStartDate,
+    appliedStartDate: importedSeed.startDate,
+    omittedLeadingDayCount: aligned.omittedLeadingDayCount,
+    workoutCount: importedSeed.workouts.filter((workout) => workout.workoutType !== "rest").length,
   };
 }
 
@@ -148,6 +211,197 @@ export function deriveEffectiveStartDate(
   }
 
   return startDate > currentDate ? startDate : currentDate;
+}
+
+function resolveSavedPlanAlignedProjection(
+  importedSeed: ImportedPlanSeed,
+  currentDate: string,
+  requestedStartDate: string | null,
+  invariant: WeekdayRestInvariant,
+  preferredLongRunDay: WeekdayName | null,
+) {
+  if (requestedStartDate && !isRealIsoDate(requestedStartDate)) {
+    throw new Error("The requested Start date must be a real YYYY-MM-DD date.");
+  }
+  if (requestedStartDate && requestedStartDate < currentDate) {
+    throw new Error("Choose the runner's current date or a future date before starting this plan.");
+  }
+
+  const candidates = requestedStartDate
+    ? [requestedStartDate]
+    : Array.from({ length: 7 }, (_, offset) => addDaysIso(currentDate, offset));
+  let lastError: Error | null = null;
+
+  for (const candidate of candidates) {
+    try {
+      assertStartDateAllowedByWeekdayRestInvariant(candidate, invariant);
+      const aligned = alignSavedPlanSeedToStartWindow(importedSeed, candidate);
+      return {
+        importedSeed: mapImportedSeedAcrossAllowedWeekdays(
+          aligned.importedSeed,
+          candidate,
+          invariant,
+          {
+            preserveSourceWeeklyCounts: true,
+            preferredLongRunDay,
+          },
+        ),
+        resolvedStartDate: candidate,
+        omittedLeadingDayCount: aligned.omittedLeadingDayCount,
+      };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("Saved-plan alignment failed.");
+    }
+  }
+
+  throw new Error(
+    requestedStartDate
+      ? (lastError?.message ?? "The requested Start date is not compatible with this plan.")
+      : `No compatible runner-local Start date is available in the next seven days. ${
+          lastError?.message ?? ""
+        }`.trim(),
+  );
+}
+
+function alignSavedPlanSeedToStartWindow(importedSeed: ImportedPlanSeed, startDate: string) {
+  const sourceWeekStart = startOfWeekIso(importedSeed.startDate);
+  const runnerWeekStart = startOfWeekIso(startDate);
+  const calendarOffset = diffDaysIso(runnerWeekStart, sourceWeekStart);
+  const shiftedWorkouts = importedSeed.workouts.map((workout) => {
+    const workoutDate = addDaysIso(workout.workoutDate, calendarOffset);
+
+    return {
+      ...workout,
+      workoutDate,
+      weekday: weekdayLong(workoutDate),
+    };
+  });
+  const retainedWorkouts = shiftedWorkouts
+    .filter((workout) => workout.workoutDate >= startDate)
+    .map((workout, displayOrder) => ({ ...workout, displayOrder }));
+  const firstWorkout = retainedWorkouts[0];
+
+  if (!firstWorkout) {
+    throw new Error("This saved plan has no remaining future days to apply.");
+  }
+
+  return {
+    importedSeed: {
+      ...importedSeed,
+      startDate,
+      endDate: retainedWorkouts.at(-1)?.workoutDate ?? firstWorkout.workoutDate,
+      targetDate: importedSeed.targetDate
+        ? addDaysIso(importedSeed.targetDate, calendarOffset)
+        : null,
+      workouts: retainedWorkouts,
+    },
+    omittedLeadingDayCount: shiftedWorkouts.length - retainedWorkouts.length,
+  };
+}
+
+function validateSavedPlanWeeklyCapacity(
+  importedSeed: ImportedPlanSeed,
+  preferences: RunnerTrainingPreferencesStorage,
+) {
+  const maximum = preferences.max_running_days_per_week;
+
+  if (maximum == null) {
+    return;
+  }
+
+  const countByWeek = new Map<string, number>();
+  for (const workout of importedSeed.workouts) {
+    if (workout.workoutType === "rest") {
+      continue;
+    }
+
+    const week = startOfWeekIso(workout.workoutDate);
+    const count = (countByWeek.get(week) ?? 0) + 1;
+    if (count > maximum) {
+      throw new Error(
+        `This saved plan schedules more than ${maximum} running days in the week of ${week}.`,
+      );
+    }
+    countByWeek.set(week, count);
+  }
+}
+
+function resolveSavedPlanSchedulePreferences(
+  importedPlan: ImportedPlanInput,
+  runnerPreferences: unknown,
+  options: SavedPlanStartScheduleOptions,
+) {
+  if (
+    options.fixedRestDays &&
+    new Set(options.fixedRestDays).size !== options.fixedRestDays.length
+  ) {
+    throw new Error("One-time fixed rest days must not contain duplicates.");
+  }
+
+  const persisted = parseStoredRunnerTrainingPreferences(runnerPreferences);
+  const imported = parseStoredRunnerTrainingPreferences(importedPlan.plan_preferences);
+  const fallback = persisted ??
+    imported ?? {
+      blocked_days: [],
+      preferred_long_run_day: null,
+      max_running_days_per_week: null,
+    };
+  const preferences = normalizeRunnerTrainingPreferencesForSave({
+    blocked_days: options.fixedRestDays ?? fallback.blocked_days,
+    preferred_long_run_day:
+      options.preferredLongRunDay === undefined
+        ? fallback.preferred_long_run_day
+        : options.preferredLongRunDay,
+    max_running_days_per_week: persisted
+      ? persisted.max_running_days_per_week
+      : (imported?.max_running_days_per_week ?? null),
+  });
+  const source =
+    persisted || options.fixedRestDays !== undefined || options.preferredLongRunDay !== undefined
+      ? "runner_profile"
+      : imported
+        ? "imported_plan"
+        : "none";
+
+  return {
+    preferences,
+    invariant: {
+      blockedWeekdays: preferences.blocked_days,
+      source,
+    } satisfies WeekdayRestInvariant,
+  };
+}
+
+function buildSavedPlanMaterializationPreferences(
+  value: Json | null,
+  preferences: RunnerTrainingPreferencesStorage,
+  invariant: WeekdayRestInvariant,
+): Json {
+  const base =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, Json>)
+      : {};
+  const includesBlockedDays =
+    Object.hasOwn(base, "blocked_days") || preferences.blocked_days.length > 0;
+  const includesPreferredLongRunDay =
+    Object.hasOwn(base, "preferred_long_run_day") || preferences.preferred_long_run_day !== null;
+  const includesMaximum =
+    Object.hasOwn(base, "max_running_days_per_week") ||
+    preferences.max_running_days_per_week !== null;
+  const includesScheduleTruth =
+    includesBlockedDays || includesPreferredLongRunDay || includesMaximum;
+
+  return {
+    ...base,
+    ...(includesBlockedDays ? { blocked_days: preferences.blocked_days } : {}),
+    ...(includesPreferredLongRunDay
+      ? { preferred_long_run_day: preferences.preferred_long_run_day }
+      : {}),
+    ...(includesMaximum
+      ? { max_running_days_per_week: preferences.max_running_days_per_week }
+      : {}),
+    ...(includesScheduleTruth ? { weekday_rest_invariant_source: invariant.source } : {}),
+  };
 }
 
 function dropFirstDayFromImportedSeed(importedSeed: ReturnType<typeof buildImportedPlanSeed>) {

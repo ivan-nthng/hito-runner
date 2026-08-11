@@ -107,7 +107,7 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
 
       <div className="hito-section-header mb-6">
         <div>
-          <h1 className="hito-section-title text-4xl lg:text-5xl">{monthLabel}</h1>
+          <h1 className="hito-ui-section-title text-4xl lg:text-5xl">{monthLabel}</h1>
         </div>
 
         <div className="flex items-center gap-2">
@@ -481,6 +481,7 @@ function CalendarDaySlot({
         onAdded={manualCalendarActionState.onManualPlanChanged}
         onMoveCanceled={manualCalendarActionState.onCancelMoveWorkout}
         onMoveTargetSelected={manualCalendarActionState.onMoveTargetSelected}
+        pasteTargetIsEmpty={!workout}
         showRestDayOption={workout?.type !== "rest"}
       >
         <CalendarDayButton
@@ -754,7 +755,7 @@ function Tooltip({ workout }: { workout: Workout }) {
           {formatDate(workout.date, { month: "short", day: "numeric", weekday: "short" })}
         </span>
       </div>
-      <div className="hito-tooltip-title mt-2 font-display text-lg">{workout.title}</div>
+      <div className="hito-tooltip-title mt-2 font-sans text-lg">{workout.title}</div>
       <div className="hito-metric-row mt-3 grid-cols-3">
         <Stat label="Distance" value={km != null ? `${formatDistanceKm(km)} km` : "—"} />
         <Stat label="Duration" value={duration ? formatDurationMin(duration) : "—"} />

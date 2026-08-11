@@ -33,6 +33,8 @@
     "validate-product-contracts": "node --import tsx ./scripts/heart-rate-guidance-editor-proof.ts && node --import tsx ./scripts/validate-workout-comparison-readback.tsx",
     "validate-local-runtime-observability": "node --import tsx ./scripts/validate-local-runtime-observability.ts",
     "validate-manual-workout-authoring": "node --import tsx ./scripts/validate-manual-workout-authoring.ts",
+    "validate-runner-calendar-context": "node --import tsx ./scripts/validate-runner-calendar-context.ts",
+    "validate-runner-calendar-context:local": "node --env-file=.env.local --import tsx ./scripts/validate-runner-calendar-context.ts --require-persistence",
     "validate:backend": "node ./scripts/validate-backend.mjs",
     "validate:backend:local-db": "node --env-file=.env.local ./scripts/validate-backend.mjs --local-db",
     "validate:backend:runtime": "node --env-file=.env.local ./scripts/validate-backend.mjs --runtime --runtime-url=http://127.0.0.1:3000",

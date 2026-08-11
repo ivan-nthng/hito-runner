@@ -140,6 +140,7 @@ export function ManualWorkoutAddMenu({
   moveTargetDayKind = "rest_day",
   moveWorkoutSource = null,
   moveOnly = false,
+  pasteTargetIsEmpty = false,
   showRestDayOption = true,
 }: {
   activePlanId: string;
@@ -154,6 +155,7 @@ export function ManualWorkoutAddMenu({
   moveTargetDayKind?: ManualWorkoutMoveTargetDayKind;
   moveWorkoutSource?: ManualCopiedWorkoutSource | null;
   moveOnly?: boolean;
+  pasteTargetIsEmpty?: boolean;
   showRestDayOption?: boolean;
 }) {
   const reviewManualWorkoutDraftFn = useServerFn(reviewManualWorkoutDraftAction);
@@ -193,9 +195,7 @@ export function ManualWorkoutAddMenu({
       ]
     : [];
   const isBusy = status !== "idle";
-  const canPasteCopiedWorkout = Boolean(
-    copiedWorkoutSource && copiedWorkoutSource.activePlanId === activePlanId,
-  );
+  const canPasteCopiedWorkout = Boolean(copiedWorkoutSource && pasteTargetIsEmpty);
   const canMoveSelectedWorkout = Boolean(
     moveWorkoutSource?.activePlanId === activePlanId &&
     moveWorkoutSource.sourceWorkoutDate !== date,
@@ -640,7 +640,6 @@ export function ManualWorkoutAddMenu({
     try {
       const response = await copyManualWorkoutWithinActivePlanFn({
         data: {
-          activePlanId,
           sourceWorkoutId: copiedWorkoutSource.sourceWorkoutId,
           sourceWorkoutDate: copiedWorkoutSource.sourceWorkoutDate,
           targetDate: date,
@@ -663,7 +662,7 @@ export function ManualWorkoutAddMenu({
       hitoToast.success({
         id: MANUAL_COPY_PASTE_TOAST_ID,
         title: "Workout pasted",
-        description: "Refreshing the calendar from saved plan truth.",
+        description: "Refreshing the calendar from saved workout truth.",
       });
       setConstructorOpen(false);
       setReviewedDraft(null);
@@ -733,7 +732,7 @@ export function ManualWorkoutAddMenu({
                 <span className="min-w-0">
                   <span className="hito-list-row-title block">Paste copied workout</span>
                   <span className="hito-list-row-copy block">
-                    Save the copied workout into this Rest day.
+                    Save the copied workout into this empty day.
                   </span>
                 </span>
               </DropdownMenuItem>
@@ -999,7 +998,7 @@ export function ManualWorkoutConstructorDialog({
           />
         ) : (
           <DialogHeader className="hito-product-dialog-header">
-            <DialogTitle className="hito-modal-title">Manual workout</DialogTitle>
+            <DialogTitle className="hito-ui-modal-title">Manual workout</DialogTitle>
             <DialogDescription className="hito-body">
               Choose a date and template before reviewing.
             </DialogDescription>
@@ -1188,7 +1187,7 @@ function ManualSaveTemplateAction({
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-modal-title">Save as template</DialogTitle>
+          <DialogTitle className="hito-ui-modal-title">Save as template</DialogTitle>
           <DialogDescription className="hito-body">
             Save this reviewed workout as a personal template. Hito rebuilds and checks it before it
             appears in your picker.

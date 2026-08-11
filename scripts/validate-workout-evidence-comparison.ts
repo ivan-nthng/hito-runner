@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { relinkComparisonPlannedWorkoutIdentity } from "../src/lib/active-plan-replacement-carry-forward";
 import { buildDeterministicWorkoutComparison } from "../src/lib/workout-result-import/compare-workout-result";
 import {
   readWorkoutComparisonDifferencePayload,
@@ -29,7 +28,6 @@ async function main() {
   const indexedComparison = validateStructuredProviderStepBoundary();
   validateActivityTypeBoundary();
   validateEvidenceBundleIdentity(indexedComparison);
-  validateCarryForwardIdentity(indexedComparison);
   validatePersistedPayloadBoundary(indexedComparison);
   validatePersistedRowBoundary(indexedComparison);
 
@@ -225,41 +223,6 @@ function buildAiInsightSummary(): WorkoutAiInsightSummary {
     cautionFlags: [],
     createdAt: "2026-07-17T08:01:00.000Z",
   };
-}
-
-function validateCarryForwardIdentity(
-  comparisonResult: ReturnType<typeof buildDeterministicWorkoutComparison>,
-) {
-  const nextWorkoutId = "10000000-0000-4000-8000-000000000005";
-  const relinked = relinkComparisonPlannedWorkoutIdentity(
-    comparisonResult.differencePayload,
-    WORKOUT_ID,
-    nextWorkoutId,
-  );
-
-  assert.equal(
-    (relinked.plannedWorkout as { plannedWorkoutId?: unknown }).plannedWorkoutId,
-    nextWorkoutId,
-  );
-  const historicalRelinked = relinkComparisonPlannedWorkoutIdentity(
-    buildHistoricalDualPayload(comparisonResult.differencePayload) as unknown as Json,
-    WORKOUT_ID,
-    nextWorkoutId,
-  ) as Record<string, Json | undefined>;
-  assert.equal("facts" in historicalRelinked, false);
-  assert.equal(
-    (historicalRelinked.plannedWorkout as { plannedWorkoutId?: unknown }).plannedWorkoutId,
-    nextWorkoutId,
-  );
-  assert.throws(
-    () =>
-      relinkComparisonPlannedWorkoutIdentity(
-        comparisonResult.differencePayload,
-        "10000000-0000-4000-8000-000000000098",
-        nextWorkoutId,
-      ),
-    /does not match its source workout/,
-  );
 }
 
 function validatePersistedPayloadBoundary(

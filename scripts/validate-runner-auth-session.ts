@@ -203,23 +203,31 @@ async function assertProductApiRequestBoundary(runtimeUrl: string) {
   assert.equal(invalidExport.status, 400);
   assert.equal(await invalidExport.text(), "Choose a valid export format.");
 
-  const noActivePlanExport = await fetch(new URL("/api/plan/export?format=json", baseUrl), {
-    headers: { cookie },
-  });
-  assert.equal(noActivePlanExport.status, 404);
-  assert.equal(await noActivePlanExport.text(), "There is no active plan to export.");
+  const missingSelectedPlanExport = await fetch(
+    new URL(
+      "/api/plan/export?format=json&savedPlanId=00000000-0000-4000-8000-000000000099",
+      baseUrl,
+    ),
+    { headers: { cookie } },
+  );
+  assert.equal(missingSelectedPlanExport.status, 404);
+  assert.equal(await missingSelectedPlanExport.text(), "The selected saved plan was not found.");
 
-  const unauthenticatedExport = await fetch(new URL("/api/plan/export?format=json", baseUrl));
+  const unauthenticatedExport = await fetch(
+    new URL(
+      "/api/plan/export?format=json&savedPlanId=00000000-0000-4000-8000-000000000099",
+      baseUrl,
+    ),
+  );
   assert.equal(unauthenticatedExport.status, 401);
   assert.equal(await unauthenticatedExport.text(), "Authentication is required for this action.");
 }
 
 async function assertPublicApiErrorRedaction() {
-  const [avatarRoute, planExportRoute, trainingApi, planReplacementActions] = await Promise.all([
+  const [avatarRoute, planExportRoute, trainingApi] = await Promise.all([
     readFile(new URL("../src/routes/api.profile-avatar.upload.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/routes/api.plan.export.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/training-api.ts", import.meta.url), "utf8"),
-    readFile(new URL("../src/lib/plan-replacement-actions.ts", import.meta.url), "utf8"),
   ]);
 
   assert.ok(
@@ -235,7 +243,7 @@ async function assertPublicApiErrorRedaction() {
     ),
     /message:\s*error\.message/,
   );
-  assert.match(planExportRoute, /The active plan could not be exported\./);
+  assert.match(planExportRoute, /The selected plan could not be exported\./);
   assert.doesNotMatch(
     planExportRoute.slice(
       planExportRoute.indexOf("} catch (error) {"),
@@ -245,17 +253,11 @@ async function assertPublicApiErrorRedaction() {
   );
   assert.equal(
     trainingApi.match(/safeRunnerServerActionError\(error, \{/g)?.length,
-    4,
+    1,
     "All runner mutation server functions with persistence owners must map unknown errors safely.",
   );
   assert.match(trainingApi, /The workout result could not be saved\. Try again shortly\./);
-  assert.match(trainingApi, /The schedule could not be cleared\. Try again shortly\./);
-  assert.match(trainingApi, /The schedule edit could not be prepared\. Try again shortly\./);
-  assert.match(trainingApi, /The schedule edit could not be applied\. Try again shortly\./);
-  assert.match(
-    planReplacementActions,
-    /The imported plan could not be saved\. Try again shortly\./,
-  );
+  assert.doesNotMatch(trainingApi, /clearUpcomingSchedule|previewActivePlan|ScheduleReflow/);
 }
 
 async function assertAuthCase(options: {

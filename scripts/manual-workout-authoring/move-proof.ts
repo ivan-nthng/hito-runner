@@ -1032,10 +1032,10 @@ export async function validateManualMoveWorkoutContract() {
       workouts: [sourceWorkout, keptWorkout],
     }),
   );
-  assertMoveReviewBlocked(
-    unsupportedPlanSource,
-    "unsupported_active_plan_source",
-    "unsupported move plan source",
+  assert.equal(
+    unsupportedPlanSource.ok,
+    true,
+    "saved-plan provenance must not govern an independent workout move review",
   );
 
   const foreignSourceWorkout = buildCanonicalPersistedPlannedWorkoutFromReview({

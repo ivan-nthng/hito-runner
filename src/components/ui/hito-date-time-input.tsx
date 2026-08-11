@@ -188,7 +188,6 @@ export function HitoDateField({
             onMonthChange={setCalendarMonth}
             disabled={disabledMatchers.length > 0 ? disabledMatchers : undefined}
             captionLayout="label"
-            buttonVariant="ghost"
             className="hito-date-picker-calendar"
             onSelect={(date) => {
               if (!date) {

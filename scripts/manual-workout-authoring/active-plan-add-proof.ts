@@ -83,7 +83,7 @@ export async function validateManualActivePlanAddWorkoutContract() {
     assert.equal(success.sourceMetadata.originalPlanSourceKind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
     assert.equal(success.sourceMetadata.reviewChecksum, reviewed.reviewChecksum);
     assert.equal(success.sourceMetadata.metricTruthMode, "structure_only");
-    assert.equal(success.safety.targetDayKind, "rest_day");
+    assert.equal(success.safety.targetDayKind, "empty_day");
     assert.equal(success.safety.trustedClientRows, false);
     assert.equal(success.safety.serverRebuiltReview, true);
   }
@@ -144,7 +144,7 @@ export async function validateManualActivePlanAddWorkoutContract() {
     assert.equal(todaySuccess.calendarRowCount, 2);
     assert.equal(todaySuccess.nonRestWorkoutCount, 2);
     assert.equal(todaySuccess.sourceMetadata.workoutDate, todayInput.workoutDate);
-    assert.equal(todaySuccess.safety.targetDayKind, "rest_day");
+    assert.equal(todaySuccess.safety.targetDayKind, "empty_day");
     assert.equal(todaySuccess.safety.trustedClientRows, false);
     assert.equal(todaySuccess.safety.serverRebuiltReview, true);
   }
@@ -229,10 +229,10 @@ export async function validateManualActivePlanAddWorkoutContract() {
       workouts: [firstWorkout],
     }),
   );
-  assertAddBlocked(
-    unsupportedSource,
-    "unsupported_active_plan_source",
-    "unsupported active-plan source",
+  assert.equal(
+    unsupportedSource.ok,
+    true,
+    "saved-plan origin must not govern a materialized workout add",
   );
 
   const occupiedWorkout = buildFakePlannedWorkout({
@@ -290,7 +290,7 @@ export async function validateManualActivePlanAddWorkoutContract() {
   );
   assertAddBlocked(protectedPastDay, "protected_day", "past add-workout day");
 
-  const activePlanMismatch = await addManualWorkoutToActivePlanForUser(
+  const staleProvenanceHint = await addManualWorkoutToActivePlanForUser(
     userId,
     {
       activePlanId: "55555555-5555-4555-8555-555555555555",
@@ -298,7 +298,14 @@ export async function validateManualActivePlanAddWorkoutContract() {
     },
     buildFakeAddDependencies({ activePlan, workouts: [firstWorkout] }),
   );
-  assertAddBlocked(activePlanMismatch, "stale_review", "active plan mismatch");
+  assert.equal(
+    staleProvenanceHint.ok,
+    true,
+    "A client-provided legacy plan id must not govern runner-owned Calendar mutation.",
+  );
+  if (staleProvenanceHint.ok) {
+    assert.equal(staleProvenanceHint.activePlanId, activePlan.id);
+  }
 
   const persistenceFailure = await addManualWorkoutToActivePlanForUser(
     userId,

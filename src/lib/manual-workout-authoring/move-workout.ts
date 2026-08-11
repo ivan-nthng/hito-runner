@@ -5,18 +5,19 @@ import {
   ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
   appendActivePlanUserEditMetadataToRecord,
   buildActivePlanUserEditMetadata,
-  resolveActivePlanSourceStatus,
-  resolveActivePlanWorkoutEditability,
+  resolveCalendarWorkoutEditability,
+  resolvePlanProvenanceSourceStatus,
 } from "@/lib/active-plan-workout-editing/policy";
 import {
-  getExistingPlanContext,
-  type ExistingPlanContext,
+  getCalendarWorkoutMutationContext,
+  getPlanRecordForUser,
+  type CalendarWorkoutContext,
   type PersistedPlanCycleRow,
   type PersistedPlannedWorkoutRow,
 } from "@/lib/active-plan-persistence";
 import {
-  ActivePlanPersistenceRejection,
-  applyAtomicActivePlanWorkoutMutation,
+  CalendarPersistenceRejection,
+  applyAtomicCalendarWorkoutMutation,
 } from "@/lib/active-plan-lifecycle-persistence";
 import {
   fetchManualWorkoutEvidenceWorkoutIds,
@@ -44,7 +45,8 @@ import {
 } from "@/lib/manual-workout-authoring/review-exactness";
 import { getCurrentManualWorkoutAuthoringUserId } from "@/lib/manual-workout-authoring/request-auth";
 import type { Json } from "@/lib/supabase/database";
-import { diffDaysIso, todayIso, weekdayLong } from "@/lib/training";
+import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
+import { diffDaysIso, weekdayLong } from "@/lib/training";
 
 const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const MANUAL_WORKOUT_MOVE_REVIEW_PAYLOAD_VERSION = "manual_workout_move_review_payload_v1" as const;
@@ -124,7 +126,7 @@ export type ManualWorkoutMoveTargetDayKind = "rest_day" | "workout_day";
 
 export type ManualWorkoutMoveDependencies = Pick<
   ManualWorkoutActivePlanAddDependencies,
-  "getExistingPlanContextForUser" | "currentDate"
+  "getCalendarWorkoutContextForUser" | "currentDate"
 > & {
   fetchEvidenceWorkoutIds?: ManualWorkoutEvidenceFetcher;
   persistWorkoutMove?: typeof persistManualWorkoutMove;
@@ -295,6 +297,7 @@ type ManualWorkoutMoveTarget =
       targetWeekNumber: number;
       targetDayKind: ManualWorkoutMoveTargetDayKind;
       targetReplacementWorkout: PersistedPlannedWorkoutRow | null;
+      currentDate: string;
     }
   | {
       ok: false;
@@ -304,6 +307,7 @@ type ManualWorkoutMoveTarget =
 
 type PersistManualWorkoutMoveInput = {
   userId: string;
+  currentDate: string;
   activePlan: PersistedPlanCycleRow;
   sourceWorkout: PersistedPlannedWorkoutRow;
   otherWorkouts: readonly PersistedPlannedWorkoutRow[];
@@ -480,6 +484,7 @@ export async function confirmManualWorkoutMoveForUser(
   try {
     await persistMove({
       userId,
+      currentDate: target.currentDate,
       activePlan: target.activePlan,
       sourceWorkout: target.sourceWorkout,
       otherWorkouts: target.otherWorkouts,
@@ -499,7 +504,7 @@ export async function confirmManualWorkoutMoveForUser(
       status: "moved",
       persisted: true,
       sourceKind: target.activePlan.source_kind ?? ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
-      sourceStatus: resolveActivePlanSourceStatus(target.activePlan),
+      sourceStatus: resolvePlanProvenanceSourceStatus(target.activePlan),
       workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
       activePlanId: target.activePlan.id,
       plannedWorkoutId: target.sourceWorkout.id,
@@ -532,7 +537,7 @@ export async function confirmManualWorkoutMoveForUser(
       },
     };
   } catch (error) {
-    if (error instanceof ActivePlanPersistenceRejection) {
+    if (error instanceof CalendarPersistenceRejection) {
       return buildMoveBlocked({
         reason:
           error.reason === "stale_review" || error.reason === "protected_day"
@@ -604,6 +609,7 @@ export async function moveManualWorkoutWithinActivePlanForUser(
   try {
     await persistMove({
       userId,
+      currentDate: target.currentDate,
       activePlan: target.activePlan,
       sourceWorkout: target.sourceWorkout,
       otherWorkouts: target.otherWorkouts,
@@ -623,7 +629,7 @@ export async function moveManualWorkoutWithinActivePlanForUser(
       status: "moved",
       persisted: true,
       sourceKind: target.activePlan.source_kind ?? ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
-      sourceStatus: resolveActivePlanSourceStatus(target.activePlan),
+      sourceStatus: resolvePlanProvenanceSourceStatus(target.activePlan),
       workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
       activePlanId: target.activePlan.id,
       plannedWorkoutId: target.sourceWorkout.id,
@@ -658,7 +664,7 @@ export async function moveManualWorkoutWithinActivePlanForUser(
       },
     };
   } catch (error) {
-    if (error instanceof ActivePlanPersistenceRejection) {
+    if (error instanceof CalendarPersistenceRejection) {
       return buildMoveBlocked({
         reason:
           error.reason === "stale_review" || error.reason === "protected_day"
@@ -677,6 +683,7 @@ export async function moveManualWorkoutWithinActivePlanForUser(
 
 export async function persistManualWorkoutMove({
   userId,
+  currentDate,
   activePlan,
   sourceWorkout,
   otherWorkouts,
@@ -685,11 +692,11 @@ export async function persistManualWorkoutMove({
   targetReplacementWorkout,
 }: PersistManualWorkoutMoveInput) {
   const movedWorkouts = buildMovedWorkoutSet({ sourceWorkout, otherWorkouts, review });
-  const persisted = await applyAtomicActivePlanWorkoutMutation({
+  const persisted = await applyAtomicCalendarWorkoutMutation({
     userId,
     planId: activePlan.id,
     expectedPlanUpdatedAt: activePlan.updated_at,
-    currentDate: todayIso(),
+    currentDate,
     mutationKind: "move",
     expectedSourceWorkout: buildSourceWorkoutFingerprint(sourceWorkout) as unknown as Json,
     expectedTargetWorkout: targetReplacementWorkout
@@ -733,12 +740,13 @@ async function resolveManualWorkoutMoveTarget(
   dependencies: ManualWorkoutMoveDependencies,
   options: ManualWorkoutMoveResolutionOptions = {},
 ): Promise<ManualWorkoutMoveTarget> {
-  const getContext = dependencies.getExistingPlanContextForUser ?? getExistingPlanContext;
+  const getContext =
+    dependencies.getCalendarWorkoutContextForUser ?? getCalendarWorkoutMutationContext;
   const fetchEvidence =
     dependencies.fetchEvidenceWorkoutIds ?? fetchManualWorkoutEvidenceWorkoutIds;
-  const currentDate = dependencies.currentDate ?? todayIso();
+  const currentDate = dependencies.currentDate ?? (await getRunnerCalendarDateForUserId(userId));
 
-  let planContext: ExistingPlanContext;
+  let planContext: CalendarWorkoutContext;
   try {
     planContext = await getContext(userId);
   } catch {
@@ -749,38 +757,8 @@ async function resolveManualWorkoutMoveTarget(
     };
   }
 
-  const activePlan = planContext.activePlan;
-  if (!activePlan) {
-    return {
-      ok: false,
-      reason: "no_active_plan",
-      message: "Create or open an active plan before moving workouts.",
-    };
-  }
-
-  if (input.activePlanId && activePlan.id !== input.activePlanId) {
-    return {
-      ok: false,
-      reason: "stale_review",
-      message: "The active manual plan changed. Refresh the calendar and review this move again.",
-    };
-  }
-
-  const editability = resolveActivePlanWorkoutEditability(activePlan, "move_workout");
-  if (!editability.ok) {
-    return {
-      ok: false,
-      reason:
-        editability.reason === "unsupported_source_metadata"
-          ? "unsupported_source_metadata"
-          : "unsupported_active_plan_source",
-      message: editability.message,
-    };
-  }
-
   const source = resolveMoveSourceWorkout({
     userId,
-    activePlanId: activePlan.id,
     workouts: planContext.existingWorkouts.workouts,
     sourceWorkoutId: input.sourceWorkoutId,
     sourceWorkoutDate: input.sourceWorkoutDate,
@@ -788,6 +766,37 @@ async function resolveManualWorkoutMoveTarget(
 
   if (!source.ok) {
     return source;
+  }
+
+  let activePlan =
+    planContext.provenancePlan?.id === source.workout.plan_cycle_id
+      ? planContext.provenancePlan
+      : null;
+  if (!activePlan) {
+    try {
+      activePlan = await getPlanRecordForUser(userId, source.workout.plan_cycle_id);
+    } catch {
+      return {
+        ok: false,
+        reason: "persistence_failed",
+        message: "The workout provenance could not be verified.",
+      };
+    }
+  }
+  if (!activePlan) {
+    return {
+      ok: false,
+      reason: "unsupported_source_metadata",
+      message: "The workout provenance is unavailable.",
+    };
+  }
+  const editability = resolveCalendarWorkoutEditability(activePlan, "move_workout");
+  if (!editability.ok) {
+    return {
+      ok: false,
+      reason: "unsupported_source_metadata",
+      message: editability.message,
+    };
   }
 
   if (source.workout.workout_type === "rest") {
@@ -802,7 +811,6 @@ async function resolveManualWorkoutMoveTarget(
     sourceWorkoutDate: source.workout.workout_date,
     targetDate: input.targetDate,
     currentDate,
-    activePlanStartDate: activePlan.start_date,
     allowRecentMissedUnloggedSource: options.allowRecentMissedUnloggedSource === true,
   });
 
@@ -914,6 +922,7 @@ async function resolveManualWorkoutMoveTarget(
     targetWeekNumber,
     targetDayKind: targetResolution.targetDayKind,
     targetReplacementWorkout: targetResolution.targetReplacementWorkout,
+    currentDate,
   };
 }
 
@@ -921,7 +930,7 @@ async function resolveMoveTargetDay(input: {
   userId: string;
   currentDate: string;
   targetDateWorkouts: readonly PersistedPlannedWorkoutRow[];
-  logsByWorkoutId: ExistingPlanContext["existingWorkouts"]["logsByWorkoutId"];
+  logsByWorkoutId: CalendarWorkoutContext["existingWorkouts"]["logsByWorkoutId"];
   fetchEvidence: ManualWorkoutEvidenceFetcher;
 }): Promise<
   | {
@@ -989,7 +998,6 @@ function resolveManualWorkoutMoveDatePolicy(input: {
   sourceWorkoutDate: string;
   targetDate: string;
   currentDate: string;
-  activePlanStartDate: string;
   allowRecentMissedUnloggedSource: boolean;
 }):
   | { ok: true; recentMissedUnloggedSource: boolean }
@@ -1002,12 +1010,11 @@ function resolveManualWorkoutMoveDatePolicy(input: {
     };
   }
 
-  if (input.targetDate < input.currentDate || input.targetDate < input.activePlanStartDate) {
+  if (input.targetDate < input.currentDate) {
     return {
       ok: false,
       reason: "protected_day",
-      message:
-        "Workout moves can only target today or future supported days inside the current active plan.",
+      message: "Workout moves can only target today or future supported Calendar days.",
     };
   }
 
@@ -1019,7 +1026,6 @@ function resolveManualWorkoutMoveDatePolicy(input: {
 
 function resolveMoveSourceWorkout(input: {
   userId: string;
-  activePlanId: string;
   workouts: readonly PersistedPlannedWorkoutRow[];
   sourceWorkoutId?: string;
   sourceWorkoutDate?: string;
@@ -1038,16 +1044,16 @@ function resolveMoveSourceWorkout(input: {
     return {
       ok: false,
       reason: "source_workout_not_found",
-      message: "The source workout was not found in the current active plan.",
+      message: "The source workout was not found in the runner Calendar.",
     };
   }
 
   const workout = matches[0]!;
-  if (workout.user_id !== input.userId || workout.plan_cycle_id !== input.activePlanId) {
+  if (workout.user_id !== input.userId) {
     return {
       ok: false,
       reason: "source_workout_not_in_active_plan",
-      message: "The source workout is not part of the current runner's active plan.",
+      message: "The source workout does not belong to the current runner.",
     };
   }
 

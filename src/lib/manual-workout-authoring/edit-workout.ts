@@ -5,12 +5,13 @@ import {
   ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
   appendActivePlanUserEditMetadataToRecord,
   buildActivePlanUserEditMetadata,
-  resolveActivePlanSourceStatus,
-  resolveActivePlanWorkoutEditability,
+  resolveCalendarWorkoutEditability,
+  resolvePlanProvenanceSourceStatus,
 } from "@/lib/active-plan-workout-editing/policy";
 import {
-  getExistingPlanContext,
-  type ExistingPlanContext,
+  getCalendarWorkoutMutationContext,
+  getPlanRecordForUser,
+  type CalendarWorkoutContext,
   type PersistedPlanCycleRow,
   type PersistedPlannedWorkoutRow,
 } from "@/lib/active-plan-persistence";
@@ -49,7 +50,7 @@ import { buildPersistedWorkoutInsertRows } from "@/lib/persisted-plan-replacemen
 import { getCurrentManualWorkoutAuthoringUserId } from "@/lib/manual-workout-authoring/request-auth";
 import type { Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
-import { todayIso } from "@/lib/training";
+import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
 
 const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
@@ -215,7 +216,7 @@ export type ManualWorkoutPersistedEditConfirmResult =
 
 export type ManualWorkoutPersistedEditDependencies = Pick<
   ManualWorkoutActivePlanAddDependencies,
-  "getExistingPlanContextForUser" | "currentDate"
+  "getCalendarWorkoutContextForUser" | "currentDate"
 > & {
   persistWorkoutEdit?: typeof persistManualWorkoutPersistedEdit;
 };
@@ -228,6 +229,7 @@ type ManualWorkoutPersistedEditTarget =
       sourceDraftInput: ManualWorkoutDraftInput;
       sourceDraftProcessingOptions: ManualWorkoutDraftProcessingOptions;
       otherWorkouts: PersistedPlannedWorkoutRow[];
+      currentDate: string;
     }
   | {
       ok: false;
@@ -237,6 +239,7 @@ type ManualWorkoutPersistedEditTarget =
 
 type PersistManualWorkoutEditInput = {
   userId: string;
+  currentDate: string;
   activePlan: PersistedPlanCycleRow;
   sourceWorkout: PersistedPlannedWorkoutRow;
   otherWorkouts: readonly PersistedPlannedWorkoutRow[];
@@ -529,6 +532,7 @@ export async function confirmManualWorkoutPersistedEditForUser(
   try {
     const persistence = await persistEdit({
       userId,
+      currentDate: target.currentDate,
       activePlan: target.activePlan,
       sourceWorkout: target.sourceWorkout,
       otherWorkouts: target.otherWorkouts,
@@ -554,7 +558,7 @@ export async function confirmManualWorkoutPersistedEditForUser(
       status: "updated",
       persisted: true,
       sourceKind: target.activePlan.source_kind!,
-      sourceStatus: resolveActivePlanSourceStatus(target.activePlan),
+      sourceStatus: resolvePlanProvenanceSourceStatus(target.activePlan),
       workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
       activePlanId: target.activePlan.id,
       plannedWorkoutId: target.sourceWorkout.id,
@@ -579,7 +583,7 @@ export async function confirmManualWorkoutPersistedEditForUser(
         reviewChecksum: review.reviewChecksum,
         draftReviewChecksum: draftReview.reviewChecksum,
         originalPlanSourceKind: target.activePlan.source_kind!,
-        originalPlanSourceStatus: resolveActivePlanSourceStatus(target.activePlan),
+        originalPlanSourceStatus: resolvePlanProvenanceSourceStatus(target.activePlan),
         originalPlanOriginSourceKind: auditMetadata.original_plan_origin_source_kind ?? null,
         originalPlanOriginSourceStatus: auditMetadata.original_plan_origin_source_status ?? null,
         originalWorkoutSourceId: auditMetadata.original_workout_source_id ?? null,
@@ -613,6 +617,7 @@ export async function confirmManualWorkoutPersistedEditForUser(
 
 export async function persistManualWorkoutPersistedEdit({
   userId,
+  currentDate,
   activePlan,
   sourceWorkout,
   otherWorkouts,
@@ -634,8 +639,8 @@ export async function persistManualWorkoutPersistedEdit({
       ...updateRow,
     },
   ];
-  const mutation = await supabase.rpc("apply_active_plan_workout_content_edit", {
-    p_current_date: todayIso(),
+  const mutation = await supabase.rpc("apply_calendar_workout_content_edit", {
+    p_current_date: currentDate,
     p_expected_plan_updated_at: activePlan.updated_at,
     p_expected_workout: toJson(buildSourceWorkoutFingerprint(sourceWorkout)),
     p_plan_goal_metadata: buildManualWorkoutEditGoalMetadata({
@@ -696,10 +701,11 @@ async function resolveManualWorkoutPersistedEditTarget(
   input: ManualWorkoutPersistedEditSourceInput,
   dependencies: ManualWorkoutPersistedEditDependencies,
 ): Promise<ManualWorkoutPersistedEditTarget> {
-  const getContext = dependencies.getExistingPlanContextForUser ?? getExistingPlanContext;
-  const currentDate = dependencies.currentDate ?? todayIso();
+  const getContext =
+    dependencies.getCalendarWorkoutContextForUser ?? getCalendarWorkoutMutationContext;
+  const currentDate = dependencies.currentDate ?? (await getRunnerCalendarDateForUserId(userId));
 
-  let planContext: ExistingPlanContext;
+  let planContext: CalendarWorkoutContext;
   try {
     planContext = await getContext(userId);
   } catch {
@@ -707,35 +713,6 @@ async function resolveManualWorkoutPersistedEditTarget(
       ok: false,
       reason: "persistence_failed",
       message: "The manual plan could not verify the current active-plan state.",
-    };
-  }
-
-  const activePlan = planContext.activePlan;
-  if (!activePlan) {
-    return {
-      ok: false,
-      reason: "no_active_plan",
-      message: "Create or open an active plan before editing workouts.",
-    };
-  }
-
-  if (input.activePlanId && activePlan.id !== input.activePlanId) {
-    return {
-      ok: false,
-      reason: "stale_review",
-      message: "The active plan changed. Refresh the workout before editing.",
-    };
-  }
-
-  const editability = resolveActivePlanWorkoutEditability(activePlan, "edit_workout");
-  if (!editability.ok) {
-    return {
-      ok: false,
-      reason:
-        editability.reason === "unsupported_source_metadata"
-          ? "unsupported_source_metadata"
-          : "unsupported_active_plan_source",
-      message: editability.message,
     };
   }
 
@@ -751,11 +728,42 @@ async function resolveManualWorkoutPersistedEditTarget(
     };
   }
 
-  if (sourceWorkout.user_id !== userId || sourceWorkout.plan_cycle_id !== activePlan.id) {
+  let activePlan =
+    planContext.provenancePlan?.id === sourceWorkout.plan_cycle_id
+      ? planContext.provenancePlan
+      : null;
+  if (!activePlan) {
+    try {
+      activePlan = await getPlanRecordForUser(userId, sourceWorkout.plan_cycle_id);
+    } catch {
+      return {
+        ok: false,
+        reason: "persistence_failed",
+        message: "The workout provenance could not be verified.",
+      };
+    }
+  }
+  if (!activePlan) {
+    return {
+      ok: false,
+      reason: "unsupported_source_metadata",
+      message: "The workout provenance is unavailable.",
+    };
+  }
+  const editability = resolveCalendarWorkoutEditability(activePlan, "edit_workout");
+  if (!editability.ok) {
+    return {
+      ok: false,
+      reason: "unsupported_source_metadata",
+      message: editability.message,
+    };
+  }
+
+  if (sourceWorkout.user_id !== userId) {
     return {
       ok: false,
       reason: "source_workout_not_in_active_plan",
-      message: "The planned workout is not part of the current runner's active plan.",
+      message: "The planned workout does not belong to the current runner.",
     };
   }
 
@@ -806,6 +814,7 @@ async function resolveManualWorkoutPersistedEditTarget(
     sourceWorkout,
     sourceDraftInput: reconstructed.draftInput,
     sourceDraftProcessingOptions: reconstructed.processingOptions,
+    currentDate,
     otherWorkouts: planContext.existingWorkouts.workouts.filter(
       (workout) => workout.id !== sourceWorkout.id,
     ),

@@ -511,7 +511,7 @@ export type ManualWorkoutAddToActivePlanResult =
         requiresExplicitConfirm: true;
         trustedClientRows: false;
         serverRebuiltReview: true;
-        targetDayKind: "rest_day";
+        targetDayKind: "empty_day";
         activePlanSourceVerified: true;
         callsOpenAi: false;
       };

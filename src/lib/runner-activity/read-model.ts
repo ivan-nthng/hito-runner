@@ -12,7 +12,7 @@ import type {
   RunnerActivityMutationReadback,
   RunnerActivityProgressReadModel,
 } from "@/lib/runner-activity/read-model-types";
-import { todayIso } from "@/lib/training";
+import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
 
 export async function getRunnerActivityProgressForUser(input: {
   userId: string;
@@ -22,7 +22,7 @@ export async function getRunnerActivityProgressForUser(input: {
   const asOfDate = z
     .string()
     .date()
-    .parse(input.asOfDate ?? todayIso());
+    .parse(input.asOfDate ?? (await getRunnerCalendarDateForUserId(input.userId)));
   const factsPromise = getRunnerActivityProgressFactsForUser({
     userId: input.userId,
     asOfDate,

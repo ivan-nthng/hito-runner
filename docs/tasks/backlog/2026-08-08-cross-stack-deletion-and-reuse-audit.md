@@ -18,7 +18,7 @@ high
 
 ## Owner
 
-backend
+product
 
 ## Scope
 
@@ -40,47 +40,47 @@ change and scale without weakening security, product truth, or validation.
 
 ## Stage
 
-BACKEND canonical persisted-preference correction is completed. DESIGN SYSTEM Rank 4 remains the
-next admitted cross-owner boundary and was not started inside this Backend batch.
+DESIGN SYSTEM Rank 4 is completed. The legacy Calendar-only `Button/buttonVariants` compatibility
+API has zero runtime reachability and is retired. PRODUCT owns the remaining pre-commit sequence and
+selection of the next admitted portfolio batch.
 
 ## Next Recommended Role
 
-design-system
+product
 
 ## Exact Handoff Prompt
 
 ```text
-ROLE: DESIGN SYSTEM
+ROLE: PRODUCT
 
 Task:
-Retire the legacy `ui/button.tsx` Button/CVA compatibility API after migrating its exact Calendar
-and date-time-input consumers to the existing Hito control contract.
+Resume the existing cross-stack cleanup after the completed Design System Rank 4 compatibility
+retirement. Inspect the current canonical receipts and dirty integration set, then select the next
+admitted owner or sequence the remaining pre-commit checks without implementing another role's work.
 
 Canonical work item:
 docs/tasks/backlog/2026-08-08-cross-stack-deletion-and-reuse-audit.md
 
 Stage:
-DESIGN SYSTEM Rank 4 compatibility retirement with independent interaction review.
+PRODUCT sequencing after DESIGN SYSTEM Rank 4.
 
 Required outcome:
-- Preserve DayPicker navigation/day-button semantics, keyboard/focus behavior, disabled/range states,
-  and approved desktop/375px light/dark presentation.
-- Delete the legacy Button exports, variants, and compatibility prop once consumer reachability is
-  zero.
-- Add no replacement compatibility API or route-local control primitive.
-- Keep this parent in_progress and record one compact owner receipt.
+- Keep this parent truthful and `in_progress` while admitted portfolio work remains.
+- Use the Rank 4 receipt and its explicit range-mode browser coverage gap when planning later QA.
+- Select one factual next owner or the remaining pre-commit inventory; do not collapse focused owner
+  validation into Global QA or release acceptance.
 
 Boundaries:
-Do not change Product behavior, Backend contracts, persistence, auth, providers, hosted state, or
-completed Backend/Design System batches.
+Do not reopen completed owner slices without new evidence. Do not stage, commit, push, deploy,
+mutate hosted state, or implement another role's code.
 
 Definition of Done:
-The exact legacy API has zero consumers and is removed; focused Design System validation, date-picker
-interaction/browser proof, build/integrity, diff hygiene, and independent review pass.
+The next owner or pre-commit inventory is selected from current source truth, with the Rank 4
+coverage gap preserved and no unsupported Global QA or release claim.
 
 Approval policy:
-Routine local inspection, implementation, fixture/browser QA, and validation proceed under standing
-authorization. Do not stage, commit, push, deploy, mutate hosted state, or request routine approval.
+Product may inspect local source and receipts under standing authorization. Publishing and hosted or
+irreversible actions remain outside this item without explicit user direction.
 ```
 
 ## Issue Category
@@ -346,6 +346,48 @@ deployment occurred. `Implementation DoD: Passed`; `Global QA Acceptance: Pendin
   read-only review passed. No hosted access, new file, helper, proof case, API, schema, migration, or
   compatibility layer occurred. This parent remains `in_progress`; Rank 4 was not started.
 
+### Design System Rank 4 Button Compatibility Retirement Receipt (2026-08-10)
+
+Preflight reused the existing `HitoButton`, `hitoButtonClasses`, shared control-size/radius contract,
+and date-picker CSS. New production runtime artifacts: none. The demonstrated reachability was exact:
+the legacy CVA `Button/buttonVariants` export served only `ui/calendar.tsx`, while
+`hito-date-time-input.tsx` was the sole `buttonVariant` caller. The obsolete responsibility was
+removed instead of wrapped.
+
+| API / handoff      | Before                                                                                              | After                                                                                                      |
+| ------------------ | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `Button`           | Exported from `ui/button.tsx`; used only for Calendar day buttons                                   | Removed; `ui/button.tsx` exports only live `HitoButton`; zero runtime consumers                             |
+| `buttonVariants`   | Exported CVA recipe; used only for Calendar previous/next navigation classes                        | Removed; Calendar navigation composes existing `ghost` / `xs` Hito classes through `hitoButtonClasses`     |
+| `buttonVariant`    | Optional Calendar compatibility prop defaulting to `ghost`; forwarded once by date-time input      | Removed from Calendar and its sole caller                                                                  |
+| CVA dependency     | Needed by legacy Button and live Sheet                                                              | Retained only because `ui/sheet.tsx` remains a live consumer; package and lockfile are unchanged            |
+| Range/focus wiring | DayPicker props, `CalendarDayButton` focused-ref effect, range modifiers, and disabled props intact | Unchanged; range start/middle/end data attributes and native DayPicker event props still reach `HitoButton` |
+
+Changed runtime owners are `src/components/ui/button.tsx`, `src/components/ui/calendar.tsx`,
+`src/components/ui/hito-date-time-input.tsx`, and two protective `transform: none` declarations in
+`src/styles/controls-fields.css` that prevent the general Hito button hover motion from changing
+date-picker geometry. The DS validator now rejects restoration of the legacy export/handoff. There
+was no material source growth: the runtime change is net-negative; growth is limited to the two
+geometry-preservation declarations and focused retirement assertions.
+
+| Check | Scenario / environment | Result | Evidence |
+| --- | --- | --- | --- |
+| Exact reachability | Current `src` export/import/caller map for `Button`, `buttonVariants`, and `buttonVariant` | Passed | No legacy runtime definition, export, import, or caller remains; all live button consumers use `HitoButton` |
+| Shared DS contract | `npm run validate-hito-ds-components` | Passed | Validator reported `contract ok` across 320 scanned files and now enforces the retired boundary |
+| Focused static | Targeted ESLint, Prettier check, and scoped `git diff --check` | Passed | No lint, format, or whitespace failures in the task-owned source/validator set |
+| Production build | `npm run build` and managed QA rebuild | Passed | Client, SSR, Nitro, and postbuild completed with exit 0; managed loopback runtime reported healthy/fresh before browser proof |
+| Calendar navigation | `/hitoDS/components#inputs`, bounded date picker, desktop dark | Passed | Previous/next controls carried `hito-button ghost xs icon`; rendered month moved May → June → May |
+| Keyboard/focus and disabled | Same bounded picker | Passed | ArrowRight moved focus from May 29 to May 30 with a visible signal ring; May 19 remained native-disabled and visually quiet; pointer selection updated the controlled field |
+| Responsive/theme presentation | Desktop `1280x900` and exact `375x812`, light and dark | Passed | Navigation/day geometry stabilized at 32px, `transform: none`, selected/disabled contrast remained distinct, and 375px document width stayed 375px; ignored screenshots are under `qa-artifacts/screenshots/2026-08-10/cross-stack-rank4-button-compat/` |
+| Rendered range-mode matrix | Desktop/375px, light/dark | Coverage gap | The repository has no current real `mode="range"` specimen. Non-prompting temporary harness paths were unusable for a complete approved matrix: direct bind was restricted and the fallback was explicitly stopped before theme/viewport evidence. Range preservation is therefore source/static/build evidence only, not rendered acceptance |
+| Repo-wide TypeScript | `npx tsc --noEmit` | Baseline failed | The dirty integration tree reports many pre-existing errors outside these owners; none were reported in the three changed runtime TSX files. This run is not counted as a passing repo-wide type gate |
+
+Rank 4 implementation outcome is passed: the compatibility API has zero reachability and is deleted,
+Calendar/date-time-input use the canonical Hito control seam, focused interaction and build checks
+pass, and the one range-mode browser coverage gap is explicit. No independent subagent was used; the
+bounded self-check was sufficient for the demonstrated seam. No stage, commit, push, deployment,
+hosted mutation, provider call, dependency/lockfile change, product-route change, or Figma mutation
+occurred. `Global QA Acceptance: Pending`.
+
 ### Intentional Complexity, Evidence Holds, And Exclusions
 
 | Classification          | Boundary                                                                                                                                         | Evidence-backed disposition                                                                                                                                                                                                       |
@@ -360,8 +402,8 @@ deployment occurred. `Implementation DoD: Passed`; `Global QA Acceptance: Pendin
 
 ### Closure
 
-The maximum-reuse audit remains **in progress**, not completed: Ranks 1-3 have passed their
-owner-scoped validation and independent review, and the persisted-preference decoding consolidation
-has passed its Backend scope. Three admitted portfolio batches remain; Rank 4, the Design System
-legacy Button compatibility retirement, is the next truthful boundary. No release, hosted
-acceptance, or Global QA Acceptance is claimed.
+The maximum-reuse audit remains **in progress**, not completed: Ranks 1-4 have passed their
+owner-scoped implementation outcomes, and Rank 4 retains the explicit rendered range-mode coverage
+gap above. Two admitted portfolio batches remain. Product now owns the remaining pre-commit sequence
+and selection of the next factual owner. No release, hosted acceptance, or Global QA Acceptance is
+claimed.

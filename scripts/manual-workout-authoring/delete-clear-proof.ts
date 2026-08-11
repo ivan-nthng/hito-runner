@@ -437,10 +437,10 @@ export async function validateManualDeleteClearContract() {
       workouts: [targetWorkout, keptWorkout],
     }),
   );
-  assertDeleteReviewBlocked(
-    unsupportedSource,
-    "unsupported_active_plan_source",
-    "unsupported delete plan source",
+  assert.equal(
+    unsupportedSource.ok,
+    true,
+    "saved-plan provenance must not govern an independent workout delete review",
   );
 
   const foreignWorkout = buildCanonicalPersistedPlannedWorkoutFromReview({

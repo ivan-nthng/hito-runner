@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { isEditableActivePlanSourceKind } from "@/lib/active-plan-workout-editing/policy";
-import { createEmptyActivePlanForUser, getActivePlan } from "@/lib/active-plan-persistence";
+import { createEmptyCalendarProvenanceForUser } from "@/lib/active-plan-persistence";
 import { type TrainingPlanV2 } from "@/lib/imported-plan";
 import {
   buildManualEmptyActivePlanCreationInput,
@@ -39,9 +38,9 @@ import {
   type ParsedManualWorkoutDraftInput,
 } from "@/lib/manual-workout-authoring/schema";
 import { resolveCurrentManualWorkoutAuthoringUser } from "@/lib/manual-workout-authoring/request-auth";
+import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
 import { normalizeManualWorkoutDraft } from "@/lib/manual-workout-authoring/normalize";
 import { validateManualWorkoutDraft } from "@/lib/manual-workout-authoring/validator";
-import { todayIso } from "@/lib/training";
 import { saveRunnerBaselineForUserId } from "@/lib/user-settings-actions";
 
 type ManualWorkoutDraftRejectionReason = Extract<
@@ -52,8 +51,7 @@ type ManualWorkoutDraftRejectionReason = Extract<
 const MANUAL_WORKOUT_REVIEW_TOKEN_PREFIX = "manual-workout-review-v1.";
 
 type ManualEmptyPlanCreateDependencies = {
-  getActivePlanForUser?: typeof getActivePlan;
-  createEmptyPlanForUser?: typeof createEmptyActivePlanForUser;
+  createEmptyPlanForUser?: typeof createEmptyCalendarProvenanceForUser;
   saveBaselineForUser?: typeof saveRunnerBaselineForUserId;
   currentDate?: string;
 };
@@ -228,30 +226,10 @@ export async function createEmptyManualActivePlanForUser(
     });
   }
 
-  const getActivePlanForUser = dependencies.getActivePlanForUser ?? getActivePlan;
   const createEmptyPlanForUser =
-    dependencies.createEmptyPlanForUser ?? createEmptyActivePlanForUser;
+    dependencies.createEmptyPlanForUser ?? createEmptyCalendarProvenanceForUser;
   const saveBaselineForUser = dependencies.saveBaselineForUser ?? saveRunnerBaselineForUserId;
-  const currentDate = dependencies.currentDate ?? todayIso();
-
-  let activePlan: Awaited<ReturnType<typeof getActivePlan>> | null = null;
-  try {
-    activePlan = await getActivePlanForUser(userId);
-  } catch {
-    return buildManualEmptyPlanCreateFailure({
-      reason: "persistence_failed",
-      message:
-        "The manual plan could not verify the current active-plan state. Try again before creating a plan.",
-    });
-  }
-
-  if (activePlan) {
-    return buildManualEmptyPlanCreateFailure({
-      reason: "active_plan_exists",
-      message:
-        "Manual user-built plans can be created only when there is no active plan. Open the existing plan to add workouts.",
-    });
-  }
+  const currentDate = dependencies.currentDate ?? (await getRunnerCalendarDateForUserId(userId));
 
   const creationInput = buildManualEmptyActivePlanCreationInput({
     setup: parsed.data,
@@ -339,12 +317,7 @@ export async function addManualWorkoutToActivePlanForUser(
     });
   }
 
-  return addReviewedManualWorkoutToActivePlanForUser(
-    userId,
-    exactness,
-    dependencies,
-    request.activePlanId,
-  );
+  return addReviewedManualWorkoutToActivePlanForUser(userId, exactness, dependencies);
 }
 
 export function validateManualWorkoutReviewExactness(input: {
@@ -470,18 +443,6 @@ function buildLifecycleConflict(
     mode: "no_active_plan_draft" as const,
     targetDateProtection: "none" as const,
   };
-
-  if (
-    context.mode === "existing_active_plan" &&
-    !isEditableActivePlanSourceKind(context.activePlanSourceKind)
-  ) {
-    return {
-      code: "existing_active_plan_not_supported",
-      message: "This active plan source is not supported for manual workout authoring yet.",
-      workoutDate: input.workoutDate,
-      activePlanId: context.activePlanId ?? null,
-    };
-  }
 
   if (context.targetDateProtection === "none") {
     return null;

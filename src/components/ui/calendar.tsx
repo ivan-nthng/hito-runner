@@ -3,22 +3,20 @@
 import * as React from "react";
 import { DayButton, DayPicker, getDefaultClassNames } from "react-day-picker";
 
+import { HitoButton } from "@/components/ui/button";
+import { hitoButtonClasses } from "@/components/ui/hito-control-contract";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
-import { Button, buttonVariants } from "@/components/ui/button";
 
 function Calendar({
   className,
   classNames,
   showOutsideDays = true,
   captionLayout = "label",
-  buttonVariant = "ghost",
   formatters,
   components,
   ...props
-}: React.ComponentProps<typeof DayPicker> & {
-  buttonVariant?: React.ComponentProps<typeof Button>["variant"];
-}) {
+}: React.ComponentProps<typeof DayPicker>) {
   const defaultClassNames = getDefaultClassNames();
 
   return (
@@ -44,12 +42,12 @@ function Calendar({
           defaultClassNames.nav,
         ),
         button_previous: cn(
-          buttonVariants({ variant: buttonVariant }),
+          hitoButtonClasses({ iconOnly: true, size: "xs", variant: "ghost" }),
           "h-(--cell-size) w-(--cell-size) select-none p-0 aria-disabled:opacity-50",
           defaultClassNames.button_previous,
         ),
         button_next: cn(
-          buttonVariants({ variant: buttonVariant }),
+          hitoButtonClasses({ iconOnly: true, size: "xs", variant: "ghost" }),
           "h-(--cell-size) w-(--cell-size) select-none p-0 aria-disabled:opacity-50",
           defaultClassNames.button_next,
         ),
@@ -150,10 +148,10 @@ function CalendarDayButton({
   }, [modifiers.focused]);
 
   return (
-    <Button
+    <HitoButton
       ref={ref}
       variant="ghost"
-      size="icon"
+      size="xs"
       data-day={day.date.toLocaleDateString()}
       data-selected-single={
         modifiers.selected &&

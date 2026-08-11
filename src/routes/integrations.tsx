@@ -88,7 +88,7 @@ function Integrations() {
       <div className="hito-route-gutter max-w-5xl py-10">
         <header className="hito-page-header">
           <p className="hito-label">{snapshot.source === "persisted" ? "Saved plan" : "Preview"}</p>
-          <h1 className="hito-page-title">Connections</h1>
+          <h1 className="hito-ui-page-title">Connections</h1>
           <p className="hito-page-copy">
             {snapshot.source === "persisted"
               ? "Your saved plan is active, but the provider connections listed here are not connected unless they say Live."
@@ -100,7 +100,7 @@ function Integrations() {
           {cats.map((c) => (
             <section key={c}>
               <div className="hito-section-header">
-                <h2 className="hito-section-title">{c}</h2>
+                <h2 className="hito-ui-section-title">{c}</h2>
                 <span className="hito-section-subtitle">
                   {c === "Intelligence" ? "Available now and later" : "Later"}
                 </span>

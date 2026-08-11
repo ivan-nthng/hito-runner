@@ -24,6 +24,10 @@ import {
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/database";
 import type { TrainingSnapshot } from "@/lib/training";
+import {
+  runnerCalendarTimezoneSchema,
+  type RunnerCalendarTimezoneSource,
+} from "@/lib/runner-calendar-timezone";
 
 export type RunnerTrainingPreferences = RunnerTrainingPreferencesStorage;
 
@@ -34,6 +38,8 @@ export const RUNNER_SETTINGS_SAVE_ERROR =
 export const RUNNER_SETTINGS_LOAD_ERROR = "Your runner settings could not be loaded. Try again.";
 export const RUNNER_SETTINGS_STALE_ERROR =
   "Your runner settings changed while saving. Reload and try again.";
+export const RUNNER_CALENDAR_TIMEZONE_SAVE_ERROR =
+  "Your calendar timezone could not be saved. Choose a recognized city timezone.";
 
 export interface UserSettingsSummary {
   firstName: string | null;
@@ -48,6 +54,13 @@ export interface UserSettingsSummary {
   profileRevision: number;
   trainingPreferences: RunnerTrainingPreferences | null;
   heartRateZones: HeartRateZonesSummary;
+  calendarTimezone: string;
+  calendarTimezoneSource: RunnerCalendarTimezoneSource;
+}
+
+export interface RunnerCalendarTimezonePreference {
+  calendarTimezone: string;
+  calendarTimezoneSource: Exclude<RunnerCalendarTimezoneSource, "fallback_utc">;
 }
 
 export interface RunnerPlanAuthoringProfileSnapshot {
@@ -92,7 +105,15 @@ const userSettingsInputSchema = z.object({
   fitnessLevel: z.enum(FITNESS_LEVEL_VALUES).optional(),
   heartRateProfile: personalHeartRateProfileInputSchema.optional(),
   trainingPreferences: runnerTrainingPreferencesSaveInputSchema.nullable().optional(),
+  calendarTimezone: runnerCalendarTimezoneSchema.optional(),
 });
+
+const runnerCalendarTimezoneSaveInputSchema = z
+  .object({
+    calendarTimezone: runnerCalendarTimezoneSchema,
+    source: z.enum(["browser", "user"]),
+  })
+  .strict();
 
 type UserSettingsInput = z.output<typeof userSettingsInputSchema>;
 
@@ -132,6 +153,15 @@ export const saveRunnerBaseline = createServerFn({ method: "POST" })
     const settings = await saveRunnerBaselineForUserId(userId, data, auth.email);
 
     return { ok: true, settings };
+  });
+
+export const saveRunnerCalendarTimezone = createServerFn({ method: "POST" })
+  .validator((value: unknown) => runnerCalendarTimezoneSaveInputSchema.parse(value))
+  .handler(async ({ data }) => {
+    const userId = await requirePersistedUserIdForCurrentRequest();
+    const preference = await updateRunnerCalendarTimezoneForUserId(userId, data);
+
+    return { ok: true, preference };
   });
 
 export async function saveRunnerBaselineForUserId(
@@ -189,6 +219,8 @@ export async function getUserSettingsForUserId(
     profileRevision: profile.baseline_revision,
     trainingPreferences: parseStoredRunnerTrainingPreferences(profile.training_preferences),
     heartRateZones: buildHeartRateZonesSummary(profile.age, profile.heart_rate_profile),
+    calendarTimezone: profile.calendar_timezone,
+    calendarTimezoneSource: parseCalendarTimezoneSource(profile.calendar_timezone_source),
   };
 }
 
@@ -232,6 +264,8 @@ export async function updateUserSettingsForUserId(
     baseline_revision: number;
     heart_rate_profile?: Json | null;
     training_preferences?: Json | null;
+    calendar_timezone?: string;
+    calendar_timezone_source?: Exclude<RunnerCalendarTimezoneSource, "fallback_utc">;
   } = {
     first_name: data.firstName || null,
     last_name: data.lastName || null,
@@ -248,6 +282,10 @@ export async function updateUserSettingsForUserId(
   }
   if (heartRateProfile !== undefined) {
     updatePayload.heart_rate_profile = heartRateProfile;
+  }
+  if (data.calendarTimezone !== undefined) {
+    updatePayload.calendar_timezone = data.calendarTimezone;
+    updatePayload.calendar_timezone_source = "user";
   }
 
   const updatedProfile = currentProfile
@@ -294,6 +332,89 @@ export async function updateUserSettingsForUserId(
       updatedProfile.data.age,
       updatedProfile.data.heart_rate_profile,
     ),
+    calendarTimezone: updatedProfile.data.calendar_timezone,
+    calendarTimezoneSource: parseCalendarTimezoneSource(
+      updatedProfile.data.calendar_timezone_source,
+    ),
+  };
+}
+
+export async function updateRunnerCalendarTimezoneForUserId(
+  userId: string,
+  input: unknown,
+): Promise<RunnerCalendarTimezonePreference> {
+  const parsed = runnerCalendarTimezoneSaveInputSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new Error(RUNNER_CALENDAR_TIMEZONE_SAVE_ERROR);
+  }
+
+  const supabase = createAdminSupabaseClient();
+  let updateQuery = supabase
+    .from("runner_profiles")
+    .update({
+      calendar_timezone: parsed.data.calendarTimezone,
+      calendar_timezone_source: parsed.data.source,
+    })
+    .eq("user_id", userId);
+
+  if (parsed.data.source === "browser") {
+    updateQuery = updateQuery.eq("calendar_timezone_source", "fallback_utc");
+  }
+
+  const updatedProfile = await updateQuery
+    .select("calendar_timezone, calendar_timezone_source")
+    .maybeSingle();
+
+  if (updatedProfile.error) {
+    throw buildRunnerSettingsPersistenceError(updatedProfile.error, "write");
+  }
+
+  let persistedPreference = updatedProfile.data;
+  if (!persistedPreference) {
+    const currentProfile = await supabase
+      .from("runner_profiles")
+      .select("calendar_timezone, calendar_timezone_source")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (currentProfile.error) {
+      throw buildRunnerSettingsPersistenceError(currentProfile.error, "read");
+    }
+    persistedPreference = currentProfile.data;
+
+    if (!persistedPreference) {
+      const insertedProfile = await supabase
+        .from("runner_profiles")
+        .insert({
+          user_id: userId,
+          calendar_timezone: parsed.data.calendarTimezone,
+          calendar_timezone_source: parsed.data.source,
+        })
+        .select("calendar_timezone, calendar_timezone_source")
+        .single();
+
+      if (insertedProfile.error?.code === "23505") {
+        return updateRunnerCalendarTimezoneForUserId(userId, parsed.data);
+      }
+      if (insertedProfile.error) {
+        throw buildRunnerSettingsPersistenceError(insertedProfile.error, "write");
+      }
+      persistedPreference = insertedProfile.data;
+    }
+  }
+
+  if (!persistedPreference) {
+    throw new Error(RUNNER_CALENDAR_TIMEZONE_SAVE_ERROR);
+  }
+
+  const source = parseCalendarTimezoneSource(persistedPreference.calendar_timezone_source);
+  if (source === "fallback_utc") {
+    throw new Error(RUNNER_CALENDAR_TIMEZONE_SAVE_ERROR);
+  }
+
+  return {
+    calendarTimezone: persistedPreference.calendar_timezone,
+    calendarTimezoneSource: source,
   };
 }
 
@@ -363,6 +484,10 @@ function parseFitnessLevel(value: unknown): RunnerFitnessLevel | null {
   return FITNESS_LEVEL_VALUES.includes(value as RunnerFitnessLevel)
     ? (value as RunnerFitnessLevel)
     : null;
+}
+
+function parseCalendarTimezoneSource(value: unknown): RunnerCalendarTimezoneSource {
+  return value === "browser" || value === "user" ? value : "fallback_utc";
 }
 
 export function buildRunnerSettingsPersistenceError(

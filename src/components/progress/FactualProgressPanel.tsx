@@ -42,7 +42,7 @@ export function FactualProgressPanel({
     <section aria-labelledby="factual-progress-title">
       <header className="hito-page-header">
         <p className="hito-label">Comparable evidence</p>
-        <h1 id="factual-progress-title" className="hito-page-title">
+        <h1 id="factual-progress-title" className="hito-ui-page-title">
           Progress
         </h1>
         <p className="hito-page-copy">
@@ -55,7 +55,7 @@ export function FactualProgressPanel({
       {state.status === "updating" ? (
         <div className="hito-state-surface" data-tone="signal" role="status" aria-live="polite">
           <p className="hito-label">Updating</p>
-          <h2 className="hito-section-title mt-2">Your activity facts are being refreshed.</h2>
+          <h2 className="hito-ui-section-title mt-2">Your activity facts are being refreshed.</h2>
           <p className="hito-body mt-2">
             Current values will return when the backend snapshot is ready.
           </p>
@@ -90,7 +90,7 @@ function ProgressReadback({ progress }: { progress: RunnerActivityProgressProduc
         <p className="hito-label">Last 28 days</p>
         <h2
           id="rolling-summary-title"
-          className="mt-3 font-display text-3xl leading-tight sm:text-4xl"
+          className="mt-3 font-sans text-3xl leading-tight sm:text-4xl"
         >
           {summary}
         </h2>
@@ -102,7 +102,7 @@ function ProgressReadback({ progress }: { progress: RunnerActivityProgressProduc
       {visibleFacts.length > 0 ? (
         <section aria-labelledby="progress-facts-title">
           <div className="hito-section-header">
-            <h2 id="progress-facts-title" className="hito-section-title">
+            <h2 id="progress-facts-title" className="hito-ui-section-title">
               Running facts
             </h2>
             <span className="hito-section-subtitle">Current and previous 28 days</span>
@@ -169,7 +169,7 @@ function Gate4Readback({
         aria-labelledby="activity-intelligence-updating-title"
       >
         <p className="hito-label">Updating records and reported load</p>
-        <h2 id="activity-intelligence-updating-title" className="hito-section-title mt-2">
+        <h2 id="activity-intelligence-updating-title" className="hito-ui-section-title mt-2">
           A recent activity change is being applied.
         </h2>
         <p className="hito-body mt-2">
@@ -189,7 +189,7 @@ function Gate4Readback({
       </p>
       <div className="hito-section-header">
         <div>
-          <h2 id="activity-intelligence-title" className="hito-section-title">
+          <h2 id="activity-intelligence-title" className="hito-ui-section-title">
             Records and reported load
           </h2>
           <p className="hito-section-subtitle">
@@ -219,7 +219,7 @@ function RecordsReadback({
     <section aria-labelledby="activity-records-title">
       <div className="hito-section-header">
         <div>
-          <h3 id="activity-records-title" className="hito-section-title">
+          <h3 id="activity-records-title" className="hito-ui-section-title">
             Current records
           </h3>
           <p className="hito-section-subtitle">Accepted whole-activity and official results</p>
@@ -378,7 +378,7 @@ function Gate5UnavailableReadback({
 }) {
   return (
     <section aria-labelledby="detailed-progress-title" className="border-t border-hairline pt-6">
-      <h3 id="detailed-progress-title" className="hito-section-title">
+      <h3 id="detailed-progress-title" className="hito-ui-section-title">
         Detailed progress metrics are not available yet.
       </h3>
       <p className="hito-body mt-2 max-w-3xl">
@@ -492,7 +492,9 @@ function ProgressEmptyState() {
   return (
     <div className="hito-state-surface">
       <p className="hito-label">Not enough recorded activity</p>
-      <h2 className="hito-section-title mt-2">Progress facts will appear after recorded runs.</h2>
+      <h2 className="hito-ui-section-title mt-2">
+        Progress facts will appear after recorded runs.
+      </h2>
       <p className="hito-body mt-2">
         Hito will show only facts supported by your activity evidence.
       </p>

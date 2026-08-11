@@ -101,6 +101,7 @@ export function HitoCalendarDayCell({
     <div
       data-hito-calendar-day-cell=""
       data-hito-calendar-day-state={state}
+      data-interactive={interactive ? "true" : undefined}
       tabIndex={focused ? 0 : undefined}
       aria-label={ariaLabel}
       className={cn(
@@ -219,6 +220,7 @@ export function HitoWorkoutDayRow({
     <div
       data-hito-workout-day-row=""
       data-hito-calendar-day-state={state}
+      data-interactive={interactive ? "true" : undefined}
       tabIndex={focused ? 0 : undefined}
       aria-label={ariaLabel}
       className={cn(

@@ -489,6 +489,7 @@
   .hito-date-picker-calendar .rdp-button_next:focus-visible {
     background: color-mix(in oklch, var(--color-foreground) 8%, transparent);
     color: var(--color-foreground);
+    transform: none;
   }
 
   .hito-date-picker-calendar .rdp-weekday {
@@ -507,6 +508,7 @@
   .hito-date-picker-calendar .rdp-day button:hover {
     background: color-mix(in oklch, var(--color-foreground) 8%, transparent);
     color: var(--color-foreground);
+    transform: none;
   }
 
   .hito-date-picker-calendar .rdp-day button:focus-visible {

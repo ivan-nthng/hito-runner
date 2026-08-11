@@ -70,6 +70,7 @@ export async function applyAtomicReviewedPlanPersistence(input: {
   profile: Json;
   plan: Json;
   workouts: Json;
+  currentDate: string;
   expectedProfileRevision?: number;
 }) {
   const supabase = createAdminSupabaseClient();
@@ -78,6 +79,7 @@ export async function applyAtomicReviewedPlanPersistence(input: {
     p_profile: input.profile,
     p_plan: input.plan,
     p_workouts: input.workouts,
+    p_current_date: input.currentDate,
     p_expected_profile_revision: input.expectedProfileRevision ?? null,
   });
 
@@ -122,6 +124,28 @@ export async function applyAtomicReviewedFutureSchedulePersistence(input: {
   return {
     planCycle,
     workouts,
+  };
+}
+
+export async function clearAtomicCalendarFutureWorkouts(input: {
+  userId: string;
+  currentDate: string;
+}) {
+  const supabase = createAdminSupabaseClient();
+  const result = await supabase.rpc("clear_calendar_future_workouts", {
+    p_user_id: input.userId,
+    p_current_date: input.currentDate,
+  });
+
+  if (result.error) {
+    throw new Error(result.error.message);
+  }
+
+  const payload = readRpcPayload(result.data, "Future Calendar deletion");
+
+  return {
+    currentDate: readStringField(payload, "current_date"),
+    clearedWorkoutCount: readNonNegativeIntegerField(payload, "cleared_workout_count"),
   };
 }
 
@@ -173,6 +197,26 @@ function readObjectArrayField(value: RpcPayload, key: string) {
     !Array.isArray(field) ||
     field.some((entry) => !entry || typeof entry !== "object" || Array.isArray(entry))
   ) {
+    throw new Error(`Atomic persistence result has an invalid ${key}.`);
+  }
+
+  return field;
+}
+
+function readStringField(value: RpcPayload, key: string) {
+  const field = value[key];
+
+  if (typeof field !== "string" || !field) {
+    throw new Error(`Atomic persistence result has an invalid ${key}.`);
+  }
+
+  return field;
+}
+
+function readNonNegativeIntegerField(value: RpcPayload, key: string) {
+  const field = value[key];
+
+  if (typeof field !== "number" || !Number.isSafeInteger(field) || field < 0) {
     throw new Error(`Atomic persistence result has an invalid ${key}.`);
   }
 

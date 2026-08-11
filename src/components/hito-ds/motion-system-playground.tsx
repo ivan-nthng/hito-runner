@@ -69,6 +69,16 @@ export function MotionSystemPlayground() {
       label="Motion"
       status="Shared foundation"
       statusTone="signal"
+      description={{
+        purpose:
+          "Apply restrained shared timing and origin-aware transitions to controls, feedback, and overlays.",
+        useWhen:
+          "Motion clarifies a state change without delaying focus, Escape, disabled state, or product truth.",
+        avoidWhen:
+          "Animation is decorative, spatially disorienting, or substitutes for immediate state feedback.",
+        accessibility:
+          "Reduced-motion preferences preserve the same state and interaction outcome without required spatial animation.",
+      }}
       usedIn="Buttons, controls, feedback, and shared Radix overlays."
       demo={
         <div className="flex min-h-44 min-w-0 items-center justify-center">

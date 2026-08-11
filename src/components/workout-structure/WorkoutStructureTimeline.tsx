@@ -121,7 +121,7 @@ export function WorkoutStructureTimeline({
             )}
           </div>
 
-          <ol className="hito-row-group mt-5">
+          <ol className={cn("mt-5", density === "compact" ? "hito-row-group" : "grid gap-3")}>
             {items.map((item, index) => {
               const colors = segmentColorMeta(item.semanticKind, item.target);
               const isActive = activeIndex === index;
@@ -131,7 +131,10 @@ export function WorkoutStructureTimeline({
                 <li
                   key={item.id}
                   className={cn(
-                    "hito-list-row justify-start gap-4 transition-colors",
+                    density === "compact"
+                      ? "hito-list-row"
+                      : "flex items-center rounded-xl bg-background p-4",
+                    "justify-start gap-4 transition-colors",
                     isActive && "bg-foreground/[0.085]",
                   )}
                 >

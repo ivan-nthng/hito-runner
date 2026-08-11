@@ -3,6 +3,7 @@
 import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 
+import { hitoFieldClasses } from "@/components/ui/hito-control-contract";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 
@@ -20,17 +21,20 @@ const SelectTrigger = React.forwardRef<
 >(({ className, children, size = "default", ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
-    className={cn(
-      "hito-ui-select-trigger flex w-full cursor-pointer items-center justify-between whitespace-nowrap px-3 py-2 disabled:cursor-not-allowed [&>span]:line-clamp-1",
-      size === "sm" && "hito-ui-select-trigger-sm !px-2 !py-0",
-      className,
-    )}
+    className={hitoFieldClasses({
+      className: cn(
+        "hito-ui-select-trigger flex w-full cursor-pointer items-center justify-between whitespace-nowrap px-3 py-2 disabled:cursor-not-allowed [&>span]:line-clamp-1",
+        size === "sm" && "hito-ui-select-trigger-sm !px-2 !py-0",
+        className,
+      ),
+      size: size === "sm" ? "sm" : "md",
+    })}
     {...props}
     data-hito-component="select"
   >
     {children}
     <SelectPrimitive.Icon>
-      <Icon name="chevron-down" size="sm" className="opacity-50" />
+      <Icon name="chevron-down" size="sm" className="text-text-secondary" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));

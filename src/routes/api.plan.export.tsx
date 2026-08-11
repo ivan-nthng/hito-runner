@@ -1,12 +1,26 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
+import {
+  CalendarFutureWorkoutsExportUnavailableError,
+  exportFutureCalendarWorkoutsForUser,
+} from "@/lib/calendar-overflow-actions";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
 import { exportSavedPlanForUser } from "@/lib/active-plan-export-actions";
 
-const planExportQuerySchema = z.object({
-  format: z.enum(["json", "markdown"]),
-  savedPlanId: z.string().uuid(),
-});
+const planExportQuerySchema = z.union([
+  z
+    .object({
+      format: z.enum(["json", "markdown"]),
+      savedPlanId: z.string().uuid(),
+    })
+    .strict(),
+  z
+    .object({
+      format: z.literal("json"),
+      scope: z.literal("future-calendar"),
+    })
+    .strict(),
+]);
 
 export const Route = createFileRoute("/api/plan/export")({
   server: {
@@ -14,12 +28,23 @@ export const Route = createFileRoute("/api/plan/export")({
       GET: async ({ request }) => {
         try {
           const url = new URL(request.url);
-          const { format, savedPlanId } = planExportQuerySchema.parse({
-            format: url.searchParams.get("format"),
-            savedPlanId: url.searchParams.get("savedPlanId"),
-          });
+          const scope = url.searchParams.get("scope");
+          const query = planExportQuerySchema.parse(
+            scope === null
+              ? {
+                  format: url.searchParams.get("format"),
+                  savedPlanId: url.searchParams.get("savedPlanId"),
+                }
+              : {
+                  format: url.searchParams.get("format"),
+                  scope,
+                },
+          );
           const userId = await requirePersistedUserIdForCurrentRequest();
-          const document = await exportSavedPlanForUser(userId, savedPlanId, format);
+          const document =
+            "scope" in query
+              ? await exportFutureCalendarWorkoutsForUser(userId)
+              : await exportSavedPlanForUser(userId, query.savedPlanId, query.format);
 
           return new Response(document.body, {
             status: 200,
@@ -65,6 +90,10 @@ function getPlanExportPublicFailure(error: unknown): PlanExportPublicFailure {
   }
 
   if (error instanceof Error && error.message === "The selected saved plan was not found.") {
+    return { status: 404, message: error.message, report: false };
+  }
+
+  if (error instanceof CalendarFutureWorkoutsExportUnavailableError) {
     return { status: 404, message: error.message, report: false };
   }
 

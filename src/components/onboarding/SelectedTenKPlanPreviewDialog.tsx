@@ -152,6 +152,7 @@ export function SelectedRunningPlanPreviewDialog({
     >
       <DialogContent
         ref={dialogContentRef}
+        {...(reviewVisible ? { "aria-describedby": undefined } : {})}
         className={cn(
           "hito-dialog-stable hito-product-dialog hito-dialog-surface-product",
           compact
@@ -197,7 +198,7 @@ export function SelectedRunningPlanPreviewDialog({
             <DialogDescription>Plan preview preparation is in progress.</DialogDescription>
           </div>
         ) : reviewVisible && draft ? (
-          <GeneratedPlanReadyReviewHeader description={description} draft={draft} />
+          <GeneratedPlanReadyReviewHeader draft={draft} />
         ) : (
           <DialogHeader className="hito-product-dialog-header">
             <div className="min-w-0">
@@ -286,16 +287,6 @@ export function SelectedRunningPlanPreviewDialog({
                 ref={readyFocusTargetRef}
                 type="button"
                 size="md"
-                variant="secondary"
-                disabled={creating}
-                loading={loading}
-                onClick={onRefresh}
-              >
-                {loading ? "Refreshing..." : "Refresh preview"}
-              </HitoButton>
-              <HitoButton
-                type="button"
-                size="md"
                 variant="primary"
                 disabled={!reviewReady || loading}
                 loading={creating}
@@ -332,13 +323,7 @@ export function SelectedRunningPlanPreviewDialog({
   );
 }
 
-function GeneratedPlanReadyReviewHeader({
-  description,
-  draft,
-}: {
-  description: string;
-  draft: SelectedRunningPlanPreviewDraft;
-}) {
+function GeneratedPlanReadyReviewHeader({ draft }: { draft: SelectedRunningPlanPreviewDraft }) {
   const startDate = draft.schedule.startDate;
   const endDate = draft.schedule.endDate;
   const raceDate = draft.goal.targetDate;
@@ -354,24 +339,16 @@ function GeneratedPlanReadyReviewHeader({
   });
 
   return (
-    <DialogHeader className="hito-product-dialog-header">
-      <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-        <div className="min-w-0">
-          <p className="hito-micro-label" data-tone="signal">
-            Generated plan
-          </p>
-          <DialogTitle className="hito-ui-modal-title mt-2 break-words">{header.title}</DialogTitle>
-        </div>
-        <p className="hito-ui-section-title min-w-0 break-words sm:text-right">
-          {header.startCopy}
-        </p>
+    <DialogHeader className="hito-product-dialog-header border-b-0">
+      <div className="min-w-0">
+        <DialogTitle className="hito-ui-page-title mt-2 break-words">{header.title}</DialogTitle>
+        <p className="hito-ui-section-title mt-2 min-w-0 break-words">{header.startCopy}</p>
       </div>
       <div className="mt-3 grid min-w-0 gap-1">
         <p className="hito-body-small break-words">{header.rangeCopy}</p>
         {header.modifierCopy ? (
           <p className="hito-body-small break-words">{header.modifierCopy}</p>
         ) : null}
-        <DialogDescription className="hito-body mt-2 max-w-2xl">{description}</DialogDescription>
       </div>
     </DialogHeader>
   );

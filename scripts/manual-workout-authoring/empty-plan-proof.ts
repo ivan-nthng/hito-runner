@@ -254,7 +254,7 @@ function buildFakePlanCycle({
   return {
     id,
     user_id: userId,
-    status: "active",
+    status: "archived",
     title: "Manual user-built plan",
     goal_summary: "Manual user-built plan",
     source_template: "training-plan-v2",

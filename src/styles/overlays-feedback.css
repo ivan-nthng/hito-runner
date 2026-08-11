@@ -50,7 +50,7 @@
     justify-content: center;
     border: 1px solid transparent;
     border-radius: var(--radius-md);
-    color: var(--color-muted-foreground);
+    color: var(--color-text-secondary);
     transition:
       background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
       border-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
@@ -59,15 +59,15 @@
 
   .hito-ui-dialog-close:hover,
   .hito-ui-sheet-close:hover {
-    border-color: var(--color-hairline);
-    background: color-mix(in oklch, var(--color-foreground) 6%, transparent);
+    border-color: var(--color-chrome-edge-default);
+    background: var(--color-chrome-subtle);
     color: var(--color-foreground);
   }
 
   .hito-ui-dialog-close:focus-visible,
   .hito-ui-sheet-close:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 20%, transparent);
+    box-shadow: 0 0 0 2px var(--color-ring);
   }
 
   .hito-ui-dialog-header,
@@ -102,7 +102,7 @@
     --hito-typography-role: body;
     font-size: 0.875rem;
     line-height: 1.58;
-    color: var(--color-muted-foreground);
+    color: var(--color-text-secondary);
   }
 
   .hito-ui-menu-surface {
@@ -124,7 +124,7 @@
   .hito-ui-menu-item {
     --hito-typography-role: nav-menu;
     border-radius: var(--radius-md);
-    color: color-mix(in oklch, var(--color-foreground) 86%, transparent);
+    color: var(--color-text-secondary);
     font-size: 0.8125rem;
     font-weight: 500;
     line-height: 1.3;
@@ -136,7 +136,7 @@
   .hito-ui-menu-item:focus,
   .hito-ui-menu-item[data-highlighted],
   .hito-ui-menu-item[data-state="open"] {
-    background: color-mix(in oklch, var(--color-foreground) 8%, transparent);
+    background: var(--color-chrome-subtle);
     color: var(--color-foreground);
     outline: none;
   }
@@ -147,17 +147,17 @@
   }
 
   .hito-ui-menu-item[data-tone="destructive"] {
-    color: color-mix(in oklch, var(--color-destructive) 88%, var(--color-foreground));
+    color: var(--color-text-negative);
   }
 
   .hito-ui-menu-item[data-tone="destructive"]:focus,
   .hito-ui-menu-item[data-tone="destructive"][data-highlighted] {
     background: color-mix(in oklch, var(--color-destructive) 10%, transparent);
-    color: color-mix(in oklch, var(--color-destructive) 90%, var(--color-foreground));
+    color: var(--color-text-negative);
   }
 
   .hito-ui-menu-item[data-disabled] {
-    color: color-mix(in oklch, var(--color-muted-foreground) 58%, transparent);
+    color: var(--color-text-disabled);
     cursor: not-allowed;
     opacity: 1;
   }
@@ -169,7 +169,7 @@
     letter-spacing: 0.18em;
     line-height: 1;
     text-transform: uppercase;
-    color: var(--color-muted-foreground);
+    color: var(--color-text-tertiary);
   }
 
   .hito-ui-menu-separator {
@@ -181,56 +181,15 @@
     margin-left: auto;
     font-size: 0.6875rem;
     line-height: 1;
-    color: var(--color-muted-foreground);
+    color: var(--color-text-tertiary);
   }
 
   .hito-ui-select-trigger {
-    min-height: 2.5rem;
-    border: 1px solid var(--color-hairline);
-    border-radius: var(--radius-lg);
-    background: color-mix(in oklch, var(--color-background) 62%, transparent);
-    color: var(--color-foreground);
-    font-size: 0.875rem;
     line-height: 1;
-    transition:
-      border-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
-      background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
-      box-shadow var(--hito-motion-duration-140) var(--hito-motion-ease-out);
-  }
-
-  .hito-ui-select-trigger-sm {
-    min-height: 2rem;
-    border-radius: var(--radius-md);
-    font-size: 0.75rem;
-  }
-
-  .hito-ui-select-trigger:hover,
-  .hito-ui-select-trigger[data-demo-state="hover"] {
-    border-color: color-mix(in oklch, var(--color-foreground) 20%, transparent);
-    background: color-mix(in oklch, var(--color-background) 72%, transparent);
-  }
-
-  .hito-ui-select-trigger:focus,
-  .hito-ui-select-trigger[data-state="open"],
-  .hito-ui-select-trigger[data-demo-state="focus"] {
-    border-color: color-mix(in oklch, var(--color-foreground) 32%, transparent);
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 16%, transparent);
-    outline: none;
-  }
-
-  .hito-ui-select-trigger[data-placeholder] {
-    color: color-mix(in oklch, var(--color-muted-foreground) 72%, transparent);
-  }
-
-  .hito-ui-select-trigger:disabled {
-    background: color-mix(in oklch, var(--color-muted) 26%, transparent);
-    color: color-mix(in oklch, var(--color-foreground) 78%, transparent);
-    cursor: not-allowed;
-    opacity: 1;
   }
 
   .hito-ui-progress-track {
-    background: color-mix(in oklch, var(--color-foreground) 10%, transparent);
+    background: var(--color-chrome-standard);
   }
 
   .hito-ui-progress-fill {
@@ -471,7 +430,7 @@
   .hito-info-window-copy {
     font-size: 0.8125rem;
     line-height: 1.5;
-    color: var(--color-muted-foreground);
+    color: var(--color-text-secondary);
   }
 
   .hito-info-window-footer {
@@ -604,24 +563,24 @@
     margin-top: 0.1875rem !important;
     font-size: 0.75rem !important;
     line-height: 1.45 !important;
-    color: var(--color-muted-foreground) !important;
+    color: var(--color-text-secondary) !important;
   }
 
   .hito-toast-icon,
   .hito-toast-loader {
-    color: var(--color-muted-foreground) !important;
+    color: var(--color-text-tertiary) !important;
   }
 
   .hito-toast-info .hito-toast-icon {
-    color: var(--color-muted-foreground) !important;
+    color: var(--color-text-informative) !important;
   }
 
   .hito-toast-success .hito-toast-icon {
-    color: var(--color-success) !important;
+    color: var(--color-text-positive) !important;
   }
 
   .hito-toast-error .hito-toast-icon {
-    color: var(--color-destructive) !important;
+    color: var(--color-text-negative) !important;
   }
 
   .hito-toast-loading {
@@ -632,7 +591,7 @@
   .hito-toast-working .hito-toast-loader,
   .hito-toast-loading .hito-toast-icon,
   .hito-toast-loading .hito-toast-loader {
-    color: var(--color-muted-foreground) !important;
+    color: var(--color-text-tertiary) !important;
   }
 
   .hito-toast-loading::after {
@@ -644,7 +603,7 @@
     height: 2px;
     overflow: hidden;
     border-radius: 999px;
-    background: color-mix(in oklch, var(--color-muted-foreground) 14%, transparent);
+    background: var(--color-chrome-standard);
   }
 
   .hito-toast-loading::before {
@@ -678,8 +637,8 @@
     margin-left: 0.125rem !important;
     border: 0 !important;
     border-radius: var(--radius-sm) !important;
-    background: transparent !important;
-    color: var(--color-muted-foreground) !important;
+    background: var(--color-chrome-clear) !important;
+    color: var(--color-text-secondary) !important;
     cursor: pointer !important;
     opacity: 1 !important;
     visibility: visible !important;
@@ -693,19 +652,19 @@
 
   .hito-toast-close:hover,
   .hito-toast-dismiss-action:hover {
-    background: color-mix(in oklch, var(--color-foreground) 7%, transparent) !important;
+    background: var(--color-chrome-subtle) !important;
     color: var(--color-foreground) !important;
   }
 
   .hito-toast-close:focus-visible,
   .hito-toast-dismiss-action:focus-visible {
     outline: none !important;
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 24%, transparent) !important;
+    box-shadow: 0 0 0 2px var(--color-ring) !important;
   }
 
   .hito-toast-close:active,
   .hito-toast-dismiss-action:active {
-    background: color-mix(in oklch, var(--color-foreground) 10%, transparent) !important;
+    background: var(--color-chrome-standard) !important;
   }
 
   .hito-toast-close svg,

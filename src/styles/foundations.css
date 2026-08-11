@@ -26,8 +26,6 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
@@ -54,6 +52,20 @@
   --color-surface: var(--surface);
   --color-surface-elevated: var(--surface-elevated);
   --color-hairline: var(--hairline);
+  --color-chrome-clear: var(--chrome-clear);
+  --color-chrome-subtle: var(--chrome-subtle);
+  --color-chrome-standard: var(--chrome-standard);
+  --color-chrome-strong: var(--chrome-strong);
+  --color-chrome-edge-default: var(--chrome-edge-default);
+  --color-chrome-edge-emphasis: var(--chrome-edge-emphasis);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-text-disabled: var(--text-disabled);
+  --color-text-accent: var(--text-accent);
+  --color-text-positive: var(--text-positive);
+  --color-text-negative: var(--text-negative);
+  --color-text-informative: var(--text-informative);
+  --color-text-warning: var(--text-warning);
   --color-signal: var(--signal);
   --color-signal-foreground: var(--signal-foreground);
   --color-info: var(--info);
@@ -714,8 +726,6 @@
   --popover-foreground: var(--foreground);
   --primary: var(--foreground);
   --primary-foreground: var(--background);
-  --secondary: var(--stone-750);
-  --secondary-foreground: var(--sand-200);
   --muted: var(--stone-800);
   --muted-foreground: var(--sand-500);
   --accent: var(--stone-700);
@@ -733,6 +743,20 @@
   --warn: var(--orange-500);
   --success: var(--green-500);
   --success-foreground: var(--stone-950);
+  --chrome-clear: transparent;
+  --chrome-subtle: color-mix(in oklch, var(--foreground) 8%, transparent);
+  --chrome-standard: color-mix(in oklch, var(--foreground) 12%, transparent);
+  --chrome-strong: color-mix(in oklch, var(--foreground) 16%, transparent);
+  --chrome-edge-default: color-mix(in oklch, var(--foreground) 16%, transparent);
+  --chrome-edge-emphasis: color-mix(in oklch, var(--foreground) 32%, transparent);
+  --text-secondary: color-mix(in oklch, var(--foreground) 75%, transparent);
+  --text-tertiary: color-mix(in oklch, var(--foreground) 60%, transparent);
+  --text-disabled: color-mix(in oklch, var(--foreground) 40%, transparent);
+  --text-accent: color-mix(in oklch, var(--signal) 50%, var(--foreground) 50%);
+  --text-positive: var(--success);
+  --text-negative: color-mix(in oklch, var(--destructive) 80%, var(--foreground) 20%);
+  --text-informative: var(--info);
+  --text-warning: var(--warn);
   /* @hito-export-end semantic-color-dark */
 
   --chart-1: var(--signal);
@@ -775,8 +799,6 @@
   --popover-foreground: var(--foreground);
   --primary: var(--foreground);
   --primary-foreground: var(--linen-50);
-  --secondary: var(--linen-180);
-  --secondary-foreground: var(--ink-800);
   --muted: var(--linen-160);
   --muted-foreground: var(--taupe-650);
   --accent: var(--linen-220);
@@ -794,6 +816,20 @@
   --destructive-foreground: var(--linen-50);
   --info: var(--blue-700);
   --info-foreground: var(--linen-50);
+  --chrome-clear: transparent;
+  --chrome-subtle: color-mix(in oklch, var(--foreground) 8%, transparent);
+  --chrome-standard: color-mix(in oklch, var(--foreground) 12%, transparent);
+  --chrome-strong: color-mix(in oklch, var(--foreground) 16%, transparent);
+  --chrome-edge-default: color-mix(in oklch, var(--foreground) 16%, transparent);
+  --chrome-edge-emphasis: color-mix(in oklch, var(--foreground) 32%, transparent);
+  --text-secondary: color-mix(in oklch, var(--foreground) 75%, transparent);
+  --text-tertiary: color-mix(in oklch, var(--foreground) 60%, transparent);
+  --text-disabled: color-mix(in oklch, var(--foreground) 40%, transparent);
+  --text-accent: color-mix(in oklch, var(--signal) 50%, var(--foreground) 50%);
+  --text-positive: var(--success);
+  --text-negative: color-mix(in oklch, var(--destructive) 80%, var(--foreground) 20%);
+  --text-informative: var(--info);
+  --text-warning: var(--warn);
   /* @hito-export-end semantic-color-light */
 
   --chart-1: var(--signal);
@@ -821,14 +857,26 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-border: var(--border);
   --color-hairline: var(--hairline);
+  --color-chrome-clear: var(--chrome-clear);
+  --color-chrome-subtle: var(--chrome-subtle);
+  --color-chrome-standard: var(--chrome-standard);
+  --color-chrome-strong: var(--chrome-strong);
+  --color-chrome-edge-default: var(--chrome-edge-default);
+  --color-chrome-edge-emphasis: var(--chrome-edge-emphasis);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-text-disabled: var(--text-disabled);
+  --color-text-accent: var(--text-accent);
+  --color-text-positive: var(--text-positive);
+  --color-text-negative: var(--text-negative);
+  --color-text-informative: var(--text-informative);
+  --color-text-warning: var(--text-warning);
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-ring-offset-background: var(--background);
@@ -881,13 +929,6 @@
   }
 
   /* DS gradient / overlay roles. Keep these scarce and role-based, not decorative defaults. */
-  .canvas-grain,
-  .hito-canvas-atmosphere {
-    background-image:
-      radial-gradient(ellipse at top, oklch(0.22 0.01 60 / 0.4), transparent 60%),
-      radial-gradient(ellipse at bottom, oklch(0.13 0.005 60 / 0.6), transparent 50%);
-  }
-
   .auth-hero {
     position: relative;
     isolation: isolate;
@@ -938,21 +979,6 @@
     background: color-mix(in oklch, var(--color-background) 78%, transparent);
     box-shadow: 0 28px 80px oklch(0.05 0.005 60 / 0.34);
     backdrop-filter: blur(18px);
-  }
-
-  [data-hito-theme="light"] .canvas-grain,
-  [data-hito-theme="light"] .hito-canvas-atmosphere {
-    background-image:
-      radial-gradient(
-        ellipse at top,
-        color-mix(in oklch, var(--color-signal) 10%, transparent),
-        transparent 58%
-      ),
-      radial-gradient(
-        ellipse at bottom,
-        color-mix(in oklch, var(--color-accent) 68%, transparent),
-        transparent 56%
-      );
   }
 
   [data-hito-theme="light"] .auth-hero-image {

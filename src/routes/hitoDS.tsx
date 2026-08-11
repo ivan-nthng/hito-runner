@@ -3,8 +3,6 @@ import { HitoDesignSystemReferencePage } from "@/components/hito-ds/reference-pa
 import { APP_NAME } from "@/lib/app-config";
 
 export { HitoDesignSystemReferencePage } from "@/components/hito-ds/reference-page";
-export { HITO_DS_PAGE_ROUTES } from "@/components/hito-ds/reference-model";
-export type { HitoDsPageId } from "@/components/hito-ds/reference-model";
 
 export const Route = createFileRoute("/hitoDS")({
   head: () => ({

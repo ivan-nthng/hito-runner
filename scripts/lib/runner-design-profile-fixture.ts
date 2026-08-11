@@ -185,6 +185,9 @@ export async function createRunnerDesignProfilePlan(input: {
   assert.equal(providerDispatchCount, 0);
 
   assert.ok(reviewed.savedPlanId, "The fixture candidate must be retained before materialization.");
+  const historicalMaterializationInstant = new Date(
+    `${reviewed.draft.canonicalPlan.start_date}T12:00:00`,
+  );
   const materialized = await materializeFirstReviewedPlanForUser(
     input.userId,
     reviewed.draft.canonicalPlan,
@@ -193,6 +196,7 @@ export async function createRunnerDesignProfilePlan(input: {
       canonicalPlan: reviewed.draft.canonicalPlan,
       reviewChecksum: reviewed.draft.reviewChecksum,
     }),
+    { calendarInstant: historicalMaterializationInstant },
   );
   assert.equal(materialized.ok, true);
   assert.equal(providerDispatchCount, 0);

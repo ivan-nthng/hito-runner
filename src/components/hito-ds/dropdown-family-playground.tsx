@@ -71,6 +71,14 @@ export function DropdownFamilyPlayground() {
       label="Dropdowns"
       status="Documented family"
       statusTone="signal"
+      description={{
+        purpose: "Expose compact actions or selections in the shared menu surface and row anatomy.",
+        useWhen: "A trigger owns a bounded list of related commands, choices, or nested options.",
+        avoidWhen:
+          "Primary actions should stay visible, the choice set belongs in a form, or dense mobile navigation needs a Sheet.",
+        accessibility:
+          "Trigger naming, arrow keys, focus transfer, Escape, disabled and selected items, submenu behavior, and destructive tone remain wrapper-owned.",
+      }}
       usedIn="Calendar actions, admin filters, profile menus, compact controls, and export boards."
       demo={<DropdownFamilyStage mode="demo" settings={settings} />}
       variants={<DropdownFamilyStage mode="variants" settings={settings} />}

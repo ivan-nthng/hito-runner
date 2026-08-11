@@ -6,6 +6,14 @@ import { HitoDsPlayground } from "@/components/hito-ds/playground";
 import { HitoButton } from "@/components/ui/button";
 import { ProductLinks } from "@/components/hito-ds/reference";
 import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
   ChoiceSelector,
   InfoWindowPreview,
   ModalWindowPreview,
@@ -89,6 +97,20 @@ export function HitoDsComponentOverlays() {
         label="Modals"
         status="Core overlay"
         statusTone="signal"
+        description={{
+          purpose:
+            "Present focused dialog and sheet workflows through shared overlay anatomy and lifecycle.",
+          useWhen:
+            "A bounded task, decision, or mobile navigation surface must temporarily sit above the current context.",
+          avoidWhen:
+            "Inline disclosure, ordinary navigation, or route content can preserve context more simply.",
+          accessibility:
+            "Trigger naming, initial focus, focus trap and restoration, Escape, labelled title and description, scroll ownership, and destructive state remain wrapper-owned.",
+        }}
+        anchors={[
+          { id: "dialog", label: "Dialog", tab: "demo" },
+          { id: "sheet", label: "Sheet", tab: "variants" },
+        ]}
         usedIn={
           <ProductLinks
             links={[
@@ -113,6 +135,30 @@ export function HitoDsComponentOverlays() {
         }
         variants={
           <div className="grid min-w-0 gap-6">
+            <div className="border-t border-hairline pt-5">
+              <p className="hito-label">Sheet composition</p>
+              <p className="hito-caption mt-1">
+                Directional and mobile workflows reuse the shared Sheet focus and scroll owner.
+              </p>
+              <div className="mt-4">
+                <Sheet>
+                  <SheetTrigger asChild>
+                    <HitoButton size="sm" variant="secondary">
+                      Open reference Sheet
+                    </HitoButton>
+                  </SheetTrigger>
+                  <SheetContent side="right">
+                    <SheetHeader>
+                      <SheetTitle>Reference Sheet</SheetTitle>
+                      <SheetDescription>
+                        Shared focus, Escape, restoration, and directional motion remain intact.
+                      </SheetDescription>
+                    </SheetHeader>
+                  </SheetContent>
+                </Sheet>
+              </div>
+            </div>
+
             <div className="border-t border-hairline pt-5">
               <p className="hito-label">Compact info-window</p>
               <div className="mt-4">
@@ -264,6 +310,16 @@ export function HitoDsComponentOverlays() {
         label="Async action toasts"
         status="Primitive"
         statusTone="signal"
+        description={{
+          purpose:
+            "Report bounded asynchronous progress and outcomes without replacing inline validation, recovery, or persisted truth.",
+          useWhen:
+            "A user-triggered operation needs concise global working, success, error, or information feedback.",
+          avoidWhen:
+            "The message is required to continue, belongs beside a field, or needs durable route-level recovery guidance.",
+          accessibility:
+            "Announcements remain concise and timely; working state, completion, errors, dismissal, and paired button state never rely on motion or tone alone.",
+        }}
         usedIn="Global progress and outcome feedback for bounded async actions."
         demo={
           <div className="grid min-w-0 gap-4">

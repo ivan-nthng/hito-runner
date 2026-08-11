@@ -2,24 +2,28 @@ import { useState } from "react";
 import { DropdownFamilyPlayground } from "@/components/hito-ds/dropdown-family-playground";
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
 import { HitoButton } from "@/components/ui/button";
+import { HitoLogo, HitoLogoMark } from "@/components/ui/hito-logo";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ProductLinks } from "@/components/hito-ds/reference";
 import { ChoiceSelector, MenuRow, ToggleRow } from "@/components/hito-ds/specimen-previews";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 
 const ROW_DENSITIES = ["standard", "compact"] as const;
-const SHELL_CONTEXTS = ["runner", "admin"] as const;
 type RowDensity = (typeof ROW_DENSITIES)[number];
-type ShellContext = (typeof SHELL_CONTEXTS)[number];
 
 export function HitoDsComponentStructure() {
   const [rowDensity, setRowDensity] = useState<RowDensity>("standard");
   const [rowIcon, setRowIcon] = useState(true);
   const [rowMeta, setRowMeta] = useState(true);
   const [rowDisclosure, setRowDisclosure] = useState(true);
-  const [shellContext, setShellContext] = useState<ShellContext>("runner");
   const [shellProfileMeta, setShellProfileMeta] = useState(true);
-  const [shellUtilityRows, setShellUtilityRows] = useState(true);
+  const [shellNotice, setShellNotice] = useState(true);
 
   return (
     <>
@@ -28,6 +32,15 @@ export function HitoDsComponentStructure() {
         label="Rows & disclosure"
         status="Pattern"
         statusTone="signal"
+        description={{
+          purpose:
+            "Organize concise titles, helper copy, metadata, metrics, and optional disclosure in one scan-friendly row grammar.",
+          useWhen: "Related objects or settings need repeated alignment and a clear reading order.",
+          avoidWhen:
+            "Dense tabular comparison or a route-level content hierarchy is the real owner.",
+          accessibility:
+            "Interactive rows use the appropriate link, button, or disclosure semantics; disabled, focus, summary, and expanded state remain explicit.",
+        }}
         usedIn={
           <ProductLinks
             links={[
@@ -202,158 +215,224 @@ export function HitoDsComponentStructure() {
       />
 
       <HitoDsPlayground
-        id="shell"
-        label="Shell navigation"
+        id="app-shell"
+        label="App Shell"
         status="Pattern"
         statusTone="signal"
+        description={{
+          purpose:
+            "Compose product identity, primary navigation, profile and utility boundaries, and route content into one stable frame.",
+          useWhen:
+            "Demonstrating the current authenticated product frame around route-owned content without loading runner state.",
+          avoidWhen:
+            "A route section, card, or navigation fragment can stand alone without the whole product frame.",
+          accessibility:
+            "Landmarks, active navigation, readable identity, narrow navigation representation, focus order, and route-content ownership stay explicit.",
+        }}
         usedIn={
           <ProductLinks
             links={[
               { href: "/", label: "/" },
-              { href: "/admin/analytics", label: "/admin/analytics" },
+              { href: "/progress", label: "/progress" },
             ]}
           />
         }
         demo={
-          <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,260px)_minmax(0,1fr)]">
-            <div className="hito-surface-flat min-w-0 p-4">
-              <div className="hito-shell-nav">
-                {(shellContext === "runner"
-                  ? [
-                      { label: "Calendar", icon: "calendar", active: true },
-                      { label: "Progress", icon: "progress", active: false },
-                      { label: "Connections", icon: "connections", active: false },
-                    ]
-                  : [
-                      { label: "Overview", icon: "progress", active: true },
-                      { label: "Work items", icon: "file-text", active: false },
-                      { label: "Users", icon: "user", active: false },
-                    ]
-                ).map(({ label, icon, active }) => (
-                  <div key={label} className="hito-shell-nav-row min-w-0" data-active={active}>
-                    <Icon name={icon as HitoIconName} className="hito-shell-nav-icon" />
-                    <span className="truncate">{label}</span>
-                    {active && <span className="hito-shell-nav-dot" />}
-                  </div>
-                ))}
+          <div className="hito-ds-app-shell-frame" data-context="runner">
+            <aside className="hito-ds-app-shell-sidebar" aria-label="Contained shell navigation">
+              <div>
+                <HitoLogo className="[--hito-logo-height:1.25rem]" />
+                <p className="hito-shell-brand-kicker">Runner</p>
               </div>
-            </div>
-            <div className="grid min-w-0 gap-4">
-              <button
-                type="button"
-                className="hito-surface-quiet hito-shell-profile-trigger min-w-0"
-                data-hito-ds-pattern="quiet-surface"
-              >
-                <span className="hito-shell-avatar-fallback h-9 w-9 rounded-full">
-                  {shellContext === "runner" ? "IR" : "AD"}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="hito-menu-text block truncate">
-                    {shellContext === "runner" ? "Ivan" : "Admin"}
-                  </span>
-                  {shellProfileMeta && (
-                    <span className="hito-menu-meta block truncate">
-                      {shellContext === "runner" ? "Half Marathon Plan" : "Admin workspace"}
+              <nav className="hito-shell-nav" aria-label="Runner destinations">
+                {[
+                  { label: "Calendar", icon: "calendar", href: "/", active: true },
+                  { label: "Progress", icon: "progress", href: "/progress", active: false },
+                ].map(({ label, icon, href, active }) => (
+                  <a
+                    key={label}
+                    href={href}
+                    className="hito-shell-nav-row min-w-0"
+                    data-active={active}
+                    aria-current={active ? "page" : undefined}
+                  >
+                    <Icon name={icon as HitoIconName} className="hito-shell-nav-icon" decorative />
+                    <span className="truncate">{label}</span>
+                    {active && <span className="hito-shell-nav-dot" aria-hidden="true" />}
+                  </a>
+                ))}
+              </nav>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="hito-surface-quiet hito-shell-profile-trigger mt-auto min-w-0"
+                    data-hito-ds-pattern="quiet-surface"
+                  >
+                    <span className="hito-shell-avatar-fallback h-9 w-9 rounded-full">PR</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="hito-menu-text block truncate">Preview runner</span>
+                      {shellProfileMeta ? (
+                        <span className="hito-menu-meta block truncate">Reference only</span>
+                      ) : null}
                     </span>
-                  )}
-                </span>
-                <Icon name="chevron-down" size="sm" className="shrink-0 text-muted-foreground" />
-              </button>
-              {shellUtilityRows && (
-                <div className="hito-row-group min-w-0">
-                  <MenuRow icon="import" label="Advanced import" meta="Plan file" />
-                  <MenuRow icon="settings" label="User settings" meta="Preferences" />
-                  <MenuRow icon="connections" label="Connections" meta="Connected apps" />
+                    <Icon
+                      name="chevron-down"
+                      size="sm"
+                      className="shrink-0 text-muted-foreground"
+                    />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem asChild>
+                    <a href="/settings">
+                      <Icon name="settings" size="sm" decorative />
+                      Profile &amp; heart rate
+                    </a>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <a href="/integrations">
+                      <Icon name="connections" size="sm" decorative />
+                      Connections
+                    </a>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </aside>
+
+            <section className="hito-ds-app-shell-content" aria-label="Contained route content">
+              <header className="flex min-w-0 flex-wrap items-start justify-between gap-4 border-b border-hairline pb-4">
+                <div className="min-w-0">
+                  <p className="hito-label hito-label-signal">Training</p>
+                  <h3 className="hito-panel-title mt-2">Training week</h3>
+                  <p className="hito-support-copy mt-2">
+                    Route content owns this hierarchy; App Shell owns the stable frame around it.
+                  </p>
                 </div>
-              )}
-            </div>
+                <span className="hito-status-pill" data-tone="signal">
+                  Contained specimen
+                </span>
+              </header>
+
+              {shellNotice ? (
+                <div className="hito-state-surface py-3" data-tone="signal" role="status">
+                  <p className="hito-list-row-title">Reference notice</p>
+                  <p className="hito-list-row-copy">
+                    Existing notice surfaces compose inside route content, not in shell navigation.
+                  </p>
+                </div>
+              ) : null}
+
+              <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+                <article className="hito-surface-flat min-w-0 p-4">
+                  <p className="hito-micro-label">Primary content</p>
+                  <p className="hito-list-row-title mt-2">Current focus</p>
+                  <p className="hito-list-row-copy mt-1">
+                    One route-owned object leads the reading order.
+                  </p>
+                </article>
+                <article className="hito-surface-flat min-w-0 p-4">
+                  <p className="hito-micro-label">Supporting content</p>
+                  <p className="hito-list-row-title mt-2">Next action</p>
+                  <p className="hito-list-row-copy mt-1">
+                    Secondary information stays inside the content region.
+                  </p>
+                </article>
+              </div>
+            </section>
           </div>
         }
         variants={
           <div className="grid min-w-0 gap-6">
             <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Runner and admin shell contexts</p>
+              <p className="hito-label">Narrow shell representation</p>
               <p className="hito-caption mt-1">
-                Context changes labels and destination meaning, but keeps the same shell row, active
-                dot, profile trigger, and menu-row anatomy.
+                The same identity, current location, and navigation boundary reflow without scaling
+                desktop geometry or inventing authenticated behavior.
               </p>
-              <div className="mt-4 grid min-w-0 gap-5 xl:grid-cols-2">
-                {(["runner", "admin"] as const).map((context) => (
-                  <div key={context} className="hito-surface-flat min-w-0 p-4">
-                    <p className="hito-label mb-4 capitalize">{context}</p>
-                    <div className="hito-shell-nav">
-                      {(context === "runner"
-                        ? [
-                            { label: "Calendar", icon: "calendar", active: true },
-                            { label: "Progress", icon: "progress", active: false },
-                          ]
-                        : [
-                            { label: "Overview", icon: "progress", active: true },
-                            { label: "Work items", icon: "file-text", active: false },
-                          ]
-                      ).map(({ label, icon, active }) => (
-                        <div
-                          key={label}
-                          className="hito-shell-nav-row min-w-0"
-                          data-active={active}
-                        >
-                          <Icon name={icon as HitoIconName} className="hito-shell-nav-icon" />
-                          <span className="truncate">{label}</span>
-                          {active && <span className="hito-shell-nav-dot" />}
-                        </div>
-                      ))}
+              <div className="hito-ds-app-shell-narrow mt-4">
+                <div className="flex min-w-0 items-center justify-between gap-3 border-b border-hairline p-4">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <HitoLogoMark decorative className="[--hito-logo-height:1.45rem]" />
+                    <div className="min-w-0">
+                      <p className="hito-menu-text truncate">Hito</p>
+                      <p className="hito-menu-meta truncate">Calendar</p>
                     </div>
                   </div>
-                ))}
+                  <HitoButton
+                    asChild
+                    iconOnly
+                    size="sm"
+                    variant="ghost"
+                    className="hito-surface-quiet hito-shell-profile-trigger"
+                    data-hito-ds-pattern="quiet-surface"
+                    aria-label="Open profile and heart-rate settings"
+                  >
+                    <a href="/settings">
+                      <Icon name="settings" size="sm" decorative />
+                    </a>
+                  </HitoButton>
+                </div>
+                <div className="grid min-w-0 gap-4 p-4">
+                  <div>
+                    <p className="hito-label hito-label-signal">Route content</p>
+                    <p className="hito-panel-title mt-2">Readable at narrow width</p>
+                  </div>
+                  {shellNotice ? (
+                    <div className="hito-state-surface py-3" data-tone="signal">
+                      <p className="hito-list-row-copy">Notice remains inside route content.</p>
+                    </div>
+                  ) : null}
+                </div>
+                <nav className="hito-shell-mobile-nav" aria-label="Contained narrow navigation">
+                  {[
+                    { label: "Calendar", icon: "calendar", href: "/", active: true },
+                    { label: "Progress", icon: "progress", href: "/progress", active: false },
+                  ].map(({ label, icon, href, active }) => (
+                    <a
+                      key={label}
+                      href={href}
+                      className="hito-shell-mobile-row"
+                      data-active={active}
+                      aria-current={active ? "page" : undefined}
+                    >
+                      <Icon
+                        name={icon as HitoIconName}
+                        className="hito-shell-nav-icon"
+                        decorative
+                      />
+                      {label}
+                    </a>
+                  ))}
+                </nav>
               </div>
             </div>
 
             <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Profile and utility rows</p>
+              <p className="hito-label">Ownership boundary</p>
               <p className="hito-caption mt-1">
-                The profile trigger and utility rows use menu typography and quiet metadata, not
-                duplicated page identity.
+                App Shell owns identity, primary navigation, profile/utility placement, and the
+                content frame. Route modules own headings, state surfaces, data, and actions.
               </p>
-              <div className="mt-4 grid min-w-0 gap-4 xl:grid-cols-2">
-                <button
-                  type="button"
-                  className="hito-surface-quiet hito-shell-profile-trigger min-w-0"
-                  data-hito-ds-pattern="quiet-surface"
-                >
-                  <span className="hito-shell-avatar-fallback h-9 w-9 rounded-full">IR</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="hito-menu-text block truncate">Ivan</span>
-                    <span className="hito-menu-meta block truncate">Manual plan</span>
-                  </span>
-                  <Icon name="chevron-down" size="sm" className="shrink-0 text-muted-foreground" />
-                </button>
-                <div className="hito-row-group min-w-0">
-                  <MenuRow icon="settings" label="Account settings" meta="Profile" />
-                  <MenuRow icon="logout" label="Sign out" meta="Account" />
-                </div>
+              <div className="hito-row-group mt-4 min-w-0">
+                <MenuRow icon="calendar" label="Primary navigation" meta="Shell" />
+                <MenuRow icon="user" label="Profile boundary" meta="Shell" />
+                <MenuRow icon="file-text" label="Page hierarchy" meta="Route content" />
               </div>
             </div>
           </div>
         }
         controls={
           <div className="hito-row-group border-0">
-            <div className="hito-list-row items-start">
-              <ChoiceSelector
-                label="Context"
-                value={shellContext}
-                options={SHELL_CONTEXTS}
-                onChange={setShellContext}
-              />
-            </div>
             <ToggleRow
               label="Profile meta"
               active={shellProfileMeta}
               onToggle={() => setShellProfileMeta((v) => !v)}
             />
             <ToggleRow
-              label="Utility rows"
-              active={shellUtilityRows}
-              onToggle={() => setShellUtilityRows((v) => !v)}
+              label="Notice surface"
+              active={shellNotice}
+              onToggle={() => setShellNotice((v) => !v)}
             />
           </div>
         }

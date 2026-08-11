@@ -439,7 +439,7 @@ function AdminCapturePage() {
   };
 
   return (
-    <main className="min-h-screen bg-background text-foreground hito-canvas-atmosphere">
+    <main className="min-h-screen bg-background text-foreground">
       <div className="hito-workbench-shell hito-workbench-shell-compact-sidebar">
         <AdminWorkspaceSidebar activeSection="work-items" />
 
@@ -505,7 +505,7 @@ function AdminCapturePage() {
 
 function CapturePendingState() {
   return (
-    <main className="min-h-screen bg-background text-foreground hito-canvas-atmosphere">
+    <main className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex min-h-screen max-w-3xl items-center px-6">
         <section className="hito-state-surface w-full">
           <p className="hito-label">Loading work items...</p>

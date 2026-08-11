@@ -2,7 +2,7 @@
 export const HITO_DS_MANIFEST = {
   schemaVersion: 1,
   direction: "code-to-figma",
-  sourceDigest: "sha256:75758e79d23e6cb3eb8f48fec30009ecb2915854bcd22923f2b4e414433683c4",
+  sourceDigest: "sha256:a44db5d89e3ddf68ed28f39a1b619a81c5c5955545628b3e85bb21833efda9fa",
   sourceOfTruth: {
     tokens: "src/styles/foundations.css",
     typography: "src/lib/hito-typography-roles.ts",
@@ -26,11 +26,9 @@ export const HITO_DS_MANIFEST = {
       { id: "stone-850", cssVariable: "--stone-850", value: "oklch(0.19 0.005 60)", alias: null },
       { id: "stone-825", cssVariable: "--stone-825", value: "oklch(0.21 0.006 60)", alias: null },
       { id: "stone-800", cssVariable: "--stone-800", value: "oklch(0.22 0.006 60)", alias: null },
-      { id: "stone-750", cssVariable: "--stone-750", value: "oklch(0.24 0.006 60)", alias: null },
       { id: "stone-700", cssVariable: "--stone-700", value: "oklch(0.26 0.008 60)", alias: null },
       { id: "sand-50", cssVariable: "--sand-50", value: "oklch(0.98 0.005 80)", alias: null },
       { id: "sand-100", cssVariable: "--sand-100", value: "oklch(0.96 0.005 80)", alias: null },
-      { id: "sand-200", cssVariable: "--sand-200", value: "oklch(0.92 0.005 80)", alias: null },
       { id: "sand-500", cssVariable: "--sand-500", value: "oklch(0.62 0.01 70)", alias: null },
       {
         id: "sand-alpha-06",
@@ -69,7 +67,6 @@ export const HITO_DS_MANIFEST = {
       { id: "linen-220", cssVariable: "--linen-220", value: "oklch(0.912 0.014 74)", alias: null },
       { id: "ink-950", cssVariable: "--ink-950", value: "oklch(0.14 0.006 58)", alias: null },
       { id: "ink-900", cssVariable: "--ink-900", value: "oklch(0.18 0.01 60)", alias: null },
-      { id: "ink-800", cssVariable: "--ink-800", value: "oklch(0.24 0.012 64)", alias: null },
       { id: "taupe-650", cssVariable: "--taupe-650", value: "oklch(0.4 0.014 62)", alias: null },
       {
         id: "taupe-alpha-32",
@@ -169,22 +166,6 @@ export const HITO_DS_MANIFEST = {
         modes: {
           dark: { value: "var(--background)", alias: "background" },
           light: { value: "var(--linen-50)", alias: "linen-50" },
-        },
-      },
-      {
-        id: "secondary",
-        cssVariable: "--secondary",
-        modes: {
-          dark: { value: "var(--stone-750)", alias: "stone-750" },
-          light: { value: "var(--linen-180)", alias: "linen-180" },
-        },
-      },
-      {
-        id: "secondary-foreground",
-        cssVariable: "--secondary-foreground",
-        modes: {
-          dark: { value: "var(--sand-200)", alias: "sand-200" },
-          light: { value: "var(--ink-800)", alias: "ink-800" },
         },
       },
       {
@@ -321,6 +302,130 @@ export const HITO_DS_MANIFEST = {
         modes: {
           dark: { value: "var(--stone-950)", alias: "stone-950" },
           light: { value: "var(--linen-50)", alias: "linen-50" },
+        },
+      },
+      {
+        id: "chrome-clear",
+        cssVariable: "--chrome-clear",
+        modes: {
+          dark: { value: "transparent", alias: null },
+          light: { value: "transparent", alias: null },
+        },
+      },
+      {
+        id: "chrome-subtle",
+        cssVariable: "--chrome-subtle",
+        modes: {
+          dark: { value: "color-mix(in oklch, var(--foreground) 8%, transparent)", alias: null },
+          light: { value: "color-mix(in oklch, var(--foreground) 8%, transparent)", alias: null },
+        },
+      },
+      {
+        id: "chrome-standard",
+        cssVariable: "--chrome-standard",
+        modes: {
+          dark: { value: "color-mix(in oklch, var(--foreground) 12%, transparent)", alias: null },
+          light: { value: "color-mix(in oklch, var(--foreground) 12%, transparent)", alias: null },
+        },
+      },
+      {
+        id: "chrome-strong",
+        cssVariable: "--chrome-strong",
+        modes: {
+          dark: { value: "color-mix(in oklch, var(--foreground) 16%, transparent)", alias: null },
+          light: { value: "color-mix(in oklch, var(--foreground) 16%, transparent)", alias: null },
+        },
+      },
+      {
+        id: "chrome-edge-default",
+        cssVariable: "--chrome-edge-default",
+        modes: {
+          dark: { value: "color-mix(in oklch, var(--foreground) 16%, transparent)", alias: null },
+          light: { value: "color-mix(in oklch, var(--foreground) 16%, transparent)", alias: null },
+        },
+      },
+      {
+        id: "chrome-edge-emphasis",
+        cssVariable: "--chrome-edge-emphasis",
+        modes: {
+          dark: { value: "color-mix(in oklch, var(--foreground) 32%, transparent)", alias: null },
+          light: { value: "color-mix(in oklch, var(--foreground) 32%, transparent)", alias: null },
+        },
+      },
+      {
+        id: "text-secondary",
+        cssVariable: "--text-secondary",
+        modes: {
+          dark: { value: "color-mix(in oklch, var(--foreground) 75%, transparent)", alias: null },
+          light: { value: "color-mix(in oklch, var(--foreground) 75%, transparent)", alias: null },
+        },
+      },
+      {
+        id: "text-tertiary",
+        cssVariable: "--text-tertiary",
+        modes: {
+          dark: { value: "color-mix(in oklch, var(--foreground) 60%, transparent)", alias: null },
+          light: { value: "color-mix(in oklch, var(--foreground) 60%, transparent)", alias: null },
+        },
+      },
+      {
+        id: "text-disabled",
+        cssVariable: "--text-disabled",
+        modes: {
+          dark: { value: "color-mix(in oklch, var(--foreground) 40%, transparent)", alias: null },
+          light: { value: "color-mix(in oklch, var(--foreground) 40%, transparent)", alias: null },
+        },
+      },
+      {
+        id: "text-accent",
+        cssVariable: "--text-accent",
+        modes: {
+          dark: {
+            value: "color-mix(in oklch, var(--signal) 50%, var(--foreground) 50%)",
+            alias: null,
+          },
+          light: {
+            value: "color-mix(in oklch, var(--signal) 50%, var(--foreground) 50%)",
+            alias: null,
+          },
+        },
+      },
+      {
+        id: "text-positive",
+        cssVariable: "--text-positive",
+        modes: {
+          dark: { value: "var(--success)", alias: "success" },
+          light: { value: "var(--success)", alias: "success" },
+        },
+      },
+      {
+        id: "text-negative",
+        cssVariable: "--text-negative",
+        modes: {
+          dark: {
+            value: "color-mix(in oklch, var(--destructive) 80%, var(--foreground) 20%)",
+            alias: null,
+          },
+          light: {
+            value: "color-mix(in oklch, var(--destructive) 80%, var(--foreground) 20%)",
+            alias: null,
+          },
+        },
+      },
+      {
+        id: "text-informative",
+        cssVariable: "--text-informative",
+        modes: {
+          dark: { value: "var(--info)", alias: "info" },
+          light: { value: "var(--info)", alias: "info" },
+        },
+      },
+      {
+        id: "text-warning",
+        cssVariable: "--text-warning",
+        modes: {
+          dark: { value: "var(--warn)", alias: "warn" },
+          light: { value: "var(--warn)", alias: "warn" },
         },
       },
     ],

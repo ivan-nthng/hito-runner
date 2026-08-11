@@ -2,25 +2,23 @@ import {
   HeartRateProfileSection,
   type HeartRateProfileDraftState,
 } from "@/components/settings/HeartRateProfileSection";
-import { HitoButton } from "@/components/ui/button";
+import type { HeartRateZonesSummary } from "@/lib/heart-rate-zones";
 import type { UserSettingsSummary } from "@/lib/user-settings-actions";
 
 export function OnboardingRunnerHeartRateProfile({
-  canPrepare,
   onClearError,
   error,
   isSaving,
   onDraftStateChange,
-  onPrepare,
+  onRecommendedApplied,
   recommendedAge,
   summary,
 }: {
-  canPrepare: boolean;
   error: string | null;
   isSaving: boolean;
   onClearError: () => void;
   onDraftStateChange: (state: HeartRateProfileDraftState) => void;
-  onPrepare: () => Promise<boolean>;
+  onRecommendedApplied: (summary: HeartRateZonesSummary) => void;
   recommendedAge: number | null;
   summary: UserSettingsSummary["heartRateZones"] | null;
 }) {
@@ -32,28 +30,17 @@ export function OnboardingRunnerHeartRateProfile({
           isSaving={isSaving}
           onClearError={onClearError}
           onDraftStateChange={onDraftStateChange}
+          onRecommendedApplied={onRecommendedApplied}
           recommendedAge={recommendedAge}
           summary={summary}
         />
       ) : (
         <div className="hito-state-surface" data-tone="signal">
-          <p className="hito-list-row-title">Review your BPM guidance before plan creation</p>
+          <p className="hito-list-row-title">Complete your runner baseline</p>
           <p className="hito-list-row-copy">
-            Save these baseline facts to load estimated starting ranges. This saves only your runner
-            profile and does not create a plan.
+            Estimated BPM guidance appears automatically when the required profile facts are valid.
+            The estimate itself is age-based.
           </p>
-          <div className="hito-state-actions">
-            <HitoButton
-              type="button"
-              size="md"
-              variant="secondary"
-              disabled={!canPrepare || isSaving}
-              loading={isSaving}
-              onClick={() => void onPrepare()}
-            >
-              {isSaving ? "Saving baseline..." : "Show BPM guidance"}
-            </HitoButton>
-          </div>
         </div>
       )}
 

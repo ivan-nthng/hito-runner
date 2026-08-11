@@ -1,12 +1,11 @@
 import { useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { EditableSelectValueField, EditableValueField } from "@/components/ui/editable-value-field";
 import { HitoEditableDateField } from "@/components/ui/hito-date-time-input";
+import { HitoSlider } from "@/components/ui/hito-slider";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
-import { OptionButton, OptionGrid } from "./onboarding-choice-controls";
 import {
   PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS,
   normalizePresetPrimaryFitnessLevel,
-  type PresetPrimaryFitnessLevel,
   type StructuredConstructorState,
   type WeekdayName,
 } from "./onboarding-form-model";
@@ -37,13 +36,6 @@ type QuickSetupPlanSetupSectionsProps = {
   firstSectionHasDivider?: boolean;
 };
 
-const RUNNING_LEVEL_HELPER: Record<PresetPrimaryFitnessLevel, string> = {
-  new_to_running: "Start gently and build the habit first.",
-  beginner: "Build a steady base with manageable structure.",
-  running_regularly: "Use your current rhythm to build toward a goal.",
-  performance_focused: "Add more structured quality when the plan supports it.",
-};
-
 const RECENT_5K_TIME_OPTIONS = [
   { value: "", label: "No recent 5K" },
   ...Array.from({ length: 111 }, (_, index) => {
@@ -69,6 +61,13 @@ export function QuickSetupPlanSetupSections({
 }: QuickSetupPlanSetupSectionsProps) {
   const [activeEditableKey, setActiveEditableKey] = useState<QuickSetupEditableKey | null>(null);
   const primaryFitnessLevel = normalizePresetPrimaryFitnessLevel(state.fitnessLevel);
+  const runningLevelIndex = Math.max(
+    PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS.findIndex(
+      (option) => option.value === primaryFitnessLevel,
+    ),
+    0,
+  );
+  const runningLevelOption = PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS[runningLevelIndex]!;
   let sectionNumber = firstSectionNumber;
   let hasRenderedSection = false;
   const nextSectionMeta = () => {
@@ -142,26 +141,22 @@ export function QuickSetupPlanSetupSections({
           title="Running level"
           body="Choose the closest current rhythm."
         >
-          <div className="grid gap-3">
-            <OptionGrid
-              label="Running level"
-              items={PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS}
-              value={primaryFitnessLevel}
-            >
-              {PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS.map((option) => (
-                <OptionButton
-                  key={option.value}
-                  active={primaryFitnessLevel === option.value}
-                  value={option.value}
-                  label={option.label}
-                  onClick={() => {
-                    setState.setFitnessLevel(option.value);
-                  }}
-                />
-              ))}
-            </OptionGrid>
-            <p className="hito-field-helper">{RUNNING_LEVEL_HELPER[primaryFitnessLevel]}</p>
-          </div>
+          <HitoSlider
+            label="Running level"
+            min={0}
+            max={PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS.length - 1}
+            step={1}
+            value={runningLevelIndex}
+            valueLabel={runningLevelOption.label}
+            ariaValueText={runningLevelOption.label}
+            minLabel=""
+            maxLabel=""
+            markers={[1, 2]}
+            onValueChange={(value) => {
+              const option = PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS[value];
+              if (option) setState.setFitnessLevel(option.value);
+            }}
+          />
         </QuickSetupSection>
       ) : null}
 

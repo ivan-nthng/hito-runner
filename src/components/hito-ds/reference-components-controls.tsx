@@ -37,7 +37,7 @@ import { useHitoTabs } from "@/components/ui/hito-tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
 import { EditableValueFieldSandbox } from "@/components/hito-ds/editable-value-field-sandbox";
-import { ProductLinks, ReferenceListRow, SectionIntro } from "@/components/hito-ds/reference";
+import { ProductLinks, ReferenceListRow } from "@/components/hito-ds/reference";
 import {
   ChoiceSelector,
   DataTableSpecimenPreview,
@@ -89,7 +89,30 @@ type DataTableSortDirection = (typeof DATA_TABLE_SORT_DIRECTIONS)[number];
 type FieldSize = HitoFieldSize;
 type TabDemoValue = "plan" | "progress" | "updates" | "archived";
 
-export function HitoDsComponentControls() {
+const TAB_ITEMS = [
+  { value: "plan", icon: "calendar" },
+  { value: "progress", icon: "progress" },
+  { value: "updates", icon: null },
+  { value: "archived", icon: null },
+] as const;
+
+const BUTTON_STATE_CASES = [
+  { id: "default", includeConfiguredIcons: true, props: {} },
+  { id: "hover", includeConfiguredIcons: true, props: { demoState: "hover" } },
+  { id: "active", includeConfiguredIcons: true, props: { demoState: "active" } },
+  { id: "focus", includeConfiguredIcons: true, props: { demoState: "focus" } },
+  { id: "disabled", includeConfiguredIcons: true, props: { disabled: true } },
+  { id: "loading", includeConfiguredIcons: false, props: { loading: true, disabled: true } },
+  { id: "success", includeConfiguredIcons: false, props: { motionState: "success" } },
+  { id: "error", includeConfiguredIcons: false, props: { motionState: "error" } },
+  {
+    id: "timed-progress",
+    includeConfiguredIcons: false,
+    props: { motionState: "timed-progress", progress: 0.64 },
+  },
+] as const;
+
+function ButtonPlayground() {
   const [variant, setVariant] = useState<ButtonVariant>("primary");
   const [buttonTone, setButtonTone] = useState<ButtonTone>("default");
   const [size, setSize] = useState<ButtonSize>("lg");
@@ -97,54 +120,6 @@ export function HitoDsComponentControls() {
   const [rightIcon, setRightIcon] = useState(true);
   const [buttonMotionState, setButtonMotionState] = useState<ButtonMotionState>("default");
   const [buttonProgress, setButtonProgress] = useState<ButtonProgressValue>("75%");
-  const [inputVariant, setInputVariant] = useState<InputVariant>("primary");
-  const [inputSize, setInputSize] = useState<FieldSize>("md");
-  const [inputLeftIcon, setInputLeftIcon] = useState(true);
-  const [inputRightIcon, setInputRightIcon] = useState(false);
-  const [inputState, setInputState] = useState<InputState>("default");
-  const [inputFeedback, setInputFeedback] = useState<InputFeedback>("neutral");
-  const [dualRangeValue, setDualRangeValue] = useState<readonly [number, number]>([124, 156]);
-  const [compoundRangeValue, setCompoundRangeValue] = useState<readonly [string, string]>([
-    "124",
-    "156",
-  ]);
-  const [dateFieldDemo, setDateFieldDemo] = useState("2026-12-11");
-  const [editableDateDemo, setEditableDateDemo] = useState("");
-  const [boundedDateDemo, setBoundedDateDemo] = useState("2026-05-29");
-  const [timeFieldDemo, setTimeFieldDemo] = useState("3:50:00");
-  const [nativeSelectDemo, setNativeSelectDemo] = useState("easy");
-  const [tabStyle, setTabStyle] = useState<TabStyle>("simple");
-  const [tabIcon, setTabIcon] = useState(true);
-  const [tabBadge, setTabBadge] = useState(true);
-  const [tabDot, setTabDot] = useState(true);
-  const [tabDisabled, setTabDisabled] = useState(true);
-  const [tabDemoValue, setTabDemoValue] = useState<TabDemoValue>("plan");
-  const tabDemo = useHitoTabs({
-    items: [
-      { value: "plan" },
-      { value: "progress" },
-      { value: "updates" },
-      { value: "archived", disabled: tabDisabled },
-    ],
-    value: tabDemoValue,
-  });
-  const [statusTone, setStatusTone] = useState<StatusTone>("signal");
-  const [statusLongLabel, setStatusLongLabel] = useState(false);
-  const [metadataState, setMetadataState] = useState("reviewed");
-  const [selectionKind, setSelectionKind] = useState<SelectionControlKind>("toggle");
-  const [selectionSize, setSelectionSize] = useState<ChoiceToggleSize>("sm");
-  const [selectionSelected, setSelectionSelected] = useState(true);
-  const [selectionDisabled, setSelectionDisabled] = useState(false);
-  const [selectionInvalid, setSelectionInvalid] = useState(false);
-  const [selectionFocusDemo, setSelectionFocusDemo] = useState(false);
-  const [selectionCardMode, setSelectionCardMode] = useState(false);
-  const [dataTableSortable, setDataTableSortable] = useState(true);
-  const [dataTableActiveSort, setDataTableActiveSort] = useState(true);
-  const [dataTableSortDirection, setDataTableSortDirection] =
-    useState<DataTableSortDirection>("asc");
-  const [dataTableFiltered, setDataTableFiltered] = useState(true);
-  const [dataTableStaticMode, setDataTableStaticMode] = useState(false);
-  const [dataTableUtilityRow, setDataTableUtilityRow] = useState(true);
 
   return (
     <>
@@ -153,6 +128,20 @@ export function HitoDsComponentControls() {
         label="Buttons"
         status="Core control"
         statusTone="signal"
+        description={{
+          purpose:
+            "Express primary, secondary, compact, semantic, and progress-bearing actions through one canonical control family.",
+          useWhen:
+            "A user can trigger a concrete action, submit a decision, or open an owned interactive surface.",
+          avoidWhen:
+            "The destination is ordinary navigation or the content is display-only status.",
+          accessibility:
+            "Use native button semantics, an accessible name for icon-only actions, visible focus, and truthful disabled or loading state.",
+        }}
+        anchors={[
+          { id: "button-group", label: "Grouped Buttons", tab: "variants" },
+          { id: "icon-only-button", label: "Icon-only Button", tab: "variants" },
+        ]}
         usedIn={
           <ProductLinks
             links={[
@@ -179,60 +168,40 @@ export function HitoDsComponentControls() {
         variants={
           <div className="grid gap-6" inert>
             <div className="border-t border-hairline pt-5">
+              <p className="hito-label">Grouped action composition</p>
+              <p className="hito-caption mt-1 max-w-2xl">
+                Responsive action groups compose canonical Buttons without adding a connected
+                ButtonGroup API.
+              </p>
+              <div className="mt-4 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+                <HitoButton size="md" variant="secondary" className="w-full sm:w-auto">
+                  Previous week
+                </HitoButton>
+                <HitoButton size="md" variant="outlined" className="w-full sm:w-auto">
+                  Today
+                </HitoButton>
+                <HitoButton size="md" variant="primary" className="w-full sm:w-auto">
+                  Next week
+                </HitoButton>
+              </div>
+            </div>
+            <div className="border-t border-hairline pt-5">
               <p className="hito-label">State matrix</p>
               <p className="hito-caption mt-1">
                 Follows the selected variant, tone, size, and icon rhythm.
               </p>
               <div className="mt-4 flex flex-wrap items-center gap-3">
-                <DemoButton
-                  variant={variant}
-                  tone={buttonTone}
-                  size={size}
-                  leftIcon={leftIcon}
-                  rightIcon={rightIcon}
-                />
-                <DemoButton
-                  variant={variant}
-                  tone={buttonTone}
-                  size={size}
-                  leftIcon={leftIcon}
-                  rightIcon={rightIcon}
-                  demoState="hover"
-                />
-                <DemoButton
-                  variant={variant}
-                  tone={buttonTone}
-                  size={size}
-                  leftIcon={leftIcon}
-                  rightIcon={rightIcon}
-                  demoState="active"
-                />
-                <DemoButton
-                  variant={variant}
-                  tone={buttonTone}
-                  size={size}
-                  leftIcon={leftIcon}
-                  rightIcon={rightIcon}
-                  demoState="focus"
-                />
-                <DemoButton
-                  variant={variant}
-                  tone={buttonTone}
-                  size={size}
-                  leftIcon={leftIcon}
-                  rightIcon={rightIcon}
-                  disabled
-                />
-                <DemoButton variant={variant} tone={buttonTone} size={size} loading disabled />
-                <DemoButton variant={variant} tone={buttonTone} size={size} motionState="success" />
-                <DemoButton variant={variant} tone={buttonTone} size={size} motionState="error" />
-                <DemoButton
-                  variant={variant}
-                  tone={buttonTone}
-                  size={size}
-                  motionState="timed-progress"
-                  progress={0.64}
-                />
+                {BUTTON_STATE_CASES.map(({ id, includeConfiguredIcons, props }) => (
+                  <DemoButton
+                    key={id}
+                    variant={variant}
+                    tone={buttonTone}
+                    size={size}
+                    leftIcon={includeConfiguredIcons ? leftIcon : undefined}
+                    rightIcon={includeConfiguredIcons ? rightIcon : undefined}
+                    {...props}
+                  />
+                ))}
               </div>
             </div>
             <div className="border-t border-hairline pt-5">
@@ -329,12 +298,41 @@ export function HitoDsComponentControls() {
           </div>
         }
       />
+    </>
+  );
+}
 
+function TabsPlayground() {
+  const [tabStyle, setTabStyle] = useState<TabStyle>("simple");
+  const [tabIcon, setTabIcon] = useState(true);
+  const [tabBadge, setTabBadge] = useState(true);
+  const [tabDot, setTabDot] = useState(true);
+  const [tabDisabled, setTabDisabled] = useState(true);
+  const [tabDemoValue, setTabDemoValue] = useState<TabDemoValue>("plan");
+  const tabDemo = useHitoTabs({
+    items: TAB_ITEMS.map(({ value }) => ({
+      value,
+      disabled: value === "archived" && tabDisabled,
+    })),
+    value: tabDemoValue,
+  });
+
+  return (
+    <>
       <HitoDsPlayground
         id="tabs"
         label="Tabs"
         status="Core control"
         statusTone="signal"
+        description={{
+          purpose:
+            "Switch between peer views while keeping one clear selected destination or panel.",
+          useWhen: "A bounded surface has a small set of equally ranked views that share context.",
+          avoidWhen:
+            "The choices are form values, sequential steps, or unrelated routes with different context.",
+          accessibility:
+            "Arrow-key, Home, End, focus, selection, disabled, and panel relationships follow the shared tab contract.",
+        }}
         usedIn={
           <ProductLinks
             links={[
@@ -354,58 +352,37 @@ export function HitoDsComponentControls() {
               {...tabDemo.tabListProps}
               aria-label="Configurable tab example"
             >
-              <button
-                type="button"
-                {...tabDemo.getTabProps("plan")}
-                className="hito-tab"
-                data-active={tabDemoValue === "plan" ? "true" : undefined}
-                onClick={() => setTabDemoValue("plan")}
-              >
-                {tabIcon && <Icon name="calendar" size="sm" className="hito-tab-icon" />}
-                Plan
-              </button>
-              <button
-                type="button"
-                {...tabDemo.getTabProps("progress")}
-                className="hito-tab"
-                data-active={tabDemoValue === "progress" ? "true" : undefined}
-                onClick={() => setTabDemoValue("progress")}
-              >
-                {tabIcon && <Icon name="progress" size="sm" className="hito-tab-icon" />}
-                Progress
-                {tabBadge && (
-                  <span className="hito-tab-badge" data-variant="count">
-                    3
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                {...tabDemo.getTabProps("updates")}
-                className="hito-tab"
-                data-active={tabDemoValue === "updates" ? "true" : undefined}
-                onClick={() => setTabDemoValue("updates")}
-              >
-                Updates
-                {tabDot && <span className="hito-tab-dot" aria-hidden="true" />}
-              </button>
-              {tabDisabled && (
-                <button
-                  type="button"
-                  {...tabDemo.getTabProps("archived")}
-                  className="hito-tab"
-                  disabled
-                >
-                  Archived
-                </button>
-              )}
+              {TAB_ITEMS.map((item) => {
+                const optional = item.value === "archived";
+
+                return optional && !tabDisabled ? null : (
+                  <button
+                    key={item.value}
+                    className="hito-tab"
+                    type="button"
+                    {...tabDemo.getTabProps(item.value)}
+                    data-active={tabDemoValue === item.value ? "true" : undefined}
+                    disabled={optional}
+                    onClick={optional ? undefined : () => setTabDemoValue(item.value)}
+                  >
+                    {tabIcon && item.icon ? (
+                      <Icon name={item.icon} size="sm" className="hito-tab-icon" />
+                    ) : null}
+                    {getTabLabel(item.value)}
+                    {tabBadge && item.value === "progress" ? (
+                      <span className="hito-tab-badge" data-variant="count">
+                        3
+                      </span>
+                    ) : null}
+                    {tabDot && item.value === "updates" ? (
+                      <span className="hito-tab-dot" aria-hidden="true" />
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
             <p className="hito-caption mt-3" {...tabDemo.getPanelProps(tabDemoValue)}>
-              {tabDemoValue === "plan"
-                ? "Plan view"
-                : tabDemoValue === "progress"
-                  ? "Progress view"
-                  : "Updates view"}
+              {getTabLabel(tabDemoValue)} view
             </p>
           </div>
         }
@@ -470,12 +447,75 @@ export function HitoDsComponentControls() {
           </div>
         }
       />
+    </>
+  );
+}
+
+export function HitoDsComponentControls() {
+  const [inputVariant, setInputVariant] = useState<InputVariant>("primary");
+  const [inputSize, setInputSize] = useState<FieldSize>("md");
+  const [inputLeftIcon, setInputLeftIcon] = useState(true);
+  const [inputRightIcon, setInputRightIcon] = useState(false);
+  const [inputState, setInputState] = useState<InputState>("default");
+  const [inputFeedback, setInputFeedback] = useState<InputFeedback>("neutral");
+  const [dualRangeValue, setDualRangeValue] = useState<readonly [number, number]>([124, 156]);
+  const [compoundRangeValue, setCompoundRangeValue] = useState<readonly [string, string]>([
+    "124",
+    "156",
+  ]);
+  const [dateFieldDemo, setDateFieldDemo] = useState("2026-12-11");
+  const [editableDateDemo, setEditableDateDemo] = useState("");
+  const [boundedDateDemo, setBoundedDateDemo] = useState("2026-05-29");
+  const [timeFieldDemo, setTimeFieldDemo] = useState("3:50:00");
+  const [nativeSelectDemo, setNativeSelectDemo] = useState("easy");
+  const [statusTone, setStatusTone] = useState<StatusTone>("signal");
+  const [statusLongLabel, setStatusLongLabel] = useState(false);
+  const [metadataState, setMetadataState] = useState("reviewed");
+  const [selectionKind, setSelectionKind] = useState<SelectionControlKind>("toggle");
+  const [selectionSize, setSelectionSize] = useState<ChoiceToggleSize>("sm");
+  const [selectionSelected, setSelectionSelected] = useState(true);
+  const [selectionDisabled, setSelectionDisabled] = useState(false);
+  const [selectionInvalid, setSelectionInvalid] = useState(false);
+  const [selectionFocusDemo, setSelectionFocusDemo] = useState(false);
+  const [selectionCardMode, setSelectionCardMode] = useState(false);
+  const [dataTableSortable, setDataTableSortable] = useState(true);
+  const [dataTableActiveSort, setDataTableActiveSort] = useState(true);
+  const [dataTableSortDirection, setDataTableSortDirection] =
+    useState<DataTableSortDirection>("asc");
+  const [dataTableFiltered, setDataTableFiltered] = useState(true);
+  const [dataTableStaticMode, setDataTableStaticMode] = useState(false);
+  const [dataTableUtilityRow, setDataTableUtilityRow] = useState(true);
+
+  return (
+    <>
+      <ButtonPlayground />
+      <TabsPlayground />
 
       <HitoDsPlayground
         id="data-table"
         label="Data table"
         status="Pattern"
         statusTone="signal"
+        description={{
+          purpose:
+            "Present operational data with a canonical toolbar, sortable or static headers, and readable row anatomy.",
+          useWhen:
+            "Users compare multiple records across stable columns and may sort, filter, or search them.",
+          avoidWhen:
+            "A short list, metric row, or mobile-first card composition communicates the same truth more clearly.",
+          accessibility:
+            "Interactive headers preserve native table semantics, aria-sort, accessible menu labels, keyboard operation, and a contained scroll region.",
+        }}
+        anchors={[
+          { id: "data-table-toolbar", label: "Toolbar", tab: "demo" },
+          {
+            id: "data-table-interactive-header",
+            label: "Interactive Column Header",
+            tab: "variants",
+          },
+          { id: "data-table-static-header", label: "Static Header", tab: "variants" },
+          { id: "data-table-row", label: "Row Anatomy", tab: "demo" },
+        ]}
         usedIn={
           <ProductLinks
             links={[
@@ -576,6 +616,23 @@ export function HitoDsComponentControls() {
         label="Inputs"
         status="Core control"
         statusTone="signal"
+        description={{
+          purpose:
+            "Collect text, selection, date, time, and bounded range values with one field rhythm and feedback contract.",
+          useWhen:
+            "A user must enter or edit a value that has an explicit label, format, and validation boundary.",
+          avoidWhen:
+            "A compact read/edit scalar belongs to Editable Value Field or the choice is a small visible selection set.",
+          accessibility:
+            "Labels, descriptions, errors, native input behavior, focus, disabled, read-only, and typed date/time feedback remain programmatically connected.",
+        }}
+        anchors={[
+          { id: "field", label: "Field", tab: "demo" },
+          { id: "native-select", label: "Native Select", tab: "variants" },
+          { id: "textarea", label: "Textarea", tab: "variants" },
+          { id: "date-field", label: "Date Field", tab: "variants" },
+          { id: "time-field", label: "Time Field", tab: "variants" },
+        ]}
         usedIn={
           <ProductLinks
             links={[
@@ -768,16 +825,10 @@ export function HitoDsComponentControls() {
                   size="sm"
                   value={dualRangeValue}
                   onMinValueChange={(value) =>
-                    setDualRangeValue(([currentMin, currentMax]) => [
-                      Math.min(value, currentMax),
-                      currentMax,
-                    ])
+                    setDualRangeValue(([, currentMax]) => [Math.min(value, currentMax), currentMax])
                   }
                   onMaxValueChange={(value) =>
-                    setDualRangeValue(([currentMin, currentMax]) => [
-                      currentMin,
-                      Math.max(value, currentMin),
-                    ])
+                    setDualRangeValue(([currentMin]) => [currentMin, Math.max(value, currentMin)])
                   }
                 />
                 <div className="flex items-center justify-between gap-3">
@@ -1019,6 +1070,19 @@ export function HitoDsComponentControls() {
         label="Status"
         status="Core feedback"
         statusTone="signal"
+        description={{
+          purpose:
+            "Communicate concise state, result, severity, or metadata without turning display truth into an action.",
+          useWhen: "A stable label, marker, or metadata tag helps scan current product truth.",
+          avoidWhen:
+            "The state needs recovery guidance, a route-level notice surface, or an interactive choice.",
+          accessibility:
+            "Meaning is carried by readable text or an accessible marker label, never by tone or icon alone.",
+        }}
+        anchors={[
+          { id: "status-marker", label: "Status Marker", tab: "variants" },
+          { id: "metadata-tag", label: "Metadata Tag", tab: "variants" },
+        ]}
         usedIn={
           <ProductLinks
             links={[
@@ -1177,6 +1241,15 @@ export function HitoDsComponentControls() {
         label="Selection controls"
         status="Core control"
         statusTone="signal"
+        description={{
+          purpose:
+            "Represent boolean, single-choice, and compact card-choice state with shared field geometry.",
+          useWhen: "Users choose one or more explicit values whose options should remain visible.",
+          avoidWhen:
+            "The option set is long, needs search, or is better served by a native select or menu.",
+          accessibility:
+            "Checkbox, radio, and switch semantics remain native or ARIA-backed with labels, keyboard behavior, focus, invalid, and disabled state.",
+        }}
         usedIn={
           <ProductLinks
             links={[
@@ -1473,6 +1546,10 @@ function getSelectionKindLabel(kind: SelectionControlKind) {
   }
 
   return kind;
+}
+
+function getTabLabel(value: TabDemoValue) {
+  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
 }
 
 function isBinarySelectionSize(size: ChoiceToggleSize): size is SelectionBinarySize {

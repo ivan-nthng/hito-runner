@@ -1,0 +1,197 @@
+ROLE: PRODUCT
+
+Task:
+Interpret and route this local Inspector batch
+
+Stage:
+PRODUCT routing / local Inspector generated batch
+
+Batch context:
+- Route: /
+- Page title: Hito Running — Weekly plan
+- Theme: dark
+- Viewport: 1470x801
+- Items: 6
+- Created: 2026-08-11T11:54:10.968Z
+- Source: local_ui_inspector_batch_v1
+- Local-only draft; no product or design-system mutation has occurred.
+
+Item 1
+- Item id: c4511a43-6a92-43dc-b7f1-9abaa390c8b3
+- Captured: 2026-08-11T11:52:45.963Z
+- Target: p.hito-micro-label
+- Target kind/tag/role: hierarchy · p · none
+- Selector: #radix-_r_f_ > div:nth-of-type(1) > div:nth-of-type(1) > div > p
+- Current text (raw): Generated plan
+- Request: Remove object
+- Comment: Not provided
+- Proposed text: Not requested
+- Scope: Only here — Change only this selected element, place, screen, or component instance.
+- Suggested owner evidence: frontend
+- Object action: Remove object at only here.
+- Prompt-only request: remove the scoped page object usage without retiring or deleting a shared DS component.
+- Token evidence and requested changes:
+  - None selected.
+- Typography request: None
+- Chrome request: None
+- Observed evidence:
+  - Element: p.
+  - Display: block; children: 0.
+  - Current text evidence: "Generated plan".
+  - Hito DS class evidence: hito-micro-label.
+  - Dimensions: width 747.6px; height 13.2px.
+  - Typography: tag p; family Poppins, ui-sans-serif, system-ui, sans-serif; font 11px; line-height 13.2px; weight 500; letter-spacing 1.98px; text-transform uppercase.
+  - Hito typography role: Micro label (hito-micro-label).
+
+Item 2
+- Item id: 0fc10638-4da1-4ca2-be04-53972c97b7e2
+- Captured: 2026-08-11T11:53:04.649Z
+- Target: radix-_r_g_
+- Target kind/tag/role: hierarchy · h2 · none
+- Selector: #radix-_r_g_
+- Current text (raw): 10K plan
+- Request: Use UI page title
+- Comment: Not provided
+- Proposed text: Not requested
+- Scope: Only here — Change only this selected element, place, screen, or component instance.
+- Suggested owner evidence: frontend
+- Token evidence and requested changes:
+  - None selected.
+- Typography request: UI modal title -> UI page title (hito-ui-page-title)
+- Chrome request: None
+- Observed evidence:
+  - Element: h2.
+  - Display: block; children: 0.
+  - Current text evidence: "10K plan".
+  - Hito DS class evidence: hito-ui-dialog-title, hito-ui-modal-title.
+  - Dimensions: width 747.6px; height 35.2px.
+  - Typography: tag h2; family Poppins, ui-sans-serif, system-ui, sans-serif; font 32px; line-height 35.2px; weight 400; letter-spacing -0.64px.
+  - Hito typography role: UI modal title (hito-ui-modal-title).
+
+Item 3
+- Item id: b72a6944-21ea-49e5-81b1-67f94d1d85c2
+- Captured: 2026-08-11T11:53:32.245Z
+- Target: p.hito-ui-section-title
+- Target kind/tag/role: text · p · none
+- Selector: p.hito-ui-section-title.min-w-0.break-words
+- Current text (raw): Starts Jun 29, 2026
+- Request: Нужно перенести под название плана.
+- Comment: Нужно перенести под название плана.
+- Proposed text: Not requested
+- Scope: Only here — Change only this selected element, place, screen, or component instance.
+- Suggested owner evidence: frontend
+- Token evidence and requested changes:
+  - None selected.
+- Typography request: None
+- Chrome request: None
+- Observed evidence:
+  - Element: p.
+  - Display: block; children: 0.
+  - Current text evidence: "Starts Jun 29, 2026".
+  - Hito DS class evidence: hito-ui-section-title.
+  - Dimensions: width 214.4px; height 27.59px.
+  - Typography: tag p; family Poppins, ui-sans-serif, system-ui, sans-serif; font 24px; line-height 27.6px; weight 400; letter-spacing -0.48px.
+  - Hito typography role: UI section title (hito-ui-section-title).
+
+Item 4
+- Item id: 563cc232-0ab2-4750-aa7c-0754575a3bf6
+- Captured: 2026-08-11T11:53:45.529Z
+- Target: radix-_r_h_
+- Target kind/tag/role: text · p · none
+- Selector: #radix-_r_h_
+- Current text (raw): Review the saved plan before adding its workouts to Calendar.
+- Request: Remove object
+- Comment: Not provided
+- Proposed text: Not requested
+- Scope: Only here — Change only this selected element, place, screen, or component instance.
+- Suggested owner evidence: frontend
+- Object action: Remove object at only here.
+- Prompt-only request: remove the scoped page object usage without retiring or deleting a shared DS component.
+- Token evidence and requested changes:
+  - None selected.
+- Typography request: None
+- Chrome request: None
+- Observed evidence:
+  - Element: p.
+  - Display: block; children: 0.
+  - Current text evidence: "Review the saved plan before adding its workouts to Calendar.".
+  - Hito DS class evidence: hito-ui-dialog-description, hito-body.
+  - Dimensions: width 672px; height 22.12px.
+  - Typography: tag p; family Poppins, ui-sans-serif, system-ui, sans-serif; font 14px; line-height 22.12px; weight 400; letter-spacing normal.
+  - Hito typography role: Body (hito-body).
+
+Item 5
+- Item id: e137b75e-ae73-48b2-9e63-c0b76103f2cf
+- Captured: 2026-08-11T11:53:59.744Z
+- Target: div.hito-ui-dialog-header
+- Target kind/tag/role: container · div · none
+- Selector: div.hito-ui-dialog-header.hito-product-dialog-header
+- Current text (raw): Not captured
+- Request: Remove bottom border
+- Comment: Remove bottom border
+- Proposed text: Not requested
+- Scope: Only here — Change only this selected element, place, screen, or component instance.
+- Suggested owner evidence: frontend
+- Confirmed DS component: Dialog.
+- DS source: src/components/ui/dialog.tsx.
+- DS reference: /hitoDS/components#modals.
+- Token evidence and requested changes:
+  - Left padding: observed 24px; available Hito token --space-6; no desired token selected.
+  - Right padding: observed 24px; available Hito token --space-6; no desired token selected.
+  - Top padding: observed 20px; available Hito token --space-5; no desired token selected.
+  - Bottom padding: observed 20px; available Hito token --space-5; no desired token selected.
+  - Horizontal gap: observed 8px; available Hito token --space-2; no desired token selected.
+  - Vertical gap: observed 8px; available Hito token --space-2; no desired token selected.
+- Typography request: None
+- Chrome request: None
+- Observed evidence:
+  - Element: div.
+  - Display: flex; children: 2.
+  - Hito DS class evidence: hito-ui-dialog-header, hito-product-dialog-header.
+  - Border: 1px solid oklch(1 0 0 / 0.06).
+  - Dimensions: width 1022px; height 171.01px.
+
+Item 6
+- Item id: 88a2c228-2e06-4006-a364-16c835393d71
+- Captured: 2026-08-11T11:54:09.359Z
+- Target: button.hito-button
+- Target kind/tag/role: control · button · none
+- Selector: button.hito-button.hito-button-secondary.hito-button-md
+- Current text (raw): Refresh preview
+- Request: Remove object
+- Comment: Not provided
+- Proposed text: Not requested
+- Scope: Only here — Change only this selected element, place, screen, or component instance.
+- Suggested owner evidence: frontend
+- Confirmed DS component: Button.
+- DS source: src/styles/controls-lists.css.
+- DS reference: /hitoDS/components#buttons.
+- Object action: Remove object at only here.
+- Prompt-only request: remove the scoped page object usage without retiring or deleting a shared DS component.
+- Token evidence and requested changes:
+  - Left padding: observed 14px; no desired token selected.
+  - Right padding: observed 14px; no desired token selected.
+  - Horizontal gap: observed 8px; available Hito token --space-2; no desired token selected.
+  - Vertical gap: observed 8px; available Hito token --space-2; no desired token selected.
+  - Top-right radius: observed 6px; available Hito token --radius-md; no desired token selected.
+  - Top-left radius: observed 6px; available Hito token --radius-md; no desired token selected.
+  - Bottom-right radius: observed 6px; available Hito token --radius-md; no desired token selected.
+  - Bottom-left radius: observed 6px; available Hito token --radius-md; no desired token selected.
+- Typography request: None
+- Chrome request: None
+- Observed evidence:
+  - Element: button.
+  - Display: flex; children: 0.
+  - Current text evidence: "Refresh preview".
+  - Hito DS class evidence: hito-button, hito-button-secondary, hito-button-md.
+  - Border: 1px solid.
+  - Dimensions: width 141.8px; height 40px.
+  - Typography: tag button; family Poppins, ui-sans-serif, system-ui, sans-serif; font 14px; line-height 14px; weight 500; letter-spacing normal.
+  - Hito typography role: Button (hito-button hito-button-secondary hito-button-sm).
+
+Product routing instructions:
+- Interpret every request against its captured target and evidence before assigning implementation.
+- Treat DS ownership as confirmed only when the item contains positive source-backed metadata.
+- Inspect source before changing UI and split this packet only if source inspection proves different canonical owners.
+- Produce the next-role work without mutating product data, generated/readback truth, or Hito DS registration from this prompt.
+- Preserve each item’s route, selector, request, evidence, and scope.

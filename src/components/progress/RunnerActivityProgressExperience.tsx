@@ -191,9 +191,9 @@ export function RunnerActivityProgressExperience({
 
   return (
     <div className="hito-route-gutter hito-route-stack max-w-5xl py-10">
-      <div className="border-b border-hairline/80 pb-3">
+      <div className="pb-3">
         <div
-          className="hito-tabs hito-tabs-simple w-full sm:w-auto"
+          className="hito-tabs hito-tabs-simple w-full"
           {...tabs.tabListProps}
           aria-label="Running history, progress, and saved plans"
         >

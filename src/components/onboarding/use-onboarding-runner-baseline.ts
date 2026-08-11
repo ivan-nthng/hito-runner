@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import type { StructuredConstructorState } from "@/components/onboarding/onboarding-form-model";
 import type { HeartRateProfileDraftState } from "@/components/settings/HeartRateProfileSection";
-import type { PersonalHeartRateProfileInput } from "@/lib/heart-rate-zones";
+import {
+  buildHeartRateZonesSummary,
+  type HeartRateZonesSummary,
+  type PersonalHeartRateProfileInput,
+} from "@/lib/heart-rate-zones";
 import { runnerFacingHeartRateSaveError } from "@/components/settings/heart-rate-profile-errors";
 import {
   saveRunnerBaseline,
@@ -23,7 +27,9 @@ export function useOnboardingRunnerBaseline({
   state: RunnerBaselineState;
 }) {
   const saveRunnerBaselineFn = useServerFn(saveRunnerBaseline);
-  const [savedSettings, setSavedSettings] = useState(defaults);
+  const [summary, setSummary] = useState<HeartRateZonesSummary | null>(() =>
+    buildSavedGuidanceSummary(defaults),
+  );
   const [status, setStatus] = useState<"idle" | "saving">("idle");
   const [error, setError] = useState<string | null>(null);
   const [heartRateDraftState, setHeartRateDraftState] = useState<HeartRateProfileDraftState | null>(
@@ -31,20 +37,21 @@ export function useOnboardingRunnerBaseline({
   );
   const input = useMemo(() => buildRunnerBaselineInput(state), [state]);
   const inputKey = input ? JSON.stringify(input) : "invalid";
-  const savedInputKey = savedSettings ? runnerBaselineKey(savedSettings) : null;
-  const matchesSavedBaseline = input != null && inputKey === savedInputKey;
-  const summary = matchesSavedBaseline ? (savedSettings?.heartRateZones ?? null) : null;
-  const isReady = Boolean(summary && (summary.accepted || heartRateDraftState?.canSubmit));
+  const isReady = Boolean(input && summary && (summary.accepted || heartRateDraftState?.canSubmit));
+
+  useEffect(() => {
+    setSummary(buildSavedGuidanceSummary(defaults));
+    setHeartRateDraftState(null);
+  }, [defaults]);
 
   useEffect(() => {
     setError(null);
-    setHeartRateDraftState(null);
-  }, [inputKey]);
+    if (!input) {
+      return;
+    }
 
-  useEffect(() => {
-    setSavedSettings(defaults);
-    setHeartRateDraftState(null);
-  }, [defaults]);
+    setSummary((current) => current ?? buildHeartRateZonesSummary(input.age));
+  }, [defaults, input, inputKey]);
 
   const persist = async (heartRateProfile?: PersonalHeartRateProfileInput) => {
     if (!input) {
@@ -62,7 +69,8 @@ export function useOnboardingRunnerBaseline({
           ...(heartRateProfile ? { heartRateProfile } : {}),
         },
       });
-      setSavedSettings(result.settings);
+      const persistedBaselineKey = runnerBaselineKey(result.settings);
+      setSummary(persistedBaselineKey ? result.settings.heartRateZones : null);
       if (heartRateProfile && !result.settings.heartRateZones.accepted) {
         setError("The saved BPM guidance could not be accepted. Review the ranges and try again.");
         return false;
@@ -96,8 +104,18 @@ export function useOnboardingRunnerBaseline({
     return persist(heartRateDraftState.profileToPersist);
   };
 
+  const applyRecommendedSummary = (recommendedSummary: HeartRateZonesSummary) => {
+    if (!input) {
+      return;
+    }
+
+    setError(null);
+    setHeartRateDraftState(null);
+    setSummary(recommendedSummary);
+  };
+
   return {
-    canPrepare: input != null,
+    applyRecommendedSummary,
     clearError: () => setError(null),
     error,
     heartRateDraftState,
@@ -105,14 +123,18 @@ export function useOnboardingRunnerBaseline({
     isSaving: status === "saving",
     onHeartRateDraftStateChange: setHeartRateDraftState,
     persistHeartRateDraft,
-    prepare: () => persist(),
-    previewContextKey:
-      matchesSavedBaseline && heartRateDraftState
-        ? `baseline:${inputKey}:heart-rate:${heartRateDraftState.key}`
-        : `baseline-pending:${inputKey}`,
+    previewContextKey: heartRateDraftState
+      ? `baseline:${inputKey}:heart-rate:${heartRateDraftState.key}`
+      : `baseline-pending:${inputKey}`,
     recommendedAge: input?.age ?? null,
     summary,
   };
+}
+
+function buildSavedGuidanceSummary(settings: UserSettingsSummary | null) {
+  const baselineKey = settings ? runnerBaselineKey(settings) : null;
+
+  return baselineKey && settings ? settings.heartRateZones : null;
 }
 
 function buildRunnerBaselineInput(state: RunnerBaselineState): RunnerBaselineSaveInput | null {

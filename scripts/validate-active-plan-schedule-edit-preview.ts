@@ -9,6 +9,13 @@ const migration = await readFile(
   ),
   "utf8",
 );
+const calendarOverflowMigration = await readFile(
+  new URL(
+    "../supabase/migrations/20260811125538_clear_calendar_future_workouts.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const persistence = await readFile(
   new URL("../src/lib/active-plan-persistence.ts", import.meta.url),
   "utf8",
@@ -20,6 +27,14 @@ const databaseTypes = await readFile(
 );
 const sourceCapabilities = await readFile(
   new URL("../src/lib/active-plan-workout-editing/source-capabilities.ts", import.meta.url),
+  "utf8",
+);
+const calendarOverflowActions = await readFile(
+  new URL("../src/lib/calendar-overflow-actions.ts", import.meta.url),
+  "utf8",
+);
+const planExportRoute = await readFile(
+  new URL("../src/routes/api.plan.export.tsx", import.meta.url),
   "utf8",
 );
 
@@ -52,5 +67,33 @@ assert.match(databaseTypes, /apply_reviewed_future_schedule_persistence/);
 assert.doesNotMatch(databaseTypes, /apply_active_plan_workout|apply_active_plan_schedule_reflow/);
 assert.match(sourceCapabilities, /provenancePlan/);
 assert.doesNotMatch(sourceCapabilities, /provenancePlan\.status|status === "active"/);
+assert.match(
+  calendarOverflowMigration,
+  /create or replace function public\.clear_calendar_future_workouts/,
+);
+assert.match(calendarOverflowMigration, /pg_advisory_xact_lock/);
+assert.match(calendarOverflowMigration, /protected_future_schedule/);
+assert.match(
+  calendarOverflowMigration,
+  /drop function if exists public\.apply_reviewed_plan_persistence/,
+);
+assert.match(calendarOverflowMigration, /p_current_date date/);
+assert.match(calendarOverflowMigration, /apply_reviewed_future_schedule_persistence/);
+assert.doesNotMatch(
+  calendarOverflowMigration,
+  /Initial plan materialization requires an empty runner Calendar/,
+);
+assert.match(
+  calendarOverflowMigration,
+  /revoke execute[\s\S]*from public, anon, authenticated;[\s\S]*grant execute[\s\S]*to service_role;/,
+);
+assert.match(calendarOverflowActions, /validateImportedPlanJson/);
+assert.match(calendarOverflowActions, /retainImportedPlanCandidateForUser/);
+assert.match(calendarOverflowActions, /getRunnerCalendarDateForUserId/);
+assert.match(calendarOverflowActions, /clearAtomicCalendarFutureWorkouts/);
+assert.match(calendarOverflowActions, /z\.literal\("delete_future_workouts"\)/);
+assert.match(calendarOverflowActions, /z\.literal\("start_new_plan"\)/);
+assert.doesNotMatch(calendarOverflowActions, /status:\s*["']active["']/);
+assert.match(planExportRoute, /scope:\s*z\.literal\("future-calendar"\)/);
 
-console.log("Active-plan Calendar authority retirement contract passed.");
+console.log("Runner-owned Calendar authority and overflow action contracts passed.");

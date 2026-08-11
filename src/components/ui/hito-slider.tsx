@@ -14,6 +14,7 @@ export type HitoSliderProps = {
   maxLabel?: ReactNode;
   min: number;
   minLabel?: ReactNode;
+  markers?: readonly number[];
   onValueChange: (value: number) => void;
   previousValue?: number;
   previousValueLabel?: string;
@@ -34,6 +35,7 @@ export function HitoSlider({
   maxLabel,
   min,
   minLabel,
+  markers = [],
   onValueChange,
   previousValue,
   previousValueLabel,
@@ -46,6 +48,10 @@ export function HitoSlider({
   const inputId = id ?? generatedId;
   const helperId = helper ? `${inputId}-helper` : undefined;
   const span = Math.max(max - min, Number.EPSILON);
+  const valueProgress = (value - min) / span;
+  const markerValues = [...new Set(markers)].filter(
+    (marker) => Number.isFinite(marker) && marker >= min && marker <= max,
+  );
   const hasRestorablePreviousValue =
     previousValue != null &&
     Number.isFinite(previousValue) &&
@@ -54,6 +60,7 @@ export function HitoSlider({
     previousValue !== value;
   const previousProgress = hasRestorablePreviousValue ? (previousValue - min) / span : 0;
   const style = {
+    "--hito-slider-value": `${Math.min(Math.max(valueProgress, 0), 1) * 100}%`,
     "--hito-slider-previous": `${Math.min(Math.max(previousProgress, 0), 1) * 100}%`,
   } as CSSProperties;
 
@@ -92,14 +99,33 @@ export function HitoSlider({
           aria-valuetext={ariaValueText}
           onInput={(event) => onValueChange(event.currentTarget.valueAsNumber)}
         />
+        <div className="hito-slider-visual-track" aria-hidden="true">
+          {markerValues.map((marker) => (
+            <span
+              key={marker}
+              className="hito-slider-marker"
+              style={
+                {
+                  "--hito-slider-marker-position": `${((marker - min) / span) * 100}%`,
+                } as CSSProperties
+              }
+            />
+          ))}
+          {hasRestorablePreviousValue ? (
+            <span className="hito-slider-previous-marker-visual" />
+          ) : null}
+          <span className="hito-slider-handle" />
+        </div>
         {hasRestorablePreviousValue ? (
-          <button
-            type="button"
-            className="hito-slider-previous-marker"
-            disabled={disabled}
-            aria-label={previousValueLabel ?? `Restore previous value ${previousValue}`}
-            onClick={() => onValueChange(previousValue)}
-          />
+          <div className="hito-slider-marker-actions">
+            <button
+              type="button"
+              className="hito-slider-previous-marker"
+              disabled={disabled}
+              aria-label={previousValueLabel ?? `Restore previous value ${previousValue}`}
+              onClick={() => onValueChange(previousValue)}
+            />
+          </div>
         ) : null}
       </div>
 

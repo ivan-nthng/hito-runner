@@ -20,6 +20,7 @@ const sourceChecks = [
 ];
 
 const localDatabaseChecks = [
+  tsCheck("calendar-overflow-actions", "scripts/validate-calendar-overflow-future-actions.ts"),
   tsCheck("running-plan-confirm-persistence", "scripts/validate-running-plan-engine-confirm.ts", [
     "--require-persistence",
   ]),

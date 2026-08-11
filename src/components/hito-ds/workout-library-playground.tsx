@@ -64,6 +64,16 @@ export function WorkoutLibraryPlayground() {
       label="Workout taxonomy appendix"
       status={`${WORKOUT_LIBRARY_IDENTITY_COUNT} of ${WORKOUT_LIBRARY_CANONICAL_IDENTITY_COUNT} canonical identities`}
       statusTone="neutral"
+      description={{
+        purpose:
+          "Demonstrate the current workout taxonomy and its product-owned semantic presentation without promoting domain geometry into generic primitives.",
+        useWhen:
+          "Reviewing source-backed workout identities, sections, targets, and allowed presentation boundaries.",
+        avoidWhen:
+          "A generic component or token example can express the contract without training-domain meaning.",
+        accessibility:
+          "Labels, section order, target meaning, contrast, and readable fallback copy remain explicit; color is never the only carrier.",
+      }}
       usedIn="Running Coach taxonomy review after the primary calendar specimen."
       controls={<ControlsBody state={state} setField={setField} />}
       preview={

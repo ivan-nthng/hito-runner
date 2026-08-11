@@ -1291,6 +1291,7 @@ export type Database = {
       };
       apply_reviewed_plan_persistence: {
         Args: {
+          p_current_date: string;
           p_expected_profile_revision?: number | null;
           p_plan: Json;
           p_profile: Json;
@@ -1306,6 +1307,13 @@ export type Database = {
           p_replace_future_workouts: boolean;
           p_user_id: string;
           p_workouts: Json;
+        };
+        Returns: Json;
+      };
+      clear_calendar_future_workouts: {
+        Args: {
+          p_current_date: string;
+          p_user_id: string;
         };
         Returns: Json;
       };

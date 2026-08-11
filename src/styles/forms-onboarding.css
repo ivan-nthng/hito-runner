@@ -103,7 +103,6 @@
     flex: 0 0 auto;
     border-radius: 999px;
     background: var(--hito-selected-plan-calendar-tone, var(--color-muted-foreground));
-    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--color-background) 35%, transparent);
   }
 
   .hito-selected-plan-calendar-weeks {
@@ -140,9 +139,7 @@
     );
     padding: 0;
     text-align: left;
-    transition:
-      background-color 150ms ease,
-      box-shadow 150ms ease;
+    transition: background-color 150ms ease;
   }
 
   .hito-selected-plan-calendar-day[data-calendar-state="rest"] {
@@ -160,15 +157,6 @@
 
   .hito-selected-plan-calendar-day[data-calendar-state="rest"]:hover {
     background: color-mix(in oklch, var(--color-muted-foreground) 12%, transparent);
-  }
-
-  .hito-selected-plan-calendar-day[aria-expanded="true"] {
-    box-shadow: inset 0 0 0 1px
-      color-mix(
-        in oklch,
-        var(--hito-selected-plan-calendar-tone, var(--color-foreground)) 42%,
-        transparent
-      );
   }
 
   .hito-selected-plan-calendar-day:focus-visible {

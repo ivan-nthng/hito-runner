@@ -10,6 +10,9 @@ import { getHomeRouteData } from "@/lib/training-api";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/")({
+  validateSearch: (search: Record<string, unknown>): { createPlan?: true } => ({
+    createPlan: search.createPlan === "true" || search.createPlan === true ? true : undefined,
+  }),
   head: () => ({
     meta: [
       { title: `${APP_NAME} — Weekly plan` },
@@ -29,6 +32,7 @@ export const Route = createFileRoute("/")({
 function Index() {
   const { snapshot, viewer, onboardingDefaults, localBypassEnabled, magicLinkEnabled } =
     Route.useLoaderData();
+  const search = Route.useSearch();
 
   if (snapshot.mode === "preview") {
     return (
@@ -43,7 +47,7 @@ function Index() {
   return (
     <AppShell snapshot={snapshot} viewer={viewer}>
       <div className="hito-route-gutter py-8 lg:py-10">
-        {snapshot.mode === "onboarding" ? (
+        {snapshot.mode === "onboarding" || search.createPlan ? (
           <OnboardingGate defaults={onboardingDefaults} />
         ) : (
           <div className="hito-route-stack">

@@ -30,6 +30,7 @@ export function HeartRateProfileSection({
   isSaving,
   onClearError,
   onDraftStateChange,
+  onRecommendedApplied,
   recommendedAge,
   summary,
 }: {
@@ -37,6 +38,7 @@ export function HeartRateProfileSection({
   isSaving: boolean;
   onClearError?: () => void;
   onDraftStateChange?: (state: HeartRateProfileDraftState) => void;
+  onRecommendedApplied?: (summary: HeartRateZonesSummary) => void;
   recommendedAge: number | null;
   summary: HeartRateZonesSummary;
 }) {
@@ -119,6 +121,7 @@ export function HeartRateProfileSection({
     onClearError?.();
     setRecommendedApplied(true);
     setDraft(buildHeartRateProfileDraft(recommendedSummary));
+    onRecommendedApplied?.(recommendedSummary);
   };
 
   const updateTextValue = (index: number, field: HeartRateDraftField, value: string) => {
@@ -137,10 +140,14 @@ export function HeartRateProfileSection({
         <div className="min-w-0">
           {appearance === "settings" ? (
             <h2 className="hito-ui-section-title">Heart-rate guidance</h2>
-          ) : (
-            <p className="hito-label">Guidance bands</p>
-          )}
-          <p className="hito-support-copy mt-2 max-w-2xl">
+          ) : null}
+          <p
+            className={
+              appearance === "settings"
+                ? "hito-support-copy mt-2 max-w-2xl"
+                : "hito-support-copy max-w-2xl"
+            }
+          >
             Adjust the BPM ranges Hito can use for future plan authoring.
           </p>
         </div>

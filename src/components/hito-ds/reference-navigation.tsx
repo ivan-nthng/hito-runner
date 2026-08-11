@@ -3,153 +3,222 @@ import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/ui/icon";
 import { HitoButton } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getHitoDsPageIndex, HITO_DS_PAGES, type HitoDsPageId } from "./reference-model";
+import {
+  getHitoDsPageIndex,
+  HITO_DS_NAV_ITEMS,
+  HITO_DS_PAGES,
+  type HitoDsNavDestination,
+  type HitoDsNavItem,
+  type HitoDsPageId,
+} from "./reference-model";
+
+function destinationMatches(destination: HitoDsNavDestination, query: string) {
+  return [destination.label, ...destination.keywords].some((value) =>
+    value.toLowerCase().includes(query),
+  );
+}
+
+function itemContainsHref(item: HitoDsNavItem, href: string) {
+  return item.kind === "link"
+    ? item.href === href
+    : item.children.some((child) => child.href === href);
+}
 
 export function HitoDsNestedNav({
   idPrefix,
-  activePageId,
+  activeHref,
   onNavigate,
+  onQueryChange,
 }: {
   idPrefix: string;
-  activePageId: HitoDsPageId;
+  activeHref: string;
   onNavigate?: () => void;
+  onQueryChange?: (query: string) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [expandedPageIds, setExpandedPageIds] = useState<Set<HitoDsPageId>>(
-    () => new Set([activePageId]),
+  const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(() => {
+    const activeGroup = HITO_DS_NAV_ITEMS.find(
+      (item) => item.kind === "group" && itemContainsHref(item, activeHref),
+    );
+    return activeGroup ? new Set([activeGroup.id]) : new Set();
+  });
+  const [searchCollapsedGroupIds, setSearchCollapsedGroupIds] = useState<Set<string>>(
+    () => new Set(),
   );
   const normalizedQuery = query.trim().toLowerCase();
-  const matchingPages = useMemo(
+
+  const matchingItems = useMemo(
     () =>
-      HITO_DS_PAGES.map((page) => {
-        const pageMatches = page.label.toLowerCase().includes(normalizedQuery);
-        const sections = normalizedQuery
-          ? page.sections.filter((section) =>
-              [section.label, ...section.keywords].some((value) =>
-                value.toLowerCase().includes(normalizedQuery),
-              ),
-            )
-          : page.sections;
+      HITO_DS_NAV_ITEMS.map((item) => {
+        if (item.kind === "link") {
+          return {
+            item,
+            children: [] as readonly HitoDsNavDestination[],
+            visible: !normalizedQuery || destinationMatches(item, normalizedQuery),
+          };
+        }
+
+        const groupMatches = [item.label, ...item.keywords].some((value) =>
+          value.toLowerCase().includes(normalizedQuery),
+        );
+        const matchingChildren = normalizedQuery
+          ? item.children.filter((child) => destinationMatches(child, normalizedQuery))
+          : item.children;
 
         return {
-          page,
-          sections: pageMatches ? page.sections : sections,
-          visible: !normalizedQuery || pageMatches || sections.length > 0,
+          item,
+          children: groupMatches ? item.children : matchingChildren,
+          visible: !normalizedQuery || groupMatches || matchingChildren.length > 0,
         };
       }),
     [normalizedQuery],
   );
-  const hasMatches = matchingPages.some(({ visible }) => visible);
+  const hasMatches = matchingItems.some(({ visible }) => visible);
 
   useEffect(() => {
-    setExpandedPageIds((current) => {
-      if (current.has(activePageId)) {
+    const activeGroup = HITO_DS_NAV_ITEMS.find(
+      (item) => item.kind === "group" && itemContainsHref(item, activeHref),
+    );
+    if (!activeGroup) {
+      return;
+    }
+
+    setExpandedGroupIds((current) => {
+      if (current.has(activeGroup.id)) {
         return current;
       }
-
-      return new Set([...current, activePageId]);
+      return new Set([...current, activeGroup.id]);
     });
-  }, [activePageId]);
+  }, [activeHref]);
 
-  const togglePage = (pageId: HitoDsPageId) => {
-    setExpandedPageIds((current) => {
+  useEffect(() => {
+    setSearchCollapsedGroupIds(new Set());
+  }, [normalizedQuery]);
+
+  const toggleGroup = (groupId: string) => {
+    const setter = normalizedQuery ? setSearchCollapsedGroupIds : setExpandedGroupIds;
+    setter((current) => {
       const next = new Set(current);
-      if (next.has(pageId)) {
-        next.delete(pageId);
+      if (next.has(groupId)) {
+        next.delete(groupId);
       } else {
-        next.add(pageId);
+        next.add(groupId);
       }
       return next;
     });
   };
 
   return (
-    <nav className="hito-ds-sidebar-tree" aria-label="Hito DS pages">
+    <nav
+      className="hito-ds-sidebar-tree"
+      aria-label="Hito DS pages"
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && query) {
+          event.preventDefault();
+          event.stopPropagation();
+          event.currentTarget.querySelector<HTMLInputElement>('input[type="search"]')?.focus();
+          setQuery("");
+          onQueryChange?.("");
+        }
+      }}
+    >
       <div className="hito-ds-sidebar-search">
         <Input
           type="search"
           value={query}
           aria-label="Find in Hito DS"
           placeholder="Find a component"
-          onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Escape" && query) {
-              event.preventDefault();
-              setQuery("");
-            }
+          onChange={(event) => {
+            setQuery(event.target.value);
+            onQueryChange?.(event.target.value);
           }}
         />
       </div>
 
-      {matchingPages.map(({ page, sections, visible }) => {
+      {matchingItems.map(({ item, children, visible }) => {
         if (!visible) {
           return null;
         }
 
-        const pageActive = activePageId === page.id;
-        const childrenId = `${idPrefix}-${page.id}-sections`;
-        const expanded = normalizedQuery ? true : expandedPageIds.has(page.id);
+        if (item.kind === "link") {
+          const active = item.href === activeHref;
+          return (
+            <a
+              key={item.id}
+              href={item.href}
+              className="hito-ds-sidebar-link hito-nav-text"
+              data-active={active ? "true" : undefined}
+              aria-current={active ? "page" : undefined}
+              onClick={onNavigate}
+            >
+              <span className="hito-ds-sidebar-link-marker" aria-hidden="true" />
+              <span className="hito-ds-sidebar-link-label">{item.label}</span>
+            </a>
+          );
+        }
+
+        const groupButtonId = `${idPrefix}-${item.id}-button`;
+        const childrenId = `${idPrefix}-${item.id}-destinations`;
+        const groupActive = itemContainsHref(item, activeHref);
+        const expanded = normalizedQuery
+          ? !searchCollapsedGroupIds.has(item.id)
+          : expandedGroupIds.has(item.id);
 
         return (
-          <div key={page.id} className="hito-ds-sidebar-group">
-            <div className="hito-ds-sidebar-group-row">
-              <a
-                href={page.path}
-                className="hito-ds-sidebar-link hito-nav-text"
-                data-active={pageActive ? "true" : undefined}
-                aria-current={pageActive ? "page" : undefined}
-                onClick={onNavigate}
-              >
-                <span className="hito-ds-sidebar-link-marker" aria-hidden="true" />
-                <span className="hito-ds-sidebar-link-label">{page.label}</span>
-              </a>
-              <button
-                type="button"
-                className="hito-ds-sidebar-toggle"
-                aria-expanded={expanded}
-                aria-controls={childrenId}
-                aria-label={
-                  normalizedQuery
-                    ? `${page.label} expanded for search`
-                    : `${expanded ? "Collapse" : "Expand"} ${page.label}`
-                }
-                disabled={Boolean(normalizedQuery)}
-                onClick={() => togglePage(page.id)}
-              >
-                <Icon
-                  name="chevron-down"
-                  size="xs"
-                  decorative
-                  className="hito-ds-sidebar-chevron"
-                  data-open={expanded ? "true" : undefined}
-                />
-              </button>
-            </div>
+          <div
+            key={item.id}
+            className="hito-ds-sidebar-group"
+            data-secondary={item.secondary ? "true" : undefined}
+          >
+            <button
+              id={groupButtonId}
+              type="button"
+              className="hito-ds-sidebar-link hito-ds-sidebar-group-button hito-nav-text"
+              data-active={groupActive ? "true" : undefined}
+              aria-expanded={expanded}
+              aria-controls={childrenId}
+              onClick={() => toggleGroup(item.id)}
+            >
+              <span className="hito-ds-sidebar-link-marker" aria-hidden="true" />
+              <span className="hito-ds-sidebar-link-label">{item.label}</span>
+              <Icon
+                name="chevron-down"
+                size="xs"
+                decorative
+                className="hito-ds-sidebar-chevron"
+                data-open={expanded ? "true" : undefined}
+              />
+            </button>
 
             <div
               id={childrenId}
               className="hito-ds-sidebar-children"
               role="group"
-              aria-label={`${page.label} sections`}
+              aria-labelledby={groupButtonId}
               hidden={!expanded}
             >
-              {sections.map((section) => (
-                <a
-                  key={section.id}
-                  href={`${page.path}#${section.id}`}
-                  className="hito-ds-sidebar-child-link"
-                  onClick={onNavigate}
-                >
-                  {section.label}
-                </a>
-              ))}
+              {children.map((child) => {
+                const childActive = child.href === activeHref;
+                return (
+                  <a
+                    key={child.id}
+                    href={child.href}
+                    className="hito-ds-sidebar-child-link"
+                    data-active={childActive ? "true" : undefined}
+                    aria-current={childActive ? "location" : undefined}
+                    onClick={onNavigate}
+                  >
+                    {child.label}
+                  </a>
+                );
+              })}
             </div>
           </div>
         );
       })}
 
       {!hasMatches ? (
-        <p className="hito-caption px-3 py-2" role="status">
+        <p className="hito-caption px-3 py-2" role="status" aria-live="polite">
           No matching components.
         </p>
       ) : null}

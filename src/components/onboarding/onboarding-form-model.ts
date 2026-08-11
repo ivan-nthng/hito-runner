@@ -81,12 +81,12 @@ export const PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS: {
 }[] = [
   {
     value: "new_to_running",
-    label: "New to running",
+    label: "Neutral running",
     copy: "Start gently and build the habit first.",
   },
   {
     value: "beginner",
-    label: "Beginner",
+    label: "Beginning",
     copy: "You run sometimes and want a steady base.",
   },
   {

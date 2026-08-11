@@ -15,6 +15,7 @@ export function HitoDualRange({
   invalid = false,
   max,
   maxLabel,
+  markers = [],
   maximumBounds,
   min,
   minLabel,
@@ -31,6 +32,7 @@ export function HitoDualRange({
   invalid?: boolean;
   max: number;
   maxLabel: string;
+  markers?: readonly number[];
   maximumBounds?: readonly [number, number];
   min: number;
   minLabel: string;
@@ -50,6 +52,9 @@ export function HitoDualRange({
     null,
   );
   const span = Math.max(max - min, 1);
+  const markerValues = [...new Set(markers)].filter(
+    (marker) => Number.isFinite(marker) && marker >= min && marker <= max,
+  );
   const minimumPercent = ((value[0] - min) / span) * 100;
   const maximumPercent = ((value[1] - min) / span) * 100;
   const previousMinimumPercent = previousValue ? ((previousValue[0] - min) / span) * 100 : 0;
@@ -191,9 +196,7 @@ export function HitoDualRange({
         onLostPointerCapture={() => {
           activeRailPointerRef.current = null;
         }}
-      >
-        <span className="hito-dual-range-selection" />
-      </div>
+      />
       <label className="sr-only" htmlFor={minimumId}>
         {minLabel}
       </label>
@@ -234,23 +237,49 @@ export function HitoDualRange({
         onKeyDown={(event) => handleRangeKeyDown(event, "maximum")}
         onChange={(event) => onMaxValueChange(Math.max(Number(event.target.value), value[0]))}
       />
-      {hasPreviousMinimum ? (
-        <button
-          type="button"
-          className="hito-dual-range-previous-marker hito-dual-range-previous-marker-min"
-          disabled={disabled}
-          aria-label={`Restore previous ${minLabel}: ${previousValue[0]}`}
-          onClick={() => onMinValueChange(previousValue[0])}
-        />
-      ) : null}
-      {hasPreviousMaximum ? (
-        <button
-          type="button"
-          className="hito-dual-range-previous-marker hito-dual-range-previous-marker-max"
-          disabled={disabled}
-          aria-label={`Restore previous ${maxLabel}: ${previousValue[1]}`}
-          onClick={() => onMaxValueChange(previousValue[1])}
-        />
+      <div className="hito-dual-range-visual-track" aria-hidden="true">
+        <span className="hito-dual-range-selection" />
+        {markerValues.map((marker) => (
+          <span
+            key={marker}
+            className="hito-dual-range-marker"
+            style={
+              {
+                "--hito-dual-range-marker-position": `${((marker - min) / span) * 100}%`,
+              } as CSSProperties
+            }
+          />
+        ))}
+        {hasPreviousMinimum ? (
+          <span className="hito-dual-range-previous-marker-visual hito-dual-range-previous-marker-visual-min" />
+        ) : null}
+        {hasPreviousMaximum ? (
+          <span className="hito-dual-range-previous-marker-visual hito-dual-range-previous-marker-visual-max" />
+        ) : null}
+        <span className="hito-dual-range-handle hito-dual-range-handle-min" />
+        <span className="hito-dual-range-handle hito-dual-range-handle-max" />
+      </div>
+      {hasPreviousMinimum || hasPreviousMaximum ? (
+        <div className="hito-dual-range-marker-actions">
+          {hasPreviousMinimum ? (
+            <button
+              type="button"
+              className="hito-dual-range-previous-marker hito-dual-range-previous-marker-min"
+              disabled={disabled}
+              aria-label={`Restore previous ${minLabel}: ${previousValue[0]}`}
+              onClick={() => onMinValueChange(previousValue[0])}
+            />
+          ) : null}
+          {hasPreviousMaximum ? (
+            <button
+              type="button"
+              className="hito-dual-range-previous-marker hito-dual-range-previous-marker-max"
+              disabled={disabled}
+              aria-label={`Restore previous ${maxLabel}: ${previousValue[1]}`}
+              onClick={() => onMaxValueChange(previousValue[1])}
+            />
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

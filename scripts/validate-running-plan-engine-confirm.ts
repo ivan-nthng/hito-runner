@@ -189,7 +189,10 @@ async function main() {
         ? persistenceProof.persistedDistanceGoals.slice(-4).map((proof) => ({
             fixedRestDays: proof.availability.fixedRestDays,
             maxRunningDaysPerWeek: proof.availability.maxRunningDaysPerWeek,
-            rows: proof.rows,
+            savedSourceRows: proof.savedSourceRows,
+            materializedCalendarRows: proof.materializedCalendarRows,
+            omittedLeadingRows: proof.omittedLeadingRows,
+            runnerCurrentDate: proof.runnerCurrentDate,
             cleanupZero:
               Object.values(proof.cleanup.ownedRows).every((value) => value === 0) &&
               proof.cleanup.authUserPreserved &&

@@ -61,6 +61,16 @@ export function CalendarWorkoutPlayground() {
       label="Calendar primitive"
       status="Shared primitive"
       statusTone="signal"
+      description={{
+        purpose:
+          "Render shared desktop day cells and mobile workout rows from explicit calendar presentation state.",
+        useWhen:
+          "A calendar consumer already owns date, workout, result, feedback, and interaction eligibility truth.",
+        avoidWhen:
+          "The UI would need the primitive to decide schedule, persistence, route action, or workout meaning.",
+        accessibility:
+          "Interactive state, focus, readable labels, markers, and timed-action presentation remain explicit across desktop and mobile renderers.",
+      }}
       usedIn="Product calendar day cells and mobile workout rows."
       controls={
         <ControlsBody

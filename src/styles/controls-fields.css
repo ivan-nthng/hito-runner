@@ -2,9 +2,9 @@
   .hito-field {
     display: block;
     cursor: text;
-    border: 1px solid var(--color-hairline);
+    border: 1px solid var(--color-chrome-edge-default);
     border-radius: var(--radius-lg);
-    background: color-mix(in oklch, var(--color-background) 62%, transparent);
+    background: var(--color-chrome-subtle);
     color: var(--color-foreground);
     width: 100%;
     transition:
@@ -14,42 +14,44 @@
   }
 
   .hito-field-primary {
-    border-color: var(--color-hairline);
-    background: color-mix(in oklch, var(--color-background) 62%, transparent);
+    border-color: var(--color-chrome-edge-default);
+    background: var(--color-chrome-subtle);
   }
 
   .hito-field-secondary {
     border-color: transparent;
-    background: color-mix(in oklch, var(--color-muted) 54%, transparent);
+    background: var(--color-chrome-standard);
   }
 
-  .hito-field::placeholder {
-    color: color-mix(in oklch, var(--color-muted-foreground) 72%, transparent);
+  .hito-field::placeholder,
+  .hito-field[data-placeholder] {
+    color: var(--color-text-tertiary);
   }
 
   .hito-field:hover:not(:disabled):not([readonly]),
   .hito-field[data-demo-state="hover"] {
-    border-color: color-mix(in oklch, var(--color-foreground) 20%, transparent);
-    background: color-mix(in oklch, var(--color-background) 72%, transparent);
+    border-color: var(--color-chrome-edge-emphasis);
+    background: var(--color-chrome-standard);
   }
 
   .hito-field-secondary:hover:not(:disabled):not([readonly]),
   .hito-field-secondary[data-demo-state="hover"] {
     border-color: transparent;
-    background: color-mix(in oklch, var(--color-muted) 64%, transparent);
+    background: var(--color-chrome-strong);
   }
 
   .hito-field:focus,
+  .hito-field[data-state="open"],
   .hito-field[data-demo-state="focus"] {
-    border-color: color-mix(in oklch, var(--color-foreground) 32%, transparent);
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 16%, transparent);
+    border-color: var(--color-chrome-edge-emphasis);
+    box-shadow: 0 0 0 2px var(--color-ring);
     outline: none;
   }
 
   .hito-field-secondary:focus,
   .hito-field-secondary[data-demo-state="focus"] {
     border-color: transparent;
-    background: color-mix(in oklch, var(--color-muted) 64%, transparent);
+    background: var(--color-chrome-strong);
   }
 
   .hito-field-feedback-error,
@@ -62,7 +64,9 @@
   .hito-field-feedback-error:focus,
   .hito-field-feedback-error[data-demo-state="focus"] {
     border-color: color-mix(in oklch, var(--color-destructive) 58%, transparent);
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-destructive) 16%, transparent);
+    box-shadow:
+      0 0 0 2px color-mix(in oklch, var(--color-destructive) 16%, transparent),
+      0 0 0 4px var(--color-ring);
     outline: none;
   }
 
@@ -76,21 +80,23 @@
   .hito-field-feedback-success:focus,
   .hito-field-feedback-success[data-demo-state="focus"] {
     border-color: color-mix(in oklch, var(--color-success) 56%, transparent);
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-success) 16%, transparent);
+    box-shadow:
+      0 0 0 2px color-mix(in oklch, var(--color-success) 16%, transparent),
+      0 0 0 4px var(--color-ring);
     outline: none;
   }
 
   .hito-field:disabled,
   .hito-field[data-demo-state="disabled"] {
-    background: color-mix(in oklch, var(--color-muted) 26%, transparent);
-    color: color-mix(in oklch, var(--color-foreground) 78%, transparent);
+    background: var(--color-chrome-subtle);
+    color: var(--color-text-disabled);
     cursor: not-allowed;
   }
 
   .hito-field[readonly],
   .hito-field[data-demo-state="readonly"] {
-    background: color-mix(in oklch, var(--color-muted) 26%, transparent);
-    color: color-mix(in oklch, var(--color-foreground) 78%, transparent);
+    background: var(--color-chrome-subtle);
+    color: var(--color-text-secondary);
     cursor: default;
   }
 
@@ -133,8 +139,8 @@
 
   .hito-compound-range-control:focus-within {
     border-color: transparent;
-    background: color-mix(in oklch, var(--color-muted) 64%, transparent);
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 16%, transparent);
+    background: var(--color-chrome-strong);
+    box-shadow: 0 0 0 2px var(--color-ring);
   }
 
   .hito-compound-range-control[data-invalid="true"] {
@@ -144,12 +150,14 @@
 
   .hito-compound-range-control[data-invalid="true"]:focus-within {
     border-color: color-mix(in oklch, var(--color-destructive) 58%, transparent);
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-destructive) 16%, transparent);
+    box-shadow:
+      0 0 0 2px color-mix(in oklch, var(--color-destructive) 16%, transparent),
+      0 0 0 4px var(--color-ring);
   }
 
   .hito-compound-range-control[data-disabled="true"] {
-    background: color-mix(in oklch, var(--color-muted) 26%, transparent);
-    color: color-mix(in oklch, var(--color-foreground) 78%, transparent);
+    background: var(--color-chrome-subtle);
+    color: var(--color-text-disabled);
   }
 
   .hito-compound-range-input,
@@ -166,7 +174,7 @@
 
   .hito-compound-range-separator,
   .hito-compound-range-unit {
-    color: var(--color-muted-foreground);
+    color: var(--color-text-secondary);
     white-space: nowrap;
   }
 
@@ -214,19 +222,19 @@
     min-width: min(var(--hito-inline-header-min-width, 12rem), 100%);
     max-width: 100%;
     border-color: transparent;
-    background: color-mix(in oklch, var(--color-input) 52%, var(--color-surface) 48%);
+    background: var(--color-chrome-standard);
   }
 
   .hito-field-header:not(.hito-field-feedback-error):hover:not(:disabled):not([readonly]),
   .hito-field-header:not(.hito-field-feedback-error)[data-demo-state="hover"] {
     border-color: transparent;
-    background: color-mix(in oklch, var(--color-input) 64%, var(--color-surface) 36%);
+    background: var(--color-chrome-strong);
   }
 
   .hito-field-header:not(.hito-field-feedback-error):focus,
   .hito-field-header:not(.hito-field-feedback-error)[data-demo-state="focus"] {
-    border-color: color-mix(in oklch, var(--color-signal) 24%, var(--color-border));
-    background: color-mix(in oklch, var(--color-input) 72%, var(--color-surface) 28%);
+    border-color: var(--color-chrome-edge-emphasis);
+    background: var(--color-chrome-strong);
   }
 
   .hito-inline-header-input-trigger {
@@ -285,25 +293,25 @@
 
   .hito-inline-header-input-trigger:hover:not(:disabled),
   .hito-inline-header-input-trigger[data-demo-state="hover"] {
-    background: color-mix(in oklch, var(--color-foreground) 6%, transparent);
+    background: var(--color-chrome-subtle);
   }
 
   .hito-inline-header-input-trigger:focus-visible,
   .hito-inline-header-input-trigger[data-demo-state="focus"] {
-    border-color: color-mix(in oklch, var(--color-signal) 24%, var(--color-border));
-    background: color-mix(in oklch, var(--color-foreground) 8%, transparent);
-    box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-signal) 18%, transparent);
+    border-color: var(--color-chrome-edge-emphasis);
+    background: var(--color-chrome-standard);
+    box-shadow: 0 0 0 2px var(--color-ring);
     outline: none;
   }
 
   .hito-inline-header-input-trigger:disabled,
   .hito-inline-header-input-trigger[data-disabled="true"] {
-    color: color-mix(in oklch, var(--color-foreground) 62%, transparent);
+    color: var(--color-text-disabled);
     cursor: not-allowed;
   }
 
   .hito-inline-header-input-affordance {
-    color: color-mix(in oklch, var(--color-foreground) 88%, transparent);
+    color: var(--color-text-secondary);
     opacity: 0;
   }
 
@@ -417,8 +425,8 @@
   }
 
   .hito-date-field-control .hito-field[data-state="open"] {
-    border-color: color-mix(in oklch, var(--color-foreground) 32%, transparent);
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 16%, transparent);
+    border-color: var(--color-chrome-edge-emphasis);
+    box-shadow: 0 0 0 2px var(--color-ring);
     outline: none;
   }
 
@@ -430,7 +438,7 @@
     width: 1rem;
     height: 1rem;
     place-items: center;
-    color: color-mix(in oklch, var(--color-muted-foreground) 84%, transparent);
+    color: var(--color-text-tertiary);
     transform: translateY(-50%);
     transition: color 160ms ease;
     pointer-events: none;
@@ -439,11 +447,11 @@
   .hito-date-field-control:hover .hito-date-field-icon,
   .hito-date-field-control .hito-field:focus + .hito-date-field-icon,
   .hito-date-field-control .hito-field[data-state="open"] + .hito-date-field-icon {
-    color: color-mix(in oklch, var(--color-foreground) 78%, transparent);
+    color: var(--color-text-secondary);
   }
 
   .hito-date-field-control .hito-field:disabled + .hito-date-field-icon {
-    color: color-mix(in oklch, var(--color-muted-foreground) 42%, transparent);
+    color: var(--color-text-disabled);
   }
 
   .hito-date-picker-popover {
@@ -480,20 +488,26 @@
   .hito-date-picker-calendar .rdp-button_previous,
   .hito-date-picker-calendar .rdp-button_next {
     border-radius: var(--radius-md);
-    color: color-mix(in oklch, var(--color-foreground) 72%, transparent);
+    color: var(--color-text-secondary);
   }
 
   .hito-date-picker-calendar .rdp-button_previous:hover,
   .hito-date-picker-calendar .rdp-button_next:hover,
   .hito-date-picker-calendar .rdp-button_previous:focus-visible,
   .hito-date-picker-calendar .rdp-button_next:focus-visible {
-    background: color-mix(in oklch, var(--color-foreground) 8%, transparent);
+    background: var(--color-chrome-subtle);
     color: var(--color-foreground);
     transform: none;
   }
 
+  .hito-date-picker-calendar .rdp-button_previous:focus-visible,
+  .hito-date-picker-calendar .rdp-button_next:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-ring);
+  }
+
   .hito-date-picker-calendar .rdp-weekday {
-    color: color-mix(in oklch, var(--color-muted-foreground) 78%, transparent);
+    color: var(--color-text-tertiary);
     font-size: 0.6875rem;
     font-weight: 500;
     letter-spacing: 0.08em;
@@ -502,23 +516,23 @@
 
   .hito-date-picker-calendar .rdp-day button {
     border-radius: var(--radius-md);
-    color: color-mix(in oklch, var(--color-foreground) 86%, transparent);
+    color: var(--color-text-secondary);
   }
 
   .hito-date-picker-calendar .rdp-day button:hover {
-    background: color-mix(in oklch, var(--color-foreground) 8%, transparent);
+    background: var(--color-chrome-subtle);
     color: var(--color-foreground);
     transform: none;
   }
 
   .hito-date-picker-calendar .rdp-day button:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px color-mix(in oklch, var(--color-signal) 24%, transparent);
+    box-shadow: 0 0 0 2px var(--color-ring);
   }
 
   .hito-date-picker-calendar .rdp-today button:not([data-selected-single="true"]) {
     box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--color-signal) 42%, transparent);
-    color: color-mix(in oklch, var(--color-signal) 78%, var(--color-foreground));
+    color: var(--color-text-accent);
   }
 
   .hito-date-picker-calendar button[data-selected-single="true"] {
@@ -528,13 +542,13 @@
   }
 
   .hito-date-picker-calendar .rdp-outside button {
-    color: color-mix(in oklch, var(--color-muted-foreground) 52%, transparent);
+    color: var(--color-text-tertiary);
   }
 
   .hito-date-picker-calendar .rdp-disabled button,
   .hito-date-picker-calendar button:disabled {
     background: transparent !important;
-    color: color-mix(in oklch, var(--color-muted-foreground) 38%, transparent) !important;
+    color: var(--color-text-disabled) !important;
     box-shadow: none !important;
     cursor: not-allowed;
   }
@@ -550,7 +564,7 @@
     --hito-typography-role: helper;
     font-size: 0.75rem;
     line-height: 1.45;
-    color: var(--color-muted-foreground);
+    color: var(--color-text-secondary);
   }
 
   .hito-field-error {
@@ -558,7 +572,7 @@
     font-size: 0.875rem;
     font-weight: 500;
     line-height: 1.45;
-    color: var(--color-destructive);
+    color: var(--color-text-negative);
   }
 
   .hito-field-success {
@@ -566,7 +580,7 @@
     font-size: 0.875rem;
     font-weight: 500;
     line-height: 1.45;
-    color: var(--color-success);
+    color: var(--color-text-positive);
   }
 
   .hito-editable-value-field-group {
@@ -612,8 +626,7 @@
 
   .hito-editable-value-field-label {
     flex: 0 0 auto;
-    color: currentColor;
-    opacity: 0.7;
+    color: var(--color-text-secondary);
   }
 
   .hito-editable-value-field-text {
@@ -680,7 +693,7 @@
     font-size: 0.875rem;
     font-weight: 500;
     line-height: 1.45;
-    color: var(--color-destructive);
+    color: var(--color-text-negative);
   }
 
   @media (prefers-reduced-motion: reduce) {

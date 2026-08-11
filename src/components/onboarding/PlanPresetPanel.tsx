@@ -1,4 +1,4 @@
-import { useId, type ReactNode, type RefObject } from "react";
+import type { ReactNode, RefObject } from "react";
 import { HitoDateField, HitoMaskedTimeField } from "@/components/ui/hito-date-time-input";
 import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
 import { Input } from "@/components/ui/input";
@@ -132,7 +132,6 @@ export function PlanPresetPanel({
   onRunnerCommentChange,
   status,
 }: PlanPresetPanelProps) {
-  const runnerCommentHelperId = useId();
   const previewGoalLabel = planGoalChoice
     ? planGoalChoice === "custom" && planGoalCustomDistanceLabel.trim()
       ? planGoalCustomDistanceLabel.trim()
@@ -140,13 +139,10 @@ export function PlanPresetPanel({
     : "Generated";
 
   return (
-    <section className="hito-plan-preset-stage hito-section-divider pt-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <section className="hito-plan-preset-stage pt-8">
+      <div className="flex flex-wrap items-start justify-center gap-4 text-center">
         <div className="max-w-2xl">
-          <p className="hito-micro-label" data-tone="signal">
-            Generated plan
-          </p>
-          <h2 className="hito-ui-panel-title mt-2">Choose your goal.</h2>
+          <h2 className="hito-ui-panel-title">Choose your goal.</h2>
           <p className="hito-helper mt-2">
             Pick one goal. A successful reviewed preview is saved in Plans before its workouts are
             added to Calendar.
@@ -172,7 +168,6 @@ export function PlanPresetPanel({
         <label className="grid min-w-0 gap-2">
           <span className="hito-form-label">Plan context (optional)</span>
           <Textarea
-            aria-describedby={runnerCommentHelperId}
             className="min-h-24 resize-y"
             name="runnerComment"
             onChange={(event) => onRunnerCommentChange(event.target.value)}
@@ -180,9 +175,6 @@ export function PlanPresetPanel({
             rows={3}
             value={runnerComment}
           />
-          <span className="hito-field-helper" id={runnerCommentHelperId}>
-            Share a recent result or training circumstance for this plan request.
-          </span>
         </label>
 
         {!hasRequiredPlanBasics ? (
@@ -268,13 +260,6 @@ function PlanGoalIntentControls({
 
   return (
     <div className="grid gap-4">
-      <div>
-        <p className="hito-list-row-title">What are you training for?</p>
-        <p className="hito-list-row-copy">
-          Race day and finish time stay optional for every generated goal.
-        </p>
-      </div>
-
       <div
         className="grid gap-3 sm:grid-cols-2"
         {...goalGroup.groupProps}
@@ -293,8 +278,6 @@ function PlanGoalIntentControls({
           />
         ))}
       </div>
-
-      {!goalChoice ? <p className="hito-field-helper">Choose what you are training for.</p> : null}
 
       {goalChoice === "custom" ? (
         <div className="hito-form-two-column-grid">

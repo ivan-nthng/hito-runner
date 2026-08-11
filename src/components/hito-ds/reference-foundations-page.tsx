@@ -10,7 +10,6 @@ import { useHitoTabs } from "@/components/ui/hito-tabs";
 import { hitoToast } from "@/components/ui/hito-toast";
 import { HITO_ICON_META, HITO_ICON_SIZES, Icon, type HitoIconSize } from "@/components/ui/icon";
 import { HitoDsLightPaletteReference } from "@/components/hito-ds/light-palette-reference";
-import { ChoiceSelector } from "@/components/hito-ds/specimen-previews";
 import { ReferenceListRow, SectionIntro } from "@/components/hito-ds/reference";
 import { TypographyControlRow } from "@/components/devtools/LocalUiTypographyControls";
 import type { InlineChangeTargetInput } from "@/components/devtools/local-inline-change-target-utils";
@@ -92,12 +91,6 @@ const SEMANTIC_COLOR_TOKENS: readonly SemanticColorTokenData[] = [
     ].join(" / "),
     group: semanticColorGroup(token.id),
   })),
-  {
-    name: "canvas atmosphere",
-    value: "hito-canvas-atmosphere",
-    mapsTo: "stone alpha gradients",
-    group: "gradient / overlay",
-  },
   {
     name: "auth photo overlay",
     value: "hito-auth-photo-overlay",
@@ -188,27 +181,6 @@ const TYPOGRAPHY_FAMILIES = [
   },
 ] as const;
 
-type ButtonVariant = (typeof BUTTON_VARIANTS)[number];
-type ButtonTone = (typeof BUTTON_TONES)[number];
-type ButtonSize = (typeof BUTTON_SIZES)[number];
-type InputVariant = (typeof INPUT_VARIANTS)[number];
-type InputState = (typeof INPUT_STATES)[number];
-type InputFeedback = (typeof INPUT_FEEDBACK)[number];
-type ChoiceToggleSize = (typeof CHOICE_TOGGLE_SIZES)[number];
-type SelectionControlKind = (typeof SELECTION_CONTROL_KINDS)[number];
-type SelectionBinarySize = (typeof SELECTION_BINARY_SIZES)[number];
-type ModalSizeMode = (typeof MODAL_SIZE_MODES)[number];
-type ModalBodyMode = (typeof MODAL_BODY_MODES)[number];
-type ModalHeaderMode = (typeof MODAL_HEADER_MODES)[number];
-type ModalFooterMode = (typeof MODAL_FOOTER_MODES)[number];
-type TabStyle = (typeof TAB_STYLES)[number];
-type StatusTone = (typeof STATUS_TONES)[number];
-type DataTableSortDirection = (typeof DATA_TABLE_SORT_DIRECTIONS)[number];
-type RowDensity = (typeof ROW_DENSITIES)[number];
-type ShellContext = (typeof SHELL_CONTEXTS)[number];
-type AsyncToastDemoState = "info" | "working" | "success" | "error";
-
-const HITO_DS_TOAST_ID = "hito-ds-async-action-toast";
 export function HitoDsFoundationsPage() {
   const [colorTab, setColorTab] = useState<ColorTab>("semantic");
   const [iconPreviewSize, setIconPreviewSize] = useState<HitoIconSize>("md");
@@ -324,15 +296,6 @@ export function HitoDsFoundationsPage() {
 
         <div className="grid gap-8">
           <div className="grid gap-5 xl:grid-cols-2">
-            <article className="hito-canvas-atmosphere rounded-2xl border border-hairline bg-background p-5">
-              <p className="hito-label hito-label-signal">Canvas atmosphere</p>
-              <h3 className="hito-panel-title mt-3">Route-level depth only.</h3>
-              <p className="hito-body-small mt-3 text-muted-foreground">
-                Use <code className="hito-inline-code">hito-canvas-atmosphere</code> for large app
-                canvases and design-system reference pages, not nested cards.
-              </p>
-            </article>
-
             <article className="auth-hero min-h-[14rem] overflow-hidden rounded-2xl border border-hairline">
               <img src={loginDesertHorizon} alt="" aria-hidden="true" className="auth-hero-image" />
               <div className="hito-auth-photo-overlay" aria-hidden="true" />
@@ -1097,17 +1060,8 @@ function SemanticColorPreview({ token }: { token: SemanticColorTokenData }) {
     );
   }
 
-  if (token.value === "hito-canvas-atmosphere" || token.value === "hito-editorial-signal-wash") {
-    return (
-      <span
-        aria-hidden="true"
-        className={cn(
-          className,
-          token.value === "hito-canvas-atmosphere" && "bg-background",
-          token.value,
-        )}
-      />
-    );
+  if (token.value === "hito-editorial-signal-wash") {
+    return <span aria-hidden="true" className={cn(className, token.value)} />;
   }
 
   return (

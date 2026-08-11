@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const SUPABASE_CLI_VERSION = "2.109.1";
 const PRODUCTION_SUPABASE_PROJECT_REF = "dltfjwexyctmihclcjqj";
 const REQUIRED_PROFILE_COLUMNS = ["baseline_revision", "fitness_level", "heart_rate_profile"];
-const REQUIRED_REVIEW_RPC = "apply_reviewed_plan_persistence_with_profile_revision";
+const REQUIRED_REVIEW_RPC = "apply_reviewed_plan_persistence";
 const REQUIRED_MIGRATION_HISTORY_RPC = "list_hito_applied_migration_versions";
 const args = new Set(process.argv.slice(2));
 const vercelBuild = args.has("--vercel-build");

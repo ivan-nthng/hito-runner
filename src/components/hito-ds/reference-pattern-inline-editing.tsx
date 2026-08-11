@@ -47,6 +47,16 @@ export function HitoDsPatternInlineEditing() {
       label="Inline editable text"
       status="Interaction pattern"
       statusTone="signal"
+      description={{
+        purpose:
+          "Let a short visible title or label enter a bounded text-edit state without replacing its reading hierarchy.",
+        useWhen:
+          "A source-owned short string benefits from direct edit, commit, cancel, and validation in place.",
+        avoidWhen:
+          "The edit is long-form, multi-field, destructive, or requires a separate review workflow.",
+        accessibility:
+          "The edit affordance is named; Enter, Escape, blur, validation, focus restoration, and read-only state remain explicit.",
+      }}
       usedIn="Manual workout draft titles, section labels, and template names."
       demo={
         <div className="grid min-w-0 gap-5">

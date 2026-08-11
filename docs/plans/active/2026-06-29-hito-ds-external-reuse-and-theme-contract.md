@@ -18,17 +18,22 @@ product
 
 ## Task
 
-Select a new bounded discoverability or safe-reuse outcome without reopening accepted Inspector,
-typography, or heart-rate guidance work.
+Retain the broader discoverability and safe-reuse program while the selected `/hitoDS` showcase
+child owns the current implementation gate. Any later expansion requires a new bounded Product
+selection without reopening accepted Inspector, typography, or heart-rate guidance work.
 
 ## Stage
 
-PRODUCT selection / the former Settings-bounds blocker is superseded by accepted backend and frontend heart-rate guidance work; broader Global QA remains separate.
+DESIGN SYSTEM child selected / Ivan accepted a bounded high-priority `/hitoDS` showcase,
+navigation, and catalogue information-architecture task; the broader discoverability and external
+reuse program remains backlog.
 
 ## Next Gate
 
-No implementation gate is selected. A future task must begin from fresh source evidence and reuse the
-accepted Hito DS catalog and Inspector provenance owners instead of creating a parallel registry.
+The selected implementation gate is
+[Hito DS Showcase Navigation And Catalog Information Architecture](../../tasks/backlog/2026-08-10-hito-ds-showcase-navigation-and-catalog-ia.md).
+That canonical backlog item owns execution and lifecycle. This supporting plan remains backlog and
+must not become a second active task or a parallel registry.
 
 ## Owner
 
@@ -36,7 +41,7 @@ ARCHITECT / DESIGNER / FRONTEND
 
 ## Last Updated
 
-2026-07-24
+2026-08-10
 
 ## Exact Handoff Prompt
 
@@ -44,16 +49,20 @@ ARCHITECT / DESIGNER / FRONTEND
 ROLE: PRODUCT
 
 Task:
-Select one new, source-proven bounded Hito DS discoverability or safe-reuse task, or retain this plan in backlog.
+After the selected Hito DS showcase child completes, decide whether one further source-proven
+discoverability or safe-reuse outcome is needed, or retain this broader plan in backlog.
 
 Stage:
-PRODUCT selection / completed Inspector, typography, and heart-rate guidance slices remain closed.
+PRODUCT follow-up selection / the Hito DS showcase child owns the current implementation gate;
+completed Inspector, typography, and heart-rate guidance slices remain closed.
 
 Context:
 The Local Inspector and typography provenance work are accepted local-only tooling. The shared heart-rate guidance editor is accepted across its existing runner consumers. Global QA is a separate release gate and does not reopen these task-level outcomes.
 
 Required outcome:
-Choose work only when fresh evidence identifies one canonical owner, one user or maintainer problem, and a bounded validation story. Preserve the existing catalog, metadata, and runner-profile contracts.
+Do not create a second active task while the selected showcase child is open. Any later outcome must
+begin from fresh evidence, one canonical owner, one user or maintainer problem, and one bounded
+validation story. Preserve the existing catalogue, metadata, and runner-profile contracts.
 ```
 
 ## Context

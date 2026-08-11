@@ -53,6 +53,7 @@ import {
   ManualWorkoutSourceActionMenu,
 } from "@/components/manual-workout/ManualWorkoutAuthoringControls";
 import { ManualWorkoutMoveController } from "@/components/manual-workout/ManualWorkoutMoveControls";
+import { CalendarOverflowActions } from "@/components/calendar/CalendarOverflowActions";
 
 type View = "month" | "week";
 type TooltipAnchor = {
@@ -164,6 +165,7 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
           >
             <Icon name="chevron-right" size="sm" />
           </HitoButton>
+          <CalendarOverflowActions onCalendarRefresh={() => router.invalidate({ sync: true })} />
         </div>
       </div>
 

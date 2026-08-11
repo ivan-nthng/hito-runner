@@ -30,6 +30,8 @@ export function SliderPlayground() {
   const max = range === "five" ? 5 : 10;
   const previousValue = range === "five" ? 2 : 4;
   const previousDualValue = (range === "five" ? [2, 5] : [3, 8]) as readonly [number, number];
+  const markerValues = range === "five" ? [2, 4] : [3, 6, 9];
+  const dualMarkerValues = range === "five" ? [2, 3, 4] : [2, 4, 6, 7, 9];
   const rangeGroup = useHitoRadioGroup({
     items: RANGE_OPTIONS.map((option) => ({ value: option.value })),
     value: range,
@@ -51,6 +53,16 @@ export function SliderPlayground() {
       label="Slider"
       status="Shared control"
       statusTone="signal"
+      description={{
+        purpose:
+          "Adjust one bounded numeric value or an ordered pair with shared size, radius, and reversible-baseline behavior.",
+        useWhen:
+          "Relative adjustment within a known range is faster to understand than free-form numeric entry.",
+        avoidWhen:
+          "Exact entry is primary, the range is unbounded, or endpoint meaning cannot be labelled clearly.",
+        accessibility:
+          "Each handle has an accessible label and value; keyboard adjustment, focus, disabled state, ordering, and baseline restore remain operable.",
+      }}
       usedIn={
         <ProductLinks
           links={[
@@ -73,6 +85,7 @@ export function SliderPlayground() {
             max={max}
             step={1}
             size={size}
+            markers={markerValues}
             value={value}
             previousValue={previousValue}
             previousValueLabel={`Restore baseline ${previousValue} out of ${max}`}
@@ -93,6 +106,7 @@ export function SliderPlayground() {
               minLabel="lower endpoint"
               maxLabel="upper endpoint"
               size={size}
+              markers={dualMarkerValues}
               value={dualValue}
               previousValue={previousDualValue}
               onMinValueChange={(nextValue) =>
@@ -116,6 +130,7 @@ export function SliderPlayground() {
                 max={10}
                 step={1}
                 size={specimenSize}
+                markers={[3, 6, 9]}
                 value={6}
                 previousValue={4}
                 valueLabel="6/10"
@@ -128,6 +143,7 @@ export function SliderPlayground() {
                 minLabel="Specimen lower endpoint"
                 maxLabel="Specimen upper endpoint"
                 size={specimenSize}
+                markers={[2, 4, 6, 7, 9]}
                 value={[4, 7]}
                 previousValue={[3, 8]}
                 onMinValueChange={noop}
@@ -207,9 +223,26 @@ export function SliderPlayground() {
           <div className="hito-row-group border-0">
             <div className="hito-list-row">
               <div>
+                <p className="hito-list-row-title">Scale markers</p>
+                <p className="hito-list-row-copy">
+                  Gray points are passive. A coincident solid handle completely occludes its point.
+                </p>
+              </div>
+            </div>
+            <div className="hito-list-row">
+              <div>
                 <p className="hito-list-row-title">Baseline</p>
                 <p className="hito-list-row-copy">
                   The gray point is an action: activate it to restore the controlled endpoint.
+                </p>
+              </div>
+            </div>
+            <div className="hito-list-row">
+              <div>
+                <p className="hito-list-row-title">Motion</p>
+                <p className="hito-list-row-copy">
+                  Controlled visuals ease between exact values and become immediate with reduced
+                  motion.
                 </p>
               </div>
             </div>

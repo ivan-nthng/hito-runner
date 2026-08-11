@@ -25,27 +25,40 @@ import {
 
 export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId }) {
   const [mobileJumpOpen, setMobileJumpOpen] = useState(false);
+  const [mobileSearchQuery, setMobileSearchQuery] = useState("");
   const currentPage = getHitoDsPage(pageId);
+  const [activeHref, setActiveHref] = useState<string>(currentPage.path);
 
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
 
-    const hashSection = getSectionIdFromHash(window.location.hash);
-    const targetPage = hashSection ? getHitoDsPageForSection(hashSection) : null;
+    const syncActiveDestination = () => {
+      const hashSection = getSectionIdFromHash(window.location.hash);
+      const canonicalSection = hashSection === "shell" ? "app-shell" : hashSection;
+      const targetPage = canonicalSection ? getHitoDsPageForSection(canonicalSection) : null;
 
-    if (targetPage && targetPage.id !== pageId) {
-      window.location.replace(`${targetPage.path}#${hashSection}`);
-    }
+      if (targetPage && (targetPage.id !== pageId || canonicalSection !== hashSection)) {
+        window.location.replace(`${targetPage.path}#${canonicalSection}`);
+        return;
+      }
+
+      setActiveHref(`${window.location.pathname}${window.location.hash}`);
+    };
+
+    syncActiveDestination();
+    window.addEventListener("hashchange", syncActiveDestination);
+    return () => window.removeEventListener("hashchange", syncActiveDestination);
   }, [pageId]);
 
   const closeMobileJump = () => {
     setMobileJumpOpen(false);
+    setMobileSearchQuery("");
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground hito-canvas-atmosphere">
+    <div className="min-h-screen bg-surface text-foreground">
       <div className="hito-workbench-shell">
         <aside className="hito-workbench-sidebar px-5 py-6">
           <div>
@@ -53,7 +66,7 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
             <p className="hito-shell-brand-kicker">Design System</p>
           </div>
 
-          <HitoDsNestedNav idPrefix="desktop" activePageId={pageId} />
+          <HitoDsNestedNav idPrefix="desktop" activeHref={activeHref} />
 
           <div className="hito-workbench-sidebar-footer">
             <ThemePreferenceChoiceGroup label={null} />
@@ -75,7 +88,15 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                 <HitoLogoMark decorative className="text-foreground [--hito-logo-height:1.65rem]" />
               </div>
               <ThemePreferenceChoiceGroup label={null} />
-              <Sheet open={mobileJumpOpen} onOpenChange={setMobileJumpOpen}>
+              <Sheet
+                open={mobileJumpOpen}
+                onOpenChange={(open) => {
+                  setMobileJumpOpen(open);
+                  if (!open) {
+                    setMobileSearchQuery("");
+                  }
+                }}
+              >
                 <SheetTrigger asChild>
                   <HitoButton
                     size="sm"
@@ -91,6 +112,11 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                 <SheetContent
                   side="bottom"
                   className="inset-0 flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none border-0 p-0 sm:max-w-none"
+                  onEscapeKeyDown={(event) => {
+                    if (mobileSearchQuery) {
+                      event.preventDefault();
+                    }
+                  }}
                 >
                   <SheetHeader className="border-b border-hairline px-5 py-4 pr-14">
                     <SheetTitle>Browse DS pages</SheetTitle>
@@ -99,8 +125,9 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                   <div id="hito-ds-mobile-jump-nav" className="hito-ds-mobile-jump-nav">
                     <HitoDsNestedNav
                       idPrefix="mobile"
-                      activePageId={pageId}
+                      activeHref={activeHref}
                       onNavigate={closeMobileJump}
+                      onQueryChange={setMobileSearchQuery}
                     />
                   </div>
                 </SheetContent>
@@ -110,7 +137,7 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
 
           <div className="mx-auto max-w-6xl px-6 py-8 lg:px-10 lg:py-10">
             {pageId !== "overview" ? (
-              <header className="hito-page-header border-t border-hairline pt-8">
+              <header className="hito-page-header pt-8">
                 <p className="hito-label hito-label-signal">Hito design system</p>
                 <h1 className="hito-page-title">{currentPage.label}.</h1>
               </header>

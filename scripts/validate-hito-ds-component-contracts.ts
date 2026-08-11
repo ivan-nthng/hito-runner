@@ -181,6 +181,7 @@ type SourceFile = {
 type GeneratedManifest = {
   collections: {
     primitiveSpacing: Array<{ cssVariable: string; id: string }>;
+    semanticColor: Array<{ cssVariable: string; id: string }>;
     [key: string]: unknown;
   };
   sourceDigest?: string;
@@ -581,6 +582,12 @@ const hitoDsRoute = sourceFiles.find((file) => file.relativePath === "src/routes
 const hitoCalendarDaySource = sourceFiles.find(
   (file) => file.relativePath === "src/components/ui/hito-calendar-day.tsx",
 );
+const selectSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/ui/select.tsx",
+);
+const overlaysFeedbackSource = sourceFiles.find(
+  (file) => file.relativePath === "src/styles/overlays-feedback.css",
+);
 const hubRoute = sourceFiles.find((file) => file.relativePath === "src/routes/hub.tsx");
 const showcaseBoundaryLeaks = showcaseBoundaryLeakFindings(sourceFiles);
 const uiTitleRoles = HITO_TYPOGRAPHY_ROLES.filter((role) => role.group === "ui-title");
@@ -593,6 +600,44 @@ const titleLineBoxProperties = [
   "line-height",
   "text-wrap",
 ] as const;
+const neutralChromeTokenIds = [
+  "chrome-clear",
+  "chrome-subtle",
+  "chrome-standard",
+  "chrome-strong",
+  "chrome-edge-default",
+  "chrome-edge-emphasis",
+  "text-secondary",
+  "text-tertiary",
+  "text-disabled",
+  "text-accent",
+  "text-positive",
+  "text-negative",
+  "text-informative",
+  "text-warning",
+] as const;
+
+expect(
+  neutralChromeTokenIds.every((id) =>
+    generatedManifest.collections.semanticColor.some((token) => token.id === id),
+  ),
+  "The generated manifest must retain the canonical neutral chrome and content roles.",
+);
+expect(
+  generatedManifest.collections.semanticColor.every(
+    (token) => token.id !== "secondary" && token.id !== "secondary-foreground",
+  ),
+  "Retired secondary foundation color roles returned to the manifest.",
+);
+expect(
+  selectSource?.content.includes("hitoFieldClasses({") === true &&
+    selectSource.content.includes('className="opacity-50"') === false &&
+    overlaysFeedbackSource?.content.includes(".hito-ui-select-trigger:hover") === false &&
+    fieldBaseCss.includes("background: var(--color-chrome-subtle);") &&
+    fieldBaseCss.includes("color: var(--color-text-tertiary);") &&
+    fieldBaseCss.includes("box-shadow: 0 0 0 2px var(--color-ring);"),
+  "Select must reuse the tokenized Field contract without reviving duplicate chrome or attenuated icon opacity.",
+);
 
 expect(
   uiTitleRoles.length === 4,
@@ -1105,6 +1150,9 @@ expect(
 expect(
   sliderSource?.content.includes("size?: HitoFieldSize;") === true &&
     sliderSource.content.includes('size = "sm"') &&
+    sliderSource.content.includes("markers?: readonly number[];") &&
+    sliderSource.content.includes('className="hito-slider-marker"') &&
+    sliderSource.content.includes('className="hito-slider-handle"') &&
     sliderSource.content.includes("previousValue?: number;") &&
     sliderSource.content.includes('type="button"') &&
     sliderSource.content.includes("onClick={() => onValueChange(previousValue)}"),
@@ -1113,6 +1161,10 @@ expect(
 expect(
   dualRangeSource?.content.includes("size?: HitoFieldSize;") === true &&
     dualRangeSource.content.includes('size = "sm"') &&
+    dualRangeSource.content.includes("markers?: readonly number[];") &&
+    dualRangeSource.content.includes('className="hito-dual-range-marker"') &&
+    dualRangeSource.content.includes("hito-dual-range-handle-min") &&
+    dualRangeSource.content.includes("hito-dual-range-handle-max") &&
     dualRangeSource.content.includes("previousValue?: readonly [number, number];") &&
     dualRangeSource.content.includes("onClick={() => onMinValueChange(previousValue[0])}") &&
     dualRangeSource.content.includes("onClick={() => onMaxValueChange(previousValue[1])}"),
@@ -1130,14 +1182,55 @@ expect(
       "background: color-mix(in oklch, var(--color-foreground) 42%, transparent);",
     ) &&
     controlsCss.includes("height: var(--hito-range-control-height") &&
-    controlsCss.includes("background: var(--hito-slider-accent);") &&
-    controlsCss.includes("background: var(--hito-dual-range-accent);"),
+    selectorDeclarations(controlsCss, ".hito-slider-input::-webkit-slider-thumb")?.background ===
+      "transparent" &&
+    selectorDeclarations(controlsCss, ".hito-dual-range-input::-webkit-slider-thumb")
+      ?.background === "transparent" &&
+    selectorDeclarations(controlsCss, ".hito-slider-handle")?.background ===
+      "var(--hito-slider-accent)" &&
+    selectorDeclarations(controlsCss, ".hito-dual-range-handle")?.background ===
+      "var(--hito-dual-range-accent)" &&
+    controlsCss.includes("left var(--hito-motion-duration-140) var(--hito-motion-ease-out)") &&
+    controlsCss.includes(".hito-slider-input:focus-visible ~ .hito-slider-visual-track") &&
+    controlsCss.includes(".hito-dual-range-input-min:focus-visible") &&
+    controlsCss.includes(".hito-dual-range-selection {"),
   "Slider chrome must retain alpha rail/selection/markers with full-height solid signal handles.",
+);
+expect(
+  selectorDeclarations(controlsCss, ".hito-slider-input,\n  .hito-dual-range-rail")?.cursor ===
+    "pointer" &&
+    selectorDeclarations(
+      controlsCss,
+      ".hito-slider-input::-webkit-slider-thumb,\n  .hito-dual-range-input::-webkit-slider-thumb",
+    )?.cursor === "grab" &&
+    selectorDeclarations(
+      controlsCss,
+      ".hito-slider-input::-moz-range-thumb,\n  .hito-dual-range-input::-moz-range-thumb",
+    )?.cursor === "grab" &&
+    selectorDeclarations(controlsCss, ".hito-slider-input:active,\n  .hito-dual-range-rail:active")
+      ?.cursor === "grabbing" &&
+    selectorDeclarations(
+      controlsCss,
+      ".hito-slider-input:active::-webkit-slider-thumb,\n  .hito-dual-range-input:active::-webkit-slider-thumb",
+    )?.cursor === "grabbing" &&
+    selectorDeclarations(
+      controlsCss,
+      ".hito-slider-input:active::-moz-range-thumb,\n  .hito-dual-range-input:active::-moz-range-thumb",
+    )?.cursor === "grabbing" &&
+    selectorDeclarations(controlsCss, '.hito-slider[data-disabled="true"] .hito-slider-input')
+      ?.cursor === "not-allowed" &&
+    selectorDeclarations(
+      controlsCss,
+      '.hito-dual-range[data-disabled="true"] .hito-dual-range-rail',
+    )?.cursor === "not-allowed",
+  "Single and dual sliders must share pointer rails, grab handles, grabbing active states, and disabled cursor affordance.",
 );
 expect(
   sliderPlaygroundSource?.content.includes("HITO_FIELD_SIZES.map") === true &&
     sliderPlaygroundSource.content.includes("HitoDualRange") &&
     sliderPlaygroundSource.content.includes('aria-label="Slider size"') &&
+    sliderPlaygroundSource.content.includes("markers={markerValues}") &&
+    sliderPlaygroundSource.content.includes("markers={dualMarkerValues}") &&
     sliderPlaygroundSource.content.includes("previousValue={previousValue}") &&
     sliderPlaygroundSource.content.includes("previousValue={previousDualValue}"),
   "The Slider playground must expose every shared size and interactive single/dual baseline restoration.",
@@ -1290,6 +1383,7 @@ if (errors.length > 0) {
       retiredSelectors: retiredFoundationSelectors.length,
       retiredTokens: retiredFoundationTokens.length,
       retiredWorkoutShades: retiredWorkoutShadeDeclarations.length,
+      semanticColors: generatedManifest.collections.semanticColor.length,
       textStyles: generatedManifest.textStyles.length,
       uiTitleRoles: uiTitleRoles.length,
       workoutDomainBases: retainedWorkoutBaseDefinitions.length,

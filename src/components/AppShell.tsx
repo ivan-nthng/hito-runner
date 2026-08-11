@@ -84,7 +84,7 @@ export function AppShell({
   const useFreshHomeRequest = shellSnapshot.mode !== "preview";
 
   return (
-    <div className="min-h-screen flex bg-background text-foreground hito-canvas-atmosphere">
+    <div className="min-h-screen flex bg-background text-foreground">
       <RunnerCalendarTimezoneBootstrap
         enabled={snapshot?.source === "persisted"}
         preference={
@@ -233,7 +233,7 @@ export function AppShell({
       </aside>
 
       <main className="flex-1 min-w-0 flex flex-col">
-        <header className="sticky top-0 z-30 border-b border-hairline bg-background/70 backdrop-blur-xl">
+        <header className="sticky top-0 z-30 bg-background/90 backdrop-blur-xl">
           <div className="flex items-center gap-6 px-6 lg:px-10 h-14">
             <Link
               to="/"

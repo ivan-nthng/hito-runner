@@ -3,7 +3,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import {
   applySavedPlanRecordForUser,
-  retainReviewedGeneratedPlanCandidateForUser,
+  retainReviewedPlanCandidateForUser,
 } from "@/lib/active-plan-persistence";
 import { CalendarPersistenceRejection } from "@/lib/active-plan-lifecycle-persistence";
 import { getRequestAuthContext } from "@/lib/backend/auth";
@@ -363,9 +363,9 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
     });
   }
 
-  let savedPlan: Awaited<ReturnType<typeof retainReviewedGeneratedPlanCandidateForUser>>;
+  let savedPlan: Awaited<ReturnType<typeof retainReviewedPlanCandidateForUser>>;
   try {
-    savedPlan = await retainReviewedGeneratedPlanCandidateForUser({
+    savedPlan = await retainReviewedPlanCandidateForUser({
       userId,
       canonicalPlan: exactness.canonicalPlan,
       reviewChecksum: exactness.reviewChecksum,
@@ -541,7 +541,7 @@ export async function buildReviewedAiGeneratedRunningPlanPreviewForUser(
   }
 
   try {
-    const savedPlan = await retainReviewedGeneratedPlanCandidateForUser({
+    const savedPlan = await retainReviewedPlanCandidateForUser({
       userId,
       canonicalPlan: reviewed.draft.canonicalPlan,
       reviewChecksum: reviewed.draft.reviewChecksum,

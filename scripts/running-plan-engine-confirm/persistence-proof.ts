@@ -24,7 +24,8 @@ import {
   getSavedPlanRecordForUser,
   listSavedPlanLibraryForUser,
   logicallyRemoveSavedPlanRecordForUser,
-  retainReviewedGeneratedPlanCandidateForUser,
+  readSavedPlanPayload,
+  retainReviewedPlanCandidateForUser,
 } from "../../src/lib/active-plan-persistence";
 import {
   exportSavedPlanForUser,
@@ -141,7 +142,10 @@ export async function validatePersistenceContract(
   const persistedDistanceGoals: Array<{
     goalLabel: string;
     distanceMeters: number | null;
-    rows: number;
+    savedSourceRows: number;
+    materializedCalendarRows: number;
+    omittedLeadingRows: number;
+    runnerCurrentDate: string;
     sourceKind: string;
     availability: {
       fixedRestDays: string[] | null;
@@ -175,12 +179,42 @@ export async function validatePersistenceContract(
       );
       if (!result.ok) throw new Error(result.message);
 
+      const expectedMaterialization = await prepareExpectedSavedPlanMaterialization({
+        supabase,
+        userId,
+        savedPlanId: result.savedPlanId,
+      });
       const persisted = await loadPersistedPlanForUser(supabase, userId);
       assert.equal(persisted.plan.source_kind, draft.sourceKind);
-      assert.equal(persisted.workouts.length, draft.canonicalRowCount);
+      assert.equal(
+        expectedMaterialization.savedPlan.planned_workouts.length,
+        draft.canonicalRowCount,
+      );
+      assert.equal(
+        expectedMaterialization.savedPlan.planned_workouts.filter(
+          (workout) => workout.workout_type !== "rest",
+        ).length,
+        draft.canonicalNonRestRowCount,
+      );
+      assert.equal(
+        persisted.workouts.length,
+        expectedMaterialization.prepared.importedSeed.workouts.length,
+      );
       assert.equal(
         persisted.workouts.filter((workout) => workout.workout_type !== "rest").length,
-        draft.canonicalNonRestRowCount,
+        expectedMaterialization.prepared.workoutCount,
+      );
+      assert.equal(
+        result.calendarRowCount,
+        expectedMaterialization.prepared.importedSeed.workouts.length,
+      );
+      assert.equal(result.appliedStartDate, expectedMaterialization.prepared.appliedStartDate);
+      assert.deepEqual(
+        persisted.workouts.map((workout) => workout.source_workout_id),
+        expectedMaterialization.prepared.importedSeed.workouts.map(
+          (workout) => workout.sourceWorkoutId,
+        ),
+        "Calendar materialization must preserve the retained source-row order after leading omission.",
       );
       assert.equal(
         (persisted.plan.goal_metadata as { selected_plan_engine?: { source_status?: string } })
@@ -197,7 +231,7 @@ export async function validatePersistenceContract(
 
       if (draft.canonicalRowCount >= 210) {
         const snapshot = await getPersistedSnapshot(userId);
-        assert.equal(snapshot.workouts.length, draft.canonicalRowCount);
+        assert.equal(snapshot.workouts.length, persisted.workouts.length);
         assert.equal(snapshot.planMeta?.id, persisted.plan.id);
         assert.deepEqual(
           snapshot.workouts.map((workout) => workout.id),
@@ -210,8 +244,8 @@ export async function validatePersistenceContract(
           exportedAt: "2026-07-27T12:00:00.000Z",
         });
         const reimported = activePlanExportToTrainingPlanV2(exportPayload);
-        assert.equal(reimported.planned_workouts.length, draft.canonicalRowCount);
-        assert.equal(buildImportedPlanSeed(reimported).workouts.length, draft.canonicalRowCount);
+        assert.equal(reimported.planned_workouts.length, persisted.workouts.length);
+        assert.equal(buildImportedPlanSeed(reimported).workouts.length, persisted.workouts.length);
       }
       const persistedPlanPreferences = asJsonRecord(persisted.plan.plan_preferences);
       const expectedFixedRestDays = draft.normalizedInputSummary.fixedRestDays;
@@ -234,6 +268,7 @@ export async function validatePersistenceContract(
         persistedPlanPreferences?.preferred_long_run_day,
         draft.normalizedInputSummary.preferredLongRunDay ?? undefined,
       );
+      assert.deepEqual(expectedMaterialization.savedPlan, draft.canonicalPlan);
 
       const duplicate = await confirmRunningPlanDraftForUser(
         userId,
@@ -242,13 +277,16 @@ export async function validatePersistenceContract(
       );
       assert.equal(duplicate.ok, false);
       if (!duplicate.ok) {
-        assert.equal(duplicate.reason, "replacement_required");
+        assert.equal(duplicate.reason, "replacement_required", JSON.stringify(duplicate));
       }
 
       distanceGoalProof = {
         goalLabel: distanceGoal.goalLabel,
         distanceMeters: distanceGoal.distanceMeters,
-        rows: persisted.workouts.length,
+        savedSourceRows: expectedMaterialization.savedPlan.planned_workouts.length,
+        materializedCalendarRows: persisted.workouts.length,
+        omittedLeadingRows: expectedMaterialization.prepared.omittedLeadingDayCount,
+        runnerCurrentDate: expectedMaterialization.prepared.currentDate,
         sourceKind: draft.sourceKind,
         availability: {
           fixedRestDays: expectedFixedRestDays,
@@ -324,7 +362,7 @@ async function validateSavedPlanLibraryPersistence(input: {
     const savedRecords = [];
     for (const draft of input.reviewedDrafts) {
       savedRecords.push(
-        await retainReviewedGeneratedPlanCandidateForUser({
+        await retainReviewedPlanCandidateForUser({
           userId: owner.userId,
           canonicalPlan: draft.canonicalPlan,
           reviewChecksum: draft.reviewChecksum,
@@ -644,10 +682,18 @@ async function validateSavedPlanLibraryPersistence(input: {
     assert.equal(calendarBeforeImpossibleStart.error, null);
     await assert.rejects(
       applySavedPlanRecordForUser(owner.userId, savedRecords[0]!.id, "apply_if_future_empty", {
-        fixedRestDays: ["Monday", "Tuesday", "Wednesday", "Thursday"],
+        fixedRestDays: [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday",
+        ],
         preferredLongRunDay: "Sunday",
       }),
-      /only 3 compatible weekdays/i,
+      /Leave at least one weekday available for running/i,
     );
     const calendarAfterImpossibleStart = await input.supabase
       .from("planned_workouts")
@@ -1118,7 +1164,10 @@ async function validateQaFixtureRuntimePersistence(input: {
   const previousEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
   let proof: {
     providerCalls: number;
-    rows: number;
+    savedSourceRows: number;
+    materializedCalendarRows: number;
+    omittedLeadingRows: number;
+    runnerCurrentDate: string;
     sourceKind: string;
     responseId: string;
     reviewChecksum: string;
@@ -1199,10 +1248,24 @@ async function validateQaFixtureRuntimePersistence(input: {
       { allowLocalQaFixture: true },
     );
     assert.equal(confirmed.ok, true, JSON.stringify(confirmed));
+    if (!confirmed.ok) throw new Error(confirmed.message);
     assert.equal(providerCalls, 0);
 
+    const expectedMaterialization = await prepareExpectedSavedPlanMaterialization({
+      supabase: input.supabase,
+      userId: disposableUser.userId,
+      savedPlanId: confirmed.savedPlanId,
+    });
     const persisted = await loadPersistedPlanForUser(input.supabase, disposableUser.userId);
-    assert.equal(persisted.workouts.length, reviewed.draft.canonicalRowCount);
+    assert.equal(
+      expectedMaterialization.savedPlan.planned_workouts.length,
+      reviewed.draft.canonicalRowCount,
+    );
+    assert.equal(
+      persisted.workouts.length,
+      expectedMaterialization.prepared.importedSeed.workouts.length,
+    );
+    assert.equal(confirmed.calendarRowCount, persisted.workouts.length);
     assert.equal(persisted.plan.source_kind, reviewed.draft.sourceKind);
     const persistedJson = JSON.stringify(persisted);
     assert.equal(persistedJson.includes(transientContextCanary), false);
@@ -1239,7 +1302,10 @@ async function validateQaFixtureRuntimePersistence(input: {
 
     proof = {
       providerCalls,
-      rows: persisted.workouts.length,
+      savedSourceRows: expectedMaterialization.savedPlan.planned_workouts.length,
+      materializedCalendarRows: persisted.workouts.length,
+      omittedLeadingRows: expectedMaterialization.prepared.omittedLeadingDayCount,
+      runnerCurrentDate: expectedMaterialization.prepared.currentDate,
       sourceKind: persisted.plan.source_kind,
       responseId: AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID,
       reviewChecksum: reviewed.draft.reviewChecksum,
@@ -1679,6 +1745,14 @@ async function validatePersonalHeartRateProfilePersistence(input: {
     });
     const exportPlan = activePlanExportToTrainingPlanV2(exportPayload);
     const exportTargets = collectTargetRecords(exportPlan.planned_workouts);
+    const selectedSavedPlanExport = await exportSavedPlanForUser(
+      owner.userId,
+      confirmed.savedPlanId,
+      "json",
+    );
+    const selectedSavedPlanTargets = collectTargetRecords(
+      (JSON.parse(selectedSavedPlanExport.body) as TrainingPlanV2).planned_workouts,
+    );
     assert.ok(
       exportTargets.some(
         (target) =>
@@ -1700,7 +1774,7 @@ async function validatePersonalHeartRateProfilePersistence(input: {
       "Export must preserve reviewed BPM guidance, named identity, parent snapshot, and provenance.",
     );
     assert.ok(
-      exportTargets.some(
+      selectedSavedPlanTargets.some(
         (target) =>
           target.primary_execution_mode === "heart_rate" &&
           target.target_source === "ai_authored_plan_guidance" &&
@@ -1717,7 +1791,7 @@ async function validatePersonalHeartRateProfilePersistence(input: {
           target.hr_execution_range_kind === "ai_selected_subrange" &&
           target.extra === undefined,
       ),
-      "Export must preserve the confirmed execution subrange independently of its parent band.",
+      "Selected saved-plan export must preserve the source execution subrange independently of its parent band.",
     );
     assert.match(renderPlanExportMarkdown(exportPayload), /116-135 bpm/);
     assert.doesNotMatch(renderPlanExportMarkdown(exportPayload), /\bZ[1-5](?:-Z[1-5])?\b/);
@@ -2172,6 +2246,35 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
       .single();
     assert.equal(baselineBefore.error, null);
 
+    const historicalPlanId = crypto.randomUUID();
+    const historicalWorkoutId = crypto.randomUUID();
+    await assert.rejects(
+      applyAtomicReviewedPlanPersistence({
+        userId: disposableUser.userId,
+        profile: profilePayload,
+        plan: buildPlanPayload(
+          historicalPlanId,
+          "Historical row rejection proof",
+          "historical_row_rejection",
+        ),
+        workouts: [
+          {
+            ...buildAtomicCreationWorkout(
+              historicalWorkoutId,
+              historicalPlanId,
+              disposableUser.userId,
+              "easy",
+            ),
+            workout_date: "2026-07-19",
+            weekday: "Sunday",
+          },
+        ] as unknown as Json,
+        currentDate: "2026-07-20",
+        expectedProfileRevision: savedBaseline.profileRevision,
+      }),
+      (error) => error instanceof CalendarPersistenceRejection && error.reason === "invalid_input",
+    );
+
     await assert.rejects(
       applyAtomicReviewedPlanPersistence({
         userId: disposableUser.userId,
@@ -2180,6 +2283,7 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
         workouts: [
           buildAtomicCreationWorkout(firstWorkoutId, planId, disposableUser.userId, "easy"),
         ] as unknown as Json,
+        currentDate: "2026-07-20",
         expectedProfileRevision: savedBaseline.profileRevision + 1,
       }),
       (error) => error instanceof CalendarPersistenceRejection && error.reason === "stale_review",
@@ -2199,6 +2303,7 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
             "invalid_workout_type",
           ),
         ] as unknown as Json,
+        currentDate: "2026-07-20",
         expectedProfileRevision: savedBaseline.profileRevision,
       }),
     );
@@ -2249,6 +2354,7 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
           "easy",
         ),
       ] as unknown as Json,
+      currentDate: "2026-07-20",
       expectedProfileRevision: savedBaseline.profileRevision,
     });
     assert.equal(created.planCycle.id, materializedPlanId);
@@ -2284,6 +2390,7 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
             "quality",
           ),
         ] as unknown as Json,
+        currentDate: "2026-07-20",
         expectedProfileRevision: savedBaseline.profileRevision,
       }),
       (error) => error instanceof CalendarPersistenceRejection && error.reason === "stale_review",
@@ -2315,6 +2422,7 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
 
   return {
     creationRollback: true,
+    historicalRowsRejected: true,
     staleProfileRaceRejected: true,
   } as const;
 }
@@ -2391,6 +2499,34 @@ async function loadPersistedPlanForUser(
   return {
     plan: planResult.data,
     workouts: workoutsResult.data,
+  };
+}
+
+async function prepareExpectedSavedPlanMaterialization(input: {
+  supabase: ReturnType<typeof createAdminSupabaseClient>;
+  userId: string;
+  savedPlanId: string;
+}) {
+  const [savedPlanRecord, runnerCurrentDate, profile] = await Promise.all([
+    getSavedPlanRecordForUser(input.userId, input.savedPlanId),
+    getRunnerCalendarDateForUserId(input.userId),
+    input.supabase
+      .from("runner_profiles")
+      .select("training_preferences")
+      .eq("user_id", input.userId)
+      .single(),
+  ]);
+  assert.ok(savedPlanRecord, "The confirmed saved-plan source record was not found.");
+  assert.equal(profile.error, null);
+  const savedPlan = readSavedPlanPayload(savedPlanRecord);
+
+  return {
+    savedPlan,
+    prepared: prepareSavedPlanFutureApplyPolicy(
+      savedPlan,
+      runnerCurrentDate,
+      profile.data?.training_preferences ?? null,
+    ),
   };
 }
 

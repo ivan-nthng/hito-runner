@@ -21,11 +21,7 @@
   }
 
   .hito-label-signal {
-    color: var(--color-signal);
-  }
-
-  [data-hito-theme="light"] .hito-label-signal {
-    color: color-mix(in oklch, var(--color-signal) 50%, var(--color-foreground) 50%);
+    color: var(--color-text-accent);
   }
 
   .hito-display-title {
@@ -98,7 +94,7 @@
     text-align: right;
     font-size: 0.75rem;
     line-height: 1.625;
-    color: color-mix(in oklch, var(--color-foreground) 85%, transparent);
+    color: var(--color-text-secondary);
   }
 
   .hito-readback-value-compact {
@@ -242,7 +238,7 @@
     max-width: 40rem;
     font-size: 0.875rem;
     line-height: 1.58;
-    color: var(--color-muted-foreground);
+    color: var(--color-text-secondary);
     text-wrap: pretty;
   }
 
@@ -280,7 +276,7 @@
     font-size: 0.875rem;
     font-weight: 400;
     line-height: 1.58;
-    color: color-mix(in oklch, var(--color-foreground) 86%, transparent);
+    color: var(--color-text-secondary);
     text-wrap: pretty;
   }
 
@@ -289,7 +285,7 @@
     font-size: 0.8125rem;
     font-weight: 400;
     line-height: 1.5;
-    color: var(--color-muted-foreground);
+    color: var(--color-text-secondary);
     text-wrap: pretty;
   }
 
@@ -300,14 +296,14 @@
     letter-spacing: 0.18em;
     line-height: 1.25;
     text-transform: uppercase;
-    color: var(--color-muted-foreground);
+    color: var(--color-text-tertiary);
   }
 
   .hito-support-copy {
     --hito-typography-role: body;
     font-size: 0.875rem;
     line-height: 1.58;
-    color: var(--color-muted-foreground);
+    color: var(--color-text-secondary);
     text-wrap: pretty;
   }
 
@@ -315,7 +311,7 @@
     --hito-typography-role: caption;
     font-size: 0.6875rem;
     line-height: 1.45;
-    color: var(--color-muted-foreground);
+    color: var(--color-text-tertiary);
   }
 
   .hito-form-label {
@@ -335,15 +331,11 @@
     letter-spacing: 0.18em;
     line-height: 1.2;
     text-transform: uppercase;
-    color: var(--color-muted-foreground);
+    color: var(--color-text-tertiary);
   }
 
   .hito-micro-label[data-tone="signal"] {
-    color: var(--color-signal);
-  }
-
-  [data-hito-theme="light"] .hito-micro-label[data-tone="signal"] {
-    color: color-mix(in oklch, var(--color-signal) 50%, var(--color-foreground) 50%);
+    color: var(--color-text-accent);
   }
 
   .hito-technical-mono {
@@ -352,7 +344,7 @@
     font-size: 0.75rem;
     font-variant-numeric: tabular-nums;
     line-height: 1.45;
-    color: color-mix(in oklch, var(--color-foreground) 84%, transparent);
+    color: var(--color-text-secondary);
   }
 
   .hito-timeline-year,
@@ -367,7 +359,7 @@
   }
 
   .hito-timeline-year {
-    color: color-mix(in oklch, var(--color-foreground) 78%, transparent);
+    color: var(--color-text-secondary);
   }
 
   .hito-timeline-month,
@@ -385,16 +377,12 @@
 
   .hito-highlight-tag[data-tone="signal"] {
     background: color-mix(in oklch, var(--color-signal) 13%, transparent);
-    color: var(--color-signal);
-  }
-
-  [data-hito-theme="light"] .hito-highlight-tag[data-tone="signal"] {
-    color: color-mix(in oklch, var(--color-signal) 50%, var(--color-foreground) 50%);
+    color: var(--color-text-accent);
   }
 
   .hito-highlight-tag[data-tone="neutral"] {
-    background: color-mix(in oklch, var(--color-foreground) 5%, transparent);
-    color: var(--color-muted-foreground);
+    background: var(--color-chrome-subtle);
+    color: var(--color-text-tertiary);
   }
 
   .hito-editorial-backdrop {

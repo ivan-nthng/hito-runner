@@ -43,6 +43,15 @@ export function EditableValueFieldSandbox() {
       label="Editable Value Field"
       status="Shared control"
       statusTone="signal"
+      description={{
+        purpose:
+          "Keep a compact scalar readable until the user explicitly enters a shared edit lifecycle.",
+        useWhen: "A short numeric or select value is scanned more often than it is edited.",
+        avoidWhen:
+          "The value needs a full form, long text, complex validation, or simultaneous multi-field editing.",
+        accessibility:
+          "Edit, commit, clear, Escape restore, focus transfer, labels, validation, and cross-field transitions stay in one lifecycle owner.",
+      }}
       usedIn={
         <ProductLinks
           links={[

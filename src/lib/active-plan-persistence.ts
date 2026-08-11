@@ -2,6 +2,7 @@ import type { z } from "zod";
 import {
   buildImportedPlanSeed,
   importedPlanSchema,
+  normalizeConfirmedExternalImportSeed,
   type ImportedPlanSeed,
   type TrainingPlanV2,
 } from "@/lib/imported-plan";
@@ -137,12 +138,17 @@ export async function materializeFirstReviewedPlanForUser(
   userId: string,
   reviewedPlan: ImportedPlanInput,
   planMetadata: AdditionalPlanPersistenceMetadata | null = null,
-  options: { expectedProfileRevision?: number } = {},
+  options: { expectedProfileRevision?: number; calendarInstant?: Date } = {},
 ): Promise<PlanApplySuccessResult> {
-  const calendar = await getCalendarWorkoutsWithLogsForUser(userId);
+  const [calendar, currentDate] = await Promise.all([
+    getCalendarWorkoutsWithLogsForUser(userId),
+    getRunnerCalendarDateForUserId(userId, options.calendarInstant),
+  ]);
 
-  if (calendar.workouts.length > 0) {
-    throw new Error("A first plan can be materialized only into an empty Calendar.");
+  if (calendar.workouts.some((workout) => workout.workout_date >= currentDate)) {
+    throw new Error(
+      "A first plan can be materialized only when the runner has no upcoming Calendar workouts.",
+    );
   }
 
   const importedSeed = buildReviewedFirstPlanImportedSeed(reviewedPlan);
@@ -151,6 +157,7 @@ export async function materializeFirstReviewedPlanForUser(
     userId,
     importedSeed,
     planMetadata,
+    currentDate,
     expectedProfileRevision: options.expectedProfileRevision,
   });
 
@@ -169,6 +176,15 @@ export async function createEmptyCalendarProvenanceForUser(
   userId: string,
   input: EmptyCalendarProvenanceCreationInput,
 ): Promise<EmptyCalendarProvenanceCreationResult> {
+  const [calendar, currentDate] = await Promise.all([
+    getCalendarWorkoutsWithLogsForUser(userId),
+    getRunnerCalendarDateForUserId(userId),
+  ]);
+
+  if (calendar.workouts.some((workout) => workout.workout_date >= currentDate)) {
+    throw new Error("Manual Calendar setup requires no upcoming Calendar workouts.");
+  }
+
   const persisted = await persistNewReviewedPlan({
     userId,
     importedSeed: {
@@ -186,6 +202,7 @@ export async function createEmptyCalendarProvenanceForUser(
       workouts: [],
     },
     planMetadata: input.planMetadata ?? null,
+    currentDate,
   });
 
   return {
@@ -259,7 +276,7 @@ export async function getMaterializedPlanProvenancesForUser(
   return new Map(plans.data.map((plan) => [plan.id, plan]));
 }
 
-export async function retainReviewedGeneratedPlanCandidateForUser(input: {
+export async function retainReviewedPlanCandidateForUser(input: {
   userId: string;
   canonicalPlan: TrainingPlanV2;
   reviewChecksum: string;
@@ -267,8 +284,42 @@ export async function retainReviewedGeneratedPlanCandidateForUser(input: {
 }) {
   const canonicalPlan = importedPlanSchema.parse(input.canonicalPlan);
   const importedSeed = buildImportedPlanSeed(canonicalPlan);
+
+  return persistReviewedPlanCandidateForUser({
+    ...input,
+    canonicalPlan,
+    importedSeed,
+  });
+}
+
+export async function retainImportedPlanCandidateForUser(input: {
+  userId: string;
+  canonicalPlan: TrainingPlanV2;
+  reviewChecksum: string;
+}) {
+  const canonicalPlan = importedPlanSchema.parse(input.canonicalPlan);
+  const importedSeed = normalizeConfirmedExternalImportSeed(
+    canonicalPlan,
+    buildImportedPlanSeed(canonicalPlan),
+  );
+
+  return persistReviewedPlanCandidateForUser({
+    ...input,
+    canonicalPlan,
+    importedSeed,
+    planMetadata: null,
+  });
+}
+
+async function persistReviewedPlanCandidateForUser(input: {
+  userId: string;
+  canonicalPlan: TrainingPlanV2;
+  importedSeed: ImportedPlanSeed;
+  reviewChecksum: string;
+  planMetadata: AdditionalPlanPersistenceMetadata | null;
+}) {
   const planId = crypto.randomUUID();
-  const plan = buildPlanPersistencePayload(planId, importedSeed, input.planMetadata);
+  const plan = buildPlanPersistencePayload(planId, input.importedSeed, input.planMetadata);
   const supabase = createAdminSupabaseClient();
   const inserted = await supabase
     .from("plan_cycles")
@@ -286,7 +337,7 @@ export async function retainReviewedGeneratedPlanCandidateForUser(input: {
       target_date: optionalStringField(plan, "target_date"),
       goal_metadata: jsonField(plan, "goal_metadata"),
       plan_preferences: jsonField(plan, "plan_preferences"),
-      saved_plan_payload: canonicalPlan as unknown as Json,
+      saved_plan_payload: input.canonicalPlan as unknown as Json,
       saved_plan_review_checksum: input.reviewChecksum,
       library_removed_at: null,
     })
@@ -305,7 +356,7 @@ export async function retainReviewedGeneratedPlanCandidateForUser(input: {
     input.userId,
     input.reviewChecksum,
   );
-  if (!existing || !stableJsonEqual(existing.saved_plan_payload, canonicalPlan)) {
+  if (!existing || !stableJsonEqual(existing.saved_plan_payload, input.canonicalPlan)) {
     throw new Error("The reviewed saved-plan candidate conflicts with an existing record.");
   }
 
@@ -493,6 +544,7 @@ async function persistNewReviewedPlan(input: {
   userId: string;
   importedSeed: ImportedPlanSeed;
   planMetadata: AdditionalPlanPersistenceMetadata | null;
+  currentDate: string;
   expectedProfileRevision?: number;
 }) {
   const planId = crypto.randomUUID();
@@ -503,6 +555,7 @@ async function persistNewReviewedPlan(input: {
     profile: buildProfilePersistencePayload(input.importedSeed.profile),
     plan: buildPlanPersistencePayload(planId, input.importedSeed, input.planMetadata),
     workouts: workoutRows as unknown as Json,
+    currentDate: input.currentDate,
     ...(input.expectedProfileRevision == null
       ? {}
       : { expectedProfileRevision: input.expectedProfileRevision }),

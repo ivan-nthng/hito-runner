@@ -124,7 +124,7 @@ function AdminAnalyticsPage() {
   const activeSection = getAdminWorkspaceSection(activeTab);
 
   return (
-    <main className="min-h-screen bg-background text-foreground hito-canvas-atmosphere">
+    <main className="min-h-screen bg-background text-foreground">
       <div className="hito-workbench-shell hito-workbench-shell-compact-sidebar">
         <AdminWorkspaceSidebar activeSection={activeTab} />
 

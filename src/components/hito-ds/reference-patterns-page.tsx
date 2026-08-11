@@ -1,7 +1,8 @@
 import type { CSSProperties } from "react";
+import { HitoDsPlayground } from "@/components/hito-ds/playground";
 import { WorkoutLibraryPlayground } from "@/components/hito-ds/workout-library-playground";
 import { HitoDsPatternInlineEditing } from "@/components/hito-ds/reference-pattern-inline-editing";
-import { ReferenceListRow, SectionIntro } from "@/components/hito-ds/reference";
+import { ProductLinks, ReferenceListRow, SectionIntro } from "@/components/hito-ds/reference";
 import { HitoButton } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -186,6 +187,84 @@ export function HitoDsPatternsPage() {
           </article>
         </div>
       </section>
+      <HitoDsPlayground
+        id="notice-surface"
+        label="Banner / Notice Surface"
+        status="Pattern"
+        statusTone="signal"
+        description={{
+          purpose:
+            "Keep route-level setup, empty, warning, and recovery guidance visible in one owned state surface.",
+          useWhen:
+            "A message and optional action must remain in the route until its underlying state changes.",
+          avoidWhen:
+            "Concise operation feedback belongs in a toast, field validation belongs beside its field, or display-only truth fits a status tag.",
+          accessibility:
+            "Readable headings and copy carry meaning; live status semantics are added only when the message is newly announced, and actions remain native controls.",
+        }}
+        usedIn={
+          <ProductLinks
+            links={[
+              { href: "/settings", label: "/settings" },
+              { href: "/progress", label: "/progress" },
+              { href: "/hitoDS", label: "/hitoDS" },
+            ]}
+          />
+        }
+        demo={
+          <article className="hito-state-surface" data-tone="signal" role="status">
+            <p className="hito-label hito-label-signal">Setup</p>
+            <h3 className="hito-section-title mt-3">Create a first plan.</h3>
+            <p className="hito-support-copy mt-3">
+              State surfaces keep route-level setup and empty states consistent.
+            </p>
+            <div className="hito-state-actions">
+              <HitoButton size="md" variant="primary">
+                Continue
+              </HitoButton>
+            </div>
+          </article>
+        }
+        variants={
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+            <article className="hito-state-surface" data-tone="success">
+              <p className="hito-label">Ready</p>
+              <h3 className="hito-section-title mt-3">Plan ready to review.</h3>
+              <p className="hito-support-copy mt-3">Success remains readable without color.</p>
+            </article>
+            <article className="hito-state-surface" data-tone="warning">
+              <p className="hito-label">Attention</p>
+              <h3 className="hito-section-title mt-3">One value needs review.</h3>
+              <p className="hito-support-copy mt-3">Keep the next step near the message.</p>
+            </article>
+            <article className="hito-state-surface sm:col-span-2" data-tone="destructive">
+              <p className="hito-label">Recovery</p>
+              <h3 className="hito-section-title mt-3">The update was not applied.</h3>
+              <p className="hito-support-copy mt-3">
+                Persistent recovery guidance stays in the route instead of disappearing in a toast.
+              </p>
+            </article>
+          </div>
+        }
+        controls={
+          <div className="hito-row-group border-0">
+            <div className="hito-list-row items-start">
+              <div>
+                <p className="hito-list-row-title">Content owner</p>
+                <p className="hito-list-row-copy">The route owns the message, state, and action.</p>
+              </div>
+            </div>
+            <div className="hito-list-row items-start">
+              <div>
+                <p className="hito-list-row-title">Presentation owner</p>
+                <p className="hito-list-row-copy">
+                  The existing state-surface recipe owns tone, spacing, and action rhythm.
+                </p>
+              </div>
+            </div>
+          </div>
+        }
+      />
       <section id="states" className="ds-section">
         <SectionIntro label="States" title="Markers, route states, tooltips, and severity." />
         <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -223,18 +302,6 @@ export function HitoDsPatternsPage() {
                   <Skeleton className="h-9 w-full" />
                   <Skeleton className="h-9 w-full" />
                 </div>
-              </div>
-            </article>
-            <article className="hito-state-surface" data-tone="signal">
-              <p className="hito-label hito-label-signal">Empty</p>
-              <h3 className="hito-section-title mt-3">Create a first plan.</h3>
-              <p className="hito-support-copy mt-3">
-                State surfaces keep route-level setup and empty states consistent.
-              </p>
-              <div className="hito-state-actions">
-                <HitoButton size="md" variant="primary">
-                  Continue
-                </HitoButton>
               </div>
             </article>
             <article className="hito-state-surface" data-tone="success">

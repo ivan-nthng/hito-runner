@@ -1,23 +1,12 @@
 :root {
-  /* Shell and operational geometry stays with the shell/admin owner. */
+  /* App Shell geometry is shared with Manual Workout and the Hito DS workbench. */
   --hito-mobile-bottom-nav-height: 3.75rem;
   --hito-shell-sidebar-width: 15rem;
-  --hito-shell-menu-width-profile: 13rem;
-  --hito-shell-menu-width-plan: 14rem;
-  --hito-shell-menu-width-account: 14rem;
-  --hito-menu-width-standard: 14rem;
-  --hito-admin-quick-note-panel-width: min(36rem, calc(100vw - 2.5rem));
-  --hito-data-table-code-width-sm: 14rem;
-  --hito-data-table-code-width-md: 18rem;
-  --hito-data-table-code-width-lg: 20rem;
-  --hito-data-table-action-width: 18rem;
-  --hito-data-table-note-width: 16rem;
-  --hito-tooltip-width-lg: 18rem;
 }
 
 @layer components {
   .hito-shell-brand-kicker {
-    --hito-typography-role: label;
+    --hito-typography-role: label-md;
     margin-top: 0.5rem;
     font-size: 0.75rem;
     font-weight: 600;
@@ -144,9 +133,25 @@
     width: 100%;
     align-items: center;
     gap: 0.75rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-xl);
+    background: color-mix(in oklch, var(--color-surface) 42%, transparent);
     padding: 0.75rem;
     cursor: pointer;
     text-align: left;
+    box-shadow: none;
+    transition:
+      background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      box-shadow var(--hito-motion-duration-140) var(--hito-motion-ease-out);
+  }
+
+  .hito-shell-profile-trigger:not(:disabled):not([aria-disabled="true"]):hover {
+    background: color-mix(in oklch, var(--color-surface-elevated) 58%, transparent);
+  }
+
+  .hito-shell-profile-trigger:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-ring);
   }
 
   .hito-shell-profile-trigger:disabled,
@@ -241,19 +246,19 @@
   }
 
   .hito-shell-menu-profile {
-    width: var(--hito-shell-menu-width-profile);
+    width: 13rem;
   }
 
   .hito-shell-menu-plan {
-    width: var(--hito-shell-menu-width-plan);
+    width: 14rem;
   }
 
   .hito-shell-menu-account {
-    width: var(--hito-shell-menu-width-account);
+    width: 14rem;
   }
 
   .hito-menu-width-standard {
-    width: var(--hito-menu-width-standard);
+    width: 14rem;
   }
 
   .hito-shell-profile-menu-label {
@@ -486,25 +491,25 @@
   }
 
   .hito-data-table-code-width-sm {
-    max-width: var(--hito-data-table-code-width-sm);
+    max-width: 14rem;
   }
 
   .hito-data-table-code-width-md {
-    max-width: var(--hito-data-table-code-width-md);
+    max-width: 18rem;
   }
 
   .hito-data-table-code-width-lg {
-    max-width: var(--hito-data-table-code-width-lg);
+    max-width: 20rem;
   }
 
   .hito-data-table-action-stack {
     display: grid;
-    max-width: var(--hito-data-table-action-width);
+    max-width: 18rem;
     gap: 0.5rem;
   }
 
   .hito-data-table-note {
-    max-width: var(--hito-data-table-note-width);
+    max-width: 16rem;
   }
 
   .hito-data-table-utility-row {
@@ -525,7 +530,7 @@
 
   .hito-admin-quick-note-panel {
     z-index: 30;
-    width: var(--hito-admin-quick-note-panel-width);
+    width: min(36rem, calc(100vw - 2.5rem));
     max-width: calc(100vw - 2.5rem);
     margin-top: 0.5rem;
   }
@@ -819,8 +824,8 @@
   }
 
   .hito-tooltip-width-lg {
-    width: min(var(--hito-tooltip-width-lg), calc(100vw - 2rem));
-    max-width: min(var(--hito-tooltip-width-lg), calc(100vw - 2rem));
+    width: min(18rem, calc(100vw - 2rem));
+    max-width: min(18rem, calc(100vw - 2rem));
   }
 
   .hito-tooltip-title {

@@ -59,6 +59,7 @@ function formatBatchItem(item: LocalUiInspectorBatchItem, index: number) {
   const tokenLines = (item.target.tokenControls ?? []).map((control) =>
     formatTokenEvidence(control, item.draft.desiredTokens[control.id] ?? null),
   );
+  const colorLines = payload.target.colorControls.map(formatColorEvidence);
   const ownershipLines = formatOwnership(item);
   const componentActionLines = formatComponentAction(item);
   const evidenceLines = payload.target.evidence.length
@@ -75,13 +76,21 @@ function formatBatchItem(item: LocalUiInspectorBatchItem, index: number) {
     `- Current text (raw): ${payload.target.visibleText ?? "Not captured"}`,
     `- Request: ${getLocalUiInspectorItemSummary(item)}`,
     `- Comment: ${payload.comment || "Not provided"}`,
-    `- Proposed text: ${payload.target.proposedText ?? "Not requested"}`,
+    `- Proposed text: ${
+      payload.target.proposedText === null
+        ? "Not requested"
+        : payload.target.proposedText || "Remove text"
+    }`,
     `- Scope: ${scope.label} — ${scope.description}`,
     `- Suggested owner evidence: ${payload.target.suggestedOwner}`,
     ...ownershipLines,
     ...componentActionLines,
     "- Token evidence and requested changes:",
     ...(tokenLines.length ? tokenLines.map((line) => `  - ${line}`) : ["  - None selected."]),
+    "- Color evidence and requested changes:",
+    ...(colorLines.length
+      ? colorLines.map((line) => `  - ${line}`)
+      : ["  - No eligible color channel."]),
     `- Typography request: ${formatTypography(item)}`,
     `- Chrome request: ${payload.target.chromeRemoval ? payload.target.chromeRemoval.kind : "None"}`,
     "- Observed evidence:",
@@ -152,6 +161,31 @@ function formatTokenEvidence(
     : "no desired token selected";
 
   return [observed, evidence, desired].filter(Boolean).join("; ") + ".";
+}
+
+function formatColorEvidence(
+  control: LocalUiInspectorBatchItem["payload"]["target"]["colorControls"][number],
+) {
+  const observed = [
+    `${control.label}: observed ${control.currentLabel}`,
+    control.currentToken?.cssVariable,
+    control.currentToken?.source ? `source ${control.currentToken.source}` : null,
+    control.currentHex,
+    `alpha ${control.alphaPercent}%`,
+  ]
+    .filter(Boolean)
+    .join("; ");
+
+  if (control.requestedChange?.kind === "remove_declaration") {
+    return `${observed}; requested remove ${control.requestedChange.property} declaration at the canonical source seam; no live preview.`;
+  }
+
+  if (control.requestedChange?.kind === "semantic_token") {
+    const token = control.requestedChange.token;
+    return `${observed}; requested ${token.label} (${token.cssVariable}; ${token.resolvedHex}; alpha ${token.alphaPercent}%).`;
+  }
+
+  return `${observed}; no requested color change.`;
 }
 
 function formatTypography(item: LocalUiInspectorBatchItem) {

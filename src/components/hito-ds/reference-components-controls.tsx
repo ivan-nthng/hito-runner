@@ -168,8 +168,8 @@ function ButtonPlayground() {
         variants={
           <div className="grid gap-6" inert>
             <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Grouped action composition</p>
-              <p className="hito-caption mt-1 max-w-2xl">
+              <p className="hito-label-md">Grouped action composition</p>
+              <p className="hito-body-xs text-tertiary mt-1 max-w-2xl">
                 Responsive action groups compose canonical Buttons without adding a connected
                 ButtonGroup API.
               </p>
@@ -186,8 +186,8 @@ function ButtonPlayground() {
               </div>
             </div>
             <div className="border-t border-hairline pt-5">
-              <p className="hito-label">State matrix</p>
-              <p className="hito-caption mt-1">
+              <p className="hito-label-md">State matrix</p>
+              <p className="hito-body-xs text-tertiary mt-1">
                 Follows the selected variant, tone, size, and icon rhythm.
               </p>
               <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -205,26 +205,26 @@ function ButtonPlayground() {
               </div>
             </div>
             <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Hierarchy × tone</p>
+              <p className="hito-label-md">Hierarchy × tone</p>
               <div className="mt-4 grid gap-3">
                 {BUTTON_TONES.map((tone) => (
                   <div key={tone} className="flex min-w-0 flex-wrap items-center gap-3">
-                    <span className="hito-micro-label w-16">{tone}</span>
+                    <span className="hito-label-sm w-16 text-tertiary">{tone}</span>
                     {BUTTON_VARIANTS.map((item) => (
                       <DemoButton key={`${tone}-${item}`} variant={item} tone={tone} size="sm" />
                     ))}
                   </div>
                 ))}
               </div>
-              <p className="hito-caption mt-3 max-w-2xl">
+              <p className="hito-body-xs text-tertiary mt-3 max-w-2xl">
                 Default primary stays signal/orange. Secondary stays soft and borderless. Outlined
                 stays border-led. Success and error are semantic tones, not separate button
                 families.
               </p>
             </div>
             <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Icon-only configuration</p>
-              <p className="hito-caption mt-1 max-w-2xl">
+              <p className="hito-label-md">Icon-only configuration</p>
+              <p className="hito-body-xs text-tertiary mt-1 max-w-2xl">
                 Icon-only actions are square configurations of the same Button variants, tones,
                 sizes, focus, disabled, and loading states. They always require an accessible name.
               </p>
@@ -381,7 +381,7 @@ function TabsPlayground() {
                 );
               })}
             </div>
-            <p className="hito-caption mt-3" {...tabDemo.getPanelProps(tabDemoValue)}>
+            <p className="hito-body-xs text-tertiary mt-3" {...tabDemo.getPanelProps(tabDemoValue)}>
               {getTabLabel(tabDemoValue)} view
             </p>
           </div>
@@ -389,8 +389,10 @@ function TabsPlayground() {
         variants={
           <div className="grid min-w-0 gap-5">
             <div className="border-t border-hairline pt-5">
-              <p className="hito-label">State matrix</p>
-              <p className="hito-caption mt-1">Follows the selected tab visual style.</p>
+              <p className="hito-label-md">State matrix</p>
+              <p className="hito-body-xs text-tertiary mt-1">
+                Follows the selected tab visual style.
+              </p>
               <div className="max-w-full min-w-0 overflow-hidden pb-1">
                 <div
                   className={cn(
@@ -484,7 +486,6 @@ export function HitoDsComponentControls() {
     useState<DataTableSortDirection>("asc");
   const [dataTableFiltered, setDataTableFiltered] = useState(true);
   const [dataTableStaticMode, setDataTableStaticMode] = useState(false);
-  const [dataTableUtilityRow, setDataTableUtilityRow] = useState(true);
 
   return (
     <>
@@ -498,16 +499,15 @@ export function HitoDsComponentControls() {
         statusTone="signal"
         description={{
           purpose:
-            "Present operational data with a canonical toolbar, sortable or static headers, and readable row anatomy.",
+            "Present operational data with sortable or static headers and readable row anatomy.",
           useWhen:
-            "Users compare multiple records across stable columns and may sort, filter, or search them.",
+            "Users compare multiple records across stable columns and may sort or filter them from a column header.",
           avoidWhen:
             "A short list, metric row, or mobile-first card composition communicates the same truth more clearly.",
           accessibility:
             "Interactive headers preserve native table semantics, aria-sort, accessible menu labels, keyboard operation, and a contained scroll region.",
         }}
         anchors={[
-          { id: "data-table-toolbar", label: "Toolbar", tab: "demo" },
           {
             id: "data-table-interactive-header",
             label: "Interactive Column Header",
@@ -531,14 +531,14 @@ export function HitoDsComponentControls() {
             sortDirection={dataTableSortDirection}
             filtered={dataTableFiltered}
             staticMode={dataTableStaticMode}
-            showUtilityRow={dataTableUtilityRow}
+            showUtilityRow={false}
           />
         }
         variants={
           <div className="grid min-w-0 gap-6">
             <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Interactive header states</p>
-              <p className="hito-caption mt-1">
+              <p className="hito-label-md">Interactive header states</p>
+              <p className="hito-body-xs text-tertiary mt-1">
                 Sortable, active-sort, filtered, hover/demo, and static header cells stay in one
                 contained table scroll region.
               </p>
@@ -549,14 +549,14 @@ export function HitoDsComponentControls() {
                   sortDirection={dataTableSortDirection}
                   filtered
                   staticMode={false}
-                  showUtilityRow
+                  showUtilityRow={false}
                 />
               </div>
             </div>
 
             <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Static table mode</p>
-              <p className="hito-caption mt-1">
+              <p className="hito-label-md">Static table mode</p>
+              <p className="hito-body-xs text-tertiary mt-1">
                 Read-only table headers keep the same typography and spacing without implying
                 clickable sorting.
               </p>
@@ -602,11 +602,6 @@ export function HitoDsComponentControls() {
               active={dataTableStaticMode}
               onToggle={() => setDataTableStaticMode((v) => !v)}
             />
-            <ToggleRow
-              label="Utility/search row"
-              active={dataTableUtilityRow}
-              onToggle={() => setDataTableUtilityRow((v) => !v)}
-            />
           </div>
         }
       />
@@ -644,46 +639,31 @@ export function HitoDsComponentControls() {
           />
         }
         demo={
-          <div className="hito-surface-flat p-5">
-            <p className="hito-label">Current input</p>
-            <div className="mt-5 grid min-w-0 gap-4">
-              <DemoInput
-                variant={inputVariant}
-                size={inputSize}
-                leftIcon={inputLeftIcon}
-                rightIcon={inputRightIcon}
-                state={inputState}
-                feedback={inputFeedback}
-                placeholder={`${inputVariant} ${inputSize} field`}
-              />
-              <span
-                className={
-                  inputFeedback === "error"
-                    ? "hito-field-error"
-                    : inputFeedback === "success"
-                      ? "hito-field-success"
-                      : "hito-field-helper"
-                }
-              >
-                {inputFeedback === "error"
-                  ? "Choose a valid value before continuing."
+          <div className="grid w-full min-w-0 gap-4">
+            <DemoInput
+              variant={inputVariant}
+              size={inputSize}
+              leftIcon={inputLeftIcon}
+              rightIcon={inputRightIcon}
+              state={inputState}
+              feedback={inputFeedback}
+              placeholder={`${inputVariant} ${inputSize} field`}
+            />
+            <span
+              className={
+                inputFeedback === "error"
+                  ? "hito-field-error"
                   : inputFeedback === "success"
-                    ? "This value is ready."
-                    : "Helper text stays quiet unless validation needs attention."}
-              </span>
-              <div className="flex min-w-0 flex-wrap items-center gap-3">
-                <DemoButton
-                  variant={inputVariant === "primary" ? "primary" : "secondary"}
-                  size={inputSize}
-                  leftIcon={inputLeftIcon}
-                  rightIcon={inputRightIcon}
-                  disabled={inputState === "disabled"}
-                />
-                <span className="hito-caption">
-                  Same {inputSize.toUpperCase()} height and XS radius rhythm.
-                </span>
-              </div>
-            </div>
+                    ? "hito-field-success"
+                    : "hito-field-helper"
+              }
+            >
+              {inputFeedback === "error"
+                ? "Choose a valid value before continuing."
+                : inputFeedback === "success"
+                  ? "This value is ready."
+                  : "Helper text stays quiet unless validation needs attention."}
+            </span>
           </div>
         }
         variants={
@@ -692,8 +672,8 @@ export function HitoDsComponentControls() {
               {INPUT_STATES.map((state) => (
                 <article key={state} className="hito-reference-row">
                   <div>
-                    <p className="hito-label">{state === "focus" ? "Active" : state}</p>
-                    <p className="hito-caption mt-2">
+                    <p className="hito-label-md">{state === "focus" ? "Active" : state}</p>
+                    <p className="hito-body-xs text-tertiary mt-2">
                       {state === "default"
                         ? "Default field state."
                         : state === "hover"
@@ -720,7 +700,7 @@ export function HitoDsComponentControls() {
 
             <div className="grid min-w-0 gap-4 lg:grid-cols-2">
               <label className="grid min-w-0 gap-2">
-                <span className="hito-label">Primary field</span>
+                <span className="hito-label-md">Primary field</span>
                 <DemoInput
                   variant="primary"
                   size="md"
@@ -733,7 +713,7 @@ export function HitoDsComponentControls() {
                 </span>
               </label>
               <label className="grid min-w-0 gap-2">
-                <span className="hito-label">Secondary field</span>
+                <span className="hito-label-md">Secondary field</span>
                 <DemoInput
                   variant="secondary"
                   size="md"
@@ -746,7 +726,7 @@ export function HitoDsComponentControls() {
                 </span>
               </label>
               <label className="grid min-w-0 gap-2">
-                <span className="hito-label">Error feedback</span>
+                <span className="hito-label-md">Error feedback</span>
                 <DemoInput
                   variant="primary"
                   size="md"
@@ -758,7 +738,7 @@ export function HitoDsComponentControls() {
                 <span className="hito-field-error">Choose a start date before importing.</span>
               </label>
               <label className="grid min-w-0 gap-2">
-                <span className="hito-label">Success feedback</span>
+                <span className="hito-label-md">Success feedback</span>
                 <DemoInput
                   variant="secondary"
                   size="md"
@@ -770,7 +750,7 @@ export function HitoDsComponentControls() {
                 <span className="hito-field-success">Saved profile value is valid.</span>
               </label>
               <label className="grid min-w-0 gap-2 lg:col-span-2">
-                <span className="hito-label">Textarea</span>
+                <span className="hito-label-md">Textarea</span>
                 <Textarea
                   rows={5}
                   className="resize-none"
@@ -779,8 +759,8 @@ export function HitoDsComponentControls() {
               </label>
               <div className="grid min-w-0 gap-3 lg:col-span-2">
                 <div>
-                  <p className="hito-label">Header input variant</p>
-                  <p className="hito-caption mt-2 max-w-2xl">
+                  <p className="hito-label-md">Header input variant</p>
+                  <p className="hito-body-xs text-tertiary mt-2 max-w-2xl">
                     True editable headings use the shared inline text primitive with Hito-sized
                     header field padding, fit-content width, and an edit affordance that stays
                     adjacent to the text.
@@ -809,8 +789,8 @@ export function HitoDsComponentControls() {
 
             <div className="border-t border-hairline pt-5">
               <div>
-                <p className="hito-label">Dual-value range</p>
-                <p className="hito-caption mt-2 max-w-2xl">
+                <p className="hito-label-md">Dual-value range</p>
+                <p className="hito-body-xs text-tertiary mt-2 max-w-2xl">
                   Use two accessible handles to adjust an ordered interval. Pair the rail with the
                   compound Hito Field when both endpoints need direct numeric entry.
                 </p>
@@ -832,8 +812,8 @@ export function HitoDsComponentControls() {
                   }
                 />
                 <div className="flex items-center justify-between gap-3">
-                  <span className="hito-caption">Minimum {dualRangeValue[0]}</span>
-                  <span className="hito-caption">Maximum {dualRangeValue[1]}</span>
+                  <span className="hito-body-xs text-tertiary">Minimum {dualRangeValue[0]}</span>
+                  <span className="hito-body-xs text-tertiary">Maximum {dualRangeValue[1]}</span>
                 </div>
                 <HitoCompoundRangeField
                   label="Range"
@@ -854,8 +834,8 @@ export function HitoDsComponentControls() {
 
             <div className="border-t border-hairline pt-5">
               <div className="mb-4">
-                <p className="hito-label">Date and time inputs</p>
-                <p className="hito-caption mt-2 max-w-2xl">
+                <p className="hito-label-md">Date and time inputs</p>
+                <p className="hito-body-xs text-tertiary mt-2 max-w-2xl">
                   Date/time truth stays ISO or duration-shaped in state. Calendar selection, typed
                   date entry, compact optional date fields, and masked time entry share the same
                   Hito field rhythm.
@@ -865,7 +845,7 @@ export function HitoDsComponentControls() {
                 <article className="hito-reference-row items-start">
                   <div>
                     <p className="hito-list-row-title">Native select field</p>
-                    <p className="hito-caption mt-2">
+                    <p className="hito-body-xs text-tertiary mt-2">
                       Native option behavior with the shared Hito field, label, and helper anatomy.
                     </p>
                   </div>
@@ -885,7 +865,7 @@ export function HitoDsComponentControls() {
                 <article className="hito-reference-row items-start">
                   <div>
                     <p className="hito-list-row-title">Date picker field</p>
-                    <p className="hito-caption mt-2">
+                    <p className="hito-body-xs text-tertiary mt-2">
                       Use for required or visible dates such as target race day.
                     </p>
                   </div>
@@ -900,7 +880,7 @@ export function HitoDsComponentControls() {
                 <article className="hito-reference-row items-start">
                   <div>
                     <p className="hito-list-row-title">Date picker states</p>
-                    <p className="hito-caption mt-2">
+                    <p className="hito-body-xs text-tertiary mt-2">
                       Error, disabled, and bounded date states stay in the same field-owned anatomy.
                     </p>
                   </div>
@@ -934,7 +914,7 @@ export function HitoDsComponentControls() {
                 <article className="hito-reference-row items-start">
                   <div>
                     <p className="hito-list-row-title">Optional date field</p>
-                    <p className="hito-caption mt-2">
+                    <p className="hito-body-xs text-tertiary mt-2">
                       Empty state is an action; saved state is visible and editable.
                     </p>
                   </div>
@@ -948,7 +928,7 @@ export function HitoDsComponentControls() {
                 <article className="hito-reference-row items-start">
                   <div>
                     <p className="hito-list-row-title">Masked time field</p>
-                    <p className="hito-caption mt-2">
+                    <p className="hito-body-xs text-tertiary mt-2">
                       Use for race targets and durations. Continuous digits normalize while editing.
                     </p>
                   </div>
@@ -964,15 +944,15 @@ export function HitoDsComponentControls() {
             </div>
 
             <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Avatar tile action</p>
-              <p className="hito-caption mt-2 max-w-2xl">
+              <p className="hito-label-md">Avatar tile action</p>
+              <p className="hito-body-xs text-tertiary mt-2 max-w-2xl">
                 Settings avatar controls use one rectangular tile and a same-width action.
               </p>
               <div className="hito-reference-list mt-4">
                 <article className="hito-reference-row">
                   <div>
                     <p className="hito-list-row-title">Empty avatar</p>
-                    <p className="hito-caption mt-2">
+                    <p className="hito-body-xs text-tertiary mt-2">
                       The action spans the tile width and keeps the camera affordance.
                     </p>
                   </div>
@@ -989,7 +969,7 @@ export function HitoDsComponentControls() {
                 <article className="hito-reference-row">
                   <div>
                     <p className="hito-list-row-title">Existing avatar</p>
-                    <p className="hito-caption mt-2">
+                    <p className="hito-body-xs text-tertiary mt-2">
                       Edit is a separate product label, not hidden inside avatar hover chrome.
                     </p>
                   </div>
@@ -1094,46 +1074,39 @@ export function HitoDsComponentControls() {
           />
         }
         demo={
-          <div className="grid min-w-0 gap-5">
-            <p className="hito-label">Current status</p>
-            <div className="flex flex-wrap items-center gap-3">
-              <span
-                className="hito-status-pill"
-                data-tone={statusTone === "neutral" ? undefined : statusTone}
-              >
-                {statusLongLabel ? "Feedback ready for review" : statusTone}
-              </span>
-              <span
-                className="hito-status-marker"
-                data-tone={statusTone === "neutral" ? "muted" : statusTone}
-                aria-label={`${statusTone} marker`}
-              >
-                <Icon
-                  name={
-                    statusTone === "destructive"
-                      ? "close"
-                      : statusTone === "warning"
-                        ? "warning"
-                        : statusTone === "success"
-                          ? "check"
-                          : "minus"
-                  }
-                  size="xs"
-                  strokeWidth={2.2}
-                />
-              </span>
-            </div>
-            <p className="hito-caption max-w-lg">
-              Status is display-only. Tone and concise readable labels carry the meaningful state;
-              actions still use buttons and menus.
-            </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <span
+              className="hito-status-pill"
+              data-tone={statusTone === "neutral" ? undefined : statusTone}
+            >
+              {statusLongLabel ? "Feedback ready for review" : statusTone}
+            </span>
+            <span
+              className="hito-status-marker"
+              data-tone={statusTone === "neutral" ? "muted" : statusTone}
+              aria-label={`${statusTone} marker`}
+            >
+              <Icon
+                name={
+                  statusTone === "destructive"
+                    ? "close"
+                    : statusTone === "warning"
+                      ? "warning"
+                      : statusTone === "success"
+                        ? "check"
+                        : "minus"
+                }
+                size="xs"
+                strokeWidth={2.2}
+              />
+            </span>
           </div>
         }
         variants={
           <div className="grid min-w-0 gap-6">
             <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Chip tones</p>
-              <p className="hito-caption mt-1">
+              <p className="hito-label-md">Chip tones</p>
+              <p className="hito-body-xs text-tertiary mt-1">
                 Neutral, signal, success, warning, and destructive share one chip anatomy.
               </p>
               <div className="mt-4 flex min-w-0 flex-wrap items-center gap-3">
@@ -1150,8 +1123,8 @@ export function HitoDsComponentControls() {
             </div>
 
             <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Marker states</p>
-              <p className="hito-caption mt-1">
+              <p className="hito-label-md">Marker states</p>
+              <p className="hito-body-xs text-tertiary mt-1">
                 Tiny markers carry result or feedback truth without becoming another badge.
               </p>
               <div className="mt-4 grid min-w-0 gap-3 sm:grid-cols-2">
@@ -1176,8 +1149,8 @@ export function HitoDsComponentControls() {
             </div>
 
             <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Metadata tags and menu</p>
-              <p className="hito-caption mt-1">
+              <p className="hito-label-md">Metadata tags and menu</p>
+              <p className="hito-body-xs text-tertiary mt-1">
                 Read-only metadata and interactive operational metadata share the runtime tag owner.
               </p>
               <div className="mt-4 flex min-w-0 flex-wrap items-center gap-3">
@@ -1205,7 +1178,7 @@ export function HitoDsComponentControls() {
             </div>
 
             <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Long labels stay rare</p>
+              <p className="hito-label-md">Long labels stay rare</p>
               <div className="mt-4 flex min-w-0 flex-wrap items-center gap-3">
                 <span className="hito-status-pill" data-tone="signal">
                   Feedback ready for review
@@ -1276,7 +1249,7 @@ export function HitoDsComponentControls() {
         variants={
           <div className="grid min-w-0 gap-6" inert>
             <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Required states</p>
+              <p className="hito-label-md">Required states</p>
               <div className="mt-4 grid gap-3">
                 <div className="hito-control-label hito-control-label-sm cursor-default">
                   <span
@@ -1354,8 +1327,8 @@ export function HitoDsComponentControls() {
 
             <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.72fr)]">
               <article className="hito-surface-flat min-w-0 p-5">
-                <p className="hito-label">Functional toggle scale</p>
-                <p className="hito-caption mt-2 max-w-xl">
+                <p className="hito-label-md">Functional toggle scale</p>
+                <p className="hito-body-xs text-tertiary mt-2 max-w-xl">
                   The mixed-size row aligns to each control height instead of stretching every item
                   to the tallest toggle.
                 </p>
@@ -1408,8 +1381,8 @@ export function HitoDsComponentControls() {
               </article>
 
               <article className="hito-surface-flat min-w-0 p-5">
-                <p className="hito-label">Card / display choice</p>
-                <p className="hito-caption mt-2">
+                <p className="hito-label-md">Card / display choice</p>
+                <p className="hito-body-xs text-tertiary mt-2">
                   Card is not part of the functional size ladder. Use it only when the choice is a
                   large visual planning moment.
                 </p>
@@ -1435,8 +1408,8 @@ export function HitoDsComponentControls() {
 
             <article className="hito-reference-row">
               <div>
-                <p className="hito-label">Destructive confirmation</p>
-                <p className="hito-caption mt-2 max-w-xl">
+                <p className="hito-label-md">Destructive confirmation</p>
+                <p className="hito-body-xs text-tertiary mt-2 max-w-xl">
                   The checkbox confirms understanding and stays signal-selected. Destructive meaning
                   belongs to warning copy and final destructive action.
                 </p>

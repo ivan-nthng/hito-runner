@@ -36,8 +36,8 @@ export function OnboardingRunnerHeartRateProfile({
         />
       ) : (
         <div className="hito-state-surface" data-tone="signal">
-          <p className="hito-list-row-title">Complete your runner baseline</p>
-          <p className="hito-list-row-copy">
+          <p className="hito-body-md text-foreground">Complete your runner baseline</p>
+          <p className="hito-body-sm mt-1 text-secondary">
             Estimated BPM guidance appears automatically when the required profile facts are valid.
             The estimate itself is age-based.
           </p>
@@ -46,7 +46,7 @@ export function OnboardingRunnerHeartRateProfile({
 
       {error ? (
         <div className="hito-state-surface p-3" data-tone="destructive" role="alert">
-          <p className="hito-body-small">{error}</p>
+          <p className="hito-body-sm text-secondary">{error}</p>
         </div>
       ) : null}
     </div>

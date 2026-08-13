@@ -142,8 +142,8 @@ export function PlanPresetPanel({
     <section className="hito-plan-preset-stage pt-8">
       <div className="flex flex-wrap items-start justify-center gap-4 text-center">
         <div className="max-w-2xl">
-          <h2 className="hito-ui-panel-title">Choose your goal.</h2>
-          <p className="hito-helper mt-2">
+          <h2 className="hito-ui-title-xs text-foreground">Choose your goal.</h2>
+          <p className="hito-body-xs text-secondary mt-2">
             Pick one goal. A successful reviewed preview is saved in Plans before its workouts are
             added to Calendar.
           </p>
@@ -166,7 +166,7 @@ export function PlanPresetPanel({
         />
 
         <label className="grid min-w-0 gap-2">
-          <span className="hito-form-label">Plan context (optional)</span>
+          <span className="hito-label-md text-foreground">Plan context (optional)</span>
           <Textarea
             className="min-h-24 resize-y"
             name="runnerComment"
@@ -179,12 +179,12 @@ export function PlanPresetPanel({
 
         {!hasRequiredPlanBasics ? (
           <div className="hito-surface-wash">
-            <p className="hito-list-row-title">Add a few basics before previewing</p>
-            <p className="hito-list-row-copy">{requiredBasicsCopy}</p>
+            <p className="hito-body-md text-foreground">Add a few basics before previewing</p>
+            <p className="hito-body-sm mt-1 text-secondary">{requiredBasicsCopy}</p>
           </div>
         ) : null}
 
-        {error ? <p className="hito-field-error">{error}</p> : null}
+        {error ? <p className="hito-body-md font-medium text-negative">{error}</p> : null}
       </div>
 
       <SelectedRunningPlanPreviewDialog
@@ -282,7 +282,7 @@ function PlanGoalIntentControls({
       {goalChoice === "custom" ? (
         <div className="hito-form-two-column-grid">
           <label className="grid gap-2">
-            <span className="hito-form-label">Custom distance</span>
+            <span className="hito-label-md text-foreground">Custom distance</span>
             <Input
               type="text"
               inputMode="decimal"
@@ -295,13 +295,13 @@ function PlanGoalIntentControls({
               variant="primary"
             />
             {customDistanceError ? (
-              <span className="hito-field-error">{customDistanceError}</span>
+              <span className="hito-body-md font-medium text-negative">{customDistanceError}</span>
             ) : (
-              <span className="hito-field-helper">Kilometers. For example: 12.5.</span>
+              <span className="hito-body-xs text-secondary">Kilometers. For example: 12.5.</span>
             )}
           </label>
           <label className="grid gap-2">
-            <span className="hito-form-label">Goal name</span>
+            <span className="hito-label-md text-foreground">Goal name</span>
             <Input
               type="text"
               autoComplete="off"
@@ -311,7 +311,7 @@ function PlanGoalIntentControls({
               size="md"
               variant="primary"
             />
-            <span className="hito-field-helper">Optional. For example: City 12.5K.</span>
+            <span className="hito-body-xs text-secondary">Optional. For example: City 12.5K.</span>
           </label>
         </div>
       ) : null}
@@ -339,8 +339,10 @@ function PlanGoalIntentControls({
           </div>
           {derivedPace ? (
             <div className="hito-surface-wash" data-tone="signal">
-              <p className="hito-list-row-title">That means about {derivedPace} on race day.</p>
-              <p className="hito-list-row-copy">
+              <p className="hito-body-md text-foreground">
+                That means about {derivedPace} on race day.
+              </p>
+              <p className="hito-body-sm mt-1 text-secondary">
                 This is goal readback, not your workout pace target.
               </p>
             </div>

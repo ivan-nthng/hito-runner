@@ -12,9 +12,9 @@ export function SectionIntro({
   return (
     <div className="hito-section-header">
       <div>
-        <p className="hito-label hito-label-signal">{label}</p>
-        <h2 className="hito-section-title mt-3">{title}</h2>
-        {body ? <p className="hito-support-copy mt-3 max-w-2xl">{body}</p> : null}
+        <p className="hito-label-md hito-label-signal">{label}</p>
+        <h2 className="hito-ui-title-sm mt-3">{title}</h2>
+        {body ? <p className="hito-body-md text-secondary mt-3 max-w-2xl">{body}</p> : null}
       </div>
     </div>
   );
@@ -32,7 +32,7 @@ export function ReferenceListRow({
   return (
     <div className="hito-list-row items-start">
       <div>
-        <p className="hito-label">{label}</p>
+        <p className="hito-label-md">{label}</p>
         <p className="hito-list-row-title mt-2">{title}</p>
         <div className="hito-list-row-copy">{body}</div>
       </div>

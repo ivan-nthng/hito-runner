@@ -211,8 +211,8 @@ export function CompletionPanel({
   if (workout.type === "rest") {
     return (
       <div className="hito-surface-flat p-5">
-        <div className="hito-label">Rest day</div>
-        <p className="hito-body mt-2">
+        <div className="hito-label-md text-foreground">Rest day</div>
+        <p className="hito-body-md text-secondary mt-2">
           Rest days do not need a workout result. If a mobility or strength assignment is added
           later, you can log it here.
         </p>
@@ -228,7 +228,7 @@ export function CompletionPanel({
           error ? "destructive" : message || isFitCompleted || hasSavedLog ? "success" : undefined
         }
       >
-        <div className="hito-label">
+        <div className="hito-label-md text-foreground">
           {isSaving
             ? isFitCompleted
               ? "Saving feedback"
@@ -249,7 +249,7 @@ export function CompletionPanel({
                         : "Ready to save"
                       : "Preview only"}
         </div>
-        <p className="hito-body mt-2">
+        <p className="hito-body-md text-secondary mt-2">
           {isSaving
             ? isFitCompleted
               ? "Saving your personal feedback now."
@@ -274,7 +274,7 @@ export function CompletionPanel({
                         : "Save this result to update the workout and this week's status."
                       : "You can try the form here, but preview results are not saved."}
         </p>
-        <div className="hito-caption mt-3 flex flex-wrap items-center gap-3">
+        <div className="hito-body-xs text-tertiary mt-3 flex flex-wrap items-center gap-3">
           <span>
             This week <span className="text-foreground/80">{weekStatus.label}</span>
           </span>
@@ -345,7 +345,7 @@ export function CompletionPanel({
                     size="sm"
                     style={{ color: active ? option.c : undefined }}
                   />
-                  <span className="hito-list-row-title">{option.label}</span>
+                  <span className="hito-body-md text-foreground">{option.label}</span>
                 </HitoChoiceToggle>
               );
             })}
@@ -355,8 +355,8 @@ export function CompletionPanel({
 
       {isSkipped ? (
         <div className="hito-surface-flat p-4">
-          <div className="hito-label">Skipped result</div>
-          <p className="hito-body mt-2">
+          <div className="hito-label-md text-foreground">Skipped result</div>
+          <p className="hito-body-md text-secondary mt-2">
             A skipped result saves without distance, duration, reps, or RPE. You can still leave a
             note for context.
           </p>
@@ -379,8 +379,8 @@ export function CompletionPanel({
           <div className="mt-6 space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline pb-4">
               <div>
-                <div className="hito-label">Completion correction</div>
-                <p className="hito-body mt-1">
+                <div className="hito-label-md text-foreground">Completion correction</div>
+                <p className="hito-body-md text-secondary mt-1">
                   {form.outcome === "partial"
                     ? "This activity is recorded as partial by your choice."
                     : "Recorded activity remains completed unless you mark it partial."}
@@ -429,7 +429,7 @@ export function CompletionPanel({
                 variant="primary"
                 className="mt-3 min-h-28 resize-none"
               />
-              <p className="hito-caption mt-3">
+              <p className="hito-body-xs text-tertiary mt-3">
                 This saves personal feedback. Distance, duration, and intervals remain with the
                 recorded activity.
               </p>
@@ -438,7 +438,7 @@ export function CompletionPanel({
         ) : (
           <details className={cn("hito-disclosure", !isSkipped && "mt-6")}>
             <summary className="hito-disclosure-summary">
-              <span className="hito-list-row-title">Manually add details</span>
+              <span className="hito-body-md text-foreground">Manually add details</span>
               <Icon name="chevron-down" className="hito-disclosure-chevron" />
             </summary>
             <div className="hito-disclosure-body">
@@ -469,7 +469,9 @@ export function CompletionPanel({
 
                     {plannedRepeats > 0 && (
                       <div className="mt-4">
-                        <div className="hito-label mb-2">Intervals completed</div>
+                        <div className="hito-label-md text-foreground mb-2">
+                          Intervals completed
+                        </div>
                         <div
                           className="hito-choice-toggle-group flex-nowrap"
                           {...intervalGroup.groupProps}
@@ -493,7 +495,7 @@ export function CompletionPanel({
                             </HitoChoiceToggle>
                           ))}
                         </div>
-                        <p className="hito-field-helper mt-2">
+                        <p className="hito-body-xs text-secondary mt-2">
                           Tap to mark how many reps were completed.
                         </p>
                       </div>
@@ -530,7 +532,7 @@ export function CompletionPanel({
                   variant="primary"
                   className="mt-3 min-h-28 resize-none"
                 />
-                <p className="hito-caption mt-3">
+                <p className="hito-body-xs text-tertiary mt-3">
                   {snapshot.source === "persisted"
                     ? "This saves your workout result. Garmin uploads live in Feedback."
                     : "Preview only. Results entered here are not saved."}
@@ -608,7 +610,7 @@ export function CompletionPanel({
         >
           {saveButtonLabel}
         </HitoButton>
-        <span className="hito-caption ml-auto">
+        <span className="hito-body-xs text-tertiary ml-auto">
           {isFitCompleted
             ? "Personal feedback only. Run data stays with the activity file."
             : snapshot.source === "persisted"
@@ -642,14 +644,14 @@ function LogResultFeedbackBridge({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="hito-label">{state.label}</p>
+            <p className="hito-label-md text-foreground">{state.label}</p>
             {state.pill ? (
               <span className="hito-status-pill" data-tone={state.pill.tone}>
                 {state.pill.label}
               </span>
             ) : null}
           </div>
-          <p className="hito-body-small mt-1 max-w-xl">{state.body}</p>
+          <p className="hito-body-sm text-secondary mt-1 max-w-xl">{state.body}</p>
         </div>
         {onOpenActivityFile ? (
           <HitoButton
@@ -758,8 +760,8 @@ export function WorkoutFeedbackPanel({
   if (workout.type === "rest") {
     return (
       <div className="hito-surface-flat p-5">
-        <div className="hito-label">Feedback unavailable</div>
-        <p className="hito-body mt-2">
+        <div className="hito-label-md text-foreground">Feedback unavailable</div>
+        <p className="hito-body-md text-secondary mt-2">
           Rest days do not support Garmin review right now. If you need to log something, keep it in
           the workout result instead.
         </p>
@@ -777,9 +779,11 @@ export function WorkoutFeedbackPanel({
       <header className="space-y-3 max-w-3xl">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="hito-label">Feedback</div>
-            <h2 className="hito-ui-section-title mt-2">Compare your run with the plan.</h2>
-            <p className="hito-body mt-2">
+            <div className="hito-label-md text-foreground">Feedback</div>
+            <h2 className="hito-ui-title-sm text-foreground mt-2">
+              Compare your run with the plan.
+            </h2>
+            <p className="hito-body-md text-secondary mt-2">
               {attachedGarminAsset
                 ? "Your Garmin file and review live here."
                 : "Add an activity file if you want a deeper review."}
@@ -1017,18 +1021,18 @@ export function WorkoutFeedbackPanel({
                   <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-hairline bg-surface/40">
                     <Icon name="file-up" size="md" className="text-foreground/82" />
                   </div>
-                  <div className="hito-label">Upload activity file</div>
-                  <h3 className="hito-ui-panel-title mt-3">
+                  <div className="hito-label-md text-foreground">Upload activity file</div>
+                  <h3 className="hito-ui-title-xs text-foreground mt-3">
                     Add an activity file to compare it with the plan.
                   </h3>
-                  <p className="hito-body mt-3 max-w-xl">
+                  <p className="hito-body-md text-secondary mt-3 max-w-xl">
                     Hito currently accepts one Garmin{" "}
-                    <span className="hito-technical-mono">.fit</span> activity or one{" "}
-                    <span className="hito-technical-mono">.zip</span> archive containing exactly one
-                    FIT activity. That unlocks the comparison below.
+                    <span className="hito-technical-sm text-secondary">.fit</span> activity or one{" "}
+                    <span className="hito-technical-sm text-secondary">.zip</span> archive
+                    containing exactly one FIT activity. That unlocks the comparison below.
                   </p>
                   {localActivityFileDesignFixtureEnabled ? (
-                    <p className="hito-caption mt-3 max-w-xl text-muted-foreground">
+                    <p className="hito-body-xs mt-3 max-w-xl text-muted-foreground">
                       Local design fixture. Choose any file to preview deterministic activity
                       readback; nothing is uploaded or saved.
                     </p>
@@ -1062,7 +1066,7 @@ export function WorkoutFeedbackPanel({
               </div>
 
               {uploadError ? (
-                <p className="hito-field-error mt-3" role="alert">
+                <p className="hito-body-md font-medium text-negative mt-3" role="alert">
                   {uploadError}
                 </p>
               ) : null}
@@ -1070,7 +1074,7 @@ export function WorkoutFeedbackPanel({
           )}
 
           {removeError ? (
-            <p className="hito-field-error mt-3" role="alert">
+            <p className="hito-body-md font-medium text-negative mt-3" role="alert">
               {removeError}
             </p>
           ) : null}
@@ -1088,7 +1092,7 @@ export function WorkoutFeedbackPanel({
         {latestComparison ? (
           <section className="border-t border-hairline pt-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <h3 className="hito-ui-panel-title">Plan vs run</h3>
+              <h3 className="hito-ui-title-xs text-foreground">Plan vs run</h3>
               <span
                 className="hito-status-pill"
                 data-tone={getComparisonCoverageMeta(latestComparison).tone}
@@ -1102,7 +1106,7 @@ export function WorkoutFeedbackPanel({
 
         {latestAiInsight ? (
           <section className="border-t border-hairline pt-6">
-            <h3 className="hito-ui-panel-title">Saved coach note</h3>
+            <h3 className="hito-ui-title-xs text-foreground">Saved coach note</h3>
             <WorkoutAiInsightReadback insight={latestAiInsight} comparison={latestComparison} />
           </section>
         ) : null}
@@ -1213,15 +1217,17 @@ function FeedbackUploadSummary({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <p className="hito-label">{summary.label}</p>
+        <p className="hito-label-md text-foreground">{summary.label}</p>
         {summary.pill ? (
           <span className="hito-status-pill" data-tone={summary.pill.tone}>
             {summary.pill.label}
           </span>
         ) : null}
       </div>
-      <p className="hito-body">{summary.body}</p>
-      {summary.detailLine ? <p className="hito-caption">{summary.detailLine}</p> : null}
+      <p className="hito-body-md text-secondary">{summary.body}</p>
+      {summary.detailLine ? (
+        <p className="hito-body-xs text-tertiary">{summary.detailLine}</p>
+      ) : null}
     </div>
   );
 }
@@ -1245,16 +1251,18 @@ function AttachedEvidenceReadback({
     <div className="group rounded-xl bg-background/16 px-4 py-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
-          <div className="hito-label">Attached file</div>
-          <p className="hito-list-row-title mt-2">{asset.originalFileName}</p>
-          <p className="hito-caption mt-2">{fileTypeLabel}</p>
-          <p className="hito-caption mt-1">
+          <div className="hito-label-md text-foreground">Attached file</div>
+          <p className="hito-body-md text-foreground mt-2">{asset.originalFileName}</p>
+          <p className="hito-body-xs text-tertiary mt-2">{fileTypeLabel}</p>
+          <p className="hito-body-xs text-tertiary mt-1">
             {localFixture
               ? "Local design fixture only. No file was uploaded or saved."
               : "Remove this file before uploading a replacement. Your manual result stays as it is."}
           </p>
           {asset.primaryFileName && asset.primaryFileName !== asset.originalFileName ? (
-            <p className="hito-caption mt-1">Extracted activity: {asset.primaryFileName}</p>
+            <p className="hito-body-xs text-tertiary mt-1">
+              Extracted activity: {asset.primaryFileName}
+            </p>
           ) : null}
         </div>
         <HitoButton
@@ -1278,10 +1286,12 @@ function AttachedEvidenceReadback({
         role={summary.tone === "destructive" ? "alert" : undefined}
       >
         <div className="flex flex-wrap items-center gap-2">
-          <p className="hito-list-row-title">{summary.label}</p>
+          <p className="hito-body-md text-foreground">{summary.label}</p>
         </div>
-        <p className="hito-body mt-2">{summary.body}</p>
-        {summary.detailLine ? <p className="hito-caption mt-2">{summary.detailLine}</p> : null}
+        <p className="hito-body-md text-secondary mt-2">{summary.body}</p>
+        {summary.detailLine ? (
+          <p className="hito-body-xs text-tertiary mt-2">{summary.detailLine}</p>
+        ) : null}
       </div>
     </div>
   );
@@ -1520,7 +1530,7 @@ function getFeedbackInviteState(
 }
 
 function Label({ children }: { children: React.ReactNode }) {
-  return <div className="hito-form-label">{children}</div>;
+  return <div className="hito-label-md text-foreground">{children}</div>;
 }
 
 function NumField({
@@ -1539,8 +1549,8 @@ function NumField({
   return (
     <label className="grid gap-2">
       <div className="flex items-center justify-between gap-3">
-        <span className="hito-form-label">{label}</span>
-        <span className="hito-caption font-mono-num">plan {planned}</span>
+        <span className="hito-label-md text-foreground">{label}</span>
+        <span className="hito-technical-sm text-tertiary">plan {planned}</span>
       </div>
       <span className="relative block">
         <Input
@@ -1554,7 +1564,7 @@ function NumField({
           className="pr-12 font-mono-num"
         />
         <span
-          className="hito-caption pointer-events-none absolute inset-y-0 right-3 flex items-center"
+          className="hito-body-xs text-tertiary pointer-events-none absolute inset-y-0 right-3 flex items-center"
           aria-hidden="true"
         >
           {suffix}

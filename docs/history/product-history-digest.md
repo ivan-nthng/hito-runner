@@ -1,8 +1,8 @@
 # Product History Digest
 
 Status: active digest
-Last Updated: 2026-07-13
-Owner: ARCHITECT
+Last Updated: 2026-08-11
+Owner: PRODUCT
 
 ## Purpose And Source Boundary
 
@@ -14,7 +14,7 @@ This digest is not:
 
 - the curated public shipped-history source for `/changelog`; that remains
   [changelog](./changelog.md)
-- the internal accepted-slice ledger; that remains [technical log](./technical-log.md)
+- the durable internal decision index; that remains [technical log](./technical-log.md)
 - the implemented-behavior source; that remains [current product](../current-product.md) and
   [current system](../current-system.md)
 - an active execution plan or backlog
@@ -32,7 +32,7 @@ archived plans for detailed historical evidence.
 - [Current functional map](../current-functional-map.md) owns business-flow cleanup and source
   hierarchy.
 - [Changelog](./changelog.md) owns curated public shipped-history highlights.
-- [Technical log](./technical-log.md) owns the complete internal accepted-slice ledger.
+- [Technical log](./technical-log.md) owns concise durable release and architecture decisions.
 - [Hito Docs and Artifact Compression](../plans/active/2026-06-20-hito-docs-and-artifact-compression.md)
   owns the current docs/artifact compression track.
 
@@ -122,7 +122,7 @@ Key archived evidence:
 ### 2026-06-06 To 2026-06-07: Plan Presets And No-Active-Plan Shortcuts
 
 - Plan Presets shipped as no-active-plan discovery cards for `10K Foundation`, `Half Marathon
-  Balanced`, and `Marathon Base`.
+Balanced`, and `Marathon Base`.
 - The accepted runner-facing model became card discovery into selected running-plan preview/create,
   not a revived Plan Preset-owned create engine.
 - Backend-owned preset card truth included eligibility, duration, date summaries, workout mix, metric
@@ -193,32 +193,50 @@ Key archived evidence:
   before AI/local detail authoring fills dated workout documents.
 - After the July catch-up exposed that public changelog and internal implementation history had been
   blurred, Product split the model: `docs/history/changelog.md` stays curated highlights while
-  `docs/history/technical-log.md` carries the complete accepted-slice ledger by evidence date.
-  The split was repaired losslessly by mirroring older public changelog sections into the technical
-  log as historical migrated entries, preserving project history back to the May 5 import baseline.
+  `docs/history/technical-log.md` carries only durable decisions and release evidence. Detailed
+  receipts remain canonical backlog records; Git preserves the full chronology.
+
+### 2026-08-09 To 2026-08-11: Runner-Owned Calendar And Released Product Truth
+
+- Calendar dates became runner-local: a persisted IANA time zone, not the deployment process clock,
+  determines each runner's current day across calendar and date-sensitive server policy.
+- A plan is now a retained library/provenance record. Starting one materializes ordinary future
+  Calendar workouts, after which runners can work with them independently; no active-plan authority
+  remains over Calendar truth.
+- The Plans library makes generated plans discoverable and reusable without rewriting saved records.
+  Starting a plan aligns to runner schedule preferences, can omit incompatible leading days, and
+  requires explicit replacement of eligible future workouts.
+- FIT-backed feedback retains the raw source while exposing normalized observed run facts, including
+  elevation, separately from prescribed plan facts.
+- The shared Design System consolidated neutral chrome and text attenuation into theme-resolved
+  semantic roles, reducing local color recipes without flattening genuine structural surfaces.
 
 ## Major Product Capability Tracks
 
-### First-Plan Creation
+### First-Plan Creation And Saved Plans
 
-Hito now has multiple accepted no-active-plan paths with distinct owners:
+Hito has multiple no-current-calendar-authority creation paths with distinct owners:
 
 - structured Quick setup uses backend-reviewed draft/confirm through first-plan actions
 - selected-distance plans preview and confirm through running-plan engine actions
 - Plan Preset cards are discovery only and hand creation to selected-plan preview/create
-- manual setup creates a `manual_user_built_plan_v1` active plan through manual authoring review
+- manual setup creates an empty runner-owned Calendar through profile-backed manual authoring
 - advanced JSON import remains a secondary migration/testing fallback
 
-### Active-Plan Calendar Lifecycle
+Every successful generated plan is retained as an immutable runner library record. A plan can be
+browsed, downloaded, hidden, or started later, but it is not an active Calendar controller.
 
-The saved calendar is one viewing surface across active-plan sources, but mutation rights stay
-backend-shaped:
+### Runner-Owned Calendar Lifecycle
+
+The Calendar is runner-owned persisted truth. Creation provenance may point to a saved plan, but
+mutation rights stay backend-shaped and do not depend on a plan's status:
 
 - eligible Add/Clear/Move is capability-driven
-- manual Copy/Paste and Move use accepted direct backend mutation in the proved manual scope
-- Clear uses backend-shaped review/confirm
+- every persisted non-Rest workout can copy its prescription to a truly empty eligible future day
+- Clear and future replacement retain explicit backend protection
 - protected/logged/evidence-backed rows remain blocked
-- universal Copy/Paste and broader generated-row mutation remain future-only
+- saved-plan Start only affects eligible future truth; past history is not relinked, cloned, or
+  replaced
 
 ### Running-Plan Quality And Metric Truth
 
@@ -241,7 +259,7 @@ Provider and physiology backlog work remains deliberately future-scoped:
   match conservatively to planned workouts, and reuse deterministic comparison before optional AI.
 - Personal HR-zone/AeT work remains a separate runner-level physiology track. Age-estimated HR is
   advisory/readback-only, executable HR targets require real personal zone truth, and applying new
-  zones to an active plan requires explicit review/confirm.
+  zones affects only future authoring through explicit runner input.
 - PDF export, light/dark mode, and commercial Basic/Pro expansion are future backlog tracks; current
   docs and source own only the accepted JSON/Markdown export, dark-first UI, and pre-billing
   entitlement foundation.
@@ -319,13 +337,13 @@ Hito DS owns the internal component/specimen grammar:
 
 The detailed history remains available in linked source artifacts:
 
-| Track | Detailed source |
-| --- | --- |
-| Core stack cleanup ledger | [Hito Stack Simplification Strike](../plans/archive/2026-06-07-hito-stack-simplification-strike.md) |
-| Plan Presets | [Plan Preset Library And Custom Authoring Escape Hatch](../plans/archive/2026-06-06-first-plan-preset-library-and-custom-authoring-escape-hatch.md) |
-| AI first-plan blueprint wave | [AI-Authored First-Plan Pipeline](../plans/archive/2026-05-26-ai-authored-first-plan-pipeline.md) |
-| Shipped product history | [Changelog](./changelog.md) |
-| Current business-flow source hierarchy | [Current functional map](../current-functional-map.md) |
+| Track                                  | Detailed source                                                                                                                                     |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Core stack cleanup ledger              | [Hito Stack Simplification Strike](../plans/archive/2026-06-07-hito-stack-simplification-strike.md)                                                 |
+| Plan Presets                           | [Plan Preset Library And Custom Authoring Escape Hatch](../plans/archive/2026-06-06-first-plan-preset-library-and-custom-authoring-escape-hatch.md) |
+| AI first-plan blueprint wave           | [AI-Authored First-Plan Pipeline](../plans/archive/2026-05-26-ai-authored-first-plan-pipeline.md)                                                   |
+| Shipped product history                | [Changelog](./changelog.md)                                                                                                                         |
+| Current business-flow source hierarchy | [Current functional map](../current-functional-map.md)                                                                                              |
 
 ## Not Included Here
 

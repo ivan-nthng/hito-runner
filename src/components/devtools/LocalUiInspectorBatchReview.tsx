@@ -119,10 +119,15 @@ export function LocalUiInspectorBatchReview({
     >
       <div className="relative min-w-0 pr-8" data-local-ui-inspector-header="">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-          <h2 ref={titleRef} id={titleId} tabIndex={-1} className="hito-panel-title outline-none">
+          <h2
+            ref={titleRef}
+            id={titleId}
+            tabIndex={-1}
+            className="hito-ui-title-xs text-foreground outline-none"
+          >
             Draft
           </h2>
-          <span className="hito-caption text-muted-foreground">
+          <span className="hito-body-xs text-muted-foreground">
             {items.length} of {LOCAL_UI_INSPECTOR_BATCH_LIMIT}
           </span>
           <button
@@ -157,7 +162,7 @@ export function LocalUiInspectorBatchReview({
             const targetPresent = isLocalUiInspectorTargetPresent(item.target);
             return (
               <li key={item.id} className="hito-list-row min-w-0 gap-2 px-2 py-2">
-                <span className="hito-technical-mono shrink-0 text-xs text-muted-foreground">
+                <span className="hito-technical-sm shrink-0 text-muted-foreground">
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <button
@@ -166,10 +171,10 @@ export function LocalUiInspectorBatchReview({
                   className="min-w-0 flex-1 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   onClick={() => onEdit(item)}
                 >
-                  <span className="hito-list-row-title block truncate">
+                  <span className="hito-body-md block truncate text-foreground">
                     {getLocalUiInspectorTargetLabel(item.target)}
                   </span>
-                  <span className="hito-caption mt-0.5 line-clamp-2 block">
+                  <span className="hito-body-xs mt-0.5 line-clamp-2 block text-tertiary">
                     {getLocalUiInspectorItemSummary(item)}
                   </span>
                   <span className="mt-1 flex min-w-0 flex-wrap gap-1">
@@ -216,12 +221,12 @@ export function LocalUiInspectorBatchReview({
 
         {copyState === "copy_failed" ? (
           <div className="grid min-w-0 gap-2 rounded-lg border border-hairline bg-surface/70 p-2">
-            <p className="hito-caption text-warn">Copy blocked. Select the prompt below.</p>
+            <p className="hito-body-xs text-warn">Copy blocked. Select the prompt below.</p>
             <Textarea
               ref={promptRef}
               readOnly
               aria-label="Manual copy generated batch prompt"
-              className="hito-technical-mono max-h-48 min-h-32 resize-y whitespace-pre-wrap py-1.5 text-xs leading-5"
+              className="hito-technical-sm max-h-48 min-h-32 resize-y whitespace-pre-wrap py-1.5"
               value={prompt}
               onFocus={(event) => event.currentTarget.select()}
             />
@@ -230,14 +235,14 @@ export function LocalUiInspectorBatchReview({
 
         <details className="hito-disclosure border-0 bg-transparent p-0">
           <summary className="hito-disclosure-summary cursor-pointer list-none px-0 py-1 [&::-webkit-details-marker]:hidden">
-            <span className="hito-caption text-foreground">Inspect generated prompt</span>
+            <span className="hito-body-xs text-foreground">Inspect generated prompt</span>
             <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
           </summary>
           <div className="hito-disclosure-body mt-1 grid gap-2">
             <Textarea
               readOnly
               aria-label="Generated local Inspector batch prompt"
-              className="hito-technical-mono max-h-52 min-h-36 resize-y whitespace-pre-wrap py-1.5 text-xs leading-5"
+              className="hito-technical-sm max-h-52 min-h-36 resize-y whitespace-pre-wrap py-1.5"
               value={prompt}
               onFocus={(event) => event.currentTarget.select()}
             />

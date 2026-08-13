@@ -202,13 +202,18 @@ export function SelectedRunningPlanPreviewDialog({
         ) : (
           <DialogHeader className="hito-product-dialog-header">
             <div className="min-w-0">
-              <p className="hito-micro-label" data-tone="signal">
+              <p
+                className="hito-label-sm uppercase tracking-[0.18em] text-accent"
+                data-tone="signal"
+              >
                 Generated plan
               </p>
-              <DialogTitle className="hito-ui-modal-title mt-2">
+              <DialogTitle className="hito-ui-title-md text-foreground mt-2">
                 {goalLabel} plan preview
               </DialogTitle>
-              <DialogDescription className="hito-body max-w-2xl">{description}</DialogDescription>
+              <DialogDescription className="hito-body-md text-secondary max-w-2xl">
+                {description}
+              </DialogDescription>
             </div>
           </DialogHeader>
         )}
@@ -226,8 +231,8 @@ export function SelectedRunningPlanPreviewDialog({
 
           {error ? (
             <div className="hito-surface-wash" data-tone="destructive">
-              <p className="hito-list-row-title">Preview unavailable</p>
-              <p className="hito-list-row-copy">{error}</p>
+              <p className="hito-body-md text-foreground">Preview unavailable</p>
+              <p className="hito-body-sm mt-1 text-secondary">{error}</p>
             </div>
           ) : null}
 
@@ -242,8 +247,8 @@ export function SelectedRunningPlanPreviewDialog({
               <div className="flex items-start gap-3">
                 <Icon name="loader" size="sm" className="mt-0.5 animate-spin" />
                 <div className="min-w-0">
-                  <p className="hito-list-row-title">Refreshing preview</p>
-                  <p className="hito-list-row-copy">
+                  <p className="hito-body-md text-foreground">Refreshing preview</p>
+                  <p className="hito-body-sm mt-1 text-secondary">
                     Your current saved plan stays in Plans while Hito prepares a new reviewed
                     version.
                   </p>
@@ -258,8 +263,8 @@ export function SelectedRunningPlanPreviewDialog({
               role="status"
               aria-live="polite"
             >
-              <p className="hito-list-row-title">Adding workouts to Calendar</p>
-              <p className="hito-list-row-copy">
+              <p className="hito-body-md text-foreground">Adding workouts to Calendar</p>
+              <p className="hito-body-sm mt-1 text-secondary">
                 Hito is adding this saved plan&apos;s workouts to Calendar.
               </p>
             </div>
@@ -279,7 +284,7 @@ export function SelectedRunningPlanPreviewDialog({
           </DialogFooter>
         ) : reviewVisible && draft ? (
           <DialogFooter className="hito-product-dialog-footer grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:space-x-0">
-            <p className="hito-caption min-w-0">
+            <p className="hito-body-xs text-tertiary min-w-0">
               Saved in Plans. Calendar workouts have not been added yet.
             </p>
             <div className="flex w-full flex-col-reverse gap-3 sm:w-auto sm:flex-row sm:items-center">
@@ -341,13 +346,17 @@ function GeneratedPlanReadyReviewHeader({ draft }: { draft: SelectedRunningPlanP
   return (
     <DialogHeader className="hito-product-dialog-header border-b-0">
       <div className="min-w-0">
-        <DialogTitle className="hito-ui-page-title mt-2 break-words">{header.title}</DialogTitle>
-        <p className="hito-ui-section-title mt-2 min-w-0 break-words">{header.startCopy}</p>
+        <DialogTitle className="hito-ui-title-xl mt-2 max-w-[44rem] break-words">
+          {header.title}
+        </DialogTitle>
+        <p className="hito-ui-title-sm text-foreground mt-2 min-w-0 break-words">
+          {header.startCopy}
+        </p>
       </div>
       <div className="mt-3 grid min-w-0 gap-1">
-        <p className="hito-body-small break-words">{header.rangeCopy}</p>
+        <p className="hito-body-sm text-secondary break-words">{header.rangeCopy}</p>
         {header.modifierCopy ? (
-          <p className="hito-body-small break-words">{header.modifierCopy}</p>
+          <p className="hito-body-sm text-secondary break-words">{header.modifierCopy}</p>
         ) : null}
       </div>
     </DialogHeader>
@@ -365,8 +374,8 @@ function CreateBlockedNotice({
     <div className="hito-surface-wash" data-tone={view.tone}>
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="hito-list-row-title">{view.title}</p>
-          <p className="hito-list-row-copy">{view.copy}</p>
+          <p className="hito-body-md text-foreground">{view.title}</p>
+          <p className="hito-body-sm mt-1 text-secondary">{view.copy}</p>
         </div>
         {view.openPlan ? (
           <HitoButton asChild className="shrink-0" size="sm" variant="secondary">
@@ -428,8 +437,8 @@ function PreviewUnavailableState({ result }: { result: SelectedRunningPlanPrevie
   return (
     <div className="grid gap-4">
       <div className="hito-surface-wash" data-tone={view.tone}>
-        <p className="hito-list-row-title">{view.title}</p>
-        <p className="hito-list-row-copy">{view.copy}</p>
+        <p className="hito-body-md text-foreground">{view.title}</p>
+        <p className="hito-body-sm mt-1 text-secondary">{view.copy}</p>
       </div>
       <div className="hito-row-group">
         <div className="hito-list-row items-start">
@@ -444,8 +453,8 @@ function PreviewUnavailableState({ result }: { result: SelectedRunningPlanPrevie
 function PreviewFact({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <p className="hito-label">{label}</p>
-      <p className="hito-list-row-copy mt-1">{value}</p>
+      <p className="hito-label-md text-foreground">{label}</p>
+      <p className="hito-body-sm mt-1 text-secondary">{value}</p>
     </div>
   );
 }
@@ -525,8 +534,8 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
   if (missingWorkoutDocumentRow) {
     return (
       <div className="hito-surface-wash" data-tone="destructive">
-        <p className="hito-list-row-title">Workout preview unavailable</p>
-        <p className="hito-list-row-copy">
+        <p className="hito-body-md text-foreground">Workout preview unavailable</p>
+        <p className="hito-body-sm mt-1 text-secondary">
           The reviewed workout document for {missingWorkoutDocumentRow.date} is unavailable. Refresh
           this preview before creating the plan.
         </p>
@@ -538,8 +547,10 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
     <div className="grid gap-4">
       <section className="grid gap-3">
         <div>
-          <h3 className="hito-ui-section-title">Plan calendar</h3>
-          <p className="hito-body-small mt-1">Select a day to review the workout summary.</p>
+          <h3 className="hito-ui-title-sm text-foreground">Plan calendar</h3>
+          <p className="hito-body-sm text-secondary mt-1">
+            Select a day to review the workout summary.
+          </p>
         </div>
 
         <div className="hito-selected-plan-calendar grid gap-2">

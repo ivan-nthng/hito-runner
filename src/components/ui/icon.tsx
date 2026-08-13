@@ -123,6 +123,7 @@ export const HITO_ICON_META = [
   { name: "radius-bottom-right", category: "layout/radius", label: "Radius bottom right" },
   { name: "radius-bottom-left", category: "layout/radius", label: "Radius bottom left" },
   { name: "typography", category: "text/typography", label: "Typography" },
+  { name: "color", category: "utility", label: "Color" },
 ] as const;
 
 export type HitoIconName = (typeof HITO_ICON_META)[number]["name"];
@@ -207,6 +208,38 @@ const IconTypography = forwardRef<SVGSVGElement, HitoTablerIconProps>(function T
           clipRule="evenodd"
           d="M8.7283 2.94543C8.61837 2.67123 8.32683 2.48819 8 2.48819C7.67317 2.48819 7.38162 2.67123 7.27169 2.94543L3.40489 12.591C3.26124 12.9493 3.47086 13.3435 3.87309 13.4715C4.27532 13.5995 4.71785 13.4127 4.8615 13.0544L6.0592 10.0668H9.9408L11.1385 13.0544C11.2822 13.4127 11.7247 13.5995 12.1269 13.4715C12.5291 13.3435 12.7388 12.9493 12.5951 12.591L8.7283 2.94543ZM9.38839 8.68888H6.6116L8 5.22559L9.38839 8.68888Z"
         />
+      </g>
+    </svg>
+  );
+}) as TablerIcon;
+
+const IconColor = forwardRef<SVGSVGElement, HitoTablerIconProps>(function ColorIcon(
+  { className, fill, size = 24, stroke: _stroke, title, ...props },
+  ref,
+) {
+  return (
+    <svg
+      ref={ref}
+      aria-hidden={props["aria-hidden"]}
+      aria-label={props["aria-label"]}
+      className={className}
+      fill="none"
+      focusable={props.focusable}
+      height={size}
+      role={props.role}
+      viewBox="0 0 16 16"
+      width={size}
+      xmlns="http://www.w3.org/2000/svg"
+      {...props}
+    >
+      {title ? <title>{title}</title> : null}
+      <g fill={fill ?? "currentColor"}>
+        <path
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M6.71589 0.857697C6.46218 0.603146 6.05063 0.602951 5.79667 0.857263C5.54271 1.11158 5.54251 1.52409 5.79623 1.77864L6.62499 2.61012L1.23395 8.01886C0.477517 8.77772 0.477517 10.0079 1.23395 10.7669L4.88567 14.4305C5.64245 15.1898 6.86969 15.1898 7.62649 14.4305L13.482 8.57566C13.6002 8.45746 13.6733 8.29692 13.666 8.12992C13.6738 7.95372 13.6106 7.77499 13.4765 7.64039L6.71589 0.857697ZM3.58118 7.50752L7.54383 3.53189L11.5064 7.50752H3.58118Z"
+        />
+        <path d="M12.8227 10.8037C13.0156 10.621 13.3177 10.621 13.5106 10.8037L13.5157 10.8091C13.652 10.9508 14.0451 11.3595 14.2205 11.5741C14.3966 11.7897 14.5828 12.0415 14.7273 12.2982C14.8644 12.5415 15 12.8511 15 13.1667C15 14.1792 14.1792 15 13.1666 15C12.1541 15 11.3333 14.1792 11.3333 13.1667C11.3333 12.8511 11.4689 12.5415 11.606 12.2982C11.7505 12.0415 11.9367 11.7897 12.1128 11.5741C12.2904 11.3567 12.8227 10.8037 12.8227 10.8037Z" />
       </g>
     </svg>
   );
@@ -430,6 +463,7 @@ const HITO_ICON_COMPONENTS: Record<HitoIconName, TablerIcon> = {
   "radius-bottom-right": IconRadiusBottomRight,
   "radius-bottom-left": IconRadiusBottomLeft,
   typography: IconTypography,
+  color: IconColor,
 };
 
 type IconProps = Omit<SVGProps<SVGSVGElement>, "aria-label" | "role"> & {

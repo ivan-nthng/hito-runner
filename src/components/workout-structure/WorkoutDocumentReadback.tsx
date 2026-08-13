@@ -33,9 +33,11 @@ export function WorkoutDocumentReadback({
     <section className={cn("grid gap-5", className)}>
       {heading ? (
         <div className="min-w-0">
-          {heading.eyebrow ? <p className="hito-label">{heading.eyebrow}</p> : null}
-          <h3 className="hito-list-row-title mt-1 text-base">{heading.title}</h3>
-          {heading.copy ? <p className="hito-list-row-copy mt-1">{heading.copy}</p> : null}
+          {heading.eyebrow ? (
+            <p className="hito-label-md text-foreground">{heading.eyebrow}</p>
+          ) : null}
+          <h3 className="hito-body-md text-foreground mt-1">{heading.title}</h3>
+          {heading.copy ? <p className="hito-body-sm mt-1 text-secondary">{heading.copy}</p> : null}
         </div>
       ) : null}
 
@@ -51,7 +53,7 @@ export function WorkoutDocumentReadback({
 }
 
 export function WorkoutDocumentNotes({
-  labelClassName = "hito-label",
+  labelClassName = "hito-label-md text-foreground",
   notes,
 }: {
   labelClassName?: string;
@@ -70,7 +72,7 @@ export function WorkoutDocumentNotes({
                 {note.label}
               </span>
             ) : null}
-            <p className="hito-list-row-copy min-w-0">{note.value}</p>
+            <p className="hito-body-sm mt-1 text-secondary min-w-0">{note.value}</p>
           </div>
         ))}
       </div>

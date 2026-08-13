@@ -6,6 +6,8 @@ import {
   HitoValueTagSelectTrigger,
 } from "@/components/ui/value-tag";
 import type {
+  InlineChangeColorControlInput,
+  InlineChangeColorTokenOption,
   InlineChangeTokenControlInput,
   InlineChangeTypographyEvidence,
   InlineChangeTypographyRoleOption,
@@ -85,6 +87,172 @@ export function ValueTag({
       {value}
     </HitoValueTag>
   );
+}
+
+export function ColorValueSelect({
+  ariaLabel,
+  control,
+  desiredValue,
+  onValueChange,
+}: {
+  ariaLabel: string;
+  control: InlineChangeColorControlInput;
+  desiredValue: string | null;
+  onValueChange: (value: string) => void;
+}) {
+  const desiredOption = control.options.find((option) => option.id === desiredValue) ?? null;
+  const isRemoval = desiredValue === "__remove";
+  const displayedOption = desiredOption ?? control.currentToken;
+  const displayLabel = isRemoval
+    ? "Remove color"
+    : (displayedOption?.label ?? control.currentLabel);
+  const displayColor = displayedOption?.previewColor ?? control.currentColor;
+  const displayAlpha = displayedOption?.alphaPercent ?? control.alphaPercent;
+  const tooltip = isRemoval
+    ? `Remove the ${control.label.toLowerCase()} declaration at the eventual canonical source seam.`
+    : getColorDetail(displayedOption, {
+        alphaPercent: control.alphaPercent,
+        color: control.currentColor,
+        hex: control.currentHex,
+        label: control.currentLabel,
+      });
+
+  return (
+    <Select value={desiredValue ?? "__keep"} onValueChange={(value) => onValueChange(value)}>
+      <HitoValueTagSelectTrigger
+        aria-label={`${ariaLabel}. ${tooltip}`}
+        title={tooltip}
+        className="min-w-24 max-w-40"
+        tone={desiredOption || isRemoval ? "signal" : control.currentToken ? "desired" : "neutral"}
+      >
+        <span className="inline-flex min-w-0 items-center gap-1.5">
+          <ColorSwatch alphaPercent={displayAlpha} color={displayColor} />
+          <span className="truncate">{displayLabel}</span>
+        </span>
+      </HitoValueTagSelectTrigger>
+      <SelectContent
+        align="end"
+        className="z-[94] w-80 max-w-[calc(100vw-1rem)]"
+        data-local-ui-inspector-layer=""
+      >
+        <SelectItem value="__keep">
+          <ColorSelectOption
+            alphaPercent={control.alphaPercent}
+            color={control.currentColor}
+            detail={getColorDetail(control.currentToken, {
+              alphaPercent: control.alphaPercent,
+              color: control.currentColor,
+              hex: control.currentHex,
+              label: control.currentLabel,
+            })}
+            label="Keep current"
+          />
+        </SelectItem>
+        {control.options.map((option) => (
+          <SelectItem
+            key={option.id}
+            aria-label={`Use Hito color ${option.label}. ${getColorDetail(option)}`}
+            value={option.id}
+          >
+            <ColorSelectOption
+              alphaPercent={option.alphaPercent}
+              color={option.previewColor}
+              detail={getColorDetail(option)}
+              label={option.label}
+            />
+          </SelectItem>
+        ))}
+        <SelectItem
+          aria-label={`Remove ${control.label.toLowerCase()} color declaration`}
+          value="__remove"
+        >
+          <span className="grid min-w-0 gap-0.5 text-destructive">
+            <span className="hito-label-md truncate">Remove color</span>
+            <span className="hito-body-xs line-clamp-2 text-muted-foreground">
+              Request removal of the {control.declarationProperty} declaration; no live preview.
+            </span>
+          </span>
+        </SelectItem>
+      </SelectContent>
+    </Select>
+  );
+}
+
+export function ColorSwatch({
+  alphaPercent,
+  color,
+  size = "sm",
+}: {
+  alphaPercent: number;
+  color: string;
+  size?: "lg" | "sm";
+}) {
+  const isTranslucent = alphaPercent < 100;
+
+  return (
+    <span
+      aria-hidden="true"
+      className={
+        size === "lg"
+          ? "block size-7 shrink-0 rounded border border-hairline"
+          : "block size-3 shrink-0 rounded-sm border border-hairline"
+      }
+      style={{
+        backgroundColor: color,
+        backgroundImage: isTranslucent
+          ? `linear-gradient(${color}, ${color}), conic-gradient(#ffffff 25%, #d1d1d1 0 50%, #ffffff 0 75%, #d1d1d1 0)`
+          : undefined,
+        backgroundSize: isTranslucent ? "100% 100%, 6px 6px" : undefined,
+      }}
+    />
+  );
+}
+
+function ColorSelectOption({
+  alphaPercent,
+  color,
+  detail,
+  label,
+}: {
+  alphaPercent: number;
+  color: string;
+  detail: string;
+  label: string;
+}) {
+  return (
+    <span className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] items-center gap-2">
+      <ColorSwatch alphaPercent={alphaPercent} color={color} size="lg" />
+      <span className="grid min-w-0 gap-0.5">
+        <span className="hito-label-md truncate text-foreground">{label}</span>
+        <span className="hito-body-xs line-clamp-3 text-muted-foreground">{detail}</span>
+      </span>
+    </span>
+  );
+}
+
+function getColorDetail(
+  option: InlineChangeColorTokenOption | null,
+  fallback?: { alphaPercent: number; color: string; hex: string; label: string },
+) {
+  if (!option) {
+    return [
+      fallback?.label ?? "Custom (computed)",
+      fallback?.hex,
+      fallback ? `alpha ${fallback.alphaPercent}%` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  return [
+    option.label,
+    option.cssVariable,
+    option.source ? `source ${option.source}` : null,
+    option.resolvedHex,
+    `alpha ${option.alphaPercent}%`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 export function TypographyRoleSelect({
@@ -233,8 +401,8 @@ function createTypographyTriggerFocusRestorer(triggerId: string) {
 function TypographyOptionDetails({ descriptor, name }: { descriptor: string; name: string }) {
   return (
     <span className="grid min-w-0 gap-0.5">
-      <span className="hito-label truncate">{name}</span>
-      <span className="hito-caption line-clamp-2 text-muted-foreground" title={descriptor}>
+      <span className="hito-label-md truncate text-foreground">{name}</span>
+      <span className="hito-body-xs line-clamp-2 text-muted-foreground" title={descriptor}>
         {descriptor}
       </span>
     </span>

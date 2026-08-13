@@ -139,13 +139,13 @@ export function HeartRateProfileSection({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           {appearance === "settings" ? (
-            <h2 className="hito-ui-section-title">Heart-rate guidance</h2>
+            <h2 className="hito-ui-title-sm text-foreground">Heart-rate guidance</h2>
           ) : null}
           <p
             className={
               appearance === "settings"
-                ? "hito-support-copy mt-2 max-w-2xl"
-                : "hito-support-copy max-w-2xl"
+                ? "hito-body-md text-secondary mt-2 max-w-2xl"
+                : "hito-body-md text-secondary max-w-2xl"
             }
           >
             Adjust the BPM ranges Hito can use for future plan authoring.
@@ -168,7 +168,7 @@ export function HeartRateProfileSection({
           <div className="hito-heart-rate-scale" aria-hidden="true">
             <div className="hito-heart-rate-scale-values">
               {HEART_RATE_GUIDANCE_SCALE.ticks.map((tick) => (
-                <span key={tick} className="hito-caption">
+                <span key={tick} className="hito-body-xs text-tertiary">
                   {tick}
                 </span>
               ))}
@@ -201,8 +201,8 @@ export function HeartRateProfileSection({
                   <div className="hito-heart-rate-lane-identity">
                     <span className="hito-heart-rate-zone-marker" aria-hidden="true" />
                     <div className="min-w-0">
-                      <h3 className="hito-list-row-title">{zone.label}</h3>
-                      <p className="hito-list-row-copy">{zone.description}</p>
+                      <h3 className="hito-body-md text-foreground">{zone.label}</h3>
+                      <p className="hito-body-sm mt-1 text-secondary">{zone.description}</p>
                     </div>
                   </div>
 
@@ -251,13 +251,13 @@ export function HeartRateProfileSection({
 
           {visibleSummaryError ? (
             <div className="hito-state-surface p-3" data-tone="destructive" role="alert">
-              <p className="hito-body-small">{visibleSummaryError}</p>
+              <p className="hito-body-sm text-secondary">{visibleSummaryError}</p>
             </div>
           ) : null}
         </div>
       ) : (
         <div className="hito-surface-flat mt-4 p-4">
-          <p className="hito-body-small">
+          <p className="hito-body-sm text-secondary">
             Add and save your age first to establish editable starting ranges.
           </p>
         </div>

@@ -210,7 +210,7 @@ export function EditableValueField<Key extends string = string>({
           <span className="hito-editable-value-field-content">
             {hasValue ? (
               <>
-                <span className="hito-micro-label hito-editable-value-field-label">{label}</span>
+                <span className="hito-label-md hito-editable-value-field-label">{label}</span>
                 <span className="hito-editable-value-field-text">
                   {value}
                   {unit ? ` ${unit}` : ""}
@@ -349,7 +349,7 @@ export function EditableSelectValueField<Key extends string = string>({
           <span className="hito-editable-value-field-content">
             {hasSavedValue ? (
               <>
-                <span className="hito-micro-label hito-editable-value-field-label">{label}</span>
+                <span className="hito-label-md hito-editable-value-field-label">{label}</span>
                 <span className="hito-editable-value-field-text">{displayValue}</span>
               </>
             ) : (

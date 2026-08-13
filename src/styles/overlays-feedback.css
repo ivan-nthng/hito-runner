@@ -1,4 +1,20 @@
 @layer components {
+  .hito-surface {
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-2xl);
+    background: linear-gradient(
+      145deg,
+      color-mix(in oklch, var(--color-surface-elevated) 72%, transparent),
+      color-mix(in oklch, var(--color-surface) 64%, transparent)
+    );
+  }
+
+  .hito-surface-flat {
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-xl);
+    background: color-mix(in oklch, var(--color-background) 48%, transparent);
+  }
+
   .hito-ui-overlay {
     --tw-animation-duration: var(--hito-motion-duration-180);
     --tw-ease: var(--hito-motion-ease-out);
@@ -87,8 +103,8 @@
 
   .hito-ui-dialog-title,
   .hito-ui-sheet-title {
-    --hito-typography-role: modal-title;
-    font-family: var(--font-display);
+    --hito-typography-role: ui-title-md;
+    font-family: var(--font-sans);
     font-size: 1.75rem;
     font-feature-settings: "ss01";
     font-weight: 400;
@@ -99,7 +115,7 @@
 
   .hito-ui-dialog-description,
   .hito-ui-sheet-description {
-    --hito-typography-role: body;
+    --hito-typography-role: body-md;
     font-size: 0.875rem;
     line-height: 1.58;
     color: var(--color-text-secondary);
@@ -163,12 +179,13 @@
   }
 
   .hito-ui-menu-label {
-    --hito-typography-role: micro-label;
+    --hito-typography-role: label-sm;
+    font-family: var(--font-sans);
     font-size: 0.6875rem;
     font-weight: 500;
-    letter-spacing: 0.18em;
-    line-height: 1;
-    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    line-height: 1.25;
+    text-transform: none;
     color: var(--color-text-tertiary);
   }
 

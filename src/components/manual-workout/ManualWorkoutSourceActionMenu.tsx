@@ -345,8 +345,10 @@ function ManualDeleteClearReadyDialog({
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-ui-modal-title">Review clear workout</DialogTitle>
-          <DialogDescription className="hito-body">
+          <DialogTitle className="hito-ui-title-md text-foreground">
+            Review clear workout
+          </DialogTitle>
+          <DialogDescription className="hito-body-md text-secondary">
             Confirm before Hito removes this planned workout from your active plan.
           </DialogDescription>
         </DialogHeader>
@@ -354,8 +356,8 @@ function ManualDeleteClearReadyDialog({
           <div className="hito-row-group">
             <div className="hito-list-row items-start">
               <div className="min-w-0">
-                <p className="hito-list-row-title">{dateLabel}</p>
-                <p className="hito-list-row-copy">
+                <p className="hito-body-md text-foreground">{dateLabel}</p>
+                <p className="hito-body-sm mt-1 text-secondary">
                   Selected calendar day for the planned workout being cleared.
                 </p>
               </div>
@@ -366,8 +368,10 @@ function ManualDeleteClearReadyDialog({
 
             <div className="hito-list-row items-start">
               <div className="min-w-0">
-                <p className="hito-list-row-title">{result.title}</p>
-                <p className="hito-list-row-copy">{formatDeleteClearWorkoutSummary(result)}</p>
+                <p className="hito-body-md text-foreground">{result.title}</p>
+                <p className="hito-body-sm mt-1 text-secondary">
+                  {formatDeleteClearWorkoutSummary(result)}
+                </p>
               </div>
               <span className="hito-status-pill shrink-0" data-tone="muted">
                 {manualTemplateRunnerLabelFromKey(result.templateKey)}
@@ -376,8 +380,8 @@ function ManualDeleteClearReadyDialog({
 
             <div className="hito-list-row items-start">
               <div className="min-w-0">
-                <p className="hito-list-row-title">What changes</p>
-                <p className="hito-list-row-copy">
+                <p className="hito-body-md text-foreground">What changes</p>
+                <p className="hito-body-sm mt-1 text-secondary">
                   Hito deletes exactly this planned workout row. The active plan remains active and
                   the calendar refreshes from persisted plan truth.
                 </p>
@@ -389,8 +393,8 @@ function ManualDeleteClearReadyDialog({
 
             <div className="hito-list-row items-start">
               <div className="min-w-0">
-                <p className="hito-list-row-title">If you need it again</p>
-                <p className="hito-list-row-copy">
+                <p className="hito-body-md text-foreground">If you need it again</p>
+                <p className="hito-body-sm mt-1 text-secondary">
                   {result.restore.available
                     ? "Add it again from the calendar later. Hito will review it as a new planned workout before saving anything."
                     : "This clears only the planned row. Hito will not recreate unsupported workout sources automatically."}
@@ -403,7 +407,7 @@ function ManualDeleteClearReadyDialog({
 
             {confirmMessage ? (
               <div className="hito-list-row items-start">
-                <p className="hito-field-error min-w-0">{confirmMessage}</p>
+                <p className="hito-body-md font-medium text-negative min-w-0">{confirmMessage}</p>
               </div>
             ) : null}
           </div>

@@ -154,9 +154,11 @@ function SettingsPage() {
       <AppShell snapshot={snapshot} viewer={viewer}>
         <div className="hito-route-gutter hito-route-stack py-20">
           <section className="hito-state-surface" data-tone="signal">
-            <p className="hito-label">Sign in first</p>
-            <h1 className="hito-ui-page-title">User settings open after sign-in.</h1>
-            <p className="hito-page-copy">
+            <p className="hito-label-md text-foreground">Sign in first</p>
+            <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
+              User settings open after sign-in.
+            </h1>
+            <p className="hito-body-md mt-4 max-w-[40rem] text-secondary">
               Save a profile first, then you can manage your avatar, body data, and future heart
               rate settings here.
             </p>
@@ -177,9 +179,11 @@ function SettingsPage() {
       <AppShell snapshot={snapshot} viewer={viewer}>
         <div className="hito-route-gutter hito-route-stack py-20">
           <section className="hito-state-surface" data-tone="signal">
-            <p className="hito-label">Finish setup first</p>
-            <h1 className="hito-ui-page-title">User settings need a saved runner profile.</h1>
-            <p className="hito-page-copy">
+            <p className="hito-label-md text-foreground">Finish setup first</p>
+            <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
+              User settings need a saved runner profile.
+            </h1>
+            <p className="hito-body-md mt-4 max-w-[40rem] text-secondary">
               Complete setup on home first, then this page can store your profile details.
             </p>
             <div className="hito-state-actions">
@@ -200,9 +204,11 @@ function SettingsPage() {
     <AppShell snapshot={snapshot} viewer={viewer}>
       <div className="hito-route-gutter hito-route-stack max-w-5xl py-10">
         <header className="hito-page-header">
-          <p className="hito-label">User settings</p>
-          <h1 className="hito-ui-page-title">Profile details that follow your training.</h1>
-          <p className="hito-page-copy">
+          <p className="hito-label-md text-foreground">User settings</p>
+          <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
+            Profile details that follow your training.
+          </h1>
+          <p className="hito-body-md mt-4 max-w-[40rem] text-secondary">
             Keep your personal data and future-plan training defaults in one place. Settings update
             your runner profile, not the active plan already on your calendar.
           </p>
@@ -212,10 +218,10 @@ function SettingsPage() {
           className="hito-state-surface p-4"
           data-tone={error ? "destructive" : message ? "success" : undefined}
         >
-          <div className="hito-label">
+          <div className="hito-label-md text-foreground">
             {isUploadingAvatar ? "Uploading avatar" : isSaving ? "Saving settings" : "Ready"}
           </div>
-          <p className="hito-body mt-2">
+          <p className="hito-body-md text-secondary mt-2">
             {error
               ? error
               : message
@@ -334,7 +340,7 @@ function SettingsPage() {
               <section className="hito-settings-section">
                 <div className="flex items-center gap-2">
                   <Icon name="user" size="sm" className="text-signal" />
-                  <h2 className="hito-ui-section-title">Identity</h2>
+                  <h2 className="hito-ui-title-sm text-foreground">Identity</h2>
                 </div>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <Field
@@ -365,8 +371,8 @@ function SettingsPage() {
               <RunnerCalendarTimezoneSection preference={settings} />
 
               <section className="hito-settings-section">
-                <h2 className="hito-ui-section-title">Body data</h2>
-                <p className="hito-support-copy mt-2">
+                <h2 className="hito-ui-title-sm text-foreground">Body data</h2>
+                <p className="hito-body-md text-secondary mt-2">
                   The same compact profile facts used during plan setup.
                 </p>
                 <div className="hito-editable-value-field-group mt-4">
@@ -448,9 +454,9 @@ function SettingsPage() {
             <div>
               <div className="flex items-center gap-2">
                 <Icon name="calendar" size="sm" className="text-signal" />
-                <h2 className="hito-ui-section-title">Training preferences</h2>
+                <h2 className="hito-ui-title-sm text-foreground">Training preferences</h2>
               </div>
-              <p className="hito-support-copy mt-3 max-w-2xl">
+              <p className="hito-body-md text-secondary mt-3 max-w-2xl">
                 Defaults for new plans only. They prefill setup but never rewrite an existing active
                 schedule.
               </p>
@@ -526,7 +532,7 @@ function Field({
 }) {
   return (
     <label className="grid gap-2">
-      <span className="hito-form-label">{label}</span>
+      <span className="hito-label-md text-foreground">{label}</span>
       <Input
         type="text"
         name={name}
@@ -544,7 +550,7 @@ function Field({
 function ReadOnlyField({ label, value }: { label: string; value: string }) {
   return (
     <label className="grid gap-2">
-      <span className="hito-form-label">{label}</span>
+      <span className="hito-label-md text-foreground">{label}</span>
       <Input
         type="email"
         name="email"

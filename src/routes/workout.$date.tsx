@@ -106,17 +106,21 @@ function WorkoutPage() {
           >
             {snapshot.mode === "onboarding" ? (
               <>
-                <p className="hito-label">Setup required</p>
-                <h1 className="hito-ui-page-title">Finish setup before opening workouts.</h1>
-                <p className="hito-page-copy">
+                <p className="hito-label-md text-foreground">Setup required</p>
+                <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
+                  Finish setup before opening workouts.
+                </h1>
+                <p className="hito-body-md mt-4 max-w-[40rem] text-secondary">
                   Create your plan first, then your workouts will open here.
                 </p>
               </>
             ) : (
               <>
-                <p className="hito-label">No workout</p>
-                <h1 className="hito-ui-page-title">Nothing is scheduled for this day.</h1>
-                <p className="hito-page-copy">
+                <p className="hito-label-md text-foreground">No workout</p>
+                <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
+                  Nothing is scheduled for this day.
+                </h1>
+                <p className="hito-body-md mt-4 max-w-[40rem] text-secondary">
                   There is no workout on this date in the current plan. Go back and choose another
                   day.
                 </p>
@@ -179,13 +183,13 @@ function WorkoutPage() {
         <section className="relative mt-5 overflow-hidden px-1 pb-3 pt-2 lg:pt-3">
           <div className="hito-workout-hero-grid">
             <div>
-              <div className="hito-technical-mono flex flex-wrap items-center gap-2.5">
+              <div className="hito-technical-sm text-secondary flex flex-wrap items-center gap-2.5">
                 {resultMeta ? (
                   <ResultBadge meta={resultMeta} mode="identity" />
                 ) : (
                   <span className="h-1.5 w-1.5 rounded-full" style={{ background: meta.color }} />
                 )}
-                <span style={{ color: meta.color }}>{meta.label}</span>
+                <span style={{ color: meta.content }}>{meta.label}</span>
                 <span className="opacity-50">·</span>
                 <span className="text-muted-foreground">
                   {formatDate(workout.date, {
@@ -202,11 +206,11 @@ function WorkoutPage() {
                   <span className="text-signal">· Today</span>
                 )}
               </div>
-              <h1 className="mt-3 max-w-2xl text-balance font-sans text-4xl leading-[1.05] lg:text-5xl">
+              <h1 className="hito-ui-title-lg mt-3 max-w-2xl text-foreground">
                 {isRestDay ? "Rest day" : workout.title}
               </h1>
               {!isRestDay && workout.notes?.trim() && (
-                <p className="hito-support-copy mt-4 max-w-xl">{workout.notes.trim()}</p>
+                <p className="hito-body-md text-secondary mt-4 max-w-xl">{workout.notes.trim()}</p>
               )}
             </div>
 
@@ -348,7 +352,9 @@ function WorkoutPage() {
                           key={entry.key}
                           className="flex items-start justify-between gap-3 py-1 last:border-0"
                         >
-                          <span className="hito-section-subtitle">{entry.label}</span>
+                          <span className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
+                            {entry.label}
+                          </span>
                           <span className="hito-readback-value hito-readback-value-compact">
                             {entry.value}
                           </span>
@@ -363,7 +369,9 @@ function WorkoutPage() {
                                 key={entry.key}
                                 className="flex items-start justify-between gap-3 py-1 last:border-0"
                               >
-                                <span className="hito-section-subtitle">{entry.label}</span>
+                                <span className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
+                                  {entry.label}
+                                </span>
                                 <span className="hito-readback-value hito-readback-value-compact">
                                   {entry.value}
                                 </span>
@@ -371,7 +379,7 @@ function WorkoutPage() {
                             ))}
                           </div>
                         ) : (
-                          <p className="hito-caption">
+                          <p className="hito-body-xs text-tertiary">
                             No reliable pace or heart-rate target is supplied for this workout.
                           </p>
                         )}
@@ -384,7 +392,7 @@ function WorkoutPage() {
                 primaryStructureMetrics.length === 0 &&
                 primaryTargetMetrics.length === 0 && (
                   <SidebarSection title="Execution" tone="signal" titleVariant="strong">
-                    <p className="hito-caption">
+                    <p className="hito-body-xs text-tertiary">
                       No reliable pace or heart-rate target is supplied for this workout.
                     </p>
                   </SidebarSection>
@@ -394,7 +402,7 @@ function WorkoutPage() {
                 <SidebarSection title="Skipped">
                   <div className="flex items-start gap-2">
                     <Icon name="shield-alert" size="xs" className="mt-0.5 text-destructive" />
-                    <p className="hito-body-small">
+                    <p className="hito-body-sm text-secondary">
                       {snapshot.source === "persisted"
                         ? skippedCopy
                         : "This sample status comes from preview logic only."}
@@ -424,7 +432,7 @@ function WorkoutPage() {
                     style={{ width: `${weekProgress.percent}%` }}
                   />
                 </div>
-                <div className="mt-3 flex items-center justify-between gap-3 hito-caption">
+                <div className="mt-3 flex items-center justify-between gap-3 hito-body-xs text-tertiary">
                   <span>{weekStatus.label}</span>
                   <span>{weekProgress.remaining} left</span>
                 </div>
@@ -455,7 +463,7 @@ function WorkoutPendingState() {
   return (
     <AppShell>
       <div className="hito-route-gutter max-w-6xl space-y-8 py-8">
-        <div className="flex items-center gap-3 hito-section-subtitle">
+        <div className="flex items-center gap-3 hito-label-sm uppercase tracking-[0.18em] text-tertiary">
           <Skeleton className="h-3 w-32" />
         </div>
         <div className="hito-workout-hero-grid">
@@ -489,9 +497,11 @@ function WorkoutErrorState({ reset }: { error: Error; reset: () => void }) {
     <AppShell>
       <div className="hito-route-gutter max-w-2xl py-20">
         <section className="hito-state-surface" data-tone="destructive">
-          <p className="hito-label text-destructive">Workout unavailable</p>
-          <h1 className="hito-ui-page-title">We couldn&apos;t load this workout.</h1>
-          <p className="hito-page-copy text-foreground/85">
+          <p className="hito-label-md text-destructive">Workout unavailable</p>
+          <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
+            We couldn&apos;t load this workout.
+          </h1>
+          <p className="hito-body-md mt-4 max-w-[40rem] text-foreground/85">
             Try again. If your plan is still being set up, go back home first.
           </p>
           <div className="hito-state-actions">
@@ -716,10 +726,10 @@ function CompletionActionPanel({
           className={cn("mt-0.5", isToday ? "text-success" : "text-warn")}
         />
         <div className="min-w-0 flex-1">
-          <p className="hito-list-row-title">
+          <p className="hito-body-md text-foreground">
             {isToday ? "Ready when you finish" : "Not logged yet"}
           </p>
-          <p className="hito-list-row-copy">
+          <p className="hito-body-sm mt-1 text-secondary">
             {isToday
               ? "Add a result or activity file after you run it. Both update this planned workout."
               : "This past workout is treated as unlogged until you add a real result."}
@@ -764,9 +774,9 @@ function Overview({ snapshot, workout }: { snapshot: TrainingSnapshot; workout: 
       <section className="flex min-h-[220px] flex-col border-t border-hairline pt-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="hito-label">Recovery day</p>
+            <p className="hito-label-md text-foreground">Recovery day</p>
             <h3 className="mt-2 font-sans text-3xl">Keep it light.</h3>
-            <p className="hito-support-copy mt-4 max-w-lg">
+            <p className="hito-body-md text-secondary mt-4 max-w-lg">
               No distance, duration, or load is scheduled here. Let the day stay open unless a real
               recovery assignment is present.
             </p>
@@ -781,7 +791,7 @@ function Overview({ snapshot, workout }: { snapshot: TrainingSnapshot; workout: 
         {restAssignment && (
           <div className="mt-auto border-t border-hairline pt-5">
             <div>
-              <p className="hito-label">Assignment</p>
+              <p className="hito-label-md text-foreground">Assignment</p>
               <p className="mt-3 text-sm leading-relaxed text-foreground/85">{restAssignment}</p>
             </div>
           </div>
@@ -800,7 +810,7 @@ function Overview({ snapshot, workout }: { snapshot: TrainingSnapshot; workout: 
           month: "short",
           day: "numeric",
         })}
-        iconTone={meta.color}
+        iconTone={meta.content}
         notes={documentNotes}
         readbackEntries={workoutDocumentSectionsToManualReadbackEntries(workout.steps)}
         timelineItems={timelineItems}
@@ -834,7 +844,7 @@ function Stat({ label, value, unit }: { label: string; value: string; unit?: str
   return (
     <div className="hito-metric min-w-16">
       <div className="flex items-baseline justify-center gap-1">
-        <span className="hito-metric-value text-2xl">{value}</span>
+        <span className="hito-metric-value">{value}</span>
         {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
       </div>
       <div className="hito-metric-label">{label}</div>
@@ -873,7 +883,7 @@ function SidebarSection({
             "mb-3",
             titleVariant === "strong"
               ? "text-sm font-medium tracking-[0.01em] text-foreground/92"
-              : "hito-label",
+              : "hito-label-md text-foreground",
           )}
         >
           {title}
@@ -887,7 +897,7 @@ function SidebarSection({
 function ReadbackRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-3 py-1">
-      <span className="hito-section-subtitle">{label}</span>
+      <span className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">{label}</span>
       <span className="hito-readback-value">{value}</span>
     </div>
   );

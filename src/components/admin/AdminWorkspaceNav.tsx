@@ -26,11 +26,11 @@ export function AdminWorkspaceSidebar({
   return (
     <aside className="hito-workbench-sidebar">
       <div className="px-5 pb-7 pt-6">
-        <Link to="/" className="hito-admin-brand">
+        <Link to="/" className="hito-admin-brand hito-label-md">
           <HitoLogo decorative className="[--hito-logo-height:1.15rem]" />
           <span>Admin</span>
         </Link>
-        <p className="hito-menu-meta mt-1">Admin workspace</p>
+        <p className="hito-body-xs mt-1 text-tertiary">Admin workspace</p>
       </div>
 
       <AdminWorkspaceNav activeSection={activeSection} variant="sidebar" />
@@ -63,8 +63,10 @@ export function AdminWorkspacePageHeader({
         <div className="min-w-0">
           <div className="hito-admin-mobile-shell lg:hidden">
             <div className="hito-workbench-location">
-              <span className="hito-workbench-location-title">Admin workspace</span>
-              <span className="hito-workbench-location-meta">
+              <span className="hito-workbench-location-title hito-ui-title-xs">
+                Admin workspace
+              </span>
+              <span className="hito-workbench-location-meta hito-label-md">
                 <span>{activeItem?.label ?? title}</span>
                 {mobileMeta ? (
                   <>
@@ -76,10 +78,8 @@ export function AdminWorkspacePageHeader({
             </div>
             <AdminWorkspaceAccountMenu activeSection={activeSection} compact />
           </div>
-          <h1 className="mt-3 font-display text-3xl tracking-tight text-foreground sm:text-4xl lg:mt-0">
-            {title}
-          </h1>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p>
+          <h1 className="hito-ui-title-md mt-3 text-foreground lg:mt-0">{title}</h1>
+          <p className="hito-body-md mt-2 max-w-3xl text-muted-foreground">{description}</p>
         </div>
         {action ? (
           <div className="flex flex-wrap items-start gap-2 lg:items-center">{action}</div>
@@ -149,9 +149,9 @@ function AdminWorkspaceAccountMenu({
             <AvatarFallback className="hito-shell-avatar-fallback">A</AvatarFallback>
           </Avatar>
           {!compact ? (
-            <div className="min-w-0 flex-1 leading-tight">
+            <div className="min-w-0 flex-1">
               <div className="hito-menu-text truncate">Admin</div>
-              <div className="hito-menu-meta truncate">Local operations</div>
+              <div className="hito-body-xs truncate text-tertiary">Local operations</div>
             </div>
           ) : null}
           <Icon
@@ -168,8 +168,8 @@ function AdminWorkspaceAccountMenu({
       >
         <DropdownMenuLabel className="pb-1">
           <div className="hito-menu-text">Admin</div>
-          <div className="hito-menu-meta mt-1 truncate">Local operations</div>
-          <div className="hito-micro-label mt-2">Admin workspace</div>
+          <div className="hito-body-xs mt-1 truncate text-tertiary">Local operations</div>
+          <div className="hito-label-sm mt-2 text-tertiary">Admin workspace</div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="hito-shell-menu-separator" />
         <DropdownMenuItem className="hito-shell-menu-item" asChild>

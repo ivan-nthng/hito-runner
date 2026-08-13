@@ -6,6 +6,10 @@ import {
   groupChangelogByMonth,
   groupMonthsByYear,
   parseChangelog,
+  getTechnicalLogEntryCount,
+  getTechnicalLogLastUpdated,
+  groupTechnicalLogByMonth,
+  parseTechnicalLog,
 } from "../src/lib/changelog-utils";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -13,10 +17,21 @@ const repoRoot = path.resolve(__dirname, "..");
 
 const PUBLIC_CHANGELOG_PATH = path.join(repoRoot, "docs/history/changelog.md");
 const TECHNICAL_LOG_PATH = path.join(repoRoot, "docs/history/technical-log.md");
+const PRODUCT_HISTORY_DIGEST_PATH = path.join(repoRoot, "docs/history/product-history-digest.md");
 const CHANGELOG_ROUTE_PATH = path.join(repoRoot, "src/routes/changelog.tsx");
 const CHANGE_LOG_ROUTE_PATH = path.join(repoRoot, "src/routes/change-log.tsx");
-const TECHNICAL_LOG_CUTOFF = "2026-07-08";
-const REQUIRED_TECHNICAL_DATES = ["2026-07-13", "2026-07-07", "2026-05-05"] as const;
+const REQUIRED_TECHNICAL_PERIODS = [
+  "2026-08-11",
+  "2026-08-10",
+  "2026-08-06",
+  "2026-08-05",
+  "2026-08-03",
+  "2026-07-23",
+  "2026-07-21",
+  "2026-07",
+  "2026-05 to 2026-06",
+] as const;
+const TECHNICAL_LOG_LAST_UPDATED = "2026-08-11";
 const HISTORICAL_MIRROR_LABEL = "HISTORICAL / migrated public changelog mirror";
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -30,37 +45,49 @@ function readFile(filePath: string) {
   return fs.readFileSync(filePath, "utf8");
 }
 
+function assertLocalMarkdownLinks(markdown: string, sourcePath: string) {
+  for (const match of markdown.matchAll(/\[[^\]]+\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)) {
+    const href = match[1];
+
+    if (/^(?:https?:|mailto:|#)/i.test(href)) {
+      continue;
+    }
+
+    const targetPath = path.resolve(path.dirname(sourcePath), href.split("#", 1)[0]);
+    assert(
+      fs.existsSync(targetPath),
+      `Broken Markdown link in ${path.relative(repoRoot, sourcePath)}: ${href}`,
+    );
+  }
+}
+
 const publicMarkdown = readFile(PUBLIC_CHANGELOG_PATH);
 const technicalMarkdown = readFile(TECHNICAL_LOG_PATH);
+const productHistoryDigestMarkdown = readFile(PRODUCT_HISTORY_DIGEST_PATH);
 const changelogRoute = readFile(CHANGELOG_ROUTE_PATH);
 const changeLogAliasRoute = readFile(CHANGE_LOG_ROUTE_PATH);
 
 const publicDays = parseChangelog(publicMarkdown);
-const technicalDays = parseChangelog(technicalMarkdown);
-const publicDates = new Set(publicDays.map((day) => day.date));
-const technicalDates = new Set(technicalDays.map((day) => day.date));
-const technicalMonths = groupChangelogByMonth(technicalDays);
+const technicalSections = parseTechnicalLog(technicalMarkdown);
+const technicalPeriods = new Set(technicalSections.map((section) => section.period.source));
+const technicalMonths = groupTechnicalLogByMonth(technicalSections);
 const technicalYears = groupMonthsByYear(technicalMonths);
-const missingPublicDates = Array.from(publicDates).filter((date) => !technicalDates.has(date));
-const oldestTechnicalDate = technicalDays
-  .map((day) => day.date)
-  .sort((left, right) => left.localeCompare(right))[0];
 
 assert(publicDays.length > 0, "Public changelog parsed zero dated sections.");
-assert(technicalDays.length > 0, "Technical log parsed zero dated sections.");
+assert(technicalSections.length > 0, "Technical log parsed zero compact decision sections.");
 assert(technicalMonths.length > 0, "Technical log would render zero months.");
 assert(technicalYears.length > 0, "Technical log would render zero years.");
 assert(
-  missingPublicDates.length === 0,
-  `Technical log is missing public changelog date(s): ${missingPublicDates.join(", ")}`,
+  getTechnicalLogEntryCount(technicalSections) > 0,
+  "Technical log parsed zero durable decisions.",
 );
 assert(
-  oldestTechnicalDate < TECHNICAL_LOG_CUTOFF,
-  `Technical log must include history before ${TECHNICAL_LOG_CUTOFF}; oldest parsed date is ${oldestTechnicalDate}.`,
+  getTechnicalLogLastUpdated(technicalMarkdown) === TECHNICAL_LOG_LAST_UPDATED,
+  `Technical log Last Updated must be ${TECHNICAL_LOG_LAST_UPDATED}.`,
 );
 
-for (const date of REQUIRED_TECHNICAL_DATES) {
-  assert(technicalDates.has(date), `Technical log is missing required date ${date}.`);
+for (const period of REQUIRED_TECHNICAL_PERIODS) {
+  assert(technicalPeriods.has(period), `Technical log is missing required period ${period}.`);
 }
 
 assert(
@@ -68,8 +95,21 @@ assert(
   `Public changelog must not contain internal mirror label "${HISTORICAL_MIRROR_LABEL}".`,
 );
 assert(
-  technicalMarkdown.includes(HISTORICAL_MIRROR_LABEL),
-  `Technical log must retain internal mirror label "${HISTORICAL_MIRROR_LABEL}" for migrated history.`,
+  !technicalMarkdown.includes(HISTORICAL_MIRROR_LABEL),
+  `Technical log must not retain retired mirror label "${HISTORICAL_MIRROR_LABEL}".`,
+);
+assert(
+  technicalMarkdown.includes("Status: active durable decision index"),
+  "Technical log must remain the compact durable decision index.",
+);
+assert(
+  publicMarkdown.includes("For the compact internal decision index"),
+  "Public changelog must describe the technical log as a compact decision index.",
+);
+assert(
+  productHistoryDigestMarkdown.includes("curated public shipped-history source") &&
+    productHistoryDigestMarkdown.includes("durable internal decision index"),
+  "Product history digest must preserve the distinct public and technical history roles.",
 );
 assert(
   changelogRoute.includes(
@@ -78,8 +118,8 @@ assert(
   "Changelog route must import docs/history/technical-log.md?raw.",
 );
 assert(
-  changelogRoute.includes("parseChangelog(technicalLogMarkdown)"),
-  "Changelog route must parse technicalLogMarkdown with the shared parser.",
+  changelogRoute.includes("parseTechnicalLog(technicalLogMarkdown)"),
+  "Changelog route must parse technicalLogMarkdown with the shared compact parser.",
 );
 assert(
   changelogRoute.includes("<TechnicalTimeline years={technicalLogYears} />"),
@@ -90,10 +130,25 @@ assert(
   "Changelog route Highlights must derive from publicChangelogDays.",
 );
 assert(
+  changelogRoute.includes("function TimelineDayGutter") &&
+    (changelogRoute.match(/<TimelineDayGutter\b/g)?.length ?? 0) === 2 &&
+    changelogRoute.includes('section.period.kind === "day"') &&
+    !changelogRoute.includes("formatTechnicalLogPeriod"),
+  "Highlights and day-kind Technical sections must share the route-owned TimelineDayGutter.",
+);
+assert(
   changeLogAliasRoute.includes('createFileRoute("/change-log")') &&
     changeLogAliasRoute.includes('to: "/changelog"'),
   "/change-log route must redirect to /changelog.",
 );
+
+for (const [markdown, sourcePath] of [
+  [publicMarkdown, PUBLIC_CHANGELOG_PATH],
+  [technicalMarkdown, TECHNICAL_LOG_PATH],
+  [productHistoryDigestMarkdown, PRODUCT_HISTORY_DIGEST_PATH],
+] as const) {
+  assertLocalMarkdownLinks(markdown, sourcePath);
+}
 
 console.log(
   JSON.stringify(
@@ -107,11 +162,11 @@ console.log(
       },
       technical: {
         source: "docs/history/technical-log.md",
-        dates: technicalDays.length,
-        entries: getChangelogEntryCount(technicalMonths),
-        latest: technicalDays[0]?.date ?? null,
-        oldest: oldestTechnicalDate,
-        requiredDates: REQUIRED_TECHNICAL_DATES,
+        sections: technicalSections.length,
+        entries: getTechnicalLogEntryCount(technicalSections),
+        lastUpdated: getTechnicalLogLastUpdated(technicalMarkdown),
+        periods: technicalSections.map((section) => section.period.source),
+        requiredPeriods: REQUIRED_TECHNICAL_PERIODS,
       },
       route: {
         alias: "/change-log -> /changelog",

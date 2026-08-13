@@ -76,9 +76,9 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
     <section className="pt-1 lg:pt-2">
       <div className="hito-workout-hero-grid">
         <div>
-          <div className="hito-technical-mono flex flex-wrap items-center gap-2.5">
+          <div className="hito-technical-sm text-secondary flex flex-wrap items-center gap-2.5">
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: meta.color }} />
-            <span style={{ color: meta.color }}>{meta.label}</span>
+            <span style={{ color: meta.content }}>{meta.label}</span>
             <span className="opacity-50">·</span>
             <span className="text-muted-foreground">
               {formatDate(snapshot.currentDate, {
@@ -90,11 +90,11 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
             <span className="text-signal">· Today</span>
           </div>
 
-          <h2 className="mt-3 max-w-2xl text-balance font-sans text-4xl leading-[1.05] lg:text-5xl">
+          <h2 className="hito-ui-title-lg mt-3 max-w-2xl text-foreground">
             {isRestDay ? "Rest day" : workout.title}
           </h2>
 
-          <p className="hito-support-copy mt-4 max-w-xl">{workoutSupportText}</p>
+          <p className="hito-body-md text-secondary mt-4 max-w-xl">{workoutSupportText}</p>
 
           <div className="mt-6 flex flex-wrap items-center gap-2">
             <HitoButton asChild size="sm" variant="primary">
@@ -176,7 +176,7 @@ function PlanStartsLaterHero({
     <section className="pt-1 lg:pt-2">
       <div className="hito-workout-hero-grid">
         <div>
-          <div className="hito-technical-mono flex flex-wrap items-center gap-2.5">
+          <div className="hito-technical-sm text-secondary flex flex-wrap items-center gap-2.5">
             <span className="h-1.5 w-1.5 rounded-full bg-signal animate-pulse" />
             <span className="text-signal">
               Today ·{" "}
@@ -190,11 +190,11 @@ function PlanStartsLaterHero({
             <span>No scheduled workout</span>
           </div>
 
-          <h2 className="mt-3 max-w-2xl text-balance font-sans text-4xl leading-[1.05] lg:text-5xl">
+          <h2 className="hito-ui-title-lg mt-3 max-w-2xl text-foreground">
             Your plan starts later.
           </h2>
 
-          <p className="hito-support-copy mt-4 max-w-xl">
+          <p className="hito-body-md text-secondary mt-4 max-w-xl">
             Today is {formatDate(snapshot.currentDate, { month: "short", day: "numeric" })}, while
             your current plan begins on {formatDate(planStart, { month: "short", day: "numeric" })}.
           </p>
@@ -225,9 +225,11 @@ function PlanStartsLaterHero({
           {nextWorkout && (
             <section className="py-4">
               <div>
-                <div className="hito-section-subtitle">Next Workout</div>
+                <div className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
+                  Next Workout
+                </div>
                 <div className="mt-1 text-sm text-foreground/90">{nextWorkout.title}</div>
-                <div className="hito-caption mt-2 font-mono-num">
+                <div className="hito-technical-sm text-tertiary mt-2">
                   {formatDate(nextWorkout.date, {
                     weekday: "short",
                     month: "short",
@@ -248,7 +250,7 @@ function Metric({ label, value, unit }: { label: string; value: string; unit?: s
   return (
     <div className="hito-metric">
       <div className="flex items-baseline justify-center gap-1">
-        <span className="hito-metric-value text-2xl">{value}</span>
+        <span className="hito-metric-value">{value}</span>
         {unit ? <span className="text-xs text-muted-foreground">{unit}</span> : null}
       </div>
       <div className="hito-metric-label">{label}</div>
@@ -275,11 +277,11 @@ function DismissibleSupportNote({
     <section className="pb-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 hito-section-subtitle">
+          <div className="flex items-center gap-2 hito-label-sm uppercase tracking-[0.18em] text-tertiary">
             {icon}
             {title}
           </div>
-          <p className="hito-list-row-copy">{children}</p>
+          <p className="hito-body-sm mt-1 text-secondary">{children}</p>
         </div>
         <HitoButton
           type="button"

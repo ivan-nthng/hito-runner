@@ -6,7 +6,7 @@
 
 ## Status
 
-blocked
+closed
 
 ## Type
 
@@ -34,8 +34,10 @@ System ownership.
 
 ## Stage
 
-Stage 2 Design System runtime retirement implemented and validated; closure is blocked by the
-excluded light-theme showcase-card surface override.
+The runtime retirement is complete. The remaining reference-canvas elevation correction is
+superseded on 2026-08-11 by the combined DESIGN SYSTEM execution item
+[`Hito DS Foundations Color Truth, Context, And Reference Canvas`](/Users/ivan/Developer/hito-running/docs/tasks/backlog/2026-08-11-hito-ds-foundations-color-truth-context-and-reference-canvas.md).
+Keep this item as the immutable evidence for atmosphere deletion; do not repeat either stage here.
 
 ## Archive Intent
 
@@ -61,10 +63,9 @@ Stage 2 — DESIGN SYSTEM, after Stage 1 proves zero Product/Admin consumers:
   `src/styles/foundations.css`.
 - Remove only the now-false foundations token/demo/copy references in
   `src/components/hito-ds/reference-foundations-page.tsx`.
-- In the same existing DS reference-page composition, use the existing semantic `bg-surface` page
-  background while Overview showcase cards remain `bg-background`. This yields the requested
-  quieter background that is one existing semantic elevation lighter than cards in both themes;
-  no color or token is invented.
+- Apply the final two-theme page/card/sidebar elevation correction recorded below. It supersedes
+  the earlier same-role `bg-surface` wording, which was correct for Dark but collapsed the intended
+  difference in Light. Reuse existing semantic roles only; no colour or token is invented.
 
 ## User Report
 
@@ -113,15 +114,107 @@ the selected `main` element.
 
 ## Next Recommended Role
 
-product
+design_system
+
+## Product Correction — Two-Theme Reference Elevation
+
+Ivan's light-theme Inspector report authorizes the previously excluded
+`src/styles/reference-workbench.css` seam and corrects the prior generic page-background direction.
+The requested reference library has a deliberate three-layer hierarchy, using already defined
+semantic values rather than a custom colour:
+
+| Theme | Sidebar | Right-hand reference canvas | Showcase cards |
+| --- | --- | --- | --- |
+| Dark | `sidebar` / `stone-950` — darkest | `surface` / `stone-850` — lighter working field | `background` / `stone-900` — dark visual stage |
+| Light | `sidebar` / `linen-75` — intermediate | `background` / `linen-100` — slightly darker field | `surface` / `linen-50` — lightest visual stage |
+
+This is the intended theme-aware reversal:
+
+- in Dark, the black sidebar anchors the page, the main field opens up, and black showcase stages
+  remain legible inside it;
+- in Light, cards become the lightest objects, the main reference canvas becomes slightly darker,
+  and the existing sidebar stays between them. The current `70%` semantic sidebar treatment may
+  remain only if the rendered intermediate layer still measures as visibly distinct.
+
+### Demonstrated Cause
+
+- `reference-page.tsx` currently gives the entire Hito DS shell `bg-surface`.
+- `reference-workbench.css` correctly gives Dark showcase cards `background` but overrides Light
+  showcase cards to `surface`.
+- In Light, both shell and card therefore resolve to `surface` / `linen-50` (the Inspector measured
+  the card as `#FDFBF7`), so the cards visually disappear into the right-hand canvas.
+- The current Light sidebar already resolves from `sidebar` / `linen-75`; it is a meaningful middle
+  layer once the right canvas uses `background` / `linen-100`.
+
+### Required Final Edit
+
+- Keep the current ShowcaseCard composition, its borderless outer surface, internal header divider,
+  radius, padding, preview stage, links, and all specimens unchanged.
+- Preserve Dark: right canvas `surface`; showcase-card stage `background`; sidebar `sidebar`.
+- Make Light: right canvas `background`; showcase-card stage `surface`; sidebar `sidebar`.
+- Establish the theme-aware canvas assignment at the existing `reference-page.tsx` /
+  `reference-workbench.css` composition seam. The implementation owner may choose the smallest
+  existing class or existing stylesheet composition that follows canonical `data-hito-theme`
+  resolution; do not introduce a global token, literal colour, opacity, gradient, new surface
+  component, card variant, or product-facing class.
+- Do not treat the Inspector's reported radius request as authorization for geometry work: Ivan's
+  request is the colour/elevation relationship only.
+
+### Validation Addition
+
+- On `/hitoDS` Overview at desktop and exact `375×812`, in Dark and Light, prove the computed
+  three-layer values and visual relationship above; no outer-card border or new background image.
+- Verify sidebar navigation, card deep links, a compact centered specimen and an intrinsic-width
+  specimen, keyboard focus, page containment, and console health remain unchanged.
+
+## Exact Design System Handoff
+
+```text
+ROLE: DESIGN SYSTEM
+
+Mode: Tracked — final two-theme elevation correction and closure only
+Task: Complete the ready canonical item:
+`/Users/ivan/Developer/hito-running/docs/tasks/backlog/2026-08-11-retire-hito-canvas-atmosphere.md`
+
+Read AGENTS.md, agents/design-system.agent.md, skills/hito-frontend-design-system/SKILL.md,
+skills/hito-qa-browser-regression/SKILL.md, the complete item, and the existing canonical seams:
+- src/components/hito-ds/reference-page.tsx
+- src/styles/reference-workbench.css
+- src/styles/foundations.css
+- src/components/hito-ds/reference-overview-page.tsx (read-only unless a source map proves a
+  class-composition change is strictly required).
+
+The atmosphere gradient is already retired. Do not repeat or broaden that work. Fix only the
+remaining demonstrated Light elevation collapse: `reference-page.tsx` puts the shell on `surface`,
+while the existing Light showcase-card override also resolves cards to `surface` / #FDFBF7.
+
+Required existing-token ladder:
+- Dark: sidebar `sidebar` / stone-950; right canvas `surface` / stone-850; showcase card
+  `background` / stone-900.
+- Light: sidebar `sidebar` / linen-75; right canvas `background` / linen-100; showcase card
+  `surface` / linen-50.
+
+Keep current card geometry, borderless outer chrome, inner divider, preview stage, links, specimens,
+navigation, tokens, values, alpha ladder, Product, Figma, Backend, and unrelated dirty work. Do
+not introduce a literal colour, token, opacity recipe, gradient, component, variant, or a change to
+the Inspector-reported radius. Use the smallest existing reference-page/reference-workbench
+composition seam and canonical data-hito-theme resolution.
+
+After your focused source proof, use one bounded read-only QA browser subagent. Validate `/hitoDS`
+Overview desktop and exact 375×812 in Dark and Light: computed three-layer values, visible
+relationship, no outer-card border/background image, sidebar nav, card deep links, compact and
+intrinsic specimen layouts, keyboard focus, overflow, and console health. Run relevant DS
+validator, focused format/lint/diff, and an uncontended build or report contention. If the fixture
+QA server is stopped, restart it before the English final receipt.
+
+On pass, mark this overall item completed. Do not stage, commit, push, deploy, mutate hosted state,
+or call providers. Use Russian for visible in-progress commentary.
+```
 
 ## Blockers
 
-The authorized Stage 2 source list excludes `src/styles/reference-workbench.css`, but its accepted
-dirty light-theme rule currently assigns `.hito-ds-showcase-card` the same `--color-surface` used by
-the new DS page background. The rejected atmosphere role is fully retired, but the required
-one-elevation page/card contrast therefore cannot be truthful in light theme without Product
-authorizing that existing Design System seam. No compatibility or local override was added.
+None. Product explicitly authorized the existing Design System CSS seam. The task is queued for
+DESIGN SYSTEM after its active semantic-manifest contract task; do not interrupt that active work.
 
 ## Frontend Product Stage 1 Execution Preflight — 2026-08-11
 

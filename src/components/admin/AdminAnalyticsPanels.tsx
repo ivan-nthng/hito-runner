@@ -20,14 +20,14 @@ export function AnalyticsPanel({
     <section className="grid gap-6 pt-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="hito-label">{eyebrow}</p>
-          <h2 className="hito-modal-title mt-2">{title}</h2>
-          <p className="hito-body mt-3 max-w-3xl text-muted-foreground">{description}</p>
+          <p className="hito-label-md">{eyebrow}</p>
+          <h2 className="hito-ui-title-md mt-2">{title}</h2>
+          <p className="hito-body-md mt-3 max-w-3xl text-muted-foreground">{description}</p>
         </div>
         {generatedAt ? (
           <div className="grid gap-1 text-left sm:text-right">
-            <span className="hito-label">Generated</span>
-            <span className="hito-technical-mono text-xs text-muted-foreground">
+            <span className="hito-label-md">Generated</span>
+            <span className="hito-technical-sm text-muted-foreground">
               {formatDateTime(generatedAt)}
             </span>
           </div>
@@ -56,7 +56,7 @@ export function MetricCard({
   return (
     <div className="hito-analytics-stat">
       <div className="hito-analytics-stat-head">
-        <span className="hito-label text-muted-foreground">{label}</span>
+        <span className="hito-label-md text-muted-foreground">{label}</span>
         {tone !== "neutral" ? (
           <Icon
             name={tone === "success" ? "check-circle" : "warning"}
@@ -77,17 +77,15 @@ export function MetricCard({
 export function KeyCountList({ title, items }: { title: string; items: AdminAnalyticsKeyCount[] }) {
   return (
     <div className="hito-surface-flat p-4">
-      <h3 className="hito-label text-foreground">{title}</h3>
+      <h3 className="hito-label-md text-foreground">{title}</h3>
       {items.length === 0 ? (
-        <p className="hito-field-helper mt-3">No rows yet.</p>
+        <p className="hito-body-xs mt-3 text-secondary">No rows yet.</p>
       ) : (
         <div className="mt-4 grid gap-2">
           {items.map((item) => (
             <div key={item.key} className="hito-analytics-list-item hito-analytics-list-item-split">
-              <span className="text-sm text-muted-foreground">{formatKey(item.key)}</span>
-              <span className="hito-technical-mono text-sm text-foreground">
-                {formatCount(item.count)}
-              </span>
+              <span className="hito-body-md text-muted-foreground">{formatKey(item.key)}</span>
+              <span className="hito-technical-sm text-foreground">{formatCount(item.count)}</span>
             </div>
           ))}
         </div>
@@ -103,20 +101,18 @@ export function CapabilityUsageList({
 }) {
   return (
     <div className="hito-surface-flat p-4">
-      <h3 className="hito-label text-foreground">Capability usage</h3>
+      <h3 className="hito-label-md text-foreground">Capability usage</h3>
       {items.length === 0 ? (
-        <p className="hito-field-helper mt-3">No metered capability usage yet.</p>
+        <p className="hito-body-xs mt-3 text-secondary">No metered capability usage yet.</p>
       ) : (
         <div className="mt-4 grid gap-2">
           {items.map((item) => (
             <div key={item.key} className="hito-analytics-list-item">
               <div className="flex items-center justify-between gap-4">
-                <span className="text-sm text-muted-foreground">{formatKey(item.key)}</span>
-                <span className="hito-technical-mono text-sm text-foreground">
-                  {formatCount(item.count)}
-                </span>
+                <span className="hito-body-md text-muted-foreground">{formatKey(item.key)}</span>
+                <span className="hito-technical-sm text-foreground">{formatCount(item.count)}</span>
               </div>
-              <p className="hito-field-helper mt-1">
+              <p className="hito-body-xs mt-1 text-secondary">
                 {formatCount(item.usersWithUsage)} users with usage
               </p>
             </div>
@@ -130,8 +126,8 @@ export function CapabilityUsageList({
 export function PipelineStep({ label, value }: { label: string; value: number }) {
   return (
     <div className="hito-analytics-list-item hito-analytics-list-item-spacious">
-      <span className="hito-label text-muted-foreground">{label}</span>
-      <div className="hito-analytics-value mt-3 text-2xl">{formatCount(value)}</div>
+      <span className="hito-label-md text-muted-foreground">{label}</span>
+      <div className="hito-analytics-value mt-3">{formatCount(value)}</div>
     </div>
   );
 }
@@ -142,8 +138,8 @@ export function EmptyPanel({ title, description }: { title: string; description:
       <div className="flex items-start gap-3">
         <Icon name="user" size="md" className="mt-0.5 text-muted-foreground" />
         <div>
-          <h3 className="hito-body font-medium text-foreground">{title}</h3>
-          <p className="hito-field-helper mt-2">{description}</p>
+          <h3 className="hito-body-md font-medium text-foreground">{title}</h3>
+          <p className="hito-body-xs mt-2 text-secondary">{description}</p>
         </div>
       </div>
     </div>
@@ -168,9 +164,9 @@ export function BooleanPill({
 
 export function CompactCount({ label, value }: { label: string; value: number }) {
   return (
-    <div className="flex items-center justify-between gap-4 text-sm">
+    <div className="hito-body-md flex items-center justify-between gap-4">
       <span className="text-muted-foreground">{label}</span>
-      <span className="hito-technical-mono text-foreground">{formatCount(value)}</span>
+      <span className="hito-technical-sm text-foreground">{formatCount(value)}</span>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import {
   LocalUiComponentIdentity,
 } from "@/components/devtools/LocalUiComponentActions";
 import {
+  buildColorControlSelections,
   buildInlineChangePayload,
   buildTokenControlSelections,
   getInlineChangeAction,
@@ -19,7 +20,7 @@ import {
   type LocalUiScopedComponentActionScope,
 } from "@/components/devtools/local-ui-inspector-session";
 import { ChromeControlRows } from "@/components/devtools/LocalUiChromeControls";
-import { TokenControlRows } from "@/components/devtools/LocalUiTokenControls";
+import { ColorControlRows, TokenControlRows } from "@/components/devtools/LocalUiTokenControls";
 import { LocalUiTextControlRow } from "@/components/devtools/LocalUiTextControlRow";
 import { TypographyControlRow } from "@/components/devtools/LocalUiTypographyControls";
 import {
@@ -72,11 +73,16 @@ export function LocalUiTaskDraftPanel({
   const isRemovingInstance = draft.componentAction?.type === "remove_instance";
   const isAddingToDs = draft.componentAction?.type === "add_to_ds";
   const isReusingExistingComponent = draft.componentAction?.type === "reuse_existing_component";
-  const isScopedComponentAction = isRemovingInstance || isReusingExistingComponent;
+  const scopedComponentAction =
+    draft.componentAction?.type === "remove_instance" ||
+    draft.componentAction?.type === "reuse_existing_component"
+      ? draft.componentAction
+      : null;
+  const isScopedComponentAction = Boolean(scopedComponentAction);
   const effectiveFixScope: InlineChangeFixScope = isAddingToDs
     ? "hito_ds"
-    : isScopedComponentAction && draft.componentAction
-      ? draft.componentAction.scope
+    : scopedComponentAction
+      ? scopedComponentAction.scope
       : draft.fixScope;
   const scopeOptions = INLINE_CHANGE_SCOPE_OPTIONS.filter((option) => {
     if (isAddingToDs) return option.id === "hito_ds";
@@ -105,6 +111,11 @@ export function LocalUiTaskDraftPanel({
     () => buildTokenControlSelections(activeTokenControls, draft.desiredTokens),
     [activeTokenControls, draft.desiredTokens],
   );
+  const colorControls = useMemo(() => target.colorControls ?? [], [target.colorControls]);
+  const colorControlSelections = useMemo(
+    () => buildColorControlSelections(colorControls, draft.desiredTokens),
+    [colorControls, draft.desiredTokens],
+  );
   const typographyRoleSelection = useMemo(
     () => buildTypographyRoleSelection(target.typography, draft.desiredTypographyRole),
     [draft.desiredTypographyRole, target.typography],
@@ -122,6 +133,7 @@ export function LocalUiTaskDraftPanel({
       (selectedAction?.id === "edit_text" ? null : selectedAction) ??
       getInferredDraftAction(
         tokenControlSelections,
+        colorControlSelections,
         typographyRoleSelection,
         draft.chromeRemovalSelection,
         null,
@@ -129,6 +141,7 @@ export function LocalUiTaskDraftPanel({
     [
       componentAction,
       draft.chromeRemovalSelection,
+      colorControlSelections,
       hasTextChange,
       selectedAction,
       tokenControlSelections,
@@ -148,12 +161,14 @@ export function LocalUiTaskDraftPanel({
             ? { id: "remove_component", label: "Remove object" }
             : null,
           proposedText: hasTextProperty ? draft.proposedText : null,
+          colorControls: isRemovingInstance ? [] : colorControlSelections,
           tokenControlSelections: isRemovingInstance ? [] : tokenControlSelections,
           typographyRoleSelection: isRemovingInstance ? null : typographyRoleSelection,
         },
       }),
     [
       draft.chromeRemovalSelection,
+      colorControlSelections,
       draft.comment,
       draft.proposedText,
       draftAction,
@@ -176,6 +191,7 @@ export function LocalUiTaskDraftPanel({
       chromeRemovalSelection: draft.chromeRemovalSelection,
       comment: draft.comment,
       currentText: target.visibleText,
+      colorControlSelections,
       proposedText: draft.proposedText,
       promptActionSelection: null,
       tokenControlSelections,
@@ -231,13 +247,15 @@ export function LocalUiTaskDraftPanel({
           ref={headingRef}
           id={headingId}
           tabIndex={-1}
-          className="hito-label min-w-0 truncate text-foreground outline-none"
+          className="hito-label-md min-w-0 truncate text-foreground outline-none"
         >
           {getTargetHeaderLabel(payload)}
         </h2>
         <div className="mt-0.5 grid min-w-0 gap-0.5">
-          <p className="hito-caption truncate">{getTargetMetaLabel(payload, targetKind)}</p>
-          <p className="hito-caption truncate">{payload.route.path}</p>
+          <p className="hito-body-xs truncate text-tertiary">
+            {getTargetMetaLabel(payload, targetKind)}
+          </p>
+          <p className="hito-body-xs truncate text-tertiary">{payload.route.path}</p>
           <LocalUiComponentIdentity ownership={ownership} />
         </div>
         <button
@@ -254,20 +272,19 @@ export function LocalUiTaskDraftPanel({
         className="grid min-w-0 gap-3 max-md:min-h-0 max-md:overflow-y-auto max-md:overscroll-contain max-md:pr-1"
         data-local-ui-inspector-scroll-body=""
       >
-        {notice ? <p className="hito-caption text-signal">{notice}</p> : null}
+        {notice ? <p className="hito-body-xs text-signal">{notice}</p> : null}
         {batchFull && !isEditing ? (
-          <p className="hito-caption text-warn">
+          <p className="hito-body-xs text-warn">
             Batch is full. Generate a prompt or remove an item before adding another.
           </p>
         ) : null}
 
         <div className="grid min-w-0 gap-1.5" data-local-ui-property-controls="">
-          <p className="hito-caption text-foreground">Observed properties</p>
+          <p className="hito-body-xs text-foreground">Observed properties</p>
           {!isRemovingInstance ? (
             <>
               {hasTextProperty && target.visibleText ? (
                 <LocalUiTextControlRow
-                  currentText={target.visibleText}
                   proposedText={draft.proposedText}
                   onProposedTextChange={(proposedText) => updateDraft({ proposedText })}
                 />
@@ -285,21 +302,27 @@ export function LocalUiTaskDraftPanel({
                   controls={observableTokenControls}
                   desiredTokens={draft.desiredTokens}
                   onPendingChangeRemove={(controlIds) => {
-                    const desiredTokens = { ...draft.desiredTokens };
-                    controlIds.forEach((controlId) => delete desiredTokens[controlId]);
-                    updateDraft({ desiredTokens });
+                    setDraft((current) => {
+                      const desiredTokens = { ...current.desiredTokens };
+                      controlIds.forEach((controlId) => delete desiredTokens[controlId]);
+                      return { ...current, desiredTokens };
+                    });
                   }}
-                  onDesiredTokenChange={(controlId, token) => {
-                    const control = observableTokenControls.find(
-                      (candidate) => candidate.id === controlId,
-                    );
-                    const desiredTokens = { ...draft.desiredTokens };
-                    if (!token || token === (control ? getBaseToken(control) : null)) {
-                      delete desiredTokens[controlId];
-                    } else {
-                      desiredTokens[controlId] = token;
-                    }
-                    updateDraft({ desiredTokens });
+                  onDesiredTokenChange={(controlIds, token) => {
+                    setDraft((current) => {
+                      const desiredTokens = { ...current.desiredTokens };
+                      controlIds.forEach((controlId) => {
+                        const control = observableTokenControls.find(
+                          (candidate) => candidate.id === controlId,
+                        );
+                        if (!token || token === (control ? getBaseToken(control) : null)) {
+                          delete desiredTokens[controlId];
+                        } else {
+                          desiredTokens[controlId] = token;
+                        }
+                      });
+                      return { ...current, desiredTokens };
+                    });
                   }}
                 />
               ) : null}
@@ -319,6 +342,22 @@ export function LocalUiTaskDraftPanel({
                   typography={target.typography}
                 />
               ) : null}
+              {colorControls.length > 0 ? (
+                <ColorControlRows
+                  controls={colorControls}
+                  desiredTokens={draft.desiredTokens}
+                  onDesiredColorChange={(controlId, value) => {
+                    const control = colorControls.find((candidate) => candidate.id === controlId);
+                    const desiredTokens = { ...draft.desiredTokens };
+                    if (value === "__keep" || value === control?.currentToken?.id) {
+                      delete desiredTokens[controlId];
+                    } else {
+                      desiredTokens[controlId] = value;
+                    }
+                    updateDraft({ desiredTokens });
+                  }}
+                />
+              ) : null}
             </>
           ) : null}
           <LocalUiActionsPropertyRow
@@ -329,7 +368,7 @@ export function LocalUiTaskDraftPanel({
         </div>
 
         <label className="grid min-w-0 gap-1">
-          <span className="hito-caption text-foreground">Comment</span>
+          <span className="hito-body-xs text-foreground">Comment</span>
           <Textarea
             aria-label="Comment"
             className="min-h-16 resize-none py-1.5"
@@ -344,15 +383,15 @@ export function LocalUiTaskDraftPanel({
         </label>
 
         <label className="grid min-w-0 gap-1">
-          <span className="hito-caption text-foreground">Scope of fix</span>
+          <span className="hito-body-xs text-foreground">Scope of fix</span>
           <Select
             disabled={isAddingToDs}
             value={effectiveFixScope}
             onValueChange={(value) => {
-              if (isScopedComponentAction && draft.componentAction) {
+              if (scopedComponentAction) {
                 updateDraft({
                   componentAction: {
-                    ...draft.componentAction,
+                    ...scopedComponentAction,
                     scope: value as LocalUiScopedComponentActionScope,
                   },
                 });
@@ -375,7 +414,7 @@ export function LocalUiTaskDraftPanel({
         </label>
 
         <TaskDisclosure title="Inspect details">
-          <pre className="hito-technical-mono max-h-44 overflow-auto whitespace-pre-wrap rounded-md bg-black/25 p-3 text-xs leading-5 text-foreground">
+          <pre className="hito-technical-sm max-h-44 overflow-auto whitespace-pre-wrap rounded-md bg-black/25 p-3 text-foreground">
             {payloadJson}
           </pre>
         </TaskDisclosure>
@@ -412,7 +451,7 @@ export function TaskDisclosure({ children, title }: { children: ReactNode; title
   return (
     <details className="hito-disclosure border-0 bg-transparent p-0">
       <summary className="hito-disclosure-summary cursor-pointer list-none px-0 py-1 [&::-webkit-details-marker]:hidden">
-        <span className="hito-caption text-foreground">{title}</span>
+        <span className="hito-body-xs text-foreground">{title}</span>
         <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
       </summary>
       <div className="hito-disclosure-body mt-1 grid gap-2">{children}</div>

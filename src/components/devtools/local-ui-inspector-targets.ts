@@ -3,6 +3,11 @@ import type {
   InlineChangeBorderSide,
   InlineChangeBorderSideEvidence,
   InlineChangeCardChromeEvidence,
+  InlineChangeColorChannelId,
+  InlineChangeColorControlInput,
+  InlineChangeColorDeclarationProperty,
+  InlineChangeColorSelection,
+  InlineChangeColorTokenOption,
   InlineChangeDimensionEvidence,
   InlineChangeTargetInput,
   InlineChangeTargetKind,
@@ -19,6 +24,7 @@ import {
   type HitoTypographyRole,
 } from "@/lib/hito-typography-roles";
 import { classifyLocalUiTokenEvidence } from "@/components/devtools/local-ui-inspector-token-evidence";
+import { HITO_DS_MANIFEST } from "@/generated/hito-ds-manifest";
 
 const CONTROL_TAGS = new Set(["button", "a", "input", "textarea", "select"]);
 const CONTROL_ROLES = new Set([
@@ -64,6 +70,17 @@ const HITO_RADIUS_SCALE = [
   ["--radius-4xl", 16],
 ] as const;
 
+const HITO_SEMANTIC_COLORS = HITO_DS_MANIFEST.collections.semanticColor;
+const HITO_SEMANTIC_COLORS_BY_VARIABLE = new Map<string, (typeof HITO_SEMANTIC_COLORS)[number]>(
+  HITO_SEMANTIC_COLORS.map((color) => [color.cssVariable, color]),
+);
+const HITO_PRIMITIVE_COLORS_BY_VARIABLE = new Map<
+  string,
+  (typeof HITO_DS_MANIFEST.collections.primitiveColor)[number]
+>(HITO_DS_MANIFEST.collections.primitiveColor.map((color) => [color.cssVariable, color]));
+
+type RgbaColor = { alpha: number; blue: number; green: number; red: number };
+
 function toTypographyRoleOption(role: HitoTypographyRole): InlineChangeTypographyRoleOption {
   return {
     className: role.className,
@@ -89,6 +106,7 @@ export function inspectLocalUiTarget(
   | "classificationReason"
   | "border"
   | "cardChrome"
+  | "colorControls"
   | "dimensions"
   | "evidenceLines"
   | "targetKind"
@@ -104,6 +122,7 @@ export function inspectLocalUiTarget(
   const dimensions = buildDimensionEvidence(element);
   const tokenControls = buildTokenEvidence(styles, confirmedAppliedTokens);
   const border = buildBorderEvidence(styles);
+  const colorControls = buildColorControls(element, styles, visibleText);
   const targetKind = classifyTarget(element, styles, visibleText);
   const cardChrome = buildCardChromeEvidence(targetKind, border, tokenControls);
   const typography = canExposeTypography(targetKind)
@@ -116,11 +135,13 @@ export function inspectLocalUiTarget(
     dimensions,
     typography,
     border,
+    colorControls,
   );
 
   return {
     border,
     cardChrome,
+    colorControls,
     classificationReason: buildClassificationReason(targetKind, tag, role, className, styles),
     dimensions,
     evidenceLines,
@@ -200,6 +221,7 @@ function buildBaseEvidence(
   dimensions: InlineChangeDimensionEvidence[],
   typography: InlineChangeTypographyEvidence | null,
   border: InlineChangeBorderEvidence | null,
+  colorControls: InlineChangeColorControlInput[],
 ) {
   const className = String(element.className ?? "");
   const role = element.getAttribute("role");
@@ -215,6 +237,11 @@ function buildBaseEvidence(
   if (visibleText) evidence.push(`Current text evidence: "${visibleText.slice(0, 120)}".`);
   if (hitoClasses.length > 0) evidence.push(`Hito DS class evidence: ${hitoClasses.join(", ")}.`);
   if (border) evidence.push(`Border: ${border.summary}.`);
+  colorControls.forEach((control) => {
+    evidence.push(
+      `Color ${control.label}: ${control.currentLabel}; computed ${control.currentHex}; alpha ${control.alphaPercent}%.`,
+    );
+  });
   if (dimensions.length > 0) {
     evidence.push(
       `Dimensions: ${dimensions
@@ -247,6 +274,217 @@ function buildBaseEvidence(
   }
 
   return evidence;
+}
+
+function buildColorControls(
+  element: HTMLElement,
+  styles: CSSStyleDeclaration,
+  visibleText: string,
+): InlineChangeColorSelection[] {
+  const controls: InlineChangeColorSelection[] = [];
+
+  if (paintsVisibleTextOrCurrentColorIcon(element, styles, visibleText)) {
+    addColorControl(controls, {
+      color: styles.color,
+      declarationProperty: "color",
+      id: "text",
+      label: "Text",
+    });
+  }
+
+  if (styles.backgroundImage.trim() === "none") {
+    addColorControl(controls, {
+      color: styles.backgroundColor,
+      declarationProperty: "background-color",
+      id: "fill",
+      label: "Fill",
+    });
+  }
+
+  const uniformBorderColor = getUniformBorderColor(styles);
+  if (uniformBorderColor) {
+    addColorControl(controls, {
+      color: uniformBorderColor,
+      declarationProperty: "border-color",
+      id: "border",
+      label: "Border",
+    });
+  }
+
+  return controls;
+}
+
+function addColorControl(
+  controls: InlineChangeColorSelection[],
+  {
+    color,
+    declarationProperty,
+    id,
+    label,
+  }: {
+    color: string;
+    declarationProperty: InlineChangeColorDeclarationProperty;
+    id: InlineChangeColorChannelId;
+    label: InlineChangeColorControlInput["label"];
+  },
+) {
+  const currentRgba = resolveColorToRgba(color);
+  if (!currentRgba || currentRgba.alpha === 0) return;
+
+  const options = getSemanticColorOptions(id);
+  const matchingOptions = options.filter(
+    (option) => option.previewColor === formatRgba(currentRgba),
+  );
+  const currentToken = matchingOptions.length === 1 ? (matchingOptions[0] ?? null) : null;
+
+  controls.push({
+    alphaPercent: getAlphaPercent(currentRgba),
+    currentColor: formatRgba(currentRgba),
+    currentHex: formatRgbaHex(currentRgba),
+    currentLabel: currentToken?.label ?? "Custom (computed)",
+    currentToken,
+    declarationProperty,
+    id,
+    label,
+    options,
+    requestedChange: null,
+  });
+}
+
+function paintsVisibleTextOrCurrentColorIcon(
+  element: HTMLElement,
+  styles: CSSStyleDeclaration,
+  visibleText: string,
+) {
+  if (styles.display === "none" || styles.visibility === "hidden" || Number(styles.opacity) === 0) {
+    return false;
+  }
+
+  return visibleText.length > 0 || paintsCurrentColorIcon(element);
+}
+
+function paintsCurrentColorIcon(element: HTMLElement) {
+  return Array.from(element.querySelectorAll("svg")).some((svg) => {
+    const paintedElements = [svg, ...Array.from(svg.querySelectorAll("[fill], [stroke]"))];
+
+    return paintedElements.some((paintedElement) => {
+      const fill = paintedElement.getAttribute("fill")?.trim().toLowerCase();
+      const stroke = paintedElement.getAttribute("stroke")?.trim().toLowerCase();
+      return fill === "currentcolor" || stroke === "currentcolor";
+    });
+  });
+}
+
+function getUniformBorderColor(styles: CSSStyleDeclaration) {
+  const visibleSides = [
+    [styles.borderTopWidth, styles.borderTopStyle, styles.borderTopColor],
+    [styles.borderRightWidth, styles.borderRightStyle, styles.borderRightColor],
+    [styles.borderBottomWidth, styles.borderBottomStyle, styles.borderBottomColor],
+    [styles.borderLeftWidth, styles.borderLeftStyle, styles.borderLeftColor],
+  ].filter(([width, style]) => isVisibleBorderSide(width, style));
+  const first = visibleSides[0];
+  if (!first) return null;
+
+  const firstColor = first[2];
+  return visibleSides.every(([, , color]) => color === firstColor) ? firstColor : null;
+}
+
+function isVisibleBorderSide(width: string, style: string) {
+  return (parsePixelValue(width) ?? 0) > 0 && style !== "none" && style !== "hidden";
+}
+
+function getSemanticColorOptions(
+  channel: InlineChangeColorChannelId,
+): InlineChangeColorTokenOption[] {
+  const theme = getActiveTheme();
+  const options: InlineChangeColorTokenOption[] = [];
+
+  HITO_SEMANTIC_COLORS.forEach((color) => {
+    if (!color.channels.some((availableChannel) => availableChannel === channel)) return;
+
+    const resolved = resolveColorToRgba(resolveManifestColorValue(color.cssVariable, theme));
+    if (!resolved) return;
+
+    const mode = color.modes[theme];
+    options.push({
+      alphaPercent: getAlphaPercent(resolved),
+      cssVariable: color.cssVariable,
+      id: color.id,
+      label: color.label,
+      previewColor: formatRgba(resolved),
+      resolvedHex: formatRgbaHex(resolved),
+      source: getSemanticColorSource(mode.value, theme),
+    });
+  });
+
+  return options;
+}
+
+function getActiveTheme(): "dark" | "light" {
+  return document.documentElement.dataset.hitoTheme === "light" ? "light" : "dark";
+}
+
+function resolveManifestColorValue(
+  cssVariable: string,
+  theme: "dark" | "light",
+  depth = 0,
+): string {
+  if (depth > 12) return cssVariable;
+
+  const semanticColor = HITO_SEMANTIC_COLORS_BY_VARIABLE.get(cssVariable);
+  if (semanticColor) {
+    return resolveManifestColorValue(semanticColor.modes[theme].value, theme, depth + 1);
+  }
+
+  const primitiveColor = HITO_PRIMITIVE_COLORS_BY_VARIABLE.get(cssVariable);
+  if (primitiveColor) return primitiveColor.value;
+
+  return cssVariable.replace(/var\((--[\w-]+)\)/g, (_match, variable: string) =>
+    resolveManifestColorValue(variable, theme, depth + 1),
+  );
+}
+
+function getSemanticColorSource(value: string, theme: "dark" | "light") {
+  const alias = value.match(/^var\((--[\w-]+)\)$/)?.[1];
+  if (!alias) return value.includes("color-mix(") ? value : null;
+
+  const resolved = resolveManifestColorValue(alias, theme);
+  const primitive = HITO_DS_MANIFEST.collections.primitiveColor.find(
+    (color) => color.value === resolved,
+  );
+  return primitive?.cssVariable ?? value;
+}
+
+function resolveColorToRgba(value: string): RgbaColor | null {
+  if (!value || typeof document === "undefined" || !CSS.supports("color", value)) return null;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 1;
+  canvas.height = 1;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) return null;
+
+  context.clearRect(0, 0, 1, 1);
+  context.fillStyle = value;
+  context.fillRect(0, 0, 1, 1);
+  const [red, green, blue, alpha] = context.getImageData(0, 0, 1, 1).data;
+
+  return { alpha, blue, green, red };
+}
+
+function formatRgba({ alpha, blue, green, red }: RgbaColor) {
+  return `rgb(${red} ${green} ${blue} / ${Number((alpha / 255).toFixed(3))})`;
+}
+
+function formatRgbaHex({ alpha, blue, green, red }: RgbaColor) {
+  const hex = [red, green, blue].map((value) => value.toString(16).padStart(2, "0")).join("");
+  return alpha === 255
+    ? `#${hex.toUpperCase()}`
+    : `#${hex}${alpha.toString(16).padStart(2, "0")}`.toUpperCase();
+}
+
+function getAlphaPercent({ alpha }: RgbaColor) {
+  return Math.round((alpha / 255) * 100);
 }
 
 function buildBorderEvidence(styles: CSSStyleDeclaration): InlineChangeBorderEvidence | null {
@@ -615,7 +853,7 @@ function hasControlClass(className: string) {
 }
 
 function hasHierarchyClass(className: string) {
-  return /\bhito-(label|caption|micro|list-row-title|field-helper|status|metadata|badge|pill)\b/.test(
+  return /\bhito-(display-title-(?:xl|lg)|ui-title-(?:xl|lg|md|sm|xs)|body-(?:lg|md|sm|xs)|label-(?:md|sm)|technical-sm|list-row-(?:title|copy)|field-(?:helper|error|success)|editable-value-field-error|menu-text|metric-value|status-pill|metadata|badge|pill)\b/.test(
     className,
   );
 }

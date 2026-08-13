@@ -2,6 +2,7 @@ import {
   getInlineChangeAction,
   type InlineChangeAction,
   type InlineChangeChromeRemovalSelection,
+  type InlineChangeColorSelection,
   type InlineChangePromptActionSelection,
   type InlineChangeTargetInput,
   type InlineChangeTokenControlInput,
@@ -26,6 +27,7 @@ export function buildTypographyRoleSelection(
 
 export function getInferredDraftAction(
   tokenControlSelections: InlineChangeTokenControlSelection[],
+  colorControlSelections: InlineChangeColorSelection[],
   typographyRoleSelection: InlineChangeTypographySelection | null,
   chromeRemovalSelection: InlineChangeChromeRemovalSelection | null,
   promptActionSelection: InlineChangePromptActionSelection | null,
@@ -36,6 +38,14 @@ export function getInferredDraftAction(
     return getInlineChangeAction("remove_card_chrome");
   if (chromeRemovalSelection?.kind === "border") return getInlineChangeAction("remove_border");
   if (typographyRoleSelection) return getInlineChangeAction("align_typography");
+  if (
+    colorControlSelections.some((control) => control.requestedChange?.kind === "remove_declaration")
+  ) {
+    return getInlineChangeAction("remove_color");
+  }
+  if (colorControlSelections.some((control) => control.requestedChange)) {
+    return getInlineChangeAction("align_with_hito_ds");
+  }
   if (tokenControlSelections.length === 0) return getInlineChangeAction("comment");
 
   const firstControl = tokenControlSelections[0];
@@ -61,6 +71,7 @@ export function getHasActionableDraft({
   currentText,
   proposedText,
   tokenControlSelections,
+  colorControlSelections,
   typographyRoleSelection,
   chromeRemovalSelection,
   promptActionSelection,
@@ -72,12 +83,14 @@ export function getHasActionableDraft({
   promptActionSelection: InlineChangePromptActionSelection | null;
   proposedText: string;
   tokenControlSelections: InlineChangeTokenControlSelection[];
+  colorControlSelections: InlineChangeColorSelection[];
   typographyRoleSelection: InlineChangeTypographySelection | null;
 }) {
   const hasTextChange = getHasProposedTextChange(currentText, proposedText);
   const hasPropertyChange =
     hasTextChange ||
     tokenControlSelections.length > 0 ||
+    colorControlSelections.some((control) => control.requestedChange) ||
     Boolean(typographyRoleSelection) ||
     Boolean(chromeRemovalSelection) ||
     Boolean(promptActionSelection);
@@ -91,6 +104,10 @@ export function getHasActionableDraft({
       return hasTextChange;
     case "remove_border":
       return chromeRemovalSelection?.kind === "border";
+    case "remove_color":
+      return colorControlSelections.some(
+        (control) => control.requestedChange?.kind === "remove_declaration",
+      );
     case "remove_card_chrome":
       return chromeRemovalSelection?.kind === "card_chrome";
     case "remove_component":
@@ -112,10 +129,7 @@ export function getHasProposedTextChange(
   currentText: string | null | undefined,
   proposedText: string,
 ) {
-  const normalizedProposedText = proposedText.trim();
-  return (
-    normalizedProposedText.length > 0 && normalizedProposedText !== (currentText?.trim() ?? "")
-  );
+  return proposedText.trim() !== (currentText?.trim() ?? "");
 }
 
 export function getIsTokenControlActive(
@@ -124,6 +138,10 @@ export function getIsTokenControlActive(
 ) {
   const baseToken = getBaseToken(control);
   return Boolean(desiredToken && desiredToken !== baseToken);
+}
+
+export function getIsColorControlActive(desiredColor: string | null | undefined) {
+  return Boolean(desiredColor && desiredColor !== "__keep");
 }
 
 export function getIsObservableTokenControl(control: InlineChangeTokenControlInput) {

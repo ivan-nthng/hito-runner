@@ -754,7 +754,7 @@ function isTextLikeTarget(element: HTMLElement) {
   const visibleText = normalizeVisibleText(element.innerText || element.textContent || "");
   const className = String(element.className ?? "");
   const hasTypographyClass =
-    /\bhito-(display-title|page-title|section-title|panel-title|list-row-title|body|body-small|caption|label|technical-mono)\b/.test(
+    /\bhito-(display-title-(?:xl|lg)|ui-title-(?:xl|lg|md|sm|xs)|body-(?:lg|md|sm|xs)|label-(?:md|sm)|technical-sm|list-row-(?:title|copy)|field-(?:helper|error|success)|editable-value-field-error|menu-text|metric-value|status-pill)\b/.test(
       className,
     );
 

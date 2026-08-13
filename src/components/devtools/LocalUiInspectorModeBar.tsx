@@ -21,7 +21,7 @@ export const LocalUiInspectorModeBar = forwardRef<
       <span className="ml-1 size-2 shrink-0 rounded-full bg-signal" aria-hidden="true" />
       <span className="flex min-w-0 flex-1 items-center gap-1.5 px-1">
         <Icon name="edit" size="xs" className="shrink-0 text-signal" />
-        <span className="hito-caption truncate text-foreground">Pencil</span>
+        <span className="hito-body-xs truncate text-foreground">Pencil</span>
       </span>
       {itemCount > 0 ? (
         <button

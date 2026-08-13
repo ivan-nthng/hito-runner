@@ -33,17 +33,19 @@ export function GeneratedPlanWorkoutSummary({ document }: { document: WorkoutDoc
 
   return (
     <article className="min-w-0">
-      <p className="hito-label">{formatDate(document.workoutDate, SUMMARY_DATE_OPTIONS)}</p>
-      <h3 className="hito-list-row-title mt-1 text-base">
+      <p className="hito-label-md text-foreground">
+        {formatDate(document.workoutDate, SUMMARY_DATE_OPTIONS)}
+      </p>
+      <h3 className="hito-body-md text-foreground mt-1">
         {document.workoutType === "rest" ? "Rest day" : document.title}
       </h3>
-      {summary ? <p className="hito-body-small mt-1 font-mono-num">{summary}</p> : null}
+      {summary ? <p className="hito-technical-sm mt-1 text-secondary">{summary}</p> : null}
 
       {items.length > 0 && document.workoutType !== "rest" ? (
         <div className="mt-4">
           <div className="flex items-center justify-between gap-3">
-            <span className="hito-caption">Structure</span>
-            <span className="hito-caption font-mono-num">
+            <span className="hito-body-xs text-tertiary">Structure</span>
+            <span className="hito-technical-sm text-tertiary">
               {items.length} block{items.length === 1 ? "" : "s"}
             </span>
           </div>

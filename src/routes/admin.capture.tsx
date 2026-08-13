@@ -508,8 +508,8 @@ function CapturePendingState() {
     <main className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex min-h-screen max-w-3xl items-center px-6">
         <section className="hito-state-surface w-full">
-          <p className="hito-label">Loading work items...</p>
-          <h1 className="hito-page-title mt-3">Fetching repo work items and notes.</h1>
+          <p className="hito-label-md">Loading work items...</p>
+          <h1 className="hito-ui-title-xl mt-3">Fetching repo work items and notes.</h1>
         </section>
       </div>
     </main>
@@ -691,8 +691,8 @@ function QuickNotePanel({
     <div className={isHeader ? "hito-admin-quick-note-panel" : undefined}>
       <form className="hito-admin-quick-note-surface" onSubmit={onSubmit}>
         <div className="grid gap-1">
-          <h2 className="hito-body font-medium text-foreground">Add quick note</h2>
-          <p className="hito-field-helper">Capture a work item without selecting UI.</p>
+          <h2 className="hito-ui-title-xs text-foreground">Add quick note</h2>
+          <p className="hito-body-xs text-secondary">Capture a work item without selecting UI.</p>
         </div>
         <div className="grid gap-4 lg:grid-cols-4">
           <HitoNativeSelectField
@@ -747,7 +747,7 @@ function QuickNotePanel({
             ]}
           />
           <label className="grid gap-2">
-            <span className="hito-label">Route or URL</span>
+            <span className="hito-label-md">Route or URL</span>
             <input
               className="hito-field hito-field-md"
               name="route"
@@ -760,7 +760,7 @@ function QuickNotePanel({
           </label>
         </div>
         <label className="grid gap-2">
-          <span className="hito-label">Title</span>
+          <span className="hito-label-md">Title</span>
           <input
             className="hito-field hito-field-md"
             name="title"
@@ -772,7 +772,7 @@ function QuickNotePanel({
           />
         </label>
         <label className="grid gap-2">
-          <span className="hito-label">Note</span>
+          <span className="hito-label-md">Note</span>
           <textarea
             className="hito-field min-h-28 resize-y p-3"
             name="note"
@@ -784,9 +784,11 @@ function QuickNotePanel({
             required
           />
         </label>
-        {quickNote.error ? <p className="hito-field-error">{quickNote.error}</p> : null}
+        {quickNote.error ? (
+          <p className="hito-body-md font-medium text-negative">{quickNote.error}</p>
+        ) : null}
         {quickNote.success ? (
-          <p className="hito-field-helper text-signal">{quickNote.success}</p>
+          <p className="hito-body-xs text-positive">{quickNote.success}</p>
         ) : null}
         <div className="flex flex-wrap gap-2">
           <button
@@ -841,11 +843,13 @@ function QuickNotePanel({
     >
       <summary className="hito-list-row w-full cursor-pointer text-left list-none [&::-webkit-details-marker]:hidden">
         <span className="min-w-0">
-          <span className="hito-list-row-title flex items-center gap-2">
+          <span className="hito-body-md flex items-center gap-2">
             <Icon name="plus" size="xs" className="text-signal" />
             Add quick note
           </span>
-          <span className="hito-list-row-copy">Capture a work item without selecting UI.</span>
+          <span className="hito-body-sm text-secondary">
+            Capture a work item without selecting UI.
+          </span>
         </span>
         <Icon name="chevron-down" size="sm" />
       </summary>
@@ -936,10 +940,10 @@ function CaptureBacklogList({
                 onClick={() => setExpandedItemId(expanded ? null : item.id)}
               >
                 <span className="flex min-w-0 flex-wrap items-center gap-2">
-                  <span className="hito-list-row-title truncate font-medium">{item.title}</span>
+                  <span className="hito-body-md truncate font-medium">{item.title}</span>
                 </span>
-                <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  <code className="hito-technical-mono truncate">
+                <span className="hito-body-xs flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-tertiary">
+                  <code className="hito-technical-sm truncate">
                     {repoSource.sourcePath ?? item.route ?? "No route"}
                   </code>
                   <span>{formatDateTime(item.createdAt)}</span>
@@ -1121,7 +1125,11 @@ function CaptureItemDetail({
     mutation.message &&
     !(mutation.field === "prompt" && mutation.tone === "success") ? (
       <p
-        className={mutation.tone === "error" ? "hito-field-error" : "hito-field-helper text-signal"}
+        className={
+          mutation.tone === "error"
+            ? "hito-body-md font-medium text-negative"
+            : "hito-body-xs text-positive"
+        }
       >
         {mutation.message}
       </p>
@@ -1134,7 +1142,7 @@ function CaptureItemDetail({
         {currentMutation ? <div>{currentMutation}</div> : null}
 
         {repoSource.readOnly ? (
-          <div className="grid gap-2 text-xs text-muted-foreground">
+          <div className="hito-body-xs grid gap-2 text-tertiary">
             <div className="flex flex-wrap items-center gap-2">
               <HitoMetadataTag
                 tone="rollout"
@@ -1155,7 +1163,7 @@ function CaptureItemDetail({
 
         {repoSource.readOnly ? (
           <section className="grid gap-3 border-t border-hairline pt-4">
-            <h4 className="hito-label text-foreground">Markdown metadata</h4>
+            <h4 className="hito-label-md text-foreground">Markdown metadata</h4>
             <div className="flex flex-wrap gap-2">
               <HitoMetadataTag
                 tooltip={readOnlyMetadataTooltip("status")}
@@ -1186,8 +1194,8 @@ function CaptureItemDetail({
         <section className="grid gap-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h4 className="hito-label text-foreground">Prompt</h4>
-              <p className="hito-field-helper">
+              <h4 className="hito-label-md text-foreground">Prompt</h4>
+              <p className="hito-body-xs text-secondary">
                 {copyFallbackPrompt
                   ? "Copy blocked. Select the prompt below."
                   : item.targetRole
@@ -1205,7 +1213,7 @@ function CaptureItemDetail({
             </button>
           </div>
           <pre
-            className="hito-technical-mono max-h-80 min-h-40 overflow-auto whitespace-pre-wrap rounded-xl bg-black/35 p-4 text-xs leading-5 text-foreground"
+            className="hito-technical-sm max-h-80 min-h-40 overflow-auto whitespace-pre-wrap rounded-xl bg-black/35 p-4 text-foreground"
             tabIndex={0}
           >
             {promptBody}
@@ -1213,7 +1221,7 @@ function CaptureItemDetail({
         </section>
 
         <section className="grid gap-3 border-t border-hairline pt-4">
-          <h4 className="hito-label text-foreground">Context</h4>
+          <h4 className="hito-label-md text-foreground">Context</h4>
           <div className="grid gap-3 md:grid-cols-2">
             <DetailRow label="Created" value={formatDateTime(item.createdAt)} />
             <DetailRow label="Updated" value={formatDateTime(item.updatedAt)} />
@@ -1254,7 +1262,7 @@ function CaptureItemDetail({
 
         <details className="hito-disclosure">
           <summary className="hito-disclosure-summary">
-            <span className="hito-label text-foreground">Technical details</span>
+            <span className="hito-label-md text-foreground">Technical details</span>
             <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
           </summary>
           <div className="hito-disclosure-body mt-3 grid gap-3 md:grid-cols-2">
@@ -1282,13 +1290,13 @@ function CaptureItemDetail({
         {!repoSource.readOnly ? (
           <details className="hito-disclosure">
             <summary className="hito-disclosure-summary">
-              <span className="hito-label text-foreground">Notes</span>
+              <span className="hito-label-md text-foreground">Notes</span>
               <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
             </summary>
             <div className="hito-disclosure-body mt-3 grid gap-3">
-              <p className="hito-body whitespace-pre-wrap text-foreground">{item.note}</p>
+              <p className="hito-body-md whitespace-pre-wrap text-foreground">{item.note}</p>
               <label className="grid gap-2">
-                <span className="hito-label">Append note</span>
+                <span className="hito-label-md">Append note</span>
                 <textarea
                   className="hito-field min-h-20 resize-y p-3"
                   value={appendNote}
@@ -1310,8 +1318,8 @@ function CaptureItemDetail({
         {item.source === "quick_note" ? (
           <section className="grid gap-3 border-t border-hairline pt-4">
             <div>
-              <h4 className="hito-label text-foreground">Quick note cleanup</h4>
-              <p className="hito-field-helper">
+              <h4 className="hito-label-md text-foreground">Quick note cleanup</h4>
+              <p className="hito-body-xs text-secondary">
                 Delete only temporary manual notes after they are copied into a real task.
               </p>
             </div>
@@ -1348,8 +1356,8 @@ function CaptureUnavailableState({
           <span className="hito-status-pill" data-tone="warning">
             {result.reason.replaceAll("_", " ")}
           </span>
-          <h2 className="hito-modal-title mt-4">{title}</h2>
-          <p className="hito-body mt-3 max-w-2xl text-muted-foreground">{result.message}</p>
+          <h2 className="hito-ui-title-md mt-4">{title}</h2>
+          <p className="hito-body-md mt-3 max-w-2xl text-muted-foreground">{result.message}</p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link to="/" className="hito-button hito-button-secondary hito-button-md">
               Back to Hito
@@ -1377,8 +1385,8 @@ function EmptyState({
       <div className="flex items-start gap-3">
         <Icon name={icon} size="md" className="mt-0.5 text-muted-foreground" />
         <div>
-          <h3 className="hito-body font-medium text-foreground">{title}</h3>
-          <p className="hito-field-helper mt-2">{description}</p>
+          <h3 className="hito-body-md font-medium text-foreground">{title}</h3>
+          <p className="hito-body-xs mt-2 text-secondary">{description}</p>
           {action ? <div className="mt-4">{action}</div> : null}
         </div>
       </div>
@@ -1389,11 +1397,11 @@ function EmptyState({
 function DetailRow({ code, label, value }: { code?: boolean; label: string; value: string }) {
   return (
     <div className="grid gap-1">
-      <span className="hito-micro-label text-muted-foreground">{label}</span>
+      <span className="hito-label-sm text-muted-foreground">{label}</span>
       {code ? (
-        <code className="hito-technical-mono break-all text-xs text-foreground">{value}</code>
+        <code className="hito-technical-sm break-all text-foreground">{value}</code>
       ) : (
-        <span className="text-sm leading-5 text-foreground">{value}</span>
+        <span className="hito-body-md text-foreground">{value}</span>
       )}
     </div>
   );

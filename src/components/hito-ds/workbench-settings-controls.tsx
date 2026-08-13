@@ -33,7 +33,7 @@ export function HitoDsWorkbenchChoiceControl<Value extends string>({
 
   return (
     <div className="grid min-w-0 gap-2">
-      <p className="hito-form-label">{label}</p>
+      <p className="hito-label-md">{label}</p>
       <div className="hito-choice-toggle-group" {...choiceGroup.groupProps} aria-label={label}>
         {options.map((option) => (
           <HitoChoiceToggle
@@ -59,7 +59,7 @@ export function HitoDsWorkbenchSelectControl<Value extends string>({
 }: WorkbenchSettingProps<Value>) {
   return (
     <div className="grid min-w-0 gap-2">
-      <p className="hito-form-label">{label}</p>
+      <p className="hito-label-md">{label}</p>
       <Select value={value} onValueChange={(nextValue) => onChange(nextValue as Value)}>
         <SelectTrigger aria-label={label} className="min-w-0" size="sm">
           <SelectValue />

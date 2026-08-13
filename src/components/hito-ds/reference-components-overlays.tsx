@@ -136,8 +136,8 @@ export function HitoDsComponentOverlays() {
         variants={
           <div className="grid min-w-0 gap-6">
             <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Sheet composition</p>
-              <p className="hito-caption mt-1">
+              <p className="hito-label-md">Sheet composition</p>
+              <p className="hito-body-xs text-tertiary mt-1">
                 Directional and mobile workflows reuse the shared Sheet focus and scroll owner.
               </p>
               <div className="mt-4">
@@ -160,14 +160,14 @@ export function HitoDsComponentOverlays() {
             </div>
 
             <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Compact info-window</p>
+              <p className="hito-label-md">Compact info-window</p>
               <div className="mt-4">
                 <InfoWindowPreview />
               </div>
             </div>
 
             <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Body mode matrix</p>
+              <p className="hito-label-md">Body mode matrix</p>
               <div className="mt-4 grid min-w-0 gap-5 xl:grid-cols-2">
                 <ModalWindowPreview
                   sizeMode="standard"
@@ -203,7 +203,7 @@ export function HitoDsComponentOverlays() {
             </div>
 
             <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Footer and destructive modes</p>
+              <p className="hito-label-md">Footer and destructive modes</p>
               <div className="mt-4 grid min-w-0 gap-5 xl:grid-cols-2">
                 <ModalWindowPreview
                   sizeMode="compact"
@@ -322,120 +322,67 @@ export function HitoDsComponentOverlays() {
         }}
         usedIn="Global progress and outcome feedback for bounded async actions."
         demo={
-          <div className="grid min-w-0 gap-4">
-            <span className="hito-status-pill justify-self-start" data-tone="signal">
-              Top-center toast
-            </span>
-            <div>
-              <p className="hito-label">Current demo state</p>
-              <h3 className="hito-panel-title mt-3">
-                {describeToastDemoState(toastDemoState).title}
-              </h3>
-              <p className="hito-support-copy mt-3 max-w-xl">
-                {describeToastDemoState(toastDemoState).description}
-              </p>
-            </div>
-            <div className="hito-list-row min-w-0">
-              <div className="flex min-w-0 items-start gap-3">
-                <Icon
-                  name={toastDemoState === "working" ? "loader" : "warning"}
-                  size="sm"
-                  className={cn(
-                    "mt-1 text-muted-foreground",
-                    toastDemoState === "working" && "hito-motion-spinner",
-                    toastDemoState === "success" && "text-success",
-                    toastDemoState === "error" && "text-destructive",
-                  )}
-                />
-                <div className="min-w-0">
-                  <p className="hito-list-row-title">Use the settings panel to fire a toast</p>
-                  <p className="hito-list-row-copy">
-                    The specimen drives the real shared toast helper but keeps validation, review,
-                    and recovery copy inline.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <HitoButton size="md" variant="primary" onClick={() => showDemoToast(toastDemoState)}>
+            Show {describeToastDemoState(toastDemoState).title.toLowerCase()} toast
+          </HitoButton>
         }
         variants={
           <div className="grid min-w-0 gap-6">
-            <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Toast state matrix</p>
-              <p className="hito-caption mt-1">
-                All feedback states stay visible for reference; the live demo still owns actual
-                toast firing.
-              </p>
-              <div className="mt-4 grid min-w-0 gap-3 lg:grid-cols-2">
-                {(["info", "working", "success", "error"] as const).map((state) => {
-                  const stateCopy = describeToastDemoState(state);
-                  const iconName =
-                    state === "success"
-                      ? "check-circle"
-                      : state === "working"
-                        ? "loader"
-                        : "warning";
+            <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+              {(["info", "working", "success", "error"] as const).map((state) => {
+                const stateCopy = describeToastDemoState(state);
+                const iconName =
+                  state === "success" ? "check-circle" : state === "working" ? "loader" : "warning";
 
-                  return (
-                    <article
-                      key={state}
-                      className={cn(
-                        "hito-toast hito-ds-toast-specimen static min-w-0 shadow-none",
-                        state === "working"
-                          ? "hito-toast-working hito-toast-loading"
-                          : `hito-toast-${state}`,
-                      )}
-                      data-hito-toast=""
-                      data-hito-toast-state={state}
-                    >
-                      <div className="hito-toast-custom-body">
-                        <div data-icon="" className="hito-toast-icon">
-                          <Icon
-                            name={iconName}
-                            size="sm"
-                            className={state === "working" ? "hito-motion-spinner" : undefined}
-                          />
+                return (
+                  <article
+                    key={state}
+                    className={cn(
+                      "hito-toast hito-ds-toast-specimen static min-w-0 shadow-none",
+                      state === "working"
+                        ? "hito-toast-working hito-toast-loading"
+                        : `hito-toast-${state}`,
+                    )}
+                    data-hito-toast=""
+                    data-hito-toast-state={state}
+                  >
+                    <div className="hito-toast-custom-body">
+                      <div data-icon="" className="hito-toast-icon">
+                        <Icon
+                          name={iconName}
+                          size="sm"
+                          className={state === "working" ? "hito-motion-spinner" : undefined}
+                        />
+                      </div>
+                      <div data-content="">
+                        <div data-title="" className="hito-toast-title">
+                          {stateCopy.title}
                         </div>
-                        <div data-content="">
-                          <div data-title="" className="hito-toast-title">
-                            {stateCopy.title}
-                          </div>
-                          <div data-description="" className="hito-toast-description">
-                            {stateCopy.description}
-                          </div>
+                        <div data-description="" className="hito-toast-description">
+                          {stateCopy.description}
                         </div>
                       </div>
-                    </article>
-                  );
-                })}
-              </div>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
 
-            <div className="border-t border-hairline pt-5">
-              <p className="hito-label">Button + async pairing</p>
-              <p className="hito-caption mt-1">
-                Pending buttons stay local to the action; global toast handles only short progress
-                and outcome feedback.
-              </p>
-              <div className="mt-4 flex min-w-0 flex-wrap items-center gap-3">
-                <HitoButton size="md" variant="primary" loading>
-                  <Icon name="loader" size="sm" className="hito-motion-spinner" />
-                  Saving
-                </HitoButton>
-                <HitoButton size="md" variant="secondary">
-                  Retry
-                </HitoButton>
-                <span className="hito-caption max-w-sm">
-                  No fake percentages. No mutation authority in the toast copy.
-                </span>
-              </div>
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
+              <HitoButton size="md" variant="primary" loading>
+                <Icon name="loader" size="sm" className="hito-motion-spinner" />
+                Saving
+              </HitoButton>
+              <HitoButton size="md" variant="secondary">
+                Retry
+              </HitoButton>
             </div>
           </div>
         }
         controls={
           <div className="grid gap-5">
             <div className="grid gap-3">
-              <p className="hito-label">Toast variant</p>
+              <p className="hito-label-md">Toast variant</p>
               <div className="flex flex-wrap gap-2">
                 <HitoButton size="sm" variant="secondary" onClick={() => showDemoToast("info")}>
                   <Icon name="warning" size="sm" className="text-muted-foreground" />
@@ -461,7 +408,7 @@ export function HitoDsComponentOverlays() {
             </div>
 
             <div className="hito-section-divider grid gap-3 pt-4">
-              <p className="hito-label">Resolve in place</p>
+              <p className="hito-label-md">Resolve in place</p>
               <div className="flex flex-wrap gap-2">
                 <HitoButton size="sm" variant="ghost" onClick={() => showDemoSequence("success")}>
                   Working → success

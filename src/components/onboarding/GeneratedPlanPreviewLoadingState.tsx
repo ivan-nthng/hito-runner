@@ -25,7 +25,7 @@ export function GeneratedPlanPreviewLoadingState({
       </div>
 
       <div className="grid max-w-lg gap-2">
-        <p className="hito-ui-section-title">
+        <p className="hito-ui-title-sm text-foreground">
           {complete ? "Plan preview ready" : `Preparing your ${goalLabel} plan`}
         </p>
       </div>
@@ -34,7 +34,7 @@ export function GeneratedPlanPreviewLoadingState({
         <span className="hito-generated-plan-wait-progress-fill hito-ui-progress-fill" />
       </div>
 
-      <div className="hito-generated-plan-wait-lines hito-caption" aria-hidden="true">
+      <div className="hito-generated-plan-wait-lines hito-body-xs text-tertiary" aria-hidden="true">
         {GENERATED_PLAN_WAITING_LINES.map((line) => (
           <span key={line}>{line}</span>
         ))}

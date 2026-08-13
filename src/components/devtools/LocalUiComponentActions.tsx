@@ -19,7 +19,7 @@ export function LocalUiComponentIdentity({ ownership }: { ownership: HitoDsOwner
 
   return (
     <p
-      className="hito-caption flex min-w-0 items-center gap-1.5 text-info"
+      className="hito-body-xs flex min-w-0 items-center gap-1.5 text-info"
       data-local-ui-component-identity="confirmed"
     >
       <Icon name="components" size="xs" className="shrink-0" />
@@ -59,7 +59,7 @@ export function LocalUiActionsPropertyRow({
           <span className="grid size-5 shrink-0 place-items-center text-muted-foreground">
             <Icon name="more-horizontal" size="xs" />
           </span>
-          <span className="hito-caption min-w-0 truncate text-foreground">Actions</span>
+          <span className="hito-body-xs min-w-0 truncate text-foreground">Actions</span>
         </div>
         {selectedLabel ? (
           <div className="group relative min-w-0 shrink-0" data-local-ui-actions-selected="">

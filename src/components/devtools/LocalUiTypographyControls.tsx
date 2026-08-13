@@ -29,7 +29,7 @@ export function TypographyControlRow({
           <span className="grid size-5 shrink-0 place-items-center text-muted-foreground">
             <Icon name="typography" size="xs" />
           </span>
-          <span className="hito-caption min-w-0 truncate text-foreground">Typography</span>
+          <span className="hito-body-xs min-w-0 truncate text-foreground">Typography</span>
         </div>
         {isActive ? (
           <>

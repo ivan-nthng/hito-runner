@@ -122,11 +122,13 @@ export function EditableValueFieldSandbox() {
         <div className="grid min-w-0 gap-6">
           <div>
             <p className="hito-list-row-title">Static state reference</p>
-            <p className="hito-caption mt-2">Inert examples only. Use Demo to interact.</p>
+            <p className="hito-body-xs text-tertiary mt-2">
+              Inert examples only. Use Demo to interact.
+            </p>
           </div>
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="grid content-start gap-2">
-              <p className="hito-micro-label">Empty / add</p>
+              <p className="hito-label-sm text-tertiary">Empty / add</p>
               <div inert>
                 <EditableValueField
                   fieldKey="static-empty"
@@ -145,7 +147,7 @@ export function EditableValueFieldSandbox() {
               </div>
             </div>
             <div className="grid content-start gap-2">
-              <p className="hito-micro-label">Saved</p>
+              <p className="hito-label-sm text-tertiary">Saved</p>
               <div inert>
                 <EditableValueField
                   fieldKey="static-saved"
@@ -163,7 +165,7 @@ export function EditableValueFieldSandbox() {
               </div>
             </div>
             <div className="grid content-start gap-2">
-              <p className="hito-micro-label">Invalid readback</p>
+              <p className="hito-label-sm text-tertiary">Invalid readback</p>
               <div inert>
                 <EditableValueField
                   fieldKey="static-invalid"
@@ -182,7 +184,7 @@ export function EditableValueFieldSandbox() {
               </div>
             </div>
             <div className="grid content-start gap-2">
-              <p className="hito-micro-label">Hover visual reference</p>
+              <p className="hito-label-sm text-tertiary">Hover visual reference</p>
               <div inert>
                 <EditableValueField
                   fieldKey="static-hover"
@@ -202,7 +204,7 @@ export function EditableValueFieldSandbox() {
               </div>
             </div>
             <div className="grid content-start gap-2 sm:col-span-2">
-              <p className="hito-micro-label">Editing / compact field and commit</p>
+              <p className="hito-label-sm text-tertiary">Editing / compact field and commit</p>
               <div inert>
                 <EditableValueField
                   fieldKey="static-editing"

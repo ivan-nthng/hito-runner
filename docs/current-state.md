@@ -2,24 +2,22 @@
 
 ## Status
 
-Active product; the admitted Hito stack cleanup sequence is complete through Slice 8H.
+Active product. The released baseline and the current Design System/DevTools contracts are recorded
+below; detailed implementation evidence remains in canonical backlog items.
 
 ## Last Updated
 
-2026-08-06
+2026-08-12
 
 ## Current Released Baseline
 
-- Runtime and Product source are released through `4668190ea7735b5e643aed14367d3bad8af6ba79`
-  on `main` and `origin/main`. This includes the Admin Work Items repository-mirror recovery:
-  authenticated Admin reads refresh the one-way Markdown projection from approved filesystem sources
-  locally or a private deployed bundle.
-- Backend/security cleanup, Slices 8A-8G, and their owner-level validation are released. Their exact
-  commits and receipts remain in the
-  [Hito Stack Complexity Reduction Program](tasks/backlog/2026-08-04-hito-stack-complexity-reduction-program.md)
-  and Git history.
-- Slice 8H removes stale routing and release chronology from the current documents. It does not
-  change runtime behavior and does not claim Global QA Acceptance.
+- Runtime and Product source are released through
+  `ee4fde5c1bda4a7cb5477bcf1a8ce90d9e50674d` on `main` and `origin/main`. The exact release has
+  linked Supabase migration parity and a READY Git-backed Vercel production deployment; detailed
+  evidence is retained in the
+  [production-release receipt](/Users/ivan/Developer/hito-running/docs/tasks/backlog/2026-08-11-global-qa-approved-production-release.md).
+- Current uncommitted work is not part of that released baseline. Its lifecycle remains owned by
+  individual canonical backlog items.
 
 ## Current Product Truth
 
@@ -56,8 +54,10 @@ runtime and ownership boundaries belong in [current-system.md](current-system.md
   and uncommitted: no approved local browser could attach the safe FIT fixture through the native
   file input, so no real upload request or end-to-end browser readback was proven. This is a browser
   capability/evidence gate, not accepted Product UI and not a new source defect.
-- The Local Inspector work item remains an independent Frontend DevTools evidence boundary. Source
-  reachability cannot substitute for its required loopback and non-loopback browser proof.
+- The Local Inspector availability contract is complete: it is deliberately usable only on the
+  canonical loopback QA origin, remains absent on non-loopback origins, and is local-only and
+  non-mutating. Detailed browser evidence remains in the
+  [canonical Inspector receipt](/Users/ivan/Developer/hito-running/docs/tasks/backlog/2026-08-04-canonical-loopback-local-inspector-availability.md).
 - Global QA remains separate from the accepted owner-level and release receipts recorded by the
   completed slices.
 - The Admin mirror's local synchronization is completed. Its released deployed path still awaits a

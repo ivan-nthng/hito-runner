@@ -2,9 +2,9 @@
 
 Curated public highlights for completed implementation history.
 
-For the complete internal accepted-slice ledger, use
-[technical log](./technical-log.md). The public changelog should stay readable: it summarizes durable
-product, DS, reliability, and operations wins instead of listing every implementation or QA slice.
+For the compact internal decision index, use [technical log](./technical-log.md). The public
+changelog should stay readable: it summarizes durable product, DS, reliability, and operations wins
+instead of listing every implementation or QA slice.
 
 ## Highlight naming policy
 
@@ -16,6 +16,44 @@ The public `/changelog` Highlights view is generated from the dated entries belo
 - `Hito DS Iteration` for design-system refinements after the initial foundation. Do not call every DS pass "new"; version-like DS labels are docs-only and should wait for a real release bundle.
 - `Admin & Ops` for admin login, analytics, test-account management, and internal operational surfaces.
 - `QA / Reliability` for fixture matrices, high-risk proof passes, browser-policy hardening, and regression coverage.
+
+## 2026-08-11
+
+- Calendar & Workout Identity: released the verified runner-calendar bundle to production. The
+  exact Git-backed deployment includes the independent Calendar, saved-plan, timezone, FIT, and
+  shared UI contracts recorded below; this is the only deployment claim in this history.
+
+## 2026-08-10
+
+- Calendar & Workout Identity: calendar dates now follow each runner's own saved timezone, so a day
+  does not change merely because the server or another runner is in a different locale.
+- Calendar & Workout Identity: plans create ordinary runner-owned workouts rather than a current
+  plan controlling the calendar. A non-Rest prescription can be copied to a truly empty future day
+  while completed, logged, and FIT-backed history stays protected.
+- Run Creation Engine: every generated plan is retained in a private Plans library. Runners can
+  search, sort, download, hide, or start a saved plan, with explicit replacement only for eligible
+  future workouts.
+
+## 2026-08-05
+
+- Calendar & Workout Identity: FIT-backed run feedback now shows all captured observed metrics,
+  including elevation, while retaining the original local source for later reprocessing.
+
+## 2026-08-03
+
+- Progress: Activity History and Progress now use canonical persisted activities and factual weekly
+  and rolling snapshots, so planned and unplanned runs remain distinct and missing evidence stays
+  explicit.
+
+## 2026-07-31
+
+- Workout feedback: an attached activity file now presents the plan, observed run, and factual
+  difference together without pretending that missing metrics are known.
+
+## 2026-07-23
+
+- Run Creation Engine: generated plan creation now requires an explicit goal and distance; `Build
+  my plan myself` is the separate deliberate path to an empty manual calendar.
 
 ## 2026-07-21
 
@@ -118,9 +156,10 @@ The public `/changelog` Highlights view is generated from the dated entries belo
   persisted fixtures.
 
 ## 2026-06-13
+
 - Simplified direct manual calendar editing for saved manual plans: manual Copy/Paste and direct
   Move now mutate through one backend-owned manual edit seam instead of runner-facing `Review
-  paste` / `Review move` confirmation, while backend still re-resolves source/target truth, blocks
+paste` / `Review move` confirmation, while backend still re-resolves source/target truth, blocks
   protected or occupied days, preserves original plan source metadata, and appends
   `active_plan_user_edit_v1` audit history. QA proved persisted copy/paste and direct-move
   behavior on disposable manual fixtures without shipping universal Copy/Paste, generated-plan

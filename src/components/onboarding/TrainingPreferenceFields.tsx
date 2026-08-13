@@ -228,7 +228,7 @@ export function TrainingPreferenceFields({
                 >
                   <span className="min-w-0">
                     <span className="block">{option.label}</span>
-                    <span className="mt-1 block hito-field-helper text-current/75">
+                    <span className="mt-1 block hito-body-xs text-secondary text-current/75">
                       {option.copy}
                     </span>
                   </span>
@@ -361,8 +361,8 @@ export function RecentFiveKBenchmarkFields({
   const missingRequiredBenchmark = required && !hasTime && !hasPace;
   const helperTone =
     timeInvalid || paceInvalid || missingRequiredBenchmark
-      ? "hito-field-error"
-      : "hito-field-helper";
+      ? "hito-body-md font-medium text-negative"
+      : "hito-body-xs text-secondary";
   const helperText = timeInvalid
     ? "Use a positive recent 5K time such as 25:00."
     : paceInvalid
@@ -375,7 +375,7 @@ export function RecentFiveKBenchmarkFields({
     <div className={cn("grid gap-2", className)}>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-2">
-          <span className="hito-form-label">Recent 5K time</span>
+          <span className="hito-label-md text-foreground">Recent 5K time</span>
           <Input
             value={recent5kTime}
             onChange={(event) => onRecent5kTimeChange(event.target.value)}
@@ -387,7 +387,7 @@ export function RecentFiveKBenchmarkFields({
         </label>
 
         <label className="grid gap-2">
-          <span className="hito-form-label">Recent 5K pace</span>
+          <span className="hito-label-md text-foreground">Recent 5K pace</span>
           <Input
             value={recent5kPace}
             onChange={(event) => onRecent5kPaceChange(event.target.value)}
@@ -414,9 +414,9 @@ function TrainingPreferenceField({
 }) {
   return (
     <div className="grid gap-2">
-      <span className="hito-form-label">{label}</span>
+      <span className="hito-label-md text-foreground">{label}</span>
       {children}
-      {helper ? <span className="hito-field-helper">{helper}</span> : null}
+      {helper ? <span className="hito-body-xs text-secondary">{helper}</span> : null}
     </div>
   );
 }

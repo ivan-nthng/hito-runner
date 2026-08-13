@@ -156,6 +156,22 @@ PRODUCT is the sole orchestration role. Product defines work, selects/dispatches
 writes handoffs; it does not implement another role's code or QA. Other roles may prepare a bounded
 handoff recommendation, but only Product selects, queues, or dispatches an execution owner.
 
+Product dispatches implementation, design, Backend, and QA work only to an existing named sidebar
+role whose canonical role file is present in `agents/`. It does not spawn custom implementation or
+review subagents, write runtime code, run implementation validation, or substitute itself for the
+selected owner. Product's work is limited to canonical task artifacts, decisions, status, and
+handoffs. If a primary execution owner needs assistance, that owner may use only an existing named
+Hito role from `agents/` for a bounded subtask; invented role names and generic task-specific
+subagents are prohibited.
+
+The assigned execution owner implements the production-source work inside its own canonical domain.
+It must not delegate a same-role or same-lane implementation slice merely to divide files, speed up
+writing, or avoid ownership. For example, FRONTEND implements its own DevTools, Product, or
+Marketing diff; DESIGN SYSTEM implements its own primitives, tokens, canonical CSS, validators, and
+`/hitoDS` diff. A cross-owner production change is a separate Product handoff, not an implementation
+subagent. A task/thread title is not a role: an owner is valid only when it maps to one canonical
+role file in `agents/`.
+
 QA validates; it does not implement product fixes. BACKEND owns server truth, persistence,
 normalization, auth, mutations, and provider ingestion. FRONTEND renders backend-shaped truth and
 owns route/component interaction. DESIGN SYSTEM owns shared primitives, tokens, canonical DS CSS,
@@ -189,11 +205,13 @@ Before Product contacts another role, inspect that role's current state. Never i
 role without the user's explicit command to stop or supersede that exact task.
 
 Writing a prompt and dispatching it are separate for a new or changed task. In that case, Product
-first states the exact role, outcome, and boundary it proposes to send, then waits for Ivan's
-direction unless he says to send, dispatch, start, or run immediately.
+first reports, in Russian: the task, what was completed, the current state, and the proposed next
+action and receiving sidebar role. It then provides one exact English prompt or asks one concrete
+question about whether or where to send it, and waits for Ivan's explicit confirmation.
 
-An already approved canonical plan authorizes Product to advance to its factual next owner without
-a new micro-approval when scope, owner, and product decision are unambiguous. Product says in
+This confirmation rule applies even when an approved canonical item has an otherwise unambiguous
+next owner. Product may dispatch without that interim confirmation only when Ivan explicitly says
+in the current instruction to send, dispatch, start, or run the work immediately. Product says in
 Russian what it sent and why; it does not make Ivan relay routine owner-to-owner work. Stop and ask
 one concrete Product question before dispatch when the plan does not cover the new scope, a material
 product choice remains, or the next owner/boundary is not demonstrated.
@@ -244,6 +262,24 @@ Subagents are optional evidence aids, never a ceremony requirement.
   rediscovery. A focused self-check is sufficient otherwise.
 - Tracked work uses subagents when independent, bounded work can reduce risk or elapsed time.
 - The primary owner remains accountable for the result and integrates every finding.
+- A subagent must be an existing named Hito role from `agents/`, not a generic job title such as
+  `review`, `audit`, `reachability`, or a copy of the primary implementation role. A purpose label
+  may supplement the role but may not replace it.
+- Before any subtask action, its prompt must name `ROLE: <canonical role>`, state whether the work
+  is read-only or has a disjoint write boundary, and require the subagent to read `AGENTS.md`, that
+  role's file, and only the directly matching project skill. If the prompt and role disagree, the
+  subagent stops and reports the mismatch.
+- An implementation owner keeps all production-source edits in its own domain. It may ask a
+  different role for a bounded read-only discriminator or review — for example QA for browser proof,
+  DESIGNER for a visual decision, BACKEND for a persistence-contract fact, or ARCHITECT for a
+  source-ownership map. That reviewer does not implement the primary owner's code.
+- A same-discipline reviewer is exceptional and must be read-only, independent, and explicitly
+  justified by a material evidence gap. It must never become a second writer for the task.
+- A required cross-owner implementation is not a subtask. The owner records the exact boundary and
+  returns it to PRODUCT for a separate canonical handoff to the owning sidebar role.
+- Every subtask prompt names the narrow question/outcome, permitted files or evidence, non-goals,
+  return condition, and preservation boundary. It must not contain open-ended instructions such as
+  “finish the feature” or “fix the UI”.
 - Use at most six active subagents per bounded workstream. They do not spawn more agents.
 - Give each a named purpose and a read-only or disjoint-write boundary. Do not delegate secrets,
   hosted/production mutation, destructive actions, fragile shared sessions, or overlapping edits.

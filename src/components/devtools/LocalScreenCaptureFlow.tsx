@@ -192,10 +192,10 @@ export function LocalScreenCaptureFlow({ onClose }: { onClose: () => void }) {
 function ScreenCaptureHelper({ invalid }: { invalid: boolean }) {
   return (
     <div className="pointer-events-none fixed left-1/2 top-4 z-[82] w-[min(26rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-hairline bg-background/90 p-3 text-center shadow-soft backdrop-blur">
-      <p className="hito-caption text-foreground">
+      <p className="hito-body-xs text-foreground">
         {invalid ? "Selection is too small. Drag a larger region." : "Drag to capture a region."}
       </p>
-      <p className="hito-caption">Esc cancels. This is local only.</p>
+      <p className="hito-body-xs text-tertiary">Esc cancels. This is local only.</p>
     </div>
   );
 }
@@ -258,12 +258,12 @@ function ScreenCapturePanel({
       <div className="relative grid min-w-0 gap-3 pt-0.5">
         <div className="min-w-0 pr-8">
           <div className="flex min-w-0 items-center gap-2">
-            <p className="hito-label min-w-0 truncate text-foreground">Screen capture</p>
+            <p className="hito-label-md min-w-0 truncate text-foreground">Screen capture</p>
             <span className="hito-status-pill shrink-0" data-tone="signal">
               Local only
             </span>
           </div>
-          <p className="hito-caption mt-0.5 truncate">
+          <p className="hito-body-xs mt-0.5 truncate text-tertiary">
             {packet.route.pathname || "/"} · {packet.selection.viewportRect.width}x
             {packet.selection.viewportRect.height} region
           </p>
@@ -280,7 +280,7 @@ function ScreenCapturePanel({
         <ScreenCapturePreview packet={packet} />
 
         <section className="grid min-w-0 gap-1.5">
-          <p className="hito-caption text-foreground">Location</p>
+          <p className="hito-body-xs text-foreground">Location</p>
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             {[
               packet.route.pathname || "/",
@@ -294,7 +294,7 @@ function ScreenCapturePanel({
               </span>
             ))}
           </div>
-          <p className="hito-caption">
+          <p className="hito-body-xs text-tertiary">
             {packet.domContext?.elementAtCenter?.nearestHeading
               ? `Near ${packet.domContext.elementAtCenter.nearestHeading}.`
               : "Location metadata is included in the prompt."}
@@ -302,7 +302,7 @@ function ScreenCapturePanel({
         </section>
 
         <label className="grid min-w-0 gap-1">
-          <span className="hito-caption text-foreground">What should change?</span>
+          <span className="hito-body-xs text-foreground">What should change?</span>
           <Textarea
             className="min-h-24 resize-y py-2"
             placeholder="Describe the issue or desired UI change."
@@ -313,12 +313,12 @@ function ScreenCapturePanel({
 
         <details className="hito-disclosure border-0 bg-transparent p-0">
           <summary className="hito-disclosure-summary cursor-pointer list-none px-0 py-1 [&::-webkit-details-marker]:hidden">
-            <span className="hito-caption text-foreground">Packet details</span>
+            <span className="hito-body-xs text-foreground">Packet details</span>
             <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
           </summary>
           <pre
             data-local-screen-capture-packet-kind={packet.kind}
-            className="hito-technical-mono mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-black/25 p-3 text-xs leading-5 text-foreground"
+            className="hito-technical-sm mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-black/25 p-3 text-foreground"
           >
             {packetJson}
           </pre>
@@ -368,13 +368,13 @@ function ScreenCapturePanel({
           {promptState !== "idle" ? (
             <details className="hito-disclosure border-0 bg-transparent p-0">
               <summary className="hito-disclosure-summary cursor-pointer list-none px-0 py-1 [&::-webkit-details-marker]:hidden">
-                <span className="hito-caption text-foreground">Generated prompt</span>
+                <span className="hito-body-xs text-foreground">Generated prompt</span>
                 <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
               </summary>
               <Textarea
                 readOnly
                 aria-label="Generated screen capture prompt"
-                className="hito-technical-mono mt-1 max-h-44 min-h-28 resize-y whitespace-pre-wrap py-1.5 text-xs leading-5"
+                className="hito-technical-sm mt-1 max-h-44 min-h-28 resize-y whitespace-pre-wrap py-1.5"
                 value={prompt}
                 onFocus={(event) => event.currentTarget.select()}
               />
@@ -394,7 +394,7 @@ function ScreenCapturePreview({ packet }: { packet: LocalScreenCapturePacket }) 
 
   return (
     <section className="grid min-w-0 gap-1.5">
-      <p className="hito-caption text-foreground">Selected region</p>
+      <p className="hito-body-xs text-foreground">Selected region</p>
       <div
         className="grid min-h-32 place-items-center overflow-hidden rounded-lg bg-surface/70 p-3"
         data-local-screen-capture-preview={packet.screenshot.available ? "image" : "fallback"}
@@ -407,12 +407,12 @@ function ScreenCapturePreview({ packet }: { packet: LocalScreenCapturePacket }) 
             <Icon name="image" size="sm" />
           </div>
           <div className="grid min-w-0 gap-0.5">
-            <p className="hito-caption text-foreground">
+            <p className="hito-body-xs text-foreground">
               {packet.screenshot.available
                 ? "Screenshot preview ready."
                 : "Manual screenshot needed."}
             </p>
-            <p className="hito-caption">
+            <p className="hito-body-xs text-tertiary">
               {packet.screenshot.available
                 ? `${packet.screenshot.width ?? packet.selection.viewportRect.width}x${
                     packet.screenshot.height ?? packet.selection.viewportRect.height
@@ -438,7 +438,7 @@ function ManualPromptFallback({
   return (
     <div className="grid min-w-0 gap-2 rounded-xl border border-hairline bg-surface/70 p-3">
       <div className="flex min-w-0 items-center justify-between gap-2">
-        <p className="hito-caption text-foreground">Copy blocked. Select prompt manually.</p>
+        <p className="hito-body-xs text-foreground">Copy blocked. Select prompt manually.</p>
         <button
           type="button"
           className="hito-button hito-button-ghost hito-button-sm min-h-7 px-2"
@@ -451,7 +451,7 @@ function ManualPromptFallback({
         ref={manualPromptRef}
         readOnly
         aria-label="Manual copy screen capture prompt"
-        className="hito-technical-mono max-h-44 min-h-28 resize-y whitespace-pre-wrap py-1.5 text-xs leading-5"
+        className="hito-technical-sm max-h-44 min-h-28 resize-y whitespace-pre-wrap py-1.5"
         value={prompt}
         onFocus={(event) => event.currentTarget.select()}
       />
@@ -461,18 +461,18 @@ function ManualPromptFallback({
 
 function PromptStatus({ promptState }: { promptState: PromptState }) {
   if (promptState === "copy_failed") {
-    return <p className="hito-caption text-warn">Select prompt manually.</p>;
+    return <p className="hito-body-xs text-warn">Select prompt manually.</p>;
   }
 
   if (promptState === "fallback_hidden") {
-    return <p className="hito-caption text-success">Prompt ready.</p>;
+    return <p className="hito-body-xs text-success">Prompt ready.</p>;
   }
 
   if (promptState === "copied") {
-    return <p className="hito-caption text-success">Attach screenshot if needed.</p>;
+    return <p className="hito-body-xs text-success">Attach screenshot if needed.</p>;
   }
 
-  return <p className="hito-caption">Metadata prompt only; no upload.</p>;
+  return <p className="hito-body-xs text-tertiary">Metadata prompt only; no upload.</p>;
 }
 
 function clampViewportPoint(point: ScreenPoint): ScreenPoint {

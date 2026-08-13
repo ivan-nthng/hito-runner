@@ -87,9 +87,11 @@ function Integrations() {
     <AppShell snapshot={snapshot} viewer={viewer}>
       <div className="hito-route-gutter max-w-5xl py-10">
         <header className="hito-page-header">
-          <p className="hito-label">{snapshot.source === "persisted" ? "Saved plan" : "Preview"}</p>
-          <h1 className="hito-ui-page-title">Connections</h1>
-          <p className="hito-page-copy">
+          <p className="hito-label-md text-foreground">
+            {snapshot.source === "persisted" ? "Saved plan" : "Preview"}
+          </p>
+          <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">Connections</h1>
+          <p className="hito-body-md mt-4 max-w-[40rem] text-secondary">
             {snapshot.source === "persisted"
               ? "Your saved plan is active, but the provider connections listed here are not connected unless they say Live."
               : "This page shows what is available now and what still comes later."}
@@ -100,8 +102,8 @@ function Integrations() {
           {cats.map((c) => (
             <section key={c}>
               <div className="hito-section-header">
-                <h2 className="hito-ui-section-title">{c}</h2>
-                <span className="hito-section-subtitle">
+                <h2 className="hito-ui-title-sm text-foreground">{c}</h2>
+                <span className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
                   {c === "Intelligence" ? "Available now and later" : "Later"}
                 </span>
               </div>
@@ -124,8 +126,8 @@ function Integrations() {
                           <Icon name={i.icon} size="sm" />
                         </div>
                         <div className="min-w-0">
-                          <h3 className="hito-list-row-title">{i.name}</h3>
-                          <p className="hito-list-row-copy">{i.desc}</p>
+                          <h3 className="hito-body-md text-foreground">{i.name}</h3>
+                          <p className="hito-body-sm mt-1 text-secondary">{i.desc}</p>
                         </div>
                       </div>
                       <div className="flex shrink-0 flex-col items-end gap-3">
@@ -155,7 +157,7 @@ function Integrations() {
         </div>
 
         <section className="mt-10 border-t border-hairline pt-6">
-          <p className="hito-caption max-w-2xl">
+          <p className="hito-body-xs text-tertiary max-w-2xl">
             Available now: workout Feedback for Garmin upload, plan-vs-run review, and a short
             next-step note. Still later: screenshot import, provider sync, and broader plan
             adjustments.

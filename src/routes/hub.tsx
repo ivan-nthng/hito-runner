@@ -74,9 +74,9 @@ function HubPage() {
       <div className="auth-hero-content mx-auto flex min-h-screen max-w-6xl flex-col items-center justify-center px-5 py-10 sm:px-8 lg:px-10">
         <header className="mx-auto grid max-w-2xl justify-items-center text-center">
           <HitoLogo className="[--hito-logo-height:1.65rem]" />
-          <p className="hito-label mt-8 text-muted-foreground">Destination launcher</p>
-          <h1 className="hito-page-title mt-3">Where are we going?</h1>
-          <p className="hito-body mt-4 max-w-xl text-muted-foreground">
+          <p className="hito-label-md mt-8 text-muted-foreground">Destination launcher</p>
+          <h1 className="hito-display-title-lg mt-3">Where are we going?</h1>
+          <p className="hito-body-md mt-4 max-w-xl text-muted-foreground">
             Choose a Hito surface. Each destination keeps its own access rules, so public pages stay
             open and service pages ask for the right login when needed.
           </p>
@@ -103,12 +103,12 @@ function HubDestinationCard({ destination }: { destination: HubDestination }) {
       </span>
       <span className="grid flex-1 gap-3">
         <span className="flex flex-wrap items-center gap-2">
-          <span className="hito-panel-title">{destination.title}</span>
+          <span className="hito-ui-title-xs">{destination.title}</span>
           <span className="hito-status-pill" data-tone={destination.badgeTone}>
             {destination.badge}
           </span>
         </span>
-        <span className="hito-body-small text-muted-foreground">{destination.description}</span>
+        <span className="hito-body-sm text-muted-foreground">{destination.description}</span>
       </span>
       <span className="hito-launcher-card-footer">
         <span className="hito-button hito-button-secondary hito-button-sm">

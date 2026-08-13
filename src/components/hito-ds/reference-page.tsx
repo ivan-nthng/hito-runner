@@ -11,6 +11,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { HitoDsBrandPage } from "./reference-brand-page";
 import { HitoDsComponentsPage } from "./reference-components-page";
 import { HitoDsFoundationsPage } from "./reference-foundations-page";
 import { HitoDsNestedNav, HitoDsPagePager } from "./reference-navigation";
@@ -78,7 +79,7 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
             <div className="grid gap-3 px-5 py-4">
               <div className="flex min-w-0 items-center justify-between gap-4">
                 <div className="hito-workbench-location">
-                  <span className="hito-workbench-location-title">Hito DS</span>
+                  <span className="hito-workbench-location-title font-sans">Hito DS</span>
                   <span className="hito-workbench-location-meta">
                     <span>Reference library</span>
                     <span aria-hidden="true">/</span>
@@ -138,8 +139,8 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
           <div className="mx-auto max-w-6xl px-6 py-8 lg:px-10 lg:py-10">
             {pageId !== "overview" ? (
               <header className="hito-page-header pt-8">
-                <p className="hito-label hito-label-signal">Hito design system</p>
-                <h1 className="hito-page-title">{currentPage.label}.</h1>
+                <p className="hito-label-md hito-label-signal">Hito design system</p>
+                <h1 className="hito-ui-title-xl">{currentPage.label}.</h1>
               </header>
             ) : null}
 
@@ -147,6 +148,7 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
             {pageId === "foundations" ? <HitoDsFoundationsPage /> : null}
             {pageId === "components" ? <HitoDsComponentsPage /> : null}
             {pageId === "patterns" ? <HitoDsPatternsPage /> : null}
+            {pageId === "brand" ? <HitoDsBrandPage /> : null}
 
             <HitoDsPagePager currentPageId={pageId} />
           </div>

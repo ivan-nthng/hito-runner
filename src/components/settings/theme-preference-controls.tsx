@@ -62,7 +62,7 @@ export function ThemePreferenceChoiceGroup({
         })}
       </div>
       {label ? (
-        <p id={labelId} className="hito-form-label">
+        <p id={labelId} className="hito-label-md text-foreground">
           {label}
         </p>
       ) : null}
@@ -82,7 +82,9 @@ export function ThemePreferenceMenuItems({
 
   return (
     <>
-      <DropdownMenuLabel className={cn("hito-micro-label", labelClassName)}>
+      <DropdownMenuLabel
+        className={cn("hito-label-sm uppercase tracking-[0.18em] text-tertiary", labelClassName)}
+      >
         Theme
       </DropdownMenuLabel>
       <DropdownMenuRadioGroup

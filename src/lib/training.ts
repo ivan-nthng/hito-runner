@@ -216,43 +216,48 @@ interface TemplatePlan {
 
 const TYPE_META: Record<
   WorkoutType,
-  { label: string; short: string; color: string; ring: string }
+  { label: string; short: string; color: string; content: string; ring: string }
 > = {
   easy: {
     label: "Easy run",
     short: "Easy",
     color: workoutTypeColorVar("easy"),
+    content: workoutTypeColorVar("easy", "content"),
     ring: workoutTypeColorVar("easy", "ring"),
   },
   steady_or_easy: {
     label: "Steady",
     short: "Steady",
     color: workoutTypeColorVar("steady"),
+    content: workoutTypeColorVar("steady", "content"),
     ring: workoutTypeColorVar("steady", "ring"),
   },
   long_run: {
     label: "Long run",
     short: "Long",
     color: workoutTypeColorVar("long_run"),
+    content: workoutTypeColorVar("long_run", "content"),
     ring: workoutTypeColorVar("long_run", "ring"),
   },
   quality: {
     label: "Quality / Intervals",
     short: "Quality",
     color: workoutTypeColorVar("tempo"),
+    content: workoutTypeColorVar("tempo", "content"),
     ring: workoutTypeColorVar("tempo", "ring"),
   },
   rest: {
     label: "Rest",
     short: "Rest",
     color: workoutTypeColorVar("rest"),
+    content: workoutTypeColorVar("rest", "content"),
     ring: workoutTypeColorVar("rest", "ring"),
   },
 };
 
 const VISIBLE_TYPE_META: Record<
   VisibleWorkoutType,
-  { label: string; short: string; color: string; ring: string }
+  { label: string; short: string; color: string; content: string; ring: string }
 > = {
   easy: {
     ...TYPE_META.easy,
@@ -356,6 +361,7 @@ export function workoutTypeMeta(workout: WorkoutVisibleInput): {
   label: string;
   short: string;
   color: string;
+  content: string;
   ring: string;
 } {
   const language = workoutPlannedLanguage(workout);
@@ -365,6 +371,7 @@ export function workoutTypeMeta(workout: WorkoutVisibleInput): {
   return {
     ...meta,
     color: workoutTypeColorVar(language.runnerFacingWorkoutType),
+    content: workoutTypeColorVar(language.runnerFacingWorkoutType, "content"),
     label: language.runnerFacingWorkoutTypeLabel,
     ring: workoutTypeColorVar(language.runnerFacingWorkoutType, "ring"),
     short: language.runnerFacingWorkoutTypeLabel,

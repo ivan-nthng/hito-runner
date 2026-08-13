@@ -207,8 +207,8 @@ export function SavedPlanLibraryPanel() {
   if (status === "error" && records.length === 0) {
     return (
       <div className="hito-state-surface" data-tone="destructive" role="alert">
-        <p className="hito-label text-destructive">Could not load saved plans</p>
-        <p className="hito-body mt-2">{error}</p>
+        <p className="hito-label-md text-destructive">Could not load saved plans</p>
+        <p className="hito-body-md text-secondary mt-2">{error}</p>
         <div className="hito-state-actions">
           <HitoButton
             type="button"
@@ -227,11 +227,11 @@ export function SavedPlanLibraryPanel() {
   return (
     <section className="grid min-w-0 gap-6" aria-labelledby="saved-plans-title">
       <header className="grid gap-2">
-        <p className="hito-label">Saved plans</p>
-        <h1 id="saved-plans-title" className="hito-ui-section-title">
+        <p className="hito-label-md text-foreground">Saved plans</p>
+        <h1 id="saved-plans-title" className="hito-ui-title-sm text-foreground">
           Plan library
         </h1>
-        <p className="hito-body max-w-3xl">
+        <p className="hito-body-md text-secondary max-w-3xl">
           Saved plans are immutable records. Starting one creates ordinary future Calendar workouts
           without giving the record authority over your Calendar or protected history.
         </p>
@@ -244,19 +244,19 @@ export function SavedPlanLibraryPanel() {
           role="status"
           aria-live="polite"
         >
-          <p className="hito-body">{notice}</p>
+          <p className="hito-body-md text-secondary">{notice}</p>
         </div>
       ) : null}
 
       {actionError && pendingDialog === null ? (
         <div className="hito-state-surface py-3" data-tone="destructive" role="alert">
-          <p className="hito-body">{actionError}</p>
+          <p className="hito-body-md text-secondary">{actionError}</p>
         </div>
       ) : null}
 
       {status === "error" && records.length > 0 && error ? (
         <div className="hito-state-surface py-3" data-tone="destructive" role="alert">
-          <p className="hito-body">{error}</p>
+          <p className="hito-body-md text-secondary">{error}</p>
         </div>
       ) : null}
 
@@ -267,7 +267,7 @@ export function SavedPlanLibraryPanel() {
           role="status"
           aria-live="polite"
         >
-          <p className="hito-body">
+          <p className="hito-body-md text-secondary">
             {busyAction === "start" ? "Checking the future Calendar…" : "Hiding saved plan…"}
           </p>
         </div>
@@ -410,8 +410,8 @@ function SavedPlanRow({
     >
       <td className="hito-data-table-cell hito-data-table-cell-start">
         <div className="grid max-w-xs gap-1">
-          <p className="hito-list-row-title break-words">{record.title}</p>
-          <p className="hito-caption line-clamp-2">{record.goalSummary}</p>
+          <p className="hito-body-md text-foreground break-words">{record.title}</p>
+          <p className="hito-body-xs text-tertiary line-clamp-2">{record.goalSummary}</p>
         </div>
       </td>
       <td className="hito-data-table-cell whitespace-nowrap">
@@ -509,20 +509,20 @@ function SavedPlanActionDialog({
         }}
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-ui-modal-title">
+          <DialogTitle className="hito-ui-title-md text-foreground">
             {isReplacement ? "Replace future workouts?" : "Hide this saved plan?"}
           </DialogTitle>
           <DialogDescription>{dialog?.record.title ?? "Saved plan"}</DialogDescription>
         </DialogHeader>
         <div className="hito-product-dialog-body">
-          <p className="hito-body">
+          <p className="hito-body-md text-secondary">
             {isReplacement
               ? `${dialog.futureWorkoutCount} future ${dialog.futureWorkoutCount === 1 ? "workout" : "workouts"} already exist. Only a positive replacement will start this plan; past and protected history are not replaceable here.`
               : "This hides only the immutable library record from the ordinary view. Calendar workouts and history remain unchanged."}
           </p>
           {error ? (
             <div className="hito-state-surface mt-4 py-3" data-tone="destructive" role="alert">
-              <p className="hito-body">{error}</p>
+              <p className="hito-body-md text-secondary">{error}</p>
             </div>
           ) : null}
         </div>
@@ -557,11 +557,11 @@ function SavedPlanActionDialog({
 function SavedPlanStartReceipt({ receipt }: { receipt: AppliedReceipt }) {
   return (
     <section className="hito-state-surface" data-tone="signal" aria-labelledby="plan-start-receipt">
-      <p className="hito-label">Plan started</p>
-      <h2 id="plan-start-receipt" className="hito-ui-section-title mt-2">
+      <p className="hito-label-md text-foreground">Plan started</p>
+      <h2 id="plan-start-receipt" className="hito-ui-title-sm text-foreground mt-2">
         {receipt.planTitle}
       </h2>
-      <p className="hito-body mt-2">
+      <p className="hito-body-md text-secondary mt-2">
         Starts {formatDate(receipt.resolvedStartDate)} with {receipt.workoutCount} non-Rest workouts
         across {receipt.calendarRowCount} Calendar days.
       </p>
@@ -587,11 +587,13 @@ function SavedPlanStartReceipt({ receipt }: { receipt: AppliedReceipt }) {
 function SavedPlanEmptyState({ hasRecords, query }: { hasRecords: boolean; query: string }) {
   return (
     <div className="hito-state-surface">
-      <p className="hito-label">{hasRecords ? "No matching plans" : "No saved plans"}</p>
-      <h2 className="hito-ui-section-title mt-2">
+      <p className="hito-label-md text-foreground">
+        {hasRecords ? "No matching plans" : "No saved plans"}
+      </p>
+      <h2 className="hito-ui-title-sm text-foreground mt-2">
         {hasRecords ? "No plans match this library view." : "Your saved plan library is empty."}
       </h2>
-      <p className="hito-body mt-2">
+      <p className="hito-body-md text-secondary mt-2">
         {query.trim()
           ? "Clear the name search or change the visibility filter."
           : hasRecords

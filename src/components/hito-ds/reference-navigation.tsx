@@ -165,11 +165,7 @@ export function HitoDsNestedNav({
           : expandedGroupIds.has(item.id);
 
         return (
-          <div
-            key={item.id}
-            className="hito-ds-sidebar-group"
-            data-secondary={item.secondary ? "true" : undefined}
-          >
+          <div key={item.id} className="hito-ds-sidebar-group">
             <button
               id={groupButtonId}
               type="button"
@@ -218,7 +214,7 @@ export function HitoDsNestedNav({
       })}
 
       {!hasMatches ? (
-        <p className="hito-caption px-3 py-2" role="status" aria-live="polite">
+        <p className="hito-body-xs text-tertiary px-3 py-2" role="status" aria-live="polite">
           No matching components.
         </p>
       ) : null}

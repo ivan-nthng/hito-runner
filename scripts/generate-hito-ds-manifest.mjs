@@ -20,6 +20,50 @@ const typographyStylesheets = [
   "src/styles/shell-admin-analytics.css",
 ];
 
+const SEMANTIC_COLOR_CHANNELS = {
+  background: ["fill"],
+  foreground: ["text"],
+  surface: ["fill"],
+  "surface-elevated": ["fill"],
+  card: ["fill"],
+  "card-foreground": ["text"],
+  popover: ["fill"],
+  "popover-foreground": ["text"],
+  primary: ["fill"],
+  "primary-foreground": ["text"],
+  muted: ["fill"],
+  "muted-foreground": ["text"],
+  accent: ["fill"],
+  "accent-foreground": ["text"],
+  destructive: ["fill", "border"],
+  "destructive-foreground": ["text"],
+  border: ["border"],
+  hairline: ["border"],
+  input: ["border"],
+  ring: ["border"],
+  signal: ["fill", "border"],
+  "signal-foreground": ["text"],
+  info: ["fill", "border"],
+  "info-foreground": ["text"],
+  warn: ["fill", "border"],
+  success: ["fill", "border"],
+  "success-foreground": ["text"],
+  "chrome-clear": ["fill"],
+  "chrome-subtle": ["fill"],
+  "chrome-standard": ["fill"],
+  "chrome-strong": ["fill"],
+  "chrome-edge-default": ["border"],
+  "chrome-edge-emphasis": ["border"],
+  "text-secondary": ["text"],
+  "text-tertiary": ["text"],
+  "text-disabled": ["text"],
+  "text-accent": ["text"],
+  "text-positive": ["text"],
+  "text-negative": ["text"],
+  "text-informative": ["text"],
+  "text-warning": ["text"],
+};
+
 const foundationSource = await readFile(foundationPath, "utf8");
 const typographyModule = await import(pathToFileURL(typographyInventoryPath).href);
 const typographySources = await Promise.all(
@@ -71,8 +115,8 @@ function buildManifest({ foundationSource, typographyRoles, typographySources })
   const primitiveMotion = parseTokenSection(foundationSource, "primitive-motion");
   const semanticDark = parseTokenSection(foundationSource, "semantic-color-dark");
   const semanticLight = parseTokenSection(foundationSource, "semantic-color-light");
-  const primitiveColor = primitiveAliasClosure(primitiveColorSource, semanticDark, semanticLight);
-  const semanticColor = combineSemanticModes(semanticDark, semanticLight);
+  const primitiveColor = addColorProvenance(primitiveColorSource, primitiveColorSource);
+  const semanticColor = combineSemanticModes(semanticDark, semanticLight, primitiveColorSource);
   const textStyles = typographyRoles
     .filter((role) => role.figmaTextStyle === true)
     .map((role) => buildTextStyle(role, typographySources));
@@ -85,15 +129,14 @@ function buildManifest({ foundationSource, typographyRoles, typographySources })
         primitiveSpacing,
         primitiveRadius,
         primitiveMotion,
-        semanticDark,
-        semanticLight,
+        semanticColor,
         textStyles,
       }),
     )
     .digest("hex");
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     direction: "code-to-figma",
     sourceDigest: `sha256:${sourceDigest}`,
     sourceOfTruth: {
@@ -135,16 +178,6 @@ function buildManifest({ foundationSource, typographyRoles, typographySources })
   };
 }
 
-function primitiveAliasClosure(primitiveTokens, ...semanticModes) {
-  const usedPrimitiveIds = new Set(
-    semanticModes.flatMap((tokens) =>
-      tokens.flatMap((token) => (token.alias ? [token.alias] : [])),
-    ),
-  );
-
-  return primitiveTokens.filter((token) => usedPrimitiveIds.has(token.id));
-}
-
 function parseTokenSection(source, sectionName) {
   const start = `/* @hito-export-start ${sectionName} */`;
   const end = `/* @hito-export-end ${sectionName} */`;
@@ -170,9 +203,21 @@ function tokenRecord(cssVariable, value) {
   };
 }
 
-function combineSemanticModes(darkTokens, lightTokens) {
+function combineSemanticModes(darkTokens, lightTokens, primitiveTokens) {
   const darkByVariable = new Map(darkTokens.map((token) => [token.cssVariable, token]));
   const lightByVariable = new Map(lightTokens.map((token) => [token.cssVariable, token]));
+  const darkWithProvenance = new Map(
+    addColorProvenance(darkTokens, [...primitiveTokens, ...darkTokens]).map((token) => [
+      token.cssVariable,
+      token,
+    ]),
+  );
+  const lightWithProvenance = new Map(
+    addColorProvenance(lightTokens, [...primitiveTokens, ...lightTokens]).map((token) => [
+      token.cssVariable,
+      token,
+    ]),
+  );
   const darkNames = [...darkByVariable.keys()].sort();
   const lightNames = [...lightByVariable.keys()].sort();
 
@@ -184,14 +229,26 @@ function combineSemanticModes(darkTokens, lightTokens) {
     );
   }
 
+  const metadataIds = Object.keys(SEMANTIC_COLOR_CHANNELS).sort();
+  const semanticIds = darkTokens.map((token) => token.id).sort();
+  if (JSON.stringify(metadataIds) !== JSON.stringify(semanticIds)) {
+    const missingMetadata = semanticIds.filter((id) => !metadataIds.includes(id));
+    const staleMetadata = metadataIds.filter((id) => !semanticIds.includes(id));
+    throw new Error(
+      `Semantic metadata mismatch. missing=${missingMetadata.join(",") || "none"}; stale=${staleMetadata.join(",") || "none"}`,
+    );
+  }
+
   const modeTokens = darkTokens.map((darkToken) => {
     const lightToken = lightByVariable.get(darkToken.cssVariable);
     return {
       id: darkToken.id,
+      label: semanticColorLabel(darkToken.id),
       cssVariable: darkToken.cssVariable,
+      channels: SEMANTIC_COLOR_CHANNELS[darkToken.id],
       modes: {
-        dark: valueRecord(darkToken),
-        light: valueRecord(lightToken),
+        dark: valueRecord(darkWithProvenance.get(darkToken.cssVariable)),
+        light: valueRecord(lightWithProvenance.get(lightToken.cssVariable)),
       },
     };
   });
@@ -199,10 +256,91 @@ function combineSemanticModes(darkTokens, lightTokens) {
   return modeTokens;
 }
 
+function semanticColorLabel(id) {
+  return id
+    .split("-")
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
 function valueRecord(token) {
   return {
     value: token.value,
     alias: token.alias,
+    provenance: token.provenance,
+  };
+}
+
+function addColorProvenance(tokens, lookupTokens) {
+  const tokenByVariable = new Map(lookupTokens.map((token) => [token.cssVariable, token]));
+  return tokens.map((token) => ({
+    ...token,
+    provenance: colorProvenance(token, tokenByVariable),
+  }));
+}
+
+function colorProvenance(token, tokenByVariable, trail = []) {
+  if (trail.includes(token.cssVariable)) {
+    throw new Error(`Color provenance cycle: ${[...trail, token.cssVariable].join(" -> ")}`);
+  }
+
+  if (token.value === "transparent") {
+    return {
+      kind: "transparent",
+      source: token.value,
+      references: [],
+      aliasChain: [],
+      alpha: 0,
+    };
+  }
+
+  if (token.alias) {
+    const aliasVariable = `--${token.alias}`;
+    const aliasToken = tokenByVariable.get(aliasVariable);
+    if (!aliasToken) {
+      throw new Error(
+        `Unresolved color provenance alias: ${token.cssVariable} -> ${aliasVariable}`,
+      );
+    }
+    const aliasProvenance = colorProvenance(aliasToken, tokenByVariable, [
+      ...trail,
+      token.cssVariable,
+    ]);
+    return {
+      kind: "alias",
+      source: token.value,
+      references: [{ cssVariable: aliasVariable, percentage: null }],
+      aliasChain: [aliasToken.id, ...aliasProvenance.aliasChain],
+      alpha: aliasProvenance.alpha,
+    };
+  }
+
+  if (token.value.startsWith("color-mix(")) {
+    const references = [...token.value.matchAll(/var\((--[a-z0-9-]+)\)\s*([0-9.]+%)?/gi)].map(
+      (match) => ({
+        cssVariable: match[1],
+        percentage: match[2] ? Number(match[2].slice(0, -1)) : null,
+      }),
+    );
+    const transparentMix = token.value.includes("transparent");
+    const singleSourcePercentage = references.length === 1 ? references[0].percentage : null;
+    return {
+      kind: "formula",
+      source: token.value,
+      references,
+      aliasChain: [],
+      alpha:
+        transparentMix && singleSourcePercentage !== null ? singleSourcePercentage / 100 : null,
+    };
+  }
+
+  const alphaMatch = token.value.match(/\/\s*([0-9.]+)%\s*\)/);
+  return {
+    kind: alphaMatch ? "alpha" : "primitive",
+    source: token.value,
+    references: [],
+    aliasChain: [],
+    alpha: alphaMatch ? Number(alphaMatch[1]) / 100 : null,
   };
 }
 

@@ -512,6 +512,7 @@ export function buildCalendarWorkoutIdentity(
     label: language.runnerFacingWorkoutTypeLabel,
     short: language.runnerFacingWorkoutTypeLabel,
     color: workoutTypeColorVar(language.runnerFacingWorkoutType),
+    contentColor: workoutTypeColorVar(language.runnerFacingWorkoutType, "content"),
     glyph: workoutGlyphFromCalendarIconKey(language.canonical.calendarIconKey),
   };
 }

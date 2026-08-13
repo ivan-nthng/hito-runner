@@ -80,7 +80,7 @@ function BorderControlLine({
           <span className="grid size-5 shrink-0 place-items-center text-muted-foreground">
             <Icon name="minus" size="xs" />
           </span>
-          <span className="hito-caption min-w-0 truncate text-foreground">Border</span>
+          <span className="hito-body-xs min-w-0 truncate text-foreground">Border</span>
         </div>
         {active ? (
           <>
@@ -127,7 +127,7 @@ function CardChromeControlLine({
           <span className="grid size-5 shrink-0 place-items-center text-muted-foreground">
             <Icon name="settings" size="xs" />
           </span>
-          <span className="hito-caption min-w-0 truncate text-foreground">Card chrome</span>
+          <span className="hito-body-xs min-w-0 truncate text-foreground">Card chrome</span>
         </div>
         <button
           type="button"

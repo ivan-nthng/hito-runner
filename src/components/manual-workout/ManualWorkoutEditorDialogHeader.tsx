@@ -13,9 +13,9 @@ export function ManualWorkoutEditorDialogHeader({
 
   return (
     <DialogHeader className="hito-product-dialog-header hito-manual-workout-dialog-header">
-      <DialogDescription className="hito-body-small">{dateLabel}</DialogDescription>
+      <DialogDescription className="hito-body-sm text-secondary">{dateLabel}</DialogDescription>
       <div className="hito-manual-workout-dialog-title-row">
-        <DialogTitle className="hito-ui-modal-title hito-manual-workout-dialog-title">
+        <DialogTitle className="hito-ui-title-md text-foreground hito-manual-workout-dialog-title">
           {displayTitle}
         </DialogTitle>
         <span

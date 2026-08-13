@@ -44,7 +44,7 @@ export function DeterministicComparisonReadback({
       {structureGroups.length > 0 ? (
         <details className="hito-disclosure">
           <summary className="hito-disclosure-summary">
-            <span className="hito-label text-foreground">Workout structure</span>
+            <span className="hito-label-md text-foreground">Workout structure</span>
             <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
           </summary>
           <div className="hito-disclosure-body">
@@ -56,12 +56,12 @@ export function DeterministicComparisonReadback({
       {detailLines.length > 0 ? (
         <details className="hito-disclosure">
           <summary className="hito-disclosure-summary">
-            <span className="hito-label text-foreground">Comparison details</span>
+            <span className="hito-label-md text-foreground">Comparison details</span>
             <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
           </summary>
           <div className="hito-disclosure-body">
             {detailLines.map((line) => (
-              <p key={line} className="hito-body-small">
+              <p key={line} className="hito-body-sm text-secondary">
                 {line}
               </p>
             ))}
@@ -124,7 +124,7 @@ export function RunCapturedReadback({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="hito-ui-panel-title">Observed run</h3>
+        <h3 className="hito-ui-title-xs text-foreground">Observed run</h3>
         {!comparisonAvailable ? (
           <span className="hito-status-pill" data-tone="muted">
             Comparison unavailable
@@ -135,14 +135,14 @@ export function RunCapturedReadback({
         <dl className="hito-row-group">
           {rows.map((row) => (
             <div key={row.label} className="hito-list-row">
-              <dt className="hito-list-row-title">{row.label}</dt>
-              <dd className="hito-technical-mono text-right">{row.value}</dd>
+              <dt className="hito-body-md text-foreground">{row.label}</dt>
+              <dd className="hito-technical-sm text-secondary text-right">{row.value}</dd>
             </div>
           ))}
         </dl>
       ) : null}
       {!comparisonAvailable ? (
-        <p className="hito-body-small">
+        <p className="hito-body-sm text-secondary">
           The activity was captured, but no plan comparison is available.
         </p>
       ) : null}
@@ -196,10 +196,10 @@ function ComparisonRowGroup({ rows }: { rows: ComparisonRow[] }) {
         aria-hidden="true"
         className="hidden grid-cols-[minmax(7rem,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-4 px-4 py-3 sm:grid"
       >
-        <div className="hito-caption">Metric</div>
-        <div className="hito-caption">Plan</div>
-        <div className="hito-caption">Run</div>
-        <div className="hito-caption">Difference</div>
+        <div className="hito-body-xs text-tertiary">Metric</div>
+        <div className="hito-body-xs text-tertiary">Plan</div>
+        <div className="hito-body-xs text-tertiary">Run</div>
+        <div className="hito-body-xs text-tertiary">Difference</div>
       </div>
       {rows.map((row) => (
         <div
@@ -207,7 +207,7 @@ function ComparisonRowGroup({ rows }: { rows: ComparisonRow[] }) {
           className="hito-list-row block min-w-0 sm:grid sm:grid-cols-[minmax(7rem,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] sm:items-start sm:gap-4"
         >
           <dt className="min-w-0">
-            <span className="hito-list-row-title">{row.label}</span>
+            <span className="hito-body-md text-foreground">{row.label}</span>
           </dt>
           <ComparisonValue metric={row.label} label="Plan" value={row.plan} />
           <ComparisonValue metric={row.label} label="Run" value={row.run} />
@@ -232,10 +232,10 @@ function ComparisonValue({
       <span className="sr-only">
         {metric}, {label}:{" "}
       </span>
-      <span aria-hidden="true" className="hito-caption sm:hidden">
+      <span aria-hidden="true" className="hito-body-xs text-tertiary sm:hidden">
         {label}
       </span>
-      <p className="hito-technical-mono mt-1 break-words sm:mt-0">{value}</p>
+      <p className="hito-technical-sm text-secondary mt-1 break-words sm:mt-0">{value}</p>
     </dd>
   );
 }
@@ -247,10 +247,10 @@ function StructureReadback({ groups }: { groups: WorkoutComparisonSegmentGroup[]
         aria-hidden="true"
         className="hidden grid-cols-[minmax(7rem,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-4 px-4 py-3 sm:grid"
       >
-        <div className="hito-caption">Section</div>
-        <div className="hito-caption">Plan</div>
-        <div className="hito-caption">Run</div>
-        <div className="hito-caption">Difference</div>
+        <div className="hito-body-xs text-tertiary">Section</div>
+        <div className="hito-body-xs text-tertiary">Plan</div>
+        <div className="hito-body-xs text-tertiary">Run</div>
+        <div className="hito-body-xs text-tertiary">Difference</div>
       </div>
       {groups.map((group) => {
         const row = buildStructureRow(group);
@@ -261,7 +261,7 @@ function StructureReadback({ groups }: { groups: WorkoutComparisonSegmentGroup[]
             className="hito-list-row block min-w-0 sm:grid sm:grid-cols-[minmax(7rem,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] sm:items-start sm:gap-4"
           >
             <dt className="min-w-0">
-              <span className="hito-list-row-title">{group.label}</span>
+              <span className="hito-body-md text-foreground">{group.label}</span>
             </dt>
             <ComparisonValue metric={group.label} label="Plan" value={row.plan} />
             <ComparisonValue metric={group.label} label="Run" value={row.run} />

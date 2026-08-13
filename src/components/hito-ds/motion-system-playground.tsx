@@ -93,8 +93,8 @@ export function MotionSystemPlayground() {
         <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-5" inert>
           {MOTION_TOKENS.map((token) => (
             <article key={token.value} className="hito-state-surface min-w-0 p-4">
-              <p className="hito-panel-title font-mono-num">{token.value}</p>
-              <p className="hito-caption mt-2">{token.use}</p>
+              <p className="hito-technical-sm">{token.value}</p>
+              <p className="hito-body-xs text-tertiary mt-2">{token.use}</p>
             </article>
           ))}
         </div>
@@ -165,7 +165,9 @@ function MotionOverlayDemo({
             </DialogDescription>
           </DialogHeader>
           <div className="hito-product-dialog-body">
-            <p className="hito-support-copy">Shared dialog motion preserves modal containment.</p>
+            <p className="hito-body-md text-secondary">
+              Shared dialog motion preserves modal containment.
+            </p>
           </div>
           <DialogFooter className="hito-product-dialog-footer">
             <HitoButton size="md" variant="primary">
@@ -191,7 +193,9 @@ function MotionOverlayDemo({
             <SheetDescription>Directional origin remains clear on narrow screens.</SheetDescription>
           </SheetHeader>
           <div className="min-h-0 overflow-y-auto p-5">
-            <p className="hito-support-copy">Shared sheet content stays viewport-contained.</p>
+            <p className="hito-body-md text-secondary">
+              Shared sheet content stays viewport-contained.
+            </p>
           </div>
           <SheetFooter className="border-t border-hairline p-5">
             <HitoButton size="md" variant="primary">

@@ -234,7 +234,7 @@ export function RunnerActivityProgressExperience({
           role="status"
           aria-live="polite"
         >
-          <p className="hito-body">{notice}</p>
+          <p className="hito-body-md text-secondary">{notice}</p>
         </div>
       ) : null}
 

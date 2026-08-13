@@ -12,6 +12,7 @@ export type HitoCalendarWorkoutIdentity = {
   label: string;
   short?: string;
   color: string;
+  contentColor?: string;
   glyph: WorkoutGlyphKind;
 };
 
@@ -319,7 +320,7 @@ function CellHeader({
   if (week) {
     return (
       <div className="flex items-center justify-between">
-        <span className="hito-micro-label">{weekday}</span>
+        <span className="hito-label-sm">{weekday}</span>
         <DateSlotContent
           day={day}
           result={result}
@@ -377,15 +378,16 @@ function DateSlotContent({
       >
         <span
           className={cn(
-            "hito-technical-mono text-muted-foreground",
-            dense && "text-[0.625rem]",
+            dense
+              ? "font-mono-num text-[0.625rem] leading-[1.45] text-muted-foreground"
+              : "hito-technical-sm text-muted-foreground",
             today && "text-signal",
           )}
         >
           {day}
         </span>
         {weekday ? (
-          <span className="hito-micro-label ml-1 text-[0.625rem] text-muted-foreground">
+          <span className="ml-1 font-sans text-[0.625rem] font-medium uppercase leading-[1.2] tracking-[0.18em] text-muted-foreground">
             {weekday}
           </span>
         ) : null}
@@ -393,7 +395,7 @@ function DateSlotContent({
       </span>
       {slotAction ? (
         <span
-          className="hito-label pointer-events-none absolute inset-y-0 left-0 inline-flex items-center gap-1 whitespace-nowrap text-signal opacity-0 transition-opacity group-hover/hito-calendar-day:opacity-100 group-focus-within/hito-calendar-day:opacity-100 group-hover/manual-day:opacity-100 group-focus-within/manual-day:opacity-100"
+          className="hito-label-md pointer-events-none absolute inset-y-0 left-0 inline-flex items-center gap-1 whitespace-nowrap text-signal opacity-0 transition-opacity group-hover/hito-calendar-day:opacity-100 group-focus-within/hito-calendar-day:opacity-100 group-hover/manual-day:opacity-100 group-focus-within/manual-day:opacity-100"
           aria-hidden="true"
         >
           {slotAction.icon ? <Icon name={slotAction.icon} size="xs" /> : null}
@@ -436,7 +438,7 @@ function CalendarDayBody({
               className={cn(
                 week
                   ? "mt-1 text-sm leading-snug"
-                  : "hito-body-small mt-1.5 line-clamp-2 text-foreground/85",
+                  : "hito-body-sm mt-1.5 line-clamp-2 text-foreground/85",
                 dense && "sr-only",
               )}
             >
@@ -469,7 +471,7 @@ function SupportingText({
   return (
     <div
       className={cn(
-        technical ? "hito-technical-mono text-muted-foreground" : "hito-list-row-copy",
+        technical ? "hito-technical-sm text-muted-foreground" : "hito-list-row-copy",
         "min-w-0 break-words [overflow-wrap:anywhere]",
         footer ? "mt-auto pt-3" : "mt-2",
       )}
@@ -489,10 +491,10 @@ function WorkoutLabel({
   return (
     <span
       className={cn(
-        "hito-label inline-flex max-w-full min-w-0 items-center gap-1.5",
+        "hito-label-md inline-flex max-w-full min-w-0 items-center gap-1.5",
         muted && "line-through opacity-50",
       )}
-      style={{ color: workout.color }}
+      style={{ color: workout.contentColor ?? workout.color }}
     >
       <WorkoutGlyph kind={workout.glyph} className="hito-calendar-type-glyph" />
       <span className="truncate">{workout.short ?? workout.label}</span>
@@ -518,7 +520,13 @@ function StateLabel({
   }
 
   return (
-    <span className={cn("hito-label text-muted-foreground", dense && "text-[0.625rem]")}>
+    <span
+      className={
+        dense
+          ? "font-sans text-[0.625rem] font-semibold leading-[1.25] tracking-[0.01em] text-muted-foreground"
+          : "hito-label-md text-muted-foreground"
+      }
+    >
       {label ?? stateLabel(state, dense)}
     </span>
   );
@@ -583,7 +591,7 @@ function FeedbackMarker({
 function PendingMarker({ label }: { label: string }) {
   return (
     <span
-      className="hito-label inline-flex items-center gap-1 text-muted-foreground"
+      className="hito-label-md inline-flex items-center gap-1 text-muted-foreground"
       aria-label={label}
     >
       <Icon name="loader" size="xs" className="hito-motion-spinner text-muted-foreground/80" />

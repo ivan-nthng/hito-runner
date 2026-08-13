@@ -6,7 +6,7 @@
 
 ## Status
 
-in_progress
+completed
 
 ## Type
 
@@ -35,12 +35,13 @@ candidate and the existing linked production services.
 
 ## Stage
 
-Release preflight, intentional single `main` commit, hosted migration parity, Git-backed Vercel
-production deployment, and unauthenticated production smoke.
+Production release completed: exact approved candidate committed and pushed, hosted migration
+parity reached, exact-SHA Git-backed Vercel deployment READY, and unauthenticated production smoke
+passed.
 
 ## Next Recommended Role
 
-backend
+product
 
 ## Archive Intent
 
@@ -182,3 +183,99 @@ provider acceptance without testing it.
 - **Stop boundary:** Stop without fix-forward on candidate drift, a failed local gate, an unexpected
   hosted-only or missing migration, a linked-project mismatch, a Vercel Git SHA mismatch, or a
   failed parity/build/deployment gate.
+
+## Production Release Receipt — 2026-08-11
+
+### Task and result
+
+- **Task:** Publish the exact Global-QA-approved Hito candidate through the existing GitHub `main`,
+  linked Supabase project, and existing Vercel production project.
+- **Result:** Completed.
+- **Released commit:** `ee4fde5c1bda4a7cb5477bcf1a8ce90d9e50674d` with parent
+  `23d657b3003433a2a051b505fd48645fce6692ca` and tree
+  `6e678bc9af9bf2ccf7eb27fbd581dd9888ddeaa8`.
+- **Git state:** Local `main`, local `origin/main`, and remote `refs/heads/main` all resolved to the
+  released commit immediately after the push.
+- **Hosted target:** Existing linked Supabase project `dltfjwexyctmihclcjqj`.
+- **Production target:** Existing Vercel project `hito-runner`
+  (`prj_2vQ43bjCsO7JEbH1Ggv93avrUcyL`).
+
+### Candidate and mutation receipt
+
+The staged release contained exactly 94 paths: the 59 tracked-modified and 34 untracked paths in
+the restarted Global QA inventory, plus this release item. Before staging, the accepted tracked
+diff digest remained
+`541163cd31c01a62361936b5ba5209609e285609f2de6aab287df26e9b121e47`; the 33 untracked
+non-receipt files retained digest
+`59ae8f2fa21f89229051cd90550138b199685deaf07a11a199950969d60a7967`. The index was empty before
+the explicit path-by-path staging step, and no foreign path remained unstaged or untracked when the
+commit was created.
+
+The pre-push hosted inventory had 39 matched migrations, exactly
+`20260811125538_clear_calendar_future_workouts.sql` missing, and no hosted-only migration. A linked
+dry-run proposed only that migration. The normal linked `supabase db push` applied only that file;
+no seed, role file, raw SQL, reset, rollback, row shaping, data deletion, or function invocation was
+used. Post-application history is 40/40 with no missing or unknown version.
+
+The automatic Git deployment started before the required hosted migration step completed and
+failed at prebuild with only `missingHosted=20260811125538`. Its ID was
+`dpl_9sYK6Qp3chdDpRzNd37qqKM1TC1D`; logs proved it cloned `main@ee4fde5` and stopped before the
+application build. After linked 40/40 parity passed, the same Git-backed deployment was rebuilt in
+the existing production target without cache, source upload, configuration change, or alternate
+deployment path.
+
+The successful deployment is `dpl_Ak4V7GgdS2LNz7giARBkZv5c9RZX` at
+`https://hito-runner-lig3dmyzf-ivans-projects-133d4a2e.vercel.app`. Vercel API metadata reports
+`githubCommitSha=ee4fde5c1bda4a7cb5477bcf1a8ce90d9e50674d`, `githubCommitRef=main`, target
+`production`, and state `READY`. Its prebuild gate reported 40 migrations and canonical RPC
+`apply_reviewed_plan_persistence`; client, SSR, Nitro, and postbuild completed before production
+aliasing.
+
+### Validation inventory
+
+| Check                           | Scenario / environment                                   | Result                             | Evidence                                                                                                                         |
+| ------------------------------- | -------------------------------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Candidate freeze                | Local dirty `main` versus restarted Global QA inventory  | Passed                             | Exact 59 tracked and 34 QA untracked paths; accepted tracked and non-receipt digests matched; only this release record was added |
+| Local release gate              | Pre-staging checkout                                     | Passed                             | `git diff --check`; canonical RPC search; empty index; `HEAD == origin/main == remote main` at QA base                           |
+| Intentional commit              | Local `main`                                             | Passed                             | One 94-path commit `ee4fde5c1bda4a7cb5477bcf1a8ce90d9e50674d`; expected parent and tree; no branch or PR                         |
+| Git publication                 | GitHub `origin/main`                                     | Passed                             | Push advanced `23d657b` to `ee4fde5`; local, tracking, and remote refs matched the full SHA                                      |
+| Hosted delta discovery          | Linked Supabase before mutation                          | Passed                             | 39 matched; missing only `20260811125538`; unknown hosted versions none; dry-run named only that committed migration             |
+| Hosted migration                | Linked Supabase `dltfjwexyctmihclcjqj`                   | Passed                             | Normal linked push applied only `20260811125538`; no seeds, roles, raw SQL, reset, rollback, or data shaping                     |
+| Hosted parity                   | Linked history and canonical parity gate                 | Passed                             | 40/40, no missing/unknown; `npm run supabase:deployment:parity` returned `ok: true`                                              |
+| Early Git auto-deploy           | Vercel production before hosted push completed           | Failed as recorded sequencing race | `dpl_9sYK6Qp3chdDpRzNd37qqKM1TC1D` cloned exact SHA and failed only on missing `20260811125538` before build                     |
+| Exact-SHA production deployment | Existing Vercel project/Git artifact after hosted parity | Passed                             | `dpl_Ak4V7GgdS2LNz7giARBkZv5c9RZX`, exact full Git SHA, `main`, `production`, `READY`                                            |
+| Deployment parity/build         | Vercel build logs                                        | Passed                             | Server-visible gate reported canonical RPC and 40 migrations; client, SSR, Nitro, postbuild, and deployment completed            |
+| Public reachability             | Unauthenticated GET                                      | Passed                             | `https://www.hitocajon.com/` and `https://hito-runner.vercel.app/` both returned HTTP 200 HTML without redirect                  |
+| Deployment error scan           | Successful deployment, previous 30 minutes               | Passed                             | Deployment-scoped error-level and HTTP 5xx runtime queries returned no entries                                                   |
+
+### Preserved boundaries and omitted coverage
+
+- No source repair, migration rewrite, compatibility RPC, dependency, lockfile, provider,
+  environment, domain, project-setting, hosted reset/rollback, user-row shaping, destructive data
+  operation, branch, PR, dirty-local upload, force push, or release workaround was used.
+- The future-only Calendar persistence contract and canonical reviewed-plan RPC remain intact. The
+  migration installed the approved function/schema definition; the release did not invoke the
+  destructive Calendar action.
+- No authenticated production login, user workflow, provider/OpenAI call, production record
+  creation, FIT upload, or paid-provider acceptance was executed. Those behaviors are not claimed
+  by this release receipt.
+- No post-deploy browser matrix or Global QA rerun was performed. This receipt combines the prior
+  frozen local Global QA pass with hosted migration, deployment, public reachability, and
+  deployment-error evidence only.
+- Dependency advisories were not inspected or changed; dependency risk is outside this release.
+
+### Lifecycle and ownership
+
+- **Release state:** Completed.
+- **Global QA:** The pre-release frozen local candidate passed Global QA; no new Global QA claim is
+  inferred from deployment.
+- **Next owner:** Product may perform an ordinary authenticated production review. That review was
+  not performed by Backend.
+- **Role file:** `agents/backend.agent.md`.
+- **Skills used:** `skills/hito-backend-supabase-contract/SKILL.md`, the mandatory installed
+  Supabase procedure, and the Vercel Deployments & CI/CD procedure.
+- **Subagents used:** None.
+- **Receipt publication boundary:** The exact deployment ID and final hosted/deployment outcome did
+  not exist until after the single authorized release commit was pushed. This completed receipt is
+  therefore the sole local post-release change; no prohibited second commit, amend, or force push
+  was created.

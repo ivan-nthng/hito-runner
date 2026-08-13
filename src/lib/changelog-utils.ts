@@ -3,6 +3,29 @@ export interface ChangelogDay {
   entries: string[];
 }
 
+export type TechnicalLogPeriodKind = "day" | "month" | "range";
+
+export interface TechnicalLogPeriod {
+  kind: TechnicalLogPeriodKind;
+  source: string;
+  start: string;
+  end: string | null;
+  sortKey: string;
+}
+
+export interface TechnicalLogSection {
+  period: TechnicalLogPeriod;
+  title: string | null;
+  entries: string[];
+}
+
+export interface TechnicalLogMonth {
+  key: string;
+  year: string;
+  label: string;
+  sections: TechnicalLogSection[];
+}
+
 export interface ChangelogMonth {
   key: string;
   year: string;
@@ -66,8 +89,6 @@ export type HighlightCategory =
   | "body_notes"
   | "changelog";
 
-const MAX_HIGHLIGHTS_PER_DAY = 4;
-
 const CATEGORY_PREFIX_HIGHLIGHTS: Record<string, HighlightCategory> = {
   "Admin & Ops": "admin_ops",
   "Calendar & Workout Identity": "calendar_workout_identity",
@@ -116,6 +137,101 @@ export function parseChangelog(markdown: string): ChangelogDay[] {
     .sort((left, right) => right.date.localeCompare(left.date));
 }
 
+export function parseTechnicalLog(markdown: string): TechnicalLogSection[] {
+  const sections: TechnicalLogSection[] = [];
+  let current: TechnicalLogSection | null = null;
+
+  for (const line of markdown.split(/\r?\n/)) {
+    const headingMatch = line.match(
+      /^##\s+(\d{4}-\d{2}(?:-\d{2})?)(?:\s+(?:to|–)\s+(\d{4}-\d{2}))?(?:\s+—\s+(.+?))?\s*$/i,
+    );
+
+    if (headingMatch) {
+      const [, start, end, title] = headingMatch;
+      current = {
+        period: createTechnicalLogPeriod(start, end ?? null),
+        title: title?.trim() || null,
+        entries: [],
+      };
+      sections.push(current);
+      continue;
+    }
+
+    if (!current) {
+      continue;
+    }
+
+    const entryMatch = line.match(/^-\s+(.+)$/);
+
+    if (entryMatch) {
+      current.entries.push(entryMatch[1].trim());
+      continue;
+    }
+
+    const continuationMatch = line.match(/^\s{2,}(\S.*)$/);
+
+    if (continuationMatch && current.entries.length > 0) {
+      const previousEntryIndex = current.entries.length - 1;
+      current.entries[previousEntryIndex] =
+        `${current.entries[previousEntryIndex]} ${continuationMatch[1].trim()}`;
+    }
+  }
+
+  return sections
+    .filter((section) => section.entries.length > 0)
+    .sort((left, right) => right.period.sortKey.localeCompare(left.period.sortKey));
+}
+
+export function groupTechnicalLogByMonth(sections: TechnicalLogSection[]): TechnicalLogMonth[] {
+  const monthMap = new Map<string, TechnicalLogSection[]>();
+
+  for (const section of sections) {
+    const key = section.period.start.slice(0, 7);
+    const monthSections = monthMap.get(key) ?? [];
+    monthSections.push(section);
+    monthMap.set(key, monthSections);
+  }
+
+  return Array.from(monthMap.entries())
+    .sort(([left], [right]) => right.localeCompare(left))
+    .map(([key, monthSections]) => ({
+      key,
+      year: formatYearLabel(key),
+      label: formatMonthLabel(key),
+      sections: monthSections.sort((left, right) =>
+        right.period.sortKey.localeCompare(left.period.sortKey),
+      ),
+    }));
+}
+
+export function getTechnicalLogEntryCount(sections: TechnicalLogSection[]) {
+  return sections.reduce((total, section) => total + section.entries.length, 0);
+}
+
+export function getTechnicalLogLastUpdated(markdown: string) {
+  return markdown.match(/^Last Updated:\s*(\d{4}-\d{2}-\d{2})\s*$/m)?.[1] ?? null;
+}
+
+function createTechnicalLogPeriod(start: string, end: string | null): TechnicalLogPeriod {
+  if (end) {
+    return {
+      kind: "range",
+      source: `${start} to ${end}`,
+      start,
+      end,
+      sortKey: end,
+    };
+  }
+
+  return {
+    kind: start.length === 10 ? "day" : "month",
+    source: start,
+    start,
+    end: null,
+    sortKey: start,
+  };
+}
+
 export function getChangelogEntryCount(months: ChangelogMonth[]) {
   return months.reduce(
     (total, month) =>
@@ -154,37 +270,16 @@ export function getHighlightMonths(days: ChangelogDay[]): ChangelogHighlightMont
 }
 
 function getHighlightsForDay(day: ChangelogDay): ChangelogHighlight[] {
-  const seenCategories = new Set<string>();
-
-  const highlights = day.entries
-    .map(getHighlightPresentation)
-    .filter((highlight): highlight is ChangelogHighlight => highlight !== null)
-    .filter((highlight) => {
-      const key = highlight.category ?? `${highlight.badge}:${highlight.title}`;
-      if (seenCategories.has(key)) {
-        return false;
-      }
-
-      seenCategories.add(key);
-      return true;
-    })
-    .slice(0, MAX_HIGHLIGHTS_PER_DAY);
-
-  if (highlights.length > 0) {
-    return highlights;
-  }
-
-  return [
-    {
-      badge: "Behind the scenes",
-      title: "Implementation updates",
-      body: `${day.entries.length} implementation ${
-        day.entries.length === 1 ? "update shipped" : "updates shipped"
-      } on ${formatFullDate(day.date)}. See Technical log for the full source entry.`,
-      sourceEntry: null,
-      isFallback: true,
-    },
-  ];
+  return day.entries.map(
+    (entry) =>
+      getHighlightPresentation(entry) ?? {
+        badge: "Improved",
+        title: "Product update",
+        body: entry,
+        sourceEntry: entry,
+        isFallback: true,
+      },
+  );
 }
 
 function getHighlightPresentation(entry: string): ChangelogHighlight | null {

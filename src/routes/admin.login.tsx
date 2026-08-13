@@ -44,13 +44,13 @@ function AdminLoginPage() {
           <div className="flex flex-col justify-center gap-8">
             <div className="grid justify-items-start gap-3">
               <HitoLogo className="[--hito-logo-height:2.35rem] lg:[--hito-logo-height:3.25rem]" />
-              <p className="hito-label text-muted-foreground">Admin</p>
+              <p className="hito-label-md text-muted-foreground">Admin</p>
             </div>
             <div className="space-y-4">
-              <p className="max-w-sm text-lg text-foreground/92">
+              <p className="hito-body-lg max-w-sm text-foreground/92">
                 Sign in to view internal analytics and local test-account tools.
               </p>
-              <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
+              <p className="hito-body-md max-w-sm text-muted-foreground">
                 Admin access is separate from runner login and is limited to the configured owner
                 admin account.
               </p>
@@ -59,14 +59,14 @@ function AdminLoginPage() {
 
           <div className="hito-auth-alpha-surface hito-surface-flat p-5 lg:p-6">
             <div>
-              <h1 className="hito-modal-title">Admin sign-in</h1>
-              <p className="hito-body mt-3 text-muted-foreground">Open admin analytics</p>
+              <h1 className="hito-ui-title-md">Admin sign-in</h1>
+              <p className="hito-body-md mt-3 text-muted-foreground">Open admin analytics</p>
             </div>
 
             <form method="post" action={formAction} className="mt-6 grid gap-5">
               <input type="hidden" name="next" value={next} />
               <label className="grid gap-2">
-                <span className="hito-label">Username or email</span>
+                <span className="hito-label-md">Username or email</span>
                 <input
                   type="text"
                   name="identifier"
@@ -77,7 +77,7 @@ function AdminLoginPage() {
                 />
               </label>
               <label className="grid gap-2">
-                <span className="hito-label">Password</span>
+                <span className="hito-label-md">Password</span>
                 <div className="relative">
                   <input
                     type={passwordVisible ? "text" : "password"}
@@ -104,7 +104,7 @@ function AdminLoginPage() {
                 Sign in to admin
               </button>
               {statusMessage ? (
-                <p className="hito-field-error flex items-start gap-2">
+                <p className="hito-body-md flex items-start gap-2 font-medium text-negative">
                   <Icon name="warning" size="xs" className="mt-0.5" />
                   {statusMessage}
                 </p>

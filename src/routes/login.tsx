@@ -45,15 +45,15 @@ function LoginPage() {
       <AppShell snapshot={snapshot} viewer={viewer}>
         <div className="hito-route-gutter py-10">
           <section className="hito-surface max-w-3xl p-6 lg:p-10">
-            <p className="hito-micro-label">
+            <p className="hito-label-sm">
               {snapshot.mode === "authenticated" ? "Saved mode" : "Setup required"}
             </p>
-            <h1 className="hito-modal-title mt-3">
+            <h1 className="hito-ui-title-md mt-3">
               {snapshot.mode === "authenticated"
                 ? "You’re already signed in."
                 : "You’re signed in. Create your plan next."}
             </h1>
-            <p className="hito-body mt-4 max-w-xl text-muted-foreground">
+            <p className="hito-body-md mt-4 max-w-xl text-muted-foreground">
               {snapshot.mode === "authenticated"
                 ? "Your profile, plan, and workout results are already saved."
                 : "Your account is ready. Go home and describe your goal to create your plan."}
@@ -64,13 +64,13 @@ function LoginPage() {
               </Link>
               <Link
                 to={search.next}
-                className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                className="hito-body-md text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
               >
                 Return to {nextLabel}
               </Link>
               <a
                 href="/api/auth/logout?next=%2F"
-                className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                className="hito-body-md text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
               >
                 Sign out
               </a>

@@ -53,15 +53,15 @@ export function HitoDsOverviewPage() {
   return (
     <>
       <header id="overview" className="hito-page-header pt-8">
-        <p className="hito-label hito-label-signal">Hito design system</p>
-        <h1 className="hito-page-title">Live product building blocks.</h1>
-        <p className="hito-page-copy max-w-2xl">
+        <p className="hito-label-md hito-label-signal">Hito design system</p>
+        <h1 className="hito-ui-title-xl">Live product building blocks.</h1>
+        <p className="hito-body-md mt-4 text-secondary max-w-2xl">
           Explore the canonical controls and compositions used to build Hito, grouped by the job
           they do and linked to their complete interactive reference.
         </p>
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <HitoMetadataTag tone="warning">Figma URL awaiting approval</HitoMetadataTag>
-          <span className="hito-caption">
+          <span className="hito-body-xs text-tertiary">
             The external Hito Running Library link appears here only after its exact URL is
             confirmed.
           </span>
@@ -71,7 +71,7 @@ export function HitoDsOverviewPage() {
       <div id="showroom" className="grid gap-12 pt-10">
         <ShowcaseGroup title="Action">
           <ShowcaseCard title="Button & grouped actions" href="/hitoDS/components#buttons">
-            <div className="grid content-center gap-3">
+            <div className="grid content-center justify-self-center self-center gap-3">
               <div className="flex min-w-0 flex-col items-center gap-2 sm:flex-row sm:justify-center">
                 <HitoButton
                   size="sm"
@@ -87,13 +87,13 @@ export function HitoDsOverviewPage() {
                   Next
                 </HitoButton>
               </div>
-              <p className="hito-caption text-center" role="status">
+              <p className="hito-body-xs text-tertiary text-center" role="status">
                 Selected action: {actionState}
               </p>
             </div>
           </ShowcaseCard>
           <ShowcaseCard title="Dropdown / Menu" href="/hitoDS/components#dropdowns">
-            <div className="flex h-full items-center justify-center">
+            <div className="flex items-center justify-center justify-self-center self-center">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <HitoButton size="sm" variant="secondary">
@@ -113,7 +113,7 @@ export function HitoDsOverviewPage() {
 
         <ShowcaseGroup title="Data Input">
           <ShowcaseCard title="Field & Date-Time" href="/hitoDS/components#inputs">
-            <div className="grid gap-4">
+            <div className="grid w-full max-w-sm justify-self-center self-center gap-4">
               <Input
                 type="search"
                 variant="primary"
@@ -133,17 +133,19 @@ export function HitoDsOverviewPage() {
             title="Selection Controls & Slider"
             href="/hitoDS/components#selection-controls"
           >
-            <div className="grid gap-5">
-              <SelectionControlPreview
-                kind="toggle"
-                size="sm"
-                selected={selectionValue}
-                onSelectedChange={setSelectionValue}
-                disabled={false}
-                invalid={false}
-                focusDemo={false}
-                cardMode={false}
-              />
+            <div className="grid w-full self-center gap-5">
+              <div className="justify-self-center">
+                <SelectionControlPreview
+                  kind="toggle"
+                  size="sm"
+                  selected={selectionValue}
+                  onSelectedChange={setSelectionValue}
+                  disabled={false}
+                  invalid={false}
+                  focusDemo={false}
+                  cardMode={false}
+                />
+              </div>
               <HitoSlider
                 id="hito-ds-overview-slider"
                 label="Effort"
@@ -161,7 +163,11 @@ export function HitoDsOverviewPage() {
 
         <ShowcaseGroup title="Feedback & Status">
           <ShowcaseCard title="Banner / Notice Surface" href="/hitoDS/patterns#notice-surface">
-            <div className="hito-state-surface py-3" data-tone="signal" role="status">
+            <div
+              className="hito-state-surface w-full max-w-md justify-self-center self-center py-3"
+              data-tone="signal"
+              role="status"
+            >
               <p className="hito-list-row-title">Plan ready to review</p>
               <p className="hito-list-row-copy">
                 Route-level guidance stays visible until its state changes.
@@ -169,7 +175,7 @@ export function HitoDsOverviewPage() {
             </div>
           </ShowcaseCard>
           <ShowcaseCard title="Status & Async Toast" href="/hitoDS/components#async-actions">
-            <div className="flex h-full min-w-0 flex-wrap items-center justify-center gap-3">
+            <div className="flex min-w-0 flex-wrap items-center justify-center justify-self-center self-center gap-3">
               <HitoMetadataTag tone="success">Reviewed</HitoMetadataTag>
               <HitoButton
                 size="sm"
@@ -188,28 +194,30 @@ export function HitoDsOverviewPage() {
         </ShowcaseGroup>
 
         <ShowcaseGroup title="Layout">
-          <ShowcaseCard title="App Shell" href="/hitoDS/components#app-shell">
-            <div className="grid min-w-0 grid-cols-[5.5rem_minmax(0,1fr)] overflow-hidden rounded-xl border border-hairline">
+          <ShowcaseCard title="App Shell" href="/hitoDS/patterns#app-shell">
+            <div className="grid w-full min-w-0 self-center grid-cols-[5.5rem_minmax(0,1fr)] overflow-hidden rounded-xl border border-hairline">
               <div className="grid content-start gap-3 border-r border-hairline bg-sidebar p-3 text-sidebar-foreground">
                 <HitoLogoMark decorative className="[--hito-logo-height:1.2rem]" />
-                <span className="hito-caption text-sidebar-foreground">Calendar</span>
-                <span className="hito-caption text-sidebar-foreground/60">Progress</span>
+                <span className="hito-body-xs text-tertiary text-sidebar-foreground">Calendar</span>
+                <span className="hito-body-xs text-tertiary text-sidebar-foreground/60">
+                  Progress
+                </span>
               </div>
               <div className="grid min-w-0 gap-3 p-4">
-                <p className="hito-micro-label">Route content</p>
+                <p className="hito-label-sm text-tertiary">Route content</p>
                 <p className="hito-list-row-title">Training week</p>
                 <div className="h-12 rounded-lg bg-foreground/5" aria-hidden="true" />
               </div>
             </div>
           </ShowcaseCard>
           <ShowcaseCard title="Surface & Row" href="/hitoDS/components#rows">
-            <div className="hito-row-group">
+            <div className="hito-row-group w-full self-center">
               <div className="hito-list-row">
                 <div>
                   <p className="hito-list-row-title">Workout summary</p>
                   <p className="hito-list-row-copy">One title and one calm helper.</p>
                 </div>
-                <span className="hito-caption">Planned</span>
+                <span className="hito-body-xs text-tertiary">Planned</span>
               </div>
             </div>
           </ShowcaseCard>
@@ -217,7 +225,7 @@ export function HitoDsOverviewPage() {
 
         <ShowcaseGroup title="Navigation">
           <ShowcaseCard title="Tabs" href="/hitoDS/components#tabs">
-            <div>
+            <div className="w-full self-center">
               <div className="hito-tabs hito-tabs-simple" {...overviewTabs.tabListProps}>
                 {OVERVIEW_TABS.map((tab) => (
                   <button
@@ -232,13 +240,16 @@ export function HitoDsOverviewPage() {
                   </button>
                 ))}
               </div>
-              <div {...overviewTabs.getPanelProps(activeTab)} className="hito-caption mt-4">
+              <div
+                {...overviewTabs.getPanelProps(activeTab)}
+                className="hito-body-xs text-tertiary mt-4"
+              >
                 {activeTab} view selected.
               </div>
             </div>
           </ShowcaseCard>
-          <ShowcaseCard title="Shell Navigation" href="/hitoDS/components#app-shell">
-            <div className="hito-shell-nav max-w-xs">
+          <ShowcaseCard title="Shell Navigation" href="/hitoDS/patterns#app-shell">
+            <div className="hito-shell-nav w-full max-w-xs justify-self-center self-center">
               <div className="hito-shell-nav-row" data-active="true">
                 <Icon name="calendar" className="hito-shell-nav-icon" />
                 <span>Calendar</span>
@@ -254,7 +265,7 @@ export function HitoDsOverviewPage() {
 
         <ShowcaseGroup title="Overlay">
           <ShowcaseCard title="Dialog / Sheet" href="/hitoDS/components#modals">
-            <div className="flex h-full min-w-0 flex-wrap items-center justify-center gap-2">
+            <div className="flex min-w-0 flex-wrap items-center justify-center justify-self-center self-center gap-2">
               <Dialog>
                 <DialogTrigger asChild>
                   <HitoButton size="sm" variant="primary">
@@ -288,7 +299,7 @@ export function HitoDsOverviewPage() {
             </div>
           </ShowcaseCard>
           <ShowcaseCard title="Tooltip" href="/hitoDS/patterns#tooltip">
-            <div className="flex h-full items-center justify-center">
+            <div className="flex items-center justify-center justify-self-center self-center">
               <TooltipProvider delayDuration={120}>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -305,9 +316,9 @@ export function HitoDsOverviewPage() {
 
         <ShowcaseGroup title="Table & List">
           <ShowcaseCard title="Data Table & Headers" href="/hitoDS/components#data-table">
-            <div className="grid min-w-0 gap-5">
+            <div className="grid w-full min-w-0 self-center gap-5">
               <div className="grid min-w-0 gap-2">
-                <p className="hito-micro-label">Interactive header</p>
+                <p className="hito-label-sm text-tertiary">Interactive header</p>
                 <DataTableSpecimenPreview
                   sortable
                   activeSort
@@ -317,7 +328,7 @@ export function HitoDsOverviewPage() {
                 />
               </div>
               <div className="grid min-w-0 gap-2 border-t border-hairline pt-5">
-                <p className="hito-micro-label">Static header</p>
+                <p className="hito-label-sm text-tertiary">Static header</p>
                 <DataTableSpecimenPreview
                   sortable={false}
                   activeSort={false}
@@ -329,7 +340,7 @@ export function HitoDsOverviewPage() {
             </div>
           </ShowcaseCard>
           <ShowcaseCard title="Rows & Disclosure" href="/hitoDS/components#rows">
-            <details className="hito-disclosure" open>
+            <details className="hito-disclosure w-full self-center" open>
               <summary className="hito-disclosure-summary">
                 <span className="hito-list-row-title">Advanced options</span>
                 <Icon name="chevron-down" className="hito-disclosure-chevron" decorative />
@@ -376,7 +387,7 @@ function ShowcaseGroup({ title, children }: { title: string; children: ReactNode
     <section aria-labelledby={`showcase-${title.toLowerCase().replaceAll(/[^a-z]+/g, "-")}`}>
       <h2
         id={`showcase-${title.toLowerCase().replaceAll(/[^a-z]+/g, "-")}`}
-        className="hito-ui-section-title"
+        className="hito-ui-title-sm"
       >
         {title}
       </h2>
@@ -410,7 +421,7 @@ function ShowcaseCard({
           </a>
         </HitoButton>
       </div>
-      <div className="grid min-h-64 min-w-0 pt-5">{children}</div>
+      <div className="grid min-h-64 min-w-0 content-center pt-5">{children}</div>
     </article>
   );
 }

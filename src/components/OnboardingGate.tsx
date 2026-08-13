@@ -356,8 +356,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   return (
     <section className="hito-onboarding-surface">
       <div className="max-w-3xl">
-        <h1 className="hito-ui-page-title">Choose how to start your plan.</h1>
-        <p className="hito-body mt-4 text-muted-foreground">
+        <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">Choose how to start your plan.</h1>
+        <p className="hito-body-md mt-4 text-muted-foreground">
           Add the basics once, then choose a training distance or open an empty manual calendar.
         </p>
       </div>
@@ -477,7 +477,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
                 </div>
               ) : (
                 <div className="pt-6">
-                  <p className="hito-body text-center text-foreground/85">
+                  <p className="hito-body-md text-center text-foreground/85">
                     Create workouts independently, or use a workout from a coach or friend.
                   </p>
                 </div>
@@ -495,7 +495,9 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
                 <div className="min-w-0">
                   <p
                     className={
-                      footerHint.tone === "error" ? "hito-field-error" : "hito-field-helper"
+                      footerHint.tone === "error"
+                        ? "hito-body-md font-medium text-negative"
+                        : "hito-body-xs text-secondary"
                     }
                     role={
                       selectedPreviewIsReady && !selectedPlanPreview.previewOpen
@@ -535,7 +537,13 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
             ) : (
               <>
                 <div className="min-w-0">
-                  <p className={manualCreateError ? "hito-field-error" : "hito-field-helper"}>
+                  <p
+                    className={
+                      manualCreateError
+                        ? "hito-body-md font-medium text-negative"
+                        : "hito-body-xs text-secondary"
+                    }
+                  >
                     {manualCreateError ?? "Your saved runner baseline will be used for this plan."}
                   </p>
                 </div>

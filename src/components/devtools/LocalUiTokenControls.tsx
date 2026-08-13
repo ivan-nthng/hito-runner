@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
 import type {
+  InlineChangeColorChannelId,
+  InlineChangeColorControlInput,
   InlineChangeTokenControlId,
   InlineChangeTokenControlInput,
 } from "@/components/devtools/local-inline-change-target-utils";
 import { getIsTokenControlActive } from "@/components/devtools/local-ui-task-draft-view-model";
 import {
+  ColorSwatch,
+  ColorValueSelect,
   PendingChangeRemoveButton,
   ValueSelect,
   ValueTag,
@@ -20,7 +24,7 @@ export function TokenControlRows({
   controls: InlineChangeTokenControlInput[];
   desiredTokens: Record<string, string>;
   onPendingChangeRemove: (controlIds: InlineChangeTokenControlId[]) => void;
-  onDesiredTokenChange: (controlId: string, token: string) => void;
+  onDesiredTokenChange: (controlIds: InlineChangeTokenControlId[], token: string) => void;
 }) {
   const groups = buildTokenControlGroups(controls);
 
@@ -39,6 +43,146 @@ export function TokenControlRows({
   );
 }
 
+export function ColorControlRows({
+  controls,
+  desiredTokens,
+  onDesiredColorChange,
+}: {
+  controls: InlineChangeColorControlInput[];
+  desiredTokens: Record<string, string>;
+  onDesiredColorChange: (controlId: InlineChangeColorChannelId, value: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const isGrouped = controls.length > 1;
+
+  if (controls.length === 0) return null;
+
+  if (!isGrouped) {
+    const control = controls[0];
+    return control ? (
+      <ColorControlLine
+        control={control}
+        desiredValue={desiredTokens[control.id] ?? null}
+        onDesiredColorChange={onDesiredColorChange}
+      />
+    ) : null;
+  }
+
+  return (
+    <div className="grid min-w-0 gap-1 py-0.5" data-local-ui-property-control-row="color">
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="grid size-5 shrink-0 place-items-center text-muted-foreground">
+          <Icon name="color" size="xs" />
+        </span>
+        <span className="hito-body-xs min-w-0 flex-1 truncate text-foreground">Color</span>
+        <button
+          type="button"
+          className="hito-button hito-button-ghost hito-button-xs size-5 min-h-5 shrink-0 rounded-sm px-0 text-muted-foreground hover:text-foreground"
+          aria-label="Show color channels"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((current) => !current)}
+        >
+          <Icon
+            name="chevron-down"
+            size="xs"
+            className={`transition-transform ${expanded ? "rotate-180" : ""}`}
+          />
+        </button>
+      </div>
+      {expanded ? (
+        <div className="grid min-w-0 gap-1 rounded-lg bg-muted p-1">
+          {controls.map((control) => (
+            <ColorControlLine
+              compact
+              control={control}
+              desiredValue={desiredTokens[control.id] ?? null}
+              key={control.id}
+              onDesiredColorChange={onDesiredColorChange}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ColorControlLine({
+  compact = false,
+  control,
+  desiredValue,
+  onDesiredColorChange,
+}: {
+  compact?: boolean;
+  control: InlineChangeColorControlInput;
+  desiredValue: string | null;
+  onDesiredColorChange: (controlId: InlineChangeColorChannelId, value: string) => void;
+}) {
+  const isActive = Boolean(desiredValue);
+  const currentDetail = getCurrentColorDetail(control);
+
+  return (
+    <div
+      className={`grid min-w-0 gap-1 ${compact ? "pl-6" : ""}`}
+      data-local-ui-property-control-row={`color-${control.id}`}
+    >
+      <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          {!compact ? (
+            <span className="grid size-5 shrink-0 place-items-center text-muted-foreground">
+              <Icon name="color" size="xs" />
+            </span>
+          ) : null}
+          <span className="hito-body-xs min-w-0 truncate text-foreground">{control.label}</span>
+        </div>
+        {isActive ? (
+          <>
+            <span className="flex min-w-0 shrink items-center gap-1" title={currentDetail}>
+              <ColorSwatch alphaPercent={control.alphaPercent} color={control.currentColor} />
+              <ValueTag
+                tone={control.currentToken ? "available" : "neutral"}
+                tooltip={currentDetail}
+                value={control.currentLabel}
+              />
+            </span>
+            <Icon name="arrow-right" size="xs" className="shrink-0 text-muted-foreground" />
+            <div className="group relative shrink-0">
+              <ColorValueSelect
+                ariaLabel={`${control.label} desired color`}
+                control={control}
+                desiredValue={desiredValue}
+                onValueChange={(value) => onDesiredColorChange(control.id, value)}
+              />
+              <PendingChangeRemoveButton
+                ariaLabel={`Clear ${control.label.toLowerCase()} color pending request`}
+                onClick={() => onDesiredColorChange(control.id, "__keep")}
+              />
+            </div>
+          </>
+        ) : (
+          <ColorValueSelect
+            ariaLabel={`${control.label} desired color`}
+            control={control}
+            desiredValue={null}
+            onValueChange={(value) => onDesiredColorChange(control.id, value)}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function getCurrentColorDetail(control: InlineChangeColorControlInput) {
+  return [
+    control.currentLabel,
+    control.currentToken?.cssVariable,
+    control.currentToken?.source ? `source ${control.currentToken.source}` : null,
+    control.currentHex,
+    `alpha ${control.alphaPercent}%`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 function TokenControlGroupRow({
   desiredTokens,
   group,
@@ -47,7 +191,7 @@ function TokenControlGroupRow({
 }: {
   desiredTokens: Record<string, string>;
   group: TokenControlGroup;
-  onDesiredTokenChange: (controlId: string, token: string) => void;
+  onDesiredTokenChange: (controlIds: InlineChangeTokenControlId[], token: string) => void;
   onPendingChangeRemove: (controlIds: InlineChangeTokenControlId[]) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -90,14 +234,12 @@ function TokenControlGroupRow({
         iconName={group.iconName}
         isActive={isActive}
         label={group.label}
-        onDesiredTokenChange={(token) => {
-          controlIds.forEach((controlId) => onDesiredTokenChange(controlId, token));
-        }}
+        onDesiredTokenChange={(token) => onDesiredTokenChange(controlIds, token)}
         onExpandedChange={group.controls.length > 1 ? setExpanded : undefined}
         onPendingChangeRemove={() => onPendingChangeRemove(controlIds)}
       />
       {group.controls.length > 1 && expanded ? (
-        <div className="ml-2 grid min-w-0 gap-1 rounded-md border border-hairline bg-surface/35 p-1">
+        <div className="grid min-w-0 gap-1 rounded-lg bg-muted p-1">
           {group.controls.map((sideControl) => (
             <PropertyControlLine
               compact
@@ -113,7 +255,7 @@ function TokenControlGroupRow({
               isActive={getIsTokenControlActive(sideControl, desiredTokens[sideControl.id])}
               key={sideControl.id}
               label={sideControl.label}
-              onDesiredTokenChange={(token) => onDesiredTokenChange(sideControl.id, token)}
+              onDesiredTokenChange={(token) => onDesiredTokenChange([sideControl.id], token)}
               onPendingChangeRemove={() => onPendingChangeRemove([sideControl.id])}
             />
           ))}
@@ -166,7 +308,7 @@ function PropertyControlLine({
               <Icon name={iconName} size="xs" />
             </span>
           ) : null}
-          <span className="hito-caption min-w-0 truncate text-foreground">{label}</span>
+          <span className="hito-body-xs min-w-0 truncate text-foreground">{label}</span>
           {onExpandedChange ? (
             <button
               type="button"

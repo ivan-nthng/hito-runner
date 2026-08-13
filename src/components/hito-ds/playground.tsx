@@ -75,26 +75,26 @@ export function HitoDsPlayground({
     <section id={id} className="ds-section hito-ds-playground-section">
       <div className="hito-specimen-header">
         <div className="max-w-3xl">
-          <p className="hito-micro-label">Component</p>
-          <h2 className="hito-section-title mt-2">{label}</h2>
-          <p className="hito-body-small mt-3">{description.purpose}</p>
+          <p className="hito-label-sm text-tertiary">Component</p>
+          <h2 className="hito-ui-title-sm mt-2">{label}</h2>
+          <p className="hito-body-sm text-secondary mt-3">{description.purpose}</p>
           <dl className="mt-4 grid gap-3 sm:grid-cols-2">
             <div>
-              <dt className="hito-micro-label">Use when</dt>
+              <dt className="hito-label-sm text-tertiary">Use when</dt>
               <dd className="hito-list-row-copy mt-1">{description.useWhen}</dd>
             </div>
             <div>
-              <dt className="hito-micro-label">Avoid when</dt>
+              <dt className="hito-label-sm text-tertiary">Avoid when</dt>
               <dd className="hito-list-row-copy mt-1">{description.avoidWhen}</dd>
             </div>
             <div className="sm:col-span-2">
-              <dt className="hito-micro-label">Interaction & accessibility</dt>
+              <dt className="hito-label-sm text-tertiary">Interaction & accessibility</dt>
               <dd className="hito-list-row-copy mt-1">{description.accessibility}</dd>
             </div>
           </dl>
           {usedIn ? (
             <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="hito-micro-label">Used in</span>
+              <span className="hito-label-sm text-tertiary">Used in</span>
               <div className="hito-list-row-copy">{usedIn}</div>
             </div>
           ) : null}

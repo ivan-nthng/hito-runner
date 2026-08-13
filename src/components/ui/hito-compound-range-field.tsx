@@ -84,7 +84,7 @@ export function HitoCompoundRangeField({
 
   return (
     <div className={cn("hito-compound-range-field", className)}>
-      <span id={labelId} className="hito-form-label">
+      <span id={labelId} className="hito-label-md">
         {label}
       </span>
       <div
@@ -112,7 +112,10 @@ export function HitoCompoundRangeField({
           onChange={(event) => onLowerValueChange(event.target.value)}
           onKeyDown={(event) => handleEndpointKeyDown(event, "lower")}
         />
-        <span className="hito-caption hito-compound-range-separator" aria-hidden="true">
+        <span
+          className="hito-body-xs hito-compound-range-separator text-tertiary"
+          aria-hidden="true"
+        >
           –
         </span>
         <input
@@ -133,7 +136,7 @@ export function HitoCompoundRangeField({
           onChange={(event) => onUpperValueChange(event.target.value)}
           onKeyDown={(event) => handleEndpointKeyDown(event, "upper")}
         />
-        <span className="hito-caption hito-compound-range-unit" aria-hidden="true">
+        <span className="hito-body-xs hito-compound-range-unit text-tertiary" aria-hidden="true">
           {unit}
         </span>
       </div>

@@ -235,17 +235,19 @@ export function CalendarOverflowActions({
           }}
         >
           <DialogHeader className="hito-product-dialog-header">
-            <DialogTitle className="hito-ui-modal-title">
+            <DialogTitle className="hito-ui-title-md text-foreground">
               {pendingAction === "start" ? "Start a new plan?" : "Delete future workouts?"}
             </DialogTitle>
-            <DialogDescription className="hito-body">
+            <DialogDescription className="hito-body-md text-secondary">
               {pendingAction === "start"
                 ? "Eligible upcoming workouts will be removed before plan creation opens."
                 : "This removes eligible upcoming Calendar workouts."}
             </DialogDescription>
           </DialogHeader>
           <div className="hito-product-dialog-body">
-            <p className="hito-body">Past workouts, results, and FIT records are not touched.</p>
+            <p className="hito-body-md text-secondary">
+              Past workouts, results, and FIT records are not touched.
+            </p>
           </div>
           <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
             <HitoButton

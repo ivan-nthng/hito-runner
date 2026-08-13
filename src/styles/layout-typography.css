@@ -1,31 +1,85 @@
 :root {
-  /* Layout composition geometry stays with its component owner and is not exportable DS foundation. */
-  --hito-route-support-sidebar-width: 20rem;
-  --hito-route-panel-skeleton-calendar-height: 26.25rem;
-  --hito-route-panel-skeleton-detail-height: 28.75rem;
-  --hito-form-section-label-width: 13.75rem;
+  /* Shared avatar/form geometry has consumers in this layout owner and shell/admin composition. */
   --hito-form-section-avatar-width: 7rem;
-  --hito-readback-value-width: 12rem;
-  --hito-readback-value-compact-width: 11rem;
 }
 
 @layer components {
-  .hito-label {
-    --hito-typography-role: label;
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-    line-height: 1.25;
-    text-transform: none;
-    color: var(--color-foreground);
+  .hito-icon {
+    display: inline-block;
+    color: currentColor;
+    vector-effect: non-scaling-stroke;
   }
 
-  .hito-label-signal {
-    color: var(--color-text-accent);
+  .hito-logo,
+  .hito-logo-mark {
+    --hito-logo-height: 1.6rem;
+    display: inline-block;
+    width: var(--hito-logo-width);
+    height: var(--hito-logo-height);
+    flex: 0 0 auto;
+    color: currentColor;
   }
 
-  .hito-display-title {
-    --hito-typography-role: display-title;
+  .hito-logo {
+    --hito-logo-width: calc(var(--hito-logo-height) * 2.05);
+  }
+
+  .hito-logo-mark {
+    --hito-logo-width: calc(var(--hito-logo-height) * 1.0167);
+  }
+
+  .hito-ui-title-xl {
+    --hito-typography-role: ui-title-xl;
+    font-family: var(--font-sans);
+    font-size: clamp(3rem, 6vw, 4.5rem);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    text-wrap: balance;
+  }
+
+  .hito-ui-title-lg {
+    --hito-typography-role: ui-title-lg;
+    font-family: var(--font-sans);
+    font-size: clamp(2.25rem, 5vw, 3rem);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    text-wrap: balance;
+  }
+
+  .hito-ui-title-md {
+    --hito-typography-role: ui-title-md;
+    font-family: var(--font-sans);
+    font-size: clamp(1.75rem, 5vw, 2rem);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    text-wrap: balance;
+  }
+
+  .hito-ui-title-sm {
+    --hito-typography-role: ui-title-sm;
+    font-family: var(--font-sans);
+    font-size: 1.5rem;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+
+  .hito-ui-title-xs {
+    --hito-typography-role: ui-title-xs;
+    font-family: var(--font-sans);
+    font-size: clamp(1.25rem, 3vw, 1.375rem);
+    font-weight: 400;
+    letter-spacing: -0.015em;
+    line-height: 1.18;
+    text-wrap: balance;
+  }
+
+  .hito-display-title-xl {
+    --hito-typography-role: display-title-xl;
     font-family: var(--font-display);
     font-size: clamp(3.5rem, 7vw, 5rem);
     font-feature-settings: "ss01";
@@ -33,6 +87,86 @@
     letter-spacing: -0.02em;
     line-height: 1;
     text-wrap: balance;
+  }
+
+  .hito-display-title-lg {
+    --hito-typography-role: display-title-lg;
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 6vw, 4.5rem);
+    font-feature-settings: "ss01";
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    text-wrap: balance;
+  }
+
+  .hito-body-lg {
+    --hito-typography-role: body-lg;
+    font-family: var(--font-sans);
+    font-size: 1.125rem;
+    font-weight: 400;
+    line-height: 1.55;
+    text-wrap: pretty;
+  }
+
+  .hito-body-md {
+    --hito-typography-role: body-md;
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    font-weight: 400;
+    line-height: 1.58;
+    text-wrap: pretty;
+  }
+
+  .hito-body-sm {
+    --hito-typography-role: body-sm;
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    font-weight: 400;
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+
+  .hito-body-xs {
+    --hito-typography-role: body-xs;
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.45;
+    text-wrap: pretty;
+  }
+
+  .hito-label-md {
+    --hito-typography-role: label-md;
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1.25;
+    text-transform: none;
+  }
+
+  .hito-label-sm {
+    --hito-typography-role: label-sm;
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    line-height: 1.25;
+    text-transform: none;
+  }
+
+  .hito-technical-sm {
+    --hito-typography-role: technical-sm;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 400;
+    line-height: 1.45;
+  }
+
+  .hito-label-signal {
+    color: var(--color-text-accent);
   }
 
   .hito-route-stack {
@@ -82,15 +216,15 @@
   }
 
   .hito-route-panel-skeleton-calendar {
-    height: var(--hito-route-panel-skeleton-calendar-height);
+    height: 26.25rem;
   }
 
   .hito-route-panel-skeleton-detail {
-    height: var(--hito-route-panel-skeleton-detail-height);
+    height: 28.75rem;
   }
 
   .hito-readback-value {
-    max-width: var(--hito-readback-value-width);
+    max-width: 12rem;
     text-align: right;
     font-size: 0.75rem;
     line-height: 1.625;
@@ -98,7 +232,7 @@
   }
 
   .hito-readback-value-compact {
-    max-width: var(--hito-readback-value-compact-width);
+    max-width: 11rem;
     line-height: 1.333;
   }
 
@@ -119,7 +253,7 @@
 
   @media (min-width: 768px) {
     .hito-form-section-grid {
-      grid-template-columns: var(--hito-form-section-label-width) minmax(0, 1fr);
+      grid-template-columns: 13.75rem minmax(0, 1fr);
       column-gap: 3rem;
     }
 
@@ -138,7 +272,7 @@
     }
 
     .hito-route-support-grid {
-      grid-template-columns: minmax(0, 1fr) var(--hito-route-support-sidebar-width);
+      grid-template-columns: minmax(0, 1fr) 20rem;
     }
 
     .hito-workout-hero-grid {
@@ -161,190 +295,12 @@
     margin-top: 3rem;
   }
 
-  .hito-page-title {
-    --hito-typography-role: page-title;
-    margin-top: 0.5rem;
-    max-width: 44rem;
-    font-family: var(--font-display);
-    font-size: clamp(3rem, 6vw, 4.5rem);
-    font-feature-settings: "ss01";
-    font-weight: 400;
-    letter-spacing: -0.02em;
-    line-height: 1;
-    text-wrap: balance;
-  }
-
-  .hito-ui-page-title {
-    --hito-typography-role: ui-page-title;
-    margin-top: 0.5rem;
-    max-width: 44rem;
-    font-family: var(--font-sans);
-    font-size: clamp(3rem, 6vw, 4.5rem);
-    font-weight: 400;
-    letter-spacing: -0.02em;
-    line-height: 1;
-    text-wrap: balance;
-  }
-
-  .hito-modal-title {
-    --hito-typography-role: modal-title;
-    font-family: var(--font-display);
-    font-size: clamp(1.75rem, 5vw, 2rem);
-    font-feature-settings: "ss01";
-    font-weight: 400;
-    letter-spacing: -0.02em;
-    line-height: 1.1;
-    color: var(--color-foreground);
-    text-wrap: balance;
-  }
-
-  .hito-ui-modal-title {
-    --hito-typography-role: ui-modal-title;
-    font-family: var(--font-sans);
-    font-size: clamp(1.75rem, 5vw, 2rem);
-    font-weight: 400;
-    letter-spacing: -0.02em;
-    line-height: 1.1;
-    color: var(--color-foreground);
-    text-wrap: balance;
-  }
-
-  .hito-panel-title {
-    --hito-typography-role: panel-title;
-    font-family: var(--font-display);
-    font-size: clamp(1.25rem, 3vw, 1.375rem);
-    font-feature-settings: "ss01";
-    font-weight: 400;
-    letter-spacing: -0.015em;
-    line-height: 1.18;
-    color: var(--color-foreground);
-    text-wrap: balance;
-  }
-
-  .hito-ui-panel-title {
-    --hito-typography-role: ui-panel-title;
-    font-family: var(--font-sans);
-    font-size: clamp(1.25rem, 3vw, 1.375rem);
-    font-weight: 400;
-    letter-spacing: -0.015em;
-    line-height: 1.18;
-    color: var(--color-foreground);
-    text-wrap: balance;
-  }
-
-  .hito-page-copy {
-    --hito-typography-role: body;
-    margin-top: 1rem;
-    max-width: 40rem;
-    font-size: 0.875rem;
-    line-height: 1.58;
-    color: var(--color-text-secondary);
-    text-wrap: pretty;
-  }
-
   .hito-section-header {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
     gap: 1rem;
     margin-bottom: 1rem;
-  }
-
-  .hito-section-title {
-    --hito-typography-role: section-title;
-    font-family: var(--font-display);
-    font-size: 1.5rem;
-    font-feature-settings: "ss01";
-    font-weight: 400;
-    letter-spacing: -0.02em;
-    line-height: 1.15;
-    color: var(--color-foreground);
-  }
-
-  .hito-ui-section-title {
-    --hito-typography-role: ui-section-title;
-    font-family: var(--font-sans);
-    font-size: 1.5rem;
-    font-weight: 400;
-    letter-spacing: -0.02em;
-    line-height: 1.15;
-    color: var(--color-foreground);
-  }
-
-  .hito-body {
-    --hito-typography-role: body;
-    font-size: 0.875rem;
-    font-weight: 400;
-    line-height: 1.58;
-    color: var(--color-text-secondary);
-    text-wrap: pretty;
-  }
-
-  .hito-body-small {
-    --hito-typography-role: body-small;
-    font-size: 0.8125rem;
-    font-weight: 400;
-    line-height: 1.5;
-    color: var(--color-text-secondary);
-    text-wrap: pretty;
-  }
-
-  .hito-section-subtitle {
-    --hito-typography-role: micro-label;
-    font-size: 0.6875rem;
-    font-weight: 500;
-    letter-spacing: 0.18em;
-    line-height: 1.25;
-    text-transform: uppercase;
-    color: var(--color-text-tertiary);
-  }
-
-  .hito-support-copy {
-    --hito-typography-role: body;
-    font-size: 0.875rem;
-    line-height: 1.58;
-    color: var(--color-text-secondary);
-    text-wrap: pretty;
-  }
-
-  .hito-caption {
-    --hito-typography-role: caption;
-    font-size: 0.6875rem;
-    line-height: 1.45;
-    color: var(--color-text-tertiary);
-  }
-
-  .hito-form-label {
-    --hito-typography-role: form-label;
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.01em;
-    line-height: 1.25;
-    text-transform: none;
-    color: var(--color-foreground);
-  }
-
-  .hito-micro-label {
-    --hito-typography-role: micro-label;
-    font-size: 0.6875rem;
-    font-weight: 500;
-    letter-spacing: 0.18em;
-    line-height: 1.2;
-    text-transform: uppercase;
-    color: var(--color-text-tertiary);
-  }
-
-  .hito-micro-label[data-tone="signal"] {
-    color: var(--color-text-accent);
-  }
-
-  .hito-technical-mono {
-    --hito-typography-role: technical-mono;
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    font-variant-numeric: tabular-nums;
-    line-height: 1.45;
-    color: var(--color-text-secondary);
   }
 
   .hito-timeline-year,
@@ -413,14 +369,6 @@
 
   .hito-timeline-entry p {
     overflow-wrap: anywhere;
-  }
-
-  .hito-timeline-entry .hito-panel-title {
-    font-size: 1.1rem;
-  }
-
-  .hito-timeline-entry[data-entry-kind="milestone"] .hito-panel-title {
-    font-size: 1.15rem;
   }
 
   .hito-timeline-entry-dot {

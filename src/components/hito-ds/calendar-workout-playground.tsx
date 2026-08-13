@@ -205,8 +205,8 @@ function ControlGroup({
   return (
     <div className="grid gap-3">
       <div>
-        <p className="hito-form-label">{title}</p>
-        <p className="hito-caption mt-1">{body}</p>
+        <p className="hito-label-md">{title}</p>
+        <p className="hito-body-xs text-tertiary mt-1">{body}</p>
       </div>
       <div className="grid gap-3">{children}</div>
     </div>

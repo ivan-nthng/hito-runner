@@ -95,8 +95,8 @@ export function SliderPlayground() {
           />
           <div className="grid min-w-0 gap-3">
             <div className="flex items-center justify-between gap-3">
-              <span className="hito-form-label">Dual-value range</span>
-              <span className="hito-caption font-mono-num">
+              <span className="hito-label-md">Dual-value range</span>
+              <span className="hito-technical-sm text-tertiary">
                 {dualValue[0]}–{dualValue[1]}
               </span>
             </div>
@@ -123,7 +123,7 @@ export function SliderPlayground() {
         <div className="grid min-w-0 gap-7" inert>
           {HITO_FIELD_SIZES.map((specimenSize) => (
             <div key={specimenSize} className="grid min-w-0 gap-3">
-              <p className="hito-form-label">{SIZE_LABELS[specimenSize]}</p>
+              <p className="hito-label-md">{SIZE_LABELS[specimenSize]}</p>
               <HitoSlider
                 label="Changed single value"
                 min={1}
@@ -181,7 +181,7 @@ export function SliderPlayground() {
       controls={
         <div className="grid min-w-0 gap-5">
           <div className="grid gap-3">
-            <p className="hito-form-label">Size</p>
+            <p className="hito-label-md">Size</p>
             <div
               className="hito-choice-toggle-group"
               {...sizeGroup.groupProps}
@@ -201,7 +201,7 @@ export function SliderPlayground() {
             </div>
           </div>
           <div className="grid gap-3">
-            <p className="hito-form-label">Range</p>
+            <p className="hito-label-md">Range</p>
             <div
               className="hito-choice-toggle-group"
               {...rangeGroup.groupProps}

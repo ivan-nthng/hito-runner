@@ -108,7 +108,7 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
 
       <div className="hito-section-header mb-6">
         <div>
-          <h1 className="hito-ui-section-title text-4xl lg:text-5xl">{monthLabel}</h1>
+          <h1 className="hito-ui-title-lg text-foreground">{monthLabel}</h1>
         </div>
 
         <div className="flex items-center gap-2">
@@ -174,7 +174,10 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
           <div className="hidden border-b border-hairline lg:block">
             <div className="hito-calendar-grid hito-calendar-grid-month">
               {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
-                <div key={day} className="hito-calendar-grid-heading hito-micro-label">
+                <div
+                  key={day}
+                  className="hito-calendar-grid-heading hito-label-sm uppercase tracking-[0.18em] text-tertiary"
+                >
                   {day}
                 </div>
               ))}
@@ -750,10 +753,10 @@ function Tooltip({ workout }: { workout: Workout }) {
   return (
     <div className="hito-tooltip hito-tooltip-width-lg">
       <div className="flex items-center justify-between">
-        <span className="hito-label" style={{ color: meta.color }}>
+        <span className="hito-label-md text-foreground" style={{ color: meta.content }}>
           {meta.label}
         </span>
-        <span className="hito-micro-label">
+        <span className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
           {formatDate(workout.date, { month: "short", day: "numeric", weekday: "short" })}
         </span>
       </div>
@@ -764,7 +767,7 @@ function Tooltip({ workout }: { workout: Workout }) {
         <Stat label="Status" value={workoutStatusLabel(workout.status)} />
       </div>
       {readbackEntries.length > 0 && (
-        <div className="hito-caption mt-3 space-y-0.5 border-t border-hairline pt-3">
+        <div className="hito-body-xs text-tertiary mt-3 space-y-0.5 border-t border-hairline pt-3">
           {readbackEntries.map((entry) => (
             <div key={entry.key} className="flex justify-between gap-3">
               <span className="hito-metric-label">{entry.label}</span>
@@ -780,7 +783,7 @@ function Tooltip({ workout }: { workout: Workout }) {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="hito-metric">
-      <div className="hito-technical-mono capitalize">{value}</div>
+      <div className="hito-technical-sm text-secondary capitalize">{value}</div>
       <div className="hito-metric-label">{label}</div>
     </div>
   );

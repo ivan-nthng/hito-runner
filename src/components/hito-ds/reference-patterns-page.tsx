@@ -2,7 +2,9 @@ import type { CSSProperties } from "react";
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
 import { WorkoutLibraryPlayground } from "@/components/hito-ds/workout-library-playground";
 import { HitoDsPatternInlineEditing } from "@/components/hito-ds/reference-pattern-inline-editing";
+import { HitoDsAppShellPattern } from "@/components/hito-ds/reference-components-structure";
 import { ProductLinks, ReferenceListRow, SectionIntro } from "@/components/hito-ds/reference";
+import { DataTableSpecimenPreview } from "@/components/hito-ds/specimen-previews";
 import { HitoButton } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -64,6 +66,62 @@ const CALENDAR_TYPE_EXAMPLES: ReadonlyArray<{
 export function HitoDsPatternsPage() {
   return (
     <>
+      <HitoDsAppShellPattern />
+      <HitoDsPlayground
+        id="data-table-composition"
+        label="Data table composition"
+        status="Pattern"
+        statusTone="signal"
+        description={{
+          purpose:
+            "Compose the existing operational toolbar with canonical table header and row anatomy without creating another table owner.",
+          useWhen:
+            "A route-owned dataset needs search, visible filters, result count, sorting, and horizontal containment together.",
+          avoidWhen:
+            "A standalone header, row, or static table anatomy example is the real subject; those remain in Components.",
+          accessibility:
+            "Search, filter, and sort controls keep their existing names and keyboard behavior; native table semantics and the contained scroll region remain intact.",
+        }}
+        anchors={[{ id: "data-table-toolbar", label: "Toolbar & filters" }]}
+        usedIn={
+          <ProductLinks
+            links={[
+              { href: "/admin/analytics", label: "/admin/analytics" },
+              { href: "/hitoDS", label: "/hitoDS" },
+            ]}
+          />
+        }
+        preview={
+          <DataTableSpecimenPreview
+            sortable
+            activeSort
+            filtered
+            staticMode={false}
+            showUtilityRow
+          />
+        }
+        controls={
+          <div className="hito-row-group border-0">
+            <div className="hito-list-row items-start">
+              <div>
+                <p className="hito-list-row-title">Composition owner</p>
+                <p className="hito-list-row-copy">
+                  The toolbar composes search and filter controls around the existing Data Table
+                  anatomy.
+                </p>
+              </div>
+            </div>
+            <div className="hito-list-row items-start">
+              <div>
+                <p className="hito-list-row-title">Standalone owner</p>
+                <p className="hito-list-row-copy">
+                  Header, row, sorting, and static anatomy remain addressable in Components.
+                </p>
+              </div>
+            </div>
+          </div>
+        }
+      />
       <HitoDsPatternInlineEditing />
       <section id="editorial-patterns" className="ds-section">
         <SectionIntro
@@ -75,11 +133,11 @@ export function HitoDsPatternsPage() {
           <div className="grid gap-5 lg:grid-cols-[15rem_minmax(0,1fr)]">
             <div className="grid gap-4 rounded-2xl bg-foreground/[0.025] p-5">
               <div className="grid grid-cols-[4.75rem_3.25rem_minmax(0,1fr)] items-baseline gap-4">
-                <span className="hito-timeline-year">2026</span>
-                <span className="hito-timeline-month">May</span>
-                <span className="hito-timeline-day">24</span>
+                <span className="hito-timeline-year font-sans">2026</span>
+                <span className="hito-timeline-month font-sans">May</span>
+                <span className="hito-timeline-day font-sans">24</span>
               </div>
-              <p className="hito-body-small text-muted-foreground">
+              <p className="hito-body-sm text-secondary">
                 Use year, month, and day roles for sticky editorial timeline rails. Layout and
                 sticky scope stay with the route.
               </p>
@@ -101,11 +159,11 @@ export function HitoDsPatternsPage() {
                       <span className="hito-highlight-tag" data-tone="signal">
                         New
                       </span>
-                      <h3 className="hito-panel-title text-foreground">
+                      <h3 className="hito-ui-title-xs text-foreground">
                         Editorial timeline family
                       </h3>
                     </div>
-                    <p className="hito-body-small mt-2 leading-relaxed text-muted-foreground">
+                    <p className="hito-body-sm mt-2 text-secondary">
                       Timeline entries use a calm backdrop and preserve technical chips like{" "}
                       <code className="hito-inline-code">hito-inline-code</code> inside readable
                       release copy.
@@ -122,9 +180,9 @@ export function HitoDsPatternsPage() {
                       <span className="hito-highlight-tag" data-tone="neutral">
                         Cleanup
                       </span>
-                      <h3 className="hito-panel-title text-foreground">Behind the scenes</h3>
+                      <h3 className="hito-ui-title-xs text-foreground">Behind the scenes</h3>
                     </div>
-                    <p className="hito-body-small mt-2 leading-relaxed text-muted-foreground">
+                    <p className="hito-body-sm mt-2 text-secondary">
                       Quiet entries stay legible without turning editorial history into card soup.
                     </p>
                   </div>
@@ -158,29 +216,29 @@ export function HitoDsPatternsPage() {
           <article className="border-t border-hairline pt-5">
             <div className="hito-section-header">
               <div>
-                <h3 className="hito-section-title">Section with no box.</h3>
-                <p className="hito-support-copy mt-2">
+                <h3 className="hito-ui-title-sm">Section with no box.</h3>
+                <p className="hito-body-md text-secondary mt-2">
                   This is the default route cadence used by simplified home, progress, and body
                   surfaces.
                 </p>
               </div>
-              <span className="hito-section-subtitle">Default</span>
+              <span className="hito-label-sm text-tertiary">Default</span>
             </div>
             <div className="mt-5 grid gap-0 border-t border-hairline">
               <div className="flex items-center justify-between gap-4 border-b border-hairline py-3">
                 <span className="hito-list-row-title">Primary truth first</span>
-                <span className="hito-caption">Visible</span>
+                <span className="hito-body-xs text-tertiary">Visible</span>
               </div>
               <div className="flex items-center justify-between gap-4 border-b border-hairline py-3">
                 <span className="hito-list-row-title">Support after divider</span>
-                <span className="hito-caption">Quiet</span>
+                <span className="hito-body-xs text-tertiary">Quiet</span>
               </div>
             </div>
           </article>
           <article className="hito-surface-flat p-5">
-            <p className="hito-label">Use sparingly</p>
-            <h3 className="hito-panel-title mt-3">Owned payload.</h3>
-            <p className="hito-support-copy mt-3">
+            <p className="hito-label-md">Use sparingly</p>
+            <h3 className="hito-ui-title-xs mt-3">Owned payload.</h3>
+            <p className="hito-body-md text-secondary mt-3">
               Keep a surface when it contains one active object, like an attached file, form, or
               route-level state. Avoid stacking subcards inside it.
             </p>
@@ -213,9 +271,9 @@ export function HitoDsPatternsPage() {
         }
         demo={
           <article className="hito-state-surface" data-tone="signal" role="status">
-            <p className="hito-label hito-label-signal">Setup</p>
-            <h3 className="hito-section-title mt-3">Create a first plan.</h3>
-            <p className="hito-support-copy mt-3">
+            <p className="hito-label-md hito-label-signal">Setup</p>
+            <h3 className="hito-ui-title-sm mt-3">Create a first plan.</h3>
+            <p className="hito-body-md text-secondary mt-3">
               State surfaces keep route-level setup and empty states consistent.
             </p>
             <div className="hito-state-actions">
@@ -228,19 +286,23 @@ export function HitoDsPatternsPage() {
         variants={
           <div className="grid min-w-0 gap-4 sm:grid-cols-2">
             <article className="hito-state-surface" data-tone="success">
-              <p className="hito-label">Ready</p>
-              <h3 className="hito-section-title mt-3">Plan ready to review.</h3>
-              <p className="hito-support-copy mt-3">Success remains readable without color.</p>
+              <p className="hito-label-md">Ready</p>
+              <h3 className="hito-ui-title-sm mt-3">Plan ready to review.</h3>
+              <p className="hito-body-md text-secondary mt-3">
+                Success remains readable without color.
+              </p>
             </article>
             <article className="hito-state-surface" data-tone="warning">
-              <p className="hito-label">Attention</p>
-              <h3 className="hito-section-title mt-3">One value needs review.</h3>
-              <p className="hito-support-copy mt-3">Keep the next step near the message.</p>
+              <p className="hito-label-md">Attention</p>
+              <h3 className="hito-ui-title-sm mt-3">One value needs review.</h3>
+              <p className="hito-body-md text-secondary mt-3">
+                Keep the next step near the message.
+              </p>
             </article>
             <article className="hito-state-surface sm:col-span-2" data-tone="destructive">
-              <p className="hito-label">Recovery</p>
-              <h3 className="hito-section-title mt-3">The update was not applied.</h3>
-              <p className="hito-support-copy mt-3">
+              <p className="hito-label-md">Recovery</p>
+              <h3 className="hito-ui-title-sm mt-3">The update was not applied.</h3>
+              <p className="hito-body-md text-secondary mt-3">
                 Persistent recovery guidance stays in the route instead of disappearing in a toast.
               </p>
             </article>
@@ -280,8 +342,8 @@ export function HitoDsPatternsPage() {
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
             <article id="skeleton" className="hito-state-surface" aria-busy="true">
-              <p className="hito-label">Skeleton / loading</p>
-              <h3 className="hito-section-title mt-3 flex items-center gap-2">
+              <p className="hito-label-md">Skeleton / loading</p>
+              <h3 className="hito-ui-title-sm mt-3 flex items-center gap-2">
                 <Icon
                   name="loader"
                   size="sm"
@@ -289,7 +351,7 @@ export function HitoDsPatternsPage() {
                 />
                 Loading your plan.
               </h3>
-              <p className="hito-support-copy mt-3">
+              <p className="hito-body-md text-secondary mt-3">
                 Loading is neutral and does not imply success or failure before truth arrives.
               </p>
               <div className="mt-5 grid gap-3" aria-hidden="true">
@@ -305,9 +367,9 @@ export function HitoDsPatternsPage() {
               </div>
             </article>
             <article className="hito-state-surface" data-tone="success">
-              <p className="hito-label text-success">Success</p>
-              <h3 className="hito-section-title mt-3">Plan saved.</h3>
-              <p className="hito-support-copy mt-3">
+              <p className="hito-label-md text-success">Success</p>
+              <h3 className="hito-ui-title-sm mt-3">Plan saved.</h3>
+              <p className="hito-body-md text-secondary mt-3">
                 Success confirms a completed operation without becoming another card family.
               </p>
               <div className="hito-state-actions">
@@ -317,9 +379,9 @@ export function HitoDsPatternsPage() {
               </div>
             </article>
             <article className="hito-state-surface" data-tone="destructive">
-              <p className="hito-label text-destructive">Error</p>
-              <h3 className="hito-section-title mt-3">Try again.</h3>
-              <p className="hito-support-copy mt-3">
+              <p className="hito-label-md text-destructive">Error</p>
+              <h3 className="hito-ui-title-sm mt-3">Try again.</h3>
+              <p className="hito-body-md text-secondary mt-3">
                 Error tone is reserved for real load or save failures, not normal previews.
               </p>
               <div className="hito-state-actions">
@@ -348,7 +410,7 @@ export function HitoDsPatternsPage() {
                     />
                   ))}
                 </div>
-                <span className="hito-caption font-mono-num">3</span>
+                <span className="hito-technical-sm text-tertiary">3</span>
               </div>
             </div>
           </article>
@@ -357,7 +419,7 @@ export function HitoDsPatternsPage() {
           <article className="hito-row-group">
             <div className="hito-list-row items-start">
               <div>
-                <p className="hito-label">Tooltip</p>
+                <p className="hito-label-md">Tooltip</p>
                 <p className="hito-list-row-copy">
                   Hover or focus the live trigger. Shared tooltip behavior owns short contextual
                   hints; chart geometry stays route-owned.
@@ -400,8 +462,8 @@ export function HitoDsPatternsPage() {
             ))}
           </article>
           <article className="hito-surface-flat p-5">
-            <p className="hito-label">Feedback markers</p>
-            <p className="hito-support-copy mt-3">
+            <p className="hito-label-md">Feedback markers</p>
+            <p className="hito-body-md text-secondary mt-3">
               Secondary discovery only. Completion check, dash, and cross stay primary.
             </p>
           </article>
@@ -410,7 +472,7 @@ export function HitoDsPatternsPage() {
           <article className="hito-row-group">
             {CALENDAR_TYPE_EXAMPLES.map(({ label, glyph, role, color }) => (
               <div key={label} className="hito-list-row py-3">
-                <span className="hito-label inline-flex items-center gap-2">
+                <span className="hito-label-md inline-flex items-center gap-2">
                   <WorkoutGlyph
                     kind={glyph}
                     className="hito-calendar-type-glyph"
@@ -418,13 +480,13 @@ export function HitoDsPatternsPage() {
                   />
                   <span style={{ color }}>{label}</span>
                 </span>
-                <span className="hito-caption">{role} role</span>
+                <span className="hito-body-xs text-tertiary">{role} role</span>
               </div>
             ))}
           </article>
           <article className="hito-surface-flat p-5">
-            <p className="hito-label">Calendar type identity</p>
-            <p className="hito-support-copy mt-3">
+            <p className="hito-label-md">Calendar type identity</p>
+            <p className="hito-body-md text-secondary mt-3">
               Month cells use accepted runner-facing workout labels and semantic workout type
               colors. Distance, duration, and target details stay in hover or workout detail.
             </p>
@@ -438,8 +500,8 @@ export function HitoDsPatternsPage() {
         <div className="hito-row-group">
           <div className="hito-list-row items-start lg:items-end">
             <div className="max-w-md">
-              <h3 className="hito-section-title">Current summary</h3>
-              <p className="hito-support-copy mt-2">
+              <h3 className="hito-ui-title-sm">Current summary</h3>
+              <p className="hito-body-md text-secondary mt-2">
                 One grouped row can carry the real aggregate truth without pretending to be a mature
                 analytics dashboard.
               </p>
@@ -452,7 +514,7 @@ export function HitoDsPatternsPage() {
           </div>
         </div>
         <div className="mt-5 border-t border-hairline pt-5">
-          <p className="hito-label">Compact legend</p>
+          <p className="hito-label-md">Compact legend</p>
           <div className="hito-legend mt-4">
             <LegendDemoItem tone="actual" label="Actual" />
             <LegendDemoItem tone="planned" label="Planned" />
@@ -460,7 +522,7 @@ export function HitoDsPatternsPage() {
           </div>
         </div>
         <div className="hito-chart-section mt-5">
-          <p className="hito-label">Visualization chrome</p>
+          <p className="hito-label-md">Visualization chrome</p>
           <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <div>
               <p className="hito-list-row-title">Planned vs actual bars</p>
@@ -521,14 +583,14 @@ export function HitoDsPatternsPage() {
         <div className="hito-row-group mt-5">
           <div className="hito-list-row items-start">
             <div>
-              <p className="hito-label">Allowed geometry exceptions</p>
+              <p className="hito-label-md">Allowed geometry exceptions</p>
               <p className="hito-list-row-copy">
                 Bar height/width, plotted lines, interval block widths, SVG silhouettes, and marker
                 coordinates remain visualization geometry. Bar chrome, labels, captions, legends,
                 rows, and tooltips use Hito primitives.
               </p>
             </div>
-            <span className="hito-caption">Exception</span>
+            <span className="hito-body-xs text-tertiary">Exception</span>
           </div>
         </div>
       </section>

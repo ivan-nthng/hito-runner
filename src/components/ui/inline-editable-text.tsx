@@ -271,7 +271,7 @@ export function InlineEditableText({
             )}
           >
             <Icon name="edit" size={isHeaderInput && size === "lg" ? "lg" : "sm"} />
-            {editLabel ? <span className="hito-micro-label">{editLabel}</span> : null}
+            {editLabel ? <span className="hito-label-md">{editLabel}</span> : null}
           </span>
         ) : null}
       </button>

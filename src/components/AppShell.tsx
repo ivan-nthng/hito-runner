@@ -128,7 +128,7 @@ export function AppShell({
               <div className="hito-list-row items-start p-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="hito-label flex items-center gap-2">
+                    <div className="hito-label-md text-foreground flex items-center gap-2">
                       <Icon name="plan-note" size="xs" className="text-signal" />
                       Plan note
                     </div>
@@ -144,7 +144,7 @@ export function AppShell({
                       <Icon name="close" size="xs" />
                     </HitoButton>
                   </div>
-                  <p className="hito-list-row-copy">
+                  <p className="hito-body-sm mt-1 text-secondary">
                     {shellSnapshot.source === "persisted"
                       ? "Your saved workouts and results show up here."
                       : "You can browse the preview here until you sign in and save a plan."}
@@ -244,8 +244,8 @@ export function AppShell({
               <HitoLogo className="[--hito-logo-height:1.15rem]" />
             </Link>
             <div className="hidden md:flex items-baseline gap-3">
-              <span className="hito-micro-label">Today</span>
-              <span className="hito-technical-mono">
+              <span className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">Today</span>
+              <span className="hito-technical-sm text-secondary">
                 {formatDate(shellSnapshot.currentDate, {
                   month: "long",
                   day: "numeric",
@@ -336,7 +336,7 @@ export function AppShell({
 function StatusPill({ label, value }: { label: string; value: string }) {
   return (
     <div className="hidden lg:flex items-center gap-2">
-      <span className="hito-micro-label">{label}</span>
+      <span className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">{label}</span>
       <span className="hito-status-pill" data-tone={weekStatusTone(value)}>
         {value}
       </span>

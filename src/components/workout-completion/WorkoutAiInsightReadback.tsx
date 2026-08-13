@@ -45,15 +45,17 @@ export function WorkoutAiInsightReadback({
         <span className="hito-status-pill" data-tone={recommendationTone}>
           {recommendationLabel}
         </span>
-        <span className="hito-caption">{formatWorkoutFeedbackTimestamp(insight.createdAt)}</span>
+        <span className="hito-body-xs text-tertiary">
+          {formatWorkoutFeedbackTimestamp(insight.createdAt)}
+        </span>
       </div>
 
-      <p className="hito-caption">{supportCopy}</p>
+      <p className="hito-body-xs text-tertiary">{supportCopy}</p>
 
       <div className="rounded-xl bg-background/18 px-4 py-4">
-        <p className="hito-label">{recommendationSectionLabel}</p>
-        <p className="hito-body mt-2">{insight.nextWorkoutRecommendation}</p>
-        <p className="hito-caption mt-3">{recommendationSupport}</p>
+        <p className="hito-label-md text-foreground">{recommendationSectionLabel}</p>
+        <p className="hito-body-md text-secondary mt-2">{insight.nextWorkoutRecommendation}</p>
+        <p className="hito-body-xs text-tertiary mt-3">{recommendationSupport}</p>
       </div>
 
       <AiInsightSection label={analysisLabel} body={insight.analysisSummary} />
@@ -63,15 +65,15 @@ export function WorkoutAiInsightReadback({
       ) : (
         <details className="hito-disclosure">
           <summary className="hito-disclosure-summary">
-            <span className="hito-label text-foreground">{differenceLabel}</span>
+            <span className="hito-label-md text-foreground">{differenceLabel}</span>
             <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
           </summary>
           <div className="hito-disclosure-body">
-            <p className="hito-body-small">{insight.differenceExplanation}</p>
+            <p className="hito-body-sm text-secondary">{insight.differenceExplanation}</p>
             {cautionSummary ? (
               <div className="rounded-lg bg-background/18 px-3 py-2">
-                <p className="hito-label">Use with care</p>
-                <p className="hito-body-small mt-2">{cautionSummary}</p>
+                <p className="hito-label-md text-foreground">Use with care</p>
+                <p className="hito-body-sm text-secondary mt-2">{cautionSummary}</p>
               </div>
             ) : null}
           </div>
@@ -84,8 +86,8 @@ export function WorkoutAiInsightReadback({
 function AiInsightSection({ label, body }: { label: string; body: string }) {
   return (
     <div className="pt-1">
-      <p className="hito-list-row-title">{label}</p>
-      <p className="hito-body-small mt-1">{body}</p>
+      <p className="hito-body-md text-foreground">{label}</p>
+      <p className="hito-body-sm text-secondary mt-1">{body}</p>
     </div>
   );
 }

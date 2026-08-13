@@ -96,9 +96,11 @@ function HomeErrorState({ reset }: { error: Error; reset: () => void }) {
     <AppShell>
       <div className="hito-route-gutter max-w-2xl py-20">
         <section className="hito-state-surface" data-tone="destructive">
-          <p className="hito-label text-destructive">Home unavailable</p>
-          <h1 className="hito-ui-page-title">We couldn&apos;t load this week&apos;s plan.</h1>
-          <p className="hito-page-copy text-foreground/85">
+          <p className="hito-label-md text-destructive">Home unavailable</p>
+          <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
+            We couldn&apos;t load this week&apos;s plan.
+          </h1>
+          <p className="hito-body-md mt-4 max-w-[40rem] text-foreground/85">
             Try again to reopen the latest saved or preview state. If setup is still incomplete,
             returning home will keep you in the onboarding flow.
           </p>

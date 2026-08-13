@@ -71,8 +71,10 @@ export function AuthEntryScreen({
               <HitoLogo className="[--hito-logo-height:2.35rem] lg:[--hito-logo-height:3.25rem]" />
             </div>
             <div className="space-y-4">
-              <p className="max-w-sm text-lg text-foreground/92">Your running plan, kept simple.</p>
-              <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
+              <p className="hito-body-lg max-w-sm text-foreground/92">
+                Your running plan, kept simple.
+              </p>
+              <p className="hito-body-md max-w-sm text-muted-foreground">
                 Start a plan for your next event, or pick up where you left off.
               </p>
             </div>
@@ -114,7 +116,7 @@ export function AuthEntryScreen({
                 <form method="post" action="/api/auth/local-login" className="grid gap-5">
                   <input type="hidden" name="next" value={next} />
                   <label className="grid gap-2">
-                    <span className="hito-label">Username or email</span>
+                    <span className="hito-label-md">Username or email</span>
                     <input
                       type="text"
                       name="identifier"
@@ -124,7 +126,7 @@ export function AuthEntryScreen({
                     />
                   </label>
                   <label className="grid gap-2">
-                    <span className="hito-label">Password</span>
+                    <span className="hito-label-md">Password</span>
                     <div className="relative">
                       <input
                         type={passwordVisible ? "text" : "password"}
@@ -150,12 +152,12 @@ export function AuthEntryScreen({
                     Log in
                   </button>
                   {status === "invalid_credentials" && (
-                    <p className="hito-field-error">
+                    <p className="hito-body-md font-medium text-negative">
                       The username or password was not accepted. Try again.
                     </p>
                   )}
                   {status === "local_unavailable" && (
-                    <p className="hito-field-error">
+                    <p className="hito-body-md font-medium text-negative">
                       Local login is not available in this environment.
                     </p>
                   )}
@@ -166,18 +168,18 @@ export function AuthEntryScreen({
                 className="mt-6"
                 {...(localBypassEnabled ? authTabs.getPanelProps("signup") : {})}
               >
-                <div className="hito-micro-label flex items-center gap-2">
+                <div className="hito-label-sm flex items-center gap-2">
                   <Icon name="mail" size="xs" className="text-signal" />
                   <span>Continue with email</span>
                 </div>
-                <p className="mt-3 text-sm text-muted-foreground">
+                <p className="hito-body-md mt-3 text-muted-foreground">
                   {localBypassEnabled
                     ? "Use an email sign-in link from a public Hito app URL."
                     : "Use email to sign in from a public Hito app URL."}
                 </p>
 
                 {status === "error" && (
-                  <p className="hito-field-error mt-4">
+                  <p className="hito-body-md mt-4 font-medium text-negative">
                     The last sign-in link did not work. Request a new one and try again.
                   </p>
                 )}
@@ -214,7 +216,7 @@ export function AuthEntryScreen({
                     }}
                   >
                     <label className="grid gap-2">
-                      <span className="hito-label">Email</span>
+                      <span className="hito-label-md">Email</span>
                       <input
                         type="email"
                         name="email"
@@ -234,7 +236,10 @@ export function AuthEntryScreen({
                         className={`hito-field hito-field-lg ${emailValidationMessage ? "hito-field-feedback-error" : ""}`}
                       />
                       {emailValidationMessage ? (
-                        <span id="email-sign-in-error" className="hito-field-error">
+                        <span
+                          id="email-sign-in-error"
+                          className="hito-body-md font-medium text-negative"
+                        >
                           {emailValidationMessage}
                         </span>
                       ) : null}
@@ -263,7 +268,7 @@ export function AuthEntryScreen({
                           )}
                         </button>
                         {phase === "sent" ? (
-                          <p className="hito-field-success">
+                          <p className="hito-body-md font-medium text-positive">
                             Check your email for the sign-in link.
                           </p>
                         ) : null}
@@ -271,7 +276,7 @@ export function AuthEntryScreen({
                     ) : null}
                   </form>
                 ) : (
-                  <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+                  <p className="hito-body-md mt-4 text-muted-foreground">
                     {localBypassEnabled
                       ? "Email sign-in links are turned off on this local runtime. Use local login here, or open Hito from a public app URL if you need a sign-in link."
                       : "Email sign-in links are not available from this local runtime. Open Hito from a public app URL to request a sign-in link."}

@@ -162,7 +162,7 @@ export function AdminDataTableToolbar({
           >
             {activeFilters.length > 0 ? (
               <>
-                <DropdownMenuLabel className="hito-micro-label">Active filters</DropdownMenuLabel>
+                <DropdownMenuLabel className="hito-label-sm">Active filters</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {activeFilters.map((filter) => (
                   <DropdownMenuItem
@@ -173,7 +173,7 @@ export function AdminDataTableToolbar({
                     <Icon name="close" size="xs" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{filter.label}</span>
-                      <span className="block truncate text-xs text-muted-foreground">
+                      <span className="hito-body-xs block truncate text-tertiary">
                         {filter.value}
                       </span>
                     </span>
@@ -201,7 +201,7 @@ export function AdminDataTableToolbar({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <p className="hito-field-helper whitespace-nowrap">{rowCountLabel}</p>
+      <p className="hito-body-xs whitespace-nowrap text-secondary">{rowCountLabel}</p>
     </div>
   );
 }
@@ -216,7 +216,7 @@ function FilterSection({
   return (
     <>
       {showSeparator ? <DropdownMenuSeparator /> : null}
-      <DropdownMenuLabel className="hito-micro-label">{section.label}</DropdownMenuLabel>
+      <DropdownMenuLabel className="hito-label-sm">{section.label}</DropdownMenuLabel>
       {section.options.map((option) => (
         <DropdownMenuItem
           key={option.value}
@@ -287,7 +287,7 @@ export function AdminDataTableColumnHeader<SortKey extends string>({
           align="start"
           className="hito-shell-menu hito-data-table-column-menu hito-data-table-menu-width-standard"
         >
-          <DropdownMenuLabel className="hito-micro-label">Sort</DropdownMenuLabel>
+          <DropdownMenuLabel className="hito-label-sm">Sort</DropdownMenuLabel>
           {sortOptions.map((option) => {
             const optionActive =
               activeSort.key === option.key && activeSort.direction === option.direction;
@@ -309,7 +309,7 @@ export function AdminDataTableColumnHeader<SortKey extends string>({
           {(filterOptions?.length ?? 0) > 0 && onFilterChange ? (
             <>
               <DropdownMenuSeparator />
-              <DropdownMenuLabel className="hito-micro-label">Filter</DropdownMenuLabel>
+              <DropdownMenuLabel className="hito-label-sm">Filter</DropdownMenuLabel>
               {filterOptions.map((option) => {
                 const optionActive = selectedFilter === option.value;
                 return (
@@ -389,7 +389,7 @@ export function AdminMetadataMenu({
         align="end"
         className="hito-shell-menu hito-data-table-column-menu hito-data-table-menu-width-compact"
       >
-        <DropdownMenuLabel className="hito-micro-label">{label}</DropdownMenuLabel>
+        <DropdownMenuLabel className="hito-label-sm">{label}</DropdownMenuLabel>
         {options.map((option) => {
           const selected = value === option.value;
           return (

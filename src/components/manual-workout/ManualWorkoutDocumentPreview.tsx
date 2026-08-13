@@ -50,7 +50,7 @@ export function ManualWorkoutDocumentPreview({
           </>
         }
         statusLabel={statusLabel}
-        title={<h3 className="hito-list-row-title min-w-0 truncate">{title}</h3>}
+        title={<h3 className="hito-body-md text-foreground min-w-0 truncate">{title}</h3>}
       />
 
       <ManualWorkoutStructurePreview
@@ -64,7 +64,7 @@ export function ManualWorkoutDocumentPreview({
 
       <ManualWorkoutReadbackStack entries={readbackEntries} />
 
-      <WorkoutDocumentNotes labelClassName="hito-form-label" notes={notes} />
+      <WorkoutDocumentNotes labelClassName="hito-label-md text-foreground" notes={notes} />
     </section>
   );
 }

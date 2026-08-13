@@ -149,39 +149,21 @@ function WorkoutLibraryPreview({
 }) {
   return (
     <div className="grid min-w-0 gap-5">
-      <div className="min-w-0">
-        <div className="flex min-w-0 flex-wrap items-end justify-between gap-3 border-b border-hairline pb-3">
-          <div className="min-w-0">
-            <p className="hito-label">
-              {state.viewMode === "desktop" ? "Static identity grid" : "Static identity rows"}
-            </p>
-            <h3 className="hito-list-row-title mt-1">
-              {specimens.length} of {WORKOUT_LIBRARY_IDENTITY_COUNT} identities visible
-            </h3>
-          </div>
-          <span className="hito-status-pill" data-tone="neutral">
-            Specimen only
-          </span>
-        </div>
-
-        <div className="mt-4 min-w-0">
-          {state.viewMode === "desktop" ? (
-            <DesktopWorkoutLibrary
-              onSelect={onSelect}
-              selectedIdentity={selectedIdentity}
-              specimens={specimens}
-              state={state}
-            />
-          ) : (
-            <MobileWorkoutLibrary
-              onSelect={onSelect}
-              selectedIdentity={selectedIdentity}
-              specimens={specimens}
-              state={state}
-            />
-          )}
-        </div>
-      </div>
+      {state.viewMode === "desktop" ? (
+        <DesktopWorkoutLibrary
+          onSelect={onSelect}
+          selectedIdentity={selectedIdentity}
+          specimens={specimens}
+          state={state}
+        />
+      ) : (
+        <MobileWorkoutLibrary
+          onSelect={onSelect}
+          selectedIdentity={selectedIdentity}
+          specimens={specimens}
+          state={state}
+        />
+      )}
 
       <WorkoutDetailSpecimen specimen={selectedSpecimen} state={state} />
     </div>
@@ -204,7 +186,7 @@ function DesktopWorkoutLibrary({
       <div className="hito-calendar-grid-seven">
         <div className="hito-calendar-grid hito-calendar-grid-month hito-calendar-grid-month-dense">
           {WEEKDAY_HEADINGS.map((weekday) => (
-            <span key={weekday} className="hito-calendar-grid-heading hito-micro-label">
+            <span key={weekday} className="hito-calendar-grid-heading hito-label-sm text-tertiary">
               {weekday}
             </span>
           ))}
@@ -360,11 +342,11 @@ function WorkoutDetailSpecimen({
     <section className="min-w-0 border-t border-hairline pt-5">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 border-b border-hairline pb-4">
         <div className="min-w-0">
-          <p className="hito-label break-words [overflow-wrap:anywhere]">
+          <p className="hito-label-md break-words [overflow-wrap:anywhere]">
             Internal: {specimen.family} / {specimen.identity}
           </p>
-          <h3 className="hito-section-title mt-1">{specimen.detailTitle}</h3>
-          <p className="hito-support-copy mt-2">{specimen.purpose}</p>
+          <h3 className="hito-ui-title-sm mt-1">{specimen.detailTitle}</h3>
+          <p className="hito-body-md text-secondary mt-2">{specimen.purpose}</p>
         </div>
         <span
           className="hito-status-pill"
@@ -390,7 +372,7 @@ function WorkoutDetailSpecimen({
         </div>
 
         <div className="rounded-lg bg-foreground/[0.035] p-3">
-          <p className="hito-label">Provider overlay</p>
+          <p className="hito-label-md">Provider overlay</p>
           <p className="hito-list-row-copy mt-1">
             {provider.detail}
             {!providerAllowed
@@ -400,7 +382,7 @@ function WorkoutDetailSpecimen({
         </div>
 
         <div className="rounded-lg bg-foreground/[0.035] p-3">
-          <p className="hito-label">Editable default HR note</p>
+          <p className="hito-label-md">Editable default HR note</p>
           <p className="hito-list-row-copy mt-1">
             {specimen.editableDefaultHrNote ?? "No editable default HR note for this specimen."}
           </p>
@@ -409,7 +391,7 @@ function WorkoutDetailSpecimen({
 
       <div className="border-b border-hairline py-4">
         <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-          <p className="hito-label">Segments</p>
+          <p className="hito-label-md">Segments</p>
           <span className="hito-status-pill" data-tone="muted">
             {state.detailDensity === "compact" ? "Compact" : "Full"}
           </span>
@@ -426,7 +408,7 @@ function WorkoutDetailSpecimen({
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="hito-list-row-title">{segment.label}</p>
-                  <p className="hito-technical-mono mt-1 break-words text-foreground/80">
+                  <p className="hito-technical-sm mt-1 break-words text-secondary">
                     {segment.prescription}
                   </p>
                   <p className="hito-list-row-copy mt-1">{segment.cue}</p>
@@ -434,13 +416,13 @@ function WorkoutDetailSpecimen({
               </div>
             ))}
             {hiddenSegmentCount > 0 ? (
-              <p className="hito-caption">
+              <p className="hito-body-xs text-tertiary">
                 + {hiddenSegmentCount} more segment rows in full density.
               </p>
             ) : null}
           </div>
         ) : (
-          <p className="hito-support-copy mt-3">
+          <p className="hito-body-md text-secondary mt-3">
             No run segments. This is a true rest-day specimen.
           </p>
         )}
@@ -450,7 +432,7 @@ function WorkoutDetailSpecimen({
         <BoundaryNote label="Proves" body={specimen.proves} icon="check-circle" />
         <BoundaryNote label="Must not imply" body={specimen.mustNotImply} icon="shield-alert" />
       </div>
-      <p className="hito-caption mt-4">
+      <p className="hito-body-xs text-tertiary mt-4">
         Calendar visual: {visual.result} / {visual.feedback}. No real upload, provider sync,
         comparison row, AI insight, plan creation, or workout mutation is performed.
       </p>
@@ -461,8 +443,8 @@ function WorkoutDetailSpecimen({
 function DetailFact({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <p className="hito-label">{label}</p>
-      <p className="hito-technical-mono mt-1 break-words text-foreground/80">{value}</p>
+      <p className="hito-label-md">{label}</p>
+      <p className="hito-technical-sm mt-1 break-words text-secondary">{value}</p>
     </div>
   );
 }
@@ -478,7 +460,7 @@ function BoundaryNote({
 }) {
   return (
     <div className="min-w-0 rounded-lg bg-foreground/[0.035] p-3">
-      <p className="hito-label inline-flex items-center gap-2">
+      <p className="hito-label-md inline-flex items-center gap-2">
         <Icon name={icon} size="xs" decorative />
         {label}
       </p>

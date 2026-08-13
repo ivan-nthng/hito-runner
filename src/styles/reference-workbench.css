@@ -1,54 +1,18 @@
 @layer components {
-  .hito-icon {
-    display: inline-block;
-    color: currentColor;
-    vector-effect: non-scaling-stroke;
+  .hito-ds-token-specimen-surface {
+    border: 0;
+    border-radius: var(--radius-3xl);
+    background: var(--color-background);
   }
 
-  .hito-logo,
-  .hito-logo-mark {
-    --hito-logo-height: 1.6rem;
-    display: inline-block;
-    width: var(--hito-logo-width);
-    height: var(--hito-logo-height);
-    flex: 0 0 auto;
-    color: currentColor;
-  }
-
-  .hito-logo {
-    --hito-logo-width: calc(var(--hito-logo-height) * 2.05);
-  }
-
-  .hito-logo-mark {
-    --hito-logo-width: calc(var(--hito-logo-height) * 1.0167);
-  }
-
-  .hito-surface {
-    border: 1px solid var(--color-hairline);
-    border-radius: var(--radius-2xl);
-    background: linear-gradient(
-      145deg,
-      color-mix(in oklch, var(--color-surface-elevated) 72%, transparent),
-      color-mix(in oklch, var(--color-surface) 64%, transparent)
-    );
-  }
-
-  .hito-surface-flat {
-    border: 1px solid var(--color-hairline);
-    border-radius: var(--radius-xl);
-    background: color-mix(in oklch, var(--color-background) 48%, transparent);
-  }
-
-  .hito-surface-quiet,
-  .hito-shell-profile-trigger {
+  .hito-surface-quiet {
     border: 1px solid transparent;
     border-radius: var(--radius-xl);
     background: color-mix(in oklch, var(--color-surface) 42%, transparent);
     box-shadow: none;
   }
 
-  .hito-surface-quiet:where(button, a, [role="button"]),
-  .hito-shell-profile-trigger {
+  .hito-surface-quiet:where(button, a, [role="button"]) {
     transition:
       background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
       box-shadow var(--hito-motion-duration-140) var(--hito-motion-ease-out);
@@ -58,13 +22,11 @@
       button:not(:disabled),
       a:not([aria-disabled="true"]),
       [role="button"]:not([aria-disabled="true"])
-    ):hover,
-  .hito-shell-profile-trigger:not(:disabled):not([aria-disabled="true"]):hover {
+    ):hover {
     background: color-mix(in oklch, var(--color-surface-elevated) 58%, transparent);
   }
 
-  .hito-surface-quiet:where(button, a, [role="button"]):focus-visible,
-  .hito-shell-profile-trigger:focus-visible {
+  .hito-surface-quiet:where(button, a, [role="button"]):focus-visible {
     outline: none;
     box-shadow: 0 0 0 2px var(--color-ring);
   }
@@ -176,16 +138,14 @@
     display: grid;
     min-height: clamp(20rem, 38vw, 29rem);
     place-items: center;
-    border-radius: var(--radius-xl);
-    border: 1px solid color-mix(in oklch, var(--color-hairline) 46%, transparent);
-    background:
-      radial-gradient(
-        ellipse at 18% 0%,
-        color-mix(in oklch, var(--color-signal) 5%, transparent),
-        transparent 48%
-      ),
-      color-mix(in oklch, var(--color-background) 18%, transparent);
+    border: 0;
+    border-radius: var(--radius-3xl);
+    background: var(--color-background);
     padding: clamp(1.75rem, 4vw, 3rem);
+  }
+
+  [data-hito-theme="light"] .hito-ds-playground-stage[data-mode="demo"] {
+    background: var(--color-surface);
   }
 
   .hito-ds-playground-stage[data-mode="variants"] {
@@ -261,8 +221,7 @@
     display: none;
     min-width: 0;
     border-right: 1px solid var(--color-hairline);
-    background: color-mix(in oklch, var(--color-sidebar) 70%, transparent);
-    backdrop-filter: blur(18px);
+    background: var(--color-sidebar);
   }
 
   .hito-workbench-sidebar-footer {
@@ -273,6 +232,11 @@
   .hito-workbench-main {
     --hito-workbench-anchor-offset: 10.5rem;
     min-width: 0;
+    background: var(--color-surface);
+  }
+
+  [data-hito-theme="light"] .hito-workbench-main {
+    background: var(--color-background);
   }
 
   .hito-workbench-main :where(.ds-section, .hito-page-header[id], .hito-specimen-link[id]) {

@@ -65,6 +65,7 @@ import {
   buildManualDraftInput,
   cloneManualWorkoutEntries,
   formatReadableDate,
+  getDefaultManualWorkoutTemplate,
   templateIconKind,
   templateIconTone,
   templateRunnerFacingLabel,
@@ -699,8 +700,10 @@ export function ManualWorkoutAddMenu({
               >
                 <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="arrow-right" size="xs" />
                 <span className="min-w-0">
-                  <span className="hito-list-row-title block">Move selected workout here</span>
-                  <span className="hito-list-row-copy block">
+                  <span className="hito-body-md text-foreground block">
+                    Move selected workout here
+                  </span>
+                  <span className="hito-body-sm mt-1 text-secondary block">
                     {moveTargetMenuCopy(moveTargetDayKind)}
                   </span>
                 </span>
@@ -712,8 +715,8 @@ export function ManualWorkoutAddMenu({
               >
                 <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="close" size="xs" />
                 <span className="min-w-0">
-                  <span className="hito-list-row-title block">Cancel move</span>
-                  <span className="hito-list-row-copy block">
+                  <span className="hito-body-md text-foreground block">Cancel move</span>
+                  <span className="hito-body-sm mt-1 text-secondary block">
                     Keep the source workout where it is.
                   </span>
                 </span>
@@ -730,8 +733,8 @@ export function ManualWorkoutAddMenu({
               >
                 <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="copy" size="xs" />
                 <span className="min-w-0">
-                  <span className="hito-list-row-title block">Paste copied workout</span>
-                  <span className="hito-list-row-copy block">
+                  <span className="hito-body-md text-foreground block">Paste copied workout</span>
+                  <span className="hito-body-sm mt-1 text-secondary block">
                     Save the copied workout into this empty day.
                   </span>
                 </span>
@@ -748,8 +751,10 @@ export function ManualWorkoutAddMenu({
               >
                 <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="edit" size="xs" />
                 <span className="min-w-0">
-                  <span className="hito-list-row-title block">Start from scratch</span>
-                  <span className="hito-list-row-copy block">Start with a blank workout.</span>
+                  <span className="hito-body-md text-foreground block">Start from scratch</span>
+                  <span className="hito-body-sm mt-1 text-secondary block">
+                    Start with a blank workout.
+                  </span>
                 </span>
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -759,8 +764,8 @@ export function ManualWorkoutAddMenu({
               >
                 <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="workout" size="xs" />
                 <span className="min-w-0">
-                  <span className="hito-list-row-title block">Choose template</span>
-                  <span className="hito-list-row-copy block">
+                  <span className="hito-body-md text-foreground block">Choose template</span>
+                  <span className="hito-body-sm mt-1 text-secondary block">
                     Browse built-in and saved templates.
                   </span>
                 </span>
@@ -778,8 +783,8 @@ export function ManualWorkoutAddMenu({
                 >
                   <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="minus" size="xs" />
                   <span className="min-w-0">
-                    <span className="hito-list-row-title block">Add rest day</span>
-                    <span className="hito-list-row-copy block">
+                    <span className="hito-body-md text-foreground block">Add rest day</span>
+                    <span className="hito-body-sm mt-1 text-secondary block">
                       Create an intentional no-run day.
                     </span>
                   </span>
@@ -998,8 +1003,8 @@ export function ManualWorkoutConstructorDialog({
           />
         ) : (
           <DialogHeader className="hito-product-dialog-header">
-            <DialogTitle className="hito-ui-modal-title">Manual workout</DialogTitle>
-            <DialogDescription className="hito-body">
+            <DialogTitle className="hito-ui-title-md text-foreground">Manual workout</DialogTitle>
+            <DialogDescription className="hito-body-md text-secondary">
               Choose a date and template before reviewing.
             </DialogDescription>
           </DialogHeader>
@@ -1105,7 +1110,7 @@ function ManualReviewedDraftNotice({
 }) {
   if (review.review.warnings.length === 0 && !confirmMessage) {
     return (
-      <p className="hito-field-helper">
+      <p className="hito-body-xs text-secondary">
         Hito reviewed this workout. Nothing is saved until you confirm.
       </p>
     );
@@ -1115,11 +1120,13 @@ function ManualReviewedDraftNotice({
     <div className="hito-list-row items-start">
       <div className="grid min-w-0 gap-2">
         {review.review.warnings.map((warning) => (
-          <p key={warning} className="hito-field-helper">
+          <p key={warning} className="hito-body-xs text-secondary">
             Warning: {warning}
           </p>
         ))}
-        {confirmMessage ? <p className="hito-field-error">{confirmMessage}</p> : null}
+        {confirmMessage ? (
+          <p className="hito-body-md font-medium text-negative">{confirmMessage}</p>
+        ) : null}
       </div>
     </div>
   );
@@ -1187,15 +1194,15 @@ function ManualSaveTemplateAction({
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-ui-modal-title">Save as template</DialogTitle>
-          <DialogDescription className="hito-body">
+          <DialogTitle className="hito-ui-title-md text-foreground">Save as template</DialogTitle>
+          <DialogDescription className="hito-body-md text-secondary">
             Save this reviewed workout as a personal template. Hito rebuilds and checks it before it
             appears in your picker.
           </DialogDescription>
         </DialogHeader>
         <div className="hito-product-dialog-body grid gap-4">
           <label className="grid gap-2">
-            <span className="hito-form-label">Template name</span>
+            <span className="hito-label-md text-foreground">Template name</span>
             <Input
               size="md"
               variant="primary"
@@ -1206,7 +1213,7 @@ function ManualSaveTemplateAction({
           </label>
 
           <label className="grid gap-2">
-            <span className="hito-form-label">Calendar icon</span>
+            <span className="hito-label-md text-foreground">Calendar icon</span>
             <Select value={iconKey} onValueChange={(value) => setIconKey(value as CalendarIconKey)}>
               <SelectTrigger aria-label="Template calendar icon">
                 <SelectValue placeholder="Calendar icon" />
@@ -1222,12 +1229,12 @@ function ManualSaveTemplateAction({
                 ))}
               </SelectContent>
             </Select>
-            <span className="hito-field-helper">
+            <span className="hito-body-xs text-secondary">
               This icon only changes how your personal template appears in the picker.
             </span>
           </label>
 
-          {error ? <p className="hito-field-error">{error}</p> : null}
+          {error ? <p className="hito-body-md font-medium text-negative">{error}</p> : null}
         </div>
         <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
           <HitoButton
@@ -1260,9 +1267,11 @@ export function ManualReviewResultNotice({ result }: { result: ManualWorkoutDraf
     return (
       <div className="hito-list-row items-start">
         <div className="min-w-0">
-          <p className="hito-list-row-title">{result.review.headline}</p>
-          <p className="hito-list-row-copy">{manualReviewReadyInlineSummary(result)}</p>
-          <p className="hito-field-helper">
+          <p className="hito-body-md text-foreground">{result.review.headline}</p>
+          <p className="hito-body-sm mt-1 text-secondary">
+            {manualReviewReadyInlineSummary(result)}
+          </p>
+          <p className="hito-body-xs text-secondary">
             Nothing is saved until you confirm this reviewed workout.
           </p>
         </div>
@@ -1293,10 +1302,13 @@ function ManualRejectedNotice({ result }: { result: ManualReviewRejected }) {
   return (
     <div className="hito-list-row items-start">
       <div className="grid min-w-0 gap-2">
-        <p className="hito-list-row-title">Review blocked</p>
-        <p className="hito-list-row-copy">{result.message}</p>
+        <p className="hito-body-md text-foreground">Review blocked</p>
+        <p className="hito-body-sm mt-1 text-secondary">{result.message}</p>
         {result.issues.map((issue) => (
-          <p key={`${issue.code}-${issue.message}`} className="hito-field-error">
+          <p
+            key={`${issue.code}-${issue.message}`}
+            className="hito-body-md font-medium text-negative"
+          >
             {issue.message}
           </p>
         ))}
@@ -1333,7 +1345,9 @@ function constructorIconTone(
   selection: ManualDraftSelection,
   selectedTemplate: ManualWorkoutTemplate | null,
 ) {
-  if (selection.kind === "saved") return calendarIconToneColor(selection.template.iconKey);
+  if (selection.kind === "saved") {
+    return templateIconTone(getDefaultManualWorkoutTemplate(selection.template.templateKey));
+  }
   return templateIconTone(selectedTemplate);
 }
 
@@ -1489,15 +1503,4 @@ function calendarIconLabel(iconKey: CalendarIconKey) {
     .split("_")
     .map((part) => part[0]?.toUpperCase() + part.slice(1))
     .join(" ");
-}
-
-function calendarIconToneColor(iconKey: CalendarIconKey) {
-  if (iconKey === "rest") return "var(--color-muted-foreground)";
-  if (iconKey === "long") return "var(--color-signal)";
-  if (iconKey === "tempo" || iconKey === "intervals" || iconKey === "hills") {
-    return "var(--color-warning)";
-  }
-  if (iconKey === "trail") return "var(--color-success)";
-  if (iconKey === "recovery") return "var(--color-info)";
-  return "var(--color-foreground)";
 }

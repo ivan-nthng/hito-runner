@@ -397,13 +397,13 @@ export function ManualWorkoutConstructorEditor({
       >
         {source === "scratch" ? (
           <div className="hito-manual-workout-type-row">
-            <span className="hito-form-label">Workout type</span>
+            <span className="hito-label-md text-foreground">Workout type</span>
             <ManualScratchWorkoutTypePicker
               onChange={onScratchTemplateChange}
               selectedTemplateKey={selectedTemplateKey}
               templateOptions={templateOptions}
             />
-            <span className="hito-field-helper">
+            <span className="hito-body-xs text-secondary">
               Scratch starts empty. Choose the kind of run, then add the blocks you want reviewed.
             </span>
           </div>
@@ -495,10 +495,10 @@ export function ManualWorkoutConstructorEditor({
               {isRestDraft ? "Rest" : "Empty"}
             </span>
             <div className="min-w-0">
-              <p className="hito-list-row-title">
+              <p className="hito-body-md text-foreground">
                 {isRestDraft ? "No run blocks" : "Add workout section"}
               </p>
-              <p className="hito-list-row-copy">
+              <p className="hito-body-sm mt-1 text-secondary">
                 {isRestDraft
                   ? "Rest/no-run structure is represented without fake workout targets."
                   : "Choose a run type and add at least one duration or distance block before review."}
@@ -508,14 +508,14 @@ export function ManualWorkoutConstructorEditor({
         )}
 
         {entriesLocked ? (
-          <p className="hito-field-helper">
+          <p className="hito-body-xs text-secondary">
             Saved template structure is rebuilt for review; title and notes can still be adjusted.
           </p>
         ) : null}
       </section>
 
       <label className="grid gap-2">
-        <span className="hito-form-label">Notes or cues</span>
+        <span className="hito-label-md text-foreground">Notes or cues</span>
         <Textarea
           className="resize-none"
           size="md"
@@ -627,7 +627,7 @@ function ManualTargetGuidanceSection({
   if (onTargetTruthModeChange && allowedTargetTruthModes.length > 1) {
     return (
       <section className="grid gap-2">
-        <span className="hito-form-label">How to approach it</span>
+        <span className="hito-label-md text-foreground">How to approach it</span>
         <Select
           value={targetTruthMode}
           onValueChange={(value) => onTargetTruthModeChange(value as ManualWorkoutTargetTruthMode)}
@@ -643,18 +643,18 @@ function ManualTargetGuidanceSection({
             ))}
           </SelectContent>
         </Select>
-        <span className="hito-field-helper">{guidanceCopy}</span>
+        <span className="hito-body-xs text-secondary">{guidanceCopy}</span>
       </section>
     );
   }
 
   return (
     <section className="grid gap-2">
-      <span className="hito-form-label">How to approach it</span>
+      <span className="hito-label-md text-foreground">How to approach it</span>
       <div className="hito-list-row hito-manual-workout-guidance-row items-start">
         <div className="min-w-0">
-          <p className="hito-list-row-title">{guidanceLabel}</p>
-          <p className="hito-list-row-copy">{guidanceCopy}</p>
+          <p className="hito-body-md text-foreground">{guidanceLabel}</p>
+          <p className="hito-body-sm mt-1 text-secondary">{guidanceCopy}</p>
         </div>
       </div>
     </section>
@@ -990,7 +990,7 @@ function ManualWorkoutEntryRow({
         <div className="hito-manual-workout-step-overlay">
           <div className="hito-manual-workout-repeat-header">
             <div className="hito-manual-workout-repeat-header-controls">
-              <span className="hito-form-label">Repeats</span>
+              <span className="hito-label-md text-foreground">Repeats</span>
               <ManualRepeatCountField
                 disabled={!editable}
                 group={entry.group}
@@ -1330,7 +1330,7 @@ function ManualBlockIdentityFields({
 }) {
   return (
     <label className="hito-manual-workout-label-field grid gap-2">
-      <span className="hito-form-label">Section name</span>
+      <span className="hito-label-md text-foreground">Section name</span>
       <Input
         size="sm"
         variant="secondary"
@@ -1366,7 +1366,7 @@ function ManualBlockQuantityFields({
     return (
       <div className="grid gap-3">
         <label className="grid gap-2">
-          <span className="hito-form-label">{roleLabel} cue</span>
+          <span className="hito-label-md text-foreground">{roleLabel} cue</span>
           <Textarea
             className="resize-none"
             size="md"
@@ -1563,7 +1563,7 @@ function ManualDistancePartsInput({
       <span className="sr-only">{roleLabel} distance</span>
       <div className="hito-manual-workout-compound-inputs">
         <label className="hito-manual-workout-unit-field">
-          <span className="hito-form-label">km</span>
+          <span className="hito-label-md text-foreground">km</span>
           <Input
             className="hito-manual-workout-unit-input"
             size="sm"
@@ -1581,7 +1581,7 @@ function ManualDistancePartsInput({
           />
         </label>
         <label className="hito-manual-workout-unit-field">
-          <span className="hito-form-label">m</span>
+          <span className="hito-label-md text-foreground">m</span>
           <Input
             aria-invalid={metersInvalid || undefined}
             className="hito-manual-workout-unit-input"
@@ -1602,7 +1602,9 @@ function ManualDistancePartsInput({
           />
         </label>
       </div>
-      {metersInvalid ? <span className="hito-field-error">Meters must be 0-999.</span> : null}
+      {metersInvalid ? (
+        <span className="hito-body-md font-medium text-negative">Meters must be 0-999.</span>
+      ) : null}
     </div>
   );
 }
@@ -1617,7 +1619,7 @@ function parseWholeNumberDraft(value: string, fallback: number) {
 function PickerField({ children, label }: { children: ReactNode; label: string }) {
   return (
     <div className="grid gap-2">
-      <span className="hito-form-label">{label}</span>
+      <span className="hito-label-md text-foreground">{label}</span>
       {children}
     </div>
   );
@@ -1715,8 +1717,10 @@ function ManualScratchWorkoutTypePickerDialog({
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-ui-modal-title">Choose workout type</DialogTitle>
-          <DialogDescription className="hito-body">
+          <DialogTitle className="hito-ui-title-md text-foreground">
+            Choose workout type
+          </DialogTitle>
+          <DialogDescription className="hito-body-md text-secondary">
             Pick the kind of workout to build. The draft stays editable and Hito reviews it before
             anything is saved.
           </DialogDescription>
@@ -1774,7 +1778,7 @@ function ManualTemplateChoiceRows({
           >
             <ManualWorkoutTemplateColorIndicator template={template} />
             <span className="min-w-0">
-              <span className="hito-list-row-title block">{label}</span>
+              <span className="hito-body-md text-foreground block">{label}</span>
             </span>
           </button>
         );
@@ -1891,8 +1895,10 @@ function ManualBlockTypePickerDialog({
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-ui-modal-title">Choose {label.toLowerCase()}</DialogTitle>
-          <DialogDescription className="hito-body">
+          <DialogTitle className="hito-ui-title-md text-foreground">
+            Choose {label.toLowerCase()}
+          </DialogTitle>
+          <DialogDescription className="hito-body-md text-secondary">
             Pick the block type. Duration, distance, and labels stay editable after selection.
           </DialogDescription>
         </DialogHeader>
@@ -2288,8 +2294,8 @@ function ManualAddPiecePickerDialog({
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-ui-modal-title">Add Section</DialogTitle>
-          <DialogDescription className="hito-body">
+          <DialogTitle className="hito-ui-title-md text-foreground">Add Section</DialogTitle>
+          <DialogDescription className="hito-body-md text-secondary">
             Choose one section for this manual workout. Hito reviews the full draft before anything
             is saved.
           </DialogDescription>
@@ -2298,7 +2304,7 @@ function ManualAddPiecePickerDialog({
         <div className="hito-product-dialog-body-scroll-fill grid gap-4">
           {allowRepeatGroup && onAddRepeatGroup ? (
             <section className="grid gap-2">
-              <p className="hito-label">Repeat</p>
+              <p className="hito-label-md text-foreground">Repeat</p>
               <div className="hito-row-group">
                 <button
                   type="button"
@@ -2310,8 +2316,8 @@ function ManualAddPiecePickerDialog({
                     Repeat
                   </span>
                   <span className="min-w-0">
-                    <span className="hito-list-row-title block">Add Repeat</span>
-                    <span className="hito-list-row-copy block">
+                    <span className="hito-body-md text-foreground block">Add Repeat</span>
+                    <span className="hito-body-sm mt-1 text-secondary block">
                       Add a container whose sections repeat together.
                     </span>
                   </span>
@@ -2462,7 +2468,7 @@ function ManualBlockChoiceGroup({
 
   return (
     <section className="grid gap-2">
-      <p className="hito-label">{group.label}</p>
+      <p className="hito-label-md text-foreground">{group.label}</p>
       <div className="hito-row-group">
         {items.map((blockKey) => {
           const selected = showCurrent && currentBlockKey === blockKey;
@@ -2484,8 +2490,10 @@ function ManualBlockChoiceGroup({
                 {blockShortLabel(blockKey)}
               </span>
               <span className="min-w-0">
-                <span className="hito-list-row-title block">{blockLabel(blockKey)}</span>
-                {selected ? <span className="hito-list-row-copy block">Current type</span> : null}
+                <span className="hito-body-md text-foreground block">{blockLabel(blockKey)}</span>
+                {selected ? (
+                  <span className="hito-body-sm mt-1 text-secondary block">Current type</span>
+                ) : null}
               </span>
             </button>
           );

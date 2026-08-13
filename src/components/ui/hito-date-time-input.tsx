@@ -87,7 +87,7 @@ export function HitoDateField({
 
   return (
     <div className={cn("grid gap-2", className)}>
-      <label htmlFor={id} className="hito-form-label">
+      <label htmlFor={id} className="hito-label-md">
         {label}
       </label>
       <Popover
@@ -293,7 +293,7 @@ export function HitoEditableDateField({
             <span className="hito-editable-value-field-content">
               {hasSavedValue ? (
                 <>
-                  <span className="hito-micro-label hito-editable-value-field-label">{label}</span>
+                  <span className="hito-label-md hito-editable-value-field-label">{label}</span>
                   <span className="hito-editable-value-field-text">{value}</span>
                 </>
               ) : (
@@ -390,7 +390,7 @@ export function HitoMaskedTimeField({
 }) {
   return (
     <div className="grid gap-2">
-      <span className="hito-form-label">{label}</span>
+      <span className="hito-label-md">{label}</span>
       <Input
         id={id}
         type="text"

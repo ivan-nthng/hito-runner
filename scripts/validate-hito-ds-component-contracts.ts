@@ -16,11 +16,17 @@ import {
   moveHitoSelection,
   sanitizeHitoSelectionIdPart,
 } from "../src/components/ui/hito-selection-mechanics";
+import { HITO_MARK_META, HITO_MARK_SHAPES, HITO_MARK_SIZES } from "../src/components/ui/hito-mark";
 import {
   WORKOUT_LIBRARY_CANONICAL_IDENTITY_COUNT,
   WORKOUT_LIBRARY_IDENTITY_COUNT,
 } from "../src/components/hito-ds/workout-library-playground-data";
-import { HITO_TYPOGRAPHY_ROLES } from "../src/lib/hito-typography-roles";
+import { HITO_DS_MANIFEST as GENERATED_HITO_DS_MANIFEST } from "../src/generated/hito-ds-manifest";
+import {
+  HITO_INSPECTOR_TYPOGRAPHY_ROLES,
+  HITO_TYPOGRAPHY_GROUPS,
+  HITO_TYPOGRAPHY_ROLES,
+} from "../src/lib/hito-typography-roles";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const calendarCssPath = path.join(rootDir, "src/styles/calendar-state-surfaces.css");
@@ -28,10 +34,12 @@ const controlsCssPath = path.join(rootDir, "src/styles/controls-lists.css");
 const fieldBaseCssPath = path.join(rootDir, "src/styles/controls-fields.css");
 const fieldsCssPath = path.join(rootDir, "src/styles/forms-onboarding.css");
 const foundationsCssPath = path.join(rootDir, "src/styles/foundations.css");
+const rootStylesCssPath = path.join(rootDir, "src/styles.css");
 const typographyCssPath = path.join(rootDir, "src/styles/layout-typography.css");
 const referenceWorkbenchCssPath = path.join(rootDir, "src/styles/reference-workbench.css");
 const shellCssPath = path.join(rootDir, "src/styles/shell-admin-analytics.css");
 const generatedManifestPath = path.join(rootDir, "src/generated/hito-ds-manifest.json");
+const manifestGeneratorPath = path.join(rootDir, "scripts/generate-hito-ds-manifest.mjs");
 const retiredFoundationProofPath = path.join(
   rootDir,
   "scripts/validate-hito-ds-foundation-cleanup.mjs",
@@ -48,11 +56,7 @@ const componentClassResolvers = [
   "hitoChoiceToggleClasses",
   "hitoFieldClasses",
 ] as const;
-const showcaseImportPrefixes = [
-  "@/components/hito-ds/",
-  "@/generated/hito-ds-manifest",
-  "@/routes/hitoDS",
-] as const;
+const showcaseImportPrefixes = ["@/components/hito-ds/", "@/routes/hitoDS"] as const;
 const devtoolsReferenceMetadataImport = "@/components/hito-ds/reference-metadata";
 const demoStatePrimitiveAllowlist = new Set([
   "src/components/ui/editable-value-field.tsx",
@@ -138,6 +142,48 @@ const retiredWorkoutReferenceMarkers = [
   "mapped to primitives",
   "role.primitive",
 ] as const;
+const workoutTypeRoleNames = [
+  "rest",
+  "recovery",
+  "easy",
+  "steady",
+  "long-run",
+  "progression",
+  "tempo",
+  "intervals",
+  "race",
+  "hills",
+  "trail",
+  "run-walk",
+] as const;
+const workoutTypeSlotNames = [
+  "base",
+  "foreground",
+  "content",
+  "muted",
+  "surface",
+  "hover",
+  "active",
+  "border",
+  "ring",
+] as const;
+const expectedMarkNames = [
+  "rest",
+  "recovery",
+  "easy",
+  "steady",
+  "long",
+  "tempo",
+  "intervals",
+  "progression",
+  "race",
+  "hills",
+  "trail",
+  "hito-running",
+  "admin",
+  "design-system",
+  "changelog",
+] as const;
 const referenceManualRecipePatterns = [
   {
     family: "Button",
@@ -178,10 +224,35 @@ type SourceFile = {
   relativePath: string;
 };
 
+type GeneratedColorProvenance = {
+  aliasChain: string[];
+  alpha: number | null;
+  kind: "alias" | "alpha" | "formula" | "primitive" | "transparent";
+  references: Array<{ cssVariable: string; percentage: number | null }>;
+  source: string;
+};
+
 type GeneratedManifest = {
+  schemaVersion: number;
   collections: {
+    primitiveColor: Array<{
+      alias: string | null;
+      cssVariable: string;
+      id: string;
+      provenance: GeneratedColorProvenance;
+      value: string;
+    }>;
     primitiveSpacing: Array<{ cssVariable: string; id: string }>;
-    semanticColor: Array<{ cssVariable: string; id: string }>;
+    semanticColor: Array<{
+      channels: Array<"border" | "fill" | "text">;
+      cssVariable: string;
+      id: string;
+      label: string;
+      modes: Record<
+        "dark" | "light",
+        { alias: string | null; provenance: GeneratedColorProvenance; value: string }
+      >;
+    }>;
     [key: string]: unknown;
   };
   sourceDigest?: string;
@@ -367,7 +438,6 @@ function isShowcaseImport(relativePath: string, specifier: string) {
   );
   return (
     resolvedSpecifier.startsWith("src/components/hito-ds/") ||
-    resolvedSpecifier === "src/generated/hito-ds-manifest" ||
     /^src\/routes\/hitoDS(?:[._]|$)/.test(resolvedSpecifier)
   );
 }
@@ -555,20 +625,62 @@ const sourceFiles = (
     collectSourceFiles(path.join(rootDir, "src/styles")),
   ])
 ).flat();
+const retiredTypographyClassNames = [
+  "hito-ui-page-title",
+  "hito-ui-modal-title",
+  "hito-ui-section-title",
+  "hito-ui-panel-title",
+  "hito-display-title",
+  "hito-page-title",
+  "hito-modal-title",
+  "hito-section-title",
+  "hito-panel-title",
+  "hito-page-copy",
+  "hito-body",
+  "hito-body-small",
+  "hito-section-subtitle",
+  "hito-support-copy",
+  "hito-caption",
+  "hito-form-label",
+  "hito-micro-label",
+  "hito-technical-mono",
+  "hito-label",
+] as const;
+const retiredTypographyClassFindings = sourceFiles.flatMap((file) =>
+  retiredTypographyClassNames
+    .filter((className) =>
+      new RegExp(`(?:^|[^a-zA-Z0-9_-])${escapeRegExp(className)}(?![a-zA-Z0-9_-])`).test(
+        file.content,
+      ),
+    )
+    .map((className) => `${file.relativePath}: ${className}`),
+);
 const foundationSearchFiles = (await collectSourceFiles(path.join(rootDir, "src"))).filter((file) =>
   /\.(css|ts|tsx)$/.test(file.relativePath),
+);
+const typographyProvenanceIds = new Set(
+  foundationSearchFiles.flatMap((file) =>
+    [...file.content.matchAll(/--hito-typography-role\s*:\s*([a-z0-9-]+)/g)].map(
+      (match) => match[1],
+    ),
+  ),
+);
+const localUiInspectorTargets = foundationSearchFiles.find(
+  (file) => file.relativePath === "src/components/devtools/local-ui-inspector-targets.ts",
 );
 const calendarCss = await readFile(calendarCssPath, "utf8");
 const controlsCss = await readFile(controlsCssPath, "utf8");
 const fieldBaseCss = await readFile(fieldBaseCssPath, "utf8");
 const fieldExtendedCss = await readFile(fieldsCssPath, "utf8");
 const foundationsCss = await readFile(foundationsCssPath, "utf8");
+const rootStylesCss = await readFile(rootStylesCssPath, "utf8");
 const typographyCss = await readFile(typographyCssPath, "utf8");
 const referenceWorkbenchCss = await readFile(referenceWorkbenchCssPath, "utf8");
 const shellCss = await readFile(shellCssPath, "utf8");
 const generatedManifest = JSON.parse(
   await readFile(generatedManifestPath, "utf8"),
 ) as GeneratedManifest;
+const manifestGeneratorSource = await readFile(manifestGeneratorPath, "utf8");
 const redundantFoundationProofExists = await pathExists(retiredFoundationProofPath);
 const currentReferenceDocs = await Promise.all(
   ["docs/current-product.md", "docs/current-system.md", "docs/current-state.md"].map(
@@ -590,16 +702,55 @@ const overlaysFeedbackSource = sourceFiles.find(
 );
 const hubRoute = sourceFiles.find((file) => file.relativePath === "src/routes/hub.tsx");
 const showcaseBoundaryLeaks = showcaseBoundaryLeakFindings(sourceFiles);
-const uiTitleRoles = HITO_TYPOGRAPHY_ROLES.filter((role) => role.group === "ui-title");
-const editorialTitleRoles = HITO_TYPOGRAPHY_ROLES.filter((role) => role.group === "display");
-const typographyRolesById = new Map(HITO_TYPOGRAPHY_ROLES.map((role) => [role.id, role]));
-const titleLineBoxProperties = [
-  "font-size",
-  "font-weight",
-  "letter-spacing",
-  "line-height",
-  "text-wrap",
+const targetTypographyRoleIds = [
+  "ui-title-xl",
+  "ui-title-lg",
+  "ui-title-md",
+  "ui-title-sm",
+  "ui-title-xs",
+  "display-title-xl",
+  "display-title-lg",
+  "body-lg",
+  "body-md",
+  "body-sm",
+  "body-xs",
+  "label-md",
+  "label-sm",
+  "technical-sm",
 ] as const;
+const componentBoundTypographyRoleIds = ["button", "nav-menu", "metric", "status"] as const;
+const retiredTypographyRoleIds = [
+  "ui-page-title",
+  "ui-modal-title",
+  "ui-section-title",
+  "ui-panel-title",
+  "display-title",
+  "page-title",
+  "modal-title",
+  "section-title",
+  "panel-title",
+  "list-row-title",
+  "body",
+  "body-small",
+  "helper",
+  "caption",
+  "label",
+  "form-label",
+  "micro-label",
+  "technical-mono",
+  "error-success",
+] as const;
+const targetTypographyRoles = HITO_TYPOGRAPHY_ROLES.filter((role) => role.figmaTextStyle);
+const componentBoundTypographyRoles = HITO_TYPOGRAPHY_ROLES.filter(
+  (role) => role.group === "component-bound",
+);
+const legacyTypographyBridgeRoles = HITO_TYPOGRAPHY_ROLES.filter(
+  (role) => String(role.group) === "legacy-bridge",
+);
+const typographyFamilySpecimens = HITO_TYPOGRAPHY_GROUPS.flatMap((group) =>
+  group.familySpecimen ? [group.familySpecimen] : [],
+);
+const typographyRolesById = new Map(HITO_TYPOGRAPHY_ROLES.map((role) => [role.id, role]));
 const neutralChromeTokenIds = [
   "chrome-clear",
   "chrome-subtle",
@@ -616,7 +767,121 @@ const neutralChromeTokenIds = [
   "text-informative",
   "text-warning",
 ] as const;
-
+const primitiveColorExportSection = foundationsCss.match(
+  /\/\* @hito-export-start primitive-color \*\/([\s\S]*?)\/\* @hito-export-end primitive-color \*\//,
+)?.[1];
+const exportedPrimitiveColorIds = [
+  ...(primitiveColorExportSection?.matchAll(/(--[a-z0-9-]+)\s*:/gi) ?? []),
+].map((match) => match[1].slice(2));
+const semanticColorExportSection = foundationsCss.match(
+  /\/\* @hito-export-start semantic-color-dark \*\/([\s\S]*?)\/\* @hito-export-end semantic-color-dark \*\//,
+)?.[1];
+const exportedSemanticColorIds = [
+  ...(semanticColorExportSection?.matchAll(/(--[a-z0-9-]+)\s*:/gi) ?? []),
+].map((match) => match[1].slice(2));
+const semanticColorChannelVocabulary = new Set(["text", "fill", "border"]);
+const colorProvenanceKindVocabulary = new Set([
+  "alias",
+  "alpha",
+  "formula",
+  "primitive",
+  "transparent",
+]);
+const isValidColorProvenance = (provenance: GeneratedColorProvenance, value: string) =>
+  colorProvenanceKindVocabulary.has(provenance.kind) &&
+  provenance.source === value &&
+  Array.isArray(provenance.aliasChain) &&
+  (provenance.alpha === null ||
+    (Number.isFinite(provenance.alpha) && provenance.alpha >= 0 && provenance.alpha <= 1)) &&
+  provenance.references.every(
+    (reference) =>
+      /^--[a-z0-9-]+$/.test(reference.cssVariable) &&
+      (reference.percentage === null ||
+        (Number.isFinite(reference.percentage) &&
+          reference.percentage >= 0 &&
+          reference.percentage <= 100)),
+  );
+const semanticColorMetadataOwners = [
+  ...(manifestGeneratorSource.match(/const SEMANTIC_COLOR_CHANNELS\s*=/g) ?? []).map(
+    () => "scripts/generate-hito-ds-manifest.mjs",
+  ),
+  ...sourceFiles
+    .filter((file) => file.content.includes("SEMANTIC_COLOR_CHANNELS"))
+    .map((file) => file.relativePath),
+];
+const expectedSemanticSectionOrder = [
+  "Surfaces",
+  "Borders",
+  "Typography",
+  "Neutral chrome / overlays",
+  "Actions",
+  "Status / intent",
+] as const;
+expect(
+  generatedManifest.schemaVersion === 2,
+  `Expected additive Hito DS manifest schema version 2, received ${generatedManifest.schemaVersion}.`,
+);
+expect(
+  JSON.stringify(GENERATED_HITO_DS_MANIFEST) === JSON.stringify(generatedManifest),
+  "Generated TypeScript and JSON manifests must remain structurally identical.",
+);
+expect(
+  semanticColorExportSection !== undefined &&
+    JSON.stringify(
+      [...generatedManifest.collections.semanticColor.map((token) => token.id)].sort(),
+    ) === JSON.stringify([...exportedSemanticColorIds].sort()),
+  "Generated semantic colors must cover every exported Foundation semantic role.",
+);
+expect(
+  generatedManifest.collections.semanticColor.every(
+    (token) =>
+      token.label ===
+        token.id
+          .split("-")
+          .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+          .join(" ") &&
+      token.channels.length > 0 &&
+      new Set(token.channels).size === token.channels.length &&
+      token.channels.every((channel) => semanticColorChannelVocabulary.has(channel)),
+  ),
+  "Every generated semantic color must have its deterministic label and valid non-empty channel metadata.",
+);
+expect(
+  generatedManifest.collections.primitiveColor.every((token) =>
+    isValidColorProvenance(token.provenance, token.value),
+  ) &&
+    generatedManifest.collections.semanticColor.every((token) =>
+      (["dark", "light"] as const).every((mode) =>
+        isValidColorProvenance(token.modes[mode].provenance, token.modes[mode].value),
+      ),
+    ),
+  "Every generated primitive and semantic mode must retain valid generator-owned authored color provenance.",
+);
+const darkSemanticColors = new Map(
+  generatedManifest.collections.semanticColor.map((token) => [token.id, token.modes.dark]),
+);
+expect(
+  generatedManifest.collections.primitiveColor.find((token) => token.id === "sand-alpha-08")
+    ?.provenance.kind === "alpha" &&
+    generatedManifest.collections.primitiveColor.find((token) => token.id === "sand-alpha-08")
+      ?.provenance.alpha === 0.08 &&
+    darkSemanticColors.get("border")?.provenance.kind === "alias" &&
+    darkSemanticColors.get("border")?.provenance.aliasChain.includes("sand-alpha-08") === true &&
+    darkSemanticColors.get("border")?.provenance.alpha === 0.08 &&
+    darkSemanticColors.get("chrome-subtle")?.provenance.kind === "formula" &&
+    darkSemanticColors.get("chrome-subtle")?.provenance.references.length === 1 &&
+    darkSemanticColors.get("chrome-subtle")?.provenance.references[0]?.percentage === 8 &&
+    darkSemanticColors.get("chrome-subtle")?.provenance.alpha === 0.08 &&
+    darkSemanticColors.get("text-accent")?.provenance.kind === "formula" &&
+    darkSemanticColors.get("text-accent")?.provenance.references.length === 2 &&
+    darkSemanticColors.get("text-accent")?.provenance.alpha === null,
+  "Generated provenance must distinguish alpha primitives, direct aliases, single-source transparent mixes, and multi-source mixes.",
+);
+expect(
+  semanticColorMetadataOwners.length === 1 &&
+    semanticColorMetadataOwners[0] === "scripts/generate-hito-ds-manifest.mjs",
+  `Semantic color channel metadata must have one generator owner: ${semanticColorMetadataOwners.join(", ") || "none"}.`,
+);
 expect(
   neutralChromeTokenIds.every((id) =>
     generatedManifest.collections.semanticColor.some((token) => token.id === id),
@@ -640,70 +905,154 @@ expect(
 );
 
 expect(
-  uiTitleRoles.length === 4,
-  `Expected four canonical UI title roles, found ${uiTitleRoles.length}.`,
+  JSON.stringify(targetTypographyRoles.map((role) => role.id)) ===
+    JSON.stringify(targetTypographyRoleIds),
+  `Reusable typography target order drifted: ${targetTypographyRoles.map((role) => role.id).join(", ")}.`,
 );
 expect(
-  editorialTitleRoles.length === 5,
-  `Expected five retained editorial title roles, found ${editorialTitleRoles.length}.`,
+  JSON.stringify(HITO_INSPECTOR_TYPOGRAPHY_ROLES.map((role) => role.id)) ===
+    JSON.stringify(targetTypographyRoleIds),
+  `Local Inspector replacement roles must exactly match the 14-role target: ${HITO_INSPECTOR_TYPOGRAPHY_ROLES.map((role) => role.id).join(", ")}.`,
 );
 expect(
-  HITO_TYPOGRAPHY_ROLES.filter((role) => role.inspectorSelectable !== false).length === 18,
-  "The Local Inspector must preserve its existing roles and add the four source-backed UI titles.",
+  JSON.stringify(componentBoundTypographyRoles.map((role) => role.id)) ===
+    JSON.stringify(componentBoundTypographyRoleIds),
+  `Component-bound typography must remain Button, Nav/Menu, Metric, and Status only: ${componentBoundTypographyRoles.map((role) => role.id).join(", ")}.`,
 );
-uiTitleRoles.forEach((uiRole) => {
-  const editorialRoleId = uiRole.id.replace(/^ui-/, "");
-  const editorialRole = typographyRolesById.get(editorialRoleId);
-  const uiDeclarations = selectorDeclarations(typographyCss, `.${uiRole.className}`);
-  const editorialDeclarations = editorialRole
-    ? selectorDeclarations(typographyCss, `.${editorialRole.className}`)
-    : null;
+expect(
+  componentBoundTypographyRoles.every(
+    (role) => role.figmaTextStyle === false && role.inspectorSelectable === false,
+  ),
+  "Component-bound typography must stay recognition-only and outside Text Style export.",
+);
+expect(
+  HITO_TYPOGRAPHY_ROLES.length === 18 && legacyTypographyBridgeRoles.length === 0,
+  `The final typography registry must contain 14 reusable and four component-bound roles with no legacy bridge; received ${HITO_TYPOGRAPHY_ROLES.length} total and ${legacyTypographyBridgeRoles.length} legacy.`,
+);
+expect(
+  retiredTypographyClassFindings.length === 0,
+  `Retired typography class reachability returned:\n${retiredTypographyClassFindings.join("\n")}`,
+);
+expect(
+  retiredTypographyRoleIds.every((roleId) => !typographyProvenanceIds.has(roleId)) &&
+    JSON.stringify([...typographyProvenanceIds].sort()) ===
+      JSON.stringify([...targetTypographyRoleIds, ...componentBoundTypographyRoleIds].sort()),
+  `Typography provenance must contain only the 14 reusable and four component-bound roles; received ${[...typographyProvenanceIds].sort().join(", ")}.`,
+);
+expect(
+  rootStylesCss.includes(
+    "family=Fraunces:opsz,wght@9..144,400&family=JetBrains+Mono:wght@400;500&family=Poppins:wght@400;500;600&display=swap",
+  ) &&
+    !rootStylesCss.includes("wght@300") &&
+    !rootStylesCss.includes("300;"),
+  "Google Fonts must request only reachable weights: Fraunces 400, JetBrains Mono 400/500, and Poppins 400/500/600.",
+);
+expect(
+  JSON.stringify(typographyFamilySpecimens.map((specimen) => specimen.family)) ===
+    JSON.stringify(["Poppins", "Fraunces", "JetBrains Mono"]),
+  `Typography family specimens must derive from the central group registry: ${typographyFamilySpecimens.map((specimen) => specimen.family).join(", ")}.`,
+);
+targetTypographyRoles.forEach((role) => {
+  const declarations = selectorDeclarations(typographyCss, `.${role.className}`);
+  const expectedFamily =
+    role.group === "display"
+      ? "var(--font-display)"
+      : role.group === "technical"
+        ? "var(--font-mono)"
+        : "var(--font-sans)";
 
-  expect(editorialRole?.group === "display", `${uiRole.id} is missing its editorial counterpart.`);
+  expect(declarations !== null, `Missing canonical CSS owner for ${role.className}.`);
   expect(
-    uiRole.inspectorSelectable !== false && editorialRole?.inspectorSelectable !== false,
-    `${uiRole.id} and ${editorialRoleId} must remain available for their distinct UI/editorial contexts.`,
-  );
-  expect(uiDeclarations !== null, `Missing CSS owner for ${uiRole.className}.`);
-  expect(editorialDeclarations !== null, `Missing CSS owner for ${editorialRole?.className}.`);
-  expect(
-    uiDeclarations?.["--hito-typography-role"] === uiRole.id,
-    `${uiRole.className} is missing truthful typography provenance.`,
+    declarations?.["--hito-typography-role"] === role.id,
+    `${role.className} is missing truthful ${role.id} typography provenance.`,
   );
   expect(
-    uiDeclarations?.["font-family"] === "var(--font-sans)",
-    `${uiRole.className} must resolve through the canonical sans primitive.`,
+    declarations?.["font-family"] === expectedFamily,
+    `${role.className} must resolve through ${expectedFamily}.`,
   );
-  expect(
-    editorialDeclarations?.["font-family"] === "var(--font-display)",
-    `${editorialRole?.className} must remain explicitly editorial serif.`,
-  );
-  titleLineBoxProperties.forEach((property) => {
-    expect(
-      (uiDeclarations?.[property] ?? null) === (editorialDeclarations?.[property] ?? null),
-      `${uiRole.className} drifted from ${editorialRole?.className} ${property}.`,
-    );
-  });
 });
+expect(
+  localUiInspectorTargets?.content.includes(
+    "HITO_INSPECTOR_TYPOGRAPHY_ROLES.map(toTypographyRoleOption)",
+  ) === true &&
+    localUiInspectorTargets.content.includes("HITO_TYPOGRAPHY_ROLES.map((role)") &&
+    localUiInspectorTargets.content.includes("HITO_TYPOGRAPHY_ROLES_BY_ID.get(provenanceRoleId)"),
+  "Local Inspector must derive the 14 replacement options and all-role provenance recognition from the canonical registry.",
+);
 
 const shellProfileDeclarations = selectorDeclarations(shellCss, ".hito-shell-profile-trigger");
-expect(
-  referenceWorkbenchCss.includes(".hito-surface-quiet,\n  .hito-shell-profile-trigger {") &&
-    referenceWorkbenchCss.includes("var(--color-surface)") &&
-    referenceWorkbenchCss.includes("var(--color-surface-elevated)") &&
-    referenceWorkbenchCss.includes("border-radius: var(--radius-xl)") &&
-    referenceWorkbenchCss.includes(
-      '.hito-shell-profile-trigger:not(:disabled):not([aria-disabled="true"]):hover',
-    ) &&
-    referenceWorkbenchCss.includes("box-shadow: 0 0 0 2px var(--color-ring)"),
-  "Quiet surface and shell profile chrome must share one token-derived visual owner.",
+const shellProfileHoverDeclarations = selectorDeclarations(
+  shellCss,
+  '.hito-shell-profile-trigger:not(:disabled):not([aria-disabled="true"]):hover',
+);
+const shellProfileFocusDeclarations = selectorDeclarations(
+  shellCss,
+  ".hito-shell-profile-trigger:focus-visible",
 );
 expect(
-  shellProfileDeclarations?.border === undefined &&
-    shellProfileDeclarations?.["border-radius"] === undefined &&
-    shellProfileDeclarations?.background === undefined &&
-    shellProfileDeclarations?.["box-shadow"] === undefined,
-  "Shell profile chrome was duplicated outside the shared quiet-surface owner.",
+  shellProfileDeclarations?.border === "1px solid transparent" &&
+    shellProfileDeclarations?.["border-radius"] === "var(--radius-xl)" &&
+    shellProfileDeclarations?.background ===
+      "color-mix(in oklch, var(--color-surface) 42%, transparent)" &&
+    shellProfileDeclarations?.["box-shadow"] === "none" &&
+    shellProfileHoverDeclarations?.background ===
+      "color-mix(in oklch, var(--color-surface-elevated) 58%, transparent)" &&
+    shellProfileFocusDeclarations?.["box-shadow"] === "0 0 0 2px var(--color-ring)",
+  "Shell profile chrome must be owned completely by the shell component contract.",
+);
+expect(
+  referenceWorkbenchCss.includes(".hito-surface-quiet,\n  .hito-shell-profile-trigger {") ===
+    false &&
+    referenceWorkbenchCss.includes(
+      '.hito-shell-profile-trigger:not(:disabled):not([aria-disabled="true"]):hover',
+    ) === false &&
+    referenceWorkbenchCss.includes(".hito-shell-profile-trigger:focus-visible") === false,
+  "Shell profile chrome leaked back into the reference-only quiet-surface recipe.",
+);
+expect(
+  selectorDeclarations(overlaysFeedbackSource?.content ?? "", ".hito-surface") !== null &&
+    selectorDeclarations(overlaysFeedbackSource?.content ?? "", ".hito-surface-flat") !== null &&
+    selectorDeclarations(typographyCss, ".hito-icon") !== null &&
+    selectorDeclarations(typographyCss, ".hito-logo") !== null &&
+    selectorDeclarations(typographyCss, ".hito-logo-mark") !== null &&
+    referenceWorkbenchCss.includes("  .hito-surface {") === false &&
+    referenceWorkbenchCss.includes("  .hito-surface-flat {") === false &&
+    referenceWorkbenchCss.includes("  .hito-icon {") === false &&
+    referenceWorkbenchCss.includes("  .hito-logo {") === false &&
+    referenceWorkbenchCss.includes("  .hito-logo-mark {") === false,
+  "Shared surface, Icon, and Logo recipes must not use the reference workbench as their runtime owner.",
+);
+const retiredDocumentGlobalAliases = [
+  "--hito-route-support-sidebar-width",
+  "--hito-route-panel-skeleton-calendar-height",
+  "--hito-route-panel-skeleton-detail-height",
+  "--hito-form-section-label-width",
+  "--hito-readback-value-width",
+  "--hito-readback-value-compact-width",
+  "--hito-shell-menu-width-profile",
+  "--hito-shell-menu-width-plan",
+  "--hito-shell-menu-width-account",
+  "--hito-menu-width-standard",
+  "--hito-admin-quick-note-panel-width",
+  "--hito-data-table-code-width-sm",
+  "--hito-data-table-code-width-md",
+  "--hito-data-table-code-width-lg",
+  "--hito-data-table-action-width",
+  "--hito-data-table-note-width",
+  "--hito-tooltip-width-lg",
+  "--hito-manual-workout-title-min-width",
+  "--hito-manual-workout-step-summary-min-width",
+  "--hito-manual-workout-menu-width-add",
+  "--hito-manual-workout-menu-width-step",
+] as const;
+expect(
+  retiredDocumentGlobalAliases.every(
+    (alias) =>
+      fieldExtendedCss.includes(alias) === false &&
+      typographyCss.includes(alias) === false &&
+      shellCss.includes(alias) === false,
+  ),
+  "A proven single-owner geometry alias leaked back into document-global scope.",
 );
 
 expect(
@@ -863,6 +1212,24 @@ const figmaBoard = sourceFiles.find(
 const foundationsPage = sourceFiles.find(
   (file) => file.relativePath === "src/components/hito-ds/reference-foundations-page.tsx",
 );
+const markSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/ui/hito-mark.tsx",
+);
+const brandPage = sourceFiles.find(
+  (file) => file.relativePath === "src/components/hito-ds/reference-brand-page.tsx",
+);
+const foundationReferenceSurfaceCount =
+  (foundationsPage?.content.match(/hito-ds-token-specimen-surface/g)?.length ?? 0) +
+  (brandPage?.content.match(/hito-ds-token-specimen-surface/g)?.length ?? 0);
+const foundationFlatSurfaceCount =
+  (foundationsPage?.content.match(/hito-surface-flat/g)?.length ?? 0) +
+  (brandPage?.content.match(/hito-surface-flat/g)?.length ?? 0);
+const foundationMarkPlaygroundCount =
+  foundationsPage?.content.match(/<HitoDsPlayground/g)?.length ?? 0;
+const tokenSpecimenSurfaceDeclarations = selectorDeclarations(
+  referenceWorkbenchCss,
+  ".hito-ds-token-specimen-surface",
+);
 const workoutColorTokensSource = sourceFiles.find(
   (file) => file.relativePath === "src/lib/workout-color-tokens.ts",
 );
@@ -939,6 +1306,20 @@ const retiredWorkoutShadeDeclarations = [
   ...foundationsCss.matchAll(
     /--hito-workout-(?!type-|section-)[a-z-]+-(?:50|100|200|300|400|500|600|700|800|900|950)\s*:/g,
   ),
+].map((match) => match[0]);
+const workoutTypeSlotDeclarationCounts = workoutTypeRoleNames.flatMap((role) =>
+  workoutTypeSlotNames.map((slot) => {
+    const token = `--hito-workout-type-${role}-${slot}`;
+    const expectedCount = slot === "base" || slot === "foreground" || slot === "content" ? 2 : 1;
+    return {
+      count: foundationsCss.match(new RegExp(`${token}\\s*:`, "g"))?.length ?? 0,
+      expectedCount,
+      token,
+    };
+  }),
+);
+const workoutSectionContentDeclarations = [
+  ...foundationsCss.matchAll(/--hito-workout-section-[a-z-]+-content\s*:/g),
 ].map((match) => match[0]);
 
 expect(
@@ -1037,21 +1418,83 @@ expect(
   `Retired workout shade declarations returned: ${retiredWorkoutShadeDeclarations.join(", ")}`,
 );
 expect(
+  workoutTypeSlotDeclarationCounts.every(({ count, expectedCount }) => count === expectedCount),
+  `Workout type theme-specific/shared slot coverage drifted: ${workoutTypeSlotDeclarationCounts
+    .filter(({ count, expectedCount }) => count !== expectedCount)
+    .map(({ count, expectedCount, token }) => `${token} (${count}; expected ${expectedCount})`)
+    .join(", ")}`,
+);
+expect(
+  workoutSectionContentDeclarations.length === 0,
+  `Workout type content semantics leaked into the deferred section-role family: ${workoutSectionContentDeclarations.join(", ")}`,
+);
+expect(
   workoutColorTokensSource?.content.includes("WORKOUT_COLOR_STATE_SLOTS") === true &&
+    workoutColorTokensSource.content.includes('"content"') &&
     workoutColorTokensSource.content.includes("workoutTypeColorVar") &&
+    workoutColorTokensSource.content.includes("workoutFamilyColorToken") &&
     workoutColorTokensSource.content.includes("workoutSectionColorVar") &&
     retiredWorkoutColorApiMarkers.every(
       (marker) => workoutColorTokensSource.content.includes(marker) === false,
     ),
-  "Workout colors must expose only the semantic type and section TypeScript contract.",
+  "Workout colors must expose only the semantic type, family and section TypeScript contract.",
+);
+expect(
+  JSON.stringify(HITO_MARK_META.map((mark) => mark.name)) === JSON.stringify(expectedMarkNames) &&
+    HITO_MARK_META.filter((mark) => mark.family === "workout").length === 11 &&
+    HITO_MARK_META.filter((mark) => mark.family === "surface").length === 4 &&
+    HITO_MARK_META.reduce((count, mark) => count + mark.pathCount, 0) === 23 &&
+    HITO_MARK_META.every(
+      (mark) =>
+        /^0 0 \d+ \d+$/.test(mark.viewBox) &&
+        mark.opticalFit > 0 &&
+        mark.opticalFit <= 1 &&
+        mark.frameToken.startsWith("--") &&
+        mark.glyphToken.startsWith("--") &&
+        mark.contentToken.startsWith("--"),
+    ),
+  "Hito Mark must retain exactly 11 workout and four surface definitions with native viewBoxes, paths, optical fit and token provenance.",
+);
+expect(
+  JSON.stringify(HITO_MARK_SHAPES) === JSON.stringify(["tile", "circle"]) &&
+    JSON.stringify(Object.keys(HITO_MARK_SIZES)) ===
+      JSON.stringify(["xs", "sm", "md", "lg", "hero"]) &&
+    JSON.stringify(Object.values(HITO_MARK_SIZES).map((size) => size.className)) ===
+      JSON.stringify(["size-8", "size-10", "size-16", "size-32", "size-64"]),
+  "Hito Mark must expose only the approved two shapes and five existing-utility sizes.",
+);
+expect(
+  markSource?.content.includes('fill="currentColor"') === true &&
+    markSource.content.includes('preserveAspectRatio="xMidYMid meet"') &&
+    markSource.content.includes('role={decorative ? undefined : "img"}') &&
+    markSource.content.includes("HITO_MARK_DEFINITIONS") &&
+    /#[0-9a-f]{3,8}/i.test(markSource.content) === false &&
+    sourceFiles.filter((file) => file.content.includes("HITO_MARK_DEFINITIONS")).length === 1 &&
+    sourceFiles.filter((file) => file.content.includes("export function HitoMark")).length === 1,
+  "Hito Mark must have one currentColor owner with preserved aspect ratio and truthful decorative/labelled semantics.",
 );
 expect(
   foundationsPage?.content.includes('id="workout-semantic-type-colors"') === true &&
     foundationsPage.content.includes('id="workout-semantic-section-colors"') &&
+    foundationsPage.content.includes("data-hito-workout-role-card") &&
+    foundationsPage.content.includes("data-hito-workout-solid-contrast") &&
+    foundationsPage.content.includes('valueFor(hasContent ? "content" : "base")') &&
     retiredWorkoutReferenceMarkers.every(
       (marker) => foundationsPage.content.includes(marker) === false,
     ),
   "Foundations must document semantic workout roles without reviving raw shade ramps.",
+);
+expect(
+  foundationsPage?.content.includes('id="marks"') === true &&
+    foundationsPage.content.includes("HITO_MARK_META.map") &&
+    foundationsPage.content.includes("HITO_MARK_SHAPES.map") &&
+    foundationsPage.content.includes("Object.keys(HITO_MARK_SIZES)") &&
+    foundationsPage.content.includes("<HitoMark") &&
+    foundationMarkPlaygroundCount === 1 &&
+    foundationsPage.content.includes("data-hito-ds-mark-gallery") &&
+    foundationsPage.content.includes("MarkTokenProvenance") &&
+    foundationsPage.content.includes("data-hito-ds-mark-size-shape-matrix") === false,
+  "Foundations must document the canonical Mark inventory, playground, both shapes, five sizes, gallery and token provenance.",
 );
 const foundationGeometryDefinitions = [
   ...foundationsCss.matchAll(/(--hito-[a-z0-9-]*(?:width|height)[a-z0-9-]*)\s*:/gi),
@@ -1061,31 +1504,125 @@ expect(
   `Component geometry remains in foundations.css: ${foundationGeometryDefinitions.join(", ")}`,
 );
 expect(
-  [figmaBoard, foundationsPage, lightPaletteReference].every((file) =>
-    file?.content.includes("HITO_DS_MANIFEST"),
-  ),
-  "Figma board, Foundations page, and Light palette must consume HITO_DS_MANIFEST.",
+  [figmaBoard, foundationsPage].every((file) => file?.content.includes("HITO_DS_MANIFEST")),
+  "Figma board and Foundations page must consume HITO_DS_MANIFEST.",
+);
+expect(
+  lightPaletteReference === undefined &&
+    foundationsPage?.content.includes("light-palette-reference") === false,
+  "Foundations must remove the static Light palette instead of retaining a competing theme snapshot.",
+);
+expect(
+  primitiveColorExportSection !== undefined &&
+    JSON.stringify(
+      [...generatedManifest.collections.primitiveColor.map((token) => token.id)].sort(),
+    ) === JSON.stringify([...exportedPrimitiveColorIds].sort()),
+  "Generated manifest primitive colors must cover every exported non-workout Foundation primitive.",
+);
+expect(
+  expectedSemanticSectionOrder.every((title, index) => {
+    const currentIndex = foundationsPage?.content.indexOf(`title: "${title}"`) ?? -1;
+    const nextTitle = expectedSemanticSectionOrder[index + 1];
+    const nextIndex = nextTitle
+      ? (foundationsPage?.content.indexOf(`title: "${nextTitle}"`) ?? -1)
+      : Number.MAX_SAFE_INTEGER;
+    return currentIndex >= 0 && currentIndex < nextIndex;
+  }),
+  "Foundations Semantic Colors must retain the accepted Surfaces-to-Status section order.",
+);
+expect(
+  foundationsPage?.content.includes('data-hito-ds-foundations-context=""') === true &&
+    ["layers", "type", "interactive-intent"].every((module) =>
+      foundationsPage.content.includes(`data-hito-ds-foundations-context-module="${module}"`),
+    ),
+  "Foundations must expose one live Context specimen for layers, type, and interactive intent.",
+);
+expect(
+  foundationsPage?.content.includes("data-hito-ds-color-provenance") === true &&
+    foundationsPage.content.includes("data-hito-ds-color-active-result") &&
+    foundationsPage.content.includes("activeMode.provenance") &&
+    foundationsPage.content.includes("formatAlphaPercentage") &&
+    foundationsPage.content.includes("formatParsedColorHex") &&
+    foundationsPage.content.includes("backingToken") &&
+    foundationsPage.content.includes("Canvas → Surface (Card alias) → Elevated → Popover"),
+  "Foundations color cards and Context must expose authored provenance, alpha, active resolution, and factual backing layers.",
+);
+expect(
+  referenceWorkbenchCss.includes(".hito-workbench-sidebar {") &&
+    referenceWorkbenchCss.includes("background: var(--color-sidebar);") &&
+    referenceWorkbenchCss.includes(".hito-workbench-main {") &&
+    referenceWorkbenchCss.includes("background: var(--color-surface);") &&
+    referenceWorkbenchCss.includes('[data-hito-theme="light"] .hito-workbench-main {') &&
+    referenceWorkbenchCss.includes("background: var(--color-background);") &&
+    referenceWorkbenchCss.includes("background: color-mix(in oklch, var(--color-sidebar) 70%") ===
+      false,
+  "The Hito DS workbench must retain the exact sidebar/canvas semantic ladder without the retired translucent sidebar recipe.",
+);
+expect(
+  foundationsPage?.content.includes('if (slot === "border") {') === true &&
+    foundationsPage.content.includes('borderColor: valueFor("border")') &&
+    foundationsPage.content.includes('if (slot === "ring") {') &&
+    foundationsPage.content.includes('boxShadow: `0 0 0 2px ${valueFor("ring")}`') &&
+    foundationsPage.content.includes('slot === "border" && "border"'),
+  "Foundations must preserve the accepted workout border-only and ring-shadow-only renderer contract.",
+);
+expect(
+  tokenSpecimenSurfaceDeclarations?.border === "0" &&
+    tokenSpecimenSurfaceDeclarations?.["border-radius"] === "var(--radius-3xl)" &&
+    tokenSpecimenSurfaceDeclarations?.background === "var(--color-background)",
+  "Foundations token specimens must retain the shared borderless 16px semantic surface.",
+);
+expect(
+  foundationReferenceSurfaceCount === 11 && foundationFlatSurfaceCount === 6,
+  `Foundations reference-surface classification drifted: ${foundationReferenceSurfaceCount} accepted token specimens and ${foundationFlatSurfaceCount} preserved distinct flat surfaces.`,
+);
+expect(
+  (brandPage?.content.match(/labelTone="on-light"/g) ?? []).length === 1 &&
+    (brandPage?.content.match(/labelTone="on-dark"/g) ?? []).length === 1 &&
+    brandPage.content.includes('labelTone?: "default" | "on-light" | "on-dark"') &&
+    brandPage.content.includes('"text-[var(--stone-950)]"') &&
+    brandPage.content.includes('"text-[var(--sand-100)]"') &&
+    brandPage.content.includes('<LogoSpecimen label="Favicon surface">') &&
+    brandPage.content.includes('src="/favicon.svg"'),
+  "Brand background samples must own one truthful on-light and one on-dark tone while the favicon specimen reuses the canonical asset directly.",
 );
 expect(
   JSON.stringify(generatedManifest.collections).includes("hito-workout") === false,
   "Workout-domain colors leaked into the shared foundation manifest.",
 );
 expect(
-  generatedManifest.textStyles.length === 18,
-  `Expected 18 reusable text styles, received ${generatedManifest.textStyles.length}.`,
+  JSON.stringify(generatedManifest.textStyles.map((role) => role.id)) ===
+    JSON.stringify(targetTypographyRoleIds),
+  `Generated Text Styles must exactly match the 14-role target: ${generatedManifest.textStyles.map((role) => role.id).join(", ")}.`,
 );
-uiTitleRoles.forEach((role) => {
+targetTypographyRoles.forEach((role) => {
   const manifestRole = generatedManifest.textStyles.find((textStyle) => textStyle.id === role.id);
   expect(
-    manifestRole?.className === role.className &&
-      manifestRole.properties["font-family"] === "var(--font-sans)",
-    `Generated manifest is missing canonical UI title ${role.id}.`,
+    manifestRole?.className === role.className && manifestRole.properties["font-family"] != null,
+    `Generated manifest is missing canonical target role ${role.id}.`,
   );
 });
 expect(
-  foundationsPage?.content.includes("hito-surface-quiet") === true &&
-    foundationsPage.content.includes("hito-ui-panel-title") &&
-    foundationsPage.content.includes('data-hito-ds-pattern="quiet-surface"'),
+  foundationsPage?.content.includes("HITO_TYPOGRAPHY_GROUPS.map((group)") === true &&
+    foundationsPage.content.includes("HITO_TYPOGRAPHY_GROUPS.filter") === false &&
+    foundationsPage.content.includes("HITO_TYPOGRAPHY_GROUPS.flatMap") &&
+    foundationsPage.content.includes("const TYPOGRAPHY_FAMILY_SPECIMENS = [") === false &&
+    targetTypographyRoleIds.every((id) => typographyRolesById.has(id)) &&
+    foundationsPage.content.includes('id="type-semantic-tones"') &&
+    [
+      "--color-foreground",
+      "--color-text-accent",
+      "--color-text-positive",
+      "--color-text-negative",
+      "--color-text-warning",
+      "--color-text-disabled",
+    ].every((token) => foundationsPage.content.includes(token)),
+  "Foundations must render the full target typography groups and independent semantic text tones.",
+);
+expect(
+  brandPage?.content.includes("hito-surface-quiet") === true &&
+    brandPage.content.includes("hito-ui-title-xs") &&
+    brandPage.content.includes('data-hito-ds-pattern="quiet-surface"'),
   "Foundations must show the canonical quiet surface with real UI typography.",
 );
 expect(
@@ -1383,9 +1920,10 @@ if (errors.length > 0) {
       retiredSelectors: retiredFoundationSelectors.length,
       retiredTokens: retiredFoundationTokens.length,
       retiredWorkoutShades: retiredWorkoutShadeDeclarations.length,
+      primitiveColors: generatedManifest.collections.primitiveColor.length,
       semanticColors: generatedManifest.collections.semanticColor.length,
       textStyles: generatedManifest.textStyles.length,
-      uiTitleRoles: uiTitleRoles.length,
+      uiTitleRoles: targetTypographyRoles.filter((role) => role.group === "ui-title").length,
       workoutDomainBases: retainedWorkoutBaseDefinitions.length,
     },
     reference: {

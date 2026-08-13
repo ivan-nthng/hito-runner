@@ -1067,14 +1067,14 @@
   }
 
   .hito-list-row-title {
-    --hito-typography-role: list-row-title;
+    --hito-typography-role: body-md;
     font-size: 0.875rem;
     line-height: 1.35;
     color: var(--color-foreground);
   }
 
   .hito-list-row-copy {
-    --hito-typography-role: body-small;
+    --hito-typography-role: body-sm;
     margin-top: 0.25rem;
     font-size: 0.8125rem;
     line-height: 1.5;

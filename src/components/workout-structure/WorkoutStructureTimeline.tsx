@@ -56,8 +56,8 @@ export function WorkoutStructureTimeline({
       )}
     >
       <div className="flex items-center justify-between gap-3 mb-3">
-        <span className="hito-label">{label}</span>
-        <span className="hito-caption font-mono-num">{summary}</span>
+        <span className="hito-label-md text-foreground">{label}</span>
+        <span className="hito-technical-sm text-tertiary">{summary}</span>
       </div>
 
       {items.length ? (
@@ -138,7 +138,7 @@ export function WorkoutStructureTimeline({
                     isActive && "bg-foreground/[0.085]",
                   )}
                 >
-                  <span className="hito-caption w-6 text-right font-mono-num">
+                  <span className="hito-technical-sm text-tertiary w-6 text-right">
                     {String(index + 1).padStart(2, "0")}
                   </span>
                   <span
@@ -150,13 +150,13 @@ export function WorkoutStructureTimeline({
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2">
-                      <span className="hito-list-row-title">{item.kindLabel}</span>
+                      <span className="hito-body-md text-foreground">{item.kindLabel}</span>
                       {item.detailLabel ? (
-                        <span className="hito-caption">{item.detailLabel}</span>
+                        <span className="hito-body-xs text-tertiary">{item.detailLabel}</span>
                       ) : null}
                     </div>
                     {readbackEntries.length > 0 && (
-                      <div className="hito-caption mt-0.5 space-x-3">
+                      <div className="hito-body-xs text-tertiary mt-0.5 space-x-3">
                         {readbackEntries.map((entry) => (
                           <span key={entry.key}>
                             <span className="opacity-60">{entry.label}:</span>{" "}
@@ -166,7 +166,7 @@ export function WorkoutStructureTimeline({
                       </div>
                     )}
                   </div>
-                  <span className="hito-caption font-mono-num">{item.metric}</span>
+                  <span className="hito-technical-sm text-tertiary">{item.metric}</span>
                 </li>
               );
             })}
@@ -177,7 +177,7 @@ export function WorkoutStructureTimeline({
           <span className="hito-status-pill mt-0.5 shrink-0" data-tone="muted">
             {emptyState?.badge ?? "Empty"}
           </span>
-          <p className="hito-list-row-copy min-w-0">
+          <p className="hito-body-sm mt-1 text-secondary min-w-0">
             {emptyState?.copy ?? "No running parts to preview."}
           </p>
         </div>

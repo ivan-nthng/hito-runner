@@ -225,8 +225,8 @@ function AnalyticsUnavailableState({
           <span className="hito-status-pill" data-tone={tone}>
             {result.reason.replaceAll("_", " ")}
           </span>
-          <h2 className="hito-modal-title mt-4">{title}</h2>
-          <p className="hito-body mt-3 max-w-2xl text-muted-foreground">{result.message}</p>
+          <h2 className="hito-ui-title-md mt-4">{title}</h2>
+          <p className="hito-body-md mt-3 max-w-2xl text-muted-foreground">{result.message}</p>
           <div className="mt-6 flex flex-wrap gap-3">
             <a
               href="/admin/login?next=%2Fadmin%2Fanalytics"
@@ -473,10 +473,10 @@ function UsersSection({ rows }: { rows: AdminAnalyticsUserRow[] }) {
                   <tr key={row.userId} className="align-top">
                     <td className="hito-data-table-cell hito-data-table-cell-start">
                       <div className="grid gap-1">
-                        <span className="font-medium text-foreground">
+                        <span className="hito-body-md font-medium text-foreground">
                           {row.email ?? "No email"}
                         </span>
-                        <code className="hito-technical-mono hito-data-table-code hito-data-table-code-width-lg">
+                        <code className="hito-technical-sm hito-data-table-code hito-data-table-code-width-lg">
                           {row.userId}
                         </code>
                       </div>
@@ -504,7 +504,7 @@ function UsersSection({ rows }: { rows: AdminAnalyticsUserRow[] }) {
                       <CompactCount label="logs" value={row.workoutLogCount} />
                     </td>
                     <td className="hito-data-table-cell">
-                      <span className="whitespace-nowrap text-sm text-foreground">
+                      <span className="hito-body-md whitespace-nowrap text-foreground">
                         {formatShortDate(row.lastWorkoutLogDate)}
                       </span>
                     </td>
@@ -520,7 +520,7 @@ function UsersSection({ rows }: { rows: AdminAnalyticsUserRow[] }) {
                         >
                           {row.entitlement.tier}
                         </span>
-                        <span className="hito-field-helper whitespace-nowrap">
+                        <span className="hito-body-xs whitespace-nowrap text-secondary">
                           {row.entitlement.status} · {formatKey(row.entitlement.source)}
                         </span>
                       </div>
@@ -547,9 +547,9 @@ function TestAccountsCard({
     <section className="grid gap-6 pt-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="hito-label">Test accounts</p>
-          <h2 className="hito-modal-title mt-2">Test and excluded accounts</h2>
-          <p className="hito-body mt-3 max-w-3xl text-muted-foreground">
+          <p className="hito-label-md">Test accounts</p>
+          <h2 className="hito-ui-title-md mt-2">Test and excluded accounts</h2>
+          <p className="hito-body-md mt-3 max-w-3xl text-muted-foreground">
             Local bypass testers plus backend-classified Supabase admin, test, and suspected test
             users. Local passwords are shown only when they come from the local bypass accounts
             file.
@@ -584,8 +584,8 @@ function TestAccountsSection({
         <div className="flex items-start gap-3">
           <Icon name="user" size="md" className="mt-0.5 text-muted-foreground" />
           <div>
-            <h3 className="hito-body font-medium text-foreground">No test accounts found.</h3>
-            <p className="hito-field-helper mt-2">
+            <h3 className="hito-body-md font-medium text-foreground">No test accounts found.</h3>
+            <p className="hito-body-xs mt-2 text-secondary">
               No local accounts or backend-classified excluded users were returned.
             </p>
           </div>
@@ -624,8 +624,8 @@ function UnavailableState({
           <span className="hito-status-pill" data-tone={tone}>
             {result.reason.replaceAll("_", " ")}
           </span>
-          <h3 className="hito-modal-title mt-4">{title}</h3>
-          <p className="hito-body mt-3 max-w-2xl text-muted-foreground">{result.message}</p>
+          <h3 className="hito-ui-title-md mt-4">{title}</h3>
+          <p className="hito-body-md mt-3 max-w-2xl text-muted-foreground">{result.message}</p>
           <div className="mt-6 flex flex-wrap gap-3">
             <a
               href="/admin/login?next=%2Fadmin%2Fanalytics"
@@ -763,13 +763,13 @@ function TestAccountsTable({ rows }: { rows: TestAccountOpsRow[] }) {
   return (
     <div className="grid gap-4">
       {deleteState.error ? (
-        <p className="hito-field-error flex items-center gap-2">
+        <p className="hito-body-md flex items-center gap-2 font-medium text-negative">
           <Icon name="warning" size="xs" />
           {deleteState.error}
         </p>
       ) : null}
       {deleteState.success ? (
-        <p className="hito-field-success flex items-center gap-2">
+        <p className="hito-body-md flex items-center gap-2 font-medium text-positive">
           <Icon name="check-circle" size="xs" />
           {deleteState.success}
         </p>
@@ -928,29 +928,35 @@ function TestAccountsTable({ rows }: { rows: TestAccountOpsRow[] }) {
                 <tr key={row.key} className="align-top">
                   <td className="hito-data-table-cell hito-data-table-cell-start">
                     <div className="grid gap-1">
-                      <span className="whitespace-nowrap font-medium text-foreground">
+                      <span className="hito-body-md whitespace-nowrap font-medium text-foreground">
                         {row.username}
                       </span>
-                      <span className="hito-field-helper whitespace-nowrap">{row.displayName}</span>
+                      <span className="hito-body-xs whitespace-nowrap text-secondary">
+                        {row.displayName}
+                      </span>
                     </div>
                   </td>
                   <td className="hito-data-table-cell">
                     {row.email ? (
-                      <code className="hito-technical-mono hito-data-table-code">{row.email}</code>
+                      <code className="hito-technical-sm hito-data-table-code">{row.email}</code>
                     ) : (
-                      <span className="hito-field-helper">No email</span>
+                      <span className="hito-body-xs text-secondary">No email</span>
                     )}
                   </td>
                   <td className="hito-data-table-cell">
                     {row.password ? (
                       <>
-                        <code className="hito-technical-mono hito-data-table-code">
+                        <code className="hito-technical-sm hito-data-table-code">
                           {row.password}
                         </code>
-                        <p className="hito-field-helper mt-2">Local bypass password only.</p>
+                        <p className="hito-body-xs mt-2 text-secondary">
+                          Local bypass password only.
+                        </p>
                       </>
                     ) : (
-                      <span className="hito-field-helper whitespace-nowrap">No local password</span>
+                      <span className="hito-body-xs whitespace-nowrap text-secondary">
+                        No local password
+                      </span>
                     )}
                   </td>
                   <td className="hito-data-table-cell">
@@ -969,7 +975,7 @@ function TestAccountsTable({ rows }: { rows: TestAccountOpsRow[] }) {
                       >
                         {classificationLabel(row.classification)}
                       </span>
-                      <span className="hito-field-helper whitespace-nowrap">
+                      <span className="hito-body-xs whitespace-nowrap text-secondary">
                         {formatKey(row.classificationSource)} ·{" "}
                         {formatKey(row.classificationReason)}
                       </span>
@@ -978,7 +984,7 @@ function TestAccountsTable({ rows }: { rows: TestAccountOpsRow[] }) {
                   <td className="hito-data-table-cell">
                     <div className="grid gap-2">
                       <LinkedIdentityStatus status={row.linkedStatus} userId={row.linkedUserId} />
-                      <code className="hito-technical-mono hito-data-table-code hito-data-table-code-width-md">
+                      <code className="hito-technical-sm hito-data-table-code hito-data-table-code-width-md">
                         {row.userId}
                       </code>
                     </div>
@@ -1002,7 +1008,7 @@ function TestAccountsTable({ rows }: { rows: TestAccountOpsRow[] }) {
                         {isConfirming ? (
                           <>
                             <label className="grid gap-2">
-                              <span className="hito-field-helper">
+                              <span className="hito-body-xs text-secondary">
                                 Type the exact email to delete this local tester.
                               </span>
                               <input
@@ -1062,7 +1068,7 @@ function TestAccountsTable({ rows }: { rows: TestAccountOpsRow[] }) {
                         )}
                       </div>
                     ) : (
-                      <p className="hito-field-helper hito-data-table-note">
+                      <p className="hito-body-xs hito-data-table-note text-secondary">
                         {row.protectedFromDeletion
                           ? "Protected admin accounts cannot be deleted from this local UI."
                           : "Supabase-only or suspected rows cannot be deleted from this local UI."}
@@ -1095,7 +1101,7 @@ function LinkedIdentityStatus({
         {label}
       </span>
       {userId ? (
-        <code className="hito-technical-mono hito-data-table-code hito-data-table-code-width-sm">
+        <code className="hito-technical-sm hito-data-table-code hito-data-table-code-width-sm">
           {userId}
         </code>
       ) : null}

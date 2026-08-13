@@ -75,7 +75,7 @@ export function BodyNotesSummaryRow({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Label>Body notes</Label>
-          <p className="hito-support-copy mt-2">
+          <p className="hito-body-md text-secondary mt-2">
             Add any pain, tightness, or discomfort that showed up during or after this run.
           </p>
         </div>
@@ -87,7 +87,7 @@ export function BodyNotesSummaryRow({
 
       {!hasBodyNotes ? (
         <div className="hito-surface-flat mt-4 p-4">
-          <p className="hito-body">
+          <p className="hito-body-md text-secondary">
             No body notes saved with this workout result. Leave this empty when the run felt normal.
           </p>
         </div>
@@ -99,12 +99,14 @@ export function BodyNotesSummaryRow({
               className="hito-surface-flat flex flex-wrap items-center justify-between gap-3 p-4"
             >
               <div className="min-w-0 flex-1">
-                <p className="hito-list-row-title">{bodyNote.area}</p>
-                <p className="hito-body-small mt-1">{describeBodyNoteDraft(bodyNote)}</p>
+                <p className="hito-body-md text-foreground">{bodyNote.area}</p>
+                <p className="hito-body-sm text-secondary mt-1">
+                  {describeBodyNoteDraft(bodyNote)}
+                </p>
               </div>
               <div className="flex items-center gap-3">
                 <SeverityBars severity={bodyNote.severity} />
-                <span className="hito-caption font-mono-num">{bodyNote.severity}/5</span>
+                <span className="hito-technical-sm text-tertiary">{bodyNote.severity}/5</span>
               </div>
             </div>
           ))}
@@ -138,8 +140,8 @@ export function BodyNotesModal({
         className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-workflow hito-dialog-height-workflow-relaxed"
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-ui-modal-title">Body notes</DialogTitle>
-          <DialogDescription className="hito-body max-w-2xl">
+          <DialogTitle className="hito-ui-title-md text-foreground">Body notes</DialogTitle>
+          <DialogDescription className="hito-body-md text-secondary max-w-2xl">
             These notes stay attached to this workout result only. Use them to mark where the run
             felt off without turning the result into a second full form.
           </DialogDescription>
@@ -147,7 +149,7 @@ export function BodyNotesModal({
 
         <div className="hito-product-dialog-body-scroll-fill">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="hito-caption">
+            <p className="hito-body-xs text-tertiary">
               {bodyNotes.length === 0
                 ? "No body notes yet."
                 : `${bodyNotes.length} body note${bodyNotes.length === 1 ? "" : "s"} in this workout result.`}
@@ -167,7 +169,7 @@ export function BodyNotesModal({
 
           {bodyNotes.length === 0 ? (
             <div className="hito-surface-flat mt-5 p-5">
-              <p className="hito-body">
+              <p className="hito-body-md text-secondary">
                 No body notes will be saved with this workout unless you add one here.
               </p>
               <HitoButton
@@ -199,7 +201,7 @@ export function BodyNotesModal({
 
         <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
           <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="hito-caption">
+            <p className="hito-body-xs text-tertiary">
               Saved fields stay bounded to area, timing, sensation, severity, and an optional note.
             </p>
             <div className="flex flex-col-reverse gap-3 sm:flex-row">
@@ -239,8 +241,8 @@ function BodyNoteEditorCard({
     <div className="hito-surface-flat space-y-5 p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="hito-label">Body note {index + 1}</p>
-          <p className="hito-caption mt-1">{bodyNote.area}</p>
+          <p className="hito-label-md text-foreground">Body note {index + 1}</p>
+          <p className="hito-body-xs text-tertiary mt-1">{bodyNote.area}</p>
         </div>
         <HitoButton type="button" onClick={onRemove} size="xs" variant="ghost">
           <Icon name="trash" size="xs" />
@@ -335,7 +337,7 @@ function BodyAreaMapField({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <Label>Body location</Label>
-            <p className="hito-support-copy mt-2">
+            <p className="hito-body-md text-secondary mt-2">
               Pick one bounded area for this note. Add another note if more than one spot felt off.
             </p>
           </div>
@@ -369,7 +371,7 @@ function BodyAreaMapField({
           </svg>
         </div>
 
-        <p className="hito-support-copy mt-4 text-center">
+        <p className="hito-body-md text-secondary mt-4 text-center">
           {selectedRegion ? `${selectedRegion.area} selected` : "Choose one area for this note."}
         </p>
       </div>
@@ -385,9 +387,9 @@ function BodyAreaMapField({
               region.area === value ? "border-signal/35 bg-accent/35" : "hover:bg-accent/25",
             )}
           >
-            <span className="hito-list-row-title">{region.area}</span>
+            <span className="hito-body-md text-foreground">{region.area}</span>
             {region.area === value ? (
-              <span className="hito-caption text-signal">Selected</span>
+              <span className="hito-body-xs text-tertiary text-signal">Selected</span>
             ) : null}
           </button>
         ))}
@@ -488,5 +490,5 @@ export function describeBodyNoteDraft(bodyNote: BodyNoteDraft) {
 }
 
 function Label({ children }: { children: ReactNode }) {
-  return <div className="hito-form-label">{children}</div>;
+  return <div className="hito-label-md text-foreground">{children}</div>;
 }

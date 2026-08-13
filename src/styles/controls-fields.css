@@ -561,14 +561,14 @@
   }
 
   .hito-field-helper {
-    --hito-typography-role: helper;
+    --hito-typography-role: body-xs;
     font-size: 0.75rem;
     line-height: 1.45;
     color: var(--color-text-secondary);
   }
 
   .hito-field-error {
-    --hito-typography-role: error-success;
+    --hito-typography-role: body-md;
     font-size: 0.875rem;
     font-weight: 500;
     line-height: 1.45;
@@ -576,7 +576,7 @@
   }
 
   .hito-field-success {
-    --hito-typography-role: error-success;
+    --hito-typography-role: body-md;
     font-size: 0.875rem;
     font-weight: 500;
     line-height: 1.45;
@@ -687,7 +687,7 @@
   }
 
   .hito-editable-value-field-error {
-    --hito-typography-role: error-success;
+    --hito-typography-role: body-md;
     flex: 1 0 100%;
     padding-left: 0.125rem;
     font-size: 0.875rem;

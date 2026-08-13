@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "direction": "code-to-figma",
-  "sourceDigest": "sha256:a44db5d89e3ddf68ed28f39a1b619a81c5c5955545628b3e85bb21833efda9fa",
+  "sourceDigest": "sha256:d3dd0e4d67547bfe227f483201e0197b9e4ae34604bb502143be29800495c6f1",
   "sourceOfTruth": {
     "tokens": "src/styles/foundations.css",
     "typography": "src/lib/hito-typography-roles.ts"
@@ -24,600 +24,1803 @@
         "id": "stone-950",
         "cssVariable": "--stone-950",
         "value": "oklch(0.14 0.005 60)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.14 0.005 60)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "stone-900",
         "cssVariable": "--stone-900",
         "value": "oklch(0.16 0.005 60)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.16 0.005 60)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "stone-850",
         "cssVariable": "--stone-850",
         "value": "oklch(0.19 0.005 60)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.19 0.005 60)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "stone-825",
         "cssVariable": "--stone-825",
         "value": "oklch(0.21 0.006 60)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.21 0.006 60)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "stone-800",
         "cssVariable": "--stone-800",
         "value": "oklch(0.22 0.006 60)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.22 0.006 60)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
+      },
+      {
+        "id": "stone-750",
+        "cssVariable": "--stone-750",
+        "value": "oklch(0.24 0.006 60)",
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.24 0.006 60)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "stone-700",
         "cssVariable": "--stone-700",
         "value": "oklch(0.26 0.008 60)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.26 0.008 60)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
+      },
+      {
+        "id": "stone-500",
+        "cssVariable": "--stone-500",
+        "value": "oklch(0.55 0.01 70)",
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.55 0.01 70)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "sand-50",
         "cssVariable": "--sand-50",
         "value": "oklch(0.98 0.005 80)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.98 0.005 80)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "sand-100",
         "cssVariable": "--sand-100",
         "value": "oklch(0.96 0.005 80)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.96 0.005 80)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
+      },
+      {
+        "id": "sand-200",
+        "cssVariable": "--sand-200",
+        "value": "oklch(0.92 0.005 80)",
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.92 0.005 80)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "sand-500",
         "cssVariable": "--sand-500",
         "value": "oklch(0.62 0.01 70)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.62 0.01 70)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "sand-alpha-06",
         "cssVariable": "--sand-alpha-06",
         "value": "oklch(1 0 0 / 6%)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "alpha",
+          "source": "oklch(1 0 0 / 6%)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": 0.06
+        }
       },
       {
         "id": "sand-alpha-08",
         "cssVariable": "--sand-alpha-08",
         "value": "oklch(1 0 0 / 8%)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "alpha",
+          "source": "oklch(1 0 0 / 8%)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": 0.08
+        }
       },
       {
         "id": "sand-alpha-10",
         "cssVariable": "--sand-alpha-10",
         "value": "oklch(1 0 0 / 10%)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "alpha",
+          "source": "oklch(1 0 0 / 10%)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": 0.1
+        }
       },
       {
         "id": "amber-500",
         "cssVariable": "--amber-500",
         "value": "oklch(0.78 0.14 65)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.78 0.14 65)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "amber-600",
         "cssVariable": "--amber-600",
         "value": "oklch(0.7 0.12 60)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.7 0.12 60)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "blue-500",
         "cssVariable": "--blue-500",
         "value": "oklch(0.72 0.07 200)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.72 0.07 200)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
+      },
+      {
+        "id": "terracotta-500",
+        "cssVariable": "--terracotta-500",
+        "value": "oklch(0.7 0.16 25)",
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.7 0.16 25)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "green-500",
         "cssVariable": "--green-500",
         "value": "oklch(0.72 0.13 155)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.72 0.13 155)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "orange-500",
         "cssVariable": "--orange-500",
         "value": "oklch(0.75 0.15 50)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.75 0.15 50)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "red-500",
         "cssVariable": "--red-500",
         "value": "oklch(0.62 0.18 25)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.62 0.18 25)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "warm-white",
         "cssVariable": "--warm-white",
         "value": "oklch(0.997 0.003 82)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.997 0.003 82)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "linen-50",
         "cssVariable": "--linen-50",
         "value": "oklch(0.988 0.006 82)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.988 0.006 82)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
+      },
+      {
+        "id": "linen-75",
+        "cssVariable": "--linen-75",
+        "value": "oklch(0.982 0.008 80)",
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.982 0.008 80)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "linen-100",
         "cssVariable": "--linen-100",
         "value": "oklch(0.972 0.01 78)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.972 0.01 78)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "linen-160",
         "cssVariable": "--linen-160",
         "value": "oklch(0.946 0.009 77)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.946 0.009 77)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "linen-180",
         "cssVariable": "--linen-180",
         "value": "oklch(0.94 0.012 76)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.94 0.012 76)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "linen-220",
         "cssVariable": "--linen-220",
         "value": "oklch(0.912 0.014 74)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.912 0.014 74)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "ink-950",
         "cssVariable": "--ink-950",
         "value": "oklch(0.14 0.006 58)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.14 0.006 58)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "ink-900",
         "cssVariable": "--ink-900",
         "value": "oklch(0.18 0.01 60)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.18 0.01 60)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
+      },
+      {
+        "id": "ink-850",
+        "cssVariable": "--ink-850",
+        "value": "oklch(0.22 0.012 62)",
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.22 0.012 62)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
+      },
+      {
+        "id": "ink-800",
+        "cssVariable": "--ink-800",
+        "value": "oklch(0.24 0.012 64)",
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.24 0.012 64)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "taupe-650",
         "cssVariable": "--taupe-650",
         "value": "oklch(0.4 0.014 62)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.4 0.014 62)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "taupe-alpha-32",
         "cssVariable": "--taupe-alpha-32",
         "value": "oklch(0.72 0.014 70 / 32%)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "alpha",
+          "source": "oklch(0.72 0.014 70 / 32%)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": 0.32
+        }
+      },
+      {
+        "id": "taupe-alpha-34",
+        "cssVariable": "--taupe-alpha-34",
+        "value": "oklch(0.72 0.014 70 / 34%)",
+        "alias": null,
+        "provenance": {
+          "kind": "alpha",
+          "source": "oklch(0.72 0.014 70 / 34%)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": 0.34
+        }
       },
       {
         "id": "taupe-alpha-52",
         "cssVariable": "--taupe-alpha-52",
         "value": "oklch(0.72 0.014 70 / 52%)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "alpha",
+          "source": "oklch(0.72 0.014 70 / 52%)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": 0.52
+        }
       },
       {
         "id": "orange-650",
         "cssVariable": "--orange-650",
         "value": "oklch(0.66 0.15 62)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.66 0.15 62)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "orange-700",
         "cssVariable": "--orange-700",
         "value": "oklch(0.62 0.14 60)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.62 0.14 60)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "green-700",
         "cssVariable": "--green-700",
         "value": "oklch(0.44 0.125 150)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.44 0.125 150)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "amber-750",
         "cssVariable": "--amber-750",
         "value": "oklch(0.5 0.14 55)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.5 0.14 55)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "red-700",
         "cssVariable": "--red-700",
         "value": "oklch(0.48 0.18 28)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.48 0.18 28)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       },
       {
         "id": "blue-700",
         "cssVariable": "--blue-700",
         "value": "oklch(0.46 0.095 205)",
-        "alias": null
+        "alias": null,
+        "provenance": {
+          "kind": "primitive",
+          "source": "oklch(0.46 0.095 205)",
+          "references": [],
+          "aliasChain": [],
+          "alpha": null
+        }
       }
     ],
     "semanticColor": [
       {
         "id": "background",
+        "label": "Background",
         "cssVariable": "--background",
+        "channels": ["fill"],
         "modes": {
-          "dark": { "value": "var(--stone-900)", "alias": "stone-900" },
-          "light": { "value": "var(--linen-100)", "alias": "linen-100" }
+          "dark": {
+            "value": "var(--stone-900)",
+            "alias": "stone-900",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--stone-900)",
+              "references": [{ "cssVariable": "--stone-900", "percentage": null }],
+              "aliasChain": ["stone-900"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--linen-100)",
+            "alias": "linen-100",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--linen-100)",
+              "references": [{ "cssVariable": "--linen-100", "percentage": null }],
+              "aliasChain": ["linen-100"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "foreground",
+        "label": "Foreground",
         "cssVariable": "--foreground",
+        "channels": ["text"],
         "modes": {
-          "dark": { "value": "var(--sand-100)", "alias": "sand-100" },
-          "light": { "value": "var(--ink-900)", "alias": "ink-900" }
+          "dark": {
+            "value": "var(--sand-100)",
+            "alias": "sand-100",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--sand-100)",
+              "references": [{ "cssVariable": "--sand-100", "percentage": null }],
+              "aliasChain": ["sand-100"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--ink-900)",
+            "alias": "ink-900",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--ink-900)",
+              "references": [{ "cssVariable": "--ink-900", "percentage": null }],
+              "aliasChain": ["ink-900"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "surface",
+        "label": "Surface",
         "cssVariable": "--surface",
+        "channels": ["fill"],
         "modes": {
-          "dark": { "value": "var(--stone-850)", "alias": "stone-850" },
-          "light": { "value": "var(--linen-50)", "alias": "linen-50" }
+          "dark": {
+            "value": "var(--stone-850)",
+            "alias": "stone-850",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--stone-850)",
+              "references": [{ "cssVariable": "--stone-850", "percentage": null }],
+              "aliasChain": ["stone-850"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--linen-50)",
+            "alias": "linen-50",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--linen-50)",
+              "references": [{ "cssVariable": "--linen-50", "percentage": null }],
+              "aliasChain": ["linen-50"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "surface-elevated",
+        "label": "Surface Elevated",
         "cssVariable": "--surface-elevated",
+        "channels": ["fill"],
         "modes": {
-          "dark": { "value": "var(--stone-800)", "alias": "stone-800" },
-          "light": { "value": "var(--warm-white)", "alias": "warm-white" }
+          "dark": {
+            "value": "var(--stone-800)",
+            "alias": "stone-800",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--stone-800)",
+              "references": [{ "cssVariable": "--stone-800", "percentage": null }],
+              "aliasChain": ["stone-800"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--warm-white)",
+            "alias": "warm-white",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--warm-white)",
+              "references": [{ "cssVariable": "--warm-white", "percentage": null }],
+              "aliasChain": ["warm-white"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "card",
+        "label": "Card",
         "cssVariable": "--card",
+        "channels": ["fill"],
         "modes": {
-          "dark": { "value": "var(--surface)", "alias": "surface" },
-          "light": { "value": "var(--surface)", "alias": "surface" }
+          "dark": {
+            "value": "var(--surface)",
+            "alias": "surface",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--surface)",
+              "references": [{ "cssVariable": "--surface", "percentage": null }],
+              "aliasChain": ["surface", "stone-850"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--surface)",
+            "alias": "surface",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--surface)",
+              "references": [{ "cssVariable": "--surface", "percentage": null }],
+              "aliasChain": ["surface", "linen-50"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "card-foreground",
+        "label": "Card Foreground",
         "cssVariable": "--card-foreground",
+        "channels": ["text"],
         "modes": {
-          "dark": { "value": "var(--foreground)", "alias": "foreground" },
-          "light": { "value": "var(--foreground)", "alias": "foreground" }
+          "dark": {
+            "value": "var(--foreground)",
+            "alias": "foreground",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--foreground)",
+              "references": [{ "cssVariable": "--foreground", "percentage": null }],
+              "aliasChain": ["foreground", "sand-100"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--foreground)",
+            "alias": "foreground",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--foreground)",
+              "references": [{ "cssVariable": "--foreground", "percentage": null }],
+              "aliasChain": ["foreground", "ink-900"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "popover",
+        "label": "Popover",
         "cssVariable": "--popover",
+        "channels": ["fill"],
         "modes": {
-          "dark": { "value": "var(--stone-825)", "alias": "stone-825" },
-          "light": { "value": "var(--surface-elevated)", "alias": "surface-elevated" }
+          "dark": {
+            "value": "var(--stone-825)",
+            "alias": "stone-825",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--stone-825)",
+              "references": [{ "cssVariable": "--stone-825", "percentage": null }],
+              "aliasChain": ["stone-825"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--surface-elevated)",
+            "alias": "surface-elevated",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--surface-elevated)",
+              "references": [{ "cssVariable": "--surface-elevated", "percentage": null }],
+              "aliasChain": ["surface-elevated", "warm-white"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "popover-foreground",
+        "label": "Popover Foreground",
         "cssVariable": "--popover-foreground",
+        "channels": ["text"],
         "modes": {
-          "dark": { "value": "var(--foreground)", "alias": "foreground" },
-          "light": { "value": "var(--foreground)", "alias": "foreground" }
+          "dark": {
+            "value": "var(--foreground)",
+            "alias": "foreground",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--foreground)",
+              "references": [{ "cssVariable": "--foreground", "percentage": null }],
+              "aliasChain": ["foreground", "sand-100"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--foreground)",
+            "alias": "foreground",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--foreground)",
+              "references": [{ "cssVariable": "--foreground", "percentage": null }],
+              "aliasChain": ["foreground", "ink-900"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "primary",
+        "label": "Primary",
         "cssVariable": "--primary",
+        "channels": ["fill"],
         "modes": {
-          "dark": { "value": "var(--foreground)", "alias": "foreground" },
-          "light": { "value": "var(--foreground)", "alias": "foreground" }
+          "dark": {
+            "value": "var(--foreground)",
+            "alias": "foreground",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--foreground)",
+              "references": [{ "cssVariable": "--foreground", "percentage": null }],
+              "aliasChain": ["foreground", "sand-100"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--foreground)",
+            "alias": "foreground",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--foreground)",
+              "references": [{ "cssVariable": "--foreground", "percentage": null }],
+              "aliasChain": ["foreground", "ink-900"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "primary-foreground",
+        "label": "Primary Foreground",
         "cssVariable": "--primary-foreground",
+        "channels": ["text"],
         "modes": {
-          "dark": { "value": "var(--background)", "alias": "background" },
-          "light": { "value": "var(--linen-50)", "alias": "linen-50" }
+          "dark": {
+            "value": "var(--background)",
+            "alias": "background",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--background)",
+              "references": [{ "cssVariable": "--background", "percentage": null }],
+              "aliasChain": ["background", "stone-900"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--linen-50)",
+            "alias": "linen-50",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--linen-50)",
+              "references": [{ "cssVariable": "--linen-50", "percentage": null }],
+              "aliasChain": ["linen-50"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "muted",
+        "label": "Muted",
         "cssVariable": "--muted",
+        "channels": ["fill"],
         "modes": {
-          "dark": { "value": "var(--stone-800)", "alias": "stone-800" },
-          "light": { "value": "var(--linen-160)", "alias": "linen-160" }
+          "dark": {
+            "value": "var(--stone-800)",
+            "alias": "stone-800",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--stone-800)",
+              "references": [{ "cssVariable": "--stone-800", "percentage": null }],
+              "aliasChain": ["stone-800"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--linen-160)",
+            "alias": "linen-160",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--linen-160)",
+              "references": [{ "cssVariable": "--linen-160", "percentage": null }],
+              "aliasChain": ["linen-160"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "muted-foreground",
+        "label": "Muted Foreground",
         "cssVariable": "--muted-foreground",
+        "channels": ["text"],
         "modes": {
-          "dark": { "value": "var(--sand-500)", "alias": "sand-500" },
-          "light": { "value": "var(--taupe-650)", "alias": "taupe-650" }
+          "dark": {
+            "value": "var(--sand-500)",
+            "alias": "sand-500",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--sand-500)",
+              "references": [{ "cssVariable": "--sand-500", "percentage": null }],
+              "aliasChain": ["sand-500"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--taupe-650)",
+            "alias": "taupe-650",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--taupe-650)",
+              "references": [{ "cssVariable": "--taupe-650", "percentage": null }],
+              "aliasChain": ["taupe-650"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "accent",
+        "label": "Accent",
         "cssVariable": "--accent",
+        "channels": ["fill"],
         "modes": {
-          "dark": { "value": "var(--stone-700)", "alias": "stone-700" },
-          "light": { "value": "var(--linen-220)", "alias": "linen-220" }
+          "dark": {
+            "value": "var(--stone-700)",
+            "alias": "stone-700",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--stone-700)",
+              "references": [{ "cssVariable": "--stone-700", "percentage": null }],
+              "aliasChain": ["stone-700"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--linen-220)",
+            "alias": "linen-220",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--linen-220)",
+              "references": [{ "cssVariable": "--linen-220", "percentage": null }],
+              "aliasChain": ["linen-220"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "accent-foreground",
+        "label": "Accent Foreground",
         "cssVariable": "--accent-foreground",
+        "channels": ["text"],
         "modes": {
-          "dark": { "value": "var(--foreground)", "alias": "foreground" },
-          "light": { "value": "var(--foreground)", "alias": "foreground" }
+          "dark": {
+            "value": "var(--foreground)",
+            "alias": "foreground",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--foreground)",
+              "references": [{ "cssVariable": "--foreground", "percentage": null }],
+              "aliasChain": ["foreground", "sand-100"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--foreground)",
+            "alias": "foreground",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--foreground)",
+              "references": [{ "cssVariable": "--foreground", "percentage": null }],
+              "aliasChain": ["foreground", "ink-900"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "destructive",
+        "label": "Destructive",
         "cssVariable": "--destructive",
+        "channels": ["fill", "border"],
         "modes": {
-          "dark": { "value": "var(--red-500)", "alias": "red-500" },
-          "light": { "value": "var(--red-700)", "alias": "red-700" }
+          "dark": {
+            "value": "var(--red-500)",
+            "alias": "red-500",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--red-500)",
+              "references": [{ "cssVariable": "--red-500", "percentage": null }],
+              "aliasChain": ["red-500"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--red-700)",
+            "alias": "red-700",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--red-700)",
+              "references": [{ "cssVariable": "--red-700", "percentage": null }],
+              "aliasChain": ["red-700"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "destructive-foreground",
+        "label": "Destructive Foreground",
         "cssVariable": "--destructive-foreground",
+        "channels": ["text"],
         "modes": {
-          "dark": { "value": "var(--sand-50)", "alias": "sand-50" },
-          "light": { "value": "var(--linen-50)", "alias": "linen-50" }
+          "dark": {
+            "value": "var(--sand-50)",
+            "alias": "sand-50",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--sand-50)",
+              "references": [{ "cssVariable": "--sand-50", "percentage": null }],
+              "aliasChain": ["sand-50"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--linen-50)",
+            "alias": "linen-50",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--linen-50)",
+              "references": [{ "cssVariable": "--linen-50", "percentage": null }],
+              "aliasChain": ["linen-50"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "border",
+        "label": "Border",
         "cssVariable": "--border",
+        "channels": ["border"],
         "modes": {
-          "dark": { "value": "var(--sand-alpha-08)", "alias": "sand-alpha-08" },
-          "light": { "value": "var(--taupe-alpha-52)", "alias": "taupe-alpha-52" }
+          "dark": {
+            "value": "var(--sand-alpha-08)",
+            "alias": "sand-alpha-08",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--sand-alpha-08)",
+              "references": [{ "cssVariable": "--sand-alpha-08", "percentage": null }],
+              "aliasChain": ["sand-alpha-08"],
+              "alpha": 0.08
+            }
+          },
+          "light": {
+            "value": "var(--taupe-alpha-52)",
+            "alias": "taupe-alpha-52",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--taupe-alpha-52)",
+              "references": [{ "cssVariable": "--taupe-alpha-52", "percentage": null }],
+              "aliasChain": ["taupe-alpha-52"],
+              "alpha": 0.52
+            }
+          }
         }
       },
       {
         "id": "hairline",
+        "label": "Hairline",
         "cssVariable": "--hairline",
+        "channels": ["border"],
         "modes": {
-          "dark": { "value": "var(--sand-alpha-06)", "alias": "sand-alpha-06" },
-          "light": { "value": "var(--taupe-alpha-32)", "alias": "taupe-alpha-32" }
+          "dark": {
+            "value": "var(--sand-alpha-06)",
+            "alias": "sand-alpha-06",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--sand-alpha-06)",
+              "references": [{ "cssVariable": "--sand-alpha-06", "percentage": null }],
+              "aliasChain": ["sand-alpha-06"],
+              "alpha": 0.06
+            }
+          },
+          "light": {
+            "value": "var(--taupe-alpha-32)",
+            "alias": "taupe-alpha-32",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--taupe-alpha-32)",
+              "references": [{ "cssVariable": "--taupe-alpha-32", "percentage": null }],
+              "aliasChain": ["taupe-alpha-32"],
+              "alpha": 0.32
+            }
+          }
         }
       },
       {
         "id": "input",
+        "label": "Input",
         "cssVariable": "--input",
+        "channels": ["border"],
         "modes": {
-          "dark": { "value": "var(--sand-alpha-10)", "alias": "sand-alpha-10" },
-          "light": { "value": "var(--linen-180)", "alias": "linen-180" }
+          "dark": {
+            "value": "var(--sand-alpha-10)",
+            "alias": "sand-alpha-10",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--sand-alpha-10)",
+              "references": [{ "cssVariable": "--sand-alpha-10", "percentage": null }],
+              "aliasChain": ["sand-alpha-10"],
+              "alpha": 0.1
+            }
+          },
+          "light": {
+            "value": "var(--linen-180)",
+            "alias": "linen-180",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--linen-180)",
+              "references": [{ "cssVariable": "--linen-180", "percentage": null }],
+              "aliasChain": ["linen-180"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "ring",
+        "label": "Ring",
         "cssVariable": "--ring",
+        "channels": ["border"],
         "modes": {
-          "dark": { "value": "var(--amber-600)", "alias": "amber-600" },
-          "light": { "value": "var(--orange-700)", "alias": "orange-700" }
+          "dark": {
+            "value": "var(--amber-600)",
+            "alias": "amber-600",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--amber-600)",
+              "references": [{ "cssVariable": "--amber-600", "percentage": null }],
+              "aliasChain": ["amber-600"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--orange-700)",
+            "alias": "orange-700",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--orange-700)",
+              "references": [{ "cssVariable": "--orange-700", "percentage": null }],
+              "aliasChain": ["orange-700"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "signal",
+        "label": "Signal",
         "cssVariable": "--signal",
+        "channels": ["fill", "border"],
         "modes": {
-          "dark": { "value": "var(--amber-500)", "alias": "amber-500" },
-          "light": { "value": "var(--orange-650)", "alias": "orange-650" }
+          "dark": {
+            "value": "var(--amber-500)",
+            "alias": "amber-500",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--amber-500)",
+              "references": [{ "cssVariable": "--amber-500", "percentage": null }],
+              "aliasChain": ["amber-500"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--orange-650)",
+            "alias": "orange-650",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--orange-650)",
+              "references": [{ "cssVariable": "--orange-650", "percentage": null }],
+              "aliasChain": ["orange-650"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "signal-foreground",
+        "label": "Signal Foreground",
         "cssVariable": "--signal-foreground",
+        "channels": ["text"],
         "modes": {
-          "dark": { "value": "var(--background)", "alias": "background" },
-          "light": { "value": "var(--ink-950)", "alias": "ink-950" }
+          "dark": {
+            "value": "var(--background)",
+            "alias": "background",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--background)",
+              "references": [{ "cssVariable": "--background", "percentage": null }],
+              "aliasChain": ["background", "stone-900"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--ink-950)",
+            "alias": "ink-950",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--ink-950)",
+              "references": [{ "cssVariable": "--ink-950", "percentage": null }],
+              "aliasChain": ["ink-950"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "info",
+        "label": "Info",
         "cssVariable": "--info",
+        "channels": ["fill", "border"],
         "modes": {
-          "dark": { "value": "var(--blue-500)", "alias": "blue-500" },
-          "light": { "value": "var(--blue-700)", "alias": "blue-700" }
+          "dark": {
+            "value": "var(--blue-500)",
+            "alias": "blue-500",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--blue-500)",
+              "references": [{ "cssVariable": "--blue-500", "percentage": null }],
+              "aliasChain": ["blue-500"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--blue-700)",
+            "alias": "blue-700",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--blue-700)",
+              "references": [{ "cssVariable": "--blue-700", "percentage": null }],
+              "aliasChain": ["blue-700"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "info-foreground",
+        "label": "Info Foreground",
         "cssVariable": "--info-foreground",
+        "channels": ["text"],
         "modes": {
-          "dark": { "value": "var(--stone-950)", "alias": "stone-950" },
-          "light": { "value": "var(--linen-50)", "alias": "linen-50" }
+          "dark": {
+            "value": "var(--stone-950)",
+            "alias": "stone-950",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--stone-950)",
+              "references": [{ "cssVariable": "--stone-950", "percentage": null }],
+              "aliasChain": ["stone-950"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--linen-50)",
+            "alias": "linen-50",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--linen-50)",
+              "references": [{ "cssVariable": "--linen-50", "percentage": null }],
+              "aliasChain": ["linen-50"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "warn",
+        "label": "Warn",
         "cssVariable": "--warn",
+        "channels": ["fill", "border"],
         "modes": {
-          "dark": { "value": "var(--orange-500)", "alias": "orange-500" },
-          "light": { "value": "var(--amber-750)", "alias": "amber-750" }
+          "dark": {
+            "value": "var(--orange-500)",
+            "alias": "orange-500",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--orange-500)",
+              "references": [{ "cssVariable": "--orange-500", "percentage": null }],
+              "aliasChain": ["orange-500"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--amber-750)",
+            "alias": "amber-750",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--amber-750)",
+              "references": [{ "cssVariable": "--amber-750", "percentage": null }],
+              "aliasChain": ["amber-750"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "success",
+        "label": "Success",
         "cssVariable": "--success",
+        "channels": ["fill", "border"],
         "modes": {
-          "dark": { "value": "var(--green-500)", "alias": "green-500" },
-          "light": { "value": "var(--green-700)", "alias": "green-700" }
+          "dark": {
+            "value": "var(--green-500)",
+            "alias": "green-500",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--green-500)",
+              "references": [{ "cssVariable": "--green-500", "percentage": null }],
+              "aliasChain": ["green-500"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--green-700)",
+            "alias": "green-700",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--green-700)",
+              "references": [{ "cssVariable": "--green-700", "percentage": null }],
+              "aliasChain": ["green-700"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "success-foreground",
+        "label": "Success Foreground",
         "cssVariable": "--success-foreground",
+        "channels": ["text"],
         "modes": {
-          "dark": { "value": "var(--stone-950)", "alias": "stone-950" },
-          "light": { "value": "var(--linen-50)", "alias": "linen-50" }
+          "dark": {
+            "value": "var(--stone-950)",
+            "alias": "stone-950",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--stone-950)",
+              "references": [{ "cssVariable": "--stone-950", "percentage": null }],
+              "aliasChain": ["stone-950"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--linen-50)",
+            "alias": "linen-50",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--linen-50)",
+              "references": [{ "cssVariable": "--linen-50", "percentage": null }],
+              "aliasChain": ["linen-50"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "chrome-clear",
+        "label": "Chrome Clear",
         "cssVariable": "--chrome-clear",
+        "channels": ["fill"],
         "modes": {
-          "dark": { "value": "transparent", "alias": null },
-          "light": { "value": "transparent", "alias": null }
+          "dark": {
+            "value": "transparent",
+            "alias": null,
+            "provenance": {
+              "kind": "transparent",
+              "source": "transparent",
+              "references": [],
+              "aliasChain": [],
+              "alpha": 0
+            }
+          },
+          "light": {
+            "value": "transparent",
+            "alias": null,
+            "provenance": {
+              "kind": "transparent",
+              "source": "transparent",
+              "references": [],
+              "aliasChain": [],
+              "alpha": 0
+            }
+          }
         }
       },
       {
         "id": "chrome-subtle",
+        "label": "Chrome Subtle",
         "cssVariable": "--chrome-subtle",
+        "channels": ["fill"],
         "modes": {
           "dark": {
             "value": "color-mix(in oklch, var(--foreground) 8%, transparent)",
-            "alias": null
+            "alias": null,
+            "provenance": {
+              "kind": "formula",
+              "source": "color-mix(in oklch, var(--foreground) 8%, transparent)",
+              "references": [{ "cssVariable": "--foreground", "percentage": 8 }],
+              "aliasChain": [],
+              "alpha": 0.08
+            }
           },
           "light": {
             "value": "color-mix(in oklch, var(--foreground) 8%, transparent)",
-            "alias": null
+            "alias": null,
+            "provenance": {
+              "kind": "formula",
+              "source": "color-mix(in oklch, var(--foreground) 8%, transparent)",
+              "references": [{ "cssVariable": "--foreground", "percentage": 8 }],
+              "aliasChain": [],
+              "alpha": 0.08
+            }
           }
         }
       },
       {
         "id": "chrome-standard",
+        "label": "Chrome Standard",
         "cssVariable": "--chrome-standard",
+        "channels": ["fill"],
         "modes": {
           "dark": {
             "value": "color-mix(in oklch, var(--foreground) 12%, transparent)",
-            "alias": null
+            "alias": null,
+            "provenance": {
+              "kind": "formula",
+              "source": "color-mix(in oklch, var(--foreground) 12%, transparent)",
+              "references": [{ "cssVariable": "--foreground", "percentage": 12 }],
+              "aliasChain": [],
+              "alpha": 0.12
+            }
           },
           "light": {
             "value": "color-mix(in oklch, var(--foreground) 12%, transparent)",
-            "alias": null
+            "alias": null,
+            "provenance": {
+              "kind": "formula",
+              "source": "color-mix(in oklch, var(--foreground) 12%, transparent)",
+              "references": [{ "cssVariable": "--foreground", "percentage": 12 }],
+              "aliasChain": [],
+              "alpha": 0.12
+            }
           }
         }
       },
       {
         "id": "chrome-strong",
+        "label": "Chrome Strong",
         "cssVariable": "--chrome-strong",
+        "channels": ["fill"],
         "modes": {
           "dark": {
             "value": "color-mix(in oklch, var(--foreground) 16%, transparent)",
-            "alias": null
+            "alias": null,
+            "provenance": {
+              "kind": "formula",
+              "source": "color-mix(in oklch, var(--foreground) 16%, transparent)",
+              "references": [{ "cssVariable": "--foreground", "percentage": 16 }],
+              "aliasChain": [],
+              "alpha": 0.16
+            }
           },
           "light": {
             "value": "color-mix(in oklch, var(--foreground) 16%, transparent)",
-            "alias": null
+            "alias": null,
+            "provenance": {
+              "kind": "formula",
+              "source": "color-mix(in oklch, var(--foreground) 16%, transparent)",
+              "references": [{ "cssVariable": "--foreground", "percentage": 16 }],
+              "aliasChain": [],
+              "alpha": 0.16
+            }
           }
         }
       },
       {
         "id": "chrome-edge-default",
+        "label": "Chrome Edge Default",
         "cssVariable": "--chrome-edge-default",
+        "channels": ["border"],
         "modes": {
           "dark": {
             "value": "color-mix(in oklch, var(--foreground) 16%, transparent)",
-            "alias": null
+            "alias": null,
+            "provenance": {
+              "kind": "formula",
+              "source": "color-mix(in oklch, var(--foreground) 16%, transparent)",
+              "references": [{ "cssVariable": "--foreground", "percentage": 16 }],
+              "aliasChain": [],
+              "alpha": 0.16
+            }
           },
           "light": {
             "value": "color-mix(in oklch, var(--foreground) 16%, transparent)",
-            "alias": null
+            "alias": null,
+            "provenance": {
+              "kind": "formula",
+              "source": "color-mix(in oklch, var(--foreground) 16%, transparent)",
+              "references": [{ "cssVariable": "--foreground", "percentage": 16 }],
+              "aliasChain": [],
+              "alpha": 0.16
+            }
           }
         }
       },
       {
         "id": "chrome-edge-emphasis",
+        "label": "Chrome Edge Emphasis",
         "cssVariable": "--chrome-edge-emphasis",
+        "channels": ["border"],
         "modes": {
           "dark": {
             "value": "color-mix(in oklch, var(--foreground) 32%, transparent)",
-            "alias": null
+            "alias": null,
+            "provenance": {
+              "kind": "formula",
+              "source": "color-mix(in oklch, var(--foreground) 32%, transparent)",
+              "references": [{ "cssVariable": "--foreground", "percentage": 32 }],
+              "aliasChain": [],
+              "alpha": 0.32
+            }
           },
           "light": {
             "value": "color-mix(in oklch, var(--foreground) 32%, transparent)",
-            "alias": null
+            "alias": null,
+            "provenance": {
+              "kind": "formula",
+              "source": "color-mix(in oklch, var(--foreground) 32%, transparent)",
+              "references": [{ "cssVariable": "--foreground", "percentage": 32 }],
+              "aliasChain": [],
+              "alpha": 0.32
+            }
           }
         }
       },
       {
         "id": "text-secondary",
+        "label": "Text Secondary",
         "cssVariable": "--text-secondary",
+        "channels": ["text"],
         "modes": {
           "dark": {
             "value": "color-mix(in oklch, var(--foreground) 75%, transparent)",
-            "alias": null
+            "alias": null,
+            "provenance": {
+              "kind": "formula",
+              "source": "color-mix(in oklch, var(--foreground) 75%, transparent)",
+              "references": [{ "cssVariable": "--foreground", "percentage": 75 }],
+              "aliasChain": [],
+              "alpha": 0.75
+            }
           },
           "light": {
             "value": "color-mix(in oklch, var(--foreground) 75%, transparent)",
-            "alias": null
+            "alias": null,
+            "provenance": {
+              "kind": "formula",
+              "source": "color-mix(in oklch, var(--foreground) 75%, transparent)",
+              "references": [{ "cssVariable": "--foreground", "percentage": 75 }],
+              "aliasChain": [],
+              "alpha": 0.75
+            }
           }
         }
       },
       {
         "id": "text-tertiary",
+        "label": "Text Tertiary",
         "cssVariable": "--text-tertiary",
+        "channels": ["text"],
         "modes": {
           "dark": {
             "value": "color-mix(in oklch, var(--foreground) 60%, transparent)",
-            "alias": null
+            "alias": null,
+            "provenance": {
+              "kind": "formula",
+              "source": "color-mix(in oklch, var(--foreground) 60%, transparent)",
+              "references": [{ "cssVariable": "--foreground", "percentage": 60 }],
+              "aliasChain": [],
+              "alpha": 0.6
+            }
           },
           "light": {
             "value": "color-mix(in oklch, var(--foreground) 60%, transparent)",
-            "alias": null
+            "alias": null,
+            "provenance": {
+              "kind": "formula",
+              "source": "color-mix(in oklch, var(--foreground) 60%, transparent)",
+              "references": [{ "cssVariable": "--foreground", "percentage": 60 }],
+              "aliasChain": [],
+              "alpha": 0.6
+            }
           }
         }
       },
       {
         "id": "text-disabled",
+        "label": "Text Disabled",
         "cssVariable": "--text-disabled",
+        "channels": ["text"],
         "modes": {
           "dark": {
             "value": "color-mix(in oklch, var(--foreground) 40%, transparent)",
-            "alias": null
+            "alias": null,
+            "provenance": {
+              "kind": "formula",
+              "source": "color-mix(in oklch, var(--foreground) 40%, transparent)",
+              "references": [{ "cssVariable": "--foreground", "percentage": 40 }],
+              "aliasChain": [],
+              "alpha": 0.4
+            }
           },
           "light": {
             "value": "color-mix(in oklch, var(--foreground) 40%, transparent)",
-            "alias": null
+            "alias": null,
+            "provenance": {
+              "kind": "formula",
+              "source": "color-mix(in oklch, var(--foreground) 40%, transparent)",
+              "references": [{ "cssVariable": "--foreground", "percentage": 40 }],
+              "aliasChain": [],
+              "alpha": 0.4
+            }
           }
         }
       },
       {
         "id": "text-accent",
+        "label": "Text Accent",
         "cssVariable": "--text-accent",
+        "channels": ["text"],
         "modes": {
           "dark": {
             "value": "color-mix(in oklch, var(--signal) 50%, var(--foreground) 50%)",
-            "alias": null
+            "alias": null,
+            "provenance": {
+              "kind": "formula",
+              "source": "color-mix(in oklch, var(--signal) 50%, var(--foreground) 50%)",
+              "references": [
+                { "cssVariable": "--signal", "percentage": 50 },
+                { "cssVariable": "--foreground", "percentage": 50 }
+              ],
+              "aliasChain": [],
+              "alpha": null
+            }
           },
           "light": {
             "value": "color-mix(in oklch, var(--signal) 50%, var(--foreground) 50%)",
-            "alias": null
+            "alias": null,
+            "provenance": {
+              "kind": "formula",
+              "source": "color-mix(in oklch, var(--signal) 50%, var(--foreground) 50%)",
+              "references": [
+                { "cssVariable": "--signal", "percentage": 50 },
+                { "cssVariable": "--foreground", "percentage": 50 }
+              ],
+              "aliasChain": [],
+              "alpha": null
+            }
           }
         }
       },
       {
         "id": "text-positive",
+        "label": "Text Positive",
         "cssVariable": "--text-positive",
+        "channels": ["text"],
         "modes": {
-          "dark": { "value": "var(--success)", "alias": "success" },
-          "light": { "value": "var(--success)", "alias": "success" }
+          "dark": {
+            "value": "var(--success)",
+            "alias": "success",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--success)",
+              "references": [{ "cssVariable": "--success", "percentage": null }],
+              "aliasChain": ["success", "green-500"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--success)",
+            "alias": "success",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--success)",
+              "references": [{ "cssVariable": "--success", "percentage": null }],
+              "aliasChain": ["success", "green-700"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "text-negative",
+        "label": "Text Negative",
         "cssVariable": "--text-negative",
+        "channels": ["text"],
         "modes": {
           "dark": {
             "value": "color-mix(in oklch, var(--destructive) 80%, var(--foreground) 20%)",
-            "alias": null
+            "alias": null,
+            "provenance": {
+              "kind": "formula",
+              "source": "color-mix(in oklch, var(--destructive) 80%, var(--foreground) 20%)",
+              "references": [
+                { "cssVariable": "--destructive", "percentage": 80 },
+                { "cssVariable": "--foreground", "percentage": 20 }
+              ],
+              "aliasChain": [],
+              "alpha": null
+            }
           },
           "light": {
             "value": "color-mix(in oklch, var(--destructive) 80%, var(--foreground) 20%)",
-            "alias": null
+            "alias": null,
+            "provenance": {
+              "kind": "formula",
+              "source": "color-mix(in oklch, var(--destructive) 80%, var(--foreground) 20%)",
+              "references": [
+                { "cssVariable": "--destructive", "percentage": 80 },
+                { "cssVariable": "--foreground", "percentage": 20 }
+              ],
+              "aliasChain": [],
+              "alpha": null
+            }
           }
         }
       },
       {
         "id": "text-informative",
+        "label": "Text Informative",
         "cssVariable": "--text-informative",
+        "channels": ["text"],
         "modes": {
-          "dark": { "value": "var(--info)", "alias": "info" },
-          "light": { "value": "var(--info)", "alias": "info" }
+          "dark": {
+            "value": "var(--info)",
+            "alias": "info",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--info)",
+              "references": [{ "cssVariable": "--info", "percentage": null }],
+              "aliasChain": ["info", "blue-500"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--info)",
+            "alias": "info",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--info)",
+              "references": [{ "cssVariable": "--info", "percentage": null }],
+              "aliasChain": ["info", "blue-700"],
+              "alpha": null
+            }
+          }
         }
       },
       {
         "id": "text-warning",
+        "label": "Text Warning",
         "cssVariable": "--text-warning",
+        "channels": ["text"],
         "modes": {
-          "dark": { "value": "var(--warn)", "alias": "warn" },
-          "light": { "value": "var(--warn)", "alias": "warn" }
+          "dark": {
+            "value": "var(--warn)",
+            "alias": "warn",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--warn)",
+              "references": [{ "cssVariable": "--warn", "percentage": null }],
+              "aliasChain": ["warn", "orange-500"],
+              "alpha": null
+            }
+          },
+          "light": {
+            "value": "var(--warn)",
+            "alias": "warn",
+            "provenance": {
+              "kind": "alias",
+              "source": "var(--warn)",
+              "references": [{ "cssVariable": "--warn", "percentage": null }],
+              "aliasChain": ["warn", "amber-750"],
+              "alpha": null
+            }
+          }
         }
       }
     ],
@@ -734,12 +1937,12 @@
   },
   "textStyles": [
     {
-      "id": "ui-page-title",
-      "label": "UI page title",
-      "className": "hito-ui-page-title",
+      "id": "ui-title-xl",
+      "label": "UI Title XL",
+      "className": "hito-ui-title-xl",
       "sample": "Profile details that follow your training.",
-      "description": "Primary sans-serif route title in the authenticated product.",
-      "use": "Top-level authenticated route title or major product-state heading.",
+      "description": "Largest reusable Poppins UI title tier.",
+      "use": "Largest product route or major state heading.",
       "cssSpec": "Poppins · clamp(3rem, 6vw, 4.5rem) · 400 · -0.02em · lh 1",
       "sourcePath": "src/styles/layout-typography.css",
       "responsive": true,
@@ -754,13 +1957,33 @@
       }
     },
     {
-      "id": "ui-modal-title",
-      "label": "UI modal title",
-      "className": "hito-ui-modal-title",
+      "id": "ui-title-lg",
+      "label": "UI Title LG",
+      "className": "hito-ui-title-lg",
+      "sample": "Today, built around your training.",
+      "description": "Large reusable Poppins UI title tier backed by current product hero geometry.",
+      "use": "Prominent product hero or route subsection heading.",
+      "cssSpec": "Poppins · clamp(2.25rem, 5vw, 3rem) · 400 · -0.02em · lh 1.05",
+      "sourcePath": "src/styles/layout-typography.css",
+      "responsive": true,
+      "figmaStatus": "descriptor-only",
+      "properties": {
+        "font-family": "var(--font-sans)",
+        "font-size": "clamp(2.25rem, 5vw, 3rem)",
+        "font-weight": "400",
+        "line-height": "1.05",
+        "letter-spacing": "-0.02em",
+        "text-wrap": "balance"
+      }
+    },
+    {
+      "id": "ui-title-md",
+      "label": "UI Title MD",
+      "className": "hito-ui-title-md",
       "sample": "Edit schedule",
-      "description": "Primary sans-serif heading inside bounded product dialogs.",
-      "use": "Primary heading inside authenticated product dialogs.",
-      "cssSpec": "Poppins · 1.75-2rem · 400 · -0.02em · lh 1.1",
+      "description": "Medium reusable Poppins UI title tier.",
+      "use": "Primary title inside a bounded product surface or dialog.",
+      "cssSpec": "Poppins · clamp(1.75rem, 5vw, 2rem) · 400 · -0.02em · lh 1.1",
       "sourcePath": "src/styles/layout-typography.css",
       "responsive": true,
       "figmaStatus": "descriptor-only",
@@ -774,12 +1997,12 @@
       }
     },
     {
-      "id": "ui-section-title",
-      "label": "UI section title",
-      "className": "hito-ui-section-title",
+      "id": "ui-title-sm",
+      "label": "UI Title SM",
+      "className": "hito-ui-title-sm",
       "sample": "Body data",
-      "description": "Sans-serif section title in the authenticated product hierarchy.",
-      "use": "Section-level orientation within an authenticated product surface.",
+      "description": "Small reusable Poppins UI title tier.",
+      "use": "Section-level product orientation.",
       "cssSpec": "Poppins · 1.5rem · 400 · -0.02em · lh 1.15",
       "sourcePath": "src/styles/layout-typography.css",
       "responsive": false,
@@ -789,17 +2012,18 @@
         "font-size": "1.5rem",
         "font-weight": "400",
         "line-height": "1.15",
-        "letter-spacing": "-0.02em"
+        "letter-spacing": "-0.02em",
+        "text-wrap": "balance"
       }
     },
     {
-      "id": "ui-panel-title",
-      "label": "UI panel title",
-      "className": "hito-ui-panel-title",
+      "id": "ui-title-xs",
+      "label": "UI Title XS",
+      "className": "hito-ui-title-xs",
       "sample": "Plan vs run",
-      "description": "Compact sans-serif panel or card title in the authenticated product.",
-      "use": "Compact product panels, review modules, and feedback sections.",
-      "cssSpec": "Poppins · 1.25-1.375rem · 400 · -0.015em · lh 1.18",
+      "description": "Compact reusable Poppins UI title tier.",
+      "use": "Compact panel, card, review, or feedback title.",
+      "cssSpec": "Poppins · clamp(1.25rem, 3vw, 1.375rem) · 400 · -0.015em · lh 1.18",
       "sourcePath": "src/styles/layout-typography.css",
       "responsive": true,
       "figmaStatus": "descriptor-only",
@@ -813,12 +2037,12 @@
       }
     },
     {
-      "id": "display-title",
-      "label": "Editorial display title",
-      "className": "hito-display-title",
+      "id": "display-title-xl",
+      "label": "Display Title XL",
+      "className": "hito-display-title-xl",
       "sample": "A running plan that stays honest.",
-      "description": "Largest editorial serif heading for source-backed hero presentation.",
-      "use": "Source-backed marketing, auth, or editorial hero moments only.",
+      "description": "Largest reusable Fraunces display tier.",
+      "use": "Source-backed marketing, auth, or editorial hero moment only.",
       "cssSpec": "Fraunces · clamp(3.5rem, 7vw, 5rem) · 400 · -0.02em · lh 1",
       "sourcePath": "src/styles/layout-typography.css",
       "responsive": true,
@@ -834,12 +2058,12 @@
       }
     },
     {
-      "id": "page-title",
-      "label": "Editorial page title",
-      "className": "hito-page-title",
-      "sample": "Profile details that follow your training.",
-      "description": "Editorial serif route title retained for source-backed public presentation.",
-      "use": "Public/editorial route identity; existing Product usage migrates to UI page title.",
+      "id": "display-title-lg",
+      "label": "Display Title LG",
+      "className": "hito-display-title-lg",
+      "sample": "Run with intent.",
+      "description": "Large reusable Fraunces display tier.",
+      "use": "Source-backed editorial route identity only.",
       "cssSpec": "Fraunces · clamp(3rem, 6vw, 4.5rem) · 400 · -0.02em · lh 1",
       "sourcePath": "src/styles/layout-typography.css",
       "responsive": true,
@@ -855,236 +2079,138 @@
       }
     },
     {
-      "id": "modal-title",
-      "label": "Editorial modal title",
-      "className": "hito-modal-title",
-      "sample": "Edit schedule",
-      "description": "Serif dialog heading retained only as migration compatibility.",
-      "use": "Do not add new Product use; existing dialogs migrate to UI modal title.",
-      "cssSpec": "Fraunces · 1.75-2rem · 400 · -0.02em · lh 1.1",
-      "sourcePath": "src/styles/layout-typography.css",
-      "responsive": true,
-      "figmaStatus": "descriptor-only",
-      "properties": {
-        "font-family": "var(--font-display)",
-        "font-size": "clamp(1.75rem, 5vw, 2rem)",
-        "font-weight": "400",
-        "line-height": "1.1",
-        "letter-spacing": "-0.02em",
-        "font-feature-settings": "\"ss01\"",
-        "text-wrap": "balance"
-      }
-    },
-    {
-      "id": "section-title",
-      "label": "Editorial section title",
-      "className": "hito-section-title",
-      "sample": "Body data",
-      "description": "Serif section heading retained for editorial use and migration compatibility.",
-      "use": "Editorial sections only; existing Product usage migrates to UI section title.",
-      "cssSpec": "Fraunces · 1.5rem · 400 · -0.02em · lh 1.15",
+      "id": "body-lg",
+      "label": "Body LG",
+      "className": "hito-body-lg",
+      "sample": "A clear introduction for an important product decision.",
+      "description": "Large reusable Poppins reading tier.",
+      "use": "Prominent introductory or explanatory copy.",
+      "cssSpec": "Poppins · 1.125rem · 400 · lh 1.55",
       "sourcePath": "src/styles/layout-typography.css",
       "responsive": false,
       "figmaStatus": "ready",
       "properties": {
-        "font-family": "var(--font-display)",
-        "font-size": "1.5rem",
-        "font-weight": "400",
-        "line-height": "1.15",
-        "letter-spacing": "-0.02em",
-        "font-feature-settings": "\"ss01\""
-      }
-    },
-    {
-      "id": "panel-title",
-      "label": "Editorial panel title",
-      "className": "hito-panel-title",
-      "sample": "Plan vs run",
-      "description": "Compact serif heading for source-backed editorial modules.",
-      "use": "Editorial modules such as changelog; existing Product usage migrates to UI panel title.",
-      "cssSpec": "Fraunces · 1.25-1.375rem · 400 · -0.015em · lh 1.18",
-      "sourcePath": "src/styles/layout-typography.css",
-      "responsive": true,
-      "figmaStatus": "descriptor-only",
-      "properties": {
-        "font-family": "var(--font-display)",
-        "font-size": "clamp(1.25rem, 3vw, 1.375rem)",
-        "font-weight": "400",
-        "line-height": "1.18",
-        "letter-spacing": "-0.015em",
-        "font-feature-settings": "\"ss01\"",
-        "text-wrap": "balance"
-      }
-    },
-    {
-      "id": "list-row-title",
-      "label": "List row title",
-      "className": "hito-list-row-title",
-      "sample": "Same typography, no click",
-      "description": "Primary label inside list-row anatomy.",
-      "use": "Primary label inside list rows and compact repeated row anatomy.",
-      "cssSpec": "Poppins · 0.875rem · 400 · lh 1.35",
-      "sourcePath": "src/styles/controls-lists.css",
-      "responsive": false,
-      "figmaStatus": "ready",
-      "properties": {
-        "font-size": "0.875rem",
-        "line-height": "1.35",
         "font-family": "var(--font-sans)",
-        "font-weight": "400"
+        "font-size": "1.125rem",
+        "font-weight": "400",
+        "line-height": "1.55",
+        "text-wrap": "pretty"
       }
     },
     {
-      "id": "body",
-      "label": "Body",
-      "className": "hito-body",
+      "id": "body-md",
+      "label": "Body MD",
+      "className": "hito-body-md",
       "sample": "This compares the planned workout with the uploaded run.",
-      "description": "Default body copy role.",
-      "use": "Default readable paragraph for page, modal, and section support.",
+      "description": "Default reusable Poppins reading tier.",
+      "use": "Default readable product and editorial copy.",
       "cssSpec": "Poppins · 0.875rem · 400 · lh 1.58",
       "sourcePath": "src/styles/layout-typography.css",
       "responsive": false,
       "figmaStatus": "ready",
       "properties": {
+        "font-family": "var(--font-sans)",
         "font-size": "0.875rem",
         "font-weight": "400",
         "line-height": "1.58",
-        "text-wrap": "pretty",
-        "font-family": "var(--font-sans)"
+        "text-wrap": "pretty"
       }
     },
     {
-      "id": "body-small",
-      "label": "Body small",
-      "className": "hito-body-small",
+      "id": "body-sm",
+      "label": "Body SM",
+      "className": "hito-body-sm",
       "sample": "Saved workout history stays preserved.",
-      "description": "Small supporting body copy role.",
-      "use": "Dense secondary explanations, row support, and metadata.",
+      "description": "Small reusable Poppins reading tier.",
+      "use": "Dense supporting explanations and secondary copy.",
       "cssSpec": "Poppins · 0.8125rem · 400 · lh 1.5",
       "sourcePath": "src/styles/layout-typography.css",
       "responsive": false,
       "figmaStatus": "ready",
       "properties": {
+        "font-family": "var(--font-sans)",
         "font-size": "0.8125rem",
         "font-weight": "400",
         "line-height": "1.5",
-        "text-wrap": "pretty",
-        "font-family": "var(--font-sans)"
+        "text-wrap": "pretty"
       }
     },
     {
-      "id": "helper",
-      "label": "Helper",
-      "className": "hito-field-helper",
+      "id": "body-xs",
+      "label": "Body XS",
+      "className": "hito-body-xs",
       "sample": "Nothing changes until you choose Apply update.",
-      "description": "Field-adjacent helper copy role.",
-      "use": "Field-adjacent or control-adjacent operational guidance.",
+      "description": "Smallest reusable Poppins reading tier.",
+      "use": "Field-adjacent guidance, compact metadata, and captions.",
       "cssSpec": "Poppins · 0.75rem · 400 · lh 1.45",
-      "sourcePath": "src/styles/controls-fields.css",
-      "responsive": false,
-      "figmaStatus": "ready",
-      "properties": {
-        "font-size": "0.75rem",
-        "line-height": "1.45",
-        "font-family": "var(--font-sans)",
-        "font-weight": "400"
-      }
-    },
-    {
-      "id": "caption",
-      "label": "Caption",
-      "className": "hito-caption",
-      "sample": "Extracted activity: morning-run.fit",
-      "description": "Quiet caption and secondary metadata role.",
-      "use": "Tertiary detail, legends, tiny footnotes, and timestamps.",
-      "cssSpec": "Poppins · 0.6875rem · 400 · lh 1.45",
       "sourcePath": "src/styles/layout-typography.css",
       "responsive": false,
       "figmaStatus": "ready",
       "properties": {
-        "font-size": "0.6875rem",
-        "line-height": "1.45",
         "font-family": "var(--font-sans)",
-        "font-weight": "400"
-      }
-    },
-    {
-      "id": "label",
-      "label": "Label",
-      "className": "hito-label",
-      "sample": "Current plan",
-      "description": "Compact field or metadata label role.",
-      "use": "Micro orientation, never a substitute for a heading.",
-      "cssSpec": "Poppins · 0.75rem · 600 · 0.01em · normal case · lh 1.25",
-      "sourcePath": "src/styles/layout-typography.css",
-      "responsive": false,
-      "figmaStatus": "ready",
-      "properties": {
         "font-size": "0.75rem",
-        "font-weight": "600",
-        "line-height": "1.25",
-        "letter-spacing": "0.01em",
-        "text-transform": "none",
-        "font-family": "var(--font-sans)"
+        "font-weight": "400",
+        "line-height": "1.45",
+        "text-wrap": "pretty"
       }
     },
     {
-      "id": "form-label",
-      "label": "Form label",
-      "className": "hito-form-label",
+      "id": "label-md",
+      "label": "Label MD",
+      "className": "hito-label-md",
       "sample": "Start training",
-      "description": "Explicit ownership label for fields and controls.",
-      "use": "Explicit ownership label for fields and controls.",
+      "description": "Reusable Poppins field and metadata label tier.",
+      "use": "Explicit field ownership and compact metadata orientation.",
       "cssSpec": "Poppins · 0.75rem · 600 · 0.01em · normal case · lh 1.25",
       "sourcePath": "src/styles/layout-typography.css",
       "responsive": false,
       "figmaStatus": "ready",
       "properties": {
+        "font-family": "var(--font-sans)",
         "font-size": "0.75rem",
         "font-weight": "600",
         "line-height": "1.25",
         "letter-spacing": "0.01em",
-        "text-transform": "none",
-        "font-family": "var(--font-sans)"
+        "text-transform": "none"
       }
     },
     {
-      "id": "micro-label",
-      "label": "Micro label",
-      "className": "hito-micro-label",
+      "id": "label-sm",
+      "label": "Label SM",
+      "className": "hito-label-sm",
       "sample": "Saved mode",
-      "description": "Tiny uppercase route chrome and compact status metadata.",
-      "use": "Tiny uppercase route chrome and compact status metadata, not ordinary shell labels.",
-      "cssSpec": "Poppins · 0.6875rem · 500 · 0.18em · uppercase · lh 1.2",
+      "description": "Compact reusable Poppins neutral label tier.",
+      "use": "Compact neutral orientation; not an uppercase chrome recipe.",
+      "cssSpec": "Poppins · 0.6875rem · 500 · 0.01em · normal case · lh 1.25",
       "sourcePath": "src/styles/layout-typography.css",
       "responsive": false,
       "figmaStatus": "ready",
       "properties": {
+        "font-family": "var(--font-sans)",
         "font-size": "0.6875rem",
         "font-weight": "500",
-        "line-height": "1.2",
-        "letter-spacing": "0.18em",
-        "text-transform": "uppercase",
-        "font-family": "var(--font-sans)"
+        "line-height": "1.25",
+        "letter-spacing": "0.01em",
+        "text-transform": "none"
       }
     },
     {
-      "id": "technical-mono",
-      "label": "Technical mono",
-      "className": "hito-technical-mono",
-      "sample": "training-plan-v2",
-      "description": "Technical monospace readback role.",
-      "use": "Measured or fixed-format truth only.",
-      "cssSpec": "JetBrains Mono · 0.75rem · tabular nums · lh 1.45",
+      "id": "technical-sm",
+      "label": "Technical SM",
+      "className": "hito-technical-sm",
+      "sample": "training-plan-v2 · 04:42 /km",
+      "description": "Reusable JetBrains Mono technical readback tier.",
+      "use": "Measured or fixed-format technical truth only.",
+      "cssSpec": "JetBrains Mono · 0.75rem · 400 · tabular nums · lh 1.45",
       "sourcePath": "src/styles/layout-typography.css",
       "responsive": false,
       "figmaStatus": "ready",
       "properties": {
         "font-family": "var(--font-mono)",
         "font-size": "0.75rem",
+        "font-weight": "400",
         "line-height": "1.45",
-        "font-variant-numeric": "tabular-nums",
-        "font-weight": "400"
+        "font-variant-numeric": "tabular-nums"
       }
     }
   ]

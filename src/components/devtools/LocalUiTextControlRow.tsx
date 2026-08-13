@@ -1,82 +1,56 @@
+import { useRef } from "react";
+
+import { HitoButton } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Textarea } from "@/components/ui/textarea";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function LocalUiTextControlRow({
-  currentText,
   onProposedTextChange,
   proposedText,
 }: {
-  currentText: string;
   onProposedTextChange: (value: string) => void;
   proposedText: string;
 }) {
+  const textFieldRef = useRef<HTMLTextAreaElement | null>(null);
+
   return (
-    <div className="grid min-w-0 gap-1.5 py-0.5" data-local-ui-property-control-row="Text">
+    <div
+      className="grid min-w-0 gap-1.5 py-0.5 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start"
+      data-local-ui-property-control-row="Text"
+    >
       <div className="flex min-w-0 items-center gap-1.5">
         <span className="grid size-5 shrink-0 place-items-center text-muted-foreground">
           <Icon name="typography" size="xs" />
         </span>
-        <span className="hito-caption min-w-0 truncate text-foreground">Text</span>
+        <span className="hito-body-xs min-w-0 truncate text-foreground">Text</span>
       </div>
-      <TooltipProvider delayDuration={160}>
-        <div className="grid min-w-0 gap-1.5 pl-6 sm:grid-cols-2">
-          <TextPropertyValue label="Current" readOnly value={currentText} />
-          <TextPropertyValue
-            label="Proposed"
-            placeholder="Optional replacement text"
-            value={proposedText}
-            onChange={onProposedTextChange}
-          />
-        </div>
-      </TooltipProvider>
-    </div>
-  );
-}
-
-function TextPropertyValue({
-  label,
-  onChange,
-  placeholder,
-  readOnly = false,
-  value,
-}: {
-  label: "Current" | "Proposed";
-  onChange?: (value: string) => void;
-  placeholder?: string;
-  readOnly?: boolean;
-  value: string;
-}) {
-  const field = (
-    <Textarea
-      aria-label={`${label} text`}
-      className="hito-body-small min-h-14 resize-none overflow-auto whitespace-pre-wrap break-words px-2 py-1.5"
-      data-local-ui-text-value={label.toLowerCase()}
-      placeholder={placeholder}
-      readOnly={readOnly}
-      rows={2}
-      value={value}
-      onChange={onChange ? (event) => onChange(event.currentTarget.value) : undefined}
-    />
-  );
-
-  return (
-    <label className="grid min-w-0 gap-1">
-      <span className="hito-caption text-muted-foreground">{label}</span>
-      {value ? (
-        <Tooltip>
-          <TooltipTrigger asChild>{field}</TooltipTrigger>
-          <TooltipContent
-            className="z-[94] max-w-[min(28rem,calc(100vw-1rem))] whitespace-pre-wrap break-words"
-            data-local-ui-inspector-layer=""
-            sideOffset={8}
+      <div className="relative min-w-0">
+        <Textarea
+          ref={textFieldRef}
+          aria-label="Edit selected target text"
+          className="hito-body-sm min-h-14 resize-none overflow-auto whitespace-pre-wrap break-words px-2 py-1.5 pr-8 text-secondary"
+          data-local-ui-text-value="draft"
+          rows={2}
+          value={proposedText}
+          onChange={(event) => onProposedTextChange(event.currentTarget.value)}
+        />
+        {proposedText.length > 0 ? (
+          <HitoButton
+            type="button"
+            aria-label="Clear text draft"
+            className="absolute right-1 top-1"
+            iconOnly
+            size="xs"
+            variant="ghost"
+            onClick={() => {
+              onProposedTextChange("");
+              window.requestAnimationFrame(() => textFieldRef.current?.focus());
+            }}
           >
-            {value}
-          </TooltipContent>
-        </Tooltip>
-      ) : (
-        field
-      )}
-    </label>
+            <Icon name="close" size="xs" />
+          </HitoButton>
+        ) : null}
+      </div>
+    </div>
   );
 }

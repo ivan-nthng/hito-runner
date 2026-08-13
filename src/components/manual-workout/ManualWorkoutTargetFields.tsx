@@ -39,7 +39,7 @@ export function ManualWorkoutTargetFields({
   return (
     <div className="hito-manual-workout-target-fields">
       <div className="grid gap-2">
-        <span className="hito-form-label">Target</span>
+        <span className="hito-label-md text-foreground">Target</span>
         <Select
           disabled={disabled}
           value={mode}
@@ -211,7 +211,7 @@ function TargetTextField({
 }) {
   return (
     <label className="grid gap-2">
-      <span className="hito-form-label">{label}</span>
+      <span className="hito-label-md text-foreground">{label}</span>
       <Input
         size="sm"
         variant="secondary"

@@ -174,7 +174,7 @@ export function DataTableSpecimenPreview({
             </tr>
             <tr>
               <td className="hito-data-table-cell hito-data-table-cell-start">
-                <code className="hito-technical-mono hito-data-table-code">
+                <code className="hito-technical-sm text-secondary hito-data-table-code">
                   qa-runner@hito.test
                 </code>
               </td>
@@ -187,7 +187,7 @@ export function DataTableSpecimenPreview({
         </table>
       </div>
 
-      <p className="hito-caption">
+      <p className="hito-body-xs text-tertiary">
         The scroll container owns horizontal overflow; the page canvas should not.
       </p>
     </div>
@@ -271,10 +271,12 @@ export function ModalWindowPreview({
         <div>
           {live ? (
             <>
-              <DialogTitle className="hito-modal-title">{title}</DialogTitle>
+              <DialogTitle className="hito-ui-title-md">{title}</DialogTitle>
               <DialogDescription
                 className={
-                  headerMode === "with-description" ? "hito-body mt-2 max-w-lg" : "sr-only"
+                  headerMode === "with-description"
+                    ? "hito-body-md text-secondary mt-2 max-w-lg"
+                    : "sr-only"
                 }
               >
                 {description}
@@ -282,9 +284,9 @@ export function ModalWindowPreview({
             </>
           ) : (
             <>
-              <h3 className="hito-modal-title">{title}</h3>
+              <h3 className="hito-ui-title-md">{title}</h3>
               {headerMode === "with-description" ? (
-                <p className="hito-body mt-2 max-w-lg">{description}</p>
+                <p className="hito-body-md text-secondary mt-2 max-w-lg">{description}</p>
               ) : null}
             </>
           )}
@@ -322,7 +324,7 @@ export function ModalWindowPreview({
       {footerMode !== "none" && (
         <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
           {footerMode === "note-actions" && (
-            <p className="hito-caption min-w-0 flex-1">
+            <p className="hito-body-xs text-tertiary min-w-0 flex-1">
               Footer note stays short and tied to save/apply.
             </p>
           )}
@@ -405,7 +407,7 @@ export function ChoiceSelector<T extends string>({
 
   return (
     <div className="w-full">
-      <p className="hito-label">{label}</p>
+      <p className="hito-label-md">{label}</p>
       <div className="hito-choice-toggle-group mt-3" {...choiceGroup.groupProps} aria-label={label}>
         {options.map((item) => {
           const selected = value === item;
@@ -784,13 +786,13 @@ export function IconOnlyButtonMatrix() {
       <div className="grid gap-5">
         {BUTTON_TONES.map((tone) => (
           <div key={`icon-only-${tone}`} className="grid gap-3">
-            <p className="hito-micro-label">{tone}</p>
+            <p className="hito-label-sm text-tertiary">{tone}</p>
             {BUTTON_SIZES.map((size) => (
               <div
                 key={`icon-only-${tone}-${size}`}
                 className="flex min-w-0 flex-wrap items-center gap-3"
               >
-                <span className="hito-caption w-8 shrink-0 uppercase">{size}</span>
+                <span className="hito-body-xs text-tertiary w-8 shrink-0 uppercase">{size}</span>
                 {BUTTON_VARIANTS.map((variant) => (
                   <DemoButton
                     key={`icon-only-${tone}-${size}-${variant}`}
@@ -806,7 +808,7 @@ export function IconOnlyButtonMatrix() {
         ))}
       </div>
       <div className="grid gap-3">
-        <p className="hito-micro-label">Focus, disabled, loading · MD</p>
+        <p className="hito-label-sm text-tertiary">Focus, disabled, loading · MD</p>
         {BUTTON_TONES.map((tone) => (
           <div key={`icon-only-states-${tone}`} className="grid gap-3">
             {BUTTON_VARIANTS.map((variant) => (
@@ -814,7 +816,9 @@ export function IconOnlyButtonMatrix() {
                 key={`icon-only-states-${tone}-${variant}`}
                 className="flex min-w-0 flex-wrap items-center gap-3"
               >
-                <span className="hito-caption w-20 shrink-0 capitalize">{variant}</span>
+                <span className="hito-body-xs text-tertiary w-20 shrink-0 capitalize">
+                  {variant}
+                </span>
                 <DemoButton variant={variant} tone={tone} size="md" iconOnly demoState="focus" />
                 <DemoButton variant={variant} tone={tone} size="md" iconOnly disabled />
                 <DemoButton variant={variant} tone={tone} size="md" iconOnly loading disabled />
@@ -842,7 +846,7 @@ export function MenuRow({
         <Icon name={icon} size="sm" className="text-muted-foreground" strokeWidth={1.6} />
         <span className="hito-list-row-title">{label}</span>
       </div>
-      <span className="hito-caption">{meta}</span>
+      <span className="hito-body-xs text-tertiary">{meta}</span>
     </div>
   );
 }

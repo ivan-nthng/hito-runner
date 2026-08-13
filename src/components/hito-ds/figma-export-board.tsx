@@ -170,8 +170,8 @@ export function HitoFigmaExportBoard() {
             </span>
           </div>
           <div className="grid gap-3">
-            <h1 className="hito-display-title max-w-5xl">Figma export surface</h1>
-            <p className="hito-body max-w-3xl">
+            <h1 className="hito-ui-title-xl max-w-5xl">Figma export surface</h1>
+            <p className="hito-body-md text-secondary max-w-3xl">
               Code-owned Hito DS matrices for html.to.design capture/import. Foundation tokens and
               reusable text roles render from the generated one-way manifest.
             </p>
@@ -294,9 +294,9 @@ function ExportSection({
     <section className="grid gap-5 border-t border-hairline pt-8" data-figma-export-section={id}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="max-w-3xl">
-          <p className="hito-label hito-label-signal">{eyebrow}</p>
-          <h2 className="hito-section-title mt-2">{title}</h2>
-          <p className="hito-body-small mt-2">{body}</p>
+          <p className="hito-label-md hito-label-signal">{eyebrow}</p>
+          <h2 className="hito-ui-title-sm mt-2">{title}</h2>
+          <p className="hito-body-sm text-secondary mt-2">{body}</p>
         </div>
       </div>
       <div className="min-w-0">{children}</div>
@@ -307,7 +307,7 @@ function ExportSection({
 function TokenGrid({ title, tokens }: { title: string; tokens: ReadonlyArray<TokenGridItem> }) {
   return (
     <div className="grid gap-3">
-      <h3 className="hito-label">{title}</h3>
+      <h3 className="hito-label-md">{title}</h3>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
         {tokens.map((token) => (
           <article
@@ -320,8 +320,8 @@ function TokenGrid({ title, tokens }: { title: string; tokens: ReadonlyArray<Tok
               style={{ background: `var(${token.token})` }}
             />
             <p className="hito-list-row-title mt-3">{token.name}</p>
-            <code className="hito-technical-mono mt-1 block">{token.token}</code>
-            <p className="hito-caption mt-1">{token.note}</p>
+            <code className="hito-technical-sm text-secondary mt-1 block">{token.token}</code>
+            <p className="hito-body-xs text-tertiary mt-1">{token.note}</p>
           </article>
         ))}
       </div>
@@ -333,23 +333,23 @@ function SpacingRadiusGrid() {
   return (
     <div className="grid gap-4 xl:grid-cols-2">
       <div className="grid gap-3">
-        <h3 className="hito-label">Spacing scale</h3>
+        <h3 className="hito-label-md">Spacing scale</h3>
         <div className="grid gap-2 rounded-2xl border border-hairline bg-background/55 p-4">
           {SPACING_TOKENS.map((token) => (
             <div key={token.token} className="grid grid-cols-[7rem_1fr_4rem] items-center gap-3">
-              <code className="hito-technical-mono">{token.token}</code>
+              <code className="hito-technical-sm text-secondary">{token.token}</code>
               <span
                 className="block h-3 rounded-full bg-signal"
                 style={{ width: `var(${token.token})` }}
               />
-              <span className="hito-caption text-right">{token.value}</span>
+              <span className="hito-body-xs text-tertiary text-right">{token.value}</span>
             </div>
           ))}
         </div>
       </div>
 
       <div className="grid gap-3">
-        <h3 className="hito-label">Radius scale</h3>
+        <h3 className="hito-label-md">Radius scale</h3>
         <div className="grid grid-cols-2 gap-3 rounded-2xl border border-hairline bg-background/55 p-4 md:grid-cols-3">
           {RADIUS_TOKENS.map((token) => (
             <div key={token.token} className="grid gap-2">
@@ -357,8 +357,8 @@ function SpacingRadiusGrid() {
                 className="h-16 border border-hairline bg-muted/65"
                 style={{ borderRadius: `var(${token.token})` }}
               />
-              <code className="hito-technical-mono">{token.token}</code>
-              <span className="hito-caption">{token.value}</span>
+              <code className="hito-technical-sm text-secondary">{token.token}</code>
+              <span className="hito-body-xs text-tertiary">{token.value}</span>
             </div>
           ))}
         </div>
@@ -371,8 +371,8 @@ function TypographyGrid() {
   return (
     <div className="grid gap-3">
       <div>
-        <h3 className="hito-label">Reusable text styles</h3>
-        <p className="hito-caption mt-1">
+        <h3 className="hito-label-md">Reusable text styles</h3>
+        <p className="hito-body-xs text-tertiary mt-1">
           Component-bound typography stays with its component family and is not exported as a text
           style.
         </p>
@@ -381,8 +381,8 @@ function TypographyGrid() {
         {HITO_DS_MANIFEST.textStyles.map((role) => (
           <div key={role.id} className="grid gap-2 border-b border-hairline pb-3 last:border-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="hito-caption">{role.label}</span>
-              <code className="hito-technical-mono">{role.className}</code>
+              <span className="hito-body-xs text-tertiary">{role.label}</span>
+              <code className="hito-technical-sm text-secondary">{role.className}</code>
             </div>
             <p className={role.className}>{role.sample}</p>
           </div>
@@ -396,13 +396,13 @@ function ButtonMatrix() {
   return (
     <div className="grid gap-6">
       <div className="grid gap-4">
-        <h3 className="hito-label">Size × variant × tone matrix</h3>
+        <h3 className="hito-label-md">Size × variant × tone matrix</h3>
         {BUTTON_TONES.map((tone) => (
           <MatrixPanel key={tone} title={`Tone: ${tone}`}>
             <div className="grid gap-3">
               {BUTTON_SIZES.map((size) => (
                 <div key={`${tone}-${size}`} className="flex min-w-0 flex-wrap items-center gap-3">
-                  <span className="hito-caption w-12 shrink-0">{size}</span>
+                  <span className="hito-body-xs text-tertiary w-12 shrink-0">{size}</span>
                   {BUTTON_VARIANTS.map((variant) => (
                     <DemoButton
                       key={`${tone}-${size}-${variant}`}
@@ -419,7 +419,7 @@ function ButtonMatrix() {
       </div>
 
       <div className="grid gap-4">
-        <h3 className="hito-label">Rendered states · md size</h3>
+        <h3 className="hito-label-md">Rendered states · md size</h3>
         <div className="grid gap-3 xl:grid-cols-3">
           {BUTTON_TONES.map((tone) => (
             <MatrixPanel key={`states-${tone}`} title={`Tone: ${tone}`}>
@@ -429,7 +429,7 @@ function ButtonMatrix() {
                     key={`${tone}-${state.label}`}
                     className="flex min-w-0 flex-wrap items-center gap-3"
                   >
-                    <span className="hito-caption w-16 shrink-0">{state.label}</span>
+                    <span className="hito-body-xs text-tertiary w-16 shrink-0">{state.label}</span>
                     {BUTTON_VARIANTS.map((variant) => (
                       <DemoButton
                         key={`${tone}-${state.label}-${variant}`}
@@ -450,7 +450,7 @@ function ButtonMatrix() {
       </div>
 
       <div className="grid gap-4">
-        <h3 className="hito-label">Icon-only button contract</h3>
+        <h3 className="hito-label-md">Icon-only button contract</h3>
         <IconOnlyButtonMatrix />
       </div>
 
@@ -461,7 +461,7 @@ function ButtonMatrix() {
               key={`icon-treatment-${size}`}
               className="flex min-w-0 flex-wrap items-center gap-3"
             >
-              <span className="hito-caption w-12 shrink-0">{size}</span>
+              <span className="hito-body-xs text-tertiary w-12 shrink-0">{size}</span>
               {BUTTON_ICON_TREATMENTS.map((treatment) => (
                 <DemoButton
                   key={`${size}-${treatment.label}`}
@@ -571,7 +571,7 @@ function InputMatrix() {
   return (
     <div className="grid gap-6">
       <div className="grid gap-4">
-        <h3 className="hito-label">Size × variant matrix</h3>
+        <h3 className="hito-label-md">Size × variant matrix</h3>
         <div className="grid gap-3 xl:grid-cols-2">
           {INPUT_VARIANTS.map((variant) => (
             <MatrixPanel key={variant} title={`Variant: ${variant}`}>
@@ -581,7 +581,7 @@ function InputMatrix() {
                     key={`${variant}-${size}`}
                     className="grid grid-cols-[4rem_1fr] items-center gap-3"
                   >
-                    <span className="hito-caption">{size}</span>
+                    <span className="hito-body-xs text-tertiary">{size}</span>
                     <DemoInput variant={variant} size={size} leftIcon rightIcon />
                   </div>
                 ))}
@@ -592,7 +592,7 @@ function InputMatrix() {
       </div>
 
       <div className="grid gap-4">
-        <h3 className="hito-label">Rendered states · md primary field</h3>
+        <h3 className="hito-label-md">Rendered states · md primary field</h3>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {INPUT_STATE_SPECIMENS.map((item) => (
             <MatrixPanel key={item.label} title={item.label}>
@@ -630,7 +630,7 @@ function InputMatrix() {
 
       <MatrixPanel title="Textarea">
         <label className="grid max-w-xl gap-2">
-          <span className="hito-form-label">Training note</span>
+          <span className="hito-label-md">Training note</span>
           <Textarea
             size="md"
             className="resize-none"
@@ -652,7 +652,7 @@ function InlineTextMatrix() {
         <div className="grid gap-4">
           {INLINE_HEADER_SIZES.map((size) => (
             <div key={`inline-header-${size}`} className="grid gap-2">
-              <span className="hito-caption">{size.toUpperCase()}</span>
+              <span className="hito-body-xs text-tertiary">{size.toUpperCase()}</span>
               <InlineEditableText
                 aria-label={`Edit ${size} header title`}
                 onChange={() => {}}
@@ -734,7 +734,7 @@ function DropdownMatrix() {
   return (
     <div className="grid gap-6">
       <div className="grid gap-4">
-        <h3 className="hito-label">List-item trigger size ladder</h3>
+        <h3 className="hito-label-md">List-item trigger size ladder</h3>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           {DROPDOWN_TRIGGER_SIZES.map((size) => (
             <MatrixPanel key={`dropdown-trigger-${size}`} title={size.toUpperCase()}>
@@ -749,7 +749,7 @@ function DropdownMatrix() {
       </div>
 
       <div className="grid gap-4">
-        <h3 className="hito-label">Select / dropdown trigger states</h3>
+        <h3 className="hito-label-md">Select / dropdown trigger states</h3>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {SELECT_TRIGGER_STATES.map((state) => (
             <MatrixPanel key={state.label} title={state.label}>
@@ -760,7 +760,7 @@ function DropdownMatrix() {
       </div>
 
       <div className="grid gap-4">
-        <h3 className="hito-label">Menu item row anatomy</h3>
+        <h3 className="hito-label-md">Menu item row anatomy</h3>
         <div className="grid gap-4 xl:grid-cols-3">
           <div className="hito-ui-menu-surface grid gap-1 p-1">
             <div className="hito-ui-menu-label px-2 py-1.5">Calendar actions</div>
@@ -835,7 +835,7 @@ function AdaptiveMenuMatrix() {
       <MatrixPanel title="Simple action menu escalation">
         <div className="grid gap-4">
           <div className="grid gap-2">
-            <p className="hito-caption">Desktop / tablet anchored</p>
+            <p className="hito-body-xs text-tertiary">Desktop / tablet anchored</p>
             <div className="hito-ui-menu-surface grid max-w-xs gap-1 p-1">
               <StaticMenuItem icon="edit" label="Edit text" />
               <StaticMenuItem icon="copy" label="Copy prompt" />
@@ -908,7 +908,7 @@ function AuditControlMatrix() {
             <StaticValueChip help="5.6px · custom, nearest --space-1">5.6</StaticValueChip>
           </StaticPropertyRow>
           <StaticPropertyRow iconName="typography" label="Typography">
-            <StaticValueChip help="hito-section-title · font 24px / line 27.6px">
+            <StaticValueChip help="hito-ui-title-sm · font 24px / line 27.6px">
               Section title
             </StaticValueChip>
           </StaticPropertyRow>
@@ -978,7 +978,7 @@ function IconInventory() {
         <div className="grid gap-4 xl:grid-cols-4">
           {ICON_SIZE_SPECIMENS.map((iconName) => (
             <div key={`size-${iconName}`} className="grid gap-3">
-              <h4 className="hito-label">{getIconLabel(iconName)}</h4>
+              <h4 className="hito-label-md">{getIconLabel(iconName)}</h4>
               <div className="flex flex-wrap items-end gap-3">
                 {Object.keys(HITO_ICON_SIZES).map((size) => (
                   <div
@@ -986,7 +986,7 @@ function IconInventory() {
                     className="grid min-w-16 justify-items-center gap-2 rounded-2xl border border-hairline bg-background/55 p-3"
                   >
                     <Icon name={iconName} size={size as HitoIconSize} />
-                    <span className="hito-caption">{size}</span>
+                    <span className="hito-body-xs text-tertiary">{size}</span>
                   </div>
                 ))}
               </div>
@@ -1009,7 +1009,9 @@ function IconInventory() {
                 </div>
                 <div className="min-w-0">
                   <p className="hito-list-row-title truncate">{getIconLabel(iconName)}</p>
-                  <code className="hito-technical-mono mt-1 block truncate">{iconName}</code>
+                  <code className="hito-technical-sm text-secondary mt-1 block truncate">
+                    {iconName}
+                  </code>
                 </div>
               </article>
             ))}
@@ -1040,7 +1042,7 @@ function StaticPropertyRow({
           <span className="grid size-5 shrink-0 place-items-center text-muted-foreground">
             <Icon name={iconName} size="xs" />
           </span>
-          <span className="hito-caption min-w-0 truncate text-foreground">{label}</span>
+          <span className="hito-body-xs min-w-0 truncate text-foreground">{label}</span>
           {expanded !== undefined ? (
             <span
               className="grid size-5 shrink-0 place-items-center rounded-sm text-muted-foreground"
@@ -1079,7 +1081,7 @@ function StaticValueChip({
 function MatrixPanel({ children, title }: { children: ReactNode; title: string }) {
   return (
     <article className="grid gap-3">
-      <h4 className="hito-caption">{title}</h4>
+      <h4 className="hito-body-xs text-tertiary">{title}</h4>
       {children}
     </article>
   );

@@ -23,6 +23,39 @@ export type InlineChangeTokenControlId =
 
 export type InlineChangeTokenControlKind = "radius" | "spacing";
 
+export type InlineChangeColorChannelId = "border" | "fill" | "text";
+
+export type InlineChangeColorDeclarationProperty = "background-color" | "border-color" | "color";
+
+export type InlineChangeColorTokenOption = {
+  alphaPercent: number;
+  cssVariable: string;
+  id: string;
+  label: string;
+  previewColor: string;
+  resolvedHex: string;
+  source: string | null;
+};
+
+export type InlineChangeColorControlInput = {
+  alphaPercent: number;
+  currentColor: string;
+  currentHex: string;
+  currentLabel: string;
+  currentToken: InlineChangeColorTokenOption | null;
+  declarationProperty: InlineChangeColorDeclarationProperty;
+  id: InlineChangeColorChannelId;
+  label: "Border" | "Fill" | "Text";
+  options: InlineChangeColorTokenOption[];
+};
+
+export type InlineChangeColorSelection = InlineChangeColorControlInput & {
+  requestedChange:
+    | { kind: "remove_declaration"; property: InlineChangeColorDeclarationProperty }
+    | { kind: "semantic_token"; token: InlineChangeColorTokenOption }
+    | null;
+};
+
 export type InlineChangeBorderSide = "bottom" | "left" | "right" | "top";
 
 export type InlineChangeTokenControlOption = {
@@ -136,6 +169,7 @@ export type InlineChangeAction = {
 export type InlineChangeTargetInput = {
   border?: InlineChangeBorderEvidence | null;
   cardChrome?: InlineChangeCardChromeEvidence | null;
+  colorControls?: InlineChangeColorSelection[] | null;
   classificationReason?: string | null;
   componentId?: string | null;
   chromeRemovalSelection?: InlineChangeChromeRemovalSelection | null;
@@ -180,6 +214,7 @@ export type InlineChangeTargetPayload = {
     classificationReason: string | null;
     border: InlineChangeBorderEvidence | null;
     cardChrome: InlineChangeCardChromeEvidence | null;
+    colorControls: InlineChangeColorSelection[];
     chromeRemoval: InlineChangeChromeRemovalSelection | null;
     componentId: string | null;
     elementClasses: string | null;
@@ -235,6 +270,7 @@ export const INLINE_CHANGE_ACTIONS: InlineChangeAction[] = [
   ["edit_text", "Edit text", "Text / Copy", "copy"],
   ["comment", "Comment", "UI Note", "frontend"],
   ["remove_border", "Remove border", "Surface / Chrome", "frontend"],
+  ["remove_color", "Remove color", "Color / Styling", "frontend"],
   ["remove_card_chrome", "Card chrome", "Surface / Chrome", "frontend"],
   ["remove_component", "Remove object", "Component / Structure", "frontend"],
   ["reduce_padding", "Reduce padding", "Spacing / Layout", "frontend"],
@@ -296,6 +332,26 @@ export function buildTokenControlSelections(
   });
 }
 
+export function buildColorControlSelections(
+  controls: InlineChangeColorControlInput[],
+  desiredTokens: Record<string, string>,
+): InlineChangeColorSelection[] {
+  return controls.map((control) => {
+    const desiredValue = desiredTokens[control.id] ?? null;
+    const desiredToken = control.options.find((option) => option.id === desiredValue) ?? null;
+
+    return {
+      ...control,
+      requestedChange:
+        desiredValue === "__remove"
+          ? { kind: "remove_declaration", property: control.declarationProperty }
+          : desiredToken
+            ? { kind: "semantic_token", token: desiredToken }
+            : null,
+    };
+  });
+}
+
 export function buildInlineChangePayload({
   action,
   comment,
@@ -323,7 +379,7 @@ export function buildInlineChangePayload({
     comment: comment.trim(),
     target: {
       label: normalizeTargetValue(target.targetLabel),
-      proposedText: normalizeTargetValue(target.proposedText),
+      proposedText: normalizeProposedTextValue(target.proposedText, target.visibleText),
       promptAction: normalizePromptActionSelection(target.promptActionSelection),
       componentId: normalizeTargetValue(target.componentId),
       selector: normalizeTargetValue(target.selector),
@@ -335,6 +391,7 @@ export function buildInlineChangePayload({
       classificationReason: normalizeTargetValue(target.classificationReason),
       border: normalizeBorderEvidence(target.border),
       cardChrome: normalizeCardChromeEvidence(target.cardChrome),
+      colorControls: normalizeColorControlSelections(target.colorControls),
       chromeRemoval: normalizeChromeRemovalSelection(target.chromeRemovalSelection),
       evidence: normalizeList(target.evidenceLines),
       dimensions: normalizeDimensions(target.dimensions),
@@ -363,6 +420,18 @@ export function buildInlineChangePayload({
 function normalizeTargetValue(value: string | null | undefined) {
   const nextValue = value?.trim();
   return nextValue ? nextValue.slice(0, 500) : null;
+}
+
+function normalizeProposedTextValue(
+  proposedText: string | null | undefined,
+  currentText: string | null | undefined,
+) {
+  if (proposedText === null || proposedText === undefined) return null;
+
+  const nextValue = proposedText.trim();
+  if (nextValue === (currentText?.trim() ?? "")) return null;
+
+  return nextValue ? nextValue.slice(0, 500) : "";
 }
 
 function normalizeList(values: string[] | null | undefined) {
@@ -401,6 +470,63 @@ function normalizeTokenControlSelections(
   return (values ?? [])
     .filter((value) => value.id && value.label && Number.isFinite(value.currentValuePx))
     .slice(0, 10);
+}
+
+function normalizeColorControlSelections(values: InlineChangeColorSelection[] | null | undefined) {
+  return (values ?? [])
+    .filter(
+      (value) =>
+        (value.id === "text" || value.id === "fill" || value.id === "border") &&
+        value.label &&
+        value.currentColor &&
+        value.currentHex &&
+        Number.isFinite(value.alphaPercent) &&
+        (value.declarationProperty === "color" ||
+          value.declarationProperty === "background-color" ||
+          value.declarationProperty === "border-color"),
+    )
+    .slice(0, 3)
+    .map((value) => ({
+      ...value,
+      currentToken: normalizeColorTokenOption(value.currentToken),
+      options: value.options
+        .map(normalizeColorTokenOption)
+        .filter((option): option is InlineChangeColorTokenOption => Boolean(option)),
+      requestedChange:
+        value.requestedChange?.kind === "remove_declaration"
+          ? { kind: "remove_declaration" as const, property: value.declarationProperty }
+          : value.requestedChange?.kind === "semantic_token"
+            ? (() => {
+                const token = normalizeColorTokenOption(value.requestedChange.token);
+                return token ? ({ kind: "semantic_token" as const, token } as const) : null;
+              })()
+            : null,
+    }));
+}
+
+function normalizeColorTokenOption(
+  value: InlineChangeColorTokenOption | null | undefined,
+): InlineChangeColorTokenOption | null {
+  if (
+    !value?.id ||
+    !value.label ||
+    !value.cssVariable ||
+    !value.previewColor ||
+    !value.resolvedHex ||
+    !Number.isFinite(value.alphaPercent)
+  ) {
+    return null;
+  }
+
+  return {
+    alphaPercent: value.alphaPercent,
+    cssVariable: value.cssVariable,
+    id: value.id,
+    label: value.label,
+    previewColor: value.previewColor,
+    resolvedHex: value.resolvedHex,
+    source: value.source,
+  };
 }
 
 function normalizeTokenControlInputs(values: InlineChangeTokenControlInput[] | null | undefined) {

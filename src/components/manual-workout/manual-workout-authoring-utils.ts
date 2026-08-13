@@ -139,13 +139,6 @@ export function formatReadableDate(iso: string) {
   }).format(date);
 }
 
-export function workoutToneColor(template: ManualWorkoutTemplate) {
-  return workoutTypeColorVar(
-    templateRunnerFacingLanguage(template).runnerFacingWorkoutType,
-    "base",
-  );
-}
-
 export function templateWorkoutColorIndicatorStyle(template: ManualWorkoutTemplate) {
   const type = templateRunnerFacingLanguage(template).runnerFacingWorkoutType;
 
@@ -161,7 +154,9 @@ export function templateIconKind(template: ManualWorkoutTemplate | null | undefi
 }
 
 export function templateIconTone(template: ManualWorkoutTemplate | null | undefined) {
-  return template ? workoutToneColor(template) : "var(--color-muted-foreground)";
+  return template
+    ? workoutTypeColorVar(templateRunnerFacingLanguage(template).runnerFacingWorkoutType, "content")
+    : "var(--color-muted-foreground)";
 }
 
 export function targetTruthModeLabel(mode: ManualWorkoutTargetTruthMode | string) {

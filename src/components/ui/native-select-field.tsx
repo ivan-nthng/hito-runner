@@ -56,7 +56,7 @@ export function HitoNativeSelectField({
 
   return (
     <label className={cn("grid min-w-0 gap-2", className)}>
-      <span className={cn("hito-form-label", labelClassName)}>{label}</span>
+      <span className={cn("hito-label-md", labelClassName)}>{label}</span>
       <select
         {...selectProps}
         id={selectId}

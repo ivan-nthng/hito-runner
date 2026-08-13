@@ -30,7 +30,7 @@ export function ManualWorkoutDocumentLead({
         </span>
         <div className="hito-manual-workout-title-field hito-manual-workout-title-field-stack">
           {title}
-          {meta ? <p className="hito-list-row-copy">{meta}</p> : null}
+          {meta ? <p className="hito-body-sm mt-1 text-secondary">{meta}</p> : null}
         </div>
         {statusLabel ? (
           <span className="hito-status-pill shrink-0" data-tone="muted">
@@ -68,7 +68,7 @@ export function ManualWorkoutStructurePreview({
         items={items}
         summary={summary}
       />
-      {helper ? <p className="hito-field-helper">{helper}</p> : null}
+      {helper ? <p className="hito-body-xs text-secondary">{helper}</p> : null}
     </section>
   );
 }
@@ -95,14 +95,18 @@ export function ManualWorkoutSectionRowHeader({
         style={{ background: markerColor }}
         aria-hidden="true"
       />
-      <span className="hito-caption hito-manual-workout-row-ordinal font-mono-num">{ordinal}</span>
+      <span className="hito-technical-sm text-tertiary hito-manual-workout-row-ordinal">
+        {ordinal}
+      </span>
       <div className="hito-manual-workout-step-summary flex-1">
         <div className="hito-manual-workout-row-title-line">
           <div className="hito-manual-workout-row-title-main">
             {typeControl}
-            {title ? <p className="hito-list-row-title min-w-0 truncate">{title}</p> : null}
+            {title ? (
+              <p className="hito-body-md text-foreground min-w-0 truncate">{title}</p>
+            ) : null}
           </div>
-          <p className="hito-list-row-copy hito-manual-workout-row-duration-summary min-w-0 truncate">
+          <p className="hito-body-sm mt-1 text-secondary hito-manual-workout-row-duration-summary min-w-0 truncate">
             {summary}
           </p>
         </div>
@@ -135,7 +139,7 @@ function ManualWorkoutSegmentReadbackRow({ entry }: { entry: ManualWorkoutReadba
         aria-hidden="true"
       />
       {entry.ordinal ? (
-        <span className="hito-caption hito-manual-workout-row-ordinal font-mono-num">
+        <span className="hito-technical-sm text-tertiary hito-manual-workout-row-ordinal">
           {entry.ordinal}
         </span>
       ) : null}
@@ -145,10 +149,10 @@ function ManualWorkoutSegmentReadbackRow({ entry }: { entry: ManualWorkoutReadba
         </span>
       ) : null}
       <div className="min-w-0 flex-1">
-        <p className="hito-list-row-title min-w-0 truncate">{entry.title}</p>
-        <p className="hito-list-row-copy min-w-0 truncate">{entry.targetSummary}</p>
+        <p className="hito-body-md text-foreground min-w-0 truncate">{entry.title}</p>
+        <p className="hito-body-sm mt-1 text-secondary min-w-0 truncate">{entry.targetSummary}</p>
       </div>
-      <span className="hito-caption hito-manual-workout-readback-duration font-mono-num">
+      <span className="hito-technical-sm text-tertiary hito-manual-workout-readback-duration">
         {entry.durationSummary}
       </span>
     </div>
@@ -170,8 +174,8 @@ function ManualWorkoutRepeatReadbackRow({
       </div>
       <div className="hito-manual-workout-repeat-readback-stack">
         <div className="min-w-0 px-1">
-          <p className="hito-list-row-title min-w-0 truncate">{entry.title}</p>
-          <p className="hito-list-row-copy min-w-0 truncate">{entry.summary}</p>
+          <p className="hito-body-md text-foreground min-w-0 truncate">{entry.title}</p>
+          <p className="hito-body-sm mt-1 text-secondary min-w-0 truncate">{entry.summary}</p>
         </div>
         {entry.children.map((child) => (
           <ManualWorkoutSegmentReadbackRow entry={child} key={child.id} />

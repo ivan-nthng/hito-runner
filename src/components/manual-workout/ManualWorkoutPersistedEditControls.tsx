@@ -394,8 +394,8 @@ export function ManualWorkoutPersistedEditDialog({
             <div className="hito-list-row items-start">
               <Icon name="shield-alert" size="sm" className="mt-0.5 text-muted-foreground" />
               <div className="min-w-0">
-                <p className="hito-list-row-title">Edit unavailable</p>
-                <p className="hito-list-row-copy">
+                <p className="hito-body-md text-foreground">Edit unavailable</p>
+                <p className="hito-body-sm mt-1 text-secondary">
                   {blockedMessage ?? "This workout cannot be opened for editing yet."}
                 </p>
               </div>
@@ -498,8 +498,8 @@ function PersistedEditReviewReadback({
     return (
       <div className="hito-list-row items-start">
         <div className="grid min-w-0 gap-2">
-          <p className="hito-list-row-title">Edit blocked</p>
-          <p className="hito-list-row-copy">{result.message}</p>
+          <p className="hito-body-md text-foreground">Edit blocked</p>
+          <p className="hito-body-sm mt-1 text-secondary">{result.message}</p>
         </div>
         <span className="hito-status-pill" data-tone="warning">
           Blocked
@@ -512,7 +512,7 @@ function PersistedEditReviewReadback({
 
   if (warnings.length === 0) {
     return (
-      <p className="hito-field-helper">
+      <p className="hito-body-xs text-secondary">
         Hito reviewed this edit. Nothing changes until you save the edited workout.
       </p>
     );
@@ -522,7 +522,7 @@ function PersistedEditReviewReadback({
     <div className="hito-list-row items-start">
       <div className="grid min-w-0 gap-2">
         {warnings.map((warning) => (
-          <p key={warning} className="hito-field-helper">
+          <p key={warning} className="hito-body-xs text-secondary">
             Warning: {warning}
           </p>
         ))}

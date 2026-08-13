@@ -340,10 +340,17 @@ product rules rather than source-based editability exceptions.
 - that downloadable template now includes one reserved `_ml_agent_template` instruction block plus rich workout field examples so ML-generated files can target the canonical `training-plan-v2` contract more explicitly without turning template-only guidance into runtime truth or inventing fake pace/HR targets
 - rest days now stay intentionally sparse: no workout metrics, no placeholder targets or note sections, and no fake completion affordance from home
 - auth, onboarding, advanced import, shell navigation/profile/menu chrome, home/calendar support areas, workout-detail grouped/status/metric surfaces, route-level setup/empty/error states, progress summary metrics, legends, and bar chrome, body severity micro-UI, preserved integration utility rows, public changelog editorial timeline chrome, launcher/auth/admin atmospheric shells, calendar/workout tooltip chrome, and deeper workout-structure plus completion-log micro-surfaces now share Hito component primitives for canonical typography roles, low-card surfaces, open/divider grouping, tiered controls, helper/error text, grouped rows, metric rows, compact legends, compact tooltips, compact chart notes, comparison-bar fills, editorial date rails, highlight tags, timeline entries, bounded canvas/photo/launch/state/editorial overlay recipes, Hito-native dialog/sheet/menu/select wrapper defaults, Hito progress/card/sidebar chrome recipes, compact severity scales, compact severity summaries, compact status pills, compact status markers, shell nav rows, shell menu rows, disclosure, labels, captions, tabs, and dividers, keeping structured first-plan onboarding primary and advanced JSON import secondary
-- the first typography canonicalization pass is implemented for the highest-drift runner-facing surfaces: saved-mode plan-management/import, workout `Log result`/`Feedback`, and `User settings` now use shared modal title, panel title, body/body-small, form-label, feedback, and technical-mono roles instead of local heading and helper/body recipes where practical
+- Typography uses one completed Hito contract: 14 reusable roles plus four component-bound roles.
+  Poppins owns functional UI and reading hierarchy, Fraunces remains limited to deliberate Display
+  and timeline anatomy, and JetBrains Mono remains technical. The Local Inspector derives its
+  selectable typography choices from that same contract; retired roles, aliases, and provenance
+  paths have zero reachability. Detailed evidence remains in the
+  [Typography Scale Consolidation receipt](/Users/ivan/Developer/hito-running/docs/tasks/backlog/2026-08-11-hito-ds-typography-scale-consolidation-and-adoption.md).
 - the icon canonicalization pass is implemented on top of the Tabler-backed Hito `Icon` primitive: product surfaces consume stable Hito icon names through the shared registry, `/hitoDS` documents approved icon names, categories, and sizes, and raw SVG icon folders are not part of the product design-system source
 - remaining chart heights/widths, plotted lines, interval block widths, SVG silhouettes, and marker coordinates are treated as product visualization geometry, not runner-facing component chrome
-- the interface is broadly normalized into Hito DS ownership, but the current conformance audit still tracks bounded consumer migrations where Quick setup and Completion recreate existing choice, scale, or field grammar; future UI work should reuse shared Hito primitives or documented geometry exceptions instead of adding new custom route-local chrome
+- Future UI work reuses shared Hito primitives and documented geometry exceptions rather than adding
+  route-local chrome. Completion of the typography migration does not remove the need for a
+  separately scoped audit before any later cross-owner simplification.
 
 ## Known Allowed Fix Areas
 

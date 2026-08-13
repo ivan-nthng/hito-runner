@@ -72,11 +72,11 @@ export function HitoSlider({
       style={style}
     >
       <div className="hito-slider-header">
-        <label className="hito-form-label" htmlFor={inputId}>
+        <label className="hito-label-md" htmlFor={inputId}>
           {label}
         </label>
         <output
-          className="hito-caption font-mono-num text-foreground/80"
+          className="hito-technical-sm text-foreground/80"
           htmlFor={inputId}
           aria-hidden="true"
         >
@@ -129,7 +129,7 @@ export function HitoSlider({
         ) : null}
       </div>
 
-      <div className="hito-slider-bounds hito-caption font-mono-num" aria-hidden="true">
+      <div className="hito-slider-bounds hito-technical-sm text-tertiary" aria-hidden="true">
         <span>{minLabel ?? min}</span>
         <span>{maxLabel ?? max}</span>
       </div>

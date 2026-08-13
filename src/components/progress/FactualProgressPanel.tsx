@@ -41,11 +41,11 @@ export function FactualProgressPanel({
   return (
     <section aria-labelledby="factual-progress-title">
       <header className="hito-page-header">
-        <p className="hito-label">Comparable evidence</p>
-        <h1 id="factual-progress-title" className="hito-ui-page-title">
+        <p className="hito-label-md text-foreground">Comparable evidence</p>
+        <h1 id="factual-progress-title" className="hito-ui-title-xl mt-2 max-w-[44rem]">
           Progress
         </h1>
-        <p className="hito-page-copy">
+        <p className="hito-body-md mt-4 max-w-[40rem] text-secondary">
           Recorded running facts, current records, and your reported training load.
         </p>
       </header>
@@ -54,9 +54,11 @@ export function FactualProgressPanel({
       {state.status === "error" ? <ProgressError message={state.error} onRetry={onRetry} /> : null}
       {state.status === "updating" ? (
         <div className="hito-state-surface" data-tone="signal" role="status" aria-live="polite">
-          <p className="hito-label">Updating</p>
-          <h2 className="hito-ui-section-title mt-2">Your activity facts are being refreshed.</h2>
-          <p className="hito-body mt-2">
+          <p className="hito-label-md text-foreground">Updating</p>
+          <h2 className="hito-ui-title-sm text-foreground mt-2">
+            Your activity facts are being refreshed.
+          </h2>
+          <p className="hito-body-md text-secondary mt-2">
             Current values will return when the backend snapshot is ready.
           </p>
           <div className="hito-state-actions">
@@ -87,14 +89,14 @@ function ProgressReadback({ progress }: { progress: RunnerActivityProgressProduc
   return (
     <div className="space-y-8">
       <section aria-labelledby="rolling-summary-title">
-        <p className="hito-label">Last 28 days</p>
+        <p className="hito-label-md text-foreground">Last 28 days</p>
         <h2
           id="rolling-summary-title"
           className="mt-3 font-sans text-3xl leading-tight sm:text-4xl"
         >
           {summary}
         </h2>
-        <p className="hito-caption mt-2">
+        <p className="hito-body-xs text-tertiary mt-2">
           {formatWindow(current)} · {current.eligibleActivityCount} recorded activities
         </p>
       </section>
@@ -102,10 +104,12 @@ function ProgressReadback({ progress }: { progress: RunnerActivityProgressProduc
       {visibleFacts.length > 0 ? (
         <section aria-labelledby="progress-facts-title">
           <div className="hito-section-header">
-            <h2 id="progress-facts-title" className="hito-ui-section-title">
+            <h2 id="progress-facts-title" className="hito-ui-title-sm text-foreground">
               Running facts
             </h2>
-            <span className="hito-section-subtitle">Current and previous 28 days</span>
+            <span className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
+              Current and previous 28 days
+            </span>
           </div>
           <div className="mt-4 space-y-3">
             {visibleFacts.map(({ key, label }) => (
@@ -137,12 +141,12 @@ function ProgressReadback({ progress }: { progress: RunnerActivityProgressProduc
                   className="hito-list-row !items-start"
                 >
                   <div>
-                    <p className="hito-list-row-title">{formatWindow(week)}</p>
-                    <p className="hito-list-row-copy">
+                    <p className="hito-body-md text-foreground">{formatWindow(week)}</p>
+                    <p className="hito-body-sm mt-1 text-secondary">
                       {formatRollingSummary(week) ?? "No recorded running facts"}
                     </p>
                   </div>
-                  <span className="hito-caption shrink-0">Week</span>
+                  <span className="hito-body-xs text-tertiary shrink-0">Week</span>
                 </li>
               ))}
             </ul>
@@ -168,11 +172,14 @@ function Gate4Readback({
         aria-atomic="true"
         aria-labelledby="activity-intelligence-updating-title"
       >
-        <p className="hito-label">Updating records and reported load</p>
-        <h2 id="activity-intelligence-updating-title" className="hito-ui-section-title mt-2">
+        <p className="hito-label-md text-foreground">Updating records and reported load</p>
+        <h2
+          id="activity-intelligence-updating-title"
+          className="hito-ui-title-sm text-foreground mt-2"
+        >
           A recent activity change is being applied.
         </h2>
-        <p className="hito-body mt-2">
+        <p className="hito-body-md text-secondary mt-2">
           Current record and load values will return when the update is complete.
         </p>
       </section>
@@ -189,10 +196,10 @@ function Gate4Readback({
       </p>
       <div className="hito-section-header">
         <div>
-          <h2 id="activity-intelligence-title" className="hito-ui-section-title">
+          <h2 id="activity-intelligence-title" className="hito-ui-title-sm text-foreground">
             Records and reported load
           </h2>
-          <p className="hito-section-subtitle">
+          <p className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
             {advancedMetrics.historical ? "Historical" : "Current"} · Based on activity evidence
             through {formatDate(advancedMetrics.asOfDate)}.
           </p>
@@ -219,10 +226,12 @@ function RecordsReadback({
     <section aria-labelledby="activity-records-title">
       <div className="hito-section-header">
         <div>
-          <h3 id="activity-records-title" className="hito-ui-section-title">
+          <h3 id="activity-records-title" className="hito-ui-title-sm text-foreground">
             Current records
           </h3>
-          <p className="hito-section-subtitle">Accepted whole-activity and official results</p>
+          <p className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
+            Accepted whole-activity and official results
+          </p>
         </div>
       </div>
 
@@ -234,8 +243,8 @@ function RecordsReadback({
         </ul>
       ) : (
         <div className="mt-4">
-          <p className="hito-body font-medium">No current records to show.</p>
-          <p className="hito-caption mt-1">
+          <p className="hito-body-md text-secondary font-medium">No current records to show.</p>
+          <p className="hito-body-xs text-tertiary mt-1">
             {unavailableReasons.length > 0
               ? unavailableReasons.map(advancedUnavailableReasonLabel).join(" · ")
               : "Hito only shows exact whole-activity records and official results entered by you."}
@@ -251,9 +260,9 @@ function RecordRow({ record }: { record: RunnerActivityProgressProductRecord }) 
   return (
     <li className="hito-list-row !items-start gap-4">
       <div className="min-w-0">
-        <p className="hito-list-row-title">{recordDistanceLabel(record)}</p>
-        <p className="hito-list-row-copy">{recordClassLabel(record)}</p>
-        <p className="hito-caption mt-1">
+        <p className="hito-body-md text-foreground">{recordDistanceLabel(record)}</p>
+        <p className="hito-body-sm mt-1 text-secondary">{recordClassLabel(record)}</p>
+        <p className="hito-body-xs text-tertiary mt-1">
           {[
             record.eventDate ? formatDate(record.eventDate) : null,
             context,
@@ -286,7 +295,7 @@ function SessionLoadReadback({
             <span id="reported-load-title" className="block">
               Reported training load
             </span>
-            <span className="hito-caption mt-1 block">
+            <span className="hito-body-xs text-tertiary mt-1 block">
               {current.metric.availability === "available"
                 ? advancedConfidenceLabel(current.metric.confidence)
                 : "Not available for this period"}
@@ -298,7 +307,7 @@ function SessionLoadReadback({
           <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
         </summary>
         <div className="hito-disclosure-body">
-          <p className="hito-support-copy max-w-2xl">
+          <p className="hito-body-md text-secondary max-w-2xl">
             Based on observed activity duration and the whole-session effort you reported.
           </p>
 
@@ -309,7 +318,7 @@ function SessionLoadReadback({
 
           {metrics.sessionRpeLoad.calendarWeeks.length > 0 ? (
             <div className="mt-6">
-              <p className="hito-label">Weekly reported load</p>
+              <p className="hito-label-md text-foreground">Weekly reported load</p>
               <ul className="hito-row-group">
                 {metrics.sessionRpeLoad.calendarWeeks.map((week) => (
                   <li
@@ -317,8 +326,8 @@ function SessionLoadReadback({
                     className="hito-list-row !items-start"
                   >
                     <div className="min-w-0">
-                      <p className="hito-list-row-title">{formatAdvancedWindow(week)}</p>
-                      <p className="hito-list-row-copy">
+                      <p className="hito-body-md text-foreground">{formatAdvancedWindow(week)}</p>
+                      <p className="hito-body-sm mt-1 text-secondary">
                         {advancedConfidenceLabel(week.metric.confidence)}
                       </p>
                     </div>
@@ -332,7 +341,7 @@ function SessionLoadReadback({
           ) : null}
 
           <div className="mt-5 border-t border-hairline pt-4">
-            <p className="hito-technical-mono text-xs text-muted-foreground">
+            <p className="hito-technical-sm text-muted-foreground">
               Formula {metrics.sessionRpeLoad.formulaVersion}
             </p>
           </div>
@@ -352,16 +361,16 @@ function SessionLoadWindow({
   const reasons = [...new Set(window.metric.unavailableReasons)];
   return (
     <div className="min-w-0">
-      <p className="hito-label">{label}</p>
+      <p className="hito-label-md text-foreground">{label}</p>
       <p className="mt-2 text-2xl font-medium tabular-nums">{formatSessionLoad(window.metric)}</p>
-      <p className="hito-caption mt-1">{formatAdvancedWindow(window)}</p>
-      <p className="hito-caption mt-2">
+      <p className="hito-body-xs text-tertiary mt-1">{formatAdvancedWindow(window)}</p>
+      <p className="hito-body-xs text-tertiary mt-2">
         {advancedConfidenceLabel(window.metric.confidence)} ·{" "}
         {window.metric.includedObservationCount} included ·{" "}
         {window.metric.unavailableObservationCount} unavailable
       </p>
       {reasons.length > 0 ? (
-        <ul className="hito-caption mt-2 list-disc space-y-1 pl-4">
+        <ul className="hito-body-xs text-tertiary mt-2 list-disc space-y-1 pl-4">
           {reasons.map((reason) => (
             <li key={reason}>{advancedUnavailableReasonLabel(reason)}</li>
           ))}
@@ -378,14 +387,14 @@ function Gate5UnavailableReadback({
 }) {
   return (
     <section aria-labelledby="detailed-progress-title" className="border-t border-hairline pt-6">
-      <h3 id="detailed-progress-title" className="hito-ui-section-title">
+      <h3 id="detailed-progress-title" className="hito-ui-title-sm text-foreground">
         Detailed progress metrics are not available yet.
       </h3>
-      <p className="hito-body mt-2 max-w-3xl">
+      <p className="hito-body-md text-secondary mt-2 max-w-3xl">
         Hito does not yet store the detailed workout samples needed to calculate best efforts inside
         longer runs or compare pace, heart rate, aerobic efficiency, and durability.
       </p>
-      <p className="hito-caption mt-2">
+      <p className="hito-body-xs text-tertiary mt-2">
         {advancedUnavailableReasonLabel(metrics.detailedMetrics.reason)}
       </p>
     </section>
@@ -410,7 +419,9 @@ function ProgressFactDisclosure({
       <summary className="hito-disclosure-summary">
         <span className="min-w-0">
           <span className="block">{label}</span>
-          <span className="hito-caption mt-1 block">{confidenceLabel(currentMetric)}</span>
+          <span className="hito-body-xs text-tertiary mt-1 block">
+            {confidenceLabel(currentMetric)}
+          </span>
         </span>
         <span className="ml-auto mr-2 text-right text-sm tabular-nums">
           {formatFact(currentMetric)}
@@ -439,9 +450,9 @@ function FactWindow({
 }) {
   return (
     <div>
-      <p className="hito-label">{label}</p>
+      <p className="hito-label-md text-foreground">{label}</p>
       <p className="mt-2 text-lg tabular-nums">{formatFact(metric)}</p>
-      <p className="hito-caption mt-1">{formatWindow(snapshot)}</p>
+      <p className="hito-body-xs text-tertiary mt-1">{formatWindow(snapshot)}</p>
     </div>
   );
 }
@@ -456,12 +467,12 @@ function FactEvidence({
   const missingReasons = [...new Set(metric.missingReasons)];
   return (
     <div className="mt-5 border-t border-hairline pt-4">
-      <p className="hito-caption">
+      <p className="hito-body-xs text-tertiary">
         {metric.includedActivityCount} included · {metric.missingActivityCount} missing · Formula{" "}
         {snapshot.formulaVersion}
       </p>
       {missingReasons.length > 0 ? (
-        <ul className="hito-caption mt-2 list-disc space-y-1 pl-4">
+        <ul className="hito-body-xs text-tertiary mt-2 list-disc space-y-1 pl-4">
           {missingReasons.map((reason) => (
             <li key={reason}>{missingReasonLabel(reason)}</li>
           ))}
@@ -491,11 +502,11 @@ function ProgressSkeleton() {
 function ProgressEmptyState() {
   return (
     <div className="hito-state-surface">
-      <p className="hito-label">Not enough recorded activity</p>
-      <h2 className="hito-ui-section-title mt-2">
+      <p className="hito-label-md text-foreground">Not enough recorded activity</p>
+      <h2 className="hito-ui-title-sm text-foreground mt-2">
         Progress facts will appear after recorded runs.
       </h2>
-      <p className="hito-body mt-2">
+      <p className="hito-body-md text-secondary mt-2">
         Hito will show only facts supported by your activity evidence.
       </p>
       <div className="hito-state-actions">
@@ -510,8 +521,8 @@ function ProgressEmptyState() {
 function ProgressError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div className="hito-state-surface" data-tone="destructive" role="alert">
-      <p className="hito-label text-destructive">Could not load running progress</p>
-      <p className="hito-body mt-2">{message}</p>
+      <p className="hito-label-md text-destructive">Could not load running progress</p>
+      <p className="hito-body-md text-secondary mt-2">{message}</p>
       <div className="hito-state-actions">
         <HitoButton type="button" size="md" variant="secondary" onClick={onRetry}>
           <Icon name="refresh" size="sm" />

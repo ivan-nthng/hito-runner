@@ -137,15 +137,15 @@ export function RunnerCalendarTimezoneSection({
     <section className="hito-settings-section">
       <div className="flex items-center gap-2">
         <Icon name="calendar-clock" size="sm" className="text-signal" />
-        <h2 className="hito-ui-section-title">Calendar timezone</h2>
+        <h2 className="hito-ui-title-sm text-foreground">Calendar timezone</h2>
       </div>
-      <p className="hito-support-copy mt-2 max-w-2xl">
+      <p className="hito-body-md text-secondary mt-2 max-w-2xl">
         Hito uses this IANA timezone to decide which date is Today and which workouts are past.
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
         <label className="grid min-w-0 gap-2">
-          <span className="hito-form-label">IANA timezone</span>
+          <span className="hito-label-md text-foreground">IANA timezone</span>
           <Input
             type="text"
             name="calendarTimezone"
@@ -187,17 +187,17 @@ export function RunnerCalendarTimezoneSection({
         </div>
       </div>
 
-      <p id="calendar-timezone-helper" className="hito-field-helper mt-2">
+      <p id="calendar-timezone-helper" className="hito-body-xs text-secondary mt-2">
         Saved timezone: <code className="hito-inline-code">{preference.calendarTimezone}</code>.{" "}
         {timezoneSourceDescription(preference.calendarTimezoneSource)}
       </p>
       <div id="calendar-timezone-feedback" aria-live="polite" className="mt-2 min-h-5">
         {error ? (
-          <p className="hito-field-error" role="alert">
+          <p className="hito-body-md font-medium text-negative" role="alert">
             {error}
           </p>
         ) : message ? (
-          <p className="hito-field-success">{message}</p>
+          <p className="hito-body-md font-medium text-positive">{message}</p>
         ) : null}
       </div>
     </section>

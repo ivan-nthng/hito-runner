@@ -10,16 +10,21 @@ import {
   getEntryPresentation,
   getHighlightMonths,
   getLatestChangelogDate,
+  getTechnicalLogEntryCount,
+  getTechnicalLogLastUpdated,
   groupChangelogByMonth,
+  groupTechnicalLogByMonth,
   groupMonthsByYear,
   parseChangelog,
-  type ChangelogDay,
+  parseTechnicalLog,
   type ChangelogEntryPresentation,
   type ChangelogHighlight,
   type ChangelogHighlightDay,
   type ChangelogHighlightMonth,
   type ChangelogMonth,
   type ChangelogYear,
+  type TechnicalLogMonth,
+  type TechnicalLogSection,
 } from "@/lib/changelog-utils";
 import changelogMarkdown from "../../docs/history/changelog.md?raw";
 import technicalLogMarkdown from "../../docs/history/technical-log.md?raw";
@@ -48,9 +53,10 @@ const publicChangelogMonths = groupChangelogByMonth(publicChangelogDays);
 const changelogHighlightMonths = getHighlightMonths(publicChangelogDays);
 const changelogHighlightYears = groupMonthsByYear(changelogHighlightMonths);
 
-const technicalLogDays = parseChangelog(technicalLogMarkdown);
-const technicalLogMonths = groupChangelogByMonth(technicalLogDays);
+const technicalLogSections = parseTechnicalLog(technicalLogMarkdown);
+const technicalLogMonths = groupTechnicalLogByMonth(technicalLogSections);
 const technicalLogYears = groupMonthsByYear(technicalLogMonths);
+const technicalLogLastUpdated = getTechnicalLogLastUpdated(technicalLogMarkdown);
 
 function ChangelogPage() {
   const [activeTab, setActiveTab] = useState<ChangelogTab>("highlights");
@@ -58,13 +64,18 @@ function ChangelogPage() {
   const isHighlightsTab = activeTab === "highlights";
   const entryCount = isHighlightsTab
     ? getChangelogEntryCount(publicChangelogMonths)
-    : getChangelogEntryCount(technicalLogMonths);
+    : getTechnicalLogEntryCount(technicalLogSections);
   const entryCountLabel = isHighlightsTab
     ? formatEntryCount(entryCount)
-    : `${entryCount} accepted ${entryCount === 1 ? "slice" : "slices"}`;
-  const latestVisibleDate = getLatestChangelogDate(
-    isHighlightsTab ? publicChangelogDays : technicalLogDays,
-  );
+    : `${entryCount} durable ${entryCount === 1 ? "decision" : "decisions"}`;
+  const lastUpdatedLabel = isHighlightsTab
+    ? (() => {
+        const latestVisibleDate = getLatestChangelogDate(publicChangelogDays);
+        return latestVisibleDate ? formatFullDate(latestVisibleDate) : "No updates yet";
+      })()
+    : technicalLogLastUpdated
+      ? formatFullDate(technicalLogLastUpdated)
+      : "No updates yet";
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -73,27 +84,25 @@ function ChangelogPage() {
           <div className="max-w-3xl">
             <Link
               to="/"
-              className="hito-micro-label inline-flex text-muted-foreground transition-colors hover:text-foreground"
+              className="hito-label-sm inline-flex text-muted-foreground transition-colors hover:text-foreground"
             >
               Hito
             </Link>
-            <h1 className="hito-page-title mt-5">Hito changelog</h1>
-            <p className="hito-body mt-4 max-w-2xl text-muted-foreground">
+            <h1 className="hito-display-title-lg mt-5">Hito changelog</h1>
+            <p className="hito-body-md mt-4 max-w-2xl text-muted-foreground">
               {isHighlightsTab
                 ? "Big updates, in plain language."
-                : "The complete accepted-slice history, with the technical detail left in."}
+                : "A compact index of durable product, architecture, and reliability decisions."}
             </p>
-            <p className="hito-body-small mt-3 text-foreground/78">
+            <p className="hito-body-sm mt-3 text-foreground/78">
               {isHighlightsTab
-                ? `${entryCountLabel} so far. This view pulls out the biggest ones.`
-                : `${entryCountLabel} in the full technical log.`}
+                ? `${entryCountLabel} so far from the curated public source.`
+                : `${entryCountLabel} in the compact technical index.`}
             </p>
           </div>
           <div className="grid gap-1 text-left md:justify-items-end md:text-right">
-            <p className="hito-micro-label">Last updated</p>
-            <p className="hito-body-small text-muted-foreground">
-              {latestVisibleDate ? formatFullDate(latestVisibleDate) : "No updates yet"}
-            </p>
+            <p className="hito-label-sm">Last updated</p>
+            <p className="hito-body-sm text-muted-foreground">{lastUpdatedLabel}</p>
           </div>
         </header>
 
@@ -166,7 +175,7 @@ function HighlightsTimeline({ years }: { years: Array<ChangelogYear<ChangelogHig
   );
 }
 
-function TechnicalTimeline({ years }: { years: Array<ChangelogYear<ChangelogMonth>> }) {
+function TechnicalTimeline({ years }: { years: Array<ChangelogYear<TechnicalLogMonth>> }) {
   if (years.length === 0) {
     return <EmptyChangelogState />;
   }
@@ -177,8 +186,11 @@ function TechnicalTimeline({ years }: { years: Array<ChangelogYear<ChangelogMont
         <YearSection key={year.year} year={year.year} labelId={`changelog-${year.year}`}>
           {year.months.map((month) => (
             <MonthSection key={month.key} month={month} labelId={`changelog-${month.key}`}>
-              {month.days.map((day) => (
-                <DaySection key={day.date} day={day} />
+              {month.sections.map((section) => (
+                <TechnicalLogSectionView
+                  key={`${section.period.source}-${section.title ?? "untitled"}`}
+                  section={section}
+                />
               ))}
             </MonthSection>
           ))}
@@ -238,25 +250,29 @@ function MonthSection({
   );
 }
 
-function DaySection({ day }: { day: ChangelogDay }) {
+function TechnicalLogSectionView({ section }: { section: TechnicalLogSection }) {
+  const labelId = `changelog-${section.period.source}`;
+
   return (
     <section
-      aria-labelledby={`changelog-${day.date}`}
+      aria-labelledby={labelId}
       className="grid gap-4 sm:grid-cols-[3.25rem_minmax(0,1fr)] sm:gap-5 lg:grid-cols-[3.75rem_minmax(0,1fr)] lg:gap-6"
     >
-      <time
-        id={`changelog-${day.date}`}
-        dateTime={day.date}
-        aria-label={formatFullDate(day.date)}
-        className="hito-timeline-day sm:sticky sm:top-8 sm:self-start"
-      >
-        {formatDayLabel(day.date)}
-      </time>
+      {section.period.kind === "day" ? (
+        <TimelineDayGutter id={labelId} date={section.period.start} />
+      ) : (
+        <p id={labelId} className="hito-timeline-day sm:sticky sm:top-8 sm:self-start">
+          {section.period.source}
+        </p>
+      )}
 
       <div className="grid gap-4">
-        {day.entries.map((entry, index) => (
+        {section.title ? (
+          <h3 className="hito-ui-title-xs text-foreground">{section.title}</h3>
+        ) : null}
+        {section.entries.map((entry, index) => (
           <ChangelogEntry
-            key={`${day.date}-${index}`}
+            key={`${section.period.source}-${index}`}
             entry={entry}
             presentation={getEntryPresentation(entry)}
           />
@@ -267,19 +283,14 @@ function DaySection({ day }: { day: ChangelogDay }) {
 }
 
 function HighlightDaySection({ day }: { day: ChangelogHighlightDay }) {
+  const labelId = `changelog-highlights-${day.date}`;
+
   return (
     <section
-      aria-labelledby={`changelog-highlights-${day.date}`}
+      aria-labelledby={labelId}
       className="grid gap-4 sm:grid-cols-[3.25rem_minmax(0,1fr)] sm:gap-5 lg:grid-cols-[3.75rem_minmax(0,1fr)] lg:gap-6"
     >
-      <time
-        id={`changelog-highlights-${day.date}`}
-        dateTime={day.date}
-        aria-label={formatFullDate(day.date)}
-        className="hito-timeline-day sm:sticky sm:top-8 sm:self-start"
-      >
-        {formatDayLabel(day.date)}
-      </time>
+      <TimelineDayGutter id={labelId} date={day.date} />
 
       <div className="grid gap-4">
         {day.highlights.map((highlight, index) => (
@@ -287,6 +298,19 @@ function HighlightDaySection({ day }: { day: ChangelogHighlightDay }) {
         ))}
       </div>
     </section>
+  );
+}
+
+function TimelineDayGutter({ id, date }: { id: string; date: string }) {
+  return (
+    <time
+      id={id}
+      dateTime={date}
+      aria-label={formatFullDate(date)}
+      className="hito-timeline-day sm:sticky sm:top-8 sm:self-start"
+    >
+      {formatDayLabel(date)}
+    </time>
   );
 }
 
@@ -316,8 +340,8 @@ function ChangelogEntry({
             <h3
               className={
                 isMilestone
-                  ? "hito-panel-title text-foreground"
-                  : "hito-body-small font-medium text-foreground/86"
+                  ? "hito-ui-title-xs text-foreground"
+                  : "hito-body-sm font-medium text-foreground/86"
               }
             >
               {presentation.title}
@@ -326,8 +350,8 @@ function ChangelogEntry({
           <p
             className={
               presentation.title
-                ? "hito-body-small mt-2 leading-relaxed text-muted-foreground"
-                : "hito-body-small leading-relaxed text-foreground/84"
+                ? "hito-body-sm mt-2 text-muted-foreground"
+                : "hito-body-sm text-foreground/84"
             }
           >
             <InlineMarkdown text={entry} />
@@ -359,9 +383,9 @@ function HighlightEntry({ highlight }: { highlight: ChangelogHighlight }) {
             >
               {highlight.badge}
             </span>
-            <h3 className="hito-panel-title text-foreground">{highlight.title}</h3>
+            <h3 className="hito-ui-title-xs text-foreground">{highlight.title}</h3>
           </div>
-          <p className="hito-body-small mt-2 leading-relaxed text-muted-foreground">
+          <p className="hito-body-sm mt-2 text-muted-foreground">
             <InlineMarkdown text={highlight.body} />
           </p>
         </div>
@@ -373,8 +397,8 @@ function HighlightEntry({ highlight }: { highlight: ChangelogHighlight }) {
 function EmptyChangelogState() {
   return (
     <section className="hito-editorial-backdrop hito-timeline-entry" data-tone="neutral">
-      <h2 className="hito-panel-title">No shipped changes yet</h2>
-      <p className="hito-body-small mt-2 text-muted-foreground">
+      <h2 className="hito-ui-title-xs">No shipped changes yet</h2>
+      <p className="hito-body-sm mt-2 text-muted-foreground">
         This page will fill up once dated product updates start shipping.
       </p>
     </section>
@@ -382,19 +406,48 @@ function EmptyChangelogState() {
 }
 
 function InlineMarkdown({ text }: { text: string }) {
-  const parts = text.split(/(`[^`]+`)/g);
+  const parts = text.split(/(`[^`]+`|\[[^\]]+\]\([^)]+\))/g);
 
   return (
     <>
-      {parts.map((part, index) =>
-        part.startsWith("`") && part.endsWith("`") ? (
-          <code key={index} className="hito-inline-code">
-            {part.slice(1, -1)}
-          </code>
-        ) : (
-          <span key={index}>{part}</span>
-        ),
-      )}
+      {parts.map((part, index) => {
+        if (part.startsWith("`") && part.endsWith("`")) {
+          return (
+            <code key={index} className="hito-inline-code">
+              {part.slice(1, -1)}
+            </code>
+          );
+        }
+
+        const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+
+        if (linkMatch) {
+          return (
+            <a
+              key={index}
+              href={getHistoryMarkdownLinkHref(linkMatch[2])}
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-border/80 underline-offset-4 transition-colors hover:text-foreground"
+            >
+              {linkMatch[1]}
+            </a>
+          );
+        }
+
+        return <span key={index}>{part}</span>;
+      })}
     </>
   );
+}
+
+function getHistoryMarkdownLinkHref(href: string) {
+  if (/^(https?:|mailto:|#)/i.test(href)) {
+    return href;
+  }
+
+  return new URL(
+    href,
+    "https://github.com/ivan-nthng/hito-runner/blob/main/docs/history/",
+  ).toString();
 }

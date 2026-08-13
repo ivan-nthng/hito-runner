@@ -24,6 +24,7 @@ import { Route as AdminCaptureRouteImport } from './routes/admin.capture'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as ApiRunnerActivitiesRouteImport } from './routes/api.runner-activities'
 import { Route as ApiRunnerActivityProgressRouteImport } from './routes/api.runner-activity-progress'
+import { Route as HitoDSBrandRouteImport } from './routes/hitoDS_.brand'
 import { Route as HitoDSComponentsRouteImport } from './routes/hitoDS_.components'
 import { Route as HitoDSFoundationsRouteImport } from './routes/hitoDS_.foundations'
 import { Route as HitoDSPatternsRouteImport } from './routes/hitoDS_.patterns'
@@ -117,6 +118,11 @@ const ApiRunnerActivityProgressRoute =
     path: '/api/runner-activity-progress',
     getParentRoute: () => rootRouteImport,
   } as any)
+const HitoDSBrandRoute = HitoDSBrandRouteImport.update({
+  id: '/hitoDS_/brand',
+  path: '/hitoDS/brand',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HitoDSComponentsRoute = HitoDSComponentsRouteImport.update({
   id: '/hitoDS_/components',
   path: '/hitoDS/components',
@@ -216,6 +222,7 @@ export interface FileRoutesByFullPath {
   '/admin/login': typeof AdminLoginRoute
   '/api/runner-activities': typeof ApiRunnerActivitiesRouteWithChildren
   '/api/runner-activity-progress': typeof ApiRunnerActivityProgressRoute
+  '/hitoDS/brand': typeof HitoDSBrandRoute
   '/hitoDS/components': typeof HitoDSComponentsRoute
   '/hitoDS/foundations': typeof HitoDSFoundationsRoute
   '/hitoDS/patterns': typeof HitoDSPatternsRoute
@@ -249,6 +256,7 @@ export interface FileRoutesByTo {
   '/admin/login': typeof AdminLoginRoute
   '/api/runner-activities': typeof ApiRunnerActivitiesRouteWithChildren
   '/api/runner-activity-progress': typeof ApiRunnerActivityProgressRoute
+  '/hitoDS/brand': typeof HitoDSBrandRoute
   '/hitoDS/components': typeof HitoDSComponentsRoute
   '/hitoDS/foundations': typeof HitoDSFoundationsRoute
   '/hitoDS/patterns': typeof HitoDSPatternsRoute
@@ -283,6 +291,7 @@ export interface FileRoutesById {
   '/admin/login': typeof AdminLoginRoute
   '/api/runner-activities': typeof ApiRunnerActivitiesRouteWithChildren
   '/api/runner-activity-progress': typeof ApiRunnerActivityProgressRoute
+  '/hitoDS_/brand': typeof HitoDSBrandRoute
   '/hitoDS_/components': typeof HitoDSComponentsRoute
   '/hitoDS_/foundations': typeof HitoDSFoundationsRoute
   '/hitoDS_/patterns': typeof HitoDSPatternsRoute
@@ -318,6 +327,7 @@ export interface FileRouteTypes {
     | '/admin/login'
     | '/api/runner-activities'
     | '/api/runner-activity-progress'
+    | '/hitoDS/brand'
     | '/hitoDS/components'
     | '/hitoDS/foundations'
     | '/hitoDS/patterns'
@@ -351,6 +361,7 @@ export interface FileRouteTypes {
     | '/admin/login'
     | '/api/runner-activities'
     | '/api/runner-activity-progress'
+    | '/hitoDS/brand'
     | '/hitoDS/components'
     | '/hitoDS/foundations'
     | '/hitoDS/patterns'
@@ -384,6 +395,7 @@ export interface FileRouteTypes {
     | '/admin/login'
     | '/api/runner-activities'
     | '/api/runner-activity-progress'
+    | '/hitoDS_/brand'
     | '/hitoDS_/components'
     | '/hitoDS_/foundations'
     | '/hitoDS_/patterns'
@@ -418,6 +430,7 @@ export interface RootRouteChildren {
   AdminLoginRoute: typeof AdminLoginRoute
   ApiRunnerActivitiesRoute: typeof ApiRunnerActivitiesRouteWithChildren
   ApiRunnerActivityProgressRoute: typeof ApiRunnerActivityProgressRoute
+  HitoDSBrandRoute: typeof HitoDSBrandRoute
   HitoDSComponentsRoute: typeof HitoDSComponentsRoute
   HitoDSFoundationsRoute: typeof HitoDSFoundationsRoute
   HitoDSPatternsRoute: typeof HitoDSPatternsRoute
@@ -539,6 +552,13 @@ declare module '@tanstack/react-router' {
       path: '/api/runner-activity-progress'
       fullPath: '/api/runner-activity-progress'
       preLoaderRoute: typeof ApiRunnerActivityProgressRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/hitoDS_/brand': {
+      id: '/hitoDS_/brand'
+      path: '/hitoDS/brand'
+      fullPath: '/hitoDS/brand'
+      preLoaderRoute: typeof HitoDSBrandRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hitoDS_/components': {
@@ -699,6 +719,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminLoginRoute: AdminLoginRoute,
   ApiRunnerActivitiesRoute: ApiRunnerActivitiesRouteWithChildren,
   ApiRunnerActivityProgressRoute: ApiRunnerActivityProgressRoute,
+  HitoDSBrandRoute: HitoDSBrandRoute,
   HitoDSComponentsRoute: HitoDSComponentsRoute,
   HitoDSFoundationsRoute: HitoDSFoundationsRoute,
   HitoDSPatternsRoute: HitoDSPatternsRoute,

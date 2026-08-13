@@ -52,7 +52,7 @@ export function createLocalUiInspectorItemDraft(
     desiredTokens: {},
     desiredTypographyRole: null,
     fixScope: "screen",
-    proposedText: "",
+    proposedText: target.visibleText ?? "",
   };
 }
 
@@ -124,11 +124,20 @@ export function getLocalUiInspectorItemSummary(item: LocalUiInspectorBatchItem) 
   if (item.draft.componentAction?.type === "reuse_existing_component") {
     return "Reuse existing component";
   }
-  if (item.payload.target.proposedText) {
-    const replacement = `Replace text with “${item.payload.target.proposedText}”`;
-    return item.payload.comment ? `${replacement} · ${item.payload.comment}` : replacement;
+  if (item.payload.target.proposedText !== null) {
+    const textRequest = item.payload.target.proposedText
+      ? `Replace text with “${item.payload.target.proposedText}”`
+      : "Remove text";
+    return item.payload.comment ? `${textRequest} · ${item.payload.comment}` : textRequest;
   }
   if (item.payload.comment) return item.payload.comment;
+  if (item.payload.target.colorControls.some((control) => control.requestedChange)) {
+    return item.payload.target.colorControls.some(
+      (control) => control.requestedChange?.kind === "remove_declaration",
+    )
+      ? "Remove selected color"
+      : "Update selected color";
+  }
   if (item.payload.target.tokenControls.length > 0) return "Update selected properties";
   if (item.payload.target.typographyRoleSelection?.desiredRole) {
     return `Use ${item.payload.target.typographyRoleSelection.desiredRole.label}`;

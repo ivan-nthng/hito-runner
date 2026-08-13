@@ -62,11 +62,17 @@ export function ActivityHistoryPanel({
   return (
     <section aria-labelledby="activity-history-title">
       <header className="hito-page-header">
-        <p className="hito-label">Recorded running</p>
-        <h1 id="activity-history-title" className="hito-ui-page-title" tabIndex={-1}>
+        <p className="hito-label-md text-foreground">Recorded running</p>
+        <h1
+          id="activity-history-title"
+          className="hito-ui-title-xl mt-2 max-w-[44rem]"
+          tabIndex={-1}
+        >
           Activity history
         </h1>
-        <p className="hito-page-copy">Your recorded runs, whether or not they matched a plan.</p>
+        <p className="hito-body-md mt-4 max-w-[40rem] text-secondary">
+          Your recorded runs, whether or not they matched a plan.
+        </p>
       </header>
 
       {state.status === "loading" && !state.data ? <HistorySkeleton /> : null}
@@ -143,13 +149,13 @@ function ActivityHistoryRow({
       >
         <time dateTime={localDate ?? undefined} className="text-center tabular-nums">
           <span className="block font-sans text-2xl leading-none">{dateRail.day}</span>
-          <span className="hito-caption mt-1 block">{dateRail.month}</span>
+          <span className="hito-body-xs text-tertiary mt-1 block">{dateRail.month}</span>
         </time>
         <span className="min-w-0">
-          <span className="hito-list-row-title line-clamp-2 sm:line-clamp-1">
+          <span className="hito-body-md text-foreground line-clamp-2 sm:line-clamp-1">
             {activity.identity.label}
           </span>
-          <span className="hito-list-row-copy mt-1 block">
+          <span className="hito-body-sm mt-1 text-secondary block">
             {activity.plannedWorkout ? activity.plannedWorkout.title : "Unplanned run"}
           </span>
           {primaryFacts.length > 0 ? (
@@ -160,7 +166,7 @@ function ActivityHistoryRow({
             </span>
           ) : null}
           {supportingFacts.length > 0 ? (
-            <span className="hito-caption mt-2 flex flex-wrap gap-x-3 gap-y-1 sm:hidden">
+            <span className="hito-body-xs text-tertiary mt-2 flex flex-wrap gap-x-3 gap-y-1 sm:hidden">
               {supportingFacts.map((fact) => (
                 <span key={fact}>{fact}</span>
               ))}
@@ -176,7 +182,7 @@ function ActivityHistoryRow({
             </span>
           ) : null}
           {supportingFacts.length > 0 ? (
-            <span className="hito-caption mt-2 hidden flex-wrap justify-end gap-x-3 gap-y-1 sm:flex">
+            <span className="hito-body-xs text-tertiary mt-2 hidden flex-wrap justify-end gap-x-3 gap-y-1 sm:flex">
               {supportingFacts.map((fact) => (
                 <span key={fact}>{fact}</span>
               ))}
@@ -297,7 +303,7 @@ export function ActivityDetailOverlay({
         onCloseAutoFocus={returnFocus}
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle ref={headingRef} className="hito-ui-modal-title" tabIndex={-1}>
+          <DialogTitle ref={headingRef} className="hito-ui-title-md text-foreground" tabIndex={-1}>
             {activity?.identity.label ?? "Activity"}
           </DialogTitle>
           <DialogDescription>Recorded activity facts and source controls.</DialogDescription>
@@ -327,9 +333,11 @@ function ActivityDetailContent({
   return (
     <div className="space-y-7">
       <section>
-        <p className="hito-label">Activity</p>
-        <h2 className="hito-ui-section-title mt-2">{activityDisplayDate(activity)}</h2>
-        {startedTime ? <p className="hito-caption mt-1">Started {startedTime}</p> : null}
+        <p className="hito-label-md text-foreground">Activity</p>
+        <h2 className="hito-ui-title-sm text-foreground mt-2">{activityDisplayDate(activity)}</h2>
+        {startedTime ? (
+          <p className="hito-body-xs text-tertiary mt-1">Started {startedTime}</p>
+        ) : null}
         <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm tabular-nums">
           {[...primaryFacts, ...supportingFacts].map((fact) => (
             <span key={fact}>{fact}</span>
@@ -338,30 +346,30 @@ function ActivityDetailContent({
       </section>
 
       <section className="border-t border-hairline pt-5">
-        <p className="hito-label">Plan relationship</p>
+        <p className="hito-label-md text-foreground">Plan relationship</p>
         {activity.plannedWorkout ? (
           <div className="mt-2">
             <Link
               to="/workout/$date"
               params={{ date: activity.plannedWorkout.workoutDate }}
               search={{ tab: "overview" } as never}
-              className="hito-list-row-title underline-offset-4 hover:underline"
+              className="hito-body-md text-foreground underline-offset-4 hover:underline"
             >
               {activity.plannedWorkout.title}
             </Link>
-            <p className="hito-caption mt-1">
+            <p className="hito-body-xs text-tertiary mt-1">
               Open the workout for its exact Plan vs run comparison.
             </p>
           </div>
         ) : (
-          <p className="hito-body mt-2">Unplanned run</p>
+          <p className="hito-body-md text-secondary mt-2">Unplanned run</p>
         )}
       </section>
 
       <section className="border-t border-hairline pt-5">
-        <p className="hito-label">Source</p>
-        <p className="hito-list-row-title mt-2">Garmin file</p>
-        <p className="hito-body mt-2">
+        <p className="hito-label-md text-foreground">Source</p>
+        <p className="hito-body-md text-foreground mt-2">Garmin file</p>
+        <p className="hito-body-md text-secondary mt-2">
           {activity.source.rawState === "removed"
             ? "Original file removed. Normalized activity facts remain in history and progress, but Hito cannot reprocess the source."
             : activity.source.rawState === "removal_pending"
@@ -376,7 +384,7 @@ function ActivityDetailContent({
       </section>
 
       <section className="border-t border-hairline pt-5">
-        <p className="hito-label">Privacy and deletion</p>
+        <p className="hito-label-md text-foreground">Privacy and deletion</p>
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           {activity.capabilities.canRemoveOriginalFile ? (
             <HitoButton
@@ -443,7 +451,7 @@ export function ActivityActionConfirmation({
         }}
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-ui-modal-title">
+          <DialogTitle className="hito-ui-title-md text-foreground">
             {retriesSourceRemoval
               ? "Retry original file removal?"
               : removesSource
@@ -457,7 +465,7 @@ export function ActivityActionConfirmation({
           </DialogDescription>
         </DialogHeader>
         <div className="hito-product-dialog-body">
-          <p className="hito-body">
+          <p className="hito-body-md text-secondary">
             {removesSource
               ? retriesSourceRemoval
                 ? "The previous removal did not finish. Retrying removes the original file while keeping the normalized activity in history and progress."
@@ -466,7 +474,7 @@ export function ActivityActionConfirmation({
           </p>
           {error ? (
             <div className="hito-state-surface mt-4 py-3" data-tone="destructive" role="alert">
-              <p className="hito-body">{error}</p>
+              <p className="hito-body-md text-secondary">{error}</p>
             </div>
           ) : null}
         </div>
@@ -529,9 +537,13 @@ function HistorySkeleton() {
 function HistoryEmptyState() {
   return (
     <div className="hito-state-surface">
-      <p className="hito-label">No recorded activities</p>
-      <h2 className="hito-ui-section-title mt-2">Your running history will appear here.</h2>
-      <p className="hito-body mt-2">Record a run from its workout when you are ready.</p>
+      <p className="hito-label-md text-foreground">No recorded activities</p>
+      <h2 className="hito-ui-title-sm text-foreground mt-2">
+        Your running history will appear here.
+      </h2>
+      <p className="hito-body-md text-secondary mt-2">
+        Record a run from its workout when you are ready.
+      </p>
       <div className="hito-state-actions">
         <HitoButton asChild size="md" variant="primary">
           <Link to="/">Open Calendar</Link>
@@ -556,8 +568,8 @@ function HistoryError({
       data-tone="destructive"
       role="alert"
     >
-      <p className="hito-label text-destructive">Could not load activity history</p>
-      <p className="hito-body mt-2">{message}</p>
+      <p className="hito-label-md text-destructive">Could not load activity history</p>
+      <p className="hito-body-md text-secondary mt-2">{message}</p>
       <div className="hito-state-actions">
         <HitoButton type="button" size="md" variant="secondary" onClick={onRetry}>
           <Icon name="refresh" size="sm" />

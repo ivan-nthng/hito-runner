@@ -4,16 +4,18 @@ import {
   type RunnerFacingBlockType,
   type RunnerFacingWorkoutType,
 } from "@/lib/planned-workout-language";
+import type { CanonicalWorkoutFamily } from "@/lib/rich-workout-model";
 
 export const WORKOUT_COLOR_STATE_SLOTS = [
   "base",
+  "foreground",
+  "content",
   "muted",
   "surface",
   "hover",
   "active",
   "border",
   "ring",
-  "foreground",
 ] as const;
 
 export type WorkoutColorStateSlot = (typeof WORKOUT_COLOR_STATE_SLOTS)[number];
@@ -31,6 +33,20 @@ const WORKOUT_TYPE_TOKEN_NAMES: Record<RunnerFacingWorkoutType, string> = {
   intervals: "intervals",
   hills: "hills",
   run_walk: "run-walk",
+};
+
+const WORKOUT_FAMILY_TOKEN_NAMES: Record<CanonicalWorkoutFamily, string> = {
+  rest: "rest",
+  recovery: "recovery",
+  easy: "easy",
+  steady: "steady",
+  long: "long-run",
+  tempo: "tempo",
+  intervals: "intervals",
+  progression: "progression",
+  race: "race",
+  hills: "hills",
+  trail: "trail",
 };
 
 const WORKOUT_SECTION_TOKEN_NAMES: Record<WorkoutSectionColorRole, string> = {
@@ -69,6 +85,20 @@ export function workoutTypeColorVar(
   slot: WorkoutColorStateSlot = "base",
 ) {
   return `var(${workoutTypeColorToken(type, slot)})`;
+}
+
+export function workoutFamilyColorToken(
+  family: CanonicalWorkoutFamily,
+  slot: WorkoutColorStateSlot = "base",
+) {
+  return `--hito-workout-type-${WORKOUT_FAMILY_TOKEN_NAMES[family]}-${slot}`;
+}
+
+export function workoutFamilyColorVar(
+  family: CanonicalWorkoutFamily,
+  slot: WorkoutColorStateSlot = "base",
+) {
+  return `var(${workoutFamilyColorToken(family, slot)})`;
 }
 
 export function workoutSectionColorToken(

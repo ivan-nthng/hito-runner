@@ -111,28 +111,10 @@ function DropdownFamilyStage({
   mode: "demo" | "variants";
   settings: DropdownPlaygroundSettings;
 }) {
-  return (
-    <div className="grid min-w-0 gap-5">
-      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3 border-b border-hairline pb-3">
-        <div className="min-w-0">
-          <p className="hito-label">{mode === "demo" ? "Demo" : "Variants"}</p>
-          <h3 className="hito-list-row-title mt-1">
-            {mode === "demo"
-              ? "One real trigger, one real dropdown"
-              : "Always-visible row and state anatomy"}
-          </h3>
-        </div>
-        <span className="hito-status-pill" data-tone="neutral">
-          Shared wrapper
-        </span>
-      </div>
-
-      {mode === "demo" ? (
-        <InteractiveDropdownDemo settings={settings} />
-      ) : (
-        <DropdownAnatomyDemo settings={settings} />
-      )}
-    </div>
+  return mode === "demo" ? (
+    <InteractiveDropdownDemo settings={settings} />
+  ) : (
+    <DropdownAnatomyDemo settings={settings} />
   );
 }
 
@@ -154,7 +136,7 @@ function DropdownSettingsPanel({
   return (
     <div className="grid min-w-0 gap-5">
       <div className="grid gap-3">
-        <p className="hito-form-label">Settings</p>
+        <p className="hito-label-md">Settings</p>
         <SettingSelect
           label="Row content"
           value={settings.rowRecipe}
@@ -188,7 +170,7 @@ function DropdownSettingsPanel({
       </div>
 
       <div className="grid gap-2">
-        <p className="hito-form-label">Chrome</p>
+        <p className="hito-label-md">Chrome</p>
         <div className="grid gap-2">
           <ToggleSetting
             active={settings.showIcons}
@@ -222,14 +204,6 @@ function InteractiveDropdownDemo({ settings }: { settings: DropdownPlaygroundSet
   return (
     <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(16rem,0.62fr)]">
       <div className="grid min-w-0 content-start gap-4">
-        <div>
-          <p className="hito-label">Live component</p>
-          <p className="hito-caption mt-1">
-            This is the real dropdown trigger and content. Open it to verify keyboard, focus, menu
-            surface, submenu, disabled, and destructive behavior.
-          </p>
-        </div>
-
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -326,11 +300,6 @@ function InteractiveDropdownDemo({ settings }: { settings: DropdownPlaygroundSet
       </div>
 
       <div className="grid min-w-0 content-start gap-3">
-        <p className="hito-label">Select parity</p>
-        <p className="hito-caption">
-          Select uses the same Hito menu surface, item rhythm, selected indicator, and chevron
-          affordance.
-        </p>
         <Select defaultValue="easy">
           <SelectTrigger aria-label="Select menu-family workout type">
             <SelectValue placeholder="Workout type" />
@@ -424,79 +393,47 @@ function DropdownAnatomyDemo({ settings }: { settings: DropdownPlaygroundSetting
 
 function MobileDropdownEscalationSpecimen() {
   return (
-    <div className="grid min-w-0 gap-4 rounded-2xl border border-hairline bg-background/35 p-4 xl:col-span-2 xl:grid-cols-[minmax(0,0.9fr)_minmax(18rem,1fr)]">
-      <div className="grid min-w-0 content-start gap-3">
-        <div>
-          <p className="hito-label">Mobile escalation rule</p>
-          <h4 className="hito-list-row-title mt-1">Mobile menus escalate by complexity.</h4>
-          <p className="hito-list-row-copy mt-2">
-            Anchored cards are the desktop/tablet default. On mobile, simple action menus may use a
-            bottom sheet, while long grouped, nested, or page-switching menus use a full-height Hito
-            navigation surface.
+    <div className="mx-auto grid min-h-[22rem] w-full max-w-sm min-w-0 overflow-hidden rounded-2xl border border-hairline bg-background/95 shadow-soft xl:col-span-2">
+      <div className="hito-product-dialog-header flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="hito-ui-title-md">Choose template</p>
+          <p className="hito-body-md text-secondary mt-1">
+            Workflow dialog anatomy for grouped mobile choices.
           </p>
+        </div>
+        <Icon name="close" size="sm" className="shrink-0 text-muted-foreground" />
+      </div>
+      <div className="hito-product-dialog-body-scroll-fill grid gap-3">
+        <div className="hito-list-row items-start">
+          <Icon name="chevron-left" size="sm" className="mt-0.5 text-muted-foreground" />
+          <span className="min-w-0">
+            <span className="hito-list-row-title block">Back expectation</span>
+            <span className="hito-list-row-copy block">
+              Nested steps return inside the workflow, not a hidden submenu.
+            </span>
+          </span>
         </div>
         <div className="hito-row-group">
           <div className="hito-list-row items-start">
-            <Icon name="more-horizontal" size="sm" className="mt-0.5 text-muted-foreground" />
+            <Icon name="activity" size="sm" className="mt-0.5 text-muted-foreground" />
             <span className="min-w-0">
-              <span className="hito-list-row-title block">Simple mobile menu</span>
-              <span className="hito-list-row-copy block">
-                Use a bottom sheet when an anchored card would feel cramped.
-              </span>
+              <span className="hito-list-row-title block">Easy aerobic run</span>
+              <span className="hito-list-row-copy block">Structure-first template choice.</span>
             </span>
           </div>
           <div className="hito-list-row items-start">
-            <Icon name="file-text" size="sm" className="mt-0.5 text-muted-foreground" />
+            <Icon name="sparkles" size="sm" className="mt-0.5 text-muted-foreground" />
             <span className="min-w-0">
-              <span className="hito-list-row-title block">Dense mobile picker</span>
-              <span className="hito-list-row-copy block">
-                Use a full-height workflow or navigation surface with a Hito header.
-              </span>
+              <span className="hito-list-row-title block">Quality session</span>
+              <span className="hito-list-row-copy block">Grouped rows can scroll calmly.</span>
             </span>
           </div>
         </div>
       </div>
-
-      <div className="mx-auto grid min-h-[22rem] w-full max-w-sm min-w-0 overflow-hidden rounded-2xl border border-hairline bg-background/95 shadow-soft">
-        <div className="hito-product-dialog-header flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="hito-modal-title text-xl">Choose template</p>
-            <p className="hito-body mt-1">Workflow dialog anatomy for grouped mobile choices.</p>
-          </div>
-          <Icon name="close" size="sm" className="shrink-0 text-muted-foreground" />
-        </div>
-        <div className="hito-product-dialog-body-scroll-fill grid gap-3">
-          <div className="hito-list-row items-start">
-            <Icon name="chevron-left" size="sm" className="mt-0.5 text-muted-foreground" />
-            <span className="min-w-0">
-              <span className="hito-list-row-title block">Back expectation</span>
-              <span className="hito-list-row-copy block">
-                Nested steps return inside the workflow, not a hidden submenu.
-              </span>
-            </span>
-          </div>
-          <div className="hito-row-group">
-            <div className="hito-list-row items-start">
-              <Icon name="activity" size="sm" className="mt-0.5 text-muted-foreground" />
-              <span className="min-w-0">
-                <span className="hito-list-row-title block">Easy aerobic run</span>
-                <span className="hito-list-row-copy block">Structure-first template choice.</span>
-              </span>
-            </div>
-            <div className="hito-list-row items-start">
-              <Icon name="sparkles" size="sm" className="mt-0.5 text-muted-foreground" />
-              <span className="min-w-0">
-                <span className="hito-list-row-title block">Quality session</span>
-                <span className="hito-list-row-copy block">Grouped rows can scroll calmly.</span>
-              </span>
-            </div>
-          </div>
-        </div>
-        <div className="hito-product-dialog-footer flex justify-end">
-          <HitoButton size="sm" variant="secondary">
-            Close
-          </HitoButton>
-        </div>
+      <div className="hito-product-dialog-footer flex justify-end">
+        <HitoButton size="sm" variant="secondary">
+          Close
+        </HitoButton>
       </div>
     </div>
   );
@@ -515,7 +452,7 @@ function SettingSelect({
 }) {
   return (
     <label className="grid gap-1.5">
-      <span className="hito-label">{label}</span>
+      <span className="hito-label-md">{label}</span>
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger aria-label={label}>
           <SelectValue />
@@ -671,7 +608,7 @@ function AnatomyRow({ body, label }: { body: string; label: string }) {
   return (
     <div className="hito-list-row py-3">
       <span className="hito-list-row-title">{label}</span>
-      <code className="hito-technical-mono text-xs text-muted-foreground">{body}</code>
+      <code className="hito-technical-sm text-secondary">{body}</code>
     </div>
   );
 }

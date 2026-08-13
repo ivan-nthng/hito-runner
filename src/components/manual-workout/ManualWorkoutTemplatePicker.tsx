@@ -61,8 +61,8 @@ export function ManualTemplatePickerDialog({
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-ui-modal-title">Choose template</DialogTitle>
-          <DialogDescription className="hito-body">
+          <DialogTitle className="hito-ui-title-md text-foreground">Choose template</DialogTitle>
+          <DialogDescription className="hito-body-md text-secondary">
             Choose a template, adjust the workout, then ask Hito to review it before anything is
             created.
           </DialogDescription>
@@ -79,12 +79,12 @@ export function ManualTemplatePickerDialog({
                   {catalogState.status === "failed" ? "Unavailable" : "Loading"}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="hito-list-row-title">
+                  <p className="hito-body-md text-foreground">
                     {catalogState.status === "failed"
                       ? "Workout templates could not be loaded"
                       : "Checking workout templates"}
                   </p>
-                  <p className="hito-list-row-copy">
+                  <p className="hito-body-sm mt-1 text-secondary">
                     {catalogState.message ??
                       "Hito is loading built-in and personal templates for this account."}
                   </p>
@@ -107,7 +107,7 @@ export function ManualTemplatePickerDialog({
             <>
               <section className="grid gap-2">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="hito-label">My templates</p>
+                  <p className="hito-label-md text-foreground">My templates</p>
                   <HitoButton
                     type="button"
                     size="sm"
@@ -125,7 +125,7 @@ export function ManualTemplatePickerDialog({
                       <span className="hito-status-pill mt-0.5 shrink-0" data-tone="muted">
                         Empty
                       </span>
-                      <p className="hito-list-row-copy">
+                      <p className="hito-body-sm mt-1 text-secondary">
                         Save a reviewed workout to reuse it as a personal template.
                       </p>
                     </div>
@@ -138,8 +138,10 @@ export function ManualTemplatePickerDialog({
                           disabled={Boolean(catalogAction)}
                           onClick={() => onSelectSavedTemplate(template)}
                         >
-                          <span className="hito-list-row-title block">{template.displayName}</span>
-                          <span className="hito-list-row-copy block">
+                          <span className="hito-body-md text-foreground block">
+                            {template.displayName}
+                          </span>
+                          <span className="hito-body-sm mt-1 text-secondary block">
                             {savedTemplateSummary(template)}
                           </span>
                         </button>
@@ -157,14 +159,14 @@ export function ManualTemplatePickerDialog({
               </section>
 
               <section className="grid gap-2">
-                <p className="hito-label">Built-in templates</p>
+                <p className="hito-label-md text-foreground">Built-in templates</p>
                 <div className="hito-row-group">
                   {catalog.visibleBuiltInTemplates.length === 0 ? (
                     <div className="hito-list-row items-start">
                       <span className="hito-status-pill mt-0.5 shrink-0" data-tone="muted">
                         Hidden
                       </span>
-                      <p className="hito-list-row-copy">
+                      <p className="hito-body-sm mt-1 text-secondary">
                         Restore a built-in template below to show it in the picker.
                       </p>
                     </div>
@@ -180,7 +182,9 @@ export function ManualTemplatePickerDialog({
                             onClick={() => onSelectTemplate(template)}
                           >
                             <ManualWorkoutTemplateColorIndicator template={template} />
-                            <span className="hito-list-row-title block min-w-0">{label}</span>
+                            <span className="hito-body-md text-foreground block min-w-0">
+                              {label}
+                            </span>
                           </button>
                           <TemplateActionMenu
                             actionLabel="Hide from picker"
@@ -198,7 +202,7 @@ export function ManualTemplatePickerDialog({
               {catalog.hiddenBuiltInTemplates.length ? (
                 <section className="grid gap-2">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="hito-label">Hidden built-ins</p>
+                    <p className="hito-label-md text-foreground">Hidden built-ins</p>
                     <HitoButton
                       type="button"
                       size="sm"
@@ -217,7 +221,9 @@ export function ManualTemplatePickerDialog({
                         <div key={template.templateKey} className="hito-list-row gap-2">
                           <div className="flex min-w-0 flex-1 items-center gap-3">
                             <ManualWorkoutTemplateColorIndicator template={template} />
-                            <span className="hito-list-row-title block min-w-0">{label}</span>
+                            <span className="hito-body-md text-foreground block min-w-0">
+                              {label}
+                            </span>
                           </div>
                           <HitoButton
                             type="button"

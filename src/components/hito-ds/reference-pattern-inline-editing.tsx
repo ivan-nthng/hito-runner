@@ -6,31 +6,26 @@ import { InlineEditableText, InlineReadOnlyText } from "@/components/ui/inline-e
 const INLINE_EDITING_VARIANTS = [
   {
     label: "Normal",
-    note: "Reads like surrounding text and stays keyboard reachable.",
     props: {},
     value: "Easy aerobic run",
   },
   {
     label: "Hover",
-    note: "Soft backdrop reveals the edit affordance without reflow.",
     props: { demoState: "hover" as const },
     value: "Progression finish",
   },
   {
     label: "Focus-visible",
-    note: "Focus ring is distinct from hover and selected states.",
     props: { demoState: "focus" as const },
     value: "Tempo rhythm",
   },
   {
     label: "Edit",
-    note: "The Hito field replaces the text in place.",
     props: { demoState: "edit" as const },
     value: "Long run",
   },
   {
     label: "Disabled",
-    note: "Draft fields that cannot be changed are visibly inactive.",
     props: { disabled: true },
     value: "Disabled draft label",
   },
@@ -59,92 +54,49 @@ export function HitoDsPatternInlineEditing() {
       }}
       usedIn="Manual workout draft titles, section labels, and template names."
       demo={
-        <div className="grid min-w-0 gap-5">
-          <section className="hito-surface-flat grid min-w-0 gap-4 p-5">
-            <div className="min-w-0">
-              <p className="hito-label">Direct editable heading</p>
+        <section className="grid w-full min-w-0 gap-4">
+          <div className="min-w-0">
+            <InlineEditableText
+              aria-label="Edit workout title"
+              helper="Enter or blur saves single-line drafts; Escape cancels."
+              onChange={setHeading}
+              placeholder="Name this workout"
+              size="lg"
+              validate={(value) => (value.trim().length < 3 ? "Use at least 3 characters." : null)}
+              value={heading}
+              variant="header"
+            />
+          </div>
+
+          <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)]">
+            <div>
               <InlineEditableText
-                aria-label="Edit workout title"
-                className="mt-2"
-                helper="Enter or blur saves single-line drafts; Escape cancels."
-                onChange={setHeading}
-                placeholder="Name this workout"
-                size="lg"
-                validate={(value) =>
-                  value.trim().length < 3 ? "Use at least 3 characters." : null
-                }
-                value={heading}
-                variant="header"
+                aria-label="Edit workout note"
+                helper="Multi-line edits use explicit Save/Cancel."
+                kind="multiline"
+                onChange={setNote}
+                value={note}
               />
-              <div className="mt-4 grid min-w-0 gap-2">
-                <p className="hito-caption">
-                  Header variants hug content with a minimum width. The edit affordance stays next
-                  to the label instead of pinning to the far edge of a wide field.
-                </p>
-                <div className="flex min-w-0 flex-wrap items-center gap-3">
-                  <InlineEditableText
-                    aria-label="Edit short header"
-                    demoState="hover"
-                    onChange={() => {}}
-                    size="sm"
-                    value="Beta"
-                    variant="header"
-                  />
-                  <InlineEditableText
-                    aria-label="Edit long header"
-                    demoState="hover"
-                    onChange={() => {}}
-                    size="sm"
-                    value="Marathon-specific workout title with a longer label"
-                    variant="header"
-                  />
-                </div>
-              </div>
             </div>
-
-            <div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)]">
-              <div>
-                <p className="hito-label">Multi-line editable note</p>
-                <InlineEditableText
-                  aria-label="Edit workout note"
-                  helper="Multi-line edits use explicit Save/Cancel."
-                  kind="multiline"
-                  onChange={setNote}
-                  value={note}
-                />
-              </div>
-              <div>
-                <p className="hito-label">Read-only generated row</p>
-                <InlineReadOnlyText
-                  className="mt-2"
-                  helper="No edit affordance appears for generated preview/detail rows."
-                  value={
-                    <div className="min-w-0">
-                      <p className="hito-list-row-title">Marathon steady finish</p>
-                      <p className="hito-list-row-copy">Backend-generated workout truth.</p>
-                    </div>
-                  }
-                />
-              </div>
+            <div>
+              <InlineReadOnlyText
+                helper="No edit affordance appears for generated preview/detail rows."
+                value={
+                  <div className="min-w-0">
+                    <p className="hito-list-row-title">Marathon steady finish</p>
+                    <p className="hito-list-row-copy">Backend-generated workout truth.</p>
+                  </div>
+                }
+              />
             </div>
-
-            <div className="hito-reference-note">
-              <p className="hito-list-row-title">Local task targeting</p>
-              <p className="hito-list-row-copy">
-                Use the local Dev tool toggle to create non-mutating UI task drafts.
-              </p>
-            </div>
-          </section>
-        </div>
+          </div>
+        </section>
       }
       variants={
         <div className="hito-reference-list">
           {INLINE_EDITING_VARIANTS.map((variant) => (
             <article className="hito-reference-row items-start" key={variant.label}>
-              <div>
-                <p className="hito-label">{variant.label}</p>
-                <p className="hito-caption mt-2">{variant.note}</p>
-              </div>
+              <p className="hito-label-md">{variant.label}</p>
               <InlineEditableText
                 aria-label={`Edit ${variant.label.toLowerCase()} title`}
                 onChange={() => {}}
@@ -156,12 +108,7 @@ export function HitoDsPatternInlineEditing() {
             </article>
           ))}
           <article className="hito-reference-row items-start">
-            <div>
-              <p className="hito-label">Error / read-only</p>
-              <p className="hito-caption mt-2">
-                Invalid drafts stay in edit mode; generated truth reads normally.
-              </p>
-            </div>
+            <p className="hito-label-md">Error / read-only</p>
             <div className="grid min-w-0 gap-3">
               <InlineEditableText
                 aria-label="Edit invalid title"

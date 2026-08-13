@@ -255,9 +255,9 @@ function QuickSetupSection({
   return (
     <section className={`hito-form-section-grid ${divider ? "hito-section-divider pt-8" : ""}`}>
       <div>
-        <p className="hito-micro-label">{eyebrow}</p>
-        <h2 className="hito-ui-panel-title mt-2">{title}</h2>
-        <p className="hito-helper mt-2">{body}</p>
+        <p className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">{eyebrow}</p>
+        <h2 className="hito-ui-title-xs text-foreground mt-2">{title}</h2>
+        <p className="hito-body-xs text-secondary mt-2">{body}</p>
       </div>
       <div className="grid gap-4">{children}</div>
     </section>

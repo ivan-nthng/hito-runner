@@ -11,7 +11,8 @@
   }
 
   .hito-logo,
-  .hito-logo-mark {
+  .hito-logo-mark,
+  .hito-logo-lockup {
     --hito-logo-height: 1.6rem;
     display: inline-block;
     width: var(--hito-logo-width);
@@ -21,11 +22,15 @@
   }
 
   .hito-logo {
-    --hito-logo-width: calc(var(--hito-logo-height) * 2.05);
+    --hito-logo-width: calc(var(--hito-logo-height) * 2.375);
   }
 
   .hito-logo-mark {
-    --hito-logo-width: calc(var(--hito-logo-height) * 1.0167);
+    --hito-logo-width: calc(var(--hito-logo-height) * 0.9865);
+  }
+
+  .hito-logo-lockup {
+    --hito-logo-width: calc(var(--hito-logo-height) * 3.4286);
   }
 
   .hito-ui-title-xl {
@@ -301,6 +306,22 @@
     justify-content: space-between;
     gap: 1rem;
     margin-bottom: 1rem;
+  }
+
+  @media (max-width: 639px) {
+    .hito-route-stack {
+      gap: var(--space-8);
+    }
+
+    .hito-page-header {
+      margin-bottom: var(--space-6);
+    }
+
+    .hito-section-header {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: var(--space-1);
+    }
   }
 
   .hito-timeline-year,

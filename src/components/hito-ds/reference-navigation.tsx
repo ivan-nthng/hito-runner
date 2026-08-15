@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type Ref } from "react";
 
 import { Icon } from "@/components/ui/icon";
 import { HitoButton } from "@/components/ui/button";
@@ -29,13 +29,18 @@ export function HitoDsNestedNav({
   activeHref,
   onNavigate,
   onQueryChange,
+  query,
+  searchInputRef,
+  showSearch = true,
 }: {
   idPrefix: string;
   activeHref: string;
   onNavigate?: () => void;
-  onQueryChange?: (query: string) => void;
+  onQueryChange: (query: string) => void;
+  query: string;
+  searchInputRef?: Ref<HTMLInputElement>;
+  showSearch?: boolean;
 }) {
-  const [query, setQuery] = useState("");
   const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(() => {
     const activeGroup = HITO_DS_NAV_ITEMS.find(
       (item) => item.kind === "group" && itemContainsHref(item, activeHref),
@@ -117,23 +122,22 @@ export function HitoDsNestedNav({
           event.preventDefault();
           event.stopPropagation();
           event.currentTarget.querySelector<HTMLInputElement>('input[type="search"]')?.focus();
-          setQuery("");
-          onQueryChange?.("");
+          onQueryChange("");
         }
       }}
     >
-      <div className="hito-ds-sidebar-search">
-        <Input
-          type="search"
-          value={query}
-          aria-label="Find in Hito DS"
-          placeholder="Find a component"
-          onChange={(event) => {
-            setQuery(event.target.value);
-            onQueryChange?.(event.target.value);
-          }}
-        />
-      </div>
+      {showSearch ? (
+        <div className="hito-ds-sidebar-search">
+          <Input
+            ref={searchInputRef}
+            type="search"
+            value={query}
+            aria-label="Find in Hito DS"
+            placeholder="Find a component"
+            onChange={(event) => onQueryChange(event.target.value)}
+          />
+        </div>
+      ) : null}
 
       {matchingItems.map(({ item, children, visible }) => {
         if (!visible) {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { AdminMetadataMenu } from "@/components/admin/AdminOperationalComponents";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -32,15 +32,26 @@ import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { InlineEditableText } from "@/components/ui/inline-editable-text";
 import { HitoMetadataTag } from "@/components/ui/metadata-tag";
-import { HitoNativeSelectField } from "@/components/ui/native-select-field";
 import { useHitoTabs } from "@/components/ui/hito-tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
 import { EditableValueFieldSandbox } from "@/components/hito-ds/editable-value-field-sandbox";
-import { ProductLinks, ReferenceListRow } from "@/components/hito-ds/reference";
+import { HitoReferenceLink, ProductLinks, ReferenceListRow } from "@/components/hito-ds/reference";
 import {
   ChoiceSelector,
-  DataTableSpecimenPreview,
+  DataTableControlsDemo,
+  DataTableHeaderDemo,
+  DataTableHeaderVariants,
+  DataTableLiveDemo,
+  DataTableRowsDemo,
+  type DataTableReferenceDensity,
   DemoButton,
   DemoInput,
   IconOnlyButtonMatrix,
@@ -63,7 +74,14 @@ const SELECTION_CONTROL_KINDS = ["checkbox", "radio", "toggle"] as const;
 const SELECTION_BINARY_SIZES = ["sm", "md"] as const;
 const TAB_STYLES = ["simple", "enclosed"] as const;
 const STATUS_TONES = ["neutral", "signal", "success", "warning", "destructive"] as const;
-const DATA_TABLE_SORT_DIRECTIONS = ["asc", "desc"] as const;
+const DATA_TABLE_HEADER_STATES = [
+  "static",
+  "sortable",
+  "sorted-asc",
+  "sorted-desc",
+  "filtered",
+] as const;
+const DATA_TABLE_DENSITIES = ["sm", "md", "lg"] as const;
 const STATUS_MARKER_EXAMPLES = [
   { label: "Completed", tone: "success", icon: "check" },
   { label: "Partial", tone: "warning", icon: "minus" },
@@ -84,7 +102,7 @@ type SelectionControlKind = (typeof SELECTION_CONTROL_KINDS)[number];
 type SelectionBinarySize = (typeof SELECTION_BINARY_SIZES)[number];
 type TabStyle = (typeof TAB_STYLES)[number];
 type StatusTone = (typeof STATUS_TONES)[number];
-type DataTableSortDirection = (typeof DATA_TABLE_SORT_DIRECTIONS)[number];
+type DataTableReferenceMode = "demo" | "variants";
 
 type FieldSize = HitoFieldSize;
 type TabDemoValue = "plan" | "progress" | "updates" | "archived";
@@ -138,10 +156,7 @@ function ButtonPlayground() {
           accessibility:
             "Use native button semantics, an accessible name for icon-only actions, visible focus, and truthful disabled or loading state.",
         }}
-        anchors={[
-          { id: "button-group", label: "Grouped Buttons", tab: "variants" },
-          { id: "icon-only-button", label: "Icon-only Button", tab: "variants" },
-        ]}
+        anchors={[{ id: "button-group", label: "Grouped Buttons", tab: "variants" }]}
         usedIn={
           <ProductLinks
             links={[
@@ -453,6 +468,279 @@ function TabsPlayground() {
   );
 }
 
+function ReferenceLinkPlayground() {
+  return (
+    <HitoDsPlayground
+      id="reference-link"
+      label="Reference Link"
+      status="Reference navigation"
+      statusTone="signal"
+      description={{
+        purpose:
+          "Navigate to a referenced Product route or a durable in-document specimen without presenting the destination as an action or status.",
+        useWhen:
+          "Used-in metadata or specimen anatomy needs a compact, native route or hash destination.",
+        avoidWhen:
+          "The user is triggering an action, selecting a value, or reading non-navigational metadata.",
+        accessibility:
+          "Native anchor semantics, browser history, keyboard activation, visible focus, and truthful link text remain intact.",
+      }}
+      usedIn={
+        <ProductLinks
+          links={[
+            { href: "/hitoDS/components#buttons", label: "Used in metadata" },
+            { href: "/hitoDS/components#field", label: "Specimen anchors" },
+          ]}
+        />
+      }
+      demo={
+        <div className="hito-reference-links justify-center">
+          <HitoReferenceLink href="/settings">/settings</HitoReferenceLink>
+          <HitoReferenceLink href="#reference-link">#reference-link</HitoReferenceLink>
+        </div>
+      }
+      variants={
+        <div className="grid min-w-0 gap-5 sm:grid-cols-2">
+          <div className="grid min-w-0 content-start gap-2">
+            <p className="hito-label-sm text-secondary">Default</p>
+            <HitoReferenceLink href="/progress">/progress</HitoReferenceLink>
+          </div>
+          <div className="grid min-w-0 content-start gap-2">
+            <p className="hito-label-sm text-secondary">Hover</p>
+            <HitoReferenceLink href="/settings" data-demo-state="hover">
+              /settings
+            </HitoReferenceLink>
+          </div>
+          <div className="grid min-w-0 content-start gap-2">
+            <p className="hito-label-sm text-secondary">Focus-visible</p>
+            <HitoReferenceLink href="#reference-link" data-demo-state="focus-visible">
+              #reference-link
+            </HitoReferenceLink>
+          </div>
+          <div className="grid min-w-0 content-start gap-2">
+            <p className="hito-label-sm text-secondary">Long destination</p>
+            <HitoReferenceLink href="/hitoDS/components#reference-link">
+              /hitoDS/components#reference-link-canonical-native-anchor-contract
+            </HitoReferenceLink>
+          </div>
+        </div>
+      }
+      controls={
+        <ReferenceListRow
+          label="Contract"
+          title="Native technical navigation"
+          body="Technical SM, token spacing and radius, hairline edge, quiet surface, hover, and focus-visible feedback are shared by route and hash destinations."
+        />
+      }
+    />
+  );
+}
+
+const DATA_TABLE_MODE_LABELS: Record<DataTableReferenceMode, string> = {
+  demo: "Demo",
+  variants: "Variants",
+};
+
+function DataTableReferenceSubject({
+  density,
+  label,
+  modes,
+  onDensityChange,
+  subject,
+  views,
+}: {
+  density?: DataTableReferenceDensity;
+  label: string;
+  modes: readonly DataTableReferenceMode[];
+  onDensityChange?: (value: DataTableReferenceDensity) => void;
+  subject: string;
+  views: Partial<Record<DataTableReferenceMode, ReactNode>>;
+}) {
+  const [activeMode, setActiveMode] = useState<DataTableReferenceMode>(modes[0]);
+  const tabs = useHitoTabs({
+    idPrefix: `data-table-${subject}-reference`,
+    items: modes.map((value) => ({ value })),
+    value: activeMode,
+  });
+  const hasTabs = modes.length > 1;
+  const showControls =
+    activeMode === "demo" && density !== undefined && onDensityChange !== undefined;
+  const visualMode = activeMode === "demo" ? "demo" : "variants";
+  const titleId = `data-table-${subject}-title`;
+  const stage = (
+    <article
+      className="hito-ds-playground-stage"
+      data-mode={visualMode}
+      data-reference-mode={activeMode}
+    >
+      <div
+        {...(hasTabs ? tabs.getPanelProps(activeMode) : {})}
+        className="hito-ds-playground-panel"
+        data-mode={visualMode}
+      >
+        {views[activeMode]}
+      </div>
+    </article>
+  );
+
+  return (
+    <section
+      className="hito-ds-playground-section py-8"
+      aria-labelledby={titleId}
+      data-data-table-subject={subject}
+    >
+      <div className="hito-specimen-header mb-6">
+        <h3 id={titleId} className="hito-ui-title-sm">
+          {label}
+        </h3>
+      </div>
+      <div className="hito-ds-playground" data-mode={visualMode}>
+        {hasTabs ? (
+          <div className="hito-ds-playground-tabs">
+            <div
+              className="hito-tabs hito-tabs-simple"
+              {...tabs.tabListProps}
+              aria-label={`${label} specimen modes`}
+            >
+              {modes.map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  {...tabs.getTabProps(mode)}
+                  className="hito-tab"
+                  data-active={activeMode === mode ? "true" : undefined}
+                  onClick={() => setActiveMode(mode)}
+                >
+                  {DATA_TABLE_MODE_LABELS[mode]}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {showControls ? (
+          <div className="hito-ds-playground-shell" data-mode={visualMode}>
+            {stage}
+            <aside
+              className="hito-ds-playground-controls"
+              data-mode={visualMode}
+              aria-label={`${label} properties`}
+            >
+              <div className="hito-row-group border-0">
+                <div className="hito-list-row items-start">
+                  <ChoiceSelector
+                    label="Density"
+                    value={density}
+                    options={DATA_TABLE_DENSITIES}
+                    onChange={onDensityChange}
+                    getLabel={(value) => value.toUpperCase()}
+                    textTransform="none"
+                  />
+                </div>
+              </div>
+            </aside>
+          </div>
+        ) : (
+          stage
+        )}
+      </div>
+    </section>
+  );
+}
+
+function DataTableHeadersReference() {
+  const [density, setDensity] = useState<DataTableReferenceDensity>("md");
+
+  return (
+    <DataTableReferenceSubject
+      density={density}
+      label="Headers"
+      onDensityChange={setDensity}
+      subject="headers"
+      modes={["demo", "variants"]}
+      views={{
+        demo: <DataTableHeaderDemo density={density} state="sorted-asc" />,
+        variants: <DataTableHeaderVariants states={DATA_TABLE_HEADER_STATES} />,
+      }}
+    />
+  );
+}
+
+function DataTableControlsReference() {
+  return (
+    <DataTableReferenceSubject
+      label="Controls"
+      subject="controls"
+      modes={["demo", "variants"]}
+      views={{
+        demo: <DataTableControlsDemo />,
+        variants: (
+          <div className="grid min-w-0 gap-8">
+            <div className="grid min-w-0 gap-3">
+              <p className="hito-label-sm">Default</p>
+              <DataTableControlsDemo />
+            </div>
+            <div className="grid min-w-0 gap-3">
+              <p className="hito-label-sm">Filtered</p>
+              <DataTableControlsDemo initialFilter="active" />
+            </div>
+          </div>
+        ),
+      }}
+    />
+  );
+}
+
+function DataTableRowsReference() {
+  const [density, setDensity] = useState<DataTableReferenceDensity>("md");
+
+  return (
+    <DataTableReferenceSubject
+      density={density}
+      label="Rows & values"
+      onDensityChange={setDensity}
+      subject="rows-values"
+      modes={["demo"]}
+      views={{
+        demo: <DataTableRowsDemo density={density} />,
+      }}
+    />
+  );
+}
+
+function DataTableLiveReference() {
+  const [density, setDensity] = useState<DataTableReferenceDensity>("md");
+
+  return (
+    <DataTableReferenceSubject
+      density={density}
+      label="Table"
+      onDensityChange={setDensity}
+      subject="table"
+      modes={["demo"]}
+      views={{
+        demo: <DataTableLiveDemo density={density} />,
+      }}
+    />
+  );
+}
+
+function DataTableReference() {
+  return (
+    <section id="data-table" className="ds-section">
+      <div className="max-w-3xl">
+        <h2 className="hito-ui-title-lg">Tables</h2>
+        <p className="hito-body-sm text-secondary mt-3">
+          Headers, controls, row values, and full compositions share one accessible table rhythm.
+        </p>
+      </div>
+      <DataTableHeadersReference />
+      <DataTableControlsReference />
+      <DataTableRowsReference />
+      <DataTableLiveReference />
+    </section>
+  );
+}
+
 export function HitoDsComponentControls() {
   const [inputVariant, setInputVariant] = useState<InputVariant>("primary");
   const [inputSize, setInputSize] = useState<FieldSize>("md");
@@ -469,7 +757,7 @@ export function HitoDsComponentControls() {
   const [editableDateDemo, setEditableDateDemo] = useState("");
   const [boundedDateDemo, setBoundedDateDemo] = useState("2026-05-29");
   const [timeFieldDemo, setTimeFieldDemo] = useState("3:50:00");
-  const [nativeSelectDemo, setNativeSelectDemo] = useState("easy");
+  const [workoutTypeDemo, setWorkoutTypeDemo] = useState("easy");
   const [statusTone, setStatusTone] = useState<StatusTone>("signal");
   const [statusLongLabel, setStatusLongLabel] = useState(false);
   const [metadataState, setMetadataState] = useState("reviewed");
@@ -480,131 +768,19 @@ export function HitoDsComponentControls() {
   const [selectionInvalid, setSelectionInvalid] = useState(false);
   const [selectionFocusDemo, setSelectionFocusDemo] = useState(false);
   const [selectionCardMode, setSelectionCardMode] = useState(false);
-  const [dataTableSortable, setDataTableSortable] = useState(true);
-  const [dataTableActiveSort, setDataTableActiveSort] = useState(true);
-  const [dataTableSortDirection, setDataTableSortDirection] =
-    useState<DataTableSortDirection>("asc");
-  const [dataTableFiltered, setDataTableFiltered] = useState(true);
-  const [dataTableStaticMode, setDataTableStaticMode] = useState(false);
+  const workoutTypeLabel =
+    workoutTypeDemo === "tempo"
+      ? "Tempo"
+      : workoutTypeDemo === "intervals"
+        ? "Intervals"
+        : "Easy run";
 
   return (
     <>
       <ButtonPlayground />
       <TabsPlayground />
-
-      <HitoDsPlayground
-        id="data-table"
-        label="Data table"
-        status="Pattern"
-        statusTone="signal"
-        description={{
-          purpose:
-            "Present operational data with sortable or static headers and readable row anatomy.",
-          useWhen:
-            "Users compare multiple records across stable columns and may sort or filter them from a column header.",
-          avoidWhen:
-            "A short list, metric row, or mobile-first card composition communicates the same truth more clearly.",
-          accessibility:
-            "Interactive headers preserve native table semantics, aria-sort, accessible menu labels, keyboard operation, and a contained scroll region.",
-        }}
-        anchors={[
-          {
-            id: "data-table-interactive-header",
-            label: "Interactive Column Header",
-            tab: "variants",
-          },
-          { id: "data-table-static-header", label: "Static Header", tab: "variants" },
-          { id: "data-table-row", label: "Row Anatomy", tab: "demo" },
-        ]}
-        usedIn={
-          <ProductLinks
-            links={[
-              { href: "/admin/analytics", label: "/admin/analytics" },
-              { href: "/hitoDS", label: "/hitoDS" },
-            ]}
-          />
-        }
-        demo={
-          <DataTableSpecimenPreview
-            sortable={dataTableSortable}
-            activeSort={dataTableActiveSort}
-            sortDirection={dataTableSortDirection}
-            filtered={dataTableFiltered}
-            staticMode={dataTableStaticMode}
-            showUtilityRow={false}
-          />
-        }
-        variants={
-          <div className="grid min-w-0 gap-6">
-            <div className="border-t border-hairline pt-5">
-              <p className="hito-label-md">Interactive header states</p>
-              <p className="hito-body-xs text-tertiary mt-1">
-                Sortable, active-sort, filtered, hover/demo, and static header cells stay in one
-                contained table scroll region.
-              </p>
-              <div className="mt-4">
-                <DataTableSpecimenPreview
-                  sortable
-                  activeSort
-                  sortDirection={dataTableSortDirection}
-                  filtered
-                  staticMode={false}
-                  showUtilityRow={false}
-                />
-              </div>
-            </div>
-
-            <div className="border-t border-hairline pt-5">
-              <p className="hito-label-md">Static table mode</p>
-              <p className="hito-body-xs text-tertiary mt-1">
-                Read-only table headers keep the same typography and spacing without implying
-                clickable sorting.
-              </p>
-              <div className="mt-4">
-                <DataTableSpecimenPreview
-                  sortable={false}
-                  activeSort={false}
-                  filtered={false}
-                  staticMode
-                  showUtilityRow={false}
-                />
-              </div>
-            </div>
-          </div>
-        }
-        controls={
-          <div className="hito-row-group border-0">
-            <ToggleRow
-              label="Sortable preview column"
-              active={dataTableSortable}
-              onToggle={() => setDataTableSortable((v) => !v)}
-            />
-            <ToggleRow
-              label="Active sort"
-              active={dataTableActiveSort}
-              onToggle={() => setDataTableActiveSort((v) => !v)}
-            />
-            <ChoiceSelector
-              label="Sort direction"
-              value={dataTableSortDirection}
-              options={DATA_TABLE_SORT_DIRECTIONS}
-              onChange={setDataTableSortDirection}
-              getLabel={(value) => (value === "asc" ? "Ascending" : "Descending")}
-              textTransform="none"
-            />
-            <ToggleRow
-              label="Filtered"
-              active={dataTableFiltered}
-              onToggle={() => setDataTableFiltered((v) => !v)}
-            />
-            <ToggleRow
-              label="Static mode"
-              active={dataTableStaticMode}
-              onToggle={() => setDataTableStaticMode((v) => !v)}
-            />
-          </div>
-        }
-      />
+      <ReferenceLinkPlayground />
+      <DataTableReference />
 
       <HitoDsPlayground
         id="inputs"
@@ -613,20 +789,17 @@ export function HitoDsComponentControls() {
         statusTone="signal"
         description={{
           purpose:
-            "Collect text, selection, date, time, and bounded range values with one field rhythm and feedback contract.",
+            "Collect text and bounded range values with one field rhythm and feedback contract.",
           useWhen:
             "A user must enter or edit a value that has an explicit label, format, and validation boundary.",
           avoidWhen:
             "A compact read/edit scalar belongs to Editable Value Field or the choice is a small visible selection set.",
           accessibility:
-            "Labels, descriptions, errors, native input behavior, focus, disabled, read-only, and typed date/time feedback remain programmatically connected.",
+            "Labels, descriptions, errors, native input behavior, focus, disabled, and read-only feedback remain programmatically connected.",
         }}
         anchors={[
           { id: "field", label: "Field", tab: "demo" },
-          { id: "native-select", label: "Native Select", tab: "variants" },
           { id: "textarea", label: "Textarea", tab: "variants" },
-          { id: "date-field", label: "Date Field", tab: "variants" },
-          { id: "time-field", label: "Time Field", tab: "variants" },
         ]}
         usedIn={
           <ProductLinks
@@ -768,20 +941,21 @@ export function HitoDsComponentControls() {
                 </div>
                 <div className="grid min-w-0 gap-3 md:grid-cols-3">
                   {(["sm", "md", "lg"] as const).map((headerSize) => (
-                    <InlineEditableText
-                      key={headerSize}
-                      aria-label={`Edit ${headerSize} header input specimen`}
-                      onChange={() => {}}
-                      size={headerSize}
-                      value={
-                        headerSize === "lg"
-                          ? "Workout title"
-                          : headerSize === "md"
-                            ? "Section heading"
-                            : "Block label"
-                      }
-                      variant="header"
-                    />
+                    <div key={headerSize} className="min-w-0 self-start justify-self-start">
+                      <InlineEditableText
+                        aria-label={`Edit ${headerSize} header input specimen`}
+                        onChange={() => {}}
+                        size={headerSize}
+                        value={
+                          headerSize === "lg"
+                            ? "Workout title"
+                            : headerSize === "md"
+                              ? "Section heading"
+                              : "Block label"
+                        }
+                        variant="header"
+                      />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -829,117 +1003,6 @@ export function HitoDsComponentControls() {
                   }
                   onUpperValueChange={(value) => setCompoundRangeValue(([lower]) => [lower, value])}
                 />
-              </div>
-            </div>
-
-            <div className="border-t border-hairline pt-5">
-              <div className="mb-4">
-                <p className="hito-label-md">Date and time inputs</p>
-                <p className="hito-body-xs text-tertiary mt-2 max-w-2xl">
-                  Date/time truth stays ISO or duration-shaped in state. Calendar selection, typed
-                  date entry, compact optional date fields, and masked time entry share the same
-                  Hito field rhythm.
-                </p>
-              </div>
-              <div className="hito-reference-list">
-                <article className="hito-reference-row items-start">
-                  <div>
-                    <p className="hito-list-row-title">Native select field</p>
-                    <p className="hito-body-xs text-tertiary mt-2">
-                      Native option behavior with the shared Hito field, label, and helper anatomy.
-                    </p>
-                  </div>
-                  <HitoNativeSelectField
-                    id="ds-native-select-field"
-                    label="Workout type"
-                    value={nativeSelectDemo}
-                    onValueChange={setNativeSelectDemo}
-                    helper="Use when native selection behavior is the right interaction."
-                    options={[
-                      { value: "easy", label: "Easy run" },
-                      { value: "tempo", label: "Tempo" },
-                      { value: "intervals", label: "Intervals" },
-                    ]}
-                  />
-                </article>
-                <article className="hito-reference-row items-start">
-                  <div>
-                    <p className="hito-list-row-title">Date picker field</p>
-                    <p className="hito-body-xs text-tertiary mt-2">
-                      Use for required or visible dates such as target race day.
-                    </p>
-                  </div>
-                  <HitoDateField
-                    id="ds-date-field"
-                    label="Target date"
-                    value={dateFieldDemo}
-                    onChange={setDateFieldDemo}
-                    helper="Pick from calendar or type YYYY-MM-DD."
-                  />
-                </article>
-                <article className="hito-reference-row items-start">
-                  <div>
-                    <p className="hito-list-row-title">Date picker states</p>
-                    <p className="hito-body-xs text-tertiary mt-2">
-                      Error, disabled, and bounded date states stay in the same field-owned anatomy.
-                    </p>
-                  </div>
-                  <div className="grid min-w-0 gap-4">
-                    <HitoDateField
-                      id="ds-date-field-invalid"
-                      label="Invalid typed date"
-                      value="2026-13-40"
-                      onChange={() => {}}
-                      error="Use YYYY-MM-DD."
-                    />
-                    <HitoDateField
-                      id="ds-date-field-disabled"
-                      label="Disabled date"
-                      value="2026-12-11"
-                      onChange={() => {}}
-                      disabled
-                      helper="Disabled fields do not open the picker."
-                    />
-                    <HitoDateField
-                      id="ds-date-field-bounded"
-                      label="Bounded date"
-                      value={boundedDateDemo}
-                      onChange={setBoundedDateDemo}
-                      minDate="2026-05-20"
-                      maxDate="2026-06-10"
-                      helper="Calendar dates outside May 20-Jun 10 are disabled."
-                    />
-                  </div>
-                </article>
-                <article className="hito-reference-row items-start">
-                  <div>
-                    <p className="hito-list-row-title">Optional date field</p>
-                    <p className="hito-body-xs text-tertiary mt-2">
-                      Empty state is an action; saved state is visible and editable.
-                    </p>
-                  </div>
-                  <HitoEditableDateField
-                    label="Plan Start Date"
-                    value={editableDateDemo}
-                    onChange={setEditableDateDemo}
-                    helper="Optional date using the same picker primitive."
-                  />
-                </article>
-                <article className="hito-reference-row items-start">
-                  <div>
-                    <p className="hito-list-row-title">Masked time field</p>
-                    <p className="hito-body-xs text-tertiary mt-2">
-                      Use for race targets and durations. Continuous digits normalize while editing.
-                    </p>
-                  </div>
-                  <HitoMaskedTimeField
-                    id="ds-time-field"
-                    label="Target time"
-                    value={timeFieldDemo}
-                    onChange={setTimeFieldDemo}
-                    helper="Duration-shaped, backend-compatible value."
-                  />
-                </article>
               </div>
             </div>
 
@@ -1039,6 +1102,141 @@ export function HitoDsComponentControls() {
                 />
               </div>
             </div>
+          </div>
+        }
+      />
+
+      <HitoDsPlayground
+        id="date-time"
+        label="Date & Time"
+        status="Field family"
+        statusTone="signal"
+        description={{
+          purpose:
+            "Inspect branded selection, calendar entry, optional dates, and duration-shaped time through the existing Hito field family.",
+          useWhen:
+            "A workflow combines workout classification with a date or target-time value that needs visible format and bounds.",
+          avoidWhen:
+            "A plain text field or deliberately native platform select is the established Product interaction.",
+          accessibility:
+            "Named triggers, menu and calendar keyboard behavior, typed ISO or duration values, focus return, errors, and disabled bounds remain owned by their existing primitives.",
+        }}
+        anchors={[
+          { id: "native-select", label: "Workout type select", tab: "demo" },
+          { id: "date-field", label: "Date Field", tab: "demo" },
+          { id: "time-field", label: "Time Field", tab: "demo" },
+        ]}
+        usedIn={
+          <ProductLinks
+            links={[
+              { href: "/settings", label: "/settings" },
+              { href: "/workout/2026-05-24", label: "/workout/$date" },
+            ]}
+          />
+        }
+        demo={
+          <div className="grid w-full min-w-0 gap-5 lg:grid-cols-3">
+            <div className="grid min-w-0 content-start gap-2">
+              <span id="ds-workout-type-label" className="hito-label-md">
+                Workout type
+              </span>
+              <Select value={workoutTypeDemo} onValueChange={setWorkoutTypeDemo}>
+                <SelectTrigger aria-labelledby="ds-workout-type-label">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="easy">Easy run</SelectItem>
+                  <SelectItem value="tempo">Tempo</SelectItem>
+                  <SelectItem value="intervals">Intervals</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="hito-field-helper">Choose from the branded Hito menu.</span>
+            </div>
+            <HitoDateField
+              id="ds-date-field"
+              label="Target date"
+              value={dateFieldDemo}
+              onChange={setDateFieldDemo}
+              helper="Pick from calendar or type YYYY-MM-DD."
+            />
+            <HitoMaskedTimeField
+              id="ds-time-field"
+              label="Target time"
+              value={timeFieldDemo}
+              onChange={setTimeFieldDemo}
+              helper="Duration-shaped, backend-compatible value."
+            />
+          </div>
+        }
+        variants={
+          <div className="hito-reference-list">
+            <article className="hito-reference-row items-start">
+              <div>
+                <p className="hito-list-row-title">Date picker states</p>
+                <p className="hito-body-xs text-tertiary mt-2">
+                  Error, disabled, and bounded dates stay in the same field-owned anatomy.
+                </p>
+              </div>
+              <div className="grid min-w-0 gap-4">
+                <HitoDateField
+                  id="ds-date-field-invalid"
+                  label="Invalid typed date"
+                  value="2026-13-40"
+                  onChange={() => {}}
+                  error="Use YYYY-MM-DD."
+                />
+                <HitoDateField
+                  id="ds-date-field-disabled"
+                  label="Disabled date"
+                  value="2026-12-11"
+                  onChange={() => {}}
+                  disabled
+                  helper="Disabled fields do not open the picker."
+                />
+                <HitoDateField
+                  id="ds-date-field-bounded"
+                  label="Bounded date"
+                  value={boundedDateDemo}
+                  onChange={setBoundedDateDemo}
+                  minDate="2026-05-20"
+                  maxDate="2026-06-10"
+                  helper="Calendar dates outside May 20-Jun 10 are disabled."
+                />
+              </div>
+            </article>
+            <article className="hito-reference-row items-start">
+              <div>
+                <p className="hito-list-row-title">Optional date field</p>
+                <p className="hito-body-xs text-tertiary mt-2">
+                  Empty state is an action; saved state remains visible and editable.
+                </p>
+              </div>
+              <HitoEditableDateField
+                label="Plan Start Date"
+                value={editableDateDemo}
+                onChange={setEditableDateDemo}
+                helper="Optional date using the same picker primitive."
+              />
+            </article>
+          </div>
+        }
+        controls={
+          <div className="hito-row-group border-0">
+            <ReferenceListRow
+              label="Workout type"
+              title={workoutTypeLabel}
+              body="Branded Hito Select value"
+            />
+            <ReferenceListRow
+              label="Target date"
+              title={dateFieldDemo}
+              body="ISO-shaped local reference state"
+            />
+            <ReferenceListRow
+              label="Target time"
+              title={timeFieldDemo}
+              body="Duration-shaped local reference state"
+            />
           </div>
         }
       />
@@ -1151,29 +1349,75 @@ export function HitoDsComponentControls() {
             <div className="border-t border-hairline pt-5">
               <p className="hito-label-md">Metadata tags and menu</p>
               <p className="hito-body-xs text-tertiary mt-1">
-                Read-only metadata and interactive operational metadata share the runtime tag owner.
+                Visible words carry meaning; Light stays quiet and Accent stays deliberately scarce.
               </p>
-              <div className="mt-4 flex min-w-0 flex-wrap items-center gap-3">
-                <HitoMetadataTag
-                  tone="success"
-                  tooltip="The backend-reviewed draft is ready to confirm."
-                >
-                  Reviewed
-                </HitoMetadataTag>
-                <HitoMetadataTag tooltip="Canonical generated-plan contract.">
-                  Plan first
-                </HitoMetadataTag>
-                <AdminMetadataMenu
-                  displayValue={metadataState === "reviewed" ? "Reviewed" : "Draft"}
-                  label="Review state"
-                  onSelect={setMetadataState}
-                  options={[
-                    { value: "draft", label: "Draft" },
-                    { value: "reviewed", label: "Reviewed" },
-                  ]}
-                  tone={metadataState === "reviewed" ? "success" : "signal"}
-                  value={metadataState}
-                />
+              <div className="mt-4 grid min-w-0 gap-5">
+                <div className="grid min-w-0 gap-3">
+                  <p className="hito-label-sm text-secondary">Light · quiet and dense</p>
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <HitoMetadataTag variant="light">Plan first</HitoMetadataTag>
+                    <HitoMetadataTag variant="light" tone="success">
+                      Available
+                    </HitoMetadataTag>
+                    <HitoMetadataTag variant="light" tone="rollout">
+                      In review
+                    </HitoMetadataTag>
+                    <HitoMetadataTag variant="light" tone="warning">
+                      Needs QA
+                    </HitoMetadataTag>
+                    <HitoMetadataTag variant="light" tone="error">
+                      Invalid metadata
+                    </HitoMetadataTag>
+                  </div>
+                </div>
+
+                <div className="grid min-w-0 gap-3">
+                  <p className="hito-label-sm text-secondary">Accent · sparse and explicit</p>
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <HitoMetadataTag variant="accent" tone="success">
+                      Ready
+                    </HitoMetadataTag>
+                    <HitoMetadataTag variant="accent" tone="rollout">
+                      Live sync
+                    </HitoMetadataTag>
+                    <HitoMetadataTag variant="accent" tone="signal">
+                      Core control
+                    </HitoMetadataTag>
+                  </div>
+                  <p className="hito-body-xs text-tertiary">
+                    Signal is organizational, not status. Warning and Negative Accent are not
+                    admitted by the current foreground pairs.
+                  </p>
+                </div>
+
+                <div className="grid min-w-0 gap-3">
+                  <p className="hito-label-sm text-secondary">Behaviour</p>
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <HitoMetadataTag tooltip="Canonical generated-plan contract.">
+                      Plan first
+                    </HitoMetadataTag>
+                    <HitoMetadataTag>
+                      Canonical generated-plan metadata remains readable when its source label is
+                      unusually long
+                    </HitoMetadataTag>
+                    <AdminMetadataMenu
+                      displayValue={metadataState === "reviewed" ? "Reviewed" : "Draft"}
+                      label="Review state"
+                      onSelect={setMetadataState}
+                      options={[
+                        { value: "draft", label: "Draft" },
+                        { value: "reviewed", label: "Reviewed" },
+                      ]}
+                      tone={metadataState === "reviewed" ? "success" : "signal"}
+                      value={metadataState}
+                    />
+                    <HitoMetadataTag asChild interactive variant="accent" tone="signal">
+                      <button type="button" disabled>
+                        Unavailable action
+                      </button>
+                    </HitoMetadataTag>
+                  </div>
+                </div>
               </div>
             </div>
 

@@ -589,9 +589,9 @@ function CalendarDaySlot({
           draggable={false}
           className={
             layout === "mobile"
-              ? "hito-calendar-mobile-feedback-marker focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/20"
+              ? "hito-calendar-mobile-feedback-marker focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               : cn(
-                  "absolute z-20 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/20",
+                  "absolute z-20 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   layout === "week" ? "bottom-4 right-4" : "bottom-2.5 right-2.5",
                 )
           }
@@ -618,7 +618,6 @@ function CalendarDaySlot({
             type="button"
             className={cn(
               "hito-button hito-button-ghost hito-button-xs absolute z-30 aspect-square p-0",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/25",
               sourceActionMobile
                 ? "right-3 top-3"
                 : "opacity-0 transition-opacity group-hover/manual-day:opacity-100 focus-visible:opacity-100",
@@ -655,7 +654,7 @@ const CalendarDayButton = forwardRef<HTMLButtonElement, CalendarDayButtonProps>(
         ref={ref}
         type="button"
         className={cn(
-          "block w-full min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/25",
+          "block w-full min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           layout !== "mobile" && "group h-full",
           className,
         )}
@@ -771,7 +770,7 @@ function Tooltip({ workout }: { workout: Workout }) {
           {readbackEntries.map((entry) => (
             <div key={entry.key} className="flex justify-between gap-3">
               <span className="hito-metric-label">{entry.label}</span>
-              <span className="text-foreground/80 truncate">{entry.value}</span>
+              <span className="text-text-secondary truncate">{entry.value}</span>
             </div>
           ))}
         </div>

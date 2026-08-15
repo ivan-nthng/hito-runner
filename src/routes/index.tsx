@@ -46,7 +46,13 @@ function Index() {
 
   return (
     <AppShell snapshot={snapshot} viewer={viewer}>
-      <div className="hito-route-gutter py-8 lg:py-10">
+      <div
+        className={
+          snapshot.mode === "onboarding" || search.createPlan
+            ? "hito-route-gutter py-8 lg:py-10"
+            : "hito-route-gutter py-hito-6 sm:py-8 lg:py-10"
+        }
+      >
         {snapshot.mode === "onboarding" || search.createPlan ? (
           <OnboardingGate defaults={onboardingDefaults} />
         ) : (
@@ -63,7 +69,7 @@ function Index() {
 function HomePendingState() {
   return (
     <AppShell>
-      <div className="hito-route-gutter space-y-12 py-8 lg:py-10">
+      <div className="hito-route-gutter space-y-hito-8 py-hito-6 sm:space-y-12 sm:py-8 lg:py-10">
         <section className="pt-1 lg:pt-2">
           <div className="hito-workout-hero-grid">
             <div>
@@ -100,7 +106,7 @@ function HomeErrorState({ reset }: { error: Error; reset: () => void }) {
           <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
             We couldn&apos;t load this week&apos;s plan.
           </h1>
-          <p className="hito-body-md mt-4 max-w-[40rem] text-foreground/85">
+          <p className="hito-body-md mt-4 max-w-[40rem] text-text-secondary">
             Try again to reopen the latest saved or preview state. If setup is still incomplete,
             returning home will keep you in the onboarding flow.
           </p>

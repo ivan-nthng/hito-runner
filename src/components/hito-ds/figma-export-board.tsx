@@ -310,10 +310,7 @@ function TokenGrid({ title, tokens }: { title: string; tokens: ReadonlyArray<Tok
       <h3 className="hito-label-md">{title}</h3>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
         {tokens.map((token) => (
-          <article
-            key={token.token}
-            className="rounded-2xl border border-hairline bg-background/55 p-3"
-          >
+          <article key={token.token} className="hito-ds-token-specimen-surface p-3">
             <div
               className="h-16 rounded-xl border border-hairline"
               data-token-swatch={token.token}
@@ -334,7 +331,7 @@ function SpacingRadiusGrid() {
     <div className="grid gap-4 xl:grid-cols-2">
       <div className="grid gap-3">
         <h3 className="hito-label-md">Spacing scale</h3>
-        <div className="grid gap-2 rounded-2xl border border-hairline bg-background/55 p-4">
+        <div className="hito-ds-token-specimen-surface grid gap-2 p-4">
           {SPACING_TOKENS.map((token) => (
             <div key={token.token} className="grid grid-cols-[7rem_1fr_4rem] items-center gap-3">
               <code className="hito-technical-sm text-secondary">{token.token}</code>
@@ -350,7 +347,7 @@ function SpacingRadiusGrid() {
 
       <div className="grid gap-3">
         <h3 className="hito-label-md">Radius scale</h3>
-        <div className="grid grid-cols-2 gap-3 rounded-2xl border border-hairline bg-background/55 p-4 md:grid-cols-3">
+        <div className="hito-ds-token-specimen-surface grid grid-cols-2 gap-3 p-4 md:grid-cols-3">
           {RADIUS_TOKENS.map((token) => (
             <div key={token.token} className="grid gap-2">
               <div
@@ -377,7 +374,7 @@ function TypographyGrid() {
           style.
         </p>
       </div>
-      <div className="grid gap-3 rounded-2xl border border-hairline bg-background/55 p-4">
+      <div className="hito-ds-token-specimen-surface grid gap-3 p-4">
         {HITO_DS_MANIFEST.textStyles.map((role) => (
           <div key={role.id} className="grid gap-2 border-b border-hairline pb-3 last:border-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -959,11 +956,17 @@ function StatusMatrix() {
 
       <MatrixPanel title="Metadata tags">
         <div className="flex flex-wrap gap-3">
-          <HitoMetadataTag tone="neutral">Repo-derived</HitoMetadataTag>
-          <HitoMetadataTag tone="success">Ready</HitoMetadataTag>
-          <HitoMetadataTag tone="warning">Needs QA</HitoMetadataTag>
-          <HitoMetadataTag interactive tone="signal">
-            Editable filter
+          <HitoMetadataTag variant="light" tone="neutral">
+            Repo-derived
+          </HitoMetadataTag>
+          <HitoMetadataTag variant="accent" tone="success">
+            Ready
+          </HitoMetadataTag>
+          <HitoMetadataTag variant="light" tone="warning">
+            Needs QA
+          </HitoMetadataTag>
+          <HitoMetadataTag variant="accent" tone="signal">
+            Core control
           </HitoMetadataTag>
         </div>
       </MatrixPanel>
@@ -983,7 +986,7 @@ function IconInventory() {
                 {Object.keys(HITO_ICON_SIZES).map((size) => (
                   <div
                     key={`${iconName}-${size}`}
-                    className="grid min-w-16 justify-items-center gap-2 rounded-2xl border border-hairline bg-background/55 p-3"
+                    className="hito-ds-token-specimen-surface grid min-w-16 justify-items-center gap-2 p-3"
                   >
                     <Icon name={iconName} size={size as HitoIconSize} />
                     <span className="hito-body-xs text-tertiary">{size}</span>
@@ -1001,7 +1004,7 @@ function IconInventory() {
             {group.icons.map((iconName) => (
               <article
                 key={`${group.label}-${iconName}`}
-                className="grid min-w-0 gap-3 rounded-2xl border border-hairline bg-background/55 p-3"
+                className="hito-ds-token-specimen-surface grid min-w-0 gap-3 p-3"
                 data-icon-export={iconName}
               >
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-hairline bg-muted/45">

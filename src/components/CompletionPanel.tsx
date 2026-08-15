@@ -276,7 +276,7 @@ export function CompletionPanel({
         </p>
         <div className="hito-body-xs text-tertiary mt-3 flex flex-wrap items-center gap-3">
           <span>
-            This week <span className="text-foreground/80">{weekStatus.label}</span>
+            This week <span className="text-text-secondary">{weekStatus.label}</span>
           </span>
           <span className="opacity-50">·</span>
           <span>
@@ -1019,7 +1019,7 @@ export function WorkoutFeedbackPanel({
               <div className="hito-surface px-6 py-8 sm:px-8 sm:py-10">
                 <div className="mx-auto flex max-w-2xl flex-col items-center text-center">
                   <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-hairline bg-surface/40">
-                    <Icon name="file-up" size="md" className="text-foreground/82" />
+                    <Icon name="file-up" size="md" className="text-foreground" />
                   </div>
                   <div className="hito-label-md text-foreground">Upload activity file</div>
                   <h3 className="hito-ui-title-xs text-foreground mt-3">

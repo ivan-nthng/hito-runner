@@ -6,7 +6,7 @@
 
 ## Status
 
-in_progress
+completed
 
 ## Type
 
@@ -35,12 +35,15 @@ perform broad source deletion.
 
 ## Stage
 
-Backend source correction complete. QA integration acceptance follows after the shared checkout
-settles and the separately authorized hosted migration stage resolves the current parity delta.
+Backend parity-gate correction completed and published through later QA, hosted-parity, Git, and
+Vercel release records. Current candidate lifecycle is owned by the later release items.
 
-## Next Recommended Role
+## Evidence From
 
-QA
+- [Current Release Candidate Final Global QA](2026-08-11-current-release-candidate-final-global-qa.md)
+- [Global-QA-Approved Production Release](2026-08-11-global-qa-approved-production-release.md)
+- [Current Candidate Git Release And Vercel Verification Retry 2](2026-08-12-current-candidate-git-release-and-vercel-verification-retry-2.md)
+- [Hito Backlog Lifecycle Reconciliation And Terminal Archive](2026-08-14-hito-backlog-lifecycle-reconciliation-and-terminal-archive.md)
 
 ## Archive Intent
 
@@ -215,3 +218,61 @@ stage, commit, push, or deployment.
 QA is the next owner once concurrent checkout writes settle. A later explicitly authorized hosted
 stage must apply the ordered committed migration set and rerun linked plus API-visible parity before
 any deployment claim. This item remains `in_progress`; no Global QA or release claim is made.
+
+## Tracked Lifecycle Reconciliation Receipt — 2026-08-14
+
+### Old ambiguity and demonstrated disposition
+
+The Backend implementation receipt completed this item's assigned source correction but left the
+item `in_progress` with QA, hosted migration, and deployment presented as its pending stage. Direct
+successor evidence now proves that this wording is stale:
+
+- final local Global QA completed and passed the assembled candidate, including the corrected
+  deployment-parity source contract;
+- production release commit `ee4fde5c1bda4a7cb5477bcf1a8ce90d9e50674d` contains
+  `scripts/validate-supabase-deployment-parity.mjs` with canonical
+  `REQUIRED_REVIEW_RPC = "apply_reviewed_plan_persistence"`;
+- that release applied the exact hosted migration delta, reached 40/40 parity, and recorded the
+  exact-SHA Git-backed Vercel production deployment as `READY`;
+- the later completed 2026-08-12 release verification published
+  `74607987885ca40f33658c79fba174d173d45646` and recorded another exact-SHA Git-backed Vercel
+  deployment as `READY`;
+- the three 2026-08-14 release items each own a newer candidate admission lifecycle and remain
+  truthfully `blocked` before staging for their own unrelated ownership boundaries. They performed
+  no commit, push, hosted mutation, or Vercel deployment and do not alter the earlier release facts.
+
+The correct disposition for this item is therefore `completed`: its Backend correction was
+implemented, accepted in the named local QA gate, and included in a completed production release.
+The later release items supersede only its stale pending-stage responsibility; they remain
+authoritative for their own candidate identities, successes, failures, omissions, and lifecycle.
+
+### Exact change and retained boundaries
+
+- Changed this canonical item only: status, current stage, factual `Evidence From` relationships,
+  removal of the obsolete QA next-owner signal, and this receipt.
+- Preserved the complete historical implementation receipt, including its then-truthful linked
+  parity failure, omitted build, hosted boundary, and no-release claim at that stage.
+- Did not rewrite or infer Global QA, hosted, Git, deployment, or later retry outcomes. Every fact
+  above comes from its direct canonical owner.
+- Did not edit runtime source, scripts, validators, fixtures, migrations, `AGENTS.md`, skills, other
+  backlog records, Git state, Supabase/hosted state, Vercel, providers, or dependencies.
+
+### Validation inventory
+
+| Check                       | Scenario / environment                      | Result  | Evidence                                                                                                                  |
+| --------------------------- | ------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Historical owner receipt    | This complete canonical item                | Passed  | Backend Implementation DoD is explicitly passed; the only open wording was the later QA/hosted/release stage              |
+| Canonical source identity   | Released commit `ee4fde5`                   | Passed  | Released parity script requires `apply_reviewed_plan_persistence`; Git history attributes the change to that release      |
+| Successor QA/release chain  | 2026-08-11 and 2026-08-12 canonical records | Passed  | Final local Global QA passed; hosted parity and exact-SHA Git-backed Vercel deployments completed in their own records    |
+| Later candidate ownership   | Three 2026-08-14 release records            | Passed  | All three own newer freezes and are blocked before staging; none reopens this completed parity-gate correction            |
+| Local relationship targets  | Four `Evidence From` links                  | Passed  | Recorded after the lifecycle edit                                                                                         |
+| Focused Markdown formatting | This canonical item                         | Passed  | Recorded after the lifecycle edit                                                                                         |
+| Diff hygiene                | Shared checkout                             | Passed  | Recorded after the lifecycle edit; no task-owned source or unrelated item changed                                         |
+| Release/hosted actions      | This lifecycle-only reconciliation          | Not run | No candidate was admitted; no stage, commit, push, deployment, Supabase/hosted access, or new release validation occurred |
+
+### Final ownership
+
+This item has no remaining implementation or release owner and is terminal as `completed`.
+PRODUCT may consume this metadata correction; any current release attempt remains exclusively owned
+by its own canonical release item. This receipt does not claim a new candidate, Global QA pass,
+hosted parity result, deployment, or production readiness.

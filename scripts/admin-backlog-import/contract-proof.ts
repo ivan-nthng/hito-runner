@@ -185,6 +185,50 @@ Keep the legacy source visible.
     "Archive Intent",
   ]);
 
+  const compactTerminal = parseCanonicalMarkdown(`# Compact terminal item
+
+- **Work Item ID:** \`compact-terminal-item\`
+- **Status:** \`closed\`
+- **Type:** \`change_request\`
+- **Priority:** \`medium\`
+- **Owner:** \`backend\`
+- **Scope:** \`admin-capture\`
+- **Archive Intent:** \`retain_in_place\`
+- **Task:** Preserve a compact canonical terminal record.
+
+## Evidence
+
+- **Status:** \`in_progress\`
+`);
+  assert.deepEqual(
+    {
+      workItemId: compactTerminal.workItemId,
+      status: compactTerminal.status,
+      itemType: compactTerminal.itemType,
+      priority: compactTerminal.priority,
+      owner: compactTerminal.owner,
+      scope: compactTerminal.scope,
+      archiveIntent: compactTerminal.archiveIntent,
+      task: compactTerminal.task,
+      metadataState: compactTerminal.metadataState,
+      missing: compactTerminal.missingRequiredFields,
+      invalid: compactTerminal.invalidRequiredFields,
+    },
+    {
+      workItemId: "compact-terminal-item",
+      status: "closed",
+      itemType: "change_request",
+      priority: "medium",
+      owner: "backend",
+      scope: "admin-capture",
+      archiveIntent: "retain_in_place",
+      task: "Preserve a compact canonical terminal record.",
+      metadataState: "complete",
+      missing: [],
+      invalid: [],
+    },
+  );
+
   const invalid = parseCanonicalMarkdown(
     canonicalWorkItemMarkdown().replace("## Status\nready", "## Status\nwaiting"),
   );

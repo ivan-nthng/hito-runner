@@ -47,7 +47,7 @@ function AdminLoginPage() {
               <p className="hito-label-md text-muted-foreground">Admin</p>
             </div>
             <div className="space-y-4">
-              <p className="hito-body-lg max-w-sm text-foreground/92">
+              <p className="hito-body-lg max-w-sm text-foreground">
                 Sign in to view internal analytics and local test-account tools.
               </p>
               <p className="hito-body-md max-w-sm text-muted-foreground">

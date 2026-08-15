@@ -301,7 +301,7 @@ export function HitoDsFoundationsPage() {
       copyTextWithLegacySelection(value);
       hitoToast.success({
         id: "hito-ds-color-copy",
-        title: "Copied color token",
+        title: "Copied token value",
         description: `${label}: ${value}`,
         duration: 1800,
       });
@@ -310,7 +310,7 @@ export function HitoDsFoundationsPage() {
         await navigator.clipboard.writeText(value);
         hitoToast.success({
           id: "hito-ds-color-copy",
-          title: "Copied color token",
+          title: "Copied token value",
           description: `${label}: ${value}`,
           duration: 1800,
         });
@@ -817,70 +817,50 @@ export function HitoDsFoundationsPage() {
             </div>
           </div>
 
-          <div
-            className="hito-surface-flat flex flex-wrap items-center justify-between gap-5 p-5"
-            data-hito-ds-icon-preview
-          >
-            <div>
-              <p className="hito-label-md">Icon size</p>
-              <p className="hito-body-xs text-tertiary mt-1">
-                Registry specimens below use {iconPreviewSize} · {HITO_ICON_SIZES[iconPreviewSize]}
-                px.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-end gap-4">
-              {(["calendar", "download", "settings"] as const).map((iconName) => (
-                <div key={iconName} className="grid justify-items-center gap-2">
-                  <div className="grid h-10 min-w-10 place-items-center text-foreground">
-                    <Icon name={iconName} size={iconPreviewSize} data-hito-ds-icon={iconName} />
-                  </div>
-                  <span className="hito-body-xs text-tertiary">{iconName}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
           <div className="grid grid-cols-[repeat(auto-fit,minmax(6.5rem,1fr))] gap-x-4 gap-y-7">
             {HITO_ICON_META.map((icon) => (
               <IconSpecimen key={icon.name} icon={icon} size={iconPreviewSize} />
             ))}
           </div>
 
-          <div className="hito-surface-flat grid gap-4 p-5 lg:grid-cols-5">
-            <IconUsageCard label="Button">
-              <HitoButton size="sm" variant="secondary">
-                <Icon name="download" size="sm" />
-                Export JSON
-              </HitoButton>
-            </IconUsageCard>
-            <IconUsageCard label="Input">
-              <div className="relative">
-                <Icon
-                  name="search"
-                  size="sm"
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input size="md" className="pl-9" placeholder="Search plans" />
-              </div>
-            </IconUsageCard>
-            <IconUsageCard label="Nav row">
-              <div className="hito-shell-nav-row" data-active="true">
-                <Icon name="calendar" className="hito-shell-nav-icon" />
-                <span>Calendar</span>
-                <span className="hito-shell-nav-dot" />
-              </div>
-            </IconUsageCard>
-            <IconUsageCard label="Menu row">
-              <div className="hito-shell-menu-item">
-                <Icon name="settings" size="sm" />
-                User settings
-              </div>
-            </IconUsageCard>
-            <IconUsageCard label="Status marker">
-              <span className="hito-status-marker" data-size="xs" data-tone="success">
-                <Icon name="check" size="xs" strokeWidth={2.2} />
-              </span>
-            </IconUsageCard>
+          <div className="mt-5 grid gap-4">
+            <p className="hito-ui-title-sm">Usage</p>
+            <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+              <IconUsageCard label="Button" labelSize="sm">
+                <HitoButton size="sm" variant="secondary">
+                  <Icon name="download" size="sm" />
+                  Export JSON
+                </HitoButton>
+              </IconUsageCard>
+              <IconUsageCard label="Input">
+                <div className="relative w-full">
+                  <Icon
+                    name="search"
+                    size="sm"
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  />
+                  <Input size="md" className="pl-9" placeholder="Search plans" />
+                </div>
+              </IconUsageCard>
+              <IconUsageCard label="Nav row">
+                <div className="hito-shell-nav-row" data-active="true">
+                  <Icon name="calendar" className="hito-shell-nav-icon" />
+                  <span>Calendar</span>
+                  <span className="hito-shell-nav-dot" />
+                </div>
+              </IconUsageCard>
+              <IconUsageCard label="Menu row">
+                <div className="hito-shell-menu-item">
+                  <Icon name="settings" size="sm" />
+                  User settings
+                </div>
+              </IconUsageCard>
+              <IconUsageCard label="Status marker">
+                <span className="hito-status-marker" data-size="xs" data-tone="success">
+                  <Icon name="check" size="xs" strokeWidth={2.2} />
+                </span>
+              </IconUsageCard>
+            </div>
           </div>
 
           <HitoDsPlayground
@@ -981,7 +961,7 @@ export function HitoDsFoundationsPage() {
           />
 
           <div
-            className="mt-5 grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
+            className="mt-5 grid min-w-0 auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
             data-hito-ds-mark-gallery=""
             data-hito-ds-mark-gallery-shape={markPreviewShape}
             data-hito-ds-mark-gallery-size={markPreviewSize}
@@ -989,10 +969,10 @@ export function HitoDsFoundationsPage() {
             {HITO_MARK_META.map((mark) => (
               <article
                 key={mark.name}
-                className="hito-ds-token-specimen-surface grid min-w-0 content-between gap-5 p-5"
+                className="hito-ds-token-specimen-surface grid h-full min-w-0 content-between gap-5 p-5"
                 data-hito-mark-reference-card={mark.name}
               >
-                <div className="grid min-w-0 place-items-center">
+                <div className="grid min-w-0 place-items-center py-4">
                   <HitoMark name={mark.name} shape={markPreviewShape} size={markPreviewSize} />
                 </div>
                 <div className="grid min-w-0 gap-3">
@@ -1008,11 +988,25 @@ export function HitoDsFoundationsPage() {
                       {mark.opticalFit}
                     </p>
                   </div>
-                  <dl className="grid min-w-0 gap-2">
-                    <MarkTokenProvenance label="Frame" token={mark.frameToken} />
-                    <MarkTokenProvenance label="Glyph" token={mark.glyphToken} />
-                    <MarkTokenProvenance label="Content" token={mark.contentToken} />
-                  </dl>
+                  <div className="border-t border-hairline pt-3">
+                    <dl className="grid min-w-0 gap-2">
+                      <MarkTokenProvenance
+                        label="Frame"
+                        token={mark.frameToken}
+                        onCopy={copyColorValue}
+                      />
+                      <MarkTokenProvenance
+                        label="Glyph"
+                        token={mark.glyphToken}
+                        onCopy={copyColorValue}
+                      />
+                      <MarkTokenProvenance
+                        label="Content"
+                        token={mark.contentToken}
+                        onCopy={copyColorValue}
+                      />
+                    </dl>
+                  </div>
                 </div>
               </article>
             ))}
@@ -1147,7 +1141,10 @@ function SemanticRoleCard({
   return (
     <article
       ref={cardRef}
-      className="hito-ds-token-specimen-surface grid min-h-56 gap-4 p-4"
+      className={cn(
+        "hito-ds-token-specimen-surface grid min-h-56 gap-4",
+        reportContrast ? "p-3" : "p-4",
+      )}
       data-hito-workout-role-card={reportContrast ? label : undefined}
     >
       <div className="flex min-w-0 items-start justify-between gap-3">
@@ -1897,7 +1894,7 @@ function copyTextWithLegacySelection(value: string) {
 function TypographyFamilyRow({ item }: { item: (typeof TYPOGRAPHY_FAMILY_SPECIMENS)[number] }) {
   return (
     <article
-      className="hito-ds-token-specimen-surface grid h-full min-w-0 gap-5 p-5"
+      className="hito-ds-token-specimen-surface grid h-full min-w-0 gap-5 p-3"
       data-hito-ds-typography-family={item.family}
     >
       <div className="grid min-h-40 content-between gap-5 rounded-2xl bg-muted/60 p-5">
@@ -1923,7 +1920,7 @@ function TypographyFamilyRow({ item }: { item: (typeof TYPOGRAPHY_FAMILY_SPECIME
 function SpacingPrimitiveRow({ space }: { space: (typeof SPACING_PRIMITIVES)[number] }) {
   return (
     <article
-      className="hito-ds-token-specimen-surface grid h-full min-w-0 gap-5 p-5"
+      className="hito-ds-token-specimen-surface grid h-full min-w-0 gap-5 p-3"
       data-hito-ds-spacing-token={space.token}
     >
       <div className="grid h-28 place-items-center rounded-2xl bg-muted/60 p-4">
@@ -1949,7 +1946,7 @@ function SpacingPrimitiveRow({ space }: { space: (typeof SPACING_PRIMITIVES)[num
 function RadiusPrimitiveRow({ radius }: { radius: (typeof RADIUS_PRIMITIVES)[number] }) {
   return (
     <article
-      className="hito-ds-token-specimen-surface grid h-full min-w-0 gap-5 p-5"
+      className="hito-ds-token-specimen-surface grid h-full min-w-0 gap-5 p-3"
       data-hito-ds-radius-token={radius.token}
     >
       <div className="grid h-28 place-items-center rounded-2xl bg-muted/60 p-4">
@@ -1971,11 +1968,13 @@ function RadiusPrimitiveRow({ radius }: { radius: (typeof RADIUS_PRIMITIVES)[num
 }
 
 type InspectorTypographyEvidence = NonNullable<InlineChangeTargetInput["typography"]>;
+type TypographyInspectorPickerCase = "inherited" | "component" | "custom";
 
 function TypographyInspectorPickerSpecimen() {
   const inheritedRef = useRef<HTMLSpanElement>(null);
   const componentRef = useRef<HTMLButtonElement>(null);
   const customRef = useRef<HTMLParagraphElement>(null);
+  const [selectedCase, setSelectedCase] = useState<TypographyInspectorPickerCase>("inherited");
   const [inheritedTypography, setInheritedTypography] =
     useState<InspectorTypographyEvidence | null>(null);
   const [componentTypography, setComponentTypography] =
@@ -1986,103 +1985,172 @@ function TypographyInspectorPickerSpecimen() {
   const [inheritedDesiredRoleId, setInheritedDesiredRoleId] = useState<string | null>(null);
   const [componentDesiredRoleId, setComponentDesiredRoleId] = useState<string | null>(null);
   const [customDesiredRoleId, setCustomDesiredRoleId] = useState<string | null>(null);
+  const pickerCaseGroup = useHitoRadioGroup<TypographyInspectorPickerCase>({
+    items: [{ value: "inherited" }, { value: "component" }, { value: "custom" }],
+    value: selectedCase,
+  });
+  const selectedTypography =
+    selectedCase === "inherited"
+      ? inheritedTypography
+      : selectedCase === "component"
+        ? componentTypography
+        : customTypography;
+  const selectedDesiredRoleId =
+    selectedCase === "inherited"
+      ? inheritedDesiredRoleId
+      : selectedCase === "component"
+        ? componentDesiredRoleId
+        : customDesiredRoleId;
+  const onSelectedDesiredRoleChange = (roleId: string | null) => {
+    if (selectedCase === "inherited") {
+      setInheritedDesiredRoleId(roleId);
+      return;
+    }
+    if (selectedCase === "component") {
+      setComponentDesiredRoleId(roleId);
+      return;
+    }
+    setCustomDesiredRoleId(roleId);
+  };
 
   useLayoutEffect(() => {
-    setInheritedTypography(
-      inheritedRef.current ? (inspectLocalUiTarget(inheritedRef.current).typography ?? null) : null,
-    );
-    setComponentTypography(
-      componentRef.current ? (inspectLocalUiTarget(componentRef.current).typography ?? null) : null,
-    );
+    if (selectedCase === "inherited") {
+      setInheritedTypography(
+        inheritedRef.current
+          ? (inspectLocalUiTarget(inheritedRef.current).typography ?? null)
+          : null,
+      );
+      return;
+    }
+    if (selectedCase === "component") {
+      setComponentTypography(
+        componentRef.current
+          ? (inspectLocalUiTarget(componentRef.current).typography ?? null)
+          : null,
+      );
+      return;
+    }
     setCustomTypography(
       customRef.current ? (inspectLocalUiTarget(customRef.current).typography ?? null) : null,
     );
-  }, []);
+  }, [selectedCase]);
+
+  const selectedExample =
+    selectedCase === "inherited" ? (
+      <div className="hito-body-md">
+        <span ref={inheritedRef}>Inherited body typography from a shared Hito owner.</span>
+      </div>
+    ) : selectedCase === "component" ? (
+      <HitoButton ref={componentRef} size="sm" variant="secondary">
+        Component-owned button typography
+      </HitoButton>
+    ) : (
+      <p
+        ref={customRef}
+        style={{
+          fontFamily: "var(--font-sans)",
+          fontSize: "1.0625rem",
+          fontStyle: "italic",
+          fontWeight: 500,
+          letterSpacing: "0.015em",
+          lineHeight: 1.4,
+        }}
+      >
+        Unresolved custom typography remains observational.
+      </p>
+    );
 
   return (
-    <div className="hito-reference-note grid gap-4" data-hito-ds-typography-inspector-specimen="">
-      <div>
-        <p className="hito-label-md">Inspector typography picker</p>
-        <p className="hito-body-sm text-secondary mt-2 max-w-3xl">
-          The first option previews the selected element&apos;s computed typography. Component roles
-          can be recognized without becoming replacement choices, and a computed preview never
-          establishes provenance.
-        </p>
-      </div>
-
-      <div className="hito-row-group">
-        <div
-          className="hito-list-row grid gap-3"
-          data-hito-ds-typography-picker-case="inherited"
-          data-hito-ds-typography-picker-current-role={
-            inheritedTypography?.currentRole?.id ?? "pending"
-          }
-        >
-          <div className="hito-body-md">
-            <span ref={inheritedRef}>Inherited body typography from a shared Hito owner.</span>
+    <div className="hito-reference-note" data-hito-ds-typography-inspector-specimen="">
+      <HitoDsPlayground
+        controls={
+          <div className="grid min-w-0 gap-4">
+            <div>
+              <p className="hito-label-md">Choose an example</p>
+              <div
+                className="mt-2 grid min-w-0 gap-2"
+                {...pickerCaseGroup.groupProps}
+                aria-label="Typography inspector examples"
+              >
+                <HitoChoiceToggle
+                  presentation="card"
+                  {...pickerCaseGroup.getRadioProps("inherited")}
+                  className="w-full min-w-0 justify-start text-left"
+                  selected={selectedCase === "inherited"}
+                  onClick={() => setSelectedCase("inherited")}
+                  data-hito-ds-typography-picker-case="inherited"
+                  data-hito-ds-typography-picker-current-role={
+                    inheritedTypography?.currentRole?.id ?? "pending"
+                  }
+                >
+                  <span className="grid min-w-0 gap-1">
+                    <span>Inherited role</span>
+                    <span className="hito-body-xs text-secondary">Shared Hito body owner</span>
+                  </span>
+                </HitoChoiceToggle>
+                <HitoChoiceToggle
+                  presentation="card"
+                  {...pickerCaseGroup.getRadioProps("component")}
+                  className="w-full min-w-0 justify-start text-left"
+                  selected={selectedCase === "component"}
+                  onClick={() => setSelectedCase("component")}
+                  data-hito-ds-typography-picker-case="component"
+                  data-hito-ds-typography-picker-current-role={
+                    componentTypography?.currentRole?.id ?? "pending"
+                  }
+                >
+                  <span className="grid min-w-0 gap-1">
+                    <span>Component-owned Button</span>
+                    <span className="hito-body-xs text-secondary">Recognized, not replaceable</span>
+                  </span>
+                </HitoChoiceToggle>
+                <HitoChoiceToggle
+                  presentation="card"
+                  {...pickerCaseGroup.getRadioProps("custom")}
+                  className="w-full min-w-0 justify-start text-left"
+                  selected={selectedCase === "custom"}
+                  onClick={() => setSelectedCase("custom")}
+                  data-hito-ds-typography-picker-case="custom"
+                  data-hito-ds-typography-picker-current-role={
+                    customTypography?.currentRole?.id ?? "custom"
+                  }
+                >
+                  <span className="grid min-w-0 gap-1">
+                    <span>Custom typography</span>
+                    <span className="hito-body-xs text-secondary">Observational only</span>
+                  </span>
+                </HitoChoiceToggle>
+              </div>
+            </div>
+            {selectedTypography ? (
+              <div className="min-w-0" data-hito-ds-typography-picker-current={selectedCase}>
+                <TypographyControlRow
+                  desiredRoleId={selectedDesiredRoleId}
+                  onDesiredRoleChange={onSelectedDesiredRoleChange}
+                  typography={selectedTypography}
+                />
+              </div>
+            ) : null}
           </div>
-          {inheritedTypography ? (
-            <TypographyControlRow
-              desiredRoleId={inheritedDesiredRoleId}
-              onDesiredRoleChange={setInheritedDesiredRoleId}
-              typography={inheritedTypography}
-            />
-          ) : null}
-        </div>
-
-        <div
-          className="hito-list-row grid gap-3"
-          data-hito-ds-typography-picker-case="component"
-          data-hito-ds-typography-picker-current-role={
-            componentTypography?.currentRole?.id ?? "pending"
-          }
-        >
-          <HitoButton
-            ref={componentRef}
-            size="sm"
-            variant="secondary"
-            className="justify-self-start"
-          >
-            Component-owned button typography
-          </HitoButton>
-          {componentTypography ? (
-            <TypographyControlRow
-              desiredRoleId={componentDesiredRoleId}
-              onDesiredRoleChange={setComponentDesiredRoleId}
-              typography={componentTypography}
-            />
-          ) : null}
-        </div>
-
-        <div
-          className="hito-list-row grid gap-3"
-          data-hito-ds-typography-picker-case="custom"
-          data-hito-ds-typography-picker-current-role={
-            customTypography?.currentRole?.id ?? "custom"
-          }
-        >
-          <p
-            ref={customRef}
-            style={{
-              fontFamily: "var(--font-sans)",
-              fontSize: "1.0625rem",
-              fontStyle: "italic",
-              fontWeight: 500,
-              letterSpacing: "0.015em",
-              lineHeight: 1.4,
-            }}
-          >
-            Unresolved custom typography remains observational.
-          </p>
-          {customTypography ? (
-            <TypographyControlRow
-              desiredRoleId={customDesiredRoleId}
-              onDesiredRoleChange={setCustomDesiredRoleId}
-              typography={customTypography}
-            />
-          ) : null}
-        </div>
-      </div>
+        }
+        description={{
+          purpose:
+            "Compare computed typography without changing the live Inspector target or its provenance.",
+          useWhen:
+            "A reference example needs to distinguish inherited, component-owned, and unresolved typography facts.",
+          avoidWhen:
+            "A component-owned role needs to become a replacement choice or a computed preview needs to establish provenance.",
+          accessibility:
+            "Example cards use roving radio focus; the selected control row keeps its native focus and Escape behavior.",
+        }}
+        id="typography-inspector-picker"
+        label="Typography Inspector picker"
+        preview={
+          <div className="grid min-w-0 gap-3" data-hito-ds-typography-picker-current={selectedCase}>
+            {selectedExample}
+          </div>
+        }
+      />
     </div>
   );
 }
@@ -2131,11 +2199,19 @@ function IconSpecimen({
   );
 }
 
-function IconUsageCard({ label, children }: { label: string; children: ReactNode }) {
+function IconUsageCard({
+  label,
+  labelSize = "md",
+  children,
+}: {
+  label: string;
+  labelSize?: "sm" | "md";
+  children: ReactNode;
+}) {
   return (
-    <article className="grid min-h-28 gap-4 border-t border-hairline pt-4 first:border-t-0 first:pt-0 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0 lg:first:border-l-0 lg:first:pl-0">
-      <p className="hito-label-md">{label}</p>
-      <div className="flex items-center">{children}</div>
+    <article className="hito-ds-token-specimen-surface grid min-h-28 min-w-0 gap-4 p-4">
+      <p className={labelSize === "sm" ? "hito-label-sm" : "hito-label-md"}>{label}</p>
+      <div className="flex min-w-0 items-center justify-center">{children}</div>
     </article>
   );
 }
@@ -2190,11 +2266,37 @@ function MarkBackgroundOptionLabel({ option }: { option: HitoMarkBackgroundOptio
   );
 }
 
-function MarkTokenProvenance({ label, token }: { label: string; token: string }) {
+function MarkTokenProvenance({
+  label,
+  onCopy,
+  token,
+}: {
+  label: string;
+  onCopy: (value: string, label: string) => void;
+  token: string;
+}) {
   return (
     <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-3">
-      <dt className="hito-body-xs text-tertiary">{label}</dt>
-      <dd className="hito-technical-sm text-secondary min-w-0 break-all text-right">{token}</dd>
+      <dt className="hito-body-xs" style={{ color: "var(--color-text-secondary)" }}>
+        {label}
+      </dt>
+      <dd className="min-w-0 text-right">
+        <button
+          type="button"
+          className="group inline-flex max-w-full min-w-0 items-center gap-2 rounded-sm text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          onClick={() => onCopy(token, `${label} provenance token`)}
+          aria-label={`Copy ${label} provenance token ${token}`}
+          data-hito-mark-provenance={label}
+          title={token}
+        >
+          <span className="hito-technical-sm min-w-0 truncate">{token}</span>
+          <Icon
+            name="copy"
+            size="xs"
+            className="shrink-0 opacity-80 transition [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-80 group-focus-visible:opacity-100"
+          />
+        </button>
+      </dd>
     </div>
   );
 }

@@ -52,9 +52,9 @@ export function HitoDsOverviewPage() {
 
   return (
     <>
-      <header id="overview" className="hito-page-header pt-8">
+      <header id="overview" className="hito-page-header sm:pt-8">
         <p className="hito-label-md hito-label-signal">Hito design system</p>
-        <h1 className="hito-ui-title-xl">Live product building blocks.</h1>
+        <h1 className="hito-ui-title-xl break-words">Live product building blocks.</h1>
         <p className="hito-body-md mt-4 text-secondary max-w-2xl">
           Explore the canonical controls and compositions used to build Hito, grouped by the job
           they do and linked to their complete interactive reference.
@@ -68,7 +68,7 @@ export function HitoDsOverviewPage() {
         </div>
       </header>
 
-      <div id="showroom" className="grid gap-12 pt-10">
+      <div id="showroom" className="grid gap-8 sm:gap-12 sm:pt-10">
         <ShowcaseGroup title="Action">
           <ShowcaseCard title="Button & grouped actions" href="/hitoDS/components#buttons">
             <div className="grid content-center justify-self-center self-center gap-3">
@@ -176,7 +176,9 @@ export function HitoDsOverviewPage() {
           </ShowcaseCard>
           <ShowcaseCard title="Status & Async Toast" href="/hitoDS/components#async-actions">
             <div className="flex min-w-0 flex-wrap items-center justify-center justify-self-center self-center gap-3">
-              <HitoMetadataTag tone="success">Reviewed</HitoMetadataTag>
+              <HitoMetadataTag variant="accent" tone="success">
+                Reviewed
+              </HitoMetadataTag>
               <HitoButton
                 size="sm"
                 variant="secondary"
@@ -320,21 +322,17 @@ export function HitoDsOverviewPage() {
               <div className="grid min-w-0 gap-2">
                 <p className="hito-label-sm text-tertiary">Interactive header</p>
                 <DataTableSpecimenPreview
-                  sortable
-                  activeSort
-                  filtered
-                  staticMode={false}
-                  showUtilityRow={false}
+                  composition="headers"
+                  headerState="filtered"
+                  showToolbar={false}
                 />
               </div>
               <div className="grid min-w-0 gap-2 border-t border-hairline pt-5">
                 <p className="hito-label-sm text-tertiary">Static header</p>
                 <DataTableSpecimenPreview
-                  sortable={false}
-                  activeSort={false}
-                  filtered={false}
-                  staticMode
-                  showUtilityRow={false}
+                  composition="headers"
+                  headerState="static"
+                  showToolbar={false}
                 />
               </div>
             </div>

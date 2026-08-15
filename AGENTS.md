@@ -93,7 +93,106 @@ proof. Do not demote after behavior-changing work begins.
 Patch Pack is an optional Lite UI batch profile, not a third process: it may group one owner, one
 Frontend lane, one surface, and one proof story inside an existing item.
 
-## 3. Root Cause, Reuse, And Scope
+## 3. Canonical Work Loop, Autonomy, And Release Freeze
+
+This section composes the rules in this file into one operating loop. It does not create another
+task system, role, acceptance layer, or source of lifecycle truth.
+
+### Canonical Work Loop
+
+1. **Intake and classification.** Use one canonical backlog item when work must be retained, then
+   classify it Lite or Tracked. Record the outcome, evidence or missing discriminator, one owner,
+   existing seam, boundaries, proof, and promotion condition.
+2. **Discriminator.** Before implementation, establish the input appropriate to the work: an
+   accepted decision for a feature; an external cause artifact or exact missing discriminator for a
+   defect/debugging task; reachability, canonical replacement, consumers, and net deletion for
+   legacy cleanup; a preserved observable contract and ownership problem for a refactor; an
+   accepted contract and independent observation surface for QA; or an exact admitted candidate,
+   empty index, remote baseline, and external authority for release.
+3. **One-owner dispatch.** PRODUCT selects and dispatches one canonical role under the Product
+   communication contract below. The assigned owner keeps implementation inside its domain and
+   Frontend lane.
+4. **Same-owner execution.** After valid dispatch, the owner may choose its investigation and
+   implementation sequence, make the smallest change in the admitted seam, run proportional local
+   validation, fix forward after a failed focused check, and update the same item without a new
+   dispatch for each routine iteration.
+5. **Return or closure.** The owner closes only its assigned slice and keeps the canonical item
+   truthful. It returns a changed owner, boundary, decision, risk, acceptance layer, or successor to
+   PRODUCT. Supporting plans and current-state documents never own lifecycle.
+6. **Independent acceptance and release.** QA owns explicitly assigned independent acceptance.
+   Global QA and release remain separate gates. Release starts only from an admitted stable
+   candidate and follows the freeze below; a release owner never becomes the repair owner for a
+   failed source gate.
+
+### Optional Backlog Relationships
+
+Existing backlog Markdown may use these optional fields and no others as graph vocabulary:
+
+- `Parent` — the larger retained outcome containing this bounded item;
+- `Depends On` — work whose accepted outcome is required first;
+- `Evidence From` — an audit, decision, incident, or QA record used as factual input; and
+- `Supersedes` — an earlier item whose active responsibility this item replaces.
+
+Omit empty relationships. Store each relationship in one direction and discover the reverse with
+repository search. The referenced item remains authoritative for its own status, owner, receipt,
+and acceptance; never copy those facts into a second lifecycle owner. A plan may add detail but not
+status. A relationship alone never admits content to a release. Do not add a tracker, service,
+dashboard, schema, generated index, validator, or parallel state document for these fields.
+
+### Autonomy And Return Conditions
+
+Inside an authorized owner, outcome, seam, mode, and external boundary, the owner may decide local
+tooling, edit sequence, focused proof, same-owner fix-forward, task lifecycle updates, and removal
+of a proven superseded path. It may use only the bounded review/subagent authority already defined
+below. Concurrent writers are allowed only when files, owners, persisted data, runtimes, generated
+outputs, and validation side effects are demonstrably disjoint; shared artifacts and runtime state
+serialize to one writer.
+
+Return to PRODUCT before continuing when the first incorrect owner or Frontend lane changes, a
+second production writer or cross-owner implementation is required, Lite promotes to Tracked,
+scope or risk materially expands, an unadmitted runtime artifact/migration/framework/state or
+compatibility layer becomes necessary, a product/design decision remains, Global QA/release/a
+successor is needed, or a candidate freeze forbids the write.
+
+PRODUCT returns to Ivan before a new or materially changed dispatch without current-discussion
+consent; before staging, commit, push, deployment, hosted mutation, paid-provider use, material
+deletion, or another reserved action without exact authority; or when the plan does not cover new
+scope or an irreversible product choice. The direct send/start/run exception and required Product
+communication order remain exactly as defined below.
+
+### Repository-Wide Release Candidate Freeze
+
+A release freeze may begin only when one canonical release item is `in_progress` at a named freeze
+stage, all other repository/runtime writers affecting the checkout are idle, and the release owner
+has recorded branch, `HEAD`, remote baseline, empty index, admitted completed items, exact paths,
+explicit exclusions, owner mapping, and stable path/content digests. Every admitted path maps to a
+completed canonical owner, the release receipt, or an explicit shared integration dependency.
+
+After admission and before expensive build, integrity, hosted-read, or deployment checks, run
+staged candidate hygiene when staging is included in Ivan's release authority: stage the exact
+admitted inventory, verify its path/content identity, and run `git diff --cached --check` so
+previously untracked files are covered. Then either preserve that exact staged candidate or restore
+an empty index as required by the existing release procedure, proving working-tree bytes did not
+change. If staging is not authorized, stop and return that missing authority to PRODUCT/Ivan; do
+not simulate or bypass the staged gate.
+
+During the freeze the release owner is the sole repository writer. Other roles may inspect and
+discuss read-only context, but must not write source, backlog/receipt/plan/history files, generated
+or build output, fixtures, migrations, dependencies, configuration, or local runtime state. The
+release owner may write only its receipt and perform the exact Git/external actions Ivan authorized.
+Recompute candidate identity after every external command and immediately before staging, commit,
+and push. Any unexpected path, content, index, remote, owner, runtime, or generated-output movement
+invalidates the freeze and is never absorbed.
+
+At the first failed gate or unexplained movement, stop; restore an empty index without changing
+working-tree bytes; do not repair another owner's source, receipt, migration, configuration, or
+hosted state; and record the first incorrect owner and evidence. PRODUCT routes a separate bounded
+fix. Any retry uses a fresh freeze, inventory, and digests. The freeze ends only when the release
+item reaches a truthful terminal status and its receipt confirms index/source state plus every
+external action or omission. A terminal blocked release ends that freeze but not the larger release
+chain.
+
+## 4. Root Cause, Reuse, And Scope
 
 For a reported defect, name:
 
@@ -146,7 +245,7 @@ justify the owner or extract a real seam; around 1000 lines, require an architec
 1500 lines, treat the file as a decomposition candidate unless it is generated, fixture-only, or
 intentionally consolidated documentation.
 
-## 4. Role Activation And Boundaries
+## 5. Role Activation And Boundaries
 
 A task with a matching first line of ROLE: <ROLE> is an execution assignment for that role.
 The assigned role reads this file, its role file, the matching skill, and the named task context.
@@ -199,15 +298,16 @@ task-owned backlog lifecycle and compact mapping evidence, but it must not edit 
 generated manifests, validators, migrations, scripts, or product code. Figma remains downstream of
 implemented Hito source; a code/Figma conflict returns to DESIGN SYSTEM or Product.
 
-## 5. Product Routing And Dispatch
+## 6. Product Routing And Dispatch
 
 Before Product contacts another role, inspect that role's current state. Never interrupt an active
 role without the user's explicit command to stop or supersede that exact task.
 
-Writing a prompt and dispatching it are separate for a new or changed task. In that case, Product
-first reports, in Russian: the task, what was completed, the current state, and the proposed next
-action and receiving sidebar role. It then provides one exact English prompt or asks one concrete
-question about whether or where to send it, and waits for Ivan's explicit confirmation.
+Writing a prompt and dispatching it are separate for a new or materially changed task. Product first
+tells Ivan in Russian: the task and plan (or that no supporting plan is needed), what is completed,
+where the work is now, the proposed next action and receiving sidebar role, and blockers. It then
+provides one exact English prompt or asks one concrete question about whether or where to send it,
+and waits for Ivan's explicit confirmation.
 
 This confirmation rule applies even when an approved canonical item has an otherwise unambiguous
 next owner. Product may dispatch without that interim confirmation only when Ivan explicitly says
@@ -235,7 +335,7 @@ role chooses implementation details. An autonomous same-owner prompt may include
 validation and safe independent review; do not turn ordinary implementation-to-QA loops into user
 copy-paste.
 
-## 6. Skills
+## 7. Skills
 
 Load only the project skill that directly matches the current task. A simple status, explanation, or
 instruction-only Lite edit normally needs no skill beyond this file and the active role file.
@@ -254,7 +354,7 @@ instruction-only Lite edit normally needs no skill beyond this file and the acti
 Use more than one only when the task genuinely crosses those procedures. Each final report names
 the role file, skills used or none, task artifact or none, and any subagent used or not used.
 
-## 7. Subagents
+## 8. Subagents
 
 Subagents are optional evidence aids, never a ceremony requirement.
 
@@ -289,7 +389,7 @@ Subagents are optional evidence aids, never a ceremony requirement.
 Global QA and cross-owner/release acceptance remain independent QA work. A same-owner implementation
 may obtain an independent QA or specialist review internally when it is genuinely needed.
 
-## 8. Validation And Acceptance
+## 9. Validation And Acceptance
 
 Lite validation is proportional: run the smallest focused check or inspect the source/decision that
 proves the changed outcome. State any omitted proof only when it matters to the claim.
@@ -316,12 +416,15 @@ user to choose or approve a browser or loopback command. If a platform dialog ap
 tool path and continue with another supported local path. Browser Path Preflight is required only
 for browser QA, not source-only or backend-only validation.
 
-## 9. Backlog, Plans, And History
+## 10. Backlog, Plans, And History
 
 docs/tasks/backlog/ is the operational queue for retained work in either mode. A Lite item records
 only the durable decision needed to resume it; a Tracked item records Work Item ID, Status, Type,
 Priority, Owner, Scope, Archive Intent, Task, and, when ready or in progress, Stage, Next Recommended
 Role, and one exact handoff prompt. Retention never by itself changes the task mode.
+
+Tracked items may also use the optional `Parent`, `Depends On`, `Evidence From`, and `Supersedes`
+relationships defined in the canonical work loop. They are navigation only, not lifecycle state.
 
 Status values are backlog, ready, in_progress, blocked, completed, closed, and archived. The active
 owner keeps the item truthful before final reporting. Supporting specs and plans never create a
@@ -332,7 +435,7 @@ accepted user-impacting, QA-acceptance, source-cleanup, local-tooling, or durabl
 routine Lite receipts do not need a history entry. Update the public changelog only for shipped
 user-facing highlights.
 
-## 10. Reporting
+## 11. Reporting
 
 Language is role-specific:
 

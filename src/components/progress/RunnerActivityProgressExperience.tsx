@@ -190,7 +190,7 @@ export function RunnerActivityProgressExperience({
   };
 
   return (
-    <div className="hito-route-gutter hito-route-stack max-w-5xl py-10">
+    <div className="hito-route-gutter hito-route-stack max-w-5xl py-hito-6 sm:py-10">
       <div className="pb-3">
         <div
           className="hito-tabs hito-tabs-simple w-full"

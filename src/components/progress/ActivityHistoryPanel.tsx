@@ -143,7 +143,7 @@ function ActivityHistoryRow({
       <button
         ref={primaryButtonRef}
         type="button"
-        className="grid min-w-0 flex-1 grid-cols-[3.25rem_minmax(0,1fr)] gap-3 px-4 py-4 text-left outline-none transition-colors hover:bg-foreground/[0.035] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-signal sm:grid-cols-[4rem_minmax(0,1fr)_minmax(11rem,auto)] sm:items-center sm:gap-4"
+        className="grid min-w-0 flex-1 grid-cols-[3.25rem_minmax(0,1fr)] gap-3 px-4 py-4 text-left outline-none transition-colors hover:bg-chrome-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[4rem_minmax(0,1fr)_minmax(11rem,auto)] sm:items-center sm:gap-4"
         aria-label={activityDisclosureLabel(activity)}
         onClick={(event) => onOpenActivity(activity, event.currentTarget)}
       >

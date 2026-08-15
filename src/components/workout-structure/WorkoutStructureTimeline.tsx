@@ -84,7 +84,7 @@ export function WorkoutStructureTimeline({
                     onPointerEnter={() => setActiveIndex(index)}
                     onPointerLeave={() => setActiveIndex(null)}
                     className={cn(
-                      "relative min-w-0 cursor-default appearance-none overflow-hidden p-0 transition-[flex-grow,opacity,transform,box-shadow] duration-200 first:rounded-l-md last:rounded-r-md hover:flex-grow-[1.08] focus-visible:z-20 focus-visible:outline-none",
+                      "relative min-w-0 cursor-default appearance-none overflow-hidden p-0 transition-[flex-grow,opacity,transform,box-shadow] duration-200 first:rounded-l-md last:rounded-r-md hover:flex-grow-[1.08] focus-visible:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring",
                       isActive && "z-10 -translate-y-px",
                     )}
                     style={{
@@ -121,7 +121,12 @@ export function WorkoutStructureTimeline({
             )}
           </div>
 
-          <ol className={cn("mt-5", density === "compact" ? "hito-row-group" : "grid gap-3")}>
+          <ol
+            className={cn(
+              "mt-5",
+              density === "compact" ? "hito-row-group" : "grid gap-x-3 gap-y-1",
+            )}
+          >
             {items.map((item, index) => {
               const colors = segmentColorMeta(item.semanticKind, item.target);
               const isActive = activeIndex === index;
@@ -160,7 +165,7 @@ export function WorkoutStructureTimeline({
                         {readbackEntries.map((entry) => (
                           <span key={entry.key}>
                             <span className="opacity-60">{entry.label}:</span>{" "}
-                            <span className="text-foreground/80">{entry.value}</span>
+                            <span className="text-text-secondary">{entry.value}</span>
                           </span>
                         ))}
                       </div>

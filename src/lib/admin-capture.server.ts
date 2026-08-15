@@ -141,6 +141,12 @@ export async function listAdminCaptureBacklogForDependencies(
 
   try {
     await synchronizeRepoMirrorBeforeRead(dependencies);
+  } catch (error) {
+    reportAdminCaptureLoadFailure("repository_mirror_sync", error);
+    return failure("capture_load_failed", "Capture backlog could not be loaded.");
+  }
+
+  try {
     const { rows, statusCounts } = await dependencies.repository.listBacklog(input);
     const items = rows.map(mapItemView);
 
@@ -154,7 +160,8 @@ export async function listAdminCaptureBacklogForDependencies(
         statusCounts,
       },
     };
-  } catch {
+  } catch (error) {
+    reportAdminCaptureLoadFailure("repository_list", error);
     return failure("capture_load_failed", "Capture backlog could not be loaded.");
   }
 }
@@ -573,6 +580,20 @@ async function synchronizeRepoMirrorBeforeRead(dependencies: AdminCaptureDepende
   }
 }
 
+function reportAdminCaptureLoadFailure(
+  stage: "repository_mirror_sync" | "repository_list",
+  error: unknown,
+) {
+  const failure = error as { code?: unknown; cause?: { code?: unknown } } | null;
+  const candidate = failure?.code ?? failure?.cause?.code;
+  const code =
+    typeof candidate === "string" && /^[a-z0-9_.:-]{1,80}$/i.test(candidate)
+      ? candidate
+      : "unclassified";
+
+  console.error("[admin-capture] capture_load_failed", JSON.stringify({ stage, code }));
+}
+
 export function createSupabaseAdminCaptureRepository(
   supabase: SupabaseClient<Database>,
 ): AdminCaptureRepository {
@@ -644,7 +665,7 @@ export function createSupabaseAdminCaptureRepository(
       ]);
 
       if (pageResult.error) {
-        throw new Error(pageResult.error.message);
+        throw new Error(pageResult.error.message, { cause: pageResult.error });
       }
 
       return {
@@ -797,7 +818,7 @@ async function countSupabaseAdminCaptureStatuses(
 
       const { count, error } = await query;
 
-      if (error) throw new Error(error.message);
+      if (error) throw new Error(error.message, { cause: error });
 
       return [status, count ?? 0] as const;
     }),

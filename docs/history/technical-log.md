@@ -1,7 +1,7 @@
 # Hito Technical Log
 
 Status: active durable decision index
-Last Updated: 2026-08-11
+Last Updated: 2026-08-14
 Owner: PRODUCT
 
 ## Purpose And Source Boundary
@@ -21,6 +21,17 @@ Use:
 - [current product](../current-product.md) and [current system](../current-system.md) for current
   implemented truth;
 - canonical backlog items for evidence and full receipts.
+
+## 2026-08-14 — Canonical Work Loop Adopted
+
+- **Operating policy:** Hito adopted one canonical work loop, bounded autonomy, optional Markdown
+  relationships, and a repository-wide fail-closed release freeze. A natural BACKEND repair and
+  two fresh failed admission attempts demonstrated one-owner execution, failure recovery, and
+  release isolation. The successful staged-pilot closure condition was waived only because the
+  policy's own nonterminal files created a circular admission block; exact staged identity and
+  `git diff --cached --check` remain mandatory for every future release. Evidence:
+  [policy acceptance](../tasks/backlog/2026-08-12-hito-canonical-work-loop-autonomy-and-release-freeze-policy.md),
+  [lifecycle audit](../tasks/backlog/2026-08-14-hito-backlog-lifecycle-reconciliation-and-terminal-archive.md).
 
 ## 2026-08-11 — Released Runner Calendar Bundle
 

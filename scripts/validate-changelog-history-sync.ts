@@ -31,7 +31,6 @@ const REQUIRED_TECHNICAL_PERIODS = [
   "2026-07",
   "2026-05 to 2026-06",
 ] as const;
-const TECHNICAL_LOG_LAST_UPDATED = "2026-08-11";
 const HISTORICAL_MIRROR_LABEL = "HISTORICAL / migrated public changelog mirror";
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -72,6 +71,7 @@ const technicalSections = parseTechnicalLog(technicalMarkdown);
 const technicalPeriods = new Set(technicalSections.map((section) => section.period.source));
 const technicalMonths = groupTechnicalLogByMonth(technicalSections);
 const technicalYears = groupMonthsByYear(technicalMonths);
+const latestTechnicalDay = technicalSections.find((section) => section.period.kind === "day");
 
 assert(publicDays.length > 0, "Public changelog parsed zero dated sections.");
 assert(technicalSections.length > 0, "Technical log parsed zero compact decision sections.");
@@ -82,8 +82,9 @@ assert(
   "Technical log parsed zero durable decisions.",
 );
 assert(
-  getTechnicalLogLastUpdated(technicalMarkdown) === TECHNICAL_LOG_LAST_UPDATED,
-  `Technical log Last Updated must be ${TECHNICAL_LOG_LAST_UPDATED}.`,
+  latestTechnicalDay &&
+    getTechnicalLogLastUpdated(technicalMarkdown) === latestTechnicalDay.period.start,
+  `Technical log Last Updated must match the latest daily period ${latestTechnicalDay?.period.start ?? "(missing)"}.`,
 );
 
 for (const period of REQUIRED_TECHNICAL_PERIODS) {

@@ -151,7 +151,7 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
                 <span className="h-4 w-4 rounded-full border border-hairline bg-surface/70" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm text-foreground/85">No workout metrics are planned today.</p>
+                <p className="text-sm text-text-secondary">No workout metrics are planned today.</p>
                 <p className="mt-1 text-xs text-muted-foreground">Leave room for recovery.</p>
               </div>
             </div>
@@ -228,7 +228,7 @@ function PlanStartsLaterHero({
                 <div className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
                   Next Workout
                 </div>
-                <div className="mt-1 text-sm text-foreground/90">{nextWorkout.title}</div>
+                <div className="mt-1 text-sm text-foreground">{nextWorkout.title}</div>
                 <div className="hito-technical-sm text-tertiary mt-2">
                   {formatDate(nextWorkout.date, {
                     weekday: "short",

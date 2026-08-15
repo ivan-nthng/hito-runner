@@ -370,6 +370,7 @@ export type Database = {
           setup_completed_at: string;
           setup_state: Database["public"]["Enums"]["runner_setup_state"];
           training_preferences: Json | null;
+          ui_locale_preference: string;
           updated_at: string;
           user_id: string;
           weight_kg: number | null;
@@ -397,6 +398,7 @@ export type Database = {
           setup_completed_at?: string;
           setup_state?: Database["public"]["Enums"]["runner_setup_state"];
           training_preferences?: Json | null;
+          ui_locale_preference?: string;
           updated_at?: string;
           user_id: string;
           weight_kg?: number | null;
@@ -424,6 +426,7 @@ export type Database = {
           setup_completed_at?: string;
           setup_state?: Database["public"]["Enums"]["runner_setup_state"];
           training_preferences?: Json | null;
+          ui_locale_preference?: string;
           updated_at?: string;
           user_id?: string;
           weight_kg?: number | null;

@@ -413,13 +413,13 @@ function WorkoutPage() {
 
               {isRestDay && restAssignment && (
                 <SidebarSection title="Assignment" muted>
-                  <p className="text-xs leading-relaxed text-foreground/80">{restAssignment}</p>
+                  <p className="text-xs leading-relaxed text-text-secondary">{restAssignment}</p>
                 </SidebarSection>
               )}
 
               <SidebarSection title="This week">
                 <div className="flex items-center justify-between gap-3 text-xs">
-                  <span className="text-foreground/85">
+                  <span className="text-text-secondary">
                     {weekProgress.completed} of {weekProgress.total} workouts completed
                   </span>
                   <span className="font-mono-num text-muted-foreground">
@@ -501,7 +501,7 @@ function WorkoutErrorState({ reset }: { error: Error; reset: () => void }) {
           <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
             We couldn&apos;t load this workout.
           </h1>
-          <p className="hito-body-md mt-4 max-w-[40rem] text-foreground/85">
+          <p className="hito-body-md mt-4 max-w-[40rem] text-text-secondary">
             Try again. If your plan is still being set up, go back home first.
           </p>
           <div className="hito-state-actions">
@@ -792,7 +792,7 @@ function Overview({ snapshot, workout }: { snapshot: TrainingSnapshot; workout: 
           <div className="mt-auto border-t border-hairline pt-5">
             <div>
               <p className="hito-label-md text-foreground">Assignment</p>
-              <p className="mt-3 text-sm leading-relaxed text-foreground/85">{restAssignment}</p>
+              <p className="mt-3 text-sm leading-relaxed text-text-secondary">{restAssignment}</p>
             </div>
           </div>
         )}
@@ -853,7 +853,7 @@ function Stat({ label, value, unit }: { label: string; value: string; unit?: str
 }
 
 function SidebarPanel({ children }: { children: React.ReactNode }) {
-  return <div className="hito-row-group">{children}</div>;
+  return <div className="hito-row-group bg-background">{children}</div>;
 }
 
 function SidebarSection({
@@ -882,7 +882,7 @@ function SidebarSection({
           className={cn(
             "mb-3",
             titleVariant === "strong"
-              ? "text-sm font-medium tracking-[0.01em] text-foreground/92"
+              ? "text-sm font-medium tracking-[0.01em] text-foreground"
               : "hito-label-md text-foreground",
           )}
         >

@@ -6,7 +6,7 @@
 
 ## Status
 
-in_progress
+completed
 
 ## Type
 
@@ -149,11 +149,12 @@ browser QA, Global QA, or release readiness unless directly proven.
 
 ## Next Recommended Role
 
-BACKEND
+PRODUCT — consume this release receipt and decide any separate post-deploy QA or release-acceptance
+stage.
 
 ## Blockers
 
-None at routing time. A fresh freeze and all listed gates determine whether release can continue.
+None for this bounded Git/Vercel release verification.
 
 ## Execution Preflight — 2026-08-12
 
@@ -239,3 +240,84 @@ Explicitly excluded and unstaged:
 | Hosted deployment parity        | `npm run supabase:deployment:parity` against linked project | Passed, read-only | Project `dltfjwexyctmihclcjqj`; 40 migrations; no missing hosted delta reported                         |
 
 Git staging, exact index hygiene, commit, push, and exact-SHA Vercel verification remain pending.
+
+## Final Tracked Release Receipt — 2026-08-12
+
+### Outcome
+
+The independently frozen 169-path candidate passed every required local, staged, build, integrity,
+and read-only hosted-parity gate. BACKEND created exactly one commit on `main`, pushed exactly once
+to `origin/main`, and verified the existing Git-backed Vercel production deployment for that exact
+full SHA reached `READY`.
+
+### Git And Inventory Receipt
+
+- Parent SHA: `ee4fde5c1bda4a7cb5477bcf1a8ce90d9e50674d`.
+- Released SHA: `74607987885ca40f33658c79fba174d173d45646`.
+- Commit message: `release: publish current integrated candidate`.
+- Commit scope: 169 files; 22,487 insertions and 7,290 deletions.
+- Frozen/staged path digest:
+  `b1e6688285668353d83466f805f7ac2ce108f0adf509a9f15dddeecc12bb4982`.
+- Frozen/staged content digest:
+  `6c87bff9310c10fc8beb9e1403f35f0000ef87f04ac57fc4ac1c92ea6e1aafa7`.
+- Exact staged group counts: shared policy `1`; canonical receipts/assets `41`;
+  History/current docs `9`; Design System runtime `34`; Local UI Inspector `16`;
+  Product/shared consumers `68`; total `169`; unclassified `0`.
+- Push receipt: `ee4fde5..7460798  main -> main`.
+- Final equality: local `HEAD == origin/main ==`
+  `74607987885ca40f33658c79fba174d173d45646`; ahead/behind `0/0`; index empty.
+- Excluded work remains untracked and outside the commit:
+  `2026-08-12-hito-ds-navigation-and-async-toast-demo-clarity.md` and
+  `2026-08-12-hito-canonical-work-loop-autonomy-and-release-freeze-policy.md`, both `backlog`.
+
+### Vercel Deployment Receipt
+
+- Project: `hito-runner` in `ivans-projects-133d4a2e`.
+- Deployment ID: `dpl_BGi5EFX8oydsNVRBxTmZWYWonb3f`.
+- Deployment URL:
+  `https://hito-runner-flhstd2qm-ivans-projects-133d4a2e.vercel.app`.
+- Target/status: `production` / `READY`.
+- Vercel Git metadata: repository `ivan-nthng/hito-runner`, ref `main`, full SHA
+  `74607987885ca40f33658c79fba174d173d45646`, commit message
+  `release: publish current integrated candidate`.
+- Build receipt: `bld_1rpvtvopv` is `READY`; framework `tanstack-start`; Node `24.x`; production
+  aliases include `hitocajon.com`, `www.hitocajon.com`, `hito-runner.vercel.app`, and the existing
+  Git-main alias.
+- Deployment mechanism: existing Git integration only. No manual deploy, promote, rebuild,
+  configuration change, or workaround was used.
+
+### Final Validation Inventory
+
+| Check                        | Scenario / environment                                                     | Result | Evidence                                                                               |
+| ---------------------------- | -------------------------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------- |
+| Fresh remote baseline        | Repeated authenticated `git fetch origin` before staging, commit, and push | Passed | Remote stayed at parent SHA until the authorized push                                  |
+| Active-role isolation        | Hito Codex task list and local subagent tree                               | Passed | Only BACKEND active; no subagent used                                                  |
+| Candidate mapping            | 169 admitted paths across six exhaustive groups                            | Passed | Counts sum to 169; no unclassified path; two backlog proposals excluded                |
+| Receipt hygiene              | Corrected DS receipt plus exact staged diff                                | Passed | Target lines have no trailing spaces; `git diff --cached --check` passed               |
+| History contract             | Existing History validator                                                 | Passed | 54 dates, 362 entries, nine required technical periods                                 |
+| Generated DS manifest        | Existing manifest parity gate                                              | Passed | 43 primitive colors, 41 semantic colors, 14 text styles                                |
+| Hito DS contract             | Existing DS validator                                                      | Passed | Contract passed across 324 files                                                       |
+| Product contracts            | Existing Product proofs                                                    | Passed | Heart-rate editor and workout-comparison readback passed                               |
+| Production build             | Uncontended local build                                                    | Passed | Client, SSR, Nitro, and postbuild completed                                            |
+| Build integrity              | Existing integrity gate                                                    | Passed | 210 MJS files, 3,183 imports, 312 documents, digest `ea35100c…2138a`                   |
+| Hosted Supabase parity       | Linked read-only gate                                                      | Passed | Project `dltfjwexyctmihclcjqj`; 40 migrations; no missing delta                        |
+| Exact staged inventory       | Git index before commit                                                    | Passed | 169 paths; staged path/content digests exactly matched the freeze; two exclusions only |
+| Commit and push              | One authorized commit and one push                                         | Passed | Full SHA `74607987885ca40f33658c79fba174d173d45646`; local/remote equality `0/0`       |
+| Vercel Git identity          | Deployment list metadata                                                   | Passed | Exact full SHA, `main`, project, and commit message matched                            |
+| Vercel production deployment | Existing Git-backed deployment                                             | Passed | `dpl_BGi5EFX8oydsNVRBxTmZWYWonb3f`; production `READY`                                 |
+
+### Preserved Boundaries And Coverage
+
+- No runtime source repair, migration, raw SQL, hosted data mutation, provider call, Vercel/Supabase
+  configuration change, manual deployment, force push, branch, PR, or second commit occurred.
+- Hosted parity was read-only; no migration was applied.
+- The local managed QA runtime was not restarted after the fresh build. Browser/user-flow proof was
+  outside this Git/Vercel verification stage.
+- Post-deploy authenticated or unauthenticated browser QA, provider acceptance, Global QA, and
+  broader release readiness were not run and are not claimed.
+- This final post-push receipt is intentionally the sole tracked working-tree change after the
+  released commit. It is not followed by a second commit because the task authorized exactly one
+  commit and final deployment facts did not exist before that commit.
+- **Role / skills / subagents:** `agents/backend.agent.md`;
+  `skills/hito-backend-supabase-contract/SKILL.md`; installed Vercel Deployments & CI/CD procedure;
+  no subagent used.

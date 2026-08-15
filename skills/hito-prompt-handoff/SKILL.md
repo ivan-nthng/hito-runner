@@ -38,10 +38,11 @@ through a browser. FRONTEND prompts name one lane.
 
 ## Rules
 
-- For a new or changed task, PRODUCT states the exact proposed handoff before dispatch unless Ivan
-  explicitly says to send immediately. For an already approved canonical plan with an unambiguous
-  next owner and no Product decision, PRODUCT advances the plan autonomously and reports what it
-  sent in Russian.
+- For every new or materially changed task, PRODUCT states the exact proposed handoff and waits for
+  Ivan's explicit confirmation before dispatch, including when a canonical plan is already approved
+  and its next owner is unambiguous. The only exception is Ivan explicitly saying in the current
+  instruction to send, dispatch, start, or run the work immediately; PRODUCT then reports in Russian
+  what it sent and why.
 - Preserve Rule Zero: never interrupt an active owner.
 - Exact prompts and execution roles' final formal reports are English by default. Their in-progress
   commentary and explanations visible to Ivan are Russian by default; PRODUCT's direct status to

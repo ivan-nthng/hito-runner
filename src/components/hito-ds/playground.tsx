@@ -1,7 +1,8 @@
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import { HitoMetadataTag } from "@/components/ui/metadata-tag";
 import { useHitoTabs } from "@/components/ui/hito-tabs";
+import { HitoReferenceLink } from "@/components/hito-ds/reference";
 
 type PlaygroundStatusTone = "signal" | "neutral" | "warning" | "destructive" | "rollout";
 type HitoDsWorkbenchTab = "demo" | "variants";
@@ -47,6 +48,7 @@ export function HitoDsPlayground({
 }) {
   const hasWorkbenchTabs = demo !== undefined && variants !== undefined;
   const [activeTab, setActiveTab] = useState<HitoDsWorkbenchTab>(defaultTab);
+  const anchorsRef = useRef(anchors);
   const workbenchTabs = useHitoTabs({
     items: [{ value: "demo" }, { value: "variants" }],
     value: activeTab,
@@ -55,12 +57,18 @@ export function HitoDsPlayground({
   const workbenchMode = hasWorkbenchTabs ? activeTab : "demo";
 
   useEffect(() => {
-    if (!hasWorkbenchTabs || !anchors?.length || typeof window === "undefined") {
+    anchorsRef.current = anchors;
+  }, [anchors]);
+
+  useEffect(() => {
+    if (!hasWorkbenchTabs || typeof window === "undefined") {
       return;
     }
 
     const activateHashExample = () => {
-      const activeAnchor = anchors.find((anchor) => `#${anchor.id}` === window.location.hash);
+      const activeAnchor = anchorsRef.current?.find(
+        (anchor) => `#${anchor.id}` === window.location.hash,
+      );
       if (activeAnchor?.tab) {
         setActiveTab(activeAnchor.tab);
       }
@@ -69,14 +77,13 @@ export function HitoDsPlayground({
     activateHashExample();
     window.addEventListener("hashchange", activateHashExample);
     return () => window.removeEventListener("hashchange", activateHashExample);
-  }, [anchors, hasWorkbenchTabs]);
+  }, [hasWorkbenchTabs]);
 
   return (
     <section id={id} className="ds-section hito-ds-playground-section">
       <div className="hito-specimen-header">
         <div className="max-w-3xl">
-          <p className="hito-label-sm text-tertiary">Component</p>
-          <h2 className="hito-ui-title-sm mt-2">{label}</h2>
+          <h2 className="hito-ui-title-lg">{label}</h2>
           <p className="hito-body-sm text-secondary mt-3">{description.purpose}</p>
           <dl className="mt-4 grid gap-3 sm:grid-cols-2">
             <div>
@@ -99,13 +106,12 @@ export function HitoDsPlayground({
             </div>
           ) : null}
           {anchors?.length ? (
-            <div className="hito-specimen-links mt-4" aria-label={`${label} examples`}>
+            <div className="hito-reference-links mt-4" aria-label={`${label} examples`}>
               {anchors.map((anchor) => (
-                <a
+                <HitoReferenceLink
                   key={anchor.id}
                   id={anchor.id}
                   href={`#${anchor.id}`}
-                  className="hito-specimen-link"
                   onClick={() => {
                     if (anchor.tab) {
                       setActiveTab(anchor.tab);
@@ -113,7 +119,7 @@ export function HitoDsPlayground({
                   }}
                 >
                   {anchor.label}
-                </a>
+                </HitoReferenceLink>
               ))}
             </div>
           ) : null}

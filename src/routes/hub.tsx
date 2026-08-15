@@ -1,7 +1,8 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import loginDesertHorizon from "@/assets/marketing/hero-background/login-desert-horizon.jpg";
 import { HitoLogo } from "@/components/ui/hito-logo";
-import { Icon, type HitoIconName } from "@/components/ui/icon";
+import { HitoMark, type HitoMarkName } from "@/components/ui/hito-mark";
+import { Icon } from "@/components/ui/icon";
 import { APP_NAME } from "@/lib/app-config";
 
 type HubDestination = {
@@ -10,8 +11,9 @@ type HubDestination = {
   cta: string;
   badge: string;
   badgeTone: "signal" | "warning" | "success";
+  badgeTextToken: "--color-text-accent" | "--color-text-warning" | "--color-text-positive";
   to: "/" | "/admin/analytics" | "/hitoDS" | "/changelog";
-  icon: HitoIconName;
+  mark: HitoMarkName;
 };
 
 const HUB_DESTINATIONS: Array<HubDestination> = [
@@ -21,8 +23,9 @@ const HUB_DESTINATIONS: Array<HubDestination> = [
     cta: "Open service",
     badge: "User login required",
     badgeTone: "signal",
+    badgeTextToken: "--color-text-accent",
     to: "/",
-    icon: "workout",
+    mark: "hito-running",
   },
   {
     title: "Admin analytics",
@@ -30,8 +33,9 @@ const HUB_DESTINATIONS: Array<HubDestination> = [
     cta: "Open admin",
     badge: "Admin login required",
     badgeTone: "warning",
+    badgeTextToken: "--color-text-warning",
     to: "/admin/analytics",
-    icon: "shield-alert",
+    mark: "admin",
   },
   {
     title: "Design system",
@@ -39,8 +43,9 @@ const HUB_DESTINATIONS: Array<HubDestination> = [
     cta: "Open design system",
     badge: "Public",
     badgeTone: "success",
+    badgeTextToken: "--color-text-positive",
     to: "/hitoDS",
-    icon: "cog",
+    mark: "design-system",
   },
   {
     title: "Changelog",
@@ -48,8 +53,9 @@ const HUB_DESTINATIONS: Array<HubDestination> = [
     cta: "View changelog",
     badge: "Public",
     badgeTone: "success",
+    badgeTextToken: "--color-text-positive",
     to: "/changelog",
-    icon: "file-text",
+    mark: "changelog",
   },
 ];
 
@@ -74,7 +80,6 @@ function HubPage() {
       <div className="auth-hero-content mx-auto flex min-h-screen max-w-6xl flex-col items-center justify-center px-5 py-10 sm:px-8 lg:px-10">
         <header className="mx-auto grid max-w-2xl justify-items-center text-center">
           <HitoLogo className="[--hito-logo-height:1.65rem]" />
-          <p className="hito-label-md mt-8 text-muted-foreground">Destination launcher</p>
           <h1 className="hito-display-title-lg mt-3">Where are we going?</h1>
           <p className="hito-body-md mt-4 max-w-xl text-muted-foreground">
             Choose a Hito surface. Each destination keeps its own access rules, so public pages stay
@@ -98,15 +103,17 @@ function HubPage() {
 function HubDestinationCard({ destination }: { destination: HubDestination }) {
   return (
     <Link to={destination.to} className="hito-launch-surface">
-      <span className="hito-launcher-card-icon" aria-hidden="true">
-        <Icon name={destination.icon} size="md" />
-      </span>
+      <HitoMark name={destination.mark} shape="tile" size="sm" />
       <span className="grid flex-1 gap-3">
-        <span className="flex flex-wrap items-center gap-2">
-          <span className="hito-ui-title-xs">{destination.title}</span>
-          <span className="hito-status-pill" data-tone={destination.badgeTone}>
+        <span className="grid gap-1.5">
+          <span
+            className="hito-technical-sm"
+            data-tone={destination.badgeTone}
+            style={{ color: `var(${destination.badgeTextToken})` }}
+          >
             {destination.badge}
           </span>
+          <span className="hito-ui-title-xs">{destination.title}</span>
         </span>
         <span className="hito-body-sm text-muted-foreground">{destination.description}</span>
       </span>

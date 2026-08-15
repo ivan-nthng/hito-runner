@@ -28,6 +28,13 @@ import {
   runnerCalendarTimezoneSchema,
   type RunnerCalendarTimezoneSource,
 } from "@/lib/runner-calendar-timezone";
+import {
+  readStoredUiLocalePreference,
+  resolveUiLocale,
+  uiLocalePreferenceSchema,
+  type UiLocalePreference,
+  type UiLocaleResolution,
+} from "@/lib/ui-locale";
 
 export type RunnerTrainingPreferences = RunnerTrainingPreferencesStorage;
 
@@ -56,6 +63,8 @@ export interface UserSettingsSummary {
   heartRateZones: HeartRateZonesSummary;
   calendarTimezone: string;
   calendarTimezoneSource: RunnerCalendarTimezoneSource;
+  uiLocalePreference: UiLocalePreference | null;
+  uiLocalePreferenceContractViolation: boolean;
 }
 
 export interface RunnerCalendarTimezonePreference {
@@ -106,6 +115,7 @@ const userSettingsInputSchema = z.object({
   heartRateProfile: personalHeartRateProfileInputSchema.optional(),
   trainingPreferences: runnerTrainingPreferencesSaveInputSchema.nullable().optional(),
   calendarTimezone: runnerCalendarTimezoneSchema.optional(),
+  uiLocalePreference: uiLocalePreferenceSchema.optional(),
 });
 
 const runnerCalendarTimezoneSaveInputSchema = z
@@ -206,6 +216,8 @@ export async function getUserSettingsForUserId(
     return null;
   }
 
+  const uiLocalePreference = readStoredUiLocalePreference(profile.ui_locale_preference);
+
   return {
     firstName: profile.first_name,
     lastName: profile.last_name,
@@ -221,7 +233,21 @@ export async function getUserSettingsForUserId(
     heartRateZones: buildHeartRateZonesSummary(profile.age, profile.heart_rate_profile),
     calendarTimezone: profile.calendar_timezone,
     calendarTimezoneSource: parseCalendarTimezoneSource(profile.calendar_timezone_source),
+    uiLocalePreference: uiLocalePreference.preference,
+    uiLocalePreferenceContractViolation: uiLocalePreference.preferenceContractViolation !== null,
   };
+}
+
+export async function getUiLocaleResolutionForUserId(
+  userId: string | null,
+  acceptLanguage: string | null | undefined,
+): Promise<UiLocaleResolution> {
+  const profile = userId ? await getSettingsProfileRow(userId) : null;
+
+  return resolveUiLocale({
+    storedPreference: profile?.ui_locale_preference,
+    acceptLanguage,
+  });
 }
 
 export async function updateUserSettingsForUserId(
@@ -266,6 +292,7 @@ export async function updateUserSettingsForUserId(
     training_preferences?: Json | null;
     calendar_timezone?: string;
     calendar_timezone_source?: Exclude<RunnerCalendarTimezoneSource, "fallback_utc">;
+    ui_locale_preference?: UiLocalePreference;
   } = {
     first_name: data.firstName || null,
     last_name: data.lastName || null,
@@ -286,6 +313,9 @@ export async function updateUserSettingsForUserId(
   if (data.calendarTimezone !== undefined) {
     updatePayload.calendar_timezone = data.calendarTimezone;
     updatePayload.calendar_timezone_source = "user";
+  }
+  if (data.uiLocalePreference !== undefined) {
+    updatePayload.ui_locale_preference = data.uiLocalePreference;
   }
 
   const updatedProfile = currentProfile
@@ -314,6 +344,8 @@ export async function updateUserSettingsForUserId(
     throw buildRunnerSettingsPersistenceError(updatedProfile.error, "write");
   }
 
+  const uiLocalePreference = readStoredUiLocalePreference(updatedProfile.data.ui_locale_preference);
+
   return {
     firstName: updatedProfile.data.first_name,
     lastName: updatedProfile.data.last_name,
@@ -336,6 +368,8 @@ export async function updateUserSettingsForUserId(
     calendarTimezoneSource: parseCalendarTimezoneSource(
       updatedProfile.data.calendar_timezone_source,
     ),
+    uiLocalePreference: uiLocalePreference.preference,
+    uiLocalePreferenceContractViolation: uiLocalePreference.preferenceContractViolation !== null,
   };
 }
 

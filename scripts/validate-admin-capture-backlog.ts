@@ -166,7 +166,7 @@ class MemoryAdminCaptureRepository implements AdminCaptureRepository {
 
 class FailingAdminCaptureReadRepository extends MemoryAdminCaptureRepository {
   override async listBacklog(_input: AdminCaptureListInput): Promise<AdminCaptureBacklogRead> {
-    throw new Error("Forced backlog read failure.");
+    throw Object.assign(new Error("Forced backlog read failure."), { code: "PGRST_TEST_LIST" });
   }
 }
 
@@ -275,19 +275,25 @@ async function runDeterministicHarness() {
     assert.equal(unavailableList.reason, "supabase_admin_unavailable");
   }
 
-  const failedList = await listAdminCaptureBacklogForDependencies(
-    adminDependencies(new FailingAdminCaptureReadRepository()),
-    {
-      status: "all",
-      sourceGroup: "all_work",
-      includeArchived: false,
-      limit: 50,
-    },
+  const failedRead = await captureConsoleErrors(() =>
+    listAdminCaptureBacklogForDependencies(
+      adminDependencies(new FailingAdminCaptureReadRepository()),
+      {
+        status: "all",
+        sourceGroup: "all_work",
+        includeArchived: false,
+        limit: 50,
+      },
+    ),
   );
+  const failedList = failedRead.result;
   assert.equal(failedList.ok, false);
   if (!failedList.ok) {
     assert.equal(failedList.reason, "capture_load_failed");
   }
+  assert.deepEqual(failedRead.messages, [
+    '[admin-capture] capture_load_failed {"stage":"repository_list","code":"PGRST_TEST_LIST"}',
+  ]);
 
   const nonAdminDelete = await deleteAdminCaptureQuickNoteForDependencies(nonAdmin, {
     id: created.item.id,
@@ -554,6 +560,7 @@ async function runDeterministicHarness() {
           "unauthenticated_repo_mirror_sync_blocked",
           "repo_mirror_sync_failure_shape",
           "repo_mirror_sync_timeout_shape",
+          "repo_mirror_failure_stage_and_code_diagnostic",
           "repo_mirror_run_context_isolation",
           "missing_repo_root_refuses_archive",
           "empty_repo_root_refuses_projection",
@@ -573,6 +580,7 @@ async function runDeterministicHarness() {
           "repo_derived_markdown_prompt_copy",
           "repo_derived_read_only",
           "canonical_markdown_work_item_contract",
+          "compact_terminal_markdown_identity_contract",
           "canonical_repo_projection_metadata",
           "stale_repo_mirror_cleanup_policy",
         ],
@@ -623,45 +631,77 @@ async function assertRepoMirrorSynchronizationBoundary() {
   assert.equal(rejectedSyncCalls, 0);
 
   const unreadRepository = new MemoryAdminCaptureRepository();
-  const failed = await listAdminCaptureBacklogForDependencies(
-    {
-      ...adminDependencies(unreadRepository),
-      synchronizeRepoMirror: async () => {
-        throw new Error("Forced repository mirror synchronization failure.");
+  const failedSync = await captureConsoleErrors(() =>
+    listAdminCaptureBacklogForDependencies(
+      {
+        ...adminDependencies(unreadRepository),
+        synchronizeRepoMirror: async () => {
+          throw new Error("Forced repository mirror synchronization failure.", {
+            cause: { code: "PGRST_TEST_SYNC" },
+          });
+        },
       },
-    },
-    {
-      status: "all",
-      sourceGroup: "all_work",
-      includeArchived: false,
-      limit: 50,
-    },
+      {
+        status: "all",
+        sourceGroup: "all_work",
+        includeArchived: false,
+        limit: 50,
+      },
+    ),
   );
+  const failed = failedSync.result;
   assert.equal(failed.ok, false);
   if (!failed.ok) {
     assert.equal(failed.reason, "capture_load_failed");
   }
+  assert.deepEqual(failedSync.messages, [
+    '[admin-capture] capture_load_failed {"stage":"repository_mirror_sync","code":"PGRST_TEST_SYNC"}',
+  ]);
   assert.equal(unreadRepository.listBacklogCalls, 0);
 
   const timeoutRepository = new MemoryAdminCaptureRepository();
-  const timedOut = await listAdminCaptureBacklogForDependencies(
-    {
-      ...adminDependencies(timeoutRepository),
-      synchronizeRepoMirror: () => new Promise<void>(() => {}),
-      repoMirrorSyncTimeoutMs: 5,
-    },
-    {
-      status: "all",
-      sourceGroup: "all_work",
-      includeArchived: false,
-      limit: 50,
-    },
+  const timedOutSync = await captureConsoleErrors(() =>
+    listAdminCaptureBacklogForDependencies(
+      {
+        ...adminDependencies(timeoutRepository),
+        synchronizeRepoMirror: () => new Promise<void>(() => {}),
+        repoMirrorSyncTimeoutMs: 5,
+      },
+      {
+        status: "all",
+        sourceGroup: "all_work",
+        includeArchived: false,
+        limit: 50,
+      },
+    ),
   );
+  const timedOut = timedOutSync.result;
   assert.equal(timedOut.ok, false);
   if (!timedOut.ok) {
     assert.equal(timedOut.reason, "capture_load_failed");
   }
+  assert.deepEqual(timedOutSync.messages, [
+    '[admin-capture] capture_load_failed {"stage":"repository_mirror_sync","code":"unclassified"}',
+  ]);
   assert.equal(timeoutRepository.listBacklogCalls, 0);
+}
+
+async function captureConsoleErrors<T>(action: () => Promise<T>) {
+  const original = console.error;
+  const messages: string[] = [];
+
+  console.error = (...values: unknown[]) => {
+    messages.push(values.map(String).join(" "));
+  };
+
+  try {
+    return {
+      result: await action(),
+      messages,
+    };
+  } finally {
+    console.error = original;
+  }
 }
 
 async function assertRepoMirrorSynchronizationSafety() {

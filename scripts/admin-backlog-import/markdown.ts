@@ -479,8 +479,8 @@ function parseLeadMarkdownMetadataSections(markdown: string) {
   let fenceMarker: string | null = null;
   let currentHeading: CanonicalMarkdownField | null = null;
   let currentBody: string[] = [];
-  let startedLeadBlock = false;
-  const sections = new Map<CanonicalMarkdownField, string>();
+  const sections = parseLeadMarkdownMetadataList(lines);
+  let startedLeadBlock = sections.size > 0;
 
   const commitCurrent = () => {
     if (!currentHeading) {
@@ -549,6 +549,42 @@ function parseLeadMarkdownMetadataSections(markdown: string) {
   }
 
   commitCurrent();
+  return sections;
+}
+
+function parseLeadMarkdownMetadataList(lines: string[]) {
+  const sections = new Map<CanonicalMarkdownField, string>();
+  let titleSeen = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (!titleSeen) {
+      if (/^#\s+\S/.test(trimmed)) {
+        titleSeen = true;
+      }
+
+      continue;
+    }
+
+    if (!trimmed) {
+      continue;
+    }
+
+    if (/^##\s+\S/.test(trimmed)) {
+      break;
+    }
+
+    const match = trimmed.match(/^-\s+\*\*([^*]+?):\*\*\s+(.+)$/);
+    const field = match ? findCanonicalMarkdownField(match[1]) : null;
+
+    if (!match || !field) {
+      break;
+    }
+
+    sections.set(field, match[2].trim());
+  }
+
   return sections;
 }
 

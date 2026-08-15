@@ -252,7 +252,7 @@ function CalendarDemoStage({
 
   return (
     <div className="mx-auto w-full max-w-56">
-      <div className="hito-calendar-grid-container min-w-0 overflow-hidden rounded-xl border border-hairline bg-background/25">
+      <div className="hito-calendar-grid-container min-w-0 overflow-hidden border border-hairline bg-background/25">
         <HitoCalendarDayCell
           action={action}
           ariaLabel="Calendar specimen desktop day"
@@ -320,7 +320,7 @@ function CalendarVariantsStage({
     <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-3" inert>
       {variants.map((variant) => (
         <div key={variant.label} className="min-w-0">
-          <div className="hito-calendar-grid-container min-w-0 overflow-hidden rounded-xl border border-hairline bg-background/25">
+          <div className="hito-calendar-grid-container min-w-0 overflow-hidden border border-hairline bg-background/25">
             <HitoCalendarDayCell
               action={getActionVisual(variant.state)}
               ariaLabel={`Calendar variant ${variant.label}`}

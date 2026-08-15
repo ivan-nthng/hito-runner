@@ -763,13 +763,17 @@ function TestAccountsTable({ rows }: { rows: TestAccountOpsRow[] }) {
   return (
     <div className="grid gap-4">
       {deleteState.error ? (
-        <p className="hito-body-md flex items-center gap-2 font-medium text-negative">
+        <p className="hito-body-md flex items-center gap-2 font-medium text-negative" role="alert">
           <Icon name="warning" size="xs" />
           {deleteState.error}
         </p>
       ) : null}
       {deleteState.success ? (
-        <p className="hito-body-md flex items-center gap-2 font-medium text-positive">
+        <p
+          className="hito-body-md flex items-center gap-2 font-medium text-positive"
+          role="status"
+          aria-live="polite"
+        >
           <Icon name="check-circle" size="xs" />
           {deleteState.success}
         </p>

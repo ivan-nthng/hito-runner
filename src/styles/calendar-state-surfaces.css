@@ -449,20 +449,6 @@
   }
 
   @media (max-width: 640px) {
-    .hito-route-stack {
-      gap: 2.25rem;
-    }
-
-    .hito-page-header {
-      margin-bottom: 2rem;
-    }
-
-    .hito-section-header {
-      align-items: flex-start;
-      flex-direction: column;
-      gap: 0.35rem;
-    }
-
     .hito-nav-card {
       min-height: 5.25rem;
     }

@@ -202,7 +202,7 @@ function SettingsPage() {
 
   return (
     <AppShell snapshot={snapshot} viewer={viewer}>
-      <div className="hito-route-gutter hito-route-stack max-w-5xl py-10">
+      <div className="hito-route-gutter hito-route-stack max-w-5xl py-hito-6 sm:py-10">
         <header className="hito-page-header">
           <p className="hito-label-md text-foreground">User settings</p>
           <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">

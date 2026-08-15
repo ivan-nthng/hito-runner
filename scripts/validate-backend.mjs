@@ -12,6 +12,7 @@ const sourceChecks = [
   tsCheck("workout-comparison", "scripts/validate-workout-evidence-comparison.ts"),
   tsCheck("runner-auth", "scripts/validate-runner-auth-session.ts"),
   tsCheck("runner-calendar-context", "scripts/validate-runner-calendar-context.ts"),
+  tsCheck("ui-locale-profile", "scripts/validate-ui-locale-profile.ts"),
   tsCheck("admin-auth", "scripts/validate-admin-auth-session.ts"),
   tsCheck("runtime-observability", "scripts/validate-local-runtime-observability.ts"),
   nodeCheck("qa-build-freshness", "scripts/validate-qa-build-freshness.mjs"),
@@ -35,6 +36,7 @@ const localDatabaseChecks = [
   tsCheck("runner-calendar-context", "scripts/validate-runner-calendar-context.ts", [
     "--require-persistence",
   ]),
+  tsCheck("ui-locale-profile", "scripts/validate-ui-locale-profile.ts", ["--require-persistence"]),
 ];
 
 const runtimeUrl = argumentValue("--runtime-url");

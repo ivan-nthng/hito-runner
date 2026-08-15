@@ -1,4 +1,5 @@
 import { createRouter, useRouter } from "@tanstack/react-router";
+import { HitoButton } from "@/components/ui/button";
 import { routeTree } from "./routeTree.gen";
 
 function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
@@ -33,21 +34,20 @@ function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => vo
           </pre>
         )}
         <div className="mt-6 flex items-center justify-center gap-3">
-          <button
+          <HitoButton
+            type="button"
             onClick={() => {
               router.invalidate();
               reset();
             }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            size="md"
+            variant="primary"
           >
             Try again
-          </button>
-          <a
-            href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-          >
-            Go home
-          </a>
+          </HitoButton>
+          <HitoButton asChild size="md" variant="outlined">
+            <a href="/">Go home</a>
+          </HitoButton>
         </div>
       </div>
     </div>

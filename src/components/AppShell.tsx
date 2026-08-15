@@ -94,7 +94,7 @@ export function AppShell({
         }
         runnerKey={viewer?.email}
       />
-      <aside className="hito-shell-sidebar-width hidden shrink-0 self-start flex-col border-r border-hairline bg-sidebar/60 backdrop-blur md:sticky md:top-0 md:flex md:h-screen">
+      <aside className="hito-shell-sidebar-width hidden shrink-0 self-start flex-col border-r border-hairline bg-sidebar md:sticky md:top-0 md:flex md:h-screen">
         <div className="px-6 pt-7 pb-10">
           <Link to="/" reloadDocument={useFreshHomeRequest} aria-label="Hito home">
             <HitoLogo className="[--hito-logo-height:1.45rem]" />
@@ -232,9 +232,9 @@ export function AppShell({
         </div>
       </aside>
 
-      <main className="flex-1 min-w-0 flex flex-col">
-        <header className="sticky top-0 z-30 bg-background/90 backdrop-blur-xl">
-          <div className="flex items-center gap-6 px-6 lg:px-10 h-14">
+      <main className="flex-1 min-w-0 flex flex-col bg-background dark:bg-surface">
+        <header className="hito-workbench-topbar">
+          <div className="flex h-14 items-center gap-hito-4 px-hito-4 sm:gap-6 sm:px-6 lg:px-10">
             <Link
               to="/"
               reloadDocument={useFreshHomeRequest}

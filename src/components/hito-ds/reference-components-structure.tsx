@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { DropdownFamilyPlayground } from "@/components/hito-ds/dropdown-family-playground";
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
+import {
+  HitoDsWorkbenchChoiceControl as ChoiceControl,
+  type HitoDsWorkbenchOption,
+} from "@/components/hito-ds/workbench-settings-controls";
 import { HitoButton } from "@/components/ui/button";
 import { HitoLogo, HitoLogoMark } from "@/components/ui/hito-logo";
 import {
@@ -16,6 +20,13 @@ import { cn } from "@/lib/utils";
 
 const ROW_DENSITIES = ["standard", "compact"] as const;
 type RowDensity = (typeof ROW_DENSITIES)[number];
+
+type AppShellViewMode = "desktop" | "mobile";
+
+const APP_SHELL_VIEW_MODE_OPTIONS: readonly HitoDsWorkbenchOption<AppShellViewMode>[] = [
+  { value: "desktop", label: "Desktop" },
+  { value: "mobile", label: "Mobile" },
+];
 
 export function HitoDsComponentStructure() {
   const [rowDensity, setRowDensity] = useState<RowDensity>("standard");
@@ -216,6 +227,7 @@ export function HitoDsComponentStructure() {
 }
 
 export function HitoDsAppShellPattern() {
+  const [shellViewMode, setShellViewMode] = useState<AppShellViewMode>("desktop");
   const [shellProfileMeta, setShellProfileMeta] = useState(true);
   const [shellNotice, setShellNotice] = useState(true);
 
@@ -243,159 +255,185 @@ export function HitoDsAppShellPattern() {
           ]}
         />
       }
-      demo={
-        <div className="hito-ds-app-shell-frame" data-context="runner">
-          <aside className="hito-ds-app-shell-sidebar" aria-label="Contained shell navigation">
-            <div>
-              <HitoLogo className="[--hito-logo-height:1.25rem]" />
-              <p className="hito-shell-brand-kicker">Runner</p>
-            </div>
-            <nav className="hito-shell-nav" aria-label="Runner destinations">
-              {[
-                { label: "Calendar", icon: "calendar", href: "/", active: true },
-                { label: "Progress", icon: "progress", href: "/progress", active: false },
-              ].map(({ label, icon, href, active }) => (
-                <a
-                  key={label}
-                  href={href}
-                  className="hito-shell-nav-row min-w-0"
-                  data-active={active}
-                  aria-current={active ? "page" : undefined}
-                >
-                  <Icon name={icon as HitoIconName} className="hito-shell-nav-icon" decorative />
-                  <span className="truncate">{label}</span>
-                  {active && <span className="hito-shell-nav-dot" aria-hidden="true" />}
-                </a>
-              ))}
-            </nav>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="hito-surface-quiet hito-shell-profile-trigger mt-auto min-w-0"
-                  data-hito-ds-pattern="quiet-surface"
-                >
-                  <span className="hito-shell-avatar-fallback h-9 w-9 rounded-full">PR</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="hito-menu-text block truncate">Preview runner</span>
-                    {shellProfileMeta ? (
-                      <span className="hito-menu-meta block truncate">Marathon plan</span>
-                    ) : null}
+      preview={
+        shellViewMode === "desktop" ? (
+          <div className="hito-ds-app-shell-frame" data-context="runner">
+            <aside className="hito-ds-app-shell-sidebar" aria-label="Contained shell navigation">
+              <div>
+                <HitoLogo className="[--hito-logo-height:1.25rem]" />
+                <p className="hito-shell-brand-kicker">Runner</p>
+              </div>
+              <nav className="hito-shell-nav" aria-label="Runner destinations">
+                {[
+                  { label: "Calendar", icon: "calendar", href: "/", active: true },
+                  { label: "Progress", icon: "progress", href: "/progress", active: false },
+                ].map(({ label, icon, href, active }) => (
+                  <a
+                    key={label}
+                    href={href}
+                    className="hito-shell-nav-row min-w-0"
+                    data-active={active}
+                    aria-current={active ? "page" : undefined}
+                  >
+                    <Icon name={icon as HitoIconName} className="hito-shell-nav-icon" decorative />
+                    <span className="truncate">{label}</span>
+                    {active && <span className="hito-shell-nav-dot" aria-hidden="true" />}
+                  </a>
+                ))}
+              </nav>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="hito-surface-quiet hito-shell-profile-trigger mt-auto min-w-0"
+                    data-hito-ds-pattern="quiet-surface"
+                  >
+                    <span className="hito-shell-avatar-fallback h-9 w-9 rounded-full">PR</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="hito-menu-text block truncate">Preview runner</span>
+                      {shellProfileMeta ? (
+                        <span className="hito-menu-meta block truncate">Marathon plan</span>
+                      ) : null}
+                    </span>
+                    <Icon
+                      name="chevron-down"
+                      size="sm"
+                      className="shrink-0 text-muted-foreground"
+                    />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem asChild>
+                    <a href="/settings">
+                      <Icon name="settings" size="sm" decorative />
+                      Profile &amp; heart rate
+                    </a>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <a href="/integrations">
+                      <Icon name="connections" size="sm" decorative />
+                      Connections
+                    </a>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </aside>
+
+            <section className="hito-ds-app-shell-content" aria-label="Contained route content">
+              <header className="hito-workbench-topbar flex min-w-0 flex-wrap items-center justify-between gap-4 px-5 py-4">
+                <div className="flex min-w-0 flex-wrap items-baseline gap-3">
+                  <span className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
+                    Today
                   </span>
-                  <Icon name="chevron-down" size="sm" className="shrink-0 text-muted-foreground" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem asChild>
+                  <span className="hito-technical-sm text-secondary">Thursday, August 13</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
+                    Week
+                  </span>
+                  <span className="hito-status-pill" data-tone="success">
+                    On track
+                  </span>
+                </div>
+              </header>
+
+              <div className="grid min-w-0 gap-4 p-5">
+                {shellNotice ? (
+                  <div className="hito-state-surface py-3" data-tone="signal" role="status">
+                    <p className="hito-list-row-title">Reference notice</p>
+                    <p className="hito-list-row-copy">
+                      Existing notice surfaces compose inside route content, not in shell
+                      navigation.
+                    </p>
+                  </div>
+                ) : null}
+
+                <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+                  <article className="hito-surface-flat min-w-0 p-4">
+                    <p className="hito-label-sm text-tertiary">Primary content</p>
+                    <p className="hito-list-row-title mt-2">Current focus</p>
+                    <p className="hito-list-row-copy mt-1">
+                      One route-owned object leads the reading order.
+                    </p>
+                  </article>
+                  <article className="hito-surface-flat min-w-0 p-4">
+                    <p className="hito-label-sm text-tertiary">Supporting content</p>
+                    <p className="hito-list-row-title mt-2">Next action</p>
+                    <p className="hito-list-row-copy mt-1">
+                      Secondary information stays inside the content region.
+                    </p>
+                  </article>
+                </div>
+              </div>
+            </section>
+          </div>
+        ) : (
+          <div className="grid min-w-0">
+            <div className="hito-ds-app-shell-narrow">
+              <div className="hito-workbench-topbar flex min-w-0 items-center justify-between gap-3 p-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <HitoLogoMark decorative className="[--hito-logo-height:1.45rem]" />
+                  <div className="min-w-0">
+                    <p className="hito-menu-text truncate">Hito</p>
+                    <p className="hito-menu-meta truncate">Calendar</p>
+                  </div>
+                </div>
+                <HitoButton
+                  asChild
+                  iconOnly
+                  size="sm"
+                  variant="ghost"
+                  className="hito-surface-quiet hito-shell-profile-trigger"
+                  data-hito-ds-pattern="quiet-surface"
+                  aria-label="Open profile and heart-rate settings"
+                >
                   <a href="/settings">
                     <Icon name="settings" size="sm" decorative />
-                    Profile &amp; heart rate
                   </a>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <a href="/integrations">
-                    <Icon name="connections" size="sm" decorative />
-                    Connections
+                </HitoButton>
+              </div>
+              <div className="grid min-w-0 gap-4 p-4">
+                <div>
+                  <p className="hito-label-md hito-label-signal">Route content</p>
+                  <p className="hito-ui-title-xs mt-2">Readable at narrow width</p>
+                </div>
+                {shellNotice ? (
+                  <div className="hito-state-surface py-3" data-tone="signal">
+                    <p className="hito-list-row-copy">Notice remains inside route content.</p>
+                  </div>
+                ) : null}
+              </div>
+              <nav className="hito-shell-mobile-nav" aria-label="Contained narrow navigation">
+                {[
+                  { label: "Calendar", icon: "calendar", href: "/", active: true },
+                  { label: "Progress", icon: "progress", href: "/progress", active: false },
+                ].map(({ label, icon, href, active }) => (
+                  <a
+                    key={label}
+                    href={href}
+                    className="hito-shell-mobile-row"
+                    data-active={active}
+                    aria-current={active ? "page" : undefined}
+                  >
+                    <Icon name={icon as HitoIconName} className="hito-shell-nav-icon" decorative />
+                    {label}
                   </a>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </aside>
-
-          <section className="hito-ds-app-shell-content" aria-label="Contained route content">
-            <header className="flex min-w-0 flex-wrap items-start justify-between gap-4 border-b border-hairline pb-4">
-              <div className="min-w-0">
-                <p className="hito-label-md hito-label-signal">Training</p>
-                <h3 className="hito-ui-title-xs mt-2">Training week</h3>
-              </div>
-            </header>
-
-            {shellNotice ? (
-              <div className="hito-state-surface py-3" data-tone="signal" role="status">
-                <p className="hito-list-row-title">Reference notice</p>
-                <p className="hito-list-row-copy">
-                  Existing notice surfaces compose inside route content, not in shell navigation.
-                </p>
-              </div>
-            ) : null}
-
-            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-              <article className="hito-surface-flat min-w-0 p-4">
-                <p className="hito-label-sm text-tertiary">Primary content</p>
-                <p className="hito-list-row-title mt-2">Current focus</p>
-                <p className="hito-list-row-copy mt-1">
-                  One route-owned object leads the reading order.
-                </p>
-              </article>
-              <article className="hito-surface-flat min-w-0 p-4">
-                <p className="hito-label-sm text-tertiary">Supporting content</p>
-                <p className="hito-list-row-title mt-2">Next action</p>
-                <p className="hito-list-row-copy mt-1">
-                  Secondary information stays inside the content region.
-                </p>
-              </article>
+                ))}
+              </nav>
             </div>
-          </section>
-        </div>
-      }
-      variants={
-        <div className="grid min-w-0">
-          <div className="hito-ds-app-shell-narrow">
-            <div className="flex min-w-0 items-center justify-between gap-3 border-b border-hairline p-4">
-              <div className="flex min-w-0 items-center gap-3">
-                <HitoLogoMark decorative className="[--hito-logo-height:1.45rem]" />
-                <div className="min-w-0">
-                  <p className="hito-menu-text truncate">Hito</p>
-                  <p className="hito-menu-meta truncate">Calendar</p>
-                </div>
-              </div>
-              <HitoButton
-                asChild
-                iconOnly
-                size="sm"
-                variant="ghost"
-                className="hito-surface-quiet hito-shell-profile-trigger"
-                data-hito-ds-pattern="quiet-surface"
-                aria-label="Open profile and heart-rate settings"
-              >
-                <a href="/settings">
-                  <Icon name="settings" size="sm" decorative />
-                </a>
-              </HitoButton>
-            </div>
-            <div className="grid min-w-0 gap-4 p-4">
-              <div>
-                <p className="hito-label-md hito-label-signal">Route content</p>
-                <p className="hito-ui-title-xs mt-2">Readable at narrow width</p>
-              </div>
-              {shellNotice ? (
-                <div className="hito-state-surface py-3" data-tone="signal">
-                  <p className="hito-list-row-copy">Notice remains inside route content.</p>
-                </div>
-              ) : null}
-            </div>
-            <nav className="hito-shell-mobile-nav" aria-label="Contained narrow navigation">
-              {[
-                { label: "Calendar", icon: "calendar", href: "/", active: true },
-                { label: "Progress", icon: "progress", href: "/progress", active: false },
-              ].map(({ label, icon, href, active }) => (
-                <a
-                  key={label}
-                  href={href}
-                  className="hito-shell-mobile-row"
-                  data-active={active}
-                  aria-current={active ? "page" : undefined}
-                >
-                  <Icon name={icon as HitoIconName} className="hito-shell-nav-icon" decorative />
-                  {label}
-                </a>
-              ))}
-            </nav>
           </div>
-        </div>
+        )
       }
       controls={
         <div className="hito-row-group border-0">
+          <div className="hito-list-row items-start">
+            <ChoiceControl
+              label="Responsive context"
+              options={APP_SHELL_VIEW_MODE_OPTIONS}
+              value={shellViewMode}
+              onChange={setShellViewMode}
+            />
+          </div>
           <ToggleRow
             label="Profile meta"
             active={shellProfileMeta}

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 import loginDesertHorizon from "@/assets/marketing/hero-background/login-desert-horizon.jpg";
 import { ReferenceListRow, SectionIntro } from "@/components/hito-ds/reference";
-import { HitoLogo, HitoLogoMark } from "@/components/ui/hito-logo";
+import { HitoLogo, HitoLogoLockup, HitoLogoMark } from "@/components/ui/hito-logo";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 
@@ -23,11 +23,11 @@ export function HitoDsBrandPage() {
             <LogoSpecimen label="Hero">
               <HitoLogo decorative className="[--hito-logo-height:3rem]" />
             </LogoSpecimen>
-            <LogoSpecimen label="Short mark">
+            <LogoSpecimen label="Compact symbol">
               <HitoLogoMark decorative className="[--hito-logo-height:2.4rem]" />
             </LogoSpecimen>
-            <LogoSpecimen label="Compact mark">
-              <HitoLogoMark decorative className="[--hito-logo-height:1.35rem]" />
+            <LogoSpecimen label="Full lockup" className="md:col-span-2">
+              <HitoLogoLockup decorative className="max-w-full [--hito-logo-height:3.25rem]" />
             </LogoSpecimen>
             <LogoSpecimen
               label="Light background"
@@ -43,7 +43,7 @@ export function HitoDsBrandPage() {
             >
               <HitoLogo decorative className="[--hito-logo-height:1.7rem]" />
             </LogoSpecimen>
-            <LogoSpecimen label="Favicon surface">
+            <LogoSpecimen label="Favicon">
               <img src="/favicon.svg" alt="" aria-hidden="true" className="size-16" />
             </LogoSpecimen>
           </div>
@@ -52,7 +52,7 @@ export function HitoDsBrandPage() {
             <ReferenceListRow
               label="Use"
               title="Brand identity only"
-              body="Use HitoLogo for linked shell brands, auth hero branding, and public brand moments. Use HitoLogoMark for compact brand marks and favicon artwork. Do not add either to the generic Icon registry."
+              body="Use HitoLogo for linked shell brands, auth hero branding, and public brand moments. Use HitoLogoMark for compact brand marks and favicon artwork. Reserve HitoLogoLockup for large identity compositions and this reference. Do not add any brand artwork to the generic Icon registry."
             />
             <ReferenceListRow
               label="Color"

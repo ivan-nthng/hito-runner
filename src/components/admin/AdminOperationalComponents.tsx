@@ -55,7 +55,6 @@ type AdminDataTableToolbarProps = {
   searchLabel: string;
   searchPlaceholder: string;
   searchValue?: string;
-  variant?: "data-table" | "admin";
 };
 
 export function AdminDataTableToolbar({
@@ -73,7 +72,6 @@ export function AdminDataTableToolbar({
   searchLabel,
   searchPlaceholder,
   searchValue,
-  variant = "data-table",
 }: AdminDataTableToolbarProps) {
   const resolvedSearchValue = searchValue ?? query;
   const [searchOpen, setSearchOpen] = useState(Boolean(resolvedSearchValue));
@@ -81,11 +79,8 @@ export function AdminDataTableToolbar({
   const activeCount = activeFilters.length;
   const hasFilterSections = filterSections.length > 0;
   const filterButtonDisabled = activeCount === 0 && !hasFilterSections;
-  const toolbarClassName =
-    variant === "admin" ? "hito-admin-utility-row" : "hito-data-table-utility-row";
-
   return (
-    <div className={cn(toolbarClassName, className)}>
+    <div className={cn("hito-data-table-utility-row", className)}>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         {isSearchOpen ? (
           <label className="hito-field hito-field-sm hito-data-table-search">

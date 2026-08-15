@@ -60,17 +60,8 @@ const HITO_SPACE_SCALE = [
   ["--space-10", 2.5],
 ] as const;
 
-const HITO_RADIUS_SCALE = [
-  ["--radius-sm", -4],
-  ["--radius-md", -2],
-  ["--radius-lg", 0],
-  ["--radius-xl", 4],
-  ["--radius-2xl", 8],
-  ["--radius-3xl", 12],
-  ["--radius-4xl", 16],
-] as const;
-
 const HITO_SEMANTIC_COLORS = HITO_DS_MANIFEST.collections.semanticColor;
+const HITO_RADIUS_TOKENS = HITO_DS_MANIFEST.collections.primitiveRadius;
 const HITO_SEMANTIC_COLORS_BY_VARIABLE = new Map<string, (typeof HITO_SEMANTIC_COLORS)[number]>(
   HITO_SEMANTIC_COLORS.map((color) => [color.cssVariable, color]),
 );
@@ -826,14 +817,30 @@ function getSpaceTokenOptions(): InlineChangeTokenControlOption[] {
 
 function getRadiusTokenOptions(): InlineChangeTokenControlOption[] {
   const baseRadius = getRootRadiusPx();
-  return HITO_RADIUS_SCALE.map(([token, pxDelta]) => {
-    const valuePx = Math.max(0, baseRadius + pxDelta);
+  if (baseRadius == null) return [];
+
+  return HITO_RADIUS_TOKENS.flatMap(({ cssVariable, value }) => {
+    const valuePx = resolveRadiusValue(value, baseRadius);
+    if (valuePx == null) return [];
+
     return {
       displayValue: formatCompactPx(valuePx),
-      token,
+      token: cssVariable,
       valuePx,
     };
   });
+}
+
+function resolveRadiusValue(value: string, baseRadius: number) {
+  if (value === "var(--radius)") return baseRadius;
+
+  const relativeRadius = value.match(
+    /^calc\(var\(--radius\) (?<operator>[+-]) (?<offset>\d+(?:\.\d+)?)px\)$/,
+  );
+  if (!relativeRadius?.groups) return null;
+
+  const offset = Number(relativeRadius.groups.offset);
+  return Math.max(0, baseRadius + (relativeRadius.groups.operator === "+" ? offset : -offset));
 }
 
 function getRootFontSize() {
@@ -843,7 +850,7 @@ function getRootFontSize() {
 function getRootRadiusPx() {
   const root = window.getComputedStyle(document.documentElement);
   const radius = root.getPropertyValue("--radius").trim();
-  return parseCssLength(radius) ?? 12;
+  return parseCssLength(radius);
 }
 
 function hasControlClass(className: string) {

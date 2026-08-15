@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+import type { ComponentPropsWithoutRef, ReactNode } from "react";
+
+import { cn } from "@/lib/utils";
 
 export function SectionIntro({
   label,
@@ -40,13 +42,23 @@ export function ReferenceListRow({
   );
 }
 
+export function HitoReferenceLink({ className, ...props }: ComponentPropsWithoutRef<"a">) {
+  return (
+    <a
+      className={cn("hito-reference-link hito-technical-sm", className)}
+      data-hito-component="reference-link"
+      {...props}
+    />
+  );
+}
+
 export function ProductLinks({ links }: { links: Array<{ href: string; label: string }> }) {
   return (
-    <span className="hito-specimen-links">
+    <span className="hito-reference-links">
       {links.map((link) => (
-        <a key={link.href} href={link.href} className="hito-specimen-link">
+        <HitoReferenceLink key={link.href} href={link.href}>
           {link.label}
-        </a>
+        </HitoReferenceLink>
       ))}
     </span>
   );

@@ -90,6 +90,7 @@ const workbenchSettingsOwner = "src/components/hito-ds/workbench-settings-contro
 const workbenchSettingsImporters = new Set([
   "src/components/hito-ds/calendar-workout-playground-data.ts",
   "src/components/hito-ds/calendar-workout-playground.tsx",
+  "src/components/hito-ds/reference-components-structure.tsx",
   "src/components/hito-ds/workout-library-playground-data.ts",
   "src/components/hito-ds/workout-library-playground.tsx",
 ]);
@@ -1224,8 +1225,15 @@ const foundationReferenceSurfaceCount =
 const foundationFlatSurfaceCount =
   (foundationsPage?.content.match(/hito-surface-flat/g)?.length ?? 0) +
   (brandPage?.content.match(/hito-surface-flat/g)?.length ?? 0);
-const foundationMarkPlaygroundCount =
-  foundationsPage?.content.match(/<HitoDsPlayground/g)?.length ?? 0;
+const foundationPlaygroundOffsets = [
+  ...(foundationsPage?.content.matchAll(/<HitoDsPlayground/g) ?? []),
+].map((match) => match.index ?? -1);
+const foundationPlaygroundCount = foundationPlaygroundOffsets.length;
+const foundationMarkPlaygroundIdIndex = foundationsPage?.content.indexOf('id="marks"') ?? -1;
+const foundationTypographyPlaygroundIdIndex =
+  foundationsPage?.content.indexOf('id="typography-inspector-picker"') ?? -1;
+const foundationTypographyPickerCaseCount =
+  foundationsPage?.content.match(/data-hito-ds-typography-picker-case=/g)?.length ?? 0;
 const tokenSpecimenSurfaceDeclarations = selectorDeclarations(
   referenceWorkbenchCss,
   ".hito-ds-token-specimen-surface",
@@ -1354,7 +1362,7 @@ expect(
 expect(
   workbenchSettingsConsumers.length === workbenchSettingsImporters.size &&
     workbenchSettingsConsumers.every((file) => workbenchSettingsImporters.has(file.relativePath)),
-  `Reference workbench settings consumers drifted from the exact four-file owner boundary: ${workbenchSettingsConsumers
+  `Reference workbench settings consumers drifted from the exact five-file owner boundary: ${workbenchSettingsConsumers
     .map((file) => file.relativePath)
     .join(", ")}`,
 );
@@ -1485,16 +1493,32 @@ expect(
   "Foundations must document semantic workout roles without reviving raw shade ramps.",
 );
 expect(
+  foundationPlaygroundCount === 2,
+  `Foundations playground structure drifted: expected 2 distinct playgrounds (Marks and Typography Inspector), found ${foundationPlaygroundCount}.`,
+);
+expect(
   foundationsPage?.content.includes('id="marks"') === true &&
     foundationsPage.content.includes("HITO_MARK_META.map") &&
     foundationsPage.content.includes("HITO_MARK_SHAPES.map") &&
     foundationsPage.content.includes("Object.keys(HITO_MARK_SIZES)") &&
     foundationsPage.content.includes("<HitoMark") &&
-    foundationMarkPlaygroundCount === 1 &&
+    foundationPlaygroundCount === 2 &&
+    foundationPlaygroundOffsets[0] < foundationMarkPlaygroundIdIndex &&
+    foundationMarkPlaygroundIdIndex < foundationPlaygroundOffsets[1] &&
     foundationsPage.content.includes("data-hito-ds-mark-gallery") &&
     foundationsPage.content.includes("MarkTokenProvenance") &&
     foundationsPage.content.includes("data-hito-ds-mark-size-shape-matrix") === false,
   "Foundations must document the canonical Mark inventory, playground, both shapes, five sizes, gallery and token provenance.",
+);
+expect(
+  foundationPlaygroundCount === 2 &&
+    foundationPlaygroundOffsets[1] < foundationTypographyPlaygroundIdIndex &&
+    foundationsPage?.content.includes('data-hito-ds-typography-inspector-specimen=""') === true &&
+    foundationsPage.content.includes('aria-label="Typography inspector examples"') &&
+    foundationsPage.content.includes("useHitoRadioGroup<TypographyInspectorPickerCase>") &&
+    foundationTypographyPickerCaseCount === 3 &&
+    foundationsPage.content.includes("<TypographyControlRow"),
+  "Foundations must retain a distinct Typography Inspector playground with three interactive cases and one selected control-row seam.",
 );
 const foundationGeometryDefinitions = [
   ...foundationsCss.matchAll(/(--hito-[a-z0-9-]*(?:width|height)[a-z0-9-]*)\s*:/gi),
@@ -1573,8 +1597,8 @@ expect(
   "Foundations token specimens must retain the shared borderless 16px semantic surface.",
 );
 expect(
-  foundationReferenceSurfaceCount === 11 && foundationFlatSurfaceCount === 6,
-  `Foundations reference-surface classification drifted: ${foundationReferenceSurfaceCount} accepted token specimens and ${foundationFlatSurfaceCount} preserved distinct flat surfaces.`,
+  foundationReferenceSurfaceCount === 12 && foundationFlatSurfaceCount === 4,
+  `Foundations reference-surface classification drifted: expected 12 accepted token specimens and 4 preserved distinct flat surfaces; found ${foundationReferenceSurfaceCount} and ${foundationFlatSurfaceCount}.`,
 );
 expect(
   (brandPage?.content.match(/labelTone="on-light"/g) ?? []).length === 1 &&
@@ -1582,7 +1606,7 @@ expect(
     brandPage.content.includes('labelTone?: "default" | "on-light" | "on-dark"') &&
     brandPage.content.includes('"text-[var(--stone-950)]"') &&
     brandPage.content.includes('"text-[var(--sand-100)]"') &&
-    brandPage.content.includes('<LogoSpecimen label="Favicon surface">') &&
+    brandPage.content.includes('<LogoSpecimen label="Favicon">') &&
     brandPage.content.includes('src="/favicon.svg"'),
   "Brand background samples must own one truthful on-light and one on-dark tone while the favicon specimen reuses the canonical asset directly.",
 );

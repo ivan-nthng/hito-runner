@@ -48,7 +48,7 @@ function ProgressPage() {
 function ProgressPendingState() {
   return (
     <AppShell>
-      <div className="hito-route-gutter max-w-5xl space-y-8 py-10" aria-busy="true">
+      <div className="hito-route-gutter max-w-5xl space-y-8 py-hito-6 sm:py-10" aria-busy="true">
         <Skeleton className="h-10 w-full max-w-sm" />
         <div>
           <Skeleton className="h-4 w-28" />
@@ -75,7 +75,7 @@ function ProgressErrorState({ reset }: { error: Error; reset: () => void }) {
           <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
             We couldn&apos;t open this runner view.
           </h1>
-          <p className="hito-body-md mt-4 max-w-[40rem] text-foreground/85">
+          <p className="hito-body-md mt-4 max-w-[40rem] text-text-secondary">
             Try again to reopen the latest activity truth.
           </p>
           <div className="hito-state-actions">

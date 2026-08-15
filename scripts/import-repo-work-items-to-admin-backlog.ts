@@ -850,7 +850,7 @@ async function createImportedItem(
       }
     }
 
-    throw new Error(`Could not import ${item.sourcePath}: ${error.message}`);
+    throw new Error(`Could not import ${item.sourcePath}: ${error.message}`, { cause: error });
   }
 
   return "created";
@@ -918,7 +918,7 @@ async function refreshExistingItem(
       .limit(1);
 
     if (error) {
-      throw new Error(`Could not refresh ${item.sourcePath}: ${error.message}`);
+      throw new Error(`Could not refresh ${item.sourcePath}: ${error.message}`, { cause: error });
     }
 
     return data?.length ? "updated" : "skipped";
@@ -927,7 +927,7 @@ async function refreshExistingItem(
   const { error } = await supabase.from("admin_capture_items").update(patch).eq("id", existing.id);
 
   if (error) {
-    throw new Error(`Could not refresh ${item.sourcePath}: ${error.message}`);
+    throw new Error(`Could not refresh ${item.sourcePath}: ${error.message}`, { cause: error });
   }
 
   return "updated";
@@ -955,7 +955,9 @@ async function loadAdminCaptureRows(
     .limit(MAX_EXISTING_ROWS);
 
   if (error) {
-    throw new Error(`Could not load existing admin backlog items: ${error.message}`);
+    throw new Error(`Could not load existing admin backlog items: ${error.message}`, {
+      cause: error,
+    });
   }
 
   if (
@@ -1100,6 +1102,7 @@ async function archiveStaleRepoMirrorRow(
   if (error) {
     throw new Error(
       `Could not archive stale repo mirror ${sourcePath ?? row.id}: ${error.message}`,
+      { cause: error },
     );
   }
 }

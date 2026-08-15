@@ -477,7 +477,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
                 </div>
               ) : (
                 <div className="pt-6">
-                  <p className="hito-body-md text-center text-foreground/85">
+                  <p className="hito-body-md text-center text-text-secondary">
                     Create workouts independently, or use a workout from a coach or friend.
                   </p>
                 </div>

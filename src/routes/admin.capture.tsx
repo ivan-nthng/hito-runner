@@ -660,7 +660,6 @@ function CaptureUtilityRow({
       searchLabel="Search work items"
       searchPlaceholder="Search notes, routes, text, or role"
       searchValue={draftQuery}
-      variant="admin"
     />
   );
 }
@@ -785,10 +784,14 @@ function QuickNotePanel({
           />
         </label>
         {quickNote.error ? (
-          <p className="hito-body-md font-medium text-negative">{quickNote.error}</p>
+          <p className="hito-body-md font-medium text-negative" role="alert">
+            {quickNote.error}
+          </p>
         ) : null}
         {quickNote.success ? (
-          <p className="hito-body-xs text-positive">{quickNote.success}</p>
+          <p className="hito-body-xs text-positive" role="status" aria-live="polite">
+            {quickNote.success}
+          </p>
         ) : null}
         <div className="flex flex-wrap gap-2">
           <button
@@ -1130,6 +1133,8 @@ function CaptureItemDetail({
             ? "hito-body-md font-medium text-negative"
             : "hito-body-xs text-positive"
         }
+        role={mutation.tone === "error" ? "alert" : "status"}
+        aria-live={mutation.tone === "error" ? undefined : "polite"}
       >
         {mutation.message}
       </p>
@@ -1213,7 +1218,7 @@ function CaptureItemDetail({
             </button>
           </div>
           <pre
-            className="hito-technical-sm max-h-80 min-h-40 overflow-auto whitespace-pre-wrap rounded-xl bg-black/35 p-4 text-foreground"
+            className="hito-surface-flat hito-technical-sm max-h-80 min-h-40 overflow-auto whitespace-pre-wrap p-4 text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             tabIndex={0}
           >
             {promptBody}

@@ -565,7 +565,7 @@ function SavedPlanStartReceipt({ receipt }: { receipt: AppliedReceipt }) {
         Starts {formatDate(receipt.resolvedStartDate)} with {receipt.workoutCount} non-Rest workouts
         across {receipt.calendarRowCount} Calendar days.
       </p>
-      <ul className="mt-3 grid gap-1 text-sm text-foreground/85">
+      <ul className="mt-3 grid gap-1 text-sm text-text-secondary">
         {receipt.omittedLeadingDayCount > 0 ? (
           <li>
             {receipt.omittedLeadingDayCount} leading source days were omitted by schedule alignment.

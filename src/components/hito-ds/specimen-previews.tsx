@@ -1,9 +1,18 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   AdminDataTableColumnHeader,
   AdminDataTableStaticHeader,
   AdminDataTableToolbar,
 } from "@/components/admin/AdminOperationalComponents";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -51,48 +60,85 @@ type ModalHeaderMode = "title-only" | "with-description";
 type ModalFooterMode = "none" | "actions" | "note-actions";
 type ModalPreviewPresentation = "live" | "static";
 type DataTableSortDirection = "asc" | "desc";
-type DataTableSpecimenSortKey = "preview" | "none";
+type DataTableHeaderState = "static" | "sortable" | "sorted-asc" | "sorted-desc" | "filtered";
+type DataTableSpecimenSortKey = "runner" | "status" | "workouts" | "none";
+export type DataTableReferenceDensity = "sm" | "md" | "lg";
+
+type DataTableSpecimenRow = {
+  id: string;
+  name: string;
+  email: string;
+  initials: string;
+  plan: string;
+  planDetail: string;
+  lastActivityDate: string;
+  lastActivityTime: string;
+  workouts: number;
+  status: "Active" | "Paused";
+};
+
+const DATA_TABLE_SPECIMEN_ROWS: readonly DataTableSpecimenRow[] = [
+  {
+    id: "mara",
+    name: "Mara Vale",
+    email: "mara@hito.test",
+    initials: "MV",
+    plan: "Base rebuild",
+    planDetail: "Week 4 of 8",
+    lastActivityDate: "Aug 12, 2026",
+    lastActivityTime: "07:42",
+    workouts: 18,
+    status: "Active",
+  },
+  {
+    id: "noor",
+    name: "Noor Silva",
+    email: "noor@hito.test",
+    initials: "NS",
+    plan: "Half marathon",
+    planDetail: "Week 7 of 12",
+    lastActivityDate: "Aug 11, 2026",
+    lastActivityTime: "18:10",
+    workouts: 11,
+    status: "Paused",
+  },
+  {
+    id: "eli",
+    name: "Eli Santos",
+    email: "eli@hito.test",
+    initials: "ES",
+    plan: "5K progression",
+    planDetail: "Week 3 of 6",
+    lastActivityDate: "Aug 13, 2026",
+    lastActivityTime: "06:25",
+    workouts: 24,
+    status: "Active",
+  },
+];
 
 const BUTTON_VARIANTS = HITO_BUTTON_VARIANTS;
 const BUTTON_TONES = HITO_BUTTON_TONES;
 const BUTTON_SIZES = HITO_BUTTON_SIZES;
 
-export function DataTableSpecimenPreview({
-  sortable,
-  activeSort,
-  sortDirection = "asc",
-  filtered,
-  staticMode,
-  showUtilityRow,
-}: {
-  sortable: boolean;
-  activeSort: boolean;
-  sortDirection?: DataTableSortDirection;
-  filtered: boolean;
-  staticMode: boolean;
-  showUtilityRow: boolean;
-}) {
-  const previewIsStatic = staticMode || !sortable;
-  const [query, setQuery] = useState("runner@hito.test");
-  const [selectedFilter, setSelectedFilter] = useState(filtered ? "active" : "all");
+const DATA_TABLE_DENSITY_TEXT: Record<
+  DataTableReferenceDensity,
+  { primary: string; secondary: string }
+> = {
+  sm: { primary: "hito-body-sm", secondary: "hito-body-xs" },
+  md: { primary: "hito-body-md", secondary: "hito-body-xs" },
+  lg: { primary: "hito-body-lg", secondary: "hito-body-sm" },
+};
+
+function useDataTableSpecimenState(initialFilter: "all" | "active" = "all") {
+  const [query, setQuery] = useState("");
+  const [selectedFilter, setSelectedFilter] = useState(initialFilter);
   const [activeSortState, setActiveSortState] = useState<{
     key: DataTableSpecimenSortKey;
     direction: DataTableSortDirection;
   }>({
-    key: !previewIsStatic && activeSort ? "preview" : "none",
-    direction: sortDirection,
+    key: "workouts",
+    direction: "desc",
   });
-
-  useEffect(() => {
-    setSelectedFilter(filtered ? "active" : "all");
-  }, [filtered]);
-
-  useEffect(() => {
-    setActiveSortState({
-      key: !previewIsStatic && activeSort ? "preview" : "none",
-      direction: sortDirection,
-    });
-  }, [activeSort, previewIsStatic, sortDirection]);
 
   const activeFilters =
     selectedFilter === "active"
@@ -106,92 +152,395 @@ export function DataTableSpecimenPreview({
         ]
       : [];
 
-  return (
-    <div className="grid gap-4">
-      {showUtilityRow && (
-        <AdminDataTableToolbar
-          activeFilters={activeFilters}
-          clearAllFilters={() => setSelectedFilter("all")}
-          filterSections={[
-            {
-              currentValue: selectedFilter,
-              label: "Status",
-              onSelect: setSelectedFilter,
-              options: [
-                { value: "all", label: "All states" },
-                { value: "active", label: "Active" },
-              ],
-            },
-          ]}
-          onQueryChange={setQuery}
-          query={query}
-          rowCountLabel="3 rows"
-          searchLabel="Search data table specimen"
-          searchPlaceholder="Search runners"
-        />
-      )}
+  const normalizedQuery = query.trim().toLowerCase();
+  const rows = DATA_TABLE_SPECIMEN_ROWS.filter((row) => {
+    const matchesFilter = selectedFilter === "all" || row.status === "Active";
+    const matchesQuery =
+      normalizedQuery.length === 0 ||
+      row.name.toLowerCase().includes(normalizedQuery) ||
+      row.email.toLowerCase().includes(normalizedQuery);
+    return matchesFilter && matchesQuery;
+  }).sort((left, right) => {
+    if (activeSortState.key === "none") return 0;
+    const direction = activeSortState.direction === "asc" ? 1 : -1;
+    if (activeSortState.key === "workouts") {
+      return (left.workouts - right.workouts) * direction;
+    }
+    if (activeSortState.key === "status") {
+      return left.status.localeCompare(right.status) * direction;
+    }
+    return left.name.localeCompare(right.name) * direction;
+  });
 
+  return {
+    activeFilters,
+    activeSortState,
+    query,
+    rows,
+    selectedFilter,
+    setActiveSortState,
+    setQuery,
+    setSelectedFilter,
+  };
+}
+
+type DataTableSpecimenState = ReturnType<typeof useDataTableSpecimenState>;
+
+function DataTableToolbarSpecimen({ state }: { state: DataTableSpecimenState }) {
+  return (
+    <AdminDataTableToolbar
+      activeFilters={state.activeFilters}
+      clearAllFilters={() => state.setSelectedFilter("all")}
+      filterSections={[
+        {
+          currentValue: state.selectedFilter,
+          label: "Status",
+          onSelect: (value) => state.setSelectedFilter(value === "active" ? "active" : "all"),
+          options: [
+            { value: "all", label: "All states" },
+            { value: "active", label: "Active" },
+          ],
+        },
+      ]}
+      onQueryChange={state.setQuery}
+      query={state.query}
+      rowCountLabel={`${state.rows.length} ${state.rows.length === 1 ? "row" : "rows"}`}
+      searchLabel="Search data table specimen"
+      searchPlaceholder="Search runners"
+    />
+  );
+}
+
+function FixedHeaderCell({ state }: { state: DataTableHeaderState }) {
+  const [activeSort, setActiveSort] = useState<{
+    key: DataTableSpecimenSortKey;
+    direction: DataTableSortDirection;
+  }>({
+    key: state === "sorted-asc" || state === "sorted-desc" ? "workouts" : "none",
+    direction: state === "sorted-desc" ? "desc" : "asc",
+  });
+  const [selectedFilter, setSelectedFilter] = useState(state === "filtered" ? "active" : "all");
+
+  if (state === "static") {
+    return <AdminDataTableStaticHeader label="Workouts" />;
+  }
+
+  return (
+    <AdminDataTableColumnHeader
+      activeSort={activeSort}
+      column="workouts"
+      filterActive={state === "filtered" && selectedFilter !== "all"}
+      filterOptions={
+        state === "filtered"
+          ? [
+              { value: "all", label: "All states" },
+              { value: "active", label: "Active" },
+            ]
+          : undefined
+      }
+      label="Workouts"
+      menuLabel={`Sort${state === "filtered" ? " and filter" : ""} Workouts`}
+      onFilterChange={state === "filtered" ? setSelectedFilter : undefined}
+      onSort={(key, direction) => setActiveSort({ key, direction })}
+      selectedFilter={selectedFilter}
+      sortOptions={[
+        { key: "workouts", direction: "asc", label: "Sort ascending" },
+        { key: "workouts", direction: "desc", label: "Sort descending" },
+      ]}
+    />
+  );
+}
+
+export function DataTableHeaderDemo({
+  density = "md",
+  state,
+}: {
+  density?: DataTableReferenceDensity;
+  state: DataTableHeaderState;
+}) {
+  return (
+    <div className="hito-data-table-scroll w-full max-w-sm">
+      <table className="hito-data-table w-full" data-hito-reference-table-density={density}>
+        <caption className="sr-only">{state} data table header.</caption>
+        <thead>
+          <tr>
+            <FixedHeaderCell key={state} state={state} />
+          </tr>
+        </thead>
+      </table>
+    </div>
+  );
+}
+
+export function DataTableHeaderVariants({ states }: { states: readonly DataTableHeaderState[] }) {
+  return (
+    <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {states.map((state) => (
+        <div key={state} className="grid min-w-0 gap-2">
+          <p className="hito-label-sm capitalize">{state.replaceAll("-", " ")}</p>
+          <div inert>
+            <DataTableHeaderDemo state={state} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function DataTableControlsDemo({
+  initialFilter = "all",
+}: {
+  initialFilter?: "all" | "active";
+}) {
+  const state = useDataTableSpecimenState(initialFilter);
+  return <DataTableToolbarSpecimen state={state} />;
+}
+
+export function DataTableSpecimenPreview({
+  headerState = "sortable",
+  showToolbar = false,
+}: {
+  composition: "headers";
+  headerState?: DataTableHeaderState;
+  showToolbar?: boolean;
+}) {
+  return showToolbar ? (
+    <LiveDataTable initialFilter={headerState === "filtered" ? "active" : "all"} />
+  ) : (
+    <DataTableHeaderDemo state={headerState} />
+  );
+}
+
+function RunnerIdentityCell({
+  density,
+  row,
+}: {
+  density: DataTableReferenceDensity;
+  row: DataTableSpecimenRow;
+}) {
+  const text = DATA_TABLE_DENSITY_TEXT[density];
+
+  return (
+    <td className="hito-data-table-cell">
+      <div className="flex min-w-0 items-center gap-3">
+        <Avatar className="h-8 w-8 border border-hairline bg-background">
+          <AvatarFallback className="hito-label-sm">{row.initials}</AvatarFallback>
+        </Avatar>
+        <div className="min-w-0">
+          <span className={cn(text.primary, "block font-medium text-foreground")}>{row.name}</span>
+          <span className="hito-technical-sm hito-data-table-code-width-sm mt-1 block truncate text-secondary">
+            {row.email}
+          </span>
+        </div>
+      </div>
+    </td>
+  );
+}
+
+function RunnerValueCells({
+  density,
+  row,
+}: {
+  density: DataTableReferenceDensity;
+  row: DataTableSpecimenRow;
+}) {
+  const text = DATA_TABLE_DENSITY_TEXT[density];
+
+  return (
+    <>
+      <td className="hito-data-table-cell whitespace-nowrap">
+        <span className={cn(text.primary, "block font-medium text-foreground")}>{row.plan}</span>
+        <span className={cn(text.secondary, "mt-1 block text-secondary")}>{row.planDetail}</span>
+      </td>
+      <td className="hito-data-table-cell whitespace-nowrap">
+        <span className={cn(text.primary, "block")}>{row.lastActivityDate}</span>
+        <span className={cn(text.secondary, "mt-1 block text-secondary")}>
+          {row.lastActivityTime}
+        </span>
+      </td>
+      <td className="hito-data-table-cell tabular-nums">
+        <span className={cn(text.primary, "block font-medium text-foreground")}>
+          {row.workouts}
+        </span>
+        <span className={cn(text.secondary, "mt-1 block text-secondary")}>workouts</span>
+      </td>
+      <td className="hito-data-table-cell">
+        <span
+          className="hito-status-pill"
+          data-tone={row.status === "Active" ? "success" : "muted"}
+        >
+          {row.status}
+        </span>
+      </td>
+      <td className="hito-data-table-cell hito-data-table-cell-end text-right">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <HitoButton
+              type="button"
+              variant="ghost"
+              size="xs"
+              iconOnly
+              aria-label={`Open actions for ${row.name}`}
+            >
+              <Icon name="more-horizontal" size="xs" decorative />
+            </HitoButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="hito-shell-menu">
+            <DropdownMenuLabel className="hito-label-sm">Runner actions</DropdownMenuLabel>
+            <DropdownMenuItem className="hito-shell-menu-item">View runner</DropdownMenuItem>
+            <DropdownMenuItem className="hito-shell-menu-item">Copy email</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </td>
+    </>
+  );
+}
+
+export function DataTableRowsDemo({ density }: { density: DataTableReferenceDensity }) {
+  const row = DATA_TABLE_SPECIMEN_ROWS[0];
+
+  return (
+    <div className="grid min-w-0 gap-3">
       <div className="hito-data-table-scroll">
-        <table className="hito-data-table hito-data-table-min-md">
-          <caption className="sr-only">Hito data-table specimen preview.</caption>
-          <thead>
+        <table
+          className="hito-data-table hito-data-table-min-md"
+          data-hito-reference-table-density={density}
+        >
+          <caption className="sr-only">Approved Hito data table row anatomy.</caption>
+          <thead className="sr-only">
             <tr>
-              {previewIsStatic ? (
-                <AdminDataTableStaticHeader label="Preview column" />
-              ) : (
-                <AdminDataTableColumnHeader
-                  activeSort={activeSortState}
-                  column="preview"
-                  filterActive={selectedFilter !== "all"}
-                  filterOptions={[
-                    { value: "all", label: "All states" },
-                    { value: "active", label: "Active" },
-                  ]}
-                  label="Preview column"
-                  menuLabel="Sort and filter preview column"
-                  onFilterChange={setSelectedFilter}
-                  onSort={(key, direction) => setActiveSortState({ key, direction })}
-                  selectedFilter={selectedFilter}
-                  sortOptions={[
-                    { key: "preview", direction: "asc", label: "Sort ascending" },
-                    { key: "preview", direction: "desc", label: "Sort descending" },
-                  ]}
-                />
-              )}
-              <AdminDataTableStaticHeader label="Runtime behavior" />
-              <AdminDataTableStaticHeader label="Contract" />
+              <AdminDataTableStaticHeader label="Select" />
+              <AdminDataTableStaticHeader label="Runner" />
+              <AdminDataTableStaticHeader label="Plan" />
+              <AdminDataTableStaticHeader label="Last activity" />
+              <AdminDataTableStaticHeader label="Workouts" />
+              <AdminDataTableStaticHeader label="Status" />
+              <AdminDataTableStaticHeader label="Actions" />
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td className="hito-data-table-cell hito-data-table-cell-start">
-                {previewIsStatic ? "Non-interactive label" : "Header menu affordance"}
+              <td className="hito-data-table-cell hito-data-table-cell-start align-middle">
+                <input
+                  type="checkbox"
+                  className="hito-checkbox hito-checkbox-sm"
+                  aria-label={`Select ${row.name}`}
+                />
               </td>
-              <td className="hito-data-table-cell">Search, sort, and filter remain interactive</td>
-              <td className="hito-data-table-cell hito-data-table-cell-end">
-                Shared admin operational owner
-              </td>
-            </tr>
-            <tr>
-              <td className="hito-data-table-cell hito-data-table-cell-start">
-                <code className="hito-technical-sm text-secondary hito-data-table-code">
-                  qa-runner@hito.test
-                </code>
-              </td>
-              <td className="hito-data-table-cell">Keyboard reachable</td>
-              <td className="hito-data-table-cell hito-data-table-cell-end">
-                aria-sort stays on the table header
-              </td>
+              <RunnerIdentityCell density={density} row={row} />
+              <RunnerValueCells density={density} row={row} />
             </tr>
           </tbody>
         </table>
       </div>
-
-      <p className="hito-body-xs text-tertiary">
-        The scroll container owns horizontal overflow; the page canvas should not.
-      </p>
     </div>
   );
+}
+
+function LiveDataTable({
+  density = "md",
+  initialFilter = "all",
+}: {
+  density?: DataTableReferenceDensity;
+  initialFilter?: "all" | "active";
+}) {
+  const state = useDataTableSpecimenState(initialFilter);
+
+  return (
+    <div className="grid min-w-0 gap-4">
+      <DataTableToolbarSpecimen state={state} />
+      <div className="hito-data-table-scroll">
+        <table
+          className="hito-data-table hito-data-table-min-md"
+          data-hito-reference-table-density={density}
+        >
+          <caption className="sr-only">Interactive Hito data table specimen.</caption>
+          <thead>
+            <tr>
+              <AdminDataTableStaticHeader label="Select" />
+              <AdminDataTableColumnHeader
+                activeSort={state.activeSortState}
+                column="runner"
+                filterActive={false}
+                label="Runner"
+                menuLabel="Sort Runner"
+                onSort={(key, direction) => state.setActiveSortState({ key, direction })}
+                sortOptions={[
+                  { key: "runner", direction: "asc", label: "Sort ascending" },
+                  { key: "runner", direction: "desc", label: "Sort descending" },
+                ]}
+              />
+              <AdminDataTableStaticHeader label="Plan" />
+              <AdminDataTableStaticHeader label="Last activity" />
+              <AdminDataTableColumnHeader
+                activeSort={state.activeSortState}
+                column="workouts"
+                filterActive={false}
+                label="Workouts"
+                menuLabel="Sort Workouts"
+                onSort={(key, direction) => state.setActiveSortState({ key, direction })}
+                sortOptions={[
+                  { key: "workouts", direction: "asc", label: "Sort ascending" },
+                  { key: "workouts", direction: "desc", label: "Sort descending" },
+                ]}
+              />
+              <AdminDataTableColumnHeader
+                activeSort={state.activeSortState}
+                column="status"
+                filterActive={state.selectedFilter !== "all"}
+                filterOptions={[
+                  { value: "all", label: "All states" },
+                  { value: "active", label: "Active" },
+                ]}
+                label="Status"
+                menuLabel="Sort and filter Status"
+                onFilterChange={(value) =>
+                  state.setSelectedFilter(value === "active" ? "active" : "all")
+                }
+                onSort={(key, direction) => state.setActiveSortState({ key, direction })}
+                selectedFilter={state.selectedFilter}
+                sortOptions={[
+                  { key: "status", direction: "asc", label: "Sort ascending" },
+                  { key: "status", direction: "desc", label: "Sort descending" },
+                ]}
+              />
+              <AdminDataTableStaticHeader label="Actions" />
+            </tr>
+          </thead>
+          <tbody>
+            {state.rows.length > 0 ? (
+              state.rows.map((row) => (
+                <tr key={row.id}>
+                  <td className="hito-data-table-cell hito-data-table-cell-start align-middle">
+                    <input
+                      type="checkbox"
+                      className="hito-checkbox hito-checkbox-sm"
+                      aria-label={`Select ${row.name}`}
+                    />
+                  </td>
+                  <RunnerIdentityCell density={density} row={row} />
+                  <RunnerValueCells density={density} row={row} />
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td
+                  className="hito-data-table-cell hito-data-table-cell-start hito-data-table-cell-end text-secondary"
+                  colSpan={7}
+                >
+                  No matching rows
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+export function DataTableLiveDemo({ density }: { density: DataTableReferenceDensity }) {
+  return <LiveDataTable density={density} />;
 }
 
 export function ModalWindowPreview({

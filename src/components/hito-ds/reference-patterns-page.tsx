@@ -1,10 +1,10 @@
-import type { CSSProperties } from "react";
+import { type CSSProperties, useState } from "react";
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
 import { WorkoutLibraryPlayground } from "@/components/hito-ds/workout-library-playground";
 import { HitoDsPatternInlineEditing } from "@/components/hito-ds/reference-pattern-inline-editing";
 import { HitoDsAppShellPattern } from "@/components/hito-ds/reference-components-structure";
 import { ProductLinks, ReferenceListRow, SectionIntro } from "@/components/hito-ds/reference";
-import { DataTableSpecimenPreview } from "@/components/hito-ds/specimen-previews";
+import { ChoiceSelector, DataTableSpecimenPreview } from "@/components/hito-ds/specimen-previews";
 import { HitoButton } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -24,6 +24,71 @@ const FEEDBACK_MARKER_EXAMPLES = [
   { label: "Evidence", state: "evidence_attached" },
   { label: "Feedback", state: "feedback_ready" },
 ] as const;
+
+const STATE_SURFACE_TONES = ["neutral", "signal", "success", "warning", "destructive"] as const;
+const STATE_SURFACE_SIZES = ["sm", "md", "lg"] as const;
+const STATE_SURFACE_ACTION_STATES = ["absent", "present"] as const;
+
+type StateSurfaceTone = (typeof STATE_SURFACE_TONES)[number];
+type StateSurfaceSize = (typeof STATE_SURFACE_SIZES)[number];
+type StateSurfaceActionState = (typeof STATE_SURFACE_ACTION_STATES)[number];
+
+const STATE_SURFACE_TONE_META: Record<
+  StateSurfaceTone,
+  { contentColor: string; copy: string; kicker: string; title: string }
+> = {
+  neutral: {
+    contentColor: "var(--color-text-secondary)",
+    copy: "No outcome is implied before the route has semantic state to report.",
+    kicker: "Neutral state",
+    title: "Review the current information.",
+  },
+  signal: {
+    contentColor: "var(--color-text-accent)",
+    copy: "A factual next step stays visible until its underlying state changes.",
+    kicker: "Setup",
+    title: "Create a first plan.",
+  },
+  success: {
+    contentColor: "var(--color-text-positive)",
+    copy: "Positive state remains explicit in words instead of relying on colour alone.",
+    kicker: "Ready",
+    title: "Plan ready to review.",
+  },
+  warning: {
+    contentColor: "var(--color-text-warning)",
+    copy: "The message names what needs attention and keeps the next step nearby.",
+    kicker: "Attention",
+    title: "One value needs review.",
+  },
+  destructive: {
+    contentColor: "var(--color-text-negative)",
+    copy: "Persistent recovery guidance remains in the route instead of disappearing in a toast.",
+    kicker: "Recovery",
+    title: "The update was not applied.",
+  },
+};
+
+const STATE_SURFACE_SIZE_META: Record<
+  StateSurfaceSize,
+  { bodyClassName: string; kickerClassName: string; titleClassName: string }
+> = {
+  sm: {
+    bodyClassName: "hito-body-xs",
+    kickerClassName: "hito-label-sm",
+    titleClassName: "hito-body-md font-medium",
+  },
+  md: {
+    bodyClassName: "hito-body-sm",
+    kickerClassName: "hito-label-md",
+    titleClassName: "hito-ui-title-xs",
+  },
+  lg: {
+    bodyClassName: "hito-body-md",
+    kickerClassName: "hito-label-md",
+    titleClassName: "hito-ui-title-sm",
+  },
+};
 
 const CALENDAR_TYPE_EXAMPLES: ReadonlyArray<{
   label: string;
@@ -64,6 +129,14 @@ const CALENDAR_TYPE_EXAMPLES: ReadonlyArray<{
 ] as const;
 
 export function HitoDsPatternsPage() {
+  const [stateSurfaceTone, setStateSurfaceTone] = useState<StateSurfaceTone>("signal");
+  const [stateSurfaceSize, setStateSurfaceSize] = useState<StateSurfaceSize>("lg");
+  const [stateSurfaceActions, setStateSurfaceActions] =
+    useState<StateSurfaceActionState>("present");
+  const [stateSurfaceActionHandled, setStateSurfaceActionHandled] = useState(false);
+  const stateSurfaceToneMeta = STATE_SURFACE_TONE_META[stateSurfaceTone];
+  const stateSurfaceSizeMeta = STATE_SURFACE_SIZE_META[stateSurfaceSize];
+
   return (
     <>
       <HitoDsAppShellPattern />
@@ -92,13 +165,7 @@ export function HitoDsPatternsPage() {
           />
         }
         preview={
-          <DataTableSpecimenPreview
-            sortable
-            activeSort
-            filtered
-            staticMode={false}
-            showUtilityRow
-          />
+          <DataTableSpecimenPreview composition="headers" headerState="filtered" showToolbar />
         }
         controls={
           <div className="hito-row-group border-0">
@@ -252,7 +319,7 @@ export function HitoDsPatternsPage() {
         statusTone="signal"
         description={{
           purpose:
-            "Keep route-level setup, empty, warning, and recovery guidance visible in one owned state surface.",
+            "Keep route-level setup, empty, warning, and recovery guidance visible in one flat semantic state surface.",
           useWhen:
             "A message and optional action must remain in the route until its underlying state changes.",
           avoidWhen:
@@ -270,59 +337,97 @@ export function HitoDsPatternsPage() {
           />
         }
         demo={
-          <article className="hito-state-surface" data-tone="signal" role="status">
-            <p className="hito-label-md hito-label-signal">Setup</p>
-            <h3 className="hito-ui-title-sm mt-3">Create a first plan.</h3>
-            <p className="hito-body-md text-secondary mt-3">
-              State surfaces keep route-level setup and empty states consistent.
+          <article
+            className="hito-state-surface w-full max-w-2xl"
+            data-size={stateSurfaceSize}
+            data-tone={stateSurfaceTone}
+            aria-labelledby="state-surface-demo-title"
+          >
+            <p
+              className={stateSurfaceSizeMeta.kickerClassName}
+              style={{ color: stateSurfaceToneMeta.contentColor }}
+            >
+              {stateSurfaceToneMeta.kicker}
             </p>
-            <div className="hito-state-actions">
-              <HitoButton size="md" variant="primary">
-                Continue
-              </HitoButton>
-            </div>
+            <h3
+              id="state-surface-demo-title"
+              className={`${stateSurfaceSizeMeta.titleClassName} mt-3`}
+            >
+              {stateSurfaceToneMeta.title}
+            </h3>
+            <p className={`${stateSurfaceSizeMeta.bodyClassName} text-secondary mt-3`}>
+              {stateSurfaceToneMeta.copy}
+            </p>
+            {stateSurfaceActions === "present" ? (
+              <>
+                <div className="hito-state-actions">
+                  <HitoButton
+                    size="md"
+                    variant="primary"
+                    onClick={() => setStateSurfaceActionHandled((handled) => !handled)}
+                  >
+                    {stateSurfaceActionHandled ? "Reset action" : "Acknowledge"}
+                  </HitoButton>
+                </div>
+                {stateSurfaceActionHandled ? (
+                  <p className="hito-body-xs text-secondary mt-3" role="status">
+                    Action acknowledged.
+                  </p>
+                ) : null}
+              </>
+            ) : null}
           </article>
         }
         variants={
-          <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-            <article className="hito-state-surface" data-tone="success">
-              <p className="hito-label-md">Ready</p>
-              <h3 className="hito-ui-title-sm mt-3">Plan ready to review.</h3>
-              <p className="hito-body-md text-secondary mt-3">
-                Success remains readable without color.
-              </p>
-            </article>
-            <article className="hito-state-surface" data-tone="warning">
-              <p className="hito-label-md">Attention</p>
-              <h3 className="hito-ui-title-sm mt-3">One value needs review.</h3>
-              <p className="hito-body-md text-secondary mt-3">
-                Keep the next step near the message.
-              </p>
-            </article>
-            <article className="hito-state-surface sm:col-span-2" data-tone="destructive">
-              <p className="hito-label-md">Recovery</p>
-              <h3 className="hito-ui-title-sm mt-3">The update was not applied.</h3>
-              <p className="hito-body-md text-secondary mt-3">
-                Persistent recovery guidance stays in the route instead of disappearing in a toast.
-              </p>
-            </article>
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+            {STATE_SURFACE_TONES.map((tone) => {
+              const toneMeta = STATE_SURFACE_TONE_META[tone];
+              return (
+                <article key={tone} className="hito-state-surface" data-size="sm" data-tone={tone}>
+                  <p className="hito-label-sm" style={{ color: toneMeta.contentColor }}>
+                    {toneMeta.kicker}
+                  </p>
+                  <p className="hito-body-md mt-2 font-medium">{toneMeta.title}</p>
+                  <p className="hito-body-xs text-secondary mt-2">{toneMeta.copy}</p>
+                </article>
+              );
+            })}
           </div>
         }
         controls={
           <div className="hito-row-group border-0">
             <div className="hito-list-row items-start">
-              <div>
-                <p className="hito-list-row-title">Content owner</p>
-                <p className="hito-list-row-copy">The route owns the message, state, and action.</p>
-              </div>
+              <ChoiceSelector
+                label="Tone"
+                value={stateSurfaceTone}
+                options={STATE_SURFACE_TONES}
+                onChange={(tone) => {
+                  setStateSurfaceTone(tone);
+                  setStateSurfaceActionHandled(false);
+                }}
+                textTransform="none"
+              />
             </div>
             <div className="hito-list-row items-start">
-              <div>
-                <p className="hito-list-row-title">Presentation owner</p>
-                <p className="hito-list-row-copy">
-                  The existing state-surface recipe owns tone, spacing, and action rhythm.
-                </p>
-              </div>
+              <ChoiceSelector
+                label="Size"
+                value={stateSurfaceSize}
+                options={STATE_SURFACE_SIZES}
+                onChange={setStateSurfaceSize}
+                textTransform="uppercase"
+              />
+            </div>
+            <div className="hito-list-row items-start">
+              <ChoiceSelector
+                label="Actions"
+                value={stateSurfaceActions}
+                options={STATE_SURFACE_ACTION_STATES}
+                onChange={(actions) => {
+                  setStateSurfaceActions(actions);
+                  if (actions === "absent") setStateSurfaceActionHandled(false);
+                }}
+                textTransform="capitalize"
+              />
             </div>
           </div>
         }

@@ -11,6 +11,7 @@ type HitoMetadataTagProps = React.HTMLAttributes<HTMLElement> & {
   interactive?: boolean;
   tone?: string;
   tooltip?: React.ReactNode;
+  variant?: "light" | "accent";
 };
 
 const HitoMetadataTag = React.forwardRef<HTMLElement, HitoMetadataTagProps>(
@@ -24,6 +25,7 @@ const HitoMetadataTag = React.forwardRef<HTMLElement, HitoMetadataTagProps>(
       title,
       tone,
       tooltip,
+      variant = "light",
       ...props
     },
     ref,
@@ -33,18 +35,14 @@ const HitoMetadataTag = React.forwardRef<HTMLElement, HitoMetadataTagProps>(
     const tag = (
       <Comp
         ref={ref}
-        className={cn("hito-metadata-tag", className)}
+        className={cn("hito-metadata-tag hito-label-sm", className)}
         data-hito-component="metadata-tag"
         data-interactive={interactive ? "true" : undefined}
         data-readonly={interactive ? undefined : "true"}
         data-tone={tone}
-        aria-label={
-          !interactive && stringTooltip && typeof children === "string"
-            ? `${children}. ${stringTooltip}`
-            : undefined
-        }
+        data-variant={variant}
         tabIndex={!interactive && tooltip ? (tabIndex ?? 0) : tabIndex}
-        title={title ?? stringTooltip}
+        title={title}
         {...props}
       >
         {children}

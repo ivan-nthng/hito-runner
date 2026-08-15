@@ -1,15 +1,20 @@
-import { useEffect, useState } from "react";
-import { HitoLogo, HitoLogoMark } from "@/components/ui/hito-logo";
+import { useEffect, useRef, useState } from "react";
+import { HitoLogo } from "@/components/ui/hito-logo";
 import { HitoButton } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
-import { ThemePreferenceChoiceGroup } from "@/components/settings/theme-preference-controls";
+import { Input } from "@/components/ui/input";
+import { ThemePreferenceMenuItems } from "@/components/settings/theme-preference-controls";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from "@/components/ui/sheet";
 import { HitoDsBrandPage } from "./reference-brand-page";
 import { HitoDsComponentsPage } from "./reference-components-page";
@@ -26,9 +31,16 @@ import {
 
 export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId }) {
   const [mobileJumpOpen, setMobileJumpOpen] = useState(false);
-  const [mobileSearchQuery, setMobileSearchQuery] = useState("");
+  const [query, setQuery] = useState("");
+  const [desktopSearchOpen, setDesktopSearchOpen] = useState(false);
+  const desktopSearchInputRef = useRef<HTMLInputElement>(null);
+  const desktopSearchTriggerRef = useRef<HTMLButtonElement>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
+  const mobileSearchTriggerRef = useRef<HTMLButtonElement>(null);
+  const mobileSheetReturnFocusRef = useRef<HTMLButtonElement | null>(null);
   const currentPage = getHitoDsPage(pageId);
   const [activeHref, setActiveHref] = useState<string>(currentPage.path);
+  const desktopSearchVisible = desktopSearchOpen || Boolean(query);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -53,9 +65,20 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
     return () => window.removeEventListener("hashchange", syncActiveDestination);
   }, [pageId]);
 
+  useEffect(() => {
+    if (desktopSearchOpen) {
+      desktopSearchInputRef.current?.focus();
+    }
+  }, [desktopSearchOpen]);
+
+  const closeDesktopSearch = () => {
+    setDesktopSearchOpen(false);
+    window.setTimeout(() => desktopSearchTriggerRef.current?.focus(), 0);
+  };
+
   const closeMobileJump = () => {
     setMobileJumpOpen(false);
-    setMobileSearchQuery("");
+    setQuery("");
   };
 
   return (
@@ -67,54 +90,178 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
             <p className="hito-shell-brand-kicker">Design System</p>
           </div>
 
-          <HitoDsNestedNav idPrefix="desktop" activeHref={activeHref} />
-
-          <div className="hito-workbench-sidebar-footer">
-            <ThemePreferenceChoiceGroup label={null} />
-          </div>
+          <HitoDsNestedNav
+            idPrefix="desktop"
+            activeHref={activeHref}
+            query={query}
+            onQueryChange={setQuery}
+            showSearch={false}
+          />
         </aside>
 
         <main className="hito-workbench-main">
-          <div className="hito-workbench-topbar lg:hidden">
-            <div className="grid gap-3 px-5 py-4">
-              <div className="flex min-w-0 items-center justify-between gap-4">
-                <div className="hito-workbench-location">
-                  <span className="hito-workbench-location-title font-sans">Hito DS</span>
-                  <span className="hito-workbench-location-meta">
-                    <span>Reference library</span>
-                    <span aria-hidden="true">/</span>
-                    <span>{currentPage.label}</span>
-                  </span>
-                </div>
-                <HitoLogoMark decorative className="text-foreground [--hito-logo-height:1.65rem]" />
-              </div>
-              <ThemePreferenceChoiceGroup label={null} />
-              <Sheet
-                open={mobileJumpOpen}
-                onOpenChange={(open) => {
-                  setMobileJumpOpen(open);
-                  if (!open) {
-                    setMobileSearchQuery("");
-                  }
-                }}
-              >
-                <SheetTrigger asChild>
+          <div className="hito-workbench-topbar">
+            <Sheet
+              open={mobileJumpOpen}
+              onOpenChange={(open) => {
+                setMobileJumpOpen(open);
+                if (!open) {
+                  setQuery("");
+                }
+              }}
+            >
+              <div className="mx-auto flex max-w-6xl min-w-0 items-center justify-between gap-4 px-5 py-2 lg:px-10">
+                <span className="hito-workbench-location-title shrink-0 font-sans">Hito DS</span>
+                <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+                  <div className="lg:hidden">
+                    <HitoButton
+                      ref={mobileSearchTriggerRef}
+                      size="sm"
+                      variant="secondary"
+                      iconOnly
+                      aria-label="Search Hito DS"
+                      aria-controls="hito-ds-mobile-jump-nav"
+                      aria-expanded={mobileJumpOpen}
+                      onClick={(event) => {
+                        mobileSheetReturnFocusRef.current = event.currentTarget;
+                        setMobileJumpOpen(true);
+                      }}
+                    >
+                      <Icon name="search" size="sm" decorative />
+                    </HitoButton>
+                  </div>
+
+                  <div className="hidden min-w-0 items-center justify-end lg:flex">
+                    {desktopSearchVisible ? (
+                      <div
+                        id="hito-ds-desktop-search"
+                        className="hito-field-control w-full max-w-xs motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-2 motion-reduce:animate-none"
+                        onBlur={(event) => {
+                          if (!event.currentTarget.contains(event.relatedTarget) && !query) {
+                            setDesktopSearchOpen(false);
+                          }
+                        }}
+                      >
+                        <span
+                          className="hito-field-icon hito-field-icon-left text-muted-foreground"
+                          data-size="sm"
+                          aria-hidden="true"
+                        >
+                          <Icon name="search" size="xs" decorative />
+                        </span>
+                        <Input
+                          ref={desktopSearchInputRef}
+                          type="search"
+                          value={query}
+                          aria-label="Find in Hito DS"
+                          placeholder="Find a component"
+                          className="hito-field-has-left-icon hito-field-has-right-icon"
+                          onChange={(event) => setQuery(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key !== "Escape") {
+                              return;
+                            }
+
+                            event.preventDefault();
+                            if (query) {
+                              setQuery("");
+                              return;
+                            }
+
+                            closeDesktopSearch();
+                          }}
+                        />
+                        <HitoButton
+                          size="xs"
+                          variant="ghost"
+                          iconOnly
+                          aria-label={query ? "Clear Hito DS search" : "Close Hito DS search"}
+                          className="absolute right-1 top-1/2 -translate-y-1/2"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            if (query) {
+                              setQuery("");
+                              desktopSearchInputRef.current?.focus();
+                              return;
+                            }
+
+                            closeDesktopSearch();
+                          }}
+                        >
+                          <Icon name="close" size="xs" decorative />
+                        </HitoButton>
+                      </div>
+                    ) : (
+                      <HitoButton
+                        ref={desktopSearchTriggerRef}
+                        size="sm"
+                        variant="secondary"
+                        iconOnly
+                        aria-label="Search Hito DS"
+                        aria-controls="hito-ds-desktop-search"
+                        aria-expanded={desktopSearchVisible}
+                        onClick={() => {
+                          setDesktopSearchOpen(true);
+                          desktopSearchInputRef.current?.focus();
+                        }}
+                      >
+                        <Icon name="search" size="sm" decorative />
+                      </HitoButton>
+                    )}
+                  </div>
+
                   <HitoButton
                     size="sm"
                     variant="secondary"
-                    className="hito-ds-jump-trigger"
+                    iconOnly
+                    aria-label="Browse Hito DS pages"
                     aria-controls="hito-ds-mobile-jump-nav"
+                    aria-expanded={mobileJumpOpen}
+                    className="lg:hidden"
+                    onClick={(event) => {
+                      mobileSheetReturnFocusRef.current = event.currentTarget;
+                      setMobileJumpOpen(true);
+                    }}
                   >
-                    <span>Browse DS pages</span>
-                    <span className="hito-ds-jump-trigger-context">{currentPage.label}</span>
-                    <Icon name="chevron-right" size="xs" decorative />
+                    <Icon name="components" size="sm" decorative />
                   </HitoButton>
-                </SheetTrigger>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <HitoButton
+                        size="sm"
+                        variant="secondary"
+                        iconOnly
+                        aria-label="Theme preference"
+                      >
+                        <Icon name="settings" size="sm" decorative />
+                      </HitoButton>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="hito-shell-menu">
+                      <ThemePreferenceMenuItems
+                        itemClassName="hito-shell-theme-menu-item"
+                        labelClassName="hito-shell-profile-menu-label"
+                      />
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
                 <SheetContent
                   side="bottom"
                   className="inset-0 flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none border-0 p-0 sm:max-w-none"
+                  onOpenAutoFocus={(event) => {
+                    if (mobileSheetReturnFocusRef.current === mobileSearchTriggerRef.current) {
+                      event.preventDefault();
+                      mobileSearchInputRef.current?.focus();
+                    }
+                  }}
+                  onCloseAutoFocus={(event) => {
+                    event.preventDefault();
+                    const returnFocusTarget = mobileSheetReturnFocusRef.current;
+                    mobileSheetReturnFocusRef.current = null;
+                    window.setTimeout(() => returnFocusTarget?.focus(), 0);
+                  }}
                   onEscapeKeyDown={(event) => {
-                    if (mobileSearchQuery) {
+                    if (query) {
                       event.preventDefault();
                     }
                   }}
@@ -127,20 +274,21 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
                     <HitoDsNestedNav
                       idPrefix="mobile"
                       activeHref={activeHref}
+                      query={query}
                       onNavigate={closeMobileJump}
-                      onQueryChange={setMobileSearchQuery}
+                      onQueryChange={setQuery}
+                      searchInputRef={mobileSearchInputRef}
                     />
                   </div>
                 </SheetContent>
-              </Sheet>
-            </div>
+              </div>
+            </Sheet>
           </div>
 
-          <div className="mx-auto max-w-6xl px-6 py-8 lg:px-10 lg:py-10">
+          <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-10">
             {pageId !== "overview" ? (
-              <header className="hito-page-header pt-8">
-                <p className="hito-label-md hito-label-signal">Hito design system</p>
-                <h1 className="hito-ui-title-xl">{currentPage.label}.</h1>
+              <header className="hito-page-header sm:pt-8">
+                <h1 className="hito-ui-title-xl break-words">{currentPage.label}.</h1>
               </header>
             ) : null}
 

@@ -1,5 +1,6 @@
 import type {
   InlineChangeBorderEvidence,
+  InlineChangeBorderIntentEvidence,
   InlineChangeBorderSide,
   InlineChangeBorderSideEvidence,
   InlineChangeCardChromeEvidence,
@@ -17,6 +18,7 @@ import type {
   InlineChangeTypographyEvidence,
   InlineChangeTypographyRoleOption,
 } from "@/components/devtools/local-inline-change-target-utils";
+import { INLINE_CHANGE_ELIGIBLE_CARD_CLASSES } from "@/components/devtools/local-inline-change-target-utils";
 import {
   HITO_INSPECTOR_TYPOGRAPHY_ROLES,
   HITO_TYPOGRAPHY_PROVENANCE_PROPERTY,
@@ -72,6 +74,55 @@ const HITO_PRIMITIVE_COLORS_BY_VARIABLE = new Map<
 
 type RgbaColor = { alpha: number; blue: number; green: number; red: number };
 
+type LocalUiInspectorBoxSides = {
+  bottom: number;
+  left: number;
+  right: number;
+  top: number;
+};
+
+type LocalUiInspectorBoxSideLabels = {
+  bottom: string;
+  left: string;
+  right: string;
+  top: string;
+};
+
+export type LocalUiInspectorOverlayRegion = {
+  height: number;
+  id: string;
+  left: number;
+  top: number;
+  width: number;
+};
+
+export type LocalUiInspectorOverlayGeometry = {
+  border: LocalUiInspectorBoxSides;
+  gap: {
+    column: string;
+    disclosure: string;
+    regions: LocalUiInspectorOverlayRegion[];
+    row: string;
+    status: "ambiguous" | "drawable" | "none";
+  };
+  margin: {
+    disclosure: string;
+    regions: LocalUiInspectorOverlayRegion[];
+    status: "ambiguous" | "drawable" | "none";
+    values: LocalUiInspectorBoxSideLabels;
+  };
+  padding: {
+    regions: LocalUiInspectorOverlayRegion[];
+    values: LocalUiInspectorBoxSides;
+  };
+  radius: {
+    bottomLeft: string;
+    bottomRight: string;
+    topLeft: string;
+    topRight: string;
+  };
+};
+
 function toTypographyRoleOption(role: HitoTypographyRole): InlineChangeTypographyRoleOption {
   return {
     className: role.className,
@@ -96,6 +147,7 @@ export function inspectLocalUiTarget(
   InlineChangeTargetInput,
   | "classificationReason"
   | "border"
+  | "borderIntent"
   | "cardChrome"
   | "colorControls"
   | "dimensions"
@@ -113,6 +165,7 @@ export function inspectLocalUiTarget(
   const dimensions = buildDimensionEvidence(element);
   const tokenControls = buildTokenEvidence(styles, confirmedAppliedTokens);
   const border = buildBorderEvidence(styles);
+  const borderIntent = buildBorderIntentEvidence(element, styles);
   const colorControls = buildColorControls(element, styles, visibleText);
   const targetKind = classifyTarget(element, styles, visibleText);
   const cardChrome = buildCardChromeEvidence(targetKind, border, tokenControls);
@@ -126,11 +179,13 @@ export function inspectLocalUiTarget(
     dimensions,
     typography,
     border,
+    borderIntent,
     colorControls,
   );
 
   return {
     border,
+    borderIntent,
     cardChrome,
     colorControls,
     classificationReason: buildClassificationReason(targetKind, tag, role, className, styles),
@@ -141,6 +196,675 @@ export function inspectLocalUiTarget(
     typography,
     visibleText,
   };
+}
+
+export function inspectLocalUiOverlayGeometry(
+  element: HTMLElement,
+): LocalUiInspectorOverlayGeometry {
+  const styles = window.getComputedStyle(element);
+  const rect = element.getBoundingClientRect();
+  const border = readBoxSides(styles, "border");
+  const padding = readBoxSides(styles, "padding");
+
+  return {
+    border,
+    gap: inspectGapGeometry(element, rect, styles, border, padding),
+    margin: inspectMarginGeometry(element, rect, styles),
+    padding: {
+      regions: buildPaddingRegions(rect, border, padding),
+      values: padding,
+    },
+    radius: {
+      bottomLeft: styles.borderBottomLeftRadius,
+      bottomRight: styles.borderBottomRightRadius,
+      topLeft: styles.borderTopLeftRadius,
+      topRight: styles.borderTopRightRadius,
+    },
+  };
+}
+
+function inspectMarginGeometry(
+  element: HTMLElement,
+  rect: DOMRectReadOnly,
+  styles: CSSStyleDeclaration,
+): LocalUiInspectorOverlayGeometry["margin"] {
+  const rawValues = {
+    bottom: styles.marginBottom,
+    left: styles.marginLeft,
+    right: styles.marginRight,
+    top: styles.marginTop,
+  };
+  const autoSides = getAuthoredAutoMarginSides(element, styles);
+  const values = {
+    bottom: formatMarginLabel(rawValues.bottom, autoSides.includes("bottom")),
+    left: formatMarginLabel(rawValues.left, autoSides.includes("left")),
+    right: formatMarginLabel(rawValues.right, autoSides.includes("right")),
+    top: formatMarginLabel(rawValues.top, autoSides.includes("top")),
+  };
+  const numericValues = {
+    bottom: parsePixelValue(rawValues.bottom),
+    left: parsePixelValue(rawValues.left),
+    right: parsePixelValue(rawValues.right),
+    top: parsePixelValue(rawValues.top),
+  };
+  const parsedValues = Object.values(numericValues);
+  const hasPositiveMargin = parsedValues.some((value) => value != null && value > 0);
+
+  if (parsedValues.some((value) => value != null && value < 0)) {
+    return {
+      disclosure: "Margin not painted: negative margin can overlap neighbouring geometry.",
+      regions: [],
+      status: "ambiguous",
+      values,
+    };
+  }
+
+  if (!hasPositiveMargin && autoSides.length === 0) {
+    return {
+      disclosure: "No positive computed margin region.",
+      regions: [],
+      status: "none",
+      values,
+    };
+  }
+
+  if (autoSides.length > 0) {
+    return {
+      disclosure: `Margin not painted: ${autoSides.join(", ")} ${autoSides.length === 1 ? "side is" : "sides are"} auto.`,
+      regions: [],
+      status: "ambiguous",
+      values,
+    };
+  }
+
+  if (parsedValues.some((value) => value == null)) {
+    return {
+      disclosure: "Margin not painted: a computed side is not a resolved pixel length.",
+      regions: [],
+      status: "ambiguous",
+      values,
+    };
+  }
+
+  const parent = element.parentElement;
+  if (!parent) {
+    return {
+      disclosure: "Margin not painted: no direct layout parent is available.",
+      regions: [],
+      status: "ambiguous",
+      values,
+    };
+  }
+
+  const parentDisplay = window.getComputedStyle(parent).display;
+  if (!isFlexDisplay(parentDisplay) && !isGridDisplay(parentDisplay)) {
+    return {
+      disclosure: "Margin not painted: block-flow margins may collapse or combine with siblings.",
+      regions: [],
+      status: "ambiguous",
+      values,
+    };
+  }
+
+  if (styles.position === "absolute" || styles.position === "fixed") {
+    return {
+      disclosure: "Margin not painted: positioned-item margin geometry is not a normal-flow band.",
+      regions: [],
+      status: "ambiguous",
+      values,
+    };
+  }
+
+  if (!hasOnlyTranslationTransform(styles.transform)) {
+    return {
+      disclosure: "Margin not painted: transformed item geometry is ambiguous.",
+      regions: [],
+      status: "ambiguous",
+      values,
+    };
+  }
+
+  const marginValues = numericValues as LocalUiInspectorBoxSides;
+  const regions = buildMarginRegions(rect, marginValues);
+  const siblingRects = Array.from(parent.children)
+    .filter((child): child is HTMLElement => child instanceof HTMLElement && child !== element)
+    .map((child) => child.getBoundingClientRect())
+    .filter((childRect) => childRect.width > 0 && childRect.height > 0);
+
+  if (regions.some((region) => siblingRects.some((sibling) => rectsOverlap(region, sibling)))) {
+    return {
+      disclosure: "Margin not painted: the computed outside region overlaps a sibling box.",
+      regions: [],
+      status: "ambiguous",
+      values,
+    };
+  }
+
+  return {
+    disclosure: `Painted ${regions.length} unambiguous positive margin ${regions.length === 1 ? "side" : "sides"}.`,
+    regions,
+    status: regions.length > 0 ? "drawable" : "none",
+    values,
+  };
+}
+
+function inspectGapGeometry(
+  element: HTMLElement,
+  rect: DOMRectReadOnly,
+  styles: CSSStyleDeclaration,
+  border: LocalUiInspectorBoxSides,
+  padding: LocalUiInspectorBoxSides,
+): LocalUiInspectorOverlayGeometry["gap"] {
+  const display = styles.display;
+  const isFlex = isFlexDisplay(display);
+  const isGrid = isGridDisplay(display);
+  const columnGap = parsePixelValue(styles.columnGap) ?? 0;
+  const rowGap = parsePixelValue(styles.rowGap) ?? 0;
+  const base = {
+    column: styles.columnGap,
+    regions: [] as LocalUiInspectorOverlayRegion[],
+    row: styles.rowGap,
+  };
+
+  if (!isFlex && !isGrid) {
+    return {
+      ...base,
+      disclosure: `Gap not painted: ${display || "block"} does not establish flex/grid gaps.`,
+      status: "none",
+    };
+  }
+
+  if (columnGap <= 0 && rowGap <= 0) {
+    return {
+      ...base,
+      disclosure: "No positive computed flex/grid gap.",
+      status: "none",
+    };
+  }
+
+  if (isFlex && styles.flexWrap !== "nowrap") {
+    return {
+      ...base,
+      disclosure: "Gap not painted: wrapped flex lines do not expose one unambiguous interval.",
+      status: "ambiguous",
+    };
+  }
+
+  if (!hasOnlyTranslationTransform(styles.transform)) {
+    return {
+      ...base,
+      disclosure: "Gap not painted: transformed container geometry is ambiguous.",
+      status: "ambiguous",
+    };
+  }
+
+  const directChildren = Array.from(element.children);
+  const visibleChildren = directChildren
+    .map((child) => ({ child, styles: window.getComputedStyle(child) }))
+    .filter(({ child, styles: childStyles }) => {
+      const childRect = child.getBoundingClientRect();
+      return (
+        childStyles.display !== "none" &&
+        childStyles.visibility !== "hidden" &&
+        childRect.width > 0 &&
+        childRect.height > 0
+      );
+    });
+
+  if (visibleChildren.length < 2) {
+    return {
+      ...base,
+      disclosure: "Gap not painted: fewer than two visible direct children establish no interval.",
+      status: "none",
+    };
+  }
+
+  if (
+    visibleChildren.some(
+      ({ styles: childStyles }) =>
+        childStyles.position === "absolute" || childStyles.position === "fixed",
+    )
+  ) {
+    return {
+      ...base,
+      disclosure: "Gap not painted: a positioned direct child makes the empty interval ambiguous.",
+      status: "ambiguous",
+    };
+  }
+
+  const childGeometry = visibleChildren.map(({ child, styles: childStyles }) => ({
+    margins: readResolvedPositiveMargins(child, childStyles),
+    rect: child.getBoundingClientRect(),
+    transformSafe: hasOnlyTranslationTransform(childStyles.transform),
+  }));
+
+  if (childGeometry.some(({ margins, transformSafe }) => !margins || !transformSafe)) {
+    return {
+      ...base,
+      disclosure:
+        "Gap not painted: child auto/negative margins or transformed geometry prevent an exact interval.",
+      status: "ambiguous",
+    };
+  }
+
+  const children = childGeometry as Array<{
+    margins: LocalUiInspectorBoxSides;
+    rect: DOMRectReadOnly;
+    transformSafe: true;
+  }>;
+  const contentRect = getContentRect(rect, border, padding);
+  const regions = isFlex
+    ? buildFlexGapRegions(children, contentRect, styles, columnGap, rowGap)
+    : buildGridGapRegions(children, columnGap, rowGap);
+
+  if (regions.length === 0) {
+    return {
+      ...base,
+      disclosure:
+        "Gap not painted: direct-child geometry does not prove an empty interval equal to the computed gap.",
+      status: "ambiguous",
+    };
+  }
+
+  return {
+    ...base,
+    disclosure: `Painted ${regions.length} verified empty direct-child gap ${regions.length === 1 ? "interval" : "intervals"}.`,
+    regions,
+    status: "drawable",
+  };
+}
+
+function buildFlexGapRegions(
+  children: Array<{ margins: LocalUiInspectorBoxSides; rect: DOMRectReadOnly }>,
+  contentRect: LocalUiInspectorOverlayRegion,
+  styles: CSSStyleDeclaration,
+  columnGap: number,
+  rowGap: number,
+) {
+  const horizontal = styles.flexDirection === "row" || styles.flexDirection === "row-reverse";
+  const gap = horizontal ? columnGap : rowGap;
+  if (gap <= 0) return [];
+
+  const ordered = [...children].sort((first, second) =>
+    horizontal ? first.rect.left - second.rect.left : first.rect.top - second.rect.top,
+  );
+  const regions: LocalUiInspectorOverlayRegion[] = [];
+
+  ordered.slice(0, -1).forEach((current, index) => {
+    const next = ordered[index + 1];
+    if (!next) return;
+
+    const start = horizontal
+      ? current.rect.right + current.margins.right
+      : current.rect.bottom + current.margins.bottom;
+    const end = horizontal ? next.rect.left - next.margins.left : next.rect.top - next.margins.top;
+    if (!isNear(end - start, gap)) return;
+
+    addVerifiedGapRegion(
+      regions,
+      horizontal
+        ? {
+            height: contentRect.height,
+            id: `column-${index}`,
+            left: start,
+            top: contentRect.top,
+            width: gap,
+          }
+        : {
+            height: gap,
+            id: `row-${index}`,
+            left: contentRect.left,
+            top: start,
+            width: contentRect.width,
+          },
+      children,
+    );
+  });
+
+  return regions;
+}
+
+function buildGridGapRegions(
+  children: Array<{ margins: LocalUiInspectorBoxSides; rect: DOMRectReadOnly }>,
+  columnGap: number,
+  rowGap: number,
+) {
+  const regions: LocalUiInspectorOverlayRegion[] = [];
+
+  children.forEach((first, firstIndex) => {
+    children.slice(firstIndex + 1).forEach((second, secondOffset) => {
+      const secondIndex = firstIndex + secondOffset + 1;
+      const [leftChild, rightChild] =
+        first.rect.left <= second.rect.left ? [first, second] : [second, first];
+      const horizontalDistance =
+        rightChild.rect.left -
+        rightChild.margins.left -
+        (leftChild.rect.right + leftChild.margins.right);
+      const verticalOverlap =
+        Math.min(first.rect.bottom, second.rect.bottom) - Math.max(first.rect.top, second.rect.top);
+
+      if (columnGap > 0 && verticalOverlap > 0.5 && isNear(horizontalDistance, columnGap)) {
+        addVerifiedGapRegion(
+          regions,
+          {
+            height: verticalOverlap,
+            id: `column-${firstIndex}-${secondIndex}`,
+            left: leftChild.rect.right + leftChild.margins.right,
+            top: Math.max(first.rect.top, second.rect.top),
+            width: columnGap,
+          },
+          children,
+        );
+      }
+
+      const [topChild, bottomChild] =
+        first.rect.top <= second.rect.top ? [first, second] : [second, first];
+      const verticalDistance =
+        bottomChild.rect.top -
+        bottomChild.margins.top -
+        (topChild.rect.bottom + topChild.margins.bottom);
+      const horizontalOverlap =
+        Math.min(first.rect.right, second.rect.right) - Math.max(first.rect.left, second.rect.left);
+
+      if (rowGap > 0 && horizontalOverlap > 0.5 && isNear(verticalDistance, rowGap)) {
+        addVerifiedGapRegion(
+          regions,
+          {
+            height: rowGap,
+            id: `row-${firstIndex}-${secondIndex}`,
+            left: Math.max(first.rect.left, second.rect.left),
+            top: topChild.rect.bottom + topChild.margins.bottom,
+            width: horizontalOverlap,
+          },
+          children,
+        );
+      }
+    });
+  });
+
+  return regions;
+}
+
+function addVerifiedGapRegion(
+  regions: LocalUiInspectorOverlayRegion[],
+  candidate: LocalUiInspectorOverlayRegion,
+  children: Array<{ rect: DOMRectReadOnly }>,
+) {
+  if (candidate.width <= 0.5 || candidate.height <= 0.5) return;
+  if (children.some(({ rect }) => rectsOverlap(candidate, rect))) return;
+  if (
+    regions.some(
+      (region) =>
+        isNear(region.left, candidate.left) &&
+        isNear(region.top, candidate.top) &&
+        isNear(region.width, candidate.width) &&
+        isNear(region.height, candidate.height),
+    )
+  ) {
+    return;
+  }
+  regions.push(candidate);
+}
+
+function buildPaddingRegions(
+  rect: DOMRectReadOnly,
+  border: LocalUiInspectorBoxSides,
+  padding: LocalUiInspectorBoxSides,
+) {
+  const innerLeft = rect.left + border.left;
+  const innerTop = rect.top + border.top;
+  const innerWidth = Math.max(0, rect.width - border.left - border.right);
+  const innerHeight = Math.max(0, rect.height - border.top - border.bottom);
+  const top = Math.min(padding.top, innerHeight);
+  const bottom = Math.min(padding.bottom, Math.max(0, innerHeight - top));
+  const middleHeight = Math.max(0, innerHeight - top - bottom);
+  const left = Math.min(padding.left, innerWidth);
+  const right = Math.min(padding.right, Math.max(0, innerWidth - left));
+
+  return [
+    createOverlayRegion("top", innerLeft, innerTop, innerWidth, top),
+    createOverlayRegion(
+      "right",
+      innerLeft + innerWidth - right,
+      innerTop + top,
+      right,
+      middleHeight,
+    ),
+    createOverlayRegion("bottom", innerLeft, innerTop + innerHeight - bottom, innerWidth, bottom),
+    createOverlayRegion("left", innerLeft, innerTop + top, left, middleHeight),
+  ].filter((region): region is LocalUiInspectorOverlayRegion => Boolean(region));
+}
+
+function buildMarginRegions(rect: DOMRectReadOnly, margin: LocalUiInspectorBoxSides) {
+  return [
+    createOverlayRegion(
+      "top",
+      rect.left - margin.left,
+      rect.top - margin.top,
+      rect.width + margin.left + margin.right,
+      margin.top,
+    ),
+    createOverlayRegion("right", rect.right, rect.top, margin.right, rect.height),
+    createOverlayRegion(
+      "bottom",
+      rect.left - margin.left,
+      rect.bottom,
+      rect.width + margin.left + margin.right,
+      margin.bottom,
+    ),
+    createOverlayRegion("left", rect.left - margin.left, rect.top, margin.left, rect.height),
+  ].filter((region): region is LocalUiInspectorOverlayRegion => Boolean(region));
+}
+
+function createOverlayRegion(id: string, left: number, top: number, width: number, height: number) {
+  if (width <= 0.5 || height <= 0.5) return null;
+  return { height, id, left, top, width };
+}
+
+function getContentRect(
+  rect: DOMRectReadOnly,
+  border: LocalUiInspectorBoxSides,
+  padding: LocalUiInspectorBoxSides,
+): LocalUiInspectorOverlayRegion {
+  const left = rect.left + border.left + padding.left;
+  const top = rect.top + border.top + padding.top;
+  return {
+    height: Math.max(0, rect.height - border.top - border.bottom - padding.top - padding.bottom),
+    id: "content",
+    left,
+    top,
+    width: Math.max(0, rect.width - border.left - border.right - padding.left - padding.right),
+  };
+}
+
+function readBoxSides(styles: CSSStyleDeclaration, kind: "border" | "padding") {
+  return kind === "border"
+    ? {
+        bottom: parsePixelValue(styles.borderBottomWidth) ?? 0,
+        left: parsePixelValue(styles.borderLeftWidth) ?? 0,
+        right: parsePixelValue(styles.borderRightWidth) ?? 0,
+        top: parsePixelValue(styles.borderTopWidth) ?? 0,
+      }
+    : {
+        bottom: parsePixelValue(styles.paddingBottom) ?? 0,
+        left: parsePixelValue(styles.paddingLeft) ?? 0,
+        right: parsePixelValue(styles.paddingRight) ?? 0,
+        top: parsePixelValue(styles.paddingTop) ?? 0,
+      };
+}
+
+function readResolvedPositiveMargins(
+  element: Element,
+  styles: CSSStyleDeclaration,
+): LocalUiInspectorBoxSides | null {
+  const numericMargins = [
+    parsePixelValue(styles.marginTop),
+    parsePixelValue(styles.marginRight),
+    parsePixelValue(styles.marginBottom),
+    parsePixelValue(styles.marginLeft),
+  ];
+  const autoSides = numericMargins.some((value) => value != null && value > 0)
+    ? getAuthoredAutoMarginSides(element, styles)
+    : [];
+  const sides = [
+    {
+      auto: autoSides.includes("top"),
+      side: "top" as const,
+      value: parsePixelValue(styles.marginTop),
+    },
+    {
+      auto: autoSides.includes("right"),
+      side: "right" as const,
+      value: parsePixelValue(styles.marginRight),
+    },
+    {
+      auto: autoSides.includes("bottom"),
+      side: "bottom" as const,
+      value: parsePixelValue(styles.marginBottom),
+    },
+    {
+      auto: autoSides.includes("left"),
+      side: "left" as const,
+      value: parsePixelValue(styles.marginLeft),
+    },
+  ];
+  if (sides.some(({ auto, value }) => auto || value == null || value < 0)) return null;
+
+  return Object.fromEntries(
+    sides.map(({ side, value }) => [side, value]),
+  ) as LocalUiInspectorBoxSides;
+}
+
+function getAuthoredAutoMarginSides(
+  element: Element,
+  styles: CSSStyleDeclaration,
+): Array<"bottom" | "left" | "right" | "top"> {
+  const autoSides = new Set<"bottom" | "left" | "right" | "top">();
+  const collect = (declaration: CSSStyleDeclaration) => {
+    const { blockEnd, blockStart, inlineEnd, inlineStart } = getLogicalMarginSides(styles);
+    const properties: Array<[string, "bottom" | "left" | "right" | "top"]> = [
+      ["margin-top", "top"],
+      ["margin-right", "right"],
+      ["margin-bottom", "bottom"],
+      ["margin-left", "left"],
+      ["margin-block-start", blockStart],
+      ["margin-block-end", blockEnd],
+      ["margin-inline-start", inlineStart],
+      ["margin-inline-end", inlineEnd],
+    ];
+
+    properties.forEach(([property, side]) => {
+      if (declaration.getPropertyValue(property).trim().toLowerCase() === "auto") {
+        autoSides.add(side);
+      }
+    });
+  };
+  const visitRules = (rules: CSSRuleList) => {
+    Array.from(rules).forEach((rule) => {
+      if (
+        typeof CSSMediaRule !== "undefined" &&
+        rule instanceof CSSMediaRule &&
+        !window.matchMedia(rule.conditionText).matches
+      ) {
+        return;
+      }
+      if (
+        typeof CSSSupportsRule !== "undefined" &&
+        rule instanceof CSSSupportsRule &&
+        !CSS.supports(rule.conditionText)
+      ) {
+        return;
+      }
+
+      if (rule instanceof CSSStyleRule) {
+        try {
+          if (element.matches(rule.selectorText)) collect(rule.style);
+        } catch {
+          // Nested or browser-specific selectors can be unreadable without making geometry false.
+        }
+      }
+
+      const nestedRules = (rule as CSSRule & { cssRules?: CSSRuleList }).cssRules;
+      if (nestedRules) visitRules(nestedRules);
+    });
+  };
+
+  if ("style" in element) {
+    collect((element as HTMLElement | SVGElement).style);
+  }
+  Array.from(document.styleSheets).forEach((sheet) => {
+    try {
+      visitRules(sheet.cssRules);
+    } catch {
+      // Cross-origin sheets do not expose rules; computed values remain the factual fallback.
+    }
+  });
+
+  return ["top", "right", "bottom", "left"].filter((side) =>
+    autoSides.has(side as "bottom" | "left" | "right" | "top"),
+  ) as Array<"bottom" | "left" | "right" | "top">;
+}
+
+function getLogicalMarginSides(styles: CSSStyleDeclaration) {
+  const vertical = styles.writingMode.startsWith("vertical");
+  if (!vertical) {
+    return {
+      blockEnd: "bottom" as const,
+      blockStart: "top" as const,
+      inlineEnd: styles.direction === "rtl" ? ("left" as const) : ("right" as const),
+      inlineStart: styles.direction === "rtl" ? ("right" as const) : ("left" as const),
+    };
+  }
+
+  const blockStartsLeft = styles.writingMode === "vertical-lr";
+  return {
+    blockEnd: blockStartsLeft ? ("right" as const) : ("left" as const),
+    blockStart: blockStartsLeft ? ("left" as const) : ("right" as const),
+    inlineEnd: styles.direction === "rtl" ? ("top" as const) : ("bottom" as const),
+    inlineStart: styles.direction === "rtl" ? ("bottom" as const) : ("top" as const),
+  };
+}
+
+function formatMarginLabel(value: string, isAuto: boolean) {
+  return isAuto ? `${value} (auto)` : value;
+}
+
+function hasOnlyTranslationTransform(transform: string) {
+  if (!transform || transform === "none") return true;
+  if (typeof DOMMatrixReadOnly === "undefined") return false;
+
+  try {
+    const matrix = new DOMMatrixReadOnly(transform);
+    return (
+      matrix.is2D &&
+      isNear(matrix.a, 1) &&
+      isNear(matrix.b, 0) &&
+      isNear(matrix.c, 0) &&
+      isNear(matrix.d, 1)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isFlexDisplay(display: string) {
+  return display === "flex" || display === "inline-flex";
+}
+
+function isGridDisplay(display: string) {
+  return display === "grid" || display === "inline-grid";
+}
+
+function rectsOverlap(
+  first: Pick<DOMRectReadOnly, "bottom" | "left" | "right" | "top"> | LocalUiInspectorOverlayRegion,
+  second: Pick<DOMRectReadOnly, "bottom" | "left" | "right" | "top">,
+) {
+  const firstRight = "right" in first ? first.right : first.left + first.width;
+  const firstBottom = "bottom" in first ? first.bottom : first.top + first.height;
+  return (
+    Math.min(firstRight, second.right) - Math.max(first.left, second.left) > 0.5 &&
+    Math.min(firstBottom, second.bottom) - Math.max(first.top, second.top) > 0.5
+  );
 }
 
 function classifyTarget(
@@ -212,6 +936,7 @@ function buildBaseEvidence(
   dimensions: InlineChangeDimensionEvidence[],
   typography: InlineChangeTypographyEvidence | null,
   border: InlineChangeBorderEvidence | null,
+  borderIntent: InlineChangeBorderIntentEvidence | null,
   colorControls: InlineChangeColorControlInput[],
 ) {
   const className = String(element.className ?? "");
@@ -228,6 +953,11 @@ function buildBaseEvidence(
   if (visibleText) evidence.push(`Current text evidence: "${visibleText.slice(0, 120)}".`);
   if (hitoClasses.length > 0) evidence.push(`Hito DS class evidence: ${hitoClasses.join(", ")}.`);
   if (border) evidence.push(`Border: ${border.summary}.`);
+  if (borderIntent) {
+    evidence.push(
+      `Border intent eligibility: ${borderIntent.eligibleCardClass}; computed ${borderIntent.summary}.`,
+    );
+  }
   colorControls.forEach((control) => {
     evidence.push(
       `Color ${control.label}: ${control.currentLabel}; computed ${control.currentHex}; alpha ${control.alphaPercent}%.`,
@@ -497,6 +1227,72 @@ function buildBorderEvidence(styles: CSSStyleDeclaration): InlineChangeBorderEvi
     sides,
     summary: formatBorderSides(sides),
   };
+}
+
+function buildBorderIntentEvidence(
+  element: HTMLElement,
+  styles: CSSStyleDeclaration,
+): InlineChangeBorderIntentEvidence | null {
+  const eligibleCardClass = getEligibleBorderIntentCardClass(element);
+  if (!eligibleCardClass) return null;
+
+  const sides = (
+    [
+      ["top", styles.borderTopWidth, styles.borderTopStyle, styles.borderTopColor],
+      ["right", styles.borderRightWidth, styles.borderRightStyle, styles.borderRightColor],
+      ["bottom", styles.borderBottomWidth, styles.borderBottomStyle, styles.borderBottomColor],
+      ["left", styles.borderLeftWidth, styles.borderLeftStyle, styles.borderLeftColor],
+    ] as const
+  ).map(([side, width, style, color]) =>
+    buildComputedBorderSideEvidence(side, width, style, color),
+  );
+
+  return {
+    eligibleCardClass,
+    label: "Border",
+    sides,
+    summary: formatComputedBorderIntentSummary(sides),
+  };
+}
+
+function getEligibleBorderIntentCardClass(element: HTMLElement) {
+  if (
+    element.matches('[data-hito-component="popover"], .hito-shell-profile-trigger') ||
+    (element.matches("button, input, select, textarea, [role='button']") &&
+      element.getAttribute("data-hito-component") !== "navigation-card" &&
+      !element.classList.contains("hito-launch-surface"))
+  ) {
+    return null;
+  }
+
+  return (
+    INLINE_CHANGE_ELIGIBLE_CARD_CLASSES.find((className) =>
+      element.classList.contains(className),
+    ) ?? null
+  );
+}
+
+function buildComputedBorderSideEvidence(
+  side: InlineChangeBorderSide,
+  width: string,
+  style: string,
+  color: string,
+): InlineChangeBorderSideEvidence {
+  const widthPx = parsePixelValue(width) ?? 0;
+  const hasBorder = widthPx > 0 && style !== "none" && style !== "hidden";
+
+  return {
+    color: hasBorder ? normalizeBorderColor(color) : null,
+    side,
+    style: hasBorder ? style : "none",
+    widthLabel: hasBorder ? formatCompactPx(widthPx) : "0",
+    widthPx: hasBorder ? widthPx : 0,
+  };
+}
+
+function formatComputedBorderIntentSummary(sides: InlineChangeBorderSideEvidence[]) {
+  if (sides.every((side) => side.widthPx === 0)) return "0 on all sides";
+  return formatBorderSides(sides);
 }
 
 function buildBorderSideEvidence(

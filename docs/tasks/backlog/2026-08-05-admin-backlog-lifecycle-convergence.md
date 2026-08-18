@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** BACKEND
+- **Epic:** platform-and-operations
 - **Parent:** [Hito Stack Complexity Reduction Program](2026-08-04-hito-stack-complexity-reduction-program.md)
 - **Outcome:** backlog_doc is now the sole nonterminal executable lifecycle source; supporting.
 - **Sources:** [package.json](../../../package.json)

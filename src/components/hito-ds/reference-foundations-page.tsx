@@ -239,6 +239,58 @@ const RADIUS_PRIMITIVES = HITO_DS_MANIFEST.collections.primitiveRadius.map((toke
   use: RADIUS_USAGE[token.id] ?? "Canonical radius primitive",
 }));
 
+const ELEVATION_LEVELS = [
+  {
+    id: "none",
+    label: "None",
+    token: null,
+    intended: "Canvas, cards, rows, tabs, chart cards, and state surfaces",
+    prohibited: "Not a missing style; flat content stays flat.",
+  },
+  {
+    id: "xs",
+    label: "XS",
+    token: "--hito-elevation-xs",
+    intended: "Tooltip and tiny detached copy/value affordance",
+    prohibited: "Never hover, selection, focus, or a generic card.",
+  },
+  {
+    id: "sm",
+    label: "SM",
+    token: "--hito-elevation-sm",
+    intended: "Anchored menu, popover, and date picker",
+    prohibited: "Never a field, button, or selected tab.",
+  },
+  {
+    id: "md",
+    label: "MD",
+    token: "--hito-elevation-md",
+    intended: "Detached toast and feedback surface",
+    prohibited: "Never a status colour or validation indicator.",
+  },
+  {
+    id: "lg",
+    label: "LG",
+    token: "--hito-elevation-lg",
+    intended: "Side sheet or drawer above an overlay",
+    prohibited: "Never shell or sidebar containment.",
+  },
+  {
+    id: "xl",
+    label: "XL",
+    token: "--hito-elevation-xl",
+    intended: "Blocking dialog above an overlay",
+    prohibited: "Never marketing depth or blanket card elevation.",
+  },
+] as const;
+
+const ELEVATION_TOKENS = ELEVATION_LEVELS.flatMap((level) => (level.token ? [level.token] : []));
+
+const ELEVATION_PARENT_SURFACES = [
+  { id: "canvas", label: "Canvas parent", background: "var(--color-background)" },
+  { id: "surface", label: "Surface parent", background: "var(--color-surface)" },
+] as const;
+
 function primitiveColorSortKey(step: string) {
   if (step === "white") return -1;
   if (step.startsWith("alpha-")) return 10_000 + Number(step.slice("alpha-".length));
@@ -275,6 +327,7 @@ export function HitoDsFoundationsPage() {
   const selectedMark =
     HITO_MARK_META.find((candidate) => candidate.name === markPreviewName) ?? HITO_MARK_META[0];
   const colorResolution = useActiveColorResolution();
+  const elevationResolution = useActiveElevationResolution();
   const colorTabs = useHitoTabs({
     items: COLOR_TABS.map((value) => ({ value })),
     value: colorTab,
@@ -780,6 +833,64 @@ export function HitoDsFoundationsPage() {
         >
           {RADIUS_PRIMITIVES.map((radius) => (
             <RadiusPrimitiveRow key={radius.token} radius={radius} />
+          ))}
+        </div>
+      </section>
+
+      <section id="depth" className="ds-section">
+        <SectionIntro label="Depth" title="Quiet detachment from a parent surface." />
+        <div className="grid min-w-0 gap-8">
+          <div className="hito-reference-note">
+            <p className="hito-label-md">Boundary</p>
+            <p className="hito-body-sm text-secondary mt-2 max-w-3xl">
+              Elevation describes physical detachment only. Focus, state, selection, validation, and
+              structural edges remain separate contracts. The legacy{" "}
+              <code className="hito-technical-sm">--hito-shadow-soft</code> stays independent while
+              its remaining cross-owner consumers are migrated.
+            </p>
+          </div>
+
+          {ELEVATION_PARENT_SURFACES.map((parent) => (
+            <section
+              key={parent.id}
+              className="grid min-w-0 gap-4 rounded-2xl p-4 sm:p-6"
+              style={{ background: parent.background }}
+              aria-labelledby={"depth-" + parent.id}
+              data-hito-ds-depth-parent={parent.id}
+            >
+              <h3 id={"depth-" + parent.id} className="hito-ui-title-xs">
+                {parent.label}
+              </h3>
+              <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {ELEVATION_LEVELS.map((level) => (
+                  <article
+                    key={level.id}
+                    className="grid min-h-32 min-w-0 content-between gap-4 rounded-xl border border-hairline bg-popover p-4"
+                    style={{ boxShadow: level.token ? "var(" + level.token + ")" : "none" }}
+                    data-hito-ds-depth-level={level.id}
+                  >
+                    <div className="grid min-w-0 gap-1">
+                      <p className="hito-label-md">{level.label}</p>
+                      <code className="hito-technical-sm text-secondary break-all">
+                        {level.token ?? "none"}
+                      </code>
+                    </div>
+                    <div className="grid min-w-0 gap-2">
+                      <p
+                        className="hito-technical-sm text-tertiary break-words"
+                        data-hito-ds-depth-resolved={level.id}
+                      >
+                        {level.token
+                          ? (elevationResolution[level.token] ?? "Measuring theme value…")
+                          : "none"}
+                      </p>
+                      <p className="hito-body-xs text-secondary">{level.intended}</p>
+                      <p className="hito-body-xs text-tertiary">{level.prohibited}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       </section>
@@ -1593,6 +1704,48 @@ function useActiveColorResolution(): ActiveColorResolution {
           document.documentElement.getAttribute("data-hito-theme") === "light" ? "light" : "dark",
         values,
       });
+    };
+    const themeObserver = new MutationObserver(measure);
+
+    measure();
+    themeObserver.observe(document.documentElement, {
+      attributeFilter: ["class", "data-hito-theme"],
+      attributes: true,
+    });
+
+    return () => {
+      themeObserver.disconnect();
+      probe.remove();
+    };
+  }, []);
+
+  return resolution;
+}
+
+function useActiveElevationResolution() {
+  const [resolution, setResolution] = useState<Readonly<Record<string, string>>>({});
+
+  useLayoutEffect(() => {
+    const probe = document.createElement("span");
+    probe.setAttribute("aria-hidden", "true");
+    Object.assign(probe.style, {
+      height: "1px",
+      left: "-9999px",
+      opacity: "0",
+      pointerEvents: "none",
+      position: "fixed",
+      top: "0",
+      width: "1px",
+    });
+    document.body.append(probe);
+
+    const measure = () => {
+      const values: Record<string, string> = {};
+      for (const cssVariable of ELEVATION_TOKENS) {
+        probe.style.boxShadow = "var(" + cssVariable + ")";
+        values[cssVariable] = getComputedStyle(probe).boxShadow;
+      }
+      setResolution(values);
     };
     const themeObserver = new MutationObserver(measure);
 

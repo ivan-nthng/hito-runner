@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { createAdminSupabaseClient } from "../src/lib/supabase/server";
+import { getPersistedUserIdForAuthContext } from "../src/lib/request-persisted-user";
 import {
   getUiLocaleResolutionForUserId,
   getUserSettingsForUserId,
@@ -119,6 +120,12 @@ async function proveLocalPersistenceContract() {
     admin,
     `locale-other-${randomUUID()}@example.test`,
     password,
+  );
+  const adminPrincipal = await createDisposableUser(
+    admin,
+    `locale-admin-${randomUUID()}@example.test`,
+    password,
+    { hito_role: "admin" },
   );
 
   try {
@@ -245,9 +252,95 @@ async function proveLocalPersistenceContract() {
     assert.ifError(crossUserWrite.error);
     assert.deepEqual(crossUserWrite.data, []);
     await assertPersistedPreference(admin, owner.id, "en");
+
+    const resolvedAdminUserId = await getPersistedUserIdForAuthContext({
+      userId: adminPrincipal.id,
+      email: adminPrincipal.email,
+      appBaseUrl: "http://localhost:3000",
+      provider: "admin",
+      adminSession: {
+        label: "Disposable admin",
+        source: "local_fixture",
+        runtimeClass: "loopback",
+      },
+    });
+    const rejectedRunnerAsAdmin = await getPersistedUserIdForAuthContext({
+      userId: owner.id,
+      email: owner.email,
+      appBaseUrl: "http://localhost:3000",
+      provider: "admin",
+      adminSession: {
+        label: "Forged runner mapping",
+        source: "local_fixture",
+        runtimeClass: "loopback",
+      },
+    });
+    assert.equal(resolvedAdminUserId, adminPrincipal.id);
+    assert.equal(rejectedRunnerAsAdmin, null);
+    assert.equal(await getUserSettingsForUserId(adminPrincipal.id, adminPrincipal.email), null);
+
+    const adminPortuguese = await updateUserSettingsForUserId(
+      adminPrincipal.id,
+      preferenceOnlySettingsInput("pt-BR"),
+      adminPrincipal.email,
+    );
+    assert.equal(adminPortuguese.uiLocalePreference, "pt-BR");
+    assert.equal(adminPortuguese.profileRevision, 1);
+    assert.equal(adminPortuguese.age, null);
+    assert.equal(adminPortuguese.weightKg, null);
+    assert.equal(adminPortuguese.heightCm, null);
+    assert.equal(adminPortuguese.fitnessLevel, null);
+
+    const adminReset = await updateUserSettingsForUserId(
+      adminPrincipal.id,
+      preferenceOnlySettingsInput("system"),
+      adminPrincipal.email,
+    );
+    assert.equal(adminReset.uiLocalePreference, "system");
+    assert.equal(adminReset.profileRevision, 1);
+    assert.deepEqual(
+      {
+        age: adminReset.age,
+        weightKg: adminReset.weightKg,
+        heightCm: adminReset.heightCm,
+        fitnessLevel: adminReset.fitnessLevel,
+        trainingPreferences: adminReset.trainingPreferences,
+      },
+      {
+        age: null,
+        weightKg: null,
+        heightCm: null,
+        fitnessLevel: null,
+        trainingPreferences: null,
+      },
+    );
+    await assertPersistedPreference(admin, adminPrincipal.id, "system");
+
+    const adminClient = createClient(supabaseUrl, publishableKey);
+    assert.ifError(
+      (
+        await adminClient.auth.signInWithPassword({
+          email: adminPrincipal.email,
+          password,
+        })
+      ).error,
+    );
+    const adminOwnRead = await adminClient
+      .from("runner_profiles")
+      .select("user_id, ui_locale_preference");
+    assert.ifError(adminOwnRead.error);
+    assert.deepEqual(adminOwnRead.data, [
+      { user_id: adminPrincipal.id, ui_locale_preference: "system" },
+    ]);
+    const runnerCannotReadAdmin = await ownerClient
+      .from("runner_profiles")
+      .select("user_id")
+      .eq("user_id", adminPrincipal.id);
+    assert.ifError(runnerCannotReadAdmin.error);
+    assert.deepEqual(runnerCannotReadAdmin.data, []);
   } finally {
     const deletedUsers = await Promise.all(
-      [owner, other].map((user) => admin.auth.admin.deleteUser(user.id)),
+      [owner, other, adminPrincipal].map((user) => admin.auth.admin.deleteUser(user.id)),
     );
     for (const deletedUser of deletedUsers) {
       assert.ifError(deletedUser.error);
@@ -256,7 +349,7 @@ async function proveLocalPersistenceContract() {
     const remainingProfiles = await admin
       .from("runner_profiles")
       .select("user_id")
-      .in("user_id", [owner.id, other.id]);
+      .in("user_id", [owner.id, other.id, adminPrincipal.id]);
     assert.ifError(remainingProfiles.error);
     assert.deepEqual(remainingProfiles.data, []);
   }
@@ -301,11 +394,29 @@ async function createDisposableUser(
   admin: ReturnType<typeof createAdminSupabaseClient>,
   email: string,
   password: string,
+  appMetadata?: Record<string, unknown>,
 ) {
-  const created = await admin.auth.admin.createUser({ email, password, email_confirm: true });
+  const created = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    app_metadata: appMetadata,
+  });
   assert.ifError(created.error);
   assert.ok(created.data.user);
   return { id: created.data.user.id, email };
+}
+
+function preferenceOnlySettingsInput(uiLocalePreference: "system" | "en" | "pt-BR") {
+  return {
+    firstName: null,
+    lastName: null,
+    displayName: null,
+    age: null,
+    weightKg: null,
+    heightCm: null,
+    uiLocalePreference,
+  };
 }
 
 function readSource(path: string) {

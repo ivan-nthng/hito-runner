@@ -47,12 +47,19 @@ const ADMIN_SERVER_FUNCTIONS = [
   },
 ] as const;
 
+const ADMIN_ACCOUNT_SERVER_FUNCTIONS = [
+  {
+    sourceFile: "src/lib/user-settings-actions.ts",
+    functionName: "saveUserSettings_createServerFn_handler",
+  },
+] as const;
+
 export const ADMIN_SERVER_FUNCTION_SOURCE_FILES = [
   ...new Set(ADMIN_SERVER_FUNCTIONS.map((entry) => entry.sourceFile)),
 ] as Array<(typeof ADMIN_SERVER_FUNCTIONS)[number]["sourceFile"]>;
 
 const ADMIN_SERVER_FUNCTION_IDS = new Set(
-  ADMIN_SERVER_FUNCTIONS.map((entry) =>
+  [...ADMIN_SERVER_FUNCTIONS, ...ADMIN_ACCOUNT_SERVER_FUNCTIONS].map((entry) =>
     createHash("sha256").update(`${entry.sourceFile}--${entry.functionName}`).digest("hex"),
   ),
 );

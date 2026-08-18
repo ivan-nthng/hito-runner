@@ -1,10 +1,30 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5";
+  graphql_public: {
+    Tables: {
+      [_ in never]: never;
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json;
+          operationName?: string;
+          query?: string;
+          variables?: Json;
+        };
+        Returns: Json;
+      };
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
   };
   public: {
     Tables: {
@@ -83,6 +103,89 @@ export type Database = {
         };
         Relationships: [];
       };
+      calendar_workout_mutation_events: {
+        Row: {
+          after_workout: Json | null;
+          before_workout: Json | null;
+          created_at: string;
+          displaced_workout: Json | null;
+          event_payload: Json;
+          id: number;
+          legacy_ordinal: number | null;
+          migrated_from_plan_id: string | null;
+          mutation_checksum: string | null;
+          mutation_kind: string;
+          mutation_payload_version: string | null;
+          occurred_at: string | null;
+          planned_workout_id: string;
+          review_checksum: string;
+          review_payload_version: string;
+          source_workout_date: string | null;
+          source_workout_id: string | null;
+          target_date: string | null;
+          target_workout_id: string | null;
+          undo_expires_at: string | null;
+          undo_of_event_id: number | null;
+          user_id: string;
+        };
+        Insert: {
+          after_workout?: Json | null;
+          before_workout?: Json | null;
+          created_at?: string;
+          displaced_workout?: Json | null;
+          event_payload: Json;
+          id?: never;
+          legacy_ordinal?: number | null;
+          migrated_from_plan_id?: string | null;
+          mutation_checksum?: string | null;
+          mutation_kind: string;
+          mutation_payload_version?: string | null;
+          occurred_at?: string | null;
+          planned_workout_id: string;
+          review_checksum: string;
+          review_payload_version: string;
+          source_workout_date?: string | null;
+          source_workout_id?: string | null;
+          target_date?: string | null;
+          target_workout_id?: string | null;
+          undo_expires_at?: string | null;
+          undo_of_event_id?: number | null;
+          user_id: string;
+        };
+        Update: {
+          after_workout?: Json | null;
+          before_workout?: Json | null;
+          created_at?: string;
+          displaced_workout?: Json | null;
+          event_payload?: Json;
+          id?: never;
+          legacy_ordinal?: number | null;
+          migrated_from_plan_id?: string | null;
+          mutation_checksum?: string | null;
+          mutation_kind?: string;
+          mutation_payload_version?: string | null;
+          occurred_at?: string | null;
+          planned_workout_id?: string;
+          review_checksum?: string;
+          review_payload_version?: string;
+          source_workout_date?: string | null;
+          source_workout_id?: string | null;
+          target_date?: string | null;
+          target_workout_id?: string | null;
+          undo_expires_at?: string | null;
+          undo_of_event_id?: number | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "calendar_workout_mutation_events_undo_of_event_id_fkey";
+            columns: ["undo_of_event_id"];
+            isOneToOne: false;
+            referencedRelation: "calendar_workout_mutation_events";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       plan_cycles: {
         Row: {
           created_at: string;
@@ -156,8 +259,9 @@ export type Database = {
           id: string;
           metric_mode: Json | null;
           notes: string | null;
+          origin_kind: string;
           phase: string;
-          plan_cycle_id: string;
+          plan_cycle_id: string | null;
           planned_rpe: number | null;
           recovery_priority: string | null;
           source_workout_id: string | null;
@@ -181,8 +285,9 @@ export type Database = {
           id?: string;
           metric_mode?: Json | null;
           notes?: string | null;
+          origin_kind: string;
           phase: string;
-          plan_cycle_id: string;
+          plan_cycle_id?: string | null;
           planned_rpe?: number | null;
           recovery_priority?: string | null;
           source_workout_id?: string | null;
@@ -206,8 +311,9 @@ export type Database = {
           id?: string;
           metric_mode?: Json | null;
           notes?: string | null;
+          origin_kind?: string;
           phase?: string;
-          plan_cycle_id?: string;
+          plan_cycle_id?: string | null;
           planned_rpe?: number | null;
           recovery_priority?: string | null;
           source_workout_id?: string | null;
@@ -224,214 +330,13 @@ export type Database = {
         };
         Relationships: [
           {
-            foreignKeyName: "planned_workouts_plan_cycle_id_fkey";
-            columns: ["plan_cycle_id"];
+            foreignKeyName: "planned_workouts_source_owner_fkey";
+            columns: ["user_id", "plan_cycle_id"];
             isOneToOne: false;
             referencedRelation: "plan_cycles";
-            referencedColumns: ["id"];
+            referencedColumns: ["user_id", "id"];
           },
         ];
-      };
-      runner_manual_workout_templates: {
-        Row: {
-          created_at: string;
-          display_name: string;
-          draft_payload: Json;
-          icon_key: string;
-          id: string;
-          review_payload_version: string;
-          source_kind: string;
-          source_review_checksum: string;
-          source_status: string;
-          source_workout_family: string;
-          source_workout_identity: string;
-          target_truth_mode: string;
-          template_key: string;
-          template_version: string;
-          updated_at: string;
-          user_id: string;
-          workout_source_kind: string;
-        };
-        Insert: {
-          created_at?: string;
-          display_name: string;
-          draft_payload: Json;
-          icon_key: string;
-          id?: string;
-          review_payload_version?: string;
-          source_kind?: string;
-          source_review_checksum: string;
-          source_status?: string;
-          source_workout_family: string;
-          source_workout_identity: string;
-          target_truth_mode: string;
-          template_key: string;
-          template_version?: string;
-          updated_at?: string;
-          user_id: string;
-          workout_source_kind?: string;
-        };
-        Update: {
-          created_at?: string;
-          display_name?: string;
-          draft_payload?: Json;
-          icon_key?: string;
-          id?: string;
-          review_payload_version?: string;
-          source_kind?: string;
-          source_review_checksum?: string;
-          source_status?: string;
-          source_workout_family?: string;
-          source_workout_identity?: string;
-          target_truth_mode?: string;
-          template_key?: string;
-          template_version?: string;
-          updated_at?: string;
-          user_id?: string;
-          workout_source_kind?: string;
-        };
-        Relationships: [];
-      };
-      runner_capability_usage: {
-        Row: {
-          capability_key: string;
-          created_at: string;
-          period_key: string;
-          updated_at: string;
-          used_count: number;
-          user_id: string;
-        };
-        Insert: {
-          capability_key: string;
-          created_at?: string;
-          period_key?: string;
-          updated_at?: string;
-          used_count?: number;
-          user_id: string;
-        };
-        Update: {
-          capability_key?: string;
-          created_at?: string;
-          period_key?: string;
-          updated_at?: string;
-          used_count?: number;
-          user_id?: string;
-        };
-        Relationships: [];
-      };
-      runner_entitlements: {
-        Row: {
-          created_at: string;
-          source: string;
-          status: string;
-          tier: string;
-          updated_at: string;
-          user_id: string;
-        };
-        Insert: {
-          created_at?: string;
-          source: string;
-          status?: string;
-          tier: string;
-          updated_at?: string;
-          user_id: string;
-        };
-        Update: {
-          created_at?: string;
-          source?: string;
-          status?: string;
-          tier?: string;
-          updated_at?: string;
-          user_id?: string;
-        };
-        Relationships: [];
-      };
-      runner_profiles: {
-        Row: {
-          age: number | null;
-          avatar_storage_path: string | null;
-          avatar_url: string | null;
-          baseline_long_run_km: number | null;
-          baseline_notes: string | null;
-          baseline_revision: number;
-          baseline_sessions_per_week: number | null;
-          calendar_timezone: string;
-          calendar_timezone_source: string;
-          created_at: string;
-          display_name: string | null;
-          first_name: string | null;
-          fitness_level: string | null;
-          goal_label: string | null;
-          goal_type: Database["public"]["Enums"]["runner_goal_type"] | null;
-          heart_rate_profile: Json | null;
-          hidden_manual_workout_template_keys: string[];
-          height_cm: number | null;
-          last_name: string | null;
-          setup_completed_at: string;
-          setup_state: Database["public"]["Enums"]["runner_setup_state"];
-          training_preferences: Json | null;
-          ui_locale_preference: string;
-          updated_at: string;
-          user_id: string;
-          weight_kg: number | null;
-        };
-        Insert: {
-          age?: number | null;
-          avatar_storage_path?: string | null;
-          avatar_url?: string | null;
-          baseline_long_run_km?: number | null;
-          baseline_notes?: string | null;
-          baseline_revision?: number;
-          baseline_sessions_per_week?: number | null;
-          calendar_timezone?: string;
-          calendar_timezone_source?: string;
-          created_at?: string;
-          display_name?: string | null;
-          first_name?: string | null;
-          fitness_level?: string | null;
-          goal_label?: string | null;
-          goal_type?: Database["public"]["Enums"]["runner_goal_type"] | null;
-          heart_rate_profile?: Json | null;
-          hidden_manual_workout_template_keys?: string[];
-          height_cm?: number | null;
-          last_name?: string | null;
-          setup_completed_at?: string;
-          setup_state?: Database["public"]["Enums"]["runner_setup_state"];
-          training_preferences?: Json | null;
-          ui_locale_preference?: string;
-          updated_at?: string;
-          user_id: string;
-          weight_kg?: number | null;
-        };
-        Update: {
-          age?: number | null;
-          avatar_storage_path?: string | null;
-          avatar_url?: string | null;
-          baseline_long_run_km?: number | null;
-          baseline_notes?: string | null;
-          baseline_revision?: number;
-          baseline_sessions_per_week?: number | null;
-          calendar_timezone?: string;
-          calendar_timezone_source?: string;
-          created_at?: string;
-          display_name?: string | null;
-          first_name?: string | null;
-          fitness_level?: string | null;
-          goal_label?: string | null;
-          goal_type?: Database["public"]["Enums"]["runner_goal_type"] | null;
-          heart_rate_profile?: Json | null;
-          hidden_manual_workout_template_keys?: string[];
-          height_cm?: number | null;
-          last_name?: string | null;
-          setup_completed_at?: string;
-          setup_state?: Database["public"]["Enums"]["runner_setup_state"];
-          training_preferences?: Json | null;
-          ui_locale_preference?: string;
-          updated_at?: string;
-          user_id?: string;
-          weight_kg?: number | null;
-        };
-        Relationships: [];
       };
       runner_activities: {
         Row: {
@@ -467,10 +372,12 @@ export type Database = {
           user_id: string;
         };
         Update: {
+          created_at?: string;
           current_revision_id?: string | null;
           distance_km?: number | null;
           elapsed_duration_min?: number | null;
           historical_timezone?: string | null;
+          id?: string;
           local_date?: string | null;
           quality_state?: string;
           recording_kind?: string;
@@ -480,224 +387,15 @@ export type Database = {
           updated_at?: string;
           user_id?: string;
         };
-        Relationships: [];
-      };
-      runner_activity_sources: {
-        Row: {
-          activity_id: string;
-          created_at: string;
-          current_revision_id: string | null;
-          id: string;
-          source_fingerprint_sha256: string;
-          source_kind: string;
-          updated_at: string;
-          user_id: string;
-        };
-        Insert: {
-          activity_id: string;
-          created_at?: string;
-          current_revision_id?: string | null;
-          id?: string;
-          source_fingerprint_sha256: string;
-          source_kind: string;
-          updated_at?: string;
-          user_id: string;
-        };
-        Update: {
-          activity_id?: string;
-          current_revision_id?: string | null;
-          source_fingerprint_sha256?: string;
-          source_kind?: string;
-          updated_at?: string;
-          user_id?: string;
-        };
-        Relationships: [];
-      };
-      runner_activity_source_revisions: {
-        Row: {
-          capabilities: Json;
-          created_at: string;
-          id: string;
-          normalizer_version: string;
-          observed_at: string | null;
-          raw_asset_kind: string;
-          raw_file_size_bytes: number;
-          raw_mime_type: string;
-          raw_original_file_name: string;
-          raw_state: string;
-          raw_storage_bucket: string | null;
-          raw_storage_path: string | null;
-          revision_number: number;
-          source_id: string;
-          user_id: string;
-        };
-        Insert: {
-          capabilities: Json;
-          created_at?: string;
-          id?: string;
-          normalizer_version: string;
-          observed_at?: string | null;
-          raw_asset_kind: string;
-          raw_file_size_bytes: number;
-          raw_mime_type: string;
-          raw_original_file_name: string;
-          raw_state: string;
-          raw_storage_bucket?: string | null;
-          raw_storage_path?: string | null;
-          revision_number: number;
-          source_id: string;
-          user_id: string;
-        };
-        Update: {
-          capabilities?: Json;
-          normalizer_version?: string;
-          observed_at?: string | null;
-          raw_asset_kind?: string;
-          raw_file_size_bytes?: number;
-          raw_mime_type?: string;
-          raw_original_file_name?: string;
-          raw_state?: string;
-          raw_storage_bucket?: string | null;
-          raw_storage_path?: string | null;
-          revision_number?: number;
-          source_id?: string;
-          user_id?: string;
-        };
-        Relationships: [];
-      };
-      runner_activity_revisions: {
-        Row: {
-          activity_id: string;
-          activity_local_date: string | null;
-          activity_started_at: string | null;
-          created_at: string;
-          field_provenance: Json;
-          id: string;
-          normalized_summary: Json;
-          normalizer_version: string;
-          revision_number: number;
-          source_revision_id: string;
-          total_distance_km: number | null;
-          total_elapsed_duration_min: number | null;
-          total_timer_duration_min: number | null;
-          user_id: string;
-        };
-        Insert: {
-          activity_id: string;
-          activity_local_date?: string | null;
-          activity_started_at?: string | null;
-          created_at?: string;
-          field_provenance: Json;
-          id?: string;
-          normalized_summary: Json;
-          normalizer_version: string;
-          revision_number: number;
-          source_revision_id: string;
-          total_distance_km?: number | null;
-          total_elapsed_duration_min?: number | null;
-          total_timer_duration_min?: number | null;
-          user_id: string;
-        };
-        Update: {
-          activity_id?: string;
-          activity_local_date?: string | null;
-          activity_started_at?: string | null;
-          field_provenance?: Json;
-          normalized_summary?: Json;
-          normalizer_version?: string;
-          revision_number?: number;
-          source_revision_id?: string;
-          total_distance_km?: number | null;
-          total_elapsed_duration_min?: number | null;
-          total_timer_duration_min?: number | null;
-          user_id?: string;
-        };
-        Relationships: [];
-      };
-      runner_activity_planned_workout_matches: {
-        Row: {
-          activity_id: string;
-          created_at: string;
-          id: string;
-          match_method: string;
-          planned_workout_id: string | null;
-          source_revision_id: string;
-          user_id: string;
-        };
-        Insert: {
-          activity_id: string;
-          created_at?: string;
-          id?: string;
-          match_method: string;
-          planned_workout_id?: string | null;
-          source_revision_id: string;
-          user_id: string;
-        };
-        Update: {
-          activity_id?: string;
-          match_method?: string;
-          planned_workout_id?: string | null;
-          source_revision_id?: string;
-          user_id?: string;
-        };
-        Relationships: [];
-      };
-      runner_activity_fact_snapshots: {
-        Row: {
-          calculation_status: string;
-          cutoff_date: string;
-          created_at: string;
-          creation_cause: string;
-          exclusions: Json;
-          facts: Json;
-          formula_version: string;
-          id: string;
-          input_activity_revisions: Json;
-          input_fingerprint_sha256: string;
-          missing_field_reasons: Json;
-          snapshot_family: string;
-          user_id: string;
-          window_end: string;
-          window_start: string;
-          window_timezone_basis: string;
-        };
-        Insert: {
-          calculation_status?: string;
-          cutoff_date: string;
-          created_at?: string;
-          creation_cause: string;
-          exclusions: Json;
-          facts: Json;
-          formula_version: string;
-          id?: string;
-          input_activity_revisions: Json;
-          input_fingerprint_sha256: string;
-          missing_field_reasons: Json;
-          snapshot_family: string;
-          user_id: string;
-          window_end: string;
-          window_start: string;
-          window_timezone_basis?: string;
-        };
-        Update: {
-          calculation_status?: string;
-          cutoff_date?: string;
-          created_at?: string;
-          creation_cause?: string;
-          exclusions?: Json;
-          facts?: Json;
-          formula_version?: string;
-          id?: string;
-          input_activity_revisions?: Json;
-          input_fingerprint_sha256?: string;
-          missing_field_reasons?: Json;
-          snapshot_family?: string;
-          user_id?: string;
-          window_end?: string;
-          window_start?: string;
-          window_timezone_basis?: string;
-        };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "runner_activities_current_revision_id_fkey";
+            columns: ["current_revision_id"];
+            isOneToOne: false;
+            referencedRelation: "runner_activity_revisions";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       runner_activity_evidence_revisions: {
         Row: {
@@ -766,6 +464,92 @@ export type Database = {
           user_id?: string;
           workout_log_id?: string | null;
         };
+        Relationships: [
+          {
+            foreignKeyName: "runner_activity_evidence_revisions_activity_id_fkey";
+            columns: ["activity_id"];
+            isOneToOne: false;
+            referencedRelation: "runner_activities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "runner_activity_evidence_revisions_activity_revision_id_fkey";
+            columns: ["activity_revision_id"];
+            isOneToOne: false;
+            referencedRelation: "runner_activity_revisions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "runner_activity_evidence_revisions_predecessor_revision_id_fkey";
+            columns: ["predecessor_revision_id"];
+            isOneToOne: false;
+            referencedRelation: "runner_activity_evidence_revisions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "runner_activity_evidence_revisions_workout_log_id_fkey";
+            columns: ["workout_log_id"];
+            isOneToOne: false;
+            referencedRelation: "workout_logs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      runner_activity_fact_snapshots: {
+        Row: {
+          calculation_status: string;
+          created_at: string;
+          creation_cause: string;
+          cutoff_date: string;
+          exclusions: Json;
+          facts: Json;
+          formula_version: string;
+          id: string;
+          input_activity_revisions: Json;
+          input_fingerprint_sha256: string;
+          missing_field_reasons: Json;
+          snapshot_family: string;
+          user_id: string;
+          window_end: string;
+          window_start: string;
+          window_timezone_basis: string;
+        };
+        Insert: {
+          calculation_status: string;
+          created_at?: string;
+          creation_cause: string;
+          cutoff_date: string;
+          exclusions: Json;
+          facts: Json;
+          formula_version: string;
+          id?: string;
+          input_activity_revisions: Json;
+          input_fingerprint_sha256: string;
+          missing_field_reasons: Json;
+          snapshot_family: string;
+          user_id: string;
+          window_end: string;
+          window_start: string;
+          window_timezone_basis: string;
+        };
+        Update: {
+          calculation_status?: string;
+          created_at?: string;
+          creation_cause?: string;
+          cutoff_date?: string;
+          exclusions?: Json;
+          facts?: Json;
+          formula_version?: string;
+          id?: string;
+          input_activity_revisions?: Json;
+          input_fingerprint_sha256?: string;
+          missing_field_reasons?: Json;
+          snapshot_family?: string;
+          user_id?: string;
+          window_end?: string;
+          window_start?: string;
+          window_timezone_basis?: string;
+        };
         Relationships: [];
       };
       runner_activity_metric_observations: {
@@ -781,14 +565,14 @@ export type Database = {
           evidence_revision_id: string | null;
           exclusions: Json;
           id: string;
+          input_fingerprint_sha256: string;
           metric_formula_version: string;
           metric_key: string;
           metric_variant: string;
           observation_count: number;
-          input_fingerprint_sha256: string;
           source_revision_id: string;
-          unit: string;
           unavailable_reason: string | null;
+          unit: string;
           user_id: string;
           value: number | null;
         };
@@ -804,14 +588,14 @@ export type Database = {
           evidence_revision_id?: string | null;
           exclusions: Json;
           id?: string;
+          input_fingerprint_sha256: string;
           metric_formula_version: string;
           metric_key: string;
           metric_variant: string;
           observation_count?: number;
-          input_fingerprint_sha256: string;
           source_revision_id: string;
-          unit: string;
           unavailable_reason?: string | null;
+          unit: string;
           user_id: string;
           value?: number | null;
         };
@@ -838,7 +622,36 @@ export type Database = {
           user_id?: string;
           value?: number | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: "runner_activity_metric_observations_activity_id_fkey";
+            columns: ["activity_id"];
+            isOneToOne: false;
+            referencedRelation: "runner_activities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "runner_activity_metric_observations_activity_revision_id_fkey";
+            columns: ["activity_revision_id"];
+            isOneToOne: false;
+            referencedRelation: "runner_activity_revisions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "runner_activity_metric_observations_evidence_revision_id_fkey";
+            columns: ["evidence_revision_id"];
+            isOneToOne: false;
+            referencedRelation: "runner_activity_evidence_revisions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "runner_activity_metric_observations_source_revision_id_fkey";
+            columns: ["source_revision_id"];
+            isOneToOne: false;
+            referencedRelation: "runner_activity_source_revisions";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       runner_activity_metric_snapshots: {
         Row: {
@@ -858,7 +671,7 @@ export type Database = {
         };
         Insert: {
           as_of_date: string;
-          calculation_status?: string;
+          calculation_status: string;
           created_at?: string;
           creation_cause: string;
           formula_set_version: string;
@@ -888,11 +701,440 @@ export type Database = {
         };
         Relationships: [];
       };
+      runner_activity_planned_workout_matches: {
+        Row: {
+          activity_id: string;
+          created_at: string;
+          id: string;
+          match_method: string;
+          planned_workout_id: string | null;
+          source_revision_id: string;
+          user_id: string;
+        };
+        Insert: {
+          activity_id: string;
+          created_at?: string;
+          id?: string;
+          match_method: string;
+          planned_workout_id?: string | null;
+          source_revision_id: string;
+          user_id: string;
+        };
+        Update: {
+          activity_id?: string;
+          created_at?: string;
+          id?: string;
+          match_method?: string;
+          planned_workout_id?: string | null;
+          source_revision_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "runner_activity_planned_workout_matches_activity_id_fkey";
+            columns: ["activity_id"];
+            isOneToOne: true;
+            referencedRelation: "runner_activities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "runner_activity_planned_workout_matches_planned_workout_id_fkey";
+            columns: ["planned_workout_id"];
+            isOneToOne: false;
+            referencedRelation: "planned_workouts";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "runner_activity_planned_workout_matches_source_revision_id_fkey";
+            columns: ["source_revision_id"];
+            isOneToOne: false;
+            referencedRelation: "runner_activity_source_revisions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      runner_activity_revisions: {
+        Row: {
+          activity_id: string;
+          activity_local_date: string | null;
+          activity_started_at: string | null;
+          created_at: string;
+          field_provenance: Json;
+          id: string;
+          normalized_summary: Json;
+          normalizer_version: string;
+          revision_number: number;
+          source_revision_id: string;
+          total_distance_km: number | null;
+          total_elapsed_duration_min: number | null;
+          total_timer_duration_min: number | null;
+          user_id: string;
+        };
+        Insert: {
+          activity_id: string;
+          activity_local_date?: string | null;
+          activity_started_at?: string | null;
+          created_at?: string;
+          field_provenance: Json;
+          id?: string;
+          normalized_summary: Json;
+          normalizer_version: string;
+          revision_number: number;
+          source_revision_id: string;
+          total_distance_km?: number | null;
+          total_elapsed_duration_min?: number | null;
+          total_timer_duration_min?: number | null;
+          user_id: string;
+        };
+        Update: {
+          activity_id?: string;
+          activity_local_date?: string | null;
+          activity_started_at?: string | null;
+          created_at?: string;
+          field_provenance?: Json;
+          id?: string;
+          normalized_summary?: Json;
+          normalizer_version?: string;
+          revision_number?: number;
+          source_revision_id?: string;
+          total_distance_km?: number | null;
+          total_elapsed_duration_min?: number | null;
+          total_timer_duration_min?: number | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "runner_activity_revisions_activity_id_fkey";
+            columns: ["activity_id"];
+            isOneToOne: false;
+            referencedRelation: "runner_activities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "runner_activity_revisions_source_revision_id_fkey";
+            columns: ["source_revision_id"];
+            isOneToOne: true;
+            referencedRelation: "runner_activity_source_revisions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      runner_activity_source_revisions: {
+        Row: {
+          capabilities: Json;
+          created_at: string;
+          id: string;
+          normalizer_version: string;
+          observed_at: string | null;
+          raw_asset_kind: string;
+          raw_file_size_bytes: number;
+          raw_mime_type: string;
+          raw_original_file_name: string;
+          raw_state: string;
+          raw_storage_bucket: string | null;
+          raw_storage_path: string | null;
+          revision_number: number;
+          source_id: string;
+          user_id: string;
+        };
+        Insert: {
+          capabilities: Json;
+          created_at?: string;
+          id?: string;
+          normalizer_version: string;
+          observed_at?: string | null;
+          raw_asset_kind: string;
+          raw_file_size_bytes: number;
+          raw_mime_type: string;
+          raw_original_file_name: string;
+          raw_state: string;
+          raw_storage_bucket?: string | null;
+          raw_storage_path?: string | null;
+          revision_number: number;
+          source_id: string;
+          user_id: string;
+        };
+        Update: {
+          capabilities?: Json;
+          created_at?: string;
+          id?: string;
+          normalizer_version?: string;
+          observed_at?: string | null;
+          raw_asset_kind?: string;
+          raw_file_size_bytes?: number;
+          raw_mime_type?: string;
+          raw_original_file_name?: string;
+          raw_state?: string;
+          raw_storage_bucket?: string | null;
+          raw_storage_path?: string | null;
+          revision_number?: number;
+          source_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "runner_activity_source_revisions_source_id_fkey";
+            columns: ["source_id"];
+            isOneToOne: false;
+            referencedRelation: "runner_activity_sources";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      runner_activity_sources: {
+        Row: {
+          activity_id: string;
+          created_at: string;
+          current_revision_id: string | null;
+          id: string;
+          source_fingerprint_sha256: string;
+          source_kind: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          activity_id: string;
+          created_at?: string;
+          current_revision_id?: string | null;
+          id?: string;
+          source_fingerprint_sha256: string;
+          source_kind: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          activity_id?: string;
+          created_at?: string;
+          current_revision_id?: string | null;
+          id?: string;
+          source_fingerprint_sha256?: string;
+          source_kind?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "runner_activity_sources_activity_id_fkey";
+            columns: ["activity_id"];
+            isOneToOne: false;
+            referencedRelation: "runner_activities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "runner_activity_sources_current_revision_id_fkey";
+            columns: ["current_revision_id"];
+            isOneToOne: false;
+            referencedRelation: "runner_activity_source_revisions";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      runner_capability_usage: {
+        Row: {
+          capability_key: string;
+          created_at: string;
+          period_key: string;
+          updated_at: string;
+          used_count: number;
+          user_id: string;
+        };
+        Insert: {
+          capability_key: string;
+          created_at?: string;
+          period_key?: string;
+          updated_at?: string;
+          used_count?: number;
+          user_id: string;
+        };
+        Update: {
+          capability_key?: string;
+          created_at?: string;
+          period_key?: string;
+          updated_at?: string;
+          used_count?: number;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      runner_entitlements: {
+        Row: {
+          created_at: string;
+          source: string;
+          status: string;
+          tier: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          source: string;
+          status?: string;
+          tier: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          source?: string;
+          status?: string;
+          tier?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      runner_manual_workout_templates: {
+        Row: {
+          created_at: string;
+          display_name: string;
+          draft_payload: Json;
+          icon_key: string;
+          id: string;
+          review_payload_version: string;
+          source_kind: string;
+          source_review_checksum: string;
+          source_status: string;
+          source_workout_family: string;
+          source_workout_identity: string;
+          target_truth_mode: string;
+          template_key: string;
+          template_version: string;
+          updated_at: string;
+          user_id: string;
+          workout_source_kind: string;
+        };
+        Insert: {
+          created_at?: string;
+          display_name: string;
+          draft_payload: Json;
+          icon_key: string;
+          id?: string;
+          review_payload_version?: string;
+          source_kind?: string;
+          source_review_checksum: string;
+          source_status?: string;
+          source_workout_family: string;
+          source_workout_identity: string;
+          target_truth_mode: string;
+          template_key: string;
+          template_version?: string;
+          updated_at?: string;
+          user_id: string;
+          workout_source_kind?: string;
+        };
+        Update: {
+          created_at?: string;
+          display_name?: string;
+          draft_payload?: Json;
+          icon_key?: string;
+          id?: string;
+          review_payload_version?: string;
+          source_kind?: string;
+          source_review_checksum?: string;
+          source_status?: string;
+          source_workout_family?: string;
+          source_workout_identity?: string;
+          target_truth_mode?: string;
+          template_key?: string;
+          template_version?: string;
+          updated_at?: string;
+          user_id?: string;
+          workout_source_kind?: string;
+        };
+        Relationships: [];
+      };
+      runner_profiles: {
+        Row: {
+          age: number | null;
+          avatar_storage_path: string | null;
+          avatar_url: string | null;
+          baseline_long_run_km: number | null;
+          baseline_notes: string | null;
+          baseline_revision: number;
+          baseline_sessions_per_week: number | null;
+          calendar_timezone: string;
+          calendar_timezone_source: string;
+          created_at: string;
+          display_name: string | null;
+          first_name: string | null;
+          fitness_level: string | null;
+          goal_label: string | null;
+          goal_type: Database["public"]["Enums"]["runner_goal_type"] | null;
+          heart_rate_profile: Json | null;
+          height_cm: number | null;
+          hidden_manual_workout_template_keys: string[];
+          last_name: string | null;
+          setup_completed_at: string;
+          setup_state: Database["public"]["Enums"]["runner_setup_state"];
+          training_preferences: Json | null;
+          ui_locale_preference: string;
+          updated_at: string;
+          user_id: string;
+          weight_kg: number | null;
+        };
+        Insert: {
+          age?: number | null;
+          avatar_storage_path?: string | null;
+          avatar_url?: string | null;
+          baseline_long_run_km?: number | null;
+          baseline_notes?: string | null;
+          baseline_revision?: number;
+          baseline_sessions_per_week?: number | null;
+          calendar_timezone?: string;
+          calendar_timezone_source?: string;
+          created_at?: string;
+          display_name?: string | null;
+          first_name?: string | null;
+          fitness_level?: string | null;
+          goal_label?: string | null;
+          goal_type?: Database["public"]["Enums"]["runner_goal_type"] | null;
+          heart_rate_profile?: Json | null;
+          height_cm?: number | null;
+          hidden_manual_workout_template_keys?: string[];
+          last_name?: string | null;
+          setup_completed_at?: string;
+          setup_state?: Database["public"]["Enums"]["runner_setup_state"];
+          training_preferences?: Json | null;
+          ui_locale_preference?: string;
+          updated_at?: string;
+          user_id: string;
+          weight_kg?: number | null;
+        };
+        Update: {
+          age?: number | null;
+          avatar_storage_path?: string | null;
+          avatar_url?: string | null;
+          baseline_long_run_km?: number | null;
+          baseline_notes?: string | null;
+          baseline_revision?: number;
+          baseline_sessions_per_week?: number | null;
+          calendar_timezone?: string;
+          calendar_timezone_source?: string;
+          created_at?: string;
+          display_name?: string | null;
+          first_name?: string | null;
+          fitness_level?: string | null;
+          goal_label?: string | null;
+          goal_type?: Database["public"]["Enums"]["runner_goal_type"] | null;
+          heart_rate_profile?: Json | null;
+          height_cm?: number | null;
+          hidden_manual_workout_template_keys?: string[];
+          last_name?: string | null;
+          setup_completed_at?: string;
+          setup_state?: Database["public"]["Enums"]["runner_setup_state"];
+          training_preferences?: Json | null;
+          ui_locale_preference?: string;
+          updated_at?: string;
+          user_id?: string;
+          weight_kg?: number | null;
+        };
+        Relationships: [];
+      };
       workout_actual_metrics: {
         Row: {
           activity_id: string | null;
-          activity_revision_id: string | null;
           activity_local_date: string | null;
+          activity_revision_id: string | null;
           activity_started_at: string | null;
           actual_avg_cadence: number | null;
           actual_avg_hr: number | null;
@@ -909,7 +1151,7 @@ export type Database = {
           created_at: string;
           id: string;
           lap_payload: Json | null;
-          planned_workout_id: string | null;
+          planned_workout_id: string;
           result_asset_id: string;
           source_kind: string;
           status: string;
@@ -920,8 +1162,8 @@ export type Database = {
         };
         Insert: {
           activity_id?: string | null;
-          activity_revision_id?: string | null;
           activity_local_date?: string | null;
+          activity_revision_id?: string | null;
           activity_started_at?: string | null;
           actual_avg_cadence?: number | null;
           actual_avg_hr?: number | null;
@@ -949,8 +1191,8 @@ export type Database = {
         };
         Update: {
           activity_id?: string | null;
-          activity_revision_id?: string | null;
           activity_local_date?: string | null;
+          activity_revision_id?: string | null;
           activity_started_at?: string | null;
           actual_avg_cadence?: number | null;
           actual_avg_hr?: number | null;
@@ -977,6 +1219,20 @@ export type Database = {
           workout_log_id?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "workout_actual_metrics_activity_id_fkey";
+            columns: ["activity_id"];
+            isOneToOne: false;
+            referencedRelation: "runner_activities";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "workout_actual_metrics_activity_revision_id_fkey";
+            columns: ["activity_revision_id"];
+            isOneToOne: false;
+            referencedRelation: "runner_activity_revisions";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "workout_actual_metrics_planned_workout_id_fkey";
             columns: ["planned_workout_id"];
@@ -1194,7 +1450,7 @@ export type Database = {
           original_file_name: string;
           parse_error: string | null;
           parse_status: string;
-          planned_workout_id: string;
+          planned_workout_id: string | null;
           primary_file_kind: string | null;
           primary_file_name: string | null;
           storage_bucket: string | null;
@@ -1243,6 +1499,13 @@ export type Database = {
         };
         Relationships: [
           {
+            foreignKeyName: "workout_result_assets_activity_source_revision_id_fkey";
+            columns: ["activity_source_revision_id"];
+            isOneToOne: false;
+            referencedRelation: "runner_activity_source_revisions";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "workout_result_assets_planned_workout_id_fkey";
             columns: ["planned_workout_id"];
             isOneToOne: false;
@@ -1263,62 +1526,83 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      apply_calendar_workout_mutation: {
+      append_runner_activity_evidence_revision: {
         Args: {
-          p_current_date: string;
-          p_expected_plan_updated_at: string;
-          p_expected_source_workout: Json;
-          p_expected_target_workout: Json;
-          p_mutation_kind: string;
-          p_plan_id: string;
-          p_plan_update: Json;
+          p_activity_id: string;
+          p_captured_at?: string;
+          p_change_reason?: string;
+          p_completion_outcome?: string;
+          p_evidence_kind: string;
+          p_expected_activity_revision_id: string;
+          p_expected_predecessor_id?: string;
+          p_lifecycle_state: string;
+          p_official_context?: string;
+          p_official_distance_m?: number;
+          p_official_elapsed_seconds?: number;
+          p_official_event_date?: string;
+          p_origin?: string;
+          p_session_rpe?: number;
           p_user_id: string;
-          p_workout_insert: Json;
-          p_workout_update: Json;
+          p_workout_log_id?: string;
         };
-        Returns: Json;
+        Returns: {
+          evidence_revision_id: string;
+          reused_exact_evidence: boolean;
+          revision_number: number;
+        }[];
       };
       apply_calendar_workout_content_edit: {
         Args: {
           p_current_date: string;
-          p_expected_plan_updated_at: string;
           p_expected_workout: Json;
-          p_plan_goal_metadata: Json;
-          p_plan_id: string;
-          p_plan_preferences: Json;
+          p_mutation_event: Json;
           p_user_id: string;
           p_workout_id: string;
           p_workout_update: Json;
         };
         Returns: Json;
       };
-      apply_reviewed_plan_persistence: {
+      apply_calendar_workout_mutation: {
         Args: {
           p_current_date: string;
-          p_expected_profile_revision?: number | null;
-          p_plan: Json;
-          p_profile: Json;
+          p_expected_source_workout: Json;
+          p_expected_target_workout: Json;
+          p_mutation_event: Json;
+          p_mutation_kind: string;
           p_user_id: string;
-          p_workouts: Json;
+          p_workout_insert: Json;
+          p_workout_update: Json;
         };
         Returns: Json;
       };
       apply_reviewed_future_schedule_persistence: {
         Args: {
           p_current_date: string;
-          p_plan: Json;
           p_replace_future_workouts: boolean;
+          p_source_plan_id: string;
+          p_user_id: string;
+          p_workouts: Json;
+        };
+        Returns: Json;
+      };
+      apply_reviewed_plan_persistence: {
+        Args: {
+          p_current_date: string;
+          p_expected_profile_revision?: number;
+          p_profile: Json;
+          p_source_plan_id: string;
           p_user_id: string;
           p_workouts: Json;
         };
         Returns: Json;
       };
       clear_calendar_future_workouts: {
-        Args: {
-          p_current_date: string;
-          p_user_id: string;
-        };
+        Args: { p_current_date: string; p_user_id: string };
         Returns: Json;
+      };
+      delete_runner_activity_from_history: {
+        Args: { p_activity_id: string; p_user_id: string };
+        Returns: boolean;
       };
       finalize_runner_activity_planned_workout_projection: {
         Args: {
@@ -1333,6 +1617,43 @@ export type Database = {
         };
         Returns: undefined;
       };
+      list_hito_applied_migration_versions: {
+        Args: never;
+        Returns: {
+          version: string;
+        }[];
+      };
+      list_runner_activity_history_page: {
+        Args: {
+          p_cursor_activity_id?: string;
+          p_cursor_sort_date?: string;
+          p_cursor_sort_started_at?: string;
+          p_page_size: number;
+          p_user_id: string;
+        };
+        Returns: {
+          activity_id: string;
+          created_at: string;
+          current_revision_id: string;
+          distance_km: number;
+          elapsed_duration_min: number;
+          historical_timezone: string;
+          local_date: string;
+          quality_state: string;
+          recording_kind: string;
+          sort_date: string;
+          sort_started_at: string;
+          sport: string;
+          started_at: string;
+          timer_duration_min: number;
+        }[];
+      };
+      list_runner_fit_completed_planned_workouts: {
+        Args: { p_planned_workout_ids: string[]; p_user_id: string };
+        Returns: {
+          planned_workout_id: string;
+        }[];
+      };
       persist_runner_activity_garmin_source: {
         Args: {
           p_activity_revision: Json;
@@ -1344,78 +1665,22 @@ export type Database = {
           activity_id: string;
           activity_revision_id: string;
           raw_state: string;
-          raw_storage_bucket: string | null;
-          raw_storage_path: string | null;
+          raw_storage_bucket: string;
+          raw_storage_path: string;
           reused_exact_source: boolean;
           source_id: string;
           source_revision_id: string;
         }[];
       };
-      list_runner_activity_history_page: {
+      sync_workout_log_runner_activity_rpe: {
         Args: {
-          p_cursor_activity_id?: string | null;
-          p_cursor_sort_date?: string | null;
-          p_cursor_sort_started_at?: string | null;
-          p_page_size: number;
-          p_user_id: string;
-        };
-        Returns: {
-          activity_id: string;
-          created_at: string;
-          current_revision_id: string | null;
-          distance_km: number | null;
-          elapsed_duration_min: number | null;
-          historical_timezone: string | null;
-          local_date: string | null;
-          quality_state: string;
-          recording_kind: string;
-          sort_date: string;
-          sort_started_at: string;
-          sport: string;
-          started_at: string | null;
-          timer_duration_min: number | null;
-        }[];
-      };
-      list_runner_fit_completed_planned_workouts: {
-        Args: {
-          p_planned_workout_ids: string[];
-          p_user_id: string;
-        };
-        Returns: {
-          planned_workout_id: string;
-        }[];
-      };
-      append_runner_activity_evidence_revision: {
-        Args: {
-          p_activity_id: string;
-          p_captured_at?: string;
           p_change_reason?: string;
-          p_completion_outcome?: string | null;
-          p_evidence_kind: string;
-          p_expected_activity_revision_id: string;
-          p_expected_predecessor_id?: string | null;
-          p_lifecycle_state: string;
-          p_official_context?: string | null;
-          p_official_distance_m?: number | null;
-          p_official_elapsed_seconds?: number | null;
-          p_official_event_date?: string | null;
-          p_origin?: string;
-          p_session_rpe?: number | null;
-          p_user_id: string;
-          p_workout_log_id?: string | null;
-        };
-        Returns: {
-          evidence_revision_id: string;
-          reused_exact_evidence: boolean;
-          revision_number: number;
-        }[];
-      };
-      delete_runner_activity_from_history: {
-        Args: {
-          p_activity_id: string;
+          p_planned_workout_id: string;
+          p_removed_completion_outcome?: string;
+          p_removed_workout_log_id?: string;
           p_user_id: string;
         };
-        Returns: boolean;
+        Returns: undefined;
       };
     };
     Enums: {
@@ -1547,6 +1812,9 @@ export type CompositeTypes<
     : never;
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       plan_cycle_status: ["active", "archived"],

@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** DESIGN SYSTEM
+- **Epic:** platform-and-operations
 - **Outcome:** Completed on 2026-08-11 as a focused Lite Design System source slice.
 - **Sources:** [icon.tsx](../../../src/components/ui/icon.tsx); [button.tsx](../../../src/components/ui/button.tsx); [layout-typography.css](../../../src/styles/layout-typography.css)
 - **Validation:** Formatting, Lint, Diff hygiene passed as recorded in the terminal receipt; omitted layers remain outside this closeout.

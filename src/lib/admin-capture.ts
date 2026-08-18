@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   adminWorkItemSourceGroups,
   type AdminRepoWorkItemArchiveIntent,
+  type AdminRepoWorkItemEpic,
   type AdminRepoWorkItemFrontendLane,
   type AdminRepoWorkItemKind,
   type AdminRepoWorkItemLifecycle,
@@ -53,6 +54,7 @@ export interface AdminCaptureRepoWorkItemView {
   workItemType: AdminRepoWorkItemType | null;
   workItemPriority: AdminRepoWorkItemPriority | null;
   owner: AdminRepoWorkItemOwner | null;
+  epic: AdminRepoWorkItemEpic | null;
   scope: string | null;
   archiveIntent: AdminRepoWorkItemArchiveIntent | null;
   batch: string | null;

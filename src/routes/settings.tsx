@@ -151,7 +151,7 @@ function SettingsPage() {
 
   if (snapshot.mode === "preview") {
     return (
-      <AppShell snapshot={snapshot} viewer={viewer}>
+      <AppShell settings={settings} snapshot={snapshot} viewer={viewer}>
         <div className="hito-route-gutter hito-route-stack py-20">
           <section className="hito-state-surface" data-tone="signal">
             <p className="hito-label-md text-foreground">Sign in first</p>
@@ -176,7 +176,7 @@ function SettingsPage() {
 
   if (!settings) {
     return (
-      <AppShell snapshot={snapshot} viewer={viewer}>
+      <AppShell settings={settings} snapshot={snapshot} viewer={viewer}>
         <div className="hito-route-gutter hito-route-stack py-20">
           <section className="hito-state-surface" data-tone="signal">
             <p className="hito-label-md text-foreground">Finish setup first</p>
@@ -201,7 +201,7 @@ function SettingsPage() {
   }
 
   return (
-    <AppShell snapshot={snapshot} viewer={viewer}>
+    <AppShell settings={settings} snapshot={snapshot} viewer={viewer}>
       <div className="hito-route-gutter hito-route-stack max-w-5xl py-hito-6 sm:py-10">
         <header className="hito-page-header">
           <p className="hito-label-md text-foreground">User settings</p>
@@ -210,7 +210,7 @@ function SettingsPage() {
           </h1>
           <p className="hito-body-md mt-4 max-w-[40rem] text-secondary">
             Keep your personal data and future-plan training defaults in one place. Settings update
-            your runner profile, not the active plan already on your calendar.
+            your runner profile, not existing Calendar workouts.
           </p>
         </header>
 
@@ -373,7 +373,7 @@ function SettingsPage() {
               <section className="hito-settings-section">
                 <h2 className="hito-ui-title-sm text-foreground">Body data</h2>
                 <p className="hito-body-md text-secondary mt-2">
-                  The same compact profile facts used during plan setup.
+                  The same compact profile facts used during runner setup.
                 </p>
                 <div className="hito-editable-value-field-group mt-4">
                   <EditableValueField
@@ -457,8 +457,8 @@ function SettingsPage() {
                 <h2 className="hito-ui-title-sm text-foreground">Training preferences</h2>
               </div>
               <p className="hito-body-md text-secondary mt-3 max-w-2xl">
-                Defaults for new plans only. They prefill setup but never rewrite an existing active
-                schedule.
+                Defaults for future plan creation. They prefill setup but never rewrite existing
+                Calendar workouts.
               </p>
             </div>
 

@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { HitoLogo } from "@/components/ui/hito-logo";
 import { HitoButton } from "@/components/ui/button";
+import { HitoLanguageMenuItems } from "@/components/ui/hito-language-menu";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { ThemePreferenceMenuItems } from "@/components/settings/theme-preference-controls";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -16,6 +18,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import type { UiLocalePreference } from "@/lib/ui-locale";
 import { HitoDsBrandPage } from "./reference-brand-page";
 import { HitoDsComponentsPage } from "./reference-components-page";
 import { HitoDsFoundationsPage } from "./reference-foundations-page";
@@ -33,6 +36,7 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
   const [mobileJumpOpen, setMobileJumpOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [desktopSearchOpen, setDesktopSearchOpen] = useState(false);
+  const [languagePreference, setLanguagePreference] = useState<UiLocalePreference | null>(null);
   const desktopSearchInputRef = useRef<HTMLInputElement>(null);
   const desktopSearchTriggerRef = useRef<HTMLButtonElement>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
@@ -41,6 +45,7 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
   const currentPage = getHitoDsPage(pageId);
   const [activeHref, setActiveHref] = useState<string>(currentPage.path);
   const desktopSearchVisible = desktopSearchOpen || Boolean(query);
+  const resolvedLocale = languagePreference === "pt-BR" ? "pt-BR" : "en";
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -228,19 +233,23 @@ export function HitoDesignSystemReferencePage({ pageId }: { pageId: HitoDsPageId
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <HitoButton
-                        size="sm"
-                        variant="secondary"
-                        iconOnly
-                        aria-label="Theme preference"
-                      >
+                      <HitoButton size="sm" variant="secondary" iconOnly aria-label="Preferences">
                         <Icon name="settings" size="sm" decorative />
                       </HitoButton>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="hito-shell-menu">
+                    <DropdownMenuContent
+                      align="end"
+                      className="hito-shell-menu hito-menu-width-standard"
+                    >
                       <ThemePreferenceMenuItems
                         itemClassName="hito-shell-theme-menu-item"
                         labelClassName="hito-shell-profile-menu-label"
+                      />
+                      <DropdownMenuSeparator className="hito-shell-menu-separator" />
+                      <HitoLanguageMenuItems
+                        preference={languagePreference}
+                        resolvedLocale={resolvedLocale}
+                        onPreferenceChange={setLanguagePreference}
                       />
                     </DropdownMenuContent>
                   </DropdownMenu>

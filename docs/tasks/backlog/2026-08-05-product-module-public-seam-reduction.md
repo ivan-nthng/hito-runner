@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** FRONTEND
+- **Epic:** platform-and-operations
 - **Parent:** [Hito Stack Complexity Reduction Program](./2026-08-04-hito-stack-complexity-reduction-program.md)
 - **Outcome:** A fresh source-wide scan found no Product-owned zero-consumer export or facade; every apparent candidate belonged to another live or shared owner, so no Product source changed and existing contracts were retained.
 - **Sources:** Terminal decision/evidence record only; detailed transcript remains in Git history.

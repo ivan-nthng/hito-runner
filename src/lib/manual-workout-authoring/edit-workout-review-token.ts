@@ -1,68 +1,58 @@
 import {
-  ACTIVE_PLAN_USER_EDIT_MUTATION_KIND,
-  ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
+  CALENDAR_WORKOUT_MUTATION_KIND,
+  CALENDAR_WORKOUT_MUTATION_SOURCE_KIND,
+  type CalendarWorkoutEditRootProvenance,
 } from "@/lib/active-plan-workout-editing/policy";
-import type {
-  PersistedPlanCycleRow,
-  PersistedPlannedWorkoutRow,
-} from "@/lib/active-plan-persistence";
-import { buildManualWorkoutReviewExactnessPayload } from "@/lib/manual-workout-authoring/actions";
+import type { PersistedPlannedWorkoutRow } from "@/lib/active-plan-persistence";
 import {
   buildManualWorkoutReviewToken,
   stableManualWorkoutChecksum64Hex,
   validateManualWorkoutReviewProof,
 } from "@/lib/manual-workout-authoring/review-exactness";
-import type {
-  ManualWorkoutDraftReviewResult,
-  ManualWorkoutTemplateKey,
-} from "@/lib/manual-workout-authoring/schema";
+import type { WorkoutDocument, WorkoutDocumentEditProjection } from "@/lib/workout-document";
 
-export const MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION =
-  "manual_workout_persisted_edit_review_v1" as const;
+export const WORKOUT_DOCUMENT_EDIT_REVIEW_PAYLOAD_VERSION =
+  "workout_document_edit_review_v1" as const;
 
-const MANUAL_WORKOUT_EDIT_REVIEW_TOKEN_PREFIX = "manual-workout-edit-review-v1.";
+const WORKOUT_DOCUMENT_EDIT_REVIEW_TOKEN_PREFIX = "workout-document-edit-review-v1.";
 
-export type ManualWorkoutPersistedEditReview = {
+export type WorkoutDocumentPersistedEditReview = {
   plannedWorkoutId: string;
   workoutDate: string;
   title: string;
-  templateKey: ManualWorkoutTemplateKey;
   reviewToken: string;
   reviewChecksum: string;
-  draftReviewChecksum: string;
-  exactnessPayloadVersion: typeof MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION;
-  mutationPayloadVersion: typeof MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION;
+  exactnessPayloadVersion: typeof WORKOUT_DOCUMENT_EDIT_REVIEW_PAYLOAD_VERSION;
+  mutationPayloadVersion: typeof WORKOUT_DOCUMENT_EDIT_REVIEW_PAYLOAD_VERSION;
   mutationChecksum: string;
   trustedClientRows: false;
 };
 
 export function buildPersistedEditReview(input: {
-  activePlan: PersistedPlanCycleRow;
   sourceWorkout: PersistedPlannedWorkoutRow;
   otherWorkouts: readonly PersistedPlannedWorkoutRow[];
-  draftInput: unknown;
-  draftReview: Extract<ManualWorkoutDraftReviewResult, { ok: true }>;
-}): ManualWorkoutPersistedEditReview {
+  editProjection: WorkoutDocumentEditProjection;
+  candidateDocument: WorkoutDocument;
+  rootProvenance: CalendarWorkoutEditRootProvenance;
+}): WorkoutDocumentPersistedEditReview {
   const payload = buildPersistedEditExactnessPayload(input);
   const reviewChecksum = stableManualWorkoutChecksum64Hex(payload);
 
   return {
     plannedWorkoutId: input.sourceWorkout.id,
     workoutDate: input.sourceWorkout.workout_date,
-    title: input.draftReview.draft.title,
-    templateKey: input.draftReview.draft.templateKey,
+    title: input.candidateDocument.title,
     reviewToken: buildExpectedPersistedEditReviewToken(reviewChecksum),
     reviewChecksum,
-    draftReviewChecksum: input.draftReview.reviewChecksum,
-    exactnessPayloadVersion: MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION,
-    mutationPayloadVersion: MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION,
+    exactnessPayloadVersion: WORKOUT_DOCUMENT_EDIT_REVIEW_PAYLOAD_VERSION,
+    mutationPayloadVersion: WORKOUT_DOCUMENT_EDIT_REVIEW_PAYLOAD_VERSION,
     mutationChecksum: reviewChecksum,
     trustedClientRows: false,
   };
 }
 
 export function buildExpectedPersistedEditReviewToken(reviewChecksum: string) {
-  return buildManualWorkoutReviewToken(MANUAL_WORKOUT_EDIT_REVIEW_TOKEN_PREFIX, reviewChecksum);
+  return buildManualWorkoutReviewToken(WORKOUT_DOCUMENT_EDIT_REVIEW_TOKEN_PREFIX, reviewChecksum);
 }
 
 export function validatePersistedEditReviewProof(input: {
@@ -72,46 +62,41 @@ export function validatePersistedEditReviewProof(input: {
 }) {
   return validateManualWorkoutReviewProof({
     ...input,
-    tokenPrefix: MANUAL_WORKOUT_EDIT_REVIEW_TOKEN_PREFIX,
+    tokenPrefix: WORKOUT_DOCUMENT_EDIT_REVIEW_TOKEN_PREFIX,
   });
 }
 
-export function buildManualWorkoutEditMetadata(review: ManualWorkoutPersistedEditReview) {
+export function buildWorkoutDocumentEditMetadata(review: WorkoutDocumentPersistedEditReview) {
   return {
     planned_workout_id: review.plannedWorkoutId,
     workout_date: review.workoutDate,
     title: review.title,
-    template_key: review.templateKey,
-    review_payload_version: MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION,
+    review_payload_version: WORKOUT_DOCUMENT_EDIT_REVIEW_PAYLOAD_VERSION,
     review_checksum: review.reviewChecksum,
-    draft_review_checksum: review.draftReviewChecksum,
-    mutation_mode: "direct_manual_edit",
-    mutation_payload_version: MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION,
+    mutation_mode: "workout_document_edit",
+    mutation_payload_version: WORKOUT_DOCUMENT_EDIT_REVIEW_PAYLOAD_VERSION,
     mutation_checksum: review.mutationChecksum,
     trusted_client_rows: false,
   };
 }
 
 function buildPersistedEditExactnessPayload(input: {
-  activePlan: PersistedPlanCycleRow;
   sourceWorkout: PersistedPlannedWorkoutRow;
   otherWorkouts: readonly PersistedPlannedWorkoutRow[];
-  draftInput: unknown;
-  draftReview: Extract<ManualWorkoutDraftReviewResult, { ok: true }>;
+  editProjection: WorkoutDocumentEditProjection;
+  candidateDocument: WorkoutDocument;
+  rootProvenance: CalendarWorkoutEditRootProvenance;
 }) {
   return {
-    version: MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION,
-    sourceKind: ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
-    mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.editWorkout,
-    activePlanId: input.activePlan.id,
-    activePlanSourceKind: input.activePlan.source_kind,
-    activePlanUpdatedAt: input.activePlan.updated_at,
+    version: WORKOUT_DOCUMENT_EDIT_REVIEW_PAYLOAD_VERSION,
+    sourceKind: CALENDAR_WORKOUT_MUTATION_SOURCE_KIND,
+    mutationKind: CALENDAR_WORKOUT_MUTATION_KIND.editWorkout,
     plannedWorkoutId: input.sourceWorkout.id,
     workoutDate: input.sourceWorkout.workout_date,
-    sourceFingerprint: buildSourceWorkoutFingerprint(input.sourceWorkout),
-    editedDraftInput: input.draftInput,
-    editedDraftExactnessPayload: buildManualWorkoutReviewExactnessPayload(input.draftReview.draft),
-    editedDraftReviewChecksum: input.draftReview.reviewChecksum,
+    sourceFingerprint: buildFullSourceWorkoutFingerprint(input.sourceWorkout),
+    editProjection: input.editProjection,
+    candidateDocument: input.candidateDocument,
+    rootProvenance: input.rootProvenance,
     otherWorkoutIds: input.otherWorkouts.map((workout) => workout.id).sort(),
     rowCount: input.otherWorkouts.length + 1,
     nonRestRowCount:
@@ -142,4 +127,8 @@ export function buildSourceWorkoutFingerprint(workout: PersistedPlannedWorkoutRo
     recoveryPriority: workout.recovery_priority,
     steps: workout.steps,
   };
+}
+
+export function buildFullSourceWorkoutFingerprint(workout: PersistedPlannedWorkoutRow) {
+  return { ...workout };
 }

@@ -3,7 +3,6 @@ import {
   type CalendarWorkoutContext,
   type PersistedPlannedWorkoutRow,
 } from "@/lib/active-plan-persistence";
-import { resolveCalendarWorkoutEditability } from "@/lib/active-plan-workout-editing/policy";
 import {
   fetchManualWorkoutEvidenceWorkoutIds,
   isProtectedManualWorkoutCopySource,
@@ -56,7 +55,7 @@ export interface ManualWorkoutCopyPasteSourceInput {
 export type ManualWorkoutCopyPasteFailureReason =
   | Extract<ManualWorkoutAddToActivePlanResult, { ok: false }>["reason"]
   | "source_workout_not_found"
-  | "source_workout_not_in_active_plan"
+  | "source_workout_not_owned"
   | "source_workout_not_supported"
   | "source_date_changed"
   | "client_payload_rejected"
@@ -65,7 +64,7 @@ export type ManualWorkoutCopyPasteFailureReason =
 export type ManualWorkoutCopyPasteReconstructionResult =
   | {
       ok: true;
-      activePlanId: string;
+      activePlanId: string | null;
       sourceKind: string;
       sourceStatus: string | null;
       sourceWorkout: PersistedPlannedWorkoutRow;
@@ -97,50 +96,19 @@ export async function reconstructManualWorkoutCopyDraftForUser(
     return {
       ok: false,
       reason: "persistence_failed",
-      message: "The manual plan could not verify the current active-plan state.",
-    };
-  }
-
-  const activePlan = planContext.provenancePlan;
-  if (!activePlan) {
-    return {
-      ok: false,
-      reason: "no_active_plan",
-      message: "Create or open an active plan before copying workouts.",
-    };
-  }
-
-  if (input.activePlanId && activePlan.id !== input.activePlanId) {
-    return {
-      ok: false,
-      reason: "stale_review",
-      message: "The active plan changed. Refresh the calendar and review this copy again.",
-    };
-  }
-
-  const copyEditability = resolveCalendarWorkoutEditability(activePlan, "copy_workout");
-  if (!copyEditability.ok) {
-    return {
-      ok: false,
-      reason:
-        copyEditability.reason === "unsupported_source_metadata"
-          ? "unsupported_source_metadata"
-          : "unsupported_active_plan_source",
-      message: copyEditability.message,
-      sourceKind: activePlan.source_kind,
+      message: "The Calendar could not verify the current runner-owned workout state.",
     };
   }
 
   const source = resolveSourceWorkout({
     userId,
-    activePlanId: activePlan.id,
     workouts: planContext.existingWorkouts.workouts,
     sourceWorkoutId: input.sourceWorkoutId,
     sourceWorkoutDate: input.sourceWorkoutDate,
   });
 
   if (!source.ok) {
-    return { ...source, sourceKind: copyEditability.sourceKind };
+    return { ...source, sourceKind: null };
   }
 
   const sourceEvidenceIds = await fetchEvidence(userId, [source.workout.id]);
@@ -156,7 +124,7 @@ export async function reconstructManualWorkoutCopyDraftForUser(
       ok: false,
       reason: "protected_day",
       message: "This source workout has protected history or evidence and cannot be copied here.",
-      sourceKind: copyEditability.sourceKind,
+      sourceKind: source.workout.origin_kind,
     };
   }
 
@@ -165,24 +133,21 @@ export async function reconstructManualWorkoutCopyDraftForUser(
       ok: false,
       reason: "source_workout_not_supported",
       message: "This source workout has metric targets that cannot be copied safely.",
-      sourceKind: copyEditability.sourceKind,
+      sourceKind: source.workout.origin_kind,
     };
   }
 
-  const draft = buildManualWorkoutDraftInputFromPersistedWorkout(source.workout, input.targetDate, {
-    activePlanId: activePlan.id,
-    activePlanSourceKind: activePlan.source_kind,
-  });
+  const draft = buildManualWorkoutDraftInputFromPersistedWorkout(source.workout, input.targetDate);
 
   if (!draft.ok) {
-    return { ...draft, sourceKind: copyEditability.sourceKind };
+    return { ...draft, sourceKind: source.workout.origin_kind };
   }
 
   return {
     ok: true,
-    activePlanId: activePlan.id,
-    sourceKind: copyEditability.sourceKind,
-    sourceStatus: copyEditability.sourceStatus,
+    activePlanId: source.workout.plan_cycle_id,
+    sourceKind: source.workout.origin_kind,
+    sourceStatus: null,
     sourceWorkout: source.workout,
     draftInput: draft.draftInput,
     processingOptions: draft.processingOptions,
@@ -191,7 +156,6 @@ export async function reconstructManualWorkoutCopyDraftForUser(
 
 function resolveSourceWorkout(input: {
   userId: string;
-  activePlanId: string;
   workouts: readonly PersistedPlannedWorkoutRow[];
   sourceWorkoutId?: string;
   sourceWorkoutDate?: string;
@@ -215,11 +179,11 @@ function resolveSourceWorkout(input: {
   }
 
   const workout = matches[0]!;
-  if (workout.user_id !== input.userId || workout.plan_cycle_id !== input.activePlanId) {
+  if (workout.user_id !== input.userId) {
     return {
       ok: false,
-      reason: "source_workout_not_in_active_plan",
-      message: "The source workout is not part of the current runner's active manual plan.",
+      reason: "source_workout_not_owned",
+      message: "The source workout is not owned by the current runner.",
     };
   }
 
@@ -237,10 +201,6 @@ function resolveSourceWorkout(input: {
 export function buildManualWorkoutDraftInputFromPersistedWorkout(
   workout: PersistedPlannedWorkoutRow,
   targetDate: string,
-  context: {
-    activePlanId: string;
-    activePlanSourceKind: string | null;
-  },
 ):
   | {
       ok: true;
@@ -289,9 +249,7 @@ export function buildManualWorkoutDraftInputFromPersistedWorkout(
     targetTruthMode: deriveTargetTruthMode(workout),
     entries: reconstructedEntries.entries,
     context: {
-      mode: "existing_active_plan",
-      activePlanId: context.activePlanId,
-      activePlanSourceKind: context.activePlanSourceKind ?? undefined,
+      mode: "no_active_plan_draft",
       targetDateProtection: "none",
     },
   };

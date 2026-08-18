@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** DESIGN SYSTEM
+- **Epic:** platform-and-operations
 - **Parent:** [Hito Next Visual Patch Intake](./2026-08-13-hito-next-visual-patch-intake.md)
 - **Outcome:** The separate missing-hash observation does not invalidate radius token/value truth. No Global QA, release, hosted, deployment, or Product adoption claim is made.
 - **Sources:** [local-ui-inspector-targets.ts](../../../src/components/devtools/local-ui-inspector-targets.ts); [foundations.css](../../../src/styles/foundations.css); [local-ui-inspector-token-evidence.ts](../../../src/components/devtools/local-ui-inspector-token-evidence.ts)

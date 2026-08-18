@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** DESIGN SYSTEM
+- **Epic:** platform-and-operations
 - **Depends On:** 2026-08-13-hito-shell-surface-ladder-and-header-hierarchy-design-discovery
 - **Evidence From:** 2026-08-11-hito-ds-foundations-color-truth-context-and-reference-canvas
 - **Outcome:** Every admitted header uses the existing background role with an opaque fallback followed by the accepted 76% alpha composition, 18px blur, persistent hairline edge, sticky positioning, and no shadow. Browser replay also demonstrated that the former desktop…

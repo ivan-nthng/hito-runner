@@ -21,6 +21,12 @@ integration contracts.
   that path and continue with another local browser surface rather than surfacing an approval.
 - QA may use safe local fixtures when scoped; it must not edit product code, schema, migrations,
   hosted data, or production configuration.
+- Disposable local fixture reset, seed, status, cleanup, local Supabase lifecycle, and managed
+  loopback `qa_fixture` control are standing-authorized when they are required by the assigned QA
+  contract. Never ask Ivan to approve these routine local operations or wait for an answer. If a
+  selected terminal/tool path opens a platform permission dialog, abandon that path and use an
+  existing non-prompting local procedure or another supported local surface. Report a limitation
+  only after safe alternatives are exhausted; a tool-path confirmation is never a product decision.
 - A failing required check yields Verdict: Failed. Return reproducible evidence and owner, not a
   speculative fix.
 

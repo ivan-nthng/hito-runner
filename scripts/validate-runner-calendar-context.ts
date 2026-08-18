@@ -64,7 +64,10 @@ function proveAuthenticatedSourceWiring() {
     new URL("../src/lib/active-plan-persistence.ts", import.meta.url),
     "utf8",
   );
-  assert.match(savedPlanSource, /const currentDate = await getRunnerCalendarDateForUserId\(userId\)/);
+  assert.match(
+    savedPlanSource,
+    /const currentDate = await getRunnerCalendarDateForUserId\(userId\)/,
+  );
 }
 
 async function proveLocalPersistenceContract() {
@@ -87,6 +90,10 @@ async function proveLocalPersistenceContract() {
         goal_label: null,
         baseline_sessions_per_week: null,
         baseline_long_run_km: null,
+        age: 36,
+        weight_kg: 72,
+        height_cm: 178,
+        fitness_level: "running_regularly",
         setup_state: "completed" as const,
       })),
     );
@@ -255,20 +262,9 @@ async function seedSameDateWorkout(
   admin: ReturnType<typeof createAdminSupabaseClient>,
   userId: string,
 ) {
-  const planId = randomUUID();
-  const plan = await admin.from("plan_cycles").insert({
-    id: planId,
-    user_id: userId,
-    title: "Timezone boundary plan",
-    goal_summary: "Prove personal calendar status",
-    source_template: "runner-calendar-context-v1",
-    source_kind: "manual_user_built_v1",
-    start_date: "2026-08-09",
-    end_date: "2026-08-09",
-  });
-  assert.ifError(plan.error);
   const workout = await admin.from("planned_workouts").insert({
-    plan_cycle_id: planId,
+    plan_cycle_id: null,
+    origin_kind: "manual",
     user_id: userId,
     workout_date: "2026-08-09",
     weekday: "Sunday",

@@ -12,6 +12,10 @@ plan
 
 low
 
+## Epic
+
+platform-and-operations
+
 ## Next Recommended Role
 
 ARCHITECT
@@ -22,7 +26,12 @@ Plan watch/export integration polish after executable target contract.
 
 ## Stage
 
-ARCHITECT plan / watch-export integration polish
+PRODUCT deferred / future external-watch integration decision
+
+## Product Lifecycle Reconciliation — 2026-08-18
+
+Actual watch/provider export is future platform work. It is not a Runner Core readiness or release
+gate; current JSON export remains the accepted runner boundary.
 
 ## Exact Handoff Prompt
 

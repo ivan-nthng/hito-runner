@@ -30,11 +30,45 @@ for Hito execution unless the task explicitly concerns those templates.
 - Report what was verified and what was not verified. Never manufacture evidence, a passing state,
   or release readiness.
 
+### Runner Calendar Source Boundary
+
+The accepted runner model is mandatory for every role, task, document, and implementation:
+
+- A plan is an AI, file-import, or manual **source artifact** used only to propose initial workout
+  placement.
+- After explicit confirmation, each calendar workout is independently owned by the runner. Manual,
+  AI-authored, and imported workouts are the same entity; source origin is provenance only.
+- Add, Edit, Move, Copy, Clear, completion, results, evidence, and calendar visibility act on the
+  calendar workout. They must never require or recreate a runner-facing plan container.
+- Past Plans may retain immutable source/provenance history, but never control the current calendar,
+  permissions, schedule, or workout lifecycle. No replacement active container is admitted.
+- Existing names or storage such as `plan_cycles`, `planned_workouts`, and `active-plan` may be
+  reported as temporary legacy implementation facts only. They are not product authority and must
+  not be copied into new UI, mutation rules, fixtures, validators, or current product documentation.
+
+When a task touches that legacy coupling, establish the first incorrect owner and route its removal
+through the canonical migration sequence. Do not conceal it with Product copy, client-only logic, or
+another persistence model.
+
 Routine local source inspection, local edits, loopback runtime control, disposable local fixtures,
 local validation, and safe read-only subagent work are standing-authorized. This includes choosing
 and using any supported local browser or browser-control surface. Do not ask the user to approve a
 browser, choose a browser, approve loopback browser QA, or relay a local command. Exhaust safe
 local alternatives before reporting an environment limitation.
+
+### Local Test Identity And Session Authority
+
+For any local task that is not explicitly about authentication, credentials, access policy, or a
+hosted account, the assigned owner is standing-authorized to use the canonical `qa_fixture` and its
+role-scoped disposable local identities. Reuse a safe authenticated loopback session where possible;
+when the test needs another fixture role or a clean state, reset, sign in, sign out, or switch only
+those local disposable identities directly. Never ask Ivan to enter, choose, approve, or relay local
+test credentials. Do not expose those credentials in reports.
+
+This authority does not permit reuse of Ivan's personal browser session, hosted/production login,
+provider credentials, or a broad permanent authenticated state. A platform permission dialog is
+still abandoned and replaced with another supported local path; it is never escalated to Ivan as an
+approval request.
 
 If a raw browser bridge, WebDriver command, `curl`, or another tool would trigger a platform
 permission dialog, do not surface that dialog as a user decision. Abandon that invocation and use a
@@ -138,6 +172,20 @@ repository search. The referenced item remains authoritative for its own status,
 and acceptance; never copy those facts into a second lifecycle owner. A plan may add detail but not
 status. A relationship alone never admits content to a release. Do not add a tracker, service,
 dashboard, schema, generated index, validator, or parallel state document for these fields.
+
+### Epic Classification
+
+`Epic` is a product-classification field, not a backlog relationship. Every non-bug backlog item
+must declare one registered Epic slug at intake and retain it through handoffs and terminal
+closeout. A `Type: Bug` item remains a bug and must not be forced into an Epic; a non-bug Batch
+still declares the product Epic it advances. PRODUCT maintains the compact registered taxonomy in
+the active product roadmap and does not create one-off Epic names to avoid a classification decision.
+
+The Admin backlog mirrors Epic from canonical Markdown. It must show the source Epic for non-bug
+work and `Bug` for bugs; it must not infer a new Epic from a title, owner, or prose. Existing
+non-bug records are migrated through one controlled, auditable classification pass: active records
+receive their factual product Epic, while terminal history without sufficient evidence receives the
+registered `legacy-history` Epic. Do not leave a non-bug item unclassified after that migration.
 
 ### Autonomy And Return Conditions
 
@@ -420,8 +468,9 @@ for browser QA, not source-only or backend-only validation.
 
 docs/tasks/backlog/ is the operational queue for retained work in either mode. A Lite item records
 only the durable decision needed to resume it; a Tracked item records Work Item ID, Status, Type,
-Priority, Owner, Scope, Archive Intent, Task, and, when ready or in progress, Stage, Next Recommended
-Role, and one exact handoff prompt. Retention never by itself changes the task mode.
+Priority, Owner, Epic when non-bug, Scope, Archive Intent, Task, and, when ready or in progress,
+Stage, Next Recommended Role, and one exact handoff prompt. Retention never by itself changes the
+task mode.
 
 Tracked items may also use the optional `Parent`, `Depends On`, `Evidence From`, and `Supersedes`
 relationships defined in the canonical work loop. They are navigation only, not lifecycle state.

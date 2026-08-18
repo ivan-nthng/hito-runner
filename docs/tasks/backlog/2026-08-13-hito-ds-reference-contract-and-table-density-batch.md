@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** DESIGN SYSTEM
+- **Epic:** platform-and-operations
 - **Parent:** [Hito DS Visual Correction Batch — Components, Playgrounds, And Launch Surfaces](./2026-08-13-hito-ds-components-header-signal-cleanup.md)
 - **Evidence From:** [Metadata Tag shared contract and reference adoption](./2026-08-13-hito-ds-metadata-tag-shared-contract-and-reference-adoption.md); [Reference Link component and Used-in adoption](./2026-08-13-hito-ds-reference-link-component-and-used-in-adoption.md); [Contained App Shell header Product-anatomy alignment](./2026-08-13-hito-ds-contained-app-shell-header-product-anatomy-alignment.md); [Data Table section hierarchy and cell-density correction](./2026-08-13-hito-ds-data-table-section-hierarchy-and-cell-density-correction.md)
 - **Supersedes:** [Metadata Tag shared contract and reference adoption](./2026-08-13-hito-ds-metadata-tag-shared-contract-and-reference-adoption.md); [Reference Link component and Used-in adoption](./2026-08-13-hito-ds-reference-link-component-and-used-in-adoption.md); [Contained App Shell header Product-anatomy alignment](./2026-08-13-hito-ds-contained-app-shell-header-product-anatomy-alignment.md); [Data Table section hierarchy and cell-density correction](./2026-08-13-hito-ds-data-table-section-hierarchy-and-cell-density-correction.md)

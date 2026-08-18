@@ -2,6 +2,7 @@
 
 - **Status:** `closed`
 - **Owner:** DESIGN SYSTEM
+- **Epic:** platform-and-operations
 - **Outcome:** closed as superseded. Existing source bytes are adopted without a runtime edit and without claiming Global QA, release, deployment, hosted, or Figma acceptance.
 - **Sources:** [reference-workbench.css](../../../src/styles/reference-workbench.css); [playground.tsx](../../../src/components/hito-ds/playground.tsx); [reference.tsx](../../../src/components/hito-ds/reference.tsx)
 - **Validation:** Closure is supported by the recorded decision/evidence; no implementation, runtime, or release acceptance is inferred.

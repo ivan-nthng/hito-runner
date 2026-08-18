@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** BACKEND
+- **Epic:** platform-and-operations
 - **Parent:** [Hito Stack Complexity Reduction Program](2026-08-04-hito-stack-complexity-reduction-program.md)
 - **Outcome:** Completed request and response scope: avatar upload now authenticates before bounded multipart parsing; direct avatar/export routes retain only documented public 400/401/404 failures; and five runner mutation server functions preserve allowlisted domain/auth…
 - **Sources:** Terminal decision/evidence record only; detailed transcript remains in Git history.

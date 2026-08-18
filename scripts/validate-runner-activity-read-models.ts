@@ -261,29 +261,59 @@ function parseScaleActivityCounts(args: string[]) {
 
 async function measureSnapshotReconciliation(userId: string, activityCount: number) {
   try {
-    await seedRunnerDesignProfileFixture({ supabase, userId, asOfDate: AS_OF_DATE });
-    await seedAdditionalSyntheticActivities({ userId, activityCount: activityCount - 30 });
+    if (activityCount === 30) {
+      await seedRunnerDesignProfileFixture({ supabase, userId, asOfDate: AS_OF_DATE });
+    } else {
+      await seedAdditionalSyntheticActivities({ userId, activityCount });
+    }
     await clearDerivedMetricRows(userId);
 
     const beforeMiss = await getQaUserOwnedCounts(supabase, userId);
     assert.equal(beforeMiss.runner_activities, activityCount);
-    const reconciliationMiss = await measureProgressRead(userId);
+    const sequencePeriod =
+      activityCount === 30
+        ? undefined
+        : {
+            kind: "custom" as const,
+            startDate: addDaysIso(AS_OF_DATE, -55),
+            endDate: AS_OF_DATE,
+          };
+    const reconciliationMiss = await measureProgressRead(userId, sequencePeriod);
     const afterMiss = await getQaUserOwnedCounts(supabase, userId);
-    const warmReads = await measureProgressReads(userId, activityCount === 30 ? 1 : 3);
+    const warmReads = await measureProgressReads(
+      userId,
+      activityCount === 30 ? 1 : 3,
+      sequencePeriod,
+    );
     const afterWarm = await getQaUserOwnedCounts(supabase, userId);
 
     assert.equal(reconciliationMiss.progress.status, "current");
     assert.equal(reconciliationMiss.progress.advancedMetrics.status, "current");
     const productProgress = projectRunnerActivityProgressForProduct(reconciliationMiss.progress);
     assertProductProgressProjection(reconciliationMiss.progress, productProgress);
+    if (activityCount > 30) {
+      assertCompleteFitSequence(reconciliationMiss.progress.fitActivitySequence, activityCount);
+      assert.equal(productProgress.fitActivitySequence.status, "ready");
+      if (productProgress.fitActivitySequence.status !== "ready") {
+        throw new Error("Expected a ready Product FIT activity sequence at scale.");
+      }
+      assert.equal(productProgress.fitActivitySequence.points.length, activityCount);
+    }
     const expectedCalendarWeeks = expectedCalendarWeekCount(AS_OF_DATE);
     if (activityCount === 30) {
       assert.equal(reconciliationMiss.writeCount, expectedCalendarWeeks + 4);
-      assert.equal(reconciliationMiss.readCount, expectedCalendarWeeks + 10);
+      assert.equal(
+        reconciliationMiss.readCount,
+        expectedCalendarWeeks + 13,
+        "FIT eligibility adds exactly two paged source-graph reads, never one query per activity.",
+      );
     }
     assert.equal(afterMiss.runner_activity_fact_snapshots, expectedCalendarWeeks + 2);
     assert.equal(afterMiss.runner_activity_metric_snapshots, 1);
-    assert.equal(afterMiss.runner_activity_metric_observations, activityCount + 1);
+    assert.equal(
+      afterMiss.runner_activity_metric_observations,
+      activityCount + (activityCount === 30 ? 1 : 0),
+    );
     assertCurrentWarmReads(
       warmReads,
       reconciliationMiss.progress.rolling28Day.current.id,
@@ -333,9 +363,16 @@ async function measureSnapshotReconciliation(userId: string, activityCount: numb
     const afterMutation = await getQaUserOwnedCounts(supabase, userId);
     assert.equal(afterMutation.runner_activity_fact_snapshots, expectedCalendarWeeks + 2);
     assert.equal(afterMutation.runner_activity_metric_snapshots, 2);
-    assert.equal(afterMutation.runner_activity_metric_observations, activityCount + 2);
+    assert.equal(
+      afterMutation.runner_activity_metric_observations,
+      activityCount + (activityCount === 30 ? 2 : 1),
+    );
 
-    const postMutationWarmReads = await measureProgressReads(userId, activityCount === 30 ? 1 : 2);
+    const postMutationWarmReads = await measureProgressReads(
+      userId,
+      activityCount === 30 ? 1 : 2,
+      sequencePeriod,
+    );
     assertCurrentWarmReads(
       postMutationWarmReads,
       reconciliationMiss.progress.rolling28Day.current.id,
@@ -371,6 +408,17 @@ async function measureSnapshotReconciliation(userId: string, activityCount: numb
       factualSnapshotRemainedCurrent: true,
       internalPayloadBytes: Buffer.byteLength(JSON.stringify(reconciliationMiss.progress), "utf8"),
       productPayloadBytes: Buffer.byteLength(JSON.stringify(productProgress), "utf8"),
+      fitActivitySequence:
+        reconciliationMiss.progress.fitActivitySequence.status === "ready" ||
+        reconciliationMiss.progress.fitActivitySequence.status === "empty"
+          ? {
+              status: reconciliationMiss.progress.fitActivitySequence.status,
+              eligibleActivityCount:
+                reconciliationMiss.progress.fitActivitySequence.completeness.eligibleActivityCount,
+              returnedPointCount:
+                reconciliationMiss.progress.fitActivitySequence.completeness.returnedPointCount,
+            }
+          : { status: reconciliationMiss.progress.fitActivitySequence.status },
       planAuthorityRetirement,
     };
   } finally {
@@ -391,10 +439,17 @@ async function proveDesignProfilePlanAuthorityRetirement(userId: string) {
   if (planCycles.error) throw new Error(planCycles.error.message);
   if (plannedWorkouts.error) throw new Error(plannedWorkouts.error.message);
 
-  const materializedPlanIds = new Set(plannedWorkouts.data.map((workout) => workout.plan_cycle_id));
+  const sourcePlanIds = new Set(
+    plannedWorkouts.data
+      .map((workout) => workout.plan_cycle_id)
+      .filter((planId): planId is string => Boolean(planId)),
+  );
   const activeAuthorityCount = planCycles.data.filter((plan) => plan.status === "active").length;
-  const materializedProvenanceCount = planCycles.data.filter(
-    (plan) => materializedPlanIds.has(plan.id) && plan.saved_plan_payload === null,
+  const immutableSourceCount = planCycles.data.filter(
+    (plan) => sourcePlanIds.has(plan.id) && plan.saved_plan_payload !== null,
+  ).length;
+  const materializedContainerCount = planCycles.data.filter(
+    (plan) => sourcePlanIds.has(plan.id) && plan.saved_plan_payload === null,
   ).length;
 
   assert.equal(
@@ -402,14 +457,16 @@ async function proveDesignProfilePlanAuthorityRetirement(userId: string) {
     0,
     "Calendar readback must not require active plan authority.",
   );
-  assert.equal(materializedProvenanceCount, 1);
+  assert.equal(immutableSourceCount, 1);
+  assert.equal(materializedContainerCount, 0);
   assert.equal(snapshot.workouts.length, 55);
   assert.equal(firstHistoryPage.items.length, 20);
   assert.ok(firstHistoryPage.nextCursor);
 
   return {
     activeAuthorityCount,
-    materializedProvenanceCount,
+    immutableSourceCount,
+    materializedContainerCount,
     workoutCount: snapshot.workouts.length,
     firstHistoryPageCount: firstHistoryPage.items.length,
   };
@@ -438,9 +495,51 @@ function assertCurrentWarmReads(
   );
 }
 
+function assertCompleteFitSequence(
+  sequence: Awaited<ReturnType<typeof getRunnerActivityProgressForUser>>["fitActivitySequence"],
+  expectedActivityCount: number,
+) {
+  assert.equal(sequence.status, "ready");
+  if (sequence.status !== "ready") {
+    throw new Error("Expected a complete FIT activity sequence.");
+  }
+  assert.equal(sequence.completeness.state, "complete");
+  assert.equal(sequence.completeness.eligibleActivityCount, expectedActivityCount);
+  assert.equal(sequence.completeness.returnedPointCount, expectedActivityCount);
+  assert.equal(sequence.points.length, expectedActivityCount);
+  assert.equal(new Set(sequence.points.map((point) => point.id)).size, expectedActivityCount);
+
+  let previousDate: string | null = null;
+  let previousStartedAt: string | null = null;
+  let previousId: string | null = null;
+  let expectedSameDayOrder = 1;
+  sequence.points.forEach((point, sequenceIndex) => {
+    assert.equal(point.sequenceIndex, sequenceIndex);
+    if (point.historicalTime.localDate === previousDate) {
+      expectedSameDayOrder += 1;
+      const previousSortKey = `${previousStartedAt ?? "\uffff"}:${previousId}`;
+      const currentSortKey = `${point.historicalTime.startedAt ?? "\uffff"}:${point.id}`;
+      assert.ok(
+        previousSortKey.localeCompare(currentSortKey) <= 0,
+        "Same-day FIT activities must keep deterministic started-at and identity order.",
+      );
+    } else {
+      if (previousDate !== null) {
+        assert.ok(previousDate < point.historicalTime.localDate);
+      }
+      expectedSameDayOrder = 1;
+    }
+    assert.equal(point.sameDayOrder, expectedSameDayOrder);
+    previousDate = point.historicalTime.localDate;
+    previousStartedAt = point.historicalTime.startedAt;
+    previousId = point.id;
+  });
+}
+
 function expectedWarmReadCount(activityCount: number, asOfDate: string) {
   const activityPages = Math.floor(activityCount / 500) + 1;
-  return 7 + expectedCalendarWeekCount(asOfDate) + activityPages * 2;
+  const matchedWorkoutLogRead = activityCount === 30 ? 1 : 0;
+  return 7 + matchedWorkoutLogRead + expectedCalendarWeekCount(asOfDate) + activityPages * 4;
 }
 
 function expectedCalendarWeekCount(asOfDate: string) {
@@ -482,7 +581,10 @@ async function clearDerivedMetricRows(userId: string) {
   }
 }
 
-async function measureProgressRead(userId: string) {
+async function measureProgressRead(
+  userId: string,
+  sequencePeriod?: Parameters<typeof getRunnerActivityProgressForUser>[0]["sequencePeriod"],
+) {
   const requests: Array<{ method: string; table: string }> = [];
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async (input, init) => {
@@ -500,7 +602,11 @@ async function measureProgressRead(userId: string) {
   };
   const startedAt = performance.now();
   try {
-    const progress = await getRunnerActivityProgressForUser({ userId, asOfDate: AS_OF_DATE });
+    const progress = await getRunnerActivityProgressForUser({
+      userId,
+      asOfDate: AS_OF_DATE,
+      sequencePeriod,
+    });
     return {
       progress,
       elapsedMs: Number((performance.now() - startedAt).toFixed(2)),
@@ -513,10 +619,14 @@ async function measureProgressRead(userId: string) {
   }
 }
 
-async function measureProgressReads(userId: string, count: number) {
+async function measureProgressReads(
+  userId: string,
+  count: number,
+  sequencePeriod?: Parameters<typeof getRunnerActivityProgressForUser>[0]["sequencePeriod"],
+) {
   const reads = [];
   for (let index = 0; index < count; index += 1) {
-    reads.push(await measureProgressRead(userId));
+    reads.push(await measureProgressRead(userId, sequencePeriod));
   }
   return reads;
 }
@@ -805,6 +915,8 @@ function assertProductProgressShape(
     "advancedMetrics",
     "asOfDate",
     "calendarWeeks",
+    "fitActivitySequence",
+    "fitProgress",
     "rolling28Day",
     "status",
   ]);
@@ -812,7 +924,194 @@ function assertProductProgressShape(
   assertProductSnapshot(product.rolling28Day.current);
   assertProductSnapshot(product.rolling28Day.previous);
   product.calendarWeeks.forEach(assertProductSnapshot);
+  assertProductFitProgress(product.fitProgress);
+  assertProductFitActivitySequence(product.fitActivitySequence);
   assertProductAdvancedMetrics(product.advancedMetrics);
+}
+
+function assertProductFitActivitySequence(
+  sequence: ReturnType<typeof projectRunnerActivityProgressForProduct>["fitActivitySequence"],
+) {
+  const baseKeys = [
+    "advertisedPeriods",
+    "evidenceLabel",
+    "formulaVersion",
+    "points",
+    "selectedPeriod",
+    "status",
+  ];
+  if (sequence.status === "updating" || sequence.status === "unavailable") {
+    assertExactKeys(sequence, [...baseKeys, "reason", "reasonLabel", "staleValuesReturned"]);
+    assert.deepEqual(sequence.points, []);
+    return;
+  }
+  assertExactKeys(sequence, [...baseKeys, "completeness", "coverage"]);
+  assertExactKeys(sequence.completeness, ["eligibleActivityCount", "returnedPointCount", "state"]);
+  assert.equal(
+    sequence.completeness.eligibleActivityCount,
+    sequence.completeness.returnedPointCount,
+  );
+  assert.equal(sequence.completeness.returnedPointCount, sequence.points.length);
+  sequence.advertisedPeriods.forEach(assertFitSequencePeriod);
+  assertFitSequencePeriod(sequence.selectedPeriod);
+  for (const point of sequence.points) {
+    assertExactKeys(point, [
+      "context",
+      "evidence",
+      "historicalTime",
+      "id",
+      "label",
+      "observations",
+      "sameDayOrder",
+      "sequenceIndex",
+    ]);
+    assertExactKeys(point.historicalTime, ["localDate", "startedAt", "timezone"]);
+    assertExactKeys(point.context, ["runningContext", "state"]);
+    assertExactKeys(point.evidence, ["label", "state"]);
+    assert.deepEqual(Object.keys(point.observations), [
+      "distance",
+      "timer_duration",
+      "observed_average_pace",
+      "elevation_gain",
+      "reported_load",
+    ]);
+    for (const observation of Object.values(point.observations)) {
+      assertExactKeys(observation, [
+        "basis",
+        "coverage",
+        "displayValue",
+        "id",
+        "label",
+        "reason",
+        "reasonLabel",
+        "state",
+        "unit",
+        "unitLabel",
+        "value",
+      ]);
+      assertExactKeys(observation.coverage, ["candidateCount", "includedCount", "missingCount"]);
+      assertExactKeys(observation.basis, ["distance", "duration", "effort"]);
+    }
+  }
+}
+
+function assertFitSequencePeriod(
+  period: ReturnType<
+    typeof projectRunnerActivityProgressForProduct
+  >["fitActivitySequence"]["selectedPeriod"],
+) {
+  assertExactKeys(period, [
+    "asOfDate",
+    "endDate",
+    "futureInterval",
+    "id",
+    "label",
+    "startDate",
+    "timezoneBasis",
+  ]);
+  assertExactKeys(period.timezoneBasis, ["activities", "period", "timeZone"]);
+  if (period.futureInterval) assertExactKeys(period.futureInterval, ["endDate", "startDate"]);
+}
+
+function assertProductFitProgress(
+  progress: ReturnType<typeof projectRunnerActivityProgressForProduct>["fitProgress"],
+) {
+  if (progress.status === "updating") {
+    assertExactKeys(progress, ["reason", "staleValuesReturned", "status"]);
+    return;
+  }
+  if (progress.status === "unavailable") {
+    assertExactKeys(progress, ["reason", "status"]);
+    return;
+  }
+
+  assertExactKeys(progress, ["chart", "evidenceLabel", "personalBests", "status"]);
+  assert.equal(progress.evidenceLabel, "From FIT file");
+  assertExactKeys(progress.chart, ["advertisedPeriods"]);
+  assert.equal(progress.chart.advertisedPeriods.length, 1);
+  const [period] = progress.chart.advertisedPeriods;
+  assertExactKeys(period, [
+    "bucketResolution",
+    "endDate",
+    "id",
+    "label",
+    "series",
+    "startDate",
+    "state",
+    "timezoneBasis",
+    "weekStartsOn",
+  ]);
+  assert.equal(period.id, "28_days");
+  assert.deepEqual(
+    period.series.map((series) => series.id),
+    ["sessions", "running_time", "distance", "elevation", "reported_load"],
+  );
+  for (const series of period.series) {
+    const identityKeys = [
+      "display",
+      "evidenceLabel",
+      "formulaVersion",
+      "id",
+      "points",
+      "purpose",
+      "status",
+      "title",
+      "unit",
+      "unitLabel",
+    ];
+    if (series.status === "updating") {
+      assertExactKeys(series, [...identityKeys, "reason", "reasonLabel", "staleValuesReturned"]);
+      assert.deepEqual(series.points, []);
+      continue;
+    }
+    assertExactKeys(series, identityKeys);
+    for (const point of series.points) {
+      assertExactKeys(point, [
+        "accessibleLabel",
+        "completion",
+        "completionLabel",
+        "coverage",
+        "cutoffDate",
+        "displayValue",
+        "endDate",
+        "id",
+        "reasonLabels",
+        "reasons",
+        "shortLabel",
+        "startDate",
+        "state",
+        "value",
+      ]);
+      assertExactKeys(point.coverage, ["candidateCount", "includedCount", "label", "missingCount"]);
+    }
+  }
+
+  assertExactKeys(progress.personalBests, ["formulaVersion", "matchingRule", "slots"]);
+  assert.deepEqual(
+    progress.personalBests.slots.map((slot) => slot.id),
+    ["1_km", "5_km", "10_km", "half_marathon", "marathon"],
+  );
+  for (const slot of progress.personalBests.slots) {
+    assertExactKeys(slot, [
+      "distanceMeters",
+      "id",
+      "label",
+      "reason",
+      "reasonLabel",
+      "result",
+      "state",
+    ]);
+    if (slot.result) {
+      assertExactKeys(slot.result, [
+        "displayValue",
+        "elapsedSeconds",
+        "eventDate",
+        "evidenceLabel",
+        "source",
+      ]);
+      assertExactKeys(slot.result.source, ["activityId"]);
+    }
+  }
 }
 
 function assertProductHistoryProjection(
@@ -1034,23 +1333,12 @@ async function createPlannedWorkout(userId: string) {
     fitnessLevel: "running_regularly",
     calendarTimezone: new Intl.DateTimeFormat().resolvedOptions().timeZone,
   });
-  const planCycleId = randomUUID();
   const plannedWorkoutId = randomUUID();
-  const plan = await supabase.from("plan_cycles").insert({
-    id: planCycleId,
-    user_id: userId,
-    status: "active",
-    title: "Gate 2 read model proof",
-    goal_summary: "Local factual read model proof",
-    source_template: "qa_activity_gate_2",
-    start_date: addDaysIso(AS_OF_DATE, -1),
-    end_date: AS_OF_DATE,
-  });
-  if (plan.error) throw new Error(plan.error.message);
   const workout = await supabase.from("planned_workouts").insert({
     id: plannedWorkoutId,
     user_id: userId,
-    plan_cycle_id: planCycleId,
+    plan_cycle_id: null,
+    origin_kind: "manual",
     workout_date: addDaysIso(AS_OF_DATE, -1),
     weekday: weekdayLong(addDaysIso(AS_OF_DATE, -1)),
     week_number: 1,

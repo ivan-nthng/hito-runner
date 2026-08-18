@@ -23,6 +23,7 @@ import type { AdminAccessContext, AdminAccessResult } from "@/lib/admin-access.s
 import { requireAdminAccessForCurrentRequest } from "@/lib/admin-access.server";
 import {
   getAdminRepoWorkItemMetadata,
+  isAdminRepoWorkItemEpic,
   isAdminRepoWorkItemArchiveIntent,
   isAdminRepoWorkItemFrontendLane,
   isAdminRepoWorkItemOwner,
@@ -918,6 +919,7 @@ function stripRepoImportMetadata(input: unknown): Json {
   delete metadata.source_label;
   delete metadata.work_item_status;
   delete metadata.work_item_owner;
+  delete metadata.work_item_epic;
   delete metadata.work_item_scope;
   delete metadata.archive_intent;
   delete metadata.work_item_batch;
@@ -1033,6 +1035,11 @@ function mapRepoWorkItemView(metadata: Json): AdminCaptureItemView["repoWorkItem
       typeof metadata.work_item_owner === "string" &&
       isAdminRepoWorkItemOwner(metadata.work_item_owner)
         ? metadata.work_item_owner
+        : null,
+    epic:
+      typeof metadata.work_item_epic === "string" &&
+      isAdminRepoWorkItemEpic(metadata.work_item_epic)
+        ? metadata.work_item_epic
         : null,
     scope: readBoundedMetadataString(metadata.work_item_scope, 160),
     archiveIntent:

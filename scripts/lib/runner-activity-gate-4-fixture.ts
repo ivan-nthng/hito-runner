@@ -36,22 +36,20 @@ export async function createGate4LifecycleFixtures(input: {
   userId: string;
   asOfDate: string;
 }) {
-  const planCycleId = await createPlan(input);
   const completed = await createMatchedActivity({
     ...input,
-    planCycleId,
     key: "completed-42-rpe-4",
     localDate: addDaysIso(input.asOfDate, -1),
     timerDurationMin: 42,
     elapsedDurationMin: 44,
     distanceKm: 5,
+    elevationGainM: 120,
     plannedDurationMin: 42,
     outcome: "completed",
     rpe: 4,
   });
   const partial = await createMatchedActivity({
     ...input,
-    planCycleId,
     key: "partial-28-rpe-7",
     localDate: addDaysIso(input.asOfDate, -2),
     timerDurationMin: 28,
@@ -63,19 +61,18 @@ export async function createGate4LifecycleFixtures(input: {
   });
   const planned60Observed38 = await createMatchedActivity({
     ...input,
-    planCycleId,
     key: "planned-60-observed-38-rpe-5",
     localDate: addDaysIso(input.asOfDate, -3),
     timerDurationMin: 38,
     elapsedDurationMin: 41,
     distanceKm: 10,
+    elevationGainM: 240,
     plannedDurationMin: 60,
     outcome: "completed",
     rpe: 5,
   });
   const elapsedOnly = await createMatchedActivity({
     ...input,
-    planCycleId,
     key: "elapsed-only-rpe-3",
     localDate: addDaysIso(input.asOfDate, -4),
     timerDurationMin: null,
@@ -109,9 +106,9 @@ export async function createGate4LifecycleFixtures(input: {
     elapsedDurationMin: 30,
     distanceKm: 5,
   });
-  await createSkippedWorkout({ ...input, planCycleId });
+  const completedWithoutFitWorkoutId = await createCompletedWorkoutWithoutFit(input);
+  await createSkippedWorkout(input);
   return {
-    planCycleId,
     completed,
     partial,
     planned60Observed38,
@@ -119,6 +116,7 @@ export async function createGate4LifecycleFixtures(input: {
     unplanned,
     half,
     exactFive,
+    completedWithoutFitWorkoutId,
   };
 }
 
@@ -178,7 +176,6 @@ async function createMatchedActivity(input: {
   supabase: SupabaseClient;
   userId: string;
   asOfDate: string;
-  planCycleId: string;
   key: string;
   localDate: string;
   timerDurationMin: number | null;
@@ -213,7 +210,6 @@ async function createSkippedWorkout(input: {
   supabase: SupabaseClient;
   userId: string;
   asOfDate: string;
-  planCycleId: string;
 }) {
   const plannedWorkoutId = await createPlannedWorkout({
     ...input,
@@ -238,26 +234,31 @@ async function createSkippedWorkout(input: {
   assert.deepEqual(activities.data, []);
 }
 
-async function createPlan(input: { supabase: SupabaseClient; userId: string; asOfDate: string }) {
-  const id = randomUUID();
-  const result = await input.supabase.from("plan_cycles").insert({
-    id,
-    user_id: input.userId,
-    status: "active",
-    title: "Runner activity Gate 4 proof",
-    goal_summary: "Local immutable metric evidence proof",
-    source_template: "qa_activity_gate_4",
-    start_date: addDaysIso(input.asOfDate, -14),
-    end_date: input.asOfDate,
+async function createCompletedWorkoutWithoutFit(input: {
+  supabase: SupabaseClient;
+  userId: string;
+  asOfDate: string;
+}) {
+  const plannedWorkoutId = await createPlannedWorkout({
+    ...input,
+    localDate: addDaysIso(input.asOfDate, -9),
+    key: "completed-without-fit",
+    plannedDurationMin: 35,
   });
-  if (result.error) throw new Error(result.error.message);
-  return id;
+  const log = await input.supabase.from("workout_logs").insert({
+    user_id: input.userId,
+    planned_workout_id: plannedWorkoutId,
+    outcome: "completed",
+    rpe: 6,
+    actual_duration_min: 35,
+  });
+  if (log.error) throw new Error(log.error.message);
+  return plannedWorkoutId;
 }
 
 async function createPlannedWorkout(input: {
   supabase: SupabaseClient;
   userId: string;
-  planCycleId: string;
   localDate: string;
   key: string;
   plannedDurationMin: number;
@@ -266,7 +267,8 @@ async function createPlannedWorkout(input: {
   const result = await input.supabase.from("planned_workouts").insert({
     id,
     user_id: input.userId,
-    plan_cycle_id: input.planCycleId,
+    plan_cycle_id: null,
+    origin_kind: "manual",
     workout_date: input.localDate,
     weekday: weekdayLong(input.localDate),
     week_number: 1,

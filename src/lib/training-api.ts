@@ -12,10 +12,8 @@ import {
   workoutRouteInputSchema,
 } from "@/lib/route-data-actions";
 import {
-  getLatestMaterializedPlanProvenance,
-  getMaterializedPlanProvenancesForUser,
-  getResolvedPlanWorkoutsWithLogs,
-  type PersistedPlanCycleRow,
+  getCalendarWorkoutsWithLogsForUser,
+  getSourcePlanProvenancesForUser,
 } from "@/lib/active-plan-persistence";
 import { loadSettingsRouteData } from "@/lib/user-settings-actions";
 import {
@@ -24,6 +22,7 @@ import {
 } from "@/lib/request-persisted-user";
 import {
   resolveCalendarWorkoutEditability,
+  resolvePlanProvenanceSourceStatus,
   type CalendarWorkoutEditOperation,
   type CalendarWorkoutEditabilityResult,
 } from "@/lib/active-plan-workout-editing/policy";
@@ -36,10 +35,9 @@ import {
   inferWorkoutStatus,
   normalizeExecutableStepInstructions,
   projectWorkoutCompletionLog,
-  type ActivePlanWorkoutEditingCapabilities,
-  type ActivePlanWorkoutEditingCapability,
+  type CalendarWorkoutEditingCapabilities,
+  type CalendarWorkoutEditingCapability,
   type PersistedRunnerProfileSummary,
-  type PlanSchedulePreferencesSummary,
   type TrainingSnapshot,
   type Workout,
   type WorkoutLog,
@@ -48,7 +46,6 @@ import { saveWorkoutLogForUser, workoutLogInputSchema } from "@/lib/workout-log-
 import type { Database } from "@/lib/supabase/database";
 import { getRequestAuthContext } from "@/lib/backend/auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
-import { parseStoredRunnerTrainingPreferences } from "@/lib/runner-training-preferences";
 import { fetchManualWorkoutEvidenceWorkoutIds } from "@/lib/manual-workout-authoring/active-plan-add";
 import { readWorkoutDocumentSections } from "@/lib/workout-document";
 import { buildRunnerCalendarContext } from "@/lib/runner-calendar-timezone";
@@ -87,6 +84,7 @@ export const getWorkoutRouteData = createServerFn({ method: "POST" })
       loadSnapshot: getSnapshotForRequest,
       loadViewer: getViewerForRequest,
       loadFeedback: getLatestWorkoutResultFeedbackForServer,
+      loadSidebarReadModel: getWorkoutDetailSidebarReadModelForServer,
     });
   });
 
@@ -183,46 +181,6 @@ async function getViewerForRequest(): Promise<ViewerSummary | null> {
   };
 }
 
-function buildPlanSchedulePreferencesSummary(
-  value: PersistedPlanCycleRow["plan_preferences"],
-  workouts: readonly Workout[],
-): PlanSchedulePreferencesSummary | null {
-  const preferences = parseStoredRunnerTrainingPreferences(value);
-
-  if (!preferences) {
-    return null;
-  }
-
-  const runningDaysPerWeek = derivePeakAuthoredRunningDaysPerWeek(workouts);
-
-  if (
-    !preferences.blocked_days.length &&
-    preferences.max_running_days_per_week == null &&
-    runningDaysPerWeek == null &&
-    !preferences.preferred_long_run_day
-  ) {
-    return null;
-  }
-
-  return {
-    fixedRestDays: preferences.blocked_days,
-    maxRunningDaysPerWeek: preferences.max_running_days_per_week,
-    runningDaysPerWeek,
-    preferredLongRunDay: preferences.preferred_long_run_day,
-  };
-}
-
-function derivePeakAuthoredRunningDaysPerWeek(workouts: readonly Workout[]) {
-  const counts = workouts
-    .filter((workout) => workout.type !== "rest")
-    .reduce((byWeek, workout) => {
-      byWeek.set(workout.week, (byWeek.get(workout.week) ?? 0) + 1);
-      return byWeek;
-    }, new Map<number, number>());
-
-  return counts.size > 0 ? Math.max(...counts.values()) : null;
-}
-
 export async function getPersistedSnapshot(
   userId: string,
   options: { currentDate?: string; instant?: Date } = {},
@@ -235,40 +193,24 @@ export async function getPersistedSnapshot(
   });
   const currentDate = options.currentDate ?? calendarContext.currentDate;
 
-  if (!profileRow) {
+  if (!profileRow || !runnerProfileHasRequiredSetup(profileRow)) {
     return {
       mode: "onboarding",
       source: "persisted",
       backend: "supabase",
       currentDate,
       planMeta: null,
-      profile: null,
+      calendarContext: null,
+      profile: profileRow ? profileRowToSummary(profileRow) : null,
       workouts: [],
       weekStatus: "on_track",
     };
   }
 
   const profile = profileRowToSummary(profileRow);
-  const planCycle = await getLatestMaterializedPlanProvenance(userId);
-
-  if (!planCycle) {
-    return {
-      mode: "onboarding",
-      source: "persisted",
-      backend: "supabase",
-      currentDate,
-      planMeta: null,
-      profile,
-      workouts: [],
-      weekStatus: "on_track",
-    };
-  }
-
-  const { workouts: persistedWorkouts, logsByWorkoutId } = await getResolvedPlanWorkoutsWithLogs(
-    userId,
-    planCycle,
-  );
-  const provenanceById = await getMaterializedPlanProvenancesForUser(
+  const { workouts: persistedWorkouts, logsByWorkoutId } =
+    await getCalendarWorkoutsWithLogsForUser(userId);
+  const provenanceById = await getSourcePlanProvenancesForUser(
     userId,
     persistedWorkouts.map((workout) => workout.plan_cycle_id),
   );
@@ -280,12 +222,31 @@ export async function getPersistedSnapshot(
     persistedWorkoutIds,
   );
   const workouts = persistedWorkouts.map((workout) => {
-    const provenancePlan = provenanceById.get(workout.plan_cycle_id) ?? null;
+    const provenancePlan = workout.plan_cycle_id
+      ? (provenanceById.get(workout.plan_cycle_id) ?? null)
+      : null;
+    const originKind = workout.origin_kind as NonNullable<
+      Workout["sourceProvenance"]
+    >["originKind"];
+    const sourceProvenance: Workout["sourceProvenance"] = provenancePlan
+      ? {
+          originKind,
+          sourcePlanId: provenancePlan.id,
+          sourceKind: provenancePlan.source_kind,
+          sourceStatus: resolvePlanProvenanceSourceStatus(provenancePlan),
+        }
+      : {
+          originKind,
+          sourcePlanId: null,
+          sourceKind: null,
+          sourceStatus: null,
+        };
     return dbWorkoutToView(
       workout,
       logsByWorkoutId.get(workout.id) ?? null,
       currentDate,
-      provenancePlan?.source_kind ?? null,
+      provenancePlan?.source_kind ?? workout.origin_kind,
+      sourceProvenance,
       feedbackMarkerByWorkoutId.get(workout.id) ?? null,
       fitCompletedWorkoutIds.has(workout.id),
       resolveCalendarWorkoutSourceEditingCapabilities({
@@ -303,21 +264,9 @@ export async function getPersistedSnapshot(
     source: "persisted",
     backend: "supabase",
     currentDate,
-    planMeta: {
-      id: planCycle.id,
-      title: planCycle.title,
-      createdFor: "You",
-      createdAt: planCycle.created_at,
-      startDate: planCycle.start_date,
-      raceDate: planCycle.target_date ?? planCycle.end_date,
-      goal: planCycle.goal_summary,
-      source: "persisted",
-      sourceKind: planCycle.source_kind,
-      schedulePreferences: buildPlanSchedulePreferencesSummary(
-        planCycle.plan_preferences,
-        workouts,
-      ),
-      workoutEditing: buildActivePlanWorkoutEditingCapabilities(planCycle),
+    planMeta: null,
+    calendarContext: {
+      workoutEditing: buildCalendarWorkoutEditingCapabilities(),
     },
     profile,
     workouts,
@@ -325,33 +274,43 @@ export async function getPersistedSnapshot(
   };
 }
 
-function buildActivePlanWorkoutEditingCapabilities(
-  planCycle: PersistedPlanCycleRow,
-): ActivePlanWorkoutEditingCapabilities {
+function runnerProfileHasRequiredSetup(
+  profile: Database["public"]["Tables"]["runner_profiles"]["Row"],
+) {
+  return (
+    profile.setup_state === "completed" &&
+    profile.age != null &&
+    profile.weight_kg != null &&
+    profile.height_cm != null &&
+    Boolean(profile.fitness_level?.trim())
+  );
+}
+
+function buildCalendarWorkoutEditingCapabilities(): CalendarWorkoutEditingCapabilities {
   return {
-    addWorkout: mapActivePlanWorkoutEditingCapability(
+    addWorkout: mapCalendarWorkoutEditingCapability(
       "add_workout",
-      resolveCalendarWorkoutEditability(planCycle, "add_workout"),
+      resolveCalendarWorkoutEditability(null, "add_workout"),
     ),
-    clearWorkout: mapActivePlanWorkoutEditingCapability(
+    clearWorkout: mapCalendarWorkoutEditingCapability(
       "clear_workout",
-      resolveCalendarWorkoutEditability(planCycle, "clear_workout"),
+      resolveCalendarWorkoutEditability(null, "clear_workout"),
     ),
-    moveWorkout: mapActivePlanWorkoutEditingCapability(
+    moveWorkout: mapCalendarWorkoutEditingCapability(
       "move_workout",
-      resolveCalendarWorkoutEditability(planCycle, "move_workout"),
+      resolveCalendarWorkoutEditability(null, "move_workout"),
     ),
-    editWorkout: mapActivePlanWorkoutEditingCapability(
+    editWorkout: mapCalendarWorkoutEditingCapability(
       "edit_workout",
-      resolveCalendarWorkoutEditability(planCycle, "edit_workout"),
+      resolveCalendarWorkoutEditability(null, "edit_workout"),
     ),
   };
 }
 
-function mapActivePlanWorkoutEditingCapability(
+function mapCalendarWorkoutEditingCapability(
   operation: Exclude<CalendarWorkoutEditOperation, "copy_workout">,
   editability: CalendarWorkoutEditabilityResult,
-): ActivePlanWorkoutEditingCapability {
+): CalendarWorkoutEditingCapability {
   if (!editability.ok) {
     return {
       allowed: false,
@@ -394,6 +353,16 @@ const getLatestWorkoutResultFeedbackForServer = createServerOnlyFn(
   },
 );
 
+const getWorkoutDetailSidebarReadModelForServer = createServerOnlyFn(
+  async (currentDate: string) => {
+    const userId = await requirePersistedUserIdForCurrentRequest();
+    const { getWorkoutDetailSidebarReadModelForUser } =
+      await import("@/lib/workout-detail-sidebar-read-model");
+
+    return getWorkoutDetailSidebarReadModelForUser({ userId, currentDate });
+  },
+);
+
 async function getWorkoutResultReadbackForUser(userId: string, plannedWorkoutIds: string[]) {
   const { getFitCompletedPlannedWorkoutIds, getWorkoutFeedbackMarkerMap } =
     await import("@/lib/workout-result-import/read-workout-result-feedback");
@@ -410,6 +379,7 @@ function dbWorkoutToView(
   log: Database["public"]["Tables"]["workout_logs"]["Row"] | null,
   currentDate: string,
   sourceKind: string | null,
+  sourceProvenance: Workout["sourceProvenance"],
   feedbackMarker: Workout["feedbackMarker"],
   hasFitCompletion: boolean,
   sourceEditing: Workout["sourceEditing"],
@@ -442,6 +412,7 @@ function dbWorkoutToView(
     steps,
     feedbackMarker,
     sourceEditing,
+    sourceProvenance,
     completionOrigin: hasFitCompletion ? "fit_activity" : undefined,
     log: mappedLog,
     status: inferWorkoutStatus(

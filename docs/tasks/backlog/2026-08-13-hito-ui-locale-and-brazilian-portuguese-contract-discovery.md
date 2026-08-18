@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** ARCHITECT
+- **Epic:** platform-and-operations
 - **Outcome:** Established the canonical `en`/`pt-BR` contract: Portuguese system locales resolve to `pt-BR`, others to `en` unless profile preference overrides; SSR/hydration share one resolution, UI chrome localizes, and authored/persisted content is never retrotranslated.
 - **Sources:** [training.ts](../../../src/lib/training.ts); [runner-calendar-timezone.ts](../../../src/lib/runner-calendar-timezone.ts)
 - **Validation:** Source/evidence review completed for the recorded scope; no runtime, browser, release, or Global QA claim is inferred.

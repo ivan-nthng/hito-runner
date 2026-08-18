@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** BACKEND
+- **Epic:** platform-and-operations
 - **Parent:** [Hito Stack Complexity Reduction Program](2026-08-04-hito-stack-complexity-reduction-program.md)
 - **Outcome:** Root cause: the 571-line writer and 1.3 MB generated ledger formed a self-contained append loop; no external runtime, CI, fixture, build, or Product consumer existed. Deleted: metrics:lines, scripts/report-line-counts.mjs, and…
 - **Sources:** Terminal decision/evidence record only; detailed transcript remains in Git history.

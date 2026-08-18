@@ -6,7 +6,7 @@ import { TodayHero } from "@/components/TodayHero";
 import { Calendar } from "@/components/Calendar";
 import { HitoButton } from "@/components/ui/button";
 import { APP_NAME } from "@/lib/app-config";
-import { getHomeRouteData } from "@/lib/training-api";
+import { getHomeRouteData, type ViewerSummary } from "@/lib/training-api";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/")({
@@ -30,8 +30,16 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const { snapshot, viewer, onboardingDefaults, localBypassEnabled, magicLinkEnabled } =
-    Route.useLoaderData();
+  const {
+    snapshot,
+    viewer,
+    onboardingDefaults,
+    settings,
+    localActivityFileDesignFixtureEnabled,
+    localBypassEnabled,
+    magicLinkEnabled,
+  } = Route.useLoaderData();
+  const runnerViewer = viewer as ViewerSummary | null;
   const search = Route.useSearch();
 
   if (snapshot.mode === "preview") {
@@ -45,7 +53,7 @@ function Index() {
   }
 
   return (
-    <AppShell snapshot={snapshot} viewer={viewer}>
+    <AppShell settings={settings} snapshot={snapshot} viewer={runnerViewer}>
       <div
         className={
           snapshot.mode === "onboarding" || search.createPlan
@@ -58,7 +66,11 @@ function Index() {
         ) : (
           <div className="hito-route-stack">
             <TodayHero snapshot={snapshot} />
-            <Calendar snapshot={snapshot} />
+            <Calendar
+              snapshot={snapshot}
+              runnerScopeKey={runnerViewer?.email ?? null}
+              localActivityFileDesignFixtureEnabled={localActivityFileDesignFixtureEnabled}
+            />
           </div>
         )}
       </div>

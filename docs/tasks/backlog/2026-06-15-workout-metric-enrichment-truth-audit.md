@@ -2,6 +2,7 @@
 
 - **Status:** `closed`
 - **Owner:** ARCHITECT
+- **Epic:** runner-evidence-and-progress
 - **Outcome:** This audit resolved whether selected-plan workouts should show richer executable targets. The final accepted path was intentionally conservative: no-benchmark selected-plan previews stay structure_only_executable, while benchmark-backed pace truth may enrich…
 - **Sources:** Terminal decision/evidence record only; detailed transcript remains in Git history.
 - **Validation:** Closure is supported by the recorded decision/evidence; no implementation, runtime, or release acceptance is inferred.

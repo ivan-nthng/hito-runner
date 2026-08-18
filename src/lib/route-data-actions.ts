@@ -3,10 +3,10 @@ import { canUseMagicLinkForRequest, isLocalAuthBypassEnabledForRequest } from "@
 import { getRequestAuthContext } from "@/lib/backend/auth";
 import { isLocalActivityFileDesignFixtureEnabled } from "@/lib/local-activity-file-design-fixture";
 import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
-import { isLoopbackRuntimeUrl } from "@/lib/supabase/env";
 import { findWorkout, type TrainingSnapshot, type Workout } from "@/lib/training";
 import { getUserSettingsForUserId } from "@/lib/user-settings-actions";
 import type { WorkoutResultFeedbackSummary } from "@/lib/workout-result-import/types";
+import type { WorkoutDetailSidebarReadModel } from "@/lib/workout-detail-sidebar-read-model";
 
 export const workoutRouteInputSchema = z.object({ date: z.string() });
 
@@ -17,49 +17,61 @@ type RouteDataLoaders = {
 
 type WorkoutRouteDataLoaders = RouteDataLoaders & {
   loadFeedback: (plannedWorkoutId: string) => Promise<WorkoutResultFeedbackSummary | null>;
+  loadSidebarReadModel: (currentDate: string) => Promise<WorkoutDetailSidebarReadModel>;
 };
 
 export async function loadHomeRouteData({ loadSnapshot, loadViewer }: RouteDataLoaders) {
   const auth = getRequestAuthContext();
   const persistedUserId = await getPersistedUserIdForAuthContext(auth);
+  const settings = persistedUserId
+    ? await getUserSettingsForUserId(persistedUserId, auth.email)
+    : null;
+  const localActivityFileDesignFixtureEnabled = isLocalActivityFileDesignFixtureEnabled(auth);
 
   return {
     snapshot: await loadSnapshot(),
     viewer: await loadViewer(),
-    onboardingDefaults: persistedUserId
-      ? await getUserSettingsForUserId(persistedUserId, auth.email)
-      : null,
+    onboardingDefaults: settings,
+    settings,
+    localActivityFileDesignFixtureEnabled,
     localBypassEnabled: await isLocalAuthBypassEnabledForRequest(auth.appBaseUrl),
     magicLinkEnabled: canUseMagicLinkForRequest(auth.appBaseUrl),
   };
 }
 
 export async function loadShellRouteData({ loadSnapshot, loadViewer }: RouteDataLoaders) {
+  const auth = getRequestAuthContext();
+  const persistedUserId = await getPersistedUserIdForAuthContext(auth);
+
   return {
     snapshot: await loadSnapshot(),
     viewer: await loadViewer(),
+    settings: persistedUserId ? await getUserSettingsForUserId(persistedUserId, auth.email) : null,
   };
 }
 
 export async function loadWorkoutRouteData(
   data: z.output<typeof workoutRouteInputSchema>,
-  { loadSnapshot, loadViewer, loadFeedback }: WorkoutRouteDataLoaders,
+  { loadSnapshot, loadViewer, loadFeedback, loadSidebarReadModel }: WorkoutRouteDataLoaders,
 ) {
   const snapshot = await loadSnapshot();
   const auth = getRequestAuthContext();
-  const localActivityFileDesignFixtureEnabled =
-    auth.provider === "local" &&
-    isLoopbackRuntimeUrl(auth.appBaseUrl) &&
-    isLocalActivityFileDesignFixtureEnabled();
+  const persistedUserId = await getPersistedUserIdForAuthContext(auth);
+  const settings = persistedUserId
+    ? await getUserSettingsForUserId(persistedUserId, auth.email)
+    : null;
+  const localActivityFileDesignFixtureEnabled = isLocalActivityFileDesignFixtureEnabled(auth);
 
   if (snapshot.mode === "onboarding") {
     return {
       snapshot,
       viewer: await loadViewer(),
+      settings,
       workout: null as Workout | null,
       prev: null as Workout | null,
       next: null as Workout | null,
       feedback: null as WorkoutResultFeedbackSummary | null,
+      sidebarReadModel: null as WorkoutDetailSidebarReadModel | null,
       localActivityFileDesignFixtureEnabled,
     };
   }
@@ -70,10 +82,15 @@ export async function loadWorkoutRouteData(
     : -1;
   const feedback =
     snapshot.source === "persisted" && workout ? await loadFeedback(workout.id) : null;
+  const sidebarReadModel =
+    snapshot.source === "persisted" && workout
+      ? await loadSidebarReadModel(snapshot.currentDate)
+      : null;
 
   return {
     snapshot,
     viewer: await loadViewer(),
+    settings,
     workout,
     prev: workoutIndex > 0 ? snapshot.workouts[workoutIndex - 1] : null,
     next:
@@ -81,6 +98,7 @@ export async function loadWorkoutRouteData(
         ? snapshot.workouts[workoutIndex + 1]
         : null,
     feedback,
+    sidebarReadModel,
     localActivityFileDesignFixtureEnabled,
   };
 }

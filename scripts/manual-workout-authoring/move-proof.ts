@@ -8,7 +8,6 @@ import {
 import {
   MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-  MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
 } from "../../src/lib/manual-workout-authoring/schema";
 import {
   assertDirectMoveBlocked,
@@ -79,7 +78,7 @@ export async function validateManualMoveWorkoutContract() {
   if (moveReview.ok) {
     assert.equal(moveReview.status, "review_ready");
     assert.equal(moveReview.persisted, false);
-    assert.equal(moveReview.sourceKind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
+    assert.equal(moveReview.sourceKind, "manual");
     assert.equal(moveReview.workoutSourceKind, MANUAL_WORKOUT_AUTHORING_SOURCE_KIND);
     assert.equal(moveReview.activePlanId, activePlan.id);
     assert.equal(moveReview.sourceWorkoutId, sourceWorkout.id);
@@ -103,7 +102,8 @@ export async function validateManualMoveWorkoutContract() {
     assert.equal(moveReview.safety.sourceWorkoutVerified, true);
     assert.equal(moveReview.safety.targetDayKind, "rest_day");
     assert.equal(moveReview.safety.targetWeekdayDerivedServerSide, true);
-    assert.equal(moveReview.safety.lastWorkoutMoveAllowedWithinSamePlan, true);
+    assert.equal(moveReview.safety.runnerOwnershipVerified, true);
+    assert.equal(moveReview.safety.sourceProvenanceUnchanged, true);
     assert.equal(moveReview.safety.trustedClientRows, false);
   }
 
@@ -217,8 +217,8 @@ export async function validateManualMoveWorkoutContract() {
   if (success.ok) {
     assert.equal(success.status, "moved");
     assert.equal(success.persisted, true);
-    assert.equal(success.sourceKind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
-    assert.equal(success.sourceStatus, MANUAL_USER_BUILT_PLAN_SOURCE_STATUS);
+    assert.equal(success.sourceKind, "manual");
+    assert.equal(success.sourceStatus, null);
     assert.equal(success.workoutSourceKind, MANUAL_WORKOUT_AUTHORING_SOURCE_KIND);
     assert.equal(success.activePlanId, activePlan.id);
     assert.equal(success.plannedWorkoutId, sourceWorkout.id);
@@ -235,7 +235,8 @@ export async function validateManualMoveWorkoutContract() {
     assert.equal(success.safety.sourceDateBecameEmpty, true);
     assert.equal(success.safety.targetDayKind, "rest_day");
     assert.equal(success.safety.targetWeekdayDerivedServerSide, true);
-    assert.equal(success.safety.lastWorkoutMoveAllowedWithinSamePlan, true);
+    assert.equal(success.safety.runnerOwnershipVerified, true);
+    assert.equal(success.safety.sourceProvenanceUnchanged, true);
     assert.equal(success.safety.serverRebuiltReview, true);
     assert.equal(success.safety.trustedClientRows, false);
   }
@@ -333,8 +334,8 @@ export async function validateManualMoveWorkoutContract() {
   if (directMove.ok) {
     assert.equal(directMove.status, "moved");
     assert.equal(directMove.persisted, true);
-    assert.equal(directMove.sourceKind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
-    assert.equal(directMove.sourceStatus, MANUAL_USER_BUILT_PLAN_SOURCE_STATUS);
+    assert.equal(directMove.sourceKind, "manual");
+    assert.equal(directMove.sourceStatus, null);
     assert.equal(directMove.activePlanId, activePlan.id);
     assert.equal(directMove.plannedWorkoutId, sourceWorkout.id);
     assert.equal(directMove.sourceWorkoutDate, sourceWorkout.workout_date);
@@ -424,6 +425,30 @@ export async function validateManualMoveWorkoutContract() {
     }),
   );
   assertMoveConfirmBlocked(changedSource, "stale_review", "changed move source workout");
+
+  const changedSourceOrder = await confirmManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: sourceWorkout.id,
+      targetDate,
+      ...(moveReview.ok
+        ? {
+            reviewToken: moveReview.review.reviewToken,
+            reviewChecksum: moveReview.review.reviewChecksum,
+          }
+        : {}),
+    },
+    buildFakeMoveDependencies({
+      activePlan,
+      workouts: [{ ...sourceWorkout, display_order: sourceWorkout.display_order + 1 }, keptWorkout],
+    }),
+  );
+  assertMoveConfirmBlocked(
+    changedSourceOrder,
+    "stale_review",
+    "changed move source full-row order fingerprint",
+  );
 
   const invalidToken = await confirmManualWorkoutMoveForUser(
     userId,
@@ -571,6 +596,7 @@ export async function validateManualMoveWorkoutContract() {
   if (replacementConfirm.ok) {
     assert.equal(replacementConfirm.targetDayKind, "workout_day");
     assert.equal(replacementConfirm.targetReplacement?.plannedWorkoutId, occupiedWorkout.id);
+    assert.equal(replacementConfirm.undoExpiresAt, "2026-06-10T00:00:45.000Z");
     assert.equal(replacementConfirm.calendarRowCount, 2);
     assert.equal(replacementConfirm.nonRestWorkoutCount, 2);
     assert.equal(replacementConfirm.safety.requiresExplicitConfirm, true);
@@ -611,6 +637,34 @@ export async function validateManualMoveWorkoutContract() {
     "missing replacement target at confirm",
   );
 
+  const changedReplacementOrder = await confirmManualWorkoutMoveForUser(
+    userId,
+    {
+      activePlanId: activePlan.id,
+      sourceWorkoutId: sourceWorkout.id,
+      targetDate,
+      ...(occupiedReplacementReview.ok
+        ? {
+            reviewToken: occupiedReplacementReview.review.reviewToken,
+            reviewChecksum: occupiedReplacementReview.review.reviewChecksum,
+          }
+        : {}),
+    },
+    buildFakeMoveDependencies({
+      activePlan,
+      workouts: [
+        sourceWorkout,
+        keptWorkout,
+        { ...occupiedWorkout, display_order: occupiedWorkout.display_order + 1 },
+      ],
+    }),
+  );
+  assertMoveConfirmBlocked(
+    changedReplacementOrder,
+    "stale_review",
+    "changed replacement full-row order fingerprint",
+  );
+
   const presetPlan = buildFakePlanCycle({
     userId,
     id: activePlan.id,
@@ -629,7 +683,7 @@ export async function validateManualMoveWorkoutContract() {
   );
   assert.equal(presetMoveReview.ok, true, formatMoveReviewResult(presetMoveReview));
   if (presetMoveReview.ok) {
-    assert.equal(presetMoveReview.sourceKind, "ai_authored_plan_first_v1");
+    assert.equal(presetMoveReview.sourceKind, "manual");
     assert.equal(presetMoveReview.targetWeekday, "Monday");
     assert.equal(presetMoveReview.safety.targetWeekdayDerivedServerSide, true);
   }
@@ -651,7 +705,7 @@ export async function validateManualMoveWorkoutContract() {
   );
   assert.equal(presetMoveConfirm.ok, true, formatMoveConfirmResult(presetMoveConfirm));
   if (presetMoveConfirm.ok) {
-    assert.equal(presetMoveConfirm.sourceKind, "ai_authored_plan_first_v1");
+    assert.equal(presetMoveConfirm.sourceKind, "manual");
     assert.equal(presetMoveConfirm.sourceStatus, null);
     assert.equal(presetMoveConfirm.targetWeekday, "Monday");
     assert.equal(presetMoveConfirm.safety.movedExactlyOneRow, true);
@@ -667,6 +721,7 @@ export async function validateManualMoveWorkoutContract() {
   const selectedGeneratedSource = buildFakePlannedWorkout({
     userId,
     planCycleId: selectedPlan.id,
+    originKind: "ai",
     id: "99999999-9999-4999-8999-000000000710",
     date: "2026-06-18",
     displayOrder: 0,
@@ -733,7 +788,7 @@ export async function validateManualMoveWorkoutContract() {
   );
   assert.equal(selectedDirectMove.ok, true, formatDirectMoveResult(selectedDirectMove));
   if (selectedDirectMove.ok) {
-    assert.equal(selectedDirectMove.sourceKind, "ai_authored_plan_first_v1");
+    assert.equal(selectedDirectMove.sourceKind, "ai");
     assert.equal(selectedDirectMove.sourceStatus, null);
     assert.equal(selectedDirectMove.plannedWorkoutId, selectedGeneratedSource.id);
     assert.equal(selectedDirectMove.targetDate, "2026-06-24");
@@ -785,7 +840,7 @@ export async function validateManualMoveWorkoutContract() {
     formatMoveReviewResult(selectedReplacementReview),
   );
   if (selectedReplacementReview.ok) {
-    assert.equal(selectedReplacementReview.sourceKind, "ai_authored_plan_first_v1");
+    assert.equal(selectedReplacementReview.sourceKind, "ai");
     assert.equal(selectedReplacementReview.sourceWorkoutId, selectedGeneratedSource.id);
     assert.equal(selectedReplacementReview.sourceWorkoutDate, selectedGeneratedSource.workout_date);
     assert.equal(selectedReplacementReview.targetDate, selectedOccupiedTarget.workout_date);
@@ -864,7 +919,7 @@ export async function validateManualMoveWorkoutContract() {
     formatMoveConfirmResult(selectedReplacementConfirm),
   );
   if (selectedReplacementConfirm.ok) {
-    assert.equal(selectedReplacementConfirm.sourceKind, "ai_authored_plan_first_v1");
+    assert.equal(selectedReplacementConfirm.sourceKind, "ai");
     assert.equal(selectedReplacementConfirm.plannedWorkoutId, selectedGeneratedSource.id);
     assert.equal(selectedReplacementConfirm.targetDayKind, "workout_day");
     assert.equal(
@@ -898,6 +953,7 @@ export async function validateManualMoveWorkoutContract() {
   const aiGeneratedSource = buildFakePlannedWorkout({
     userId,
     planCycleId: aiPlan.id,
+    originKind: "ai",
     id: "99999999-9999-4999-8999-000000000712",
     date: "2026-06-18",
     displayOrder: 0,
@@ -910,6 +966,7 @@ export async function validateManualMoveWorkoutContract() {
   const aiOccupiedTarget = buildFakePlannedWorkout({
     userId,
     planCycleId: aiPlan.id,
+    originKind: "ai",
     id: "99999999-9999-4999-8999-000000000713",
     date: "2026-06-24",
     displayOrder: 1,
@@ -934,7 +991,7 @@ export async function validateManualMoveWorkoutContract() {
   );
   assert.equal(aiReplacementReview.ok, true, formatMoveReviewResult(aiReplacementReview));
   if (aiReplacementReview.ok) {
-    assert.equal(aiReplacementReview.sourceKind, "ai_authored_plan_first_v1");
+    assert.equal(aiReplacementReview.sourceKind, "ai");
     assert.equal(aiReplacementReview.sourceWorkoutId, aiGeneratedSource.id);
     assert.equal(aiReplacementReview.targetDayKind, "workout_day");
     assert.equal(aiReplacementReview.targetReplacement?.plannedWorkoutId, aiOccupiedTarget.id);
@@ -996,10 +1053,11 @@ export async function validateManualMoveWorkoutContract() {
   );
   assert.equal(aiReplacementConfirm.ok, true, formatMoveConfirmResult(aiReplacementConfirm));
   if (aiReplacementConfirm.ok) {
-    assert.equal(aiReplacementConfirm.sourceKind, "ai_authored_plan_first_v1");
+    assert.equal(aiReplacementConfirm.sourceKind, "ai");
     assert.equal(aiReplacementConfirm.plannedWorkoutId, aiGeneratedSource.id);
     assert.equal(aiReplacementConfirm.targetDayKind, "workout_day");
     assert.equal(aiReplacementConfirm.targetReplacement?.plannedWorkoutId, aiOccupiedTarget.id);
+    assert.equal(aiReplacementConfirm.undoExpiresAt, "2026-06-10T00:00:45.000Z");
     assert.equal(aiReplacementConfirm.templateKey, "ai_first_plan_easy_run");
     assert.equal(aiReplacementConfirm.safety.targetDayKind, "workout_day");
     assert.equal(aiReplacementConfirm.safety.trustedClientRows, false);
@@ -1053,11 +1111,7 @@ export async function validateManualMoveWorkoutContract() {
     },
     buildFakeMoveDependencies({ activePlan, workouts: [foreignSourceWorkout, keptWorkout] }),
   );
-  assertMoveReviewBlocked(
-    foreignSource,
-    "source_workout_not_in_active_plan",
-    "foreign move source workout",
-  );
+  assertMoveReviewBlocked(foreignSource, "source_workout_not_owned", "foreign move source workout");
 
   const missingSource = await reviewManualWorkoutMoveForUser(
     userId,
@@ -1181,7 +1235,7 @@ export async function validateManualMoveWorkoutContract() {
   );
   assert.equal(directNonManualPlan.ok, true, formatDirectMoveResult(directNonManualPlan));
   if (directNonManualPlan.ok) {
-    assert.equal(directNonManualPlan.sourceKind, "ai_authored_plan_first_v1");
+    assert.equal(directNonManualPlan.sourceKind, "manual");
     assert.equal(directNonManualPlan.sourceStatus, null);
     assert.equal(directNonManualPlan.safety.directMutation, true);
     assert.equal(directNonManualPlan.safety.movedExactlyOneRow, true);
@@ -1347,7 +1401,8 @@ export async function validateManualMoveWorkoutContract() {
   );
   assert.equal(lastWorkoutMove.ok, true, formatMoveReviewResult(lastWorkoutMove));
   if (lastWorkoutMove.ok) {
-    assert.equal(lastWorkoutMove.safety.lastWorkoutMoveAllowedWithinSamePlan, true);
+    assert.equal(lastWorkoutMove.safety.runnerOwnershipVerified, true);
+    assert.equal(lastWorkoutMove.safety.sourceProvenanceUnchanged, true);
   }
 
   const persistenceFailure = await confirmManualWorkoutMoveForUser(

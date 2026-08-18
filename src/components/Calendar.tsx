@@ -19,7 +19,6 @@ import {
   buildCalendarDayProjection,
   buildRestCalendarDayPresentation,
   buildWorkoutCalendarDayPresentation,
-  calendarDateIsBeforePlanStart,
   calendarMoveTargetAction,
   calendarMoveUndoAction,
   calendarTargetButtonAriaLabel,
@@ -68,7 +67,15 @@ type TooltipPosition = {
 const TOOLTIP_VIEWPORT_MARGIN = 12;
 const TOOLTIP_ANCHOR_GAP = 10;
 
-export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
+export function Calendar({
+  snapshot,
+  runnerScopeKey,
+  localActivityFileDesignFixtureEnabled = false,
+}: {
+  snapshot: TrainingSnapshot;
+  runnerScopeKey: string | null | undefined;
+  localActivityFileDesignFixtureEnabled?: boolean;
+}) {
   const router = useRouter();
   const [view, setView] = useState<View>("month");
   const [cursor, setCursor] = useState(snapshot.currentDate);
@@ -78,6 +85,7 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
     {
       onCalendarRefresh: () => router.invalidate(),
       onResetTransientUi: () => setTooltipAnchor(null),
+      runnerScopeKey,
     },
   );
 
@@ -165,7 +173,10 @@ export function Calendar({ snapshot }: { snapshot: TrainingSnapshot }) {
           >
             <Icon name="chevron-right" size="sm" />
           </HitoButton>
-          <CalendarOverflowActions onCalendarRefresh={() => router.invalidate({ sync: true })} />
+          <CalendarOverflowActions
+            localActivityFileDesignFixtureEnabled={localActivityFileDesignFixtureEnabled}
+            onCalendarRefresh={() => router.invalidate({ sync: true })}
+          />
         </div>
       </div>
 
@@ -291,11 +302,9 @@ function MobileMonthList({
   manualCalendarActionState: ManualCalendarActionState;
   snapshot: TrainingSnapshot;
 }) {
-  const visibleDates = dates.filter((iso) => !calendarDateIsBeforePlanStart(iso, snapshot));
-
   return (
     <div className="hito-calendar-mobile-list lg:hidden">
-      {visibleDates.map((iso) => (
+      {dates.map((iso) => (
         <CalendarDaySlot
           key={iso}
           iso={iso}
@@ -381,10 +390,6 @@ function DayCell({
   if (!iso) {
     return <CalendarSlotPlaceholder />;
   }
-  if (calendarDateIsBeforePlanStart(iso, snapshot)) {
-    return <CalendarSlotPlaceholder />;
-  }
-
   return (
     <CalendarDaySlot
       inMonth={inMonth}
@@ -476,14 +481,13 @@ function CalendarDaySlot({
   if (addAction) {
     const content = (
       <ManualWorkoutAddMenu
-        activePlanId={addAction.activePlanId}
-        activePlanSourceKind={addAction.activePlanSourceKind}
+        calendarSourceKind={addAction.calendarSourceKind}
         copiedWorkoutSource={manualCalendarActionState.copiedWorkoutSource}
         date={iso}
         moveTargetDayKind={addAction.moveTargetDayKind}
         moveOnly={addAction.moveOnly}
         moveWorkoutSource={canMoveHere ? manualCalendarActionState.moveWorkoutSource : null}
-        onAdded={manualCalendarActionState.onManualPlanChanged}
+        onAdded={manualCalendarActionState.onCalendarChanged}
         onMoveCanceled={manualCalendarActionState.onCancelMoveWorkout}
         onMoveTargetSelected={manualCalendarActionState.onMoveTargetSelected}
         pasteTargetIsEmpty={!workout}
@@ -603,11 +607,11 @@ function CalendarDaySlot({
 
       {sourceAction ? (
         <ManualWorkoutSourceActionMenu
-          activePlanId={sourceAction.activePlanId}
+          provenancePlanId={sourceAction.provenancePlanId}
           canCopy={sourceAction.canDirectCopy}
           canClear={sourceAction.canRequestClearReview}
           canMove={sourceAction.canDirectMove}
-          onCleared={manualCalendarActionState.onManualPlanChanged}
+          onCleared={manualCalendarActionState.onCalendarChanged}
           onCopy={manualCalendarActionState.onCopyWorkout}
           onMove={manualCalendarActionState.onMoveWorkout}
           sourceWorkoutDate={sourceAction.sourceWorkoutDate}
@@ -620,7 +624,7 @@ function CalendarDaySlot({
               "hito-button hito-button-ghost hito-button-xs absolute z-30 aspect-square p-0",
               sourceActionMobile
                 ? "right-3 top-3"
-                : "opacity-0 transition-opacity group-hover/manual-day:opacity-100 focus-visible:opacity-100",
+                : "opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 group-hover/manual-day:opacity-100 focus-visible:opacity-100",
               layout === "month" && "right-2 top-2",
               layout === "week" && "right-3 top-3",
             )}
@@ -728,16 +732,8 @@ function CalendarDaySurface({
   );
 }
 
-function CalendarSlotPlaceholder({ week = false }: { week?: boolean }) {
-  return (
-    <div
-      aria-hidden="true"
-      className={cn(
-        "hito-calendar-slot-placeholder",
-        week && "hito-calendar-slot-placeholder-week",
-      )}
-    />
-  );
+function CalendarSlotPlaceholder() {
+  return <div aria-hidden="true" className="hito-calendar-slot-placeholder" />;
 }
 
 function Tooltip({ workout }: { workout: Workout }) {
@@ -800,10 +796,6 @@ function WeekStrip({
   return (
     <div className="hito-calendar-grid-month grid grid-cols-1 border-b border-hairline lg:grid-cols-7">
       {dates.map((iso) => {
-        if (calendarDateIsBeforePlanStart(iso, snapshot)) {
-          return <CalendarSlotPlaceholder key={iso} week />;
-        }
-
         return (
           <CalendarDaySlot
             key={iso}

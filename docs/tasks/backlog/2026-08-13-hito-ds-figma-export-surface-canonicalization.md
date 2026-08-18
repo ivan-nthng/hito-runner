@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** DESIGN SYSTEM
+- **Epic:** platform-and-operations
 - **Evidence From:** [Hito DS Card Surface, Copy Affordance, And Figma Reconciliation Discovery](2026-08-13-hito-ds-card-surface-copy-affordance-and-figma-reconciliation-discovery.md)
 - **Outcome:** Replaced six route-local decorative Figma Export wrappers with the canonical borderless neutral specimen surface; retained all structural/state edges, static content, responsive behavior, and deterministic export endpoints.
 - **Sources:** [figma-export-board.tsx](../../../src/components/hito-ds/figma-export-board.tsx); [reference-workbench.css](../../../src/styles/reference-workbench.css); [SKILL.md](../../../skills/hito-qa-browser-regression/SKILL.md)

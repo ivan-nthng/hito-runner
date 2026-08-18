@@ -2,6 +2,7 @@
 
 - **Status:** `closed`
 - **Owner:** PRODUCT
+- **Epic:** runner-core-readiness
 - **Outcome:** Closed. QA proved that non-rest template selection now opens the constructor directly and no longer fails through a submenu-close no-op. Reopen only if a fresh browser regression shows that selecting non-rest templates stops opening the constructor again.
 - **Sources:** [manual-workout-authoring-utils.ts](../../../src/components/manual-workout/manual-workout-authoring-utils.ts); [ManualWorkoutConstructorEditor.tsx](../../../src/components/manual-workout/ManualWorkoutConstructorEditor.tsx); [ManualWorkoutAuthoringControls.tsx](../../../src/components/manual-workout/ManualWorkoutAuthoringControls.tsx)
 - **Validation:** Closure is supported by the recorded decision/evidence; no implementation, runtime, or release acceptance is inferred.

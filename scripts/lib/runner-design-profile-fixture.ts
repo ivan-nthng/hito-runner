@@ -12,9 +12,13 @@ import {
   buildAiGeneratedRunningPlanQaFixtureAuthoringInput,
 } from "../../src/lib/ai-generated-running-plan-dev-fixture";
 import { buildReviewedAiGeneratedRunningPlanPreviewForUser } from "../../src/lib/running-plan-engine-actions";
-import { materializeFirstReviewedPlanForUser } from "../../src/lib/active-plan-persistence";
-import { buildRunningPlanPersistenceMetadata } from "../../src/lib/running-plan-engine-review";
+import {
+  materializeFirstReviewedPlanForUser,
+  retainImportedPlanCandidateForUser,
+} from "../../src/lib/active-plan-persistence";
+import { importedPlanSchema, type ImportedPlan } from "../../src/lib/imported-plan";
 import { DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE } from "../../src/lib/local-auth-account-registry.server";
+import { digestSha256Hex, stableJsonStringify } from "../../src/lib/review-token-signing";
 import {
   persistGarminFitActivitySource,
   readRunnerActivityProjection,
@@ -24,7 +28,17 @@ import { recordRunnerActivitySessionRpeForUser } from "../../src/lib/runner-acti
 import { listRunnerActivityHistoryForUser } from "../../src/lib/runner-activity/history-read-model";
 import { getRunnerActivityProgressForUser } from "../../src/lib/runner-activity/read-model";
 import { getPersistedSnapshot } from "../../src/lib/training-api";
-import { addDaysIso, diffDaysIso, startOfWeekIso, todayIso } from "../../src/lib/training";
+import {
+  addDaysIso,
+  diffDaysIso,
+  startOfWeekIso,
+  todayIso,
+  weekdayLong,
+} from "../../src/lib/training";
+import {
+  resolveWeekdayRestInvariant,
+  type WeekdayName,
+} from "../../src/lib/weekday-rest-invariants";
 import { isLoopbackRuntimeUrl } from "../../src/lib/supabase/env";
 import {
   buildFirstTimeRunnerBaselineReadback,
@@ -40,6 +54,9 @@ import { loginToLoopbackRuntime } from "./runner-activity-proof-runtime";
 export const RUNNER_DESIGN_PROFILE_FIXTURE_VERSION = "runner_design_profile_v1" as const;
 export const RUNNER_DESIGN_PROFILE_FIXTURE_ROLE = "saved-plan-readback" as const;
 export const RUNNER_DESIGN_PROFILE_FIXTURE_STORAGE_BUCKET = WORKOUT_RESULT_STORAGE_BUCKET;
+export const RUNNER_CORE_FILE_FLOW_FIXTURE_ROLE = "isolation-a" as const;
+export const RUNNER_CORE_FILE_FLOW_FIXTURE_TEMPLATE =
+  "public/templates/hito-training-plan-v2-template.json" as const;
 
 type FixtureActivitySpec = {
   key: string;
@@ -65,6 +82,210 @@ type FixtureSeedReceipt = {
 
 const AS_OF_DATE_SCHEMA = z.string().date();
 const MIN_MATCHED_ACTIVITY_COUNT = 11;
+
+export async function seedRunnerCoreFileFlowFixture(input: {
+  supabase: SupabaseClient;
+  userId: string;
+  templatePlan: ImportedPlan;
+  asOfDate?: string;
+}) {
+  const asOfDate = normalizeAsOfDate(input.asOfDate);
+  const baseline = buildFirstTimeRunnerBaselineReadback({
+    age: 36,
+    weightKg: 72,
+    heightCm: 178,
+    fitnessLevel: "running_regularly",
+  });
+  await updateUserSettingsForUserId(input.userId, {
+    firstName: "QA",
+    lastName: "File Flow",
+    displayName: "QA File Flow",
+    age: baseline.age,
+    weightKg: baseline.weightKg,
+    heightCm: baseline.heightCm,
+    fitnessLevel: baseline.fitnessLevel!,
+    calendarTimezone: "UTC",
+    heartRateProfile: {
+      zones: baseline.heartRateZones.zones.map(({ reference, minBpm, maxBpm }) => ({
+        reference,
+        minBpm,
+        maxBpm,
+      })),
+    },
+  });
+  const canonicalPlan = buildRunnerCoreFileFlowPlan(input.templatePlan, asOfDate);
+  const sourcePlan = await retainImportedPlanCandidateForUser({
+    userId: input.userId,
+    canonicalPlan,
+    reviewChecksum: await digestSha256Hex(stableJsonStringify(canonicalPlan)),
+  });
+  const materialized = await materializeFirstReviewedPlanForUser(input.userId, canonicalPlan, {
+    sourcePlanId: sourcePlan.id,
+    calendarInstant: new Date(`${asOfDate}T12:00:00.000Z`),
+  });
+  assert.equal(materialized.ok, true);
+
+  return readRunnerCoreFileFlowFixture({
+    supabase: input.supabase,
+    userId: input.userId,
+    asOfDate,
+  });
+}
+
+export async function readRunnerCoreFileFlowFixture(input: {
+  supabase: SupabaseClient;
+  userId: string;
+  asOfDate?: string;
+  expectedEditingState?: "eligible" | "evidence_backed";
+}) {
+  const asOfDate = normalizeAsOfDate(input.asOfDate);
+  const plans = await input.supabase
+    .from("plan_cycles")
+    .select("id, status, source_kind, saved_plan_payload")
+    .eq("user_id", input.userId);
+  if (plans.error) throw new Error(plans.error.message);
+  const sourcePlans = plans.data.filter((plan) => plan.saved_plan_payload !== null);
+  assert.equal(sourcePlans.length, 1, "The file-flow fixture requires one immutable source.");
+  assert.equal(
+    plans.data.filter((plan) => plan.saved_plan_payload === null).length,
+    0,
+    "The file-flow fixture must not create a materialized plan container.",
+  );
+  assert.equal(
+    plans.data.filter((plan) => plan.status === "active").length,
+    0,
+    "The file-flow fixture must not create active-plan authority.",
+  );
+  const sourcePlan = sourcePlans[0]!;
+  assert.equal(sourcePlan.status, "archived");
+  assert.equal(sourcePlan.source_kind, "training_plan_v2_import");
+
+  const workouts = await input.supabase
+    .from("planned_workouts")
+    .select(
+      "id, user_id, plan_cycle_id, origin_kind, source_workout_id, workout_date, workout_type, title",
+    )
+    .eq("user_id", input.userId);
+  if (workouts.error) throw new Error(workouts.error.message);
+  assert.equal(workouts.data.length, 1, "The file-flow fixture requires exactly one workout.");
+  const workout = workouts.data[0]!;
+  assert.equal(workout.user_id, input.userId);
+  assert.equal(workout.plan_cycle_id, sourcePlan.id);
+  assert.equal(workout.origin_kind, "file_import");
+  assert.ok(workout.source_workout_id, "Imported provenance requires a source workout identity.");
+  assert.notEqual(workout.workout_type, "rest");
+  assert.ok(workout.workout_date > asOfDate, "The imported workout must remain future-eligible.");
+
+  const snapshot = await getPersistedSnapshot(input.userId, { currentDate: asOfDate });
+  assert.equal(snapshot.mode, "authenticated");
+  assert.equal(snapshot.planMeta, null);
+  const snapshotWorkout = snapshot.workouts.find((candidate) => candidate.id === workout.id);
+  assert.ok(snapshotWorkout, "The future imported workout must reach the Calendar read model.");
+  assert.equal(snapshotWorkout.sourceProvenance?.originKind, "file_import");
+  const sourceEditing = snapshotWorkout.sourceEditing;
+  assert.ok(sourceEditing, "The future imported workout requires Calendar editing readback.");
+  if ((input.expectedEditingState ?? "eligible") === "eligible") {
+    assert.equal(sourceEditing.eligibility, "eligible_future_unlogged");
+    assert.equal(sourceEditing.canEditContent, true);
+    assert.equal(sourceEditing.canDirectMove, true);
+    assert.equal(sourceEditing.canDirectCopy, true);
+  } else {
+    assert.equal(sourceEditing.eligibility, "blocked");
+    assert.equal(sourceEditing.reason, "evidence_backed_workout");
+    assert.equal(sourceEditing.canEditContent, false);
+    assert.equal(sourceEditing.canDirectMove, false);
+    assert.equal(sourceEditing.canDirectCopy, true);
+  }
+
+  const [assets, metrics, comparisons, matches] = await Promise.all([
+    input.supabase
+      .from("workout_result_assets")
+      .select("id, parse_status")
+      .eq("user_id", input.userId)
+      .eq("planned_workout_id", workout.id),
+    input.supabase
+      .from("workout_actual_metrics")
+      .select("id")
+      .eq("user_id", input.userId)
+      .eq("planned_workout_id", workout.id),
+    input.supabase
+      .from("workout_comparisons")
+      .select("id")
+      .eq("user_id", input.userId)
+      .eq("planned_workout_id", workout.id),
+    input.supabase
+      .from("runner_activity_planned_workout_matches")
+      .select("activity_id")
+      .eq("user_id", input.userId)
+      .eq("planned_workout_id", workout.id),
+  ]);
+  for (const result of [assets, metrics, comparisons, matches]) {
+    if (result.error) throw new Error(result.error.message);
+  }
+
+  return {
+    role: RUNNER_CORE_FILE_FLOW_FIXTURE_ROLE,
+    asOfDate,
+    sourcePlan: {
+      id: sourcePlan.id,
+      status: sourcePlan.status,
+      sourceKind: sourcePlan.source_kind,
+    },
+    workout: {
+      id: workout.id,
+      date: workout.workout_date,
+      type: workout.workout_type,
+      title: workout.title,
+      originKind: workout.origin_kind,
+      sourceWorkoutId: workout.source_workout_id,
+      editingEligibility: sourceEditing.eligibility,
+      canEditContent: sourceEditing.canEditContent,
+      canMove: sourceEditing.canDirectMove,
+      canCopy: sourceEditing.canDirectCopy,
+    },
+    evidence: {
+      assetCount: assets.data.length,
+      parsedAssetCount: assets.data.filter((asset) => asset.parse_status === "parsed").length,
+      metricsCount: metrics.data.length,
+      comparisonCount: comparisons.data.length,
+      matchCount: matches.data.length,
+    },
+  };
+}
+
+function buildRunnerCoreFileFlowPlan(templatePlan: ImportedPlan, asOfDate: string) {
+  const sourceWorkout = templatePlan.planned_workouts.find(
+    (workout) => workout.workout_type !== "rest",
+  );
+  assert.ok(sourceWorkout, "The canonical import template requires one non-Rest workout.");
+  const weekdayRestInvariant = resolveWeekdayRestInvariant({
+    importedPlanPreferences: templatePlan.plan_preferences,
+    importedTrainingConstraints: templatePlan.training_constraints,
+  });
+  const workoutDate = Array.from({ length: 7 }, (_, offset) =>
+    addDaysIso(asOfDate, 2 + offset),
+  ).find(
+    (date) => !weekdayRestInvariant.blockedWeekdays.includes(weekdayLong(date) as WeekdayName),
+  );
+  assert.ok(workoutDate, "The canonical import template requires one allowed training weekday.");
+
+  return importedPlanSchema.parse({
+    ...templatePlan,
+    plan_name: "QA Future Imported Workout",
+    generated_for: "QA Runner Core",
+    start_date: workoutDate,
+    planned_workouts: [
+      {
+        ...sourceWorkout,
+        workout_id: "runner-core-file-flow-imported-workout",
+        date: workoutDate,
+        weekday: weekdayLong(workoutDate),
+        week_number: 1,
+        phase: "QA fixture",
+      },
+    ],
+  });
+}
 
 const ACTIVITY_SPECS = Object.freeze<FixtureActivitySpec[]>([
   activity("w8-recovery", 55, "Recovery run", 30, 32, 4.8, 134, 18, true),
@@ -191,38 +412,39 @@ export async function createRunnerDesignProfilePlan(input: {
   const materialized = await materializeFirstReviewedPlanForUser(
     input.userId,
     reviewed.draft.canonicalPlan,
-    buildRunningPlanPersistenceMetadata({
-      draft: reviewed.draft,
-      canonicalPlan: reviewed.draft.canonicalPlan,
-      reviewChecksum: reviewed.draft.reviewChecksum,
-    }),
-    { calendarInstant: historicalMaterializationInstant },
+    {
+      sourcePlanId: reviewed.savedPlanId,
+      calendarInstant: historicalMaterializationInstant,
+    },
   );
   assert.equal(materialized.ok, true);
   assert.equal(providerDispatchCount, 0);
 
-  const materializedPlan = await input.supabase
+  const sourcePlan = await input.supabase
     .from("plan_cycles")
-    .select("id, start_date, end_date, goal_metadata")
+    .select("id, start_date, end_date, goal_metadata, saved_plan_payload, source_kind")
     .eq("user_id", input.userId)
     .eq("status", "archived")
-    .is("saved_plan_payload", null)
+    .eq("id", reviewed.savedPlanId)
+    .not("saved_plan_payload", "is", null)
     .order("created_at", { ascending: false })
     .limit(1)
     .single();
-  if (materializedPlan.error) throw new Error(materializedPlan.error.message);
+  if (sourcePlan.error) throw new Error(sourcePlan.error.message);
   const workouts = await input.supabase
     .from("planned_workouts")
-    .select("id, workout_date, workout_type, source_workout_type, title, steps")
+    .select(
+      "id, plan_cycle_id, origin_kind, source_workout_id, workout_date, workout_type, source_workout_type, title, steps",
+    )
     .eq("user_id", input.userId)
-    .eq("plan_cycle_id", materializedPlan.data.id)
+    .eq("plan_cycle_id", sourcePlan.data.id)
     .order("workout_date", { ascending: true });
   if (workouts.error) throw new Error(workouts.error.message);
 
   return {
-    planId: materializedPlan.data.id,
-    startDate: materializedPlan.data.start_date,
-    endDate: materializedPlan.data.end_date,
+    sourcePlanId: sourcePlan.data.id,
+    startDate: sourcePlan.data.start_date,
+    endDate: sourcePlan.data.end_date,
     reviewChecksum: reviewed.draft.reviewChecksum,
     canonicalRowCount: reviewed.draft.canonicalRowCount,
     providerDispatchCount,
@@ -416,22 +638,26 @@ export async function readRunnerDesignProfileFixture(input: {
     .eq("user_id", input.userId);
   if (planCycles.error) throw new Error(planCycles.error.message);
   const materializedPlans = planCycles.data.filter((plan) => plan.saved_plan_payload === null);
+  const sourcePlans = planCycles.data.filter((plan) => plan.saved_plan_payload !== null);
   assert.equal(
     materializedPlans.length,
-    1,
-    "The design profile requires exactly one materialized Calendar provenance record.",
+    0,
+    "The design profile must not create a duplicate materialized plan record.",
   );
+  assert.equal(sourcePlans.length, 1, "The design profile requires exactly one immutable source.");
   assert.equal(
     planCycles.data.filter((plan) => plan.status === "active").length,
     0,
     "The design profile must not restore active-plan authority.",
   );
-  const materializedPlan = materializedPlans[0]!;
+  const sourcePlan = sourcePlans[0]!;
   const plannedWorkouts = await input.supabase
     .from("planned_workouts")
-    .select("id, workout_date, workout_type, workout_family, workout_identity, steps")
+    .select(
+      "id, plan_cycle_id, origin_kind, source_workout_id, workout_date, workout_type, workout_family, workout_identity, steps",
+    )
     .eq("user_id", input.userId)
-    .eq("plan_cycle_id", materializedPlan.id)
+    .eq("plan_cycle_id", sourcePlan.id)
     .order("workout_date", { ascending: true });
   if (plannedWorkouts.error) throw new Error(plannedWorkouts.error.message);
 
@@ -482,13 +708,22 @@ export async function readRunnerDesignProfileFixture(input: {
   assert.equal(retryableRemoval.source.reprocessingAvailable, false);
   assert.equal(retryableRemoval.quality.updating, false);
   assert.equal(retryableRemoval.capabilities.canRemoveOriginalFile, true);
-  assert.equal(materializedPlan.source_kind, "ai_authored_plan_first_v1");
+  assert.equal(sourcePlan.source_kind, "ai_authored_plan_first_v1");
   assert.equal(
-    readFixtureResponseId(materializedPlan.goal_metadata),
+    readFixtureResponseId(sourcePlan.goal_metadata),
     AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID,
   );
-  assert.ok(materializedPlan.start_date < asOfDate);
-  assert.ok(materializedPlan.end_date > asOfDate);
+  assert.ok(sourcePlan.start_date < asOfDate);
+  assert.ok(sourcePlan.end_date > asOfDate);
+  assert.equal(
+    plannedWorkouts.data.every(
+      (workout) =>
+        workout.plan_cycle_id === sourcePlan.id &&
+        workout.origin_kind === "ai" &&
+        Boolean(workout.source_workout_id),
+    ),
+    true,
+  );
   const workoutTypes = new Set(plannedWorkouts.data.map((workout) => workout.workout_type));
   const workoutFamilies = new Set(
     plannedWorkouts.data.flatMap((workout) =>
@@ -533,19 +768,10 @@ export async function readRunnerDesignProfileFixture(input: {
   }
   assert.ok(plannedWorkouts.data.some((workout) => workout.workout_date < asOfDate));
   assert.ok(plannedWorkouts.data.some((workout) => workout.workout_date > asOfDate));
-  const persistedSnapshot = await getPersistedSnapshot(input.userId);
-  assert.equal(persistedSnapshot.planMeta?.id, materializedPlan.id);
-  assert.equal(persistedSnapshot.workouts.length, plannedWorkouts.data.length);
-  for (const workout of persistedSnapshot.workouts) {
-    if (matchedWorkoutIds.has(workout.id)) {
-      assert.equal(workout.status, "completed");
-      assert.equal(workout.completionOrigin, "fit_activity");
-      assert.equal(workout.feedbackMarker?.state, "feedback_ready");
-      continue;
-    }
-    assert.notEqual(workout.completionOrigin, "fit_activity");
-    if (workout.date > asOfDate) assert.notEqual(workout.status, "completed");
-  }
+  const futureFitCompletedWorkoutCount = plannedWorkouts.data.filter(
+    (workout) => workout.workout_date > asOfDate && fitCompletedWorkoutIds.has(workout.id),
+  ).length;
+  assert.equal(futureFitCompletedWorkoutCount, 0);
   assert.equal(
     plannedWorkouts.data
       .filter((workout) => workout.workout_type !== "rest")
@@ -643,10 +869,11 @@ export async function readRunnerDesignProfileFixture(input: {
     role: RUNNER_DESIGN_PROFILE_FIXTURE_ROLE,
     planState: {
       materializedPlanCount: materializedPlans.length,
-      savedPlanCount: planCycles.data.filter((plan) => plan.saved_plan_payload !== null).length,
+      savedPlanCount: sourcePlans.length,
       activeAuthorityCount: planCycles.data.filter((plan) => plan.status === "active").length,
-      startDate: materializedPlan.start_date,
-      endDate: materializedPlan.end_date,
+      sourcePlanId: sourcePlan.id,
+      startDate: sourcePlan.start_date,
+      endDate: sourcePlan.end_date,
       workoutCount: plannedWorkouts.data.length,
       workoutTypes: [...workoutTypes].sort(),
       workoutFamilies: [...workoutFamilies].sort(),
@@ -656,9 +883,7 @@ export async function readRunnerDesignProfileFixture(input: {
     completionState: {
       matchedWorkoutCount: matchedWorkoutIds.size,
       fitCompletedWorkoutCount: fitCompletedWorkoutIds.size,
-      futureFitCompletedWorkoutCount: persistedSnapshot.workouts.filter(
-        (workout) => workout.date > asOfDate && workout.completionOrigin === "fit_activity",
-      ).length,
+      futureFitCompletedWorkoutCount,
     },
     progress: {
       current28Day: snapshotValues(current),
@@ -1110,7 +1335,7 @@ function readFixtureResponseId(value: unknown) {
   return typeof responseId === "string" ? responseId : null;
 }
 
-async function withLocalDesignFixtureEnv<T>(run: () => Promise<T>) {
+export async function withLocalDesignFixtureEnv<T>(run: () => Promise<T>) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!supabaseUrl || !isLoopbackRuntimeUrl(supabaseUrl)) {
     throw new Error("Runner design profile fixture requires loopback Supabase.");

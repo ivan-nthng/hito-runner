@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type RefObject, useRef, useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { AppShell } from "@/components/AppShell";
 import {
@@ -10,10 +10,7 @@ import { WorkoutActivityFileDialog } from "@/components/workout-completion/Worko
 import { ManualWorkoutPersistedEditDialog } from "@/components/manual-workout/ManualWorkoutPersistedEditControls";
 import { ManualWorkoutDocumentPreview } from "@/components/manual-workout/ManualWorkoutDocumentPreview";
 import { workoutDocumentSectionsToManualReadbackEntries } from "@/components/manual-workout/ManualWorkoutTrainingBlockGrammar.model";
-import {
-  MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-  MANUAL_WORKOUT_TEMPLATE_KEY_VALUES,
-} from "@/lib/manual-workout-authoring/schema";
+import { MANUAL_WORKOUT_TEMPLATE_KEY_VALUES } from "@/lib/manual-workout-authoring/schema";
 import { WorkoutDocumentReadback } from "@/components/workout-structure/WorkoutDocumentReadback";
 import { workoutDocumentNotesForSteps } from "@/components/workout-structure/workout-document-notes";
 import {
@@ -29,18 +26,12 @@ import { Icon } from "@/components/ui/icon";
 import { useHitoTabs } from "@/components/ui/hito-tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  displayExecutableTargetEntries,
-  displayWorkoutStructureEntries,
-  formatPlannedWorkoutBlockSummary,
   formatDistanceKm,
   formatDate,
   formatDurationMin,
-  primaryWorkoutTarget,
   WEEK_STATUS_META,
   type TrainingSnapshot,
   type Workout,
-  weekOf,
-  workoutPlannedLanguage,
   workoutTypeMeta,
   workoutDistanceKm,
   workoutStructureDuration,
@@ -78,12 +69,22 @@ export const Route = createFileRoute("/workout/$date")({
 });
 
 function WorkoutPage() {
-  const { workout, snapshot, viewer, prev, next, feedback, localActivityFileDesignFixtureEnabled } =
-    Route.useLoaderData();
+  const {
+    workout,
+    snapshot,
+    viewer,
+    settings,
+    prev,
+    next,
+    feedback,
+    sidebarReadModel,
+    localActivityFileDesignFixtureEnabled,
+  } = Route.useLoaderData();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
   const router = useRouter();
   const [activityFileDialogOpen, setActivityFileDialogOpen] = useState(false);
+  const workoutActionsButtonRef = useRef<HTMLButtonElement>(null);
   const tab = search.tab as WorkoutDetailSearchTab;
   const hasFitCompletion = workout?.completionOrigin === "fit_activity";
   const hasReviewFeedback = hasFitCompletion && hasWorkoutReviewReadback(feedback);
@@ -98,7 +99,7 @@ function WorkoutPage() {
 
   if (!workout) {
     return (
-      <AppShell snapshot={snapshot} viewer={viewer}>
+      <AppShell settings={settings} snapshot={snapshot} viewer={viewer}>
         <div className="hito-route-gutter max-w-2xl py-20">
           <section
             className="hito-state-surface"
@@ -111,7 +112,7 @@ function WorkoutPage() {
                   Finish setup before opening workouts.
                 </h1>
                 <p className="hito-body-md mt-4 max-w-[40rem] text-secondary">
-                  Create your plan first, then your workouts will open here.
+                  Complete your runner setup first, then your workouts will open here.
                 </p>
               </>
             ) : (
@@ -121,14 +122,13 @@ function WorkoutPage() {
                   Nothing is scheduled for this day.
                 </h1>
                 <p className="hito-body-md mt-4 max-w-[40rem] text-secondary">
-                  There is no workout on this date in the current plan. Go back and choose another
-                  day.
+                  There is no workout on this date in your Calendar. Go back and choose another day.
                 </p>
               </>
             )}
             <div className="hito-state-actions">
               <HitoButton asChild size="lg" variant="primary">
-                <Link to="/">Back to weekly plan</Link>
+                <Link to="/">Back to Calendar</Link>
               </HitoButton>
             </div>
           </section>
@@ -146,11 +146,6 @@ function WorkoutPage() {
   const weekStatus = WEEK_STATUS_META[snapshot.weekStatus];
   const resultMeta = resultMetaForStatus(status);
   const skippedCopy = skippedExplanationFor(workout, snapshot.source);
-  const weekProgress = weekProgressFor(snapshot.workouts, snapshot.currentDate);
-  const primaryTarget = primaryWorkoutTarget(workout);
-  const primaryTargetMetrics = workoutSidebarTargetRows(workout, primaryTarget);
-  const primaryStructureMetrics = isRestDay ? [] : workoutSidebarExecutionRows(workout);
-  const identityRows = workoutIdentityRows(workout);
   const phaseLabel = humanizeSnakeCase(workout.phase);
   const weekLabel = `Week ${workout.week}`;
   const heroMetrics = isRestDay
@@ -166,17 +161,24 @@ function WorkoutPage() {
   const canEditWorkout = Boolean(
     snapshot.source === "persisted" &&
     workout.type !== "rest" &&
-    snapshot.planMeta?.workoutEditing?.editWorkout.allowed &&
+    snapshot.calendarContext?.workoutEditing.editWorkout.allowed &&
     workout.sourceEditing?.canEditContent,
   );
 
   return (
-    <AppShell snapshot={snapshot} viewer={viewer}>
+    <AppShell settings={settings} snapshot={snapshot} viewer={viewer}>
       <div className="hito-route-gutter relative max-w-6xl pb-8 pt-2">
         <WorkoutDetailTopBar
           canEdit={canEditWorkout}
-          onPlanChanged={() => router.invalidate()}
-          snapshot={snapshot}
+          onCalendarChanged={() => router.invalidate()}
+          onOpenActivityFile={
+            localActivityFileDesignFixtureEnabled &&
+            snapshot.source === "persisted" &&
+            workout.type !== "rest"
+              ? () => setActivityFileDialogOpen(true)
+              : undefined
+          }
+          workoutActionsButtonRef={workoutActionsButtonRef}
           workout={workout}
         />
 
@@ -333,71 +335,6 @@ function WorkoutPage() {
                 </SidebarSection>
               )}
 
-              {!isRestDay && (
-                <SidebarSection title="Workout type">
-                  <div className="space-y-3">
-                    {identityRows.map((row) => (
-                      <ReadbackRow key={row.label} label={row.label} value={row.value} />
-                    ))}
-                  </div>
-                </SidebarSection>
-              )}
-
-              {!isRestDay &&
-                (primaryTargetMetrics.length > 0 || primaryStructureMetrics.length > 0) && (
-                  <SidebarSection title="Execution" tone="signal" titleVariant="strong">
-                    <div className="space-y-3">
-                      {primaryStructureMetrics.map((entry) => (
-                        <div
-                          key={entry.key}
-                          className="flex items-start justify-between gap-3 py-1 last:border-0"
-                        >
-                          <span className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
-                            {entry.label}
-                          </span>
-                          <span className="hito-readback-value hito-readback-value-compact">
-                            {entry.value}
-                          </span>
-                        </div>
-                      ))}
-
-                      <div className="border-t border-hairline pt-4">
-                        {primaryTargetMetrics.length > 0 ? (
-                          <div className="space-y-3">
-                            {primaryTargetMetrics.map((entry) => (
-                              <div
-                                key={entry.key}
-                                className="flex items-start justify-between gap-3 py-1 last:border-0"
-                              >
-                                <span className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
-                                  {entry.label}
-                                </span>
-                                <span className="hito-readback-value hito-readback-value-compact">
-                                  {entry.value}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="hito-body-xs text-tertiary">
-                            No reliable pace or heart-rate target is supplied for this workout.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </SidebarSection>
-                )}
-
-              {!isRestDay &&
-                primaryStructureMetrics.length === 0 &&
-                primaryTargetMetrics.length === 0 && (
-                  <SidebarSection title="Execution" tone="signal" titleVariant="strong">
-                    <p className="hito-body-xs text-tertiary">
-                      No reliable pace or heart-rate target is supplied for this workout.
-                    </p>
-                  </SidebarSection>
-                )}
-
               {status === "skipped" && (
                 <SidebarSection title="Skipped">
                   <div className="flex items-start gap-2">
@@ -417,26 +354,158 @@ function WorkoutPage() {
                 </SidebarSection>
               )}
 
-              <SidebarSection title="This week">
-                <div className="flex items-center justify-between gap-3 text-xs">
-                  <span className="text-text-secondary">
-                    {weekProgress.completed} of {weekProgress.total} workouts completed
-                  </span>
-                  <span className="font-mono-num text-muted-foreground">
-                    {weekProgress.percent}%
-                  </span>
-                </div>
-                <div className="mt-3 h-2 rounded-full overflow-hidden bg-hairline/80">
-                  <div
-                    className="h-full rounded-full bg-signal"
-                    style={{ width: `${weekProgress.percent}%` }}
-                  />
-                </div>
-                <div className="mt-3 flex items-center justify-between gap-3 hito-body-xs text-tertiary">
-                  <span>{weekStatus.label}</span>
-                  <span>{weekProgress.remaining} left</span>
-                </div>
-              </SidebarSection>
+              {sidebarReadModel ? (
+                <>
+                  <SidebarSection title="This week">
+                    <dl className="space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <dt className="hito-body-xs text-tertiary">Completed</dt>
+                        <dd className="hito-readback-value hito-readback-value-compact text-right">
+                          {sidebarReadModel.week.completedWorkoutCount} of{" "}
+                          {sidebarReadModel.week.scheduledWorkoutCount}
+                        </dd>
+                      </div>
+                      <div className="flex items-start justify-between gap-3">
+                        <dt className="hito-body-xs text-tertiary">Scheduled</dt>
+                        <dd className="hito-readback-value hito-readback-value-compact text-right">
+                          {sidebarReadModel.week.scheduledDistance.state === "available"
+                            ? `${
+                                sidebarReadModel.week.scheduledDistance.basis ===
+                                "includes_duration_estimates"
+                                  ? "About "
+                                  : ""
+                              }${formatDistanceKm(
+                                sidebarReadModel.week.scheduledDistance.kilometres,
+                              )} km`
+                            : sidebarReadModel.week.scheduledDistance.state === "unavailable"
+                              ? "Unavailable"
+                              : "Not applicable"}
+                        </dd>
+                      </div>
+                      <div className="flex items-start justify-between gap-3">
+                        <dt className="hito-body-xs text-tertiary">Recorded</dt>
+                        <dd className="hito-readback-value hito-readback-value-compact text-right">
+                          {sidebarReadModel.week.recordedDistance.state === "available"
+                            ? `${formatDistanceKm(
+                                sidebarReadModel.week.recordedDistance.kilometres,
+                              )} km`
+                            : sidebarReadModel.week.recordedDistance.state === "unavailable"
+                              ? "Unavailable"
+                              : "Not applicable"}
+                        </dd>
+                      </div>
+                    </dl>
+
+                    <div className="hito-body-xs mt-3 space-y-1 text-tertiary">
+                      {sidebarReadModel.week.scheduledDistance.state === "available" &&
+                      sidebarReadModel.week.scheduledDistance.basis ===
+                        "includes_duration_estimates" ? (
+                        <p>
+                          Includes {sidebarReadModel.week.scheduledDistance.estimatedWorkoutCount}{" "}
+                          duration-based distance{" "}
+                          {sidebarReadModel.week.scheduledDistance.estimatedWorkoutCount === 1
+                            ? "estimate"
+                            : "estimates"}
+                          .
+                        </p>
+                      ) : null}
+                      {sidebarReadModel.week.scheduledDistance.state === "unavailable" ? (
+                        <p>
+                          Scheduled distance is missing for{" "}
+                          {sidebarReadModel.week.scheduledDistance.missingWorkoutCount}{" "}
+                          {sidebarReadModel.week.scheduledDistance.missingWorkoutCount === 1
+                            ? "workout"
+                            : "workouts"}
+                          .
+                        </p>
+                      ) : null}
+                      {sidebarReadModel.week.scheduledDistance.state === "not_applicable" ? (
+                        <p>No scheduled non-Rest workouts this week.</p>
+                      ) : null}
+                      {sidebarReadModel.week.recordedDistance.state === "available" ? (
+                        <p>
+                          {sidebarReadModel.week.recordedDistance.basis ===
+                          "no_recorded_distance_yet"
+                            ? "No distance has been recorded yet."
+                            : sidebarReadModel.week.recordedDistance.basis === "manual_logs"
+                              ? "Recorded from saved manual results."
+                              : sidebarReadModel.week.recordedDistance.basis ===
+                                  "fit_actual_metrics"
+                                ? "Recorded from uploaded activity files."
+                                : "Recorded from manual results and uploaded activity files."}
+                        </p>
+                      ) : null}
+                      {sidebarReadModel.week.recordedDistance.state === "unavailable" ? (
+                        <p>
+                          Recorded distance is missing for{" "}
+                          {sidebarReadModel.week.recordedDistance.missingWorkoutCount}{" "}
+                          {sidebarReadModel.week.recordedDistance.missingWorkoutCount === 1
+                            ? "result"
+                            : "results"}
+                          .
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div className="hito-body-xs mt-3 flex items-center justify-between gap-3 text-tertiary">
+                      <span>{weekStatus.label}</span>
+                      <span>
+                        {formatDate(sidebarReadModel.week.weekStartDate, {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                        {" – "}
+                        {formatDate(sidebarReadModel.week.weekEndDate, {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                    </div>
+                  </SidebarSection>
+
+                  <SidebarSection title="Latest workout insight">
+                    {sidebarReadModel.latestInsight.state === "available" ? (
+                      <div className="space-y-4">
+                        <div>
+                          <p className="hito-body-sm text-foreground">
+                            {sidebarReadModel.latestInsight.workout.title}
+                          </p>
+                          <p className="hito-body-xs mt-1 text-tertiary">
+                            Uploaded workout ·{" "}
+                            {formatDate(sidebarReadModel.latestInsight.workout.date, {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="hito-label-sm text-foreground">Summary</p>
+                          <p className="hito-body-sm mt-1 text-secondary">
+                            {sidebarReadModel.latestInsight.insight.analysisSummary}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="hito-label-sm text-foreground">Difference</p>
+                          <p className="hito-body-sm mt-1 text-secondary">
+                            {sidebarReadModel.latestInsight.insight.differenceExplanation}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="hito-label-sm text-foreground">Next workout</p>
+                          <p className="hito-body-sm mt-1 text-secondary">
+                            {sidebarReadModel.latestInsight.insight.nextWorkoutRecommendation}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="hito-body-sm text-secondary">
+                        No uploaded-workout insight is available yet.
+                      </p>
+                    )}
+                  </SidebarSection>
+                </>
+              ) : null}
             </SidebarPanel>
           </aside>
         </div>
@@ -446,6 +515,7 @@ function WorkoutPage() {
           localActivityFileDesignFixtureEnabled={localActivityFileDesignFixtureEnabled}
           onOpenChange={setActivityFileDialogOpen}
           open={activityFileDialogOpen}
+          returnFocusRef={workoutActionsButtonRef}
           snapshot={snapshot}
           workout={workout}
         />
@@ -502,7 +572,7 @@ function WorkoutErrorState({ reset }: { error: Error; reset: () => void }) {
             We couldn&apos;t load this workout.
           </h1>
           <p className="hito-body-md mt-4 max-w-[40rem] text-text-secondary">
-            Try again. If your plan is still being set up, go back home first.
+            Try again. If setup is still incomplete, go back home first.
           </p>
           <div className="hito-state-actions">
             <HitoButton
@@ -520,7 +590,7 @@ function WorkoutErrorState({ reset }: { error: Error; reset: () => void }) {
               to="/"
               className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
             >
-              Back to weekly plan
+              Back to Calendar
             </Link>
           </div>
         </section>
@@ -630,13 +700,15 @@ function canOpenGarminFeedback(workout: Workout, snapshot: TrainingSnapshot): bo
 
 function WorkoutDetailTopBar({
   canEdit,
-  onPlanChanged,
-  snapshot,
+  onCalendarChanged,
+  onOpenActivityFile,
+  workoutActionsButtonRef,
   workout,
 }: {
   canEdit: boolean;
-  onPlanChanged: () => Promise<void>;
-  snapshot: TrainingSnapshot;
+  onCalendarChanged: () => Promise<void>;
+  onOpenActivityFile?: () => void;
+  workoutActionsButtonRef: RefObject<HTMLButtonElement | null>;
   workout: Workout;
 }) {
   const [editOpen, setEditOpen] = useState(false);
@@ -645,6 +717,16 @@ function WorkoutDetailTopBar({
   const prepareEditDialog = () => {
     if (!canEdit) return;
     setEditPrepareSignal((current) => current + 1);
+  };
+
+  const setEditDialogOpen = (nextOpen: boolean) => {
+    setEditOpen(nextOpen);
+
+    if (!nextOpen) {
+      window.requestAnimationFrame(() => {
+        workoutActionsButtonRef.current?.focus({ preventScroll: true });
+      });
+    }
   };
 
   return (
@@ -663,6 +745,7 @@ function WorkoutDetailTopBar({
       >
         <DropdownMenuTrigger asChild>
           <HitoButton
+            ref={workoutActionsButtonRef}
             type="button"
             aria-label="Open workout actions"
             iconOnly
@@ -684,17 +767,23 @@ function WorkoutDetailTopBar({
             <Icon name="edit" size="xs" />
             Edit this training
           </DropdownMenuItem>
+          {onOpenActivityFile ? (
+            <DropdownMenuItem onSelect={onOpenActivityFile}>
+              <Icon name="file-up" size="xs" />
+              Activity file
+            </DropdownMenuItem>
+          ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
 
       {canEdit ? (
         <ManualWorkoutPersistedEditDialog
-          activePlanId={snapshot.planMeta?.id}
-          onEdited={onPlanChanged}
-          onOpenChange={setEditOpen}
+          onEdited={onCalendarChanged}
+          onOpenChange={setEditDialogOpen}
           open={editOpen}
           plannedWorkoutId={workout.id}
           prepareSignal={editPrepareSignal}
+          provenancePlanId={workout.sourceProvenance?.sourcePlanId}
           title={workout.title}
           workoutDate={workout.date}
         />
@@ -731,7 +820,7 @@ function CompletionActionPanel({
           </p>
           <p className="hito-body-sm mt-1 text-secondary">
             {isToday
-              ? "Add a result or activity file after you run it. Both update this planned workout."
+              ? "Add a result or activity file after you run it. Both update this Calendar workout."
               : "This past workout is treated as unlogged until you add a real result."}
           </p>
         </div>
@@ -800,7 +889,7 @@ function Overview({ snapshot, workout }: { snapshot: TrainingSnapshot; workout: 
     );
   }
 
-  if (isManualWorkoutPreview(workout, snapshot)) {
+  if (isManualWorkoutPresentation(workout)) {
     const meta = workoutTypeMeta(workout);
 
     return (
@@ -832,9 +921,9 @@ function Overview({ snapshot, workout }: { snapshot: TrainingSnapshot; workout: 
   );
 }
 
-function isManualWorkoutPreview(workout: Workout, snapshot: TrainingSnapshot) {
+function isManualWorkoutPresentation(workout: Workout) {
   return Boolean(
-    snapshot.planMeta?.sourceKind === MANUAL_USER_BUILT_PLAN_SOURCE_KIND &&
+    workout.sourceProvenance?.originKind === "manual" &&
     workout.sourceWorkoutType &&
     (MANUAL_WORKOUT_TEMPLATE_KEY_VALUES as readonly string[]).includes(workout.sourceWorkoutType),
   );
@@ -859,47 +948,19 @@ function SidebarPanel({ children }: { children: React.ReactNode }) {
 function SidebarSection({
   title,
   children,
-  tone,
   muted,
-  titleVariant,
 }: {
   title: string;
   children: React.ReactNode;
-  tone?: "signal";
   muted?: boolean;
-  titleVariant?: "default" | "strong";
 }) {
   return (
-    <section
-      className={cn(
-        "hito-list-row items-start",
-        tone === "signal" && "hito-list-row-signal",
-        muted && "hito-list-row-muted",
-      )}
-    >
+    <section className={cn("hito-list-row items-start", muted && "hito-list-row-muted")}>
       <div className="w-full min-w-0">
-        <div
-          className={cn(
-            "mb-3",
-            titleVariant === "strong"
-              ? "text-sm font-medium tracking-[0.01em] text-foreground"
-              : "hito-label-md text-foreground",
-          )}
-        >
-          {title}
-        </div>
+        <div className="hito-label-md mb-3 text-foreground">{title}</div>
         {children}
       </div>
     </section>
-  );
-}
-
-function ReadbackRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start justify-between gap-3 py-1">
-      <span className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">{label}</span>
-      <span className="hito-readback-value">{value}</span>
-    </div>
   );
 }
 
@@ -945,46 +1006,6 @@ function NavCard({
   );
 }
 
-function workoutIdentityRows(workout: Workout): Array<{ label: string; value: string }> {
-  const language = workoutPlannedLanguage(workout);
-
-  return [{ label: "Type", value: language.runnerFacingWorkoutTypeLabel }];
-}
-
-function workoutSidebarExecutionRows(workout: Workout) {
-  const language = workoutPlannedLanguage(workout);
-  const blockSummary = formatPlannedWorkoutBlockSummary(language.runnerFacingBlocks);
-  const duration = workoutStructureDuration(workout);
-  const distance = workoutDistanceKm(workout);
-  const repeatRows = displayWorkoutStructureEntries(workout).filter(
-    (entry) => entry.label === "Repeats",
-  );
-
-  return [
-    duration > 0
-      ? { key: "duration", label: "Duration", value: formatDurationMin(duration) }
-      : null,
-    distance != null
-      ? { key: "distance", label: "Distance", value: `${formatDistanceKm(distance)} km` }
-      : null,
-    ...repeatRows,
-    blockSummary ? { key: "blocks", label: "Blocks", value: blockSummary } : null,
-  ].filter((row): row is { key: string; label: string; value: string } => row != null);
-}
-
-function workoutSidebarTargetRows(
-  workout: Workout,
-  target: ReturnType<typeof primaryWorkoutTarget>,
-) {
-  return displayExecutableTargetEntries(target, workout.metricMode)
-    .filter((entry) => workout.metricMode.hrTargetsAllowed || !isHrTargetEntryKey(entry.key))
-    .slice(0, 2);
-}
-
-function isHrTargetEntryKey(key: string) {
-  return key.includes("hr") || key.includes("bpm");
-}
-
 function humanizeSnakeCase(value: string) {
   return value
     .replace(/[_-]+/g, " ")
@@ -1005,20 +1026,6 @@ function restAssignmentFor(workout: Workout) {
   }
 
   return note;
-}
-
-function weekProgressFor(workouts: Workout[], currentDate: string) {
-  const currentWeek = weekOf(workouts, currentDate).filter((workout) => workout.type !== "rest");
-  const total = currentWeek.length;
-  const completed = currentWeek.filter((workout) => workout.status === "completed").length;
-  const percent = total ? Math.round((completed / total) * 100) : 0;
-
-  return {
-    total,
-    completed,
-    remaining: Math.max(total - completed, 0),
-    percent,
-  };
 }
 
 function resultMetaForStatus(status: Workout["status"]) {

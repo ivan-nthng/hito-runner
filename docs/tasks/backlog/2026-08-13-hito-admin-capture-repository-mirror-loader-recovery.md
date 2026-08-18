@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** BACKEND
+- **Epic:** platform-and-operations
 - **Parent:** 2026-08-13-hito-admin-ds-bounded-consumer-remediation
 - **Evidence From:** 2026-08-13-hito-admin-ds-bounded-consumer-remediation
 - **Outcome:** fresh authenticated Admin Capture again synchronizes and reads canonical Markdown mirror.

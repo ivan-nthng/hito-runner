@@ -2,6 +2,7 @@
 
 - **Status:** `closed`
 - **Owner:** PRODUCT, only if a new voice product decision is made.
+- **Epic:** adaptive-blueprint-planning
 - **Outcome:** Closed after the recorded decision: Preserve voice-to-plan as retired product/runtime history.
 - **Sources:** [product-history-digest.md](../../history/product-history-digest.md)
 - **Validation:** Closure is supported by the recorded decision/evidence; no implementation, runtime, or release acceptance is inferred.

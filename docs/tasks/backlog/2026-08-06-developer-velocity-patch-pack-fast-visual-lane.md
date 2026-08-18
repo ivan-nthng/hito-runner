@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** ARCHITECT
+- **Epic:** platform-and-operations
 - **Parent:** [Developer Velocity And Proportional Verification](2026-08-05-developer-velocity-and-proportional-verification.md)
 - **Outcome:** one same-owner, same-risk visual Pack has a narrow iteration and final-proof boundary.
 - **Sources:** [AGENTS.md](../../../AGENTS.md)

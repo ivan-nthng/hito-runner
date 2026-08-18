@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** BACKEND
+- **Epic:** runner-evidence-and-progress
 - **Outcome:** Historical backfill is no longer reachable from either the product request graph or maintained executable source. Its target-specific inventory found one eligible, non-conflicting hosted asset; the completed lifecycle linked its canonical…
 - **Sources:** [qa-test-user-lifecycle.mjs](../../../scripts/lib/qa-test-user-lifecycle.mjs); [test-user.mjs](../../../scripts/test-user.mjs); [database.ts](../../../src/lib/supabase/database.ts)
 - **Validation:** Build/release hygiene, Cleanup changes the accepted released baseline, Accepted raw removal or Gate 4 is reopened passed as recorded in the terminal receipt; omitted layers remain outside this closeout.

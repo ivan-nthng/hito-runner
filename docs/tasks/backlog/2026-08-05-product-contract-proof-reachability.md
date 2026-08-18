@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** FRONTEND
+- **Epic:** platform-and-operations
 - **Parent:** [Hito Stack Complexity Reduction Program](./2026-08-04-hito-stack-complexity-reduction-program.md)
 - **Outcome:** One package-reachable Product validation runner executes both retained assertion modules without changing their domain behavior or adding a test framework.
 - **Sources:** Terminal decision/evidence record only; detailed transcript remains in Git history.

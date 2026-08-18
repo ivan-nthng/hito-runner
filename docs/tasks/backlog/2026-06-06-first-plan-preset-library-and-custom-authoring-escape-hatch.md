@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** ARCHITECT
+- **Epic:** adaptive-blueprint-planning
 - **Outcome:** This backlog item started the architecture track for a backend-owned first-plan preset library with custom authoring as an explicit escape hatch. The accepted outcome is narrower than the original exploration: Plan Presets became canonical card discovery…
 - **Sources:** [2026-06-06-first-plan-preset-library-and-custom-authoring-escape-hatch.md](../../plans/archive/2026-06-06-first-plan-preset-library-and-custom-authoring-escape-hatch.md)
 - **Validation:** The original terminal receipt records focused validation for the completed scope; detailed commands remain available in Git history.

@@ -52,6 +52,17 @@ export const adminRepoWorkItemArchiveIntents = ["retain_in_place", "archive_when
 
 export const adminRepoWorkItemFrontendLanes = ["product", "devtools", "marketing"] as const;
 
+export const adminRepoWorkItemEpicSlugs = [
+  "runner-core-readiness",
+  "runner-evidence-and-progress",
+  "adaptive-blueprint-planning",
+  "commercial-financial-foundation",
+  "owner-analytics-and-scenario-lab",
+  "platform-and-operations",
+  "marketing-and-growth",
+  "legacy-history",
+] as const;
+
 export type AdminRepoWorkItemSourceType = (typeof adminRepoWorkItemSourceTypes)[number];
 export type AdminWorkItemSourceGroup = (typeof adminWorkItemSourceGroups)[number];
 export type AdminRepoWorkItemStatus = (typeof adminRepoWorkItemStatuses)[number];
@@ -60,6 +71,7 @@ export type AdminRepoWorkItemPriority = (typeof adminRepoWorkItemPriorities)[num
 export type AdminRepoWorkItemOwner = (typeof adminRepoWorkItemOwners)[number];
 export type AdminRepoWorkItemArchiveIntent = (typeof adminRepoWorkItemArchiveIntents)[number];
 export type AdminRepoWorkItemFrontendLane = (typeof adminRepoWorkItemFrontendLanes)[number];
+export type AdminRepoWorkItemEpic = (typeof adminRepoWorkItemEpicSlugs)[number];
 export type AdminRepoWorkItemMetadataState = "complete" | "legacy_debt" | "malformed";
 export type AdminRepoWorkItemKind = "backlog_item" | "plan" | "frontend_spec" | "brief";
 export type AdminRepoWorkItemLifecycle = "backlog" | "active" | "archived" | "spec" | "brief";
@@ -159,6 +171,10 @@ export function isAdminRepoWorkItemFrontendLane(
   value: string,
 ): value is AdminRepoWorkItemFrontendLane {
   return adminRepoWorkItemFrontendLanes.includes(value as AdminRepoWorkItemFrontendLane);
+}
+
+export function isAdminRepoWorkItemEpic(value: string): value is AdminRepoWorkItemEpic {
+  return adminRepoWorkItemEpicSlugs.includes(value as AdminRepoWorkItemEpic);
 }
 
 export function getAdminRepoWorkItemMetadata(

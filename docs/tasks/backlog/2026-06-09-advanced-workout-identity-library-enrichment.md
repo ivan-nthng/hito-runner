@@ -78,6 +78,10 @@ Required output:
 
 ARCHITECT / RUNNING COACH / BACKEND / QA
 
+## Epic
+
+adaptive-blueprint-planning
+
 ## Reported
 
 2026-06-09

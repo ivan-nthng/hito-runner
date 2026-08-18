@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** ARCHITECT
+- **Epic:** platform-and-operations
 - **Outcome:** The mixed worktree was reconciled into four dependency-complete commits and pushed by fast-forward from main to origin/main.
 - **Sources:** Terminal decision/evidence record only; detailed transcript remains in Git history.
 - **Validation:** The original terminal receipt records focused validation for the completed scope; detailed commands remain available in Git history.

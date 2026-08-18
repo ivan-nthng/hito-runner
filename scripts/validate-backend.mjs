@@ -8,7 +8,6 @@ const sourceChecks = [
   tsCheck("planned-workout-language", "scripts/validate-planned-workout-language.ts"),
   tsCheck("running-plan-confirm", "scripts/validate-running-plan-engine-confirm.ts"),
   tsCheck("manual-workout-authoring", "scripts/validate-manual-workout-authoring.ts"),
-  tsCheck("calendar-authority-retirement", "scripts/validate-active-plan-schedule-edit-preview.ts"),
   tsCheck("workout-comparison", "scripts/validate-workout-evidence-comparison.ts"),
   tsCheck("runner-auth", "scripts/validate-runner-auth-session.ts"),
   tsCheck("runner-calendar-context", "scripts/validate-runner-calendar-context.ts"),

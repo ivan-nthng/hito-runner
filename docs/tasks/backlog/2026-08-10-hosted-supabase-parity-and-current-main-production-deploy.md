@@ -5,6 +5,7 @@
 - **Type:** `hosted-release-repair`
 - **Priority:** `urgent`
 - **Owner:** `backend`
+- **Epic:** platform-and-operations
 - **Scope:** `the existing Hito hosted Supabase project and existing Vercel project, using the current GitHub origin/main commit only`
 - **Archive Intent:** `retain_in_place`
 - **Stage:** `Hosted migration parity complete; next combined release awaits current UI batches and the stale schema-gate correction`

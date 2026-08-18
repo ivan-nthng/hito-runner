@@ -2,6 +2,7 @@
 
 - **Status:** `closed`
 - **Owner:** DESIGN SYSTEM
+- **Epic:** platform-and-operations
 - **Outcome:** closed as superseded. No runtime source was changed here, and no Product AppShell, Global QA, release, deployment, hosted, or Figma claim is made.
 - **Sources:** [AppShell.tsx](../../../src/components/AppShell.tsx); [reference-components-structure.tsx](../../../src/components/hito-ds/reference-components-structure.tsx)
 - **Validation:** Closure is supported by the recorded decision/evidence; no implementation, runtime, or release acceptance is inferred.

@@ -1,5 +1,6 @@
 import { useLocation } from "@tanstack/react-router";
 import {
+  type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   useCallback,
@@ -32,7 +33,12 @@ import type {
   InlineChangeTargetInput,
   InlineChangeTargetPayload,
 } from "@/components/devtools/local-inline-change-target-utils";
-import { inspectLocalUiTarget } from "@/components/devtools/local-ui-inspector-targets";
+import {
+  inspectLocalUiOverlayGeometry,
+  inspectLocalUiTarget,
+  type LocalUiInspectorOverlayGeometry,
+  type LocalUiInspectorOverlayRegion,
+} from "@/components/devtools/local-ui-inspector-targets";
 import {
   createLocalUiInspectorBatchItem,
   createLocalUiInspectorItemDraft,
@@ -51,8 +57,14 @@ import {
 type InspectorMode = "idle" | "inspect" | "screen";
 
 type SelectedTarget = InlineChangeTargetInput & {
+  geometry: LocalUiInspectorOverlayGeometry | null;
   ownership: HitoDsOwnershipEvidence;
   rect: DOMRectReadOnly | null;
+};
+
+type InspectorHighlightTarget = {
+  geometry: LocalUiInspectorOverlayGeometry;
+  rect: DOMRectReadOnly;
 };
 
 type ComposerPanelState = {
@@ -88,7 +100,7 @@ export function LocalUiInspector() {
   const portalHost = useLocalUiInspectorPortalHost();
   const [mode, setMode] = useState<InspectorMode>("idle");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [hoverRect, setHoverRect] = useState<DOMRectReadOnly | null>(null);
+  const [hoverTarget, setHoverTarget] = useState<InspectorHighlightTarget | null>(null);
   const [panel, setPanel] = useState<InspectorPanelState | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
   const panelRef = useRef<InspectorPanelState | null>(null);
@@ -105,7 +117,7 @@ export function LocalUiInspector() {
     routeRef.current = routeKey;
     setMode("idle");
     setMenuOpen(false);
-    setHoverRect(null);
+    setHoverTarget(null);
     setPanel(null);
     setStatusMessage("Local Inspector draft cleared after route change.");
   }, [routeKey]);
@@ -113,7 +125,7 @@ export function LocalUiInspector() {
   const closeInspectorImmediately = useCallback(() => {
     setMode("idle");
     setMenuOpen(false);
-    setHoverRect(null);
+    setHoverTarget(null);
     setPanel(null);
   }, []);
 
@@ -140,7 +152,7 @@ export function LocalUiInspector() {
 
   const discardComposerDraft = useCallback(() => {
     const currentPanel = panelRef.current;
-    setHoverRect(null);
+    setHoverTarget(null);
     setPanel((current) => {
       if (current?.kind === "composer" && current.itemId) {
         return {
@@ -180,7 +192,7 @@ export function LocalUiInspector() {
 
   useEffect(() => {
     if (mode !== "inspect") {
-      setHoverRect(null);
+      setHoverTarget(null);
       return;
     }
 
@@ -360,6 +372,7 @@ export function LocalUiInspector() {
         elementRole: null,
         elementTag: "page",
         proposedText: null,
+        geometry: null,
         ownership: { entry: null, marker: null, state: "unconfirmed" },
         rect: null,
         selector: null,
@@ -377,14 +390,21 @@ export function LocalUiInspector() {
   const startScreenCapture = () => {
     setMenuOpen(false);
     setPanel(null);
-    setHoverRect(null);
+    setHoverTarget(null);
     setMode("screen");
   };
 
   const updateHoverTarget = (event: ReactPointerEvent<HTMLElement>) => {
     const point = { x: event.clientX, y: event.clientY };
     const target = resolveInspectableElementBehindLayer(event.currentTarget, point);
-    setHoverRect(target?.getBoundingClientRect() ?? null);
+    setHoverTarget(
+      target
+        ? {
+            geometry: inspectLocalUiOverlayGeometry(target),
+            rect: target.getBoundingClientRect(),
+          }
+        : null,
+    );
   };
 
   const selectHoverTarget = (event: ReactPointerEvent<HTMLElement>) => {
@@ -399,7 +419,7 @@ export function LocalUiInspector() {
     const target = resolveInspectableElementBehindLayer(event.currentTarget, point);
 
     if (!target) {
-      setHoverRect(null);
+      setHoverTarget(null);
       return;
     }
 
@@ -419,6 +439,7 @@ export function LocalUiInspector() {
         ),
         target: {
           ...duplicate.target,
+          geometry: inspectLocalUiOverlayGeometry(target),
           ownership: duplicate.ownership,
           rect: target.getBoundingClientRect(),
         },
@@ -461,7 +482,12 @@ export function LocalUiInspector() {
       position: rect
         ? getLocalUiInspectorPanelPosition(rect, rect.right, rect.top)
         : getLocalUiInspectorLauncherPanelPosition(),
-      target: { ...item.target, ownership: item.ownership, rect },
+      target: {
+        ...item.target,
+        geometry: element ? inspectLocalUiOverlayGeometry(element) : null,
+        ownership: item.ownership,
+        rect,
+      },
     });
   };
 
@@ -477,6 +503,9 @@ export function LocalUiInspector() {
     const currentPanel = panelRef.current;
     if (currentPanel?.kind !== "composer") return;
     const target = stripLiveTarget(currentPanel.target);
+    const normalizedTarget = payload.target.borderIntent?.current
+      ? { ...target, borderIntent: payload.target.borderIntent.current }
+      : target;
     const existing = currentPanel.itemId
       ? (session.items.find((item) => item.id === currentPanel.itemId) ?? null)
       : null;
@@ -486,7 +515,7 @@ export function LocalUiInspector() {
       ownership: currentPanel.target.ownership,
       payload,
       routeKey,
-      target,
+      target: normalizedTarget,
     });
     const nextItem = existing ? { ...created, capturedAt: existing.capturedAt } : created;
 
@@ -512,7 +541,7 @@ export function LocalUiInspector() {
         focusInspectLauncher();
       }
     }
-    setHoverRect(null);
+    setHoverTarget(null);
   };
 
   if (!portalHost) return null;
@@ -537,10 +566,10 @@ export function LocalUiInspector() {
           onPointerUp={stopDevtoolEvent}
         />
       ) : null}
-      {panel?.kind === "composer" && panel.target.rect ? (
-        <InspectorHighlight rect={panel.target.rect} selected />
-      ) : hoverRect ? (
-        <InspectorHighlight rect={hoverRect} />
+      {panel?.kind === "composer" && panel.target.rect && panel.target.geometry ? (
+        <InspectorHighlight geometry={panel.target.geometry} rect={panel.target.rect} selected />
+      ) : hoverTarget ? (
+        <InspectorHighlight geometry={hoverTarget.geometry} rect={hoverTarget.rect} />
       ) : null}
       {panel ? (
         <LocalUiInspectorSurface
@@ -686,33 +715,146 @@ export function LocalUiInspector() {
 }
 
 function InspectorHighlight({
+  geometry,
   rect,
   selected = false,
 }: {
+  geometry: LocalUiInspectorOverlayGeometry;
   rect: DOMRectReadOnly;
   selected?: boolean;
 }) {
+  const radiusStyle = {
+    borderBottomLeftRadius: geometry.radius.bottomLeft,
+    borderBottomRightRadius: geometry.radius.bottomRight,
+    borderTopLeftRadius: geometry.radius.topLeft,
+    borderTopRightRadius: geometry.radius.topRight,
+  };
+  const boxStyle = {
+    height: `${Math.max(rect.height, 2)}px`,
+    left: `${rect.left}px`,
+    top: `${rect.top}px`,
+    width: `${Math.max(rect.width, 2)}px`,
+  };
+  const readbackStyle = getGeometryReadbackStyle(rect);
+
   return (
-    <div
-      aria-hidden="true"
-      data-local-ui-inspector-selected-highlight={selected ? "" : undefined}
-      className={`pointer-events-none fixed z-[89] rounded-md border border-signal bg-signal/10 ${
-        selected
-          ? "shadow-[0_0_0_4px_rgba(98,228,255,0.24),0_0_30px_rgba(98,228,255,0.18)]"
-          : "shadow-[0_0_0_3px_rgba(98,228,255,0.16)]"
-      }`}
-      style={{
-        height: `${Math.max(rect.height, 2)}px`,
-        left: `${rect.left}px`,
-        top: `${rect.top}px`,
-        width: `${Math.max(rect.width, 2)}px`,
-      }}
-    />
+    <>
+      {geometry.margin.regions.map((region) => (
+        <div
+          key={`margin-${region.id}`}
+          aria-hidden="true"
+          data-local-ui-inspector-geometry-layer="margin"
+          data-local-ui-inspector-geometry-region={region.id}
+          className="pointer-events-none fixed z-[89] border border-dashed border-warn/45 bg-warn/15"
+          style={getRegionStyle(region)}
+        />
+      ))}
+      {geometry.gap.regions.map((region) => (
+        <div
+          key={`gap-${region.id}`}
+          aria-hidden="true"
+          data-local-ui-inspector-geometry-layer="gap"
+          data-local-ui-inspector-geometry-region={region.id}
+          className="pointer-events-none fixed z-[89] border border-dashed border-success/45 bg-success/15"
+          style={getRegionStyle(region)}
+        />
+      ))}
+      <div
+        aria-hidden="true"
+        data-local-ui-inspector-geometry-layer="padding"
+        className="pointer-events-none fixed z-[89] overflow-hidden"
+        style={{ ...boxStyle, ...radiusStyle }}
+      >
+        {geometry.padding.regions.map((region) => (
+          <span
+            key={`padding-${region.id}`}
+            data-local-ui-inspector-geometry-region={region.id}
+            className="absolute bg-info/20"
+            style={{
+              height: `${region.height}px`,
+              left: `${region.left - rect.left}px`,
+              top: `${region.top - rect.top}px`,
+              width: `${region.width}px`,
+            }}
+          />
+        ))}
+      </div>
+      <div
+        aria-hidden="true"
+        data-local-ui-inspector-highlight="bounds"
+        data-local-ui-inspector-selected-highlight={selected ? "" : undefined}
+        className={`pointer-events-none fixed z-[89] border border-signal ${
+          selected
+            ? "shadow-[0_0_0_4px_rgba(98,228,255,0.24),0_0_30px_rgba(98,228,255,0.18)]"
+            : "shadow-[0_0_0_3px_rgba(98,228,255,0.16)]"
+        }`}
+        style={{ ...boxStyle, ...radiusStyle }}
+      />
+      <div
+        aria-hidden="true"
+        data-local-ui-inspector-gap-status={geometry.gap.status}
+        data-local-ui-inspector-geometry-readback=""
+        data-local-ui-inspector-margin-status={geometry.margin.status}
+        className="hito-technical-sm pointer-events-none fixed z-[89] grid max-w-[min(26rem,calc(100vw-1rem))] gap-0.5 rounded-md border border-hairline bg-background/95 px-2 py-1 text-foreground shadow-soft"
+        style={readbackStyle}
+      >
+        <span>{formatRadiusReadback(geometry)}</span>
+        <span>{formatPaddingReadback(geometry)}</span>
+        <span>{formatMarginReadback(geometry)}</span>
+        <span>{formatGapReadback(geometry)}</span>
+      </div>
+    </>
   );
 }
 
+function getRegionStyle(region: LocalUiInspectorOverlayRegion): CSSProperties {
+  return {
+    height: `${region.height}px`,
+    left: `${region.left}px`,
+    top: `${region.top}px`,
+    width: `${region.width}px`,
+  };
+}
+
+function getGeometryReadbackStyle(rect: DOMRectReadOnly): CSSProperties {
+  const viewportWidth = window.innerWidth;
+  const alignRight = rect.left > viewportWidth / 2;
+  const placeAbove = rect.top > 96;
+
+  return {
+    ...(alignRight
+      ? { right: `${Math.max(8, viewportWidth - rect.right)}px` }
+      : { left: `${Math.max(8, rect.left)}px` }),
+    top: `${placeAbove ? rect.top - 6 : rect.bottom + 6}px`,
+    transform: placeAbove ? "translateY(-100%)" : undefined,
+  };
+}
+
+function formatRadiusReadback(geometry: LocalUiInspectorOverlayGeometry) {
+  return `Radius TL ${geometry.radius.topLeft} · TR ${geometry.radius.topRight} · BR ${geometry.radius.bottomRight} · BL ${geometry.radius.bottomLeft}`;
+}
+
+function formatPaddingReadback(geometry: LocalUiInspectorOverlayGeometry) {
+  const { bottom, left, right, top } = geometry.padding.values;
+  return `Padding T ${formatGeometryPx(top)} · R ${formatGeometryPx(right)} · B ${formatGeometryPx(bottom)} · L ${formatGeometryPx(left)}`;
+}
+
+function formatMarginReadback(geometry: LocalUiInspectorOverlayGeometry) {
+  const { bottom, left, right, top } = geometry.margin.values;
+  return `Margin T ${top} · R ${right} · B ${bottom} · L ${left}. ${geometry.margin.disclosure}`;
+}
+
+function formatGapReadback(geometry: LocalUiInspectorOverlayGeometry) {
+  return `Gap row ${geometry.gap.row} · column ${geometry.gap.column}. ${geometry.gap.disclosure}`;
+}
+
+function formatGeometryPx(value: number) {
+  return `${Number(value.toFixed(2))}px`;
+}
+
 function stripLiveTarget(target: SelectedTarget): InlineChangeTargetInput {
-  const { ownership, rect, ...serializableTarget } = target;
+  const { geometry, ownership, rect, ...serializableTarget } = target;
+  void geometry;
   void ownership;
   void rect;
   return serializableTarget;
@@ -964,6 +1106,7 @@ function describeTargetElement(element: HTMLElement): SelectedTarget {
     elementClasses,
     elementRole: element.getAttribute("role"),
     elementTag: element.tagName.toLowerCase(),
+    geometry: inspectLocalUiOverlayGeometry(element),
     proposedText: null,
     ownership,
     rect,

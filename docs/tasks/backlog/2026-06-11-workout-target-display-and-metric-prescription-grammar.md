@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** FRONTEND
+- **Epic:** runner-core-readiness
 - **Outcome:** This item fixed runner-facing workout target display grammar after saved-calendar and interval surfaces exposed raw/internal prescription values. It is closed as a QA-passed display/source-of- truth cleanup.
 - **Sources:** Terminal decision/evidence record only; detailed transcript remains in Git history.
 - **Validation:** The original terminal receipt records focused validation for the completed scope; detailed commands remain available in Git history.

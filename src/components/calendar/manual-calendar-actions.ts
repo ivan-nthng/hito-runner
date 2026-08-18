@@ -9,6 +9,7 @@ import {
 } from "@/components/calendar/calendar-projection";
 import type {
   ManualWorkoutDirectMoveResult,
+  ManualWorkoutMoveConfirmResult,
   ManualWorkoutMoveReviewResult,
 } from "@/lib/manual-workout-authoring";
 import { type TrainingSnapshot, type Workout } from "@/lib/training";
@@ -25,32 +26,34 @@ export type ManualCalendarActionState = {
   onCopyWorkout: (source: ManualCopiedWorkoutSource) => void;
   onMoveDragEnd: () => void;
   onMoveTargetHover: (targetDate: string | null) => void;
-  onManualPlanChanged: () => Promise<void>;
+  onCalendarChanged: () => Promise<void>;
   onMoveTargetSelected: (targetDate: string, source?: ManualCopiedWorkoutSource | null) => void;
   onMoveWorkout: (source: ManualCopiedWorkoutSource) => void;
   onUndoLastMove: (undo: CalendarMoveUndoAffordance) => void;
 };
 
 type ManualWorkoutDirectMoveSuccess = Extract<ManualWorkoutDirectMoveResult, { ok: true }>;
+type ManualWorkoutMoveConfirmSuccess = Extract<ManualWorkoutMoveConfirmResult, { ok: true }>;
+type ManualWorkoutMoveSuccess = ManualWorkoutDirectMoveSuccess | ManualWorkoutMoveConfirmSuccess;
 
-const MANUAL_MOVE_UNDO_WINDOW_MS = 7000;
 const MANUAL_MOVE_UNDO_REFRESH_GRACE_MS = 30000;
 const MANUAL_MOVE_UNDO_STORAGE_KEY = "hito.manual-calendar.last-move-undo.v1";
 
 let cachedLastMoveUndo: CalendarMoveUndoAffordance | null = null;
 
-function getCachedLastMoveUndo(activePlanId: string | undefined) {
+function getCachedLastMoveUndo(runnerScopeKey: string | null | undefined) {
+  if (!runnerScopeKey) return null;
+
   if (!cachedLastMoveUndo) {
     cachedLastMoveUndo = readStoredLastMoveUndo();
   }
 
   if (
     !cachedLastMoveUndo ||
-    !activePlanId ||
-    cachedLastMoveUndo.activePlanId !== activePlanId ||
+    cachedLastMoveUndo.runnerScopeKey !== runnerScopeKey ||
     cachedLastMoveUndo.expiresAt <= Date.now()
   ) {
-    cachedLastMoveUndo = null;
+    clearLastMoveUndoCache();
     return null;
   }
 
@@ -62,33 +65,6 @@ function clearLastMoveUndoCache() {
   if (typeof window === "undefined") return;
 
   window.sessionStorage.removeItem(MANUAL_MOVE_UNDO_STORAGE_KEY);
-}
-
-function refreshLastMoveUndoWindow() {
-  const undo = cachedLastMoveUndo ?? readStoredLastMoveUndo();
-  if (!undo) return null;
-
-  const now = Date.now();
-  const refreshedUndo = {
-    ...undo,
-    expiresAt: now + MANUAL_MOVE_UNDO_WINDOW_MS,
-  };
-
-  storeLastMoveUndo(refreshedUndo);
-  return { now, undo: refreshedUndo };
-}
-
-function refreshManualMoveUndoCandidate(undo: CalendarMoveUndoAffordance | null) {
-  if (!undo) return null;
-
-  const now = Date.now();
-  const refreshedUndo = {
-    ...undo,
-    expiresAt: now + MANUAL_MOVE_UNDO_WINDOW_MS,
-  };
-
-  storeLastMoveUndo(refreshedUndo);
-  return { now, undo: refreshedUndo };
 }
 
 function storeLastMoveUndo(undo: CalendarMoveUndoAffordance) {
@@ -120,7 +96,7 @@ function isManualMoveUndoAffordance(value: unknown): value is CalendarMoveUndoAf
 
   const undo = value as Partial<CalendarMoveUndoAffordance>;
   return (
-    typeof undo.activePlanId === "string" &&
+    typeof undo.runnerScopeKey === "string" &&
     typeof undo.displayDate === "string" &&
     typeof undo.expiresAt === "number" &&
     typeof undo.id === "string" &&
@@ -132,14 +108,14 @@ function isManualMoveUndoAffordance(value: unknown): value is CalendarMoveUndoAf
 }
 
 function buildManualMoveUndoCandidate({
-  activePlanId,
+  runnerScopeKey,
   requestId,
   sourceWorkoutDate,
   sourceWorkoutId,
   targetDate,
   title,
 }: {
-  activePlanId: string;
+  runnerScopeKey: string;
   requestId: string;
   sourceWorkoutDate: string;
   sourceWorkoutId: string;
@@ -147,7 +123,6 @@ function buildManualMoveUndoCandidate({
   title: string;
 }): CalendarMoveUndoAffordance {
   return {
-    activePlanId,
     displayDate: sourceWorkoutDate,
     expiresAt: Date.now() + MANUAL_MOVE_UNDO_REFRESH_GRACE_MS,
     id: requestId,
@@ -155,6 +130,7 @@ function buildManualMoveUndoCandidate({
     sourceWorkoutId,
     targetDate: sourceWorkoutDate,
     title,
+    runnerScopeKey,
   };
 }
 
@@ -163,7 +139,12 @@ export function useManualCalendarActions(
   {
     onCalendarRefresh,
     onResetTransientUi,
-  }: { onCalendarRefresh: () => Promise<void>; onResetTransientUi: () => void },
+    runnerScopeKey,
+  }: {
+    onCalendarRefresh: () => Promise<void>;
+    onResetTransientUi: () => void;
+    runnerScopeKey: string | null | undefined;
+  },
 ) {
   const [manualCopySource, setManualCopySource] = useState<ManualCopiedWorkoutSource | null>(null);
   const [manualMoveSource, setManualMoveSource] = useState<ManualCopiedWorkoutSource | null>(null);
@@ -172,14 +153,24 @@ export function useManualCalendarActions(
   const [manualOptimisticMove, setManualOptimisticMove] =
     useState<CalendarOptimisticMoveDisplay | null>(null);
   const manualMoveUndoCandidateRef = useRef<CalendarMoveUndoAffordance | null>(null);
-  const [lastMoveUndo, setLastMoveUndo] = useState<CalendarMoveUndoAffordance | null>(() =>
-    getCachedLastMoveUndo(snapshot.planMeta?.id),
-  );
+  const [lastMoveUndo, setLastMoveUndo] = useState<CalendarMoveUndoAffordance | null>(null);
   const [lastMoveUndoNow, setLastMoveUndoNow] = useState(() => Date.now());
 
   const undoSecondsRemaining = lastMoveUndo
     ? Math.max(0, Math.ceil((lastMoveUndo.expiresAt - lastMoveUndoNow) / 1000))
     : 0;
+
+  useEffect(() => {
+    const storedUndo = getCachedLastMoveUndo(runnerScopeKey);
+    if (!storedUndo) {
+      setLastMoveUndo(null);
+      return;
+    }
+
+    const now = Date.now();
+    setLastMoveUndoNow(now);
+    setLastMoveUndo(storedUndo);
+  }, [runnerScopeKey]);
 
   useEffect(() => {
     if (!manualOptimisticMove) return;
@@ -199,7 +190,11 @@ export function useManualCalendarActions(
 
   useEffect(() => {
     if (!lastMoveUndo || lastMoveUndo.expiresAt > lastMoveUndoNow) return;
-    clearLastMoveUndoCache();
+
+    const storedUndo = cachedLastMoveUndo ?? readStoredLastMoveUndo();
+    if (!storedUndo || storedUndo.expiresAt <= lastMoveUndoNow) {
+      clearLastMoveUndoCache();
+    }
     setLastMoveUndo(null);
   }, [lastMoveUndo, lastMoveUndoNow]);
 
@@ -211,7 +206,7 @@ export function useManualCalendarActions(
     manualMoveUndoCandidateRef.current = null;
   }
 
-  async function refreshAfterManualPlanChange() {
+  async function refreshAfterCalendarChange() {
     onResetTransientUi();
     resetMoveState();
     clearLastMoveUndoCache();
@@ -223,47 +218,46 @@ export function useManualCalendarActions(
     onResetTransientUi();
     setManualMoveSource(null);
     setManualMoveHoverDate(null);
-    const undoCandidate = manualMoveUndoCandidateRef.current;
-    const refreshedUndo =
-      refreshLastMoveUndoWindow() ?? refreshManualMoveUndoCandidate(undoCandidate);
     manualMoveUndoCandidateRef.current = null;
-
-    if (refreshedUndo) {
-      setLastMoveUndoNow(refreshedUndo.now);
-      setLastMoveUndo(refreshedUndo.undo);
-    }
-
-    void onCalendarRefresh()
-      .then(() => {
-        const refreshedAfterReadback = refreshLastMoveUndoWindow();
-        if (!refreshedAfterReadback) return;
-
-        setLastMoveUndoNow(refreshedAfterReadback.now);
-        setLastMoveUndo(refreshedAfterReadback.undo);
-      })
-      .catch(() => undefined);
+    void onCalendarRefresh().catch(() => undefined);
   }
 
-  function recordDirectManualMoveUndo(result: ManualWorkoutDirectMoveSuccess) {
-    if (result.targetDayKind !== "rest_day") return;
+  function recordManualMoveUndo(result: ManualWorkoutMoveSuccess) {
+    if (!manualMoveUndoCandidateRef.current) {
+      manualMoveUndoCandidateRef.current = null;
+      return;
+    }
 
     const now = Date.now();
+    const serverExpiresAt = result.undoExpiresAt ? Date.parse(result.undoExpiresAt) : Number.NaN;
+    const expiresAt =
+      Number.isFinite(serverExpiresAt) && serverExpiresAt > now
+        ? serverExpiresAt
+        : result.targetReplacement === null
+          ? now + MANUAL_MOVE_UNDO_REFRESH_GRACE_MS
+          : null;
+
+    if (!expiresAt || expiresAt <= now) {
+      manualMoveUndoCandidateRef.current = null;
+      return;
+    }
 
     setLastMoveUndoNow(now);
-    const undo = {
-      activePlanId: result.activePlanId,
+    const undoCandidate = manualMoveUndoCandidateRef.current;
+    const storedUndo = {
       displayDate: result.sourceWorkoutDate,
-      expiresAt: now + MANUAL_MOVE_UNDO_REFRESH_GRACE_MS,
-      id: `${result.plannedWorkoutId}:${result.sourceWorkoutDate}:${result.targetDate}:${now}`,
+      expiresAt,
+      id: undoCandidate.id,
       sourceWorkoutDate: result.targetDate,
       sourceWorkoutId: result.plannedWorkoutId,
       targetDate: result.sourceWorkoutDate,
       title: result.title,
+      runnerScopeKey: undoCandidate.runnerScopeKey,
     };
 
-    storeLastMoveUndo(undo);
+    storeLastMoveUndo(storedUndo);
     manualMoveUndoCandidateRef.current = null;
-    setLastMoveUndo(undo);
+    setLastMoveUndo(storedUndo);
   }
 
   function projectManualOptimisticMove({
@@ -294,6 +288,7 @@ export function useManualCalendarActions(
   function requestManualWorkoutMove(
     targetDate: string,
     sourceOverride?: ManualCopiedWorkoutSource | null,
+    recordUndo = true,
   ) {
     const moveSource = sourceOverride ?? manualMoveSource;
     const canReuseOptimisticMove =
@@ -323,9 +318,9 @@ export function useManualCalendarActions(
     clearLastMoveUndoCache();
     setLastMoveUndo(null);
     manualMoveUndoCandidateRef.current =
-      targetDayKind === "rest_day"
+      recordUndo && runnerScopeKey
         ? buildManualMoveUndoCandidate({
-            activePlanId: moveSource.activePlanId,
+            runnerScopeKey,
             requestId,
             sourceWorkoutDate: moveSource.sourceWorkoutDate,
             sourceWorkoutId: moveSource.sourceWorkoutId,
@@ -354,14 +349,28 @@ export function useManualCalendarActions(
   function undoLastManualMove(undo: CalendarMoveUndoAffordance) {
     if (manualMoveRequest) return;
 
+    const movedWorkout = findManualMoveSourceWorkout(
+      snapshot.workouts,
+      {
+        sourceWorkoutDate: undo.sourceWorkoutDate,
+        sourceWorkoutId: undo.sourceWorkoutId,
+      },
+      manualOptimisticMove,
+    );
+    if (!movedWorkout) return;
+
     clearLastMoveUndoCache();
     setLastMoveUndo(null);
-    requestManualWorkoutMove(undo.targetDate, {
-      activePlanId: undo.activePlanId,
-      sourceWorkoutDate: undo.sourceWorkoutDate,
-      sourceWorkoutId: undo.sourceWorkoutId,
-      title: undo.title,
-    });
+    requestManualWorkoutMove(
+      undo.targetDate,
+      {
+        provenancePlanId: movedWorkout.sourceProvenance?.sourcePlanId ?? null,
+        sourceWorkoutDate: undo.sourceWorkoutDate,
+        sourceWorkoutId: undo.sourceWorkoutId,
+        title: undo.title,
+      },
+      false,
+    );
   }
 
   const manualCalendarActionState: ManualCalendarActionState = {
@@ -383,7 +392,7 @@ export function useManualCalendarActions(
     },
     onMoveDragEnd: () => setManualMoveHoverDate(null),
     onMoveTargetHover: setManualMoveHoverDate,
-    onManualPlanChanged: refreshAfterManualPlanChange,
+    onCalendarChanged: refreshAfterCalendarChange,
     onMoveTargetSelected: requestManualWorkoutMove,
     onMoveWorkout: (source) => {
       if (manualMoveRequest || manualOptimisticMove) return;
@@ -407,7 +416,7 @@ export function useManualCalendarActions(
         manualMoveUndoCandidateRef.current = null;
         setManualOptimisticMove(null);
       },
-      onDirectMoveSucceeded: recordDirectManualMoveUndo,
+      onDirectMoveSucceeded: recordManualMoveUndo,
       onReplacementConfirming: (review: Extract<ManualWorkoutMoveReviewResult, { ok: true }>) =>
         projectManualOptimisticMove({
           requestId: `replacement:${review.sourceWorkoutId}:${review.targetDate}:${review.review.reviewChecksum}`,
@@ -415,6 +424,7 @@ export function useManualCalendarActions(
           sourceWorkoutId: review.sourceWorkoutId,
           targetDate: review.targetDate,
         }),
+      onReplacementMoveSucceeded: recordManualMoveUndo,
       request: manualMoveRequest,
     },
   };

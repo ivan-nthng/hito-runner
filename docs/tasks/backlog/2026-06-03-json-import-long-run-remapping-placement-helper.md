@@ -12,9 +12,13 @@ change_request
 
 medium
 
+## Epic
+
+adaptive-blueprint-planning
+
 ## Next Recommended Role
 
-BACKEND
+PRODUCT
 
 ## Task
 
@@ -22,7 +26,13 @@ Wire JSON import long-run remapping through the shared active-plan schedule plac
 
 ## Stage
 
-BACKEND backlog / import scheduling follow-up
+PRODUCT deferred / future source-placement policy under adaptive planning
+
+## Product Lifecycle Reconciliation — 2026-08-18
+
+This is a future source-import placement policy, not a Runner Core readiness gap. Its historical
+`active-plan` prompt must not be dispatched. Any future work must begin from runner-owned Calendar
+materialization and the current weekday-rest invariant, under the Adaptive Blueprint Planning Epic.
 
 ## Exact Handoff Prompt
 

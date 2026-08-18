@@ -1,17 +1,30 @@
+import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Icon } from "@/components/ui/icon";
 import { HitoButton } from "@/components/ui/button";
+import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
+import { HitoDateField } from "@/components/ui/hito-date-time-input";
+import { isHitoIsoDate } from "@/components/ui/hito-date-time-utils";
+import { HitoFactualActivityPointSequence } from "@/components/ui/hito-factual-activity-point-sequence";
+import { HitoFactualBarChart } from "@/components/ui/hito-factual-bar-chart";
+import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
+import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import type {
   RunnerActivityProgressProductAdvancedMetrics,
   RunnerActivityProgressProductFactMetric,
+  RunnerActivityFitSequenceProductModel,
   RunnerActivityProgressProductModel,
   RunnerActivityProgressProductRecord,
   RunnerActivityProgressProductSessionLoadWindow,
   RunnerActivityProgressProductSnapshot,
 } from "@/lib/runner-activity/product-contract";
+import type {
+  RunnerActivityFitChartMetricId,
+  RunnerActivityFitSequenceMetricId,
+  RunnerActivityFitSequenceQuickPeriodId,
+} from "@/lib/runner-activity/read-model-types";
 import { formatDate } from "@/lib/training";
-import type { ProgressState } from "./runner-activity-progress-types";
+import type { ProgressSequenceSelection, ProgressState } from "./runner-activity-progress-types";
 import {
   PROGRESS_FACTS,
   advancedConfidenceLabel,
@@ -31,13 +44,27 @@ import {
   type ProgressFactKey,
 } from "./runner-activity-progress-view-model";
 
+const PROGRESS_WEEKLY_METRICS = [
+  { id: "sessions", label: "Runs" },
+  { id: "running_time", label: "Running time" },
+  { id: "distance", label: "Distance" },
+  { id: "elevation", label: "Elevation" },
+  { id: "reported_load", label: "Reported load" },
+] satisfies Array<{ id: RunnerActivityFitChartMetricId; label: string }>;
+
 export function FactualProgressPanel({
   state,
   onRetry,
+  onSequenceSelectionChange,
+  sequenceSelection,
 }: {
   state: ProgressState;
   onRetry: () => void;
+  onSequenceSelectionChange: (selection: ProgressSequenceSelection) => void;
+  sequenceSelection: ProgressSequenceSelection;
 }) {
+  const [weeklyMetric, setWeeklyMetric] = useState<RunnerActivityFitChartMetricId>("distance");
+
   return (
     <section aria-labelledby="factual-progress-title">
       <header className="hito-page-header">
@@ -69,12 +96,35 @@ export function FactualProgressPanel({
           </div>
         </div>
       ) : null}
-      {state.status === "ready" ? <ProgressReadback progress={state.data} /> : null}
+      {state.status === "ready" ? (
+        <ProgressReadback
+          progress={state.data}
+          sequenceSelection={sequenceSelection}
+          weeklyMetric={weeklyMetric}
+          onRetry={onRetry}
+          onSequenceSelectionChange={onSequenceSelectionChange}
+          onWeeklyMetricChange={setWeeklyMetric}
+        />
+      ) : null}
     </section>
   );
 }
 
-function ProgressReadback({ progress }: { progress: RunnerActivityProgressProductModel }) {
+function ProgressReadback({
+  onRetry,
+  onSequenceSelectionChange,
+  progress,
+  sequenceSelection,
+  weeklyMetric,
+  onWeeklyMetricChange,
+}: {
+  onRetry: () => void;
+  onSequenceSelectionChange: (selection: ProgressSequenceSelection) => void;
+  onWeeklyMetricChange: (metric: RunnerActivityFitChartMetricId) => void;
+  progress: RunnerActivityProgressProductModel;
+  sequenceSelection: ProgressSequenceSelection;
+  weeklyMetric: RunnerActivityFitChartMetricId;
+}) {
   const current = progress.rolling28Day.current;
   const previous = progress.rolling28Day.previous;
   const summary = formatRollingSummary(current);
@@ -83,76 +133,400 @@ function ProgressReadback({ progress }: { progress: RunnerActivityProgressProduc
       current.facts[key].availability === "available" ||
       previous.facts[key].availability === "available",
   );
-
-  if (!summary) return <ProgressEmptyState />;
+  const weeklyMetricGroup = useHitoRadioGroup({
+    idPrefix: "progress-weekly-metric",
+    items: PROGRESS_WEEKLY_METRICS.map(({ id }) => ({ value: id })),
+    value: weeklyMetric,
+  });
+  const weeklyPeriod =
+    progress.fitProgress.status === "current"
+      ? progress.fitProgress.chart.advertisedPeriods[0]
+      : null;
+  const weeklySeries = weeklyPeriod?.series.find((series) => series.id === weeklyMetric) ?? null;
 
   return (
     <div className="space-y-8">
-      <section aria-labelledby="rolling-summary-title">
-        <p className="hito-label-md text-foreground">Last 28 days</p>
-        <h2
-          id="rolling-summary-title"
-          className="mt-3 font-sans text-3xl leading-tight sm:text-4xl"
-        >
-          {summary}
-        </h2>
-        <p className="hito-body-xs text-tertiary mt-2">
-          {formatWindow(current)} · {current.eligibleActivityCount} recorded activities
-        </p>
-      </section>
+      <ActivitySequenceReadback
+        asOfDate={progress.asOfDate}
+        sequence={progress.fitActivitySequence}
+        selection={sequenceSelection}
+        onRetry={onRetry}
+        onSelectionChange={onSequenceSelectionChange}
+      />
 
-      {visibleFacts.length > 0 ? (
-        <section aria-labelledby="progress-facts-title">
-          <div className="hito-section-header">
-            <h2 id="progress-facts-title" className="hito-ui-title-sm text-foreground">
-              Running facts
+      {summary ? (
+        <>
+          <section aria-labelledby="rolling-summary-title">
+            <p className="hito-label-md text-foreground">Last 28 days</p>
+            <h2
+              id="rolling-summary-title"
+              className="mt-3 font-sans text-3xl leading-tight sm:text-4xl"
+            >
+              {summary}
             </h2>
-            <span className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
-              Current and previous 28 days
-            </span>
-          </div>
-          <div className="mt-4 space-y-3">
-            {visibleFacts.map(({ key, label }) => (
-              <ProgressFactDisclosure
-                key={key}
-                factKey={key}
-                label={label}
-                current={current}
-                previous={previous}
-              />
-            ))}
-          </div>
-        </section>
-      ) : null}
+            <p className="hito-body-xs text-tertiary mt-2">
+              {formatWindow(current)} · {current.eligibleActivityCount} recorded activities
+            </p>
+          </section>
 
-      <Gate4Readback advancedMetrics={progress.advancedMetrics} />
+          {weeklyPeriod && weeklySeries ? (
+            <HitoFactualBarChart
+              controls={{
+                ariaLabel: "Weekly factual chart controls",
+                content: (
+                  <fieldset className="grid min-w-0 gap-2">
+                    <legend className="hito-label-md text-foreground">Metric</legend>
+                    <div
+                      className="hito-choice-toggle-group"
+                      {...weeklyMetricGroup.groupProps}
+                      aria-label="Weekly factual chart metric"
+                    >
+                      {PROGRESS_WEEKLY_METRICS.map((metric) => (
+                        <HitoChoiceToggle
+                          key={metric.id}
+                          size="sm"
+                          {...weeklyMetricGroup.getRadioProps(metric.id)}
+                          selected={weeklyMetric === metric.id}
+                          onClick={() => onWeeklyMetricChange(metric.id)}
+                        >
+                          {metric.label}
+                        </HitoChoiceToggle>
+                      ))}
+                    </div>
+                  </fieldset>
+                ),
+              }}
+              period={weeklyPeriod}
+              series={weeklySeries}
+            />
+          ) : progress.fitProgress.status === "updating" ? (
+            <div className="hito-state-surface" data-tone="signal" role="status">
+              <p className="hito-label-md text-foreground">Updating weekly FIT progress</p>
+              <p className="hito-body-md mt-2 text-secondary">
+                Current weekly facts will return when the update is complete.
+              </p>
+            </div>
+          ) : progress.fitProgress.status === "unavailable" ? (
+            <div className="hito-state-surface" data-tone="warning" role="status">
+              <p className="hito-label-md text-foreground">Weekly FIT progress unavailable</p>
+              <p className="hito-body-md mt-2 text-secondary">
+                This historical snapshot does not include the current weekly FIT series.
+              </p>
+            </div>
+          ) : null}
 
-      {progress.calendarWeeks.length > 0 ? (
-        <details className="hito-disclosure">
-          <summary className="hito-disclosure-summary">
-            <span>Weekly facts</span>
-            <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
-          </summary>
-          <div className="hito-disclosure-body">
-            <ul className="hito-row-group">
-              {progress.calendarWeeks.map((week) => (
-                <li
-                  key={`${week.window.startDate}:${week.window.endDate}`}
-                  className="hito-list-row !items-start"
+          {visibleFacts.length > 0 ? (
+            <section aria-labelledby="progress-facts-title">
+              <div className="hito-section-header">
+                <h2 id="progress-facts-title" className="hito-ui-title-sm text-foreground">
+                  Running facts
+                </h2>
+                <span className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
+                  Current and previous 28 days
+                </span>
+              </div>
+              <div className="mt-4 space-y-3">
+                {visibleFacts.map(({ key, label }) => (
+                  <ProgressFactDisclosure
+                    key={key}
+                    factKey={key}
+                    label={label}
+                    current={current}
+                    previous={previous}
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          <Gate4Readback advancedMetrics={progress.advancedMetrics} />
+
+          {progress.calendarWeeks.length > 0 ? (
+            <details className="hito-disclosure">
+              <summary className="hito-disclosure-summary">
+                <span>Weekly facts</span>
+                <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
+              </summary>
+              <div className="hito-disclosure-body">
+                <ul className="hito-row-group">
+                  {progress.calendarWeeks.map((week) => (
+                    <li
+                      key={`${week.window.startDate}:${week.window.endDate}`}
+                      className="hito-list-row !items-start"
+                    >
+                      <div>
+                        <p className="hito-body-md text-foreground">{formatWindow(week)}</p>
+                        <p className="hito-body-sm mt-1 text-secondary">
+                          {formatRollingSummary(week) ?? "No recorded running facts"}
+                        </p>
+                      </div>
+                      <span className="hito-body-xs text-tertiary shrink-0">Week</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </details>
+          ) : null}
+        </>
+      ) : (
+        <ProgressEmptyState />
+      )}
+    </div>
+  );
+}
+
+const PROGRESS_SEQUENCE_METRICS = [
+  { id: "distance", label: "Distance" },
+  { id: "timer_duration", label: "Timer duration" },
+  { id: "observed_average_pace", label: "Observed pace" },
+  { id: "elevation_gain", label: "Elevation gain" },
+  { id: "reported_load", label: "Reported load" },
+] satisfies Array<{ id: RunnerActivityFitSequenceMetricId; label: string }>;
+
+function ActivitySequenceReadback({
+  asOfDate,
+  onRetry,
+  onSelectionChange,
+  selection,
+  sequence,
+}: {
+  asOfDate: string;
+  onRetry: () => void;
+  onSelectionChange: (selection: ProgressSequenceSelection) => void;
+  selection: ProgressSequenceSelection;
+  sequence: RunnerActivityFitSequenceProductModel;
+}) {
+  const [customOpen, setCustomOpen] = useState(selection.period === "custom");
+  const [customStartDate, setCustomStartDate] = useState(
+    selection.startDate ?? sequence.selectedPeriod.startDate,
+  );
+  const [customEndDate, setCustomEndDate] = useState(
+    selection.endDate ?? sequence.selectedPeriod.endDate,
+  );
+  const [customErrors, setCustomErrors] = useState<{
+    startDate?: string;
+    endDate?: string;
+  }>({});
+  const periodItems = [
+    ...sequence.advertisedPeriods.map((period) => ({ value: period.id })),
+    { value: "custom" as const },
+  ];
+  const periodGroup = useHitoRadioGroup({
+    idPrefix: "progress-sequence-period",
+    items: periodItems,
+    value: customOpen ? "custom" : selection.period,
+  });
+  const metricGroup = useHitoRadioGroup({
+    idPrefix: "progress-sequence-metric",
+    items: PROGRESS_SEQUENCE_METRICS.map(({ id }) => ({ value: id })),
+    value: selection.metric,
+  });
+
+  useEffect(() => {
+    if (selection.period !== "custom") return;
+    setCustomOpen(true);
+    setCustomStartDate(selection.startDate ?? sequence.selectedPeriod.startDate);
+    setCustomEndDate(selection.endDate ?? sequence.selectedPeriod.endDate);
+    setCustomErrors({});
+  }, [
+    selection.endDate,
+    selection.period,
+    selection.startDate,
+    sequence.selectedPeriod.endDate,
+    sequence.selectedPeriod.startDate,
+  ]);
+
+  const selectQuickPeriod = (period: RunnerActivityFitSequenceQuickPeriodId) => {
+    setCustomOpen(false);
+    setCustomErrors({});
+    onSelectionChange({
+      period,
+      metric: selection.metric,
+      startDate: null,
+      endDate: null,
+    });
+  };
+
+  const applyCustomRange = () => {
+    const nextErrors: { startDate?: string; endDate?: string } = {};
+    if (!isHitoIsoDate(customStartDate)) {
+      nextErrors.startDate = "Enter a valid start date in YYYY-MM-DD format.";
+    }
+    if (!isHitoIsoDate(customEndDate)) {
+      nextErrors.endDate = "Enter a valid end date in YYYY-MM-DD format.";
+    }
+    if (!nextErrors.startDate && !nextErrors.endDate && customStartDate > customEndDate) {
+      nextErrors.startDate = "Start date must be on or before the end date.";
+    }
+    if (!nextErrors.endDate && isHitoIsoDate(customEndDate) && customEndDate > asOfDate) {
+      nextErrors.endDate = `End date cannot be after ${asOfDate}.`;
+    }
+    setCustomErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      window.requestAnimationFrame(() => {
+        document
+          .getElementById(
+            nextErrors.startDate
+              ? "activity-sequence-custom-start"
+              : "activity-sequence-custom-end",
+          )
+          ?.focus();
+      });
+      return;
+    }
+
+    onSelectionChange({
+      period: "custom",
+      metric: selection.metric,
+      startDate: customStartDate,
+      endDate: customEndDate,
+    });
+  };
+
+  return (
+    <div
+      id="factual-activity-sequence-title"
+      tabIndex={-1}
+      className="grid min-w-0 gap-6 border-b border-hairline pb-8 outline-none"
+    >
+      <HitoFactualActivityPointSequence
+        controls={{
+          ariaLabel: "Activity sequence controls",
+          content: (
+            <div className="grid min-w-0 gap-4">
+              <fieldset className="grid min-w-0 gap-2">
+                <legend className="hito-label-md text-foreground">Period</legend>
+                <div
+                  className="hito-choice-toggle-group"
+                  {...periodGroup.groupProps}
+                  aria-label="Activity sequence period"
                 >
-                  <div>
-                    <p className="hito-body-md text-foreground">{formatWindow(week)}</p>
-                    <p className="hito-body-sm mt-1 text-secondary">
-                      {formatRollingSummary(week) ?? "No recorded running facts"}
-                    </p>
+                  {sequence.advertisedPeriods.map((period) => (
+                    <HitoChoiceToggle
+                      key={period.id}
+                      size="sm"
+                      {...periodGroup.getRadioProps(period.id)}
+                      selected={!customOpen && selection.period === period.id}
+                      data-progress-sequence-period={period.id}
+                      onClick={() => {
+                        if (period.id === "custom") {
+                          setCustomOpen(true);
+                          setCustomErrors({});
+                          return;
+                        }
+                        selectQuickPeriod(period.id);
+                      }}
+                    >
+                      {period.label}
+                    </HitoChoiceToggle>
+                  ))}
+                  <HitoChoiceToggle
+                    size="sm"
+                    {...periodGroup.getRadioProps("custom")}
+                    selected={customOpen}
+                    data-progress-sequence-period="custom"
+                    aria-expanded={customOpen}
+                    aria-controls="activity-sequence-custom-panel"
+                    onClick={() => {
+                      setCustomOpen(true);
+                      setCustomErrors({});
+                    }}
+                  >
+                    <Icon name="calendar" size="sm" />
+                    Custom
+                  </HitoChoiceToggle>
+                </div>
+              </fieldset>
+
+              {customOpen ? (
+                <div
+                  id="activity-sequence-custom-panel"
+                  className="hito-state-surface grid min-w-0 gap-4"
+                  data-tone="neutral"
+                >
+                  <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+                    <HitoDateField
+                      id="activity-sequence-custom-start"
+                      label="Start date"
+                      value={customStartDate}
+                      maxDate={asOfDate}
+                      error={customErrors.startDate}
+                      onChange={(value) => {
+                        setCustomStartDate(value);
+                        setCustomErrors((current) => ({ ...current, startDate: undefined }));
+                      }}
+                    />
+                    <HitoDateField
+                      id="activity-sequence-custom-end"
+                      label="End date"
+                      value={customEndDate}
+                      maxDate={asOfDate}
+                      error={customErrors.endDate}
+                      onChange={(value) => {
+                        setCustomEndDate(value);
+                        setCustomErrors((current) => ({ ...current, endDate: undefined }));
+                      }}
+                    />
                   </div>
-                  <span className="hito-body-xs text-tertiary shrink-0">Week</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </details>
-      ) : null}
+                  <div>
+                    <HitoButton
+                      id="activity-sequence-custom-apply"
+                      type="button"
+                      size="md"
+                      variant="secondary"
+                      onClick={applyCustomRange}
+                    >
+                      Apply dates
+                    </HitoButton>
+                  </div>
+                </div>
+              ) : null}
+
+              <fieldset className="grid min-w-0 gap-2">
+                <legend className="hito-label-md text-foreground">Metric</legend>
+                <div
+                  className="hito-choice-toggle-group"
+                  {...metricGroup.groupProps}
+                  aria-label="Activity sequence metric"
+                >
+                  {PROGRESS_SEQUENCE_METRICS.map((metric) => (
+                    <HitoChoiceToggle
+                      key={metric.id}
+                      size="sm"
+                      {...metricGroup.getRadioProps(metric.id)}
+                      selected={selection.metric === metric.id}
+                      onClick={() =>
+                        onSelectionChange({
+                          ...selection,
+                          metric: metric.id,
+                        })
+                      }
+                    >
+                      {metric.label}
+                    </HitoChoiceToggle>
+                  ))}
+                </div>
+              </fieldset>
+            </div>
+          ),
+        }}
+        metricId={selection.metric}
+        sequence={sequence}
+        stateAction={
+          sequence.status === "updating" || sequence.status === "unavailable" ? (
+            <HitoButton
+              id="activity-sequence-retry-action"
+              type="button"
+              size="md"
+              variant="secondary"
+              onClick={onRetry}
+            >
+              <Icon name="refresh" size="sm" />
+              Check again
+            </HitoButton>
+          ) : undefined
+        }
+      />
     </div>
   );
 }
@@ -524,7 +898,13 @@ function ProgressError({ message, onRetry }: { message: string; onRetry: () => v
       <p className="hito-label-md text-destructive">Could not load running progress</p>
       <p className="hito-body-md text-secondary mt-2">{message}</p>
       <div className="hito-state-actions">
-        <HitoButton type="button" size="md" variant="secondary" onClick={onRetry}>
+        <HitoButton
+          id="progress-retry-action"
+          type="button"
+          size="md"
+          variant="secondary"
+          onClick={onRetry}
+        >
           <Icon name="refresh" size="sm" />
           Try again
         </HitoButton>

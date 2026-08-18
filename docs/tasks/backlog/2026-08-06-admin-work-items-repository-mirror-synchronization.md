@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** BACKEND
+- **Epic:** platform-and-operations
 - **Parent:** [Admin Capture Bug Stack](2026-06-13-admin-capture-bug-stack.md)
 - **Outcome:** authenticated Admin reads synchronize the existing mirror with invocation-local state.
 - **Sources:** Terminal decision/evidence record only; detailed transcript remains in Git history.

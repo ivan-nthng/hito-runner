@@ -21,16 +21,6 @@ import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { hasSupabaseServerEnv, serverEnv } from "@/lib/supabase/env";
 
 const PAGE_SIZE = 1000;
-const RECENT_LOG_WINDOW_DAYS = 30;
-
-type PlanCycleRow = Pick<
-  Database["public"]["Tables"]["plan_cycles"]["Row"],
-  "id" | "user_id" | "status" | "source_kind" | "schema_version"
->;
-type PlannedWorkoutRow = Pick<
-  Database["public"]["Tables"]["planned_workouts"]["Row"],
-  "id" | "user_id" | "workout_type"
->;
 type WorkoutLogRow = Pick<
   Database["public"]["Tables"]["workout_logs"]["Row"],
   "user_id" | "outcome" | "logged_at"
@@ -150,8 +140,6 @@ async function buildAdminAnalyticsView(
   const supabase = dependencies.supabase!;
   const [
     profiles,
-    planCycles,
-    plannedWorkouts,
     workoutLogs,
     resultAssets,
     actualMetrics,
@@ -161,8 +149,6 @@ async function buildAdminAnalyticsView(
     capabilityUsage,
   ] = await Promise.all([
     selectAllRows(supabase, "runner_profiles", "user_id"),
-    selectAllRows(supabase, "plan_cycles", "id, user_id, status, source_kind, schema_version"),
-    selectAllRows(supabase, "planned_workouts", "id, user_id, workout_type"),
     selectAllRows(supabase, "workout_logs", "user_id, outcome, logged_at"),
     selectAllRows(supabase, "workout_result_assets", "user_id, parse_status"),
     selectAllRows(supabase, "workout_actual_metrics", "user_id"),
@@ -176,8 +162,6 @@ async function buildAdminAnalyticsView(
   const knownUserIds = buildKnownUserIds({
     authUsers: authUsers.users,
     profiles,
-    planCycles: planCycles as PlanCycleRow[],
-    plannedWorkouts: plannedWorkouts as PlannedWorkoutRow[],
     workoutLogs: workoutLogs as WorkoutLogRow[],
     resultAssets: resultAssets as ResultAssetRow[],
     aiInsights: aiInsights as AiInsightRow[],
@@ -197,12 +181,6 @@ async function buildAdminAnalyticsView(
   );
   const realAuthUsers = authUsers.users.filter((user) => realUserIds.has(user.id));
   const realProfiles = profiles.filter((profile) => realUserIds.has(profile.user_id));
-  const realPlanCycles = (planCycles as PlanCycleRow[]).filter((plan) =>
-    realUserIds.has(plan.user_id),
-  );
-  const realPlannedWorkouts = (plannedWorkouts as PlannedWorkoutRow[]).filter((workout) =>
-    realUserIds.has(workout.user_id),
-  );
   const realWorkoutLogs = (workoutLogs as WorkoutLogRow[]).filter((log) =>
     realUserIds.has(log.user_id),
   );
@@ -225,31 +203,12 @@ async function buildAdminAnalyticsView(
     realUserIds.has(row.user_id),
   );
   const profileUserIds = new Set(realProfiles.map((profile) => profile.user_id));
-  const activePlanUserIds = new Set(
-    realPlanCycles.filter((plan) => plan.status === "active").map((plan) => plan.user_id),
-  );
-  const activePlans = realPlanCycles.filter((plan) => plan.status === "active");
-  const archivedPlans = realPlanCycles.filter((plan) => plan.status === "archived");
   const workoutLogsByOutcome = countBy(realWorkoutLogs.map((log) => log.outcome));
-  const completedLogs = workoutLogsByOutcome.find((entry) => entry.key === "completed")?.count ?? 0;
-  const plannedNonRestWorkouts = realPlannedWorkouts.filter(
-    (workout) => workout.workout_type !== "rest",
-  ).length;
-  const usersWithAnyLogs = new Set(realWorkoutLogs.map((log) => log.user_id));
-  const recentCutoff = getRecentCutoff(dependencies.now ?? new Date());
-  const usersWithRecentLogs = new Set(
-    realWorkoutLogs
-      .filter((log) => new Date(log.logged_at).getTime() >= recentCutoff.getTime())
-      .map((log) => log.user_id),
-  );
   const assetsParsed = realResultAssets.filter((asset) => asset.parse_status === "parsed").length;
   const assetsFailed = realResultAssets.filter((asset) => asset.parse_status === "failed").length;
   const excludedUserRows = buildExcludedUserRows({
     users: classifiedUsers.filter((user) => user.classification.classification !== "real"),
     profileUserIds: new Set(profiles.map((profile) => profile.user_id)),
-    activePlans: (planCycles as PlanCycleRow[]).filter((plan) => plan.status === "active"),
-    archivedPlans: (planCycles as PlanCycleRow[]).filter((plan) => plan.status === "archived"),
-    plannedWorkouts: plannedWorkouts as PlannedWorkoutRow[],
     workoutLogs: workoutLogs as WorkoutLogRow[],
     resultAssets: resultAssets as ResultAssetRow[],
     aiInsights: aiInsights as AiInsightRow[],
@@ -270,28 +229,10 @@ async function buildAdminAnalyticsView(
         authUsers.status === "available"
           ? Math.max(realAuthUsers.length - profileUserIds.size, 0)
           : null,
-      usersWithActivePlan: activePlanUserIds.size,
-      usersWithoutActivePlan:
-        authUsers.status === "available"
-          ? Math.max(realAuthUsers.length - activePlanUserIds.size, 0)
-          : Math.max(profileUserIds.size - activePlanUserIds.size, 0),
-      setupToActivePlanRate: ratio(activePlanUserIds.size, profileUserIds.size),
-    },
-    plans: {
-      total: realPlanCycles.length,
-      active: activePlans.length,
-      archived: archivedPlans.length,
-      sourceKindCounts: countBy(realPlanCycles.map((plan) => plan.source_kind ?? "unknown")),
-      schemaVersionCounts: countBy(realPlanCycles.map((plan) => plan.schema_version || "unknown")),
     },
     workoutUsage: {
-      totalPlannedWorkouts: realPlannedWorkouts.length,
-      plannedNonRestWorkouts,
       totalWorkoutLogs: realWorkoutLogs.length,
       outcomeCounts: workoutLogsByOutcome,
-      roughCompletionRate: ratio(completedLogs, plannedNonRestWorkouts),
-      activePlanUsersWithoutLogs: countMissing(activePlanUserIds, usersWithAnyLogs),
-      activePlanUsersWithoutRecentLogs30d: countMissing(activePlanUserIds, usersWithRecentLogs),
     },
     garminFeedback: {
       resultAssets: realResultAssets.length,
@@ -322,9 +263,6 @@ async function buildAdminAnalyticsView(
       users: classifiedUsers.filter((user) => user.classification.classification === "real"),
       authUsers: authUsers.users,
       profileUserIds,
-      activePlans,
-      archivedPlans,
-      plannedWorkouts: realPlannedWorkouts,
       workoutLogs: realWorkoutLogs,
       resultAssets: realResultAssets,
       aiInsights: realAiInsights,
@@ -408,8 +346,6 @@ async function selectAllRows<TTable extends keyof Database["public"]["Tables"]>(
 function buildKnownUserIds({
   authUsers,
   profiles,
-  planCycles,
-  plannedWorkouts,
   workoutLogs,
   resultAssets,
   aiInsights,
@@ -418,8 +354,6 @@ function buildKnownUserIds({
 }: {
   authUsers: AuthUserSummary[];
   profiles: Array<{ user_id: string }>;
-  planCycles: PlanCycleRow[];
-  plannedWorkouts: PlannedWorkoutRow[];
   workoutLogs: WorkoutLogRow[];
   resultAssets: ResultAssetRow[];
   aiInsights: AiInsightRow[];
@@ -430,8 +364,6 @@ function buildKnownUserIds({
     new Set([
       ...authUsers.map((user) => user.id),
       ...profiles.map((profile) => profile.user_id),
-      ...planCycles.map((plan) => plan.user_id),
-      ...plannedWorkouts.map((workout) => workout.user_id),
       ...workoutLogs.map((log) => log.user_id),
       ...resultAssets.map((asset) => asset.user_id),
       ...aiInsights.map((insight) => insight.user_id),
@@ -489,9 +421,6 @@ function buildPerUserRows({
   users,
   authUsers,
   profileUserIds,
-  activePlans,
-  archivedPlans,
-  plannedWorkouts,
   workoutLogs,
   resultAssets,
   aiInsights,
@@ -500,9 +429,6 @@ function buildPerUserRows({
   users: ClassifiedUser[];
   authUsers: AuthUserSummary[];
   profileUserIds: Set<string>;
-  activePlans: PlanCycleRow[];
-  archivedPlans: PlanCycleRow[];
-  plannedWorkouts: PlannedWorkoutRow[];
   workoutLogs: WorkoutLogRow[];
   resultAssets: ResultAssetRow[];
   aiInsights: AiInsightRow[];
@@ -520,10 +446,6 @@ function buildPerUserRows({
       userId,
       email: authByUserId.get(userId)?.email ?? null,
       profilePresent: profileUserIds.has(userId),
-      activePlanPresent: activePlans.some((plan) => plan.user_id === userId),
-      activePlanCount: activePlans.filter((plan) => plan.user_id === userId).length,
-      archivedPlanCount: archivedPlans.filter((plan) => plan.user_id === userId).length,
-      plannedWorkoutCount: plannedWorkouts.filter((workout) => workout.user_id === userId).length,
       workoutLogCount: userLogs.length,
       lastWorkoutLogDate: latestDate(userLogs.map((log) => log.logged_at)),
       garminEvidenceCount: resultAssets.filter((asset) => asset.user_id === userId).length,
@@ -539,9 +461,6 @@ function buildPerUserRows({
 function buildExcludedUserRows({
   users,
   profileUserIds,
-  activePlans,
-  archivedPlans,
-  plannedWorkouts,
   workoutLogs,
   resultAssets,
   aiInsights,
@@ -549,9 +468,6 @@ function buildExcludedUserRows({
 }: {
   users: ClassifiedUser[];
   profileUserIds: Set<string>;
-  activePlans: PlanCycleRow[];
-  archivedPlans: PlanCycleRow[];
-  plannedWorkouts: PlannedWorkoutRow[];
   workoutLogs: WorkoutLogRow[];
   resultAssets: ResultAssetRow[];
   aiInsights: AiInsightRow[];
@@ -568,10 +484,6 @@ function buildExcludedUserRows({
       userId,
       email: user.authUser?.email ?? user.localAccount?.email ?? null,
       profilePresent: profileUserIds.has(userId),
-      activePlanPresent: activePlans.some((plan) => plan.user_id === userId),
-      activePlanCount: activePlans.filter((plan) => plan.user_id === userId).length,
-      archivedPlanCount: archivedPlans.filter((plan) => plan.user_id === userId).length,
-      plannedWorkoutCount: plannedWorkouts.filter((workout) => workout.user_id === userId).length,
       workoutLogCount: userLogs.length,
       lastWorkoutLogDate: latestDate(userLogs.map((log) => log.logged_at)),
       garminEvidenceCount: resultAssets.filter((asset) => asset.user_id === userId).length,
@@ -657,36 +569,12 @@ function countBy(values: string[]): AdminAnalyticsKeyCount[] {
     .sort((left, right) => left.key.localeCompare(right.key));
 }
 
-function countMissing(source: Set<string>, present: Set<string>) {
-  let missing = 0;
-
-  for (const value of source) {
-    if (!present.has(value)) {
-      missing += 1;
-    }
-  }
-
-  return missing;
-}
-
 function latestDate(values: string[]) {
   if (values.length === 0) {
     return null;
   }
 
   return values.reduce((latest, value) => (value > latest ? value : latest), values[0]);
-}
-
-function ratio(numerator: number, denominator: number) {
-  if (denominator <= 0) {
-    return null;
-  }
-
-  return Number((numerator / denominator).toFixed(4));
-}
-
-function getRecentCutoff(now: Date) {
-  return new Date(now.getTime() - RECENT_LOG_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 }
 
 function toRecord(value: unknown): Record<string, unknown> {

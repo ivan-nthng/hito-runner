@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** FRONTEND
+- **Epic:** platform-and-operations
 - **Outcome:** completed at the existing AppShell header owner. Removed only.
 - **Sources:** [AppShell.tsx](../../../src/components/AppShell.tsx)
 - **Validation:** The original terminal receipt records focused validation for the completed scope; detailed commands remain available in Git history.

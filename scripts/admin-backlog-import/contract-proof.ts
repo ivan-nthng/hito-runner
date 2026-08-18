@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { findStaleActiveRepoMirrorRows } from "../import-repo-work-items-to-admin-backlog";
+import { adminRepoWorkItemEpicSlugs } from "../../src/lib/admin-work-items";
 import {
   buildExistingRepoMirrorIndex,
   findDuplicateWorkItemIds,
@@ -31,7 +32,9 @@ type ExistingRow = Pick<
 >;
 
 export function assertCanonicalMarkdownWorkItemContract() {
-  const ready = parseCanonicalMarkdown(canonicalWorkItemMarkdown());
+  const ready = parseCanonicalMarkdown(canonicalWorkItemMarkdown(), {
+    requireEpicForActiveNonBug: true,
+  });
 
   assert.deepEqual(
     {
@@ -40,6 +43,7 @@ export function assertCanonicalMarkdownWorkItemContract() {
       itemType: ready.itemType,
       priority: ready.priority,
       owner: ready.owner,
+      epic: ready.epic,
       scope: ready.scope,
       archiveIntent: ready.archiveIntent,
       batch: ready.batch,
@@ -55,6 +59,7 @@ export function assertCanonicalMarkdownWorkItemContract() {
       itemType: "change_request",
       priority: "high",
       owner: "frontend",
+      epic: "platform-and-operations",
       scope: "admin-capture",
       archiveIntent: "retain_in_place",
       batch: "admin-contract",
@@ -146,7 +151,8 @@ Blocked on verified provider access.
     "done",
   );
 
-  const legacy = parseCanonicalMarkdown(`# Legacy item
+  const legacy = parseCanonicalMarkdown(
+    `# Legacy item
 
 ## Status
 in_progress
@@ -172,7 +178,9 @@ ROLE: BACKEND
 
 Keep the legacy source visible.
 \`\`\`
-`);
+`,
+    { requireEpicForActiveNonBug: true },
+  );
   assert.equal(legacy.metadataState, "legacy_debt");
   assert.equal(
     mapMirroredWorkItemStatusToAdminStatus("in_progress", legacy.metadataState, "active_plan"),
@@ -183,6 +191,7 @@ Keep the legacy source visible.
     "Owner",
     "Scope",
     "Archive Intent",
+    "Epic",
   ]);
 
   const compactTerminal = parseCanonicalMarkdown(`# Compact terminal item
@@ -192,6 +201,7 @@ Keep the legacy source visible.
 - **Type:** \`change_request\`
 - **Priority:** \`medium\`
 - **Owner:** \`backend\`
+- **Epic:** \`platform-and-operations\`
 - **Scope:** \`admin-capture\`
 - **Archive Intent:** \`retain_in_place\`
 - **Task:** Preserve a compact canonical terminal record.
@@ -207,6 +217,7 @@ Keep the legacy source visible.
       itemType: compactTerminal.itemType,
       priority: compactTerminal.priority,
       owner: compactTerminal.owner,
+      epic: compactTerminal.epic,
       scope: compactTerminal.scope,
       archiveIntent: compactTerminal.archiveIntent,
       task: compactTerminal.task,
@@ -220,6 +231,7 @@ Keep the legacy source visible.
       itemType: "change_request",
       priority: "medium",
       owner: "backend",
+      epic: "platform-and-operations",
       scope: "admin-capture",
       archiveIntent: "retain_in_place",
       task: "Preserve a compact canonical terminal record.",
@@ -228,6 +240,80 @@ Keep the legacy source visible.
       invalid: [],
     },
   );
+
+  const compactPlainList = parseCanonicalMarkdown(`# Compact plain-list item
+
+- Work Item ID: \`compact-plain-list-item\`
+- Status: \`completed\`
+- Type: Tracked documentation receipt
+- Epic: platform-and-operations
+`);
+  assert.equal(compactPlainList.workItemId, "compact-plain-list-item");
+  assert.equal(compactPlainList.status, "completed");
+  assert.equal(compactPlainList.epic, "platform-and-operations");
+
+  const flatLeadMetadata = parseCanonicalMarkdown(
+    `# Flat lead metadata
+
+Work Item ID: \`flat-lead-metadata\`
+Status: ready
+Type: change_request
+Priority: high
+Owner: backend
+Epic: runner-core-readiness
+Scope: admin-capture
+Archive Intent: retain_in_place
+Task: Preserve a flat canonical metadata form.
+Stage: BACKEND validation
+Next Recommended Role: backend
+Exact Handoff Prompt:
+\`\`\`text
+ROLE: BACKEND
+
+Validate the flat canonical metadata form.
+\`\`\`
+
+## Evidence
+Body metadata must not override the lead block.
+`,
+    { requireEpicForActiveNonBug: true },
+  );
+  assert.equal(flatLeadMetadata.workItemId, "flat-lead-metadata");
+  assert.equal(flatLeadMetadata.epic, "runner-core-readiness");
+  assert.equal(flatLeadMetadata.metadataState, "complete");
+
+  for (const epic of adminRepoWorkItemEpicSlugs) {
+    const parsed = parseCanonicalMarkdown(canonicalWorkItemMarkdown(epic), {
+      requireEpicForActiveNonBug: true,
+    });
+    assert.equal(parsed.epic, epic);
+    assert.equal(parsed.metadataState, "complete");
+  }
+
+  const missingEpic = parseCanonicalMarkdown(
+    canonicalWorkItemMarkdown().replace("\n## Epic\nplatform-and-operations\n", "\n"),
+    { requireEpicForActiveNonBug: true },
+  );
+  assert.equal(missingEpic.metadataState, "malformed");
+  assert.deepEqual(missingEpic.missingRequiredFields, ["Epic"]);
+
+  const invalidEpic = parseCanonicalMarkdown(
+    canonicalWorkItemMarkdown().replace("platform-and-operations", "unknown-epic"),
+    { requireEpicForActiveNonBug: true },
+  );
+  assert.equal(invalidEpic.epic, null);
+  assert.equal(invalidEpic.metadataState, "malformed");
+  assert.deepEqual(invalidEpic.invalidRequiredFields, ["Epic"]);
+
+  const bugWithEpic = parseCanonicalMarkdown(
+    canonicalWorkItemMarkdown()
+      .replace("## Type\nchange_request", "## Type\nBug — persisted contract defect")
+      .replace("## Epic\nplatform-and-operations", "## Epic\nrunner-core-readiness"),
+    { requireEpicForActiveNonBug: true },
+  );
+  assert.equal(bugWithEpic.itemType, "bug");
+  assert.equal(bugWithEpic.metadataState, "malformed");
+  assert.deepEqual(bugWithEpic.invalidRequiredFields, ["Epic"]);
 
   const invalid = parseCanonicalMarkdown(
     canonicalWorkItemMarkdown().replace("## Status\nready", "## Status\nwaiting"),
@@ -307,7 +393,7 @@ Keep the legacy source visible.
   );
 }
 
-function canonicalWorkItemMarkdown() {
+function canonicalWorkItemMarkdown(epic = "platform-and-operations") {
   return `# Canonical Admin import
 
 ## Work Item ID
@@ -324,6 +410,9 @@ high
 
 ## Owner
 frontend
+
+## Epic
+${epic}
 
 ## Scope
 admin-capture

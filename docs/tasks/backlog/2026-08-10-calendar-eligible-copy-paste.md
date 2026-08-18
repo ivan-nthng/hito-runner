@@ -2,6 +2,7 @@
 
 - **Status:** `closed`
 - **Owner:** BACKEND
+- **Epic:** runner-core-readiness
 - **Outcome:** Closed after the recorded decision: Let a runner copy an eligible planned workout from its Calendar overflow menu and paste it into an eligible current or future Rest/no-workout calendar day. Eligibility, source reconstruction, and persistence remain…
 - **Sources:** Terminal decision/evidence record only; detailed transcript remains in Git history.
 - **Validation:** Closure is supported by the recorded decision/evidence; no implementation, runtime, or release acceptance is inferred.

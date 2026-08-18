@@ -1,64 +1,34 @@
 import assert from "node:assert/strict";
+import { createClient } from "@supabase/supabase-js";
+
 import {
-  MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-  MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
+  CalendarPersistenceRejection,
+  applyAtomicCalendarWorkoutMutation,
+} from "../../src/lib/active-plan-lifecycle-persistence";
+import type { PersistedPlannedWorkoutRow } from "../../src/lib/active-plan-persistence";
+import {
   addManualWorkoutToActivePlanForUser,
-  buildManualWorkoutUserBuiltTrainingPlan,
   confirmManualWorkoutDeleteClearForUser,
   confirmManualWorkoutMoveForUser,
   confirmManualWorkoutPersistedEditForUser,
   createEmptyManualActivePlanForUser,
-  deleteManualWorkoutSavedTemplateForUser,
-  listManualWorkoutTemplateCatalogForUser,
+  moveManualWorkoutWithinActivePlanForUser,
   reconstructManualWorkoutPersistedEditDraftForUser,
-  restoreAllManualWorkoutBuiltInTemplatesForUser,
-  reviewManualWorkoutDraft,
   reviewManualWorkoutDeleteClearForUser,
+  reviewManualWorkoutDraft,
   reviewManualWorkoutMoveForUser,
   reviewManualWorkoutPersistedEditDraftForUser,
-  reviewManualWorkoutSavedTemplateForUser,
-  saveManualWorkoutSavedTemplateForUser,
-  updateManualWorkoutBuiltInVisibilityForUser,
-  type ManualEmptyPlanSetupInput,
   type ManualWorkoutDraftInput,
   type ManualWorkoutDraftReviewResult,
 } from "../../src/lib/manual-workout-authoring";
-import {
-  materializeFirstReviewedPlanForUser,
-  type PersistedPlanCycleRow,
-} from "../../src/lib/active-plan-persistence";
-import { applyAtomicCalendarWorkoutMutation } from "../../src/lib/active-plan-lifecycle-persistence";
-import { AI_AUTHORED_PLAN_FIRST_SOURCE_KIND } from "../../src/lib/ai-authored-plan-first-compiler";
-import {
-  AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
-  AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV,
-  buildAiGeneratedRunningPlanDevFixtureOpenAiFetch,
-} from "../../src/lib/ai-generated-running-plan-dev-fixture";
-import { buildAiGeneratedRunningPlanAuthoringInput } from "../../src/lib/ai-generated-running-plan";
-import { buildDeterministicWorkoutComparison } from "../../src/lib/workout-result-import/compare-workout-result";
-import { WORKOUT_COMPARISON_FORMULA_VERSION } from "../../src/lib/workout-result-import/comparison-payload";
-import { buildHeartRateZonesSummary } from "../../src/lib/heart-rate-zones";
-import { buildSourceWorkoutFingerprint } from "../../src/lib/manual-workout-authoring/edit-workout-review-token";
-import {
-  TRAINING_PLAN_V2_IMPORT_SOURCE_KIND,
-  type TrainingPlanV2,
-} from "../../src/lib/imported-plan";
-import { DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE } from "../../src/lib/local-auth-account-registry.server";
+import { copyManualWorkoutWithinActivePlanForUser } from "../../src/lib/manual-workout-authoring/copy-paste";
+import { persistManualWorkoutDeleteClear } from "../../src/lib/manual-workout-authoring/delete-clear";
+import { buildFullSourceWorkoutFingerprint } from "../../src/lib/manual-workout-authoring/edit-workout-review-token";
+import { persistManualWorkoutMove } from "../../src/lib/manual-workout-authoring/move-workout";
 import type { Database, Json } from "../../src/lib/supabase/database";
 import { createAdminSupabaseClient } from "../../src/lib/supabase/server";
-import { addDaysIso, todayIso, weekdayLong } from "../../src/lib/training";
-import { getPersistedSnapshot } from "../../src/lib/training-api";
-import { buildReviewedAiGeneratedRunningPlanPreview } from "../../src/lib/running-plan-engine-actions";
-import { buildRunningPlanCanonicalPlan } from "../../src/lib/running-plan-engine-review";
-import {
-  getRunnerPlanAuthoringProfileSnapshotForUserId,
-  saveRunnerBaselineForUserId,
-  updateRunnerCalendarTimezoneForUserId,
-} from "../../src/lib/user-settings-actions";
-import {
-  AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
-  readWorkoutDocumentSections,
-} from "../../src/lib/workout-document";
+import { addDaysIso, todayIso } from "../../src/lib/training";
+import { updateRunnerCalendarTimezoneForUserId } from "../../src/lib/user-settings-actions";
 import {
   acquireQaPoolSupabaseUser,
   DISPOSABLE_REQUIRE_PERSISTENCE_FLAG,
@@ -70,19 +40,13 @@ import {
 } from "../lib/qa-pool-persistence-proof";
 
 type ManualWorkoutReadyReview = Extract<ManualWorkoutDraftReviewResult, { ok: true }>;
-type PersistedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
-type PersistedRunnerProfileRow = Database["public"]["Tables"]["runner_profiles"]["Row"];
-type PersistedManualPlanReadback = {
-  plan: PersistedPlanCycleRow;
-  workouts: PersistedWorkoutRow[];
-  profile: PersistedRunnerProfileRow;
-};
-
-type ManualDisposableCleanupProof = QaPoolSupabaseCleanupProof;
+type AdminSupabaseClient = ReturnType<typeof createAdminSupabaseClient>;
 type QaPoolUserLease = Awaited<ReturnType<typeof acquireQaPoolSupabaseUser>>;
 
-export const MANUAL_REQUIRE_PERSISTENCE_FLAG = DISPOSABLE_REQUIRE_PERSISTENCE_FLAG;
+const DISPOSABLE_TEST_PASSWORD = "Standalone-Calendar-Local-Aa1!";
+const MOVE_UNDO_EXPIRY_PROOF_WAIT_MS = 46_000;
 
+export const MANUAL_REQUIRE_PERSISTENCE_FLAG = DISPOSABLE_REQUIRE_PERSISTENCE_FLAG;
 export type ManualPersistencePreflight = DisposablePersistencePreflight;
 
 export function readManualPersistenceCliOptions(args = process.argv.slice(2)) {
@@ -123,1108 +87,813 @@ export async function validateManualWorkoutDisposablePersistenceProof({
   preflight: Extract<ManualPersistencePreflight, { shouldRun: true }>;
 }) {
   const supabase = createAdminSupabaseClient();
-  const disposableUser = await acquireQaPoolSupabaseUser({
+  const owner = await acquireQaPoolSupabaseUser({
     supabase,
     poolRole: "provider-engine",
-    creationErrorMessage: "Disposable manual workout user creation failed.",
+    password: DISPOSABLE_TEST_PASSWORD,
+    creationErrorMessage: "Disposable standalone Calendar user acquisition failed.",
   });
-  let proof: {
-    rows: number;
-    sourceKind: string | null;
-    sourceStatus: string | null;
-    reviewChecksum: string | null;
-    editedWorkoutId: string;
-    editedTitle: string;
-    originalPlanSourceKind: string;
-    mutationFailureAtomic: true;
-    moveAndClearPersisted: true;
-    longRunHydrationPersisted: true;
-    templateLifecyclePersisted: true;
-  } | null = null;
-  let cleanup: ManualDisposableCleanupProof | null = null;
+  let isolationUser: QaPoolUserLease | null = null;
+  let proof: Record<string, unknown> | null = null;
+  let cleanup: QaPoolSupabaseCleanupProof | null = null;
+  let isolationCleanup: QaPoolSupabaseCleanupProof | null = null;
 
   try {
-    const setup: ManualEmptyPlanSetupInput = {
+    const setup = await createEmptyManualActivePlanForUser(owner.userId, {
       age: 36,
       heightCm: 178,
       weightKg: 74,
       runningLevel: "beginner",
-    };
-    const emptyPlan = await createEmptyManualActivePlanForUser(disposableUser.userId, setup);
-    assert.equal(emptyPlan.ok, true, "Manual empty plan should persist on disposable target.");
-    if (!emptyPlan.ok) {
-      throw new Error(emptyPlan.message);
-    }
-    await updateRunnerCalendarTimezoneForUserId(disposableUser.userId, {
+    });
+    assert.equal(setup.ok, true, JSON.stringify(setup));
+    if (!setup.ok) throw new Error(setup.message);
+    assert.equal(setup.activePlanId, null);
+    assert.equal(setup.calendarRowCount, 0);
+
+    await updateRunnerCalendarTimezoneForUserId(owner.userId, {
       calendarTimezone: processCalendarTimezone(),
       source: "user",
     });
 
-    const result = await addManualWorkoutToActivePlanForUser(disposableUser.userId, {
-      activePlanId: emptyPlan.activePlanId,
+    assert.equal(await countPlanRows(supabase, owner.userId), 0);
+    assert.equal((await loadCalendarRows(supabase, owner.userId)).length, 0);
+
+    const added = await addManualWorkoutToActivePlanForUser(owner.userId, {
       draftInput: input,
       reviewToken: review.reviewToken,
       reviewChecksum: review.reviewChecksum,
     });
-    assert.equal(result.ok, true, "Reviewed manual Add should persist on disposable target.");
-    if (!result.ok) {
-      throw new Error(result.message);
-    }
+    assert.equal(added.ok, true, JSON.stringify(added));
+    if (!added.ok) throw new Error(added.message);
+    assert.equal(added.activePlanId, null);
+    assert.equal(added.sourceKind, "manual");
 
-    const persisted = await loadPersistedManualPlanForUser(supabase, disposableUser.userId);
-    assert.equal(persisted.plan.source_kind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
-    assert.equal(persisted.workouts.length, 1);
-    assert.equal(persisted.workouts[0]?.workout_date, input.workoutDate);
-    assert.equal(persisted.workouts[0]?.workout_identity, "easy_aerobic_run");
-    assert.equal(persisted.profile.user_id, disposableUser.userId);
-    validateImmutableManualPlanMetadata(persisted.plan);
-    validateNoFakePaceOrPersonalHr(persisted.workouts);
-    await validateManualTemplatePersistence({
-      userId: disposableUser.userId,
-      input,
-      review,
+    const afterAdd = await loadCalendarRows(supabase, owner.userId);
+    assert.equal(afterAdd.length, 1);
+    const original = requiredWorkout(afterAdd, added.plannedWorkoutId, "direct manual Add");
+    assert.equal(original.plan_cycle_id, null);
+    assert.equal(original.origin_kind, "manual");
+    assert.equal(await countPlanRows(supabase, owner.userId), 0);
+
+    const reconstructed = await reconstructManualWorkoutPersistedEditDraftForUser(owner.userId, {
+      plannedWorkoutId: original.id,
+      workoutDate: original.workout_date,
     });
-    const manualEdit = await reviewConfirmAndReadPersistedWorkoutEdit({
-      supabase,
-      userId: disposableUser.userId,
-      persisted,
-      title: "Runner-owned manual workout edit",
+    assert.equal(reconstructed.ok, true, JSON.stringify(reconstructed));
+    if (!reconstructed.ok) throw new Error(reconstructed.message);
+    const editProjection = {
+      ...reconstructed.editProjection,
+      title: "Runner-owned standalone Calendar workout",
+    };
+    const editReview = await reviewManualWorkoutPersistedEditDraftForUser(owner.userId, {
+      plannedWorkoutId: original.id,
+      workoutDate: original.workout_date,
+      editProjection,
     });
-    assert.equal(
-      manualEdit.confirm.sourceMetadata.originalPlanSourceKind,
-      MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
+    assert.equal(editReview.ok, true, JSON.stringify(editReview));
+    if (!editReview.ok) throw new Error(editReview.message);
+    const edited = await confirmManualWorkoutPersistedEditForUser(owner.userId, {
+      plannedWorkoutId: original.id,
+      workoutDate: original.workout_date,
+      editProjection,
+      reviewToken: editReview.review.reviewToken,
+      reviewChecksum: editReview.review.reviewChecksum,
+    });
+    assert.equal(edited.ok, true, JSON.stringify(edited));
+    if (!edited.ok) throw new Error(edited.message);
+    assert.equal(edited.provenancePlanId, null);
+
+    const editedRow = requiredWorkout(
+      await loadCalendarRows(supabase, owner.userId),
+      original.id,
+      "content edit",
     );
-    assert.equal(manualEdit.editedWorkout.id, manualEdit.sourceWorkout.id);
-    assert.equal(manualEdit.editedWorkout.title, manualEdit.editedDraftInput.title);
-    assertPlanRecordUnchanged(persisted.plan, manualEdit.edited.plan, "manual workout edit");
+    assert.equal(editedRow.id, original.id);
+    assert.equal(editedRow.title, editProjection.title);
+    assert.equal(editedRow.plan_cycle_id, null);
+    assert.equal(editedRow.origin_kind, "manual");
 
-    const duplicate = await addManualWorkoutToActivePlanForUser(disposableUser.userId, {
-      activePlanId: emptyPlan.activePlanId,
-      draftInput: input,
-      reviewToken: review.reviewToken,
-      reviewChecksum: review.reviewChecksum,
+    const copyDate = addDaysIso(input.workoutDate, 4);
+    const copied = await copyManualWorkoutWithinActivePlanForUser(owner.userId, {
+      sourceWorkoutId: editedRow.id,
+      sourceWorkoutDate: editedRow.workout_date,
+      targetDate: copyDate,
     });
-    assert.equal(duplicate.ok, false);
-    if (!duplicate.ok) {
-      assert.equal(duplicate.reason, "occupied_day");
+    assert.equal(copied.ok, true, JSON.stringify(copied));
+    if (!copied.ok) throw new Error(copied.message);
+    const copiedRow = requiredWorkout(
+      await loadCalendarRows(supabase, owner.userId),
+      copied.targetWorkoutId,
+      "prescription-only copy",
+    );
+    assert.equal(copiedRow.plan_cycle_id, null);
+    assert.equal(copiedRow.origin_kind, editedRow.origin_kind);
+    assert.deepEqual(copiedRow.steps, editedRow.steps);
+
+    const copyClearReview = await reviewManualWorkoutDeleteClearForUser(owner.userId, {
+      plannedWorkoutId: copiedRow.id,
+    });
+    assert.equal(copyClearReview.ok, true, JSON.stringify(copyClearReview));
+    if (!copyClearReview.ok) throw new Error(copyClearReview.message);
+    const clearedCopy = await confirmManualWorkoutDeleteClearForUser(owner.userId, {
+      plannedWorkoutId: copiedRow.id,
+      reviewToken: copyClearReview.review.reviewToken,
+      reviewChecksum: copyClearReview.review.reviewChecksum,
+    });
+    assert.equal(clearedCopy.ok, true, JSON.stringify(clearedCopy));
+
+    const emptyTargetDate = addDaysIso(input.workoutDate, 1);
+    const emptyMoveReview = await reviewManualWorkoutMoveForUser(owner.userId, {
+      sourceWorkoutId: editedRow.id,
+      sourceWorkoutDate: editedRow.workout_date,
+      targetDate: emptyTargetDate,
+    });
+    assert.equal(emptyMoveReview.ok, true, JSON.stringify(emptyMoveReview));
+    if (!emptyMoveReview.ok) throw new Error(emptyMoveReview.message);
+    const emptyMoved = await confirmManualWorkoutMoveForUser(owner.userId, {
+      sourceWorkoutId: editedRow.id,
+      sourceWorkoutDate: editedRow.workout_date,
+      targetDate: emptyTargetDate,
+      reviewToken: emptyMoveReview.review.reviewToken,
+      reviewChecksum: emptyMoveReview.review.reviewChecksum,
+    });
+    assert.equal(emptyMoved.ok, true, JSON.stringify(emptyMoved));
+    if (!emptyMoved.ok) throw new Error(emptyMoved.message);
+
+    const restTargetDate = addDaysIso(input.workoutDate, 2);
+    const restDraft = { templateKey: "rest_day", workoutDate: restTargetDate } as const;
+    const restReview = reviewManualWorkoutDraft(restDraft);
+    assert.equal(restReview.ok, true, JSON.stringify(restReview));
+    if (!restReview.ok) throw new Error(restReview.message);
+    const restAdded = await addManualWorkoutToActivePlanForUser(owner.userId, {
+      draftInput: restDraft,
+      reviewToken: restReview.reviewToken,
+      reviewChecksum: restReview.reviewChecksum,
+    });
+    assert.equal(restAdded.ok, true, JSON.stringify(restAdded));
+    if (!restAdded.ok) throw new Error(restAdded.message);
+
+    const beforeStoredRestMove = await loadCalendarRows(supabase, owner.userId);
+    const sourceBeforeStoredRest = requiredWorkout(
+      beforeStoredRestMove,
+      editedRow.id,
+      "stored-Rest source",
+    );
+    const originalRest = requiredWorkout(
+      beforeStoredRestMove,
+      restAdded.plannedWorkoutId,
+      "stored-Rest target",
+    );
+    assert.equal(originalRest.workout_type, "rest");
+
+    const storedRestReview = await reviewManualWorkoutMoveForUser(owner.userId, {
+      sourceWorkoutId: sourceBeforeStoredRest.id,
+      sourceWorkoutDate: emptyTargetDate,
+      targetDate: restTargetDate,
+    });
+    assert.equal(storedRestReview.ok, true, JSON.stringify(storedRestReview));
+    if (!storedRestReview.ok) throw new Error(storedRestReview.message);
+    const storedRestMoved = await confirmManualWorkoutMoveForUser(owner.userId, {
+      sourceWorkoutId: sourceBeforeStoredRest.id,
+      sourceWorkoutDate: emptyTargetDate,
+      targetDate: restTargetDate,
+      reviewToken: storedRestReview.review.reviewToken,
+      reviewChecksum: storedRestReview.review.reviewChecksum,
+    });
+    assert.equal(storedRestMoved.ok, true, JSON.stringify(storedRestMoved));
+    if (!storedRestMoved.ok) throw new Error(storedRestMoved.message);
+
+    const undone = await moveManualWorkoutWithinActivePlanForUser(owner.userId, {
+      sourceWorkoutId: sourceBeforeStoredRest.id,
+      sourceWorkoutDate: restTargetDate,
+      targetDate: emptyTargetDate,
+    });
+    assert.equal(undone.ok, true, JSON.stringify(undone));
+    if (!undone.ok) throw new Error(undone.message);
+    assert.equal(undone.safety.sourceDateBecameEmpty, false);
+
+    const reloadOne = await loadCalendarRows(supabase, owner.userId);
+    const reloadTwo = await loadCalendarRows(supabase, owner.userId);
+    assert.deepEqual(
+      requiredWorkout(reloadOne, sourceBeforeStoredRest.id, "Undo reload one source"),
+      sourceBeforeStoredRest,
+    );
+    assert.deepEqual(
+      requiredWorkout(reloadTwo, sourceBeforeStoredRest.id, "Undo reload two source"),
+      sourceBeforeStoredRest,
+    );
+    assert.deepEqual(
+      requiredWorkout(reloadOne, originalRest.id, "Undo reload one Rest"),
+      originalRest,
+    );
+    assert.deepEqual(
+      requiredWorkout(reloadTwo, originalRest.id, "Undo reload two Rest"),
+      originalRest,
+    );
+
+    const occupiedTargetDate = copyDate;
+    const occupiedDraft = {
+      templateKey: "easy_aerobic_run",
+      workoutDate: occupiedTargetDate,
+      title: "Occupied workout before durable Undo",
+      notes: "This complete row must survive replacement and authoritative restoration.",
+    } as const;
+    const occupiedReview = reviewManualWorkoutDraft(occupiedDraft);
+    assert.equal(occupiedReview.ok, true, JSON.stringify(occupiedReview));
+    if (!occupiedReview.ok) throw new Error(occupiedReview.message);
+    const occupiedAdd = await addManualWorkoutToActivePlanForUser(owner.userId, {
+      draftInput: occupiedDraft,
+      reviewToken: occupiedReview.reviewToken,
+      reviewChecksum: occupiedReview.reviewChecksum,
+    });
+    assert.equal(occupiedAdd.ok, true, JSON.stringify(occupiedAdd));
+    if (!occupiedAdd.ok) throw new Error(occupiedAdd.message);
+
+    const beforeOccupiedReview = await loadCalendarRows(supabase, owner.userId);
+    const sourceBeforeOccupiedMove = requiredWorkout(
+      beforeOccupiedReview,
+      sourceBeforeStoredRest.id,
+      "occupied replacement source",
+    );
+    const occupiedTargetBeforeEdit = requiredWorkout(
+      beforeOccupiedReview,
+      occupiedAdd.plannedWorkoutId,
+      "occupied replacement target",
+    );
+    const cancelledOccupiedReview = await reviewManualWorkoutMoveForUser(owner.userId, {
+      sourceWorkoutId: sourceBeforeOccupiedMove.id,
+      sourceWorkoutDate: sourceBeforeOccupiedMove.workout_date,
+      targetDate: occupiedTargetDate,
+    });
+    assert.equal(cancelledOccupiedReview.ok, true, JSON.stringify(cancelledOccupiedReview));
+    if (!cancelledOccupiedReview.ok) throw new Error(cancelledOccupiedReview.message);
+    assert.equal(cancelledOccupiedReview.targetDayKind, "workout_day");
+    assert.equal(
+      cancelledOccupiedReview.targetReplacement?.plannedWorkoutId,
+      occupiedTargetBeforeEdit.id,
+    );
+    assert.deepEqual(
+      await loadCalendarRows(supabase, owner.userId),
+      beforeOccupiedReview,
+      "Review cancellation must not mutate either occupied replacement row.",
+    );
+
+    const occupiedEditDraft = await reconstructManualWorkoutPersistedEditDraftForUser(
+      owner.userId,
+      {
+        plannedWorkoutId: occupiedTargetBeforeEdit.id,
+        workoutDate: occupiedTargetBeforeEdit.workout_date,
+      },
+    );
+    assert.equal(occupiedEditDraft.ok, true, JSON.stringify(occupiedEditDraft));
+    if (!occupiedEditDraft.ok) throw new Error(occupiedEditDraft.message);
+    const occupiedEditProjection = {
+      ...occupiedEditDraft.editProjection,
+      title: "Occupied workout after concurrent edit",
+    };
+    const occupiedEditReview = await reviewManualWorkoutPersistedEditDraftForUser(owner.userId, {
+      plannedWorkoutId: occupiedTargetBeforeEdit.id,
+      workoutDate: occupiedTargetBeforeEdit.workout_date,
+      editProjection: occupiedEditProjection,
+    });
+    assert.equal(occupiedEditReview.ok, true, JSON.stringify(occupiedEditReview));
+    if (!occupiedEditReview.ok) throw new Error(occupiedEditReview.message);
+    const occupiedEdited = await confirmManualWorkoutPersistedEditForUser(owner.userId, {
+      plannedWorkoutId: occupiedTargetBeforeEdit.id,
+      workoutDate: occupiedTargetBeforeEdit.workout_date,
+      editProjection: occupiedEditProjection,
+      reviewToken: occupiedEditReview.review.reviewToken,
+      reviewChecksum: occupiedEditReview.review.reviewChecksum,
+    });
+    assert.equal(occupiedEdited.ok, true, JSON.stringify(occupiedEdited));
+    if (!occupiedEdited.ok) throw new Error(occupiedEdited.message);
+
+    const staleOccupiedConfirm = await confirmManualWorkoutMoveForUser(owner.userId, {
+      sourceWorkoutId: sourceBeforeOccupiedMove.id,
+      sourceWorkoutDate: sourceBeforeOccupiedMove.workout_date,
+      targetDate: occupiedTargetDate,
+      reviewToken: cancelledOccupiedReview.review.reviewToken,
+      reviewChecksum: cancelledOccupiedReview.review.reviewChecksum,
+    });
+    assert.equal(staleOccupiedConfirm.ok, false);
+    if (!staleOccupiedConfirm.ok) assert.equal(staleOccupiedConfirm.reason, "stale_review");
+
+    const occupiedTarget = requiredWorkout(
+      await loadCalendarRows(supabase, owner.userId),
+      occupiedTargetBeforeEdit.id,
+      "concurrently edited occupied target",
+    );
+    const occupiedMoveReview = await reviewManualWorkoutMoveForUser(owner.userId, {
+      sourceWorkoutId: sourceBeforeOccupiedMove.id,
+      sourceWorkoutDate: sourceBeforeOccupiedMove.workout_date,
+      targetDate: occupiedTargetDate,
+    });
+    assert.equal(occupiedMoveReview.ok, true, JSON.stringify(occupiedMoveReview));
+    if (!occupiedMoveReview.ok) throw new Error(occupiedMoveReview.message);
+    const occupiedMoved = await confirmManualWorkoutMoveForUser(owner.userId, {
+      sourceWorkoutId: sourceBeforeOccupiedMove.id,
+      sourceWorkoutDate: sourceBeforeOccupiedMove.workout_date,
+      targetDate: occupiedTargetDate,
+      reviewToken: occupiedMoveReview.review.reviewToken,
+      reviewChecksum: occupiedMoveReview.review.reviewChecksum,
+    });
+    assert.equal(occupiedMoved.ok, true, JSON.stringify(occupiedMoved));
+    if (!occupiedMoved.ok) throw new Error(occupiedMoved.message);
+
+    const afterOccupiedMove = await loadCalendarRows(supabase, owner.userId);
+    assert.equal(
+      afterOccupiedMove.some((workout) => workout.id === occupiedTarget.id),
+      false,
+      "Confirmed occupied replacement must remove only the reviewed target row.",
+    );
+    assert.equal(
+      afterOccupiedMove.some(
+        (workout) => workout.workout_date === sourceBeforeOccupiedMove.workout_date,
+      ),
+      false,
+      "Confirmed occupied replacement must leave the source date empty until Undo.",
+    );
+    const movedOntoOccupiedDate = requiredWorkout(
+      afterOccupiedMove,
+      sourceBeforeOccupiedMove.id,
+      "occupied replacement moved workout",
+    );
+    assert.equal(movedOntoOccupiedDate.workout_date, occupiedTargetDate);
+    assert.equal(movedOntoOccupiedDate.plan_cycle_id, sourceBeforeOccupiedMove.plan_cycle_id);
+    assert.equal(movedOntoOccupiedDate.origin_kind, sourceBeforeOccupiedMove.origin_kind);
+
+    const occupiedMoveEvents = await loadMutationEvents(supabase, owner.userId);
+    const occupiedMoveEvent = occupiedMoveEvents
+      .slice()
+      .reverse()
+      .find(
+        (event) =>
+          event.mutation_kind === "user_moved_workout" &&
+          event.planned_workout_id === sourceBeforeOccupiedMove.id &&
+          event.target_date === occupiedTargetDate &&
+          event.displaced_workout !== null,
+      );
+    assert.ok(occupiedMoveEvent, "Occupied replacement must retain its displaced workout audit.");
+    assert.deepEqual(occupiedMoveEvent.displaced_workout, occupiedTarget);
+    assert.ok(occupiedMoveEvent.undo_expires_at, "Occupied replacement must receive a DB expiry.");
+    assert.equal(occupiedMoveEvent.undo_of_event_id, null);
+
+    const occupiedUndone = await moveManualWorkoutWithinActivePlanForUser(owner.userId, {
+      sourceWorkoutId: sourceBeforeOccupiedMove.id,
+      sourceWorkoutDate: occupiedTargetDate,
+      targetDate: sourceBeforeOccupiedMove.workout_date,
+    });
+    assert.equal(occupiedUndone.ok, true, JSON.stringify(occupiedUndone));
+    if (!occupiedUndone.ok) throw new Error(occupiedUndone.message);
+    assert.equal(occupiedUndone.safety.sourceDateBecameEmpty, false);
+
+    const occupiedReloadOne = await loadCalendarRows(supabase, owner.userId);
+    const occupiedReloadTwo = await loadCalendarRows(supabase, owner.userId);
+    assert.deepEqual(
+      requiredWorkout(
+        occupiedReloadOne,
+        sourceBeforeOccupiedMove.id,
+        "occupied Undo reload one source",
+      ),
+      sourceBeforeOccupiedMove,
+    );
+    assert.deepEqual(
+      requiredWorkout(
+        occupiedReloadTwo,
+        sourceBeforeOccupiedMove.id,
+        "occupied Undo reload two source",
+      ),
+      sourceBeforeOccupiedMove,
+    );
+    assert.deepEqual(
+      requiredWorkout(occupiedReloadOne, occupiedTarget.id, "occupied Undo reload one target"),
+      occupiedTarget,
+    );
+    assert.deepEqual(
+      requiredWorkout(occupiedReloadTwo, occupiedTarget.id, "occupied Undo reload two target"),
+      occupiedTarget,
+    );
+    const occupiedUndoEvent = (await loadMutationEvents(supabase, owner.userId))
+      .slice()
+      .reverse()
+      .find((event) => event.undo_of_event_id === occupiedMoveEvent.id);
+    assert.ok(occupiedUndoEvent, "Occupied Undo must link exactly once to its replacement event.");
+    assert.equal(occupiedUndoEvent.displaced_workout, null);
+
+    const beforeDuplicateUndo = await loadCalendarRows(supabase, owner.userId);
+    const duplicateOccupiedUndo = await moveManualWorkoutWithinActivePlanForUser(owner.userId, {
+      sourceWorkoutId: sourceBeforeOccupiedMove.id,
+      sourceWorkoutDate: occupiedTargetDate,
+      targetDate: sourceBeforeOccupiedMove.workout_date,
+    });
+    assert.equal(duplicateOccupiedUndo.ok, false);
+    if (!duplicateOccupiedUndo.ok) {
+      assert.equal(duplicateOccupiedUndo.reason, "source_date_changed");
     }
-    const mutationFailureAtomic = await validateActivePlanWorkoutMutationFailureAtomicity({
-      supabase,
-      userId: disposableUser.userId,
+    assert.deepEqual(await loadCalendarRows(supabase, owner.userId), beforeDuplicateUndo);
+
+    const restClear = await reviewManualWorkoutDeleteClearForUser(owner.userId, {
+      plannedWorkoutId: originalRest.id,
     });
-    const moveAndClearPersisted = await validateMoveAndClearPersistence({
-      supabase,
-      userId: disposableUser.userId,
+    assert.equal(restClear.ok, false);
+    if (!restClear.ok) assert.equal(restClear.reason, "target_workout_not_supported");
+
+    const protectedDate = addDaysIso(input.workoutDate, 3);
+    const protectedDraft = {
+      templateKey: "easy_aerobic_run",
+      workoutDate: protectedDate,
+      title: "Evidence protection proof",
+    } as const;
+    const protectedReview = reviewManualWorkoutDraft(protectedDraft);
+    assert.equal(protectedReview.ok, true, JSON.stringify(protectedReview));
+    if (!protectedReview.ok) throw new Error(protectedReview.message);
+    const protectedAdd = await addManualWorkoutToActivePlanForUser(owner.userId, {
+      draftInput: protectedDraft,
+      reviewToken: protectedReview.reviewToken,
+      reviewChecksum: protectedReview.reviewChecksum,
     });
-    const longRunHydrationPersisted = await validateLongRunHydrationPersistence({
-      supabase,
-      userId: disposableUser.userId,
-      activePlanId: emptyPlan.activePlanId,
+    assert.equal(protectedAdd.ok, true, JSON.stringify(protectedAdd));
+    if (!protectedAdd.ok) throw new Error(protectedAdd.message);
+    const protectedWorkout = requiredWorkout(
+      await loadCalendarRows(supabase, owner.userId),
+      protectedAdd.plannedWorkoutId,
+      "protected workout",
+    );
+
+    const beforeEvidenceReview = await reviewManualWorkoutDeleteClearForUser(owner.userId, {
+      plannedWorkoutId: protectedWorkout.id,
     });
+    assert.equal(beforeEvidenceReview.ok, true, JSON.stringify(beforeEvidenceReview));
+    if (!beforeEvidenceReview.ok) throw new Error(beforeEvidenceReview.message);
+    const beforeEvidenceMoveReview = await reviewManualWorkoutMoveForUser(owner.userId, {
+      sourceWorkoutId: sourceBeforeOccupiedMove.id,
+      sourceWorkoutDate: sourceBeforeOccupiedMove.workout_date,
+      targetDate: protectedWorkout.workout_date,
+    });
+    assert.equal(beforeEvidenceMoveReview.ok, true, JSON.stringify(beforeEvidenceMoveReview));
+    if (!beforeEvidenceMoveReview.ok) throw new Error(beforeEvidenceMoveReview.message);
+
+    const evidence = await insertProtectedWorkoutEvidence(supabase, owner.userId, protectedWorkout);
+    const beforeProtectedMoveConfirm = await loadCalendarRows(supabase, owner.userId);
+    const protectedMove = await confirmManualWorkoutMoveForUser(owner.userId, {
+      sourceWorkoutId: sourceBeforeOccupiedMove.id,
+      sourceWorkoutDate: sourceBeforeOccupiedMove.workout_date,
+      targetDate: protectedWorkout.workout_date,
+      reviewToken: beforeEvidenceMoveReview.review.reviewToken,
+      reviewChecksum: beforeEvidenceMoveReview.review.reviewChecksum,
+    });
+    assert.equal(protectedMove.ok, false);
+    if (!protectedMove.ok) assert.equal(protectedMove.reason, "protected_day");
+    assert.deepEqual(
+      await loadCalendarRows(supabase, owner.userId),
+      beforeProtectedMoveConfirm,
+      "Evidence added after review must reject occupied Move without a partial write.",
+    );
+    await assert.rejects(
+      persistManualWorkoutMove({
+        userId: owner.userId,
+        currentDate: todayIso(),
+        sourceWorkout: sourceBeforeOccupiedMove,
+        otherWorkouts: beforeProtectedMoveConfirm.filter(
+          (workout) => workout.id !== sourceBeforeOccupiedMove.id,
+        ),
+        review: beforeEvidenceMoveReview.review,
+        targetWeekNumber: sourceBeforeOccupiedMove.week_number,
+        targetReplacementWorkout: protectedWorkout,
+      }),
+      (error: unknown) =>
+        error instanceof CalendarPersistenceRejection && error.reason === "protected_day",
+      "The transaction must reject target evidence added after Move review without deleting either row.",
+    );
+    assert.deepEqual(
+      await loadCalendarRows(supabase, owner.userId),
+      beforeProtectedMoveConfirm,
+      "Atomic occupied Move refusal must preserve source and target rows byte-for-byte.",
+    );
+    const afterEvidence = await confirmManualWorkoutDeleteClearForUser(owner.userId, {
+      plannedWorkoutId: protectedWorkout.id,
+      reviewToken: beforeEvidenceReview.review.reviewToken,
+      reviewChecksum: beforeEvidenceReview.review.reviewChecksum,
+    });
+    assert.equal(afterEvidence.ok, false);
+    if (!afterEvidence.ok) assert.equal(afterEvidence.reason, "protected_day");
+
+    await assert.rejects(
+      persistManualWorkoutDeleteClear({
+        userId: owner.userId,
+        currentDate: todayIso(),
+        targetWorkout: protectedWorkout,
+        review: beforeEvidenceReview.review,
+      }),
+      (error: unknown) =>
+        error instanceof CalendarPersistenceRejection && error.reason === "protected_day",
+      "The transaction must reject evidence added after review without deleting the workout.",
+    );
+    assert.deepEqual(
+      requiredWorkout(
+        await loadCalendarRows(supabase, owner.userId),
+        protectedWorkout.id,
+        "protected workout after atomic refusal",
+      ),
+      protectedWorkout,
+    );
+    await assertEvidenceStillPresent(supabase, evidence);
+
+    isolationUser = await acquireQaPoolSupabaseUser({
+      supabase,
+      poolRole: "isolation-b",
+      password: DISPOSABLE_TEST_PASSWORD,
+      creationErrorMessage: "Disposable isolation user acquisition failed.",
+    });
+    const rls = await validateAuthenticatedIsolation({
+      preflight,
+      owner,
+      isolationUser,
+      sourceWorkout: sourceBeforeStoredRest,
+    });
+
+    const expiringOccupiedReview = await reviewManualWorkoutMoveForUser(owner.userId, {
+      sourceWorkoutId: sourceBeforeOccupiedMove.id,
+      sourceWorkoutDate: sourceBeforeOccupiedMove.workout_date,
+      targetDate: occupiedTargetDate,
+    });
+    assert.equal(expiringOccupiedReview.ok, true, JSON.stringify(expiringOccupiedReview));
+    if (!expiringOccupiedReview.ok) throw new Error(expiringOccupiedReview.message);
+    const expiringOccupiedMove = await confirmManualWorkoutMoveForUser(owner.userId, {
+      sourceWorkoutId: sourceBeforeOccupiedMove.id,
+      sourceWorkoutDate: sourceBeforeOccupiedMove.workout_date,
+      targetDate: occupiedTargetDate,
+      reviewToken: expiringOccupiedReview.review.reviewToken,
+      reviewChecksum: expiringOccupiedReview.review.reviewChecksum,
+    });
+    assert.equal(expiringOccupiedMove.ok, true, JSON.stringify(expiringOccupiedMove));
+    if (!expiringOccupiedMove.ok) throw new Error(expiringOccupiedMove.message);
+    const beforeExpiredUndo = await loadCalendarRows(supabase, owner.userId);
+    await new Promise((resolve) => setTimeout(resolve, MOVE_UNDO_EXPIRY_PROOF_WAIT_MS));
+    const expiredOccupiedUndo = await moveManualWorkoutWithinActivePlanForUser(owner.userId, {
+      sourceWorkoutId: sourceBeforeOccupiedMove.id,
+      sourceWorkoutDate: occupiedTargetDate,
+      targetDate: sourceBeforeOccupiedMove.workout_date,
+    });
+    assert.equal(expiredOccupiedUndo.ok, false);
+    if (!expiredOccupiedUndo.ok) assert.equal(expiredOccupiedUndo.reason, "undo_expired");
+    assert.deepEqual(
+      await loadCalendarRows(supabase, owner.userId),
+      beforeExpiredUndo,
+      "Expired occupied Undo must leave the replacement state unchanged.",
+    );
+
+    const mutationEvents = await loadMutationEvents(supabase, owner.userId);
+    assert.ok(mutationEvents.length >= 8);
+    assert.ok(mutationEvents.some((event) => event.mutation_kind === "user_edited_workout"));
+    assert.ok(mutationEvents.some((event) => event.mutation_kind === "user_copied_workout"));
+    assert.ok(
+      mutationEvents.some(
+        (event) => event.mutation_kind === "user_moved_workout" && event.displaced_workout,
+      ),
+    );
+    assert.equal(await countPlanRows(supabase, owner.userId), 0);
 
     proof = {
-      rows: persisted.workouts.length,
-      sourceKind: persisted.plan.source_kind,
-      sourceStatus: readManualSourceStatus(persisted.plan),
-      reviewChecksum: readManualReviewChecksum(persisted.plan),
-      editedWorkoutId: manualEdit.editedWorkout.id,
-      editedTitle: manualEdit.editedWorkout.title,
-      originalPlanSourceKind: manualEdit.confirm.sourceMetadata.originalPlanSourceKind,
-      mutationFailureAtomic,
-      moveAndClearPersisted,
-      longRunHydrationPersisted,
-      templateLifecyclePersisted: true,
+      directManualAdd: {
+        workoutId: original.id,
+        planRowsCreated: 0,
+        planCycleId: null,
+        originKind: "manual",
+      },
+      sameRowContentEdit: true,
+      prescriptionOnlyCopy: true,
+      independentClear: true,
+      emptyTargetMove: true,
+      storedRestMoveUndoTwoReloads: true,
+      occupiedMoveCancelNoOp: true,
+      occupiedMoveStaleReviewRejected: true,
+      occupiedMoveUndoTwoReloads: true,
+      occupiedMoveUndoExactOnce: true,
+      occupiedMoveExpiredUndoNoOp: true,
+      evidenceRaceRejectedAtomically: true,
+      retainedEvidence: evidence,
+      mutationEventCount: mutationEvents.length,
+      authenticatedIsolation: rls,
     };
   } finally {
-    cleanup = await cleanupDisposableManualWorkoutUser(supabase, disposableUser);
+    if (isolationUser) {
+      isolationCleanup = await releaseQaPoolSupabaseUser({
+        supabase,
+        userId: isolationUser.userId,
+        poolRole: isolationUser.poolRole,
+        leaseToken: isolationUser.leaseToken,
+      });
+    }
+    cleanup = await releaseQaPoolSupabaseUser({
+      supabase,
+      userId: owner.userId,
+      poolRole: owner.poolRole,
+      leaseToken: owner.leaseToken,
+    });
   }
 
-  assert.ok(proof, "Manual workout persistence proof must complete before cleanup reporting.");
-  assert.ok(cleanup, "Manual workout cleanup proof must be captured.");
-  const importedEdit = await validateImportedWorkoutEditAtomicPersistence({
-    review,
-    supabase,
-  });
-  const canonicalOriginEdits = await validateCanonicalOriginWorkoutEditPersistence({
-    review,
-    supabase,
-  });
+  assert.ok(proof, "Standalone Calendar persistence proof must complete.");
+  assert.ok(cleanup, "Owner cleanup proof must be captured.");
+  assert.ok(isolationCleanup, "Isolation cleanup proof must be captured.");
 
   return {
     mode: preflight.mode,
     target: preflight.target,
-    testerPoolRole: disposableUser.poolRole,
+    testerPoolRole: owner.poolRole,
     persisted: proof,
     cleanup,
-    importedEdit,
-    canonicalOriginEdits,
+    isolationCleanup,
   };
 }
 
-async function validateLongRunHydrationPersistence(input: {
-  supabase: ReturnType<typeof createAdminSupabaseClient>;
-  userId: string;
-  activePlanId: string;
-}) {
-  const draftInput: ManualWorkoutDraftInput = {
-    templateKey: "long_aerobic_run",
-    workoutDate: addDaysIso(todayIso(), 10),
-    entries: [
-      {
-        kind: "block",
-        block: {
-          blockKey: "long_run_body_block",
-          durationSeconds: 80 * 60,
-        },
-      },
-      {
-        kind: "block",
-        block: {
-          blockKey: "hydration_block",
-        },
-      },
-      {
-        kind: "block",
-        block: {
-          blockKey: "cooldown_block",
-          durationSeconds: 25 * 60,
-        },
-      },
-    ],
-  };
-  const review = reviewManualWorkoutDraft(draftInput);
-  assert.equal(review.ok, true, JSON.stringify(review));
-  if (!review.ok) throw new Error(review.message);
-
-  const added = await addManualWorkoutToActivePlanForUser(input.userId, {
-    activePlanId: input.activePlanId,
-    draftInput,
-    reviewToken: review.reviewToken,
-    reviewChecksum: review.reviewChecksum,
-  });
-  assert.equal(added.ok, true, JSON.stringify(added));
-  if (!added.ok) throw new Error(added.message);
-
-  const persisted = await loadPersistedManualPlanForUser(input.supabase, input.userId);
-  const workout = persisted.workouts.find((candidate) => candidate.id === added.plannedWorkoutId);
-  assert.ok(workout, "Persisted long run must be readable.");
-  const hydration = readWorkoutDocumentSections(workout?.steps).find(
-    (step) => step.segment_type === "fueling",
-  );
-  assert.equal(hydration?.label, "Hydration");
-  assert.equal(hydration?.guidance, "Take water.");
-  assert.equal(hydration?.prescription?.mode, "none");
-  assert.equal(hydration?.target, undefined);
-
-  const clearReview = await reviewManualWorkoutDeleteClearForUser(input.userId, {
-    activePlanId: input.activePlanId,
-    plannedWorkoutId: added.plannedWorkoutId,
-  });
-  assert.equal(clearReview.ok, true, JSON.stringify(clearReview));
-  if (!clearReview.ok) throw new Error(clearReview.message);
-
-  const cleared = await confirmManualWorkoutDeleteClearForUser(input.userId, {
-    activePlanId: input.activePlanId,
-    plannedWorkoutId: added.plannedWorkoutId,
-    reviewToken: clearReview.review.reviewToken,
-    reviewChecksum: clearReview.review.reviewChecksum,
-  });
-  assert.equal(cleared.ok, true, JSON.stringify(cleared));
-  if (!cleared.ok) throw new Error(cleared.message);
-
-  const afterClear = await loadPersistedManualPlanForUser(input.supabase, input.userId);
-  assert.equal(afterClear.workouts.length, 0);
-  return true as const;
-}
-
-async function validateManualTemplatePersistence(input: {
-  userId: string;
-  input: ManualWorkoutDraftInput;
-  review: ManualWorkoutReadyReview;
-}) {
-  const saved = await saveManualWorkoutSavedTemplateForUser(input.userId, {
-    displayName: "Disposable reviewed easy",
-    iconKey: "easy",
-    draftInput: input.input,
-    reviewToken: input.review.reviewToken,
-    reviewChecksum: input.review.reviewChecksum,
-  });
-  assert.equal(saved.ok, true, JSON.stringify(saved));
-  if (!saved.ok) throw new Error(saved.message);
-
-  const catalog = await listManualWorkoutTemplateCatalogForUser(input.userId);
-  assert.equal(catalog.ok, true, JSON.stringify(catalog));
-  if (!catalog.ok) throw new Error(catalog.message);
-  assert.equal(
-    catalog.personalTemplates.some((template) => template.id === saved.template.id),
-    true,
-  );
-
-  const reused = await reviewManualWorkoutSavedTemplateForUser(input.userId, {
-    templateId: saved.template.id,
-    workoutDate: addDaysIso(input.review.draft.workoutDate, 7),
-  });
-  assert.equal(reused.ok, true, JSON.stringify(reused));
-  if (!reused.ok) throw new Error(reused.message);
-  assert.deepEqual(reused.review.draft.steps, input.review.draft.steps);
-
-  const hidden = await updateManualWorkoutBuiltInVisibilityForUser(
-    input.userId,
-    { templateKey: "easy_aerobic_run" },
-    "hide",
-  );
-  assert.equal(hidden.ok, true, JSON.stringify(hidden));
-  const hiddenCatalog = await listManualWorkoutTemplateCatalogForUser(input.userId);
-  assert.equal(hiddenCatalog.ok, true, JSON.stringify(hiddenCatalog));
-  if (!hiddenCatalog.ok) throw new Error(hiddenCatalog.message);
-  assert.equal(
-    hiddenCatalog.visibleBuiltInTemplates.some(
-      (template) => template.templateKey === "easy_aerobic_run",
-    ),
-    false,
-  );
-
-  const restored = await restoreAllManualWorkoutBuiltInTemplatesForUser(input.userId);
-  assert.equal(restored.ok, true, JSON.stringify(restored));
-  const deleted = await deleteManualWorkoutSavedTemplateForUser(input.userId, {
-    templateId: saved.template.id,
-  });
-  assert.equal(deleted.ok, true, JSON.stringify(deleted));
-}
-
-async function validateMoveAndClearPersistence(input: {
-  supabase: ReturnType<typeof createAdminSupabaseClient>;
-  userId: string;
-}) {
-  const beforeMove = await loadPersistedManualPlanForUser(input.supabase, input.userId);
-  const sourceWorkout = beforeMove.workouts[0];
-  assert.ok(sourceWorkout, "Move/Clear persistence proof requires one workout.");
-  const targetDate = addDaysIso(sourceWorkout.workout_date, 1);
-  const moveReview = await reviewManualWorkoutMoveForUser(input.userId, {
-    activePlanId: beforeMove.plan.id,
-    sourceWorkoutId: sourceWorkout.id,
-    targetDate,
-  });
-  assert.equal(moveReview.ok, true, JSON.stringify(moveReview));
-  if (!moveReview.ok) throw new Error(moveReview.message);
-
-  const moved = await confirmManualWorkoutMoveForUser(input.userId, {
-    activePlanId: beforeMove.plan.id,
-    sourceWorkoutId: sourceWorkout.id,
-    targetDate,
-    reviewToken: moveReview.review.reviewToken,
-    reviewChecksum: moveReview.review.reviewChecksum,
-  });
-  assert.equal(moved.ok, true, JSON.stringify(moved));
-  if (!moved.ok) throw new Error(moved.message);
-
-  const afterMove = await loadPersistedManualPlanForUser(input.supabase, input.userId);
-  assert.equal(afterMove.workouts.length, 1);
-  assert.equal(afterMove.workouts[0]?.id, sourceWorkout.id);
-  assert.equal(afterMove.workouts[0]?.workout_date, targetDate);
-  const clearReview = await reviewManualWorkoutDeleteClearForUser(input.userId, {
-    activePlanId: afterMove.plan.id,
-    plannedWorkoutId: sourceWorkout.id,
-  });
-  assert.equal(clearReview.ok, true, JSON.stringify(clearReview));
-  if (!clearReview.ok) throw new Error(clearReview.message);
-
-  const cleared = await confirmManualWorkoutDeleteClearForUser(input.userId, {
-    activePlanId: afterMove.plan.id,
-    plannedWorkoutId: sourceWorkout.id,
-    reviewToken: clearReview.review.reviewToken,
-    reviewChecksum: clearReview.review.reviewChecksum,
-  });
-  assert.equal(cleared.ok, true, JSON.stringify(cleared));
-  if (!cleared.ok) throw new Error(cleared.message);
-
-  const afterClear = await loadPersistedManualPlanForUser(input.supabase, input.userId);
-  assert.equal(afterClear.workouts.length, 0);
-  assert.equal(afterClear.plan.status, "archived");
-
-  return true as const;
-}
-
-async function validateActivePlanWorkoutMutationFailureAtomicity(input: {
-  supabase: ReturnType<typeof createAdminSupabaseClient>;
-  userId: string;
-}) {
-  const initial = await loadPersistedManualPlanForUser(input.supabase, input.userId);
-  const sourceWorkout = initial.workouts[0];
-  assert.ok(sourceWorkout, "Atomic mutation proof requires one source workout.");
-  const immutablePlanUpdate = {
-    end_date: initial.plan.end_date,
-    goal_metadata: initial.plan.goal_metadata,
-    plan_preferences: initial.plan.plan_preferences,
-  };
-  const addDate = addDaysIso(sourceWorkout.workout_date, 7);
-  const addWorkoutId = crypto.randomUUID();
-
-  await assert.rejects(
-    applyAtomicCalendarWorkoutMutation({
-      userId: input.userId,
-      planId: initial.plan.id,
-      expectedPlanUpdatedAt: initial.plan.updated_at,
-      currentDate: todayIso(),
-      mutationKind: "add",
-      expectedSourceWorkout: null,
-      expectedTargetWorkout: null,
-      workoutInsert: {
-        ...sourceWorkout,
-        id: addWorkoutId,
-        workout_date: addDate,
-        weekday: weekdayLong(addDate),
-        display_order: sourceWorkout.display_order + 1,
-        steps: { invalid: "planned_workouts.steps must remain an array" },
-      } as unknown as Json,
-      workoutUpdate: null,
-      planUpdate: immutablePlanUpdate,
-    }),
-  );
-  assert.deepEqual(
-    await loadPersistedManualPlanForUser(input.supabase, input.userId),
-    initial,
-    "Failed Add must leave the independent workout set and immutable plan unchanged.",
-  );
-
-  const targetDate = addDaysIso(sourceWorkout.workout_date, 14);
-  const targetWorkoutId = crypto.randomUUID();
-  const targetInsert = await input.supabase
+async function loadCalendarRows(supabase: AdminSupabaseClient, userId: string) {
+  const rows = await supabase
     .from("planned_workouts")
-    .insert({
-      ...sourceWorkout,
-      id: targetWorkoutId,
-      workout_date: targetDate,
-      weekday: weekdayLong(targetDate),
-      display_order: sourceWorkout.display_order + 1,
-    })
     .select("*")
+    .eq("user_id", userId)
+    .order("workout_date", { ascending: true })
+    .order("display_order", { ascending: true });
+  if (rows.error) throw new Error(rows.error.message);
+  return rows.data;
+}
+
+async function loadMutationEvents(supabase: AdminSupabaseClient, userId: string) {
+  const rows = await supabase
+    .from("calendar_workout_mutation_events")
+    .select("*")
+    .eq("user_id", userId)
+    .order("id", { ascending: true });
+  if (rows.error) throw new Error(rows.error.message);
+  return rows.data;
+}
+
+async function countPlanRows(supabase: AdminSupabaseClient, userId: string) {
+  const result = await supabase
+    .from("plan_cycles")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId);
+  if (result.error) throw new Error(result.error.message);
+  return result.count ?? 0;
+}
+
+function requiredWorkout(
+  rows: readonly PersistedPlannedWorkoutRow[],
+  workoutId: string,
+  label: string,
+) {
+  const workout = rows.find((row) => row.id === workoutId);
+  assert.ok(workout, `${label} requires workout ${workoutId}.`);
+  return workout;
+}
+
+async function insertProtectedWorkoutEvidence(
+  supabase: AdminSupabaseClient,
+  userId: string,
+  workout: PersistedPlannedWorkoutRow,
+) {
+  const workoutLogId = crypto.randomUUID();
+  const workoutLog = await supabase
+    .from("workout_logs")
+    .insert({
+      id: workoutLogId,
+      user_id: userId,
+      planned_workout_id: workout.id,
+      outcome: "completed",
+      actual_distance_km: 5,
+      actual_duration_min: 35,
+      rpe: 5,
+      notes: "Atomic protection proof",
+      intervals_completed: null,
+      body_notes: [],
+    })
+    .select("id")
     .single();
-  if (targetInsert.error || !targetInsert.data) {
-    throw new Error(targetInsert.error?.message ?? "Atomic move target setup failed.");
-  }
+  if (workoutLog.error) throw new Error(workoutLog.error.message);
 
-  const withTarget = await loadPersistedManualPlanForUser(input.supabase, input.userId);
-  const targetWorkout = withTarget.workouts.find((workout) => workout.id === targetWorkoutId);
-  assert.ok(targetWorkout, "Atomic move target must be visible before failure injection.");
+  const resultAssetId = crypto.randomUUID();
+  const resultAsset = await supabase
+    .from("workout_result_assets")
+    .insert({
+      id: resultAssetId,
+      user_id: userId,
+      planned_workout_id: workout.id,
+      workout_log_id: workoutLogId,
+      asset_kind: "garmin_fit",
+      storage_bucket: "workout-result-assets",
+      storage_path: `standalone-calendar-proof/${resultAssetId}.fit`,
+      original_file_name: "standalone-calendar-proof.fit",
+      mime_type: "application/octet-stream",
+      file_size_bytes: 1,
+      parse_status: "uploaded",
+      primary_file_kind: "fit",
+      primary_file_name: "standalone-calendar-proof.fit",
+    })
+    .select("id")
+    .single();
+  if (resultAsset.error) throw new Error(resultAsset.error.message);
 
-  await assert.rejects(
-    applyAtomicCalendarWorkoutMutation({
-      userId: input.userId,
-      planId: withTarget.plan.id,
-      expectedPlanUpdatedAt: withTarget.plan.updated_at,
-      currentDate: todayIso(),
-      mutationKind: "clear",
-      expectedSourceWorkout: {
-        ...buildSourceWorkoutFingerprint(sourceWorkout),
-        title: "stale clear fingerprint",
-      } as Json,
-      expectedTargetWorkout: null,
-      workoutInsert: null,
-      workoutUpdate: null,
-      planUpdate: immutablePlanUpdate,
+  return { workoutLogId, resultAssetId };
+}
+
+async function assertEvidenceStillPresent(
+  supabase: AdminSupabaseClient,
+  evidence: { workoutLogId: string; resultAssetId: string },
+) {
+  const [log, asset] = await Promise.all([
+    supabase.from("workout_logs").select("id").eq("id", evidence.workoutLogId).single(),
+    supabase.from("workout_result_assets").select("id").eq("id", evidence.resultAssetId).single(),
+  ]);
+  assert.equal(log.error, null);
+  assert.equal(asset.error, null);
+}
+
+async function validateAuthenticatedIsolation(input: {
+  preflight: Extract<ManualPersistencePreflight, { shouldRun: true }>;
+  owner: QaPoolUserLease;
+  isolationUser: QaPoolUserLease;
+  sourceWorkout: PersistedPlannedWorkoutRow;
+}) {
+  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
+  assert.ok(publishableKey, "Authenticated RLS proof requires the local publishable key.");
+  const ownerClient = createClient<Database>(input.preflight.target.url, publishableKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const isolationClient = createClient<Database>(input.preflight.target.url, publishableKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const [ownerSignIn, isolationSignIn] = await Promise.all([
+    ownerClient.auth.signInWithPassword({
+      email: input.owner.email,
+      password: DISPOSABLE_TEST_PASSWORD,
     }),
-  );
-  assert.deepEqual(
-    await loadPersistedManualPlanForUser(input.supabase, input.userId),
-    withTarget,
-    "A stale Clear must not mutate the independent workout or its saved provenance.",
-  );
-
-  await assert.rejects(
-    applyAtomicCalendarWorkoutMutation({
-      userId: input.userId,
-      planId: withTarget.plan.id,
-      expectedPlanUpdatedAt: withTarget.plan.updated_at,
-      currentDate: todayIso(),
-      mutationKind: "move",
-      expectedSourceWorkout: buildSourceWorkoutFingerprint(sourceWorkout) as Json,
-      expectedTargetWorkout: buildSourceWorkoutFingerprint(targetWorkout) as Json,
-      workoutInsert: null,
-      workoutUpdate: {
-        workout_date: targetDate,
-        weekday: weekdayLong(targetDate),
-        week_number: "not-an-integer",
-      },
-      planUpdate: immutablePlanUpdate,
+    isolationClient.auth.signInWithPassword({
+      email: input.isolationUser.email,
+      password: DISPOSABLE_TEST_PASSWORD,
     }),
-  );
-  assert.deepEqual(
-    await loadPersistedManualPlanForUser(input.supabase, input.userId),
-    withTarget,
-    "Failed Move must roll back target deletion and source movement without touching provenance.",
-  );
+  ]);
+  assert.equal(ownerSignIn.error, null);
+  assert.equal(isolationSignIn.error, null);
 
-  const cleanupTarget = await input.supabase
+  const ownerRead = await ownerClient
     .from("planned_workouts")
-    .delete()
-    .eq("id", targetWorkoutId)
-    .eq("user_id", input.userId);
-  if (cleanupTarget.error) {
-    throw new Error(cleanupTarget.error.message);
-  }
+    .select("id")
+    .eq("id", input.sourceWorkout.id);
+  assert.equal(ownerRead.error, null);
+  assert.equal(ownerRead.data?.length, 1);
 
-  return true as const;
-}
+  const crossUserRead = await isolationClient
+    .from("planned_workouts")
+    .select("id")
+    .eq("id", input.sourceWorkout.id);
+  assert.equal(crossUserRead.error, null);
+  assert.deepEqual(crossUserRead.data, []);
 
-async function validateImportedWorkoutEditAtomicPersistence(input: {
-  review: ManualWorkoutReadyReview;
-  supabase: ReturnType<typeof createAdminSupabaseClient>;
-}) {
-  const disposableUser = await acquireQaPoolSupabaseUser({
-    supabase: input.supabase,
-    poolRole: "provider-engine",
-    creationErrorMessage: "Disposable imported workout edit user creation failed.",
+  const directUpdate = await ownerClient
+    .from("planned_workouts")
+    .update({ title: "Direct authenticated writes must stay blocked" })
+    .eq("id", input.sourceWorkout.id);
+  assert.ok(directUpdate.error, "Authenticated direct workout updates must be revoked.");
+
+  const directInsert = await ownerClient.from("planned_workouts").insert({
+    ...input.sourceWorkout,
+    id: crypto.randomUUID(),
+    workout_date: addDaysIso(input.sourceWorkout.workout_date, 20),
   });
-  let proof: {
-    planSourceKind: string;
-    originSourceKind: string;
-    originSourceStatus: string;
-    plannedWorkoutId: string;
-    originalWorkoutSourceId: string | null;
-    originalWorkoutSourceType: string | null;
-    originalWorkoutFamily: string | null;
-    originalWorkoutIdentity: string | null;
-    failureAtomic: true;
-    replacementFailureAtomic: true;
-    todayUnloggedEditable: true;
-    todayHistoryBackedEditable: true;
-    historyPreserved: true;
-  } | null = null;
-  let cleanup: ManualDisposableCleanupProof | null = null;
+  assert.ok(directInsert.error, "Authenticated direct workout inserts must be revoked.");
 
-  try {
-    await ensureProcessCalendarProfile(disposableUser.userId);
-    const authoredPlan = buildManualWorkoutUserBuiltTrainingPlan(input.review.draft);
-    const externalPlan = {
-      ...authoredPlan,
-      plan_name: "Imported runner-owned edit proof",
-      source_kind: "external_coach_export_v7",
-      source_status: "confirmed_external_plan",
-    } satisfies TrainingPlanV2;
-
-    await materializeFirstReviewedPlanForUser(disposableUser.userId, externalPlan);
-
-    const imported = await loadPersistedManualPlanForUser(input.supabase, disposableUser.userId);
-    const importedSourceWorkout = imported.workouts[0];
-    assert.ok(importedSourceWorkout, "Imported edit proof requires one persisted workout.");
-    assert.equal(imported.plan.source_kind, "external_coach_export_v7");
-    assert.deepEqual(readImportOrigin(imported.plan), {
-      sourceKind: null,
-      sourceStatus: null,
-    });
-
-    const today = todayIso();
-    const dateUpdate = await input.supabase
-      .from("planned_workouts")
-      .update({
-        workout_date: today,
-        weekday: weekdayLong(today),
-      })
-      .eq("id", importedSourceWorkout.id)
-      .eq("user_id", disposableUser.userId);
-    if (dateUpdate.error) throw new Error(dateUpdate.error.message);
-    const importedToday = await loadPersistedManualPlanForUser(
-      input.supabase,
-      disposableUser.userId,
-    );
-    const sourceWorkout = importedToday.workouts.find(
-      (workout) => workout.id === importedSourceWorkout.id,
-    );
-    assert.ok(sourceWorkout, "Today import edit proof requires the persisted source workout.");
-
-    const todayUnloggedEdit = await reviewConfirmAndReadPersistedWorkoutEdit({
-      supabase: input.supabase,
-      userId: disposableUser.userId,
-      persisted: importedToday,
-      title: "Runner-owned imported workout edit today",
-    });
-    assertPlanRecordUnchanged(
-      importedToday.plan,
-      todayUnloggedEdit.edited.plan,
-      "today imported workout edit",
-    );
-
-    const logId = crypto.randomUUID();
-    const log = await input.supabase
-      .from("workout_logs")
-      .insert({
-        id: logId,
-        planned_workout_id: todayUnloggedEdit.editedWorkout.id,
-        user_id: disposableUser.userId,
-        outcome: "completed",
-        actual_distance_km: 5,
-        actual_duration_min: 35,
-        rpe: 5,
-        notes: "History-backed edit proof",
-        intervals_completed: null,
-        body_notes: [],
-      })
-      .select("*")
-      .single();
-    if (log.error || !log.data) {
-      throw new Error(log.error?.message ?? "History-backed edit log setup failed.");
-    }
-    const assetId = crypto.randomUUID();
-    const asset = await input.supabase
-      .from("workout_result_assets")
-      .insert({
-        id: assetId,
-        user_id: disposableUser.userId,
-        planned_workout_id: todayUnloggedEdit.editedWorkout.id,
-        workout_log_id: logId,
-        asset_kind: "garmin_fit",
-        storage_bucket: "workout-result-assets",
-        storage_path: `history-backed-edit/${assetId}.fit`,
-        original_file_name: "history-backed-edit.fit",
-        mime_type: "application/octet-stream",
-        file_size_bytes: 1,
-        parse_status: "uploaded",
-        primary_file_kind: "fit",
-        primary_file_name: "history-backed-edit.fit",
-      })
-      .select("*")
-      .single();
-    if (asset.error || !asset.data) {
-      throw new Error(asset.error?.message ?? "History-backed edit asset setup failed.");
-    }
-
-    const edit = await reviewConfirmAndReadPersistedWorkoutEdit({
-      supabase: input.supabase,
-      userId: disposableUser.userId,
-      persisted: todayUnloggedEdit.edited,
-      title: "Runner-owned imported workout edit with history",
-    });
-    const { confirm, edited, editedDraftInput, editedWorkout } = edit;
-
-    assert.equal(confirm.sourceMetadata.originalPlanSourceKind, "external_coach_export_v7");
-    assert.equal(confirm.sourceMetadata.originalPlanOriginSourceKind, null);
-    assert.equal(confirm.sourceMetadata.originalPlanOriginSourceStatus, null);
-    assert.equal(
-      confirm.sourceMetadata.originalWorkoutSourceId,
-      todayUnloggedEdit.editedWorkout.source_workout_id,
-    );
-    assert.equal(
-      confirm.sourceMetadata.originalWorkoutSourceType,
-      todayUnloggedEdit.editedWorkout.source_workout_type,
-    );
-    assert.equal(
-      confirm.sourceMetadata.originalWorkoutFamily,
-      todayUnloggedEdit.editedWorkout.workout_family,
-    );
-    assert.equal(
-      confirm.sourceMetadata.originalWorkoutIdentity,
-      todayUnloggedEdit.editedWorkout.workout_identity,
-    );
-
-    assert.equal(editedWorkout.id, sourceWorkout.id);
-    assert.equal(editedWorkout.title, editedDraftInput.title);
-    assert.deepEqual(readImportOrigin(edited.plan), {
-      sourceKind: null,
-      sourceStatus: null,
-    });
-    assertPlanRecordUnchanged(
-      todayUnloggedEdit.edited.plan,
-      edited.plan,
-      "history-backed workout edit",
-    );
-    const persistedLog = await input.supabase
-      .from("workout_logs")
-      .select("*")
-      .eq("id", logId)
-      .single();
-    const persistedAsset = await input.supabase
-      .from("workout_result_assets")
-      .select("*")
-      .eq("id", assetId)
-      .single();
-    assert.equal(persistedLog.error, null);
-    assert.equal(persistedAsset.error, null);
-    assert.deepEqual(persistedLog.data, log.data);
-    assert.deepEqual(persistedAsset.data, asset.data);
-
-    const forcedFailure = await input.supabase.rpc("apply_calendar_workout_content_edit", {
-      p_current_date: todayIso(),
-      p_expected_plan_updated_at: edited.plan.updated_at,
-      p_expected_workout: buildSourceWorkoutFingerprint(editedWorkout) as Json,
-      p_plan_goal_metadata: {
-        ...asJsonObject(edited.plan.goal_metadata),
-        atomicity_probe: "must_rollback",
-      },
-      p_plan_id: edited.plan.id,
-      p_plan_preferences: asJsonObject(edited.plan.plan_preferences),
-      p_user_id: disposableUser.userId,
-      p_workout_id: editedWorkout.id,
-      p_workout_update: {
-        phase: editedWorkout.phase,
-        workout_type: editedWorkout.workout_type,
-        source_workout_id: editedWorkout.source_workout_id,
-        source_workout_type: editedWorkout.source_workout_type,
-        workout_family: editedWorkout.workout_family,
-        workout_identity: editedWorkout.workout_identity,
-        calendar_icon_key: editedWorkout.calendar_icon_key,
-        goal_context: editedWorkout.goal_context,
-        metric_mode: editedWorkout.metric_mode,
-        title: "This write must roll back",
-        notes: editedWorkout.notes,
-        planned_rpe: editedWorkout.planned_rpe,
-        estimated_fatigue: editedWorkout.estimated_fatigue,
-        recovery_priority: editedWorkout.recovery_priority,
-        steps: { invalid: "planned_workouts.steps must remain an array" },
-        display_order: editedWorkout.display_order,
-      },
-    });
-    assert.ok(forcedFailure.error, "Invalid second write must fail the database transaction.");
-
-    const afterFailure = await loadPersistedManualPlanForUser(
-      input.supabase,
-      disposableUser.userId,
-    );
-    assert.deepEqual(afterFailure.plan, edited.plan);
-    assert.deepEqual(afterFailure.workouts, edited.workouts);
-    const afterFailureLog = await input.supabase
-      .from("workout_logs")
-      .select("*")
-      .eq("id", logId)
-      .single();
-    const afterFailureAsset = await input.supabase
-      .from("workout_result_assets")
-      .select("*")
-      .eq("id", assetId)
-      .single();
-    assert.equal(afterFailureLog.error, null);
-    assert.equal(afterFailureAsset.error, null);
-    assert.deepEqual(afterFailureLog.data, log.data);
-    assert.deepEqual(afterFailureAsset.data, asset.data);
-    proof = {
-      planSourceKind: imported.plan.source_kind!,
-      originSourceKind: "external_coach_export_v7",
-      originSourceStatus: "confirmed_external_plan",
-      plannedWorkoutId: sourceWorkout.id,
-      originalWorkoutSourceId: todayUnloggedEdit.editedWorkout.source_workout_id,
-      originalWorkoutSourceType: todayUnloggedEdit.editedWorkout.source_workout_type,
-      originalWorkoutFamily: todayUnloggedEdit.editedWorkout.workout_family,
-      originalWorkoutIdentity: todayUnloggedEdit.editedWorkout.workout_identity,
-      failureAtomic: true,
-      todayUnloggedEditable: true,
-      todayHistoryBackedEditable: true,
-      historyPreserved: true,
-    };
-  } finally {
-    cleanup = await cleanupDisposableManualWorkoutUser(input.supabase, disposableUser);
-  }
-
-  assert.ok(proof, "Imported workout edit persistence proof must complete.");
-  assert.ok(cleanup, "Imported workout edit cleanup proof must be captured.");
-
-  return {
-    persisted: proof,
-    cleanup,
-  };
-}
-
-async function validateCanonicalOriginWorkoutEditPersistence(input: {
-  review: ManualWorkoutReadyReview;
-  supabase: ReturnType<typeof createAdminSupabaseClient>;
-}) {
-  const origins = [
-    {
-      label: "generated",
-      sourceKind: AI_AUTHORED_PLAN_FIRST_SOURCE_KIND,
-      sourceStatus: "confirmed_ai_authored_plan",
+  const directRpc = await ownerClient.rpc("apply_calendar_workout_mutation", {
+    p_user_id: input.owner.userId,
+    p_current_date: todayIso(),
+    p_mutation_kind: "clear",
+    p_expected_source_workout: buildFullSourceWorkoutFingerprint(
+      input.sourceWorkout,
+    ) as unknown as Json,
+    p_expected_target_workout: null,
+    p_workout_insert: null,
+    p_workout_update: null,
+    p_mutation_event: {
+      mutation_source: "calendar_workout_mutation_v1",
+      mutation_kind: "user_cleared_workout",
+      origin_kind: input.sourceWorkout.origin_kind,
+      planned_workout_id: input.sourceWorkout.id,
+      review_payload_version: "unauthorized_direct_rpc_probe_v1",
+      review_checksum: "0".repeat(64),
     },
-  ] as const;
-  type CanonicalOriginEditProof = {
-    label: (typeof origins)[number]["label"];
-    sourceKind: (typeof origins)[number]["sourceKind"];
-    plannedWorkoutId: string;
-    originalWorkoutSourceId: string | null;
-    originalWorkoutSourceType: string | null;
-    originalWorkoutFamily: string | null;
-    originalWorkoutIdentity: string | null;
-    cleanup: ManualDisposableCleanupProof;
-  };
-  const proofs: CanonicalOriginEditProof[] = [];
-
-  for (const origin of origins) {
-    const disposableUser = await acquireQaPoolSupabaseUser({
-      supabase: input.supabase,
-      poolRole: "provider-engine",
-      creationErrorMessage: `Disposable ${origin.label} workout edit user creation failed.`,
-    });
-    let proof: Omit<CanonicalOriginEditProof, "cleanup"> | null = null;
-    let cleanup: ManualDisposableCleanupProof | null = null;
-
-    try {
-      const previewInput = {
-        age: 36,
-        heightCm: 178,
-        weightKg: 74,
-        runnerLevel: "sometimes_runs" as const,
-        daysPerWeek: 4,
-        fixedRestDays: ["Tuesday", "Saturday"] as const,
-        preferredLongRunDay: "Sunday" as const,
-        startDate: addDaysIso(todayIso(), 1),
-        benchmark: { kind: "recent_5k_pace" as const, recent5kPace: "5:30/km" },
-        planGoalIntent: {
-          distance: { kind: "preset" as const, preset: "10K" as const },
-        },
-      };
-      await saveRunnerBaselineForUserId(disposableUser.userId, {
-        age: previewInput.age,
-        heightCm: previewInput.heightCm,
-        weightKg: previewInput.weightKg,
-        fitnessLevel: "beginner",
-        heartRateProfile: {
-          zones: buildHeartRateZonesSummary(previewInput.age).zones.map(
-            ({ reference, minBpm, maxBpm }) => ({ reference, minBpm, maxBpm }),
-          ),
-        },
-      });
-      await updateRunnerCalendarTimezoneForUserId(disposableUser.userId, {
-        calendarTimezone: processCalendarTimezone(),
-        source: "user",
-      });
-      const runnerProfileSnapshot = await getRunnerPlanAuthoringProfileSnapshotForUserId(
-        disposableUser.userId,
-      );
-      const authoring = buildAiGeneratedRunningPlanAuthoringInput(
-        previewInput,
-        runnerProfileSnapshot,
-      );
-      assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);
-      if (!authoring.ok) throw new Error(authoring.message);
-      const fixtureEnv = {
-        LOCAL_AUTH_BYPASS_ENABLED: "true",
-        LOCAL_AUTH_BYPASS_ACCOUNTS_FILE: DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE,
-        NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
-        HITO_AI_GENERATED_PLAN_DEV_FIXTURE: "true",
-        HITO_AI_GENERATED_PLAN_PROVIDER_MODE: "qa_fixture",
-        [AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV]: "non_repeat_tempo",
-      };
-      const fixtureFetch = buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
-        authoringInput: authoring.authoringInput,
-        today: previewInput.startDate,
-        env: fixtureEnv,
-      });
-      const reviewed = await buildReviewedAiGeneratedRunningPlanPreview(previewInput, {
-        runnerProfileSnapshot,
-        aiPreview: {
-          apiKey: "local-qa-dev-ai-generated-plan-fixture",
-          model: AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
-          today: previewInput.startDate,
-          fetchImpl: fixtureFetch,
-          generationLedger: { disabled: true },
-        },
-      });
-      assert.equal(reviewed.ok, true, reviewed.ok ? "" : reviewed.unavailable.error.message);
-      if (!reviewed.ok) throw new Error(reviewed.unavailable.error.message);
-      const reviewedPlan = {
-        ...buildRunningPlanCanonicalPlan(reviewed.draft),
-        plan_name: `${origin.label} runner-owned edit proof`,
-        source_kind: origin.sourceKind,
-        source_status: origin.sourceStatus,
-      } satisfies TrainingPlanV2;
-
-      await materializeFirstReviewedPlanForUser(disposableUser.userId, reviewedPlan);
-
-      const persisted = await loadPersistedManualPlanForUser(input.supabase, disposableUser.userId);
-      assert.equal(persisted.plan.source_kind, origin.sourceKind);
-      const edit = await reviewConfirmAndReadPersistedWorkoutEdit({
-        supabase: input.supabase,
-        userId: disposableUser.userId,
-        persisted,
-        title: `Runner-owned ${origin.label} workout edit`,
-        workoutIdentity: "controlled_tempo_session",
-        workoutPace: "4:50-5:00/km",
-      });
-
-      assert.equal(edit.confirm.sourceMetadata.originalPlanSourceKind, origin.sourceKind);
-      assert.equal(edit.confirm.sourceMetadata.originalPlanOriginSourceKind, null);
-      assert.equal(edit.confirm.sourceMetadata.originalPlanOriginSourceStatus, null);
-      assert.equal(edit.editedWorkout.id, edit.sourceWorkout.id);
-      assert.equal(edit.editedWorkout.title, edit.editedDraftInput.title);
-      assert.deepEqual(
-        findAiAuthoredPaceTarget(edit.editedWorkout.steps, "4:50-5:00/km"),
-        findAiAuthoredPaceTarget(edit.sourceWorkout.steps, "4:50-5:00/km"),
-      );
-      assert.equal(
-        findAiAuthoredPaceTarget(edit.editedWorkout.steps, "4:50-5:00/km")?.pace,
-        "4:50-5:00/km",
-      );
-      assertPlanRecordUnchanged(persisted.plan, edit.edited.plan, `${origin.label} workout edit`);
-
-      proof = {
-        label: origin.label,
-        sourceKind: origin.sourceKind,
-        plannedWorkoutId: edit.editedWorkout.id,
-        originalWorkoutSourceId: edit.sourceWorkout.source_workout_id,
-        originalWorkoutSourceType: edit.sourceWorkout.source_workout_type,
-        originalWorkoutFamily: edit.sourceWorkout.workout_family,
-        originalWorkoutIdentity: edit.sourceWorkout.workout_identity,
-      };
-    } finally {
-      cleanup = await cleanupDisposableManualWorkoutUser(input.supabase, disposableUser);
-    }
-
-    assert.ok(proof, `${origin.label} workout edit persistence proof must complete.`);
-    assert.ok(cleanup, `${origin.label} workout edit cleanup proof must be captured.`);
-    proofs.push({
-      ...proof,
-      cleanup,
-    });
-  }
-
-  return proofs;
-}
-
-async function ensureProcessCalendarProfile(userId: string) {
-  await saveRunnerBaselineForUserId(userId, {
-    age: 36,
-    heightCm: 178,
-    weightKg: 74,
-    fitnessLevel: "beginner",
   });
-  await updateRunnerCalendarTimezoneForUserId(userId, {
-    calendarTimezone: processCalendarTimezone(),
-    source: "user",
-  });
+  assert.ok(directRpc.error, "Authenticated callers must not execute mutation RPCs directly.");
+
+  await Promise.all([ownerClient.auth.signOut(), isolationClient.auth.signOut()]);
+  return {
+    ownerRead: true,
+    crossUserReadHidden: true,
+    directInsertRevoked: true,
+    directUpdateRevoked: true,
+    directRpcRevoked: true,
+  } as const;
 }
 
 function processCalendarTimezone() {
-  return new Intl.DateTimeFormat().resolvedOptions().timeZone;
-}
-
-async function reviewConfirmAndReadPersistedWorkoutEdit(input: {
-  supabase: ReturnType<typeof createAdminSupabaseClient>;
-  userId: string;
-  persisted: PersistedManualPlanReadback;
-  title: string;
-  workoutIdentity?: string;
-  workoutPace?: string;
-}) {
-  const sourceWorkout = input.persisted.workouts.find(
-    (workout) =>
-      (!input.workoutIdentity || workout.workout_identity === input.workoutIdentity) &&
-      (!input.workoutPace ||
-        findAiAuthoredPaceTarget(workout.steps, input.workoutPace)?.pace === input.workoutPace),
-  );
-  assert.ok(sourceWorkout, "Persisted edit proof requires one planned workout.");
-
-  const reconstructed = await reconstructManualWorkoutPersistedEditDraftForUser(input.userId, {
-    activePlanId: input.persisted.plan.id,
-    plannedWorkoutId: sourceWorkout.id,
-    workoutDate: sourceWorkout.workout_date,
-  });
-  assert.equal(reconstructed.ok, true, JSON.stringify(reconstructed));
-  if (!reconstructed.ok) {
-    throw new Error(reconstructed.message);
-  }
-
-  const editedDraftInput: ManualWorkoutDraftInput = {
-    ...reconstructed.draftInput,
-    title: input.title,
-    notes: "Reviewed runner edit with atomic provenance.",
-  };
-  const review = await reviewManualWorkoutPersistedEditDraftForUser(input.userId, {
-    activePlanId: input.persisted.plan.id,
-    plannedWorkoutId: sourceWorkout.id,
-    workoutDate: sourceWorkout.workout_date,
-    draftInput: editedDraftInput,
-  });
-  assert.equal(review.ok, true, JSON.stringify(review));
-  if (!review.ok) {
-    throw new Error(review.message);
-  }
-
-  const confirm = await confirmManualWorkoutPersistedEditForUser(input.userId, {
-    activePlanId: input.persisted.plan.id,
-    plannedWorkoutId: sourceWorkout.id,
-    workoutDate: sourceWorkout.workout_date,
-    draftInput: editedDraftInput,
-    reviewToken: review.review.reviewToken,
-    reviewChecksum: review.review.reviewChecksum,
-  });
-  assert.equal(confirm.ok, true, JSON.stringify(confirm));
-  if (!confirm.ok) {
-    throw new Error(confirm.message);
-  }
-
-  const edited = await loadPersistedManualPlanForUser(input.supabase, input.userId);
-  const editedWorkout = edited.workouts.find((workout) => workout.id === sourceWorkout.id);
-  assert.ok(editedWorkout, "Persisted edit must retain the original workout row.");
-
-  return {
-    sourceWorkout,
-    editedDraftInput,
-    confirm,
-    edited,
-    editedWorkout,
-  };
-}
-
-function findAiAuthoredPaceTarget(value: unknown, expectedPace?: string) {
-  for (const section of readWorkoutDocumentSections(value)) {
-    if (
-      section.target?.target_source === AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE &&
-      section.target.pace &&
-      (!expectedPace || section.target.pace === expectedPace)
-    ) {
-      return section.target;
-    }
-
-    for (const child of section.prescription?.children ?? []) {
-      if (
-        child.target?.target_source === AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE &&
-        child.target.pace &&
-        (!expectedPace || child.target.pace === expectedPace)
-      ) {
-        return child.target;
-      }
-    }
-  }
-
-  return null;
-}
-
-async function loadPersistedManualPlanForUser(
-  supabase: ReturnType<typeof createAdminSupabaseClient>,
-  userId: string,
-): Promise<PersistedManualPlanReadback> {
-  const planResult = await supabase
-    .from("plan_cycles")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("status", "archived")
-    .is("saved_plan_payload", null)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
-
-  if (planResult.error || !planResult.data) {
-    throw new Error(planResult.error?.message ?? "Persisted Calendar provenance was not found.");
-  }
-
-  const workoutsResult = await supabase
-    .from("planned_workouts")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("plan_cycle_id", planResult.data.id)
-    .order("display_order", { ascending: true });
-
-  if (workoutsResult.error || !workoutsResult.data) {
-    throw new Error(workoutsResult.error?.message ?? "Persisted manual workout was not found.");
-  }
-
-  const profileResult = await supabase
-    .from("runner_profiles")
-    .select("*")
-    .eq("user_id", userId)
-    .single();
-
-  if (profileResult.error || !profileResult.data) {
-    throw new Error(profileResult.error?.message ?? "Persisted runner profile was not found.");
-  }
-
-  return {
-    plan: planResult.data,
-    workouts: workoutsResult.data,
-    profile: profileResult.data,
-  };
-}
-
-function readImportOrigin(plan: PersistedPlanCycleRow) {
-  const provenance = asJsonObject(
-    asJsonObject(plan.goal_metadata)[TRAINING_PLAN_V2_IMPORT_SOURCE_KIND],
-  );
-
-  return {
-    sourceKind: provenance.origin_source_kind ?? null,
-    sourceStatus: provenance.origin_source_status ?? null,
-  };
-}
-
-function asJsonObject(value: unknown): Record<string, Json> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return {};
-  }
-
-  return value as Record<string, Json>;
-}
-
-function validateImmutableManualPlanMetadata(plan: PersistedPlanCycleRow) {
-  const manualMetadata = (
-    plan.goal_metadata as {
-      manual_user_built_plan?: {
-        source_status?: string;
-        latest_review_checksum?: string;
-        row_count?: number;
-      };
-    } | null
-  )?.manual_user_built_plan;
-
-  assert.equal(manualMetadata?.source_status, MANUAL_USER_BUILT_PLAN_SOURCE_STATUS);
-  assert.equal(manualMetadata?.latest_review_checksum, undefined);
-  assert.equal(manualMetadata?.row_count, 0);
-}
-
-function assertPlanRecordUnchanged(
-  before: PersistedPlanCycleRow,
-  after: PersistedPlanCycleRow,
-  label: string,
-) {
-  assert.equal(after.id, before.id, `${label}: plan identity stays provenance-only`);
-  assert.equal(after.updated_at, before.updated_at, `${label}: plan timestamp must not change`);
-  assert.equal(after.end_date, before.end_date, `${label}: plan schedule bounds are immutable`);
-  assert.deepEqual(
-    after.goal_metadata,
-    before.goal_metadata,
-    `${label}: plan metadata is immutable`,
-  );
-  assert.deepEqual(
-    after.plan_preferences,
-    before.plan_preferences,
-    `${label}: plan preferences are immutable`,
-  );
-}
-
-function readManualSourceStatus(plan: PersistedPlanCycleRow) {
-  return readManualMetadata(plan)?.source_status ?? null;
-}
-
-function readManualReviewChecksum(plan: PersistedPlanCycleRow) {
-  return readManualMetadata(plan)?.latest_review_checksum ?? null;
-}
-
-function readManualMetadata(plan: PersistedPlanCycleRow) {
-  return (
-    plan.goal_metadata as {
-      manual_user_built_plan?: {
-        latest_review_checksum?: string;
-        source_status?: string;
-      };
-    } | null
-  )?.manual_user_built_plan;
-}
-
-function validateNoFakePaceOrPersonalHr(rows: readonly PersistedWorkoutRow[]) {
-  const serialized = JSON.stringify(rows);
-
-  assert.doesNotMatch(serialized, /"pace_min_per_km_range"|"pace_range_min_km"|"pace"/i);
-  assert.doesNotMatch(
-    serialized,
-    /personal_hr|personalized_hr|hr_zone_truth|"hr_targets_allowed":true/i,
-  );
-}
-
-async function cleanupDisposableManualWorkoutUser(
-  supabase: ReturnType<typeof createAdminSupabaseClient>,
-  lease: QaPoolUserLease,
-): Promise<ManualDisposableCleanupProof> {
-  return releaseQaPoolSupabaseUser({
-    supabase,
-    userId: lease.userId,
-    poolRole: lease.poolRole,
-    leaseToken: lease.leaseToken,
-  });
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 }

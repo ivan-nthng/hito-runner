@@ -47,7 +47,6 @@ export type CalendarOptimisticMoveDisplay = {
 };
 
 export type CalendarMoveUndoAffordance = {
-  activePlanId: string;
   displayDate: string;
   expiresAt: number;
   id: string;
@@ -55,6 +54,7 @@ export type CalendarMoveUndoAffordance = {
   sourceWorkoutId: string;
   targetDate: string;
   title: string;
+  runnerScopeKey: string;
 };
 
 export type CalendarWorkoutActionContext = ManualCopiedWorkoutSource & {
@@ -65,8 +65,7 @@ export type CalendarWorkoutActionContext = ManualCopiedWorkoutSource & {
 };
 
 export type CalendarAddActionContext = {
-  activePlanId: string;
-  activePlanSourceKind: string;
+  calendarSourceKind: string;
   canAcceptMoveTarget: boolean;
   moveTargetDayKind: ManualWorkoutMoveTargetDayKind;
   moveOnly: boolean;
@@ -130,7 +129,6 @@ export function buildCalendarDayProjection({
   const canMoveHere = Boolean(
     addAction?.canAcceptMoveTarget &&
     interaction.moveWorkoutSource &&
-    interaction.moveWorkoutSource.activePlanId === addAction.activePlanId &&
     interaction.moveWorkoutSource.sourceWorkoutDate !== iso,
   );
 
@@ -213,7 +211,7 @@ export function resolveCalendarMoveUndoForDate(
     undo.targetDate < snapshot.currentDate ||
     (undo.targetDate === snapshot.currentDate &&
       !canExposeTodayAsCalendarMoveTarget(snapshot, undo.targetDate, {
-        activePlanId: undo.activePlanId,
+        provenancePlanId: movedWorkout.sourceProvenance?.sourcePlanId ?? null,
         sourceWorkoutDate: undo.sourceWorkoutDate,
         sourceWorkoutId: undo.sourceWorkoutId,
         title: undo.title,
@@ -234,33 +232,25 @@ export function resolveCalendarAddActionContext(
   workout: Workout | undefined,
   moveSource: ManualCopiedWorkoutSource | null,
 ): CalendarAddActionContext | null {
-  const planMeta = snapshot.planMeta;
-  if (!planMeta?.id) return null;
-
-  const addCapability = planMeta.workoutEditing?.addWorkout;
-  const moveCapability = planMeta.workoutEditing?.moveWorkout;
+  const addCapability = snapshot.calendarContext?.workoutEditing.addWorkout;
+  const moveCapability = snapshot.calendarContext?.workoutEditing.moveWorkout;
   const moveTargetHint = resolveCalendarMoveTargetHint(snapshot, iso, workout, moveSource);
-  const canAddWorkout =
-    addCapability?.allowed === true &&
-    (!workout || workout.type === "rest") &&
-    iso >= snapshot.currentDate &&
-    !calendarDateIsBeforePlanStart(iso, snapshot);
+  const canAddWorkout = addCapability?.allowed === true && !workout && iso >= snapshot.currentDate;
   const canAcceptMoveTarget =
     moveCapability?.allowed === true && moveTargetHint.canAcceptMoveTarget;
 
   if (!canAddWorkout && !canAcceptMoveTarget) return null;
 
-  const activePlanSourceKind =
+  const calendarSourceKind =
     addCapability?.allowed === true
       ? addCapability.sourceKind
       : moveCapability?.allowed === true
         ? moveCapability.sourceKind
         : null;
-  if (!activePlanSourceKind) return null;
+  if (!calendarSourceKind) return null;
 
   return {
-    activePlanId: planMeta.id,
-    activePlanSourceKind,
+    calendarSourceKind,
     canAcceptMoveTarget,
     moveTargetDayKind: moveTargetHint.dayKind,
     moveOnly: !canAddWorkout,
@@ -272,21 +262,25 @@ export function resolveCalendarWorkoutActionContext(
   iso: string,
   workout: Workout | undefined,
 ): CalendarWorkoutActionContext | null {
-  const planMeta = snapshot.planMeta;
-  if (!planMeta?.id || !workout || workout.type === "rest") return null;
+  if (!workout || workout.type === "rest") return null;
 
   const sourceEditing = workout.sourceEditing;
+  const calendarEditing = snapshot.calendarContext?.workoutEditing;
   const canDirectCopy = Boolean(sourceEditing?.canDirectCopy);
-  const canDirectMove = Boolean(sourceEditing?.canDirectMove);
-  const canDragInitiate = Boolean(sourceEditing?.canDragInitiate);
+  const canDirectMove = Boolean(
+    calendarEditing?.moveWorkout.allowed && sourceEditing?.canDirectMove,
+  );
+  const canDragInitiate = Boolean(
+    calendarEditing?.moveWorkout.allowed && sourceEditing?.canDragInitiate,
+  );
   const canRequestClearReview = Boolean(
-    planMeta.workoutEditing?.clearWorkout.allowed && sourceEditing?.canClear,
+    calendarEditing?.clearWorkout.allowed && sourceEditing?.canClear,
   );
 
   if (!canDirectCopy && !canRequestClearReview && !canDirectMove && !canDragInitiate) return null;
 
   return {
-    activePlanId: planMeta.id,
+    provenancePlanId: workout.sourceProvenance?.sourcePlanId ?? null,
     canDirectCopy,
     canDirectMove,
     canDragInitiate,
@@ -358,11 +352,6 @@ export function calendarTargetButtonAriaLabel(
   return `${dateLabel}. Move selected workout to rest day.`;
 }
 
-export function calendarDateIsBeforePlanStart(iso: string, snapshot: TrainingSnapshot) {
-  const planStartDate = snapshot.planMeta?.startDate;
-  return Boolean(planStartDate && iso < planStartDate);
-}
-
 function resolveCalendarMoveTargetHint(
   snapshot: TrainingSnapshot,
   iso: string,
@@ -371,11 +360,7 @@ function resolveCalendarMoveTargetHint(
 ) {
   const dayKind = calendarMoveTargetDayKindFromWorkout(workout);
 
-  if (
-    !moveSource ||
-    calendarDateIsBeforePlanStart(iso, snapshot) ||
-    moveSource.sourceWorkoutDate === iso
-  ) {
+  if (!moveSource || moveSource.sourceWorkoutDate === iso) {
     return { canAcceptMoveTarget: false, dayKind };
   }
 

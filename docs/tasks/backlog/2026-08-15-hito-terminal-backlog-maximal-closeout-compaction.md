@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** ARCHITECT
+- **Epic:** platform-and-operations
 - **Supersedes:** [Hito Backlog Lifecycle Reconciliation And Terminal Archive](./2026-08-14-hito-backlog-lifecycle-reconciliation-and-terminal-archive.md)
 - **Outcome:** Compacted all 183 pre-existing terminal backlog records in place from 46,069 to 1,516 lines, a 44,553-line reduction; every closeout retains owner, outcome, material sources, decisive proof, residual boundary, and relationships.
 - **Sources:** [terminal backlog](.); detailed removed narration remains recoverable from Git history.

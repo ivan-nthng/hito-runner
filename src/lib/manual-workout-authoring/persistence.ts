@@ -1,13 +1,8 @@
-import type { EmptyCalendarProvenanceCreationInput } from "@/lib/active-plan-persistence";
 import { trainingPlanV2Schema, type TrainingPlanV2 } from "@/lib/imported-plan";
 import { assertWorkoutDurationTitleContract } from "@/lib/workout-duration-title-contract";
 import {
-  MANUAL_EMPTY_PLAN_SETUP_PAYLOAD_VERSION,
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-  MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
   type ManualWorkoutCanonicalDraft,
-  type ManualEmptyPlanSetupInput,
-  type ManualSetupRunningLevel,
   type ManualWorkoutTargetTruthMode,
 } from "@/lib/manual-workout-authoring/schema";
 import type { Json } from "@/lib/supabase/database";
@@ -94,62 +89,6 @@ function buildManualWorkoutTrainingPlanRow(
     ...(draft.plannedRpe ? { planned_rpe: draft.plannedRpe } : {}),
     ...(draft.estimatedFatigue ? { estimated_fatigue: draft.estimatedFatigue } : {}),
     ...(draft.recoveryPriority ? { recovery_priority: draft.recoveryPriority } : {}),
-  };
-}
-
-export function buildManualEmptyActivePlanCreationInput(input: {
-  setup: ManualEmptyPlanSetupInput;
-  currentDate: string;
-}): EmptyCalendarProvenanceCreationInput {
-  const runningLevelLabel = formatManualSetupRunningLevel(input.setup.runningLevel);
-  const baselineNotes = `Manual setup running level: ${runningLevelLabel}.`;
-
-  return {
-    profile: {
-      goalType: "build_consistency",
-      goalLabel: "Manual user-built plan",
-      baselineSessionsPerWeek: 0,
-      baselineLongRunKm: 0,
-      baselineNotes,
-      firstName: null,
-      lastName: null,
-      displayName: null,
-      avatarUrl: null,
-      avatarStoragePath: null,
-      age: input.setup.age,
-      weightKg: input.setup.weightKg,
-      heightCm: input.setup.heightCm,
-    },
-    title: "Manual user-built plan",
-    goalSummary: "Manual user-built plan",
-    sourceTemplate: "training-plan-v2",
-    schemaVersion: "training-plan-v2",
-    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-    startDate: input.currentDate,
-    endDate: input.currentDate,
-    targetDate: null,
-    goalMetadata: toJson({
-      source_status: MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
-      manual_user_built_plan: {
-        source_kind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-        source_status: MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
-        creation_mode: "empty_manual_setup",
-        setup_payload_version: MANUAL_EMPTY_PLAN_SETUP_PAYLOAD_VERSION,
-        row_count: 0,
-        non_rest_row_count: 0,
-        running_level: input.setup.runningLevel,
-      },
-    }),
-    planPreferences: toJson({
-      preferred_workout_mix: "Manual user-built plan v1",
-      notes:
-        "Created from Manual setup as empty Calendar provenance. Workouts are added only after backend review and confirmation.",
-      manual_setup: {
-        setup_payload_version: MANUAL_EMPTY_PLAN_SETUP_PAYLOAD_VERSION,
-        running_level: input.setup.runningLevel,
-      },
-      manual_workout_authoring_reviews: [],
-    }),
   };
 }
 
@@ -282,19 +221,6 @@ export function deriveManualTargetTruthMode(
   }
 
   return "structure_only";
-}
-
-function formatManualSetupRunningLevel(runningLevel: ManualSetupRunningLevel) {
-  switch (runningLevel) {
-    case "new_to_running":
-      return "new to running";
-    case "beginner":
-      return "beginner";
-    case "running_regularly":
-      return "running regularly";
-    case "performance_focused":
-      return "performance focused";
-  }
 }
 
 export function asJsonRecord(value: unknown): Record<string, unknown> {

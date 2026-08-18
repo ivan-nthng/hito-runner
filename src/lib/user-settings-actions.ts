@@ -259,7 +259,11 @@ export async function updateUserSettingsForUserId(
   const supabase = createAdminSupabaseClient();
   const currentProfile = await getSettingsProfileRow(userId);
   const fitnessLevel = data.fitnessLevel ?? parseFitnessLevel(currentProfile?.fitness_level);
-  if (!currentProfile && (!data.age || !data.weightKg || !data.heightCm || !fitnessLevel)) {
+  const hasCompleteRunnerBaseline = Boolean(
+    data.age && data.weightKg && data.heightCm && fitnessLevel,
+  );
+  const canCreatePreferenceOnlyProfile = data.uiLocalePreference !== undefined;
+  if (!currentProfile && !hasCompleteRunnerBaseline && !canCreatePreferenceOnlyProfile) {
     throw new Error("Save age, height, weight, and fitness level to create the runner baseline.");
   }
 

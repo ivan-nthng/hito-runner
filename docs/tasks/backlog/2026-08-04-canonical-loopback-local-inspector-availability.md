@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** FRONTEND
+- **Epic:** platform-and-operations
 - **Outcome:** Confirmed as a source-backed runtime no-op: Local Inspector is deliberately available on the canonical managed loopback origin and absent on non-loopback origins through the existing origin-scoped gate.
 - **Sources:** [SKILL.md](../../../skills/hito-qa-browser-regression/SKILL.md); [SKILL.md](../../../skills/hito-frontend-design-system/SKILL.md); [frontend.agent.md](../../../agents/frontend.agent.md)
 - **Validation:** Overflow, Runtime health, Source change requirement passed as recorded in the terminal receipt; omitted layers remain outside this closeout.

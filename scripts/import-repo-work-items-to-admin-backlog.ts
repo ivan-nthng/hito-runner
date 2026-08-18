@@ -70,6 +70,7 @@ const IMPORT_METADATA_COMPARE_KEYS = [
   "work_item_status",
   "work_item_status_source",
   "work_item_owner",
+  "work_item_epic",
   "work_item_scope",
   "archive_intent",
   "work_item_batch",
@@ -234,6 +235,7 @@ type ExampleItem = {
   status: WorkItemStatus;
   metadataState: CanonicalMetadataState;
   owner: string | null;
+  epic: string | null;
   scope: string | null;
   archiveIntent: string | null;
   batch: string | null;
@@ -654,7 +656,9 @@ async function normalizeMarkdownFile(
   }
 
   const contentHash = createHash("sha256").update(content).digest("hex");
-  const canonical = parseCanonicalMarkdown(content);
+  const canonical = parseCanonicalMarkdown(content, {
+    requireEpicForActiveNonBug: sourceType === "backlog_doc",
+  });
   const sourceStatusText = extractStatusText(content);
   const owner = extractSectionText(content, "Owner");
   const lastUpdated = extractSectionText(content, "Last Updated");
@@ -698,6 +702,7 @@ async function normalizeMarkdownFile(
     work_item_status: workItemStatus,
     work_item_status_source: canonical.status ? "markdown" : "fallback",
     work_item_owner: canonical.owner ?? undefined,
+    work_item_epic: canonical.epic ?? undefined,
     work_item_scope: canonical.scope ?? undefined,
     archive_intent: canonical.archiveIntent ?? undefined,
     work_item_batch: canonical.batch ?? undefined,
@@ -1299,6 +1304,7 @@ function findExample(items: RepoWorkItem[], sourceType: SourceType): ExampleItem
         ? (item.metadata.markdown_metadata_state as CanonicalMetadataState)
         : "legacy_debt",
     owner: typeof item.metadata.work_item_owner === "string" ? item.metadata.work_item_owner : null,
+    epic: typeof item.metadata.work_item_epic === "string" ? item.metadata.work_item_epic : null,
     scope: typeof item.metadata.work_item_scope === "string" ? item.metadata.work_item_scope : null,
     archiveIntent:
       typeof item.metadata.archive_intent === "string" ? item.metadata.archive_intent : null,

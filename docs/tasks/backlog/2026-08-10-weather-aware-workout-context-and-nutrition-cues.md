@@ -5,6 +5,7 @@
 - **Type:** `product-discovery`
 - **Priority:** `medium`
 - **Owner:** `product`
+- **Epic:** runner-evidence-and-progress
 - **Scope:** `future weather context, runner location choice, and useful workout-day coaching cues`
 - **Archive Intent:** `retain_in_place`
 - **Stage:** `Product decision after Running Coach discovery`

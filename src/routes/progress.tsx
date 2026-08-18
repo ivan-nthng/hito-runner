@@ -7,11 +7,53 @@ import {
 import { HitoButton } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { APP_NAME } from "@/lib/app-config";
+import type {
+  RunnerActivityFitSequenceMetricId,
+  RunnerActivityFitSequenceQuickPeriodId,
+} from "@/lib/runner-activity/read-model-types";
 import { getProgressRouteData } from "@/lib/training-api";
 
+const PROGRESS_SEQUENCE_PERIODS = [
+  "this_week",
+  "last_7_days",
+  "last_1_month",
+  "last_6_months",
+  "custom",
+] as const;
+
+const PROGRESS_SEQUENCE_METRICS = [
+  "distance",
+  "timer_duration",
+  "observed_average_pace",
+  "elevation_gain",
+  "reported_load",
+] as const;
+
+type ProgressRouteSearch = {
+  tab?: RunnerProgressTab;
+  sequencePeriod?: RunnerActivityFitSequenceQuickPeriodId | "custom";
+  sequenceMetric?: RunnerActivityFitSequenceMetricId;
+  sequenceStartDate?: string;
+  sequenceEndDate?: string;
+};
+
 export const Route = createFileRoute("/progress")({
-  validateSearch: (search: Record<string, unknown>): { tab: RunnerProgressTab } => ({
+  validateSearch: (search: Record<string, unknown>): ProgressRouteSearch => ({
     tab: search.tab === "progress" || search.tab === "plans" ? search.tab : "history",
+    sequencePeriod: PROGRESS_SEQUENCE_PERIODS.includes(
+      search.sequencePeriod as (typeof PROGRESS_SEQUENCE_PERIODS)[number],
+    )
+      ? (search.sequencePeriod as ProgressRouteSearch["sequencePeriod"])
+      : "this_week",
+    sequenceMetric: PROGRESS_SEQUENCE_METRICS.includes(
+      search.sequenceMetric as (typeof PROGRESS_SEQUENCE_METRICS)[number],
+    )
+      ? (search.sequenceMetric as RunnerActivityFitSequenceMetricId)
+      : "distance",
+    sequenceStartDate:
+      typeof search.sequenceStartDate === "string" ? search.sequenceStartDate : undefined,
+    sequenceEndDate:
+      typeof search.sequenceEndDate === "string" ? search.sequenceEndDate : undefined,
   }),
   head: () => ({
     meta: [
@@ -29,16 +71,34 @@ export const Route = createFileRoute("/progress")({
 });
 
 function ProgressPage() {
-  const { snapshot, viewer } = Route.useLoaderData();
+  const { snapshot, viewer, settings } = Route.useLoaderData();
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
 
   return (
-    <AppShell snapshot={snapshot} viewer={viewer}>
+    <AppShell settings={settings} snapshot={snapshot} viewer={viewer}>
       <RunnerActivityProgressExperience
-        activeTab={search.tab}
+        activeTab={search.tab ?? "history"}
+        sequenceSelection={{
+          period: search.sequencePeriod ?? "this_week",
+          metric: search.sequenceMetric ?? "distance",
+          startDate: search.sequenceStartDate ?? null,
+          endDate: search.sequenceEndDate ?? null,
+        }}
         onTabChange={(tab) => {
-          navigate({ search: { tab } });
+          navigate({ search: (current) => ({ ...current, tab }) });
+        }}
+        onSequenceSelectionChange={(selection) => {
+          navigate({
+            search: (current) => ({
+              ...current,
+              tab: "progress",
+              sequencePeriod: selection.period,
+              sequenceMetric: selection.metric,
+              sequenceStartDate: selection.startDate ?? undefined,
+              sequenceEndDate: selection.endDate ?? undefined,
+            }),
+          });
         }}
       />
     </AppShell>

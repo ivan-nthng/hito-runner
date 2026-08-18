@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** FRONTEND
+- **Epic:** platform-and-operations
 - **Parent:** [Cross-Stack Deletion And Reuse Audit](2026-08-08-cross-stack-deletion-and-reuse-audit.md)
 - **Outcome:** Authenticated Calendar, Today, onboarding, manual-workout dialogs, Progress.
 - **Sources:** [layout-typography.css](../../../src/styles/layout-typography.css); [hito-typography-roles.ts](../../../src/lib/hito-typography-roles.ts); [BodyNotesEditor.tsx](../../../src/components/workout-completion/BodyNotesEditor.tsx)

@@ -2,7 +2,6 @@ import type { ResolvedUiLocale } from "@/lib/ui-locale";
 
 export interface HitoSharedShellMessages {
   languageMenu: {
-    triggerLabel: string;
     menuLabel: string;
     optionLabels: Record<ResolvedUiLocale, string>;
     deviceStatus: Record<ResolvedUiLocale, string>;
@@ -14,7 +13,6 @@ export interface HitoSharedShellMessages {
 export const HITO_SHARED_SHELL_MESSAGES = {
   en: {
     languageMenu: {
-      triggerLabel: "Choose language",
       menuLabel: "Language",
       optionLabels: {
         en: "English",
@@ -33,7 +31,6 @@ export const HITO_SHARED_SHELL_MESSAGES = {
   },
   "pt-BR": {
     languageMenu: {
-      triggerLabel: "Escolher idioma",
       menuLabel: "Idioma",
       optionLabels: {
         en: "English",

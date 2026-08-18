@@ -3,6 +3,8 @@ import type { Json } from "@/lib/supabase/database";
 export const WORKOUT_RESULT_STORAGE_BUCKET = "workout-result-assets";
 export const MAX_WORKOUT_RESULT_UPLOAD_BYTES = 25 * 1024 * 1024;
 export const MAX_WORKOUT_RESULT_MULTIPART_BYTES = MAX_WORKOUT_RESULT_UPLOAD_BYTES + 1024 * 1024;
+export const LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_FIELD = "localQaFixture";
+export const LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE = "sample-fit-from-zip.fit";
 
 export type WorkoutResultAssetKind = "garmin_fit" | "garmin_zip";
 export type WorkoutResultParseStatus = "uploaded" | "extracted" | "parsed" | "failed";

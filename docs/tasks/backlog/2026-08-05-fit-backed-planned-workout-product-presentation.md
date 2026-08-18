@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** FRONTEND
+- **Epic:** runner-evidence-and-progress
 - **Parent:** [Planned Workout FIT Completion Lifecycle](./2026-08-05-planned-workout-fit-completion-lifecycle.md)
 - **Outcome:** In Workout detail, render all non-null WorkoutActualMetricsSummary fields as observed Run facts.
 - **Sources:** [validate-workout-comparison-readback.tsx](../../../scripts/validate-workout-comparison-readback.tsx); [CompletionPanel.tsx](../../../src/components/CompletionPanel.tsx); [WorkoutComparisonReadback.tsx](../../../src/components/workout-completion/WorkoutComparisonReadback.tsx)

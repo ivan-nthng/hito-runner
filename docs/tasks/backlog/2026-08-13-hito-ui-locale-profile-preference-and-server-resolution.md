@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** BACKEND
+- **Epic:** platform-and-operations
 - **Evidence From:** [UI Locale And Brazilian Portuguese Contract Discovery](./2026-08-13-hito-ui-locale-and-brazilian-portuguese-contract-discovery.md)
 - **Outcome:** Implemented constrained `runner_profiles.ui_locale_preference` persistence and one deterministic server resolver for `en`/`pt-BR`, including weighted request-language precedence, safe invalid-value handling, RLS, and cleanup proof.
 - **Sources:** [validate-backend.mjs](../../../scripts/validate-backend.mjs); [validate-ui-locale-profile.ts](../../../scripts/validate-ui-locale-profile.ts); [database.ts](../../../src/lib/supabase/database.ts)

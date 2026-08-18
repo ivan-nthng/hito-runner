@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import type { PersistedPlannedWorkoutRow } from "../../src/lib/active-plan-persistence";
 import { moveManualWorkoutWithinActivePlanForUser } from "../../src/lib/manual-workout-authoring";
-import {
-  MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-  MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
-} from "../../src/lib/manual-workout-authoring/schema";
+import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "../../src/lib/manual-workout-authoring/schema";
 import {
   assertDirectMoveBlocked,
   assertNoFakePaceOrHr,
@@ -86,8 +83,8 @@ export async function validateMissedUnloggedMoveScenarios({ userId }: { userId: 
   if (missedYesterdayMove.ok) {
     assert.equal(missedYesterdayMove.status, "moved");
     assert.equal(missedYesterdayMove.persisted, true);
-    assert.equal(missedYesterdayMove.sourceKind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
-    assert.equal(missedYesterdayMove.sourceStatus, MANUAL_USER_BUILT_PLAN_SOURCE_STATUS);
+    assert.equal(missedYesterdayMove.sourceKind, "manual");
+    assert.equal(missedYesterdayMove.sourceStatus, null);
     assert.equal(missedYesterdayMove.plannedWorkoutId, missedYesterdayWorkout.id);
     assert.equal(missedYesterdayMove.sourceWorkoutDate, "2026-06-09");
     assert.equal(missedYesterdayMove.targetDate, "2026-06-10");
@@ -112,7 +109,11 @@ export async function validateMissedUnloggedMoveScenarios({ userId }: { userId: 
   assert.equal(persistedMissedMove.sourceDate, "2026-06-09");
   assert.equal(persistedMissedMove.targetDate, "2026-06-10");
   assert.equal(persistedMissedMove.targetWeekday, "Wednesday");
-  assert.equal(persistedMissedMove.targetWeekNumber, 2);
+  assert.equal(
+    persistedMissedMove.targetWeekNumber,
+    missedYesterdayWorkout.week_number,
+    "Move preserves authored descriptive week metadata",
+  );
   assert.equal(persistedMissedMove.mutationMode, "direct_manual_edit");
   assert.equal(persistedMissedMove.mutationPayloadVersion, "manual_workout_direct_move_v1");
   assert.equal(
@@ -475,6 +476,7 @@ export async function validateMissedUnloggedMoveScenarios({ userId }: { userId: 
     assert.equal(restFutureMove.targetWeekday, "Saturday");
     assert.equal(restFutureMove.targetDayKind, "rest_day");
     assert.equal(restFutureMove.targetReplacement?.plannedWorkoutId, restFutureWorkout.id);
+    assert.equal(restFutureMove.undoExpiresAt, "2026-06-10T00:00:45.000Z");
     assert.equal(restFutureMove.calendarRowCount, 1);
     assert.equal(restFutureMove.nonRestWorkoutCount, 1);
     assert.equal(restFutureMove.safety.requiresExplicitConfirm, false);

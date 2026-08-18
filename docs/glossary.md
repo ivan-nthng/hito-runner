@@ -22,18 +22,20 @@
 - `preview`
   intentionally not trusted and not saved as runner history
 - `saved mode`
-  authenticated mode where plan, logs, and week status are backed by persisted backend truth
+  authenticated mode where calendar workouts, logs, and week status are backed by persisted
+  backend truth
 
 ## Entity Terms
 
 - `runner_profile`
   persisted record for goal, baseline, and setup state
-- `plan_cycle`
-  persisted plan context for one runner
-- `planned_workout`
-  one scheduled workout entry in a persisted plan
+- `plan source`
+  an AI-generated, imported, or manual artifact used to propose initial workout placement; retained
+  as provenance and history, not as a calendar container
+- `calendar workout`
+  one independently scheduled workout owned by the runner after confirmation
 - `workout_log`
-  persisted result recorded against a planned workout
+  persisted result recorded against a calendar workout
 - `week_status`
   backend-derived weekly state shown to the user from workout execution
 

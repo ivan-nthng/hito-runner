@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** DESIGN SYSTEM
+- **Epic:** platform-and-operations
 - **Outcome:** one factual deletion sweep completed; no replacement framework or state owner.
 - **Sources:** [reference-components-controls.tsx](../../../src/components/hito-ds/reference-components-controls.tsx); [2026-08-11-hito-ds-reference-dead-legacy-deletion-sweep.md](2026-08-11-hito-ds-reference-dead-legacy-deletion-sweep.md); [SKILL.md](../../../skills/hito-frontend-design-system/SKILL.md)
 - **Validation:** Focused ESLint / Prettier, Production build, Scope / diff hygiene passed as recorded in the terminal receipt; omitted layers remain outside this closeout.

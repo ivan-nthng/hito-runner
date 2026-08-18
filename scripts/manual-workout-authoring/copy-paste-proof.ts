@@ -28,6 +28,7 @@ export async function validateManualCopyPasteContract() {
     ...buildFakePlannedWorkout({
       userId,
       planCycleId: provenancePlan.id,
+      originKind: "file_import",
       id: "99999999-9999-4999-8999-000000000402",
       date: "2026-06-10",
       displayOrder: 4,
@@ -88,7 +89,7 @@ export async function validateManualCopyPasteContract() {
 
   assert.equal(success.ok, true, formatJsonResult(success));
   if (success.ok) {
-    assert.equal(success.sourceKind, provenancePlan.source_kind);
+    assert.equal(success.sourceKind, "file_import");
     assert.equal(success.activePlanId, provenancePlan.id);
     assert.equal(success.sourceWorkoutId, sourceWorkout.id);
     assert.equal(success.targetDate, "2026-06-24");
@@ -258,14 +259,12 @@ function buildDirectCopyDependencies(input: {
   return {
     currentDate: input.currentDate ?? "2026-06-18",
     getCalendarWorkoutContextForUser: async () => ({
-      provenancePlan: input.plans.at(-1) ?? null,
+      sourcePlansById: new Map(input.plans.map((plan) => [plan.id, plan])),
       existingWorkouts: {
         workouts: input.workouts,
         logsByWorkoutId: input.logsByWorkoutId ?? new Map(),
       },
     }),
-    getPlanRecordForUser: async (userId, planId) =>
-      input.plans.find((plan) => plan.user_id === userId && plan.id === planId) ?? null,
     persistWorkoutCopy: async (persistInput) => {
       input.onPersist?.(persistInput);
       const targetId = "66666666-6666-4666-8666-666666666666";
@@ -274,7 +273,6 @@ function buildDirectCopyDependencies(input: {
         plannedWorkout: {
           ...persistInput.sourceWorkout,
           id: targetId,
-          plan_cycle_id: persistInput.provenancePlan.id,
           workout_date: persistInput.workoutSeed.workoutDate,
           weekday: persistInput.workoutSeed.weekday,
           week_number: persistInput.workoutSeed.weekNumber,

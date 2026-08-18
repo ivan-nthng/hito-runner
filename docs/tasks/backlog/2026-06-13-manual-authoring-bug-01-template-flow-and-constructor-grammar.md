@@ -6,7 +6,7 @@ backlog
 
 ## Type
 
-change_request
+Bug
 
 ## Priority
 
@@ -49,6 +49,7 @@ medium
 ## Owner
 
 FRONTEND
+
 
 ## Reported
 

@@ -16,15 +16,17 @@ import {
   verifyLocalAuthCredentials,
   type LocalAuthAccountConfig,
 } from "@/lib/local-auth";
+import { ensureLocalAuthSupabaseUserId } from "@/lib/local-auth-supabase";
+import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
 import { isDevOnlyLocalAuthRuntime } from "@/lib/supabase/env";
 
 export const ADMIN_USERNAME = "admin";
 export const ADMIN_SESSION_COOKIE = "hito_admin_session";
 const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
-const ADMIN_SESSION_USER_ID = "hito-admin";
 const LOCAL_FIXTURE_ADMIN_SESSION_SECRET = "hito-local-admin-session-dev-only-secret-2026-06-01";
 const MIN_PASSWORD_HASH_ITERATIONS = 100_000;
 const MAX_PASSWORD_HASH_ITERATIONS = 1_000_000;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const pbkdf2 = promisify(pbkdf2Callback);
 
 export type AdminSessionSource = "deployed_password" | "local_fixture";
@@ -36,10 +38,12 @@ type AdminLoginVerificationResult =
         | {
             kind: "local_fixture";
             account: LocalAuthAccountConfig;
+            persistedUserId: string;
           }
         | {
             kind: "deployed_password";
             username: typeof ADMIN_USERNAME;
+            persistedUserId: string;
           };
     })
   | Extract<AdminLoginResult, { ok: false }>;
@@ -60,6 +64,11 @@ export interface AdminLoginDependencies {
         reason: "unavailable" | "invalid";
       }
   >;
+  resolvePersistentAdminUserId: (input: {
+    source: AdminSessionSource;
+    configuredUserId: string;
+    localAccount: LocalAuthAccountConfig | null;
+  }) => Promise<string | null>;
   deployedAdmin: DeployedAdminConfig;
 }
 
@@ -67,7 +76,15 @@ export interface DeployedAdminConfig {
   username: typeof ADMIN_USERNAME;
   passwordHash: string | null;
   sessionSecret: string | null;
+  userId: string | null;
 }
+
+type ValidatedDeployedAdminConfig = {
+  username: typeof ADMIN_USERNAME;
+  passwordHash: string;
+  sessionSecret: string;
+  userId: string;
+};
 
 export interface AdminAuthSession {
   userId: string;
@@ -172,12 +189,28 @@ export async function verifyAdminLoginForDependencies(
     return failure("invalid_credentials", "The admin credentials were not recognized.", redirectTo);
   }
 
+  const persistedUserId = await dependencies
+    .resolvePersistentAdminUserId({
+      source: "deployed_password",
+      configuredUserId: deployedConfig.config.userId,
+      localAccount: null,
+    })
+    .catch(() => null);
+  if (!persistedUserId) {
+    return failure(
+      "admin_config_invalid",
+      "Admin login is not configured for this runtime.",
+      redirectTo,
+    );
+  }
+
   return {
     ok: true,
     redirectTo,
     session: {
       kind: "deployed_password",
       username: ADMIN_USERNAME,
+      persistedUserId,
     },
   };
 }
@@ -219,12 +252,28 @@ async function verifyLocalFixtureAdminLogin(
     );
   }
 
+  const persistedUserId = await dependencies
+    .resolvePersistentAdminUserId({
+      source: "local_fixture",
+      configuredUserId: credentials.account.userId,
+      localAccount: credentials.account,
+    })
+    .catch(() => null);
+  if (!persistedUserId) {
+    return failure(
+      "admin_config_invalid",
+      "Admin login is not configured for this runtime.",
+      redirectTo,
+    );
+  }
+
   return {
     ok: true,
     redirectTo,
     session: {
       kind: "local_fixture",
       account: credentials.account,
+      persistedUserId,
     },
   };
 }
@@ -235,6 +284,7 @@ async function buildCurrentDependencies(request: Request): Promise<AdminLoginDep
     accounts: await getLocalAuthAccounts(),
     verifyCredentials: (identifier, password) =>
       verifyLocalAuthCredentials(identifier, password, request.url),
+    resolvePersistentAdminUserId: resolvePersistentAdminUserId,
     deployedAdmin: readDeployedAdminConfigForRequest(request),
   };
 }
@@ -259,15 +309,24 @@ export async function resolveAdminAuthSession(request: Request): Promise<AdminAu
     return null;
   }
 
-  const source = normalizeAdminSessionSource(payload.source);
-  const runtimeClass = normalizeAdminRuntimeClass(payload.runtimeClass, source);
+  const source = parseAdminSessionSource(payload.source);
+  const runtimeClass = parseAdminRuntimeClass(payload.runtimeClass);
+  const userId = normalizeAdminSessionUserId(payload.adminUserId);
 
-  if (source === "local_fixture" && runtimeClass !== "loopback") {
+  if (
+    !userId ||
+    !source ||
+    !runtimeClass ||
+    !(
+      (source === "local_fixture" && runtimeClass === "loopback") ||
+      (source === "deployed_password" && runtimeClass === "deployed")
+    )
+  ) {
     return null;
   }
 
   return {
-    userId: normalizeAdminSessionUserId(payload.adminUserId, source),
+    userId,
     email: null,
     username: ADMIN_USERNAME,
     label: normalizeAdminSessionLabel(payload.label, source),
@@ -304,7 +363,6 @@ function appendAdminAuthSessionCookie(
   const issuedAt = Math.floor(Date.now() / 1000);
   const expiresAt = issuedAt + ADMIN_SESSION_MAX_AGE_SECONDS;
   const isLocalFixture = session.kind === "local_fixture";
-  const adminUserId = isLocalFixture ? session.account.userId : ADMIN_SESSION_USER_ID;
   const label = isLocalFixture ? session.account.displayName || session.account.username : "admin";
 
   headers.append(
@@ -319,7 +377,7 @@ function appendAdminAuthSessionCookie(
           exp: expiresAt,
           source: isLocalFixture ? "local_fixture" : "deployed_password",
           runtimeClass: isLocalFixture ? "loopback" : "deployed",
-          adminUserId,
+          adminUserId: session.persistedUserId,
           label,
         },
         config.sessionSecret,
@@ -356,7 +414,7 @@ function validateAdminSessionSecret(secret: string | null):
 function validateDeployedAdminConfig(config: DeployedAdminConfig):
   | {
       ok: true;
-      config: Required<DeployedAdminConfig>;
+      config: ValidatedDeployedAdminConfig;
     }
   | {
       ok: false;
@@ -366,6 +424,7 @@ function validateDeployedAdminConfig(config: DeployedAdminConfig):
     !config.passwordHash ||
     !config.sessionSecret ||
     config.sessionSecret.length < 32 ||
+    !isUuid(config.userId) ||
     !isSupportedPasswordHash(config.passwordHash)
   ) {
     return { ok: false };
@@ -377,6 +436,7 @@ function validateDeployedAdminConfig(config: DeployedAdminConfig):
       username: ADMIN_USERNAME,
       passwordHash: config.passwordHash,
       sessionSecret: config.sessionSecret,
+      userId: config.userId,
     },
   };
 }
@@ -386,7 +446,31 @@ function readDeployedAdminConfigForRequest(request: Request): DeployedAdminConfi
     username: ADMIN_USERNAME,
     passwordHash: readServerEnv("HITO_ADMIN_PASSWORD_HASH"),
     sessionSecret: readAdminSessionSecretForRequest(request),
+    userId: readServerEnv("HITO_ADMIN_USER_ID"),
   };
+}
+
+async function resolvePersistentAdminUserId(input: {
+  source: AdminSessionSource;
+  configuredUserId: string;
+  localAccount: LocalAuthAccountConfig | null;
+}) {
+  const candidateUserId =
+    input.source === "local_fixture" && input.localAccount
+      ? await ensureLocalAuthSupabaseUserId(input.localAccount)
+      : input.configuredUserId;
+
+  return getPersistedUserIdForAuthContext({
+    userId: candidateUserId,
+    email: input.localAccount?.email ?? null,
+    appBaseUrl: null,
+    provider: "admin",
+    adminSession: {
+      label: input.localAccount?.displayName ?? "admin",
+      source: input.source,
+      runtimeClass: input.source === "local_fixture" ? "loopback" : "deployed",
+    },
+  });
 }
 
 function readAdminSessionSecretForRequest(request: Request): string | null {
@@ -410,7 +494,7 @@ function readServerEnv(name: string): string | null {
 async function verifyDeployedAdminCredentials(
   identifier: string,
   password: string,
-  config: Required<DeployedAdminConfig>,
+  config: ValidatedDeployedAdminConfig,
 ) {
   if (identifier.trim().toLowerCase() !== config.username) {
     return { ok: false as const };
@@ -520,30 +604,22 @@ function verifyAdminSessionToken(value: string, secret: string): AdminSessionPay
   }
 }
 
-function normalizeAdminSessionSource(value: AdminSessionPayload["source"]): AdminSessionSource {
-  return value === "local_fixture" ? "local_fixture" : "deployed_password";
+function parseAdminSessionSource(value: AdminSessionPayload["source"]): AdminSessionSource | null {
+  return value === "local_fixture" || value === "deployed_password" ? value : null;
 }
 
-function normalizeAdminRuntimeClass(
+function parseAdminRuntimeClass(
   value: AdminSessionPayload["runtimeClass"],
-  source: AdminSessionSource,
-): AdminRuntimeClass {
-  if (value === "loopback" || value === "deployed") {
-    return value;
-  }
-
-  return source === "local_fixture" ? "loopback" : "deployed";
+): AdminRuntimeClass | null {
+  return value === "loopback" || value === "deployed" ? value : null;
 }
 
-function normalizeAdminSessionUserId(
-  value: AdminSessionPayload["adminUserId"],
-  source: AdminSessionSource,
-) {
-  if (typeof value === "string" && value.trim()) {
-    return value.trim();
-  }
+function normalizeAdminSessionUserId(value: AdminSessionPayload["adminUserId"]) {
+  return isUuid(value) ? value.trim() : null;
+}
 
-  return source === "local_fixture" ? "hito-local-admin" : ADMIN_SESSION_USER_ID;
+function isUuid(value: unknown): value is string {
+  return typeof value === "string" && UUID_PATTERN.test(value.trim());
 }
 
 function normalizeAdminSessionLabel(

@@ -14,13 +14,15 @@ export type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_w
 export type PersistedWorkoutLogRow = Database["public"]["Tables"]["workout_logs"]["Row"];
 
 export function buildPersistedWorkoutInsertRows(
-  planCycleId: string,
+  planCycleId: string | null,
   userId: string,
   workouts: ImportedPlanSeed["workouts"],
+  originKind?: PersistedPlannedWorkoutRow["origin_kind"],
 ) {
   return workouts.map((workout) => ({
     plan_cycle_id: planCycleId,
     user_id: userId,
+    origin_kind: originKind,
     workout_date: workout.workoutDate,
     weekday: workout.weekday,
     week_number: workout.weekNumber,

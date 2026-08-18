@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { access, readFile } from "node:fs/promises";
 import {
   MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
@@ -30,12 +31,11 @@ import {
   resolveManualPersistencePreflight,
   validateManualWorkoutDisposablePersistenceProof,
 } from "./manual-workout-authoring/persistence-proof";
-import { validateManualActivePlanAddWorkoutContract } from "./manual-workout-authoring/active-plan-add-proof";
+import { validateStandaloneManualCalendarAddContract } from "./manual-workout-authoring/active-plan-add-proof";
 import { validateManualConstructorSegmentTargetContract } from "./manual-workout-authoring/constructor-contract-proof";
 import { validateManualConstructorDndContract } from "./manual-workout-authoring/constructor-dnd-contract-proof";
 import { validateManualCopyPasteContract } from "./manual-workout-authoring/copy-paste-proof";
 import { validateManualDeleteClearContract } from "./manual-workout-authoring/delete-clear-proof";
-import { validateManualEmptyActivePlanCreationContract } from "./manual-workout-authoring/empty-plan-proof";
 import { validateManualActivePlanExportContract } from "./manual-workout-authoring/export-proof";
 import { validateManualMoveWorkoutContract } from "./manual-workout-authoring/move-proof";
 import {
@@ -62,6 +62,7 @@ import { validateManualLongRunExecutionPolicyContract } from "./long-run-executi
 
 async function main() {
   const options = readManualPersistenceCliOptions();
+  await validateStandaloneCalendarSourceBoundary();
   validateManualLongRunExecutionPolicyContract();
   validateAcceptedFixtures();
   validateManualTitleDurationContract();
@@ -78,8 +79,7 @@ async function main() {
   validateAiAuthoredOrderedRepeatRoleRoundtrip();
   validateManualSourceEditingCapabilityReadback();
   await validateManualSavedTemplateContract();
-  await validateManualEmptyActivePlanCreationContract();
-  await validateManualActivePlanAddWorkoutContract();
+  await validateStandaloneManualCalendarAddContract();
   await validateManualCopyPasteContract();
   await validateManualDeleteClearContract();
   await validateManualMoveWorkoutContract();
@@ -113,6 +113,149 @@ async function main() {
   console.log("Manual workout authoring review contract invariants passed.", {
     persistence: persistenceProof,
   });
+}
+
+async function validateStandaloneCalendarSourceBoundary() {
+  const root = new URL("../", import.meta.url);
+  const [
+    retirementMigration,
+    overflowMigration,
+    occupiedUndoMigration,
+    persistence,
+    trainingApi,
+    databaseTypes,
+  ] = await Promise.all([
+    readFile(
+      new URL(
+        "../supabase/migrations/20260810132840_retire_active_plan_calendar_authority.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../supabase/migrations/20260811125538_clear_calendar_future_workouts.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(
+      new URL(
+        "../supabase/migrations/20260816171845_occupied_move_replace_durable_undo.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(new URL("../src/lib/active-plan-persistence.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/training-api.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/supabase/database.ts", import.meta.url), "utf8"),
+  ]);
+  const [sourceCapabilities, calendarOverflowActions, planExport, planExportRoute] =
+    await Promise.all([
+      readFile(
+        new URL("../src/lib/active-plan-workout-editing/source-capabilities.ts", import.meta.url),
+        "utf8",
+      ),
+      readFile(new URL("../src/lib/calendar-overflow-actions.ts", import.meta.url), "utf8"),
+      readFile(new URL("../src/lib/plan-export.ts", import.meta.url), "utf8"),
+      readFile(new URL("../src/routes/api.plan.export.tsx", import.meta.url), "utf8"),
+    ]);
+
+  for (const path of [
+    "src/lib/active-plan-lifecycle-actions.ts",
+    "src/lib/active-plan-schedule-edit-contract.ts",
+    "src/lib/active-plan-schedule-edit-preview.ts",
+    "src/lib/active-plan-transition-actions.ts",
+    "src/lib/active-plan-replacement-carry-forward.ts",
+    "src/lib/plan-replacement-actions.ts",
+  ]) {
+    await assert.rejects(access(new URL(path, root)), undefined, `${path} must stay deleted`);
+  }
+
+  assert.match(
+    retirementMigration,
+    /update public\.plan_cycles[\s\S]*status = 'archived'[\s\S]*status = 'active'/,
+  );
+  assert.match(retirementMigration, /alter column status set default 'archived'/);
+  assert.match(
+    retirementMigration,
+    /drop index if exists public\.plan_cycles_one_active_per_user_idx/,
+  );
+  assert.match(
+    retirementMigration,
+    /drop function if exists public\.apply_active_plan_schedule_reflow/,
+  );
+  assert.match(retirementMigration, /rename to apply_calendar_workout_mutation/);
+  assert.match(retirementMigration, /rename to apply_calendar_workout_content_edit/);
+  assert.match(
+    retirementMigration,
+    /create function public\.apply_reviewed_future_schedule_persistence/,
+  );
+  assert.match(
+    overflowMigration,
+    /create or replace function public\.clear_calendar_future_workouts/,
+  );
+  assert.match(overflowMigration, /pg_advisory_xact_lock/);
+  assert.match(overflowMigration, /protected_future_schedule/);
+  assert.match(
+    overflowMigration,
+    /revoke execute[\s\S]*from public, anon, authenticated;[\s\S]*grant execute[\s\S]*to service_role;/,
+  );
+  assert.match(
+    occupiedUndoMigration,
+    /create or replace function public\.apply_calendar_workout_mutation/,
+  );
+  assert.match(occupiedUndoMigration, /jsonb_typeof\(displaced_workout\) = 'object'/);
+  assert.match(
+    occupiedUndoMigration,
+    /v_restore := to_jsonb\(v_target\);\s+v_undo_expires_at := clock_timestamp\(\) \+ interval '45 seconds';/,
+  );
+  assert.match(occupiedUndoMigration, /\(v_restore->>'workout_type'\)::public\.workout_type/);
+  assert.doesNotMatch(
+    occupiedUndoMigration,
+    /displaced_workout->>'workout_type' = 'rest'|if v_target\.workout_type = 'rest'/,
+  );
+  assert.doesNotMatch(occupiedUndoMigration, /create table|alter table|create policy/i);
+  assert.match(
+    occupiedUndoMigration,
+    /revoke execute[\s\S]*from public, anon, authenticated;[\s\S]*grant execute[\s\S]*to service_role;/,
+  );
+
+  assert.doesNotMatch(persistence, /export async function getActivePlan/);
+  assert.doesNotMatch(persistence, /getExistingPlanContext|replaceActivePlan|carry.forward/i);
+  assert.doesNotMatch(
+    persistence,
+    /getLatestMaterializedPlanProvenance|getMaterializedPlanProvenancesForUser|getPlanWorkouts/,
+  );
+  assert.match(persistence, /getSourcePlanProvenancesForUser/);
+  assert.match(persistence, /sourcePlansById/);
+  assert.doesNotMatch(trainingApi, /clearUpcomingSchedule|previewActivePlan|ScheduleReflow/);
+  assert.doesNotMatch(
+    trainingApi,
+    /getLatestMaterializedPlanProvenance|getMaterializedPlanProvenancesForUser|getResolvedPlanWorkoutsWithLogs/,
+  );
+  assert.match(trainingApi, /getCalendarWorkoutsWithLogsForUser/);
+  assert.match(trainingApi, /calendarContext:\s*\{/);
+  assert.match(trainingApi, /planMeta:\s*null/);
+  assert.match(databaseTypes, /apply_calendar_workout_mutation/);
+  assert.match(databaseTypes, /apply_reviewed_future_schedule_persistence/);
+  assert.doesNotMatch(databaseTypes, /apply_active_plan_workout|apply_active_plan_schedule_reflow/);
+  assert.match(sourceCapabilities, /provenancePlan/);
+  assert.doesNotMatch(sourceCapabilities, /provenancePlan\.status|status === "active"/);
+  assert.match(calendarOverflowActions, /validateImportedPlanJson/);
+  assert.match(calendarOverflowActions, /retainImportedPlanCandidateForUser/);
+  assert.match(calendarOverflowActions, /getRunnerCalendarDateForUserId/);
+  assert.match(calendarOverflowActions, /clearAtomicCalendarFutureWorkouts/);
+  assert.match(calendarOverflowActions, /buildCalendarWorkoutExportPayload/);
+  assert.doesNotMatch(
+    calendarOverflowActions,
+    /getMaterializedPlanProvenancesForUser|buildFutureCalendarExportProvenance/,
+  );
+  assert.match(calendarOverflowActions, /z\.literal\("delete_future_workouts"\)/);
+  assert.match(calendarOverflowActions, /z\.literal\("start_new_plan"\)/);
+  assert.doesNotMatch(calendarOverflowActions, /status:\s*["']active["']/);
+  assert.match(planExport, /hito_calendar_workout_export_v1/);
+  assert.match(planExportRoute, /scope:\s*z\.literal\("future-calendar"\)/);
 }
 
 function validateManualDateOnlyLabels() {
@@ -166,7 +309,7 @@ function validateCalendarWorkoutContentEditabilityPolicy() {
     assert.equal(
       isEditableCalendarWorkoutSourceKind(sourceKind),
       true,
-      `${sourceKind} should be an editable active-plan source`,
+      `${sourceKind} should remain editable provenance for a runner-owned workout`,
     );
 
     for (const operation of ["add_workout", "clear_workout", "move_workout"] as const) {
@@ -219,19 +362,15 @@ function validateCalendarWorkoutContentEditabilityPolicy() {
     "confirmed workout content editing should not inherit lifecycle source allowlists",
   );
 
-  const missingSource = resolveCalendarWorkoutEditability(
-    buildFakePlanCycle({
-      userId,
-      id: "00000000-0000-4000-8000-000000000013",
-      sourceKind: null,
-      startDate: "2026-06-16",
-      endDate: "2026-06-30",
-    }),
-    "add_workout",
+  const noSourceArtifact = resolveCalendarWorkoutEditability(null, "add_workout");
+  assert.equal(
+    noSourceArtifact.ok,
+    true,
+    "a direct runner-owned Calendar workout must not require a source artifact",
   );
-  assert.equal(missingSource.ok, false, "missing source metadata should stay blocked");
-  if (!missingSource.ok) {
-    assert.equal(missingSource.reason, "unsupported_source_metadata");
+  if (noSourceArtifact.ok) {
+    assert.equal(noSourceArtifact.sourceKind, "runner_owned_calendar_workout");
+    assert.equal(noSourceArtifact.sourceStatus, null);
   }
 }
 

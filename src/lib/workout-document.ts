@@ -5,13 +5,22 @@ import {
   type PlannedWorkoutRepeatChildRole,
   type PlannedWorkoutUnitPrescription,
 } from "@/lib/planned-workout-block-contract";
-import type {
-  CalendarIconKey,
-  CanonicalGoalContext,
-  CanonicalMetricModeJson,
-  CanonicalWorkoutFamily,
-  CanonicalWorkoutIdentity,
+import {
+  normalizeCalendarIconKey,
+  normalizeCanonicalGoalContext,
+  normalizeCanonicalMetricMode,
+  resolveCanonicalWorkoutModel,
+  normalizeWorkoutFamily,
+  normalizeWorkoutIdentity,
+  toCanonicalMetricModeJson,
+  type CalendarIconKey,
+  type CanonicalGoalContext,
+  type CanonicalMetricModeJson,
+  type CanonicalWorkoutFamily,
+  type CanonicalWorkoutIdentity,
+  type WorkoutSegmentLike,
 } from "@/lib/rich-workout-model";
+import { stableJsonEqual } from "@/lib/review-token-signing";
 
 export const AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE = "ai_authored_plan_guidance" as const;
 export const WORKOUT_DOCUMENT_HYDRATION_LABEL = "Hydration" as const;
@@ -106,7 +115,7 @@ export interface WorkoutDocument extends WorkoutDocumentContent {
   weekday: string;
   weekNumber: number;
   phase: string;
-  sourceWorkoutId: string;
+  sourceWorkoutId: string | null;
   goalContext: CanonicalGoalContext | null;
   plannedRpe: number | null;
   estimatedFatigue: string | null;
@@ -114,12 +123,206 @@ export interface WorkoutDocument extends WorkoutDocumentContent {
   displayOrder: number;
 }
 
+export type WorkoutDocumentEditProjection = Omit<WorkoutDocumentContent, "sourceWorkoutType">;
+
+export type WorkoutDocumentValidationResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; message: string };
+
+export interface PersistedWorkoutDocumentRow {
+  workout_date: unknown;
+  weekday: unknown;
+  week_number: unknown;
+  phase: unknown;
+  workout_type: unknown;
+  source_workout_id: unknown;
+  source_workout_type: unknown;
+  workout_family: unknown;
+  workout_identity: unknown;
+  calendar_icon_key: unknown;
+  goal_context: unknown;
+  metric_mode: unknown;
+  title: unknown;
+  notes: unknown;
+  planned_rpe: unknown;
+  estimated_fatigue: unknown;
+  recovery_priority: unknown;
+  steps: unknown;
+  display_order: unknown;
+}
+
+/** Strict write-boundary parser. Readback callers should keep using readWorkoutDocumentSections. */
+export function normalizePersistedWorkoutDocument(
+  row: PersistedWorkoutDocumentRow,
+): WorkoutDocumentValidationResult<WorkoutDocument> {
+  const workoutDate = readIsoDate(row.workout_date);
+  const weekday = readString(row.weekday);
+  const phase = readString(row.phase);
+  const weekNumber = readPositiveInteger(row.week_number);
+  const displayOrder = readNonNegativeInteger(row.display_order);
+  const sourceWorkoutId = readNullableString(row.source_workout_id);
+  const sourceWorkoutType = readNullableString(row.source_workout_type);
+  const goalContext = normalizeNullableGoalContext(row.goal_context);
+  const plannedRpe = readNullableRpe(row.planned_rpe);
+  const estimatedFatigue = readNullableString(row.estimated_fatigue);
+  const recoveryPriority = readNullableString(row.recovery_priority);
+
+  if (
+    !workoutDate ||
+    !weekday ||
+    !phase ||
+    !weekNumber ||
+    displayOrder == null ||
+    sourceWorkoutId === INVALID_NULLABLE_STRING ||
+    sourceWorkoutType === INVALID_NULLABLE_STRING ||
+    goalContext === INVALID_GOAL_CONTEXT ||
+    plannedRpe === INVALID_RPE ||
+    estimatedFatigue === INVALID_NULLABLE_STRING ||
+    recoveryPriority === INVALID_NULLABLE_STRING
+  ) {
+    return invalidDocument("The persisted workout identity or document metadata is invalid.");
+  }
+
+  const content = normalizeWorkoutDocumentContent({
+    workoutType: row.workout_type,
+    sourceWorkoutType,
+    workoutFamily: row.workout_family,
+    workoutIdentity: row.workout_identity,
+    calendarIconKey: row.calendar_icon_key,
+    metricMode: row.metric_mode,
+    title: row.title,
+    notes: row.notes,
+    steps: row.steps,
+  });
+
+  if (!content.ok) {
+    return content;
+  }
+
+  return {
+    ok: true,
+    value: {
+      ...content.value,
+      workoutDate,
+      weekday,
+      weekNumber,
+      phase,
+      sourceWorkoutId,
+      goalContext,
+      plannedRpe,
+      estimatedFatigue,
+      recoveryPriority,
+      displayOrder,
+    },
+  };
+}
+
+export function buildWorkoutDocumentEditProjection(
+  document: WorkoutDocument,
+): WorkoutDocumentEditProjection {
+  return {
+    workoutType: document.workoutType,
+    workoutFamily: document.workoutFamily,
+    workoutIdentity: document.workoutIdentity,
+    calendarIconKey: document.calendarIconKey,
+    metricMode: document.metricMode,
+    title: document.title,
+    notes: document.notes,
+    steps: document.steps,
+  };
+}
+
+export function buildEditedWorkoutDocument(
+  source: WorkoutDocument,
+  projection: unknown,
+): WorkoutDocumentValidationResult<WorkoutDocument> {
+  const content = normalizeWorkoutDocumentContent({
+    ...unknownRecord(projection),
+    sourceWorkoutType: source.sourceWorkoutType,
+  });
+
+  if (!content.ok) {
+    return content;
+  }
+
+  return {
+    ok: true,
+    value: {
+      ...source,
+      ...content.value,
+    },
+  };
+}
+
+export function normalizeWorkoutDocumentContent(
+  value: unknown,
+): WorkoutDocumentValidationResult<WorkoutDocumentContent> {
+  const record = unknownRecord(value);
+  const workoutType = readWorkoutDocumentType(record?.workoutType);
+  const sourceWorkoutType = readNullableString(record?.sourceWorkoutType);
+  const workoutFamily = normalizeWorkoutFamily(record?.workoutFamily);
+  const workoutIdentity = normalizeWorkoutIdentity(record?.workoutIdentity);
+  const calendarIconKey = normalizeCalendarIconKey(record?.calendarIconKey);
+  const explicitMetricMode = normalizeCanonicalMetricMode(record?.metricMode);
+  const title = readString(record?.title);
+  const notes = readNullableString(record?.notes);
+  const steps = normalizeWorkoutDocumentSectionsForWrite(record?.steps);
+
+  if (
+    !workoutType ||
+    sourceWorkoutType === INVALID_NULLABLE_STRING ||
+    !workoutFamily ||
+    !workoutIdentity ||
+    !calendarIconKey ||
+    (record?.metricMode != null && !explicitMetricMode) ||
+    !title ||
+    notes === INVALID_NULLABLE_STRING ||
+    !steps.ok ||
+    (workoutType !== "rest" && steps.value.length === 0)
+  ) {
+    return invalidDocument(steps.ok ? "The workout document is invalid." : steps.message);
+  }
+
+  const canonicalModel = resolveCanonicalWorkoutModel({
+    workoutType,
+    sourceWorkoutType,
+    workoutFamily,
+    workoutIdentity,
+    calendarIconKey,
+    metricMode: explicitMetricMode,
+    title,
+    steps: steps.value as unknown as WorkoutSegmentLike[],
+  });
+  if (
+    canonicalModel.workoutFamily !== workoutFamily ||
+    canonicalModel.workoutIdentity !== workoutIdentity ||
+    canonicalModel.calendarIconKey !== calendarIconKey
+  ) {
+    return invalidDocument("The workout document semantics are internally inconsistent.");
+  }
+
+  return {
+    ok: true,
+    value: {
+      workoutType,
+      sourceWorkoutType,
+      workoutFamily,
+      workoutIdentity,
+      calendarIconKey,
+      metricMode: toCanonicalMetricModeJson(canonicalModel.metricMode),
+      title,
+      notes,
+      steps: steps.value,
+    },
+  };
+}
+
 export function readWorkoutDocumentSections(value: unknown): WorkoutDocumentSection[] {
   if (!Array.isArray(value)) {
     return [];
   }
 
-  return value.filter(isRecord) as WorkoutDocumentSection[];
+  return value.filter(isRecord) as unknown as WorkoutDocumentSection[];
 }
 
 export function normalizeWorkoutDocumentTarget(value: unknown): WorkoutDocumentTarget | undefined {
@@ -305,6 +508,404 @@ export function workoutDocumentRepeatChildRoleForSection(
     default:
       return null;
   }
+}
+
+const INVALID_NULLABLE_STRING = Symbol("invalid_nullable_string");
+const INVALID_GOAL_CONTEXT = Symbol("invalid_goal_context");
+const INVALID_RPE = Symbol("invalid_rpe");
+const WORKOUT_DOCUMENT_TYPE_VALUES = new Set<WorkoutDocumentType>([
+  "easy",
+  "steady_or_easy",
+  "rest",
+  "long_run",
+  "quality",
+]);
+
+function normalizeWorkoutDocumentSectionsForWrite(
+  value: unknown,
+): WorkoutDocumentValidationResult<WorkoutDocumentSection[]> {
+  if (!Array.isArray(value)) {
+    return invalidDocument("The workout document requires an ordered steps array.");
+  }
+
+  const sections: WorkoutDocumentSection[] = [];
+  const segmentIds = new Set<string>();
+
+  for (let index = 0; index < value.length; index += 1) {
+    const section = normalizeWorkoutDocumentSectionForWrite(value[index], index);
+    if (!section.ok) {
+      return section;
+    }
+
+    const segmentId = section.value.segment_id;
+    if (!segmentId || segmentIds.has(segmentId)) {
+      return invalidDocument("Workout sections require unique stable segment IDs.");
+    }
+
+    segmentIds.add(segmentId);
+    sections.push(section.value);
+  }
+
+  return { ok: true, value: sections };
+}
+
+function normalizeWorkoutDocumentSectionForWrite(
+  value: unknown,
+  index: number,
+): WorkoutDocumentValidationResult<WorkoutDocumentSection> {
+  const record = unknownRecord(value);
+  const type = readString(record?.type);
+  const segmentId = readString(record?.segment_id);
+  const segmentType = readOptionalString(record?.segment_type);
+  const label = readOptionalNullableString(record?.label);
+  const sequence = readPositiveInteger(record?.sequence);
+  const guidance = readOptionalNullableString(record?.guidance);
+  const prescription = normalizeWorkoutDocumentPrescriptionForWrite(record?.prescription);
+  const target = normalizeWorkoutDocumentTargetForWrite(record?.target);
+
+  if (
+    !record ||
+    !type ||
+    !segmentId ||
+    segmentType === INVALID_NULLABLE_STRING ||
+    label === INVALID_NULLABLE_STRING ||
+    !sequence ||
+    guidance === INVALID_NULLABLE_STRING ||
+    !prescription.ok ||
+    !target.ok
+  ) {
+    return invalidDocument(
+      !prescription.ok
+        ? prescription.message
+        : !target.ok
+          ? target.message
+          : `Workout section ${index + 1} is invalid.`,
+    );
+  }
+
+  const duration = readOptionalPositiveNumber(record.duration_min);
+  const distance = readOptionalPositiveNumber(record.distance_km);
+  const repeats = readOptionalPositiveInteger(record.repeats);
+  if (duration === false || distance === false || repeats === false) {
+    return invalidDocument(`Workout section ${index + 1} has an invalid executable value.`);
+  }
+
+  const resolvedPrescription = prescription.value;
+  if (
+    resolvedPrescription &&
+    ((duration != null &&
+      resolvedPrescription.duration_min != null &&
+      duration !== resolvedPrescription.duration_min) ||
+      (distance != null &&
+        resolvedPrescription.distance_km != null &&
+        distance !== resolvedPrescription.distance_km) ||
+      (repeats != null &&
+        resolvedPrescription.repeat_count != null &&
+        repeats !== resolvedPrescription.repeat_count))
+  ) {
+    return invalidDocument(`Workout section ${index + 1} has conflicting executable truth.`);
+  }
+
+  const section: WorkoutDocumentSection = {
+    type,
+    segment_id: segmentId,
+    ...(segmentType ? { segment_type: segmentType } : {}),
+    ...(label !== undefined ? { label } : {}),
+    sequence,
+    ...(resolvedPrescription ? { prescription: resolvedPrescription } : {}),
+    ...(guidance !== undefined ? { guidance } : {}),
+    ...(duration != null ? { duration_min: duration } : {}),
+    ...(distance != null ? { distance_km: distance } : {}),
+    ...(repeats != null ? { repeats } : {}),
+    ...(target.value ? { target: target.value } : {}),
+  };
+
+  if (resolvedPrescription?.mode === "repeats") {
+    if (target.value) {
+      return invalidDocument("Repeat parents cannot own executable target truth.");
+    }
+
+    const derivedChildren = workoutDocumentRepeatChildren(section);
+    if (record.children !== undefined) {
+      const materializedChildren = normalizeMaterializedRepeatChildren(record.children);
+      if (
+        !materializedChildren.ok ||
+        !stableJsonEqual(materializedChildren.value, derivedChildren)
+      ) {
+        return invalidDocument(
+          "Materialized repeat children do not match authoritative prescription children.",
+        );
+      }
+    }
+    section.children = derivedChildren;
+  } else if (record.children !== undefined) {
+    return invalidDocument("Only repeat prescriptions may include materialized children.");
+  }
+
+  return { ok: true, value: section };
+}
+
+function normalizeWorkoutDocumentPrescriptionForWrite(
+  value: unknown,
+): WorkoutDocumentValidationResult<WorkoutDocumentPrescription | undefined> {
+  if (value === undefined) {
+    return { ok: true, value: undefined };
+  }
+
+  const record = unknownRecord(value);
+  const mode = readString(record?.mode);
+  if (!record || !mode || !["time", "distance", "repeats", "none"].includes(mode)) {
+    return invalidDocument("The workout prescription mode is invalid.");
+  }
+
+  const duration = readOptionalPositiveNumber(record.duration_min);
+  const distance = readOptionalPositiveNumber(record.distance_km);
+  const repeatCount = readOptionalPositiveInteger(record.repeat_count);
+  if (duration === false || distance === false || repeatCount === false) {
+    return invalidDocument("The workout prescription has an invalid executable value.");
+  }
+
+  if (mode === "time" && (duration == null || distance != null || repeatCount != null)) {
+    return invalidDocument("Time prescriptions require only a positive duration.");
+  }
+  if (mode === "distance" && (distance == null || duration != null || repeatCount != null)) {
+    return invalidDocument("Distance prescriptions require only a positive distance.");
+  }
+  if (mode === "none" && (duration != null || distance != null || repeatCount != null)) {
+    return invalidDocument("None prescriptions cannot contain executable values.");
+  }
+
+  if (mode !== "repeats") {
+    if (record.children !== undefined) {
+      return invalidDocument("Only repeat prescriptions may own ordered children.");
+    }
+    return {
+      ok: true,
+      value: {
+        mode,
+        ...(duration != null ? { duration_min: duration } : {}),
+        ...(distance != null ? { distance_km: distance } : {}),
+      } as WorkoutDocumentPrescription,
+    };
+  }
+
+  if (!repeatCount || !Array.isArray(record.children) || record.children.length === 0) {
+    return invalidDocument("Repeat prescriptions require a count and ordered children.");
+  }
+
+  const children: WorkoutDocumentRepeatChildPrescription[] = [];
+  for (let index = 0; index < record.children.length; index += 1) {
+    const child = normalizeWorkoutDocumentRepeatChildForWrite(record.children[index], index);
+    if (!child.ok) {
+      return child;
+    }
+    children.push(child.value);
+  }
+
+  return { ok: true, value: { mode: "repeats", repeat_count: repeatCount, children } };
+}
+
+function normalizeWorkoutDocumentRepeatChildForWrite(
+  value: unknown,
+  index: number,
+): WorkoutDocumentValidationResult<WorkoutDocumentRepeatChildPrescription> {
+  const record = unknownRecord(value);
+  const role = readString(record?.role);
+  const label = readOptionalString(record?.label);
+  const sequence = readPositiveInteger(record?.sequence);
+  const guidance = readOptionalString(record?.guidance);
+  const prescription = normalizeWorkoutDocumentPrescriptionForWrite(record?.prescription);
+  const target = normalizeWorkoutDocumentTargetForWrite(record?.target);
+
+  if (
+    !record ||
+    !role ||
+    !["warm_up", "run", "walk", "work", "recover", "finish", "cooldown"].includes(role) ||
+    label === INVALID_NULLABLE_STRING ||
+    !sequence ||
+    guidance === INVALID_NULLABLE_STRING ||
+    !prescription.ok ||
+    !prescription.value ||
+    prescription.value.mode === "repeats" ||
+    !target.ok
+  ) {
+    return invalidDocument(`Repeat child ${index + 1} is invalid.`);
+  }
+
+  return {
+    ok: true,
+    value: {
+      role: role as WorkoutDocumentRepeatChildRole,
+      ...(label ? { label } : {}),
+      sequence,
+      ...(guidance ? { guidance } : {}),
+      prescription: prescription.value as WorkoutDocumentUnitPrescription,
+      ...(target.value ? { target: target.value } : {}),
+    },
+  };
+}
+
+function normalizeMaterializedRepeatChildren(
+  value: unknown,
+): WorkoutDocumentValidationResult<WorkoutDocumentSection[]> {
+  if (!Array.isArray(value)) {
+    return invalidDocument("Materialized repeat children must be an array.");
+  }
+
+  const normalized: WorkoutDocumentSection[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const record = unknownRecord(value[index]);
+    const type = readString(record?.type);
+    const segmentType = readOptionalString(record?.segment_type);
+    const label = readOptionalNullableString(record?.label);
+    const sequence = readPositiveInteger(record?.sequence);
+    const guidance = readOptionalNullableString(record?.guidance);
+    const prescription = normalizeWorkoutDocumentPrescriptionForWrite(record?.prescription);
+    const target = normalizeWorkoutDocumentTargetForWrite(record?.target);
+    if (
+      !record ||
+      !type ||
+      !sequence ||
+      segmentType === INVALID_NULLABLE_STRING ||
+      label === INVALID_NULLABLE_STRING ||
+      guidance === INVALID_NULLABLE_STRING ||
+      !prescription.ok ||
+      !prescription.value ||
+      prescription.value.mode === "repeats" ||
+      !target.ok
+    ) {
+      return invalidDocument(`Materialized repeat child ${index + 1} is invalid.`);
+    }
+
+    normalized.push({
+      type,
+      ...(segmentType ? { segment_type: segmentType } : {}),
+      ...(label !== undefined ? { label } : {}),
+      sequence,
+      prescription: prescription.value,
+      ...(guidance !== undefined ? { guidance } : {}),
+      ...(prescription.value.mode === "time"
+        ? { duration_min: prescription.value.duration_min }
+        : {}),
+      ...(prescription.value.mode === "distance"
+        ? { distance_km: prescription.value.distance_km }
+        : {}),
+      ...(target.value ? { target: target.value } : {}),
+    });
+  }
+
+  return { ok: true, value: normalized };
+}
+
+function normalizeWorkoutDocumentTargetForWrite(
+  value: unknown,
+): WorkoutDocumentValidationResult<WorkoutDocumentTarget | undefined> {
+  if (value === undefined) {
+    return { ok: true, value: undefined };
+  }
+
+  const record = unknownRecord(value);
+  if (!record) {
+    return invalidDocument("Workout targets must be objects.");
+  }
+
+  const nestedExtra = unknownRecord(record.extra);
+  if (record.extra !== undefined && !nestedExtra) {
+    return invalidDocument("Workout target extras must be scalar metadata.");
+  }
+
+  for (const [key, entry] of Object.entries(record)) {
+    if (key === "extra") continue;
+    if (typeof entry !== "string" && !(typeof entry === "number" && Number.isFinite(entry))) {
+      return invalidDocument(`Workout target field ${key} is invalid.`);
+    }
+    if (typeof entry === "string" && !entry.trim()) {
+      return invalidDocument(`Workout target field ${key} is empty.`);
+    }
+  }
+
+  for (const [key, entry] of Object.entries(nestedExtra ?? {})) {
+    if (typeof entry !== "string" && !(typeof entry === "number" && Number.isFinite(entry))) {
+      return invalidDocument(`Workout target extra ${key} is invalid.`);
+    }
+    if (record[key] !== undefined && !Object.is(record[key], entry)) {
+      return invalidDocument(`Workout target extra ${key} conflicts with its canonical field.`);
+    }
+  }
+
+  if (
+    record.primary_execution_mode !== undefined &&
+    !PRIMARY_EXECUTION_MODE_VALUES.includes(record.primary_execution_mode as PrimaryExecutionMode)
+  ) {
+    return invalidDocument("The workout target execution mode is invalid.");
+  }
+
+  const normalized = normalizeWorkoutDocumentTarget(record);
+  return normalized && Object.keys(normalized).length > 0
+    ? { ok: true, value: normalized }
+    : invalidDocument("Workout targets cannot be empty.");
+}
+
+function readWorkoutDocumentType(value: unknown): WorkoutDocumentType | null {
+  return typeof value === "string" && WORKOUT_DOCUMENT_TYPE_VALUES.has(value as WorkoutDocumentType)
+    ? (value as WorkoutDocumentType)
+    : null;
+}
+
+function readIsoDate(value: unknown) {
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
+function readPositiveInteger(value: unknown) {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
+}
+
+function readNonNegativeInteger(value: unknown) {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+function readOptionalPositiveInteger(value: unknown): number | null | false {
+  return value === undefined ? null : (readPositiveInteger(value) ?? false);
+}
+
+function readOptionalPositiveNumber(value: unknown): number | null | false {
+  return value === undefined
+    ? null
+    : typeof value === "number" && Number.isFinite(value) && value > 0
+      ? value
+      : false;
+}
+
+function readNullableString(value: unknown): string | null | typeof INVALID_NULLABLE_STRING {
+  return value === null ? null : (readString(value) ?? INVALID_NULLABLE_STRING);
+}
+
+function readOptionalString(value: unknown): string | undefined | typeof INVALID_NULLABLE_STRING {
+  return value === undefined ? undefined : (readString(value) ?? INVALID_NULLABLE_STRING);
+}
+
+function readOptionalNullableString(
+  value: unknown,
+): string | null | undefined | typeof INVALID_NULLABLE_STRING {
+  return value === undefined ? undefined : readNullableString(value);
+}
+
+function readNullableRpe(value: unknown): number | null | typeof INVALID_RPE {
+  return value === null
+    ? null
+    : typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 10
+      ? value
+      : INVALID_RPE;
+}
+
+function normalizeNullableGoalContext(
+  value: unknown,
+): CanonicalGoalContext | null | typeof INVALID_GOAL_CONTEXT {
+  return value === null ? null : (normalizeCanonicalGoalContext(value) ?? INVALID_GOAL_CONTEXT);
+}
+
+function invalidDocument(message: string): { ok: false; message: string } {
+  return { ok: false, message };
 }
 
 function workoutDocumentSectionTypeForRepeatChild(role: WorkoutDocumentRepeatChildRole) {

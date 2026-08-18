@@ -14,12 +14,18 @@ import {
   type AdminCaptureTargetRole,
 } from "@/lib/admin-capture";
 import {
+  adminRepoWorkItemEpicSlugs,
   getAdminWorkItemSourceGroupLabel,
   isAdminWorkItemSourceGroup,
+  type AdminRepoWorkItemEpic,
+  type AdminRepoWorkItemType,
 } from "@/lib/admin-work-items";
 
 export type CaptureStatusFilter = AdminCaptureStatus | "all";
 export type NullableFilter<T extends string> = T | "all";
+export type CaptureEpicFilter = AdminRepoWorkItemEpic | "bug" | "all";
+
+export const CAPTURE_EPIC_FILTER_VALUES = [...adminRepoWorkItemEpicSlugs, "bug"] as const;
 
 export type CaptureSearch = {
   status: CaptureStatusFilter;
@@ -27,6 +33,7 @@ export type CaptureSearch = {
   type: NullableFilter<AdminCaptureItemType>;
   priority: NullableFilter<AdminCapturePriority>;
   role: NullableFilter<AdminCaptureTargetRole>;
+  epic: CaptureEpicFilter;
   q: string | number;
 };
 
@@ -59,6 +66,8 @@ export type RepoDerivedInfo = {
   markdownType: string | null;
   markdownPriority: string | null;
   markdownNextRole: string | null;
+  workItemType: AdminRepoWorkItemType | null;
+  epic: AdminRepoWorkItemEpic | null;
   workItemKind: string | null;
   workItemLifecycle: string | null;
   sourceGroup: string | null;
@@ -119,6 +128,7 @@ export function buildCaptureHref(search: CaptureSearch, patch: Partial<CaptureSe
   params.set("type", next.type);
   params.set("priority", next.priority);
   params.set("role", next.role);
+  params.set("epic", next.epic);
   params.set("q", captureQueryText(next.q));
   return `/admin/capture?${params.toString()}`;
 }
@@ -191,6 +201,15 @@ export function getActiveCaptureFilters(search: CaptureSearch) {
     });
   }
 
+  if (search.epic !== "all") {
+    filters.push({
+      id: "epic",
+      label: "Epic",
+      value: search.epic === "bug" ? "Bug" : formatEpicLabel(search.epic),
+      removePatch: { epic: "all" },
+    });
+  }
+
   return filters;
 }
 
@@ -258,6 +277,8 @@ export function getRepoDerivedInfo(item: AdminCaptureItemView): RepoDerivedInfo 
     markdownType: getMetadataString(metadata.markdown_type),
     markdownPriority: getMetadataString(metadata.markdown_priority),
     markdownNextRole: getMetadataString(metadata.markdown_next_role),
+    workItemType: repoWorkItem?.workItemType ?? null,
+    epic: repoWorkItem?.epic ?? null,
     workItemKind: repoWorkItem?.workItemKind ?? getMetadataString(metadata.work_item_kind),
     workItemLifecycle:
       repoWorkItem?.workItemLifecycle ?? getMetadataString(metadata.work_item_lifecycle),
@@ -288,7 +309,9 @@ function getMetadataStringList(value: unknown) {
     .filter((item): item is string => Boolean(item));
 }
 
-export function readOnlyMetadataTooltip(kind: "status" | "type" | "priority" | "role" | undefined) {
+export function readOnlyMetadataTooltip(
+  kind: "status" | "type" | "priority" | "role" | "epic" | undefined,
+) {
   switch (kind) {
     case "status":
       return "Status from source markdown. Change it in the source work item, then refresh the import.";
@@ -298,6 +321,8 @@ export function readOnlyMetadataTooltip(kind: "status" | "type" | "priority" | "
       return "Priority from source markdown. Change it in the source work item, then refresh the import.";
     case "role":
       return "Owner role from source markdown. Change it in the source work item, then refresh the import.";
+    case "epic":
+      return "Epic or Bug classification from source markdown. Change it in the source work item, then refresh the import.";
     default:
       return null;
   }
@@ -348,6 +373,47 @@ export function formatMetadataLabel(value: string) {
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
     .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+export function formatEpicLabel(value: AdminRepoWorkItemEpic) {
+  switch (value) {
+    case "runner-core-readiness":
+      return "Runner Core Readiness";
+    case "runner-evidence-and-progress":
+      return "Runner Evidence & Progress";
+    case "adaptive-blueprint-planning":
+      return "Adaptive Blueprint Planning";
+    case "commercial-financial-foundation":
+      return "Commercial & Financial Foundation";
+    case "owner-analytics-and-scenario-lab":
+      return "Owner Analytics & Scenario Lab";
+    case "platform-and-operations":
+      return "Platform & Operations";
+    case "marketing-and-growth":
+      return "Marketing & Growth";
+    case "legacy-history":
+      return "Historical / Legacy";
+  }
+}
+
+export function formatRepoWorkItemEpicTag(repoSource: RepoDerivedInfo) {
+  if (repoSource.workItemType === "bug") {
+    return "Bug";
+  }
+
+  return repoSource.epic ? `Epic: ${formatEpicLabel(repoSource.epic)}` : null;
+}
+
+export function matchesCaptureEpicFilter(item: AdminCaptureItemView, filter: CaptureEpicFilter) {
+  if (filter === "all") {
+    return true;
+  }
+
+  if (filter === "bug") {
+    return item.repoWorkItem?.workItemType === "bug";
+  }
+
+  return item.repoWorkItem?.workItemType !== "bug" && item.repoWorkItem?.epic === filter;
 }
 
 export function formatMetadataTagValue(value: string) {

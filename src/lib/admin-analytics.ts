@@ -27,25 +27,10 @@ export interface AdminAnalyticsView {
     runnerProfiles: number;
     usersWithProfile: number;
     usersWithoutProfile: number | null;
-    usersWithActivePlan: number;
-    usersWithoutActivePlan: number | null;
-    setupToActivePlanRate: number | null;
-  };
-  plans: {
-    total: number;
-    active: number;
-    archived: number;
-    sourceKindCounts: AdminAnalyticsKeyCount[];
-    schemaVersionCounts: AdminAnalyticsKeyCount[];
   };
   workoutUsage: {
-    totalPlannedWorkouts: number;
-    plannedNonRestWorkouts: number;
     totalWorkoutLogs: number;
     outcomeCounts: AdminAnalyticsKeyCount[];
-    roughCompletionRate: number | null;
-    activePlanUsersWithoutLogs: number;
-    activePlanUsersWithoutRecentLogs30d: number;
   };
   garminFeedback: {
     resultAssets: number;
@@ -79,10 +64,6 @@ export interface AdminAnalyticsUserRow {
   userId: string;
   email: string | null;
   profilePresent: boolean;
-  activePlanPresent: boolean;
-  activePlanCount: number;
-  archivedPlanCount: number;
-  plannedWorkoutCount: number;
   workoutLogCount: number;
   lastWorkoutLogDate: string | null;
   garminEvidenceCount: number;

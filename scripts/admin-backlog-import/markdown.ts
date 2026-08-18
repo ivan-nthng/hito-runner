@@ -4,6 +4,7 @@ import {
   type AdminCaptureTargetRole,
 } from "../../src/lib/admin-capture-contract";
 import {
+  isAdminRepoWorkItemEpic,
   isAdminRepoWorkItemArchiveIntent,
   isAdminRepoWorkItemFrontendLane,
   isAdminRepoWorkItemOwner,
@@ -11,6 +12,7 @@ import {
   isAdminRepoWorkItemStatus,
   isAdminRepoWorkItemType,
   type AdminRepoWorkItemArchiveIntent,
+  type AdminRepoWorkItemEpic,
   type AdminRepoWorkItemFrontendLane,
   type AdminRepoWorkItemMetadataState,
   type AdminRepoWorkItemOwner,
@@ -29,6 +31,7 @@ export const CANONICAL_MARKDOWN_FIELDS = [
   "Type",
   "Priority",
   "Owner",
+  "Epic",
   "Scope",
   "Archive Intent",
   "Task",
@@ -65,6 +68,7 @@ export type ParsedCanonicalMarkdown = {
   itemType: MarkdownItemType | null;
   priority: AdminPriority | null;
   owner: AdminRepoWorkItemOwner | null;
+  epic: AdminRepoWorkItemEpic | null;
   scope: string | null;
   archiveIntent: AdminRepoWorkItemArchiveIntent | null;
   batch: string | null;
@@ -313,11 +317,19 @@ export function buildRepoMirrorNote(input: {
   return truncate(note, MAX_NOTE_LENGTH);
 }
 
-export function parseCanonicalMarkdown(markdown: string): ParsedCanonicalMarkdown {
+export function parseCanonicalMarkdown(
+  markdown: string,
+  options: { requireEpicForActiveNonBug?: boolean } = {},
+): ParsedCanonicalMarkdown {
   const raw: Partial<Record<CanonicalMarkdownField, string>> = {};
   const missingRequiredFields: CanonicalMarkdownField[] = [];
   const invalidRequiredFields: CanonicalMarkdownField[] = [];
   const sections = parseLeadMarkdownMetadataSections(markdown);
+  const epicSection = extractMarkdownSection(markdown, "Epic");
+
+  if (!sections.has("Epic") && epicSection) {
+    sections.set("Epic", epicSection);
+  }
 
   for (const field of CORE_CANONICAL_MARKDOWN_FIELDS) {
     const value = sections.get(field);
@@ -342,6 +354,7 @@ export function parseCanonicalMarkdown(markdown: string): ParsedCanonicalMarkdow
   const itemType = normalizeMarkdownItemType(firstMeaningfulLine(raw.Type ?? null));
   const priority = normalizeMarkdownPriority(firstMeaningfulLine(raw.Priority ?? null));
   const owner = normalizeMarkdownOwner(firstMeaningfulLine(raw.Owner ?? null));
+  const epic = normalizeMarkdownEpic(firstMeaningfulLine(raw.Epic ?? null));
   const scope = normalizeSlug(firstMeaningfulLine(raw.Scope ?? null));
   const archiveIntent = normalizeMarkdownArchiveIntent(
     firstMeaningfulLine(raw["Archive Intent"] ?? null),
@@ -374,6 +387,14 @@ export function parseCanonicalMarkdown(markdown: string): ParsedCanonicalMarkdow
     invalidRequiredFields.push("Owner");
   }
 
+  if (raw.Epic && !epic) {
+    invalidRequiredFields.push("Epic");
+  }
+
+  if (itemType === "bug" && raw.Epic) {
+    invalidRequiredFields.push("Epic");
+  }
+
   if (raw.Scope && !scope) {
     invalidRequiredFields.push("Scope");
   }
@@ -402,6 +423,15 @@ export function parseCanonicalMarkdown(markdown: string): ParsedCanonicalMarkdow
   const requiresExecutionHandoff = status === "ready" || status === "in_progress";
   const requiresBlockedStage = status === "blocked";
   const requiresFrontendLane = owner === "frontend" || nextRole === "frontend";
+  const requiresEpic =
+    options.requireEpicForActiveNonBug === true &&
+    status !== null &&
+    !["completed", "closed", "archived"].includes(status) &&
+    itemType !== "bug";
+
+  if (requiresEpic) {
+    addMissingField(missingRequiredFields, raw, "Epic");
+  }
 
   if (requiresExecutionHandoff) {
     addMissingField(missingRequiredFields, raw, "Next Recommended Role");
@@ -444,6 +474,7 @@ export function parseCanonicalMarkdown(markdown: string): ParsedCanonicalMarkdow
     itemType,
     priority,
     owner,
+    epic,
     scope,
     archiveIntent,
     batch,
@@ -555,6 +586,25 @@ function parseLeadMarkdownMetadataSections(markdown: string) {
 function parseLeadMarkdownMetadataList(lines: string[]) {
   const sections = new Map<CanonicalMarkdownField, string>();
   let titleSeen = false;
+  let currentField: CanonicalMarkdownField | null = null;
+  let currentBody: string[] = [];
+  let inFence = false;
+  let fenceMarker: string | null = null;
+
+  const commitCurrent = () => {
+    if (!currentField) {
+      return;
+    }
+
+    const value = currentBody.join("\n").trim();
+
+    if (value && !sections.has(currentField)) {
+      sections.set(currentField, value);
+    }
+
+    currentField = null;
+    currentBody = [];
+  };
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -567,23 +617,63 @@ function parseLeadMarkdownMetadataList(lines: string[]) {
       continue;
     }
 
-    if (!trimmed) {
+    const fenceMatch = trimmed.match(/^(`{3,}|~{3,})/);
+
+    if (fenceMatch && currentField) {
+      currentBody.push(line);
+
+      if (!inFence) {
+        inFence = true;
+        fenceMarker = fenceMatch[1][0];
+      } else if (fenceMarker && trimmed.startsWith(fenceMarker.repeat(3))) {
+        inFence = false;
+        fenceMarker = null;
+      }
+
+      continue;
+    }
+
+    if (inFence && currentField) {
+      currentBody.push(line);
+      continue;
+    }
+
+    if (!trimmed && !currentField) {
       continue;
     }
 
     if (/^##\s+\S/.test(trimmed)) {
+      commitCurrent();
       break;
     }
 
-    const match = trimmed.match(/^-\s+\*\*([^*]+?):\*\*\s+(.+)$/);
+    const match =
+      trimmed.match(/^-\s+\*\*([^*]+?):\*\*\s*(.*)$/) ??
+      trimmed.match(/^-\s+([^:]+?):\s*(.*)$/) ??
+      trimmed.match(/^([^:]+?):\s*(.*)$/);
     const field = match ? findCanonicalMarkdownField(match[1]) : null;
 
-    if (!match || !field) {
-      break;
+    if (field) {
+      commitCurrent();
+      currentField = field;
+      currentBody = match?.[2] ? [match[2].trim()] : [];
+      continue;
     }
 
-    sections.set(field, match[2].trim());
+    if (match) {
+      commitCurrent();
+      continue;
+    }
+
+    if (currentField) {
+      currentBody.push(line);
+      continue;
+    }
+
+    break;
   }
+
+  commitCurrent();
 
   return sections;
 }
@@ -704,6 +794,11 @@ function normalizeMarkdownStatus(input: string | null): WorkItemStatus | null {
 
 function normalizeMarkdownItemType(input: string | null): MarkdownItemType | null {
   const normalized = normalizeScalarToken(input);
+
+  if (normalized === "bug" || normalized.startsWith("bug_")) {
+    return "bug";
+  }
+
   return isAdminRepoWorkItemType(normalized) ? normalized : null;
 }
 
@@ -732,6 +827,11 @@ function normalizeMarkdownPriority(input: string | null): AdminPriority | null {
 function normalizeMarkdownOwner(input: string | null): AdminRepoWorkItemOwner | null {
   const normalized = normalizeScalarToken(input);
   return isAdminRepoWorkItemOwner(normalized) ? normalized : null;
+}
+
+function normalizeMarkdownEpic(input: string | null): AdminRepoWorkItemEpic | null {
+  const normalized = stripInlineMarkdown(input ?? "").trim();
+  return isAdminRepoWorkItemEpic(normalized) ? normalized : null;
 }
 
 function normalizeMarkdownArchiveIntent(

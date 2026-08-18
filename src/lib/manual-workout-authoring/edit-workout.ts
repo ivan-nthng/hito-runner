@@ -1,192 +1,184 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
-  ACTIVE_PLAN_USER_EDIT_MUTATION_KIND,
-  ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
-  appendActivePlanUserEditMetadataToRecord,
-  buildActivePlanUserEditMetadata,
-  resolveCalendarWorkoutEditability,
+  CALENDAR_WORKOUT_MUTATION_KIND,
+  CALENDAR_WORKOUT_MUTATION_SOURCE_KIND,
+  buildCalendarWorkoutMutationEvent,
+  resolveCalendarWorkoutEditRootProvenance,
   resolvePlanProvenanceSourceStatus,
+  type CalendarWorkoutEditRootProvenance,
 } from "@/lib/active-plan-workout-editing/policy";
 import {
   getCalendarWorkoutMutationContext,
-  getPlanRecordForUser,
   type CalendarWorkoutContext,
   type PersistedPlanCycleRow,
   type PersistedPlannedWorkoutRow,
 } from "@/lib/active-plan-persistence";
-import { buildImportedPlanSeed } from "@/lib/imported-plan";
-import type { ManualWorkoutActivePlanAddDependencies } from "@/lib/manual-workout-authoring/active-plan-add";
-import { reviewManualWorkoutDraft } from "@/lib/manual-workout-authoring/actions";
-import { buildManualWorkoutDraftInputFromPersistedWorkout } from "@/lib/manual-workout-authoring/copy-paste-reconstruction";
 import {
-  buildManualWorkoutEditMetadata,
+  CalendarPersistenceRejection,
+  applyAtomicCalendarWorkoutContentEdit,
+} from "@/lib/active-plan-lifecycle-persistence";
+import {
+  fetchManualWorkoutEvidenceWorkoutIds,
+  type ManualWorkoutEvidenceFetcher,
+} from "@/lib/manual-workout-authoring/active-plan-add";
+import {
   buildPersistedEditReview,
-  buildSourceWorkoutFingerprint,
-  MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION,
+  buildFullSourceWorkoutFingerprint,
   validatePersistedEditReviewProof,
-  type ManualWorkoutPersistedEditReview,
+  WORKOUT_DOCUMENT_EDIT_REVIEW_PAYLOAD_VERSION,
+  type WorkoutDocumentPersistedEditReview,
 } from "@/lib/manual-workout-authoring/edit-workout-review-token";
 import {
-  persistedManualWorkoutHasUnsafeMetricTruth,
-  validatePreservedAiAuthoredTargetTruth,
+  validateWorkoutDocumentTargetEdit,
+  workoutDocumentHasUnsafeMetricTruth,
 } from "@/lib/manual-workout-authoring/persisted-workout-safety";
-import {
-  asJsonRecord,
-  buildManualWorkoutUserBuiltTrainingPlan,
-  toJson,
-} from "@/lib/manual-workout-authoring/persistence";
-import {
-  MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-  MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
-  MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
-  inputHasClientPayload,
-  type ManualWorkoutDraftInput,
-  type ManualWorkoutDraftProcessingOptions,
-  type ManualWorkoutDraftReviewResult,
-  type ManualWorkoutTemplateKey,
-} from "@/lib/manual-workout-authoring/schema";
-import { buildPersistedWorkoutInsertRows } from "@/lib/persisted-plan-replacement";
+import { toJson } from "@/lib/manual-workout-authoring/persistence";
+import { inputHasClientPayload } from "@/lib/manual-workout-authoring/schema";
 import { getCurrentManualWorkoutAuthoringUserId } from "@/lib/manual-workout-authoring/request-auth";
 import type { Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
+import {
+  buildEditedWorkoutDocument,
+  buildWorkoutDocumentEditProjection,
+  normalizePersistedWorkoutDocument,
+  type WorkoutDocument,
+  type WorkoutDocumentEditProjection,
+} from "@/lib/workout-document";
 
 const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
-const manualWorkoutPersistedEditSourceInputSchema = z
+const workoutDocumentEditSourceInputSchema = z
   .object({
-    activePlanId: z.string().uuid().optional(),
+    provenancePlanId: z.string().uuid().optional(),
     plannedWorkoutId: z.string().uuid(),
     workoutDate: isoDateSchema,
   })
   .strict();
 
+export const workoutDocumentPersistedEditReviewInputSchema = workoutDocumentEditSourceInputSchema
+  .extend({
+    editProjection: z.unknown(),
+  })
+  .strict();
+
+export const workoutDocumentPersistedEditConfirmInputSchema = workoutDocumentEditSourceInputSchema
+  .extend({
+    editProjection: z.unknown(),
+    reviewToken: z.string().trim().min(16),
+    reviewChecksum: z.string().trim().length(64),
+  })
+  .strict();
+
 export const manualWorkoutPersistedEditReviewInputSchema =
-  manualWorkoutPersistedEditSourceInputSchema
-    .extend({
-      draftInput: z.unknown(),
-    })
-    .strict();
-
+  workoutDocumentPersistedEditReviewInputSchema;
 export const manualWorkoutPersistedEditConfirmInputSchema =
-  manualWorkoutPersistedEditSourceInputSchema
-    .extend({
-      draftInput: z.unknown(),
-      reviewToken: z.string().trim().min(16),
-      reviewChecksum: z.string().trim().length(64),
-    })
-    .strict();
+  workoutDocumentPersistedEditConfirmInputSchema;
 
-type ManualWorkoutPersistedEditSourceInput = z.output<
-  typeof manualWorkoutPersistedEditSourceInputSchema
->;
+type WorkoutDocumentEditSourceInput = z.output<typeof workoutDocumentEditSourceInputSchema>;
 
-export type ManualWorkoutPersistedEditFailureReason =
+export type WorkoutDocumentPersistedEditFailureReason =
   | "unauthenticated"
   | "invalid_input"
   | "invalid_review"
   | "stale_review"
-  | "no_active_plan"
-  | "unsupported_active_plan_source"
   | "unsupported_source_metadata"
   | "source_workout_not_found"
-  | "source_workout_not_in_active_plan"
-  | "source_workout_not_supported"
+  | "source_workout_not_owned"
   | "source_date_changed"
-  | "workout_date_changed"
-  | "manual_workout_required"
+  | "source_workout_not_supported"
+  | "workout_type_changed_to_rest"
   | "client_payload_rejected"
+  | "logged_workout"
+  | "evidence_backed_workout"
   | "protected_day"
   | "persistence_failed";
 
-type ManualWorkoutPersistedEditBlockedResult = {
+type WorkoutDocumentPersistedEditBlockedResult = {
   ok: false;
   status: "blocked";
   persisted: false;
-  reason: ManualWorkoutPersistedEditFailureReason;
+  reason: WorkoutDocumentPersistedEditFailureReason;
   message: string;
   sourceKind: string | null;
-  workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
+  workoutEditSourceKind: typeof CALENDAR_WORKOUT_MUTATION_SOURCE_KIND;
 };
 
-export type ManualWorkoutPersistedEditReconstructResult =
+export type WorkoutDocumentPersistedEditReconstructResult =
   | {
       ok: true;
-      status: "draft_reconstructed";
+      status: "document_ready";
       persisted: false;
       sourceKind: string;
-      workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
-      activePlanId: string;
+      workoutEditSourceKind: typeof CALENDAR_WORKOUT_MUTATION_SOURCE_KIND;
+      provenancePlanId: string | null;
       plannedWorkoutId: string;
       workoutDate: string;
-      draftInput: ManualWorkoutDraftInput;
+      document: WorkoutDocument;
+      editProjection: WorkoutDocumentEditProjection;
       safety: {
         sourceWorkoutVerified: true;
-        reconstructedFromPersistedWorkout: true;
-        historyPreservationRequired: true;
+        strictDocumentVerified: true;
+        originNeutral: true;
         trustedClientRows: false;
         callsOpenAi: false;
       };
     }
-  | ManualWorkoutPersistedEditBlockedResult;
+  | WorkoutDocumentPersistedEditBlockedResult;
 
-export type ManualWorkoutPersistedEditReviewResult =
+export type WorkoutDocumentPersistedEditReviewResult =
   | {
       ok: true;
       status: "review_ready";
       persisted: false;
       sourceKind: string;
-      workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
-      activePlanId: string;
+      workoutEditSourceKind: typeof CALENDAR_WORKOUT_MUTATION_SOURCE_KIND;
+      provenancePlanId: string | null;
       plannedWorkoutId: string;
       workoutDate: string;
-      draftInput: ManualWorkoutDraftInput;
-      draftReview: Extract<ManualWorkoutDraftReviewResult, { ok: true }>;
-      review: ManualWorkoutPersistedEditReview;
+      editProjection: WorkoutDocumentEditProjection;
+      candidateDocument: WorkoutDocument;
+      review: WorkoutDocumentPersistedEditReview;
       safety: {
         requiresExplicitConfirm: true;
         sourceWorkoutVerified: true;
-        reconstructedFromPersistedWorkout: true;
-        activePlanSourceVerified: true;
-        historyPreservationRequired: true;
+        strictDocumentVerified: true;
+        sourceFingerprintSigned: true;
+        originNeutral: true;
         updatesSamePlannedWorkoutRow: true;
         trustedClientRows: false;
         callsOpenAi: false;
       };
     }
-  | ManualWorkoutPersistedEditBlockedResult;
+  | WorkoutDocumentPersistedEditBlockedResult;
 
-export type ManualWorkoutPersistedEditConfirmResult =
+export type WorkoutDocumentPersistedEditConfirmResult =
   | {
       ok: true;
       status: "updated";
       persisted: true;
       sourceKind: string;
       sourceStatus: string | null;
-      workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
-      activePlanId: string;
+      workoutEditSourceKind: typeof CALENDAR_WORKOUT_MUTATION_SOURCE_KIND;
+      provenancePlanId: string | null;
       plannedWorkoutId: string;
       workoutDate: string;
       title: string;
-      templateKey: ManualWorkoutTemplateKey;
       reviewChecksum: string;
-      draftReviewChecksum: string;
-      exactnessPayloadVersion: typeof MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION;
+      exactnessPayloadVersion: typeof WORKOUT_DOCUMENT_EDIT_REVIEW_PAYLOAD_VERSION;
       mutationChecksum: string;
       calendarRowCount: number;
       nonRestWorkoutCount: number;
       sourceMetadata: {
-        editSourceKind: typeof ACTIVE_PLAN_USER_EDIT_SOURCE_KIND;
-        mutationKind: typeof ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.editWorkout;
-        mutationMode: "direct_manual_edit";
-        mutationPayloadVersion: typeof MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION;
+        editSourceKind: typeof CALENDAR_WORKOUT_MUTATION_SOURCE_KIND;
+        mutationKind: typeof CALENDAR_WORKOUT_MUTATION_KIND.editWorkout;
+        mutationMode: "workout_document_edit";
+        mutationPayloadVersion: typeof WORKOUT_DOCUMENT_EDIT_REVIEW_PAYLOAD_VERSION;
         mutationChecksum: string;
         plannedWorkoutId: string;
         workoutDate: string;
-        templateKey: ManualWorkoutTemplateKey;
         reviewChecksum: string;
-        draftReviewChecksum: string;
         originalPlanSourceKind: string;
         originalPlanSourceStatus: string | null;
         originalPlanOriginSourceKind: string | null;
@@ -200,58 +192,59 @@ export type ManualWorkoutPersistedEditConfirmResult =
       safety: {
         requiresExplicitConfirm: true;
         sourceWorkoutVerified: true;
-        reconstructedFromPersistedWorkout: true;
-        activePlanSourceVerified: true;
+        strictDocumentVerified: true;
+        sourceFingerprintSigned: true;
         preEditPlannedTruthPreserved: true;
         historicalRecordsPreserved: true;
         updatedExactlyOneRow: true;
         updatesSamePlannedWorkoutRow: true;
-        activePlanRemainsActive: true;
+        sourceProvenanceUnchanged: true;
         trustedClientRows: false;
         serverRebuiltReview: true;
         callsOpenAi: false;
       };
     }
-  | ManualWorkoutPersistedEditBlockedResult;
+  | WorkoutDocumentPersistedEditBlockedResult;
 
-export type ManualWorkoutPersistedEditDependencies = Pick<
-  ManualWorkoutActivePlanAddDependencies,
-  "getCalendarWorkoutContextForUser" | "currentDate"
-> & {
-  persistWorkoutEdit?: typeof persistManualWorkoutPersistedEdit;
-};
+export interface WorkoutDocumentPersistedEditDependencies {
+  getCalendarWorkoutContextForUser?: typeof getCalendarWorkoutMutationContext;
+  getEarliestMutationEventForWorkout?: typeof getEarliestMutationEventForWorkout;
+  fetchEvidenceWorkoutIds?: ManualWorkoutEvidenceFetcher;
+  persistWorkoutEdit?: typeof persistWorkoutDocumentEdit;
+  currentDate?: string;
+}
 
-type ManualWorkoutPersistedEditTarget =
+type WorkoutDocumentPersistedEditTarget =
   | {
       ok: true;
-      activePlan: PersistedPlanCycleRow;
+      provenancePlan: PersistedPlanCycleRow | null;
       sourceWorkout: PersistedPlannedWorkoutRow;
-      sourceDraftInput: ManualWorkoutDraftInput;
-      sourceDraftProcessingOptions: ManualWorkoutDraftProcessingOptions;
+      sourceDocument: WorkoutDocument;
+      rootProvenance: CalendarWorkoutEditRootProvenance;
       otherWorkouts: PersistedPlannedWorkoutRow[];
       currentDate: string;
     }
   | {
       ok: false;
-      reason: ManualWorkoutPersistedEditFailureReason;
+      reason: WorkoutDocumentPersistedEditFailureReason;
       message: string;
     };
 
-type PersistManualWorkoutEditInput = {
+type PersistWorkoutDocumentEditInput = {
   userId: string;
   currentDate: string;
-  activePlan: PersistedPlanCycleRow;
   sourceWorkout: PersistedPlannedWorkoutRow;
   otherWorkouts: readonly PersistedPlannedWorkoutRow[];
-  draftReview: Extract<ManualWorkoutDraftReviewResult, { ok: true }>;
-  review: ManualWorkoutPersistedEditReview;
+  candidateDocument: WorkoutDocument;
+  rootProvenance: CalendarWorkoutEditRootProvenance;
+  review: WorkoutDocumentPersistedEditReview;
 };
 
-type PersistManualWorkoutEditResult =
+type PersistWorkoutDocumentEditResult =
   | {
       ok: true;
       editedWorkout: PersistedPlannedWorkoutRow;
-      planCycle: PersistedPlanCycleRow;
+      mutationEventId: number;
     }
   | {
       ok: false;
@@ -261,177 +254,116 @@ type PersistManualWorkoutEditResult =
 
 export const reconstructManualWorkoutPersistedEditDraft = createServerFn({ method: "POST" })
   .validator((value: unknown) => value)
-  .handler(async ({ data }): Promise<ManualWorkoutPersistedEditReconstructResult> => {
+  .handler(async ({ data }): Promise<WorkoutDocumentPersistedEditReconstructResult> => {
     const userId = await getCurrentManualWorkoutAuthoringUserId();
-
-    if (!userId) {
-      return buildEditBlocked({
-        reason: "unauthenticated",
-        message: "Sign in before editing manual workouts.",
-      });
-    }
-
-    return reconstructManualWorkoutPersistedEditDraftForUser(userId, data);
+    return userId
+      ? reconstructWorkoutDocumentPersistedEditForUser(userId, data)
+      : buildEditBlocked("unauthenticated", "Sign in before editing workouts.");
   });
 
 export const reviewManualWorkoutPersistedEditDraft = createServerFn({ method: "POST" })
   .validator((value: unknown) => value)
-  .handler(async ({ data }): Promise<ManualWorkoutPersistedEditReviewResult> => {
+  .handler(async ({ data }): Promise<WorkoutDocumentPersistedEditReviewResult> => {
     const userId = await getCurrentManualWorkoutAuthoringUserId();
-
-    if (!userId) {
-      return buildEditBlocked({
-        reason: "unauthenticated",
-        message: "Sign in before reviewing manual workout edits.",
-      });
-    }
-
-    return reviewManualWorkoutPersistedEditDraftForUser(userId, data);
+    return userId
+      ? reviewWorkoutDocumentPersistedEditForUser(userId, data)
+      : buildEditBlocked("unauthenticated", "Sign in before reviewing workout edits.");
   });
 
 export const confirmManualWorkoutPersistedEdit = createServerFn({ method: "POST" })
   .validator((value: unknown) => value)
-  .handler(async ({ data }): Promise<ManualWorkoutPersistedEditConfirmResult> => {
+  .handler(async ({ data }): Promise<WorkoutDocumentPersistedEditConfirmResult> => {
     const userId = await getCurrentManualWorkoutAuthoringUserId();
-
-    if (!userId) {
-      return buildEditBlocked({
-        reason: "unauthenticated",
-        message: "Sign in before saving manual workout edits.",
-      });
-    }
-
-    return confirmManualWorkoutPersistedEditForUser(userId, data);
+    return userId
+      ? confirmWorkoutDocumentPersistedEditForUser(userId, data)
+      : buildEditBlocked("unauthenticated", "Sign in before saving workout edits.");
   });
 
-export async function reconstructManualWorkoutPersistedEditDraftForUser(
+export async function reconstructWorkoutDocumentPersistedEditForUser(
   userId: string,
   input: unknown,
-  dependencies: ManualWorkoutPersistedEditDependencies = {},
-): Promise<ManualWorkoutPersistedEditReconstructResult> {
-  const parsed = manualWorkoutPersistedEditSourceInputSchema.safeParse(input);
-
+  dependencies: WorkoutDocumentPersistedEditDependencies = {},
+): Promise<WorkoutDocumentPersistedEditReconstructResult> {
+  const parsed = workoutDocumentEditSourceInputSchema.safeParse(input);
   if (!parsed.success) {
-    return buildEditBlocked({
-      reason: inputHasClientPayload(parsed.error) ? "client_payload_rejected" : "invalid_input",
-      message: inputHasClientPayload(parsed.error)
-        ? "Manual workout edit reconstruction accepts only source workout identifiers."
-        : "The manual workout edit reconstruction payload is invalid.",
-    });
+    return buildEditBlocked(
+      inputHasClientPayload(parsed.error) ? "client_payload_rejected" : "invalid_input",
+      inputHasClientPayload(parsed.error)
+        ? "Workout edit reconstruction accepts only persisted source identifiers."
+        : "The workout edit reconstruction payload is invalid.",
+    );
   }
 
-  const target = await resolveManualWorkoutPersistedEditTarget(userId, parsed.data, dependencies);
-
-  if (!target.ok) {
-    return buildEditBlocked(target);
-  }
+  const target = await resolveWorkoutDocumentPersistedEditTarget(userId, parsed.data, dependencies);
+  if (!target.ok) return buildEditBlocked(target.reason, target.message);
 
   return {
     ok: true,
-    status: "draft_reconstructed",
+    status: "document_ready",
     persisted: false,
-    sourceKind: target.activePlan.source_kind!,
-    workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
-    activePlanId: target.activePlan.id,
+    sourceKind: target.sourceWorkout.origin_kind,
+    workoutEditSourceKind: CALENDAR_WORKOUT_MUTATION_SOURCE_KIND,
+    provenancePlanId: target.sourceWorkout.plan_cycle_id,
     plannedWorkoutId: target.sourceWorkout.id,
     workoutDate: target.sourceWorkout.workout_date,
-    draftInput: target.sourceDraftInput,
+    document: target.sourceDocument,
+    editProjection: buildWorkoutDocumentEditProjection(target.sourceDocument),
     safety: {
       sourceWorkoutVerified: true,
-      reconstructedFromPersistedWorkout: true,
-      historyPreservationRequired: true,
+      strictDocumentVerified: true,
+      originNeutral: true,
       trustedClientRows: false,
       callsOpenAi: false,
     },
   };
 }
 
-export async function reviewManualWorkoutPersistedEditDraftForUser(
+export async function reviewWorkoutDocumentPersistedEditForUser(
   userId: string,
   input: unknown,
-  dependencies: ManualWorkoutPersistedEditDependencies = {},
-): Promise<ManualWorkoutPersistedEditReviewResult> {
-  const parsed = manualWorkoutPersistedEditReviewInputSchema.safeParse(input);
-
+  dependencies: WorkoutDocumentPersistedEditDependencies = {},
+): Promise<WorkoutDocumentPersistedEditReviewResult> {
+  const parsed = workoutDocumentPersistedEditReviewInputSchema.safeParse(input);
   if (!parsed.success) {
-    return buildEditBlocked({
-      reason: inputHasClientPayload(parsed.error) ? "client_payload_rejected" : "invalid_input",
-      message: inputHasClientPayload(parsed.error)
-        ? "Manual workout edit review accepts only source identifiers and edited draft input."
-        : "The manual workout edit review payload is invalid.",
-    });
+    return buildEditBlocked(
+      inputHasClientPayload(parsed.error) ? "client_payload_rejected" : "invalid_input",
+      "Workout edit review accepts source identifiers and one document edit projection.",
+    );
   }
 
-  const target = await resolveManualWorkoutPersistedEditTarget(userId, parsed.data, dependencies);
+  const target = await resolveWorkoutDocumentPersistedEditTarget(userId, parsed.data, dependencies);
+  if (!target.ok) return buildEditBlocked(target.reason, target.message);
 
-  if (!target.ok) {
-    return buildEditBlocked(target);
-  }
+  const candidate = buildValidatedCandidate(target, parsed.data.editProjection);
+  if (!candidate.ok) return buildEditBlocked(candidate.reason, candidate.message);
 
-  const targetTruth = validatePreservedAiAuthoredTargetTruth(
-    parsed.data.draftInput,
-    target.sourceDraftInput,
-  );
-  if (!targetTruth.ok) {
-    return buildEditBlocked({
-      reason: "client_payload_rejected",
-      message: targetTruth.message,
-    });
-  }
-
-  const draftReview = reviewManualWorkoutDraft(parsed.data.draftInput, {
-    allowPreservedAiAuthoredTargets: true,
-    allowPersistedTemplateShape: true,
-    ...target.sourceDraftProcessingOptions,
-  });
-  if (!draftReview.ok) {
-    return buildEditBlocked({
-      reason: mapDraftReviewFailureReason(draftReview.reason),
-      message: draftReview.message,
-    });
-  }
-
-  if (draftReview.draft.workoutType === "rest") {
-    return buildEditBlocked({
-      reason: "manual_workout_required",
-      message:
-        "Workout detail editing updates planned workouts only. Use Clear for rest-day changes.",
-    });
-  }
-
-  if (draftReview.draft.workoutDate !== target.sourceWorkout.workout_date) {
-    return buildEditBlocked({
-      reason: "workout_date_changed",
-      message: "Workout detail editing cannot move workouts. Use the calendar move action.",
-    });
-  }
-
+  const editProjection = buildWorkoutDocumentEditProjection(candidate.document);
   const review = buildPersistedEditReview({
-    activePlan: target.activePlan,
     sourceWorkout: target.sourceWorkout,
     otherWorkouts: target.otherWorkouts,
-    draftInput: parsed.data.draftInput,
-    draftReview,
+    editProjection,
+    candidateDocument: candidate.document,
+    rootProvenance: target.rootProvenance,
   });
 
   return {
     ok: true,
     status: "review_ready",
     persisted: false,
-    sourceKind: target.activePlan.source_kind!,
-    workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
-    activePlanId: target.activePlan.id,
+    sourceKind: target.sourceWorkout.origin_kind,
+    workoutEditSourceKind: CALENDAR_WORKOUT_MUTATION_SOURCE_KIND,
+    provenancePlanId: target.sourceWorkout.plan_cycle_id,
     plannedWorkoutId: target.sourceWorkout.id,
     workoutDate: target.sourceWorkout.workout_date,
-    draftInput: parsed.data.draftInput as ManualWorkoutDraftInput,
-    draftReview,
+    editProjection,
+    candidateDocument: candidate.document,
     review,
     safety: {
       requiresExplicitConfirm: true,
       sourceWorkoutVerified: true,
-      reconstructedFromPersistedWorkout: true,
-      activePlanSourceVerified: true,
-      historyPreservationRequired: true,
+      strictDocumentVerified: true,
+      sourceFingerprintSigned: true,
+      originNeutral: true,
       updatesSamePlannedWorkoutRow: true,
       trustedClientRows: false,
       callsOpenAi: false,
@@ -439,568 +371,383 @@ export async function reviewManualWorkoutPersistedEditDraftForUser(
   };
 }
 
-export async function confirmManualWorkoutPersistedEditForUser(
+export async function confirmWorkoutDocumentPersistedEditForUser(
   userId: string,
   input: unknown,
-  dependencies: ManualWorkoutPersistedEditDependencies = {},
-): Promise<ManualWorkoutPersistedEditConfirmResult> {
-  const parsed = manualWorkoutPersistedEditConfirmInputSchema.safeParse(input);
-
+  dependencies: WorkoutDocumentPersistedEditDependencies = {},
+): Promise<WorkoutDocumentPersistedEditConfirmResult> {
+  const parsed = workoutDocumentPersistedEditConfirmInputSchema.safeParse(input);
   if (!parsed.success) {
-    return buildEditBlocked({
-      reason: inputHasClientPayload(parsed.error) ? "client_payload_rejected" : "invalid_review",
-      message: inputHasClientPayload(parsed.error)
-        ? "Manual workout edit confirm accepts only source identifiers, edited draft input, and review proof."
-        : "The manual workout edit confirmation payload is invalid. Refresh the review.",
-    });
+    return buildEditBlocked(
+      inputHasClientPayload(parsed.error) ? "client_payload_rejected" : "invalid_review",
+      "The workout edit confirmation payload is invalid. Refresh the review.",
+    );
   }
 
-  const target = await resolveManualWorkoutPersistedEditTarget(userId, parsed.data, dependencies);
+  const target = await resolveWorkoutDocumentPersistedEditTarget(userId, parsed.data, dependencies);
+  if (!target.ok) return buildEditBlocked(target.reason, target.message);
 
-  if (!target.ok) {
-    return buildEditBlocked(target);
-  }
+  const candidate = buildValidatedCandidate(target, parsed.data.editProjection);
+  if (!candidate.ok) return buildEditBlocked(candidate.reason, candidate.message);
 
-  const targetTruth = validatePreservedAiAuthoredTargetTruth(
-    parsed.data.draftInput,
-    target.sourceDraftInput,
-  );
-  if (!targetTruth.ok) {
-    return buildEditBlocked({
-      reason: "client_payload_rejected",
-      message: targetTruth.message,
-    });
-  }
-
-  const draftReview = reviewManualWorkoutDraft(parsed.data.draftInput, {
-    allowPreservedAiAuthoredTargets: true,
-    allowPersistedTemplateShape: true,
-    ...target.sourceDraftProcessingOptions,
-  });
-  if (!draftReview.ok) {
-    return buildEditBlocked({
-      reason: mapDraftReviewFailureReason(draftReview.reason),
-      message: draftReview.message,
-    });
-  }
-
-  if (draftReview.draft.workoutType === "rest") {
-    return buildEditBlocked({
-      reason: "manual_workout_required",
-      message:
-        "Workout detail editing updates planned workouts only. Use Clear for rest-day changes.",
-    });
-  }
-
-  if (draftReview.draft.workoutDate !== target.sourceWorkout.workout_date) {
-    return buildEditBlocked({
-      reason: "workout_date_changed",
-      message: "Workout detail editing cannot move workouts. Use the calendar move action.",
-    });
-  }
-
+  const editProjection = buildWorkoutDocumentEditProjection(candidate.document);
   const review = buildPersistedEditReview({
-    activePlan: target.activePlan,
     sourceWorkout: target.sourceWorkout,
     otherWorkouts: target.otherWorkouts,
-    draftInput: parsed.data.draftInput,
-    draftReview,
+    editProjection,
+    candidateDocument: candidate.document,
+    rootProvenance: target.rootProvenance,
   });
-
   const reviewProof = validatePersistedEditReviewProof({
     expectedChecksum: review.reviewChecksum,
     reviewChecksum: parsed.data.reviewChecksum,
     reviewToken: parsed.data.reviewToken,
   });
-
-  if (!reviewProof.ok && reviewProof.reason === "stale_review") {
-    return buildEditBlocked({
-      reason: "stale_review",
-      message: "This manual workout edit review no longer matches the current workout.",
-    });
-  }
-
   if (!reviewProof.ok) {
-    return buildEditBlocked({
-      reason: "invalid_review",
-      message: "This manual workout edit review token is invalid. Refresh the review.",
-    });
+    return buildEditBlocked(
+      reviewProof.reason,
+      reviewProof.reason === "stale_review"
+        ? "This workout edit review no longer matches authoritative workout truth."
+        : "This workout edit review token is invalid. Refresh the review.",
+    );
   }
 
-  const persistEdit = dependencies.persistWorkoutEdit ?? persistManualWorkoutPersistedEdit;
-
+  const persistEdit = dependencies.persistWorkoutEdit ?? persistWorkoutDocumentEdit;
   try {
     const persistence = await persistEdit({
       userId,
       currentDate: target.currentDate,
-      activePlan: target.activePlan,
       sourceWorkout: target.sourceWorkout,
       otherWorkouts: target.otherWorkouts,
-      draftReview,
+      candidateDocument: candidate.document,
+      rootProvenance: target.rootProvenance,
       review,
     });
-
-    if (!persistence.ok) {
-      return buildEditBlocked(persistence);
-    }
-
-    const auditMetadata = buildManualWorkoutActivePlanEditMetadata({
-      activePlan: target.activePlan,
-      sourceWorkout: target.sourceWorkout,
-      review,
-    });
-    const calendarRowCount = target.otherWorkouts.length + 1;
-    const nonRestWorkoutCount =
-      target.otherWorkouts.filter((workout) => workout.workout_type !== "rest").length + 1;
+    if (!persistence.ok) return buildEditBlocked(persistence.reason, persistence.message);
 
     return {
       ok: true,
       status: "updated",
       persisted: true,
-      sourceKind: target.activePlan.source_kind!,
-      sourceStatus: resolvePlanProvenanceSourceStatus(target.activePlan),
-      workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
-      activePlanId: target.activePlan.id,
+      sourceKind: target.sourceWorkout.origin_kind,
+      sourceStatus: target.provenancePlan
+        ? resolvePlanProvenanceSourceStatus(target.provenancePlan)
+        : null,
+      workoutEditSourceKind: CALENDAR_WORKOUT_MUTATION_SOURCE_KIND,
+      provenancePlanId: target.sourceWorkout.plan_cycle_id,
       plannedWorkoutId: target.sourceWorkout.id,
       workoutDate: target.sourceWorkout.workout_date,
-      title: draftReview.draft.title,
-      templateKey: draftReview.draft.templateKey,
+      title: candidate.document.title,
       reviewChecksum: review.reviewChecksum,
-      draftReviewChecksum: draftReview.reviewChecksum,
-      exactnessPayloadVersion: MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION,
+      exactnessPayloadVersion: WORKOUT_DOCUMENT_EDIT_REVIEW_PAYLOAD_VERSION,
       mutationChecksum: review.mutationChecksum,
-      calendarRowCount,
-      nonRestWorkoutCount,
+      calendarRowCount: target.otherWorkouts.length + 1,
+      nonRestWorkoutCount:
+        target.otherWorkouts.filter((workout) => workout.workout_type !== "rest").length + 1,
       sourceMetadata: {
-        editSourceKind: ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
-        mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.editWorkout,
-        mutationMode: "direct_manual_edit",
-        mutationPayloadVersion: MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION,
+        editSourceKind: CALENDAR_WORKOUT_MUTATION_SOURCE_KIND,
+        mutationKind: CALENDAR_WORKOUT_MUTATION_KIND.editWorkout,
+        mutationMode: "workout_document_edit",
+        mutationPayloadVersion: WORKOUT_DOCUMENT_EDIT_REVIEW_PAYLOAD_VERSION,
         mutationChecksum: review.mutationChecksum,
         plannedWorkoutId: target.sourceWorkout.id,
         workoutDate: target.sourceWorkout.workout_date,
-        templateKey: draftReview.draft.templateKey,
         reviewChecksum: review.reviewChecksum,
-        draftReviewChecksum: draftReview.reviewChecksum,
-        originalPlanSourceKind: target.activePlan.source_kind!,
-        originalPlanSourceStatus: resolvePlanProvenanceSourceStatus(target.activePlan),
-        originalPlanOriginSourceKind: auditMetadata.original_plan_origin_source_kind ?? null,
-        originalPlanOriginSourceStatus: auditMetadata.original_plan_origin_source_status ?? null,
-        originalWorkoutSourceId: auditMetadata.original_workout_source_id ?? null,
-        originalWorkoutSourceType: auditMetadata.original_workout_source_type ?? null,
-        originalWorkoutFamily: auditMetadata.original_workout_family ?? null,
-        originalWorkoutIdentity: auditMetadata.original_workout_identity ?? null,
+        originalPlanSourceKind: target.rootProvenance.originalPlanSourceKind,
+        originalPlanSourceStatus: target.rootProvenance.originalPlanSourceStatus,
+        originalPlanOriginSourceKind: target.rootProvenance.originalPlanOriginSourceKind,
+        originalPlanOriginSourceStatus: target.rootProvenance.originalPlanOriginSourceStatus,
+        originalWorkoutSourceId: target.rootProvenance.originalWorkoutSourceId,
+        originalWorkoutSourceType: target.rootProvenance.originalWorkoutSourceType,
+        originalWorkoutFamily: target.rootProvenance.originalWorkoutFamily,
+        originalWorkoutIdentity: target.rootProvenance.originalWorkoutIdentity,
         trustedClientRows: false,
       },
       safety: {
         requiresExplicitConfirm: true,
         sourceWorkoutVerified: true,
-        reconstructedFromPersistedWorkout: true,
-        activePlanSourceVerified: true,
+        strictDocumentVerified: true,
+        sourceFingerprintSigned: true,
         preEditPlannedTruthPreserved: true,
         historicalRecordsPreserved: true,
         updatedExactlyOneRow: true,
         updatesSamePlannedWorkoutRow: true,
-        activePlanRemainsActive: true,
+        sourceProvenanceUnchanged: true,
         trustedClientRows: false,
         serverRebuiltReview: true,
         callsOpenAi: false,
       },
     };
   } catch {
-    return buildEditBlocked({
-      reason: "persistence_failed",
-      message: "The manual workout edit could not be saved. The workout is unchanged.",
-    });
+    return buildEditBlocked(
+      "persistence_failed",
+      "The workout edit could not be saved. The workout is unchanged.",
+    );
   }
 }
 
-export async function persistManualWorkoutPersistedEdit({
+export async function persistWorkoutDocumentEdit({
   userId,
   currentDate,
-  activePlan,
   sourceWorkout,
-  otherWorkouts,
-  draftReview,
+  candidateDocument,
+  rootProvenance,
   review,
-}: PersistManualWorkoutEditInput): Promise<PersistManualWorkoutEditResult> {
-  const supabase = createAdminSupabaseClient();
-  const updateRow = buildPersistedWorkoutEditUpdateRow({
-    userId,
-    activePlan,
+}: PersistWorkoutDocumentEditInput): Promise<PersistWorkoutDocumentEditResult> {
+  const metadata = buildWorkoutDocumentEditAuditMetadata({
     sourceWorkout,
-    draftReview,
+    rootProvenance,
+    review,
   });
+  try {
+    const mutation = await applyAtomicCalendarWorkoutContentEdit({
+      userId,
+      workoutId: sourceWorkout.id,
+      currentDate,
+      expectedWorkout: toJson(buildFullSourceWorkoutFingerprint(sourceWorkout)),
+      workoutUpdate: toJson(buildWorkoutDocumentUpdate(candidateDocument)),
+      mutationEvent: toJson(metadata),
+    });
 
-  const editedWorkouts = [
-    ...otherWorkouts,
-    {
-      ...sourceWorkout,
-      ...updateRow,
-    },
-  ];
-  const mutation = await supabase.rpc("apply_calendar_workout_content_edit", {
-    p_current_date: currentDate,
-    p_expected_plan_updated_at: activePlan.updated_at,
-    p_expected_workout: toJson(buildSourceWorkoutFingerprint(sourceWorkout)),
-    p_plan_goal_metadata: buildManualWorkoutEditGoalMetadata({
-      activePlan,
-      sourceWorkout,
-      existingGoalMetadata: activePlan.goal_metadata,
-      editedWorkouts,
-      review,
-    }),
-    p_plan_id: activePlan.id,
-    p_plan_preferences: buildManualWorkoutEditPlanPreferences({
-      activePlan,
-      sourceWorkout,
-      existingPlanPreferences: activePlan.plan_preferences,
-      review,
-    }),
-    p_user_id: userId,
-    p_workout_id: sourceWorkout.id,
-    p_workout_update: toJson(updateRow),
-  });
-
-  if (mutation.error) {
-    throw new Error(mutation.error.message);
-  }
-
-  const result = asJsonRecord(mutation.data);
-  if (result.ok !== true) {
-    if (result.reason === "stale_review" || result.reason === "protected_day") {
+    return {
+      ok: true,
+      editedWorkout: mutation.editedWorkout,
+      mutationEventId: mutation.mutationEvent.id,
+    };
+  } catch (error) {
+    if (
+      error instanceof CalendarPersistenceRejection &&
+      (error.reason === "stale_review" || error.reason === "protected_day")
+    ) {
       return {
         ok: false,
-        reason: result.reason,
-        message:
-          typeof result.message === "string"
-            ? result.message
-            : "The reviewed workout edit is no longer safe to apply.",
-      } satisfies PersistManualWorkoutEditResult;
+        reason: error.reason,
+        message: error.message,
+      };
     }
 
-    throw new Error(
-      typeof result.message === "string"
-        ? result.message
-        : "Manual workout edit transaction was rejected.",
+    throw error;
+  }
+}
+
+// Preserve the established server-action owner names while their contract is now origin-neutral.
+export const reconstructManualWorkoutPersistedEditDraftForUser =
+  reconstructWorkoutDocumentPersistedEditForUser;
+export const reviewManualWorkoutPersistedEditDraftForUser =
+  reviewWorkoutDocumentPersistedEditForUser;
+export const confirmManualWorkoutPersistedEditForUser = confirmWorkoutDocumentPersistedEditForUser;
+export const persistManualWorkoutPersistedEdit = persistWorkoutDocumentEdit;
+export type ManualWorkoutPersistedEditFailureReason = WorkoutDocumentPersistedEditFailureReason;
+export type ManualWorkoutPersistedEditReconstructResult =
+  WorkoutDocumentPersistedEditReconstructResult;
+export type ManualWorkoutPersistedEditReviewResult = WorkoutDocumentPersistedEditReviewResult;
+export type ManualWorkoutPersistedEditConfirmResult = WorkoutDocumentPersistedEditConfirmResult;
+export type ManualWorkoutPersistedEditDependencies = WorkoutDocumentPersistedEditDependencies;
+
+async function resolveWorkoutDocumentPersistedEditTarget(
+  userId: string,
+  input: WorkoutDocumentEditSourceInput,
+  dependencies: WorkoutDocumentPersistedEditDependencies,
+): Promise<WorkoutDocumentPersistedEditTarget> {
+  const getContext =
+    dependencies.getCalendarWorkoutContextForUser ?? getCalendarWorkoutMutationContext;
+  const fetchEvidence =
+    dependencies.fetchEvidenceWorkoutIds ?? fetchManualWorkoutEvidenceWorkoutIds;
+  const getEarliestEvent =
+    dependencies.getEarliestMutationEventForWorkout ?? getEarliestMutationEventForWorkout;
+  const currentDate = dependencies.currentDate ?? (await getRunnerCalendarDateForUserId(userId));
+
+  let context: CalendarWorkoutContext;
+  try {
+    context = await getContext(userId);
+  } catch {
+    return targetBlocked("persistence_failed", "The Calendar workout state could not be verified.");
+  }
+
+  const sourceWorkout = context.existingWorkouts.workouts.find(
+    (workout) => workout.id === input.plannedWorkoutId,
+  );
+  if (!sourceWorkout) {
+    return targetBlocked("source_workout_not_found", "The planned workout was not found.");
+  }
+
+  const provenancePlan = sourceWorkout.plan_cycle_id
+    ? (context.sourcePlansById.get(sourceWorkout.plan_cycle_id) ?? null)
+    : null;
+  if (sourceWorkout.user_id !== userId || (provenancePlan && provenancePlan.user_id !== userId)) {
+    return targetBlocked("source_workout_not_owned", "The workout does not belong to this runner.");
+  }
+  if (sourceWorkout.workout_date !== input.workoutDate) {
+    return targetBlocked(
+      "source_date_changed",
+      "The workout is no longer on this date. Refresh the workout.",
+    );
+  }
+  if (sourceWorkout.workout_date < currentDate) {
+    return targetBlocked("protected_day", "Past planned workouts cannot be edited.");
+  }
+  if (context.existingWorkouts.logsByWorkoutId.has(sourceWorkout.id)) {
+    return targetBlocked("logged_workout", "Logged or skipped workouts cannot be edited.");
+  }
+
+  let evidenceWorkoutIds: Set<string>;
+  try {
+    evidenceWorkoutIds = await fetchEvidence(userId, [sourceWorkout.id]);
+  } catch {
+    return targetBlocked("persistence_failed", "Workout evidence could not be verified.");
+  }
+  if (evidenceWorkoutIds.has(sourceWorkout.id)) {
+    return targetBlocked("evidence_backed_workout", "Evidence-backed workouts cannot be edited.");
+  }
+
+  const document = normalizePersistedWorkoutDocument(sourceWorkout);
+  if (!document.ok) {
+    return targetBlocked("source_workout_not_supported", document.message);
+  }
+  if (document.value.workoutType === "rest") {
+    return targetBlocked("source_workout_not_supported", "Rest days cannot be content-edited.");
+  }
+  if (workoutDocumentHasUnsafeMetricTruth(document.value)) {
+    return targetBlocked(
+      "source_workout_not_supported",
+      "This workout contains target provenance that cannot be edited safely.",
+    );
+  }
+
+  let rootProvenance: CalendarWorkoutEditRootProvenance;
+  try {
+    const earliestEvent = await getEarliestEvent(userId, sourceWorkout.id);
+    rootProvenance = resolveCalendarWorkoutEditRootProvenance(
+      provenancePlan,
+      sourceWorkout,
+      earliestEvent?.event_payload,
+    );
+  } catch {
+    return targetBlocked(
+      "unsupported_source_metadata",
+      "The workout root provenance could not be verified.",
     );
   }
 
   return {
     ok: true,
-    editedWorkout: readPersistedRpcRow<PersistedPlannedWorkoutRow>(
-      result.edited_workout,
-      sourceWorkout.id,
-    ),
-    planCycle: readPersistedRpcRow<PersistedPlanCycleRow>(result.plan_cycle, activePlan.id),
-  };
-}
-
-async function resolveManualWorkoutPersistedEditTarget(
-  userId: string,
-  input: ManualWorkoutPersistedEditSourceInput,
-  dependencies: ManualWorkoutPersistedEditDependencies,
-): Promise<ManualWorkoutPersistedEditTarget> {
-  const getContext =
-    dependencies.getCalendarWorkoutContextForUser ?? getCalendarWorkoutMutationContext;
-  const currentDate = dependencies.currentDate ?? (await getRunnerCalendarDateForUserId(userId));
-
-  let planContext: CalendarWorkoutContext;
-  try {
-    planContext = await getContext(userId);
-  } catch {
-    return {
-      ok: false,
-      reason: "persistence_failed",
-      message: "The manual plan could not verify the current active-plan state.",
-    };
-  }
-
-  const sourceWorkout = planContext.existingWorkouts.workouts.find(
-    (workout) => workout.id === input.plannedWorkoutId,
-  );
-
-  if (!sourceWorkout) {
-    return {
-      ok: false,
-      reason: "source_workout_not_found",
-      message: "The planned workout was not found in the current active plan.",
-    };
-  }
-
-  let activePlan =
-    planContext.provenancePlan?.id === sourceWorkout.plan_cycle_id
-      ? planContext.provenancePlan
-      : null;
-  if (!activePlan) {
-    try {
-      activePlan = await getPlanRecordForUser(userId, sourceWorkout.plan_cycle_id);
-    } catch {
-      return {
-        ok: false,
-        reason: "persistence_failed",
-        message: "The workout provenance could not be verified.",
-      };
-    }
-  }
-  if (!activePlan) {
-    return {
-      ok: false,
-      reason: "unsupported_source_metadata",
-      message: "The workout provenance is unavailable.",
-    };
-  }
-  const editability = resolveCalendarWorkoutEditability(activePlan, "edit_workout");
-  if (!editability.ok) {
-    return {
-      ok: false,
-      reason: "unsupported_source_metadata",
-      message: editability.message,
-    };
-  }
-
-  if (sourceWorkout.user_id !== userId) {
-    return {
-      ok: false,
-      reason: "source_workout_not_in_active_plan",
-      message: "The planned workout does not belong to the current runner.",
-    };
-  }
-
-  if (sourceWorkout.workout_date !== input.workoutDate) {
-    return {
-      ok: false,
-      reason: "source_date_changed",
-      message: "The planned workout is no longer on this date. Refresh the workout.",
-    };
-  }
-
-  if (sourceWorkout.workout_date < currentDate) {
-    return {
-      ok: false,
-      reason: "protected_day",
-      message: "Workout detail editing is not available for past planned workouts.",
-    };
-  }
-
-  if (persistedManualWorkoutHasUnsafeMetricTruth(sourceWorkout)) {
-    return {
-      ok: false,
-      reason: "source_workout_not_supported",
-      message: "This workout has metric targets that cannot be edited safely.",
-    };
-  }
-
-  const reconstructed = buildManualWorkoutDraftInputFromPersistedWorkout(
+    provenancePlan,
     sourceWorkout,
-    sourceWorkout.workout_date,
-    {
-      activePlanId: activePlan.id,
-      activePlanSourceKind: activePlan.source_kind,
-    },
-  );
-
-  if (!reconstructed.ok) {
-    return {
-      ok: false,
-      reason: mapDraftFailureReason(reconstructed.reason),
-      message: reconstructed.message,
-    };
-  }
-
-  return {
-    ok: true,
-    activePlan,
-    sourceWorkout,
-    sourceDraftInput: reconstructed.draftInput,
-    sourceDraftProcessingOptions: reconstructed.processingOptions,
+    sourceDocument: document.value,
+    rootProvenance,
     currentDate,
-    otherWorkouts: planContext.existingWorkouts.workouts.filter(
+    otherWorkouts: context.existingWorkouts.workouts.filter(
       (workout) => workout.id !== sourceWorkout.id,
     ),
   };
 }
 
-function buildPersistedWorkoutEditUpdateRow(input: {
-  userId: string;
-  activePlan: PersistedPlanCycleRow;
-  sourceWorkout: PersistedPlannedWorkoutRow;
-  draftReview: Extract<ManualWorkoutDraftReviewResult, { ok: true }>;
-}) {
-  const canonicalPlan = buildManualWorkoutUserBuiltTrainingPlan(input.draftReview.draft);
-  const importedSeed = buildImportedPlanSeed(canonicalPlan);
-  const [insertRow] = buildPersistedWorkoutInsertRows(
-    input.activePlan.id,
-    input.userId,
-    importedSeed.workouts,
-  );
-
-  if (!insertRow) {
-    throw new Error("Manual workout edit did not prepare a planned workout update row.");
+function buildValidatedCandidate(
+  target: Extract<WorkoutDocumentPersistedEditTarget, { ok: true }>,
+  editProjection: unknown,
+):
+  | { ok: true; document: WorkoutDocument }
+  | { ok: false; reason: WorkoutDocumentPersistedEditFailureReason; message: string } {
+  const candidate = buildEditedWorkoutDocument(target.sourceDocument, editProjection);
+  if (!candidate.ok) {
+    return targetBlocked("invalid_input", candidate.message);
+  }
+  if (candidate.value.workoutType === "rest") {
+    return targetBlocked(
+      "workout_type_changed_to_rest",
+      "Content editing cannot convert a workout into a Rest day.",
+    );
   }
 
+  const targetTruth = validateWorkoutDocumentTargetEdit(target.sourceDocument, candidate.value);
+  if (!targetTruth.ok) {
+    return targetBlocked("client_payload_rejected", targetTruth.message);
+  }
+
+  return { ok: true, document: candidate.value };
+}
+
+function buildWorkoutDocumentUpdate(document: WorkoutDocument) {
   return {
-    phase: insertRow.phase,
-    workout_type: insertRow.workout_type,
-    source_workout_id: insertRow.source_workout_id,
-    source_workout_type: insertRow.source_workout_type,
-    workout_family: insertRow.workout_family,
-    workout_identity: insertRow.workout_identity,
-    calendar_icon_key: insertRow.calendar_icon_key,
-    goal_context: insertRow.goal_context,
-    metric_mode: insertRow.metric_mode,
-    title: insertRow.title,
-    notes: insertRow.notes,
-    planned_rpe: insertRow.planned_rpe,
-    estimated_fatigue: insertRow.estimated_fatigue,
-    recovery_priority: insertRow.recovery_priority,
-    steps: insertRow.steps,
-    display_order: input.sourceWorkout.display_order,
+    workout_type: document.workoutType,
+    workout_family: document.workoutFamily,
+    workout_identity: document.workoutIdentity,
+    calendar_icon_key: document.calendarIconKey,
+    metric_mode: document.metricMode,
+    title: document.title,
+    notes: document.notes,
+    steps: document.steps,
   };
 }
 
-function buildManualWorkoutEditGoalMetadata(input: {
-  activePlan: PersistedPlanCycleRow;
+function buildWorkoutDocumentEditAuditMetadata(input: {
   sourceWorkout: PersistedPlannedWorkoutRow;
-  existingGoalMetadata: Json | null;
-  editedWorkouts: readonly PersistedPlannedWorkoutRow[];
-  review: ManualWorkoutPersistedEditReview;
-}): Json {
-  const editMetadata = buildManualWorkoutActivePlanEditMetadata(input);
-  const root = appendActivePlanUserEditMetadataToRecord(
-    asJsonRecord(input.existingGoalMetadata),
-    editMetadata,
-  );
-  const manualPlan = asJsonRecord(root.manual_user_built_plan);
-
-  if (input.activePlan.source_kind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND) {
-    return toJson(root);
-  }
-
-  return toJson({
-    ...root,
-    source_status: MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
-    manual_user_built_plan: {
-      ...manualPlan,
-      source_kind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-      source_status: MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
-      row_count: input.editedWorkouts.length,
-      non_rest_row_count: input.editedWorkouts.filter((workout) => workout.workout_type !== "rest")
-        .length,
-      latest_edit_review_payload_version: MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION,
-      latest_edit_review_checksum: input.review.reviewChecksum,
-      latest_edited_workout: buildManualWorkoutEditMetadata(input.review),
-    },
-  });
-}
-
-function buildManualWorkoutEditPlanPreferences(input: {
-  activePlan: PersistedPlanCycleRow;
-  sourceWorkout: PersistedPlannedWorkoutRow;
-  existingPlanPreferences: Json | null;
-  review: ManualWorkoutPersistedEditReview;
-}): Json {
-  const editMetadata = buildManualWorkoutActivePlanEditMetadata(input);
-  const root = appendActivePlanUserEditMetadataToRecord(
-    asJsonRecord(input.existingPlanPreferences),
-    editMetadata,
-  );
-  const editHistory = Array.isArray(root.manual_workout_authoring_edits)
-    ? root.manual_workout_authoring_edits
-    : [];
-  const editMetadataRecord = buildManualWorkoutEditMetadata(input.review);
-
-  if (input.activePlan.source_kind !== MANUAL_USER_BUILT_PLAN_SOURCE_KIND) {
-    return toJson(root);
-  }
-
-  return toJson({
-    ...root,
-    manual_workout_authoring_edit: editMetadataRecord,
-    manual_workout_authoring_edits: [...editHistory, editMetadataRecord],
-  });
-}
-
-function buildManualWorkoutActivePlanEditMetadata(input: {
-  activePlan: PersistedPlanCycleRow;
-  sourceWorkout: PersistedPlannedWorkoutRow;
-  review: ManualWorkoutPersistedEditReview;
+  rootProvenance: CalendarWorkoutEditRootProvenance;
+  review: WorkoutDocumentPersistedEditReview;
 }) {
-  return buildActivePlanUserEditMetadata({
-    activePlan: input.activePlan,
-    mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.editWorkout,
-    mutationMode: "direct_manual_edit",
-    mutationPayloadVersion: MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION,
+  return buildCalendarWorkoutMutationEvent({
+    mutationKind: CALENDAR_WORKOUT_MUTATION_KIND.editWorkout,
+    originKind: input.sourceWorkout.origin_kind,
+    mutationMode: "workout_document_edit",
+    mutationPayloadVersion: WORKOUT_DOCUMENT_EDIT_REVIEW_PAYLOAD_VERSION,
     mutationChecksum: input.review.mutationChecksum,
-    plannedWorkoutId: input.review.plannedWorkoutId,
-    previousWorkoutDate: input.review.workoutDate,
-    targetWorkoutId: input.review.plannedWorkoutId,
-    reviewChecksum: input.review.reviewChecksum,
-    reviewPayloadVersion: MANUAL_WORKOUT_EDIT_REVIEW_PAYLOAD_VERSION,
-    targetDate: input.review.workoutDate,
-    templateKey: input.review.templateKey,
+    plannedWorkoutId: input.sourceWorkout.id,
+    previousWorkoutDate: input.sourceWorkout.workout_date,
+    targetWorkoutId: input.sourceWorkout.id,
+    targetDate: input.sourceWorkout.workout_date,
     title: input.review.title,
+    reviewChecksum: input.review.reviewChecksum,
+    reviewPayloadVersion: WORKOUT_DOCUMENT_EDIT_REVIEW_PAYLOAD_VERSION,
     trustedClientRows: false,
-    workoutAuthoringSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
-    originalWorkoutSourceId: input.sourceWorkout.source_workout_id,
-    originalWorkoutSourceType: input.sourceWorkout.source_workout_type,
-    originalWorkoutFamily: input.sourceWorkout.workout_family,
-    originalWorkoutIdentity: input.sourceWorkout.workout_identity,
+    originalPlanSourceKind: input.rootProvenance.originalPlanSourceKind,
+    originalPlanSourceStatus: input.rootProvenance.originalPlanSourceStatus,
+    originalPlanOriginSourceKind: input.rootProvenance.originalPlanOriginSourceKind,
+    originalPlanOriginSourceStatus: input.rootProvenance.originalPlanOriginSourceStatus,
+    originalWorkoutSourceId: input.rootProvenance.originalWorkoutSourceId,
+    originalWorkoutSourceType: input.rootProvenance.originalWorkoutSourceType,
+    originalWorkoutFamily: input.rootProvenance.originalWorkoutFamily,
+    originalWorkoutIdentity: input.rootProvenance.originalWorkoutIdentity,
     previousWorkout: input.sourceWorkout,
   });
 }
 
-function mapDraftFailureReason(reason: string): ManualWorkoutPersistedEditFailureReason {
-  switch (reason) {
-    case "source_workout_not_found":
-      return "source_workout_not_found";
-    case "source_workout_not_in_active_plan":
-      return "source_workout_not_in_active_plan";
-    case "persistence_failed":
-      return "persistence_failed";
-    default:
-      return "source_workout_not_supported";
-  }
-}
-
-function mapDraftReviewFailureReason(
-  reason: Extract<ManualWorkoutDraftReviewResult, { ok: false }>["reason"],
-): ManualWorkoutPersistedEditFailureReason {
-  switch (reason) {
-    case "active_plan_conflict":
-      return "unsupported_active_plan_source";
-    case "protected_date_conflict":
-      return "protected_day";
-    case "invalid_input":
-      return "invalid_input";
-    case "unsafe_metric_truth":
-      return "source_workout_not_supported";
-    default:
-      return "source_workout_not_supported";
-  }
-}
-
-function buildEditBlocked(input: {
-  reason: ManualWorkoutPersistedEditFailureReason;
-  message: string;
-}): ManualWorkoutPersistedEditBlockedResult {
+function buildEditBlocked(
+  reason: WorkoutDocumentPersistedEditFailureReason,
+  message: string,
+): WorkoutDocumentPersistedEditBlockedResult {
   return {
     ok: false,
     status: "blocked",
     persisted: false,
-    reason: input.reason,
-    message: input.message,
+    reason,
+    message,
     sourceKind: null,
-    workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+    workoutEditSourceKind: CALENDAR_WORKOUT_MUTATION_SOURCE_KIND,
   };
 }
 
-function readPersistedRpcRow<T extends { id: string }>(value: unknown, expectedId: string): T {
-  const row = asJsonRecord(value);
+function targetBlocked(
+  reason: WorkoutDocumentPersistedEditFailureReason,
+  message: string,
+): Extract<WorkoutDocumentPersistedEditTarget, { ok: false }> {
+  return { ok: false, reason, message };
+}
 
-  if (row.id !== expectedId) {
-    throw new Error("Manual workout edit transaction returned an unexpected persisted row.");
+export async function getEarliestMutationEventForWorkout(userId: string, workoutId: string) {
+  const supabase = createAdminSupabaseClient();
+  const event = await supabase
+    .from("calendar_workout_mutation_events")
+    .select("event_payload")
+    .eq("user_id", userId)
+    .eq("planned_workout_id", workoutId)
+    .eq("mutation_kind", CALENDAR_WORKOUT_MUTATION_KIND.editWorkout)
+    .order("id", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (event.error) {
+    throw new Error(event.error.message);
   }
 
-  return row as T;
+  return event.data;
 }

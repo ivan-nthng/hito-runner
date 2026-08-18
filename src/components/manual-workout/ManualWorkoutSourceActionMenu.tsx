@@ -32,7 +32,7 @@ import {
 } from "@/components/manual-workout/manual-workout-authoring-utils";
 
 export type ManualCopiedWorkoutSource = {
-  activePlanId: string;
+  provenancePlanId: string | null;
   sourceWorkoutId: string;
   sourceWorkoutDate: string;
   title: string;
@@ -46,7 +46,7 @@ type ManualSourceActionStatus = "idle" | "reviewing" | "creating";
 type ManualWorkoutDeleteClearReady = Extract<ManualWorkoutDeleteClearReviewResult, { ok: true }>;
 
 export type ManualWorkoutSourceActionMenuProps = {
-  activePlanId: string;
+  provenancePlanId: string | null;
   canCopy?: boolean;
   canClear?: boolean;
   canMove?: boolean;
@@ -61,7 +61,7 @@ export type ManualWorkoutSourceActionMenuProps = {
 };
 
 export function ManualWorkoutSourceActionMenu({
-  activePlanId,
+  provenancePlanId,
   canCopy = true,
   canClear = false,
   canMove = false,
@@ -85,7 +85,7 @@ export function ManualWorkoutSourceActionMenu({
 
   const copySource = () => {
     const source = {
-      activePlanId,
+      provenancePlanId,
       sourceWorkoutDate,
       sourceWorkoutId,
       title,
@@ -100,7 +100,7 @@ export function ManualWorkoutSourceActionMenu({
 
   const moveSource = () => {
     onMove?.({
-      activePlanId,
+      provenancePlanId,
       sourceWorkoutDate,
       sourceWorkoutId,
       title,
@@ -127,7 +127,7 @@ export function ManualWorkoutSourceActionMenu({
     try {
       const result = await reviewManualWorkoutDeleteClearFn({
         data: {
-          activePlanId,
+          ...(provenancePlanId ? { activePlanId: provenancePlanId } : {}),
           plannedWorkoutId: sourceWorkoutId,
         },
       });
@@ -147,7 +147,7 @@ export function ManualWorkoutSourceActionMenu({
       hitoToast.success({
         id: MANUAL_DELETE_CLEAR_TOAST_ID,
         title: "Clear reviewed",
-        description: "Confirm before Hito removes this planned workout.",
+        description: "Confirm before Hito removes this Calendar workout.",
       });
     } catch (error) {
       const message =
@@ -171,13 +171,13 @@ export function ManualWorkoutSourceActionMenu({
     hitoToast.working({
       id: MANUAL_DELETE_CLEAR_TOAST_ID,
       title: "Clearing workout",
-      description: "Hito is confirming this calendar change before removing the planned row.",
+      description: "Hito is confirming this Calendar change before removing the workout row.",
     });
 
     try {
       const result = await confirmManualWorkoutDeleteClearFn({
         data: {
-          activePlanId,
+          ...(provenancePlanId ? { activePlanId: provenancePlanId } : {}),
           plannedWorkoutId: deleteReviewResult.plannedWorkoutId,
           reviewToken: deleteReviewResult.review.reviewToken,
           reviewChecksum: deleteReviewResult.review.reviewChecksum,
@@ -200,7 +200,7 @@ export function ManualWorkoutSourceActionMenu({
       hitoToast.success({
         id: MANUAL_DELETE_CLEAR_TOAST_ID,
         title: "Workout cleared",
-        description: "Refreshing the calendar from saved plan truth.",
+        description: "Refreshing from saved Calendar truth.",
       });
       confirmInFlightRef.current = false;
       setStatus("idle");
@@ -209,7 +209,7 @@ export function ManualWorkoutSourceActionMenu({
       await onCleared?.();
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "The planned workout could not be cleared.";
+        error instanceof Error ? error.message : "The Calendar workout could not be cleared.";
       confirmInFlightRef.current = false;
       setStatus("idle");
       setConfirmMessage(null);
@@ -349,7 +349,7 @@ function ManualDeleteClearReadyDialog({
             Review clear workout
           </DialogTitle>
           <DialogDescription className="hito-body-md text-secondary">
-            Confirm before Hito removes this planned workout from your active plan.
+            Confirm before Hito removes this workout from your Calendar.
           </DialogDescription>
         </DialogHeader>
         <div className="hito-product-dialog-body space-y-4">
@@ -358,7 +358,7 @@ function ManualDeleteClearReadyDialog({
               <div className="min-w-0">
                 <p className="hito-body-md text-foreground">{dateLabel}</p>
                 <p className="hito-body-sm mt-1 text-secondary">
-                  Selected calendar day for the planned workout being cleared.
+                  Selected Calendar day for the workout being cleared.
                 </p>
               </div>
               <span className="hito-status-pill shrink-0" data-tone="muted">
@@ -382,12 +382,11 @@ function ManualDeleteClearReadyDialog({
               <div className="min-w-0">
                 <p className="hito-body-md text-foreground">What changes</p>
                 <p className="hito-body-sm mt-1 text-secondary">
-                  Hito deletes exactly this planned workout row. The active plan remains active and
-                  the calendar refreshes from persisted plan truth.
+                  Hito deletes exactly this workout row and refreshes the Calendar from saved truth.
                 </p>
               </div>
               <span className="hito-status-pill shrink-0" data-tone="warning">
-                Planned only
+                Calendar only
               </span>
             </div>
 
@@ -396,8 +395,8 @@ function ManualDeleteClearReadyDialog({
                 <p className="hito-body-md text-foreground">If you need it again</p>
                 <p className="hito-body-sm mt-1 text-secondary">
                   {result.restore.available
-                    ? "Add it again from the calendar later. Hito will review it as a new planned workout before saving anything."
-                    : "This clears only the planned row. Hito will not recreate unsupported workout sources automatically."}
+                    ? "Add it again from the Calendar later. Hito will review it as a new workout before saving anything."
+                    : "This clears only the Calendar row. Hito will not recreate unsupported workout sources automatically."}
                 </p>
               </div>
               <span className="hito-status-pill shrink-0" data-tone="muted">
@@ -451,7 +450,7 @@ function ManualDeleteClearReadyDialog({
 
 function formatDeleteClearWorkoutSummary(result: ManualWorkoutDeleteClearReady) {
   if (!result.restore.available) {
-    return "Planned workout content stays protected; clearing removes only this calendar row.";
+    return "Workout content stays protected; clearing removes only this Calendar row.";
   }
 
   const draft = result.restore.review.draft;

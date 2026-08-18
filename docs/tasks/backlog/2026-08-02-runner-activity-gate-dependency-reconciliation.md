@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** ARCHITECT
+- **Epic:** runner-evidence-and-progress
 - **Outcome:** Completed the scoped outcome: Reconcile the contradictory Gate 1 Global QA prerequisite in the Activity History task with the canonical foundation's phased delivery and Gate 7 Global QA boundary.
 - **Sources:** Terminal decision/evidence record only; detailed transcript remains in Git history.
 - **Validation:** Canonical metadata parse, Importer dry-run, Scoped diff hygiene passed as recorded in the terminal receipt; omitted layers remain outside this closeout.

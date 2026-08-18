@@ -3,6 +3,10 @@ import type {
   RunnerActivityHistoryProductPage,
   RunnerActivityProgressProductModel,
 } from "@/lib/runner-activity/product-contract";
+import type {
+  RunnerActivityFitSequenceMetricId,
+  RunnerActivityFitSequenceQuickPeriodId,
+} from "@/lib/runner-activity/read-model-types";
 
 export type AsyncState<T> =
   | { status: "idle" | "loading"; data: T | null; error: null }
@@ -14,6 +18,13 @@ export type HistoryState = AsyncState<RunnerActivityHistoryProductPage> & { load
 export type ProgressState =
   | AsyncState<RunnerActivityProgressProductModel>
   | { status: "updating"; data: null; error: null };
+
+export type ProgressSequenceSelection = {
+  period: RunnerActivityFitSequenceQuickPeriodId | "custom";
+  metric: RunnerActivityFitSequenceMetricId;
+  startDate: string | null;
+  endDate: string | null;
+};
 
 export type ActivityAction = "remove-source" | "delete";
 

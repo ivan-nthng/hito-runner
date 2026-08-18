@@ -25,13 +25,16 @@ import {
 } from "@/lib/calendar-overflow-actions";
 
 type CalendarOverflowAction = "delete" | "start";
-type CalendarOverflowBusyAction = "upload" | CalendarOverflowAction;
+type CalendarOverflowBusyAction = "upload" | "local-file-flow" | CalendarOverflowAction;
 
 const CALENDAR_OVERFLOW_TOAST_ID = "calendar-overflow-actions";
+const FUTURE_CALENDAR_JSON_URL = "/api/plan/export?scope=future-calendar&format=json";
 
 export function CalendarOverflowActions({
+  localActivityFileDesignFixtureEnabled = false,
   onCalendarRefresh,
 }: {
+  localActivityFileDesignFixtureEnabled?: boolean;
   onCalendarRefresh: () => Promise<unknown>;
 }) {
   const uploadCalendarPlanJsonFn = useServerFn(uploadCalendarPlanJson);
@@ -41,6 +44,27 @@ export function CalendarOverflowActions({
   const [busyAction, setBusyAction] = useState<CalendarOverflowBusyAction | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
+
+  async function retainPlanJson(rawJson: string, localFileFlow = false) {
+    const result = await uploadCalendarPlanJsonFn({ data: { rawJson } });
+
+    if (!result.ok) {
+      hitoToast.error({
+        id: CALENDAR_OVERFLOW_TOAST_ID,
+        title: localFileFlow ? "Calendar JSON not saved" : "Plan not saved",
+        description: result.message,
+      });
+      return;
+    }
+
+    hitoToast.success({
+      id: CALENDAR_OVERFLOW_TOAST_ID,
+      title: localFileFlow ? "Calendar JSON flow ready" : "Plan saved to Plans",
+      description: localFileFlow
+        ? `${result.record.title} was exported and saved to Plans with ${result.record.workoutCount} ${result.record.workoutCount === 1 ? "workout" : "workouts"}. Your Calendar was not changed.`
+        : `${result.record.title} was saved. Your Calendar was not changed.`,
+    });
+  }
 
   async function uploadPlanJson(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -56,27 +80,44 @@ export function CalendarOverflowActions({
     });
 
     try {
-      const result = await uploadCalendarPlanJsonFn({ data: { rawJson: await file.text() } });
-
-      if (!result.ok) {
-        hitoToast.error({
-          id: CALENDAR_OVERFLOW_TOAST_ID,
-          title: "Plan not saved",
-          description: result.message,
-        });
-        return;
-      }
-
-      hitoToast.success({
-        id: CALENDAR_OVERFLOW_TOAST_ID,
-        title: "Plan saved to Plans",
-        description: `${result.record.title} was saved. Your Calendar was not changed.`,
-      });
+      await retainPlanJson(await file.text());
     } catch {
       hitoToast.error({
         id: CALENDAR_OVERFLOW_TOAST_ID,
         title: "Plan save not confirmed",
         description: "The upload result could not be confirmed. Check Plans before trying again.",
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function runLocalFileFlowBridge() {
+    if (!localActivityFileDesignFixtureEnabled || busyAction) return;
+
+    setBusyAction("local-file-flow");
+    hitoToast.working({
+      id: CALENDAR_OVERFLOW_TOAST_ID,
+      title: "Checking Calendar JSON flow",
+      description: "Exporting the current future Calendar and saving that exact JSON to Plans.",
+    });
+
+    try {
+      const response = await fetch(FUTURE_CALENDAR_JSON_URL, {
+        headers: { accept: "application/json" },
+      });
+
+      if (!response.ok) {
+        throw new Error("Calendar JSON export failed.");
+      }
+
+      await retainPlanJson(await response.text(), true);
+    } catch {
+      hitoToast.error({
+        id: CALENDAR_OVERFLOW_TOAST_ID,
+        title: "Calendar JSON flow not confirmed",
+        description:
+          "The future Calendar JSON could not be exported or saved. Nothing was changed.",
       });
     } finally {
       setBusyAction(null);
@@ -169,11 +210,7 @@ export function CalendarOverflowActions({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="hito-menu-width-standard">
           <DropdownMenuItem asChild>
-            <a
-              href="/api/plan/export?scope=future-calendar&format=json"
-              download
-              data-calendar-future-download
-            >
+            <a href={FUTURE_CALENDAR_JSON_URL} download data-calendar-future-download>
               <Icon name="download" size="xs" />
               Download future workouts JSON
             </a>
@@ -185,6 +222,16 @@ export function CalendarOverflowActions({
             <Icon name="upload" size="xs" />
             Upload plan JSON
           </DropdownMenuItem>
+          {localActivityFileDesignFixtureEnabled ? (
+            <DropdownMenuItem
+              data-calendar-local-file-flow
+              disabled={busyAction !== null}
+              onSelect={() => void runLocalFileFlowBridge()}
+            >
+              <Icon name="check-circle" size="xs" />
+              Check Calendar JSON flow
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuItem
             disabled={busyAction !== null}
             onSelect={() => setPendingAction("start")}

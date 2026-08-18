@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** FRONTEND
+- **Epic:** adaptive-blueprint-planning
 - **Parent:** [Hito Stack Complexity Reduction Program](./2026-08-04-hito-stack-complexity-reduction-program.md)
 - **Outcome:** One Product-owned generated-plan setup state/view-model supplies the equivalent form state while first-plan confirmation and active-plan replacement transition lifecycles remain separate.
 - **Sources:** Terminal decision/evidence record only; detailed transcript remains in Git history.

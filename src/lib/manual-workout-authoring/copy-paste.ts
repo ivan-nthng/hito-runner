@@ -2,15 +2,16 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
   getCalendarWorkoutMutationContext,
-  getPlanRecordForUser,
-  type PersistedPlanCycleRow,
   type PersistedPlannedWorkoutRow,
 } from "@/lib/active-plan-persistence";
 import {
   CalendarPersistenceRejection,
   applyAtomicCalendarWorkoutMutation,
 } from "@/lib/active-plan-lifecycle-persistence";
-import { ACTIVE_PLAN_USER_EDIT_MUTATION_KIND } from "@/lib/active-plan-workout-editing/policy";
+import {
+  CALENDAR_WORKOUT_MUTATION_KIND,
+  buildCalendarWorkoutMutationEvent,
+} from "@/lib/active-plan-workout-editing/policy";
 import {
   addReviewedManualWorkoutToActivePlanForUser,
   type ManualWorkoutActivePlanAddDependencies,
@@ -33,14 +34,14 @@ import {
 } from "@/lib/manual-workout-authoring/schema";
 import { stableManualWorkoutChecksum64Hex } from "@/lib/manual-workout-authoring/review-exactness";
 import { getCurrentManualWorkoutAuthoringUserId } from "@/lib/manual-workout-authoring/request-auth";
-import { buildSourceWorkoutFingerprint } from "@/lib/manual-workout-authoring/edit-workout-review-token";
+import { buildFullSourceWorkoutFingerprint } from "@/lib/manual-workout-authoring/edit-workout-review-token";
 import {
   buildPersistedWorkoutInsertRows,
   persistedWorkoutRowToImportedSeed,
 } from "@/lib/persisted-plan-replacement";
 import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
 import type { Json } from "@/lib/supabase/database";
-import { diffDaysIso, weekdayLong } from "@/lib/training";
+import { weekdayLong } from "@/lib/training";
 
 export type { ManualWorkoutCopyPasteFailureReason } from "@/lib/manual-workout-authoring/copy-paste-reconstruction";
 
@@ -118,7 +119,7 @@ export type ManualWorkoutCopyPasteReviewResult =
       sourceKind: string;
       sourceStatus: string | null;
       workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
-      activePlanId: string;
+      activePlanId: string | null;
       sourceWorkoutId: string;
       sourceWorkoutDate: string;
       targetDate: string;
@@ -155,7 +156,7 @@ export type ManualWorkoutDirectCopyResult =
       sourceKind: string;
       sourceStatus: string | null;
       workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
-      activePlanId: string;
+      activePlanId: string | null;
       sourceWorkoutId: string;
       sourceWorkoutDate: string;
       targetWorkoutId: string;
@@ -169,7 +170,7 @@ export type ManualWorkoutDirectCopyResult =
       calendarRowCount: number;
       nonRestWorkoutCount: number;
       sourceMetadata: {
-        mutationKind: typeof ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.copyWorkout;
+        mutationKind: typeof CALENDAR_WORKOUT_MUTATION_KIND.copyWorkout;
         mutationMode: "direct_manual_edit";
         mutationPayloadVersion: typeof MANUAL_WORKOUT_DIRECT_COPY_PAYLOAD_VERSION;
         mutationChecksum: string;
@@ -198,7 +199,6 @@ export type ManualWorkoutDirectCopyResult =
 export type ManualWorkoutCopyPasteDependencies = ManualWorkoutActivePlanAddDependencies;
 
 export interface ManualWorkoutDirectCopyDependencies extends ManualWorkoutCopyPasteDependencies {
-  getPlanRecordForUser?: typeof getPlanRecordForUser;
   persistWorkoutCopy?: typeof persistCanonicalCalendarWorkoutCopy;
 }
 
@@ -318,7 +318,7 @@ export async function confirmManualWorkoutCopyPasteDraftForUser(
     {
       ...exactness,
       activePlanUserEdit: {
-        mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.copyWorkout,
+        mutationKind: CALENDAR_WORKOUT_MUTATION_KIND.copyWorkout,
         mutationChecksum: exactness.reviewChecksum,
         sourceWorkoutId: reconstruction.sourceWorkout.id,
         sourceWorkoutDate: reconstruction.sourceWorkout.workout_date,
@@ -367,7 +367,6 @@ export async function copyManualWorkoutWithinActivePlanForUser(
 
   const getContext =
     dependencies.getCalendarWorkoutContextForUser ?? getCalendarWorkoutMutationContext;
-  const getPlan = dependencies.getPlanRecordForUser ?? getPlanRecordForUser;
   const currentDate = dependencies.currentDate ?? (await getRunnerCalendarDateForUserId(userId));
   let planContext;
 
@@ -423,25 +422,11 @@ export async function copyManualWorkoutWithinActivePlanForUser(
     });
   }
 
-  let provenancePlan: PersistedPlanCycleRow | null;
-  try {
-    provenancePlan = await getPlan(userId, sourceWorkout.plan_cycle_id);
-  } catch {
-    provenancePlan = null;
-  }
-
-  if (!provenancePlan) {
-    return buildCopyPasteBlocked({
-      reason: "unsupported_source_metadata",
-      message: "The copied workout is missing its saved plan provenance.",
-    });
-  }
-
   const targetWeekday = weekdayLong(parsed.data.targetDate);
-  const sourceKind = provenancePlan.source_kind ?? "unknown_plan_provenance";
+  const sourceKind = sourceWorkout.origin_kind;
   const mutationChecksum = stableManualWorkoutChecksum64Hex({
     version: MANUAL_WORKOUT_DIRECT_COPY_PAYLOAD_VERSION,
-    mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.copyWorkout,
+    mutationKind: CALENDAR_WORKOUT_MUTATION_KIND.copyWorkout,
     sourceWorkoutId: sourceWorkout.id,
     sourceWorkoutDate: sourceWorkout.workout_date,
     targetDate: parsed.data.targetDate,
@@ -453,7 +438,7 @@ export async function copyManualWorkoutWithinActivePlanForUser(
     }),
     workoutDate: parsed.data.targetDate,
     weekday: targetWeekday,
-    weekNumber: Math.floor(diffDaysIso(parsed.data.targetDate, provenancePlan.start_date) / 7) + 1,
+    weekNumber: sourceWorkout.week_number,
   };
   const persistCopy = dependencies.persistWorkoutCopy ?? persistCanonicalCalendarWorkoutCopy;
   let persisted;
@@ -462,9 +447,9 @@ export async function copyManualWorkoutWithinActivePlanForUser(
     persisted = await persistCopy({
       userId,
       currentDate,
-      provenancePlan,
       sourceWorkout,
       workoutSeed,
+      mutationChecksum,
     });
   } catch (error) {
     if (error instanceof CalendarPersistenceRejection) {
@@ -490,9 +475,9 @@ export async function copyManualWorkoutWithinActivePlanForUser(
     status: "copied",
     persisted: true,
     sourceKind,
-    sourceStatus: provenancePlan.status,
+    sourceStatus: null,
     workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
-    activePlanId: provenancePlan.id,
+    activePlanId: sourceWorkout.plan_cycle_id,
     sourceWorkoutId: sourceWorkout.id,
     sourceWorkoutDate: sourceWorkout.workout_date,
     targetWorkoutId: persisted.plannedWorkout.id,
@@ -508,7 +493,7 @@ export async function copyManualWorkoutWithinActivePlanForUser(
       planContext.existingWorkouts.workouts.filter((workout) => workout.workout_type !== "rest")
         .length + 1,
     sourceMetadata: {
-      mutationKind: ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.copyWorkout,
+      mutationKind: CALENDAR_WORKOUT_MUTATION_KIND.copyWorkout,
       mutationMode: "direct_manual_edit",
       mutationPayloadVersion: MANUAL_WORKOUT_DIRECT_COPY_PAYLOAD_VERSION,
       mutationChecksum,
@@ -537,36 +522,58 @@ export async function copyManualWorkoutWithinActivePlanForUser(
 async function persistCanonicalCalendarWorkoutCopy(input: {
   userId: string;
   currentDate: string;
-  provenancePlan: PersistedPlanCycleRow;
   sourceWorkout: PersistedPlannedWorkoutRow;
   workoutSeed: ReturnType<typeof persistedWorkoutRowToImportedSeed>;
+  mutationChecksum: string;
 }) {
-  const [insertRow] = buildPersistedWorkoutInsertRows(input.provenancePlan.id, input.userId, [
-    input.workoutSeed,
-  ]);
+  const [insertRow] = buildPersistedWorkoutInsertRows(
+    input.sourceWorkout.plan_cycle_id,
+    input.userId,
+    [input.workoutSeed],
+    input.sourceWorkout.origin_kind,
+  );
 
   if (!insertRow) {
     throw new Error("Calendar workout copy did not prepare an insert row.");
   }
 
+  const targetWorkoutId = crypto.randomUUID();
+  const mutationEvent = buildCalendarWorkoutMutationEvent({
+    mutationKind: CALENDAR_WORKOUT_MUTATION_KIND.copyWorkout,
+    originKind: input.sourceWorkout.origin_kind,
+    reviewPayloadVersion: MANUAL_WORKOUT_DIRECT_COPY_PAYLOAD_VERSION,
+    reviewChecksum: input.mutationChecksum,
+    mutationMode: "direct_manual_edit",
+    mutationPayloadVersion: MANUAL_WORKOUT_DIRECT_COPY_PAYLOAD_VERSION,
+    mutationChecksum: input.mutationChecksum,
+    plannedWorkoutId: targetWorkoutId,
+    sourceWorkoutId: input.sourceWorkout.id,
+    sourceWorkoutDate: input.sourceWorkout.workout_date,
+    targetWorkoutId,
+    targetDate: input.workoutSeed.workoutDate,
+    title: input.sourceWorkout.title,
+    trustedClientRows: false,
+    originalPlanSourceKind: input.sourceWorkout.origin_kind,
+    originalPlanSourceStatus: null,
+    originalWorkoutSourceId: input.sourceWorkout.source_workout_id,
+    originalWorkoutSourceType: input.sourceWorkout.source_workout_type,
+    originalWorkoutFamily: input.sourceWorkout.workout_family,
+    originalWorkoutIdentity: input.sourceWorkout.workout_identity,
+  });
   const persisted = await applyAtomicCalendarWorkoutMutation({
     userId: input.userId,
-    planId: input.provenancePlan.id,
-    expectedPlanUpdatedAt: input.provenancePlan.updated_at,
     currentDate: input.currentDate,
     mutationKind: "add",
-    expectedSourceWorkout: buildSourceWorkoutFingerprint(input.sourceWorkout) as unknown as Json,
+    expectedSourceWorkout: buildFullSourceWorkoutFingerprint(
+      input.sourceWorkout,
+    ) as unknown as Json,
     expectedTargetWorkout: null,
     workoutInsert: {
       ...insertRow,
-      id: crypto.randomUUID(),
+      id: targetWorkoutId,
     } as unknown as Json,
     workoutUpdate: null,
-    planUpdate: {
-      end_date: input.provenancePlan.end_date,
-      goal_metadata: input.provenancePlan.goal_metadata,
-      plan_preferences: input.provenancePlan.plan_preferences,
-    },
+    mutationEvent: mutationEvent as unknown as Json,
   });
 
   if (!persisted.mutatedWorkout) {

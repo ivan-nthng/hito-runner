@@ -1,9 +1,16 @@
 import { type ReactNode, useState } from "react";
 
 import { DataTableSpecimenPreview, SelectionControlPreview } from "./specimen-previews";
+import {
+  FACTUAL_ACTIVITY_SEQUENCE_DEFAULT_METRIC,
+  FACTUAL_ACTIVITY_SEQUENCE_READY,
+} from "./factual-activity-point-sequence-playground";
+import { FACTUAL_PERIOD, READY_DISTANCE_SERIES } from "./factual-bar-chart-playground";
 import { ProductLinks, ReferenceListRow, SectionIntro } from "./reference";
 import { HitoButton } from "@/components/ui/button";
 import { HitoDateField } from "@/components/ui/hito-date-time-input";
+import { HitoFactualActivityPointSequence } from "@/components/ui/hito-factual-activity-point-sequence";
+import { HitoFactualBarChart } from "@/components/ui/hito-factual-bar-chart";
 import {
   Dialog,
   DialogContent,
@@ -227,8 +234,11 @@ export function HitoDsOverviewPage() {
 
         <ShowcaseGroup title="Navigation">
           <ShowcaseCard title="Tabs" href="/hitoDS/components#tabs">
-            <div className="w-full self-center">
-              <div className="hito-tabs hito-tabs-simple" {...overviewTabs.tabListProps}>
+            <div className="grid w-full min-w-0 justify-items-center self-center text-center">
+              <div
+                className="hito-tabs hito-tabs-simple max-w-full overflow-x-auto"
+                {...overviewTabs.tabListProps}
+              >
                 {OVERVIEW_TABS.map((tab) => (
                   <button
                     key={tab}
@@ -244,7 +254,7 @@ export function HitoDsOverviewPage() {
               </div>
               <div
                 {...overviewTabs.getPanelProps(activeTab)}
-                className="hito-body-xs text-tertiary mt-4"
+                className="hito-body-xs text-tertiary mt-4 text-center"
               >
                 {activeTab} view selected.
               </div>
@@ -317,6 +327,27 @@ export function HitoDsOverviewPage() {
         </ShowcaseGroup>
 
         <ShowcaseGroup title="Table & List">
+          <ShowcaseCard
+            title="Factual Bar Chart"
+            href="/hitoDS/patterns#factual-bar-chart"
+            previewMode="top"
+          >
+            <div className="w-full min-w-0 self-center">
+              <HitoFactualBarChart period={FACTUAL_PERIOD} series={READY_DISTANCE_SERIES} />
+            </div>
+          </ShowcaseCard>
+          <ShowcaseCard
+            title="Factual Activity Point Sequence"
+            href="/hitoDS/patterns#factual-activity-point-sequence"
+            previewMode="top"
+          >
+            <div className="w-full min-w-0 self-center">
+              <HitoFactualActivityPointSequence
+                metricId={FACTUAL_ACTIVITY_SEQUENCE_DEFAULT_METRIC}
+                sequence={FACTUAL_ACTIVITY_SEQUENCE_READY}
+              />
+            </div>
+          </ShowcaseCard>
           <ShowcaseCard title="Data Table & Headers" href="/hitoDS/components#data-table">
             <div className="grid w-full min-w-0 self-center gap-5">
               <div className="grid min-w-0 gap-2">
@@ -398,10 +429,12 @@ function ShowcaseCard({
   title,
   href,
   children,
+  previewMode = "center",
 }: {
   title: string;
   href: string;
   children: ReactNode;
+  previewMode?: "center" | "top";
 }) {
   return (
     <article className="hito-ds-showcase-card grid">
@@ -419,7 +452,16 @@ function ShowcaseCard({
           </a>
         </HitoButton>
       </div>
-      <div className="grid min-h-64 min-w-0 content-center pt-5">{children}</div>
+      <div
+        className={
+          previewMode === "top"
+            ? "grid min-h-64 min-w-0 content-start pt-5"
+            : "grid min-h-64 min-w-0 content-center pt-5"
+        }
+        data-hito-ds-showcase-preview={previewMode}
+      >
+        {children}
+      </div>
     </article>
   );
 }

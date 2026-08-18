@@ -1,5 +1,8 @@
 import { type CSSProperties, useState } from "react";
+import { FactualActivityPointSequencePlayground } from "@/components/hito-ds/factual-activity-point-sequence-playground";
+import { FactualBarChartPlayground } from "@/components/hito-ds/factual-bar-chart-playground";
 import { HitoDsPlayground } from "@/components/hito-ds/playground";
+import { HitoDsWorkbenchChoiceControl } from "@/components/hito-ds/workbench-settings-controls";
 import { WorkoutLibraryPlayground } from "@/components/hito-ds/workout-library-playground";
 import { HitoDsPatternInlineEditing } from "@/components/hito-ds/reference-pattern-inline-editing";
 import { HitoDsAppShellPattern } from "@/components/hito-ds/reference-components-structure";
@@ -7,6 +10,7 @@ import { ProductLinks, ReferenceListRow, SectionIntro } from "@/components/hito-
 import { ChoiceSelector, DataTableSpecimenPreview } from "@/components/hito-ds/specimen-previews";
 import { HitoButton } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
+import { HitoNavigationCard } from "@/components/ui/hito-navigation-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { WorkoutGlyph } from "@/components/WorkoutGlyph";
@@ -28,10 +32,15 @@ const FEEDBACK_MARKER_EXAMPLES = [
 const STATE_SURFACE_TONES = ["neutral", "signal", "success", "warning", "destructive"] as const;
 const STATE_SURFACE_SIZES = ["sm", "md", "lg"] as const;
 const STATE_SURFACE_ACTION_STATES = ["absent", "present"] as const;
+const STATE_SURFACE_PREVIEW_OPTIONS = [
+  { label: "Desktop", value: "desktop" },
+  { label: "Mobile", value: "mobile" },
+] as const;
 
 type StateSurfaceTone = (typeof STATE_SURFACE_TONES)[number];
 type StateSurfaceSize = (typeof STATE_SURFACE_SIZES)[number];
 type StateSurfaceActionState = (typeof STATE_SURFACE_ACTION_STATES)[number];
+type StateSurfacePreviewMode = (typeof STATE_SURFACE_PREVIEW_OPTIONS)[number]["value"];
 
 const STATE_SURFACE_TONE_META: Record<
   StateSurfaceTone,
@@ -133,6 +142,8 @@ export function HitoDsPatternsPage() {
   const [stateSurfaceSize, setStateSurfaceSize] = useState<StateSurfaceSize>("lg");
   const [stateSurfaceActions, setStateSurfaceActions] =
     useState<StateSurfaceActionState>("present");
+  const [stateSurfacePreview, setStateSurfacePreview] =
+    useState<StateSurfacePreviewMode>("desktop");
   const [stateSurfaceActionHandled, setStateSurfaceActionHandled] = useState(false);
   const stateSurfaceToneMeta = STATE_SURFACE_TONE_META[stateSurfaceTone];
   const stateSurfaceSizeMeta = STATE_SURFACE_SIZE_META[stateSurfaceSize];
@@ -338,9 +349,10 @@ export function HitoDsPatternsPage() {
         }
         demo={
           <article
-            className="hito-state-surface w-full max-w-2xl"
+            className={`hito-state-surface w-full max-w-2xl ${stateSurfacePreview === "mobile" ? "p-3" : ""}`}
             data-size={stateSurfaceSize}
             data-tone={stateSurfaceTone}
+            data-hito-ds-state-surface-preview={stateSurfacePreview}
             aria-labelledby="state-surface-demo-title"
           >
             <p
@@ -397,6 +409,14 @@ export function HitoDsPatternsPage() {
         controls={
           <div className="hito-row-group border-0">
             <div className="hito-list-row items-start">
+              <HitoDsWorkbenchChoiceControl
+                label="Preview"
+                value={stateSurfacePreview}
+                options={STATE_SURFACE_PREVIEW_OPTIONS}
+                onChange={setStateSurfacePreview}
+              />
+            </div>
+            <div className="hito-list-row items-start">
               <ChoiceSelector
                 label="Tone"
                 value={stateSurfaceTone}
@@ -432,6 +452,56 @@ export function HitoDsPatternsPage() {
           </div>
         }
       />
+      <HitoDsPlayground
+        id="navigation-card"
+        label="Navigation Card"
+        status="Shared component"
+        statusTone="signal"
+        description={{
+          purpose:
+            "Move to the previous or next dated destination through one native, whole-card link.",
+          useWhen:
+            "A detail route has stable adjacent destinations and needs direction, date, label, and title together.",
+          avoidWhen:
+            "A compact inline destination fits a Reference Link, or the action does not navigate to another document location.",
+          accessibility:
+            "The card remains one native anchor with a visible whole-card focus ring; arrows are decorative direction cues, not separate controls.",
+        }}
+        usedIn={
+          <span className="hito-technical-sm text-secondary">
+            Workout previous / next navigation · Product adoption pending
+          </span>
+        }
+        preview={
+          <div className="grid w-full max-w-3xl min-w-0 gap-3 sm:grid-cols-2">
+            <HitoNavigationCard
+              direction="previous"
+              date="Thu, Aug 13"
+              label="Previous"
+              title="Recovery run"
+              href="#notice-surface"
+            />
+            <HitoNavigationCard
+              direction="next"
+              date="Sat, Aug 15"
+              label="Next"
+              title="Long run with steady finish"
+              href="#states"
+            />
+          </div>
+        }
+        controls={
+          <div className="hito-row-group border-0">
+            <ReferenceListRow
+              label="Interaction"
+              title="One native anchor"
+              body="Direction, date, label, title, hover, and focus belong to the whole card. The arrow remains a decorative icon without separate chrome."
+            />
+          </div>
+        }
+      />
+      <FactualBarChartPlayground />
+      <FactualActivityPointSequencePlayground />
       <section id="states" className="ds-section">
         <SectionIntro label="States" title="Markers, route states, tooltips, and severity." />
         <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">

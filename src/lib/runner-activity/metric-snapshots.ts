@@ -7,6 +7,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import {
   buildGate4ObservationDrafts,
   buildGate4SnapshotPayload,
+  buildRunnerActivityFitSequence,
   gate4InputFingerprint,
   RUNNER_ACTIVITY_GATE4_FORMULA_SET_VERSION,
   RUNNER_ACTIVITY_GATE4_FORMULA_VERSIONS,
@@ -14,8 +15,14 @@ import {
   type Gate4EvidenceInput,
   type Gate4ObservationDraft,
   type Gate4PersistedObservation,
+  type RunnerActivityFitEvidenceInput,
 } from "@/lib/runner-activity/metric-formulas";
-import type { RunnerActivityAdvancedMetricsCurrent } from "@/lib/runner-activity/read-model-types";
+import type {
+  RunnerActivityAdvancedMetricsCurrent,
+  RunnerActivityFitProgressReadModel,
+  RunnerActivityFitSequencePeriodRequest,
+  RunnerActivityFitSequenceReadModel,
+} from "@/lib/runner-activity/read-model-types";
 import { readRunnerActivityRunningContext } from "@/lib/runner-activity/running-context";
 
 export type RunnerActivityMetricCreationCause =
@@ -39,7 +46,9 @@ type ActivityRow = {
   id: string;
   current_revision_id: string | null;
   current_revision: ActivityRevisionRow | null;
+  started_at: string | null;
   local_date: string | null;
+  historical_timezone: string | null;
   elapsed_duration_min: number | null;
   timer_duration_min: number | null;
   distance_km: number | null;
@@ -50,6 +59,22 @@ type ActivityRevisionRow = {
   activity_id: string;
   source_revision_id: string;
   normalized_summary: Json;
+};
+
+type ActivitySourceRow = {
+  id: string;
+  activity_id: string;
+  current_revision_id: string | null;
+  source_kind: string;
+};
+
+type ActivitySourceRevisionRow = {
+  id: string;
+  source_id: string;
+  raw_asset_kind: string;
+  raw_state: string;
+  raw_storage_bucket: string | null;
+  raw_storage_path: string | null;
 };
 
 type EvidenceRow = {
@@ -118,6 +143,102 @@ const loadWindowSchema = z.object({
   metric: loadMetricSchema,
 });
 
+const fitChartPointSchema = z.object({
+  id: z.string().min(1),
+  startDate: z.string().date(),
+  endDate: z.string().date(),
+  cutoffDate: z.string().date(),
+  shortLabel: z.string().min(1),
+  accessibleLabel: z.string().min(1),
+  completion: z.enum(["partial_start", "complete", "to_date"]),
+  completionLabel: z.enum(["Partial week", "Complete week", "To date"]),
+  state: z.enum(["available", "partial", "unavailable"]),
+  value: z.number().nullable(),
+  displayValue: z.string().nullable(),
+  coverage: z.object({
+    includedCount: z.number().int().nonnegative(),
+    candidateCount: z.number().int().nonnegative(),
+    missingCount: z.number().int().nonnegative(),
+    label: z.string().min(1),
+  }),
+  reasons: z.array(z.string()),
+  reasonLabels: z.array(z.string()),
+});
+
+const fitChartSeriesIdentitySchema = z.object({
+  id: z.enum(["sessions", "running_time", "distance", "elevation", "reported_load"]),
+  title: z.string().min(1),
+  purpose: z.string().min(1),
+  unit: z.enum(["sessions", "minutes", "kilometers", "meters", "arbitrary_units"]),
+  unitLabel: z.enum(["sessions", "min", "km", "m", "AU"]),
+  display: z.object({
+    format: z.enum(["integer", "duration_minutes", "decimal"]),
+    maximumFractionDigits: z.number().int().nonnegative(),
+  }),
+  evidenceLabel: z.literal("From FIT file"),
+  formulaVersion: z.string().min(1),
+});
+
+const fitChartSeriesSchema = z.union([
+  fitChartSeriesIdentitySchema.extend({
+    status: z.literal("ready"),
+    points: z.array(fitChartPointSchema),
+  }),
+  fitChartSeriesIdentitySchema.extend({
+    status: z.literal("updating"),
+    reason: z.literal("fit_evidence_updating"),
+    reasonLabel: z.literal("FIT evidence is updating."),
+    staleValuesReturned: z.literal(false),
+    points: z.tuple([]),
+  }),
+]);
+
+const fitPersonalBestSlotSchema = z.object({
+  id: z.enum(["1_km", "5_km", "10_km", "half_marathon", "marathon"]),
+  label: z.enum(["1 km", "5 km", "10 km", "Half Marathon · 21.0975 km", "Marathon · 42.195 km"]),
+  distanceMeters: z.number().positive(),
+  state: z.enum(["available", "no_verified_time", "unavailable", "updating"]),
+  reason: z.string().nullable(),
+  reasonLabel: z.string().nullable(),
+  result: z
+    .object({
+      elapsedSeconds: z.number().positive(),
+      displayValue: z.string().min(1),
+      eventDate: z.string().date().nullable(),
+      evidenceLabel: z.literal("From FIT file"),
+      source: z.object({
+        activityId: z.string().uuid(),
+        activityRevisionId: z.string().uuid(),
+      }),
+    })
+    .nullable(),
+});
+
+const fitProgressSchema = z.object({
+  status: z.literal("current"),
+  evidenceLabel: z.literal("From FIT file"),
+  chart: z.object({
+    advertisedPeriods: z.tuple([
+      z.object({
+        id: z.literal("28_days"),
+        label: z.literal("28 days"),
+        startDate: z.string().date(),
+        endDate: z.string().date(),
+        state: z.literal("to_date"),
+        bucketResolution: z.literal("calendar_week"),
+        timezoneBasis: z.literal("historical_local_date"),
+        weekStartsOn: z.literal("monday"),
+        series: z.array(fitChartSeriesSchema),
+      }),
+    ]),
+  }),
+  personalBests: z.object({
+    formulaVersion: z.string().min(1),
+    matchingRule: z.literal("exact_whole_activity_distance_within_0_05_meters"),
+    slots: z.array(fitPersonalBestSlotSchema).length(5),
+  }),
+});
+
 const unavailableStreamMetricSchema = z.object({
   status: z.literal("unavailable"),
   reason: z.literal("normalized_stream_not_persisted"),
@@ -133,7 +254,9 @@ const advancedSnapshotSchema = z.object({
   formulaVersions: z.object({
     personalBest: z.string().min(1),
     sessionRpeLoad: z.string().min(1),
+    fitProgress: z.string().min(1).optional(),
   }),
+  fitProgress: fitProgressSchema.optional(),
   sessionRpeLoad: z.object({
     rolling28Day: z.object({ current: loadWindowSchema, previous: loadWindowSchema }),
     calendarWeeks: z.array(loadWindowSchema),
@@ -190,6 +313,44 @@ export async function getRunnerActivityAdvancedMetricsForUser(input: {
 }): Promise<RunnerActivityAdvancedMetricsCurrent> {
   const asOfDate = z.string().date().parse(input.asOfDate);
   const activities = await loadGate4Activities(input.userId, asOfDate);
+  return reconcileRunnerActivityAdvancedMetrics({ ...input, asOfDate, activities });
+}
+
+export async function getRunnerActivityProgressMetricsForUser(input: {
+  userId: string;
+  asOfDate: string;
+  timeZone: string;
+  sequencePeriod: RunnerActivityFitSequencePeriodRequest;
+  creationCause?: RunnerActivityMetricCreationCause;
+}): Promise<{
+  advancedMetrics: RunnerActivityAdvancedMetricsCurrent;
+  fitActivitySequence: RunnerActivityFitSequenceReadModel;
+}> {
+  const asOfDate = z.string().date().parse(input.asOfDate);
+  const activities = await loadGate4Activities(input.userId, asOfDate);
+  const advancedMetrics = await reconcileRunnerActivityAdvancedMetrics({
+    ...input,
+    asOfDate,
+    activities,
+  });
+  return {
+    advancedMetrics,
+    fitActivitySequence: buildRunnerActivityFitSequence({
+      asOfDate,
+      timeZone: input.timeZone,
+      period: input.sequencePeriod,
+      activities,
+    }),
+  };
+}
+
+async function reconcileRunnerActivityAdvancedMetrics(input: {
+  userId: string;
+  asOfDate: string;
+  activities: Gate4ActivityInput[];
+  creationCause?: RunnerActivityMetricCreationCause;
+}) {
+  const { activities, asOfDate } = input;
   const inputFingerprint = gate4InputFingerprint({ activities });
   const supabase = createAdminSupabaseClient();
   const existing = await supabase
@@ -221,6 +382,7 @@ export async function getRunnerActivityAdvancedMetricsForUser(input: {
     id: snapshotId,
     asOfDate,
     historical: false,
+    activities,
     observations,
     activityRevisionIds: activities.map((activity) => activity.activityRevisionId),
     evidenceRevisionIds,
@@ -300,16 +462,34 @@ async function loadGate4Activities(
     supabase
       .from("runner_activities")
       .select(
-        "id, current_revision_id, local_date, elapsed_duration_min, timer_duration_min, distance_km, current_revision:runner_activity_revisions!runner_activities_current_revision_id_fkey(id, activity_id, source_revision_id, normalized_summary)",
+        "id, current_revision_id, started_at, local_date, historical_timezone, elapsed_duration_min, timer_duration_min, distance_km, current_revision:runner_activity_revisions!runner_activities_current_revision_id_fkey(id, activity_id, source_revision_id, normalized_summary)",
       )
       .eq("user_id", userId)
       .eq("sport", "run")
       .eq("recording_kind", "recorded")
       .eq("quality_state", "accepted")
-      .lte("local_date", asOfDate)
+      .or(`local_date.lte.${asOfDate},local_date.is.null`)
       .order("id", { ascending: true })
       .range(from, to),
   );
+  const [activitySources, sourceRevisions] = await Promise.all([
+    loadPaged<ActivitySourceRow>(async (from, to) =>
+      supabase
+        .from("runner_activity_sources")
+        .select("id, activity_id, current_revision_id, source_kind")
+        .eq("user_id", userId)
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+    loadPaged<ActivitySourceRevisionRow>(async (from, to) =>
+      supabase
+        .from("runner_activity_source_revisions")
+        .select("id, source_id, raw_asset_kind, raw_state, raw_storage_bucket, raw_storage_path")
+        .eq("user_id", userId)
+        .order("id", { ascending: true })
+        .range(from, to),
+    ),
+  ]);
   const evidenceRows = await loadPaged<EvidenceRow>(async (from, to) =>
     supabase
       .from("runner_activity_evidence_revisions")
@@ -346,6 +526,10 @@ async function loadGate4Activities(
     values: plannedWorkoutIds,
   });
   const logByWorkout = new Map(logs.map((log) => [log.planned_workout_id, log]));
+  const sourceById = new Map(activitySources.map((source) => [source.id, source]));
+  const sourceRevisionById = new Map(
+    sourceRevisions.map((sourceRevision) => [sourceRevision.id, sourceRevision]),
+  );
 
   return activities.map((activity) => {
     const revision = activity.current_revision;
@@ -364,9 +548,18 @@ async function loadGate4Activities(
       activityRevisionId: revision.id,
       sourceRevisionId: revision.source_revision_id,
       localDate: activity.local_date,
+      startedAt: activity.started_at,
+      historicalTimezone: activity.historical_timezone,
       timerDurationMin: activity.timer_duration_min,
       elapsedDurationMin: activity.elapsed_duration_min,
       distanceKm: activity.distance_km,
+      elevationGainM: observedElevationGain(revision.normalized_summary),
+      fitEvidence: fitEvidenceForActivity({
+        activityId: activity.id,
+        sourceRevisionId: revision.source_revision_id,
+        sourceRevisionById,
+        sourceById,
+      }),
       recordContext: readRunnerActivityRunningContext(revision.normalized_summary),
       rpeLinkState: !plannedWorkoutId ? "missing" : matchCount === 1 ? "exact" : "ambiguous",
       rpeInputPresent: plannedWorkoutId
@@ -379,6 +572,50 @@ async function loadGate4Activities(
       },
     };
   });
+}
+
+function fitEvidenceForActivity(input: {
+  activityId: string;
+  sourceRevisionId: string;
+  sourceRevisionById: Map<string, ActivitySourceRevisionRow>;
+  sourceById: Map<string, ActivitySourceRow>;
+}): RunnerActivityFitEvidenceInput {
+  // The canonical Garmin adapter creates the normalized activity revision only after a successful
+  // parse, in the same transaction that installs this source revision as current.
+  const sourceRevision = input.sourceRevisionById.get(input.sourceRevisionId);
+  const source = sourceRevision ? input.sourceById.get(sourceRevision.source_id) : null;
+  if (
+    !sourceRevision ||
+    !source ||
+    source.activity_id !== input.activityId ||
+    source.source_kind !== "manual_garmin_fit" ||
+    (sourceRevision.raw_asset_kind !== "garmin_fit" &&
+      sourceRevision.raw_asset_kind !== "garmin_zip")
+  ) {
+    return { state: "unavailable", reason: "fit_source_graph_invalid" };
+  }
+  if (source.current_revision_id !== sourceRevision.id) {
+    return { state: "unavailable", reason: "fit_source_revision_not_current" };
+  }
+  if (sourceRevision.raw_state === "removal_pending") {
+    return { state: "updating", reason: "fit_source_removal_pending" };
+  }
+  if (sourceRevision.raw_state === "removed") {
+    return { state: "unavailable", reason: "fit_source_removed" };
+  }
+  if (
+    sourceRevision.raw_state !== "available" ||
+    !sourceRevision.raw_storage_bucket ||
+    !sourceRevision.raw_storage_path
+  ) {
+    return { state: "unavailable", reason: "fit_source_graph_invalid" };
+  }
+  return { state: "eligible", reason: null };
+}
+
+function observedElevationGain(value: Json) {
+  const elevation = objectValue(value).total_ascent_m;
+  return typeof elevation === "number" && Number.isFinite(elevation) ? elevation : null;
 }
 
 async function persistObservations(input: {
@@ -506,7 +743,28 @@ function evidenceInputFromRow(row: EvidenceRow): Gate4EvidenceInput {
 }
 
 function parseSnapshot(value: Json, historical: boolean): RunnerActivityAdvancedMetricsCurrent {
-  return advancedSnapshotSchema.parse({ ...objectValue(value), historical });
+  const parsed = advancedSnapshotSchema.parse({ ...objectValue(value), historical });
+  let fitProgress: RunnerActivityFitProgressReadModel;
+  if (parsed.formulaSetVersion === RUNNER_ACTIVITY_GATE4_FORMULA_SET_VERSION) {
+    if (
+      !parsed.fitProgress ||
+      parsed.formulaVersions.fitProgress !== RUNNER_ACTIVITY_GATE4_FORMULA_VERSIONS.fitProgress ||
+      parsed.fitProgress.personalBests.formulaVersion !==
+        RUNNER_ACTIVITY_GATE4_FORMULA_VERSIONS.fitProgress ||
+      parsed.fitProgress.chart.advertisedPeriods[0].series.some(
+        (series) => series.formulaVersion !== RUNNER_ACTIVITY_GATE4_FORMULA_VERSIONS.fitProgress,
+      )
+    ) {
+      throw new Error("Current runner activity metric snapshot is missing FIT Progress truth.");
+    }
+    fitProgress = parsed.fitProgress as RunnerActivityFitProgressReadModel;
+  } else {
+    fitProgress = {
+      status: "unavailable",
+      reason: "historical_formula_version_without_fit_progress",
+    };
+  }
+  return { ...parsed, fitProgress } as RunnerActivityAdvancedMetricsCurrent;
 }
 
 function objectValue(value: Json): Record<string, unknown> {

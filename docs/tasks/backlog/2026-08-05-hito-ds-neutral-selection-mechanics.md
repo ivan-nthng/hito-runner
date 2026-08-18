@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** DESIGN SYSTEM
+- **Epic:** platform-and-operations
 - **Parent:** [Hito Stack Complexity Reduction Program](2026-08-04-hito-stack-complexity-reduction-program.md)
 - **Outcome:** hito-selection-mechanics.ts is the sole neutral owner. Tabs and Radio retain separate.
 - **Sources:** Terminal decision/evidence record only; detailed transcript remains in Git history.

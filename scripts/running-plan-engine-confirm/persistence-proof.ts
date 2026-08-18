@@ -25,6 +25,7 @@ import {
   listSavedPlanLibraryForUser,
   logicallyRemoveSavedPlanRecordForUser,
   readSavedPlanPayload,
+  retainImportedPlanCandidateForUser,
   retainReviewedPlanCandidateForUser,
 } from "../../src/lib/active-plan-persistence";
 import {
@@ -54,7 +55,6 @@ import {
   renderPlanExportMarkdown,
 } from "../../src/lib/plan-export";
 import { createAdminSupabaseClient } from "../../src/lib/supabase/server";
-import { getPersistedSnapshot } from "../../src/lib/training-api";
 import { addDaysIso, startOfWeekIso, weekdayLong } from "../../src/lib/training";
 import type { Database, Json } from "../../src/lib/supabase/database";
 import {
@@ -184,7 +184,7 @@ export async function validatePersistenceContract(
         userId,
         savedPlanId: result.savedPlanId,
       });
-      const persisted = await loadPersistedPlanForUser(supabase, userId);
+      const persisted = await loadPersistedPlanForUser(supabase, userId, result.savedPlanId);
       assert.equal(persisted.plan.source_kind, draft.sourceKind);
       assert.equal(
         expectedMaterialization.savedPlan.planned_workouts.length,
@@ -230,14 +230,6 @@ export async function validatePersistenceContract(
       validateNoClientRowsTrusted(persisted.workouts);
 
       if (draft.canonicalRowCount >= 210) {
-        const snapshot = await getPersistedSnapshot(userId);
-        assert.equal(snapshot.workouts.length, persisted.workouts.length);
-        assert.equal(snapshot.planMeta?.id, persisted.plan.id);
-        assert.deepEqual(
-          snapshot.workouts.map((workout) => workout.id),
-          persisted.workouts.map((workout) => workout.id),
-          "Calendar/detail readback must preserve every persisted workout in order.",
-        );
         const exportPayload = buildActivePlanExportPayload({
           planCycle: persisted.plan,
           workouts: persisted.workouts,
@@ -759,21 +751,6 @@ async function validateSavedPlanLibraryPersistence(input: {
       ),
       true,
     );
-    const materializedPlanPreferences = await input.supabase
-      .from("plan_cycles")
-      .select("plan_preferences")
-      .eq("id", emptyFutureApply.materializedPlanId)
-      .single();
-    assert.equal(materializedPlanPreferences.error, null);
-    assert.deepEqual(
-      (materializedPlanPreferences.data.plan_preferences as Record<string, Json>).blocked_days,
-      ["Monday", "Wednesday"],
-    );
-    assert.equal(
-      (materializedPlanPreferences.data.plan_preferences as Record<string, Json>)
-        .preferred_long_run_day,
-      "Sunday",
-    );
     const directAuthenticatedConversion = await ownerClient
       .from("plan_cycles")
       .update({
@@ -1256,7 +1233,11 @@ async function validateQaFixtureRuntimePersistence(input: {
       userId: disposableUser.userId,
       savedPlanId: confirmed.savedPlanId,
     });
-    const persisted = await loadPersistedPlanForUser(input.supabase, disposableUser.userId);
+    const persisted = await loadPersistedPlanForUser(
+      input.supabase,
+      disposableUser.userId,
+      confirmed.savedPlanId,
+    );
     assert.equal(
       expectedMaterialization.savedPlan.planned_workouts.length,
       reviewed.draft.canonicalRowCount,
@@ -1734,6 +1715,7 @@ async function validatePersonalHeartRateProfilePersistence(input: {
     const persistedBeforeSettingsChange = await loadPersistedPlanForUser(
       input.supabase,
       owner.userId,
+      confirmed.savedPlanId,
     );
     const originalPersistedSteps = persistedBeforeSettingsChange.workouts.map(
       (workout) => workout.steps,
@@ -1809,6 +1791,7 @@ async function validatePersonalHeartRateProfilePersistence(input: {
     const persistedAfterSettingsChange = await loadPersistedPlanForUser(
       input.supabase,
       owner.userId,
+      confirmed.savedPlanId,
     );
     assert.deepEqual(
       persistedAfterSettingsChange.workouts.map((workout) => workout.steps),
@@ -2185,7 +2168,6 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
     poolRole: "provider-engine",
     creationErrorMessage: "Disposable atomic plan-creation user creation failed.",
   });
-  const planId = crypto.randomUUID();
   const firstWorkoutId = crypto.randomUUID();
   const profilePayload = {
     goal_type: "distance_build",
@@ -2194,28 +2176,6 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
     baseline_long_run_km: 6,
     baseline_notes: null,
   };
-  const buildPlanPayload = (id: string, title: string, sourceTemplate: string) => ({
-    id,
-    title,
-    goal_summary: "10K",
-    source_template: sourceTemplate,
-    schema_version: "training-plan-v2",
-    source_kind: "ai_authored_plan_first_v1",
-    start_date: "2026-07-20",
-    end_date: "2026-07-27",
-    target_date: null,
-    goal_metadata: {},
-    plan_preferences: {},
-  });
-  const buildExpectedHistory = (workoutIds: string[] = []) => ({
-    workout_ids: workoutIds,
-    log_ids: [],
-    asset_ids: [],
-    metric_ids: [],
-    comparison_ids: [],
-    insight_ids: [],
-  });
-
   try {
     const baseline = buildFirstTimeRunnerBaselineReadback({
       age: 36,
@@ -2246,24 +2206,27 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
       .single();
     assert.equal(baselineBefore.error, null);
 
-    const historicalPlanId = crypto.randomUUID();
+    const sourcePlan = await retainImportedPlanCandidateForUser({
+      userId: disposableUser.userId,
+      canonicalPlan: buildAtomicSourcePlan(),
+      reviewChecksum: "a".repeat(64),
+    });
+    const sourcePlanBefore = structuredClone(sourcePlan);
+
     const historicalWorkoutId = crypto.randomUUID();
     await assert.rejects(
       applyAtomicReviewedPlanPersistence({
         userId: disposableUser.userId,
         profile: profilePayload,
-        plan: buildPlanPayload(
-          historicalPlanId,
-          "Historical row rejection proof",
-          "historical_row_rejection",
-        ),
+        sourcePlanId: sourcePlan.id,
         workouts: [
           {
             ...buildAtomicCreationWorkout(
               historicalWorkoutId,
-              historicalPlanId,
+              sourcePlan.id,
               disposableUser.userId,
               "easy",
+              "atomic-source-easy",
             ),
             workout_date: "2026-07-19",
             weekday: "Sunday",
@@ -2279,9 +2242,15 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
       applyAtomicReviewedPlanPersistence({
         userId: disposableUser.userId,
         profile: profilePayload,
-        plan: buildPlanPayload(planId, "Stale profile revision proof", "stale_profile_revision"),
+        sourcePlanId: sourcePlan.id,
         workouts: [
-          buildAtomicCreationWorkout(firstWorkoutId, planId, disposableUser.userId, "easy"),
+          buildAtomicCreationWorkout(
+            firstWorkoutId,
+            sourcePlan.id,
+            disposableUser.userId,
+            "easy",
+            "atomic-source-easy",
+          ),
         ] as unknown as Json,
         currentDate: "2026-07-20",
         expectedProfileRevision: savedBaseline.profileRevision + 1,
@@ -2293,14 +2262,21 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
       applyAtomicReviewedPlanPersistence({
         userId: disposableUser.userId,
         profile: profilePayload,
-        plan: buildPlanPayload(planId, "Atomic creation failure proof", "atomic_creation_failure"),
+        sourcePlanId: sourcePlan.id,
         workouts: [
-          buildAtomicCreationWorkout(firstWorkoutId, planId, disposableUser.userId, "easy"),
+          buildAtomicCreationWorkout(
+            firstWorkoutId,
+            sourcePlan.id,
+            disposableUser.userId,
+            "easy",
+            "atomic-source-easy",
+          ),
           buildAtomicCreationWorkout(
             crypto.randomUUID(),
-            planId,
+            sourcePlan.id,
             disposableUser.userId,
             "invalid_workout_type",
+            "atomic-source-quality",
           ),
         ] as unknown as Json,
         currentDate: "2026-07-20",
@@ -2326,7 +2302,7 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
     assert.equal(plans.error, null);
     assert.equal(workouts.error, null);
     assert.equal(profile.count, 1, "Failed plan creation must preserve the saved baseline.");
-    assert.equal(plans.count, 0, "Failed plan creation must roll back the plan cycle.");
+    assert.equal(plans.count, 1, "Failed materialization must preserve only its immutable source.");
     assert.equal(workouts.count, 0, "Failed plan creation must roll back every workout row.");
     const baselineAfter = await supabase
       .from("runner_profiles")
@@ -2336,29 +2312,26 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
     assert.equal(baselineAfter.error, null);
     assert.deepEqual(baselineAfter.data, baselineBefore.data);
 
-    const materializedPlanId = crypto.randomUUID();
     const materializedWorkoutId = crypto.randomUUID();
     const created = await applyAtomicReviewedPlanPersistence({
       userId: disposableUser.userId,
       profile: profilePayload,
-      plan: buildPlanPayload(
-        materializedPlanId,
-        "Atomic materialization proof",
-        "atomic_materialization_proof",
-      ),
+      sourcePlanId: sourcePlan.id,
       workouts: [
         buildAtomicCreationWorkout(
           materializedWorkoutId,
-          materializedPlanId,
+          sourcePlan.id,
           disposableUser.userId,
           "easy",
+          "atomic-source-easy",
         ),
       ] as unknown as Json,
       currentDate: "2026-07-20",
       expectedProfileRevision: savedBaseline.profileRevision,
     });
-    assert.equal(created.planCycle.id, materializedPlanId);
+    assert.equal(created.planCycle.id, sourcePlan.id);
     assert.equal(created.planCycle.status, "archived");
+    assert.deepEqual(created.planCycle, sourcePlanBefore);
 
     const changedBaseline = await updateUserSettingsForUserId(disposableUser.userId, {
       firstName: null,
@@ -2372,22 +2345,18 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
     });
     assert.equal(changedBaseline.profileRevision, savedBaseline.profileRevision + 1);
 
-    const secondPlanId = crypto.randomUUID();
     await assert.rejects(
       applyAtomicReviewedPlanPersistence({
         userId: disposableUser.userId,
         profile: profilePayload,
-        plan: buildPlanPayload(
-          secondPlanId,
-          "Atomic stale baseline proof",
-          "atomic_stale_baseline_proof",
-        ),
+        sourcePlanId: sourcePlan.id,
         workouts: [
           buildAtomicCreationWorkout(
             crypto.randomUUID(),
-            secondPlanId,
+            sourcePlan.id,
             disposableUser.userId,
             "quality",
+            "atomic-source-quality",
           ),
         ] as unknown as Json,
         currentDate: "2026-07-20",
@@ -2411,10 +2380,14 @@ async function validateReviewedPlanPersistenceFailureAtomicity(
     assert.equal(plansAfterRace.error, null);
     assert.equal(workoutsAfterRace.error, null);
     assert.equal(profileAfterRace.error, null);
-    assert.deepEqual(plansAfterRace.data, [{ id: materializedPlanId, status: "archived" }]);
+    assert.deepEqual(plansAfterRace.data, [{ id: sourcePlan.id, status: "archived" }]);
     assert.deepEqual(workoutsAfterRace.data, [
-      { id: materializedWorkoutId, plan_cycle_id: materializedPlanId },
+      { id: materializedWorkoutId, plan_cycle_id: sourcePlan.id },
     ]);
+    assert.deepEqual(
+      await getSavedPlanRecordForUser(disposableUser.userId, sourcePlan.id),
+      sourcePlanBefore,
+    );
     assert.equal(profileAfterRace.data?.baseline_revision, changedBaseline.profileRevision);
   } finally {
     await cleanupDisposableUser(supabase, disposableUser);
@@ -2432,6 +2405,7 @@ function buildAtomicCreationWorkout(
   planId: string,
   userId: string,
   workoutType: string,
+  sourceWorkoutId: string,
 ) {
   return {
     id,
@@ -2442,7 +2416,8 @@ function buildAtomicCreationWorkout(
     week_number: 1,
     phase: "Base",
     workout_type: workoutType,
-    source_workout_id: `atomic-${id}`,
+    origin_kind: "file_import",
+    source_workout_id: sourceWorkoutId,
     source_workout_type: "Easy",
     workout_family: "easy",
     workout_identity: "easy_aerobic_run",
@@ -2459,6 +2434,76 @@ function buildAtomicCreationWorkout(
   };
 }
 
+function buildAtomicSourcePlan(): TrainingPlanV2 {
+  return {
+    schema_version: "training-plan-v2",
+    plan_name: "Atomic reviewed materialization source",
+    source_kind: "training_plan_v2_import",
+    generated_for: "Disposable local persistence proof",
+    goal: {
+      goal_type: "distance_build",
+      goal_label: "10K",
+    },
+    start_date: "2026-07-20",
+    preparation_horizon_weeks: 1,
+    planned_workouts: [
+      buildAtomicSourceWorkout("atomic-source-easy", "2026-07-20", "Monday", "easy"),
+      buildAtomicSourceWorkout("atomic-source-quality", "2026-07-21", "Tuesday", "quality"),
+    ],
+  };
+}
+
+function buildAtomicSourceWorkout(
+  workoutId: string,
+  date: string,
+  weekday: string,
+  workoutType: "easy" | "quality",
+): TrainingPlanV2["planned_workouts"][number] {
+  return {
+    workout_id: workoutId,
+    date,
+    weekday,
+    week_number: 1,
+    phase: "Base",
+    segments: [
+      {
+        segment_id: `${workoutId}-segment`,
+        segment_type: "main",
+        label: "Easy running",
+        sequence: 1,
+        guidance: "Run easily.",
+        prescription: { mode: "time", duration_min: 30 },
+        target: { cue: "Conversational effort." },
+      },
+    ],
+    workout_type: workoutType,
+    source_workout_type: workoutType === "easy" ? "Easy" : "Tempo",
+    workout_family: workoutType === "easy" ? "easy" : "tempo",
+    workout_identity: workoutType === "easy" ? "easy_aerobic_run" : "controlled_tempo_session",
+    calendar_icon_key: workoutType === "easy" ? "easy" : "tempo",
+    goal_context: {
+      goal_type: "distance_build",
+      goal_style: "atomic_persistence_proof",
+      terrain_focus: "standard",
+      target_date: null,
+      target_time: null,
+    },
+    metric_mode: {
+      guidance: "effort",
+      executable_mode: "structure_only_executable",
+      pace_targets_allowed: false,
+      hr_targets_allowed: false,
+      hr_target_source: "effort_only",
+      reason: "Atomic persistence proof uses effort-only guidance.",
+    },
+    title: workoutType === "easy" ? "Easy run" : "Quality run",
+    summary: "Atomic persistence proof workout.",
+    planned_rpe: workoutType === "easy" ? 3 : 6,
+    estimated_fatigue: workoutType === "easy" ? "low" : "moderate",
+    recovery_priority: "normal",
+  };
+}
+
 function distanceGoalSummary(draft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>) {
   const distance = draft.normalizedInputSummary.planGoalIntent.distance;
 
@@ -2471,18 +2516,18 @@ function distanceGoalSummary(draft: RunningPlanReviewedPreviewDraft<RunningPlanP
 async function loadPersistedPlanForUser(
   supabase: ReturnType<typeof createAdminSupabaseClient>,
   userId: string,
+  sourcePlanId: string,
 ) {
   const planResult = await supabase
     .from("plan_cycles")
     .select("*")
+    .eq("id", sourcePlanId)
     .eq("user_id", userId)
-    .is("saved_plan_payload", null)
-    .order("created_at", { ascending: false })
-    .limit(1)
+    .not("saved_plan_payload", "is", null)
     .single();
 
   if (planResult.error || !planResult.data) {
-    throw new Error(planResult.error?.message ?? "Materialized plan provenance was not found.");
+    throw new Error(planResult.error?.message ?? "Immutable source-plan provenance was not found.");
   }
 
   const workoutsResult = await supabase

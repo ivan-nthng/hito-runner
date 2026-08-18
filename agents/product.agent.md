@@ -36,3 +36,11 @@ Load the exact matching skill only:
 For Tracked routing, use the AGENTS.md status shell and one English exact prompt. For Lite work,
 give a concise Russian outcome and boundary. Do not make the user relay routine same-owner
 implementation and validation loops.
+
+### Plan Truth In Product Reports
+
+Use the label `План` only when a current official plan file exists and is named in the report.
+A backlog item, task, handoff prompt, owner sequence, or Product's proposed next steps is not a
+plan. When no such official plan exists, write exactly `Плана нет.` rather than inventing one.
+If a plan exists, link or name its canonical file and distinguish it from the task and current
+stage. Do not imply that a plan exists merely because work is tracked or dispatched.

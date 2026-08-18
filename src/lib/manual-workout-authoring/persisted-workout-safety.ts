@@ -5,7 +5,14 @@ import {
   type ManualWorkoutBlockInput,
 } from "@/lib/manual-workout-authoring/schema";
 import { stableManualWorkoutChecksum64Hex } from "@/lib/manual-workout-authoring/review-exactness";
-import { AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE } from "@/lib/workout-document";
+import { stableJsonEqual } from "@/lib/review-token-signing";
+import {
+  AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
+  workoutDocumentRepeatChildren,
+  type WorkoutDocument,
+  type WorkoutDocumentSection,
+  type WorkoutDocumentTarget,
+} from "@/lib/workout-document";
 
 type AiTargetPreservationResult =
   | { ok: true }
@@ -16,6 +23,74 @@ type AiTargetPreservationResult =
 
 export function persistedManualWorkoutHasUnsafeMetricTruth(workout: PersistedPlannedWorkoutRow) {
   return hasUnsafeMetricTruth(workout.metric_mode) || hasUnsafeMetricTruth(workout.steps);
+}
+
+export function workoutDocumentHasUnsafeMetricTruth(document: WorkoutDocument) {
+  return hasUnsafeMetricTruth(document.metricMode) || hasUnsafeMetricTruth(document.steps);
+}
+
+export function validateWorkoutDocumentTargetEdit(
+  source: WorkoutDocument,
+  candidate: WorkoutDocument,
+): AiTargetPreservationResult {
+  if (
+    workoutDocumentHasUnsafeMetricTruth(source) ||
+    workoutDocumentHasUnsafeMetricTruth(candidate)
+  ) {
+    return {
+      ok: false,
+      message: "The workout document contains target provenance that cannot be edited safely.",
+    };
+  }
+
+  const sourceTargets = collectWorkoutDocumentTargets(source.steps);
+  const candidateTargets = collectWorkoutDocumentTargets(candidate.steps);
+
+  for (const [path, sourceTarget] of sourceTargets) {
+    if (sourceTarget.target_source !== AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE) continue;
+
+    const candidateTarget = candidateTargets.get(path);
+    if (!candidateTarget) {
+      return {
+        ok: false,
+        message:
+          "AI-authored target guidance must remain unchanged or be replaced by runner-entered guidance.",
+      };
+    }
+
+    if (candidateTarget.target_source === AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE) {
+      if (!stableJsonEqual(candidateTarget, sourceTarget)) {
+        return {
+          ok: false,
+          message:
+            "AI-authored target guidance must remain unchanged or be replaced by runner-entered guidance.",
+        };
+      }
+      continue;
+    }
+
+    if (!isRunnerEnteredTarget(candidateTarget)) {
+      return {
+        ok: false,
+        message:
+          "AI-authored target guidance must remain unchanged or be replaced by runner-entered guidance.",
+      };
+    }
+  }
+
+  for (const [path, candidateTarget] of candidateTargets) {
+    if (
+      candidateTarget.target_source === AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE &&
+      sourceTargets.get(path)?.target_source !== AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE
+    ) {
+      return {
+        ok: false,
+        message: "A workout edit cannot fabricate AI-authored target provenance.",
+      };
+    }
+  }
+
+  return { ok: true };
 }
 
 export function validatePreservedAiAuthoredTargetTruth(
@@ -136,4 +211,30 @@ function collectAiAuthoredTargets(
   }
 
   return targets;
+}
+
+function collectWorkoutDocumentTargets(
+  sections: readonly WorkoutDocumentSection[],
+  prefix = "steps",
+): Map<string, WorkoutDocumentTarget> {
+  const targets = new Map<string, WorkoutDocumentTarget>();
+
+  sections.forEach((section, index) => {
+    const sectionPath = `${prefix}.${index}`;
+    if (section.target) {
+      targets.set(`${sectionPath}.target`, section.target);
+    }
+
+    workoutDocumentRepeatChildren(section).forEach((child, childIndex) => {
+      if (child.target) {
+        targets.set(`${sectionPath}.children.${childIndex}.target`, child.target);
+      }
+    });
+  });
+
+  return targets;
+}
+
+function isRunnerEnteredTarget(target: WorkoutDocumentTarget) {
+  return target.target_source === "user_entered" || target.target_source === "runner_entered";
 }

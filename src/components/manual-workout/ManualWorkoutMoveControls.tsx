@@ -31,7 +31,7 @@ const MOVE_UNAVAILABLE_MESSAGE =
   "Hito could not move this workout yet. Try again from the calendar.";
 
 export type ManualWorkoutMoveRequest = {
-  activePlanId: string;
+  provenancePlanId: string | null;
   requestId: string;
   sourceWorkoutDate: string;
   sourceWorkoutId: string;
@@ -48,6 +48,7 @@ export function ManualWorkoutMoveController({
   onMoved,
   onOptimisticMoveRejected,
   onReplacementConfirming,
+  onReplacementMoveSucceeded,
   onRequestHandled,
   request,
 }: {
@@ -56,6 +57,9 @@ export function ManualWorkoutMoveController({
   onRequestHandled: () => void;
   onOptimisticMoveRejected: () => void;
   onReplacementConfirming: (review: ManualWorkoutMoveReady) => void;
+  onReplacementMoveSucceeded: (
+    result: Extract<ManualWorkoutMoveConfirmResult, { ok: true }>,
+  ) => void;
   onMoved: () => void | Promise<void>;
 }) {
   const moveManualWorkoutWithinActivePlanFn = useServerFn(moveManualWorkoutWithinActivePlan);
@@ -92,7 +96,7 @@ export function ManualWorkoutMoveController({
       try {
         const response = await moveManualWorkoutWithinActivePlanFn({
           data: {
-            activePlanId: nextRequest.activePlanId,
+            ...(nextRequest.provenancePlanId ? { activePlanId: nextRequest.provenancePlanId } : {}),
             sourceWorkoutId: nextRequest.sourceWorkoutId,
             sourceWorkoutDate: nextRequest.sourceWorkoutDate,
             targetDate: nextRequest.targetDate,
@@ -151,7 +155,7 @@ export function ManualWorkoutMoveController({
       try {
         const response = await reviewManualWorkoutMoveFn({
           data: {
-            activePlanId: nextRequest.activePlanId,
+            ...(nextRequest.provenancePlanId ? { activePlanId: nextRequest.provenancePlanId } : {}),
             sourceWorkoutId: nextRequest.sourceWorkoutId,
             sourceWorkoutDate: nextRequest.sourceWorkoutDate,
             targetDate: nextRequest.targetDate,
@@ -215,7 +219,7 @@ export function ManualWorkoutMoveController({
     try {
       const response = await confirmManualWorkoutMoveFn({
         data: {
-          activePlanId: reviewResult.activePlanId,
+          ...(reviewResult.activePlanId ? { activePlanId: reviewResult.activePlanId } : {}),
           sourceWorkoutId: reviewResult.sourceWorkoutId,
           sourceWorkoutDate: reviewResult.sourceWorkoutDate,
           targetDate: reviewResult.targetDate,
@@ -243,6 +247,7 @@ export function ManualWorkoutMoveController({
       confirmInFlightRef.current = false;
       setStatus("idle");
       setReviewResult(null);
+      onReplacementMoveSucceeded(result);
       await onMoved();
       hitoToast.success({
         id: MANUAL_MOVE_TOAST_ID,
@@ -320,7 +325,7 @@ function isManualWorkoutDirectMoveResult(value: unknown): value is ManualWorkout
   return (
     value.status === "moved" &&
     value.persisted === true &&
-    typeof value.activePlanId === "string" &&
+    (value.activePlanId === null || typeof value.activePlanId === "string") &&
     typeof value.plannedWorkoutId === "string" &&
     typeof value.sourceWorkoutDate === "string" &&
     typeof value.targetDate === "string" &&
@@ -328,7 +333,8 @@ function isManualWorkoutDirectMoveResult(value: unknown): value is ManualWorkout
     isManualWorkoutMoveTargetDayKind(value.targetDayKind) &&
     typeof value.title === "string" &&
     typeof value.templateKey === "string" &&
-    value.mutationMode === "direct_manual_edit"
+    value.mutationMode === "direct_manual_edit" &&
+    (value.undoExpiresAt === null || typeof value.undoExpiresAt === "string")
   );
 }
 
@@ -339,7 +345,7 @@ function isManualWorkoutMoveReviewResult(value: unknown): value is ManualWorkout
   return (
     value.status === "review_ready" &&
     value.persisted === false &&
-    typeof value.activePlanId === "string" &&
+    (value.activePlanId === null || typeof value.activePlanId === "string") &&
     typeof value.sourceWorkoutId === "string" &&
     typeof value.sourceWorkoutDate === "string" &&
     typeof value.targetDate === "string" &&
@@ -357,14 +363,15 @@ function isManualWorkoutMoveConfirmResult(value: unknown): value is ManualWorkou
   return (
     value.status === "moved" &&
     value.persisted === true &&
-    typeof value.activePlanId === "string" &&
+    (value.activePlanId === null || typeof value.activePlanId === "string") &&
     typeof value.plannedWorkoutId === "string" &&
     typeof value.sourceWorkoutDate === "string" &&
     typeof value.targetDate === "string" &&
     typeof value.targetWeekday === "string" &&
     isManualWorkoutMoveTargetDayKind(value.targetDayKind) &&
     typeof value.title === "string" &&
-    typeof value.templateKey === "string"
+    typeof value.templateKey === "string" &&
+    (value.undoExpiresAt === null || typeof value.undoExpiresAt === "string")
   );
 }
 
@@ -400,11 +407,34 @@ function ManualWorkoutMoveReplacementDialog({
   status: ManualWorkoutMoveStatus;
 }) {
   const busy = status !== "idle";
+  const returnFocusDateRef = useRef<string | null>(null);
+
+  if (review?.sourceWorkoutDate) {
+    returnFocusDateRef.current = review.sourceWorkoutDate;
+  }
 
   return (
     <Dialog open={Boolean(review)} onOpenChange={onOpenChange}>
       <DialogContent
         className="hito-dialog-stable hito-window hito-window-content-fit hito-info-window"
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+
+          const sourceWorkoutDate = returnFocusDateRef.current;
+          if (!sourceWorkoutDate) return;
+
+          window.requestAnimationFrame(() => {
+            const sourceLink = Array.from(
+              document.querySelectorAll<HTMLAnchorElement>(
+                `a[href="/workout/${sourceWorkoutDate}"]`,
+              ),
+            ).find((link) => link.getClientRects().length > 0);
+
+            sourceLink?.parentElement
+              ?.querySelector<HTMLButtonElement>('button[aria-label^="More activity actions for "]')
+              ?.focus({ preventScroll: true });
+          });
+        }}
         overlayClassName="hito-dialog-overlay-stable hito-info-window-overlay"
       >
         <DialogHeader className="hito-info-window-header">

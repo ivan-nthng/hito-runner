@@ -1,9 +1,15 @@
 import type { HitoDsOwnershipEvidence } from "@/components/hito-ds/reference-metadata";
 import type {
+  InlineChangeBorderIntentSelection,
   InlineChangeChromeRemovalSelection,
   InlineChangeFixScope,
   InlineChangeTargetInput,
   InlineChangeTargetPayload,
+} from "@/components/devtools/local-inline-change-target-utils";
+import {
+  INLINE_CHANGE_BORDER_SIDES,
+  formatInlineChangeBorderIntentSelection,
+  normalizeInlineChangeBorderIntentSelection,
 } from "@/components/devtools/local-inline-change-target-utils";
 
 export const LOCAL_UI_INSPECTOR_BATCH_LIMIT = 8;
@@ -21,6 +27,7 @@ export type LocalUiComponentAction =
 
 export type LocalUiInspectorItemDraft = {
   actionId: string | null;
+  borderIntentSelection: InlineChangeBorderIntentSelection | null;
   chromeRemovalSelection: InlineChangeChromeRemovalSelection | null;
   comment: string;
   componentAction: LocalUiComponentAction;
@@ -46,6 +53,7 @@ export function createLocalUiInspectorItemDraft(
 ): LocalUiInspectorItemDraft {
   return {
     actionId,
+    borderIntentSelection: null,
     chromeRemovalSelection: null,
     comment: "",
     componentAction: null,
@@ -80,12 +88,32 @@ export function createLocalUiInspectorBatchItem({
 }): LocalUiInspectorBatchItem {
   return {
     capturedAt: new Date().toISOString(),
-    draft,
+    draft: normalizeLocalUiInspectorItemDraft(draft),
     id: id ?? createLocalItemId(),
     ownership,
     payload,
     routeKey,
     target,
+  };
+}
+
+export function normalizeLocalUiInspectorItemDraft(
+  draft: LocalUiInspectorItemDraft,
+): LocalUiInspectorItemDraft {
+  const legacyChromeRemoval = draft.chromeRemovalSelection as unknown as { kind?: string } | null;
+  const historicBorderIntent: InlineChangeBorderIntentSelection | null =
+    legacyChromeRemoval?.kind === "border"
+      ? { sides: [...INLINE_CHANGE_BORDER_SIDES], treatment: "none" }
+      : null;
+
+  return {
+    ...draft,
+    actionId: historicBorderIntent && draft.actionId === "remove_border" ? null : draft.actionId,
+    borderIntentSelection:
+      normalizeInlineChangeBorderIntentSelection(draft.borderIntentSelection) ??
+      historicBorderIntent,
+    chromeRemovalSelection:
+      legacyChromeRemoval?.kind === "card_chrome" ? draft.chromeRemovalSelection : null,
   };
 }
 
@@ -137,6 +165,11 @@ export function getLocalUiInspectorItemSummary(item: LocalUiInspectorBatchItem) 
     )
       ? "Remove selected color"
       : "Update selected color";
+  }
+  if (item.payload.target.borderIntent?.requestedChange) {
+    return formatInlineChangeBorderIntentSelection(
+      item.payload.target.borderIntent.requestedChange,
+    );
   }
   if (item.payload.target.tokenControls.length > 0) return "Update selected properties";
   if (item.payload.target.typographyRoleSelection?.desiredRole) {

@@ -2,7 +2,7 @@
 
 ## Status
 
-backlog
+closed
 
 ## Type
 
@@ -11,6 +11,10 @@ context_capture
 ## Priority
 
 low
+
+## Epic
+
+runner-core-readiness
 
 ## Next Recommended Role
 
@@ -22,7 +26,14 @@ Validate authenticated saved-mode workout readback browser smoke for executable 
 
 ## Stage
 
-QA hygiene / authenticated workout readback browser smoke
+Closed — superseded by the accepted 2026-08-17 Runner Core baseline.
+
+## Product Lifecycle Reconciliation — 2026-08-18
+
+This optional saved-mode smoke no longer represents the current Runner Core model or an independent
+acceptance gap. The accepted baseline covered authenticated Calendar/workout readback, FIT and
+scheduled-completion truth, History, Progress, responsive containment, and durable cleanup. Retain
+this item as historical context; do not execute its stale prompt.
 
 ## Exact Handoff Prompt
 

@@ -2,9 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
   getCalendarWorkoutsWithLogsForUser,
-  getMaterializedPlanProvenancesForUser,
   retainImportedPlanCandidateForUser,
-  type PersistedPlanCycleRow,
 } from "@/lib/active-plan-persistence";
 import {
   CalendarPersistenceRejection,
@@ -12,7 +10,7 @@ import {
 } from "@/lib/active-plan-lifecycle-persistence";
 import { importedPlanSchema, validateImportedPlanJson } from "@/lib/imported-plan";
 import {
-  buildActivePlanExportPayload,
+  buildCalendarWorkoutExportPayload,
   buildPlanExportDocument,
   type PlanExportDocument,
 } from "@/lib/plan-export";
@@ -128,20 +126,7 @@ export async function exportFutureCalendarWorkoutsForUser(
     throw new CalendarFutureWorkoutsExportUnavailableError();
   }
 
-  const provenanceById = await getMaterializedPlanProvenancesForUser(
-    userId,
-    futureWorkouts.map((workout) => workout.plan_cycle_id),
-  );
-  const provenance = provenanceById.get(futureWorkouts[0]!.plan_cycle_id);
-
-  if (!provenance) {
-    throw new Error("The future Calendar provenance is unavailable for export.");
-  }
-
-  const exportPayload = buildActivePlanExportPayload({
-    planCycle: buildFutureCalendarExportProvenance(provenance, futureWorkouts),
-    workouts: futureWorkouts,
-  });
+  const exportPayload = buildCalendarWorkoutExportPayload({ workouts: futureWorkouts });
   const document = buildPlanExportDocument(exportPayload, "json");
 
   importedPlanSchema.parse(JSON.parse(document.body));
@@ -206,28 +191,6 @@ export async function clearCalendarFutureWorkoutsForUser(
       "Upcoming Calendar workouts could not be changed. Nothing was removed.",
     );
   }
-}
-
-function buildFutureCalendarExportProvenance(
-  source: PersistedPlanCycleRow,
-  workouts: Awaited<ReturnType<typeof getCalendarWorkoutsWithLogsForUser>>["workouts"],
-): PersistedPlanCycleRow {
-  const firstDate = workouts[0]!.workout_date;
-  const lastDate = workouts.at(-1)!.workout_date;
-
-  return {
-    ...source,
-    title: "Future Calendar workouts",
-    goal_summary: "Current runner Calendar export",
-    source_template: "calendar-future-workouts",
-    schema_version: "training-plan-v2",
-    source_kind: "hito_calendar_future_export",
-    start_date: firstDate,
-    end_date: lastDate,
-    target_date: null,
-    goal_metadata: null,
-    plan_preferences: null,
-  };
 }
 
 function clearFailure(reason: CalendarFutureMutationFailureReason, message: string) {

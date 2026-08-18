@@ -10,44 +10,34 @@ import {
   reviewManualWorkoutPersistedEditDraft,
 } from "@/lib/manual-workout-authoring";
 import type {
-  ManualWorkoutDraftInput,
   ManualWorkoutPersistedEditReconstructResult,
   ManualWorkoutPersistedEditReviewResult,
-  ManualWorkoutTargetTruthMode,
 } from "@/lib/manual-workout-authoring";
-import type { ManualWorkoutTemplateKey } from "@/lib/manual-workout-authoring/schema";
-import {
-  MANUAL_WORKOUT_TEMPLATES,
-  cloneManualWorkoutEntries,
-  formatReadableDate,
-  getDefaultManualWorkoutTemplate,
-  templateIconKind,
-  templateIconTone,
-} from "@/components/manual-workout/manual-workout-authoring-utils";
+import { formatReadableDate } from "@/components/manual-workout/manual-workout-authoring-utils";
 import { ManualWorkoutConstructorEditor } from "@/components/manual-workout/ManualWorkoutConstructorEditor";
 import { ManualWorkoutEditorDialogHeader } from "@/components/manual-workout/ManualWorkoutEditorDialogHeader";
 import { focusManualWorkoutDialogCloseOnOpen } from "@/components/manual-workout/manual-workout-dialog-focus";
+import { workoutFamilyColorVar } from "@/lib/workout-color-tokens";
+import { workoutGlyphFromCalendarIconKey } from "@/lib/workout-glyph";
+import type { WorkoutDocument, WorkoutDocumentEditProjection } from "@/lib/workout-document";
 
 const MANUAL_PERSISTED_EDIT_TOAST_ID = "manual-workout-persisted-edit";
 
 type PersistedEditStatus = "idle" | "loading" | "reviewing" | "saving";
 
-type EditableDraftState = {
-  baseDraftInput: ManualWorkoutDraftInput;
-  entries: ManualWorkoutDraftInput["entries"];
-  notes: string;
-  targetTruthMode: ManualWorkoutTargetTruthMode;
-  title: string;
+type EditableDocumentState = {
+  editProjection: WorkoutDocumentEditProjection;
+  sourceDocument: WorkoutDocument;
 };
 
 type PersistedEditSourcePayload = {
-  activePlanId?: string;
+  provenancePlanId?: string;
   plannedWorkoutId: string;
   workoutDate: string;
 };
 
 export function ManualWorkoutPersistedEditDialog({
-  activePlanId,
+  provenancePlanId,
   onEdited,
   onOpenChange,
   open,
@@ -56,7 +46,7 @@ export function ManualWorkoutPersistedEditDialog({
   title,
   workoutDate,
 }: {
-  activePlanId: string | null | undefined;
+  provenancePlanId: string | null | undefined;
   onEdited: () => void | Promise<void>;
   onOpenChange: (open: boolean) => void;
   open: boolean;
@@ -78,7 +68,7 @@ export function ManualWorkoutPersistedEditDialog({
     sourceKey: string;
   } | null>(null);
   const lastPrepareSignalRef = useRef<number | null>(null);
-  const [draftState, setDraftState] = useState<EditableDraftState | null>(null);
+  const [draftState, setDraftState] = useState<EditableDocumentState | null>(null);
   const [loadedSourceKey, setLoadedSourceKey] = useState<string | null>(null);
   const [status, setStatus] = useState<PersistedEditStatus>("idle");
   const [message, setMessage] = useState<string | null>(null);
@@ -86,12 +76,17 @@ export function ManualWorkoutPersistedEditDialog({
     null,
   );
 
-  const sourceKey = buildPersistedEditSourceKey({ activePlanId, plannedWorkoutId, workoutDate });
+  const sourceKey = buildPersistedEditSourceKey({
+    provenancePlanId,
+    plannedWorkoutId,
+    workoutDate,
+  });
   const activeDraftState = loadedSourceKey === sourceKey ? draftState : null;
   const isBusy = status !== "idle";
   const readyReview = reviewResult?.ok ? reviewResult : null;
   const blockedMessage = reviewResult && !reviewResult.ok ? reviewResult.message : message;
   const shouldRenderDialog = open && (Boolean(activeDraftState) || Boolean(blockedMessage));
+  const editorDocument = readyReview?.candidateDocument ?? buildEditableDocument(activeDraftState);
 
   const applyPersistedEditReconstructResult = useCallback(
     (result: ManualWorkoutPersistedEditReconstructResult | null | undefined) => {
@@ -109,14 +104,12 @@ export function ManualWorkoutPersistedEditDialog({
       }
 
       setDraftState({
-        baseDraftInput: result.draftInput,
-        entries: cloneManualWorkoutEntries(result.draftInput.entries),
-        notes: result.draftInput.notes ?? "",
-        targetTruthMode: result.draftInput.targetTruthMode,
-        title: result.draftInput.title,
+        editProjection: result.editProjection,
+        sourceDocument: result.document,
       });
       setLoadedSourceKey(sourceKey);
       setStatus("idle");
+      setMessage(null);
     },
     [sourceKey],
   );
@@ -133,7 +126,11 @@ export function ManualWorkoutPersistedEditDialog({
     }
 
     const promise = reconstructEditDraftFn({
-      data: buildPersistedEditSourcePayload({ activePlanId, plannedWorkoutId, workoutDate }),
+      data: buildPersistedEditSourcePayload({
+        provenancePlanId,
+        plannedWorkoutId,
+        workoutDate,
+      }),
     }).then((result) => {
       reconstructedDraftCacheRef.current = { result, sourceKey };
       if (reconstructRequestRef.current?.sourceKey === sourceKey) {
@@ -144,7 +141,7 @@ export function ManualWorkoutPersistedEditDialog({
 
     reconstructRequestRef.current = { promise, sourceKey };
     return promise;
-  }, [activePlanId, plannedWorkoutId, reconstructEditDraftFn, sourceKey, workoutDate]);
+  }, [plannedWorkoutId, provenancePlanId, reconstructEditDraftFn, sourceKey, workoutDate]);
 
   useEffect(() => {
     if (!prepareSignal || lastPrepareSignalRef.current === prepareSignal) return;
@@ -198,30 +195,31 @@ export function ManualWorkoutPersistedEditDialog({
     };
   }, [applyPersistedEditReconstructResult, loadPersistedEditDraft, open, sourceKey]);
 
-  const updateDraftState = (next: Partial<Omit<EditableDraftState, "baseDraftInput">>) => {
-    setDraftState((current) => (current ? { ...current, ...next } : current));
+  const updateEditProjection = (
+    next: Partial<Pick<WorkoutDocumentEditProjection, "notes" | "title">>,
+  ) => {
+    setDraftState((current) =>
+      current ? { ...current, editProjection: { ...current.editProjection, ...next } } : current,
+    );
     setReviewResult(null);
     setMessage(null);
   };
 
-  const buildEditedDraftInput = () => {
+  const buildEditedProjection = () => {
     if (!activeDraftState) return null;
 
     return {
-      ...activeDraftState.baseDraftInput,
-      entries: cloneManualWorkoutEntries(activeDraftState.entries),
-      notes: activeDraftState.notes.trim() || null,
-      targetTruthMode: activeDraftState.targetTruthMode,
-      title: activeDraftState.title.trim() || activeDraftState.baseDraftInput.title,
-      workoutDate: activeDraftState.baseDraftInput.workoutDate,
-    } satisfies ManualWorkoutDraftInput;
+      ...activeDraftState.editProjection,
+      notes: activeDraftState.editProjection.notes?.trim() || null,
+      title: activeDraftState.editProjection.title.trim() || activeDraftState.sourceDocument.title,
+    } satisfies WorkoutDocumentEditProjection;
   };
 
   const submitReview = async () => {
     if (!activeDraftState || isBusy) return;
 
-    const draftInput = buildEditedDraftInput();
-    if (!draftInput) return;
+    const editProjection = buildEditedProjection();
+    if (!editProjection) return;
 
     setStatus("reviewing");
     setMessage(null);
@@ -235,8 +233,12 @@ export function ManualWorkoutPersistedEditDialog({
     try {
       const result = await reviewEditDraftFn({
         data: {
-          ...buildPersistedEditSourcePayload({ activePlanId, plannedWorkoutId, workoutDate }),
-          draftInput,
+          ...buildPersistedEditSourcePayload({
+            provenancePlanId,
+            plannedWorkoutId,
+            workoutDate,
+          }),
+          editProjection,
         },
       });
       setStatus("idle");
@@ -255,11 +257,7 @@ export function ManualWorkoutPersistedEditDialog({
         current
           ? {
               ...current,
-              baseDraftInput: result.draftInput,
-              entries: cloneManualWorkoutEntries(result.draftInput.entries),
-              notes: result.draftInput.notes ?? "",
-              targetTruthMode: result.draftInput.targetTruthMode,
-              title: result.draftInput.title,
+              editProjection: result.editProjection,
             }
           : current,
       );
@@ -291,8 +289,12 @@ export function ManualWorkoutPersistedEditDialog({
     try {
       const result = await confirmEditDraftFn({
         data: {
-          ...buildPersistedEditSourcePayload({ activePlanId, plannedWorkoutId, workoutDate }),
-          draftInput: readyReview.draftInput,
+          ...buildPersistedEditSourcePayload({
+            provenancePlanId,
+            plannedWorkoutId,
+            workoutDate,
+          }),
+          editProjection: readyReview.editProjection,
           reviewToken: readyReview.review.reviewToken,
           reviewChecksum: readyReview.review.reviewChecksum,
         },
@@ -301,19 +303,22 @@ export function ManualWorkoutPersistedEditDialog({
       if (!result.ok) {
         confirmInFlightRef.current = false;
         setStatus("idle");
+        setReviewResult(null);
         setMessage(result.message);
+        reconstructedDraftCacheRef.current = null;
         hitoToast.error({
           id: MANUAL_PERSISTED_EDIT_TOAST_ID,
           title: "Workout not updated",
           description: result.message,
         });
+        await onEdited();
         return;
       }
 
       hitoToast.success({
         id: MANUAL_PERSISTED_EDIT_TOAST_ID,
         title: "Workout updated",
-        description: "Refreshing from saved plan truth.",
+        description: "Refreshing from saved Calendar truth.",
       });
       confirmInFlightRef.current = false;
       setStatus("idle");
@@ -335,16 +340,6 @@ export function ManualWorkoutPersistedEditDialog({
     }
   };
 
-  const template = getManualTemplateForDraft(activeDraftState?.baseDraftInput.templateKey ?? null);
-  const allowedTargetTruthModes = activeDraftState
-    ? Array.from(
-        new Set<ManualWorkoutTargetTruthMode>([
-          activeDraftState.targetTruthMode,
-          ...template.allowedTargetTruthModes,
-        ]),
-      )
-    : template.allowedTargetTruthModes;
-
   return (
     <Dialog
       open={shouldRenderDialog}
@@ -361,32 +356,40 @@ export function ManualWorkoutPersistedEditDialog({
         <ManualWorkoutEditorDialogHeader
           dateLabel={formatReadableDate(workoutDate)}
           statusLabel={statusLabelFor(status, reviewResult)}
-          title={activeDraftState?.title ?? title}
+          title={activeDraftState?.editProjection.title ?? title}
         />
 
         <div className="hito-product-dialog-body-scroll-fill">
           {activeDraftState ? (
             <div className="grid gap-4">
               <ManualWorkoutConstructorEditor
-                allowedTargetTruthModes={allowedTargetTruthModes}
+                allowedTargetTruthModes={[]}
                 dateLabel={formatReadableDate(workoutDate)}
-                entries={activeDraftState.entries}
-                iconKey={templateIconKind(template)}
-                iconTone={templateIconTone(template)}
-                isRestDraft={template.workoutType === "rest"}
-                notes={activeDraftState.notes}
-                onEntriesChange={(entries) => updateDraftState({ entries })}
-                onNotesChange={(notes) => updateDraftState({ notes })}
-                onTargetTruthModeChange={(targetTruthMode) => updateDraftState({ targetTruthMode })}
-                onTitleChange={(nextTitle) => updateDraftState({ title: nextTitle })}
+                entries={[]}
+                entriesLocked
+                entriesLockedMessage="Saved structure, targets, provenance, and extra metadata stay read-only here and are preserved during review."
+                iconKey={workoutGlyphFromCalendarIconKey(
+                  activeDraftState.editProjection.calendarIconKey,
+                )}
+                iconTone={workoutFamilyColorVar(
+                  activeDraftState.editProjection.workoutFamily,
+                  "content",
+                )}
+                isRestDraft={false}
+                notes={activeDraftState.editProjection.notes ?? ""}
+                notesPlaceholder="Optional notes or cues for this workout."
+                onEntriesChange={() => undefined}
+                onNotesChange={(notes) => updateEditProjection({ notes })}
+                onTitleChange={(nextTitle) => updateEditProjection({ title: nextTitle })}
                 readbackMode={Boolean(readyReview)}
-                reviewedDocument={readyReview?.draftReview.draft ?? null}
+                reviewedDocument={editorDocument}
                 reviewDisabledReason={blockedMessage}
-                selectedTemplateKey={template.templateKey}
+                selectedTemplateKey={null}
+                showTargetGuidance={false}
                 source="template"
-                targetTruthMode={activeDraftState.targetTruthMode}
-                templateOptions={MANUAL_WORKOUT_TEMPLATES}
-                title={activeDraftState.title}
+                targetTruthMode="structure_only"
+                templateOptions={[]}
+                title={activeDraftState.editProjection.title}
               />
               <PersistedEditReviewReadback result={reviewResult} />
             </div>
@@ -443,36 +446,40 @@ export function ManualWorkoutPersistedEditDialog({
 }
 
 function buildPersistedEditSourcePayload({
-  activePlanId,
+  provenancePlanId,
   plannedWorkoutId,
   workoutDate,
 }: {
-  activePlanId: string | null | undefined;
+  provenancePlanId: string | null | undefined;
   plannedWorkoutId: string;
   workoutDate: string;
 }): PersistedEditSourcePayload {
   return {
-    ...(activePlanId ? { activePlanId } : {}),
+    ...(provenancePlanId ? { provenancePlanId } : {}),
     plannedWorkoutId,
     workoutDate,
   };
 }
 
 function buildPersistedEditSourceKey({
-  activePlanId,
+  provenancePlanId,
   plannedWorkoutId,
   workoutDate,
 }: {
-  activePlanId: string | null | undefined;
+  provenancePlanId: string | null | undefined;
   plannedWorkoutId: string;
   workoutDate: string;
 }) {
-  return `${activePlanId ?? "no-active-plan"}:${plannedWorkoutId}:${workoutDate}`;
+  return `${provenancePlanId ?? "no-provenance-plan"}:${plannedWorkoutId}:${workoutDate}`;
 }
 
-function getManualTemplateForDraft(templateKey: ManualWorkoutTemplateKey | null) {
-  if (!templateKey) return MANUAL_WORKOUT_TEMPLATES[0]!;
-  return getDefaultManualWorkoutTemplate(templateKey);
+function buildEditableDocument(state: EditableDocumentState | null): WorkoutDocument | null {
+  if (!state) return null;
+
+  return {
+    ...state.sourceDocument,
+    ...state.editProjection,
+  };
 }
 
 function statusLabelFor(
@@ -508,25 +515,10 @@ function PersistedEditReviewReadback({
     );
   }
 
-  const warnings = result.draftReview.review.warnings;
-
-  if (warnings.length === 0) {
-    return (
-      <p className="hito-body-xs text-secondary">
-        Hito reviewed this edit. Nothing changes until you save the edited workout.
-      </p>
-    );
-  }
-
   return (
-    <div className="hito-list-row items-start">
-      <div className="grid min-w-0 gap-2">
-        {warnings.map((warning) => (
-          <p key={warning} className="hito-body-xs text-secondary">
-            Warning: {warning}
-          </p>
-        ))}
-      </div>
-    </div>
+    <p className="hito-body-xs text-secondary">
+      Hito reviewed the complete saved workout document. Nothing changes until you save the edited
+      workout.
+    </p>
   );
 }

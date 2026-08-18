@@ -13,12 +13,14 @@ import {
 } from "@/components/admin/AdminWorkspaceNav";
 import {
   buildCaptureHref,
+  CAPTURE_EPIC_FILTER_VALUES,
   captureQueryText,
   copyTextToClipboard,
   countForStatusFilter,
   EDITABLE_CAPTURE_STATUS_OPTIONS,
   formatCaptureMutationError,
   formatDateTime,
+  formatEpicLabel,
   formatItemSource,
   formatItemType,
   formatItemTypeTagValue,
@@ -29,6 +31,7 @@ import {
   formatPriority,
   formatPriorityTagValue,
   formatRepoMarkdownStatus,
+  formatRepoWorkItemEpicTag,
   formatStatusLabel,
   formatStatusTagValue,
   formatTargetRole,
@@ -38,6 +41,7 @@ import {
   getRepoDerivedInfo,
   initialQuickNoteState,
   markdownPriorityTone,
+  matchesCaptureEpicFilter,
   parseCaptureItemType,
   parseCaptureSourceGroup,
   parseCaptureStatus,
@@ -81,7 +85,11 @@ import {
   type AdminCaptureTargetRole,
 } from "@/lib/admin-capture";
 import { APP_NAME } from "@/lib/app-config";
-import { adminWorkItemSourceGroupOptions } from "@/lib/admin-work-items";
+import {
+  adminRepoWorkItemEpicSlugs,
+  adminWorkItemSourceGroupOptions,
+} from "@/lib/admin-work-items";
+import { getSettingsRouteData } from "@/lib/training-api";
 
 export const Route = createFileRoute("/admin/capture")({
   validateSearch: (search: Record<string, unknown>): CaptureSearch => ({
@@ -90,6 +98,7 @@ export const Route = createFileRoute("/admin/capture")({
     type: parseNullableFilter(search.type, adminCaptureItemTypes),
     priority: parseNullableFilter(search.priority, adminCapturePriorities),
     role: parseNullableFilter(search.role, adminCaptureTargetRoles),
+    epic: parseNullableFilter(search.epic, CAPTURE_EPIC_FILTER_VALUES),
     q: parseSearchQuery(search.q),
   }),
   head: () => ({
@@ -111,13 +120,16 @@ export const Route = createFileRoute("/admin/capture")({
       search: captureQueryText(search.q) || null,
       limit: 100,
     };
-    const result = await listAdminCaptureBacklog({
-      data: {
-        ...listInput,
-        status: search.status,
-        includeArchived: search.status === "archived",
-      },
-    });
+    const [result, settingsRouteData] = await Promise.all([
+      listAdminCaptureBacklog({
+        data: {
+          ...listInput,
+          status: search.status,
+          includeArchived: search.status === "archived",
+        },
+      }),
+      getSettingsRouteData(),
+    ]);
 
     if (
       !result.ok &&
@@ -132,14 +144,14 @@ export const Route = createFileRoute("/admin/capture")({
       });
     }
 
-    return { result };
+    return { result, settings: settingsRouteData.settings };
   },
   pendingComponent: CapturePendingState,
   component: AdminCapturePage,
 });
 
 function AdminCapturePage() {
-  const { result } = Route.useLoaderData();
+  const { result, settings } = Route.useLoaderData();
   const search = Route.useSearch();
   const router = useRouter();
   const createItemFn = useServerFn(createAdminCaptureItem);
@@ -164,6 +176,7 @@ function AdminCapturePage() {
     type: "all",
     priority: "all",
     role: "all",
+    epic: "all",
     q: "",
   });
 
@@ -438,14 +451,26 @@ function AdminCapturePage() {
     }
   };
 
+  const epicFilteredItems = result.ok
+    ? result.view.items.filter((item) => matchesCaptureEpicFilter(item, search.epic))
+    : [];
+  const visibleBacklogView = result.ok
+    ? {
+        ...result.view,
+        items: epicFilteredItems,
+        shown: epicFilteredItems.length,
+      }
+    : null;
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       <div className="hito-workbench-shell hito-workbench-shell-compact-sidebar">
-        <AdminWorkspaceSidebar activeSection="work-items" />
+        <AdminWorkspaceSidebar activeSection="work-items" settings={settings} />
 
         <section className="hito-workbench-main">
           <AdminWorkspacePageHeader
             activeSection="work-items"
+            settings={settings}
             title="Work items"
             description="Review repo work items, active plans, specs, briefs, and admin notes for manual handoff."
             mobileMeta={formatStatusLabel(search.status)}
@@ -473,7 +498,11 @@ function AdminCapturePage() {
                     <CaptureUtilityRow
                       clearFiltersHref={clearFiltersHref}
                       query={captureQueryText(search.q)}
-                      rowCountLabel={`Showing ${result.view.shown} of ${result.view.total} items`}
+                      rowCountLabel={
+                        search.epic === "all"
+                          ? `Showing ${result.view.shown} of ${result.view.total} items`
+                          : `Showing ${visibleBacklogView?.shown ?? 0} of ${result.view.shown} loaded items`
+                      }
                       search={search}
                     />
                     <CaptureBacklogList
@@ -483,7 +512,7 @@ function AdminCapturePage() {
                       copyFallbackPrompts={copyFallbackPrompts}
                       expandedItemId={expandedItemId}
                       mutation={mutation}
-                      result={result.view}
+                      result={visibleBacklogView ?? result.view}
                       search={search}
                       setAppendNotes={setAppendNotes}
                       setExpandedItemId={setExpandedItemId}
@@ -636,6 +665,19 @@ function CaptureUtilityRow({
         })),
       ],
       onSelect: (role) => goToFilter({ role: role as CaptureSearch["role"] }),
+    },
+    {
+      currentValue: search.epic,
+      label: "Epic",
+      options: [
+        { value: "all", label: "All" },
+        ...adminRepoWorkItemEpicSlugs.map((epic) => ({
+          value: epic,
+          label: formatEpicLabel(epic),
+        })),
+        { value: "bug", label: "Bug" },
+      ],
+      onSelect: (epic) => goToFilter({ epic: epic as CaptureSearch["epic"] }),
     },
   ];
 
@@ -905,7 +947,8 @@ function CaptureBacklogList({
       captureQueryText(search.q) ||
       search.type !== "all" ||
       search.priority !== "all" ||
-      search.role !== "all";
+      search.role !== "all" ||
+      search.epic !== "all";
 
     return filtered ? (
       <EmptyState
@@ -933,6 +976,7 @@ function CaptureBacklogList({
         const expanded = expandedItemId === item.id;
         const repoSource = getRepoDerivedInfo(item);
         const readOnly = repoSource.readOnly;
+        const epicTag = formatRepoWorkItemEpicTag(repoSource);
         return (
           <article key={item.id} data-expanded={expanded ? "true" : undefined}>
             <div className="hito-list-row w-full items-start text-left">
@@ -966,6 +1010,11 @@ function CaptureBacklogList({
                     <HitoMetadataTag tooltip={readOnlyMetadataTooltip("type")}>
                       {formatMarkdownMetadataValue("type", repoSource.markdownType, item.itemType)}
                     </HitoMetadataTag>
+                    {epicTag ? (
+                      <HitoMetadataTag tooltip={readOnlyMetadataTooltip("epic")}>
+                        {epicTag}
+                      </HitoMetadataTag>
+                    ) : null}
                     <HitoMetadataTag
                       tooltip={readOnlyMetadataTooltip("priority")}
                       tone={
@@ -1123,6 +1172,7 @@ function CaptureItemDetail({
   onCopyPrompt: () => void;
   onDeleteQuickNote: () => void;
 }) {
+  const epicTag = formatRepoWorkItemEpicTag(repoSource);
   const currentMutation =
     mutation.itemId === item.id &&
     mutation.message &&
@@ -1179,6 +1229,11 @@ function CaptureItemDetail({
               <HitoMetadataTag tooltip={readOnlyMetadataTooltip("type")}>
                 {formatMarkdownMetadataValue("type", repoSource.markdownType, item.itemType)}
               </HitoMetadataTag>
+              {epicTag ? (
+                <HitoMetadataTag tooltip={readOnlyMetadataTooltip("epic")}>
+                  {epicTag}
+                </HitoMetadataTag>
+              ) : null}
               <HitoMetadataTag
                 tooltip={readOnlyMetadataTooltip("priority")}
                 tone={repoSource.markdownPriority ? markdownPriorityTone(repoSource) : undefined}

@@ -84,7 +84,7 @@ export function validateManualSourceEditingCapabilityReadback() {
     }),
     "skipped_logged_workout",
     "persisted skipped results should block direct source affordances",
-    true,
+    false,
     true,
   );
 
@@ -98,7 +98,7 @@ export function validateManualSourceEditingCapabilityReadback() {
     }),
     "logged_workout",
     "completed logged results should block direct source affordances",
-    true,
+    false,
     true,
   );
 
@@ -112,7 +112,7 @@ export function validateManualSourceEditingCapabilityReadback() {
     }),
     "evidence_backed_workout",
     "provider/comparison/AI evidence should block direct source affordances",
-    true,
+    false,
     true,
   );
 
@@ -325,7 +325,7 @@ export function validateManualSourceEditingCapabilityReadback() {
     }),
     "logged_workout",
     "today logged rows should preserve lifecycle protection while exposing content edit",
-    true,
+    false,
     true,
   );
   assertSourceEditingBlocked(
@@ -338,7 +338,7 @@ export function validateManualSourceEditingCapabilityReadback() {
     }),
     "evidence_backed_workout",
     "today evidence-backed rows should preserve lifecycle protection while exposing content edit",
-    true,
+    false,
     true,
   );
 
@@ -360,14 +360,20 @@ export function validateManualSourceEditingCapabilityReadback() {
     steps: [
       {
         type: "warmup",
+        segment_id: "ai-warmup",
         segment_type: "warmup",
         label: "Warm up",
+        sequence: 1,
         prescription: { mode: "time", duration_min: 10 },
+        duration_min: 10,
       },
       {
         type: "intervals",
+        segment_id: "ai-tempo-repeat",
         segment_type: "interval_block",
         label: "3 x tempo",
+        sequence: 2,
+        repeats: 3,
         prescription: {
           mode: "repeats",
           repeat_count: 3,
@@ -396,9 +402,12 @@ export function validateManualSourceEditingCapabilityReadback() {
       },
       {
         type: "cooldown",
+        segment_id: "ai-cooldown",
         segment_type: "cooldown",
         label: "Cool down",
+        sequence: 3,
         prescription: { mode: "time", duration_min: 10 },
+        duration_min: 10,
       },
     ] as PersistedPlannedWorkoutRow["steps"],
   } satisfies PersistedPlannedWorkoutRow;
@@ -413,11 +422,11 @@ export function validateManualSourceEditingCapabilityReadback() {
     {
       canClear: true,
       canCopy: true,
-      canEditContent: false,
+      canEditContent: true,
       canMove: true,
       eligibility: "eligible_future_unlogged",
     },
-    "generated guidance targets copy exactly while reviewed content edit remains blocked",
+    "generated guidance targets remain eligible through the origin-neutral document contract",
   );
 
   const selectedPlan = buildFakePlanCycle({
@@ -441,7 +450,10 @@ export function validateManualSourceEditingCapabilityReadback() {
     steps: [
       {
         type: "work",
+        segment_id: "selected-main",
         segment_type: "main",
+        sequence: 1,
+        prescription: { mode: "time", duration_min: 30 },
         duration_min: 30,
         target: { effort: "easy" },
       },
@@ -477,7 +489,9 @@ export function validateManualSourceEditingCapabilityReadback() {
     id: "00000000-0000-4000-8000-000000000033",
     plan_cycle_id: importedPlan.id,
     source_workout_type: "imported_steady_run",
+    workout_family: "steady",
     workout_identity: "steady_aerobic_run",
+    calendar_icon_key: "steady",
   } satisfies PersistedPlannedWorkoutRow;
   assertSourceEditingAllowed(
     resolveCalendarWorkoutSourceEditingCapabilities({
@@ -617,7 +631,11 @@ function assertSourceEditingAllowed(
       canEditContent: expected.canEditContent,
       canMove: expected.canMove,
       copyReason: expected.canCopy ? null : "copy_requires_editor_support",
-      editContentReason: expected.canEditContent ? null : "edit_content_requires_editor_support",
+      editContentReason: expected.canEditContent
+        ? null
+        : expected.eligibility === "eligible_past_unlogged"
+          ? "protected_history"
+          : "unsupported_source_workout",
       eligibility: expected.eligibility,
       reason: null,
     },

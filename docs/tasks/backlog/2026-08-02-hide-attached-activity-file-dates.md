@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** FRONTEND
+- **Epic:** runner-evidence-and-progress
 - **Outcome:** Completed the scoped outcome: Remove redundant upload and activity-date copy from the attached activity-file readback while preserving stored activity date for comparison truth and future runner analytics.
 - **Sources:** [CompletionPanel.tsx](../../../src/components/CompletionPanel.tsx)
 - **Validation:** The original terminal receipt records focused validation for the completed scope; detailed commands remain available in Git history.

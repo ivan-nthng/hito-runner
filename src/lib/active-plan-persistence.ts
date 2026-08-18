@@ -92,28 +92,8 @@ export type SavedPlanApplyResult =
       callsOpenAi: false;
     };
 
-export interface EmptyCalendarProvenanceCreationInput {
-  profile: RunnerProfileSummary;
-  title: string;
-  goalSummary: string;
-  sourceTemplate: string;
-  schemaVersion: string;
-  sourceKind: string;
-  startDate: string;
-  endDate: string;
-  targetDate: string | null;
-  goalMetadata: Json | null;
-  planPreferences: Json | null;
-  planMetadata?: AdditionalPlanPersistenceMetadata | null;
-}
-
-type EmptyCalendarProvenanceCreationResult = PlanApplySuccessResult & {
-  planCycle: PersistedPlanCycleRow;
-  workouts: [];
-};
-
 export type CalendarWorkoutContext = {
-  provenancePlan: PersistedPlanCycleRow | null;
+  sourcePlansById: Map<string, PersistedPlanCycleRow>;
   existingWorkouts: {
     workouts: PersistedPlannedWorkoutRow[];
     logsByWorkoutId: Map<string, PersistedWorkoutLogRow>;
@@ -137,8 +117,11 @@ export function buildReviewedFirstPlanImportedSeed(
 export async function materializeFirstReviewedPlanForUser(
   userId: string,
   reviewedPlan: ImportedPlanInput,
-  planMetadata: AdditionalPlanPersistenceMetadata | null = null,
-  options: { expectedProfileRevision?: number; calendarInstant?: Date } = {},
+  options: {
+    sourcePlanId: string;
+    expectedProfileRevision?: number;
+    calendarInstant?: Date;
+  },
 ): Promise<PlanApplySuccessResult> {
   const [calendar, currentDate] = await Promise.all([
     getCalendarWorkoutsWithLogsForUser(userId),
@@ -152,11 +135,15 @@ export async function materializeFirstReviewedPlanForUser(
   }
 
   const importedSeed = buildReviewedFirstPlanImportedSeed(reviewedPlan);
+  const sourcePlan = await getSavedPlanRecordForUser(userId, options.sourcePlanId);
+  if (!sourcePlan || !stableJsonEqual(sourcePlan.saved_plan_payload, reviewedPlan)) {
+    throw new Error("The reviewed plan does not match its immutable source record.");
+  }
 
   await persistNewReviewedPlan({
     userId,
     importedSeed,
-    planMetadata,
+    sourcePlan,
     currentDate,
     expectedProfileRevision: options.expectedProfileRevision,
   });
@@ -172,91 +159,11 @@ export async function materializeFirstReviewedPlanForUser(
   };
 }
 
-export async function createEmptyCalendarProvenanceForUser(
+export async function getSourcePlanProvenancesForUser(
   userId: string,
-  input: EmptyCalendarProvenanceCreationInput,
-): Promise<EmptyCalendarProvenanceCreationResult> {
-  const [calendar, currentDate] = await Promise.all([
-    getCalendarWorkoutsWithLogsForUser(userId),
-    getRunnerCalendarDateForUserId(userId),
-  ]);
-
-  if (calendar.workouts.some((workout) => workout.workout_date >= currentDate)) {
-    throw new Error("Manual Calendar setup requires no upcoming Calendar workouts.");
-  }
-
-  const persisted = await persistNewReviewedPlan({
-    userId,
-    importedSeed: {
-      profile: input.profile,
-      title: input.title,
-      goalSummary: input.goalSummary,
-      sourceTemplate: input.sourceTemplate,
-      schemaVersion: input.schemaVersion,
-      sourceKind: input.sourceKind,
-      startDate: input.startDate,
-      endDate: input.endDate,
-      targetDate: input.targetDate,
-      goalMetadata: input.goalMetadata,
-      planPreferences: input.planPreferences,
-      workouts: [],
-    },
-    planMetadata: input.planMetadata ?? null,
-    currentDate,
-  });
-
-  return {
-    ok: true,
-    status: "applied",
-    effectiveStartDate: input.startDate,
-    appliedStartDate: input.startDate,
-    normalizedFromStartDate: null,
-    firstDayResolution: null,
-    workoutCount: 0,
-    planCycle: persisted.planCycle,
-    workouts: [],
-  };
-}
-
-export async function getLatestMaterializedPlanProvenance(userId: string) {
-  const supabase = createAdminSupabaseClient();
-  const latest = await supabase
-    .from("plan_cycles")
-    .select("*")
-    .eq("user_id", userId)
-    .is("saved_plan_payload", null)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (latest.error) {
-    throw new Error(latest.error.message);
-  }
-
-  return latest.data;
-}
-
-export async function getPlanRecordForUser(userId: string, planId: string) {
-  const supabase = createAdminSupabaseClient();
-  const plan = await supabase
-    .from("plan_cycles")
-    .select("*")
-    .eq("id", planId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (plan.error) {
-    throw new Error(plan.error.message);
-  }
-
-  return plan.data;
-}
-
-export async function getMaterializedPlanProvenancesForUser(
-  userId: string,
-  planIds: readonly string[],
+  planIds: readonly (string | null)[],
 ) {
-  const uniquePlanIds = [...new Set(planIds)];
+  const uniquePlanIds = [...new Set(planIds.filter((planId): planId is string => Boolean(planId)))];
   if (uniquePlanIds.length === 0) {
     return new Map<string, PersistedPlanCycleRow>();
   }
@@ -266,7 +173,6 @@ export async function getMaterializedPlanProvenancesForUser(
     .from("plan_cycles")
     .select("*")
     .eq("user_id", userId)
-    .is("saved_plan_payload", null)
     .in("id", uniquePlanIds);
 
   if (plans.error) {
@@ -493,17 +399,15 @@ export async function applySavedPlanRecordForUser(
     currentProfile.training_preferences,
     scheduleOptions,
   );
-  const materializedPlanId = crypto.randomUUID();
-  const workoutRows = buildPersistedWorkoutRows(materializedPlanId, userId, prepared.importedSeed);
-  const planMetadata: AdditionalPlanPersistenceMetadata = {
-    goalMetadata: mergePlanPersistenceMetadata(selectedRecord.goal_metadata, {
-      saved_plan_record_id: selectedRecord.id,
-      saved_plan_review_checksum: selectedRecord.saved_plan_review_checksum,
-    }),
-  };
+  const workoutRows = buildPersistedWorkoutRows(
+    selectedRecord.id,
+    userId,
+    prepared.importedSeed,
+    resolveCalendarWorkoutOriginKind(selectedRecord.source_kind),
+  );
   const persisted = await applyAtomicReviewedFutureSchedulePersistence({
     userId,
-    plan: buildPlanPersistencePayload(materializedPlanId, prepared.importedSeed, planMetadata),
+    sourcePlanId: selectedRecord.id,
     workouts: workoutRows as unknown as Json,
     currentDate,
     replaceFutureWorkouts: intent === "replace_future_workouts",
@@ -534,26 +438,35 @@ export async function applySavedPlanRecordForUser(
 export async function getCalendarWorkoutMutationContext(
   userId: string,
 ): Promise<CalendarWorkoutContext> {
+  const existingWorkouts = await getCalendarWorkoutsWithLogsForUser(userId);
+
   return {
-    provenancePlan: await getLatestMaterializedPlanProvenance(userId),
-    existingWorkouts: await getCalendarWorkoutsWithLogsForUser(userId),
+    sourcePlansById: await getSourcePlanProvenancesForUser(
+      userId,
+      existingWorkouts.workouts.map((workout) => workout.plan_cycle_id),
+    ),
+    existingWorkouts,
   };
 }
 
 async function persistNewReviewedPlan(input: {
   userId: string;
   importedSeed: ImportedPlanSeed;
-  planMetadata: AdditionalPlanPersistenceMetadata | null;
+  sourcePlan: PersistedPlanCycleRow;
   currentDate: string;
   expectedProfileRevision?: number;
 }) {
-  const planId = crypto.randomUUID();
-  const workoutRows = buildPersistedWorkoutRows(planId, input.userId, input.importedSeed);
+  const workoutRows = buildPersistedWorkoutRows(
+    input.sourcePlan.id,
+    input.userId,
+    input.importedSeed,
+    resolveCalendarWorkoutOriginKind(input.sourcePlan.source_kind),
+  );
 
   return applyAtomicReviewedPlanPersistence({
     userId: input.userId,
     profile: buildProfilePersistencePayload(input.importedSeed.profile),
-    plan: buildPlanPersistencePayload(planId, input.importedSeed, input.planMetadata),
+    sourcePlanId: input.sourcePlan.id,
     workouts: workoutRows as unknown as Json,
     currentDate: input.currentDate,
     ...(input.expectedProfileRevision == null
@@ -687,11 +600,27 @@ function jsonField(value: Json, key: string): Json | null {
   return jsonObject(value)[key] ?? null;
 }
 
-function buildPersistedWorkoutRows(planId: string, userId: string, seed: ImportedPlanSeed) {
-  return buildPersistedWorkoutInsertRows(planId, userId, seed.workouts).map((workout) => ({
-    ...workout,
-    id: crypto.randomUUID(),
-  }));
+function buildPersistedWorkoutRows(
+  sourcePlanId: string,
+  userId: string,
+  seed: ImportedPlanSeed,
+  originKind: PersistedPlannedWorkoutRow["origin_kind"],
+) {
+  return buildPersistedWorkoutInsertRows(sourcePlanId, userId, seed.workouts, originKind).map(
+    (workout) => ({
+      ...workout,
+      id: crypto.randomUUID(),
+    }),
+  );
+}
+
+function resolveCalendarWorkoutOriginKind(
+  sourceKind: string | null,
+): PersistedPlannedWorkoutRow["origin_kind"] {
+  if (sourceKind === "manual_user_built_plan_v1") return "manual";
+  if (sourceKind === "ai_authored_plan_first_v1") return "ai";
+  if (sourceKind === "training_plan_v2_import") return "file_import";
+  throw new Error("The saved source does not have a supported Calendar workout origin.");
 }
 
 export async function getCalendarWorkoutsWithLogsForUser(
@@ -720,27 +649,4 @@ export async function getCalendarWorkoutsWithLogsForUser(
     workouts,
     logsByWorkoutId: new Map(logs.map((log) => [log.planned_workout_id, log])),
   };
-}
-
-export async function getPlanWorkouts(planCycleId: string) {
-  const supabase = createAdminSupabaseClient();
-  const workoutsResult = await supabase
-    .from("planned_workouts")
-    .select("*")
-    .eq("plan_cycle_id", planCycleId)
-    .order("workout_date", { ascending: true })
-    .order("display_order", { ascending: true });
-
-  if (workoutsResult.error) {
-    throw new Error(workoutsResult.error.message);
-  }
-
-  return workoutsResult.data;
-}
-
-export async function getResolvedPlanWorkoutsWithLogs(
-  userId: string,
-  _planCycle: PersistedPlanCycleRow,
-) {
-  return getCalendarWorkoutsWithLogsForUser(userId);
 }

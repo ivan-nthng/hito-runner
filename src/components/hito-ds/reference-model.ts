@@ -100,6 +100,7 @@ const FOUNDATION_SECTIONS = [
   { id: "typography", label: "Typography", keywords: ["type", "font", "text roles"] },
   { id: "spacing", label: "Spacing", keywords: ["space", "gap", "inset"] },
   { id: "radius", label: "Radius", keywords: ["corner", "rounding", "surface"] },
+  { id: "depth", label: "Depth", keywords: ["elevation", "shadow", "detached", "overlay"] },
   { id: "icons", label: "Icons", keywords: ["tabler", "symbol"] },
   { id: "motion", label: "Motion", keywords: ["animation", "reduced motion", "transition"] },
 ] as const;
@@ -111,6 +112,21 @@ const PATTERN_SECTIONS = [
     id: "notice-surface",
     label: "Banner / Notice Surface",
     keywords: ["banner", "notice", "alert", "state"],
+  },
+  {
+    id: "navigation-card",
+    label: "Navigation Card",
+    keywords: ["previous", "next", "date", "anchor"],
+  },
+  {
+    id: "factual-bar-chart",
+    label: "Factual Bar Chart",
+    keywords: ["chart", "bar", "data", "evidence", "progress"],
+  },
+  {
+    id: "factual-activity-point-sequence",
+    label: "Factual Activity Point Sequence",
+    keywords: ["activity", "chart", "evidence", "fit", "point", "progress", "sequence"],
   },
   {
     id: "data-table-composition",

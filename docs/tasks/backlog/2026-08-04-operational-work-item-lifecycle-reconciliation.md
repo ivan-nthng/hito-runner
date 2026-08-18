@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** ARCHITECT
+- **Epic:** platform-and-operations
 - **Outcome:** Completed the scoped outcome: Reconcile the repository work-item lifecycle so docs/tasks/backlog/ remains the only operational queue, current statuses match accepted evidence, and every external work document is classified as supporting detail, retained…
 - **Sources:** [technical-log.md](../../history/technical-log.md); [AGENTS.md](../../../AGENTS.md)
 - **Validation:** Markdown links, Source-of-truth claims, Scoped diff hygiene passed as recorded in the terminal receipt; omitted layers remain outside this closeout.

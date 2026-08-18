@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** FRONTEND
+- **Epic:** runner-evidence-and-progress
 - **Outcome:** Mode and preflight: Tracked FRONTEND Product work. The source discriminator confirmed that the onboarding-only Show BPM guidance control called prepare(), which saved the baseline merely to expose the existing editor. The first incorrect owner was the…
 - **Sources:** [OnboardingGate.tsx](../../../src/components/OnboardingGate.tsx); [HeartRateProfileSection.tsx](../../../src/components/settings/HeartRateProfileSection.tsx); [OnboardingRunnerBaseline.tsx](../../../src/components/onboarding/OnboardingRunnerBaseline.tsx)
 - **Validation:** Browser health, Product/static contracts, Formatting/lint/diff/build passed as recorded in the terminal receipt; omitted layers remain outside this closeout.

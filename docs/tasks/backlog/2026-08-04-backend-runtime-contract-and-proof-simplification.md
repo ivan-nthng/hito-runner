@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** BACKEND
+- **Epic:** platform-and-operations
 - **Outcome:** Added one explicit Backend validation manifest with separate source, local-database, built-runtime, and release groups. The shared Runner Activity proof runtime became deliberate tracked proof source; repeated fixture/review setup and the superseded…
 - **Sources:** Terminal decision/evidence record only; detailed transcript remains in Git history.
 - **Validation:** The original terminal receipt records focused validation for the completed scope; detailed commands remain available in Git history.

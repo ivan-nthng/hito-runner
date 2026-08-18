@@ -1,4 +1,8 @@
 import "@tanstack/react-start/server-only";
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { isAiGeneratedRunningPlanDevFixtureEnabled } from "@/lib/ai-generated-running-plan-dev-fixture";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import {
   findRunnerActivityPlanMatch,
@@ -16,14 +20,58 @@ import {
 import { getLatestWorkoutResultFeedback } from "@/lib/workout-result-import/read-workout-result-feedback";
 import {
   type ExtractedGarminFitFile,
+  LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE,
   MAX_WORKOUT_RESULT_UPLOAD_BYTES,
   WORKOUT_RESULT_STORAGE_BUCKET,
   type WorkoutResultAssetKind,
   runnerSafeWorkoutResultMessage,
   WorkoutResultImportError,
 } from "@/lib/workout-result-import/types";
+import { isLoopbackRuntimeUrl } from "@/lib/supabase/env";
+
+const LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SHA256 =
+  "fb5e9a4b3a0d9ff90e105c174bb728f730de621875b17503db8981cb80c108a2";
 
 export type { WorkoutResultProjectionFailurePointForQa } from "@/lib/workout-result-import/planned-workout-projection";
+
+export async function ingestLocalQaFixtureWorkoutResult(params: {
+  userId: string;
+  plannedWorkoutId?: string | null;
+  requestedFixture: string;
+  authProvider: string;
+  appBaseUrl: string | null;
+}) {
+  if (
+    params.authProvider !== "local" ||
+    !isLoopbackRuntimeUrl(params.appBaseUrl) ||
+    !isAiGeneratedRunningPlanDevFixtureEnabled() ||
+    params.requestedFixture !== LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE
+  ) {
+    throw new WorkoutResultImportError(
+      "invalid_upload",
+      "Choose a Garmin .fit file or .zip archive before uploading.",
+    );
+  }
+
+  const fileBuffer = await readFile(
+    resolve(process.cwd(), LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE),
+  );
+  const checksum = createHash("sha256").update(fileBuffer).digest("hex");
+  if (checksum !== LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SHA256) {
+    throw new WorkoutResultImportError(
+      "invalid_upload",
+      "The approved local FIT fixture does not match its canonical checksum.",
+    );
+  }
+
+  return ingestGarminWorkoutResult({
+    userId: params.userId,
+    plannedWorkoutId: params.plannedWorkoutId,
+    file: new File([fileBuffer], LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE, {
+      type: "application/octet-stream",
+    }),
+  });
+}
 
 export async function ingestGarminWorkoutResult(params: {
   userId: string;

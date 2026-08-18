@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** DESIGN SYSTEM
+- **Epic:** platform-and-operations
 - **Depends On:** [Locale Profile Preference And Server Resolution](2026-08-13-hito-ui-locale-profile-preference-and-server-resolution.md)
 - **Evidence From:** [UI Locale And Brazilian Portuguese Contract Discovery](2026-08-13-hito-ui-locale-and-brazilian-portuguese-contract-discovery.md)
 - **Outcome:** completed for the focused Design System Implementation DoD. Shared shell consumers.

@@ -45,7 +45,6 @@ import { WorkoutGlyph } from "@/components/WorkoutGlyph";
 import {
   type ManualWorkoutBlockInput,
   type ManualWorkoutBlockKey,
-  type ManualWorkoutCanonicalDraft,
   type ManualWorkoutConstructorEntryInput,
   type ManualWorkoutRepeatGroupInput,
   type ManualWorkoutTargetTruthMode,
@@ -105,6 +104,7 @@ import {
   workoutDocumentSectionsToManualReadbackEntries,
 } from "@/components/manual-workout/ManualWorkoutTrainingBlockGrammar.model";
 import { workoutDocumentTimelineItems } from "@/components/workout-structure/workout-structure-timeline-items";
+import type { WorkoutDocumentContent } from "@/lib/workout-document";
 
 export type ManualWorkoutConstructorSource = "template" | "scratch" | "saved_template";
 
@@ -129,10 +129,12 @@ export function ManualWorkoutConstructorEditor({
   dateLabel,
   entries,
   entriesLocked = false,
+  entriesLockedMessage = "Saved template structure is rebuilt for review; title and notes can still be adjusted.",
   iconKey,
   iconTone,
   isRestDraft,
   notes,
+  notesPlaceholder = "Optional note for this manual workout.",
   onEntriesChange,
   onNotesChange,
   onScratchTemplateChange,
@@ -142,6 +144,7 @@ export function ManualWorkoutConstructorEditor({
   reviewedDocument = null,
   reviewDisabledReason,
   selectedTemplateKey,
+  showTargetGuidance = true,
   source,
   targetTruthMode,
   templateOptions,
@@ -151,19 +154,22 @@ export function ManualWorkoutConstructorEditor({
   dateLabel: string;
   entries: ManualWorkoutConstructorEntryInput[];
   entriesLocked?: boolean;
+  entriesLockedMessage?: string;
   iconKey: WorkoutGlyphKind;
   iconTone: string;
   isRestDraft: boolean;
   notes: string;
+  notesPlaceholder?: string;
   onEntriesChange: (entries: ManualWorkoutConstructorEntryInput[]) => void;
   onNotesChange: (value: string) => void;
   onScratchTemplateChange?: (templateKey: ManualWorkoutTemplate["templateKey"]) => void;
   onTargetTruthModeChange?: (value: ManualWorkoutTargetTruthMode) => void;
   onTitleChange: (value: string) => void;
   readbackMode?: boolean;
-  reviewedDocument?: ManualWorkoutCanonicalDraft | null;
+  reviewedDocument?: WorkoutDocumentContent | null;
   reviewDisabledReason?: string | null;
   selectedTemplateKey?: ManualWorkoutTemplate["templateKey"] | null;
+  showTargetGuidance?: boolean;
   source: ManualWorkoutConstructorSource;
   targetTruthMode: ManualWorkoutTargetTruthMode;
   templateOptions: ManualWorkoutTemplate[];
@@ -184,6 +190,7 @@ export function ManualWorkoutConstructorEditor({
         }));
   const documentTitle = reviewedDocument?.title ?? title;
   const documentNotes = reviewedDocument?.notes ?? notes;
+  const hasStructureEntries = structureReadback ? documentSteps.length > 0 : entries.length > 0;
   const hasRepeatGroup = entries.some((entry) => entry.kind === "repeat_group");
   const rowRefs = useRef<Array<HTMLElement | null>>([]);
   const pendingFocusIndexRef = useRef<number | null>(null);
@@ -434,7 +441,7 @@ export function ManualWorkoutConstructorEditor({
           />
         ) : null}
 
-        {entries.length ? (
+        {hasStructureEntries ? (
           <div className="hito-manual-workout-entry-stack">
             {structureReadback ? (
               <ManualWorkoutReadbackRows steps={documentSteps} />
@@ -508,9 +515,7 @@ export function ManualWorkoutConstructorEditor({
         )}
 
         {entriesLocked ? (
-          <p className="hito-body-xs text-secondary">
-            Saved template structure is rebuilt for review; title and notes can still be adjusted.
-          </p>
+          <p className="hito-body-xs text-secondary">{entriesLockedMessage}</p>
         ) : null}
       </section>
 
@@ -524,15 +529,17 @@ export function ManualWorkoutConstructorEditor({
           rows={3}
           value={documentNotes}
           onChange={(event) => onNotesChange(event.target.value)}
-          placeholder="Optional note for this manual workout."
+          placeholder={notesPlaceholder}
         />
       </label>
 
-      <ManualTargetGuidanceSection
-        allowedTargetTruthModes={allowedTargetTruthModes}
-        onTargetTruthModeChange={readbackMode ? undefined : onTargetTruthModeChange}
-        targetTruthMode={targetTruthMode}
-      />
+      {showTargetGuidance ? (
+        <ManualTargetGuidanceSection
+          allowedTargetTruthModes={allowedTargetTruthModes}
+          onTargetTruthModeChange={readbackMode ? undefined : onTargetTruthModeChange}
+          targetTruthMode={targetTruthMode}
+        />
+      ) : null}
     </div>
   );
 }
@@ -561,7 +568,7 @@ function ManualWorkoutDraftStructureTimeline({
   steps,
   title,
 }: {
-  document: ManualWorkoutCanonicalDraft | null;
+  document: WorkoutDocumentContent | null;
   isRestDraft: boolean;
   reviewDisabledReason?: string | null;
   selectedTemplate: ManualWorkoutTemplate | undefined;
@@ -582,14 +589,22 @@ function ManualWorkoutDraftStructureTimeline({
           steps,
         })
       : [];
+  const reviewedTotalDurationMin =
+    document && "totalDurationMin" in document && typeof document.totalDurationMin === "number"
+      ? document.totalDurationMin
+      : null;
+  const reviewedTotalDistanceKm =
+    document && "totalDistanceKm" in document && typeof document.totalDistanceKm === "number"
+      ? document.totalDistanceKm
+      : null;
   const totalDurationMin =
-    document?.totalDurationMin ??
+    reviewedTotalDurationMin ??
     (workoutType
       ? steps.reduce((sum, step) => sum + stepPlannedDurationMin(step, workoutType), 0)
       : 0);
   const totalDistanceMeters =
-    (document?.totalDistanceKm ??
-      steps.reduce((sum, step) => sum + stepPlannedDistanceKm(step), 0)) * 1000;
+    (reviewedTotalDistanceKm ?? steps.reduce((sum, step) => sum + stepPlannedDistanceKm(step), 0)) *
+    1000;
   const structureParts = [
     totalDurationMin > 0 ? formatDurationMin(totalDurationMin) : null,
     totalDistanceMeters > 0 ? formatDistanceMeters(totalDistanceMeters) : null,

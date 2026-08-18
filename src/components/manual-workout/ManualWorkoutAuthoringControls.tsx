@@ -123,14 +123,13 @@ export type ManualSaveTemplateRequest = {
   iconKey: CalendarIconKey;
 };
 
-const MANUAL_ADD_TOAST_ID = "manual-active-plan-add";
+const MANUAL_ADD_TOAST_ID = "manual-calendar-add";
 const MANUAL_TEMPLATE_CATALOG_TOAST_ID = "manual-template-catalog";
 const PASTE_UNAVAILABLE_MESSAGE =
   "Hito could not paste this workout yet. Try again from the calendar.";
 
 export function ManualWorkoutAddMenu({
-  activePlanId,
-  activePlanSourceKind,
+  calendarSourceKind,
   children,
   copiedWorkoutSource = null,
   date,
@@ -144,8 +143,7 @@ export function ManualWorkoutAddMenu({
   pasteTargetIsEmpty = false,
   showRestDayOption = true,
 }: {
-  activePlanId: string;
-  activePlanSourceKind: string;
+  calendarSourceKind: string;
   children: ReactNode;
   copiedWorkoutSource?: ManualCopiedWorkoutSource | null;
   date: string;
@@ -198,8 +196,7 @@ export function ManualWorkoutAddMenu({
   const isBusy = status !== "idle";
   const canPasteCopiedWorkout = Boolean(copiedWorkoutSource && pasteTargetIsEmpty);
   const canMoveSelectedWorkout = Boolean(
-    moveWorkoutSource?.activePlanId === activePlanId &&
-    moveWorkoutSource.sourceWorkoutDate !== date,
+    moveWorkoutSource && moveWorkoutSource.sourceWorkoutDate !== date,
   );
 
   const openConstructorDialog = () => {
@@ -275,8 +272,7 @@ export function ManualWorkoutAddMenu({
     }
 
     return buildManualDraftInput({
-      activePlanId,
-      activePlanSourceKind,
+      activePlanSourceKind: calendarSourceKind,
       contextMode: "existing_active_plan",
       date: draftSelection.date,
       entries,
@@ -298,8 +294,7 @@ export function ManualWorkoutAddMenu({
     notes: nextNotes.trim() || null,
     context: {
       mode: "existing_active_plan" as const,
-      activePlanId,
-      activePlanSourceKind,
+      activePlanSourceKind: calendarSourceKind,
       targetDateProtection: "none" as const,
     },
   });
@@ -381,7 +376,7 @@ export function ManualWorkoutAddMenu({
       hitoToast.success({
         id: MANUAL_ADD_TOAST_ID,
         title: "Workout reviewed",
-        description: "Check the reviewed workout before adding it to the plan.",
+        description: "Check the reviewed workout before adding it to the Calendar.",
       });
     } catch (error) {
       const message =
@@ -442,7 +437,7 @@ export function ManualWorkoutAddMenu({
       hitoToast.success({
         id: MANUAL_ADD_TOAST_ID,
         title: "Template reviewed",
-        description: "Check the reviewed workout before adding it to the plan.",
+        description: "Check the reviewed workout before adding it to the Calendar.",
       });
     } catch (error) {
       const message =
@@ -580,7 +575,6 @@ export function ManualWorkoutAddMenu({
     try {
       const result = await addManualWorkoutToActivePlanFn({
         data: {
-          activePlanId,
           draftInput: reviewedDraft.input,
           reviewToken: reviewedDraft.review.reviewToken,
           reviewChecksum: reviewedDraft.review.reviewChecksum,
@@ -602,7 +596,7 @@ export function ManualWorkoutAddMenu({
       hitoToast.success({
         id: MANUAL_ADD_TOAST_ID,
         title: "Workout added",
-        description: "Refreshing the calendar from saved plan truth.",
+        description: "Refreshing from saved Calendar truth.",
       });
       confirmInFlightRef.current = false;
       setStatus("idle");
@@ -613,7 +607,7 @@ export function ManualWorkoutAddMenu({
       await onAdded();
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "The workout could not be added to this plan.";
+        error instanceof Error ? error.message : "The workout could not be added to the Calendar.";
       confirmInFlightRef.current = false;
       setStatus("idle");
       setConfirmMessage(message);
@@ -1459,7 +1453,7 @@ function buildPasteUnavailableResult(): ManualWorkoutDirectCopyResult {
 
 function moveTargetMenuCopy(dayKind: ManualWorkoutMoveTargetDayKind) {
   if (dayKind === "workout_day") {
-    return "Review before replacing the planned workout on this day.";
+    return "Review before replacing the Calendar workout on this day.";
   }
 
   return "Use this Rest day as the target.";
@@ -1472,7 +1466,7 @@ function isManualWorkoutDirectCopyResult(value: unknown): value is ManualWorkout
   return (
     value.status === "copied" &&
     value.persisted === true &&
-    typeof value.activePlanId === "string" &&
+    (value.activePlanId === null || typeof value.activePlanId === "string") &&
     typeof value.sourceWorkoutId === "string" &&
     typeof value.sourceWorkoutDate === "string" &&
     typeof value.targetWorkoutId === "string" &&

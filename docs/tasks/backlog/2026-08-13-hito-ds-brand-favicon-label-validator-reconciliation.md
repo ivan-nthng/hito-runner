@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** DESIGN SYSTEM
+- **Epic:** platform-and-operations
 - **Evidence From:** [Brand favicon tone-validator alignment](./2026-08-12-hito-ds-brand-favicon-tone-validator-alignment.md); [Reference contract and table-density batch](./2026-08-13-hito-ds-reference-contract-and-table-density-batch.md)
 - **Outcome:** Changed only the stale Brand validator label from retired `Favicon surface` to accepted `Favicon`, restoring the full Design System validator without changing rendered source or the asset.
 - **Sources:** [validate-hito-ds-component-contracts.ts](../../../scripts/validate-hito-ds-component-contracts.ts); [favicon.svg](../../../public/favicon.svg); [reference-brand-page.tsx](../../../src/components/hito-ds/reference-brand-page.tsx)

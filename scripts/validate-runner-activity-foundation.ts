@@ -1332,33 +1332,29 @@ function proofBodyNote(area: "L. Calf" | "R. Knee", timing: "during" | "after") 
 }
 
 async function createProofWorkouts(userId: string): Promise<[string, string, string, string]> {
-  const planCycleId = randomUUID();
   const firstWorkoutId = randomUUID();
   const secondWorkoutId = randomUUID();
   const thirdWorkoutId = randomUUID();
   const fourthWorkoutId = randomUUID();
-  const profile = await supabase
-    .from("runner_profiles")
-    .upsert({ user_id: userId }, { onConflict: "user_id" });
+  const profile = await supabase.from("runner_profiles").upsert(
+    {
+      user_id: userId,
+      age: 36,
+      weight_kg: 72,
+      height_cm: 178,
+      fitness_level: "running_regularly",
+      setup_state: "completed" as const,
+    },
+    { onConflict: "user_id" },
+  );
   if (profile.error) throw new Error(profile.error.message);
-  const plan = await supabase.from("plan_cycles").insert({
-    id: planCycleId,
-    user_id: userId,
-    status: "active",
-    title: "Gate 1 proof plan",
-    goal_summary: "Local activity proof",
-    source_template: "qa_activity_foundation",
-    start_date: "2026-08-01",
-    end_date: "2026-08-04",
-  });
-  if (plan.error) throw new Error(plan.error.message);
   const workouts = await supabase
     .from("planned_workouts")
     .insert([
-      proofWorkoutRow(firstWorkoutId, planCycleId, userId, "2026-08-01", 0),
-      proofWorkoutRow(secondWorkoutId, planCycleId, userId, "2026-08-02", 1),
-      proofWorkoutRow(thirdWorkoutId, planCycleId, userId, "2026-08-03", 2),
-      proofWorkoutRow(fourthWorkoutId, planCycleId, userId, "2026-08-04", 3),
+      proofWorkoutRow(firstWorkoutId, userId, "2026-08-01", 0),
+      proofWorkoutRow(secondWorkoutId, userId, "2026-08-02", 1),
+      proofWorkoutRow(thirdWorkoutId, userId, "2026-08-03", 2),
+      proofWorkoutRow(fourthWorkoutId, userId, "2026-08-04", 3),
     ]);
   if (workouts.error) throw new Error(workouts.error.message);
   return [firstWorkoutId, secondWorkoutId, thirdWorkoutId, fourthWorkoutId];
@@ -1424,16 +1420,11 @@ async function insertLegacyProjectionAsset(input: {
   return assetId;
 }
 
-function proofWorkoutRow(
-  id: string,
-  planCycleId: string,
-  userId: string,
-  workoutDate: string,
-  displayOrder: number,
-) {
+function proofWorkoutRow(id: string, userId: string, workoutDate: string, displayOrder: number) {
   return {
     id,
-    plan_cycle_id: planCycleId,
+    plan_cycle_id: null,
+    origin_kind: "manual" as const,
     user_id: userId,
     workout_date: workoutDate,
     weekday: displayOrder === 0 ? "Saturday" : "Sunday",

@@ -15,19 +15,16 @@ export type SortDirection = AdminSortDirection;
 export type UsersSortKey =
   | "user"
   | "profile"
-  | "activePlan"
-  | "plans"
   | "workoutLogs"
-  | "lastActivity"
+  | "lastWorkoutLog"
   | "feedback"
   | "entitlement";
 
 export type UsersFilters = {
   query: string;
   profile: "all" | "present" | "missing";
-  activePlan: "all" | "active" | "none";
   activity: "all" | "has_logs" | "no_logs";
-  lastActivity: "all" | "recent" | "older" | "no_logs";
+  lastWorkoutLog: "all" | "recent" | "older" | "no_logs";
   entitlement: "all" | "basic" | "pro" | "missing";
 };
 
@@ -124,15 +121,6 @@ export function buildUsersActiveFilters(
     });
   }
 
-  if (filters.activePlan !== "all") {
-    items.push({
-      id: "activePlan",
-      label: "Active plan",
-      value: usersFilterLabel("activePlan", filters.activePlan),
-      onRemove: () => setFilter("activePlan", "all"),
-    });
-  }
-
   if (filters.activity !== "all") {
     items.push({
       id: "activity",
@@ -142,12 +130,12 @@ export function buildUsersActiveFilters(
     });
   }
 
-  if (filters.lastActivity !== "all") {
+  if (filters.lastWorkoutLog !== "all") {
     items.push({
-      id: "lastActivity",
-      label: "Last activity",
-      value: usersFilterLabel("lastActivity", filters.lastActivity),
-      onRemove: () => setFilter("lastActivity", "all"),
+      id: "lastWorkoutLog",
+      label: "Last workout log",
+      value: usersFilterLabel("lastWorkoutLog", filters.lastWorkoutLog),
+      onRemove: () => setFilter("lastWorkoutLog", "all"),
     });
   }
 
@@ -163,7 +151,11 @@ export function buildUsersActiveFilters(
   return items;
 }
 
-export function matchesUsersFilters(row: AdminAnalyticsUserRow, filters: UsersFilters) {
+export function matchesUsersFilters(
+  row: AdminAnalyticsUserRow,
+  filters: UsersFilters,
+  snapshotGeneratedAt: string,
+) {
   const query = filters.query.trim().toLowerCase();
 
   if (query) {
@@ -191,14 +183,6 @@ export function matchesUsersFilters(row: AdminAnalyticsUserRow, filters: UsersFi
     return false;
   }
 
-  if (filters.activePlan === "active" && !row.activePlanPresent) {
-    return false;
-  }
-
-  if (filters.activePlan === "none" && row.activePlanPresent) {
-    return false;
-  }
-
   if (filters.activity === "has_logs" && row.workoutLogCount === 0) {
     return false;
   }
@@ -207,18 +191,21 @@ export function matchesUsersFilters(row: AdminAnalyticsUserRow, filters: UsersFi
     return false;
   }
 
-  if (filters.lastActivity === "recent" && !isRecentActivity(row.lastWorkoutLogDate)) {
-    return false;
-  }
-
   if (
-    filters.lastActivity === "older" &&
-    (!row.lastWorkoutLogDate || isRecentActivity(row.lastWorkoutLogDate))
+    filters.lastWorkoutLog === "recent" &&
+    !isRecentWorkoutLog(row.lastWorkoutLogDate, snapshotGeneratedAt)
   ) {
     return false;
   }
 
-  if (filters.lastActivity === "no_logs" && row.lastWorkoutLogDate) {
+  if (
+    filters.lastWorkoutLog === "older" &&
+    (!row.lastWorkoutLogDate || isRecentWorkoutLog(row.lastWorkoutLogDate, snapshotGeneratedAt))
+  ) {
+    return false;
+  }
+
+  if (filters.lastWorkoutLog === "no_logs" && row.lastWorkoutLogDate) {
     return false;
   }
 
@@ -251,16 +238,6 @@ export function compareUsersRows(
       return direction * compareStrings(a.email ?? a.userId, b.email ?? b.userId);
     case "profile":
       return direction * compareBooleans(a.profilePresent, b.profilePresent);
-    case "activePlan":
-      return direction * compareBooleans(a.activePlanPresent, b.activePlanPresent);
-    case "plans":
-      return (
-        direction *
-        compareNumbers(
-          a.activePlanCount + a.archivedPlanCount,
-          b.activePlanCount + b.archivedPlanCount,
-        )
-      );
     case "workoutLogs":
       return direction * compareNumbers(a.workoutLogCount, b.workoutLogCount);
     case "feedback":
@@ -275,7 +252,7 @@ export function compareUsersRows(
       return (
         direction * compareNumbers(entitlementRank(a.entitlement), entitlementRank(b.entitlement))
       );
-    case "lastActivity":
+    case "lastWorkoutLog":
       return compareNullableDates(a.lastWorkoutLogDate, b.lastWorkoutLogDate, sort.direction);
   }
 }
@@ -513,15 +490,11 @@ function usersFilterLabel(column: keyof UsersFilters, value: string) {
     return value === "present" ? "Profile present" : "Missing";
   }
 
-  if (column === "activePlan") {
-    return value === "active" ? "Active" : "No active";
-  }
-
   if (column === "activity") {
     return value === "has_logs" ? "Has logs" : "No logs";
   }
 
-  if (column === "lastActivity") {
+  if (column === "lastWorkoutLog") {
     switch (value) {
       case "recent":
         return "Recent";
@@ -602,14 +575,18 @@ function dateTimeOrNull(value: string | null) {
   return Number.isNaN(timestamp) ? null : timestamp;
 }
 
-function isRecentActivity(value: string | null) {
+function isRecentWorkoutLog(value: string | null, snapshotGeneratedAt: string) {
   const timestamp = dateTimeOrNull(value);
-  if (timestamp === null) {
+  const snapshotTimestamp = dateTimeOrNull(snapshotGeneratedAt);
+
+  if (timestamp === null || snapshotTimestamp === null) {
     return false;
   }
 
   const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-  return Date.now() - timestamp <= thirtyDaysMs;
+  const ageMs = snapshotTimestamp - timestamp;
+
+  return ageMs >= 0 && ageMs <= thirtyDaysMs;
 }
 
 function entitlementRank(entitlement: AdminAnalyticsUserRow["entitlement"]) {

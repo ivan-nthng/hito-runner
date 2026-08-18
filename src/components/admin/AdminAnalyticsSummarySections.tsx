@@ -1,123 +1,120 @@
 import {
+  AnalyticsGroup,
   AnalyticsPanel,
   CapabilityUsageList,
   KeyCountList,
-  MetricCard,
-  MetricGrid,
-  PipelineStep,
+  MetricState,
+  NumericFact,
+  NumericFacts,
 } from "@/components/admin/AdminAnalyticsPanels";
-import {
-  formatCount,
-  formatNullableCount,
-  formatNullablePercent,
-} from "@/components/admin/admin-analytics-format";
 import type { AdminAnalyticsView } from "@/lib/admin-analytics";
 
 export function OverviewSection({ view }: { view: AdminAnalyticsView }) {
+  const authUsersTotal = view.authUsers.status === "available" ? view.authUsers.total : null;
+
   return (
     <AnalyticsPanel
-      eyebrow="Overview"
-      title="Existing product truth"
-      description="Top-level counts from auth, profile, plan, workout, and feedback tables."
+      description="Direct authentication, runner profile, and workout-log readback from the current snapshot."
       generatedAt={view.generatedAt}
     >
-      <MetricGrid>
-        <MetricCard
-          label="Auth users"
-          value={formatNullableCount(view.authUsers.total)}
-          helper={view.authUsers.status === "available" ? "Supabase auth" : view.authUsers.status}
-          tone={view.authUsers.status === "available" ? "neutral" : "warning"}
-        />
-        <MetricCard label="Profiles" value={formatCount(view.accountsActivation.runnerProfiles)} />
-        <MetricCard label="Active plans" value={formatCount(view.plans.active)} />
-        <MetricCard label="Archived plans" value={formatCount(view.plans.archived)} />
-        <MetricCard
-          label="Planned workouts"
-          value={formatCount(view.workoutUsage.totalPlannedWorkouts)}
-        />
-        <MetricCard label="Workout logs" value={formatCount(view.workoutUsage.totalWorkoutLogs)} />
-      </MetricGrid>
+      <AnalyticsGroup
+        title="Product snapshot"
+        description="Lifetime counts from their named sources; this is not a trend or source-freshness report."
+      >
+        <NumericFacts>
+          {authUsersTotal !== null ? (
+            <NumericFact label="Auth users" value={authUsersTotal} helper="Supabase auth" />
+          ) : (
+            <MetricState
+              label="Auth users"
+              status={
+                view.authUsers.status === "available"
+                  ? "unavailable"
+                  : view.authUsers.status.replaceAll("_", " ")
+              }
+              description="The authentication-user source did not return a numeric count for this snapshot."
+            />
+          )}
+          <NumericFact label="Runner profiles" value={view.accountsActivation.runnerProfiles} />
+          <NumericFact label="Workout logs" value={view.workoutUsage.totalWorkoutLogs} />
+        </NumericFacts>
+      </AnalyticsGroup>
     </AnalyticsPanel>
   );
 }
 
-export function FunnelUsageSection({ view }: { view: AdminAnalyticsView }) {
+export function ActivitySection({ view }: { view: AdminAnalyticsView }) {
   return (
     <AnalyticsPanel
-      eyebrow="Funnel & Usage"
-      title="Setup, plans, and workout logging"
-      description="Activation and usage counts already represented by canonical Hito rows."
+      description="Profile coverage and lifetime workout-log facts from the current snapshot."
       generatedAt={view.generatedAt}
     >
-      <MetricGrid>
-        <MetricCard
-          label="Profiles / setup"
-          value={formatCount(view.accountsActivation.usersWithProfile)}
-        />
-        <MetricCard
-          label="Users with active plan"
-          value={formatCount(view.accountsActivation.usersWithActivePlan)}
-        />
-        <MetricCard
-          label="Users without active plan"
-          value={formatNullableCount(view.accountsActivation.usersWithoutActivePlan)}
-        />
-        <MetricCard
-          label="Setup to active"
-          value={formatNullablePercent(view.accountsActivation.setupToActivePlanRate)}
-        />
-        <MetricCard
-          label="Completion rate"
-          value={formatNullablePercent(view.workoutUsage.roughCompletionRate)}
-          helper="completed logs / non-rest workouts"
-        />
-        <MetricCard
-          label="Active users without logs"
-          value={formatCount(view.workoutUsage.activePlanUsersWithoutLogs)}
-        />
-      </MetricGrid>
+      <AnalyticsGroup
+        title="Profiles and workout logging"
+        description="Runner setup and lifetime workout-log counts represented by their current source rows."
+      >
+        <NumericFacts>
+          <NumericFact
+            label="Profiles with setup"
+            value={view.accountsActivation.usersWithProfile}
+          />
+          {view.accountsActivation.usersWithoutProfile === null ? (
+            <MetricState
+              label="Users without a profile"
+              status="unavailable"
+              description="A numeric authentication-to-profile difference was not available for this snapshot."
+            />
+          ) : (
+            <NumericFact
+              label="Users without a profile"
+              value={view.accountsActivation.usersWithoutProfile}
+            />
+          )}
+          <NumericFact label="Workout logs" value={view.workoutUsage.totalWorkoutLogs} />
+        </NumericFacts>
+      </AnalyticsGroup>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <KeyCountList title="Workout outcomes" items={view.workoutUsage.outcomeCounts} />
-        <KeyCountList title="Plan source mix" items={view.plans.sourceKindCounts} />
-        <KeyCountList title="Plan schema versions" items={view.plans.schemaVersionCounts} />
-        <MetricCard
-          label="No logs in last 30 days"
-          value={formatCount(view.workoutUsage.activePlanUsersWithoutRecentLogs30d)}
-          helper="active-plan users"
+      <AnalyticsGroup
+        title="Recorded workout outcomes"
+        description="Backend-provided workout-log outcomes shown as recorded counts."
+      >
+        <KeyCountList
+          title="Outcome rows"
+          items={view.workoutUsage.outcomeCounts}
+          emptyDescription="The workout-log outcome source returned no rows for this snapshot."
         />
-      </div>
+      </AnalyticsGroup>
     </AnalyticsPanel>
   );
 }
 
-export function FeedbackSection({ view }: { view: AdminAnalyticsView }) {
+export function WorkoutEvidenceSection({ view }: { view: AdminAnalyticsView }) {
   return (
     <AnalyticsPanel
-      eyebrow="Integrations / Feedback"
-      title="Garmin evidence and feedback readiness"
-      description="Counts for the upload, parse, actual metrics, comparison, and AI insight pipeline."
+      description="Observed evidence-processing and enrichment counts from the current backend-shaped snapshot."
       generatedAt={view.generatedAt}
     >
-      <MetricGrid>
-        <MetricCard label="Result assets" value={formatCount(view.garminFeedback.resultAssets)} />
-        <MetricCard label="Actual metrics" value={formatCount(view.garminFeedback.actualMetrics)} />
-        <MetricCard label="Comparisons" value={formatCount(view.garminFeedback.comparisons)} />
-        <MetricCard label="AI insights" value={formatCount(view.garminFeedback.aiInsights)} />
-        <MetricCard label="Parsed assets" value={formatCount(view.garminFeedback.assetsParsed)} />
-        <MetricCard
-          label="Failed parses"
-          value={formatCount(view.garminFeedback.assetsFailed)}
-          tone="warning"
-        />
-      </MetricGrid>
+      <AnalyticsGroup
+        title="Evidence processing"
+        description="Uploaded result assets and their current parse outcomes."
+      >
+        <NumericFacts>
+          <NumericFact label="Uploaded" value={view.garminFeedback.funnel.uploaded} />
+          <NumericFact label="Parsed" value={view.garminFeedback.assetsParsed} />
+          <NumericFact label="Failed" value={view.garminFeedback.assetsFailed} tone="warning" />
+        </NumericFacts>
+      </AnalyticsGroup>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <PipelineStep label="Uploaded" value={view.garminFeedback.funnel.uploaded} />
-        <PipelineStep label="Metrics ready" value={view.garminFeedback.funnel.metricsReady} />
-        <PipelineStep label="Compared" value={view.garminFeedback.funnel.compared} />
-        <PipelineStep label="AI ready" value={view.garminFeedback.funnel.aiReady} />
-      </div>
+      <AnalyticsGroup
+        title="Enrichment"
+        description="Persisted evidence rows with metrics, comparisons, or AI insight readback available."
+      >
+        <NumericFacts>
+          <NumericFact label="Metrics ready" value={view.garminFeedback.funnel.metricsReady} />
+          <NumericFact label="Compared" value={view.garminFeedback.funnel.compared} />
+          <NumericFact label="AI ready" value={view.garminFeedback.funnel.aiReady} />
+        </NumericFacts>
+      </AnalyticsGroup>
     </AnalyticsPanel>
   );
 }
@@ -125,30 +122,33 @@ export function FeedbackSection({ view }: { view: AdminAnalyticsView }) {
 export function AiEntitlementsSection({ view }: { view: AdminAnalyticsView }) {
   return (
     <AnalyticsPanel
-      eyebrow="AI & Entitlements"
-      title="Entitlement rows and capability usage"
-      description="Backend-shaped counts for tiers, statuses, metered capabilities, and AI insight rows."
+      description="Entitlement records and aggregate capability usage without billing or credit inference."
       generatedAt={view.generatedAt}
     >
-      <MetricGrid>
-        <MetricCard
-          label="Workout AI insights"
-          value={formatCount(view.aiEntitlements.workoutAiInsights)}
-        />
-        <MetricCard
-          label="Capability keys used"
-          value={formatCount(view.aiEntitlements.capabilityUsage.length)}
-        />
-      </MetricGrid>
+      <AnalyticsGroup
+        title="Entitlement records"
+        description="Backend-provided tier and status rows. Effective fallback truth remains distinct in Users."
+      >
+        <div className="grid gap-6 md:grid-cols-2">
+          <KeyCountList
+            title="Tiers"
+            items={view.aiEntitlements.entitlementRowsByTier}
+            emptyDescription="The entitlement source returned no tier rows for this snapshot."
+          />
+          <KeyCountList
+            title="Statuses"
+            items={view.aiEntitlements.entitlementRowsByStatus}
+            emptyDescription="The entitlement source returned no status rows for this snapshot."
+          />
+        </div>
+      </AnalyticsGroup>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <KeyCountList title="Entitlement tiers" items={view.aiEntitlements.entitlementRowsByTier} />
-        <KeyCountList
-          title="Entitlement statuses"
-          items={view.aiEntitlements.entitlementRowsByStatus}
-        />
+      <AnalyticsGroup
+        title="Recorded capability usage"
+        description="Aggregate usage totals and users with usage; these are not costs, credits, or grants."
+      >
         <CapabilityUsageList items={view.aiEntitlements.capabilityUsage} />
-      </div>
+      </AnalyticsGroup>
     </AnalyticsPanel>
   );
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {
-  ACTIVE_PLAN_USER_EDIT_MUTATION_KIND,
-  ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
+  CALENDAR_WORKOUT_MUTATION_KIND,
+  CALENDAR_WORKOUT_MUTATION_SOURCE_KIND,
 } from "../../src/lib/active-plan-workout-editing/policy";
 import {
   MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
@@ -20,14 +20,14 @@ import {
   buildReviewConfirmInput,
 } from "./move-proof-fixtures";
 
-export async function validateManualActivePlanAddWorkoutContract() {
+export async function validateStandaloneManualCalendarAddContract() {
   const userId = "00000000-0000-4000-8000-000000000202";
   const input: ManualWorkoutDraftInput = {
     templateKey: "easy_aerobic_run",
     workoutDate: "2026-06-17",
     notes: "Second reviewed workout.",
   };
-  const reviewed = assertReady("manual active-plan add review", input);
+  const reviewed = assertReady("standalone manual Calendar add review", input);
   const activePlan = buildFakePlanCycle({
     userId,
     id: "11111111-1111-4111-8111-111111111111",
@@ -68,19 +68,16 @@ export async function validateManualActivePlanAddWorkoutContract() {
   if (success.ok) {
     assert.equal(success.status, "created");
     assert.equal(success.persisted, true);
-    assert.equal(success.sourceKind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
+    assert.equal(success.sourceKind, "manual");
     assert.equal(success.workoutSourceKind, MANUAL_WORKOUT_AUTHORING_SOURCE_KIND);
-    assert.equal(success.activePlanId, activePlan.id);
+    assert.equal(success.activePlanId, null);
     assert.equal(success.workoutDate, input.workoutDate);
     assert.equal(success.calendarRowCount, 2);
     assert.equal(success.nonRestWorkoutCount, 2);
     assert.equal(success.reviewChecksum, reviewed.reviewChecksum);
-    assert.equal(success.sourceMetadata.editSourceKind, ACTIVE_PLAN_USER_EDIT_SOURCE_KIND);
-    assert.equal(
-      success.sourceMetadata.mutationKind,
-      ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.addWorkout,
-    );
-    assert.equal(success.sourceMetadata.originalPlanSourceKind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
+    assert.equal(success.sourceMetadata.editSourceKind, CALENDAR_WORKOUT_MUTATION_SOURCE_KIND);
+    assert.equal(success.sourceMetadata.mutationKind, CALENDAR_WORKOUT_MUTATION_KIND.addWorkout);
+    assert.equal(success.sourceMetadata.originalPlanSourceKind, "manual");
     assert.equal(success.sourceMetadata.reviewChecksum, reviewed.reviewChecksum);
     assert.equal(success.sourceMetadata.metricTruthMode, "structure_only");
     assert.equal(success.safety.targetDayKind, "empty_day");
@@ -96,12 +93,61 @@ export async function validateManualActivePlanAddWorkoutContract() {
     },
   ]);
 
+  const restInput: ManualWorkoutDraftInput = {
+    templateKey: "rest_day",
+    workoutDate: "2026-06-18",
+  };
+  const restReview = assertReady("standalone manual Rest add review", restInput);
+  const persistedRestAdds: Array<{
+    workoutType: string;
+    workoutDate: string;
+    stepCount: number;
+    executableMode: unknown;
+  }> = [];
+  const restSuccess = await addManualWorkoutToActivePlanForUser(
+    userId,
+    buildReviewConfirmInput(restInput, restReview),
+    buildFakeAddDependencies({
+      activePlan,
+      workouts: [firstWorkout],
+      plannedWorkoutId: "66666666-6666-4666-8666-666666666667",
+      onPersist: ({ workoutSeed }) => {
+        persistedRestAdds.push({
+          workoutType: workoutSeed.workoutType,
+          workoutDate: workoutSeed.workoutDate,
+          stepCount: workoutSeed.steps.length,
+          executableMode: workoutSeed.metricMode.executable_mode,
+        });
+      },
+    }),
+  );
+
+  assert.equal(restSuccess.ok, true, formatJsonResult(restSuccess));
+  if (restSuccess.ok) {
+    assert.equal(restSuccess.status, "created");
+    assert.equal(restSuccess.workoutDate, restInput.workoutDate);
+    assert.equal(restSuccess.calendarRowCount, 2);
+    assert.equal(restSuccess.nonRestWorkoutCount, 1);
+    assert.equal(restSuccess.sourceMetadata.metricTruthMode, "none");
+    assert.equal(restSuccess.safety.targetDayKind, "empty_day");
+    assert.equal(restSuccess.safety.trustedClientRows, false);
+    assert.equal(restSuccess.safety.serverRebuiltReview, true);
+  }
+  assert.deepEqual(persistedRestAdds, [
+    {
+      workoutType: "rest",
+      workoutDate: restInput.workoutDate,
+      stepCount: 0,
+      executableMode: "none",
+    },
+  ]);
+
   const todayInput: ManualWorkoutDraftInput = {
     ...input,
     workoutDate: "2026-06-10",
     notes: "Same-day manual workout on a Rest day.",
   };
-  const todayReview = assertReady("today manual active-plan add review", todayInput);
+  const todayReview = assertReady("today standalone Calendar add review", todayInput);
   const todayActivePlan = buildFakePlanCycle({
     userId,
     id: "11111111-1111-4111-8111-111111111112",
@@ -190,7 +236,12 @@ export async function validateManualActivePlanAddWorkoutContract() {
     buildReviewConfirmInput(input, reviewed),
     buildFakeAddDependencies({ activePlan: null, workouts: [] }),
   );
-  assertAddBlocked(noActivePlan, "no_active_plan", "missing active plan");
+  assert.equal(noActivePlan.ok, true, "direct manual Add must not require a plan container");
+  if (noActivePlan.ok) {
+    assert.equal(noActivePlan.activePlanId, null);
+    assert.equal(noActivePlan.sourceKind, "manual");
+    assert.equal(noActivePlan.calendarRowCount, 1);
+  }
 
   const presetPlan = buildFakePlanCycle({
     userId,
@@ -206,13 +257,10 @@ export async function validateManualActivePlanAddWorkoutContract() {
   );
   assert.equal(presetAdd.ok, true, formatJsonResult(presetAdd));
   if (presetAdd.ok) {
-    assert.equal(presetAdd.sourceKind, "ai_authored_plan_first_v1");
-    assert.equal(presetAdd.sourceMetadata.editSourceKind, ACTIVE_PLAN_USER_EDIT_SOURCE_KIND);
-    assert.equal(presetAdd.sourceMetadata.originalPlanSourceKind, "ai_authored_plan_first_v1");
-    assert.equal(
-      presetAdd.sourceMetadata.mutationKind,
-      ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.addWorkout,
-    );
+    assert.equal(presetAdd.sourceKind, "manual");
+    assert.equal(presetAdd.sourceMetadata.editSourceKind, CALENDAR_WORKOUT_MUTATION_SOURCE_KIND);
+    assert.equal(presetAdd.sourceMetadata.originalPlanSourceKind, "manual");
+    assert.equal(presetAdd.sourceMetadata.mutationKind, CALENDAR_WORKOUT_MUTATION_KIND.addWorkout);
   }
 
   const unsupportedSource = await addManualWorkoutToActivePlanForUser(
@@ -304,7 +352,7 @@ export async function validateManualActivePlanAddWorkoutContract() {
     "A client-provided legacy plan id must not govern runner-owned Calendar mutation.",
   );
   if (staleProvenanceHint.ok) {
-    assert.equal(staleProvenanceHint.activePlanId, activePlan.id);
+    assert.equal(staleProvenanceHint.activePlanId, null);
   }
 
   const persistenceFailure = await addManualWorkoutToActivePlanForUser(

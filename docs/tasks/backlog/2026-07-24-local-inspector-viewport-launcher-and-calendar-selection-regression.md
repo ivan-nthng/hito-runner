@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** FRONTEND
+- **Epic:** platform-and-operations
 - **Outcome:** Completed the scoped outcome: Restore independent viewport launcher behavior and reliable calendar-cell selection in the local-only Inspector.
 - **Sources:** Terminal decision/evidence record only; detailed transcript remains in Git history.
 - **Validation:** The original terminal receipt records focused validation for the completed scope; detailed commands remain available in Git history.

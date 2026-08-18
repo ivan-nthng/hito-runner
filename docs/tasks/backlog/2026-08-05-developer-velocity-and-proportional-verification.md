@@ -20,6 +20,10 @@ high
 
 product
 
+## Epic
+
+platform-and-operations
+
 ## Scope
 
 scripts-validators-qa-infrastructure

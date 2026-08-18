@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** FRONTEND
+- **Epic:** platform-and-operations
 - **Parent:** [Current Candidate Git Release And Vercel Verification — Retry 5](./2026-08-14-current-candidate-git-release-and-vercel-verification-retry-5.md)
 - **Outcome:** FRONTEND Marketing completed the bounded history-validator root repair. The initial source gate was reproduced before implementation: npm run validate-changelog-history exited 1 with Technical log Last Updated must be 2026-08-11. even though the protected…
 - **Sources:** [validate-changelog-history-sync.ts](../../../scripts/validate-changelog-history-sync.ts)

@@ -6,7 +6,7 @@
 
 ## Status
 
-backlog
+closed
 
 ## Type
 
@@ -19,6 +19,10 @@ medium
 ## Owner
 
 product
+
+## Epic
+
+runner-core-readiness
 
 ## Scope
 
@@ -35,7 +39,13 @@ reviewed transition seam.
 
 ## Stage
 
-PRODUCT backlog / no active implementation or standalone QA gate selected.
+Closed — superseded by the runner-owned standalone Calendar model.
+
+## Product Lifecycle Reconciliation — 2026-08-18
+
+The retained active-plan replacement/refresh contract is incompatible with the accepted source-only
+plan model. Confirmed Calendar workouts are runner-owned and cannot be replaced through a current
+plan container. Preserve this record as historical evidence only; do not dispatch its prompt.
 
 ## Historical Exact Handoff Prompt
 

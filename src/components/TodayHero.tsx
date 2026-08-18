@@ -21,10 +21,12 @@ import {
 
 export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
   const scheduledWorkout = findWorkout(snapshot.workouts, snapshot.currentDate);
-  const planStart = snapshot.planMeta?.startDate ?? snapshot.workouts[0]?.date ?? null;
+  const nextWorkout = snapshot.workouts.find(
+    (item) => item.date > snapshot.currentDate && item.type !== "rest",
+  );
 
-  if (!scheduledWorkout && planStart && snapshot.currentDate < planStart) {
-    return <PlanStartsLaterHero snapshot={snapshot} planStart={planStart} />;
+  if (!scheduledWorkout && nextWorkout) {
+    return <NextWorkoutLaterHero snapshot={snapshot} nextWorkout={nextWorkout} />;
   }
 
   const workout =
@@ -163,15 +165,13 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
   );
 }
 
-function PlanStartsLaterHero({
+function NextWorkoutLaterHero({
   snapshot,
-  planStart,
+  nextWorkout,
 }: {
   snapshot: TrainingSnapshot;
-  planStart: string;
+  nextWorkout: TrainingSnapshot["workouts"][number];
 }) {
-  const nextWorkout = snapshot.workouts.find((item) => item.date > snapshot.currentDate);
-
   return (
     <section className="pt-1 lg:pt-2">
       <div className="hito-workout-hero-grid">
@@ -191,23 +191,22 @@ function PlanStartsLaterHero({
           </div>
 
           <h2 className="hito-ui-title-lg mt-3 max-w-2xl text-foreground">
-            Your plan starts later.
+            Your next workout is scheduled later.
           </h2>
 
           <p className="hito-body-md text-secondary mt-4 max-w-xl">
             Today is {formatDate(snapshot.currentDate, { month: "short", day: "numeric" })}, while
-            your current plan begins on {formatDate(planStart, { month: "short", day: "numeric" })}.
+            your next Calendar workout is on{" "}
+            {formatDate(nextWorkout.date, { month: "short", day: "numeric" })}.
           </p>
 
           <div className="mt-6 flex flex-wrap items-center gap-2">
-            {nextWorkout && (
-              <HitoButton asChild size="sm" variant="primary">
-                <Link to="/workout/$date" params={{ date: nextWorkout.date }}>
-                  Open nearest workout
-                  <Icon name="arrow-up-right" size="xs" />
-                </Link>
-              </HitoButton>
-            )}
+            <HitoButton asChild size="sm" variant="primary">
+              <Link to="/workout/$date" params={{ date: nextWorkout.date }}>
+                Open nearest workout
+                <Icon name="arrow-up-right" size="xs" />
+              </Link>
+            </HitoButton>
             <HitoButton asChild size="sm" variant="secondary">
               <Link to="/progress">Open progress</Link>
             </HitoButton>
@@ -216,29 +215,27 @@ function PlanStartsLaterHero({
 
         <div>
           <DismissibleSupportNote
-            title="Plan Window"
+            title="Calendar"
             icon={<Icon name="plan-note" size="xs" className="text-signal" />}
           >
-            Begins {formatDate(planStart, { month: "short", day: "numeric" })}
+            Next workout {formatDate(nextWorkout.date, { month: "short", day: "numeric" })}
           </DismissibleSupportNote>
 
-          {nextWorkout && (
-            <section className="py-4">
-              <div>
-                <div className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
-                  Next Workout
-                </div>
-                <div className="mt-1 text-sm text-foreground">{nextWorkout.title}</div>
-                <div className="hito-technical-sm text-tertiary mt-2">
-                  {formatDate(nextWorkout.date, {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </div>
+          <section className="py-4">
+            <div>
+              <div className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
+                Next Workout
               </div>
-            </section>
-          )}
+              <div className="mt-1 text-sm text-foreground">{nextWorkout.title}</div>
+              <div className="hito-technical-sm text-tertiary mt-2">
+                {formatDate(nextWorkout.date, {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </div>
+            </div>
+          </section>
         </div>
       </div>
       <div className="mt-6 border-b border-hairline" />

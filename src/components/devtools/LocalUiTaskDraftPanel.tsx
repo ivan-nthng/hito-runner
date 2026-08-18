@@ -7,6 +7,7 @@ import {
   buildColorControlSelections,
   buildInlineChangePayload,
   buildTokenControlSelections,
+  createHistoricBorderIntentEvidence,
   getInlineChangeAction,
   INLINE_CHANGE_SCOPE_OPTIONS,
   normalizeTargetKind,
@@ -18,6 +19,7 @@ import {
   type LocalUiInspectorItemDraft,
   type LocalUiComponentAction,
   type LocalUiScopedComponentActionScope,
+  normalizeLocalUiInspectorItemDraft,
 } from "@/components/devtools/local-ui-inspector-session";
 import { ChromeControlRows } from "@/components/devtools/LocalUiChromeControls";
 import { ColorControlRows, TokenControlRows } from "@/components/devtools/LocalUiTokenControls";
@@ -66,7 +68,15 @@ export function LocalUiTaskDraftPanel({
   ownership: HitoDsOwnershipEvidence;
   target: InlineChangeTargetInput;
 }) {
-  const [draft, setDraft] = useState(initialDraft);
+  const [draft, setDraft] = useState(() => normalizeLocalUiInspectorItemDraft(initialDraft));
+  const historicBorderRemoval =
+    (initialDraft.chromeRemovalSelection as unknown as { kind?: string } | null)?.kind === "border";
+  const borderIntent = useMemo(
+    () =>
+      target.borderIntent ??
+      (historicBorderRemoval ? createHistoricBorderIntentEvidence(target.border) : null),
+    [historicBorderRemoval, target.border, target.borderIntent],
+  );
   const headingId = useId();
   const headingRef = useRef<HTMLHeadingElement | null>(null);
   const isEditing = typeof itemNumber === "number";
@@ -135,11 +145,13 @@ export function LocalUiTaskDraftPanel({
         tokenControlSelections,
         colorControlSelections,
         typographyRoleSelection,
+        draft.borderIntentSelection,
         draft.chromeRemovalSelection,
         null,
       ),
     [
       componentAction,
+      draft.borderIntentSelection,
       draft.chromeRemovalSelection,
       colorControlSelections,
       hasTextChange,
@@ -156,6 +168,8 @@ export function LocalUiTaskDraftPanel({
         fixScope: effectiveFixScope,
         target: {
           ...target,
+          borderIntent,
+          borderIntentSelection: isRemovingInstance ? null : draft.borderIntentSelection,
           chromeRemovalSelection: isRemovingInstance ? null : draft.chromeRemovalSelection,
           promptActionSelection: isRemovingInstance
             ? { id: "remove_component", label: "Remove object" }
@@ -167,11 +181,13 @@ export function LocalUiTaskDraftPanel({
         },
       }),
     [
+      draft.borderIntentSelection,
       draft.chromeRemovalSelection,
       colorControlSelections,
       draft.comment,
       draft.proposedText,
       draftAction,
+      borderIntent,
       effectiveFixScope,
       isRemovingInstance,
       hasTextProperty,
@@ -188,6 +204,7 @@ export function LocalUiTaskDraftPanel({
     draft.componentAction !== null ||
     getHasActionableDraft({
       action: draftAction,
+      borderIntentSelection: draft.borderIntentSelection,
       chromeRemovalSelection: draft.chromeRemovalSelection,
       comment: draft.comment,
       currentText: target.visibleText,
@@ -204,7 +221,7 @@ export function LocalUiTaskDraftPanel({
   const submitDisabled = !hasActionableDraft || (!isEditing && batchFull);
 
   useEffect(() => {
-    setDraft(initialDraft);
+    setDraft(normalizeLocalUiInspectorItemDraft(initialDraft));
     window.requestAnimationFrame(() => headingRef.current?.focus());
   }, [initialDraft]);
 
@@ -216,6 +233,7 @@ export function LocalUiTaskDraftPanel({
     if (componentAction?.type === "remove_instance") {
       setDraft((current) => ({
         ...current,
+        borderIntentSelection: null,
         chromeRemovalSelection: null,
         componentAction,
         desiredTokens: {},
@@ -290,9 +308,13 @@ export function LocalUiTaskDraftPanel({
                 />
               ) : null}
               <ChromeControlRows
-                border={target.border}
+                borderIntent={borderIntent}
+                borderIntentSelection={draft.borderIntentSelection}
                 cardChrome={target.cardChrome}
                 chromeRemovalSelection={draft.chromeRemovalSelection}
+                onBorderIntentChange={(borderIntentSelection) =>
+                  updateDraft({ borderIntentSelection })
+                }
                 onChromeRemovalChange={(chromeRemovalSelection) =>
                   updateDraft({ chromeRemovalSelection })
                 }

@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** DESIGN SYSTEM
+- **Epic:** platform-and-operations
 - **Parent:** [Hito Stack Complexity Reduction Program](2026-08-04-hito-stack-complexity-reduction-program.md)
 - **Outcome:** both playgrounds consume one narrow settings composition; all retired-token, retired.
 - **Sources:** [validate-hito-ds-component-contracts.ts](../../../scripts/validate-hito-ds-component-contracts.ts); [package.json](../../../package.json)

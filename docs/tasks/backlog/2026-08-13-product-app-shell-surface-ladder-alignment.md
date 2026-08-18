@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** FRONTEND
+- **Epic:** platform-and-operations
 - **Depends On:** 2026-08-13-hito-ds-canonical-app-shell-surface-and-header-contract
 - **Evidence From:** 2026-08-11-hito-ds-foundations-color-truth-context-and-reference-canvas
 - **Outcome:** The authenticated runner shell now expresses the accepted semantic ladder without adding a second visual authority. The former bg-sidebar/60 backdrop-blur desktop rail obscured the opaque sidebar role, while the unstyled <main> inherited the outer background…

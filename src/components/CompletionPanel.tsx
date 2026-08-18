@@ -12,7 +12,11 @@ import {
   workoutDistanceKm,
   workoutDuration,
 } from "@/lib/training";
-import type { WorkoutResultFeedbackSummary } from "@/lib/workout-result-import/types";
+import {
+  LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_FIELD,
+  LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE,
+  type WorkoutResultFeedbackSummary,
+} from "@/lib/workout-result-import/types";
 import { HitoButton } from "@/components/ui/button";
 import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
 import { Input } from "@/components/ui/input";
@@ -34,7 +38,6 @@ import {
 } from "@/components/workout-completion/WorkoutComparisonReadback";
 import { WorkoutAiInsightReadback } from "@/components/workout-completion/WorkoutAiInsightReadback";
 import { formatWorkoutFeedbackTimestamp } from "@/components/workout-completion/workout-feedback-time";
-import { buildLocalActivityFileDesignFixture } from "@/lib/local-activity-file-design-fixture";
 
 type Outcome = "completed" | "partial" | "skipped";
 type CompletionFormState = {
@@ -614,7 +617,7 @@ export function CompletionPanel({
           {isFitCompleted
             ? "Personal feedback only. Run data stays with the activity file."
             : snapshot.source === "persisted"
-              ? "Saved to your plan."
+              ? "Saved to this workout."
               : "Preview only."}
         </span>
       </div>
@@ -687,8 +690,6 @@ export function WorkoutFeedbackPanel({
   snapshot,
   feedback,
   localActivityFileDesignFixtureEnabled = false,
-  localFixturePreviewActive = false,
-  onLocalFixturePreviewChange,
   onUploadInProgressChange,
   onUploadSucceeded,
 }: {
@@ -696,8 +697,6 @@ export function WorkoutFeedbackPanel({
   snapshot: TrainingSnapshot;
   feedback: WorkoutResultFeedbackSummary | null;
   localActivityFileDesignFixtureEnabled?: boolean;
-  localFixturePreviewActive?: boolean;
-  onLocalFixturePreviewChange?: (feedback: WorkoutResultFeedbackSummary | null) => void;
   onUploadInProgressChange?: (isUploading: boolean) => void;
   onUploadSucceeded?: (notice: string) => void;
 }) {
@@ -709,10 +708,10 @@ export function WorkoutFeedbackPanel({
   const [operationNotice, setOperationNotice] = useState<string | null>(null);
   const [isRemoving, setIsRemoving] = useState(false);
   const [feedbackState, setFeedbackState] = useState<WorkoutResultFeedbackSummary | null>(feedback);
-  const [localFixturePreviewIsActive, setLocalFixturePreviewIsActive] =
-    useState(localFixturePreviewActive);
   const canUploadResult = snapshot.source === "persisted" && workout.type !== "rest";
-  const attachedGarminAsset = feedbackState?.latestAsset ?? null;
+  const attachedGarminAsset = feedbackState?.latestAsset?.rawFileAvailable
+    ? feedbackState.latestAsset
+    : null;
   const latestActualMetrics = feedbackState?.latestActualMetrics ?? null;
   const latestComparison = feedbackState?.latestComparison ?? null;
   const latestAiInsight = feedbackState?.latestAiInsight ?? null;
@@ -750,12 +749,116 @@ export function WorkoutFeedbackPanel({
 
   useEffect(() => {
     setFeedbackState(feedback);
-    setLocalFixturePreviewIsActive(localFixturePreviewActive);
-  }, [feedback, localFixturePreviewActive]);
+  }, [feedback]);
 
   useEffect(() => {
     onUploadInProgressChange?.(isUploading);
   }, [isUploading, onUploadInProgressChange]);
+
+  async function uploadActivityFile(selectedFile: File | null) {
+    if (!selectedFile && !localActivityFileDesignFixtureEnabled) {
+      return;
+    }
+
+    if (selectedFile) {
+      const selectedFileName = selectedFile.name.toLowerCase();
+      const isSupportedGarminFile =
+        selectedFileName.endsWith(".fit") || selectedFileName.endsWith(".zip");
+
+      if (!isSupportedGarminFile) {
+        setUploadError("Choose one Garmin .fit file or .zip archive.");
+        setOperationNotice(null);
+        return;
+      }
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+    setRemoveError(null);
+    setOperationNotice("Uploading activity file.");
+
+    try {
+      const formData = new FormData();
+      formData.set("plannedWorkoutId", workout.id);
+
+      if (localActivityFileDesignFixtureEnabled) {
+        formData.set(
+          LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_FIELD,
+          LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE,
+        );
+      } else if (selectedFile) {
+        formData.set("file", selectedFile);
+      }
+
+      const response = await fetch("/api/workout-result/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const payload = await readWorkoutResultResponse<
+        | {
+            ok: true;
+            marker: NonNullable<WorkoutResultFeedbackSummary>["marker"];
+            latestAsset: NonNullable<WorkoutResultFeedbackSummary>["latestAsset"];
+            latestActualMetrics: NonNullable<WorkoutResultFeedbackSummary>["latestActualMetrics"];
+            latestComparison: NonNullable<WorkoutResultFeedbackSummary>["latestComparison"];
+            latestAiInsight: NonNullable<WorkoutResultFeedbackSummary>["latestAiInsight"];
+          }
+        | { ok: false; message?: string }
+      >(response, "The Garmin result upload could not be completed.");
+
+      if (!response.ok || !payload.ok) {
+        throw new RunnerSafeWorkoutResultClientError(
+          "message" in payload && typeof payload.message === "string"
+            ? payload.message
+            : "The Garmin result upload could not be completed.",
+        );
+      }
+
+      setFeedbackState({
+        marker: payload.marker ?? null,
+        latestAsset: payload.latestAsset ?? null,
+        latestActualMetrics: payload.latestActualMetrics ?? null,
+        latestComparison: payload.latestComparison ?? null,
+        latestAiInsight: payload.latestAiInsight ?? null,
+      });
+
+      if (payload.latestAsset?.parseStatus === "failed") {
+        setOperationNotice(null);
+
+        try {
+          await router.invalidate();
+        } catch {
+          // Keep the runner-safe parse failure visible even if route refresh lags.
+        }
+
+        return;
+      }
+
+      const successNotice = payload.latestComparison
+        ? "Activity file uploaded. Plan versus run is ready to review."
+        : payload.latestActualMetrics
+          ? "Activity file uploaded. Run captured; plan comparison is unavailable."
+          : "Activity file uploaded.";
+      setOperationNotice(successNotice);
+
+      try {
+        await router.invalidate();
+      } catch {
+        // Keep the successful upload state visible even if route refresh lags.
+      }
+
+      onUploadSucceeded?.(successNotice);
+    } catch (uploadFailure) {
+      setOperationNotice(null);
+      setUploadError(
+        uploadFailure instanceof RunnerSafeWorkoutResultClientError
+          ? uploadFailure.message
+          : "The Garmin result upload could not be completed.",
+      );
+    } finally {
+      setIsUploading(false);
+    }
+  }
 
   if (workout.type === "rest") {
     return (
@@ -797,126 +900,20 @@ export function WorkoutFeedbackPanel({
         </div>
       </header>
 
-      {!attachedGarminAsset ? (
+      {!attachedGarminAsset && !localActivityFileDesignFixtureEnabled ? (
         <input
           ref={fileInputRef}
           type="file"
           className="sr-only"
-          onChange={async (event) => {
+          onChange={(event) => {
             const selectedFile = event.target.files?.[0];
+            event.target.value = "";
 
             if (!selectedFile) {
               return;
             }
 
-            if (localActivityFileDesignFixtureEnabled) {
-              const fixtureNotice =
-                "Local activity file preview is ready. Nothing was uploaded or saved.";
-              const fixtureFeedback = buildLocalActivityFileDesignFixture(
-                workout,
-                selectedFile.name,
-              );
-              setUploadError(null);
-              setRemoveError(null);
-              setOperationNotice(fixtureNotice);
-              setFeedbackState(fixtureFeedback);
-              setLocalFixturePreviewIsActive(true);
-              onLocalFixturePreviewChange?.(fixtureFeedback);
-              event.target.value = "";
-              onUploadSucceeded?.(fixtureNotice);
-              return;
-            }
-
-            const selectedFileName = selectedFile.name.toLowerCase();
-            const isSupportedGarminFile =
-              selectedFileName.endsWith(".fit") || selectedFileName.endsWith(".zip");
-
-            if (!isSupportedGarminFile) {
-              setUploadError("Choose one Garmin .fit file or .zip archive.");
-              setOperationNotice(null);
-              event.target.value = "";
-              return;
-            }
-
-            setIsUploading(true);
-            setUploadError(null);
-            setRemoveError(null);
-            setOperationNotice("Uploading activity file.");
-
-            try {
-              const formData = new FormData();
-              formData.set("plannedWorkoutId", workout.id);
-              formData.set("file", selectedFile);
-
-              const response = await fetch("/api/workout-result/upload", {
-                method: "POST",
-                body: formData,
-              });
-              const payload = await readWorkoutResultResponse<
-                | {
-                    ok: true;
-                    marker: NonNullable<WorkoutResultFeedbackSummary>["marker"];
-                    latestAsset: NonNullable<WorkoutResultFeedbackSummary>["latestAsset"];
-                    latestActualMetrics: NonNullable<WorkoutResultFeedbackSummary>["latestActualMetrics"];
-                    latestComparison: NonNullable<WorkoutResultFeedbackSummary>["latestComparison"];
-                    latestAiInsight: NonNullable<WorkoutResultFeedbackSummary>["latestAiInsight"];
-                  }
-                | { ok: false; message?: string }
-              >(response, "The Garmin result upload could not be completed.");
-
-              if (!response.ok || !payload.ok) {
-                throw new RunnerSafeWorkoutResultClientError(
-                  "message" in payload && typeof payload.message === "string"
-                    ? payload.message
-                    : "The Garmin result upload could not be completed.",
-                );
-              }
-
-              setFeedbackState({
-                marker: payload.marker ?? null,
-                latestAsset: payload.latestAsset ?? null,
-                latestActualMetrics: payload.latestActualMetrics ?? null,
-                latestComparison: payload.latestComparison ?? null,
-                latestAiInsight: payload.latestAiInsight ?? null,
-              });
-
-              if (payload.latestAsset?.parseStatus === "failed") {
-                setOperationNotice(null);
-
-                try {
-                  await router.invalidate();
-                } catch {
-                  // Keep the runner-safe parse failure visible even if route refresh lags.
-                }
-
-                return;
-              }
-
-              const successNotice = payload.latestComparison
-                ? "Activity file uploaded. Plan versus run is ready to review."
-                : payload.latestActualMetrics
-                  ? "Activity file uploaded. Run captured; plan comparison is unavailable."
-                  : "Activity file uploaded.";
-              setOperationNotice(successNotice);
-
-              try {
-                await router.invalidate();
-              } catch {
-                // Keep the successful upload state visible even if route refresh lags.
-              }
-
-              onUploadSucceeded?.(successNotice);
-            } catch (uploadFailure) {
-              setOperationNotice(null);
-              setUploadError(
-                uploadFailure instanceof RunnerSafeWorkoutResultClientError
-                  ? uploadFailure.message
-                  : "The Garmin result upload could not be completed.",
-              );
-            } finally {
-              event.target.value = "";
-              setIsUploading(false);
-            }
+            void uploadActivityFile(selectedFile);
           }}
         />
       ) : null}
@@ -928,27 +925,8 @@ export function WorkoutFeedbackPanel({
               asset={attachedGarminAsset}
               summary={uploadSummary}
               isRemoving={isRemoving}
-              localFixture={localFixturePreviewIsActive}
               onRemove={async () => {
                 if (!canUploadResult || isRemoving) {
-                  return;
-                }
-
-                if (localFixturePreviewIsActive) {
-                  const confirmed = window.confirm(
-                    "Clear this local design preview? No file was uploaded or saved.",
-                  );
-
-                  if (!confirmed) {
-                    return;
-                  }
-
-                  setFeedbackState(null);
-                  setLocalFixturePreviewIsActive(false);
-                  onLocalFixturePreviewChange?.(null);
-                  setOperationNotice(
-                    "Local activity file preview cleared. Nothing was uploaded or saved.",
-                  );
                   return;
                 }
 
@@ -1033,8 +1011,8 @@ export function WorkoutFeedbackPanel({
                   </p>
                   {localActivityFileDesignFixtureEnabled ? (
                     <p className="hito-body-xs mt-3 max-w-xl text-muted-foreground">
-                      Local design fixture. Choose any file to preview deterministic activity
-                      readback; nothing is uploaded or saved.
+                      Local QA fixture. Attach the canonical FIT sample through the same durable
+                      upload path used by runner files.
                     </p>
                   ) : null}
                   <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
@@ -1044,7 +1022,11 @@ export function WorkoutFeedbackPanel({
                         setUploadError(null);
                         setRemoveError(null);
                         setOperationNotice(null);
-                        fileInputRef.current?.click();
+                        if (localActivityFileDesignFixtureEnabled) {
+                          void uploadActivityFile(null);
+                        } else {
+                          fileInputRef.current?.click();
+                        }
                       }}
                       disabled={!canUploadResult || isUploading}
                       size="md"
@@ -1053,7 +1035,11 @@ export function WorkoutFeedbackPanel({
                       className={cn(!canUploadResult && "disabled:opacity-100")}
                     >
                       <Icon name="file-up" size="sm" />
-                      {isUploading ? "Uploading file..." : "Upload activity file"}
+                      {isUploading
+                        ? "Uploading file..."
+                        : localActivityFileDesignFixtureEnabled
+                          ? "Attach local FIT sample"
+                          : "Upload activity file"}
                     </HitoButton>
                   </div>
                 </div>
@@ -1236,13 +1222,11 @@ function AttachedEvidenceReadback({
   asset,
   summary,
   isRemoving,
-  localFixture = false,
   onRemove,
 }: {
-  asset: NonNullable<WorkoutResultFeedbackSummary>["latestAsset"];
+  asset: NonNullable<NonNullable<WorkoutResultFeedbackSummary>["latestAsset"]>;
   summary: ReturnType<typeof getFeedbackUploadSummary>;
   isRemoving: boolean;
-  localFixture?: boolean;
   onRemove: () => Promise<void>;
 }) {
   const fileTypeLabel = asset.assetKind === "garmin_zip" ? "Garmin ZIP" : "Garmin FIT";
@@ -1255,9 +1239,7 @@ function AttachedEvidenceReadback({
           <p className="hito-body-md text-foreground mt-2">{asset.originalFileName}</p>
           <p className="hito-body-xs text-tertiary mt-2">{fileTypeLabel}</p>
           <p className="hito-body-xs text-tertiary mt-1">
-            {localFixture
-              ? "Local design fixture only. No file was uploaded or saved."
-              : "Remove this file before uploading a replacement. Your manual result stays as it is."}
+            Remove this file before uploading a replacement. Your manual result stays as it is.
           </p>
           {asset.primaryFileName && asset.primaryFileName !== asset.originalFileName ? (
             <p className="hito-body-xs text-tertiary mt-1">
@@ -1277,7 +1259,7 @@ function AttachedEvidenceReadback({
           className="w-full shrink-0 opacity-100 transition-opacity sm:w-auto sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus-visible:opacity-100"
         >
           <Icon name="trash" size="sm" />
-          {isRemoving ? "Removing..." : localFixture ? "Clear local preview" : "Remove file"}
+          {isRemoving ? "Removing..." : "Remove file"}
         </HitoButton>
       </div>
 

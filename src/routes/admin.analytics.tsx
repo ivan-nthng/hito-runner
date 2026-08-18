@@ -7,6 +7,7 @@ import {
   AdminDataTableToolbar,
 } from "@/components/admin/AdminOperationalComponents";
 import {
+  AnalyticsGroup,
   AnalyticsPanel,
   BooleanPill,
   CompactCount,
@@ -19,10 +20,10 @@ import {
   formatShortDate,
 } from "@/components/admin/admin-analytics-format";
 import {
+  ActivitySection,
   AiEntitlementsSection,
-  FeedbackSection,
-  FunnelUsageSection,
   OverviewSection,
+  WorkoutEvidenceSection,
 } from "@/components/admin/AdminAnalyticsSummarySections";
 import {
   AdminWorkspacePageHeader,
@@ -68,6 +69,7 @@ import {
   type AdminLocalTestAccountsResult,
 } from "@/lib/admin-local-test-accounts";
 import { APP_NAME } from "@/lib/app-config";
+import { getSettingsRouteData } from "@/lib/training-api";
 
 export const Route = createFileRoute("/admin/analytics")({
   validateSearch: (search: Record<string, unknown>): AdminAnalyticsSearch => ({
@@ -78,7 +80,7 @@ export const Route = createFileRoute("/admin/analytics")({
       { title: `Admin analytics — ${APP_NAME}` },
       {
         name: "description",
-        content: "Internal Hito admin operations summary from existing product truth.",
+        content: "Internal Hito admin operations summary from direct product readback.",
       },
     ],
   }),
@@ -93,9 +95,9 @@ type AdminAnalyticsSearch = {
 };
 
 const ADMIN_SECTION_DESCRIPTIONS: Record<AdminTab, string> = {
-  overview: "Top-level admin readback from existing Hito product truth.",
-  funnel: "Activation, plan, and workout usage counts from canonical rows.",
-  feedback: "Garmin evidence and feedback pipeline readiness from backend-shaped truth.",
+  overview: "Direct authentication, profile, and workout-log readback.",
+  funnel: "Direct profile and workout-log activity facts.",
+  feedback: "Workout evidence processing and enrichment readback.",
   ai: "Entitlement rows, capability usage, and AI readback without exposing raw payloads.",
   users: "Backend-classified real users, scoped to internal operational readback.",
   "test-accounts": "Local and excluded QA accounts kept separate from real-user analytics.",
@@ -118,7 +120,7 @@ const initialDeleteState: DeleteState = {
 };
 
 function AdminAnalyticsPage() {
-  const { analyticsResult, testAccountsResult } = Route.useLoaderData();
+  const { analyticsResult, testAccountsResult, settings } = Route.useLoaderData();
   const search = Route.useSearch();
   const activeTab = search.section;
   const activeSection = getAdminWorkspaceSection(activeTab);
@@ -126,16 +128,17 @@ function AdminAnalyticsPage() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <div className="hito-workbench-shell hito-workbench-shell-compact-sidebar">
-        <AdminWorkspaceSidebar activeSection={activeTab} />
+        <AdminWorkspaceSidebar activeSection={activeTab} settings={settings} />
 
         <section className="hito-workbench-main">
           <AdminWorkspacePageHeader
             activeSection={activeTab}
+            settings={settings}
             title={activeSection.label}
             description={ADMIN_SECTION_DESCRIPTIONS[activeTab]}
           />
 
-          <div className="hito-route-stack mx-auto max-w-7xl px-5 py-8 sm:px-8 lg:px-10">
+          <div className="hito-route-gutter mx-auto max-w-7xl py-6 md:py-8 lg:px-6">
             <div>
               {activeTab === "test-accounts" ? (
                 <TestAccountsCard
@@ -154,9 +157,10 @@ function AdminAnalyticsPage() {
 }
 
 async function loadAdminAnalyticsRouteData() {
-  const [analyticsResult, testAccountsResult] = await Promise.all([
+  const [analyticsResult, testAccountsResult, settingsRouteData] = await Promise.all([
     getAdminAnalytics(),
     getAdminLocalTestAccounts(),
+    getSettingsRouteData(),
   ]);
 
   if (
@@ -172,7 +176,7 @@ async function loadAdminAnalyticsRouteData() {
     });
   }
 
-  return { analyticsResult, testAccountsResult };
+  return { analyticsResult, testAccountsResult, settings: settingsRouteData.settings };
 }
 
 function AnalyticsContent({
@@ -190,13 +194,13 @@ function AnalyticsContent({
     case "overview":
       return <OverviewSection view={result.view} />;
     case "funnel":
-      return <FunnelUsageSection view={result.view} />;
+      return <ActivitySection view={result.view} />;
     case "feedback":
-      return <FeedbackSection view={result.view} />;
+      return <WorkoutEvidenceSection view={result.view} />;
     case "ai":
       return <AiEntitlementsSection view={result.view} />;
     case "users":
-      return <UsersSection rows={result.view.perUserRows} />;
+      return <UsersSection rows={result.view.perUserRows} generatedAt={result.view.generatedAt} />;
   }
 }
 
@@ -244,25 +248,30 @@ function AnalyticsUnavailableState({
   );
 }
 
-function UsersSection({ rows }: { rows: AdminAnalyticsUserRow[] }) {
+function UsersSection({
+  rows,
+  generatedAt,
+}: {
+  rows: AdminAnalyticsUserRow[];
+  generatedAt: string;
+}) {
   const [filters, setFilters] = useState<UsersFilters>({
     query: "",
     profile: "all",
-    activePlan: "all",
     activity: "all",
-    lastActivity: "all",
+    lastWorkoutLog: "all",
     entitlement: "all",
   });
   const [sort, setSort] = useState<UsersSortState>({
-    key: "lastActivity",
+    key: "lastWorkoutLog",
     direction: "desc",
   });
 
   const visibleRows = useMemo(() => {
     return rows
-      .filter((row) => matchesUsersFilters(row, filters))
+      .filter((row) => matchesUsersFilters(row, filters, generatedAt))
       .sort((a, b) => compareUsersRows(a, b, sort));
-  }, [filters, rows, sort]);
+  }, [filters, generatedAt, rows, sort]);
 
   const setFilter = <Key extends keyof UsersFilters>(key: Key, value: UsersFilters[Key]) => {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -277,261 +286,234 @@ function UsersSection({ rows }: { rows: AdminAnalyticsUserRow[] }) {
     setFilters({
       query: "",
       profile: "all",
-      activePlan: "all",
       activity: "all",
-      lastActivity: "all",
+      lastWorkoutLog: "all",
       entitlement: "all",
     });
   };
 
   return (
     <AnalyticsPanel
-      eyebrow="Users"
-      title="Real product users"
       description="Backend-classified real Hito users only. Local, QA, Codex, apply, admin, and suspected test accounts are excluded from this table."
+      generatedAt={generatedAt}
     >
-      {rows.length === 0 ? (
-        <EmptyPanel
-          title="No real users yet."
-          description="Only test/local accounts exist in this environment. Use Test accounts for QA fixtures."
-        />
-      ) : (
-        <div className="grid gap-4">
-          <AdminDataTableToolbar
-            activeFilters={activeFilters}
-            clearAllFilters={clearAllFilters}
-            onQueryChange={(value) => setFilter("query", value)}
-            query={filters.query}
-            rowCountLabel={`Showing ${formatCount(visibleRows.length)} of ${formatCount(
-              rows.length,
-            )} real users.`}
-            searchLabel="Search users"
-            searchPlaceholder="Email, user id, entitlement..."
+      <AnalyticsGroup
+        title="Real product users"
+        description="Direct profile, workout-log, evidence, and entitlement facts for operational review."
+      >
+        {rows.length === 0 ? (
+          <EmptyPanel
+            title="No real users yet."
+            description="Only test/local accounts exist in this environment. Use Test accounts for QA fixtures."
           />
-
-          {visibleRows.length === 0 ? (
-            <EmptyPanel
-              title="No real users match these filters."
-              description="Adjust search or filters to return the backend-provided real user rows."
+        ) : (
+          <div className="grid gap-4">
+            <AdminDataTableToolbar
+              activeFilters={activeFilters}
+              clearAllFilters={clearAllFilters}
+              onQueryChange={(value) => setFilter("query", value)}
+              query={filters.query}
+              rowCountLabel={`Showing ${formatCount(visibleRows.length)} of ${formatCount(
+                rows.length,
+              )} real users.`}
+              searchLabel="Search users"
+              searchPlaceholder="Email, user id, entitlement..."
             />
-          ) : null}
 
-          <div className="hito-data-table-scroll">
-            <table className="hito-data-table hito-data-table-min-xl">
-              <caption className="sr-only">
-                Admin real-user activity summary with search, filters, and sorting.
-              </caption>
-              <thead>
-                <tr>
-                  <AdminDataTableColumnHeader
-                    activeSort={sort}
-                    column="user"
-                    filterActive={false}
-                    label="User / email"
-                    menuLabel="Sort and filter User / email"
-                    onSort={setSortOption}
-                    sortOptions={[
-                      { label: "A to Z", key: "user", direction: "asc" },
-                      { label: "Z to A", key: "user", direction: "desc" },
-                    ]}
-                  />
-                  <AdminDataTableColumnHeader
-                    activeSort={sort}
-                    column="profile"
-                    filterActive={filters.profile !== "all"}
-                    filterOptions={[
-                      { label: "All", value: "all" },
-                      { label: "Profile present", value: "present" },
-                      { label: "Missing", value: "missing" },
-                    ]}
-                    label="Profile"
-                    menuLabel="Sort and filter Profile"
-                    onFilterChange={(value) =>
-                      setFilter("profile", value as UsersFilters["profile"])
-                    }
-                    onSort={setSortOption}
-                    selectedFilter={filters.profile}
-                    sortOptions={[
-                      { label: "Profile present first", key: "profile", direction: "desc" },
-                      { label: "Missing first", key: "profile", direction: "asc" },
-                    ]}
-                  />
-                  <AdminDataTableColumnHeader
-                    activeSort={sort}
-                    column="activePlan"
-                    filterActive={filters.activePlan !== "all"}
-                    filterOptions={[
-                      { label: "All", value: "all" },
-                      { label: "Active", value: "active" },
-                      { label: "No active", value: "none" },
-                    ]}
-                    label="Active plan"
-                    menuLabel="Sort and filter Active plan"
-                    onFilterChange={(value) =>
-                      setFilter("activePlan", value as UsersFilters["activePlan"])
-                    }
-                    onSort={setSortOption}
-                    selectedFilter={filters.activePlan}
-                    sortOptions={[
-                      { label: "Active first", key: "activePlan", direction: "desc" },
-                      { label: "No active first", key: "activePlan", direction: "asc" },
-                    ]}
-                  />
-                  <AdminDataTableColumnHeader
-                    activeSort={sort}
-                    column="plans"
-                    filterActive={false}
-                    label="Plans"
-                    menuLabel="Sort and filter Plans"
-                    onSort={setSortOption}
-                    sortOptions={[
-                      { label: "Highest first", key: "plans", direction: "desc" },
-                      { label: "Lowest first", key: "plans", direction: "asc" },
-                    ]}
-                  />
-                  <AdminDataTableColumnHeader
-                    activeSort={sort}
-                    column="workoutLogs"
-                    filterActive={filters.activity !== "all"}
-                    filterOptions={[
-                      { label: "All", value: "all" },
-                      { label: "Has logs", value: "has_logs" },
-                      { label: "No logs", value: "no_logs" },
-                    ]}
-                    label="Workout logs"
-                    menuLabel="Sort and filter Workout logs"
-                    onFilterChange={(value) =>
-                      setFilter("activity", value as UsersFilters["activity"])
-                    }
-                    onSort={setSortOption}
-                    selectedFilter={filters.activity}
-                    sortOptions={[
-                      { label: "Highest first", key: "workoutLogs", direction: "desc" },
-                      { label: "Lowest first", key: "workoutLogs", direction: "asc" },
-                    ]}
-                  />
-                  <AdminDataTableColumnHeader
-                    activeSort={sort}
-                    column="lastActivity"
-                    filterActive={filters.lastActivity !== "all"}
-                    filterOptions={[
-                      { label: "All", value: "all" },
-                      { label: "Recent", value: "recent" },
-                      { label: "Older", value: "older" },
-                      { label: "No logs", value: "no_logs" },
-                    ]}
-                    label="Last activity"
-                    menuLabel="Sort and filter Last activity"
-                    onFilterChange={(value) =>
-                      setFilter("lastActivity", value as UsersFilters["lastActivity"])
-                    }
-                    onSort={setSortOption}
-                    selectedFilter={filters.lastActivity}
-                    sortOptions={[
-                      { label: "Newest first", key: "lastActivity", direction: "desc" },
-                      { label: "Oldest first", key: "lastActivity", direction: "asc" },
-                    ]}
-                  />
-                  <AdminDataTableColumnHeader
-                    activeSort={sort}
-                    column="feedback"
-                    filterActive={false}
-                    label="Feedback"
-                    menuLabel="Sort and filter Feedback"
-                    onSort={setSortOption}
-                    sortOptions={[
-                      { label: "Highest first", key: "feedback", direction: "desc" },
-                      { label: "Lowest first", key: "feedback", direction: "asc" },
-                    ]}
-                  />
-                  <AdminDataTableColumnHeader
-                    activeSort={sort}
-                    column="entitlement"
-                    filterActive={filters.entitlement !== "all"}
-                    filterOptions={[
-                      { label: "All", value: "all" },
-                      { label: "Basic", value: "basic" },
-                      { label: "Pro", value: "pro" },
-                      { label: "Missing/effective fallback", value: "missing" },
-                    ]}
-                    label="Entitlement"
-                    menuLabel="Sort and filter Entitlement"
-                    onFilterChange={(value) =>
-                      setFilter("entitlement", value as UsersFilters["entitlement"])
-                    }
-                    onSort={setSortOption}
-                    selectedFilter={filters.entitlement}
-                    sortOptions={[
-                      { label: "Pro first", key: "entitlement", direction: "desc" },
-                      { label: "Basic first", key: "entitlement", direction: "asc" },
-                    ]}
-                  />
-                </tr>
-              </thead>
-              <tbody>
-                {visibleRows.map((row) => (
-                  <tr key={row.userId} className="align-top">
-                    <td className="hito-data-table-cell hito-data-table-cell-start">
-                      <div className="grid gap-1">
-                        <span className="hito-body-md font-medium text-foreground">
-                          {row.email ?? "No email"}
-                        </span>
-                        <code className="hito-technical-sm hito-data-table-code hito-data-table-code-width-lg">
-                          {row.userId}
-                        </code>
-                      </div>
-                    </td>
-                    <td className="hito-data-table-cell">
-                      <BooleanPill
-                        value={row.profilePresent}
-                        trueLabel="Profile"
-                        falseLabel="Missing"
+            {visibleRows.length === 0 ? (
+              <EmptyPanel
+                title="No real users match these filters."
+                description="Adjust search or filters to return the backend-provided real user rows."
+              />
+            ) : (
+              <div className="hito-data-table-scroll">
+                <table className="hito-data-table hito-data-table-min-md">
+                  <caption className="sr-only">
+                    Admin real-user activity summary with search, filters, and sorting.
+                  </caption>
+                  <thead>
+                    <tr>
+                      <AdminDataTableColumnHeader
+                        activeSort={sort}
+                        column="user"
+                        filterActive={false}
+                        label="User / email"
+                        menuLabel="Sort and filter User / email"
+                        onSort={setSortOption}
+                        sortOptions={[
+                          { label: "A to Z", key: "user", direction: "asc" },
+                          { label: "Z to A", key: "user", direction: "desc" },
+                        ]}
                       />
-                    </td>
-                    <td className="hito-data-table-cell">
-                      <BooleanPill
-                        value={row.activePlanPresent}
-                        trueLabel="Active"
-                        falseLabel="No active plan"
+                      <AdminDataTableColumnHeader
+                        activeSort={sort}
+                        column="profile"
+                        filterActive={filters.profile !== "all"}
+                        filterOptions={[
+                          { label: "All", value: "all" },
+                          { label: "Profile present", value: "present" },
+                          { label: "Missing", value: "missing" },
+                        ]}
+                        label="Profile"
+                        menuLabel="Sort and filter Profile"
+                        onFilterChange={(value) =>
+                          setFilter("profile", value as UsersFilters["profile"])
+                        }
+                        onSort={setSortOption}
+                        selectedFilter={filters.profile}
+                        sortOptions={[
+                          { label: "Profile present first", key: "profile", direction: "desc" },
+                          { label: "Missing first", key: "profile", direction: "asc" },
+                        ]}
                       />
-                    </td>
-                    <td className="hito-data-table-cell">
-                      <CompactCount label="active" value={row.activePlanCount} />
-                      <CompactCount label="archived" value={row.archivedPlanCount} />
-                    </td>
-                    <td className="hito-data-table-cell">
-                      <CompactCount label="planned" value={row.plannedWorkoutCount} />
-                      <CompactCount label="logs" value={row.workoutLogCount} />
-                    </td>
-                    <td className="hito-data-table-cell">
-                      <span className="hito-body-md whitespace-nowrap text-foreground">
-                        {formatShortDate(row.lastWorkoutLogDate)}
-                      </span>
-                    </td>
-                    <td className="hito-data-table-cell">
-                      <CompactCount label="Garmin" value={row.garminEvidenceCount} />
-                      <CompactCount label="AI" value={row.aiInsightCount} />
-                    </td>
-                    <td className="hito-data-table-cell hito-data-table-cell-end">
-                      <div className="grid gap-2">
-                        <span
-                          className="hito-status-pill"
-                          data-tone={entitlementTone(row.entitlement.tier)}
-                        >
-                          {row.entitlement.tier}
-                        </span>
-                        <span className="hito-body-xs whitespace-nowrap text-secondary">
-                          {row.entitlement.status} · {formatKey(row.entitlement.source)}
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      <AdminDataTableColumnHeader
+                        activeSort={sort}
+                        column="workoutLogs"
+                        filterActive={filters.activity !== "all"}
+                        filterOptions={[
+                          { label: "All", value: "all" },
+                          { label: "Has logs", value: "has_logs" },
+                          { label: "No logs", value: "no_logs" },
+                        ]}
+                        label="Workout logs"
+                        menuLabel="Sort and filter Workout logs"
+                        onFilterChange={(value) =>
+                          setFilter("activity", value as UsersFilters["activity"])
+                        }
+                        onSort={setSortOption}
+                        selectedFilter={filters.activity}
+                        sortOptions={[
+                          { label: "Highest first", key: "workoutLogs", direction: "desc" },
+                          { label: "Lowest first", key: "workoutLogs", direction: "asc" },
+                        ]}
+                      />
+                      <AdminDataTableColumnHeader
+                        activeSort={sort}
+                        column="lastWorkoutLog"
+                        filterActive={filters.lastWorkoutLog !== "all"}
+                        filterOptions={[
+                          { label: "All", value: "all" },
+                          { label: "Within 30 days", value: "recent" },
+                          { label: "Older than 30 days", value: "older" },
+                          { label: "No logs", value: "no_logs" },
+                        ]}
+                        label="Last workout log"
+                        menuLabel="Sort and filter Last workout log"
+                        onFilterChange={(value) =>
+                          setFilter("lastWorkoutLog", value as UsersFilters["lastWorkoutLog"])
+                        }
+                        onSort={setSortOption}
+                        selectedFilter={filters.lastWorkoutLog}
+                        sortOptions={[
+                          { label: "Newest first", key: "lastWorkoutLog", direction: "desc" },
+                          { label: "Oldest first", key: "lastWorkoutLog", direction: "asc" },
+                        ]}
+                      />
+                      <AdminDataTableColumnHeader
+                        activeSort={sort}
+                        column="feedback"
+                        filterActive={false}
+                        label="Evidence / AI"
+                        menuLabel="Sort Evidence / AI"
+                        onSort={setSortOption}
+                        sortOptions={[
+                          { label: "Highest first", key: "feedback", direction: "desc" },
+                          { label: "Lowest first", key: "feedback", direction: "asc" },
+                        ]}
+                      />
+                      <AdminDataTableColumnHeader
+                        activeSort={sort}
+                        column="entitlement"
+                        filterActive={filters.entitlement !== "all"}
+                        filterOptions={[
+                          { label: "All", value: "all" },
+                          { label: "Basic", value: "basic" },
+                          { label: "Pro", value: "pro" },
+                          { label: "Missing/effective fallback", value: "missing" },
+                        ]}
+                        label="Entitlement"
+                        menuLabel="Sort and filter Entitlement"
+                        onFilterChange={(value) =>
+                          setFilter("entitlement", value as UsersFilters["entitlement"])
+                        }
+                        onSort={setSortOption}
+                        selectedFilter={filters.entitlement}
+                        sortOptions={[
+                          { label: "Pro first", key: "entitlement", direction: "desc" },
+                          { label: "Basic first", key: "entitlement", direction: "asc" },
+                        ]}
+                      />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleRows.map((row) => {
+                      const usesEffectiveFallback =
+                        row.entitlement.source === "missing_row_effective_pro";
+
+                      return (
+                        <tr key={row.userId} className="align-top">
+                          <td className="hito-data-table-cell hito-data-table-cell-start">
+                            <div className="grid gap-1">
+                              <span className="hito-body-md font-medium text-foreground">
+                                {row.email ?? "No email"}
+                              </span>
+                              <code className="hito-technical-sm hito-data-table-code hito-data-table-code-width-lg">
+                                {row.userId}
+                              </code>
+                            </div>
+                          </td>
+                          <td className="hito-data-table-cell">
+                            <BooleanPill
+                              value={row.profilePresent}
+                              trueLabel="Profile"
+                              falseLabel="Missing"
+                            />
+                          </td>
+                          <td className="hito-data-table-cell">
+                            <span className="hito-technical-sm text-foreground">
+                              {formatCount(row.workoutLogCount)}
+                            </span>
+                          </td>
+                          <td className="hito-data-table-cell">
+                            <span className="hito-body-md whitespace-nowrap text-foreground">
+                              {formatShortDate(row.lastWorkoutLogDate)}
+                            </span>
+                          </td>
+                          <td className="hito-data-table-cell">
+                            <CompactCount label="Evidence" value={row.garminEvidenceCount} />
+                            <CompactCount label="AI" value={row.aiInsightCount} />
+                          </td>
+                          <td className="hito-data-table-cell hito-data-table-cell-end">
+                            <div className="grid gap-2">
+                              <span
+                                className="hito-status-pill"
+                                data-tone={
+                                  usesEffectiveFallback
+                                    ? "warning"
+                                    : entitlementTone(row.entitlement.tier)
+                                }
+                              >
+                                {usesEffectiveFallback
+                                  ? "Effective Pro — no entitlement row"
+                                  : row.entitlement.tier}
+                              </span>
+                              {usesEffectiveFallback ? null : (
+                                <span className="hito-body-xs whitespace-nowrap text-secondary">
+                                  {row.entitlement.status} · {formatKey(row.entitlement.source)}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </AnalyticsGroup>
     </AnalyticsPanel>
   );
 }
@@ -544,24 +526,17 @@ function TestAccountsCard({
   excludedUsers: AdminAnalyticsExcludedUserRow[];
 }) {
   return (
-    <section className="grid gap-6 pt-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="hito-label-md">Test accounts</p>
-          <h2 className="hito-ui-title-md mt-2">Test and excluded accounts</h2>
-          <p className="hito-body-md mt-3 max-w-3xl text-muted-foreground">
-            Local bypass testers plus backend-classified Supabase admin, test, and suspected test
-            users. Local passwords are shown only when they come from the local bypass accounts
-            file.
-          </p>
-        </div>
+    <AnalyticsPanel description="Local and backend-classified excluded identities remain separate from real-user analytics.">
+      <AnalyticsGroup
+        title="Test and excluded accounts"
+        description="Local bypass testers plus backend-classified Supabase admin, test, and suspected test users. Local passwords appear only when the local bypass account source provides them."
+      >
         <span className="hito-status-pill self-start" data-tone="warning">
           Local / QA only
         </span>
-      </div>
-
-      <TestAccountsSection result={result} excludedUsers={excludedUsers} />
-    </section>
+        <TestAccountsSection result={result} excludedUsers={excludedUsers} />
+      </AnalyticsGroup>
+    </AnalyticsPanel>
   );
 }
 
@@ -798,7 +773,7 @@ function TestAccountsTable({ rows }: { rows: TestAccountOpsRow[] }) {
         />
       ) : null}
 
-      <div className="hito-data-table-scroll">
+      <div className={visibleRows.length === 0 ? "hidden" : "hito-data-table-scroll"}>
         <table className="hito-data-table hito-data-table-min-lg">
           <caption className="sr-only">
             Test and excluded accounts visible to the admin runtime.

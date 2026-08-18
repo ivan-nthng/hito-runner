@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { type RefObject, useRef, useState } from "react";
 import { WorkoutFeedbackPanel } from "@/components/CompletionPanel";
 import {
   Dialog,
@@ -15,6 +15,7 @@ export function WorkoutActivityFileDialog({
   localActivityFileDesignFixtureEnabled,
   onOpenChange,
   open,
+  returnFocusRef,
   snapshot,
   workout,
 }: {
@@ -22,15 +23,13 @@ export function WorkoutActivityFileDialog({
   localActivityFileDesignFixtureEnabled: boolean;
   onOpenChange: (open: boolean) => void;
   open: boolean;
+  returnFocusRef?: RefObject<HTMLElement | null>;
   snapshot: TrainingSnapshot;
   workout: Workout;
 }) {
   const fallbackReturnFocusRef = useRef<HTMLElement | null>(null);
   const [isUploadInProgress, setIsUploadInProgress] = useState(false);
-  const [localFixtureFeedback, setLocalFixtureFeedback] =
-    useState<WorkoutResultFeedbackSummary | null>(null);
   const [uploadNotice, setUploadNotice] = useState<string | null>(null);
-  const activeFeedback = localFixtureFeedback ?? feedback;
 
   return (
     <>
@@ -73,7 +72,7 @@ export function WorkoutActivityFileDialog({
               activeElement instanceof HTMLElement ? activeElement : null;
           }}
           onCloseAutoFocus={(event) => {
-            const returnTarget = fallbackReturnFocusRef.current;
+            const returnTarget = returnFocusRef?.current ?? fallbackReturnFocusRef.current;
 
             if (!returnTarget?.isConnected) {
               return;
@@ -97,16 +96,8 @@ export function WorkoutActivityFileDialog({
             <WorkoutFeedbackPanel
               workout={workout}
               snapshot={snapshot}
-              feedback={activeFeedback}
-              localFixturePreviewActive={localFixtureFeedback != null}
+              feedback={feedback}
               localActivityFileDesignFixtureEnabled={localActivityFileDesignFixtureEnabled}
-              onLocalFixturePreviewChange={(nextFixtureFeedback) => {
-                setLocalFixtureFeedback(nextFixtureFeedback);
-
-                if (!nextFixtureFeedback) {
-                  setUploadNotice(null);
-                }
-              }}
               onUploadInProgressChange={setIsUploadInProgress}
               onUploadSucceeded={(notice) => {
                 setUploadNotice(notice);

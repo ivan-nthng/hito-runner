@@ -1,6 +1,7 @@
 import {
   getInlineChangeAction,
   type InlineChangeAction,
+  type InlineChangeBorderIntentSelection,
   type InlineChangeChromeRemovalSelection,
   type InlineChangeColorSelection,
   type InlineChangePromptActionSelection,
@@ -29,6 +30,7 @@ export function getInferredDraftAction(
   tokenControlSelections: InlineChangeTokenControlSelection[],
   colorControlSelections: InlineChangeColorSelection[],
   typographyRoleSelection: InlineChangeTypographySelection | null,
+  borderIntentSelection: InlineChangeBorderIntentSelection | null,
   chromeRemovalSelection: InlineChangeChromeRemovalSelection | null,
   promptActionSelection: InlineChangePromptActionSelection | null,
 ) {
@@ -36,7 +38,10 @@ export function getInferredDraftAction(
     return getInlineChangeAction("remove_component");
   if (chromeRemovalSelection?.kind === "card_chrome")
     return getInlineChangeAction("remove_card_chrome");
-  if (chromeRemovalSelection?.kind === "border") return getInlineChangeAction("remove_border");
+  if (borderIntentSelection?.treatment === "none") return getInlineChangeAction("remove_border");
+  if (borderIntentSelection?.treatment === "hairline") {
+    return getInlineChangeAction("align_with_hito_ds");
+  }
   if (typographyRoleSelection) return getInlineChangeAction("align_typography");
   if (
     colorControlSelections.some((control) => control.requestedChange?.kind === "remove_declaration")
@@ -67,6 +72,7 @@ export function getInferredDraftAction(
 
 export function getHasActionableDraft({
   action,
+  borderIntentSelection,
   comment,
   currentText,
   proposedText,
@@ -77,6 +83,7 @@ export function getHasActionableDraft({
   promptActionSelection,
 }: {
   action: InlineChangeAction | null;
+  borderIntentSelection: InlineChangeBorderIntentSelection | null;
   chromeRemovalSelection: InlineChangeChromeRemovalSelection | null;
   comment: string;
   currentText: string | null | undefined;
@@ -92,6 +99,7 @@ export function getHasActionableDraft({
     tokenControlSelections.length > 0 ||
     colorControlSelections.some((control) => control.requestedChange) ||
     Boolean(typographyRoleSelection) ||
+    Boolean(borderIntentSelection) ||
     Boolean(chromeRemovalSelection) ||
     Boolean(promptActionSelection);
   if (!action) return comment.trim().length > 0 || hasPropertyChange;
@@ -103,7 +111,7 @@ export function getHasActionableDraft({
     case "edit_text":
       return hasTextChange;
     case "remove_border":
-      return chromeRemovalSelection?.kind === "border";
+      return borderIntentSelection?.treatment === "none";
     case "remove_color":
       return colorControlSelections.some(
         (control) => control.requestedChange?.kind === "remove_declaration",

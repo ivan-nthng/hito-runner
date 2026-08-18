@@ -1,12 +1,11 @@
 import {
-  ACTIVE_PLAN_USER_EDIT_MUTATION_KIND,
-  type ActivePlanUserEditMutationKind,
-  resolveCalendarWorkoutEditability,
+  CALENDAR_WORKOUT_MUTATION_KIND,
+  buildCalendarWorkoutMutationEvent,
+  type CalendarWorkoutMutationKind,
 } from "@/lib/active-plan-workout-editing/policy";
 import {
   getCalendarWorkoutMutationContext,
   type CalendarWorkoutContext,
-  type PersistedPlanCycleRow,
   type PersistedPlannedWorkoutRow,
   type PersistedWorkoutLogRow,
 } from "@/lib/active-plan-persistence";
@@ -29,13 +28,12 @@ import {
   type ManualWorkoutCanonicalDraft,
   type ManualWorkoutTargetTruthMode,
 } from "@/lib/manual-workout-authoring/schema";
-import { buildSourceWorkoutFingerprint } from "@/lib/manual-workout-authoring/edit-workout-review-token";
+import { buildFullSourceWorkoutFingerprint } from "@/lib/manual-workout-authoring/edit-workout-review-token";
 import { buildPersistedWorkoutInsertRows } from "@/lib/persisted-plan-replacement";
 import { collectRowsForIdBatches } from "@/lib/supabase/batched-in-filter";
 import type { Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
-import { diffDaysIso } from "@/lib/training";
 
 export type ManualWorkoutEvidenceFetcher = (
   userId: string,
@@ -70,7 +68,7 @@ interface ManualWorkoutAuthoringReviewMetadata {
   mapping_gaps: string[];
   warnings: string[];
   user_edit_mutation_kind?: Extract<
-    ActivePlanUserEditMutationKind,
+    CalendarWorkoutMutationKind,
     "user_added_workout" | "user_copied_workout"
   >;
   user_edit_mutation_mode?: "direct_manual_edit";
@@ -82,10 +80,7 @@ interface ManualWorkoutAuthoringReviewMetadata {
 }
 
 interface ManualWorkoutActivePlanUserEditAuditInput {
-  mutationKind?: Extract<
-    ActivePlanUserEditMutationKind,
-    "user_added_workout" | "user_copied_workout"
-  >;
+  mutationKind?: Extract<CalendarWorkoutMutationKind, "user_added_workout" | "user_copied_workout">;
   mutationMode?: "direct_manual_edit";
   mutationPayloadVersion?: string;
   mutationChecksum?: string;
@@ -97,8 +92,6 @@ interface ManualWorkoutActivePlanUserEditAuditInput {
 interface PersistManualWorkoutActivePlanAddInput {
   userId: string;
   currentDate: string;
-  activePlan: PersistedPlanCycleRow;
-  existingWorkouts: readonly PersistedPlannedWorkoutRow[];
   workoutSeed: ImportedPlanSeed["workouts"][number];
   reviewMetadata: ManualWorkoutAuthoringReviewMetadata;
   copySourceWorkout: PersistedPlannedWorkoutRow | null;
@@ -126,33 +119,6 @@ export async function addReviewedManualWorkoutToActivePlanForUser(
     });
   }
 
-  const activePlan = planContext.provenancePlan;
-  if (!activePlan) {
-    return buildManualWorkoutAddFailure({
-      reason: "no_active_plan",
-      message: "Create the runner Calendar before adding another workout.",
-    });
-  }
-
-  const editability = resolveCalendarWorkoutEditability(activePlan, "add_workout");
-  if (!editability.ok) {
-    return buildManualWorkoutAddFailure({
-      reason:
-        editability.reason === "unsupported_source_metadata"
-          ? "unsupported_source_metadata"
-          : "unsupported_active_plan_source",
-      message: editability.message,
-    });
-  }
-
-  if (reviewed.draft.workoutType === "rest") {
-    return buildManualWorkoutAddFailure({
-      reason: "manual_workout_required",
-      message:
-        "This add-workout action saves reviewed workouts only. Rest-day editing is separate.",
-    });
-  }
-
   if (reviewed.draft.workoutDate < currentDate) {
     return buildManualWorkoutAddFailure({
       reason: "protected_day",
@@ -165,7 +131,7 @@ export async function addReviewedManualWorkoutToActivePlanForUser(
     (workout) => workout.workout_date === reviewed.draft.workoutDate,
   );
   const isCopyMutation =
-    reviewed.activePlanUserEdit?.mutationKind === ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.copyWorkout;
+    reviewed.activePlanUserEdit?.mutationKind === CALENDAR_WORKOUT_MUTATION_KIND.copyWorkout;
   const copySourceWorkout = isCopyMutation
     ? (planContext.existingWorkouts.workouts.find(
         (workout) =>
@@ -209,7 +175,6 @@ export async function addReviewedManualWorkoutToActivePlanForUser(
 
   const reviewMetadata = buildManualWorkoutAuthoringReviewMetadata(reviewed);
   const workoutSeed = buildManualWorkoutSeedForActivePlanAdd({
-    activePlan,
     existingWorkouts: retainedExistingWorkouts,
     reviewed,
   });
@@ -218,8 +183,6 @@ export async function addReviewedManualWorkoutToActivePlanForUser(
     const persisted = await persistAdd({
       userId,
       currentDate,
-      activePlan,
-      existingWorkouts: planContext.existingWorkouts.workouts,
       workoutSeed,
       reviewMetadata,
       copySourceWorkout,
@@ -227,17 +190,17 @@ export async function addReviewedManualWorkoutToActivePlanForUser(
     const calendarRowCount = retainedExistingWorkouts.length + 1;
     const nonRestWorkoutCount =
       planContext.existingWorkouts.workouts.filter((workout) => workout.workout_type !== "rest")
-        .length + 1;
+        .length + (reviewed.draft.workoutType === "rest" ? 0 : 1);
 
     return {
       ok: true,
       status: "created",
       persisted: true,
-      sourceKind: editability.sourceKind,
-      sourceStatus: editability.sourceStatus,
+      sourceKind: copySourceWorkout?.origin_kind ?? "manual",
+      sourceStatus: null,
       workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
       workoutSourceStatus: MANUAL_WORKOUT_AUTHORING_SOURCE_STATUS,
-      activePlanId: activePlan.id,
+      activePlanId: copySourceWorkout?.plan_cycle_id ?? null,
       plannedWorkoutId: persisted.plannedWorkout.id,
       workoutDate: reviewed.draft.workoutDate,
       templateKey: reviewed.draft.templateKey,
@@ -246,11 +209,11 @@ export async function addReviewedManualWorkoutToActivePlanForUser(
       calendarRowCount,
       nonRestWorkoutCount,
       sourceMetadata: {
-        editSourceKind: "active_plan_user_edit_v1",
+        editSourceKind: "calendar_workout_mutation_v1",
         mutationKind:
-          reviewMetadata.user_edit_mutation_kind ?? ACTIVE_PLAN_USER_EDIT_MUTATION_KIND.addWorkout,
-        originalPlanSourceKind: editability.sourceKind,
-        originalPlanSourceStatus: editability.sourceStatus,
+          reviewMetadata.user_edit_mutation_kind ?? CALENDAR_WORKOUT_MUTATION_KIND.addWorkout,
+        originalPlanSourceKind: copySourceWorkout?.origin_kind ?? "manual",
+        originalPlanSourceStatus: null,
         mutationMode: reviewMetadata.user_edit_mutation_mode,
         mutationPayloadVersion: reviewMetadata.user_edit_mutation_payload_version,
         mutationChecksum:
@@ -270,7 +233,7 @@ export async function addReviewedManualWorkoutToActivePlanForUser(
         trustedClientRows: false,
         serverRebuiltReview: true,
         targetDayKind: "empty_day",
-        activePlanSourceVerified: true,
+        runnerOwnershipVerified: true,
         callsOpenAi: false,
       },
     };
@@ -295,11 +258,18 @@ export async function addReviewedManualWorkoutToActivePlanForUser(
 export async function persistManualWorkoutActivePlanAdd({
   userId,
   currentDate,
-  activePlan,
   workoutSeed,
+  reviewMetadata,
   copySourceWorkout,
 }: PersistManualWorkoutActivePlanAddInput) {
-  const [insertRow] = buildPersistedWorkoutInsertRows(activePlan.id, userId, [workoutSeed]);
+  const sourcePlanId = copySourceWorkout?.plan_cycle_id ?? null;
+  const originKind = copySourceWorkout?.origin_kind ?? "manual";
+  const [insertRow] = buildPersistedWorkoutInsertRows(
+    sourcePlanId,
+    userId,
+    [workoutSeed],
+    originKind,
+  );
 
   if (!insertRow) {
     throw new Error("Manual workout add did not prepare a planned workout row.");
@@ -311,24 +281,42 @@ export async function persistManualWorkoutActivePlanAdd({
     id: plannedWorkoutId,
   };
 
-  const planUpdate = {
-    end_date: activePlan.end_date,
-    goal_metadata: activePlan.goal_metadata,
-    plan_preferences: activePlan.plan_preferences,
-  };
+  const mutationEvent = buildCalendarWorkoutMutationEvent({
+    mutationKind:
+      reviewMetadata.user_edit_mutation_kind ?? CALENDAR_WORKOUT_MUTATION_KIND.addWorkout,
+    originKind,
+    reviewPayloadVersion: reviewMetadata.review_payload_version,
+    reviewChecksum: reviewMetadata.review_checksum,
+    workoutAuthoringSourceKind: reviewMetadata.source_kind,
+    plannedWorkoutId,
+    sourceWorkoutId: reviewMetadata.user_edit_source_workout_id,
+    sourceWorkoutDate: reviewMetadata.user_edit_source_workout_date,
+    targetWorkoutId: plannedWorkoutId,
+    targetDate: workoutSeed.workoutDate,
+    templateKey: reviewMetadata.template_key,
+    title: workoutSeed.title,
+    mutationMode: reviewMetadata.user_edit_mutation_mode,
+    mutationPayloadVersion: reviewMetadata.user_edit_mutation_payload_version,
+    mutationChecksum: reviewMetadata.user_edit_mutation_checksum ?? reviewMetadata.review_checksum,
+    trustedClientRows: false,
+    originalPlanSourceKind: copySourceWorkout?.origin_kind ?? "manual",
+    originalPlanSourceStatus: null,
+    originalWorkoutSourceId: copySourceWorkout?.source_workout_id,
+    originalWorkoutSourceType: copySourceWorkout?.source_workout_type,
+    originalWorkoutFamily: copySourceWorkout?.workout_family,
+    originalWorkoutIdentity: copySourceWorkout?.workout_identity,
+  });
   const persisted = await applyAtomicCalendarWorkoutMutation({
     userId,
-    planId: activePlan.id,
-    expectedPlanUpdatedAt: activePlan.updated_at,
     currentDate,
     mutationKind: "add",
     expectedSourceWorkout: copySourceWorkout
-      ? (buildSourceWorkoutFingerprint(copySourceWorkout) as unknown as Json)
+      ? (buildFullSourceWorkoutFingerprint(copySourceWorkout) as unknown as Json)
       : null,
     expectedTargetWorkout: null,
     workoutInsert: workoutInsert as unknown as Json,
     workoutUpdate: null,
-    planUpdate,
+    mutationEvent: mutationEvent as unknown as Json,
   });
 
   if (!persisted.mutatedWorkout) {
@@ -337,7 +325,7 @@ export async function persistManualWorkoutActivePlanAdd({
 
   return {
     plannedWorkout: persisted.mutatedWorkout,
-    planCycle: persisted.planCycle,
+    mutationEvent: persisted.mutationEvent,
   };
 }
 
@@ -347,7 +335,7 @@ export async function fetchManualWorkoutEvidenceWorkoutIds(userId: string, worko
   }
 
   const supabase = createAdminSupabaseClient();
-  const assets = await collectRowsForIdBatches<{ planned_workout_id: string }>(
+  const assets = await collectRowsForIdBatches<{ planned_workout_id: string | null }>(
     workoutIds,
     async (ids) =>
       await supabase
@@ -358,15 +346,17 @@ export async function fetchManualWorkoutEvidenceWorkoutIds(userId: string, worko
   );
 
   // Metrics, comparisons, and insights all cascade from this canonical evidence root.
-  return new Set(assets.map((row) => row.planned_workout_id));
+  return new Set(
+    assets
+      .map((row) => row.planned_workout_id)
+      .filter((plannedWorkoutId): plannedWorkoutId is string => Boolean(plannedWorkoutId)),
+  );
 }
 
 function buildManualWorkoutSeedForActivePlanAdd({
-  activePlan,
   existingWorkouts,
   reviewed,
 }: {
-  activePlan: PersistedPlanCycleRow;
   existingWorkouts: readonly PersistedPlannedWorkoutRow[];
   reviewed: ReviewedManualWorkoutForActivePlanAdd;
 }): ImportedPlanSeed["workouts"][number] {
@@ -378,13 +368,8 @@ function buildManualWorkoutSeedForActivePlanAdd({
 
   return {
     ...seedWorkout,
-    weekNumber: resolveManualWorkoutWeekNumber(activePlan.start_date, seedWorkout.workoutDate),
     displayOrder: resolveNextDisplayOrder(existingWorkouts),
   };
-}
-
-function resolveManualWorkoutWeekNumber(planStartDate: string, workoutDate: string) {
-  return Math.floor(diffDaysIso(workoutDate, planStartDate) / 7) + 1;
 }
 
 function resolveNextDisplayOrder(existingWorkouts: readonly PersistedPlannedWorkoutRow[]) {

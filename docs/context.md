@@ -2,13 +2,15 @@
 
 ## Project Purpose
 
-Hito Running is a running-plan product focused on one clear promise: help a runner understand the current week, open today's workout quickly, and stay oriented without fake coaching authority.
+Hito Running is a runner-calendar product focused on one clear promise: help a runner
+understand the current week, open today's workout quickly, and stay oriented without
+fake coaching authority.
 
 ## Current Pipeline Summary
 
 The implemented repo now operates as:
 
-`preview access or magic-link auth -> runner profile onboarding -> persisted plan assignment -> planned workouts -> workout log mutation -> backend-derived week status -> preserved preview shells for later surfaces`
+`preview access or magic-link auth -> runner profile onboarding -> reviewed source proposal -> independently scheduled workouts -> workout log mutation -> backend-derived week status -> preserved preview shells for later surfaces`
 
 The imported UI baseline still exists as a read-only preview for signed-out users, but trusted runner truth now starts only after authentication and persisted backend state.
 
@@ -16,10 +18,11 @@ The imported UI baseline still exists as a read-only preview for signed-out user
 
 - `runner_profile`
   persisted goal, baseline, and setup record keyed to one authenticated user
-- `plan_cycle`
-  persisted active training context for the runner
-- `planned_workout`
-  persisted scheduled workout entry inside one active plan
+- `plan source`
+  an AI-generated, imported, or manual source artifact used to propose initial workout placement;
+  it remains provenance/history after confirmation
+- `calendar workout`
+  a persisted scheduled workout independently owned by the runner after it is materialised
 - `workout_log`
   persisted result for completed, partial, or skipped workouts
 - `week_status`
@@ -31,8 +34,7 @@ Trusted product output now includes:
 
 - authenticated runner identity
 - persisted runner profile
-- persisted active plan cycle
-- persisted planned workouts
+- persisted calendar workouts
 - persisted workout logs
 - backend-derived week status
 
@@ -43,7 +45,8 @@ Signed-out preview mode remains intentionally outside the trusted product bounda
 - runtime:
   one TanStack Start app at the repo root
 - storage:
-  Supabase auth plus persisted Postgres tables for profile, plan cycle, planned workouts, and workout logs
+  Supabase auth plus persisted Postgres tables for profile, legacy plan-source storage,
+  scheduled workouts, and workout logs
 - seam:
   one canonical data seam in `src/lib/training.ts` with backend loading through `src/lib/training-api.ts`
 - env:
@@ -52,7 +55,7 @@ Signed-out preview mode remains intentionally outside the trusted product bounda
 ## Important Constraints
 
 - preserve imported layout, styles, motion, and route structure unless honesty or contract safety requires change
-- keep one canonical backend truth path for profile, plan, workout logs, and week status
+- keep one canonical backend truth path for profile, calendar workouts, workout logs, and week status
 - keep preview mode visibly separate from authenticated saved mode
 - keep secrets server-only and do not expose service-role access to the client
 - keep session refresh server-validated in request middleware so cookie-backed auth stays current across SSR requests
@@ -60,7 +63,8 @@ Signed-out preview mode remains intentionally outside the trusted product bounda
 ## Key Routes And Surfaces
 
 - `/`
-  weekly plan home with preview fallback, onboarding gate for authenticated users without a profile, and persisted plan view for authenticated users with setup complete
+  weekly calendar home with preview fallback, onboarding gate for authenticated users without a
+  profile, and persisted workout schedule for authenticated users with setup complete
 - `/login`
   magic-link entry point for saved mode
 - `/api/auth/confirm`

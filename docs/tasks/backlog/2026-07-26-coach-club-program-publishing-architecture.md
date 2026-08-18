@@ -20,6 +20,10 @@ high
 
 backend
 
+## Epic
+
+platform-and-operations
+
 ## Scope
 
 program-publishing-and-adoption
@@ -43,8 +47,13 @@ giving a Coach access to runner-owned data or calendar rows.
 
 ## Stage
 
-BACKEND implementation ready. Product approved the relationship bootstrap and the first vertical
-slice below.
+PRODUCT deferred / future coach-domain architecture decision.
+
+## Product Lifecycle Reconciliation — 2026-08-18
+
+Coach/Club publishing is a separate future platform domain and is not part of Runner Core readiness.
+Its historical prompt uses obsolete active-plan vocabulary and must be re-audited before any future
+dispatch; this reclassification authorizes no implementation.
 
 ## Exact Handoff Prompt
 

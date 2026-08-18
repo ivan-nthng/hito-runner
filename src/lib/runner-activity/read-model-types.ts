@@ -146,6 +146,273 @@ export type RunnerActivitySessionLoadWindow = {
   metric: RunnerActivitySessionLoadMetric;
 };
 
+export type RunnerActivityFitChartMetricId =
+  | "sessions"
+  | "running_time"
+  | "distance"
+  | "elevation"
+  | "reported_load";
+
+export type RunnerActivityFitChartPoint = {
+  id: string;
+  startDate: string;
+  endDate: string;
+  cutoffDate: string;
+  shortLabel: string;
+  accessibleLabel: string;
+  completion: "partial_start" | "complete" | "to_date";
+  completionLabel: "Partial week" | "Complete week" | "To date";
+  state: "available" | "partial" | "unavailable";
+  value: number | null;
+  displayValue: string | null;
+  coverage: {
+    includedCount: number;
+    candidateCount: number;
+    missingCount: number;
+    label: string;
+  };
+  reasons: string[];
+  reasonLabels: string[];
+};
+
+export type RunnerActivityFitChartSeries =
+  | {
+      id: RunnerActivityFitChartMetricId;
+      title: string;
+      purpose: string;
+      status: "ready";
+      unit: "sessions" | "minutes" | "kilometers" | "meters" | "arbitrary_units";
+      unitLabel: "sessions" | "min" | "km" | "m" | "AU";
+      display: {
+        format: "integer" | "duration_minutes" | "decimal";
+        maximumFractionDigits: number;
+      };
+      evidenceLabel: "From FIT file";
+      formulaVersion: string;
+      points: RunnerActivityFitChartPoint[];
+    }
+  | {
+      id: RunnerActivityFitChartMetricId;
+      title: string;
+      purpose: string;
+      status: "updating";
+      unit: "sessions" | "minutes" | "kilometers" | "meters" | "arbitrary_units";
+      unitLabel: "sessions" | "min" | "km" | "m" | "AU";
+      display: {
+        format: "integer" | "duration_minutes" | "decimal";
+        maximumFractionDigits: number;
+      };
+      evidenceLabel: "From FIT file";
+      formulaVersion: string;
+      reason: "fit_evidence_updating";
+      reasonLabel: "FIT evidence is updating.";
+      staleValuesReturned: false;
+      points: [];
+    };
+
+export type RunnerActivityFitChartPeriod = {
+  id: "28_days";
+  label: "28 days";
+  startDate: string;
+  endDate: string;
+  state: "to_date";
+  bucketResolution: "calendar_week";
+  timezoneBasis: "historical_local_date";
+  weekStartsOn: "monday";
+  series: RunnerActivityFitChartSeries[];
+};
+
+export type RunnerActivityFitSequenceQuickPeriodId =
+  | "this_week"
+  | "last_7_days"
+  | "last_1_month"
+  | "last_6_months";
+
+export type RunnerActivityFitSequencePeriodRequest =
+  | { kind: RunnerActivityFitSequenceQuickPeriodId }
+  | { kind: "custom"; startDate: string; endDate: string };
+
+export type RunnerActivityFitSequencePeriod = {
+  id: RunnerActivityFitSequenceQuickPeriodId | "custom";
+  label: "This week" | "Last 7 days" | "Last 1 month" | "Last 6 months" | "Custom";
+  startDate: string;
+  endDate: string;
+  asOfDate: string;
+  timezoneBasis: {
+    period: "runner_calendar_timezone";
+    activities: "historical_local_date";
+    timeZone: string;
+  };
+  futureInterval: { startDate: string; endDate: string } | null;
+};
+
+export type RunnerActivityFitSequenceMetricId =
+  | "distance"
+  | "timer_duration"
+  | "observed_average_pace"
+  | "elevation_gain"
+  | "reported_load";
+
+export type RunnerActivityFitSequenceObservation = {
+  id: RunnerActivityFitSequenceMetricId;
+  label: string;
+  state: "available" | "partial" | "unavailable";
+  value: number | null;
+  displayValue: string | null;
+  unit: "kilometers" | "minutes" | "seconds_per_kilometer" | "meters" | "arbitrary_units";
+  unitLabel: "km" | "min" | "/km" | "m" | "AU";
+  reason: string | null;
+  reasonLabel: string | null;
+  coverage: {
+    includedCount: 0 | 1;
+    candidateCount: 1;
+    missingCount: 0 | 1;
+  };
+  basis: {
+    duration: "timer" | "elapsed" | null;
+    distance: "whole_activity" | null;
+    effort: "session_rpe" | null;
+  };
+};
+
+export type RunnerActivityFitSequencePoint = {
+  id: string;
+  sequenceIndex: number;
+  sameDayOrder: number;
+  label: "Run";
+  historicalTime: {
+    localDate: string;
+    startedAt: string | null;
+    timezone: string | null;
+  };
+  context: {
+    state: "available" | "unknown";
+    runningContext: string | null;
+  };
+  evidence: {
+    state: "current";
+    label: "From FIT file";
+    activityRevisionId: string;
+    sourceRevisionId: string;
+  };
+  observations: Record<RunnerActivityFitSequenceMetricId, RunnerActivityFitSequenceObservation>;
+};
+
+export type RunnerActivityFitSequenceCoverage = Record<
+  RunnerActivityFitSequenceMetricId,
+  {
+    includedCount: number;
+    eligibleActivityCount: number;
+    missingCount: number;
+    label: string;
+  }
+>;
+
+type RunnerActivityFitSequenceReadModelBase = {
+  formulaVersion: string;
+  evidenceLabel: "From FIT file";
+  advertisedPeriods: [
+    RunnerActivityFitSequencePeriod,
+    RunnerActivityFitSequencePeriod,
+    RunnerActivityFitSequencePeriod,
+    RunnerActivityFitSequencePeriod,
+  ];
+  selectedPeriod: RunnerActivityFitSequencePeriod;
+};
+
+export type RunnerActivityFitSequenceReadModel = RunnerActivityFitSequenceReadModelBase &
+  (
+    | {
+        status: "ready" | "empty";
+        completeness: {
+          state: "complete";
+          eligibleActivityCount: number;
+          returnedPointCount: number;
+        };
+        coverage: RunnerActivityFitSequenceCoverage;
+        points: RunnerActivityFitSequencePoint[];
+      }
+    | {
+        status: "updating";
+        reason: "fit_evidence_updating" | "metric_recalculation_pending";
+        reasonLabel: string;
+        staleValuesReturned: false;
+        points: [];
+      }
+    | {
+        status: "unavailable";
+        reason: "accepted_fit_activity_missing_historical_local_date" | "sequence_incomplete";
+        reasonLabel: string;
+        staleValuesReturned: false;
+        points: [];
+      }
+  );
+
+export type RunnerActivityFitPersonalBestSlotId =
+  | "1_km"
+  | "5_km"
+  | "10_km"
+  | "half_marathon"
+  | "marathon";
+
+export type RunnerActivityFitPersonalBestSlot = {
+  id: RunnerActivityFitPersonalBestSlotId;
+  label: "1 km" | "5 km" | "10 km" | "Half Marathon · 21.0975 km" | "Marathon · 42.195 km";
+  distanceMeters: number;
+} & (
+  | {
+      state: "available";
+      reason: null;
+      reasonLabel: null;
+      result: {
+        elapsedSeconds: number;
+        displayValue: string;
+        eventDate: string | null;
+        evidenceLabel: "From FIT file";
+        source: {
+          activityId: string;
+          activityRevisionId: string;
+        };
+      };
+    }
+  | {
+      state: "no_verified_time";
+      reason: "no_verified_fit_time";
+      reasonLabel: "No verified FIT time yet.";
+      result: null;
+    }
+  | {
+      state: "unavailable";
+      reason: string;
+      reasonLabel: string;
+      result: null;
+    }
+  | {
+      state: "updating";
+      reason: "fit_evidence_updating";
+      reasonLabel: "FIT evidence is updating.";
+      result: null;
+    }
+);
+
+export type RunnerActivityFitProgressReadModel =
+  | {
+      status: "current";
+      evidenceLabel: "From FIT file";
+      chart: {
+        advertisedPeriods: [RunnerActivityFitChartPeriod];
+      };
+      personalBests: {
+        formulaVersion: string;
+        matchingRule: "exact_whole_activity_distance_within_0_05_meters";
+        slots: RunnerActivityFitPersonalBestSlot[];
+      };
+    }
+  | {
+      status: "unavailable";
+      reason: "historical_formula_version_without_fit_progress";
+    };
+
 export type RunnerActivityRecordItem = {
   observationId: string;
   activityId: string;
@@ -178,7 +445,9 @@ export type RunnerActivityAdvancedMetricsCurrent = {
   formulaVersions: {
     personalBest: string;
     sessionRpeLoad: string;
+    fitProgress?: string;
   };
+  fitProgress: RunnerActivityFitProgressReadModel;
   sessionRpeLoad: {
     rolling28Day: {
       current: RunnerActivitySessionLoadWindow;
@@ -224,6 +493,7 @@ export type RunnerActivityAdvancedMetricsReadModel =
     };
 
 export type RunnerActivityProgressReadModel = RunnerActivityProgressFactsReadModel & {
+  fitActivitySequence: RunnerActivityFitSequenceReadModel;
   advancedMetrics: RunnerActivityAdvancedMetricsReadModel;
 };
 

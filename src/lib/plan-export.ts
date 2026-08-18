@@ -88,15 +88,10 @@ export function buildActivePlanExportPayload(args: {
   workouts: PersistedPlannedWorkoutRow[];
   exportedAt?: string;
 }): ActivePlanExportPayload {
-  const orderedWorkouts = args.workouts
-    .slice()
-    .sort(
-      (left, right) =>
-        left.workout_date.localeCompare(right.workout_date) ||
-        left.display_order - right.display_order ||
-        left.title.localeCompare(right.title),
-    )
-    .map((workout) => workoutRowToExportWorkout(workout, args.planCycle.source_kind));
+  const orderedWorkouts = orderWorkoutRowsForExport(
+    args.workouts,
+    () => args.planCycle.source_kind,
+  );
 
   const firstWorkoutDate = orderedWorkouts[0]?.date ?? args.planCycle.start_date;
   const lastWorkoutDate = orderedWorkouts.at(-1)?.date ?? args.planCycle.end_date;
@@ -124,6 +119,66 @@ export function buildActivePlanExportPayload(args: {
     availability: buildExportAvailability(args.planCycle.plan_preferences),
     workouts: orderedWorkouts,
   };
+}
+
+export function buildCalendarWorkoutExportPayload(args: {
+  workouts: PersistedPlannedWorkoutRow[];
+  exportedAt?: string;
+}): ActivePlanExportPayload {
+  const orderedWorkouts = orderWorkoutRowsForExport(
+    args.workouts,
+    (workout) => workout.origin_kind,
+  );
+  const firstWorkoutDate = orderedWorkouts[0]?.date;
+  const lastWorkoutDate = orderedWorkouts.at(-1)?.date;
+
+  if (!firstWorkoutDate || !lastWorkoutDate) {
+    throw new Error("Calendar workout export requires at least one persisted row.");
+  }
+
+  const weeks = new Set(orderedWorkouts.map((workout) => workout.weekNumber));
+
+  return {
+    plan: {
+      schemaVersion: "training-plan-v2",
+      planId: `hito-export-calendar-${firstWorkoutDate}-${lastWorkoutDate}`,
+      title: "Future Calendar workouts",
+      goalSummary: "Current runner Calendar export",
+      createdFor: "Hito saved runner",
+      effectiveStartDate: firstWorkoutDate,
+      effectiveEndDate: lastWorkoutDate,
+      targetDate: null,
+      sourceKind: "hito_calendar_future_export",
+      sourceStatus: null,
+      exportedAt: args.exportedAt ?? new Date().toISOString(),
+    },
+    summary: {
+      dayCount: orderedWorkouts.length,
+      workoutCount: orderedWorkouts.filter((workout) => workout.workoutType !== "rest").length,
+      weeksCount: weeks.size,
+    },
+    availability: {
+      fixedRestDays: null,
+      maxRunningDaysPerWeek: null,
+      preferredLongRunDay: null,
+    },
+    workouts: orderedWorkouts,
+  };
+}
+
+function orderWorkoutRowsForExport(
+  workouts: PersistedPlannedWorkoutRow[],
+  resolveSourceKind: (workout: PersistedPlannedWorkoutRow) => string | null,
+) {
+  return workouts
+    .slice()
+    .sort(
+      (left, right) =>
+        left.workout_date.localeCompare(right.workout_date) ||
+        left.display_order - right.display_order ||
+        left.title.localeCompare(right.title),
+    )
+    .map((workout) => workoutRowToExportWorkout(workout, resolveSourceKind(workout)));
 }
 
 export function buildPlanExportDocument(
@@ -405,7 +460,10 @@ function workoutRowToExportWorkout(
 
 function buildPlanExportMetadata(payload: ActivePlanExportPayload) {
   return {
-    export_format_version: "hito_active_plan_export_v1",
+    export_format_version:
+      payload.plan.sourceKind === "hito_calendar_future_export"
+        ? "hito_calendar_workout_export_v1"
+        : "hito_active_plan_export_v1",
     exported_at: payload.plan.exportedAt,
     source_kind: payload.plan.sourceKind ?? "hito_active_plan_export",
     ...(payload.plan.sourceStatus ? { source_status: payload.plan.sourceStatus } : {}),
@@ -543,15 +601,17 @@ function stepToRepeatChildPrescription(
 ): StepRepeatChildPrescription | null {
   const prescription = stepToUnitPrescription(step);
   const role = stepToRepeatChildRole(step);
+  const label = stringValue(step.label);
+  const guidance = stringValue(step.guidance);
   if (!prescription || !role) {
     return null;
   }
 
   return {
     role,
-    ...(stringValue(step.label) ? { label: stringValue(step.label) } : {}),
+    ...(label ? { label } : {}),
     sequence: step.sequence ?? index + 1,
-    ...(stringValue(step.guidance) ? { guidance: stringValue(step.guidance) } : {}),
+    ...(guidance ? { guidance } : {}),
     prescription,
     ...targetForTrainingPlanV2(step.target),
   };

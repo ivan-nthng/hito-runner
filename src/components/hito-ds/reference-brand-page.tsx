@@ -135,7 +135,7 @@ export function HitoDsBrandPage() {
               </p>
             </article>
 
-            <article className="hito-auth-alpha-surface hito-surface-flat rounded-2xl border border-hairline p-5">
+            <article className="hito-auth-alpha-surface hito-surface-flat rounded-2xl p-5">
               <p className="hito-label-md">Alpha overlay surface</p>
               <h3 className="hito-ui-title-xs mt-3">Translucent only in atmospheric shells.</h3>
               <p className="hito-body-sm mt-3 text-secondary">

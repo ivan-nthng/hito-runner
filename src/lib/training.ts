@@ -1,5 +1,5 @@
 import { signedOutPreviewPlanSeed } from "@/data/signed-out-preview-plan";
-import type { ActivePlanWorkoutSourceEditingCapabilities } from "@/lib/active-plan-workout-editing/source-capabilities";
+import type { CalendarWorkoutSourceEditingCapabilities } from "@/lib/active-plan-workout-editing/source-capabilities";
 import type { BodyNote } from "@/lib/body-notes";
 import { heartRateGuidanceBandLabel } from "@/lib/heart-rate-zones";
 import {
@@ -20,8 +20,10 @@ import {
   type CalendarIconKey,
   type CanonicalGoalContext,
   type CanonicalMetricMode,
+  type CanonicalMetricModeJson,
   type CanonicalWorkoutFamily,
   type CanonicalWorkoutIdentity,
+  type WorkoutSegmentLike,
 } from "@/lib/rich-workout-model";
 import type { WorkoutFeedbackMarkerSummary } from "@/lib/workout-result-import/types";
 import {
@@ -94,11 +96,19 @@ export interface Workout {
   notes: string | null;
   steps: Step[];
   feedbackMarker: WorkoutFeedbackMarkerSummary | null;
-  sourceEditing: ActivePlanWorkoutSourceEditingCapabilities | null;
+  sourceEditing: CalendarWorkoutSourceEditingCapabilities | null;
+  sourceProvenance: WorkoutSourceProvenanceSummary | null;
   /** Persisted activity evidence projected by the canonical workout read model. */
   completionOrigin?: "fit_activity";
   status: Status;
   log: WorkoutLog | null;
+}
+
+export interface WorkoutSourceProvenanceSummary {
+  originKind: "manual" | "ai" | "file_import";
+  sourcePlanId: string | null;
+  sourceKind: string | null;
+  sourceStatus: string | null;
 }
 
 export interface PlanMeta {
@@ -112,7 +122,7 @@ export interface PlanMeta {
   source: "preview" | "persisted";
   sourceKind: string | null;
   schedulePreferences: PlanSchedulePreferencesSummary | null;
-  workoutEditing: ActivePlanWorkoutEditingCapabilities | null;
+  workoutEditing: CalendarWorkoutEditingCapabilities | null;
 }
 
 export interface PlanSchedulePreferencesSummary {
@@ -123,31 +133,35 @@ export interface PlanSchedulePreferencesSummary {
   preferredLongRunDay: string | null;
 }
 
-type ActivePlanWorkoutEditingOperation =
+type CalendarWorkoutEditingOperation =
   | "add_workout"
   | "clear_workout"
   | "move_workout"
   | "edit_workout";
 
-export type ActivePlanWorkoutEditingCapability =
+export type CalendarWorkoutEditingCapability =
   | {
       allowed: true;
-      operation: ActivePlanWorkoutEditingOperation;
+      operation: CalendarWorkoutEditingOperation;
       sourceKind: string;
       sourceStatus: string | null;
     }
   | {
       allowed: false;
-      operation: ActivePlanWorkoutEditingOperation;
-      reason: "no_active_plan" | "unsupported_active_plan_source" | "unsupported_source_metadata";
+      operation: CalendarWorkoutEditingOperation;
+      reason: "unsupported_source_metadata";
       message: string;
     };
 
-export interface ActivePlanWorkoutEditingCapabilities {
-  addWorkout: ActivePlanWorkoutEditingCapability;
-  clearWorkout: ActivePlanWorkoutEditingCapability;
-  moveWorkout: ActivePlanWorkoutEditingCapability;
-  editWorkout: ActivePlanWorkoutEditingCapability;
+export interface CalendarWorkoutEditingCapabilities {
+  addWorkout: CalendarWorkoutEditingCapability;
+  clearWorkout: CalendarWorkoutEditingCapability;
+  moveWorkout: CalendarWorkoutEditingCapability;
+  editWorkout: CalendarWorkoutEditingCapability;
+}
+
+export interface RunnerCalendarSnapshotContext {
+  workoutEditing: CalendarWorkoutEditingCapabilities;
 }
 
 export interface RunnerProfileSummary {
@@ -178,6 +192,7 @@ export interface TrainingSnapshot {
   currentDate: string;
   weekStatus: WeekStatus;
   planMeta: PlanMeta | null;
+  calendarContext: RunnerCalendarSnapshotContext | null;
   profile: PersistedRunnerProfileSummary | null;
   workouts: Workout[];
 }
@@ -353,7 +368,7 @@ export function workoutPlannedLanguage(
     calendarIconKey: workout.calendarIconKey,
     metricMode: workout.metricMode,
     title: workout.title,
-    steps: workout.steps,
+    steps: workout.steps as unknown as WorkoutSegmentLike[],
   });
 }
 
@@ -490,6 +505,7 @@ export function getPreviewSnapshot(): TrainingSnapshot {
       steps,
       feedbackMarker: null,
       sourceEditing: null,
+      sourceProvenance: null,
       log: null,
       status: inferWorkoutStatus(workout.type, workout.date, currentDate, null),
     };
@@ -513,6 +529,7 @@ export function getPreviewSnapshot(): TrainingSnapshot {
       schedulePreferences: null,
       workoutEditing: null,
     },
+    calendarContext: null,
     profile: null,
     workouts,
     weekStatus: deriveWeekStatus(workouts, currentDate),
@@ -595,6 +612,7 @@ export function weekOf(workouts: Workout[], date: string): Workout[] {
       steps: [],
       feedbackMarker: null,
       sourceEditing: null,
+      sourceProvenance: null,
       log: null,
       status: "rest",
     });
@@ -640,9 +658,9 @@ export function deriveWorkoutRichModel({
     workoutFamily,
     workoutIdentity,
     calendarIconKey,
-    metricMode,
+    metricMode: metricMode as CanonicalMetricMode | CanonicalMetricModeJson | null | undefined,
     title,
-    steps,
+    steps: steps as unknown as WorkoutSegmentLike[],
   });
   const plannedWorkoutLanguage = buildPlannedWorkoutLanguage({
     workoutType: type,
@@ -653,7 +671,7 @@ export function deriveWorkoutRichModel({
     calendarIconKey: richWorkout.calendarIconKey,
     metricMode: richWorkout.metricMode,
     title,
-    steps,
+    steps: steps as unknown as WorkoutSegmentLike[],
   });
 
   return {

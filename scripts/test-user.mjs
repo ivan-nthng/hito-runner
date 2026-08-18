@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { randomBytes } from "node:crypto";
 import path from "node:path";
@@ -21,18 +22,36 @@ import {
   resetQaPoolUserData,
 } from "./lib/qa-test-user-lifecycle.mjs";
 
-const { materializeFirstReviewedPlanForUser } = await tsImport(
+const { materializeFirstReviewedPlanForUser, retainImportedPlanCandidateForUser } = await tsImport(
   "../src/lib/active-plan-persistence.ts",
   import.meta.url,
 );
+const { importedPlanSchema } = await tsImport("../src/lib/imported-plan.ts", import.meta.url);
+const { digestSha256Hex, stableJsonStringify } = await tsImport(
+  "../src/lib/review-token-signing.ts",
+  import.meta.url,
+);
 const { isLoopbackRuntimeUrl } = await tsImport("../src/lib/supabase/env.ts", import.meta.url);
+const { getLatestWorkoutResultFeedback } = await tsImport(
+  "../src/lib/workout-result-import/read-workout-result-feedback.ts",
+  import.meta.url,
+);
+const { ingestLocalQaFixtureWorkoutResult, removeWorkoutResultEvidence } = await tsImport(
+  "../src/lib/workout-result-import/ingest-garmin-result.ts",
+  import.meta.url,
+);
 const {
+  RUNNER_CORE_FILE_FLOW_FIXTURE_ROLE,
+  RUNNER_CORE_FILE_FLOW_FIXTURE_TEMPLATE,
   RUNNER_DESIGN_PROFILE_FIXTURE_ROLE,
   RUNNER_DESIGN_PROFILE_FIXTURE_STORAGE_BUCKET,
   RUNNER_DESIGN_PROFILE_FIXTURE_VERSION,
+  readRunnerCoreFileFlowFixture,
   readRunnerDesignProfileFixture,
+  seedRunnerCoreFileFlowFixture,
   seedRunnerDesignProfileFixture,
   verifyRunnerDesignProfileFixtureRuntime,
+  withLocalDesignFixtureEnv,
 } = await tsImport("./lib/runner-design-profile-fixture.ts", import.meta.url);
 
 const {
@@ -61,10 +80,12 @@ if (
     "design-profile-seed",
     "design-profile-status",
     "design-profile-reset",
+    "runner-core-file-flow-seed",
+    "runner-core-file-flow-proof",
   ].includes(command)
 ) {
   throw new Error(
-    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-reset-plan|pool-reset|pool-delete|design-profile-seed|design-profile-status|design-profile-reset|create|reset-plan|reset|delete> [options]",
+    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-reset-plan|pool-reset|pool-delete|design-profile-seed|design-profile-status|design-profile-reset|runner-core-file-flow-seed|runner-core-file-flow-proof|create|reset-plan|reset|delete> [options]",
   );
 }
 
@@ -96,6 +117,10 @@ if (command === "inventory") {
   await handleDesignProfileStatus();
 } else if (command === "design-profile-reset") {
   await handleDesignProfileReset();
+} else if (command === "runner-core-file-flow-seed") {
+  await handleRunnerCoreFileFlowSeed();
+} else if (command === "runner-core-file-flow-proof") {
+  await handleRunnerCoreFileFlowProof();
 } else if (command === "create") {
   await handleCreate();
 } else if (command === "reset-plan") {
@@ -387,7 +412,24 @@ async function handleDesignProfileReset() {
     const definition = QA_TESTER_POOL[RUNNER_DESIGN_PROFILE_FIXTURE_ROLE];
     const authUser = await findAuthUserByEmail(definition.email);
     if (!authUser) {
-      throw new Error(`Runner design profile identity ${definition.email} was not found.`);
+      console.log(
+        JSON.stringify(
+          {
+            ok: true,
+            action: "design-profile-reset",
+            localOnly: true,
+            authUserPreserved: false,
+            authUserId: null,
+            identityAbsent: true,
+            retainedStorageObjects: 0,
+            beforeCounts: null,
+            afterCounts: null,
+          },
+          null,
+          2,
+        ),
+      );
+      return;
     }
     await assertQaPoolAuthUser({
       supabase,
@@ -423,6 +465,247 @@ async function handleDesignProfileReset() {
       ),
     );
   });
+}
+
+async function handleRunnerCoreFileFlowSeed() {
+  await withRunnerCoreFileFlowLease(async () => {
+    const authUser = await ensureQaPoolUserWithLocalAccount(RUNNER_CORE_FILE_FLOW_FIXTURE_ROLE);
+    const beforeCounts = await getQaUserOwnedCounts(supabase, authUser.id);
+    await resetQaPoolUserData({ supabase, userId: authUser.id });
+    let fixture;
+    try {
+      fixture = await seedRunnerCoreFileFlowFixtureForUser(authUser.id);
+    } catch (error) {
+      await resetQaPoolUserData({ supabase, userId: authUser.id });
+      throw error;
+    }
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          action: "runner-core-file-flow-seed",
+          localOnly: true,
+          beforeCounts,
+          fixture,
+          afterCounts: await getQaUserOwnedCounts(supabase, authUser.id),
+        },
+        null,
+        2,
+      ),
+    );
+  });
+}
+
+async function handleRunnerCoreFileFlowProof() {
+  await withRunnerCoreFileFlowProofLeases(async () => {
+    const fixtureUser = await ensureQaPoolUserWithLocalAccount(RUNNER_CORE_FILE_FLOW_FIXTURE_ROLE);
+    const isolatedUser = await ensureQaPoolUserWithLocalAccount("isolation-b");
+    await resetQaPoolUserData({ supabase, userId: fixtureUser.id });
+    await resetQaPoolUserData({ supabase, userId: isolatedUser.id });
+    const receipts = {};
+
+    try {
+      const firstSeed = await seedRunnerCoreFileFlowFixtureForUser(fixtureUser.id);
+      receipts.firstSeed = firstSeed;
+      assert.equal(firstSeed.evidence.assetCount, 0);
+      const firstReset = await resetQaPoolUserData({ supabase, userId: fixtureUser.id });
+      assertAllOwnedCountsZero(firstReset, "Runner Core file-flow first reset");
+      await assertUserStorageEmpty(fixtureUser.id);
+
+      const secondSeed = await seedRunnerCoreFileFlowFixtureForUser(fixtureUser.id);
+      receipts.secondSeed = secondSeed;
+      assert.equal(secondSeed.workout.date, firstSeed.workout.date);
+      assert.equal(secondSeed.workout.originKind, "file_import");
+      assert.equal(secondSeed.workout.sourceWorkoutId, firstSeed.workout.sourceWorkoutId);
+
+      await assertLocalFixtureUploadRejected({
+        userId: fixtureUser.id,
+        plannedWorkoutId: secondSeed.workout.id,
+        requestedFixture: "../sample-fit-from-zip.fit",
+        authProvider: "local",
+        appBaseUrl: "http://127.0.0.1:3000",
+      });
+      await assertLocalFixtureUploadRejected({
+        userId: fixtureUser.id,
+        plannedWorkoutId: secondSeed.workout.id,
+        requestedFixture: "sample-fit-from-zip.fit",
+        authProvider: "supabase",
+        appBaseUrl: "http://127.0.0.1:3000",
+      });
+      await assertLocalFixtureUploadRejected({
+        userId: fixtureUser.id,
+        plannedWorkoutId: secondSeed.workout.id,
+        requestedFixture: "sample-fit-from-zip.fit",
+        authProvider: "local",
+        appBaseUrl: "https://example.com",
+      });
+      await assertLocalFixtureUploadRejected(
+        {
+          userId: isolatedUser.id,
+          plannedWorkoutId: secondSeed.workout.id,
+          requestedFixture: "sample-fit-from-zip.fit",
+          authProvider: "local",
+          appBaseUrl: "http://127.0.0.1:3000",
+        },
+        "planned_workout_not_found",
+      );
+      assert.equal(
+        (
+          await readRunnerCoreFileFlowFixture({
+            supabase,
+            userId: fixtureUser.id,
+            asOfDate: options["as-of-date"],
+          })
+        ).evidence.assetCount,
+        0,
+      );
+      assertAllOwnedCountsZero(
+        await getQaUserOwnedCounts(supabase, isolatedUser.id),
+        "Runner Core file-flow isolated user",
+      );
+
+      const uploaded = await withLocalDesignFixtureEnv(() =>
+        ingestLocalQaFixtureWorkoutResult({
+          userId: fixtureUser.id,
+          plannedWorkoutId: secondSeed.workout.id,
+          requestedFixture: "sample-fit-from-zip.fit",
+          authProvider: "local",
+          appBaseUrl: "http://127.0.0.1:3000",
+        }),
+      );
+      assert.ok(uploaded.latestAsset?.id);
+      assert.ok(uploaded.latestActualMetrics?.id);
+      assert.ok(uploaded.latestComparison?.id);
+      const durable = await readRunnerCoreFileFlowFixture({
+        supabase,
+        userId: fixtureUser.id,
+        asOfDate: options["as-of-date"],
+        expectedEditingState: "evidence_backed",
+      });
+      assert.deepEqual(durable.evidence, {
+        assetCount: 1,
+        parsedAssetCount: 1,
+        metricsCount: 1,
+        comparisonCount: 1,
+        matchCount: 1,
+      });
+      const feedbackBeforeRemoval = await getLatestWorkoutResultFeedback({
+        userId: fixtureUser.id,
+        plannedWorkoutId: secondSeed.workout.id,
+      });
+      assert.equal(feedbackBeforeRemoval?.latestAsset?.rawFileAvailable, true);
+
+      const feedbackAfterRemoval = await removeWorkoutResultEvidence({
+        userId: fixtureUser.id,
+        plannedWorkoutId: secondSeed.workout.id,
+      });
+      assert.equal(feedbackAfterRemoval?.latestAsset?.rawFileAvailable, false);
+      assert.equal(
+        feedbackAfterRemoval?.latestActualMetrics?.id,
+        feedbackBeforeRemoval?.latestActualMetrics?.id,
+      );
+      assert.equal(
+        feedbackAfterRemoval?.latestComparison?.id,
+        feedbackBeforeRemoval?.latestComparison?.id,
+      );
+      receipts.durableLifecycle = {
+        assetId: uploaded.latestAsset.id,
+        metricsId: uploaded.latestActualMetrics.id,
+        comparisonId: uploaded.latestComparison.id,
+        rawFileAvailableBeforeRemoval: true,
+        rawFileAvailableAfterRemoval: false,
+      };
+    } finally {
+      const fixtureCleanup = await resetQaPoolUserData({ supabase, userId: fixtureUser.id });
+      const isolatedCleanup = await resetQaPoolUserData({ supabase, userId: isolatedUser.id });
+      assertAllOwnedCountsZero(fixtureCleanup, "Runner Core file-flow fixture cleanup");
+      assertAllOwnedCountsZero(isolatedCleanup, "Runner Core file-flow isolation cleanup");
+      await assertUserStorageEmpty(fixtureUser.id);
+      await assertUserStorageEmpty(isolatedUser.id);
+      receipts.cleanup = { fixtureCleanup, isolatedCleanup };
+    }
+
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          action: "runner-core-file-flow-proof",
+          localOnly: true,
+          receipts,
+        },
+        null,
+        2,
+      ),
+    );
+  });
+}
+
+async function seedRunnerCoreFileFlowFixtureForUser(userId) {
+  const rawPlan = await readFile(
+    path.resolve(process.cwd(), RUNNER_CORE_FILE_FLOW_FIXTURE_TEMPLATE),
+    "utf8",
+  );
+  return seedRunnerCoreFileFlowFixture({
+    supabase,
+    userId,
+    templatePlan: importedPlanSchema.parse(JSON.parse(rawPlan)),
+    asOfDate: options["as-of-date"],
+  });
+}
+
+async function assertLocalFixtureUploadRejected(input, expectedCode = "invalid_upload") {
+  await assert.rejects(
+    withLocalDesignFixtureEnv(() => ingestLocalQaFixtureWorkoutResult(input)),
+    (error) => error && error.code === expectedCode,
+  );
+}
+
+async function assertUserStorageEmpty(userId) {
+  const storage = await supabase.storage
+    .from(RUNNER_DESIGN_PROFILE_FIXTURE_STORAGE_BUCKET)
+    .list(userId, { limit: 100 });
+  if (storage.error) throw new Error(storage.error.message);
+  assert.deepEqual(storage.data, []);
+}
+
+function assertAllOwnedCountsZero(counts, label) {
+  const retained = Object.entries(counts).filter(([, count]) => count !== 0);
+  assert.deepEqual(retained, [], `${label} retained canonical rows.`);
+}
+
+async function ensureQaPoolUserWithLocalAccount(role) {
+  const definition = QA_TESTER_POOL[role];
+  const accounts = await loadLocalAccounts();
+  const existingLocalAccount =
+    accounts.find((account) => account.email === definition.email) ?? null;
+  const password = existingLocalAccount?.password ?? randomBytes(24).toString("base64url");
+  const authUser = await ensureQaPoolAuthUser({ supabase, role, password });
+  await assertQaPoolAuthUser({ supabase, role, userId: authUser.id });
+  await saveLocalAccounts(
+    upsertLocalAccount(accounts, poolLocalAccount(role, password, authUser.id)),
+  );
+  return authUser;
+}
+
+async function withRunnerCoreFileFlowLease(action) {
+  const lease = await acquireQaPoolLease({ role: RUNNER_CORE_FILE_FLOW_FIXTURE_ROLE });
+  try {
+    return await action();
+  } finally {
+    await releaseQaPoolLease(lease);
+  }
+}
+
+async function withRunnerCoreFileFlowProofLeases(action) {
+  const fixtureLease = await acquireQaPoolLease({ role: RUNNER_CORE_FILE_FLOW_FIXTURE_ROLE });
+  let isolatedLease;
+  try {
+    isolatedLease = await acquireQaPoolLease({ role: "isolation-b" });
+    return await action();
+  } finally {
+    if (isolatedLease) await releaseQaPoolLease(isolatedLease);
+    await releaseQaPoolLease(fixtureLease);
+  }
 }
 
 async function ensureDesignProfilePoolUser() {
@@ -771,9 +1054,18 @@ async function readRunnerProfileForUser(userId) {
 
 async function importPlanForUser(userId, planPath) {
   const rawPlan = await readFile(path.resolve(process.cwd(), planPath), "utf8");
-  const plan = JSON.parse(rawPlan);
+  const plan = importedPlanSchema.parse(JSON.parse(rawPlan));
+  const fixtureMaterializationInstant = new Date(`${plan.start_date}T12:00:00.000Z`);
+  const sourcePlan = await retainImportedPlanCandidateForUser({
+    userId,
+    canonicalPlan: plan,
+    reviewChecksum: await digestSha256Hex(stableJsonStringify(plan)),
+  });
 
-  await materializeFirstReviewedPlanForUser(userId, plan);
+  await materializeFirstReviewedPlanForUser(userId, plan, {
+    sourcePlanId: sourcePlan.id,
+    calendarInstant: fixtureMaterializationInstant,
+  });
   const appliedPlan = await readImportedPlanForUser(userId);
 
   const richWorkoutCount = appliedPlan.workouts.filter(
@@ -815,21 +1107,21 @@ async function importPlanForUser(userId, planPath) {
 }
 
 async function readImportedPlanForUser(userId) {
-  const planCycle = await supabase
+  const sourcePlan = await supabase
     .from("plan_cycles")
     .select("id, title, start_date, end_date")
     .eq("user_id", userId)
     .eq("status", "archived")
-    .is("saved_plan_payload", null)
+    .not("saved_plan_payload", "is", null)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (planCycle.error) {
-    throw new Error(planCycle.error.message);
+  if (sourcePlan.error) {
+    throw new Error(sourcePlan.error.message);
   }
-  if (!planCycle.data) {
-    throw new Error("Persisted plan readback evidence requires materialized Calendar provenance.");
+  if (!sourcePlan.data) {
+    throw new Error("Persisted plan readback evidence requires immutable source provenance.");
   }
 
   const workouts = await supabase
@@ -837,7 +1129,7 @@ async function readImportedPlanForUser(userId) {
     .select(
       "id, workout_date, title, source_workout_type, workout_family, workout_identity, calendar_icon_key, goal_context, metric_mode",
     )
-    .eq("plan_cycle_id", planCycle.data.id)
+    .eq("plan_cycle_id", sourcePlan.data.id)
     .order("workout_date", { ascending: true });
 
   if (workouts.error) {
@@ -845,7 +1137,7 @@ async function readImportedPlanForUser(userId) {
   }
 
   return {
-    planCycle: planCycle.data,
+    planCycle: sourcePlan.data,
     workoutCount: workouts.data.length,
     workouts: workouts.data,
   };

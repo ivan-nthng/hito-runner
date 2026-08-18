@@ -3,6 +3,10 @@ import type {
   RunnerActivityDurationBasis,
   RunnerActivityFactMetric,
   RunnerActivityFactSnapshot,
+  RunnerActivityFitChartPeriod,
+  RunnerActivityFitSequencePoint,
+  RunnerActivityFitSequenceReadModel,
+  RunnerActivityFitPersonalBestSlot,
   RunnerActivityHistoryItem,
   RunnerActivityHistoryPage,
   RunnerActivityMutationReadback,
@@ -147,6 +151,60 @@ export type RunnerActivityProgressProductAdvancedMetrics =
       };
     };
 
+export type RunnerActivityFitPersonalBestProductSlot = Omit<
+  RunnerActivityFitPersonalBestSlot,
+  "result"
+> & {
+  result: null | {
+    elapsedSeconds: number;
+    displayValue: string;
+    eventDate: string | null;
+    evidenceLabel: "From FIT file";
+    source: {
+      activityId: string;
+    };
+  };
+};
+
+export type RunnerActivityFitProgressProductModel =
+  | {
+      status: "current";
+      evidenceLabel: "From FIT file";
+      chart: {
+        advertisedPeriods: [RunnerActivityFitChartPeriod];
+      };
+      personalBests: {
+        formulaVersion: string;
+        matchingRule: "exact_whole_activity_distance_within_0_05_meters";
+        slots: RunnerActivityFitPersonalBestProductSlot[];
+      };
+    }
+  | {
+      status: "unavailable";
+      reason: "historical_formula_version_without_fit_progress";
+    }
+  | {
+      status: "updating";
+      reason: "metric_recalculation_pending";
+      staleValuesReturned: false;
+    };
+
+export type RunnerActivityFitSequenceProductPoint = Omit<
+  RunnerActivityFitSequencePoint,
+  "evidence"
+> & {
+  evidence: {
+    state: "current";
+    label: "From FIT file";
+  };
+};
+
+export type RunnerActivityFitSequenceProductModel =
+  | (Omit<Extract<RunnerActivityFitSequenceReadModel, { status: "ready" | "empty" }>, "points"> & {
+      points: RunnerActivityFitSequenceProductPoint[];
+    })
+  | Extract<RunnerActivityFitSequenceReadModel, { status: "updating" | "unavailable" }>;
+
 export type RunnerActivityProgressProductModel = {
   status: "current";
   asOfDate: string;
@@ -155,6 +213,8 @@ export type RunnerActivityProgressProductModel = {
     previous: RunnerActivityProgressProductSnapshot;
   };
   calendarWeeks: RunnerActivityProgressProductSnapshot[];
+  fitProgress: RunnerActivityFitProgressProductModel;
+  fitActivitySequence: RunnerActivityFitSequenceProductModel;
   advancedMetrics: RunnerActivityProgressProductAdvancedMetrics;
 };
 
@@ -184,6 +244,8 @@ export function projectRunnerActivityProgressForProduct(
       previous: projectFactSnapshot(progress.rolling28Day.previous),
     },
     calendarWeeks: progress.calendarWeeks.map(projectFactSnapshot),
+    fitProgress: projectFitProgress(progress.advancedMetrics),
+    fitActivitySequence: projectFitActivitySequence(progress.fitActivitySequence),
     advancedMetrics: projectAdvancedMetrics(progress.advancedMetrics),
   };
 }
@@ -346,6 +408,56 @@ function projectAdvancedMetrics(
       status: metrics.streamDependentMetrics.aerobicEfficiency.status,
       reason: metrics.streamDependentMetrics.aerobicEfficiency.reason,
     },
+  };
+}
+
+function projectFitProgress(
+  metrics: RunnerActivityAdvancedMetricsReadModel,
+): RunnerActivityFitProgressProductModel {
+  if (metrics.status === "updating") {
+    return {
+      status: "updating",
+      reason: metrics.reason,
+      staleValuesReturned: metrics.staleValuesReturned,
+    };
+  }
+  if (metrics.fitProgress.status === "unavailable") return metrics.fitProgress;
+  return {
+    status: metrics.fitProgress.status,
+    evidenceLabel: metrics.fitProgress.evidenceLabel,
+    chart: metrics.fitProgress.chart,
+    personalBests: {
+      formulaVersion: metrics.fitProgress.personalBests.formulaVersion,
+      matchingRule: metrics.fitProgress.personalBests.matchingRule,
+      slots: metrics.fitProgress.personalBests.slots.map((slot) => ({
+        ...slot,
+        result: slot.result
+          ? {
+              elapsedSeconds: slot.result.elapsedSeconds,
+              displayValue: slot.result.displayValue,
+              eventDate: slot.result.eventDate,
+              evidenceLabel: slot.result.evidenceLabel,
+              source: { activityId: slot.result.source.activityId },
+            }
+          : null,
+      })),
+    },
+  };
+}
+
+function projectFitActivitySequence(
+  sequence: RunnerActivityFitSequenceReadModel,
+): RunnerActivityFitSequenceProductModel {
+  if (sequence.status === "updating" || sequence.status === "unavailable") return sequence;
+  return {
+    ...sequence,
+    points: sequence.points.map((point) => ({
+      ...point,
+      evidence: {
+        state: point.evidence.state,
+        label: point.evidence.label,
+      },
+    })),
   };
 }
 

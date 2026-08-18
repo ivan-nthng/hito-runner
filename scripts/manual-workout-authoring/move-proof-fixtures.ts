@@ -5,6 +5,7 @@ import type {
   PersistedPlannedWorkoutRow,
   PersistedWorkoutLogRow,
 } from "../../src/lib/active-plan-persistence";
+import type { Database } from "../../src/lib/supabase/database";
 import type { ManualWorkoutActivePlanAddDependencies } from "../../src/lib/manual-workout-authoring/active-plan-add";
 import { buildImportedPlanSeed } from "../../src/lib/imported-plan";
 import {
@@ -22,6 +23,8 @@ import { buildPersistedWorkoutInsertRows } from "../../src/lib/persisted-plan-re
 import { formatResult } from "./move-proof-assertions";
 
 export type MoveDependencies = NonNullable<Parameters<typeof reviewManualWorkoutMoveForUser>[2]>;
+type CalendarWorkoutMutationEventRow =
+  Database["public"]["Tables"]["calendar_workout_mutation_events"]["Row"];
 type FakeAddPersistRecord = Parameters<
   NonNullable<ManualWorkoutActivePlanAddDependencies["persistWorkoutAdd"]>
 >[0];
@@ -36,7 +39,9 @@ export function buildFakeActivePlanMutationDependencyBase(input: {
     currentDate: "2026-06-10",
     getCalendarWorkoutContextForUser: async () =>
       ({
-        provenancePlan: input.activePlan,
+        sourcePlansById: input.activePlan
+          ? new Map([[input.activePlan.id, input.activePlan]])
+          : new Map(),
         existingWorkouts: {
           workouts: input.workouts,
           logsByWorkoutId: input.logsByWorkoutId ?? new Map(),
@@ -138,20 +143,23 @@ export function buildFakeAddDependencies(input: {
       return {
         plannedWorkout: buildFakePlannedWorkout({
           userId: record.userId,
-          planCycleId: record.activePlan.id,
+          planCycleId: record.copySourceWorkout?.plan_cycle_id ?? null,
+          originKind: record.copySourceWorkout?.origin_kind ?? "manual",
           id: input.plannedWorkoutId ?? "66666666-6666-4666-8666-666666666666",
           date: record.workoutSeed.workoutDate,
           displayOrder: record.workoutSeed.displayOrder,
           title: record.workoutSeed.title,
           workoutIdentity: record.workoutSeed.workoutIdentity,
         }),
-        planCycle: {
-          ...record.activePlan,
-          end_date:
-            record.workoutSeed.workoutDate > record.activePlan.end_date
-              ? record.workoutSeed.workoutDate
-              : record.activePlan.end_date,
-        },
+        mutationEvent: buildFakeMutationEvent({
+          userId: record.userId,
+          plannedWorkoutId: input.plannedWorkoutId ?? "66666666-6666-4666-8666-666666666666",
+          mutationKind: record.copySourceWorkout ? "user_copied_workout" : "user_added_workout",
+          sourceWorkoutId: record.copySourceWorkout?.id ?? null,
+          sourceWorkoutDate: record.copySourceWorkout?.workout_date ?? null,
+          targetDate: record.workoutSeed.workoutDate,
+          eventPayload: record.reviewMetadata,
+        }),
       };
     },
   };
@@ -163,13 +171,16 @@ export function buildFakeMoveDependencies(input: {
   logsByWorkoutId?: Map<string, PersistedWorkoutLogRow>;
   evidenceWorkoutIds?: Set<string>;
   persistError?: Error;
+  now?: () => Date;
   onPersist?: (record: Parameters<NonNullable<MoveDependencies["persistWorkoutMove"]>>[0]) => void;
 }): MoveDependencies {
   return {
     currentDate: "2026-06-10",
     getCalendarWorkoutContextForUser: async () =>
       ({
-        provenancePlan: input.activePlan,
+        sourcePlansById: input.activePlan
+          ? new Map([[input.activePlan.id, input.activePlan]])
+          : new Map(),
         existingWorkouts: {
           workouts: input.workouts,
           logsByWorkoutId: input.logsByWorkoutId ?? new Map(),
@@ -183,9 +194,6 @@ export function buildFakeMoveDependencies(input: {
 
       input.onPersist?.(record);
 
-      const retainedWorkouts = record.otherWorkouts.filter(
-        (workout) => workout.id !== record.targetReplacementWorkout?.id,
-      );
       const movedWorkout = {
         ...record.sourceWorkout,
         workout_date: record.review.targetDate,
@@ -195,13 +203,17 @@ export function buildFakeMoveDependencies(input: {
 
       return {
         movedWorkout,
-        planCycle: {
-          ...record.activePlan,
-          end_date: [...retainedWorkouts, movedWorkout]
-            .map((workout) => workout.workout_date)
-            .sort()
-            .at(-1)!,
-        },
+        restoredWorkout: null,
+        mutationEvent: buildFakeMutationEvent({
+          userId: record.userId,
+          plannedWorkoutId: record.sourceWorkout.id,
+          mutationKind: "user_moved_workout",
+          sourceWorkoutId: record.sourceWorkout.id,
+          sourceWorkoutDate: record.sourceWorkout.workout_date,
+          targetDate: record.review.targetDate,
+          eventPayload: record.review,
+        }),
+        undoExpiresAt: record.targetReplacementWorkout ? "2026-06-10T00:00:45.000Z" : null,
       };
     },
   };
@@ -220,7 +232,12 @@ export function buildCanonicalPersistedPlannedWorkoutFromReview({
 }): PersistedPlannedWorkoutRow {
   const canonicalPlan = buildManualWorkoutUserBuiltTrainingPlan(review.draft);
   const importedSeed = buildImportedPlanSeed(canonicalPlan);
-  const [insertRow] = buildPersistedWorkoutInsertRows(planCycleId, userId, importedSeed.workouts);
+  const [insertRow] = buildPersistedWorkoutInsertRows(
+    planCycleId,
+    userId,
+    importedSeed.workouts,
+    "manual",
+  );
 
   assert.ok(insertRow, "canonical persisted workout fixture should produce one insert row");
 
@@ -249,7 +266,7 @@ export function buildFakePlanCycle({
   return {
     id,
     user_id: userId,
-    status: "active",
+    status: "archived",
     title: "Manual user-built plan",
     goal_summary: "Manual user-built plan",
     source_template: "training-plan-v2",
@@ -315,6 +332,7 @@ export function buildFakePlannedWorkoutFromReview({
 export function buildFakePlannedWorkout({
   userId,
   planCycleId,
+  originKind = "manual",
   id,
   date,
   displayOrder,
@@ -330,7 +348,8 @@ export function buildFakePlannedWorkout({
   steps = [],
 }: {
   userId: string;
-  planCycleId: string;
+  planCycleId: string | null;
+  originKind?: PersistedPlannedWorkoutRow["origin_kind"];
   id: string;
   date: string;
   displayOrder: number;
@@ -349,6 +368,7 @@ export function buildFakePlannedWorkout({
     id,
     user_id: userId,
     plan_cycle_id: planCycleId,
+    origin_kind: originKind,
     workout_date: date,
     weekday,
     week_number: 1,
@@ -368,6 +388,42 @@ export function buildFakePlannedWorkout({
     recovery_priority: null,
     steps,
     display_order: displayOrder,
+    created_at: "2026-06-10T00:00:00.000Z",
+  };
+}
+
+function buildFakeMutationEvent(input: {
+  userId: string;
+  plannedWorkoutId: string;
+  mutationKind: CalendarWorkoutMutationEventRow["mutation_kind"];
+  sourceWorkoutId: string | null;
+  sourceWorkoutDate: string | null;
+  targetDate: string;
+  eventPayload: unknown;
+}): CalendarWorkoutMutationEventRow {
+  return {
+    id: 1,
+    user_id: input.userId,
+    mutation_kind: input.mutationKind,
+    planned_workout_id: input.plannedWorkoutId,
+    source_workout_id: input.sourceWorkoutId,
+    target_workout_id: input.plannedWorkoutId,
+    source_workout_date: input.sourceWorkoutDate,
+    target_date: input.targetDate,
+    before_workout: null,
+    after_workout: null,
+    displaced_workout: null,
+    review_payload_version: "fixture_review_v1",
+    review_checksum: "a".repeat(64),
+    mutation_payload_version: null,
+    mutation_checksum: null,
+    event_payload:
+      input.eventPayload as Database["public"]["Tables"]["calendar_workout_mutation_events"]["Row"]["event_payload"],
+    occurred_at: "2026-06-10T00:00:00.000Z",
+    undo_expires_at: null,
+    undo_of_event_id: null,
+    migrated_from_plan_id: null,
+    legacy_ordinal: null,
     created_at: "2026-06-10T00:00:00.000Z",
   };
 }

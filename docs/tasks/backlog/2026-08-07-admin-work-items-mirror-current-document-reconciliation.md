@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** ARCHITECT
+- **Epic:** platform-and-operations
 - **Outcome:** one current receipt distinguishes released local/deployed capability from still-pending.
 - **Sources:** Terminal decision/evidence record only; detailed transcript remains in Git history.
 - **Validation:** The original terminal receipt records focused validation for the completed scope; detailed commands remain available in Git history.

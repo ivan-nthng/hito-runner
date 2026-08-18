@@ -2,18 +2,6 @@ export function formatCount(value: number) {
   return new Intl.NumberFormat("en-US").format(value);
 }
 
-export function formatNullableCount(value: number | null) {
-  return value === null ? "Unavailable" : formatCount(value);
-}
-
-export function formatNullablePercent(value: number | null) {
-  if (value === null) {
-    return "Unavailable";
-  }
-
-  return `${Math.round(value * 100)}%`;
-}
-
 export function formatKey(value: string) {
   return value.replaceAll("_", " ");
 }

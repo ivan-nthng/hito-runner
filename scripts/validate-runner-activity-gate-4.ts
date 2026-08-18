@@ -16,7 +16,9 @@ import {
 import {
   buildGate4ObservationDrafts,
   buildGate4SnapshotPayload,
+  buildRunnerActivityFitSequence,
   gate4InputFingerprint,
+  resolveRunnerActivityFitSequencePeriod,
   RUNNER_ACTIVITY_GATE4_FORMULA_SET_VERSION,
 } from "../src/lib/runner-activity/metric-formulas";
 import {
@@ -26,13 +28,18 @@ import {
   RunnerActivityMetricRecalculationPendingError,
 } from "../src/lib/runner-activity/metric-snapshots";
 import { listRunnerActivityHistoryForUser } from "../src/lib/runner-activity/history-read-model";
-import { getRunnerActivityProgressForUser } from "../src/lib/runner-activity/read-model";
+import {
+  getRunnerActivityProgressForUser,
+  parseRunnerActivityFitSequencePeriodRequest,
+} from "../src/lib/runner-activity/read-model";
+import { projectRunnerActivityProgressForProduct } from "../src/lib/runner-activity/product-contract";
 import type {
   RunnerActivityAdvancedMetricsCurrent,
   RunnerActivityProgressReadModel,
 } from "../src/lib/runner-activity/read-model-types";
-import { addDaysIso, todayIso } from "../src/lib/training";
+import { addDaysIso, startOfWeekIso, todayIso } from "../src/lib/training";
 import {
+  QA_TEST_USER_OWNED_TABLES,
   QA_TESTER_POOL,
   getQaUserOwnedCounts,
   resetQaPoolUserData,
@@ -63,6 +70,7 @@ async function runValidation() {
 
   try {
     proveFormulaBoundaryMatrix();
+    proveFitActivitySequenceFormulaBoundaryMatrix();
     proveRecordContextIdentity();
     proveObservedRecordContextIdentity();
     const fixtures = await createGate4LifecycleFixtures({
@@ -71,9 +79,13 @@ async function runValidation() {
       asOfDate: AS_OF_DATE,
     });
 
-    const initial = requireCurrent(
-      await getRunnerActivityProgressForUser({ userId: owner.id, asOfDate: AS_OF_DATE }),
-    );
+    await proveInvalidCustomSequencePeriods(owner.id);
+    const initialProgress = await getRunnerActivityProgressForUser({
+      userId: owner.id,
+      asOfDate: AS_OF_DATE,
+      sequencePeriod: sequencePeriodForProof(-9),
+    });
+    const initial = requireCurrent(initialProgress);
     assert.equal(initial.sessionRpeLoad.rolling28Day.current.metric.value, 674);
     assert.equal(initial.sessionRpeLoad.rolling28Day.current.metric.confidence, "partial");
     assertRecord(initial, "hito_observed_whole_activity", "5_km", 30 * 60);
@@ -84,19 +96,26 @@ async function runValidation() {
       false,
     );
     assertGate5Unavailable(initial);
+    await proveFitProgressInitialContract({
+      userId: owner.id,
+      progress: initialProgress,
+      completedWithoutFitWorkoutId: fixtures.completedWithoutFitWorkoutId,
+    });
 
     await proveStoredObservedRecordContextIdentity(owner.id);
     await proveAsOfCutoffExcludesFutureActivity(owner.id);
     await proveWorkoutLogDeletionLifecycle(owner.id, fixtures.elapsedOnly);
     await proveHistoricalFormulaVersionReadback(owner.id, initial);
     await proveImmutableRpeLifecycle(owner.id, fixtures.unplanned, initial.snapshotId);
-    await proveDuplicateWorkoutLinkRejected(owner.id, fixtures.completed, fixtures.planCycleId);
+    await proveDuplicateWorkoutLinkRejected(owner.id, fixtures.completed);
     await proveRpeActivityRevisionReattribution(owner.id, fixtures.completed);
     await proveOfficialResultLifecycle(owner.id, fixtures.planned60Observed38);
     await proveRawRemovalAndRevisionInvalidation(owner.id, fixtures.half);
     await provePartialRawRemovalTruth(owner.id, fixtures.exactFive);
+    await proveFitUpdatingAndUnavailableStates(owner.id);
     await proveFreshReadNeverReturnsStale(owner.id);
     await proveMetricRls({ ownerRole: "provider-engine", otherRole: "isolation-a" });
+    await proveFitProgressIsolation(other.id);
 
     const beforeDelete = requireCurrent(
       await getRunnerActivityProgressForUser({ userId: owner.id, asOfDate: AS_OF_DATE }),
@@ -128,16 +147,175 @@ async function runValidation() {
 
   const ownerCounts = await getQaUserOwnedCounts(supabase, owner.id);
   const otherCounts = await getQaUserOwnedCounts(supabase, other.id);
-  for (const table of [
-    "runner_activities",
-    "runner_activity_evidence_revisions",
-    "runner_activity_metric_observations",
-    "runner_activity_metric_snapshots",
-  ]) {
+  for (const table of QA_TEST_USER_OWNED_TABLES) {
     assert.equal(ownerCounts[table], 0, `${table} was not cleaned for the owner.`);
     assert.equal(otherCounts[table], 0, `${table} was not cleaned for the isolation user.`);
   }
   console.log("Runner activity Gate 4 metric contract passed.");
+}
+
+async function proveFitProgressInitialContract(input: {
+  userId: string;
+  progress: RunnerActivityProgressReadModel;
+  completedWithoutFitWorkoutId: string;
+}) {
+  const metrics = requireCurrent(input.progress);
+  assert.equal(metrics.fitProgress.status, "current");
+  if (metrics.fitProgress.status !== "current") {
+    throw new Error("Expected current FIT Progress readback.");
+  }
+  const [period] = metrics.fitProgress.chart.advertisedPeriods;
+  assert.equal(period.id, "28_days");
+  assert.equal(period.label, "28 days");
+  assert.equal(period.startDate, addDaysIso(AS_OF_DATE, -27));
+  assert.equal(period.endDate, AS_OF_DATE);
+  assert.equal(period.series.length, 5);
+  assert.deepEqual(
+    period.series.map((series) => series.id),
+    ["sessions", "running_time", "distance", "elevation", "reported_load"],
+  );
+
+  const readySeries = period.series.map((series) => {
+    assert.equal(series.status, "ready");
+    if (series.status !== "ready") throw new Error("Expected ready FIT chart series.");
+    return series;
+  });
+  const pointWindows = readySeries[0]!.points.map((point) => ({
+    startDate: point.startDate,
+    endDate: point.endDate,
+    completion: point.completion,
+  }));
+  assert.equal(pointWindows[0]?.startDate, period.startDate);
+  assert.equal(pointWindows.at(-1)?.endDate, period.endDate);
+  for (const [index, point] of pointWindows.entries()) {
+    if (index > 0) assert.equal(point.startDate, addDaysIso(pointWindows[index - 1]!.endDate, 1));
+  }
+  assert.equal(
+    pointWindows[0]?.completion,
+    startOfWeekIso(period.startDate) === period.startDate ? "complete" : "partial_start",
+  );
+  assert.equal(
+    pointWindows.at(-1)?.completion,
+    addDaysIso(startOfWeekIso(period.endDate), 6) === period.endDate ? "complete" : "to_date",
+  );
+  for (const series of readySeries.slice(1)) {
+    assert.deepEqual(
+      series.points.map((point) => [point.startDate, point.endDate, point.completion]),
+      readySeries[0]!.points.map((point) => [point.startDate, point.endDate, point.completion]),
+    );
+  }
+
+  assert.equal(sumReadySeries(readySeries, "sessions"), 7);
+  assert.equal(sumReadySeries(readySeries, "distance"), 60.098);
+  assert.equal(sumReadySeries(readySeries, "elevation"), 360);
+  assert.ok(
+    readySeries
+      .find((series) => series.id === "running_time")
+      ?.points.some((point) => point.state === "partial"),
+  );
+  assert.ok(
+    readySeries
+      .find((series) => series.id === "elevation")
+      ?.points.some((point) => point.state === "partial"),
+  );
+  assert.ok(
+    readySeries.every((series) =>
+      series.points
+        .filter((point) => point.coverage.candidateCount === 0)
+        .every((point) => point.state === "available" && point.value === 0),
+    ),
+  );
+
+  assert.deepEqual(
+    metrics.fitProgress.personalBests.slots.map((slot) => slot.id),
+    ["1_km", "5_km", "10_km", "half_marathon", "marathon"],
+  );
+  assert.equal(requireFitSlot(metrics, "1_km").state, "no_verified_time");
+  assert.equal(requireFitSlot(metrics, "5_km").result?.elapsedSeconds, 1_800);
+  assert.equal(requireFitSlot(metrics, "10_km").result?.elapsedSeconds, 2_460);
+  assert.equal(requireFitSlot(metrics, "half_marathon").result?.elapsedSeconds, 5_700);
+  assert.equal(requireFitSlot(metrics, "marathon").state, "no_verified_time");
+
+  const noFitMatch = await supabase
+    .from("runner_activity_planned_workout_matches")
+    .select("id")
+    .eq("user_id", input.userId)
+    .eq("planned_workout_id", input.completedWithoutFitWorkoutId);
+  if (noFitMatch.error) throw new Error(noFitMatch.error.message);
+  assert.deepEqual(noFitMatch.data, []);
+  const noFitLog = await supabase
+    .from("workout_logs")
+    .select("outcome")
+    .eq("user_id", input.userId)
+    .eq("planned_workout_id", input.completedWithoutFitWorkoutId)
+    .single();
+  if (noFitLog.error) throw new Error(noFitLog.error.message);
+  assert.equal(noFitLog.data.outcome, "completed");
+
+  const sequence = input.progress.fitActivitySequence;
+  assert.equal(sequence.status, "ready");
+  if (sequence.status !== "ready") throw new Error("Expected a ready FIT activity sequence.");
+  assert.equal(sequence.selectedPeriod.id, "custom");
+  assert.equal(sequence.selectedPeriod.startDate, addDaysIso(AS_OF_DATE, -9));
+  assert.equal(sequence.selectedPeriod.endDate, AS_OF_DATE);
+  assert.equal(sequence.completeness.eligibleActivityCount, 7);
+  assert.equal(sequence.completeness.returnedPointCount, 7);
+  assert.equal(sequence.points.length, 7);
+  assert.deepEqual(
+    sequence.points.map((point) => point.historicalTime.localDate),
+    [-7, -6, -5, -4, -3, -2, -1].map((offset) => addDaysIso(AS_OF_DATE, offset)),
+  );
+  assert.ok(sequence.points.every((point, index) => point.sequenceIndex === index));
+  const elapsedOnlyPoint = sequence.points.find(
+    (point) => point.observations.timer_duration.state === "unavailable",
+  );
+  assert.ok(elapsedOnlyPoint);
+  assert.equal(elapsedOnlyPoint.observations.observed_average_pace.state, "available");
+  assert.equal(elapsedOnlyPoint.observations.observed_average_pace.basis.duration, "elapsed");
+  assert.equal(elapsedOnlyPoint.observations.reported_load.state, "partial");
+  assert.equal(sequence.coverage.timer_duration.includedCount, 6);
+  assert.equal(sequence.coverage.reported_load.includedCount, 4);
+
+  const product = projectRunnerActivityProgressForProduct(input.progress);
+  assert.equal(product.fitProgress.status, "current");
+  assert.equal(product.fitActivitySequence.status, "ready");
+  assert.equal(JSON.stringify(product.fitProgress).includes("sourceRevisionId"), false);
+  assert.equal(JSON.stringify(product.fitActivitySequence).includes("sourceRevisionId"), false);
+  assert.equal(JSON.stringify(product.fitActivitySequence).includes("activityRevisionId"), false);
+  assert.equal(JSON.stringify(product.fitProgress).includes("storage"), false);
+}
+
+function sumReadySeries(
+  series: Array<Extract<RunnerActivityFitChartSeriesForProof, { status: "ready" }>>,
+  id: "sessions" | "running_time" | "distance" | "elevation" | "reported_load",
+) {
+  return roundForProof(
+    series
+      .find((candidate) => candidate.id === id)!
+      .points.reduce((sum, point) => sum + (point.value ?? 0), 0),
+  );
+}
+
+type RunnerActivityFitChartSeriesForProof = Extract<
+  RunnerActivityAdvancedMetricsCurrent["fitProgress"],
+  { status: "current" }
+>["chart"]["advertisedPeriods"][number]["series"][number];
+
+function requireFitSlot(
+  metrics: RunnerActivityAdvancedMetricsCurrent,
+  id: "1_km" | "5_km" | "10_km" | "half_marathon" | "marathon",
+) {
+  assert.equal(metrics.fitProgress.status, "current");
+  if (metrics.fitProgress.status !== "current") {
+    throw new Error("Expected current FIT Progress readback.");
+  }
+  const slot = metrics.fitProgress.personalBests.slots.find((candidate) => candidate.id === id);
+  if (!slot) throw new Error(`Missing FIT personal-best slot ${id}.`);
+  return slot;
+}
+
+function roundForProof(value: number) {
+  return Math.round(value * 10_000) / 10_000;
 }
 
 function proveFormulaBoundaryMatrix() {
@@ -203,6 +381,184 @@ function proveFormulaBoundaryMatrix() {
     formulaSetVersion: "runner_activity_gate4_formula_set_v1",
   });
   assert.notEqual(currentFingerprint, priorFormulaFingerprint);
+  proveFitPersonalBestTieBreak();
+}
+
+function proveFitActivitySequenceFormulaBoundaryMatrix() {
+  const thisWeek = resolveRunnerActivityFitSequencePeriod({
+    asOfDate: "2026-08-19",
+    timeZone: "America/Sao_Paulo",
+    period: { kind: "this_week" },
+  });
+  assert.deepEqual(thisWeek, {
+    id: "this_week",
+    label: "This week",
+    startDate: "2026-08-17",
+    endDate: "2026-08-23",
+    asOfDate: "2026-08-19",
+    timezoneBasis: {
+      period: "runner_calendar_timezone",
+      activities: "historical_local_date",
+      timeZone: "America/Sao_Paulo",
+    },
+    futureInterval: { startDate: "2026-08-20", endDate: "2026-08-23" },
+  });
+  assert.equal(
+    resolveRunnerActivityFitSequencePeriod({
+      asOfDate: "2026-08-19",
+      timeZone: "UTC",
+      period: { kind: "last_7_days" },
+    }).startDate,
+    "2026-08-13",
+  );
+  assert.equal(
+    resolveRunnerActivityFitSequencePeriod({
+      asOfDate: "2024-03-01",
+      timeZone: "UTC",
+      period: { kind: "last_1_month" },
+    }).startDate,
+    "2024-02-02",
+  );
+  assert.equal(
+    resolveRunnerActivityFitSequencePeriod({
+      asOfDate: "2024-08-31",
+      timeZone: "UTC",
+      period: { kind: "last_6_months" },
+    }).startDate,
+    "2024-03-01",
+  );
+
+  const earlier = {
+    ...syntheticFormulaActivity(),
+    id: "00000000-0000-4000-8000-000000000002",
+    startedAt: `${AS_OF_DATE}T07:00:00Z`,
+    distanceKm: 5,
+    evidence: { sessionRpe: null, officialResult: null },
+  };
+  const later = {
+    ...syntheticFormulaActivity(),
+    id: "00000000-0000-4000-8000-000000000001",
+    startedAt: `${AS_OF_DATE}T09:00:00Z`,
+    distanceKm: null,
+    evidence: { sessionRpe: null, officialResult: null },
+  };
+  const sequence = buildRunnerActivityFitSequence({
+    asOfDate: AS_OF_DATE,
+    timeZone: "UTC",
+    period: { kind: "custom", startDate: AS_OF_DATE, endDate: AS_OF_DATE },
+    activities: [later, earlier],
+  });
+  assert.equal(sequence.status, "ready");
+  if (sequence.status !== "ready") throw new Error("Expected a ready FIT activity sequence.");
+  assert.deepEqual(
+    sequence.points.map((point) => [point.id, point.sequenceIndex, point.sameDayOrder]),
+    [
+      [earlier.id, 0, 1],
+      [later.id, 1, 2],
+    ],
+  );
+  assert.equal(sequence.completeness.eligibleActivityCount, 2);
+  assert.equal(sequence.completeness.returnedPointCount, 2);
+  assert.equal(sequence.points[1]?.observations.distance.state, "unavailable");
+  assert.equal(sequence.points[1]?.observations.observed_average_pace.state, "unavailable");
+  assert.equal(sequence.coverage.distance.includedCount, 1);
+
+  const missingDate = buildRunnerActivityFitSequence({
+    asOfDate: AS_OF_DATE,
+    timeZone: "UTC",
+    period: { kind: "this_week" },
+    activities: [{ ...earlier, localDate: null }],
+  });
+  assert.equal(missingDate.status, "unavailable");
+  assert.equal(
+    missingDate.status === "unavailable" ? missingDate.reason : null,
+    "accepted_fit_activity_missing_historical_local_date",
+  );
+  assert.deepEqual(missingDate.points, []);
+}
+
+async function proveInvalidCustomSequencePeriods(userId: string) {
+  assert.throws(
+    () => parseRunnerActivityFitSequencePeriodRequest({ kind: "latest_20" }),
+    /supported activity period/i,
+  );
+  await assert.rejects(
+    getRunnerActivityProgressForUser({
+      userId,
+      asOfDate: AS_OF_DATE,
+      sequencePeriod: {
+        kind: "custom",
+        startDate: addDaysIso(AS_OF_DATE, -1),
+        endDate: addDaysIso(AS_OF_DATE, 1),
+      },
+    }),
+    /must not follow the runner's current date/i,
+  );
+  await assert.rejects(
+    getRunnerActivityProgressForUser({
+      userId,
+      asOfDate: AS_OF_DATE,
+      sequencePeriod: {
+        kind: "custom",
+        startDate: AS_OF_DATE,
+        endDate: addDaysIso(AS_OF_DATE, -1),
+      },
+    }),
+    /start date must not follow/i,
+  );
+}
+
+function sequencePeriodForProof(startOffset: number) {
+  return {
+    kind: "custom" as const,
+    startDate: addDaysIso(AS_OF_DATE, startOffset),
+    endDate: AS_OF_DATE,
+  };
+}
+
+function proveFitPersonalBestTieBreak() {
+  const preferredActivityId = "00000000-0000-4000-8000-000000000001";
+  const laterActivityId = "00000000-0000-4000-8000-000000000002";
+  const candidate = (id: string) => ({
+    ...syntheticFormulaActivity(),
+    id,
+    activityRevisionId: randomUUID(),
+    sourceRevisionId: randomUUID(),
+    timerDurationMin: 29,
+    elapsedDurationMin: 30,
+    distanceKm: 5,
+    rpeLinkState: "missing" as const,
+    rpeInputPresent: false,
+    evidence: { sessionRpe: null, officialResult: null },
+  });
+  const preferred = candidate(preferredActivityId);
+  const later = candidate(laterActivityId);
+  const build = (activities: Array<ReturnType<typeof candidate>>) => {
+    const observations = buildGate4ObservationDrafts(activities).map((observation) => ({
+      ...observation,
+      id: randomUUID(),
+      localDate: AS_OF_DATE,
+    }));
+    return buildGate4SnapshotPayload({
+      id: randomUUID(),
+      asOfDate: AS_OF_DATE,
+      historical: false,
+      activities,
+      observations,
+      activityRevisionIds: activities.map((activity) => activity.activityRevisionId),
+      evidenceRevisionIds: [],
+    });
+  };
+
+  for (const activities of [
+    [later, preferred],
+    [preferred, later],
+  ]) {
+    const slot = requireFitSlot(build(activities), "5_km");
+    assert.equal(slot.state, "available");
+    if (slot.state !== "available") throw new Error("Expected available 5 km FIT result.");
+    assert.equal(slot.result?.source.activityId, preferredActivityId);
+  }
 }
 
 function proveRecordContextIdentity() {
@@ -238,6 +594,7 @@ function proveRecordContextIdentity() {
     id: randomUUID(),
     asOfDate: AS_OF_DATE,
     historical: false,
+    activities,
     observations,
     activityRevisionIds: activities.map((activity) => activity.activityRevisionId),
     evidenceRevisionIds: activities.map((activity) => activity.evidence.officialResult.id),
@@ -270,6 +627,7 @@ function proveObservedRecordContextIdentity() {
     id: randomUUID(),
     asOfDate: AS_OF_DATE,
     historical: false,
+    activities,
     observations,
     activityRevisionIds: activities.map((activity) => activity.activityRevisionId),
     evidenceRevisionIds: [],
@@ -493,6 +851,10 @@ async function proveHistoricalFormulaVersionReadback(
   assert.equal(historical.historical, true);
   assert.equal(historical.formulaSetVersion, formulaSetVersion);
   assert.deepEqual(historical.formulaVersions, formulaVersions);
+  assert.deepEqual(historical.fitProgress, {
+    status: "unavailable",
+    reason: "historical_formula_version_without_fit_progress",
+  });
   assert.ok(historical.records.items.every((record) => record.formulaVersion.endsWith("_v0")));
   assert.deepEqual(historical.evidence.observationIds, metricPayload.evidence.observationIds);
   const stillCurrent = requireCurrent(
@@ -566,7 +928,6 @@ async function proveImmutableRpeLifecycle(
 async function proveDuplicateWorkoutLinkRejected(
   userId: string,
   completed: Gate4SyntheticActivity & { plannedWorkoutId: string },
-  planCycleId: string,
 ) {
   const duplicate = await persistGate4SyntheticActivity({
     supabase,
@@ -605,13 +966,15 @@ async function proveDuplicateWorkoutLinkRejected(
   );
 
   await deleteRunnerActivityFromHistory({ userId, activityId: duplicate.receipt.activityId });
-  const plan = await supabase
-    .from("plan_cycles")
-    .select("id")
-    .eq("id", planCycleId)
+  const workout = await supabase
+    .from("planned_workouts")
+    .select("id, plan_cycle_id, origin_kind")
+    .eq("id", completed.plannedWorkoutId)
     .eq("user_id", userId)
     .single();
-  if (plan.error) throw new Error(plan.error.message);
+  if (workout.error) throw new Error(workout.error.message);
+  assert.equal(workout.data.plan_cycle_id, null);
+  assert.equal(workout.data.origin_kind, "manual");
 }
 
 async function proveOfficialResultLifecycle(userId: string, activity: Gate4SyntheticActivity) {
@@ -694,7 +1057,7 @@ async function proveRpeActivityRevisionReattribution(
   });
   assert.equal(removed.status, "current");
   if (removed.status !== "current") throw new Error("Expected current source removal readback.");
-  assert.equal(requireCurrent(removed.progress).snapshotId, before.snapshotId);
+  assert.notEqual(requireCurrent(removed.progress).snapshotId, before.snapshotId);
 
   const correctedSource = await persistGate4SyntheticActivity({
     supabase,
@@ -770,7 +1133,7 @@ async function proveRawRemovalAndRevisionInvalidation(
   });
   assert.equal(removed.status, "current");
   if (removed.status !== "current") throw new Error("Expected current source removal readback.");
-  assert.equal(requireCurrent(removed.progress).snapshotId, beforeRemoval.snapshotId);
+  assert.notEqual(requireCurrent(removed.progress).snapshotId, beforeRemoval.snapshotId);
 
   const correctedSource = await persistGate4SyntheticActivity({
     supabase,
@@ -849,6 +1212,54 @@ async function provePartialRawRemovalTruth(userId: string, first: Gate4Synthetic
     .from(first.receipt.rawStorageBucket!)
     .download(first.receipt.rawStoragePath!);
   assert.ok(removedObject.error);
+  const afterRemovalProgress = await getRunnerActivityProgressForUser({
+    userId,
+    asOfDate: AS_OF_DATE,
+    sequencePeriod: sequencePeriodForProof(-8),
+  });
+  const afterRemoval = requireCurrent(afterRemovalProgress);
+  assert.equal(requireFitSlot(afterRemoval, "5_km").result?.elapsedSeconds, 2_640);
+  assert.ok(
+    afterRemovalProgress.fitActivitySequence.status === "ready" ||
+      afterRemovalProgress.fitActivitySequence.status === "empty",
+  );
+  if (
+    afterRemovalProgress.fitActivitySequence.status !== "ready" &&
+    afterRemovalProgress.fitActivitySequence.status !== "empty"
+  ) {
+    throw new Error("Expected a complete FIT activity sequence after removal.");
+  }
+  assert.equal(
+    afterRemovalProgress.fitActivitySequence.points.some(
+      (point) => point.id === first.receipt.activityId,
+    ),
+    false,
+  );
+
+  const corrected = await persistGate4SyntheticActivity({
+    supabase,
+    ...first.input,
+    timerDurationMin: 29,
+    elapsedDurationMin: 29,
+    storageSuffix: "fit-progress-correction",
+  });
+  assert.equal(corrected.receipt.activityId, first.receipt.activityId);
+  assert.notEqual(corrected.receipt.activityRevisionId, first.receipt.activityRevisionId);
+  const afterCorrectionProgress = await getRunnerActivityProgressForUser({
+    userId,
+    asOfDate: AS_OF_DATE,
+    sequencePeriod: sequencePeriodForProof(-8),
+  });
+  const afterCorrection = requireCurrent(afterCorrectionProgress);
+  assert.equal(requireFitSlot(afterCorrection, "5_km").result?.elapsedSeconds, 1_740);
+  assert.equal(afterCorrectionProgress.fitActivitySequence.status, "ready");
+  if (afterCorrectionProgress.fitActivitySequence.status !== "ready") {
+    throw new Error("Expected a ready FIT activity sequence after correction.");
+  }
+  const correctedPoint = afterCorrectionProgress.fitActivitySequence.points.find(
+    (point) => point.id === first.receipt.activityId,
+  );
+  assert.equal(correctedPoint?.observations.timer_duration.value, 29);
 
   const history = await listRunnerActivityHistoryForUser({ userId, pageSize: 50 });
   const retryable = history.items.find((item) => item.id === second.receipt.activityId);
@@ -885,6 +1296,119 @@ async function provePartialRawRemovalTruth(userId: string, first: Gate4Synthetic
   await deleteRunnerActivityFromHistory({ userId, activityId: second.receipt.activityId });
 }
 
+async function proveFitUpdatingAndUnavailableStates(userId: string) {
+  const activity = await persistGate4SyntheticActivity({
+    supabase,
+    userId,
+    key: "fit-progress-updating-1km",
+    localDate: addDaysIso(AS_OF_DATE, -10),
+    timerDurationMin: 4,
+    elapsedDurationMin: 4,
+    distanceKm: 1,
+    elevationGainM: 12,
+  });
+  await markRunnerActivitySourceRemovalPendingForFixture({
+    supabase,
+    userId,
+    sourceRevisionId: activity.receipt.sourceRevisionId,
+  });
+  const updatingProgress = await getRunnerActivityProgressForUser({
+    userId,
+    asOfDate: AS_OF_DATE,
+    sequencePeriod: sequencePeriodForProof(-10),
+  });
+  assert.equal(updatingProgress.fitActivitySequence.status, "updating");
+  assert.deepEqual(updatingProgress.fitActivitySequence.points, []);
+  const updating = requireCurrent(updatingProgress);
+  assert.equal(requireFitSlot(updating, "1_km").state, "updating");
+  assert.equal(updating.fitProgress.status, "current");
+  if (updating.fitProgress.status !== "current") {
+    throw new Error("Expected current FIT Progress readback.");
+  }
+  assert.ok(
+    updating.fitProgress.chart.advertisedPeriods[0].series.every(
+      (series) => series.status === "updating" && series.points.length === 0,
+    ),
+  );
+
+  const removal = await removeRunnerActivityOriginalFilesForActivity({
+    userId,
+    activityId: activity.receipt.activityId,
+  });
+  assert.equal(removal.status, "current");
+  if (removal.status !== "current") throw new Error("Expected current source removal readback.");
+  const removed = requireCurrent(removal.progress);
+  const slot = requireFitSlot(removed, "1_km");
+  assert.equal(slot.state, "unavailable");
+  assert.equal(slot.reason, "fit_source_removed");
+  assert.equal(removed.fitProgress.status, "current");
+  if (removed.fitProgress.status !== "current") {
+    throw new Error("Expected current FIT Progress readback.");
+  }
+  assert.ok(
+    removed.fitProgress.chart.advertisedPeriods[0].series.some(
+      (series) =>
+        series.status === "ready" &&
+        series.points.some((point) => point.reasons.includes("fit_source_removed")),
+    ),
+  );
+  const removedSequence = await getRunnerActivityProgressForUser({
+    userId,
+    asOfDate: AS_OF_DATE,
+    sequencePeriod: sequencePeriodForProof(-10),
+  });
+  assert.ok(
+    removedSequence.fitActivitySequence.status === "ready" ||
+      removedSequence.fitActivitySequence.status === "empty",
+  );
+  if (
+    removedSequence.fitActivitySequence.status !== "ready" &&
+    removedSequence.fitActivitySequence.status !== "empty"
+  ) {
+    throw new Error("Expected a complete FIT activity sequence after source removal.");
+  }
+  assert.equal(
+    removedSequence.fitActivitySequence.points.some(
+      (point) => point.id === activity.receipt.activityId,
+    ),
+    false,
+  );
+  await deleteRunnerActivityFromHistory({ userId, activityId: activity.receipt.activityId });
+}
+
+async function proveFitProgressIsolation(otherUserId: string) {
+  const progress = await getRunnerActivityProgressForUser({
+    userId: otherUserId,
+    asOfDate: AS_OF_DATE,
+  });
+  assert.equal(progress.fitActivitySequence.status, "empty");
+  if (progress.fitActivitySequence.status !== "empty") {
+    throw new Error("Expected an empty isolated FIT activity sequence.");
+  }
+  assert.equal(progress.fitActivitySequence.completeness.eligibleActivityCount, 0);
+  assert.deepEqual(progress.fitActivitySequence.points, []);
+  const metrics = requireCurrent(progress);
+  assert.equal(metrics.fitProgress.status, "current");
+  if (metrics.fitProgress.status !== "current") {
+    throw new Error("Expected current FIT Progress readback.");
+  }
+  assert.ok(
+    metrics.fitProgress.chart.advertisedPeriods[0].series.every(
+      (series) =>
+        series.status === "ready" &&
+        series.points.every(
+          (point) =>
+            point.state === "available" && point.value === 0 && point.coverage.candidateCount === 0,
+        ),
+    ),
+  );
+  assert.ok(
+    metrics.fitProgress.personalBests.slots.every(
+      (slot) => slot.state === "no_verified_time" && slot.result === null,
+    ),
+  );
+}
+
 async function proveFreshReadNeverReturnsStale(userId: string) {
   const current = requireCurrent(
     await getRunnerActivityProgressForUser({ userId, asOfDate: AS_OF_DATE }),
@@ -900,9 +1424,14 @@ async function proveFreshReadNeverReturnsStale(userId: string) {
     .delete()
     .eq("id", current.snapshotId);
   if (removed.error) throw new Error(removed.error.message);
+  const missingFitProgressPayload = structuredClone(snapshot.data.metric_payload) as Record<
+    string,
+    unknown
+  >;
+  delete missingFitProgressPayload.fitProgress;
   const poisoned = await supabase.from("runner_activity_metric_snapshots").insert({
     ...snapshot.data,
-    metric_payload: { status: "current", fixture: "invalid_payload" },
+    metric_payload: missingFitProgressPayload,
   });
   if (poisoned.error) throw new Error(poisoned.error.message);
 
@@ -995,9 +1524,13 @@ function syntheticFormulaActivity() {
     activityRevisionId,
     sourceRevisionId: randomUUID(),
     localDate: AS_OF_DATE,
+    startedAt: `${AS_OF_DATE}T08:00:00Z`,
+    historicalTimezone: "UTC",
     timerDurationMin: 42,
     elapsedDurationMin: 45,
     distanceKm: null,
+    elevationGainM: null,
+    fitEvidence: { state: "eligible" as const, reason: null },
     recordContext: null,
     rpeLinkState: "exact" as const,
     rpeInputPresent: true,

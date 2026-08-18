@@ -1,9 +1,19 @@
+import { useState } from "react";
 import { Icon } from "@/components/ui/icon";
+import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
+import { HitoValueTagSelectTrigger } from "@/components/ui/value-tag";
+import { Select, SelectContent, SelectItem } from "@/components/ui/select";
 import type {
-  InlineChangeBorderEvidence,
+  InlineChangeBorderIntentEvidence,
+  InlineChangeBorderIntentSelection,
+  InlineChangeBorderSide,
   InlineChangeCardChromeEvidence,
   InlineChangeChromeRemovalSelection,
   InlineChangeTokenControlInput,
+} from "@/components/devtools/local-inline-change-target-utils";
+import {
+  formatInlineChangeBorderIntentSelection,
+  INLINE_CHANGE_BORDER_SIDES,
 } from "@/components/devtools/local-inline-change-target-utils";
 import {
   PendingChangeRemoveButton,
@@ -11,34 +21,29 @@ import {
 } from "@/components/devtools/LocalUiPropertyControlPrimitives";
 
 export function ChromeControlRows({
-  border,
+  borderIntent,
+  borderIntentSelection,
   cardChrome,
   chromeRemovalSelection,
+  onBorderIntentChange,
   onChromeRemovalChange,
 }: {
-  border: InlineChangeBorderEvidence | null | undefined;
+  borderIntent: InlineChangeBorderIntentEvidence | null | undefined;
+  borderIntentSelection: InlineChangeBorderIntentSelection | null;
   cardChrome: InlineChangeCardChromeEvidence | null | undefined;
   chromeRemovalSelection: InlineChangeChromeRemovalSelection | null;
+  onBorderIntentChange: (selection: InlineChangeBorderIntentSelection | null) => void;
   onChromeRemovalChange: (selection: InlineChangeChromeRemovalSelection | null) => void;
 }) {
-  if (!border && !cardChrome?.isDetected) return null;
+  if (!borderIntent && !cardChrome?.isDetected) return null;
 
   return (
     <div className="grid min-w-0 gap-1.5">
-      {border ? (
+      {borderIntent ? (
         <BorderControlLine
-          active={chromeRemovalSelection?.kind === "border"}
-          currentLabel={getBorderValueLabel(border)}
-          tooltip={border.summary}
-          onActivate={() =>
-            onChromeRemovalChange({
-              border,
-              kind: "border",
-              paddingControls: [],
-              radiusControls: [],
-            })
-          }
-          onRemove={() => onChromeRemovalChange(null)}
+          border={borderIntent}
+          selection={borderIntentSelection}
+          onChange={onBorderIntentChange}
         />
       ) : null}
       {cardChrome?.isDetected ? (
@@ -61,18 +66,20 @@ export function ChromeControlRows({
 }
 
 function BorderControlLine({
-  active,
-  currentLabel,
-  onActivate,
-  onRemove,
-  tooltip,
+  border,
+  onChange,
+  selection,
 }: {
-  active: boolean;
-  currentLabel: string;
-  onActivate: () => void;
-  onRemove: () => void;
-  tooltip: string;
+  border: InlineChangeBorderIntentEvidence;
+  onChange: (selection: InlineChangeBorderIntentSelection | null) => void;
+  selection: InlineChangeBorderIntentSelection | null;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const currentLabel = getBorderValueLabel(border);
+  const allSidesSelected = INLINE_CHANGE_BORDER_SIDES.every((side) =>
+    selection?.sides.includes(side),
+  );
+
   return (
     <div className="grid min-w-0 gap-1 py-0.5" data-local-ui-property-control-row="Border">
       <div className="flex min-w-0 items-center gap-2">
@@ -81,30 +88,112 @@ function BorderControlLine({
             <Icon name="minus" size="xs" />
           </span>
           <span className="hito-body-xs min-w-0 truncate text-foreground">Border</span>
+          <button
+            type="button"
+            className="hito-button hito-button-ghost hito-button-xs size-5 min-h-5 shrink-0 rounded-sm px-0 text-muted-foreground hover:text-foreground"
+            aria-label="Show border side controls"
+            aria-expanded={expanded}
+            onClick={() => setExpanded((current) => !current)}
+          >
+            <Icon
+              name="chevron-down"
+              size="xs"
+              className={`transition-transform ${expanded ? "rotate-180" : ""}`}
+            />
+          </button>
         </div>
-        {active ? (
+        {selection ? (
           <>
-            <ValueTag tone="current" value={currentLabel} tooltip={tooltip} />
+            <ValueTag tone="current" value={currentLabel} tooltip={border.summary} />
             <Icon name="arrow-right" size="xs" className="shrink-0 text-muted-foreground" />
             <div className="group relative shrink-0">
-              <ValueTag tone="desired" value="Removed" tooltip={tooltip} />
+              <ValueTag
+                tone="desired"
+                value={formatInlineChangeBorderIntentSelection(selection)}
+                tooltip={getBorderIntentHelp(selection)}
+              />
               <PendingChangeRemoveButton
                 ariaLabel="Remove Border pending change"
-                onClick={onRemove}
+                onClick={() => onChange(null)}
               />
             </div>
           </>
         ) : (
-          <div className="group relative shrink-0">
-            <ValueTag value={currentLabel} tooltip={tooltip} />
-            <PendingChangeRemoveButton
-              ariaLabel="Remove Border"
-              onClick={onActivate}
-              visibility="hover"
-            />
-          </div>
+          <ValueTag value={currentLabel} tooltip={border.summary} />
         )}
       </div>
+      {expanded ? (
+        <div className="grid min-w-0 gap-1 rounded-lg bg-muted p-1">
+          <div
+            className="flex min-w-0 flex-wrap items-center gap-1"
+            role="group"
+            aria-label="Border sides"
+          >
+            <HitoChoiceToggle
+              size="xs"
+              selected={allSidesSelected}
+              onClick={() =>
+                onChange(
+                  allSidesSelected
+                    ? null
+                    : {
+                        sides: [...INLINE_CHANGE_BORDER_SIDES],
+                        treatment:
+                          selection?.treatment ??
+                          getDefaultTreatment(border, [...INLINE_CHANGE_BORDER_SIDES]),
+                      },
+                )
+              }
+            >
+              All sides
+            </HitoChoiceToggle>
+            {INLINE_CHANGE_BORDER_SIDES.map((side) => {
+              const selected = selection?.sides.includes(side) ?? false;
+              return (
+                <HitoChoiceToggle
+                  key={side}
+                  size="xs"
+                  selected={selected}
+                  aria-label={`${capitalizeSide(side)} border side`}
+                  onClick={() => onChange(toggleBorderSide(border, selection, side, selected))}
+                >
+                  {capitalizeSide(side)}
+                </HitoChoiceToggle>
+              );
+            })}
+          </div>
+          {selection ? (
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <span className="hito-body-xs text-foreground">Treatment</span>
+              <Select
+                value={selection.treatment}
+                onValueChange={(value) =>
+                  onChange({
+                    ...selection,
+                    treatment: value === "none" ? "none" : "hairline",
+                  })
+                }
+              >
+                <HitoValueTagSelectTrigger
+                  aria-label="Border treatment"
+                  className="min-w-20"
+                  tone="signal"
+                >
+                  {selection.treatment === "hairline" ? "Hairline" : "None"}
+                </HitoValueTagSelectTrigger>
+                <SelectContent align="end" className="z-[94] w-40" data-local-ui-inspector-layer="">
+                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="hairline">Hairline</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <p className="hito-body-xs text-tertiary">
+              Select one or more sides to request None or Hairline.
+            </p>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -145,7 +234,9 @@ function CardChromeControlLine({
   );
 }
 
-function getBorderValueLabel(border: InlineChangeBorderEvidence) {
+function getBorderValueLabel(border: InlineChangeBorderIntentEvidence) {
+  if (border.sides.every((side) => side.widthPx === 0)) return "0";
+
   const [first] = border.sides;
   const allSame =
     first &&
@@ -156,7 +247,47 @@ function getBorderValueLabel(border: InlineChangeBorderEvidence) {
         side.color === first.color,
     );
 
-  return first && allSame ? first.widthLabel : "Mixed";
+  return first && allSame ? `${first.widthLabel}px ${first.style}` : "Mixed";
+}
+
+function toggleBorderSide(
+  border: InlineChangeBorderIntentEvidence,
+  selection: InlineChangeBorderIntentSelection | null,
+  side: InlineChangeBorderSide,
+  selected: boolean,
+): InlineChangeBorderIntentSelection | null {
+  const requestedSides = new Set(selection?.sides ?? []);
+  if (selected) requestedSides.delete(side);
+  else requestedSides.add(side);
+
+  const sides = INLINE_CHANGE_BORDER_SIDES.filter((candidate) => requestedSides.has(candidate));
+  if (sides.length === 0) return null;
+
+  return {
+    sides,
+    treatment: selection?.treatment ?? getDefaultTreatment(border, [side]),
+  };
+}
+
+function getDefaultTreatment(
+  border: InlineChangeBorderIntentEvidence,
+  sides: InlineChangeBorderSide[],
+): InlineChangeBorderIntentSelection["treatment"] {
+  return sides.every(
+    (side) => border.sides.find((candidate) => candidate.side === side)?.widthPx === 0,
+  )
+    ? "hairline"
+    : "none";
+}
+
+function getBorderIntentHelp(selection: InlineChangeBorderIntentSelection) {
+  return selection.treatment === "hairline"
+    ? `${formatInlineChangeBorderIntentSelection(selection)} using 1px solid var(--color-hairline). No live CSS mutation.`
+    : `${formatInlineChangeBorderIntentSelection(selection)}. No live CSS mutation.`;
+}
+
+function capitalizeSide(side: InlineChangeBorderSide) {
+  return side.charAt(0).toUpperCase() + side.slice(1);
 }
 
 function getCardChromeHelpLabel(cardChrome: InlineChangeCardChromeEvidence) {

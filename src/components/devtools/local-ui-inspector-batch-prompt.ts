@@ -1,4 +1,5 @@
 import {
+  formatInlineChangeBorderIntentSelection,
   getFixScopeDescription,
   getFixScopeLabel,
 } from "@/components/devtools/local-inline-change-target-utils";
@@ -92,10 +93,17 @@ function formatBatchItem(item: LocalUiInspectorBatchItem, index: number) {
       ? colorLines.map((line) => `  - ${line}`)
       : ["  - No eligible color channel."]),
     `- Typography request: ${formatTypography(item)}`,
+    `- Border evidence: ${payload.target.borderIntent?.current.summary ?? "Not eligible"}`,
+    `- Border request: ${formatBorderIntent(item)}`,
     `- Chrome request: ${payload.target.chromeRemoval ? payload.target.chromeRemoval.kind : "None"}`,
     "- Observed evidence:",
     ...evidenceLines,
   ];
+}
+
+function formatBorderIntent(item: LocalUiInspectorBatchItem) {
+  const selection = item.payload.target.borderIntent?.requestedChange;
+  return selection ? formatInlineChangeBorderIntentSelection(selection) : "None";
 }
 
 function formatOwnership(item: LocalUiInspectorBatchItem) {

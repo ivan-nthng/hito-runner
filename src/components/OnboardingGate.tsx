@@ -309,8 +309,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     setManualCreateError(null);
     hitoToast.working({
       id: MANUAL_CREATE_TOAST_ID,
-      title: "Creating manual plan",
-      description: "Hito is opening a saved empty calendar for manual building.",
+      title: "Opening Calendar",
+      description: "Hito is opening an empty Calendar for manual building.",
     });
 
     try {
@@ -324,7 +324,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
         setManualCreateError(result.message);
         hitoToast.error({
           id: MANUAL_CREATE_TOAST_ID,
-          title: "Plan not created",
+          title: "Calendar not opened",
           description: result.message,
         });
         return;
@@ -332,22 +332,20 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
 
       hitoToast.success({
         id: MANUAL_CREATE_TOAST_ID,
-        title: "Manual plan created",
-        description: "Opening your manual calendar now.",
+        title: "Calendar ready",
+        description: "Opening your Calendar now.",
         duration: 2600,
       });
       openSavedHome();
     } catch (submitError) {
       const message =
-        submitError instanceof Error
-          ? submitError.message
-          : "The manual plan could not be created.";
+        submitError instanceof Error ? submitError.message : "The Calendar could not be opened.";
       manualCreateInFlightRef.current = false;
       setManualCreateStatus("idle");
       setManualCreateError(message);
       hitoToast.error({
         id: MANUAL_CREATE_TOAST_ID,
-        title: "Plan not created",
+        title: "Calendar not opened",
         description: message,
       });
     }
@@ -356,7 +354,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   return (
     <section className="hito-onboarding-surface">
       <div className="max-w-3xl">
-        <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">Choose how to start your plan.</h1>
+        <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">Choose how to start training.</h1>
         <p className="hito-body-md mt-4 text-muted-foreground">
           Add the basics once, then choose a training distance or open an empty manual calendar.
         </p>
@@ -386,7 +384,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
             <div
               className="hito-tabs hito-tabs-enclosed mx-auto w-fit max-w-full"
               {...planStartTabs.tabListProps}
-              aria-label="Plan creation method"
+              aria-label="Training setup method"
             >
               {PLAN_START_TABS.map((tab) => (
                 <button
@@ -544,7 +542,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
                         : "hito-body-xs text-secondary"
                     }
                   >
-                    {manualCreateError ?? "Your saved runner baseline will be used for this plan."}
+                    {manualCreateError ??
+                      "Your saved runner baseline is ready. Your Calendar will open without adding workouts."}
                   </p>
                 </div>
                 <HitoButton
@@ -557,7 +556,9 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
                     void createManualPlan();
                   }}
                 >
-                  {manualCreateStatus === "creating" ? "Opening manual calendar..." : "Create plan"}
+                  {manualCreateStatus === "creating"
+                    ? "Opening manual calendar..."
+                    : "Open Calendar"}
                 </HitoButton>
               </>
             )}
@@ -678,7 +679,7 @@ function buildManualEmptyPlanInput(
   }
 
   if (!age.ok || !weightKg.ok || !heightCm.ok) {
-    return { ok: false, error: "Add age, height, and weight to create a manual plan." };
+    return { ok: false, error: "Add age, height, and weight before opening Calendar." };
   }
 
   return {

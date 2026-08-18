@@ -14,7 +14,6 @@ import {
 import {
   MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-  MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
 } from "../../src/lib/manual-workout-authoring/schema";
 import type { Step } from "../../src/lib/training";
 import {
@@ -81,7 +80,7 @@ export async function validateManualDeleteClearContract() {
   if (review.ok) {
     assert.equal(review.status, "review_ready");
     assert.equal(review.persisted, false);
-    assert.equal(review.sourceKind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
+    assert.equal(review.sourceKind, "manual");
     assert.equal(review.workoutSourceKind, MANUAL_WORKOUT_AUTHORING_SOURCE_KIND);
     assert.equal(review.activePlanId, activePlan.id);
     assert.equal(review.plannedWorkoutId, targetWorkout.id);
@@ -201,8 +200,8 @@ export async function validateManualDeleteClearContract() {
   if (success.ok) {
     assert.equal(success.status, "deleted");
     assert.equal(success.persisted, true);
-    assert.equal(success.sourceKind, MANUAL_USER_BUILT_PLAN_SOURCE_KIND);
-    assert.equal(success.sourceStatus, MANUAL_USER_BUILT_PLAN_SOURCE_STATUS);
+    assert.equal(success.sourceKind, "manual");
+    assert.equal(success.sourceStatus, null);
     assert.equal(success.workoutSourceKind, MANUAL_WORKOUT_AUTHORING_SOURCE_KIND);
     assert.equal(success.activePlanId, activePlan.id);
     assert.equal(success.plannedWorkoutId, targetWorkout.id);
@@ -215,7 +214,8 @@ export async function validateManualDeleteClearContract() {
       assert.equal(success.restore.review.draft.workoutDate, targetWorkout.workout_date);
     }
     assert.equal(success.safety.deletedExactlyOneRow, true);
-    assert.equal(success.safety.activePlanRemainsActive, true);
+    assert.equal(success.safety.runnerOwnershipVerified, true);
+    assert.equal(success.safety.sourceProvenanceUnchanged, true);
     assert.equal(success.safety.serverRebuiltReview, true);
     assert.equal(success.safety.trustedClientRows, false);
   }
@@ -306,7 +306,7 @@ export async function validateManualDeleteClearContract() {
   );
   assert.equal(presetReview.ok, true, formatJsonResult(presetReview));
   if (presetReview.ok) {
-    assert.equal(presetReview.sourceKind, "ai_authored_plan_first_v1");
+    assert.equal(presetReview.sourceKind, "manual");
     assert.equal(presetReview.restore.available, true);
     assert.deepEqual(presetReview.restore.alternateLabels, ["Put back", "Redo"]);
   }
@@ -327,7 +327,7 @@ export async function validateManualDeleteClearContract() {
   );
   assert.equal(presetConfirm.ok, true, formatJsonResult(presetConfirm));
   if (presetConfirm.ok) {
-    assert.equal(presetConfirm.sourceKind, "ai_authored_plan_first_v1");
+    assert.equal(presetConfirm.sourceKind, "manual");
     assert.equal(presetConfirm.sourceStatus, null);
     assert.equal(presetConfirm.safety.deletedExactlyOneRow, true);
   }
@@ -342,6 +342,7 @@ export async function validateManualDeleteClearContract() {
   const selectedGeneratedTarget = buildFakePlannedWorkout({
     userId,
     planCycleId: selectedPlan.id,
+    originKind: "ai",
     id: "99999999-9999-4999-8999-000000000509",
     date: "2026-06-24",
     displayOrder: 0,
@@ -377,7 +378,7 @@ export async function validateManualDeleteClearContract() {
   );
   assert.equal(selectedReview.ok, true, formatJsonResult(selectedReview));
   if (selectedReview.ok) {
-    assert.equal(selectedReview.sourceKind, "ai_authored_plan_first_v1");
+    assert.equal(selectedReview.sourceKind, "ai");
     assert.equal(selectedReview.templateKey, "selected_plan_easy_run");
     assert.equal(selectedReview.restore.available, false);
     assert.equal(selectedReview.restore.reason, "restore_requires_editor_support");
@@ -409,7 +410,7 @@ export async function validateManualDeleteClearContract() {
   );
   assert.equal(selectedConfirm.ok, true, formatJsonResult(selectedConfirm));
   if (selectedConfirm.ok) {
-    assert.equal(selectedConfirm.sourceKind, "ai_authored_plan_first_v1");
+    assert.equal(selectedConfirm.sourceKind, "ai");
     assert.equal(selectedConfirm.safety.deletedExactlyOneRow, true);
     assert.equal(selectedConfirm.restore.available, false);
   }
@@ -648,14 +649,7 @@ function buildFakeDeleteDependencies(input: {
 
       return {
         deletedWorkout: record.targetWorkout,
-        planCycle: {
-          ...record.activePlan,
-          end_date:
-            record.remainingWorkouts
-              .map((workout) => workout.workout_date)
-              .sort()
-              .at(-1) ?? record.activePlan.start_date,
-        },
+        mutationEvent: null as never,
       };
     },
   };

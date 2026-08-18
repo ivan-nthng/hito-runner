@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** DESIGN SYSTEM
+- **Epic:** platform-and-operations
 - **Evidence From:** [Mobile Density And Responsive Typography Discovery](./2026-08-13-hito-ds-mobile-density-and-responsive-typography-discovery.md)
 - **Outcome:** The three generic narrow layout rules have one shared owner in layout-typography.css; Calendar CSS retains only Calendar-specific navigation/card rules. /hitoDS uses 16px horizontal / 24px vertical narrow wrapper insets, zero duplicate header and showroom…
 - **Sources:** [playground.tsx](../../../src/components/hito-ds/playground.tsx); [validate-hito-ds-component-contracts.ts](../../../scripts/validate-hito-ds-component-contracts.ts); [reference-components-structure.tsx](../../../src/components/hito-ds/reference-components-structure.tsx)

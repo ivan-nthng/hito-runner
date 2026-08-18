@@ -90,7 +90,10 @@ const workbenchSettingsOwner = "src/components/hito-ds/workbench-settings-contro
 const workbenchSettingsImporters = new Set([
   "src/components/hito-ds/calendar-workout-playground-data.ts",
   "src/components/hito-ds/calendar-workout-playground.tsx",
+  "src/components/hito-ds/factual-activity-point-sequence-playground.tsx",
+  "src/components/hito-ds/factual-bar-chart-playground.tsx",
   "src/components/hito-ds/reference-components-structure.tsx",
+  "src/components/hito-ds/reference-patterns-page.tsx",
   "src/components/hito-ds/workout-library-playground-data.ts",
   "src/components/hito-ds/workout-library-playground.tsx",
 ]);
@@ -698,8 +701,39 @@ const hitoCalendarDaySource = sourceFiles.find(
 const selectSource = sourceFiles.find(
   (file) => file.relativePath === "src/components/ui/select.tsx",
 );
+const popoverSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/ui/popover.tsx",
+);
+const valueTagSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/ui/value-tag.tsx",
+);
 const overlaysFeedbackSource = sourceFiles.find(
   (file) => file.relativePath === "src/styles/overlays-feedback.css",
+);
+const referencePatternsSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/hito-ds/reference-patterns-page.tsx",
+);
+const referenceBrandSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/hito-ds/reference-brand-page.tsx",
+);
+const navigationCardSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/ui/hito-navigation-card.tsx",
+);
+const factualBarChartSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/ui/hito-factual-bar-chart.tsx",
+);
+const factualBarChartPlaygroundSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/hito-ds/factual-bar-chart-playground.tsx",
+);
+const factualActivityPointSequenceSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/ui/hito-factual-activity-point-sequence.tsx",
+);
+const factualActivityPointSequencePlaygroundSource = sourceFiles.find(
+  (file) =>
+    file.relativePath === "src/components/hito-ds/factual-activity-point-sequence-playground.tsx",
+);
+const referenceOverviewSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/hito-ds/reference-overview-page.tsx",
 );
 const hubRoute = sourceFiles.find((file) => file.relativePath === "src/routes/hub.tsx");
 const showcaseBoundaryLeaks = showcaseBoundaryLeakFindings(sourceFiles);
@@ -993,8 +1027,7 @@ const shellProfileFocusDeclarations = selectorDeclarations(
 expect(
   shellProfileDeclarations?.border === "1px solid transparent" &&
     shellProfileDeclarations?.["border-radius"] === "var(--radius-xl)" &&
-    shellProfileDeclarations?.background ===
-      "color-mix(in oklch, var(--color-surface) 42%, transparent)" &&
+    shellProfileDeclarations?.background === "var(--color-chrome-subtle)" &&
     shellProfileDeclarations?.["box-shadow"] === "none" &&
     shellProfileHoverDeclarations?.background ===
       "color-mix(in oklch, var(--color-surface-elevated) 58%, transparent)" &&
@@ -1013,15 +1046,285 @@ expect(
 expect(
   selectorDeclarations(overlaysFeedbackSource?.content ?? "", ".hito-surface") !== null &&
     selectorDeclarations(overlaysFeedbackSource?.content ?? "", ".hito-surface-flat") !== null &&
+    selectorDeclarations(overlaysFeedbackSource?.content ?? "", ".hito-surface-quiet") !== null &&
     selectorDeclarations(typographyCss, ".hito-icon") !== null &&
     selectorDeclarations(typographyCss, ".hito-logo") !== null &&
     selectorDeclarations(typographyCss, ".hito-logo-mark") !== null &&
     referenceWorkbenchCss.includes("  .hito-surface {") === false &&
     referenceWorkbenchCss.includes("  .hito-surface-flat {") === false &&
+    referenceWorkbenchCss.includes("  .hito-surface-quiet {") === false &&
     referenceWorkbenchCss.includes("  .hito-icon {") === false &&
     referenceWorkbenchCss.includes("  .hito-logo {") === false &&
     referenceWorkbenchCss.includes("  .hito-logo-mark {") === false,
   "Shared surface, Icon, and Logo recipes must not use the reference workbench as their runtime owner.",
+);
+const sharedSurfaceDeclarations = selectorDeclarations(
+  overlaysFeedbackSource?.content ?? "",
+  ".hito-surface",
+);
+const sharedFlatSurfaceDeclarations = selectorDeclarations(
+  overlaysFeedbackSource?.content ?? "",
+  ".hito-surface-flat",
+);
+const sharedQuietSurfaceDeclarations = selectorDeclarations(
+  overlaysFeedbackSource?.content ?? "",
+  ".hito-surface-quiet",
+);
+const popoverSurfaceDeclarations = selectorDeclarations(
+  overlaysFeedbackSource?.content ?? "",
+  ".hito-ui-popover-surface",
+);
+expect(
+  sharedSurfaceDeclarations?.border === "0" &&
+    sharedFlatSurfaceDeclarations?.border === "0" &&
+    sharedQuietSurfaceDeclarations?.border === "0" &&
+    popoverSurfaceDeclarations?.border === "1px solid var(--color-hairline)" &&
+    selectorDeclarations(foundationsCss, ".hito-launch-surface")?.border === "0" &&
+    declaresSelector(foundationsCss, ".hito-launcher-card") === false &&
+    selectorDeclarations(controlsCss, ".hito-row-group")?.border ===
+      "1px solid var(--color-hairline)" &&
+    referenceBrandSource?.content.includes(
+      "hito-auth-alpha-surface hito-surface-flat rounded-2xl border border-hairline",
+    ) === false,
+  "Reusable visual cards must remain borderless while detached overlays and structural row groups retain their explicit edges.",
+);
+const responsiveStateSurfaceDeclarations = selectorDeclarations(
+  overlaysFeedbackSource?.content ?? "",
+  '.hito-state-surface:is([data-size="sm"], [data-size="md"], [data-size="lg"])',
+);
+const stateSurfaceDeclarations = selectorDeclarations(
+  overlaysFeedbackSource?.content ?? "",
+  ".hito-state-surface",
+);
+const detachedSurfaceElevationMap = {
+  ".hito-tooltip": "var(--hito-elevation-xs)",
+  ".hito-ui-menu-surface": "var(--hito-elevation-sm)",
+  ".hito-ui-popover-surface": "var(--hito-elevation-sm)",
+  ".hito-ui-dialog-surface": "var(--hito-elevation-xl)",
+} as const;
+const semanticStateSurfaceBackgrounds = {
+  signal: "color-mix(in oklch, var(--color-signal) 7%, var(--color-background))",
+  success: "color-mix(in oklch, var(--color-success) 8%, var(--color-background))",
+  warning: "color-mix(in oklch, var(--color-warn) 9%, var(--color-background))",
+  destructive: "color-mix(in oklch, var(--color-destructive) 10%, var(--color-background))",
+} as const;
+expect(
+  Object.entries(detachedSurfaceElevationMap).every(
+    ([selector, elevation]) =>
+      selectorDeclarations(overlaysFeedbackSource?.content ?? "", selector)?.["box-shadow"] ===
+      elevation,
+  ) &&
+    [
+      ...(overlaysFeedbackSource?.content.matchAll(/\.hito-ui-sheet-surface\s*\{([^}]*)\}/g) ?? []),
+    ].some((match) => match[1].includes("box-shadow: var(--hito-elevation-lg);")) &&
+    selectorDeclarations(overlaysFeedbackSource?.content ?? "", ".hito-toast")?.[
+      "box-shadow"
+    ]?.startsWith("var(--hito-elevation-md), inset 0 1px 0") === true &&
+    selectorDeclarations(fieldBaseCss, ".hito-date-picker-popover")?.["box-shadow"] ===
+      "var(--hito-elevation-sm)" &&
+    shellCss.includes(".hito-tooltip {") === false &&
+    overlaysFeedbackSource?.content.includes(".hito-tooltip-width-lg {") === true &&
+    overlaysFeedbackSource.content.includes(".hito-tooltip-title {") &&
+    overlaysFeedbackSource.content.includes(".hito-tooltip-meta {") &&
+    overlaysFeedbackSource.content.includes(".hito-tooltip-dot {") &&
+    popoverSource?.content.includes("shadow-soft") === false &&
+    valueTagSource?.content.includes("shadow-[var(--hito-elevation-xs)]") === true,
+  "Shared detached surfaces must use the admitted XS–XL elevation map with one tooltip owner and no superseded soft-shadow utility.",
+);
+expect(
+  stateSurfaceDeclarations?.border === "0" &&
+    stateSurfaceDeclarations.background === "var(--color-chrome-subtle)" &&
+    stateSurfaceDeclarations.transition?.includes("border-color") === false &&
+    Object.entries(semanticStateSurfaceBackgrounds).every(([tone, background]) => {
+      const declarations = selectorDeclarations(
+        overlaysFeedbackSource?.content ?? "",
+        `.hito-state-surface[data-tone="${tone}"]`,
+      );
+      return declarations?.background === background && declarations["border-color"] === undefined;
+    }),
+  "State Surface must remain borderless with the canonical neutral fill and existing semantic tone fills.",
+);
+expect(
+  overlaysFeedbackSource?.content.includes("@media (max-width: 639px)") === true &&
+    responsiveStateSurfaceDeclarations?.padding === "var(--space-3)",
+  "Explicit State Surface sizes must converge on space-3 padding at the canonical narrow breakpoint.",
+);
+expect(
+  referencePatternsSource?.content.includes("const STATE_SURFACE_PREVIEW_OPTIONS = [") === true &&
+    referencePatternsSource.content.includes("HitoDsWorkbenchChoiceControl") &&
+    referencePatternsSource.content.includes('{ label: "Desktop", value: "desktop" }') &&
+    referencePatternsSource.content.includes('{ label: "Mobile", value: "mobile" }') &&
+    referencePatternsSource.content.includes("data-hito-ds-state-surface-preview") &&
+    referencePatternsSource.content.includes('label="Preview"') &&
+    referencePatternsSource.content.includes('stateSurfacePreview === "mobile" ? "p-3" : ""'),
+  "The State Surface reference must expose a separate Desktop/Mobile control that previews the shared responsive padding.",
+);
+expect(
+  navigationCardSource?.content.includes('ComponentPropsWithoutRef<"a">') === true &&
+    navigationCardSource.content.includes('direction: "previous" | "next"') &&
+    navigationCardSource.content.includes('data-hito-component="navigation-card"') &&
+    navigationCardSource.content.includes("data-hito-navigation-card-arrow") &&
+    navigationCardSource.content.includes("decorative") &&
+    navigationCardSource.content.includes(
+      '"group hito-surface-quiet grid min-w-0 gap-4 p-4 text-foreground no-underline"',
+    ) &&
+    navigationCardSource.content.includes("border border-hairline") === false &&
+    navigationCardSource.content.includes("rounded-xl bg-background") === false &&
+    navigationCardSource.content.includes("hover:bg-chrome-subtle") === false &&
+    navigationCardSource.content.includes("focus-visible:ring-2") === false &&
+    navigationCardSource.content.includes("hito-nav-card-arrow") === false,
+  "HitoNavigationCard must compose the canonical quiet surface while retaining one native anchor, directional metadata, whole-card focus, and bare decorative arrow icons.",
+);
+expect(
+  referencePatternsSource?.content.includes('id="navigation-card"') === true &&
+    (referencePatternsSource.content.match(/<HitoNavigationCard/g)?.length ?? 0) === 2,
+  "The Patterns reference must physically document both previous and next Navigation Card directions.",
+);
+expect(
+  factualBarChartSource?.content.includes(
+    "import type {\n  RunnerActivityFitChartPeriod,\n  RunnerActivityFitChartPoint,\n  RunnerActivityFitChartSeries,",
+  ) === true &&
+    factualBarChartSource.content.includes('data-hito-component="factual-bar-chart"') &&
+    factualBarChartSource.content.includes("export type HitoFactualBarChartControls") &&
+    factualBarChartSource.content.includes("data-hito-factual-figure-controls") &&
+    factualBarChartSource.content.includes("formatDate(period.startDate") &&
+    factualBarChartSource.content.indexOf("data-hito-factual-figure-controls") <
+      factualBarChartSource.content.indexOf("data-hito-factual-chart-plot") &&
+    factualBarChartSource.content.includes("data-hito-factual-chart-plot") &&
+    factualBarChartSource.content.includes("Math.max(") &&
+    factualBarChartSource.content.includes("point.value / maxValue") &&
+    factualBarChartSource.content.includes("tabIndex={activeIndex === index ? 0 : -1}") &&
+    factualBarChartSource.content.includes('event.key === "ArrowRight"') &&
+    factualBarChartSource.content.includes('event.key === "ArrowLeft"') &&
+    factualBarChartSource.content.includes('event.key === "Home"') &&
+    factualBarChartSource.content.includes('event.key === "End"') &&
+    factualBarChartSource.content.includes('event.key === "Enter"') &&
+    factualBarChartSource.content.includes('event.key === " "') &&
+    factualBarChartSource.content.includes('event.key === "Escape"') &&
+    factualBarChartSource.content.includes("pointRefs.current[activeIndex]?.focus();") &&
+    factualBarChartSource.content.includes('aria-label="Close active point"') &&
+    factualBarChartSource.content.includes("<Tooltip") &&
+    factualBarChartSource.content.includes("View data") &&
+    factualBarChartSource.content.includes("<table") &&
+    factualBarChartSource.content.includes("<canvas") === false &&
+    factualBarChartSource.content.includes("<svg") === false,
+  "HitoFactualBarChart must consume canonical Backend-shaped facts, calculate presentation geometry only, and preserve one-tab-stop input, Close focus return, and Tooltip/table parity without Canvas or SVG.",
+);
+expect(
+  factualBarChartPlaygroundSource?.content.includes('id="factual-bar-chart"') === true &&
+    factualBarChartPlaygroundSource.content.includes("READY_DISTANCE_SERIES") &&
+    factualBarChartPlaygroundSource.content.includes('state: "available"') &&
+    factualBarChartPlaygroundSource.content.includes("value: 0") &&
+    factualBarChartPlaygroundSource.content.includes('state: "partial"') &&
+    factualBarChartPlaygroundSource.content.includes('state: "unavailable"') &&
+    factualBarChartPlaygroundSource.content.includes('status: "updating"') &&
+    factualBarChartPlaygroundSource.content.includes('status: "error"') &&
+    factualBarChartPlaygroundSource.content.includes("controls={{") &&
+    (factualBarChartPlaygroundSource.content.match(/HitoDsWorkbenchChoiceControl/g)?.length ??
+      0) === 2 &&
+    factualBarChartPlaygroundSource.content.includes("HitoDsWorkbenchChoiceControl") &&
+    factualBarChartPlaygroundSource.content.includes("HitoFactualBarChart"),
+  "The Factual Bar Chart reference must prove zero, partial, unavailable, updating, and error states from static Backend-shaped examples through one canonical playground.",
+);
+expect(
+  referenceOverviewSource?.content.includes("<HitoFactualBarChart") === true &&
+    referenceOverviewSource.content.includes("FACTUAL_PERIOD") &&
+    referenceOverviewSource.content.includes("READY_DISTANCE_SERIES") &&
+    (referenceOverviewSource.content.match(/previewMode="top"/g)?.length ?? 0) === 2 &&
+    referenceOverviewSource.content.includes("data-hito-ds-showcase-preview") &&
+    referenceOverviewSource.content.includes(
+      "grid w-full min-w-0 justify-items-center self-center text-center",
+    ) &&
+    referenceOverviewSource.content.includes('href="/hitoDS/patterns#factual-bar-chart"'),
+  "The Overview must link one contained live Factual Bar Chart showcase to its canonical Patterns playground without duplicating reference facts.",
+);
+expect(
+  factualActivityPointSequenceSource?.content.includes("RunnerActivityFitSequenceProductModel") ===
+    true &&
+    factualActivityPointSequenceSource.content.includes(
+      'data-hito-component="factual-activity-point-sequence"',
+    ) &&
+    factualActivityPointSequenceSource.content.includes(
+      "export type HitoFactualActivityPointSequenceControls",
+    ) &&
+    factualActivityPointSequenceSource.content.includes("data-hito-factual-figure-controls") &&
+    factualActivityPointSequenceSource.content.includes(
+      "formatDate(sequence.selectedPeriod.startDate",
+    ) &&
+    factualActivityPointSequenceSource.content.indexOf("data-hito-factual-figure-controls") <
+      factualActivityPointSequenceSource.content.indexOf(
+        "data-hito-factual-activity-sequence-plot",
+      ) &&
+    factualActivityPointSequenceSource.content.includes(
+      "data-hito-factual-activity-sequence-plot",
+    ) &&
+    factualActivityPointSequenceSource.content.includes("historicalTimeFraction(") &&
+    factualActivityPointSequenceSource.content.includes("pointPosition(") &&
+    factualActivityPointSequenceSource.content.includes("sequence.points.map((point, index)") &&
+    factualActivityPointSequenceSource.content.includes(
+      "tabIndex={activeIndex === index ? 0 : -1}",
+    ) &&
+    factualActivityPointSequenceSource.content.includes('event.key === "ArrowRight"') &&
+    factualActivityPointSequenceSource.content.includes('event.key === "ArrowLeft"') &&
+    factualActivityPointSequenceSource.content.includes('event.key === "Home"') &&
+    factualActivityPointSequenceSource.content.includes('event.key === "End"') &&
+    factualActivityPointSequenceSource.content.includes('event.key === "Enter"') &&
+    factualActivityPointSequenceSource.content.includes('event.key === " "') &&
+    factualActivityPointSequenceSource.content.includes('event.key === "Escape"') &&
+    factualActivityPointSequenceSource.content.includes(
+      'sequence.completeness.returnedPointCount === 1 ? " activity" : " activities"',
+    ) &&
+    factualActivityPointSequenceSource.content.includes(
+      "pointRefs.current[activeIndex]?.focus();",
+    ) &&
+    factualActivityPointSequenceSource.content.includes('aria-label="Close active activity"') &&
+    factualActivityPointSequenceSource.content.includes("<Tooltip") &&
+    factualActivityPointSequenceSource.content.includes("View data") &&
+    factualActivityPointSequenceSource.content.includes("<table") &&
+    factualActivityPointSequenceSource.content.includes(
+      "Different workouts are not directly comparable.",
+    ) &&
+    factualActivityPointSequenceSource.content.includes("<canvas") === false &&
+    factualActivityPointSequenceSource.content.includes("<svg") === false &&
+    factualActivityPointSequenceSource.content.includes(".slice(") === false &&
+    factualActivityPointSequenceSource.content.includes("linear-gradient") === false,
+  "HitoFactualActivityPointSequence must consume the canonical product-safe Backend sequence, pluralize the factual count, position every member by historical time, retain one-tab-stop Close-focus and Tooltip/table parity, and avoid caps, connectors, Canvas, or SVG.",
+);
+expect(
+  factualActivityPointSequencePlaygroundSource?.content.includes(
+    'id="factual-activity-point-sequence"',
+  ) === true &&
+    factualActivityPointSequencePlaygroundSource.content.includes(
+      "FACTUAL_ACTIVITY_SEQUENCE_READY",
+    ) &&
+    factualActivityPointSequencePlaygroundSource.content.includes('value: "distance"') &&
+    factualActivityPointSequencePlaygroundSource.content.includes(
+      'value: "observed_average_pace"',
+    ) &&
+    factualActivityPointSequencePlaygroundSource.content.includes('value: "elevation_gain"') &&
+    factualActivityPointSequencePlaygroundSource.content.includes('value: "reported_load"') &&
+    factualActivityPointSequencePlaygroundSource.content.includes('state: "partial"') &&
+    factualActivityPointSequencePlaygroundSource.content.includes('state: "unavailable"') &&
+    factualActivityPointSequencePlaygroundSource.content.includes('status: "empty"') &&
+    factualActivityPointSequencePlaygroundSource.content.includes('status: "updating"') &&
+    factualActivityPointSequencePlaygroundSource.content.includes('status: "error"') &&
+    factualActivityPointSequencePlaygroundSource.content.includes("futureInterval") &&
+    factualActivityPointSequencePlaygroundSource.content.includes("controls={{") &&
+    factualActivityPointSequencePlaygroundSource.content.includes("HitoDsWorkbenchChoiceControl") &&
+    factualActivityPointSequencePlaygroundSource.content.includes(
+      "HitoFactualActivityPointSequence",
+    ),
+  "The Factual Activity Point Sequence reference must cover every selected metric plus ready, empty, unavailable-member, updating, incomplete, error, and future-week truth through one canonical playground.",
+);
+expect(
+  referencePatternsSource?.content.includes("<FactualActivityPointSequencePlayground") === true &&
+    referenceOverviewSource?.content.includes("<HitoFactualActivityPointSequence") === true &&
+    referenceOverviewSource.content.includes("FACTUAL_ACTIVITY_SEQUENCE_READY") &&
+    referenceOverviewSource.content.includes("FACTUAL_ACTIVITY_SEQUENCE_DEFAULT_METRIC") &&
+    referenceOverviewSource.content.includes(
+      'href="/hitoDS/patterns#factual-activity-point-sequence"',
+    ),
+  "Patterns and Overview must register one canonical factual activity sequence and reuse the same static Backend-shaped reference truth without a second playground.",
 );
 const retiredDocumentGlobalAliases = [
   "--hito-route-support-sidebar-width",
@@ -1213,6 +1516,9 @@ const figmaBoard = sourceFiles.find(
 const foundationsPage = sourceFiles.find(
   (file) => file.relativePath === "src/components/hito-ds/reference-foundations-page.tsx",
 );
+const referenceModel = sourceFiles.find(
+  (file) => file.relativePath === "src/components/hito-ds/reference-model.ts",
+);
 const markSource = sourceFiles.find(
   (file) => file.relativePath === "src/components/ui/hito-mark.tsx",
 );
@@ -1238,6 +1544,34 @@ const tokenSpecimenSurfaceDeclarations = selectorDeclarations(
   referenceWorkbenchCss,
   ".hito-ds-token-specimen-surface",
 );
+const elevationDefinitions = [
+  ...foundationsCss.matchAll(/--hito-elevation-(xs|sm|md|lg|xl)\s*:\s*([\s\S]*?);/g),
+].map((match) => ({
+  level: match[1],
+  value: match[2].replace(/\s+/g, " ").trim(),
+}));
+const expectedElevationDefinitions = {
+  xs: [
+    "0 1px 2px -1px color-mix(in oklch, var(--stone-950) 40%, transparent), 0 3px 8px -5px color-mix(in oklch, var(--stone-950) 20%, transparent)",
+    "0 1px 2px -1px color-mix(in oklch, var(--taupe-650) 12%, transparent), 0 3px 8px -5px color-mix(in oklch, var(--taupe-650) 6%, transparent)",
+  ],
+  sm: [
+    "0 2px 4px -2px color-mix(in oklch, var(--stone-950) 42%, transparent), 0 7px 18px -10px color-mix(in oklch, var(--stone-950) 22%, transparent)",
+    "0 2px 4px -2px color-mix(in oklch, var(--taupe-650) 13%, transparent), 0 7px 18px -10px color-mix(in oklch, var(--taupe-650) 7%, transparent)",
+  ],
+  md: [
+    "0 3px 8px -3px color-mix(in oklch, var(--stone-950) 44%, transparent), 0 12px 28px -14px color-mix(in oklch, var(--stone-950) 24%, transparent)",
+    "0 3px 8px -3px color-mix(in oklch, var(--taupe-650) 14%, transparent), 0 12px 28px -14px color-mix(in oklch, var(--taupe-650) 8%, transparent)",
+  ],
+  lg: [
+    "0 5px 14px -5px color-mix(in oklch, var(--stone-950) 46%, transparent), 0 22px 48px -20px color-mix(in oklch, var(--stone-950) 26%, transparent)",
+    "0 5px 14px -5px color-mix(in oklch, var(--taupe-650) 16%, transparent), 0 22px 48px -20px color-mix(in oklch, var(--taupe-650) 10%, transparent)",
+  ],
+  xl: [
+    "0 8px 22px -8px color-mix(in oklch, var(--stone-950) 48%, transparent), 0 34px 72px -28px color-mix(in oklch, var(--stone-950) 28%, transparent)",
+    "0 8px 22px -8px color-mix(in oklch, var(--taupe-650) 18%, transparent), 0 34px 72px -28px color-mix(in oklch, var(--taupe-650) 12%, transparent)",
+  ],
+} as const;
 const workoutColorTokensSource = sourceFiles.find(
   (file) => file.relativePath === "src/lib/workout-color-tokens.ts",
 );
@@ -1252,6 +1586,9 @@ const referenceStructure = sourceFiles.find(
 );
 const buttonSource = sourceFiles.find(
   (file) => file.relativePath === "src/components/ui/button.tsx",
+);
+const compoundRangeSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/ui/hito-compound-range-field.tsx",
 );
 const sliderSource = sourceFiles.find(
   (file) => file.relativePath === "src/components/ui/hito-slider.tsx",
@@ -1337,6 +1674,27 @@ expect(
   "Hito DS controls must consume the central control contract.",
 );
 expect(
+  compoundRangeSource?.content.includes("label?: string;") === true &&
+    compoundRangeSource.content.includes("const visibleLabel = label?.trim() || undefined;") &&
+    compoundRangeSource.content.includes(
+      "const accessibleGroupLabel = `${lowerLabel} to ${upperLabel}, ${unit}`;",
+    ) &&
+    compoundRangeSource.content.includes("{visibleLabel ? (") &&
+    compoundRangeSource.content.includes("aria-labelledby={labelId}") &&
+    compoundRangeSource.content.includes(
+      "aria-label={labelId ? undefined : accessibleGroupLabel}",
+    ) &&
+    compoundRangeSource.content.includes('event.key === "ArrowUp" || event.key === "ArrowDown"') &&
+    compoundRangeSource.content.includes('event.key === "Escape"') &&
+    compoundRangeSource.content.includes('event.key === "Enter" && !endpointError') &&
+    compoundRangeSource.content.includes("data-disabled={disabled || undefined}") &&
+    compoundRangeSource.content.includes("data-invalid={Boolean(error) || undefined}") &&
+    referenceControls?.content.includes(
+      '<HitoCompoundRangeField\n                  label="Range"',
+    ) === true,
+  "Compound Range Field must support a label-free accessible group without drifting its keyboard, disabled, invalid, or labelled reference contracts.",
+);
+expect(
   figmaBoard?.content.includes("HITO_BUTTON_SIZES") === true &&
     figmaBoard.content.includes("HITO_FIELD_SIZES"),
   "Figma capture board must consume the central control contract.",
@@ -1362,7 +1720,7 @@ expect(
 expect(
   workbenchSettingsConsumers.length === workbenchSettingsImporters.size &&
     workbenchSettingsConsumers.every((file) => workbenchSettingsImporters.has(file.relativePath)),
-  `Reference workbench settings consumers drifted from the exact five-file owner boundary: ${workbenchSettingsConsumers
+  `Reference workbench settings consumers drifted from the exact seven-file owner boundary: ${workbenchSettingsConsumers
     .map((file) => file.relativePath)
     .join(", ")}`,
 );
@@ -1589,6 +1947,32 @@ expect(
     foundationsPage.content.includes('boxShadow: `0 0 0 2px ${valueFor("ring")}`') &&
     foundationsPage.content.includes('slot === "border" && "border"'),
   "Foundations must preserve the accepted workout border-only and ring-shadow-only renderer contract.",
+);
+expect(
+  elevationDefinitions.length === 10 &&
+    Object.entries(expectedElevationDefinitions).every(([level, expectedValues]) => {
+      const actualValues = elevationDefinitions
+        .filter((definition) => definition.level === level)
+        .map((definition) => definition.value);
+      return (
+        JSON.stringify(actualValues) === JSON.stringify(expectedValues) &&
+        actualValues.every(
+          (value) =>
+            value.includes("inset") === false &&
+            (value.match(/(?:^|,\s*)0\s+\d+px/g)?.length ?? 0) === 2,
+        )
+      );
+    }) &&
+    (foundationsCss.match(/--hito-shadow-soft\s*:/g)?.length ?? 0) === 2,
+  "Hito elevation must expose exactly five Dark/Light tokens with the approved two outer layers while preserving the independent soft shadow.",
+);
+expect(
+  foundationsPage?.content.includes('id="depth"') === true &&
+    foundationsPage.content.includes("ELEVATION_PARENT_SURFACES.map") &&
+    foundationsPage.content.includes("ELEVATION_LEVELS.map") &&
+    foundationsPage.content.includes("data-hito-ds-depth-resolved") &&
+    referenceModel?.content.includes('{ id: "depth", label: "Depth"') === true,
+  "Foundations must register one live Depth reference covering None and XS–XL on canvas and surface parents.",
 );
 expect(
   tokenSpecimenSurfaceDeclarations?.border === "0" &&

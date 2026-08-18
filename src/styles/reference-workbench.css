@@ -5,32 +5,6 @@
     background: var(--color-background);
   }
 
-  .hito-surface-quiet {
-    border: 1px solid transparent;
-    border-radius: var(--radius-xl);
-    background: color-mix(in oklch, var(--color-surface) 42%, transparent);
-    box-shadow: none;
-  }
-
-  .hito-surface-quiet:where(button, a, [role="button"]) {
-    transition:
-      background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
-      box-shadow var(--hito-motion-duration-140) var(--hito-motion-ease-out);
-  }
-
-  .hito-surface-quiet:where(
-      button:not(:disabled),
-      a:not([aria-disabled="true"]),
-      [role="button"]:not([aria-disabled="true"])
-    ):hover {
-    background: color-mix(in oklch, var(--color-surface-elevated) 58%, transparent);
-  }
-
-  .hito-surface-quiet:where(button, a, [role="button"]):focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 2px var(--color-ring);
-  }
-
   .hito-section-divider {
     border-top: 1px solid var(--color-hairline);
   }

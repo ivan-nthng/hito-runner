@@ -11,13 +11,21 @@ import {
   listSavedPlanLibraryForUser,
   materializeFirstReviewedPlanForUser,
   retainImportedPlanCandidateForUser,
+  retainReviewedPlanCandidateForUser,
 } from "../src/lib/active-plan-persistence";
 import { validateImportedPlanJson, type TrainingPlanV2 } from "../src/lib/imported-plan";
-import { createEmptyManualActivePlanForUser } from "../src/lib/manual-workout-authoring";
+import {
+  addManualWorkoutToActivePlanForUser,
+  copyManualWorkoutWithinActivePlanForUser,
+  createEmptyManualActivePlanForUser,
+  reviewManualWorkoutDraft,
+  type ManualWorkoutDraftInput,
+} from "../src/lib/manual-workout-authoring";
 import { getRunnerCalendarDateForUserId } from "../src/lib/runner-calendar-context";
 import { digestSha256Hex, stableJsonStringify } from "../src/lib/review-token-signing";
 import { createAdminSupabaseClient } from "../src/lib/supabase/server";
 import { addDaysIso, weekdayLong } from "../src/lib/training";
+import { getPersistedSnapshot } from "../src/lib/training-api";
 import {
   acquireQaPoolSupabaseUser,
   releaseQaPoolSupabaseUser,
@@ -39,6 +47,12 @@ async function main() {
     creationErrorMessage: "Calendar-overflow concurrency setup failed.",
     run: (lease) => validateConcurrentRunnerClear({ supabase, lease }),
   });
+  const mixedOriginProof = await withDisposableRunner({
+    supabase,
+    poolRole: "baseline-no-plan",
+    creationErrorMessage: "Mixed-origin Calendar setup failed.",
+    run: (lease) => validateMixedOriginCalendarReadbackAndExport({ supabase, lease }),
+  });
   const protectedProof = await withDisposableRunner({
     supabase,
     poolRole: "isolation-a",
@@ -49,9 +63,129 @@ async function main() {
   console.log("Calendar overflow future-workout contract passed.", {
     ownerProof,
     concurrencyProof,
+    mixedOriginProof,
     protectedProof,
     callsOpenAi: false,
   });
+}
+
+async function validateMixedOriginCalendarReadbackAndExport(input: {
+  supabase: ReturnType<typeof createAdminSupabaseClient>;
+  lease: QaPoolLease;
+}) {
+  const currentDate = await getRunnerCalendarDateForUserId(input.lease.userId);
+  const setup = await createEmptyManualActivePlanForUser(input.lease.userId, {
+    age: 34,
+    heightCm: 178,
+    weightKg: 72,
+    runningLevel: "running_regularly",
+  });
+  assert.equal(setup.ok, true);
+  if (!setup.ok) throw new Error(setup.message);
+  assert.equal(setup.activePlanId, null);
+  const importedPlan = await buildFixturePlan(currentDate, "Imported source history", {
+    sourceKind: "training_plan_v2_import",
+    dayOffsets: [-3, -2, -1],
+  });
+  const importedSource = await retainAndMaterializeFixturePlan(input.lease.userId, importedPlan, {
+    calendarInstant: new Date(`${addDaysIso(currentDate, -7)}T12:00:00.000Z`),
+  });
+  const aiPlan = await buildFixturePlan(currentDate, "AI source future", {
+    sourceKind: "ai_authored_plan_first_v1",
+    dayOffsets: [0, 1, 2],
+  });
+  const aiSource = await retainAndMaterializeFixturePlan(input.lease.userId, aiPlan);
+  const manualDate = addDaysIso(currentDate, 4);
+  const manualDraft: ManualWorkoutDraftInput = {
+    templateKey: "easy_aerobic_run",
+    workoutDate: manualDate,
+    notes: "Mixed-origin direct manual workout.",
+  };
+  const manualReview = reviewManualWorkoutDraft(manualDraft);
+  assert.equal(manualReview.ok, true);
+  if (!manualReview.ok) throw new Error("Mixed-origin manual review failed.");
+  const manualAdd = await addManualWorkoutToActivePlanForUser(input.lease.userId, {
+    draftInput: manualDraft,
+    reviewToken: manualReview.reviewToken,
+    reviewChecksum: manualReview.reviewChecksum,
+  });
+  assert.equal(manualAdd.ok, true);
+  if (!manualAdd.ok) throw new Error(manualAdd.message);
+
+  const beforeCopy = await getCalendarWorkoutsWithLogsForUser(input.lease.userId);
+  const importedWorkout = beforeCopy.workouts.find(
+    (workout) =>
+      workout.origin_kind === "file_import" && workout.plan_cycle_id === importedSource.id,
+  );
+  assert.ok(importedWorkout, "Mixed-origin proof requires one imported source workout.");
+  const copiedDate = addDaysIso(currentDate, 5);
+  const copied = await copyManualWorkoutWithinActivePlanForUser(input.lease.userId, {
+    sourceWorkoutId: importedWorkout.id,
+    sourceWorkoutDate: importedWorkout.workout_date,
+    targetDate: copiedDate,
+  });
+  assert.equal(copied.ok, true);
+  if (!copied.ok) throw new Error(copied.message);
+
+  const snapshot = await getPersistedSnapshot(input.lease.userId);
+  assert.equal(snapshot.mode, "authenticated");
+  assert.equal(snapshot.planMeta, null);
+  assert.equal(snapshot.calendarContext?.workoutEditing.addWorkout.allowed, true);
+  const futureSnapshotWorkouts = snapshot.workouts.filter((workout) => workout.date >= currentDate);
+  assert.deepEqual(
+    futureSnapshotWorkouts.reduce(
+      (counts, workout) => {
+        const origin = workout.sourceProvenance?.originKind;
+        if (origin) counts[origin] += 1;
+        return counts;
+      },
+      { manual: 0, ai: 0, file_import: 0 },
+    ),
+    { manual: 1, ai: 3, file_import: 1 },
+  );
+  assert.ok(
+    futureSnapshotWorkouts
+      .filter((workout) => workout.sourceProvenance?.originKind === "ai")
+      .every((workout) => workout.sourceProvenance?.sourcePlanId === aiSource.id),
+  );
+  assert.equal(
+    futureSnapshotWorkouts.find((workout) => workout.sourceProvenance?.originKind === "manual")
+      ?.sourceProvenance?.sourcePlanId,
+    null,
+  );
+  assert.equal(
+    futureSnapshotWorkouts.find((workout) => workout.sourceProvenance?.originKind === "file_import")
+      ?.sourceProvenance?.sourcePlanId,
+    importedSource.id,
+  );
+
+  const exported = await exportFutureCalendarWorkoutsForUser(input.lease.userId);
+  const exportedPlan = JSON.parse(exported.body) as TrainingPlanV2;
+  assert.equal(exportedPlan.source_kind, "hito_calendar_future_export");
+  assert.equal(
+    exportedPlan.export_metadata?.export_format_version,
+    "hito_calendar_workout_export_v1",
+  );
+  assert.equal(exportedPlan.planned_workouts.length, 5);
+  assert.doesNotMatch(exported.body, new RegExp(importedSource.id, "u"));
+  assert.doesNotMatch(exported.body, new RegExp(aiSource.id, "u"));
+
+  const sources = await input.supabase
+    .from("plan_cycles")
+    .select("id, status, saved_plan_payload")
+    .eq("user_id", input.lease.userId);
+  if (sources.error) throw new Error(sources.error.message);
+  assert.equal(sources.data.length, 2);
+  assert.ok(sources.data.every((source) => source.status === "archived"));
+  assert.ok(sources.data.every((source) => source.saved_plan_payload !== null));
+
+  return {
+    calendarRows: snapshot.workouts.length,
+    futureRowsExported: exportedPlan.planned_workouts.length,
+    origins: { manual: 1, ai: 3, fileImport: 1 },
+    immutableSourceRows: sources.data.length,
+    activeAuthorityRows: 0,
+  };
 }
 
 async function withDisposableRunner<T>(input: {
@@ -113,7 +247,7 @@ async function validateOwnerImportExportAndClear(input: {
     currentDate,
     "Calendar truth should win over saved payload",
   );
-  await materializeFirstReviewedPlanForUser(input.owner.userId, materializedPlan);
+  await retainAndMaterializeFixturePlan(input.owner.userId, materializedPlan);
   const materializedCalendar = await getCalendarWorkoutsWithLogsForUser(input.owner.userId);
   assert.equal(materializedCalendar.workouts.length, 3);
   const currentWorkout = materializedCalendar.workouts.find(
@@ -206,7 +340,7 @@ async function validateOwnerImportExportAndClear(input: {
     "Build myself must preserve past history and create no fake Calendar workout.",
   );
 
-  await materializeFirstReviewedPlanForUser(
+  await retainAndMaterializeFixturePlan(
     input.owner.userId,
     await buildFixturePlan(currentDate, "New plan after future Calendar clear"),
   );
@@ -245,7 +379,7 @@ async function validateConcurrentRunnerClear(input: {
   lease: QaPoolLease;
 }) {
   const currentDate = await getRunnerCalendarDateForUserId(input.lease.userId);
-  await materializeFirstReviewedPlanForUser(
+  await retainAndMaterializeFixturePlan(
     input.lease.userId,
     await buildFixturePlan(currentDate, "Calendar overflow concurrency plan"),
   );
@@ -275,7 +409,7 @@ async function validateProtectedFutureRejection(input: {
   lease: QaPoolLease;
 }) {
   const currentDate = await getRunnerCalendarDateForUserId(input.lease.userId);
-  await materializeFirstReviewedPlanForUser(
+  await retainAndMaterializeFixturePlan(
     input.lease.userId,
     await buildFixturePlan(currentDate, "Calendar overflow protected future plan"),
   );
@@ -315,18 +449,26 @@ async function validateProtectedFutureRejection(input: {
   };
 }
 
-async function buildFixturePlan(currentDate: string, title: string): Promise<TrainingPlanV2> {
+async function buildFixturePlan(
+  currentDate: string,
+  title: string,
+  options: {
+    sourceKind?: "training_plan_v2_import" | "ai_authored_plan_first_v1";
+    dayOffsets?: [number, number, number];
+  } = {},
+): Promise<TrainingPlanV2> {
   const templatePath = fileURLToPath(
     new URL("../public/templates/hito-training-plan-v2-template.json", import.meta.url),
   );
   const template = JSON.parse(await readFile(templatePath, "utf8")) as TrainingPlanV2;
-  const dates = [currentDate, addDaysIso(currentDate, 1), addDaysIso(currentDate, 2)];
+  const dayOffsets = options.dayOffsets ?? [0, 1, 2];
+  const dates = dayOffsets.map((offset) => addDaysIso(currentDate, offset));
 
   const plan = {
     ...template,
     plan_id: crypto.randomUUID(),
     plan_name: title,
-    source_kind: "calendar_overflow_local_fixture",
+    source_kind: options.sourceKind ?? "training_plan_v2_import",
     generated_for: "Local QA runner",
     start_date: dates[0]!,
     target_date: addDaysIso(currentDate, 56),
@@ -345,6 +487,34 @@ async function buildFixturePlan(currentDate: string, title: string): Promise<Tra
   } satisfies TrainingPlanV2;
 
   return plan;
+}
+
+async function retainAndMaterializeFixturePlan(
+  userId: string,
+  plan: TrainingPlanV2,
+  options: { calendarInstant?: Date } = {},
+) {
+  const reviewChecksum = await digestSha256Hex(stableJsonStringify(plan));
+  const sourcePlan =
+    plan.source_kind === "ai_authored_plan_first_v1"
+      ? await retainReviewedPlanCandidateForUser({
+          userId,
+          canonicalPlan: plan,
+          reviewChecksum,
+          planMetadata: null,
+        })
+      : await retainImportedPlanCandidateForUser({
+          userId,
+          canonicalPlan: plan,
+          reviewChecksum,
+        });
+
+  await materializeFirstReviewedPlanForUser(userId, plan, {
+    sourcePlanId: sourcePlan.id,
+    ...(options.calendarInstant ? { calendarInstant: options.calendarInstant } : {}),
+  });
+
+  return sourcePlan;
 }
 
 async function attachPastFitEvidence(input: {

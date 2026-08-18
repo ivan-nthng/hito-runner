@@ -35,13 +35,13 @@ export const ADMIN_WORKSPACE_NAV_ITEMS: AdminWorkspaceNavItem[] = [
   },
   {
     id: "funnel",
-    label: "Funnel & Usage",
+    label: "Activity",
     icon: "progress",
     href: "/admin/analytics?section=funnel",
   },
   {
     id: "feedback",
-    label: "Feedback",
+    label: "Workout evidence",
     icon: "watch",
     href: "/admin/analytics?section=feedback",
   },

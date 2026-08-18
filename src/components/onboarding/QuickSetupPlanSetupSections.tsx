@@ -86,7 +86,7 @@ export function QuickSetupPlanSetupSections({
         <QuickSetupSection
           {...nextSectionMeta()}
           title="Runner baseline"
-          body="Add the few facts Hito needs before plan setup."
+          body="Add the few facts Hito needs before training setup."
         >
           <div className="grid gap-4">
             <div className="hito-editable-value-field-group">

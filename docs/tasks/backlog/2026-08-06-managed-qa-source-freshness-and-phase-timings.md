@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** BACKEND
+- **Epic:** platform-and-operations
 - **Parent:** [Developer Velocity And Proportional Verification](2026-08-05-developer-velocity-and-proportional-verification.md)
 - **Outcome:** artifact-local freshness evidence, truthful reuse/rebuild output, and fail-closed source.
 - **Sources:** [qa-local-server.mjs](../../../scripts/qa-local-server.mjs)

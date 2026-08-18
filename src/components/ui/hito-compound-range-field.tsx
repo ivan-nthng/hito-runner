@@ -6,7 +6,7 @@ type HitoCompoundRangeFieldProps = {
   className?: string;
   disabled?: boolean;
   error?: string;
-  label: string;
+  label?: string;
   lowerError?: string;
   lowerLabel: string;
   lowerValue: string;
@@ -40,7 +40,9 @@ export function HitoCompoundRangeField({
   upperValue,
 }: HitoCompoundRangeFieldProps) {
   const generatedId = useId();
-  const labelId = `${generatedId}-label`;
+  const visibleLabel = label?.trim() || undefined;
+  const labelId = visibleLabel ? `${generatedId}-label` : undefined;
+  const accessibleGroupLabel = `${lowerLabel} to ${upperLabel}, ${unit}`;
   const errorId = error ? `${generatedId}-error` : undefined;
   const focusedValueRef = useRef({ lower: lowerValue, upper: upperValue });
 
@@ -84,13 +86,16 @@ export function HitoCompoundRangeField({
 
   return (
     <div className={cn("hito-compound-range-field", className)}>
-      <span id={labelId} className="hito-label-md">
-        {label}
-      </span>
+      {visibleLabel ? (
+        <span id={labelId} className="hito-label-md">
+          {visibleLabel}
+        </span>
+      ) : null}
       <div
         className="hito-field hito-field-secondary hito-compound-range-control"
         role="group"
         aria-labelledby={labelId}
+        aria-label={labelId ? undefined : accessibleGroupLabel}
         data-disabled={disabled || undefined}
         data-invalid={Boolean(error) || undefined}
       >

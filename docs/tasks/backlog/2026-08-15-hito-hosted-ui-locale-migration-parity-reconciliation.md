@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** BACKEND
+- **Epic:** platform-and-operations
 - **Parent:** [Current Candidate Git Release And Vercel Verification — Retry 6](./2026-08-15-current-candidate-git-release-and-vercel-verification-retry-6.md)
 - **Outcome:** The linked hosted Supabase project dltfjwexyctmihclcjqj now has repository migration parity. BACKEND applied exactly one migration through the repository's normal pinned CLI procedure.
 - **Sources:** [project-ref](../../../supabase/.temp/project-ref); [20260813124903_runner_ui_locale_preference.sql](../../../supabase/migrations/20260813124903_runner_ui_locale_preference.sql)

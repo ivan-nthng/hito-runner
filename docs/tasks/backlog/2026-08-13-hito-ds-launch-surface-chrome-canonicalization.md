@@ -2,6 +2,7 @@
 
 - **Status:** `closed`
 - **Owner:** DESIGN SYSTEM
+- **Epic:** platform-and-operations
 - **Evidence From:** [Hub Mark Adoption And Access Label Hierarchy](./2026-08-13-hub-mark-adoption-and-access-label-hierarchy.md)
 - **Outcome:** Closed after the recorded decision: Make every hito-launch-surface use the canonical 16px corner tier and have no decorative perimeter border in its resting or hover state. Preserve its content, theme-aware fill, interaction, navigation, elevation, and…
 - **Sources:** [hub.tsx](../../../src/routes/hub.tsx)

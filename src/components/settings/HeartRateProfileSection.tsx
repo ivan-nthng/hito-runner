@@ -228,7 +228,6 @@ export function HeartRateProfileSection({
 
                   <div className="hito-heart-rate-lane-fields">
                     <HitoCompoundRangeField
-                      label="Range"
                       lowerLabel={`${zone.label} lower bound`}
                       upperLabel={`${zone.label} upper bound`}
                       lowerValue={zone.minBpm}

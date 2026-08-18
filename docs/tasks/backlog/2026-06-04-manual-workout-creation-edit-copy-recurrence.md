@@ -2,6 +2,7 @@
 
 - **Status:** `closed`
 - **Owner:** PRODUCT
+- **Epic:** runner-core-readiness
 - **Outcome:** Closed the broad request after the accepted manual-workout authoring plan and coaching taxonomy superseded it; BACKEND owns typed workout truth, FRONTEND owns construction and Calendar interaction, and recurrence remains separately reviewed.
 - **Sources:** Terminal decision/evidence record only; detailed transcript remains in Git history.
 - **Validation:** Closure is supported by the recorded decision/evidence; no implementation, runtime, or release acceptance is inferred.

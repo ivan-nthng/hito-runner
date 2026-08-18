@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** FRONTEND (ds)
+- **Epic:** platform-and-operations
 - **Depends On:** [Hito DS Shared Locale Catalog And Language Menu Contract](2026-08-13-hito-ds-shared-locale-catalog-and-language-menu-contract.md)
 - **Supersedes:** [Hito DS Header Search And Context Navigation](2026-08-13-hito-ds-header-search-and-context-navigation.md)
 - **Outcome:** The accepted compact hierarchy is implemented at the existing reference-shell owner. The header is 49px high in the checked desktop and mobile compositions, exposes only Hito DS on the left, and uses named icon-only Hito Buttons for Search, Browse, and Theme…

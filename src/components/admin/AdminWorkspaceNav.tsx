@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useState, type ReactNode } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -11,17 +12,28 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LocalDevtoolMenuItem } from "@/components/devtools/LocalDevtoolMenuItem";
 import { HitoLogo } from "@/components/ui/hito-logo";
+import { HitoLanguageMenuItems } from "@/components/ui/hito-language-menu";
+import { hitoToast } from "@/components/ui/hito-toast";
 import { Icon } from "@/components/ui/icon";
 import {
   ADMIN_WORKSPACE_NAV_ITEMS,
   type AdminWorkspaceSectionId,
 } from "@/components/admin/admin-workspace-nav-model";
 import { ThemePreferenceMenuItems } from "@/components/settings/theme-preference-controls";
+import { saveUserSettings, type UserSettingsSummary } from "@/lib/user-settings-actions";
+import {
+  DEFAULT_RESOLVED_UI_LOCALE,
+  resolveRequestUiLocale,
+  type ResolvedUiLocale,
+  type UiLocalePreference,
+} from "@/lib/ui-locale";
 
 export function AdminWorkspaceSidebar({
   activeSection,
+  settings,
 }: {
   activeSection: AdminWorkspaceSectionId;
+  settings: UserSettingsSummary | null;
 }) {
   return (
     <aside className="hito-workbench-sidebar">
@@ -36,7 +48,7 @@ export function AdminWorkspaceSidebar({
       <AdminWorkspaceNav activeSection={activeSection} variant="sidebar" />
 
       <div className="mt-auto p-4">
-        <AdminWorkspaceAccountMenu activeSection={activeSection} />
+        <AdminWorkspaceAccountMenu activeSection={activeSection} settings={settings} />
       </div>
     </aside>
   );
@@ -47,12 +59,14 @@ export function AdminWorkspacePageHeader({
   action,
   description,
   mobileMeta,
+  settings,
   title,
 }: {
   activeSection: AdminWorkspaceSectionId;
   action?: ReactNode;
   description: string;
   mobileMeta?: ReactNode;
+  settings: UserSettingsSummary | null;
   title: string;
 }) {
   const activeItem = ADMIN_WORKSPACE_NAV_ITEMS.find((item) => item.id === activeSection);
@@ -76,7 +90,7 @@ export function AdminWorkspacePageHeader({
                 ) : null}
               </span>
             </div>
-            <AdminWorkspaceAccountMenu activeSection={activeSection} compact />
+            <AdminWorkspaceAccountMenu activeSection={activeSection} compact settings={settings} />
           </div>
           <h1 className="hito-ui-title-md mt-3 text-foreground lg:mt-0">{title}</h1>
           <p className="hito-body-md mt-2 max-w-3xl text-muted-foreground">{description}</p>
@@ -130,11 +144,64 @@ function AdminWorkspaceNav({
 function AdminWorkspaceAccountMenu({
   activeSection,
   compact = false,
+  settings,
 }: {
   activeSection: AdminWorkspaceSectionId;
   compact?: boolean;
+  settings: UserSettingsSummary | null;
 }) {
+  const [languageSettings, setLanguageSettings] = useState(settings);
+  const [languageSavePending, setLanguageSavePending] = useState(false);
+  const [deviceLocale, setDeviceLocale] = useState<ResolvedUiLocale>(DEFAULT_RESOLVED_UI_LOCALE);
+  const saveUserSettingsFn = useServerFn(saveUserSettings);
   const logoutNext = activeSection === "work-items" ? "%2Fadmin%2Fcapture" : "%2Fadmin%2Fanalytics";
+  const explicitLanguagePreference =
+    languageSettings?.uiLocalePreference === "en" ||
+    languageSettings?.uiLocalePreference === "pt-BR"
+      ? languageSettings.uiLocalePreference
+      : null;
+  const resolvedLocale = explicitLanguagePreference ?? deviceLocale;
+
+  useEffect(() => {
+    setDeviceLocale(
+      resolveRequestUiLocale(
+        navigator.languages.length > 0 ? navigator.languages.join(",") : navigator.language,
+      ),
+    );
+  }, []);
+
+  const saveLanguagePreference = async (preference: UiLocalePreference) => {
+    if (languageSavePending) {
+      return;
+    }
+
+    setLanguageSavePending(true);
+
+    try {
+      const result = await saveUserSettingsFn({
+        data: {
+          firstName: languageSettings?.firstName ?? null,
+          lastName: languageSettings?.lastName ?? null,
+          displayName: languageSettings?.displayName ?? null,
+          age: languageSettings?.age ?? null,
+          weightKg: languageSettings?.weightKg ?? null,
+          heightCm: languageSettings?.heightCm ?? null,
+          ...(languageSettings?.fitnessLevel
+            ? { fitnessLevel: languageSettings.fitnessLevel }
+            : {}),
+          uiLocalePreference: preference,
+        },
+      });
+      setLanguageSettings(result.settings);
+    } catch (error) {
+      hitoToast.error({
+        title: "Language preference not saved",
+        description: error instanceof Error ? error.message : "Try choosing the language again.",
+      });
+    } finally {
+      setLanguageSavePending(false);
+    }
+  };
 
   return (
     <DropdownMenu>
@@ -182,6 +249,14 @@ function AdminWorkspaceAccountMenu({
         <ThemePreferenceMenuItems
           itemClassName="hito-shell-theme-menu-item"
           labelClassName="hito-shell-theme-menu-label"
+        />
+        <DropdownMenuSeparator className="hito-shell-menu-separator" />
+        <HitoLanguageMenuItems
+          onPreferenceChange={(preference) => {
+            void saveLanguagePreference(preference);
+          }}
+          preference={languageSettings?.uiLocalePreference ?? null}
+          resolvedLocale={resolvedLocale}
         />
         <DropdownMenuSeparator className="hito-shell-menu-separator" />
         <LocalDevtoolMenuItem

@@ -80,11 +80,11 @@ const ITEMS = [
 }[];
 
 function Integrations() {
-  const { snapshot, viewer } = Route.useLoaderData();
+  const { snapshot, viewer, settings } = Route.useLoaderData();
   const cats = Array.from(new Set(ITEMS.map((i) => i.category)));
   const feedbackWorkout = resolveFeedbackWorkout(snapshot.workouts, snapshot.currentDate);
   return (
-    <AppShell snapshot={snapshot} viewer={viewer}>
+    <AppShell settings={settings} snapshot={snapshot} viewer={viewer}>
       <div className="hito-route-gutter max-w-5xl py-10">
         <header className="hito-page-header">
           <p className="hito-label-md text-foreground">

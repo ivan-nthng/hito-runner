@@ -1,9 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { createEmptyCalendarProvenanceForUser } from "@/lib/active-plan-persistence";
 import { type TrainingPlanV2 } from "@/lib/imported-plan";
 import {
-  buildManualEmptyActivePlanCreationInput,
   buildManualWorkoutUserBuiltTrainingPlan,
   deriveManualTargetTruthMode,
 } from "@/lib/manual-workout-authoring/persistence";
@@ -51,7 +49,6 @@ type ManualWorkoutDraftRejectionReason = Extract<
 const MANUAL_WORKOUT_REVIEW_TOKEN_PREFIX = "manual-workout-review-v1.";
 
 type ManualEmptyPlanCreateDependencies = {
-  createEmptyPlanForUser?: typeof createEmptyCalendarProvenanceForUser;
   saveBaselineForUser?: typeof saveRunnerBaselineForUserId;
   currentDate?: string;
 };
@@ -92,17 +89,11 @@ export function reviewManualWorkoutDraft(
 
   if (lifecycleConflict) {
     return rejectManualWorkoutDraft({
-      reason:
-        lifecycleConflict.code === "existing_active_plan_not_supported"
-          ? "active_plan_conflict"
-          : "protected_date_conflict",
+      reason: "protected_date_conflict",
       message: lifecycleConflict.message,
       issues: [
         {
-          code:
-            lifecycleConflict.code === "existing_active_plan_not_supported"
-              ? "active_plan_conflict"
-              : "protected_date_conflict",
+          code: "protected_date_conflict",
           message: lifecycleConflict.message,
           path: ["context"],
         },
@@ -226,15 +217,8 @@ export async function createEmptyManualActivePlanForUser(
     });
   }
 
-  const createEmptyPlanForUser =
-    dependencies.createEmptyPlanForUser ?? createEmptyCalendarProvenanceForUser;
   const saveBaselineForUser = dependencies.saveBaselineForUser ?? saveRunnerBaselineForUserId;
   const currentDate = dependencies.currentDate ?? (await getRunnerCalendarDateForUserId(userId));
-
-  const creationInput = buildManualEmptyActivePlanCreationInput({
-    setup: parsed.data,
-    currentDate,
-  });
 
   try {
     await saveBaselineForUser(userId, {
@@ -243,8 +227,6 @@ export async function createEmptyManualActivePlanForUser(
       weightKg: parsed.data.weightKg,
       fitnessLevel: parsed.data.runningLevel,
     });
-    const applyResult = await createEmptyPlanForUser(userId, creationInput);
-
     return {
       ok: true,
       status: "created",
@@ -252,9 +234,9 @@ export async function createEmptyManualActivePlanForUser(
       sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
       sourceStatus: MANUAL_USER_BUILT_PLAN_SOURCE_STATUS,
       schemaVersion: "training-plan-v2",
-      activePlanId: applyResult.planCycle.id,
-      effectiveStartDate: applyResult.effectiveStartDate,
-      appliedStartDate: applyResult.appliedStartDate,
+      activePlanId: null,
+      effectiveStartDate: currentDate,
+      appliedStartDate: currentDate,
       workoutCount: 0,
       calendarRowCount: 0,
       nonRestWorkoutCount: 0,
@@ -273,18 +255,10 @@ export async function createEmptyManualActivePlanForUser(
         readyForManualAdd: true,
       },
     };
-  } catch (error) {
-    if (error instanceof Error && /active plan/i.test(error.message)) {
-      return buildManualEmptyPlanCreateFailure({
-        reason: "active_plan_exists",
-        message:
-          "Manual user-built plans can be created only when there is no active plan. Open the existing plan to add workouts.",
-      });
-    }
-
+  } catch {
     return buildManualEmptyPlanCreateFailure({
       reason: "persistence_failed",
-      message: "The empty manual user-built plan could not be created. No plan was changed.",
+      message: "The runner setup could not be saved. The Calendar was not changed.",
     });
   }
 }
@@ -332,15 +306,6 @@ export function validateManualWorkoutReviewExactness(input: {
       ok: false,
       reason: review.reason,
       message: review.message,
-    };
-  }
-
-  if (review.draft.workoutType === "rest") {
-    return {
-      ok: false,
-      reason: "manual_workout_required",
-      message:
-        "Create at least one reviewed workout before starting a manual user-built active plan.",
     };
   }
 

@@ -25,7 +25,9 @@ Turn retained feedback into one factual, executable backlog item without impleme
 
 Every retained item has Work Item ID, Status, Type, Priority, Owner, Scope, Archive Intent, Task,
 User Report, Evidence, Observed Behavior, Expected Behavior, Source Investigation, Likely Root Cause
-or Required Discriminator, What Not To Touch, and Validation Expectations.
+or Required Discriminator, What Not To Touch, and Validation Expectations. Every non-bug item also
+has one registered `Epic` slug; `Type: Bug` remains unepicked. A non-bug Batch still uses the Epic
+of the outcome it advances.
 
 Tracked ready/in-progress work also has Stage, Next Recommended Role, and one exact handoff prompt.
 Do not manufacture a future prompt for terminal history.

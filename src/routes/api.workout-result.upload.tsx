@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { getRequestAuthContext } from "@/lib/backend/auth";
 import { readBoundedMultipartFormData } from "@/lib/bounded-multipart-form-data";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
 import {
+  LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_FIELD,
+  LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE,
   MAX_WORKOUT_RESULT_MULTIPART_BYTES,
   runnerSafeWorkoutResultMessage,
   workoutResultErrorResponseHeaders,
@@ -24,21 +27,35 @@ export const Route = createFileRoute("/api/workout-result/upload")({
               ? (formData.get("plannedWorkoutId") as string).trim() || null
               : null;
           const fileEntry = formData.get("file");
+          const fixtureEntry = formData.get(LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_FIELD);
+          const requestedFixture = typeof fixtureEntry === "string" ? fixtureEntry : null;
 
-          if (!(fileEntry instanceof File)) {
+          if (
+            !(fileEntry instanceof File) &&
+            requestedFixture !== LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE
+          ) {
             throw new WorkoutResultImportError(
               "invalid_upload",
               "Choose a Garmin .fit file or .zip archive before uploading.",
             );
           }
 
-          const { ingestGarminWorkoutResult } =
+          const { ingestGarminWorkoutResult, ingestLocalQaFixtureWorkoutResult } =
             await import("@/lib/workout-result-import/ingest-garmin-result");
-          const result = await ingestGarminWorkoutResult({
-            userId,
-            plannedWorkoutId,
-            file: fileEntry,
-          });
+          const result =
+            fileEntry instanceof File
+              ? await ingestGarminWorkoutResult({
+                  userId,
+                  plannedWorkoutId,
+                  file: fileEntry,
+                })
+              : await ingestLocalQaFixtureWorkoutResult({
+                  userId,
+                  plannedWorkoutId,
+                  requestedFixture: LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE,
+                  authProvider: getRequestAuthContext().provider,
+                  appBaseUrl: getRequestAuthContext().appBaseUrl,
+                });
           const feedback = "plannedWorkout" in result ? result : null;
 
           return Response.json(

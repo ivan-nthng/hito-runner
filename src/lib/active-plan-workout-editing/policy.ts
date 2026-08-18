@@ -4,9 +4,9 @@ import type {
 } from "@/lib/active-plan-persistence";
 import { TRAINING_PLAN_V2_IMPORT_SOURCE_KIND } from "@/lib/imported-plan";
 
-export const ACTIVE_PLAN_USER_EDIT_SOURCE_KIND = "active_plan_user_edit_v1" as const;
+export const CALENDAR_WORKOUT_MUTATION_SOURCE_KIND = "calendar_workout_mutation_v1" as const;
 
-export const ACTIVE_PLAN_USER_EDIT_MUTATION_KIND = {
+export const CALENDAR_WORKOUT_MUTATION_KIND = {
   addWorkout: "user_added_workout",
   clearWorkout: "user_cleared_workout",
   moveWorkout: "user_moved_workout",
@@ -14,8 +14,8 @@ export const ACTIVE_PLAN_USER_EDIT_MUTATION_KIND = {
   editWorkout: "user_edited_workout",
 } as const;
 
-export type ActivePlanUserEditMutationKind =
-  (typeof ACTIVE_PLAN_USER_EDIT_MUTATION_KIND)[keyof typeof ACTIVE_PLAN_USER_EDIT_MUTATION_KIND];
+export type CalendarWorkoutMutationKind =
+  (typeof CALENDAR_WORKOUT_MUTATION_KIND)[keyof typeof CALENDAR_WORKOUT_MUTATION_KIND];
 
 export type CalendarWorkoutEditOperation =
   | "add_workout"
@@ -37,9 +37,9 @@ export type CalendarWorkoutEditabilityResult =
       message: string;
     };
 
-export interface ActivePlanUserEditMetadataInput {
-  activePlan: PersistedPlanCycleRow;
-  mutationKind: ActivePlanUserEditMutationKind;
+export interface CalendarWorkoutMutationEventInput {
+  mutationKind: CalendarWorkoutMutationKind;
+  originKind: PersistedPlannedWorkoutRow["origin_kind"];
   reviewPayloadVersion: string;
   reviewChecksum: string;
   workoutAuthoringSourceKind?: string | null;
@@ -51,7 +51,7 @@ export interface ActivePlanUserEditMetadataInput {
   targetDate?: string | null;
   templateKey?: string | null;
   title?: string | null;
-  mutationMode?: "direct_manual_edit" | null;
+  mutationMode?: "direct_manual_edit" | "workout_document_edit" | null;
   mutationPayloadVersion?: string | null;
   mutationChecksum?: string | null;
   trustedClientRows?: boolean | null;
@@ -59,14 +59,19 @@ export interface ActivePlanUserEditMetadataInput {
   originalWorkoutSourceType?: string | null;
   originalWorkoutFamily?: string | null;
   originalWorkoutIdentity?: string | null;
+  originalPlanSourceKind?: string | null;
+  originalPlanSourceStatus?: string | null;
+  originalPlanOriginSourceKind?: string | null;
+  originalPlanOriginSourceStatus?: string | null;
   previousWorkout?: PersistedPlannedWorkoutRow | null;
 }
 
-export interface ActivePlanUserEditMetadata {
-  mutation_source: typeof ACTIVE_PLAN_USER_EDIT_SOURCE_KIND;
-  mutation_kind: ActivePlanUserEditMutationKind;
-  original_plan_source_kind: string;
-  original_plan_source_status: string | null;
+export interface CalendarWorkoutMutationEventPayload {
+  mutation_source: typeof CALENDAR_WORKOUT_MUTATION_SOURCE_KIND;
+  mutation_kind: CalendarWorkoutMutationKind;
+  origin_kind: PersistedPlannedWorkoutRow["origin_kind"];
+  original_plan_source_kind?: string;
+  original_plan_source_status?: string | null;
   original_plan_origin_source_kind?: string;
   original_plan_origin_source_status?: string;
   original_workout_source_id?: string | null;
@@ -85,7 +90,7 @@ export interface ActivePlanUserEditMetadata {
   title?: string;
   review_payload_version: string;
   review_checksum: string;
-  mutation_mode?: "direct_manual_edit";
+  mutation_mode?: "direct_manual_edit" | "workout_document_edit";
   mutation_payload_version?: string;
   mutation_checksum?: string;
   trusted_client_rows?: boolean;
@@ -95,27 +100,12 @@ export function resolveCalendarWorkoutEditability(
   provenancePlan: PersistedPlanCycleRow | null,
   operation: CalendarWorkoutEditOperation,
 ): CalendarWorkoutEditabilityResult {
-  if (!provenancePlan) {
-    return {
-      ok: false,
-      reason: "unsupported_source_metadata",
-      message: "This workout provenance is unavailable.",
-    };
-  }
-
-  const sourceKind = provenancePlan.source_kind?.trim();
-  if (!sourceKind) {
-    return {
-      ok: false,
-      reason: "unsupported_source_metadata",
-      message: "This workout provenance is missing source metadata.",
-    };
-  }
+  const sourceKind = provenancePlan?.source_kind?.trim() || "runner_owned_calendar_workout";
 
   return {
     ok: true,
     sourceKind,
-    sourceStatus: resolvePlanProvenanceSourceStatus(provenancePlan),
+    sourceStatus: provenancePlan ? resolvePlanProvenanceSourceStatus(provenancePlan) : null,
     operation,
   };
 }
@@ -147,9 +137,9 @@ export function resolvePlanProvenanceSourceStatus(provenancePlan: PersistedPlanC
   return null;
 }
 
-export function buildActivePlanUserEditMetadata({
-  activePlan,
+export function buildCalendarWorkoutMutationEvent({
   mutationKind,
+  originKind,
   mutationMode,
   mutationPayloadVersion,
   mutationChecksum,
@@ -169,23 +159,20 @@ export function buildActivePlanUserEditMetadata({
   originalWorkoutSourceType,
   originalWorkoutFamily,
   originalWorkoutIdentity,
+  originalPlanSourceKind,
+  originalPlanSourceStatus,
+  originalPlanOriginSourceKind,
+  originalPlanOriginSourceStatus,
   previousWorkout,
-}: ActivePlanUserEditMetadataInput): ActivePlanUserEditMetadata {
-  const sourceKind = activePlan.source_kind?.trim();
-
-  if (!sourceKind) {
-    throw new Error("Active plan user edit metadata requires an original source kind.");
-  }
-
-  const importOrigin = resolveConfirmedImportOrigin(activePlan);
-
+}: CalendarWorkoutMutationEventInput): CalendarWorkoutMutationEventPayload {
   return omitUndefined({
-    mutation_source: ACTIVE_PLAN_USER_EDIT_SOURCE_KIND,
+    mutation_source: CALENDAR_WORKOUT_MUTATION_SOURCE_KIND,
     mutation_kind: mutationKind,
-    original_plan_source_kind: sourceKind,
-    original_plan_source_status: resolvePlanProvenanceSourceStatus(activePlan),
-    original_plan_origin_source_kind: importOrigin.sourceKind ?? undefined,
-    original_plan_origin_source_status: importOrigin.sourceStatus ?? undefined,
+    origin_kind: originKind,
+    original_plan_source_kind: originalPlanSourceKind?.trim() || undefined,
+    original_plan_source_status: originalPlanSourceStatus,
+    original_plan_origin_source_kind: originalPlanOriginSourceKind ?? undefined,
+    original_plan_origin_source_status: originalPlanOriginSourceStatus ?? undefined,
     original_workout_source_id: originalWorkoutSourceId,
     original_workout_source_type: originalWorkoutSourceType,
     original_workout_family: originalWorkoutFamily,
@@ -209,6 +196,64 @@ export function buildActivePlanUserEditMetadata({
   });
 }
 
+export interface CalendarWorkoutEditRootProvenance {
+  originalPlanSourceKind: string;
+  originalPlanSourceStatus: string | null;
+  originalPlanOriginSourceKind: string | null;
+  originalPlanOriginSourceStatus: string | null;
+  originalWorkoutSourceId: string | null;
+  originalWorkoutSourceType: string | null;
+  originalWorkoutFamily: string | null;
+  originalWorkoutIdentity: string | null;
+}
+
+export function resolveCalendarWorkoutEditRootProvenance(
+  provenancePlan: PersistedPlanCycleRow | null,
+  workout: PersistedPlannedWorkoutRow,
+  earliestEditPayload: unknown = null,
+): CalendarWorkoutEditRootProvenance {
+  const earliestEdit = asRecord(earliestEditPayload);
+
+  if (Object.keys(earliestEdit).length > 0) {
+    const rootSourceKind = readString(earliestEdit.original_plan_source_kind);
+    if (rootSourceKind) {
+      return {
+        originalPlanSourceKind: rootSourceKind,
+        originalPlanSourceStatus: readNullableString(earliestEdit.original_plan_source_status),
+        originalPlanOriginSourceKind: readNullableString(
+          earliestEdit.original_plan_origin_source_kind,
+        ),
+        originalPlanOriginSourceStatus: readNullableString(
+          earliestEdit.original_plan_origin_source_status,
+        ),
+        originalWorkoutSourceId: readNullableString(earliestEdit.original_workout_source_id),
+        originalWorkoutSourceType: readNullableString(earliestEdit.original_workout_source_type),
+        originalWorkoutFamily: readNullableString(earliestEdit.original_workout_family),
+        originalWorkoutIdentity: readNullableString(earliestEdit.original_workout_identity),
+      };
+    }
+  }
+
+  const sourceKind =
+    provenancePlan?.source_kind?.trim() || workout.origin_kind || "runner_owned_calendar_workout";
+  const importOrigin = provenancePlan
+    ? resolveConfirmedImportOrigin(provenancePlan)
+    : { sourceKind: null, sourceStatus: null };
+
+  return {
+    originalPlanSourceKind: sourceKind,
+    originalPlanSourceStatus: provenancePlan
+      ? resolvePlanProvenanceSourceStatus(provenancePlan)
+      : null,
+    originalPlanOriginSourceKind: importOrigin.sourceKind,
+    originalPlanOriginSourceStatus: importOrigin.sourceStatus,
+    originalWorkoutSourceId: workout.source_workout_id,
+    originalWorkoutSourceType: workout.source_workout_type,
+    originalWorkoutFamily: workout.workout_family,
+    originalWorkoutIdentity: workout.workout_identity,
+  };
+}
+
 function resolveConfirmedImportOrigin(activePlan: PersistedPlanCycleRow) {
   const root = asRecord(activePlan.goal_metadata);
   const provenance = asRecord(root[TRAINING_PLAN_V2_IMPORT_SOURCE_KIND]);
@@ -219,21 +264,12 @@ function resolveConfirmedImportOrigin(activePlan: PersistedPlanCycleRow) {
   };
 }
 
-export function appendActivePlanUserEditMetadataToRecord(
-  root: Record<string, unknown>,
-  editMetadata: ActivePlanUserEditMetadata,
-): Record<string, unknown> {
-  const history = Array.isArray(root.active_plan_user_edits) ? root.active_plan_user_edits : [];
-
-  return {
-    ...root,
-    active_plan_user_edit: editMetadata,
-    active_plan_user_edits: [...history, editMetadata],
-  };
-}
-
 function readString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function readNullableString(value: unknown) {
+  return value == null ? null : readString(value);
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

@@ -1,6 +1,6 @@
 @layer components {
   .hito-surface {
-    border: 1px solid var(--color-hairline);
+    border: 0;
     border-radius: var(--radius-2xl);
     background: linear-gradient(
       145deg,
@@ -10,9 +10,35 @@
   }
 
   .hito-surface-flat {
-    border: 1px solid var(--color-hairline);
+    border: 0;
     border-radius: var(--radius-xl);
     background: color-mix(in oklch, var(--color-background) 48%, transparent);
+  }
+
+  .hito-surface-quiet {
+    border: 0;
+    border-radius: var(--radius-xl);
+    background: color-mix(in oklch, var(--color-surface) 42%, transparent);
+    box-shadow: none;
+  }
+
+  .hito-surface-quiet:where(button, a, [role="button"]) {
+    transition:
+      background-color var(--hito-motion-duration-140) var(--hito-motion-ease-out),
+      box-shadow var(--hito-motion-duration-140) var(--hito-motion-ease-out);
+  }
+
+  .hito-surface-quiet:where(
+      button:not(:disabled),
+      a:not([aria-disabled="true"]),
+      [role="button"]:not([aria-disabled="true"])
+    ):hover {
+    background: color-mix(in oklch, var(--color-surface-elevated) 58%, transparent);
+  }
+
+  .hito-surface-quiet:where(button, a, [role="button"]):focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-ring);
   }
 
   .hito-ui-overlay {
@@ -27,7 +53,6 @@
     border: 1px solid var(--color-hairline);
     background: color-mix(in oklch, var(--color-background) 96%, transparent);
     color: var(--color-foreground);
-    box-shadow: 0 28px 86px color-mix(in oklch, black 42%, transparent);
     backdrop-filter: blur(18px);
   }
 
@@ -35,11 +60,13 @@
     --tw-animation-duration: var(--hito-motion-duration-220);
     --tw-ease: var(--hito-motion-ease-out);
     border-radius: var(--radius-2xl);
+    box-shadow: var(--hito-elevation-xl);
   }
 
   .hito-ui-sheet-surface {
     --tw-animation-duration: var(--hito-motion-duration-260);
     --tw-ease: var(--hito-motion-ease-out);
+    box-shadow: var(--hito-elevation-lg);
   }
 
   .hito-ui-popover-surface {
@@ -55,6 +82,8 @@
     );
     overflow: auto;
     overscroll-behavior: contain;
+    border: 1px solid var(--color-hairline);
+    box-shadow: var(--hito-elevation-sm);
   }
 
   .hito-ui-dialog-close,
@@ -128,13 +157,50 @@
     border-radius: var(--radius-lg);
     background: color-mix(in oklch, var(--color-background) 96%, transparent);
     color: var(--color-foreground);
-    box-shadow: 0 18px 44px color-mix(in oklch, black 34%, transparent);
+    box-shadow: var(--hito-elevation-sm);
     backdrop-filter: blur(18px);
   }
 
   .hito-tooltip {
     --tw-animation-duration: var(--hito-motion-duration-140);
     --tw-ease: var(--hito-motion-ease-out);
+    pointer-events: none;
+    display: block;
+    width: max-content;
+    max-width: 15rem;
+    border: 1px solid var(--color-hairline);
+    border-radius: var(--radius-xl);
+    background: color-mix(in oklch, var(--color-popover) 96%, transparent);
+    padding: 0.75rem;
+    color: var(--color-foreground);
+    text-align: left;
+    box-shadow: var(--hito-elevation-xs);
+    backdrop-filter: blur(18px);
+  }
+
+  .hito-tooltip-width-lg {
+    width: min(18rem, calc(100vw - 2rem));
+    max-width: min(18rem, calc(100vw - 2rem));
+  }
+
+  .hito-tooltip-title {
+    font-size: 0.875rem;
+    line-height: 1.25;
+    color: var(--color-foreground);
+  }
+
+  .hito-tooltip-meta {
+    font-size: 0.6875rem;
+    line-height: 1.45;
+    color: var(--color-muted-foreground);
+  }
+
+  .hito-tooltip-dot {
+    width: 0.375rem;
+    height: 0.375rem;
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: currentColor;
   }
 
   .hito-ui-menu-item {
@@ -214,13 +280,12 @@
   }
 
   .hito-state-surface {
-    border: 1px solid var(--color-hairline);
+    border: 0;
     border-radius: var(--radius-2xl);
-    background: color-mix(in oklch, var(--color-surface-elevated) 56%, var(--color-background) 44%);
+    background: var(--color-chrome-subtle);
     padding: var(--space-6);
     transition:
       background-color var(--hito-motion-duration-180) var(--hito-motion-ease-out),
-      border-color var(--hito-motion-duration-180) var(--hito-motion-ease-out),
       color var(--hito-motion-duration-180) var(--hito-motion-ease-out);
   }
 
@@ -239,23 +304,25 @@
     padding: var(--space-6);
   }
 
+  @media (max-width: 639px) {
+    .hito-state-surface:is([data-size="sm"], [data-size="md"], [data-size="lg"]) {
+      padding: var(--space-3);
+    }
+  }
+
   .hito-state-surface[data-tone="signal"] {
-    border-color: color-mix(in oklch, var(--color-signal) 18%, transparent);
     background: color-mix(in oklch, var(--color-signal) 7%, var(--color-background));
   }
 
   .hito-state-surface[data-tone="success"] {
-    border-color: color-mix(in oklch, var(--color-success) 22%, transparent);
     background: color-mix(in oklch, var(--color-success) 8%, var(--color-background));
   }
 
   .hito-state-surface[data-tone="warning"] {
-    border-color: color-mix(in oklch, var(--color-warn) 24%, transparent);
     background: color-mix(in oklch, var(--color-warn) 9%, var(--color-background));
   }
 
   .hito-state-surface[data-tone="destructive"] {
-    border-color: color-mix(in oklch, var(--color-destructive) 24%, transparent);
     background: color-mix(in oklch, var(--color-destructive) 10%, var(--color-background));
   }
 
@@ -572,7 +639,7 @@
     ) !important;
     color: var(--color-foreground) !important;
     box-shadow:
-      0 18px 50px color-mix(in oklch, var(--color-background) 58%, black),
+      var(--hito-elevation-md),
       inset 0 1px 0 color-mix(in oklch, white 8%, transparent) !important;
     padding: 0.875rem !important;
     gap: 0.75rem !important;

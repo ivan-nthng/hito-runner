@@ -335,10 +335,7 @@ export interface ManualWorkoutDraftIssue {
 }
 
 export interface ManualWorkoutDraftConflict {
-  code:
-    | "existing_active_plan_not_supported"
-    | "protected_past_or_history"
-    | "protected_provider_or_analysis";
+  code: "protected_past_or_history" | "protected_provider_or_analysis";
   message: string;
   workoutDate: string;
   activePlanId?: string | null;
@@ -442,7 +439,7 @@ export type ManualEmptyPlanCreateResult =
       sourceKind: typeof MANUAL_USER_BUILT_PLAN_SOURCE_KIND;
       sourceStatus: typeof MANUAL_USER_BUILT_PLAN_SOURCE_STATUS;
       schemaVersion: "training-plan-v2";
-      activePlanId: string;
+      activePlanId: null;
       effectiveStartDate: string;
       appliedStartDate: string;
       workoutCount: 0;
@@ -481,7 +478,7 @@ export type ManualWorkoutAddToActivePlanResult =
       sourceStatus: string | null;
       workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
       workoutSourceStatus: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_STATUS;
-      activePlanId: string;
+      activePlanId: string | null;
       plannedWorkoutId: string;
       workoutDate: string;
       templateKey: ManualWorkoutTemplateKey;
@@ -490,7 +487,7 @@ export type ManualWorkoutAddToActivePlanResult =
       calendarRowCount: number;
       nonRestWorkoutCount: number;
       sourceMetadata: {
-        editSourceKind?: "active_plan_user_edit_v1";
+        editSourceKind?: "calendar_workout_mutation_v1";
         mutationKind?: "user_added_workout" | "user_copied_workout";
         originalPlanSourceKind?: string;
         originalPlanSourceStatus?: string | null;
@@ -512,7 +509,7 @@ export type ManualWorkoutAddToActivePlanResult =
         trustedClientRows: false;
         serverRebuiltReview: true;
         targetDayKind: "empty_day";
-        activePlanSourceVerified: true;
+        runnerOwnershipVerified: true;
         callsOpenAi: false;
       };
     }

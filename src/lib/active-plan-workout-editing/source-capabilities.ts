@@ -4,16 +4,16 @@ import type {
   PersistedWorkoutLogRow,
 } from "@/lib/active-plan-persistence";
 import { resolveCalendarWorkoutEditability } from "@/lib/active-plan-workout-editing/policy";
-import { reviewManualWorkoutDraft } from "@/lib/manual-workout-authoring/actions";
-import { buildManualWorkoutDraftInputFromPersistedWorkout } from "@/lib/manual-workout-authoring/copy-paste-reconstruction";
+import { workoutDocumentHasUnsafeMetricTruth } from "@/lib/manual-workout-authoring/persisted-workout-safety";
+import { normalizePersistedWorkoutDocument } from "@/lib/workout-document";
 
-export type ActivePlanWorkoutSourceEditingEligibility =
+export type CalendarWorkoutSourceEditingEligibility =
   | "eligible_past_unlogged"
   | "eligible_current_unlogged"
   | "eligible_future_unlogged"
   | "blocked";
 
-export type ActivePlanWorkoutSourceEditingReason =
+export type CalendarWorkoutSourceEditingReason =
   | "logged_workout"
   | "skipped_logged_workout"
   | "evidence_backed_workout"
@@ -21,11 +21,10 @@ export type ActivePlanWorkoutSourceEditingReason =
   | "unsupported_source_metadata"
   | "unsupported_source_workout"
   | "rest_day"
-  | "unsupported_active_plan_source"
   | "copy_requires_editor_support"
   | "edit_content_requires_editor_support";
 
-export interface ActivePlanWorkoutSourceEditingCapabilities {
+export interface CalendarWorkoutSourceEditingCapabilities {
   canMove: boolean;
   canClear: boolean;
   canCopy: boolean;
@@ -33,10 +32,10 @@ export interface ActivePlanWorkoutSourceEditingCapabilities {
   canDirectCopy: boolean;
   canDirectMove: boolean;
   canDragInitiate: boolean;
-  eligibility: ActivePlanWorkoutSourceEditingEligibility;
-  reason: ActivePlanWorkoutSourceEditingReason | null;
-  copyReason: ActivePlanWorkoutSourceEditingReason | null;
-  editContentReason: ActivePlanWorkoutSourceEditingReason | null;
+  eligibility: CalendarWorkoutSourceEditingEligibility;
+  reason: CalendarWorkoutSourceEditingReason | null;
+  copyReason: CalendarWorkoutSourceEditingReason | null;
+  editContentReason: CalendarWorkoutSourceEditingReason | null;
   message: string | null;
 }
 
@@ -52,44 +51,18 @@ export function resolveCalendarWorkoutSourceEditingCapabilities({
   log: PersistedWorkoutLogRow | null;
   evidenceWorkoutIds: ReadonlySet<string>;
   currentDate: string;
-}): ActivePlanWorkoutSourceEditingCapabilities {
-  if (!provenancePlan) {
-    return blockedSourceEditing(
-      "unsupported_source_metadata",
-      "This workout provenance is unavailable for direct workout actions.",
-    );
-  }
-
-  if (workout.user_id !== provenancePlan.user_id) {
-    return blockedSourceEditing(
-      "unsupported_source_metadata",
-      "This workout row does not belong to the current runner.",
-    );
-  }
-
+}): CalendarWorkoutSourceEditingCapabilities {
   if (workout.workout_type === "rest") {
     return blockedSourceEditing("rest_day", "Rest days cannot start direct workout actions.");
   }
 
   const moveEditability = resolveCalendarWorkoutEditability(provenancePlan, "move_workout");
   const contentEditability = resolveCalendarWorkoutEditability(provenancePlan, "edit_workout");
-  const reconstructedManualDraft = contentEditability.ok
-    ? buildManualWorkoutDraftInputFromPersistedWorkout(
-        workout,
-        workout.workout_date < currentDate ? currentDate : workout.workout_date,
-        {
-          activePlanId: provenancePlan.id,
-          activePlanSourceKind: provenancePlan.source_kind,
-        },
-      )
-    : null;
-  const reconstructableManualDraft = Boolean(
-    reconstructedManualDraft?.ok &&
-    reviewManualWorkoutDraft(reconstructedManualDraft.draftInput).ok,
-  );
+  const document = normalizePersistedWorkoutDocument(workout);
+  const validEditableDocument = document.ok && !workoutDocumentHasUnsafeMetricTruth(document.value);
   const canCopy = true;
   const canEditContent =
-    contentEditability.ok && reconstructableManualDraft && workout.workout_date >= currentDate;
+    contentEditability.ok && validEditableDocument && workout.workout_date >= currentDate;
 
   if (!moveEditability.ok) {
     return blockedSourceEditing(
@@ -105,7 +78,7 @@ export function resolveCalendarWorkoutSourceEditingCapabilities({
       log.outcome === "skipped" ? "skipped_logged_workout" : "logged_workout",
       "Logged workouts cannot be moved, cleared, or dragged; their prescription can still be copied.",
       canCopy,
-      canEditContent,
+      false,
     );
   }
 
@@ -114,7 +87,7 @@ export function resolveCalendarWorkoutSourceEditingCapabilities({
       "evidence_backed_workout",
       "Evidence-backed workouts cannot be moved, cleared, or dragged; their prescription can still be copied.",
       canCopy,
-      canEditContent,
+      false,
     );
   }
 
@@ -126,6 +99,7 @@ export function resolveCalendarWorkoutSourceEditingCapabilities({
           : "eligible_future_unlogged",
       canCopy,
       canEditContent,
+      editContentReason: canEditContent ? null : "unsupported_source_workout",
     });
   }
 
@@ -133,6 +107,7 @@ export function resolveCalendarWorkoutSourceEditingCapabilities({
     eligibility: "eligible_past_unlogged",
     canCopy,
     canEditContent: false,
+    editContentReason: "protected_history",
   });
 }
 
@@ -140,11 +115,13 @@ function allowedSourceEditing({
   eligibility,
   canCopy,
   canEditContent,
+  editContentReason,
 }: {
-  eligibility: Exclude<ActivePlanWorkoutSourceEditingEligibility, "blocked">;
+  eligibility: Exclude<CalendarWorkoutSourceEditingEligibility, "blocked">;
   canCopy: boolean;
   canEditContent: boolean;
-}): ActivePlanWorkoutSourceEditingCapabilities {
+  editContentReason?: CalendarWorkoutSourceEditingReason | null;
+}): CalendarWorkoutSourceEditingCapabilities {
   return {
     canMove: true,
     canClear: true,
@@ -156,17 +133,19 @@ function allowedSourceEditing({
     eligibility,
     reason: null,
     copyReason: canCopy ? null : "copy_requires_editor_support",
-    editContentReason: canEditContent ? null : "edit_content_requires_editor_support",
+    editContentReason: canEditContent
+      ? null
+      : (editContentReason ?? "edit_content_requires_editor_support"),
     message: null,
   };
 }
 
 function blockedSourceEditing(
-  reason: ActivePlanWorkoutSourceEditingReason,
+  reason: CalendarWorkoutSourceEditingReason,
   message: string,
   canCopy = false,
   canEditContent = false,
-): ActivePlanWorkoutSourceEditingCapabilities {
+): CalendarWorkoutSourceEditingCapabilities {
   return {
     canMove: false,
     canClear: false,

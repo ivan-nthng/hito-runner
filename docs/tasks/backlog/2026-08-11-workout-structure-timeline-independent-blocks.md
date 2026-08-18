@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** FRONTEND
+- **Epic:** runner-core-readiness
 - **Outcome:** The default-density Workout Structure Timeline now uses independent rounded background rows in a borderless spaced grid; compact density retains the existing grouped-list composition.
 - **Sources:** [WorkoutStructureTimeline.tsx](../../../src/components/workout-structure/WorkoutStructureTimeline.tsx); [controls-lists.css](../../../src/styles/controls-lists.css)
 - **Validation:** Formatting and lint, Diff hygiene, Production compilation passed as recorded in the terminal receipt; omitted layers remain outside this closeout.

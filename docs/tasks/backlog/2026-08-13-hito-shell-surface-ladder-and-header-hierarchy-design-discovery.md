@@ -2,6 +2,7 @@
 
 - **Status:** `completed`
 - **Owner:** DESIGNER
+- **Epic:** platform-and-operations
 - **Evidence From:** `2026-08-11-hito-ds-foundations-color-truth-context-and-reference-canvas`
 - **Outcome:** Established the contextual surface ladder and header material contract, then split implementation between DESIGN SYSTEM for shared/reference surfaces and FRONTEND Product for runner AppShell; no new token or shell component was needed.
 - **Sources:** [AppShell.tsx](../../../src/components/AppShell.tsx); [reference-components-structure.tsx](../../../src/components/hito-ds/reference-components-structure.tsx); [reference-workbench.css](../../../src/styles/reference-workbench.css)

@@ -1,9 +1,12 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { type ReactNode, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { type ReactNode, useEffect, useState } from "react";
 import { DEFAULT_AUTH_REDIRECT, getLoginIntentPath } from "@/lib/auth-redirect";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { HitoButton } from "@/components/ui/button";
 import { HitoLogo } from "@/components/ui/hito-logo";
+import { HitoLanguageMenuItems } from "@/components/ui/hito-language-menu";
+import { hitoToast } from "@/components/ui/hito-toast";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
 import {
   DropdownMenu,
@@ -24,6 +27,13 @@ import {
   type TrainingSnapshot,
 } from "@/lib/training";
 import type { ViewerSummary } from "@/lib/training-api";
+import { saveUserSettings, type UserSettingsSummary } from "@/lib/user-settings-actions";
+import {
+  DEFAULT_RESOLVED_UI_LOCALE,
+  resolveRequestUiLocale,
+  type ResolvedUiLocale,
+  type UiLocalePreference,
+} from "@/lib/ui-locale";
 
 const NAV: { to: string; label: string; icon: HitoIconName }[] = [
   { to: "/", label: "Calendar", icon: "calendar" },
@@ -49,14 +59,20 @@ function getCurrentShellNavPath(pathname: string): string | null {
 
 export function AppShell({
   children,
+  settings,
   snapshot,
   viewer,
 }: {
   children: ReactNode;
+  settings?: UserSettingsSummary | null;
   snapshot?: TrainingSnapshot | null;
   viewer?: ViewerSummary | null;
 }) {
-  const [showShellPlanNote, setShowShellPlanNote] = useState(true);
+  const [showShellCalendarNote, setShowShellCalendarNote] = useState(true);
+  const [languageSettings, setLanguageSettings] = useState(settings);
+  const [languageSavePending, setLanguageSavePending] = useState(false);
+  const [deviceLocale, setDeviceLocale] = useState<ResolvedUiLocale>(DEFAULT_RESOLVED_UI_LOCALE);
+  const saveUserSettingsFn = useServerFn(saveUserSettings);
   const loc = useLocation();
   const currentNavPath = getCurrentShellNavPath(loc.pathname);
   const nextPath = getLoginIntentPath(
@@ -69,7 +85,7 @@ export function AppShell({
     shellSnapshot.mode === "authenticated"
       ? "Beta"
       : shellSnapshot.mode === "onboarding"
-        ? "Create plan"
+        ? "Setup"
         : "Preview";
   const profileName = viewer?.name
     ? viewer.name
@@ -82,6 +98,54 @@ export function AppShell({
   const profileInitials = buildInitials(profileName);
   const showSettingsAction = shellSnapshot.mode !== "preview";
   const useFreshHomeRequest = shellSnapshot.mode !== "preview";
+  const showLanguageAction = snapshot?.source === "persisted" && settings !== undefined;
+  const explicitLanguagePreference =
+    languageSettings?.uiLocalePreference === "en" ||
+    languageSettings?.uiLocalePreference === "pt-BR"
+      ? languageSettings.uiLocalePreference
+      : null;
+  const resolvedLocale = explicitLanguagePreference ?? deviceLocale;
+
+  useEffect(() => {
+    setDeviceLocale(
+      resolveRequestUiLocale(
+        navigator.languages.length > 0 ? navigator.languages.join(",") : navigator.language,
+      ),
+    );
+  }, []);
+
+  const saveLanguagePreference = async (preference: UiLocalePreference) => {
+    if (languageSavePending) {
+      return;
+    }
+
+    setLanguageSavePending(true);
+
+    try {
+      const result = await saveUserSettingsFn({
+        data: {
+          firstName: languageSettings?.firstName ?? null,
+          lastName: languageSettings?.lastName ?? null,
+          displayName: languageSettings?.displayName ?? null,
+          age: languageSettings?.age ?? null,
+          weightKg: languageSettings?.weightKg ?? null,
+          heightCm: languageSettings?.heightCm ?? null,
+          ...(languageSettings?.fitnessLevel
+            ? { fitnessLevel: languageSettings.fitnessLevel }
+            : {}),
+          uiLocalePreference: preference,
+        },
+      });
+      setLanguageSettings(result.settings);
+    } catch (error) {
+      hitoToast.error({
+        title: "Language preference not saved",
+        description: error instanceof Error ? error.message : "Try choosing the language again.",
+      });
+    } finally {
+      setLanguageSavePending(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex bg-background text-foreground">
@@ -94,15 +158,15 @@ export function AppShell({
         }
         runnerKey={viewer?.email}
       />
-      <aside className="hito-shell-sidebar-width hidden shrink-0 self-start flex-col border-r border-hairline bg-sidebar md:sticky md:top-0 md:flex md:h-screen">
-        <div className="px-6 pt-7 pb-10">
+      <aside className="hito-shell-sidebar-width hidden h-screen min-h-0 shrink-0 self-start box-border flex-col overflow-hidden border-r border-hairline bg-sidebar supports-[height:100dvh]:h-dvh [@media(min-width:48rem)_and_(min-height:32rem)]:sticky [@media(min-width:48rem)_and_(min-height:32rem)]:top-0 [@media(min-width:48rem)_and_(min-height:32rem)]:flex">
+        <div className="shrink-0 pb-10 pr-6 pl-[max(var(--space-6),env(safe-area-inset-left))] pt-[max(1.75rem,env(safe-area-inset-top))]">
           <Link to="/" reloadDocument={useFreshHomeRequest} aria-label="Hito home">
             <HitoLogo className="[--hito-logo-height:1.45rem]" />
           </Link>
           <p className="hito-shell-brand-kicker">{modeLabel}</p>
         </div>
 
-        <nav className="hito-shell-nav px-3">
+        <nav className="hito-shell-nav shrink-0 px-3">
           {NAV.map((navItem) => {
             const active = currentNavPath === navItem.to;
             return (
@@ -122,38 +186,44 @@ export function AppShell({
           })}
         </nav>
 
-        <div className="mt-auto flex flex-col gap-4 p-4">
-          {showShellPlanNote && (
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain p-4">
+          {showShellCalendarNote && (
             <div className="hito-row-group">
               <div className="hito-list-row items-start p-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
                     <div className="hito-label-md text-foreground flex items-center gap-2">
                       <Icon name="plan-note" size="xs" className="text-signal" />
-                      Plan note
+                      {shellSnapshot.source === "persisted" ? "Beta User" : "Preview note"}
                     </div>
                     <HitoButton
                       type="button"
-                      onClick={() => setShowShellPlanNote(false)}
+                      onClick={() => setShowShellCalendarNote(false)}
                       className="shrink-0 text-muted-foreground hover:text-foreground"
                       iconOnly
                       size="xs"
                       variant="ghost"
-                      aria-label="Dismiss plan note"
+                      aria-label={
+                        shellSnapshot.source === "persisted"
+                          ? "Dismiss Beta User note"
+                          : "Dismiss preview note"
+                      }
                     >
                       <Icon name="close" size="xs" />
                     </HitoButton>
                   </div>
                   <p className="hito-body-sm mt-1 text-secondary">
                     {shellSnapshot.source === "persisted"
-                      ? "Your saved workouts and results show up here."
+                      ? "All features are free for you."
                       : "You can browse the preview here until you sign in and save a plan."}
                   </p>
                 </div>
               </div>
             </div>
           )}
+        </div>
 
+        <div className="flex shrink-0 flex-col gap-4 pl-4 pr-[max(var(--space-4),env(safe-area-inset-right))] pb-[max(var(--space-4),env(safe-area-inset-bottom))]">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button type="button" className="hito-shell-profile-trigger group">
@@ -206,6 +276,18 @@ export function AppShell({
                 labelClassName="hito-shell-theme-menu-label"
               />
               <DropdownMenuSeparator className="hito-shell-menu-separator" />
+              {showLanguageAction ? (
+                <>
+                  <HitoLanguageMenuItems
+                    onPreferenceChange={(preference) => {
+                      void saveLanguagePreference(preference);
+                    }}
+                    preference={languageSettings?.uiLocalePreference ?? null}
+                    resolvedLocale={resolvedLocale}
+                  />
+                  <DropdownMenuSeparator className="hito-shell-menu-separator" />
+                </>
+              ) : null}
               <LocalDevtoolMenuItem
                 itemClassName="hito-shell-menu-item"
                 separatorClassName="hito-shell-menu-separator"
@@ -239,11 +321,11 @@ export function AppShell({
               to="/"
               reloadDocument={useFreshHomeRequest}
               aria-label="Hito home"
-              className="md:hidden"
+              className="[@media(min-width:48rem)_and_(min-height:32rem)]:hidden"
             >
               <HitoLogo className="[--hito-logo-height:1.15rem]" />
             </Link>
-            <div className="hidden md:flex items-baseline gap-3">
+            <div className="hidden items-baseline gap-3 [@media(min-width:48rem)_and_(min-height:32rem)]:flex">
               <span className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">Today</span>
               <span className="hito-technical-sm text-secondary">
                 {formatDate(shellSnapshot.currentDate, {
@@ -258,7 +340,12 @@ export function AppShell({
                 <StatusPill label="Week" value={weekStatus.label} />
               ) : null}
               {shellSnapshot.mode === "preview" ? (
-                <HitoButton asChild className="hidden md:inline-flex" size="sm" variant="secondary">
+                <HitoButton
+                  asChild
+                  className="hidden [@media(min-width:48rem)_and_(min-height:32rem)]:inline-flex"
+                  size="sm"
+                  variant="secondary"
+                >
                   <Link
                     to="/login"
                     search={nextPath !== DEFAULT_AUTH_REDIRECT ? { next: nextPath } : undefined}
@@ -271,7 +358,7 @@ export function AppShell({
               <HitoButton
                 asChild
                 aria-label="Open Connections"
-                className="md:hidden"
+                className="[@media(min-width:48rem)_and_(min-height:32rem)]:hidden"
                 iconOnly
                 size="sm"
                 variant="ghost"
@@ -284,7 +371,7 @@ export function AppShell({
                 <HitoButton
                   asChild
                   aria-label="Open profile and heart-rate settings"
-                  className="md:hidden"
+                  className="[@media(min-width:48rem)_and_(min-height:32rem)]:hidden"
                   iconOnly
                   size="sm"
                   variant="ghost"
@@ -300,7 +387,7 @@ export function AppShell({
 
         <div className="flex-1">{children}</div>
 
-        <nav className="hito-shell-mobile-nav md:hidden sticky bottom-0 z-30">
+        <nav className="hito-shell-mobile-nav sticky bottom-0 z-30 [@media(min-width:48rem)_and_(min-height:32rem)]:hidden">
           {NAV.map((navItem) => {
             const active = currentNavPath === navItem.to;
             return (
@@ -376,39 +463,17 @@ function getProfileDetail(
   snapshot: TrainingSnapshot | null | undefined,
   mode: ReturnType<typeof getShellSnapshot>["mode"],
 ) {
-  if (snapshot?.planMeta) {
-    return getShellPlanContext(snapshot.planMeta);
-  }
-
-  if (mode === "authenticated") {
-    return "Saved plan";
-  }
-
-  if (mode === "onboarding") {
-    return snapshot?.profile ? "Plan setup" : "Profile setup";
-  }
-
-  return "Preview only";
-}
-
-function getShellPlanContext(planMeta: NonNullable<TrainingSnapshot["planMeta"]>) {
-  if (planMeta.source === "preview") {
+  if (mode === "preview" && snapshot?.planMeta?.source === "preview") {
     return "Preview plan";
   }
 
-  if (planMeta.sourceKind === "manual_user_built_plan_v1") {
-    return "Manual plan";
+  if (mode === "authenticated") {
+    return "Runner Calendar";
   }
 
-  const title = planMeta.title.trim();
-
-  if (!title || isTechnicalShellPlanTitle(title)) {
-    return "Saved plan";
+  if (mode === "onboarding") {
+    return snapshot?.profile ? "Training setup" : "Profile setup";
   }
 
-  return title;
-}
-
-function isTechnicalShellPlanTitle(title: string) {
-  return title.includes("_") || /^[A-Z0-9\s-]{10,}$/.test(title);
+  return "Preview only";
 }

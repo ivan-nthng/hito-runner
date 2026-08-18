@@ -143,6 +143,39 @@ export type InlineChangeBorderEvidence = {
   summary: string;
 };
 
+export const INLINE_CHANGE_BORDER_SIDES = ["top", "right", "bottom", "left"] as const;
+
+export const INLINE_CHANGE_ELIGIBLE_CARD_CLASSES = [
+  "hito-surface",
+  "hito-surface-flat",
+  "hito-surface-quiet",
+  "hito-ds-showcase-card",
+  "hito-ds-token-specimen-surface",
+  "hito-state-surface",
+  "hito-launch-surface",
+] as const;
+
+export type InlineChangeEligibleCardClass = (typeof INLINE_CHANGE_ELIGIBLE_CARD_CLASSES)[number];
+
+export type InlineChangeBorderIntentEvidence = {
+  eligibleCardClass: InlineChangeEligibleCardClass | "historic-border-removal";
+  label: "Border";
+  sides: InlineChangeBorderSideEvidence[];
+  summary: string;
+};
+
+export type InlineChangeBorderIntentTreatment = "hairline" | "none";
+
+export type InlineChangeBorderIntentSelection = {
+  sides: InlineChangeBorderSide[];
+  treatment: InlineChangeBorderIntentTreatment;
+};
+
+export type InlineChangeBorderIntent = {
+  current: InlineChangeBorderIntentEvidence;
+  requestedChange: InlineChangeBorderIntentSelection | null;
+};
+
 export type InlineChangeCardChromeEvidence = {
   border: InlineChangeBorderEvidence | null;
   isDetected: boolean;
@@ -150,7 +183,7 @@ export type InlineChangeCardChromeEvidence = {
   radiusControls: InlineChangeTokenControlInput[];
 };
 
-export type InlineChangeChromeRemovalKind = "border" | "card_chrome";
+export type InlineChangeChromeRemovalKind = "card_chrome";
 
 export type InlineChangeChromeRemovalSelection = {
   border: InlineChangeBorderEvidence | null;
@@ -168,6 +201,8 @@ export type InlineChangeAction = {
 
 export type InlineChangeTargetInput = {
   border?: InlineChangeBorderEvidence | null;
+  borderIntent?: InlineChangeBorderIntentEvidence | null;
+  borderIntentSelection?: InlineChangeBorderIntentSelection | null;
   cardChrome?: InlineChangeCardChromeEvidence | null;
   colorControls?: InlineChangeColorSelection[] | null;
   classificationReason?: string | null;
@@ -213,6 +248,7 @@ export type InlineChangeTargetPayload = {
   target: {
     classificationReason: string | null;
     border: InlineChangeBorderEvidence | null;
+    borderIntent: InlineChangeBorderIntent | null;
     cardChrome: InlineChangeCardChromeEvidence | null;
     colorControls: InlineChangeColorSelection[];
     chromeRemoval: InlineChangeChromeRemovalSelection | null;
@@ -390,6 +426,7 @@ export function buildInlineChangePayload({
       kind: normalizeTargetKind(target.targetKind),
       classificationReason: normalizeTargetValue(target.classificationReason),
       border: normalizeBorderEvidence(target.border),
+      borderIntent: normalizeBorderIntent(target.borderIntent, target.borderIntentSelection),
       cardChrome: normalizeCardChromeEvidence(target.cardChrome),
       colorControls: normalizeColorControlSelections(target.colorControls),
       chromeRemoval: normalizeChromeRemovalSelection(target.chromeRemovalSelection),
@@ -557,6 +594,119 @@ function normalizeBorderEvidence(
   };
 }
 
+function normalizeBorderIntent(
+  evidence: InlineChangeBorderIntentEvidence | null | undefined,
+  selection: InlineChangeBorderIntentSelection | null | undefined,
+): InlineChangeBorderIntent | null {
+  const current = normalizeBorderIntentEvidence(evidence);
+  if (!current) return null;
+
+  return {
+    current,
+    requestedChange: normalizeInlineChangeBorderIntentSelection(selection),
+  };
+}
+
+function normalizeBorderIntentEvidence(
+  value: InlineChangeBorderIntentEvidence | null | undefined,
+): InlineChangeBorderIntentEvidence | null {
+  if (!value || !isEligibleCardClass(value.eligibleCardClass)) return null;
+
+  const sides = INLINE_CHANGE_BORDER_SIDES.map((side) =>
+    normalizeBorderIntentSide(value.sides.find((candidate) => candidate.side === side)),
+  );
+  if (sides.some((side) => !side)) return null;
+
+  const normalizedSides = sides as InlineChangeBorderSideEvidence[];
+  return {
+    eligibleCardClass: value.eligibleCardClass,
+    label: "Border",
+    sides: normalizedSides,
+    summary: normalizeTargetValue(value.summary) ?? formatBorderSides(normalizedSides),
+  };
+}
+
+function normalizeBorderIntentSide(
+  value: InlineChangeBorderSideEvidence | null | undefined,
+): InlineChangeBorderSideEvidence | null {
+  if (
+    !value ||
+    !INLINE_CHANGE_BORDER_SIDES.includes(value.side) ||
+    !value.style ||
+    !value.widthLabel ||
+    !Number.isFinite(value.widthPx) ||
+    value.widthPx < 0
+  ) {
+    return null;
+  }
+
+  return {
+    color: value.color,
+    side: value.side,
+    style: value.style,
+    widthLabel: value.widthLabel,
+    widthPx: value.widthPx,
+  };
+}
+
+function isEligibleCardClass(
+  value: string,
+): value is InlineChangeBorderIntentEvidence["eligibleCardClass"] {
+  return value === "historic-border-removal" || INLINE_CHANGE_ELIGIBLE_CARD_CLASS_SET.has(value);
+}
+
+const INLINE_CHANGE_ELIGIBLE_CARD_CLASS_SET = new Set<string>(INLINE_CHANGE_ELIGIBLE_CARD_CLASSES);
+
+export function normalizeInlineChangeBorderIntentSelection(
+  value: InlineChangeBorderIntentSelection | null | undefined,
+): InlineChangeBorderIntentSelection | null {
+  if (value?.treatment !== "hairline" && value?.treatment !== "none") return null;
+
+  const selectedSides = new Set(value.sides);
+  const sides = INLINE_CHANGE_BORDER_SIDES.filter((side) => selectedSides.has(side));
+  if (sides.length === 0) return null;
+
+  return { sides, treatment: value.treatment };
+}
+
+export function createHistoricBorderIntentEvidence(
+  border: InlineChangeBorderEvidence | null | undefined,
+): InlineChangeBorderIntentEvidence {
+  const observedSides = new Map((border?.sides ?? []).map((side) => [side.side, side]));
+  const sides = INLINE_CHANGE_BORDER_SIDES.map(
+    (side): InlineChangeBorderSideEvidence =>
+      observedSides.get(side) ?? {
+        color: null,
+        side,
+        style: "none",
+        widthLabel: "0",
+        widthPx: 0,
+      },
+  );
+
+  return {
+    eligibleCardClass: "historic-border-removal",
+    label: "Border",
+    sides,
+    summary: border?.summary ?? "0",
+  };
+}
+
+export function formatInlineChangeBorderIntentSelection(value: InlineChangeBorderIntentSelection) {
+  const selection = normalizeInlineChangeBorderIntentSelection(value);
+  if (!selection) return "No border intent";
+
+  const sideLabel =
+    selection.sides.length === INLINE_CHANGE_BORDER_SIDES.length
+      ? "All"
+      : selection.sides.map(capitalizeBorderSide).join(" + ");
+  return `${sideLabel} -> ${selection.treatment === "hairline" ? "Hairline" : "None"}`;
+}
+
+function capitalizeBorderSide(value: InlineChangeBorderSide) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 function normalizeCardChromeEvidence(
   value: InlineChangeCardChromeEvidence | null | undefined,
 ): InlineChangeCardChromeEvidence | null {
@@ -579,19 +729,13 @@ function normalizeCardChromeEvidence(
 function normalizeChromeRemovalSelection(
   value: InlineChangeChromeRemovalSelection | null | undefined,
 ): InlineChangeChromeRemovalSelection | null {
-  if (!value) return null;
+  if (!value || (value as { kind?: string }).kind !== "card_chrome") return null;
 
   const border = normalizeBorderEvidence(value.border);
   const paddingControls = normalizeTokenControlInputs(value.paddingControls);
   const radiusControls = normalizeTokenControlInputs(value.radiusControls);
 
-  if (value.kind === "border" && !border) return null;
-  if (
-    value.kind === "card_chrome" &&
-    !border &&
-    paddingControls.length === 0 &&
-    radiusControls.length === 0
-  ) {
+  if (!border && paddingControls.length === 0 && radiusControls.length === 0) {
     return null;
   }
 

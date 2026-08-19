@@ -46,6 +46,15 @@ architecture, not a new Epic, framework, source registry, or artificial reading 
 The accepted decision and the current coupling-removal priorities are recorded in
 [Hito Product Domain Boundaries And Efficient Delivery Architecture Audit](../../tasks/backlog/2026-08-18-hito-product-domain-boundaries-and-efficient-delivery-architecture-audit.md).
 
+## Accepted Post-Release Priority — Delivery Architecture Transformation
+
+After the active hosted Runner Core reconciliation and deployment chain reaches a truthful terminal
+state, the highest-priority implementation track is the approved
+[Hito Modular Monolith Domain-Boundary Transformation](./2026-08-18-hito-modular-monolith-domain-boundary-transformation.md).
+It improves bounded ownership and focused regression evidence without rewriting the product or
+changing this product-Epic order. Its canonical implementation item is
+[Hito Modular Monolith Domain-Boundary Transformation Implementation](../../tasks/backlog/2026-08-18-hito-modular-monolith-domain-boundary-transformation-implementation.md).
+
 ## Registered Epics And Sequencing
 
 | Order | Epic slug                          | Product result                                                                                                                                          | Primary owners                                                 | Exit evidence                                                                                            |
@@ -77,8 +86,9 @@ Canonical task: [Hito Notion Project Management Interface And Canonical Backlog 
 
 - **Blueprint:** the runner sees phases, dates, workout family/cadence, goal assumptions, and the
   current detailed horizon. Future undeveloped sessions never pretend to be prescribed workouts.
-- **Initial horizon:** accommodation plus the first normal training week. Its exact duration is a
-  Running Coach decision, not a frontend constant.
+- **Initial horizon:** exactly four calendar weeks of detailed, reviewable runner-owned workouts.
+  The blueprint may cover a much longer honest goal trajectory, but undeveloped future sessions are
+  never shown as detailed prescriptions.
 - **Continuation input:** only persisted workout outcome, runner edits/misses, supported evidence,
   profile constraints, and the original immutable blueprint. Missing or contradictory evidence must
   result in an honest check-in or review state, not invented adaptation.
@@ -89,10 +99,27 @@ Canonical task: [Hito Notion Project Management Interface And Canonical Backlog 
 
 ## Decisions Needed Before Any `adaptive-blueprint-planning` Dispatch
 
-1. Choose the exact initial detailed horizon.
-2. Choose whether continuation is runner-initiated, horizon-initiated, or both.
-3. Define the smallest evidence/check-in threshold that permits a continuation preview.
-4. Define how archive/hide differs from permanent source deletion after materialisation.
+1. Choose whether continuation is runner-initiated, horizon-initiated, or both.
+2. Define the smallest evidence/check-in threshold that permits a continuation preview.
+3. Define how archive/hide differs from permanent source deletion after materialisation.
+
+## Adaptive Engine Replacement Decision — 2026-08-18
+
+Hito will replace—not run alongside—the all-at-once detailed plan-generation product path with the
+adaptive blueprint engine. The durable request/validation/preview/confirmation envelope remains
+one server-owned structured Responses API flow; the generated content changes from a fully detailed
+long plan to `blueprint + first four detailed weeks`. Each later four-week block is prepared from
+factual runner evidence and explicitly confirmed. This is not an Agents SDK, streaming, tools, or
+multi-agent feature.
+
+## Product Sequencing Update — 2026-08-18
+
+The next release route is now: complete the active modular-monolith domain-boundary
+transformation; deliver the retained [Adaptive Blueprint And Four-Week Detail
+Engine](../../tasks/backlog/2026-08-18-hito-adaptive-blueprint-four-week-detail-engine.md); run its
+Epic-level acceptance; then start one authorized commit/push candidate. The current all-at-once
+detailed-plan engine is not retained as a parallel product path. Weekday preferences become reviewable
+soft conflicts; structural, persistence, and security violations remain hard errors.
 
 ## Risks And Guardrails
 

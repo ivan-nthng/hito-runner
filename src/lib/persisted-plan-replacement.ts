@@ -1,17 +1,17 @@
 import type { ImportedPlanSeed } from "@/lib/imported-plan";
+import type {
+  PersistedPlannedWorkoutRow,
+  PersistedWorkoutLogRow,
+} from "@/lib/runner-calendar-persistence";
 import {
   normalizeCanonicalGoalContext,
   resolveCanonicalWorkoutModel,
   toCanonicalMetricModeJson,
 } from "@/lib/rich-workout-model";
 import type { Json } from "@/lib/supabase/database";
-import type { Database } from "@/lib/supabase/database";
 import { stableJsonStringify } from "@/lib/review-token-signing";
 import { normalizeExecutableStepInstructions } from "@/lib/training";
 import { readWorkoutDocumentSections } from "@/lib/workout-document";
-
-export type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
-export type PersistedWorkoutLogRow = Database["public"]["Tables"]["workout_logs"]["Row"];
 
 export function buildPersistedWorkoutInsertRows(
   planCycleId: string | null,

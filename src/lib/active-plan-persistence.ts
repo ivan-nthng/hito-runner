@@ -20,9 +20,12 @@ import {
   applyAtomicReviewedPlanPersistence,
 } from "@/lib/active-plan-lifecycle-persistence";
 import { buildPersistedWorkoutInsertRows } from "@/lib/persisted-plan-replacement";
-import { collectRowsForIdBatches } from "@/lib/supabase/batched-in-filter";
 import type { Database, Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
+import {
+  getCalendarWorkoutsWithLogsForUser,
+  type PersistedPlannedWorkoutRow,
+} from "@/lib/runner-calendar-persistence";
 import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
 import { type RunnerProfileSummary } from "@/lib/training";
 import {
@@ -32,8 +35,6 @@ import {
 import { stableJsonEqual } from "@/lib/review-token-signing";
 
 export type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
-export type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
-export type PersistedWorkoutLogRow = Database["public"]["Tables"]["workout_logs"]["Row"];
 
 type ImportedPlanInput = z.infer<typeof importedPlanSchema>;
 
@@ -92,14 +93,6 @@ export type SavedPlanApplyResult =
       callsOpenAi: false;
     };
 
-export type CalendarWorkoutContext = {
-  sourcePlansById: Map<string, PersistedPlanCycleRow>;
-  existingWorkouts: {
-    workouts: PersistedPlannedWorkoutRow[];
-    logsByWorkoutId: Map<string, PersistedWorkoutLogRow>;
-  };
-};
-
 export function buildReviewedFirstPlanImportedSeed(
   reviewedPlan: ImportedPlanInput,
 ): ImportedPlanSeed {
@@ -157,29 +150,6 @@ export async function materializeFirstReviewedPlanForUser(
     firstDayResolution: null,
     workoutCount: importedSeed.workouts.filter((workout) => workout.workoutType !== "rest").length,
   };
-}
-
-export async function getSourcePlanProvenancesForUser(
-  userId: string,
-  planIds: readonly (string | null)[],
-) {
-  const uniquePlanIds = [...new Set(planIds.filter((planId): planId is string => Boolean(planId)))];
-  if (uniquePlanIds.length === 0) {
-    return new Map<string, PersistedPlanCycleRow>();
-  }
-
-  const supabase = createAdminSupabaseClient();
-  const plans = await supabase
-    .from("plan_cycles")
-    .select("*")
-    .eq("user_id", userId)
-    .in("id", uniquePlanIds);
-
-  if (plans.error) {
-    throw new Error(plans.error.message);
-  }
-
-  return new Map(plans.data.map((plan) => [plan.id, plan]));
 }
 
 export async function retainReviewedPlanCandidateForUser(input: {
@@ -435,20 +405,6 @@ export async function applySavedPlanRecordForUser(
   };
 }
 
-export async function getCalendarWorkoutMutationContext(
-  userId: string,
-): Promise<CalendarWorkoutContext> {
-  const existingWorkouts = await getCalendarWorkoutsWithLogsForUser(userId);
-
-  return {
-    sourcePlansById: await getSourcePlanProvenancesForUser(
-      userId,
-      existingWorkouts.workouts.map((workout) => workout.plan_cycle_id),
-    ),
-    existingWorkouts,
-  };
-}
-
 async function persistNewReviewedPlan(input: {
   userId: string;
   importedSeed: ImportedPlanSeed;
@@ -621,32 +577,4 @@ function resolveCalendarWorkoutOriginKind(
   if (sourceKind === "ai_authored_plan_first_v1") return "ai";
   if (sourceKind === "training_plan_v2_import") return "file_import";
   throw new Error("The saved source does not have a supported Calendar workout origin.");
-}
-
-export async function getCalendarWorkoutsWithLogsForUser(
-  userId: string,
-): Promise<CalendarWorkoutContext["existingWorkouts"]> {
-  const supabase = createAdminSupabaseClient();
-  const workoutsResult = await supabase
-    .from("planned_workouts")
-    .select("*")
-    .eq("user_id", userId)
-    .order("workout_date", { ascending: true })
-    .order("display_order", { ascending: true });
-
-  if (workoutsResult.error) {
-    throw new Error(workoutsResult.error.message);
-  }
-
-  const workouts = workoutsResult.data as PersistedPlannedWorkoutRow[];
-  const workoutIds = workouts.map((workout) => workout.id);
-  const logs = await collectRowsForIdBatches<PersistedWorkoutLogRow>(
-    workoutIds,
-    async (ids) => await supabase.from("workout_logs").select("*").in("planned_workout_id", ids),
-  );
-
-  return {
-    workouts,
-    logsByWorkoutId: new Map(logs.map((log) => [log.planned_workout_id, log])),
-  };
 }

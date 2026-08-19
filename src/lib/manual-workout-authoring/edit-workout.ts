@@ -11,9 +11,9 @@ import {
 import {
   getCalendarWorkoutMutationContext,
   type CalendarWorkoutContext,
-  type PersistedPlanCycleRow,
   type PersistedPlannedWorkoutRow,
-} from "@/lib/active-plan-persistence";
+} from "@/lib/runner-calendar-persistence";
+import type { SourcePlanProvenanceRow } from "@/lib/source-plan-provenance-persistence";
 import {
   CalendarPersistenceRejection,
   applyAtomicCalendarWorkoutContentEdit,
@@ -217,7 +217,7 @@ export interface WorkoutDocumentPersistedEditDependencies {
 type WorkoutDocumentPersistedEditTarget =
   | {
       ok: true;
-      provenancePlan: PersistedPlanCycleRow | null;
+      provenancePlan: SourcePlanProvenanceRow | null;
       sourceWorkout: PersistedPlannedWorkoutRow;
       sourceDocument: WorkoutDocument;
       rootProvenance: CalendarWorkoutEditRootProvenance;
@@ -574,7 +574,7 @@ async function resolveWorkoutDocumentPersistedEditTarget(
   const provenancePlan = sourceWorkout.plan_cycle_id
     ? (context.sourcePlansById.get(sourceWorkout.plan_cycle_id) ?? null)
     : null;
-  if (sourceWorkout.user_id !== userId || (provenancePlan && provenancePlan.user_id !== userId)) {
+  if (sourceWorkout.user_id !== userId) {
     return targetBlocked("source_workout_not_owned", "The workout does not belong to this runner.");
   }
   if (sourceWorkout.workout_date !== input.workoutDate) {

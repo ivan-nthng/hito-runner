@@ -8,7 +8,7 @@ import {
   type CalendarWorkoutContext,
   type PersistedPlannedWorkoutRow,
   type PersistedWorkoutLogRow,
-} from "@/lib/active-plan-persistence";
+} from "@/lib/runner-calendar-persistence";
 import {
   CalendarPersistenceRejection,
   applyAtomicCalendarWorkoutMutation,

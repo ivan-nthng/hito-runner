@@ -3,7 +3,7 @@ import {
   CALENDAR_WORKOUT_MUTATION_SOURCE_KIND,
   type CalendarWorkoutEditRootProvenance,
 } from "@/lib/active-plan-workout-editing/policy";
-import type { PersistedPlannedWorkoutRow } from "@/lib/active-plan-persistence";
+import type { PersistedPlannedWorkoutRow } from "@/lib/runner-calendar-persistence";
 import {
   buildManualWorkoutReviewToken,
   stableManualWorkoutChecksum64Hex,

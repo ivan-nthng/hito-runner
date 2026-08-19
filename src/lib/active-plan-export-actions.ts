@@ -6,8 +6,8 @@ import {
   listSavedPlanLibraryForUser,
   logicallyRemoveSavedPlanRecordForUser,
   readSavedPlanPayload,
-  type PersistedPlannedWorkoutRow,
 } from "@/lib/active-plan-persistence";
+import type { PersistedPlannedWorkoutRow } from "@/lib/runner-calendar-persistence";
 import { isRealIsoDate } from "@/lib/first-plan-authoring-utils";
 import { buildImportedPlanSeed } from "@/lib/imported-plan";
 import { buildPersistedWorkoutInsertRows } from "@/lib/persisted-plan-replacement";

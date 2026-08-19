@@ -1,9 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import {
-  getCalendarWorkoutsWithLogsForUser,
-  retainImportedPlanCandidateForUser,
-} from "@/lib/active-plan-persistence";
+import { retainImportedPlanCandidateForUser } from "@/lib/active-plan-persistence";
 import {
   CalendarPersistenceRejection,
   clearAtomicCalendarFutureWorkouts,
@@ -16,6 +13,7 @@ import {
 } from "@/lib/plan-export";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
 import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
+import { getCalendarWorkoutsWithLogsForUser } from "@/lib/runner-calendar-persistence";
 import { digestSha256Hex, stableJsonStringify } from "@/lib/review-token-signing";
 
 const uploadCalendarPlanJsonInputSchema = z.object({ rawJson: z.string().trim().min(1) }).strict();

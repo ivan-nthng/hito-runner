@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import type { PersistedPlannedWorkoutRow } from "../../src/lib/active-plan-persistence";
+import type { PersistedPlannedWorkoutRow } from "../../src/lib/runner-calendar-persistence";
 import { moveManualWorkoutWithinActivePlanForUser } from "../../src/lib/manual-workout-authoring";
 import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "../../src/lib/manual-workout-authoring/schema";
 import {

@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import type {
   CalendarWorkoutContext,
-  PersistedPlanCycleRow,
   PersistedPlannedWorkoutRow,
   PersistedWorkoutLogRow,
-} from "../../src/lib/active-plan-persistence";
+} from "../../src/lib/runner-calendar-persistence";
+import type { PersistedPlanCycleRow } from "../../src/lib/active-plan-persistence";
 import type { Database } from "../../src/lib/supabase/database";
 import type { ManualWorkoutActivePlanAddDependencies } from "../../src/lib/manual-workout-authoring/active-plan-add";
 import { buildImportedPlanSeed } from "../../src/lib/imported-plan";

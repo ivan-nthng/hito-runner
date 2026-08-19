@@ -169,6 +169,7 @@ export function ManualWorkoutAddMenu({
   const restoreManualWorkoutBuiltInTemplateFn = useServerFn(restoreManualWorkoutBuiltInTemplate);
   const saveManualWorkoutSavedTemplateFn = useServerFn(saveManualWorkoutSavedTemplate);
   const addManualWorkoutToActivePlanFn = useServerFn(addManualWorkoutToActivePlan);
+  const addMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const confirmInFlightRef = useRef(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
@@ -679,7 +680,7 @@ export function ManualWorkoutAddMenu({
   return (
     <>
       <DropdownMenu open={addMenuOpen} onOpenChange={handleAddMenuOpenChange}>
-        <DropdownMenuTrigger asChild disabled={disabled}>
+        <DropdownMenuTrigger asChild disabled={disabled} ref={addMenuTriggerRef}>
           {children}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className={MANUAL_ADD_MENU_CONTENT_CLASS}>
@@ -870,6 +871,12 @@ export function ManualWorkoutAddMenu({
           setReviewResult(null);
           setReviewedDraft(null);
         }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          window.requestAnimationFrame(() => {
+            addMenuTriggerRef.current?.focus({ preventScroll: true });
+          });
+        }}
         onOpenChange={(open) => {
           if (!open && !isBusy) {
             setReviewedDraft(null);
@@ -926,6 +933,7 @@ export function ManualWorkoutConstructorDialog({
   isBusy,
   notes,
   onConfirm,
+  onCloseAutoFocus,
   onEntriesChange,
   onNotesChange,
   onOpenChange,
@@ -950,6 +958,7 @@ export function ManualWorkoutConstructorDialog({
   isBusy: boolean;
   notes: string;
   onConfirm: () => void;
+  onCloseAutoFocus?: (event: Event) => void;
   onEntriesChange: (entries: ManualWorkoutConstructorEntryInput[]) => void;
   onNotesChange: (value: string) => void;
   onOpenChange: (open: boolean) => void;
@@ -986,6 +995,7 @@ export function ManualWorkoutConstructorDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-workflow hito-dialog-height-workflow"
+        onCloseAutoFocus={onCloseAutoFocus}
         onOpenAutoFocus={focusManualWorkoutDialogCloseOnOpen}
         overlayClassName="hito-dialog-overlay-stable"
       >

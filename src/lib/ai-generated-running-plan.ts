@@ -133,6 +133,10 @@ export type AiGeneratedRunningPlanPreviewUnavailable = {
       | "structured_input_invalid";
     message: string;
     issues: readonly string[];
+    compilerDiagnostic: {
+      code: string;
+      path: string;
+    } | null;
   };
   debug: {
     generationTrace: AiPlanGenerationLedgerTrace | null;
@@ -290,6 +294,7 @@ export async function buildAiGeneratedRunningPlanPreview(
           ? "The generated-plan setup could not be normalized. Adjust the goal details."
           : result.message,
         issues: result.issues,
+        compilerDiagnostic: structuredInputInvalid ? null : result.metadata.compilerDiagnostic,
         generationTrace: structuredInputInvalid ? null : result.metadata.generationTrace,
         input,
         normalizedInputSummary: authoring.normalizedInputSummary,
@@ -1026,6 +1031,7 @@ export function buildAiGeneratedRunningPlanPreviewUnavailable(input: {
   input: BuildRunningPlanPreviewInput;
   normalizedInputSummary: RunningPlanPreviewNormalizedInputSummary | null;
   previewOutcome: AiGeneratedRunningPlanPreviewUnavailable["previewOutcome"];
+  compilerDiagnostic?: AiGeneratedRunningPlanPreviewUnavailable["error"]["compilerDiagnostic"];
 }): AiGeneratedRunningPlanPreviewUnavailable {
   return {
     sourceKind: AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
@@ -1040,6 +1046,7 @@ export function buildAiGeneratedRunningPlanPreviewUnavailable(input: {
       code: input.code,
       message: input.message,
       issues: input.issues,
+      compilerDiagnostic: input.compilerDiagnostic ?? null,
     },
     debug: {
       generationTrace: input.generationTrace,

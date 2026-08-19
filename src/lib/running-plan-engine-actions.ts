@@ -159,6 +159,7 @@ type RunningPlanPreviewProductUnavailable = {
   error: {
     code: AiGeneratedRunningPlanPreviewUnavailable["error"]["code"];
     message: string;
+    compilerDiagnostic: AiGeneratedRunningPlanPreviewUnavailable["error"]["compilerDiagnostic"];
   };
 };
 
@@ -532,6 +533,10 @@ export async function buildReviewedAiGeneratedRunningPlanPreviewForUser(
     calendarDate && !data.startDate?.trim() ? { ...data, startDate: calendarDate } : data,
     {
       ...options,
+      aiPreview: {
+        ...(options.aiPreview ?? {}),
+        candidateOwnerUserId: userId,
+      },
       ...(runnerProfileSnapshot ? { runnerProfileSnapshot } : {}),
     },
   );
@@ -579,6 +584,16 @@ export function projectRunningPlanPreviewResultForProduct(
   result: RunningPlanReviewedPreviewResult,
 ): RunningPlanPreviewActionResult {
   if (!result.ok) {
+    if (result.unavailable.previewOutcome === "compiler_rejection") {
+      console.error(
+        "[generated-plan/preview] compiler_rejection",
+        JSON.stringify({
+          code: result.unavailable.error.code,
+          compilerDiagnostic: result.unavailable.error.compilerDiagnostic,
+        }),
+      );
+    }
+
     return {
       ok: false,
       unavailable: {
@@ -586,6 +601,7 @@ export function projectRunningPlanPreviewResultForProduct(
         error: {
           code: result.unavailable.error.code,
           message: result.unavailable.error.message,
+          compilerDiagnostic: result.unavailable.error.compilerDiagnostic,
         },
       },
     };

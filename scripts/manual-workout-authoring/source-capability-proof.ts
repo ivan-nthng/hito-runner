@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
+import type { PersistedPlanCycleRow } from "../../src/lib/active-plan-persistence";
 import type {
-  PersistedPlanCycleRow,
   PersistedPlannedWorkoutRow,
   PersistedWorkoutLogRow,
-} from "../../src/lib/active-plan-persistence";
+} from "../../src/lib/runner-calendar-persistence";
 import { resolveCalendarWorkoutSourceEditingCapabilities } from "../../src/lib/active-plan-workout-editing/source-capabilities";
 import { type ManualWorkoutDraftInput } from "../../src/lib/manual-workout-authoring";
 import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "../../src/lib/manual-workout-authoring/schema";

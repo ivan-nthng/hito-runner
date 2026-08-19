@@ -103,6 +103,51 @@ export type Database = {
         };
         Relationships: [];
       };
+      ai_plan_generation_responses: {
+        Row: {
+          compiler_outcome: string;
+          created_at: string;
+          diagnostic_code: string | null;
+          diagnostic_path: string | null;
+          generation_id: string;
+          id: string;
+          provider_response_id: string | null;
+          response_body: string;
+          response_sha256: string;
+          schema_outcome: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          compiler_outcome?: string;
+          created_at?: string;
+          diagnostic_code?: string | null;
+          diagnostic_path?: string | null;
+          generation_id: string;
+          id?: string;
+          provider_response_id?: string | null;
+          response_body: string;
+          response_sha256: string;
+          schema_outcome?: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          compiler_outcome?: string;
+          created_at?: string;
+          diagnostic_code?: string | null;
+          diagnostic_path?: string | null;
+          generation_id?: string;
+          id?: string;
+          provider_response_id?: string | null;
+          response_body?: string;
+          response_sha256?: string;
+          schema_outcome?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       calendar_workout_mutation_events: {
         Row: {
           after_workout: Json | null;

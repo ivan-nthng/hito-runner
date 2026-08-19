@@ -11,10 +11,8 @@ import {
   loadWorkoutRouteData,
   workoutRouteInputSchema,
 } from "@/lib/route-data-actions";
-import {
-  getCalendarWorkoutsWithLogsForUser,
-  getSourcePlanProvenancesForUser,
-} from "@/lib/active-plan-persistence";
+import { getCalendarWorkoutsWithLogsForUser } from "@/lib/runner-calendar-persistence";
+import { getSourcePlanProvenancesForUser } from "@/lib/source-plan-provenance-persistence";
 import { loadSettingsRouteData } from "@/lib/user-settings-actions";
 import {
   getPersistedUserIdForAuthContext,

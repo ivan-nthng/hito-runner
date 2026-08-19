@@ -5,7 +5,7 @@ import type {
   ManualWorkoutMoveConfirmResult,
   ManualWorkoutMoveReviewResult,
 } from "../../src/lib/manual-workout-authoring";
-import type { PersistedPlannedWorkoutRow } from "../../src/lib/active-plan-persistence";
+import type { PersistedPlannedWorkoutRow } from "../../src/lib/runner-calendar-persistence";
 import type { Step } from "../../src/lib/training";
 
 export function assertManualBlockedResult<Result extends { ok: boolean }, Reason extends string>(

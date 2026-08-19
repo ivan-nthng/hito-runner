@@ -1,4 +1,4 @@
-import type { PersistedPlannedWorkoutRow } from "@/lib/active-plan-persistence";
+import type { PersistedPlannedWorkoutRow } from "@/lib/runner-calendar-persistence";
 import { getManualWorkoutRepeatGroupChildren } from "@/lib/manual-workout-authoring/repeat-groups";
 import {
   manualWorkoutDraftInputSchema,

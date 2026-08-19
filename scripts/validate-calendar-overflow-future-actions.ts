@@ -7,12 +7,12 @@ import {
   exportFutureCalendarWorkoutsForUser,
 } from "../src/lib/calendar-overflow-actions";
 import {
-  getCalendarWorkoutsWithLogsForUser,
   listSavedPlanLibraryForUser,
   materializeFirstReviewedPlanForUser,
   retainImportedPlanCandidateForUser,
   retainReviewedPlanCandidateForUser,
 } from "../src/lib/active-plan-persistence";
+import { getCalendarWorkoutsWithLogsForUser } from "../src/lib/runner-calendar-persistence";
 import { validateImportedPlanJson, type TrainingPlanV2 } from "../src/lib/imported-plan";
 import {
   addManualWorkoutToActivePlanForUser,

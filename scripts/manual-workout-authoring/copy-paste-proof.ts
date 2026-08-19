@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
+import type { PersistedPlanCycleRow } from "../../src/lib/active-plan-persistence";
 import type {
-  PersistedPlanCycleRow,
   PersistedPlannedWorkoutRow,
   PersistedWorkoutLogRow,
-} from "../../src/lib/active-plan-persistence";
+} from "../../src/lib/runner-calendar-persistence";
 import {
   copyManualWorkoutWithinActivePlanForUser,
   type ManualWorkoutDirectCopyDependencies,

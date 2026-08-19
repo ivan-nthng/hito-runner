@@ -6,7 +6,7 @@ import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
 import { findWorkout, type TrainingSnapshot, type Workout } from "@/lib/training";
 import { getUserSettingsForUserId } from "@/lib/user-settings-actions";
 import type { WorkoutResultFeedbackSummary } from "@/lib/workout-result-import/types";
-import type { WorkoutDetailSidebarReadModel } from "@/lib/workout-detail-sidebar-read-model";
+import type { WorkoutDetailSidebarReadModel } from "@/lib/workout-detail-sidebar-contract";
 
 export const workoutRouteInputSchema = z.object({ date: z.string() });
 

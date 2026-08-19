@@ -9,7 +9,7 @@ import {
 } from "../src/lib/manual-workout-authoring";
 import { buildManualWorkoutDraftInputFromPersistedWorkout } from "../src/lib/manual-workout-authoring/copy-paste-reconstruction";
 import { AI_AUTHORED_PLAN_FIRST_WORKOUT_IDENTITY_VALUES } from "../src/lib/ai-authored-plan-first-provider-contract";
-import type { PersistedPlannedWorkoutRow } from "../src/lib/active-plan-persistence";
+import type { PersistedPlannedWorkoutRow } from "../src/lib/runner-calendar-persistence";
 import {
   isContentCopyableCalendarWorkoutSourceKind,
   isEditableCalendarWorkoutSourceKind,
@@ -122,6 +122,9 @@ async function validateStandaloneCalendarSourceBoundary() {
     overflowMigration,
     occupiedUndoMigration,
     persistence,
+    persistedPlanReplacement,
+    runnerCalendarPersistence,
+    sourceProvenancePersistence,
     trainingApi,
     databaseTypes,
   ] = await Promise.all([
@@ -147,6 +150,9 @@ async function validateStandaloneCalendarSourceBoundary() {
       "utf8",
     ),
     readFile(new URL("../src/lib/active-plan-persistence.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/persisted-plan-replacement.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/runner-calendar-persistence.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/lib/source-plan-provenance-persistence.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/training-api.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/supabase/database.ts", import.meta.url), "utf8"),
   ]);
@@ -227,8 +233,45 @@ async function validateStandaloneCalendarSourceBoundary() {
     persistence,
     /getLatestMaterializedPlanProvenance|getMaterializedPlanProvenancesForUser|getPlanWorkouts/,
   );
-  assert.match(persistence, /getSourcePlanProvenancesForUser/);
-  assert.match(persistence, /sourcePlansById/);
+  assert.doesNotMatch(
+    persistence,
+    /export async function getSourcePlanProvenancesForUser/,
+    "the source library owner must not keep a provenance lookup export",
+  );
+  assert.doesNotMatch(persistence, /source-plan-provenance-persistence|sourcePlansById/);
+  assert.match(persistence, /from "@\/lib\/runner-calendar-persistence"/);
+  assert.match(runnerCalendarPersistence, /sourcePlansById/);
+  assert.match(runnerCalendarPersistence, /from "@\/lib\/source-plan-provenance-persistence"/);
+  for (const exportName of [
+    "PersistedPlannedWorkoutRow",
+    "PersistedWorkoutLogRow",
+    "CalendarWorkoutContext",
+    "getCalendarWorkoutsWithLogsForUser",
+    "getCalendarWorkoutMutationContext",
+  ]) {
+    assert.match(
+      runnerCalendarPersistence,
+      new RegExp(`export (?:type |async function )${exportName}`),
+    );
+    assert.doesNotMatch(persistence, new RegExp(`export (?:type |async function )${exportName}`));
+  }
+  for (const rowType of ["PersistedPlannedWorkoutRow", "PersistedWorkoutLogRow"]) {
+    assert.match(runnerCalendarPersistence, new RegExp(`export type ${rowType}`));
+    assert.doesNotMatch(persistedPlanReplacement, new RegExp(`(?:export )?type ${rowType}\\s*=`));
+  }
+  assert.match(persistedPlanReplacement, /from "@\/lib\/runner-calendar-persistence"/);
+  assert.match(
+    sourceProvenancePersistence,
+    /export type SourcePlanProvenanceRow = Pick<[\s\S]*"id" \| "source_kind" \| "goal_metadata"/,
+  );
+  assert.match(
+    sourceProvenancePersistence,
+    /\.select\("id, source_kind, goal_metadata"\)[\s\S]*\.eq\("user_id", userId\)/,
+  );
+  assert.doesNotMatch(
+    sourceProvenancePersistence,
+    /active-plan-persistence|runner-calendar-persistence|\.select\("\*"\)/,
+  );
   assert.doesNotMatch(trainingApi, /clearUpcomingSchedule|previewActivePlan|ScheduleReflow/);
   assert.doesNotMatch(
     trainingApi,

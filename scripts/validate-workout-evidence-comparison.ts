@@ -8,15 +8,7 @@ import {
 import { buildWorkoutResultEvidenceBundle } from "../src/lib/workout-result-import/evidence-bundle";
 import { parseGarminFitActivity } from "../src/lib/workout-result-import/parse-garmin-fit";
 import { comparisonRowToSummary } from "../src/lib/workout-result-import/read-workout-result-feedback";
-import {
-  buildWorkoutSidebarWeekSummary,
-  projectEligibleWorkoutInsight,
-  type WorkoutSidebarActualMetricsRow,
-  type WorkoutSidebarInsightCandidateRow,
-  type WorkoutSidebarInsightWorkoutRow,
-  type WorkoutSidebarLogRow,
-  type WorkoutSidebarPlannedWorkoutRow,
-} from "../src/lib/workout-detail-sidebar-read-model";
+import { buildWorkoutSidebarWeekSummary } from "../src/lib/workout-detail-sidebar-read-model";
 import type { Database, Json } from "../src/lib/supabase/database";
 import type {
   WorkoutActualMetricsSummary,
@@ -26,6 +18,10 @@ import type {
   WorkoutComparisonSummary,
   WorkoutResultAssetSummary,
 } from "../src/lib/workout-result-import/types";
+
+type WorkoutSidebarWeekSummaryInput = Parameters<typeof buildWorkoutSidebarWeekSummary>[0];
+type WorkoutSidebarPlannedWorkoutRow = WorkoutSidebarWeekSummaryInput["plannedWorkouts"][number];
+type WorkoutSidebarLogRow = WorkoutSidebarWeekSummaryInput["logs"][number];
 
 const WORKOUT_ID = "10000000-0000-4000-8000-000000000001";
 const ASSET_ID = "10000000-0000-4000-8000-000000000002";
@@ -40,7 +36,6 @@ async function main() {
   validatePersistedPayloadBoundary(indexedComparison);
   validatePersistedRowBoundary(indexedComparison);
   validateWorkoutSidebarWeekSummaryContract();
-  validateWorkoutSidebarInsightContract(indexedComparison);
 
   console.log("Workout evidence comparison contract passed.");
 }
@@ -52,188 +47,62 @@ function validateWorkoutSidebarWeekSummaryContract() {
   const fitWorkoutId = "10000000-0000-4000-8000-000000000013";
   const skippedWorkoutId = "10000000-0000-4000-8000-000000000014";
   const restWorkoutId = "10000000-0000-4000-8000-000000000015";
+  const noResultWorkoutId = "10000000-0000-4000-8000-000000000016";
   const currentDate = "2026-08-13";
   const plannedWorkouts: WorkoutSidebarPlannedWorkoutRow[] = [
-    sidebarWorkout(userId, manualWorkoutId, "2026-08-10", "easy", [{ distance_km: 5 }]),
-    sidebarWorkout(userId, fitWorkoutId, "2026-08-12", "easy", [{ duration_min: 35 }]),
-    sidebarWorkout(userId, skippedWorkoutId, "2026-08-14", "quality", [{ distance_km: 3 }]),
-    sidebarWorkout(userId, restWorkoutId, "2026-08-11", "rest", []),
-    sidebarWorkout(userId, crypto.randomUUID(), "2026-08-18", "easy", [{ distance_km: 50 }]),
-    sidebarWorkout(otherUserId, crypto.randomUUID(), "2026-08-13", "easy", [{ distance_km: 100 }]),
+    sidebarWorkout(userId, manualWorkoutId, "2026-08-10", "easy"),
+    sidebarWorkout(userId, fitWorkoutId, "2026-08-12", "easy"),
+    sidebarWorkout(userId, noResultWorkoutId, "2026-08-13", "easy"),
+    sidebarWorkout(userId, skippedWorkoutId, "2026-08-14", "quality"),
+    sidebarWorkout(userId, restWorkoutId, "2026-08-11", "rest"),
+    sidebarWorkout(userId, crypto.randomUUID(), "2026-08-18", "easy"),
+    sidebarWorkout(otherUserId, crypto.randomUUID(), "2026-08-13", "easy"),
   ];
   const logs: WorkoutSidebarLogRow[] = [
-    sidebarLog(userId, manualWorkoutId, "completed", 4.8),
-    sidebarLog(userId, skippedWorkoutId, "skipped", 99),
-    sidebarLog(otherUserId, fitWorkoutId, "completed", 88),
-  ];
-  const actualMetrics: WorkoutSidebarActualMetricsRow[] = [
-    sidebarMetrics(userId, fitWorkoutId, "normalized", 6.2, "2026-08-12T08:00:00.000Z"),
-    sidebarMetrics(userId, fitWorkoutId, "superseded", 99, "2026-08-12T09:00:00.000Z"),
-    sidebarMetrics(otherUserId, manualWorkoutId, "normalized", 77, "2026-08-12T10:00:00.000Z"),
+    sidebarLog(userId, manualWorkoutId, "completed"),
+    sidebarLog(userId, skippedWorkoutId, "skipped"),
+    sidebarLog(otherUserId, fitWorkoutId, "completed"),
   ];
   const baseInput = {
     userId,
     currentDate,
     plannedWorkouts,
     logs,
-    actualMetrics,
     fitCompletedWorkoutIds: new Set([fitWorkoutId]),
   };
   const summary = buildWorkoutSidebarWeekSummary(baseInput);
 
-  assert.equal(summary.weekStartDate, "2026-08-10");
-  assert.equal(summary.weekEndDate, "2026-08-16");
-  assert.equal(summary.scheduledWorkoutCount, 3);
-  assert.equal(summary.completedWorkoutCount, 2);
-  assert.deepEqual(summary.scheduledDistance, {
-    state: "available",
-    kilometres: 13,
-    basis: "includes_duration_estimates",
-    estimatedWorkoutCount: 1,
-  });
-  assert.deepEqual(summary.recordedDistance, {
-    state: "available",
-    kilometres: 11,
-    basis: "manual_and_fit_actuals",
-    recordedWorkoutCount: 2,
-  });
+  assert.equal(summary.scheduledWorkoutCount, 4);
+  assert.equal(summary.completedWorkoutCount, 2, "manual and FIT results are completed");
 
-  const partial = buildWorkoutSidebarWeekSummary({
+  const withoutFitResult = buildWorkoutSidebarWeekSummary({
+    ...baseInput,
+    fitCompletedWorkoutIds: new Set(),
+  });
+  assert.equal(
+    withoutFitResult.completedWorkoutCount,
+    1,
+    "a workout without a result remains incomplete",
+  );
+
+  const partialFit = buildWorkoutSidebarWeekSummary({
     ...baseInput,
     logs: [
-      sidebarLog(userId, manualWorkoutId, "completed", 4.8),
-      sidebarLog(userId, skippedWorkoutId, "partial", 2),
+      sidebarLog(userId, manualWorkoutId, "completed"),
+      sidebarLog(userId, fitWorkoutId, "partial"),
     ],
   });
-  assert.equal(partial.completedWorkoutCount, 2, "partial is recorded but not completed");
-  assert.deepEqual(partial.recordedDistance, {
-    state: "available",
-    kilometres: 13,
-    basis: "manual_and_fit_actuals",
-    recordedWorkoutCount: 3,
-  });
-
-  const missingRecorded = buildWorkoutSidebarWeekSummary({
-    ...baseInput,
-    logs: [sidebarLog(userId, manualWorkoutId, "completed", null)],
-  });
-  assert.deepEqual(missingRecorded.recordedDistance, {
-    state: "unavailable",
-    kilometres: null,
-    reason: "recorded_distance_missing",
-    missingWorkoutCount: 1,
-  });
-
-  const missingFit = buildWorkoutSidebarWeekSummary({
-    ...baseInput,
-    actualMetrics: actualMetrics.filter((metrics) => metrics.status === "superseded"),
-  });
-  assert.deepEqual(missingFit.recordedDistance, {
-    state: "unavailable",
-    kilometres: null,
-    reason: "recorded_distance_missing",
-    missingWorkoutCount: 1,
-  });
-
-  const missingScheduled = buildWorkoutSidebarWeekSummary({
-    ...baseInput,
-    plannedWorkouts: [
-      ...plannedWorkouts,
-      sidebarWorkout(userId, crypto.randomUUID(), "2026-08-15", "easy", []),
-    ],
-  });
-  assert.deepEqual(missingScheduled.scheduledDistance, {
-    state: "unavailable",
-    kilometres: null,
-    reason: "scheduled_distance_missing",
-    missingWorkoutCount: 1,
-  });
+  assert.equal(partialFit.completedWorkoutCount, 1, "partial FIT result is not completed");
 
   const restOnly = buildWorkoutSidebarWeekSummary({
     userId,
     currentDate,
-    plannedWorkouts: [sidebarWorkout(userId, restWorkoutId, "2026-08-11", "rest", [])],
+    plannedWorkouts: [sidebarWorkout(userId, restWorkoutId, "2026-08-11", "rest")],
     logs: [],
-    actualMetrics: [],
     fitCompletedWorkoutIds: new Set(),
   });
   assert.equal(restOnly.scheduledWorkoutCount, 0);
   assert.equal(restOnly.completedWorkoutCount, 0);
-  assert.equal(restOnly.scheduledDistance.state, "not_applicable");
-  assert.equal(restOnly.recordedDistance.state, "not_applicable");
-}
-
-function validateWorkoutSidebarInsightContract(
-  comparisonResult: ReturnType<typeof buildDeterministicWorkoutComparison>,
-) {
-  const userId = "10000000-0000-4000-8000-000000000005";
-  const candidate: WorkoutSidebarInsightCandidateRow = {
-    id: buildAiInsightSummary().id,
-    user_id: userId,
-    planned_workout_id: WORKOUT_ID,
-    status: "final",
-    created_at: buildAiInsightSummary().createdAt,
-  };
-  const workout: WorkoutSidebarInsightWorkoutRow = {
-    id: WORKOUT_ID,
-    user_id: userId,
-    workout_date: "2026-07-17",
-    title: "Threshold session",
-  };
-  const feedback = buildWorkoutResultEvidenceBundle({
-    latestAsset: buildAssetSummary(),
-    latestActualMetrics: buildActualMetricsSummary(),
-    latestComparison: buildComparisonSummary(comparisonResult),
-    latestAiInsight: buildAiInsightSummary(),
-  });
-  const available = projectEligibleWorkoutInsight({ userId, candidate, workout, feedback });
-
-  assert.equal(available.state, "available");
-  if (available.state === "available") {
-    assert.deepEqual(available.workout, {
-      id: WORKOUT_ID,
-      date: "2026-07-17",
-      title: "Threshold session",
-    });
-    assert.equal(available.insight.analysisSummary, "Sanitized historical insight");
-  }
-
-  assert.equal(
-    projectEligibleWorkoutInsight({
-      userId,
-      candidate: { ...candidate, status: "superseded" },
-      workout,
-      feedback,
-    }).state,
-    "absent",
-  );
-  assert.equal(
-    projectEligibleWorkoutInsight({
-      userId,
-      candidate: { ...candidate, user_id: crypto.randomUUID() },
-      workout,
-      feedback,
-    }).state,
-    "absent",
-  );
-  assert.equal(
-    projectEligibleWorkoutInsight({
-      userId,
-      candidate,
-      workout: { ...workout, user_id: crypto.randomUUID() },
-      feedback,
-    }).state,
-    "absent",
-  );
-  assert.equal(
-    projectEligibleWorkoutInsight({
-      userId,
-      candidate,
-      workout,
-      feedback: { ...feedback, latestAiInsight: null },
-    }).state,
-    "absent",
-  );
 }
 
 function sidebarWorkout(
@@ -241,15 +110,12 @@ function sidebarWorkout(
   id: string,
   workoutDate: string,
   workoutType: WorkoutSidebarPlannedWorkoutRow["workout_type"],
-  steps: WorkoutSidebarPlannedWorkoutRow["steps"],
 ): WorkoutSidebarPlannedWorkoutRow {
   return {
     id,
     user_id: userId,
     workout_date: workoutDate,
     workout_type: workoutType,
-    title: `${workoutType} workout`,
-    steps,
   };
 }
 
@@ -257,31 +123,11 @@ function sidebarLog(
   userId: string,
   plannedWorkoutId: string,
   outcome: WorkoutSidebarLogRow["outcome"],
-  actualDistanceKm: number | null,
 ): WorkoutSidebarLogRow {
   return {
     user_id: userId,
     planned_workout_id: plannedWorkoutId,
     outcome,
-    actual_distance_km: actualDistanceKm,
-  };
-}
-
-function sidebarMetrics(
-  userId: string,
-  plannedWorkoutId: string,
-  status: string,
-  actualDistanceKm: number | null,
-  createdAt: string,
-): WorkoutSidebarActualMetricsRow {
-  return {
-    id: crypto.randomUUID(),
-    user_id: userId,
-    planned_workout_id: plannedWorkoutId,
-    source_kind: "garmin_fit",
-    status,
-    actual_distance_km: actualDistanceKm,
-    created_at: createdAt,
   };
 }
 

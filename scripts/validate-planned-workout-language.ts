@@ -29,6 +29,7 @@ import {
   type TrainingPlanV2,
 } from "../src/lib/imported-plan";
 import { buildPersistedWorkoutInsertRows } from "../src/lib/persisted-plan-replacement";
+import type { PersistedPlannedWorkoutRow } from "../src/lib/runner-calendar-persistence";
 import { AI_GENERATED_RUNNING_PLAN_SOURCE_KIND } from "../src/lib/ai-generated-running-plan";
 import type { RunningPlanPreviewActionInput } from "../src/lib/running-plan-engine-actions";
 import { buildRunningPlanCanonicalPlan } from "../src/lib/running-plan-engine-review";
@@ -39,7 +40,6 @@ import { buildReviewedAiFixtureResult as buildReviewedAiFixture } from "./lib/ge
 import { buildCanonicalPersistedPlannedWorkoutFromReview } from "./manual-workout-authoring/move-proof-fixtures";
 
 type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
-type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
 type TrainingPlanWorkout = TrainingPlanV2["planned_workouts"][number];
 type TrainingPlanSegment = TrainingPlanWorkout["segments"][number];
 type TrainingPlanRepeatChild = NonNullable<

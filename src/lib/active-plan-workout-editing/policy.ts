@@ -1,8 +1,6 @@
-import type {
-  PersistedPlanCycleRow,
-  PersistedPlannedWorkoutRow,
-} from "@/lib/active-plan-persistence";
+import type { PersistedPlannedWorkoutRow } from "@/lib/runner-calendar-persistence";
 import { TRAINING_PLAN_V2_IMPORT_SOURCE_KIND } from "@/lib/imported-plan";
+import type { SourcePlanProvenanceRow } from "@/lib/source-plan-provenance-persistence";
 
 export const CALENDAR_WORKOUT_MUTATION_SOURCE_KIND = "calendar_workout_mutation_v1" as const;
 
@@ -97,7 +95,7 @@ export interface CalendarWorkoutMutationEventPayload {
 }
 
 export function resolveCalendarWorkoutEditability(
-  provenancePlan: PersistedPlanCycleRow | null,
+  provenancePlan: SourcePlanProvenanceRow | null,
   operation: CalendarWorkoutEditOperation,
 ): CalendarWorkoutEditabilityResult {
   const sourceKind = provenancePlan?.source_kind?.trim() || "runner_owned_calendar_workout";
@@ -118,7 +116,7 @@ export function isContentCopyableCalendarWorkoutSourceKind(sourceKind: string | 
   return Boolean(sourceKind?.trim());
 }
 
-export function resolvePlanProvenanceSourceStatus(provenancePlan: PersistedPlanCycleRow) {
+export function resolvePlanProvenanceSourceStatus(provenancePlan: SourcePlanProvenanceRow) {
   const root = asRecord(provenancePlan.goal_metadata);
   const directStatus = readString(root.source_status);
 
@@ -208,7 +206,7 @@ export interface CalendarWorkoutEditRootProvenance {
 }
 
 export function resolveCalendarWorkoutEditRootProvenance(
-  provenancePlan: PersistedPlanCycleRow | null,
+  provenancePlan: SourcePlanProvenanceRow | null,
   workout: PersistedPlannedWorkoutRow,
   earliestEditPayload: unknown = null,
 ): CalendarWorkoutEditRootProvenance {
@@ -254,7 +252,7 @@ export function resolveCalendarWorkoutEditRootProvenance(
   };
 }
 
-function resolveConfirmedImportOrigin(activePlan: PersistedPlanCycleRow) {
+function resolveConfirmedImportOrigin(activePlan: SourcePlanProvenanceRow) {
   const root = asRecord(activePlan.goal_metadata);
   const provenance = asRecord(root[TRAINING_PLAN_V2_IMPORT_SOURCE_KIND]);
 

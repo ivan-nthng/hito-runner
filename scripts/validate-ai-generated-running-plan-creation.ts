@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createClient } from "@supabase/supabase-js";
 import {
   AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV,
   AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_DELAY_MS_ENV,
@@ -16,6 +17,12 @@ import {
   resolveAiGeneratedRunningPlanDevFixtureDelayMs,
 } from "../src/lib/ai-generated-running-plan-dev-fixture";
 import { generateAiFirstPlanDraftPreview } from "../src/lib/ai-first-plan-draft-service";
+import {
+  getAiPlanGenerationResponseByProviderIdForUser,
+  getAiPlanGenerationResponseForUser,
+  recordAiPlanGenerationResponseOutcomeForUser,
+  retainCompletedAiPlanGenerationResponseForUser,
+} from "../src/lib/ai-plan-generation-response-persistence";
 import {
   attachOutputToAiPlanGenerationLedgerTrace,
   createAiPlanGenerationLedgerTrace,
@@ -61,12 +68,19 @@ import { base64UrlDecodeUtf8 } from "../src/lib/review-token-signing";
 import { selectedDistanceEndpointMainDistanceMeters } from "../src/lib/plan-creation-engine";
 import { GENERATED_PLAN_RUNNER_COMMENT_MAX_LENGTH } from "../src/lib/structured-plan-authoring-schema";
 import { addDaysIso } from "../src/lib/training";
+import type { Database } from "../src/lib/supabase/database";
+import { createAdminSupabaseClient } from "../src/lib/supabase/server";
 import { validateGeneratedLongRunExecutionPolicyContract } from "./long-run-execution-policy-proof";
 import {
   parsePositiveIntegerOption,
   resolveDirectCanaryTimeoutPolicy,
 } from "./ai-first-plan-draft-ops/cli";
 import { validatePlanFirstHeartRateTargetContract } from "./plan-first-heart-rate-target-proof";
+import {
+  formatDisposablePersistenceBlocker,
+  readDisposablePersistenceCliOptions,
+  resolveDisposablePersistencePreflight,
+} from "./lib/qa-pool-persistence-proof";
 import {
   buildAiGeneratedRunningPlanAuthoringInput,
   buildReviewedAiGeneratedRunningPlanPreview,
@@ -175,12 +189,297 @@ await validateTypedPlanFirstFailureOutcomes();
 await validatePlanFirstProviderRepresentationContract();
 await validateLocalDevFixtureAvailabilityGating();
 await validateLocalGenerationIncidentTrail();
+if (readDisposablePersistenceCliOptions().requirePersistence) {
+  await validateCompletedAiPlanResponseRetentionPersistence();
+}
 
 console.log("AI-generated plan-first creation contract checks passed.", {
   scenarios: scenarios.map((scenario) => scenario.name),
   sourceKind: AI_AUTHORED_PLAN_FIRST_SOURCE_KIND,
   contractMode: "plan_first",
 });
+
+async function validateCompletedAiPlanResponseRetentionPersistence() {
+  const preflight = resolveDisposablePersistencePreflight({
+    options: readDisposablePersistenceCliOptions(),
+    includeNotRequested: false,
+    envIncompleteReason:
+      "AI plan response retention persistence proof requires the repository-managed local Supabase environment.",
+    envIncompleteOverrideHint:
+      "Run the repository local Supabase configure/status procedure before this proof.",
+    invalidUrlReason: "The configured Supabase URL is invalid.",
+    invalidUrlOverrideHint: "Restore the repository-managed local Supabase environment.",
+    nonLoopbackBlockedReason:
+      "AI plan response retention persistence proof is restricted to disposable loopback Supabase.",
+    nonLoopbackOverrideHint: "Use the repository-managed local Supabase target only.",
+  });
+  if (!preflight.shouldRun) {
+    throw new Error(
+      formatDisposablePersistenceBlocker("AI plan response retention proof", preflight),
+    );
+  }
+
+  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
+  assert.ok(publishableKey, "Local Supabase publishable key must be configured.");
+  const admin = createAdminSupabaseClient();
+  const createdUserIds: string[] = [];
+  const password = `Ai-Retention-Proof-Aa1-${crypto.randomUUID()}`;
+  const ownerEmail = `ai-retention-owner-${crypto.randomUUID()}@example.test`;
+  const otherEmail = `ai-retention-other-${crypto.randomUUID()}@example.test`;
+
+  try {
+    const ownerCreate = await admin.auth.admin.createUser({
+      email: ownerEmail,
+      password,
+      email_confirm: true,
+    });
+    assert.equal(ownerCreate.error, null, "Disposable response owner creation must succeed.");
+    assert.ok(ownerCreate.data.user);
+    createdUserIds.push(ownerCreate.data.user!.id);
+
+    const otherCreate = await admin.auth.admin.createUser({
+      email: otherEmail,
+      password,
+      email_confirm: true,
+    });
+    assert.equal(otherCreate.error, null, "Disposable isolation user creation must succeed.");
+    assert.ok(otherCreate.data.user);
+    createdUserIds.push(otherCreate.data.user!.id);
+
+    const ownerId = ownerCreate.data.user!.id;
+    const otherId = otherCreate.data.user!.id;
+    const clientOptions = {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false,
+      },
+    };
+    const ownerClient = createClient<Database>(preflight.target.url, publishableKey, clientOptions);
+    const otherClient = createClient<Database>(preflight.target.url, publishableKey, clientOptions);
+    const ownerSignIn = await ownerClient.auth.signInWithPassword({
+      email: ownerEmail,
+      password,
+    });
+    const otherSignIn = await otherClient.auth.signInWithPassword({
+      email: otherEmail,
+      password,
+    });
+    assert.equal(ownerSignIn.error, null, "Disposable response owner sign-in must succeed.");
+    assert.equal(otherSignIn.error, null, "Disposable isolation sign-in must succeed.");
+
+    const scenario = scenarios[0]!;
+    const resolved = buildAiGeneratedRunningPlanAuthoringInput(scenario.input);
+    assert.equal(resolved.ok, true, resolved.ok ? "" : resolved.message);
+    if (!resolved.ok) throw new Error(resolved.message);
+    const fixtureFetch = buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
+      authoringInput: resolved.authoringInput,
+      today: scenario.input.startDate ?? resolved.authoringInput.schedule.startDate,
+    });
+    const fixtureResponse = await fixtureFetch("https://api.openai.com/v1/responses", {});
+    const fixtureBody = (await fixtureResponse.json()) as { output_text: string };
+    const validDraft = parseFixtureProviderDraft(fixtureBody.output_text);
+    const invalidCompilerDraft = structuredClone(validDraft);
+    const firstRunningWorkout = invalidCompilerDraft.workouts[0];
+    assert.ok(firstRunningWorkout, "Retention proof requires a running workout.");
+    firstRunningWorkout!.date = "2026-06-10";
+
+    const schemaResponseId = `resp_schema_${crypto.randomUUID()}`;
+    const schemaRejectedJson = ` \n${JSON.stringify({ workouts: [], endpoint: null }, null, 2)}\n `;
+    const schemaRejected = await generateAiFirstPlanDraftPreview({
+      input: resolved.authoringInput,
+      apiKey: "synthetic-retention-schema-proof",
+      model: "gpt-5.2-retention-proof",
+      today: scenario.input.startDate,
+      candidateOwnerUserId: ownerId,
+      generationLedger: { disabled: true },
+      fetchImpl: async () =>
+        jsonResponse({
+          id: schemaResponseId,
+          status: "completed",
+          output_text: schemaRejectedJson,
+        }),
+    });
+    assert.equal(schemaRejected.ok, false, "Schema rejection must remain unavailable.");
+    const schemaRow = await getAiPlanGenerationResponseByProviderIdForUser(
+      ownerId,
+      schemaResponseId,
+    );
+    assert.ok(schemaRow, "Parseable JSON must be retained before schema rejection.");
+    assert.equal(schemaRow!.response_body, schemaRejectedJson);
+    assert.equal(schemaRow!.schema_outcome, "rejected");
+    assert.equal(schemaRow!.compiler_outcome, "not_run");
+    assert.match(schemaRow!.diagnostic_code ?? "", /^[a-z0-9._-]+$/);
+    assert.match(schemaRow!.diagnostic_path ?? "", /^[A-Za-z0-9._[\]-]+$/);
+
+    const compilerResponseId = `resp_compiler_${crypto.randomUUID()}`;
+    const compilerRejectedJson = JSON.stringify(invalidCompilerDraft, null, 2);
+    const compilerRejected = await generateAiFirstPlanDraftPreview({
+      input: resolved.authoringInput,
+      apiKey: "synthetic-retention-compiler-proof",
+      model: "gpt-5.2-retention-proof",
+      today: scenario.input.startDate,
+      candidateOwnerUserId: ownerId,
+      generationLedger: { disabled: true },
+      fetchImpl: async () =>
+        jsonResponse({
+          id: compilerResponseId,
+          status: "completed",
+          output_text: compilerRejectedJson,
+        }),
+    });
+    assert.equal(compilerRejected.ok, false, "Compiler rejection must remain unavailable.");
+    const compilerRow = await getAiPlanGenerationResponseByProviderIdForUser(
+      ownerId,
+      compilerResponseId,
+    );
+    assert.ok(compilerRow, "Parseable JSON must survive compiler rejection.");
+    assert.equal(compilerRow!.response_body, compilerRejectedJson);
+    assert.equal(compilerRow!.schema_outcome, "accepted");
+    assert.equal(compilerRow!.compiler_outcome, "rejected");
+    assert.equal(compilerRow!.diagnostic_code, "ai_authored_plan_first_fixed_rest_day_violation");
+    assert.equal(compilerRow!.diagnostic_path, "days.2026-06-10");
+
+    const acceptedResponseId = `resp_accepted_${crypto.randomUUID()}`;
+    const accepted = await generateAiFirstPlanDraftPreview({
+      input: resolved.authoringInput,
+      apiKey: "synthetic-retention-accepted-proof",
+      model: "gpt-5.2-retention-proof",
+      today: scenario.input.startDate,
+      candidateOwnerUserId: ownerId,
+      generationLedger: { disabled: true },
+      fetchImpl: async () =>
+        jsonResponse({
+          id: acceptedResponseId,
+          status: "completed",
+          output_text: fixtureBody.output_text,
+        }),
+    });
+    assert.equal(accepted.ok, true, accepted.ok ? "" : accepted.message);
+    const acceptedRow = await getAiPlanGenerationResponseByProviderIdForUser(
+      ownerId,
+      acceptedResponseId,
+    );
+    assert.ok(acceptedRow, "Accepted parseable JSON must also be retained.");
+    assert.equal(acceptedRow!.response_body, fixtureBody.output_text);
+    assert.equal(acceptedRow!.schema_outcome, "accepted");
+    assert.equal(acceptedRow!.compiler_outcome, "accepted");
+    assert.equal(acceptedRow!.diagnostic_code, null);
+    assert.equal(acceptedRow!.diagnostic_path, null);
+
+    const canonicalResponseId = `resp_canonical_${crypto.randomUUID()}`;
+    const originalFetch = globalThis.fetch;
+    let canonicalTransportCallCount = 0;
+    let canonicalRequestHasDispatcher = false;
+    globalThis.fetch = (async (url, init) => {
+      if (String(url) === "https://api.openai.com/v1/responses") {
+        canonicalTransportCallCount += 1;
+        canonicalRequestHasDispatcher =
+          Boolean(init) && typeof init === "object" && "dispatcher" in init;
+        return jsonResponse({
+          id: canonicalResponseId,
+          status: "completed",
+          output_text: fixtureBody.output_text,
+        });
+      }
+      return originalFetch(url, init);
+    }) as typeof fetch;
+    try {
+      const canonicalTransport = await generateAiFirstPlanDraftPreview({
+        input: resolved.authoringInput,
+        apiKey: "synthetic-retention-canonical-proof",
+        model: "gpt-5.2-retention-proof",
+        today: scenario.input.startDate,
+        candidateOwnerUserId: ownerId,
+        generationLedger: { disabled: true },
+      });
+      assert.equal(canonicalTransport.ok, true, "Owned canonical transport must remain accepted.");
+      assert.equal(canonicalTransportCallCount, 1);
+      assert.equal(canonicalRequestHasDispatcher, true);
+      assert.ok(
+        await getAiPlanGenerationResponseByProviderIdForUser(ownerId, canonicalResponseId),
+        "Owned canonical transport must retain its completed JSON before returning.",
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    const ownerRead = await ownerClient
+      .from("ai_plan_generation_responses")
+      .select("id, response_body")
+      .eq("id", compilerRow!.id)
+      .maybeSingle();
+    assert.equal(ownerRead.error, null);
+    assert.equal(ownerRead.data?.response_body, compilerRejectedJson);
+    const isolatedRead = await otherClient
+      .from("ai_plan_generation_responses")
+      .select("id")
+      .eq("id", compilerRow!.id)
+      .maybeSingle();
+    assert.equal(isolatedRead.error, null);
+    assert.equal(isolatedRead.data, null, "Another runner must not read retained JSON.");
+    assert.equal(await getAiPlanGenerationResponseForUser(otherId, compilerRow!.id), null);
+
+    const forbiddenOwnerUpdate = await ownerClient
+      .from("ai_plan_generation_responses")
+      .update({ diagnostic_code: "owner_write_must_fail" })
+      .eq("id", compilerRow!.id);
+    assert.ok(forbiddenOwnerUpdate.error, "Authenticated owners must not mutate server truth.");
+    const immutableBodyUpdate = await admin
+      .from("ai_plan_generation_responses")
+      .update({ response_body: "{}" })
+      .eq("id", compilerRow!.id);
+    assert.ok(immutableBodyUpdate.error, "Retained JSON must be immutable after insert.");
+    await assert.rejects(
+      recordAiPlanGenerationResponseOutcomeForUser({
+        userId: ownerId,
+        responseRecordId: compilerRow!.id,
+        schemaOutcome: "accepted",
+        compilerOutcome: "accepted",
+        diagnostic: null,
+      }),
+      /final|retained/i,
+      "Validation outcomes must not be rewritten after finalization.",
+    );
+
+    const idempotent = await retainCompletedAiPlanGenerationResponseForUser({
+      userId: ownerId,
+      generationId: compilerRow!.generation_id,
+      providerResponseId: compilerRow!.provider_response_id,
+      responseBody: compilerRejectedJson,
+    });
+    assert.equal(idempotent.id, compilerRow!.id);
+
+    for (const table of ["planned_workouts", "plan_cycles"] as const) {
+      const rows = await admin
+        .from(table)
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", ownerId);
+      assert.equal(rows.error, null);
+      assert.equal(rows.count, 0, `Raw response retention must create zero ${table} rows.`);
+    }
+
+    const ownerRows = await admin
+      .from("ai_plan_generation_responses")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", ownerId);
+    assert.equal(ownerRows.error, null);
+    assert.equal(ownerRows.count, 4, "The proof must retain every parseable outcome.");
+  } finally {
+    for (const userId of createdUserIds.reverse()) {
+      const deleted = await admin.auth.admin.deleteUser(userId);
+      assert.equal(deleted.error, null, "Disposable retention proof user cleanup must succeed.");
+    }
+    if (createdUserIds.length > 0) {
+      const remaining = await admin
+        .from("ai_plan_generation_responses")
+        .select("id", { count: "exact", head: true })
+        .in("user_id", createdUserIds);
+      assert.equal(remaining.error, null);
+      assert.equal(remaining.count, 0, "Auth cleanup must cascade retained response rows.");
+    }
+  }
+}
 
 function validateDirectLiveCanaryTimeoutPolicy() {
   assert.throws(
@@ -1100,35 +1399,24 @@ async function validateFirstPlanGenerationLifecycle() {
   assert.equal(providerFailureCallCount, 1);
   assert.equal(providerFailure.metadata.debug.abortReason, null);
 
-  const originalFetch = globalThis.fetch;
   let canonicalTransportCallCount = 0;
-  let canonicalRequestHasDispatcher = false;
-  globalThis.fetch = (async (_url, init) => {
-    canonicalTransportCallCount += 1;
-    canonicalRequestHasDispatcher =
-      Boolean(init) && typeof init === "object" && "dispatcher" in init;
-    return jsonResponse(completedBody);
-  }) as typeof fetch;
-  try {
-    const canonicalTransport = await generateAiFirstPlanDraftPreview({
-      input: resolved.authoringInput,
-      apiKey: "canonical-transport-plan-first-proof",
-      model: "canonical-transport-plan-first-proof",
-      generationLedger: { disabled: true },
-    });
-    assert.equal(canonicalTransport.ok, true);
-    if (!canonicalTransport.ok) {
-      throw new Error(canonicalTransport.metadata.unavailableReason);
-    }
-    assert.equal(canonicalTransportCallCount, 1);
-    assert.equal(canonicalRequestHasDispatcher, true);
-    assert.equal(canonicalTransport.metadata.debug.transportMode, "canonical_no_deadline");
-    assert.equal(canonicalTransport.metadata.debug.transportHeadersTimeoutMs, 0);
-    assert.equal(canonicalTransport.metadata.debug.transportBodyTimeoutMs, 0);
-    assert.equal(canonicalTransport.metadata.debug.transportFailureCode, null);
-  } finally {
-    globalThis.fetch = originalFetch;
+  const canonicalTransport = await generateAiFirstPlanDraftPreview({
+    input: resolved.authoringInput,
+    apiKey: "canonical-transport-plan-first-proof",
+    model: "canonical-transport-plan-first-proof",
+    generationLedger: { disabled: true },
+    fetchImpl: globalThis.fetch,
+  });
+  assert.equal(canonicalTransport.ok, false);
+  if (canonicalTransport.ok || canonicalTransport.reason === "structured_input_invalid") {
+    throw new Error("Ownerless canonical transport unexpectedly reached provider work.");
   }
+  assert.equal(
+    canonicalTransport.metadata.unavailableReason,
+    "ai_plan_generation_response_owner_required",
+  );
+  assert.equal(canonicalTransport.metadata.debug.requestPhase, "not_started");
+  assert.equal(canonicalTransportCallCount, 0);
 
   let incompleteCallCount = 0;
   const incomplete = await generateAiFirstPlanDraftPreview({
@@ -1315,6 +1603,15 @@ async function validateTypedPlanFirstFailureOutcomes() {
       if (result.ok) throw new Error(`${scenarioCase.expected} unexpectedly produced a draft.`);
       assert.equal(result.unavailable.previewOutcome, scenarioCase.expected);
       assert.equal(result.unavailable.persisted, false);
+      if (scenarioCase.expected === "compiler_rejection") {
+        assert.equal(
+          result.unavailable.error.compilerDiagnostic?.code,
+          "ai_authored_plan_first_fixed_rest_day_violation",
+        );
+        assert.equal(result.unavailable.error.compilerDiagnostic?.path, "days.2026-06-10");
+      } else {
+        assert.equal(result.unavailable.error.compilerDiagnostic, null);
+      }
       assertProductUnavailableProjection(result);
     }
   } finally {
@@ -1382,12 +1679,45 @@ function assertProductUnavailableProjection(
     { ok: false }
   >,
 ) {
-  const product = projectRunningPlanPreviewResultForProduct(result);
+  const loggedErrors: unknown[][] = [];
+  const originalConsoleError = console.error;
+  console.error = (...args: unknown[]) => loggedErrors.push(args);
+  let product: ReturnType<typeof projectRunningPlanPreviewResultForProduct>;
+  try {
+    product = projectRunningPlanPreviewResultForProduct(result);
+  } finally {
+    console.error = originalConsoleError;
+  }
   assert.deepEqual(Object.keys(product).sort(), ["ok", "unavailable"]);
   assert.equal(product.ok, false);
   if (product.ok) throw new Error("Unavailable Product projection unexpectedly became ready.");
   assert.deepEqual(Object.keys(product.unavailable).sort(), ["error", "previewOutcome"]);
-  assert.deepEqual(Object.keys(product.unavailable.error).sort(), ["code", "message"]);
+  assert.deepEqual(Object.keys(product.unavailable.error).sort(), [
+    "code",
+    "compilerDiagnostic",
+    "message",
+  ]);
+  assert.deepEqual(
+    product.unavailable.error.compilerDiagnostic,
+    result.unavailable.error.compilerDiagnostic,
+  );
+  if (result.unavailable.previewOutcome === "compiler_rejection") {
+    assert.deepEqual(loggedErrors, [
+      [
+        "[generated-plan/preview] compiler_rejection",
+        JSON.stringify({
+          code: "ai_generated_plan_unavailable",
+          compilerDiagnostic: result.unavailable.error.compilerDiagnostic,
+        }),
+      ],
+    ]);
+    assert.deepEqual(Object.keys(JSON.parse(String(loggedErrors[0]?.[1]))).sort(), [
+      "code",
+      "compilerDiagnostic",
+    ]);
+  } else {
+    assert.deepEqual(loggedErrors, []);
+  }
 }
 
 function assertUnavailableLifecycleResult(

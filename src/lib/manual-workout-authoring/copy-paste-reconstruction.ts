@@ -2,7 +2,7 @@ import {
   getCalendarWorkoutMutationContext,
   type CalendarWorkoutContext,
   type PersistedPlannedWorkoutRow,
-} from "@/lib/active-plan-persistence";
+} from "@/lib/runner-calendar-persistence";
 import {
   fetchManualWorkoutEvidenceWorkoutIds,
   isProtectedManualWorkoutCopySource,

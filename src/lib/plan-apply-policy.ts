@@ -8,9 +8,13 @@ import {
   buildImportedLogCarryForwardPlan,
   persistedWorkoutRowToImportedSeed as persistedWorkoutRowToImportedSeedBase,
 } from "@/lib/persisted-plan-replacement";
+import type {
+  PersistedPlannedWorkoutRow,
+  PersistedWorkoutLogRow,
+} from "@/lib/runner-calendar-persistence";
 import { isRealIsoDate } from "@/lib/first-plan-authoring-utils";
 import { addDaysIso, diffDaysIso, startOfWeekIso, todayIso, weekdayLong } from "@/lib/training";
-import type { Database, Json } from "@/lib/supabase/database";
+import type { Json } from "@/lib/supabase/database";
 import {
   assertStartDateAllowedByWeekdayRestInvariant,
   mapImportedSeedAcrossAllowedWeekdays,
@@ -25,8 +29,6 @@ import {
   type RunnerTrainingPreferencesStorage,
 } from "@/lib/runner-training-preferences";
 
-type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
-type PersistedWorkoutLogRow = Database["public"]["Tables"]["workout_logs"]["Row"];
 type ImportedPlanInput = z.infer<typeof importedPlanSchema>;
 
 export type FirstDayResolution = "replace_first_day" | "ignore_first_day";

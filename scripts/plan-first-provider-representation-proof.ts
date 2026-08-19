@@ -28,6 +28,7 @@ import {
   buildActivePlanExportPayload,
 } from "../src/lib/plan-export";
 import { buildPersistedWorkoutInsertRows } from "../src/lib/persisted-plan-replacement";
+import type { PersistedPlannedWorkoutRow } from "../src/lib/runner-calendar-persistence";
 import {
   buildReviewedAiGeneratedRunningPlanPreview as buildReviewedAiGeneratedRunningPlanPreviewRuntime,
   type RunningPlanPreviewActionInput,
@@ -50,7 +51,6 @@ import {
 } from "./long-run-execution-policy-proof";
 
 type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
-type PersistedPlannedWorkoutRow = Database["public"]["Tables"]["planned_workouts"]["Row"];
 
 type Scenario = {
   name: string;

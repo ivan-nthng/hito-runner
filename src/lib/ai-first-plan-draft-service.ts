@@ -17,6 +17,12 @@ import {
   type AiPlanGenerationLedgerOptions,
   type AiPlanGenerationLedgerTrace,
 } from "@/lib/ai-plan-generation-ledger";
+import {
+  recordAiPlanGenerationResponseOutcomeForUser,
+  retainCompletedAiPlanGenerationResponseForUser,
+  type AiPlanGenerationResponseRow,
+  type AiPlanGenerationValidationOutcome,
+} from "@/lib/ai-plan-generation-response-persistence";
 import { type TrainingPlanV2 } from "@/lib/imported-plan";
 import {
   recordLocalProviderTranscript,
@@ -70,6 +76,7 @@ export interface GenerateAiFirstPlanDraftPreviewOptions {
   fetchImpl?: typeof fetch;
   signal?: AbortSignal;
   generationLedger?: AiPlanGenerationLedgerOptions;
+  candidateOwnerUserId?: string | null;
 }
 
 export interface AiFirstPlanDraftPreviewMetadata extends AiFirstPlanDraftMetadata {
@@ -134,6 +141,10 @@ interface AiFirstPlanDraftUnavailableMetadata {
   elapsedMs: number;
   validationIssues: string[];
   validationIssueCount: number;
+  compilerDiagnostic: {
+    code: string;
+    path: string;
+  } | null;
   generationTrace: AiPlanGenerationLedgerTrace | null;
   debug: AiFirstPlanDraftDebugMetadata;
 }
@@ -178,6 +189,7 @@ export async function generateAiFirstPlanDraftPreview({
   fetchImpl = globalThis.fetch,
   signal,
   generationLedger,
+  candidateOwnerUserId = null,
 }: GenerateAiFirstPlanDraftPreviewOptions): Promise<AiFirstPlanDraftPreviewResult> {
   const authoringInputResult = resolveStructuredAuthoringInput(input);
 
@@ -188,13 +200,17 @@ export async function generateAiFirstPlanDraftPreview({
   const authoringInput = authoringInputResult.authoringInput;
   const startedAt = Date.now();
   const resolvedModel = model ?? DEFAULT_OPENAI_PLAN_MODEL;
+  const providerKind = resolveAiPlanGenerationProviderKind({
+    apiKey,
+    model: resolvedModel,
+  });
   const prompt = buildAiAuthoredPlanFirstPrompt({
     authoringInput,
     today,
   });
   let latestGenerationTrace: AiPlanGenerationLedgerTrace | null =
     await createAiPlanGenerationLedgerTrace({
-      providerKind: resolveAiPlanGenerationProviderKind({ apiKey, model: resolvedModel }),
+      providerKind,
       model: resolvedModel,
       contractMode: AI_FIRST_PLAN_CONTRACT_MODE,
       responseSchemaMode: AI_FIRST_PLAN_RESPONSE_SCHEMA_MODE,
@@ -209,6 +225,31 @@ export async function generateAiFirstPlanDraftPreview({
     {},
     generationLedger,
   );
+
+  if (
+    providerKind === "openai_responses_api" &&
+    fetchImpl === globalThis.fetch &&
+    !candidateOwnerUserId
+  ) {
+    const reason = "ai_plan_generation_response_owner_required";
+    latestGenerationTrace = await recordAiPlanGenerationUnavailable({
+      trace: latestGenerationTrace,
+      reason,
+      issues: [reason],
+      parseStatus: "not_started",
+      normalizationStatus: "not_started",
+      options: generationLedger,
+    });
+    return unavailableAiFirstPlanDraft({
+      reason,
+      issues: ["AI plan generation requires private response-retention ownership."],
+      model: resolvedModel,
+      responseId: null,
+      startedAt,
+      debug: buildNotStartedDebug({ timeoutMs, maxOutputTokens, model: resolvedModel }),
+      generationTrace: latestGenerationTrace,
+    });
+  }
 
   if (!apiKey) {
     latestGenerationTrace = await recordAiPlanGenerationUnavailable({
@@ -284,9 +325,47 @@ export async function generateAiFirstPlanDraftPreview({
       });
     }
 
+    let retainedResponse: AiPlanGenerationResponseRow | null = null;
+    if (providerKind === "openai_responses_api" && candidateOwnerUserId) {
+      const generationId = latestGenerationTrace?.generationId;
+      if (!generationId) {
+        throw new AiFirstPlanDraftServiceError(
+          "ai_plan_generation_response_retention_failed",
+          ["The completed AI plan response has no retention identity."],
+          { ...responseDebug, requestPhase: "request_failed" },
+          latestGenerationTrace,
+        );
+      }
+      try {
+        retainedResponse = await retainCompletedAiPlanGenerationResponseForUser({
+          userId: candidateOwnerUserId,
+          generationId,
+          providerResponseId:
+            latestGenerationTrace?.provider.responseId ?? response.body.id ?? null,
+          responseBody: rawOutput,
+        });
+      } catch {
+        throw new AiFirstPlanDraftServiceError(
+          "ai_plan_generation_response_retention_failed",
+          ["The completed AI plan response could not be retained privately."],
+          { ...responseDebug, requestPhase: "request_failed" },
+          latestGenerationTrace,
+        );
+      }
+    }
+
     const runnerComment = authoringInput.requestContext?.runnerComment;
     if (runnerComment && containsExactRunnerContext(parsedOutput, runnerComment)) {
       const reason = "ai_authored_plan_first_runner_context_echoed";
+      await recordRetainedResponseOutcome({
+        retainedResponse,
+        userId: candidateOwnerUserId,
+        schemaOutcome: "not_run",
+        compilerOutcome: "rejected",
+        diagnostic: { code: reason, path: "response" },
+        debug: responseDebug,
+        generationTrace: latestGenerationTrace,
+      });
       latestGenerationTrace = await recordAiPlanGenerationUnavailable({
         trace: latestGenerationTrace,
         reason,
@@ -314,6 +393,21 @@ export async function generateAiFirstPlanDraftPreview({
     });
 
     if (!normalized.ok) {
+      const schemaRejected = normalized.reason === "ai_authored_plan_first_provider_schema_invalid";
+      await recordRetainedResponseOutcome({
+        retainedResponse,
+        userId: candidateOwnerUserId,
+        schemaOutcome: schemaRejected ? "rejected" : "accepted",
+        compilerOutcome: schemaRejected ? "not_run" : "rejected",
+        diagnostic: normalized.issues[0]
+          ? {
+              code: normalized.issues[0].code,
+              path: normalized.issues[0].path ?? "root",
+            }
+          : { code: normalized.reason, path: "root" },
+        debug: responseDebug,
+        generationTrace: latestGenerationTrace,
+      });
       latestGenerationTrace = await recordAiPlanGenerationUnavailable({
         trace: latestGenerationTrace,
         reason: normalized.reason,
@@ -326,6 +420,9 @@ export async function generateAiFirstPlanDraftPreview({
       return unavailableAiFirstPlanDraft({
         reason: normalized.reason,
         issues: normalized.issues.map((issue) => `${issue.code}: ${issue.message}`).slice(0, 12),
+        compilerDiagnostic: normalized.issues[0]
+          ? { code: normalized.issues[0].code, path: normalized.issues[0].path ?? "root" }
+          : null,
         model: resolvedModel,
         responseId: latestGenerationTrace?.provider.responseId ?? response.body.id ?? null,
         startedAt,
@@ -335,6 +432,16 @@ export async function generateAiFirstPlanDraftPreview({
     }
 
     const finalized = normalized;
+
+    await recordRetainedResponseOutcome({
+      retainedResponse,
+      userId: candidateOwnerUserId,
+      schemaOutcome: "accepted",
+      compilerOutcome: "accepted",
+      diagnostic: null,
+      debug: responseDebug,
+      generationTrace: latestGenerationTrace,
+    });
 
     latestGenerationTrace = await updateAiPlanGenerationLedgerTrace(
       latestGenerationTrace,
@@ -983,6 +1090,53 @@ function resolveAiPlanGenerationProviderKind({
     : "openai_responses_api";
 }
 
+async function recordRetainedResponseOutcome({
+  retainedResponse,
+  userId,
+  schemaOutcome,
+  compilerOutcome,
+  diagnostic,
+  debug,
+  generationTrace,
+}: {
+  retainedResponse: AiPlanGenerationResponseRow | null;
+  userId: string | null;
+  schemaOutcome: AiPlanGenerationValidationOutcome;
+  compilerOutcome: AiPlanGenerationValidationOutcome;
+  diagnostic: { code: string; path: string } | null;
+  debug: AiFirstPlanDraftDebugMetadata;
+  generationTrace: AiPlanGenerationLedgerTrace | null;
+}) {
+  if (!retainedResponse) {
+    return null;
+  }
+  if (!userId) {
+    throw new AiFirstPlanDraftServiceError(
+      "ai_plan_generation_response_outcome_persistence_failed",
+      ["The retained AI plan response has no owner context."],
+      { ...debug, requestPhase: "request_failed" },
+      generationTrace,
+    );
+  }
+
+  try {
+    return await recordAiPlanGenerationResponseOutcomeForUser({
+      userId,
+      responseRecordId: retainedResponse.id,
+      schemaOutcome,
+      compilerOutcome,
+      diagnostic,
+    });
+  } catch {
+    throw new AiFirstPlanDraftServiceError(
+      "ai_plan_generation_response_outcome_persistence_failed",
+      ["The AI plan response validation outcome could not be retained privately."],
+      { ...debug, requestPhase: "request_failed" },
+      generationTrace,
+    );
+  }
+}
+
 async function recordAiPlanGenerationUnavailable({
   trace,
   reason,
@@ -1054,6 +1208,7 @@ function unavailableAiFirstPlanDraft({
   startedAt,
   debug,
   generationTrace,
+  compilerDiagnostic = null,
 }: {
   reason: string;
   issues: string[];
@@ -1062,6 +1217,7 @@ function unavailableAiFirstPlanDraft({
   startedAt: number;
   debug: AiFirstPlanDraftDebugMetadata;
   generationTrace?: AiPlanGenerationLedgerTrace | null;
+  compilerDiagnostic?: AiFirstPlanDraftUnavailableMetadata["compilerDiagnostic"];
 }): Extract<
   AiFirstPlanDraftPreviewResult,
   {
@@ -1089,6 +1245,7 @@ function unavailableAiFirstPlanDraft({
       elapsedMs,
       validationIssues,
       validationIssueCount: validationIssues.length,
+      compilerDiagnostic,
       generationTrace: generationTrace ?? null,
       debug,
     },
@@ -1141,13 +1298,13 @@ function extractStructuredOutputText(
   debug: AiFirstPlanDraftDebugMetadata,
 ) {
   if (typeof response.output_text === "string" && response.output_text.trim()) {
-    return response.output_text.trim();
+    return response.output_text;
   }
 
   for (const outputItem of response.output ?? []) {
     for (const part of outputItem.content ?? []) {
       if (typeof part.text === "string" && part.text.trim()) {
-        return part.text.trim();
+        return part.text;
       }
     }
   }

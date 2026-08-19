@@ -5,7 +5,7 @@ import {
   CalendarPersistenceRejection,
   applyAtomicCalendarWorkoutMutation,
 } from "../../src/lib/active-plan-lifecycle-persistence";
-import type { PersistedPlannedWorkoutRow } from "../../src/lib/active-plan-persistence";
+import type { PersistedPlannedWorkoutRow } from "../../src/lib/runner-calendar-persistence";
 import {
   addManualWorkoutToActivePlanForUser,
   confirmManualWorkoutDeleteClearForUser,

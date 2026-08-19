@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   getCalendarWorkoutMutationContext,
   type PersistedPlannedWorkoutRow,
-} from "@/lib/active-plan-persistence";
+} from "@/lib/runner-calendar-persistence";
 import {
   CalendarPersistenceRejection,
   applyAtomicCalendarWorkoutMutation,

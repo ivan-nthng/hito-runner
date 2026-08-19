@@ -1,10 +1,10 @@
 import type {
-  PersistedPlanCycleRow,
   PersistedPlannedWorkoutRow,
   PersistedWorkoutLogRow,
-} from "@/lib/active-plan-persistence";
+} from "@/lib/runner-calendar-persistence";
 import { resolveCalendarWorkoutEditability } from "@/lib/active-plan-workout-editing/policy";
 import { workoutDocumentHasUnsafeMetricTruth } from "@/lib/manual-workout-authoring/persisted-workout-safety";
+import type { SourcePlanProvenanceRow } from "@/lib/source-plan-provenance-persistence";
 import { normalizePersistedWorkoutDocument } from "@/lib/workout-document";
 
 export type CalendarWorkoutSourceEditingEligibility =
@@ -46,7 +46,7 @@ export function resolveCalendarWorkoutSourceEditingCapabilities({
   log,
   workout,
 }: {
-  provenancePlan: PersistedPlanCycleRow | null;
+  provenancePlan: SourcePlanProvenanceRow | null;
   workout: PersistedPlannedWorkoutRow;
   log: PersistedWorkoutLogRow | null;
   evidenceWorkoutIds: ReadonlySet<string>;

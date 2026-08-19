@@ -29,7 +29,6 @@ import {
   formatDistanceKm,
   formatDate,
   formatDurationMin,
-  WEEK_STATUS_META,
   type TrainingSnapshot,
   type Workout,
   workoutTypeMeta,
@@ -143,9 +142,7 @@ function WorkoutPage() {
   const status = workout.status;
   const isRestDay = workout.type === "rest";
   const restAssignment = restAssignmentFor(workout);
-  const weekStatus = WEEK_STATUS_META[snapshot.weekStatus];
   const resultMeta = resultMetaForStatus(status);
-  const skippedCopy = skippedExplanationFor(workout, snapshot.source);
   const phaseLabel = humanizeSnakeCase(workout.phase);
   const weekLabel = `Week ${workout.week}`;
   const heroMetrics = isRestDay
@@ -318,193 +315,19 @@ function WorkoutPage() {
 
           <aside>
             <SidebarPanel>
-              {resultMeta && (
-                <SidebarSection
-                  title={hasReviewFeedback || hasFitCompletion ? "Result" : "Saved result"}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <ResultBadge meta={resultMeta} mode="sidebar" />
-                    <span className="text-xs text-muted-foreground">
-                      {hasFitCompletion
-                        ? "Activity file"
-                        : snapshot.source === "persisted"
-                          ? "Saved"
-                          : "Preview"}
-                    </span>
-                  </div>
-                </SidebarSection>
-              )}
-
-              {status === "skipped" && (
-                <SidebarSection title="Skipped">
-                  <div className="flex items-start gap-2">
-                    <Icon name="shield-alert" size="xs" className="mt-0.5 text-destructive" />
-                    <p className="hito-body-sm text-secondary">
-                      {snapshot.source === "persisted"
-                        ? skippedCopy
-                        : "This sample status comes from preview logic only."}
-                    </p>
-                  </div>
-                </SidebarSection>
-              )}
-
-              {isRestDay && restAssignment && (
-                <SidebarSection title="Assignment" muted>
-                  <p className="text-xs leading-relaxed text-text-secondary">{restAssignment}</p>
-                </SidebarSection>
-              )}
-
+              <SidebarSection title="Future insights">
+                <p className="hito-body-sm text-secondary">
+                  There isn&apos;t enough data yet to provide these inputs and insights. This is a
+                  future feature.
+                </p>
+              </SidebarSection>
               {sidebarReadModel ? (
-                <>
-                  <SidebarSection title="This week">
-                    <dl className="space-y-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <dt className="hito-body-xs text-tertiary">Completed</dt>
-                        <dd className="hito-readback-value hito-readback-value-compact text-right">
-                          {sidebarReadModel.week.completedWorkoutCount} of{" "}
-                          {sidebarReadModel.week.scheduledWorkoutCount}
-                        </dd>
-                      </div>
-                      <div className="flex items-start justify-between gap-3">
-                        <dt className="hito-body-xs text-tertiary">Scheduled</dt>
-                        <dd className="hito-readback-value hito-readback-value-compact text-right">
-                          {sidebarReadModel.week.scheduledDistance.state === "available"
-                            ? `${
-                                sidebarReadModel.week.scheduledDistance.basis ===
-                                "includes_duration_estimates"
-                                  ? "About "
-                                  : ""
-                              }${formatDistanceKm(
-                                sidebarReadModel.week.scheduledDistance.kilometres,
-                              )} km`
-                            : sidebarReadModel.week.scheduledDistance.state === "unavailable"
-                              ? "Unavailable"
-                              : "Not applicable"}
-                        </dd>
-                      </div>
-                      <div className="flex items-start justify-between gap-3">
-                        <dt className="hito-body-xs text-tertiary">Recorded</dt>
-                        <dd className="hito-readback-value hito-readback-value-compact text-right">
-                          {sidebarReadModel.week.recordedDistance.state === "available"
-                            ? `${formatDistanceKm(
-                                sidebarReadModel.week.recordedDistance.kilometres,
-                              )} km`
-                            : sidebarReadModel.week.recordedDistance.state === "unavailable"
-                              ? "Unavailable"
-                              : "Not applicable"}
-                        </dd>
-                      </div>
-                    </dl>
-
-                    <div className="hito-body-xs mt-3 space-y-1 text-tertiary">
-                      {sidebarReadModel.week.scheduledDistance.state === "available" &&
-                      sidebarReadModel.week.scheduledDistance.basis ===
-                        "includes_duration_estimates" ? (
-                        <p>
-                          Includes {sidebarReadModel.week.scheduledDistance.estimatedWorkoutCount}{" "}
-                          duration-based distance{" "}
-                          {sidebarReadModel.week.scheduledDistance.estimatedWorkoutCount === 1
-                            ? "estimate"
-                            : "estimates"}
-                          .
-                        </p>
-                      ) : null}
-                      {sidebarReadModel.week.scheduledDistance.state === "unavailable" ? (
-                        <p>
-                          Scheduled distance is missing for{" "}
-                          {sidebarReadModel.week.scheduledDistance.missingWorkoutCount}{" "}
-                          {sidebarReadModel.week.scheduledDistance.missingWorkoutCount === 1
-                            ? "workout"
-                            : "workouts"}
-                          .
-                        </p>
-                      ) : null}
-                      {sidebarReadModel.week.scheduledDistance.state === "not_applicable" ? (
-                        <p>No scheduled non-Rest workouts this week.</p>
-                      ) : null}
-                      {sidebarReadModel.week.recordedDistance.state === "available" ? (
-                        <p>
-                          {sidebarReadModel.week.recordedDistance.basis ===
-                          "no_recorded_distance_yet"
-                            ? "No distance has been recorded yet."
-                            : sidebarReadModel.week.recordedDistance.basis === "manual_logs"
-                              ? "Recorded from saved manual results."
-                              : sidebarReadModel.week.recordedDistance.basis ===
-                                  "fit_actual_metrics"
-                                ? "Recorded from uploaded activity files."
-                                : "Recorded from manual results and uploaded activity files."}
-                        </p>
-                      ) : null}
-                      {sidebarReadModel.week.recordedDistance.state === "unavailable" ? (
-                        <p>
-                          Recorded distance is missing for{" "}
-                          {sidebarReadModel.week.recordedDistance.missingWorkoutCount}{" "}
-                          {sidebarReadModel.week.recordedDistance.missingWorkoutCount === 1
-                            ? "result"
-                            : "results"}
-                          .
-                        </p>
-                      ) : null}
-                    </div>
-
-                    <div className="hito-body-xs mt-3 flex items-center justify-between gap-3 text-tertiary">
-                      <span>{weekStatus.label}</span>
-                      <span>
-                        {formatDate(sidebarReadModel.week.weekStartDate, {
-                          month: "short",
-                          day: "numeric",
-                        })}
-                        {" – "}
-                        {formatDate(sidebarReadModel.week.weekEndDate, {
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </span>
-                    </div>
-                  </SidebarSection>
-
-                  <SidebarSection title="Latest workout insight">
-                    {sidebarReadModel.latestInsight.state === "available" ? (
-                      <div className="space-y-4">
-                        <div>
-                          <p className="hito-body-sm text-foreground">
-                            {sidebarReadModel.latestInsight.workout.title}
-                          </p>
-                          <p className="hito-body-xs mt-1 text-tertiary">
-                            Uploaded workout ·{" "}
-                            {formatDate(sidebarReadModel.latestInsight.workout.date, {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="hito-label-sm text-foreground">Summary</p>
-                          <p className="hito-body-sm mt-1 text-secondary">
-                            {sidebarReadModel.latestInsight.insight.analysisSummary}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="hito-label-sm text-foreground">Difference</p>
-                          <p className="hito-body-sm mt-1 text-secondary">
-                            {sidebarReadModel.latestInsight.insight.differenceExplanation}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="hito-label-sm text-foreground">Next workout</p>
-                          <p className="hito-body-sm mt-1 text-secondary">
-                            {sidebarReadModel.latestInsight.insight.nextWorkoutRecommendation}
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="hito-body-sm text-secondary">
-                        No uploaded-workout insight is available yet.
-                      </p>
-                    )}
-                  </SidebarSection>
-                </>
+                <SidebarSection title="This week">
+                  <p className="hito-body-sm text-secondary">
+                    {sidebarReadModel.week.completedWorkoutCount} of{" "}
+                    {sidebarReadModel.week.scheduledWorkoutCount} workouts completed
+                  </p>
+                </SidebarSection>
               ) : null}
             </SidebarPanel>
           </aside>
@@ -945,17 +768,9 @@ function SidebarPanel({ children }: { children: React.ReactNode }) {
   return <div className="hito-row-group bg-background">{children}</div>;
 }
 
-function SidebarSection({
-  title,
-  children,
-  muted,
-}: {
-  title: string;
-  children: React.ReactNode;
-  muted?: boolean;
-}) {
+function SidebarSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className={cn("hito-list-row items-start", muted && "hito-list-row-muted")}>
+    <section className="hito-list-row items-start">
       <div className="w-full min-w-0">
         <div className="hito-label-md mb-3 text-foreground">{title}</div>
         {children}
@@ -1054,18 +869,6 @@ function resultMetaForStatus(status: Workout["status"]) {
   }
 
   return null;
-}
-
-function skippedExplanationFor(workout: Workout, source: TrainingSnapshot["source"]) {
-  if (source !== "persisted") {
-    return "This sample status comes from preview logic only.";
-  }
-
-  if (workout.log?.outcome === "skipped") {
-    return "This skipped result was saved manually and is reflected in the current workout log.";
-  }
-
-  return "Past-due workouts without a saved log are treated as skipped until you overwrite them with a real result.";
 }
 
 function ResultBadge({

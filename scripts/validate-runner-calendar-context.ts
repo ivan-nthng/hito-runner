@@ -44,6 +44,7 @@ function proveAuthenticatedSourceWiring() {
   const noHostClockOwners = [
     "src/lib/training-api.ts",
     "src/lib/active-plan-persistence.ts",
+    "src/lib/runner-calendar-persistence.ts",
     "src/lib/running-plan-engine-actions.ts",
     "src/lib/runner-activity/read-model.ts",
     "src/lib/runner-activity/fact-snapshots.ts",

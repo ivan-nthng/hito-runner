@@ -1,10 +1,10 @@
-import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
 import {
   CALENDAR_WORKOUT_MUTATION_KIND,
   CALENDAR_WORKOUT_MUTATION_SOURCE_KIND,
+  CalendarPersistenceRejection,
+  applyAtomicCalendarWorkoutMutation,
   buildCalendarWorkoutMutationEvent,
-} from "@/lib/active-plan-workout-editing/policy";
+} from "@/lib/runner-calendar-mutations";
 import {
   getCalendarWorkoutMutationContext,
   type CalendarWorkoutContext,
@@ -12,80 +12,28 @@ import {
   type PersistedWorkoutLogRow,
 } from "@/lib/runner-calendar-persistence";
 import {
-  CalendarPersistenceRejection,
-  applyAtomicCalendarWorkoutMutation,
-} from "@/lib/active-plan-lifecycle-persistence";
-import {
   fetchManualWorkoutEvidenceWorkoutIds,
   type ManualWorkoutActivePlanAddDependencies,
   type ManualWorkoutEvidenceFetcher,
 } from "@/lib/manual-workout-authoring/active-plan-add";
-import { buildManualWorkoutDraftInputFromPersistedWorkout } from "@/lib/manual-workout-authoring/copy-paste-reconstruction";
-import { reviewManualWorkoutDraft } from "@/lib/manual-workout-authoring/actions";
+import { MANUAL_WORKOUT_AUTHORING_SOURCE_KIND } from "@/lib/manual-workout-authoring/schema";
+import { workoutDocumentHasUnsafeMetricTruth } from "@/lib/manual-workout-authoring/persisted-workout-safety";
+import { stableJsonEqual } from "@/lib/review-token-signing";
 import {
-  MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
-  type ManualWorkoutDraftInput,
-  type ManualWorkoutDraftReviewResult,
-} from "@/lib/manual-workout-authoring/schema";
-import { persistedManualWorkoutHasUnsafeMetricTruth } from "@/lib/manual-workout-authoring/persisted-workout-safety";
-import { buildFullSourceWorkoutFingerprint } from "@/lib/manual-workout-authoring/edit-workout-review-token";
-import {
-  buildManualWorkoutReviewToken,
-  stableManualWorkoutChecksum64Hex,
-  validateManualWorkoutReviewProof,
-} from "@/lib/manual-workout-authoring/review-exactness";
-import { getCurrentManualWorkoutAuthoringUserId } from "@/lib/manual-workout-authoring/request-auth";
+  buildFullCalendarWorkoutFingerprint,
+  rejectWorkoutCommandReview,
+  reviewWorkoutCommand,
+  type ReviewedWorkoutCommandCandidate,
+  type WorkoutCommandInput,
+  type WorkoutCommandReviewResult,
+  WORKOUT_COMMAND_REVIEW_PAYLOAD_VERSION,
+} from "@/lib/workout-authoring-review";
+import { stableManualWorkoutChecksum64Hex } from "@/lib/manual-workout-authoring/review-exactness";
 import type { Json } from "@/lib/supabase/database";
 import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
+import { normalizePersistedWorkoutDocument, type WorkoutDocument } from "@/lib/workout-document";
 
-const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-const MANUAL_WORKOUT_DELETE_REVIEW_PAYLOAD_VERSION =
-  "manual_workout_delete_review_payload_v1" as const;
-const MANUAL_WORKOUT_DELETE_REVIEW_TOKEN_PREFIX = "manual-workout-delete-review-v1.";
-
-const manualWorkoutDeleteClearBaseInputSchema = z
-  .object({
-    activePlanId: z.string().uuid().optional(),
-    plannedWorkoutId: z.string().uuid().optional(),
-    workoutDate: isoDateSchema.optional(),
-  })
-  .strict()
-  .superRefine((value, context) => {
-    const targetReferences = [value.plannedWorkoutId, value.workoutDate].filter(Boolean);
-
-    if (targetReferences.length !== 1) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Provide exactly one planned workout id or workout date.",
-        path: ["plannedWorkoutId"],
-      });
-    }
-  });
-
-export const manualWorkoutDeleteClearReviewInputSchema = manualWorkoutDeleteClearBaseInputSchema;
-
-export const manualWorkoutDeleteClearConfirmInputSchema = z
-  .object({
-    activePlanId: z.string().uuid().optional(),
-    plannedWorkoutId: z.string().uuid().optional(),
-    workoutDate: isoDateSchema.optional(),
-    reviewToken: z.string().trim().min(16),
-    reviewChecksum: z.string().trim().length(64),
-  })
-  .strict()
-  .superRefine((value, context) => {
-    const targetReferences = [value.plannedWorkoutId, value.workoutDate].filter(Boolean);
-
-    if (targetReferences.length !== 1) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Provide exactly one planned workout id or workout date.",
-        path: ["plannedWorkoutId"],
-      });
-    }
-  });
-
-export type ManualWorkoutDeleteClearFailureReason =
+type ManualWorkoutDeleteClearFailureReason =
   | "unauthenticated"
   | "invalid_review"
   | "stale_review"
@@ -98,7 +46,7 @@ export type ManualWorkoutDeleteClearFailureReason =
   | "last_workout_not_deletable"
   | "persistence_failed";
 
-export type ManualWorkoutDeleteClearDependencies = Pick<
+export type ManualWorkoutDeleteClearCommandDependencies = Pick<
   ManualWorkoutActivePlanAddDependencies,
   "getCalendarWorkoutContextForUser" | "currentDate"
 > & {
@@ -106,123 +54,25 @@ export type ManualWorkoutDeleteClearDependencies = Pick<
   persistWorkoutDelete?: typeof persistManualWorkoutDeleteClear;
 };
 
-type ManualWorkoutDeleteClearBlockedResult = {
-  ok: false;
-  status: "blocked";
-  persisted: false;
-  reason: ManualWorkoutDeleteClearFailureReason;
-  message: string;
-  sourceKind: string | null;
-  workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
-};
-
-type ManualWorkoutDeleteRestoreAffordance = {
-  label: "Restore";
-  alternateLabels: ["Put back", "Redo"];
-} & (
-  | {
-      available: true;
-      draftInput: ManualWorkoutDraftInput;
-      review: Extract<ManualWorkoutDraftReviewResult, { ok: true }>;
-      safety: {
-        reviewedThroughManualAuthoring: true;
-        trustedClientRows: false;
-        targetDateDerivedServerSide: true;
-      };
-    }
-  | {
-      available: false;
-      reason: "restore_requires_editor_support";
-      message: string;
-      safety: {
-        reviewedThroughManualAuthoring: false;
-        trustedClientRows: false;
-        targetDateDerivedServerSide: true;
-      };
-    }
-);
-
 type ManualWorkoutDeleteClearReview = {
   plannedWorkoutId: string;
   workoutDate: string;
   title: string;
   templateKey: string;
-  reviewToken: string;
   reviewChecksum: string;
-  exactnessPayloadVersion: typeof MANUAL_WORKOUT_DELETE_REVIEW_PAYLOAD_VERSION;
 };
 
-export type ManualWorkoutDeleteClearReviewResult =
-  | {
-      ok: true;
-      status: "review_ready";
-      persisted: false;
-      sourceKind: string;
-      workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
-      activePlanId: string | null;
-      plannedWorkoutId: string;
-      workoutDate: string;
-      title: string;
-      templateKey: string;
-      review: ManualWorkoutDeleteClearReview;
-      restore: ManualWorkoutDeleteRestoreAffordance;
-      safety: {
-        requiresExplicitConfirm: true;
-        targetWorkoutVerified: true;
-        runnerOwnershipVerified: true;
-        protectedHistoryChecked: true;
-        lastWorkoutDeleteAllowed: true;
-        trustedClientRows: false;
-        callsOpenAi: false;
-      };
-    }
-  | ManualWorkoutDeleteClearBlockedResult;
-
-export type ManualWorkoutDeleteClearConfirmResult =
-  | {
-      ok: true;
-      status: "deleted";
-      persisted: true;
-      sourceKind: string;
-      sourceStatus: string | null;
-      workoutSourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
-      activePlanId: string | null;
-      plannedWorkoutId: string;
-      workoutDate: string;
-      title: string;
-      templateKey: string;
-      reviewChecksum: string;
-      exactnessPayloadVersion: typeof MANUAL_WORKOUT_DELETE_REVIEW_PAYLOAD_VERSION;
-      calendarRowCount: number;
-      nonRestWorkoutCount: number;
-      restore: ManualWorkoutDeleteRestoreAffordance;
-      safety: {
-        requiresExplicitConfirm: true;
-        targetWorkoutVerified: true;
-        runnerOwnershipVerified: true;
-        protectedHistoryChecked: true;
-        deletedExactlyOneRow: true;
-        sourceProvenanceUnchanged: true;
-        trustedClientRows: false;
-        serverRebuiltReview: true;
-        callsOpenAi: false;
-      };
-    }
-  | ManualWorkoutDeleteClearBlockedResult;
-
-type ManualWorkoutDeleteClearReviewInput = z.output<
-  typeof manualWorkoutDeleteClearReviewInputSchema
->;
-type ManualWorkoutDeleteClearConfirmInput = z.output<
-  typeof manualWorkoutDeleteClearConfirmInputSchema
->;
+type ManualWorkoutDeleteClearInput = {
+  plannedWorkoutId?: string;
+  workoutDate?: string;
+};
 
 type ManualWorkoutDeleteClearTarget =
   | {
       ok: true;
       targetWorkout: PersistedPlannedWorkoutRow;
+      sourceDocument: WorkoutDocument;
       remainingWorkouts: PersistedPlannedWorkoutRow[];
-      restore: ManualWorkoutDeleteRestoreAffordance;
       review: ManualWorkoutDeleteClearReview;
       currentDate: string;
     }
@@ -240,180 +90,132 @@ type PersistManualWorkoutDeleteClearInput = {
   review: ManualWorkoutDeleteClearReview;
 };
 
-export const reviewManualWorkoutDeleteClear = createServerFn({ method: "POST" })
-  .validator((value: unknown) => value)
-  .handler(async ({ data }): Promise<ManualWorkoutDeleteClearReviewResult> => {
-    const userId = await getCurrentManualWorkoutAuthoringUserId();
+type CalendarWorkoutDeleteClearCommandInput = Extract<
+  WorkoutCommandInput,
+  { operation: "delete" | "clear" }
+>;
 
-    if (!userId) {
-      return buildDeleteClearBlocked({
-        reason: "unauthenticated",
-        message: "Sign in before deleting manual workouts.",
-      });
-    }
-
-    return reviewManualWorkoutDeleteClearForUser(userId, data);
-  });
-
-export const confirmManualWorkoutDeleteClear = createServerFn({ method: "POST" })
-  .validator((value: unknown) => value)
-  .handler(async ({ data }): Promise<ManualWorkoutDeleteClearConfirmResult> => {
-    const userId = await getCurrentManualWorkoutAuthoringUserId();
-
-    if (!userId) {
-      return buildDeleteClearBlocked({
-        reason: "unauthenticated",
-        message: "Sign in before deleting manual workouts.",
-      });
-    }
-
-    return confirmManualWorkoutDeleteClearForUser(userId, data);
-  });
-
-export async function reviewManualWorkoutDeleteClearForUser(
+export async function reviewCalendarWorkoutDeleteClearCommandForUser(
   userId: string,
-  input: unknown,
-  dependencies: ManualWorkoutDeleteClearDependencies = {},
-): Promise<ManualWorkoutDeleteClearReviewResult> {
-  const parsed = manualWorkoutDeleteClearReviewInputSchema.safeParse(input);
+  command: CalendarWorkoutDeleteClearCommandInput,
+  dependencies: ManualWorkoutDeleteClearCommandDependencies = {},
+): Promise<WorkoutCommandReviewResult> {
+  const target = await resolveManualWorkoutDeleteClearTarget(
+    userId,
+    command.operation === "delete"
+      ? { plannedWorkoutId: command.workoutId }
+      : { workoutDate: command.workoutDate },
+    dependencies,
+  );
+  if (!target.ok) return rejectDeleteClearCommand(target.reason, target.message);
 
-  if (!parsed.success) {
-    return buildDeleteClearBlocked({
-      reason: "invalid_input",
-      message: "The manual workout delete review payload is invalid.",
-    });
+  const fingerprint = buildFullCalendarWorkoutFingerprint(target.targetWorkout);
+  if (
+    command.expectedFingerprint !== undefined &&
+    !stableJsonEqual(command.expectedFingerprint, fingerprint)
+  ) {
+    return rejectWorkoutCommandReview(
+      "stale_reference",
+      "The Calendar workout changed after review. Review this command again.",
+      ["command", "expectedFingerprint"],
+    );
   }
 
-  const target = await resolveManualWorkoutDeleteClearTarget(userId, parsed.data, dependencies);
-
-  if (!target.ok) {
-    return buildDeleteClearBlocked(target);
-  }
-
-  return {
-    ok: true,
-    status: "review_ready",
-    persisted: false,
-    sourceKind: target.targetWorkout.origin_kind,
-    workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
-    activePlanId: target.targetWorkout.plan_cycle_id,
-    plannedWorkoutId: target.targetWorkout.id,
-    workoutDate: target.targetWorkout.workout_date,
-    title: target.targetWorkout.title,
-    templateKey: target.review.templateKey,
-    review: target.review,
-    restore: target.restore,
-    safety: {
-      requiresExplicitConfirm: true,
-      targetWorkoutVerified: true,
-      runnerOwnershipVerified: true,
-      protectedHistoryChecked: true,
-      lastWorkoutDeleteAllowed: true,
-      trustedClientRows: false,
-      callsOpenAi: false,
-    },
-  };
+  return reviewWorkoutCommand({
+    command:
+      command.operation === "delete"
+        ? {
+            operation: "delete",
+            workoutId: target.targetWorkout.id,
+            expectedFingerprint: fingerprint,
+          }
+        : {
+            operation: "clear",
+            workoutDate: target.targetWorkout.workout_date,
+            expectedFingerprint: fingerprint,
+          },
+  });
 }
 
-export async function confirmManualWorkoutDeleteClearForUser(
+export async function executeCalendarWorkoutDeleteClearCommandForUser(
   userId: string,
-  input: unknown,
-  dependencies: ManualWorkoutDeleteClearDependencies = {},
-): Promise<ManualWorkoutDeleteClearConfirmResult> {
-  const parsed = manualWorkoutDeleteClearConfirmInputSchema.safeParse(input);
-
-  if (!parsed.success) {
-    return buildDeleteClearBlocked({
+  candidate: ReviewedWorkoutCommandCandidate,
+  dependencies: ManualWorkoutDeleteClearCommandDependencies = {},
+): Promise<{ ok: true; result: Json } | { ok: false; reason: string; message: string }> {
+  const command = candidate.command;
+  if (command.operation !== "delete" && command.operation !== "clear") {
+    return {
+      ok: false,
       reason: "invalid_review",
-      message: "The manual workout delete confirmation payload is invalid. Refresh the review.",
-    });
+      message: "The reviewed command is not Delete or Clear.",
+    };
   }
 
-  const target = await resolveManualWorkoutDeleteClearTarget(userId, parsed.data, dependencies);
-
-  if (!target.ok) {
-    return buildDeleteClearBlocked(target);
-  }
-
-  const reviewProof = validateManualWorkoutReviewProof({
-    expectedChecksum: target.review.reviewChecksum,
-    reviewChecksum: parsed.data.reviewChecksum,
-    reviewToken: parsed.data.reviewToken,
-    tokenPrefix: MANUAL_WORKOUT_DELETE_REVIEW_TOKEN_PREFIX,
-  });
-
-  if (!reviewProof.ok && reviewProof.reason === "stale_review") {
-    return buildDeleteClearBlocked({
+  const target = await resolveManualWorkoutDeleteClearTarget(
+    userId,
+    command.operation === "delete"
+      ? { plannedWorkoutId: command.workoutId }
+      : { workoutDate: command.workoutDate },
+    dependencies,
+  );
+  if (!target.ok) return { ok: false, reason: target.reason, message: target.message };
+  if (
+    !stableJsonEqual(
+      command.expectedFingerprint,
+      buildFullCalendarWorkoutFingerprint(target.targetWorkout),
+    )
+  ) {
+    return {
+      ok: false,
       reason: "stale_review",
-      message: "This workout delete review no longer matches the Calendar row.",
-    });
-  }
-
-  if (!reviewProof.ok) {
-    return buildDeleteClearBlocked({
-      reason: "invalid_review",
-      message: "This manual workout delete review token is invalid. Refresh the review.",
-    });
+      message: "The Calendar workout changed after review. Review this command again.",
+    };
   }
 
   const persistDelete = dependencies.persistWorkoutDelete ?? persistManualWorkoutDeleteClear;
-
   try {
     const persisted = await persistDelete({
       userId,
       currentDate: target.currentDate,
       targetWorkout: target.targetWorkout,
       remainingWorkouts: target.remainingWorkouts,
-      review: target.review,
+      review: { ...target.review, reviewChecksum: candidate.reviewChecksum },
     });
-
     return {
       ok: true,
-      status: "deleted",
-      persisted: true,
-      sourceKind: target.targetWorkout.origin_kind,
-      sourceStatus: null,
-      workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
-      activePlanId: target.targetWorkout.plan_cycle_id,
-      plannedWorkoutId: target.targetWorkout.id,
-      workoutDate: target.targetWorkout.workout_date,
-      title: target.targetWorkout.title,
-      templateKey: target.review.templateKey,
-      reviewChecksum: target.review.reviewChecksum,
-      exactnessPayloadVersion: MANUAL_WORKOUT_DELETE_REVIEW_PAYLOAD_VERSION,
-      calendarRowCount: target.remainingWorkouts.length,
-      nonRestWorkoutCount: target.remainingWorkouts.filter(
-        (workout) => workout.workout_type !== "rest",
-      ).length,
-      restore: target.restore,
-      safety: {
-        requiresExplicitConfirm: true,
-        targetWorkoutVerified: true,
-        runnerOwnershipVerified: true,
-        protectedHistoryChecked: true,
-        deletedExactlyOneRow: true,
+      result: {
+        operation: command.operation,
+        plannedWorkoutId: persisted.deletedWorkout.id,
+        workoutDate: persisted.deletedWorkout.workout_date,
         sourceProvenanceUnchanged: true,
-        trustedClientRows: false,
-        serverRebuiltReview: true,
-        callsOpenAi: false,
+        explicitConfirm: true,
       },
     };
   } catch (error) {
     if (error instanceof CalendarPersistenceRejection) {
-      return buildDeleteClearBlocked({
-        reason:
-          error.reason === "stale_review" || error.reason === "protected_day"
-            ? error.reason
-            : "persistence_failed",
-        message: error.message,
-      });
+      return { ok: false, reason: error.reason, message: error.message };
     }
-
-    return buildDeleteClearBlocked({
+    return {
+      ok: false,
       reason: "persistence_failed",
       message: "The workout could not be deleted. The Calendar is unchanged.",
-    });
+    };
   }
+}
+
+function rejectDeleteClearCommand(
+  reason: ManualWorkoutDeleteClearFailureReason,
+  message: string,
+): WorkoutCommandReviewResult {
+  const code =
+    reason === "target_workout_not_found" || reason === "target_workout_not_in_active_plan"
+      ? "not_found"
+      : reason === "protected_day" || reason === "target_workout_not_supported"
+        ? "protected_operation"
+        : reason === "persistence_failed"
+          ? "persistence_failed"
+          : "invalid_operation";
+  return rejectWorkoutCommandReview(code, message, ["command", "delete"]);
 }
 
 export async function persistManualWorkoutDeleteClear({
@@ -425,7 +227,7 @@ export async function persistManualWorkoutDeleteClear({
   const mutationEvent = buildCalendarWorkoutMutationEvent({
     mutationKind: CALENDAR_WORKOUT_MUTATION_KIND.clearWorkout,
     originKind: targetWorkout.origin_kind,
-    reviewPayloadVersion: MANUAL_WORKOUT_DELETE_REVIEW_PAYLOAD_VERSION,
+    reviewPayloadVersion: WORKOUT_COMMAND_REVIEW_PAYLOAD_VERSION,
     reviewChecksum: review.reviewChecksum,
     workoutAuthoringSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
     plannedWorkoutId: targetWorkout.id,
@@ -446,7 +248,7 @@ export async function persistManualWorkoutDeleteClear({
     userId,
     currentDate,
     mutationKind: "clear",
-    expectedSourceWorkout: buildFullSourceWorkoutFingerprint(targetWorkout) as unknown as Json,
+    expectedSourceWorkout: buildFullCalendarWorkoutFingerprint(targetWorkout) as unknown as Json,
     expectedTargetWorkout: null,
     workoutInsert: null,
     workoutUpdate: null,
@@ -465,8 +267,8 @@ export async function persistManualWorkoutDeleteClear({
 
 async function resolveManualWorkoutDeleteClearTarget(
   userId: string,
-  input: ManualWorkoutDeleteClearReviewInput | ManualWorkoutDeleteClearConfirmInput,
-  dependencies: ManualWorkoutDeleteClearDependencies,
+  input: ManualWorkoutDeleteClearInput,
+  dependencies: ManualWorkoutDeleteClearCommandDependencies,
 ): Promise<ManualWorkoutDeleteClearTarget> {
   const getContext =
     dependencies.getCalendarWorkoutContextForUser ?? getCalendarWorkoutMutationContext;
@@ -504,6 +306,25 @@ async function resolveManualWorkoutDeleteClearTarget(
     };
   }
 
+  if (target.workout.workout_date < currentDate) {
+    return {
+      ok: false,
+      reason: "protected_day",
+      message: "Past workouts cannot be cleared.",
+    };
+  }
+
+  const sourceDocument = normalizePersistedWorkoutDocument(target.workout);
+  if (!sourceDocument.ok || workoutDocumentHasUnsafeMetricTruth(sourceDocument.value)) {
+    return {
+      ok: false,
+      reason: "target_workout_not_supported",
+      message: sourceDocument.ok
+        ? "This workout contains target provenance that cannot be cleared safely."
+        : sourceDocument.message,
+    };
+  }
+
   const evidenceIds = await fetchEvidence(userId, [target.workout.id]);
   if (
     isProtectedWorkoutRowForClear(
@@ -519,25 +340,21 @@ async function resolveManualWorkoutDeleteClearTarget(
     };
   }
 
-  const restore = buildRestoreAffordance(target.workout);
-  if (!restore.ok) {
-    return restore;
-  }
-
   const remainingWorkouts = planContext.existingWorkouts.workouts.filter(
     (workout) => workout.id !== target.workout.id,
   );
   const review = buildDeleteClearReview({
     targetWorkout: target.workout,
+    sourceDocument: sourceDocument.value,
     remainingWorkouts,
-    templateKey: resolveWorkoutSourceTemplateKey(target.workout, restore.restore),
+    templateKey: sourceDocument.value.workoutIdentity,
   });
 
   return {
     ok: true,
     targetWorkout: target.workout,
+    sourceDocument: sourceDocument.value,
     remainingWorkouts,
-    restore: restore.restore,
     review,
     currentDate,
   };
@@ -579,86 +396,6 @@ function resolveDeleteTargetWorkout(input: {
   return { ok: true, workout };
 }
 
-function buildRestoreAffordance(
-  workout: PersistedPlannedWorkoutRow,
-):
-  | { ok: true; restore: ManualWorkoutDeleteRestoreAffordance }
-  | { ok: false; reason: ManualWorkoutDeleteClearFailureReason; message: string } {
-  if (persistedManualWorkoutHasUnsafeMetricTruth(workout)) {
-    return {
-      ok: true,
-      restore: unavailableRestoreAffordance(
-        "This workout can be cleared, but restoring metric targets requires a supported workout editor.",
-      ),
-    };
-  }
-
-  const draft = buildManualWorkoutDraftInputFromPersistedWorkout(workout, workout.workout_date);
-
-  if (!draft.ok) {
-    return {
-      ok: true,
-      restore: unavailableRestoreAffordance(draft.message),
-    };
-  }
-
-  const review = reviewManualWorkoutDraft(draft.draftInput);
-  if (!review.ok) {
-    return {
-      ok: true,
-      restore: unavailableRestoreAffordance(review.message),
-    };
-  }
-
-  return {
-    ok: true,
-    restore: {
-      available: true,
-      label: "Restore",
-      alternateLabels: ["Put back", "Redo"],
-      draftInput: draft.draftInput,
-      review,
-      safety: {
-        reviewedThroughManualAuthoring: true,
-        trustedClientRows: false,
-        targetDateDerivedServerSide: true,
-      },
-    },
-  };
-}
-
-function unavailableRestoreAffordance(message: string): ManualWorkoutDeleteRestoreAffordance {
-  return {
-    available: false,
-    label: "Restore",
-    alternateLabels: ["Put back", "Redo"],
-    reason: "restore_requires_editor_support",
-    message:
-      message ||
-      "This workout can be cleared, but restoring it requires a supported workout editor.",
-    safety: {
-      reviewedThroughManualAuthoring: false,
-      trustedClientRows: false,
-      targetDateDerivedServerSide: true,
-    },
-  };
-}
-
-function resolveWorkoutSourceTemplateKey(
-  workout: PersistedPlannedWorkoutRow,
-  restore: ManualWorkoutDeleteRestoreAffordance,
-) {
-  if (restore.available) {
-    return restore.draftInput.templateKey;
-  }
-
-  if (typeof workout.source_workout_type === "string" && workout.source_workout_type.trim()) {
-    return workout.source_workout_type.trim();
-  }
-
-  return workout.workout_type;
-}
-
 function isProtectedWorkoutRowForClear(
   workout: PersistedPlannedWorkoutRow,
   logsByWorkoutId: Map<string, PersistedWorkoutLogRow>,
@@ -669,6 +406,7 @@ function isProtectedWorkoutRowForClear(
 
 function buildDeleteClearReview(input: {
   targetWorkout: PersistedPlannedWorkoutRow;
+  sourceDocument: WorkoutDocument;
   remainingWorkouts: readonly PersistedPlannedWorkoutRow[];
   templateKey: string;
 }): ManualWorkoutDeleteClearReview {
@@ -680,22 +418,18 @@ function buildDeleteClearReview(input: {
     workoutDate: input.targetWorkout.workout_date,
     title: input.targetWorkout.title,
     templateKey: input.templateKey,
-    reviewToken: buildManualWorkoutReviewToken(
-      MANUAL_WORKOUT_DELETE_REVIEW_TOKEN_PREFIX,
-      reviewChecksum,
-    ),
     reviewChecksum,
-    exactnessPayloadVersion: MANUAL_WORKOUT_DELETE_REVIEW_PAYLOAD_VERSION,
   };
 }
 
 function buildDeleteClearExactnessPayload(input: {
   targetWorkout: PersistedPlannedWorkoutRow;
+  sourceDocument: WorkoutDocument;
   remainingWorkouts: readonly PersistedPlannedWorkoutRow[];
   templateKey: string;
 }) {
   return {
-    version: MANUAL_WORKOUT_DELETE_REVIEW_PAYLOAD_VERSION,
+    version: WORKOUT_COMMAND_REVIEW_PAYLOAD_VERSION,
     sourceKind: CALENDAR_WORKOUT_MUTATION_SOURCE_KIND,
     originKind: input.targetWorkout.origin_kind,
     sourcePlanId: input.targetWorkout.plan_cycle_id,
@@ -703,30 +437,12 @@ function buildDeleteClearExactnessPayload(input: {
     workoutDate: input.targetWorkout.workout_date,
     title: input.targetWorkout.title,
     templateKey: input.templateKey,
-    sourceWorkoutType: input.targetWorkout.source_workout_type,
-    workoutType: input.targetWorkout.workout_type,
-    workoutFamily: input.targetWorkout.workout_family,
-    workoutIdentity: input.targetWorkout.workout_identity,
-    sourceFingerprint: buildFullSourceWorkoutFingerprint(input.targetWorkout),
+    sourceDocument: input.sourceDocument,
+    sourceFingerprint: buildFullCalendarWorkoutFingerprint(input.targetWorkout),
     remainingWorkoutIds: input.remainingWorkouts.map((workout) => workout.id).sort(),
     remainingRowCount: input.remainingWorkouts.length,
     remainingNonRestRowCount: input.remainingWorkouts.filter(
       (workout) => workout.workout_type !== "rest",
     ).length,
-  };
-}
-
-function buildDeleteClearBlocked(input: {
-  reason: ManualWorkoutDeleteClearFailureReason;
-  message: string;
-}): ManualWorkoutDeleteClearBlockedResult {
-  return {
-    ok: false,
-    status: "blocked",
-    persisted: false,
-    reason: input.reason,
-    message: input.message,
-    sourceKind: null,
-    workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   };
 }

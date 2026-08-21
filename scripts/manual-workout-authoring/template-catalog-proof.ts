@@ -112,6 +112,9 @@ function buildEmptySavedTemplateRepository(): ManualWorkoutSavedTemplateReposito
     async getTemplateForUser() {
       return null;
     },
+    async replaceDraftPayloadForUser() {
+      return null;
+    },
     async deleteTemplateForUser() {
       return false;
     },

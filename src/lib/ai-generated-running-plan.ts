@@ -46,6 +46,10 @@ import {
 import { todayIso, weekdayLong } from "@/lib/training";
 import { WEEKDAY_NAMES, uniqueWeekdays, type WeekdayName } from "@/lib/weekday-rest-invariants";
 import type { WorkoutDocument } from "@/lib/workout-document";
+import {
+  reviewWorkoutCommand,
+  type ReviewedWorkoutCommandCandidate,
+} from "@/lib/workout-authoring-review";
 import type { RunnerPlanAuthoringProfileSnapshot } from "@/lib/user-settings-actions";
 
 export const AI_GENERATED_RUNNING_PLAN_SOURCE_KIND = AI_AUTHORED_PLAN_FIRST_SOURCE_KIND;
@@ -90,6 +94,7 @@ export interface AiGeneratedRunningPlanPreviewDraft {
   normalizedInputSummary: RunningPlanPreviewNormalizedInputSummary;
   calendarRows: readonly RunningPlanPreviewCalendarRow[];
   workoutDocuments: readonly WorkoutDocument[];
+  candidate: ReviewedWorkoutCommandCandidate;
   endpointProof: {
     finalRowId: string;
     finalDate: string;
@@ -317,9 +322,25 @@ export async function buildAiGeneratedRunningPlanPreview(
   );
   let calendarRows: readonly RunningPlanPreviewCalendarRow[];
   let workoutDocuments: readonly WorkoutDocument[];
+  let candidate: ReviewedWorkoutCommandCandidate;
   try {
     calendarRows = projectCanonicalPlanToPreviewRows(canonicalPlan);
     workoutDocuments = buildImportedPlanSeed(canonicalPlan).workouts;
+    const candidateReview = reviewWorkoutCommand({
+      command: {
+        operation: "materialize",
+        documents: workoutDocuments,
+        provenanceReferences: workoutDocuments.map((document) => ({
+          sourceKind: AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
+          sourceStatus: result.metadata.status,
+          sourceWorkoutId: document.sourceWorkoutId,
+        })),
+      },
+    });
+    if (!candidateReview.ok || candidateReview.candidate.collisions.length > 0) {
+      throw new Error("The AI workout initializer candidate is invalid.");
+    }
+    candidate = candidateReview.candidate;
   } catch {
     const issueCode = "ai_authored_plan_first_preview_projection_failed";
     const generationTrace = await updateAiPlanGenerationLedgerTrace(
@@ -380,6 +401,7 @@ export async function buildAiGeneratedRunningPlanPreview(
       normalizedInputSummary,
       calendarRows,
       workoutDocuments,
+      candidate,
       endpointProof,
       validation: {
         ok: true,

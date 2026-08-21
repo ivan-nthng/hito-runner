@@ -7,96 +7,9 @@ import {
 } from "@/lib/manual-workout-authoring/templates";
 import { workoutTypeColorVar } from "@/lib/workout-color-tokens";
 import type { PlannedWorkoutLanguageReadModel } from "@/lib/planned-workout-language";
-import type {
-  ManualWorkoutBlockInput,
-  ManualWorkoutConstructorEntryInput,
-  ManualWorkoutDraftInput,
-  ManualWorkoutTargetTruthMode,
-} from "@/lib/manual-workout-authoring/schema";
-import {
-  getManualWorkoutRepeatGroupChildren,
-  isManualWorkoutRepeatRecoveryBlock,
-} from "@/lib/manual-workout-authoring/repeat-groups";
-import type { WorkoutSegmentLike } from "@/lib/rich-workout-model";
 import { workoutGlyphFromCalendarIconKey, type WorkoutGlyphKind } from "@/lib/workout-glyph";
 
 export const MANUAL_WORKOUT_TEMPLATES = listManualWorkoutTemplates();
-
-export function buildManualDraftInput({
-  activePlanId,
-  activePlanSourceKind,
-  contextMode,
-  date,
-  notes,
-  targetTruthMode,
-  template,
-  title,
-  entries,
-}: {
-  activePlanId?: string;
-  activePlanSourceKind?: string;
-  contextMode: "no_active_plan_draft" | "existing_active_plan";
-  date: string;
-  entries?: ManualWorkoutConstructorEntryInput[];
-  notes: string;
-  targetTruthMode: ManualWorkoutTargetTruthMode;
-  template: ManualWorkoutTemplate;
-  title: string;
-}): ManualWorkoutDraftInput {
-  return {
-    templateKey: template.templateKey,
-    workoutDate: date,
-    title: title.trim() || template.defaultTitle,
-    notes: notes.trim() || null,
-    targetTruthMode,
-    entries: entries
-      ? cloneManualWorkoutEntries(entries)
-      : cloneManualWorkoutEntries(template.defaultEntries),
-    context: {
-      mode: contextMode,
-      ...(activePlanId ? { activePlanId } : {}),
-      ...(activePlanSourceKind ? { activePlanSourceKind } : {}),
-      targetDateProtection: "none",
-    },
-  };
-}
-
-export function cloneManualWorkoutEntries(
-  entries: ManualWorkoutConstructorEntryInput[],
-): ManualWorkoutConstructorEntryInput[] {
-  return entries.map((entryValue) => {
-    if (entryValue.kind === "repeat_group") {
-      const children = getManualWorkoutRepeatGroupChildren(entryValue.group).map(
-        cloneManualWorkoutBlock,
-      );
-      const recoveryBlock = children.find((child) =>
-        isManualWorkoutRepeatRecoveryBlock(child.blockKey),
-      );
-
-      return {
-        kind: "repeat_group",
-        group: {
-          ...entryValue.group,
-          children,
-          workBlock: children[0] ?? cloneManualWorkoutBlock(entryValue.group.workBlock),
-          ...(recoveryBlock ? { recoveryBlock } : {}),
-        },
-      };
-    }
-
-    return {
-      kind: "block",
-      block: cloneManualWorkoutBlock(entryValue.block),
-    };
-  });
-}
-
-function cloneManualWorkoutBlock(block: ManualWorkoutBlockInput): ManualWorkoutBlockInput {
-  return {
-    ...block,
-    ...(block.target ? { target: { ...block.target } } : {}),
-  };
-}
 
 export function getDefaultManualWorkoutTemplate(templateKey: ManualWorkoutTemplate["templateKey"]) {
   return (
@@ -115,7 +28,6 @@ export function templateRunnerFacingLanguage(
     workoutIdentity: template.workoutIdentity,
     calendarIconKey: template.calendarIconKey,
     title: template.defaultTitle,
-    steps: manualWorkoutEntriesToLanguageSteps(template.defaultEntries),
   });
 }
 
@@ -159,19 +71,6 @@ export function templateIconTone(template: ManualWorkoutTemplate | null | undefi
     : "var(--color-muted-foreground)";
 }
 
-export function targetTruthModeLabel(mode: ManualWorkoutTargetTruthMode | string) {
-  if (mode === "none") return "Rest / no run";
-  return "Workout guidance";
-}
-
-export function targetTruthModeCopy(mode: ManualWorkoutTargetTruthMode) {
-  if (mode === "none") {
-    return "Use this for rest or no-run days. Hito will not create a running target.";
-  }
-
-  return "Follow the reviewed workout structure. Hito will not invent pace or personal heart-rate targets.";
-}
-
 export function formatManualDraftStructure(totalDurationMin: number, totalDistanceKm: number) {
   const parts: string[] = [];
 
@@ -189,41 +88,4 @@ export function formatManualDraftStructure(totalDurationMin: number, totalDistan
 function parseIsoDateAsLocalCalendarDay(iso: string) {
   const [year = "1970", month = "01", day = "01"] = iso.split("-");
   return new Date(Number(year), Number(month) - 1, Number(day));
-}
-
-function manualWorkoutEntriesToLanguageSteps(
-  entries: ManualWorkoutConstructorEntryInput[],
-): WorkoutSegmentLike[] {
-  return entries.map((entryValue) => {
-    if (entryValue.kind === "repeat_group") {
-      const repeatChildren = getManualWorkoutRepeatGroupChildren(entryValue.group);
-      const children = repeatChildren.map(manualWorkoutBlockToLanguageStep);
-      const recoveryIndex = repeatChildren.findIndex((child) =>
-        isManualWorkoutRepeatRecoveryBlock(child.blockKey),
-      );
-
-      return {
-        type: "repeats",
-        segment_type: "repeat_group",
-        label: entryValue.group.groupLabel ?? null,
-        repeat_count: entryValue.group.repeatCount,
-        children,
-        work: children[0] ?? manualWorkoutBlockToLanguageStep(entryValue.group.workBlock),
-        recovery: recoveryIndex >= 0 ? (children[recoveryIndex] ?? null) : null,
-      };
-    }
-
-    return manualWorkoutBlockToLanguageStep(entryValue.block);
-  });
-}
-
-function manualWorkoutBlockToLanguageStep(block: ManualWorkoutBlockInput): WorkoutSegmentLike {
-  return {
-    type: block.blockKey,
-    segment_type: block.blockKey,
-    label: block.label ?? null,
-    duration_min: block.durationSeconds ? block.durationSeconds / 60 : null,
-    distance_km: block.distanceMeters ? block.distanceMeters / 1000 : null,
-    target: block.target ?? null,
-  };
 }

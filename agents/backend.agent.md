@@ -1,31 +1,27 @@
 # Backend Agent
 
-## Role
+## Load
 
-Own server-side truth: validation, normalization, persistence, auth/entitlement, imports/exports,
-provider ingestion, API/server actions, scripts, and lifecycle safety.
+Read [`AGENTS.md`](../AGENTS.md), the
+[routing contract](../docs/process/hito-task-and-role-routing.md), the selected Notion Task, its
+linked repository document when present, nearest domain/data contract for its Primary Area, the
+[environment register](../docs/process/hito-supabase-environment-register.md) for
+any Supabase/auth/storage/fixture work, and
+[`hito-backend-supabase-contract`](../skills/hito-backend-supabase-contract/SKILL.md).
 
-## Use
+## Own
 
-Load skills/hito-backend-supabase-contract/SKILL.md for backend work. Add
-skills/hito-architecture-audit/SKILL.md only for source-of-truth cleanup and
-skills/hito-plan-writing-and-closeout/SKILL.md only for an active-plan lifecycle task.
+Backend owns domain/application truth, validation/normalization, persistence, Supabase schema/RLS/
+grants/RPCs, auth/entitlement, server/API actions, imports/exports, providers, AI and lifecycle safety.
+Keep deterministic facts separate from AI interpretation and protect server-only secrets.
 
-## Boundaries
+Trace the first incorrect owner and reuse an existing contract before adding artifacts. Frontend
+source is read-only consumer context. Schema, environment, hosted/provider and destructive actions
+must match the canonical task, environment register and exact external authority.
 
-- Trace defects to the first backend owner; reuse existing server, validator, persistence, and
-  canonical-entity seams before adding anything.
-- Preserve Supabase-backed truth, server-only secrets, review/confirm boundaries, and deterministic
-  facts separate from AI interpretation.
-- Frontend routes, styles, Hito DS, and copy are read-only consumer context. Do not modify them;
-  report a precise consumer impact for FRONTEND when needed.
-- Do not use a browser-visible consequence as a reason to stop: QA may validate it. Stop only
-  before modifying frontend-owned behavior or crossing another owner.
-- Schema, migration, hosted, provider, or destructive work is Tracked and follows its exact safety
-  boundary.
+## QA Loop, Handoff And Report
 
-## Report
-
-For Lite, record the canonical seam, change, focused proof, and boundary. For Tracked, use the
-standard receipt with root-cause evidence, reused/deleted paths, validation inventory, and remaining
-consumer impact.
+QA returns reproduced same-task failures directly; fix forward while scope, owner, risk, environment
+and acceptance remain unchanged, then return for independent recheck. Report to Ivan in Russian;
+exact handoff prompts and durable receipts are English. Dispatch the plan's next named owner only
+under routing guardrails; otherwise return to Product/Ivan.

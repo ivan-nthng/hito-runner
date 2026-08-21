@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   Dialog,
@@ -11,20 +11,14 @@ import {
 import { hitoToast } from "@/components/ui/hito-toast";
 import { HitoButton } from "@/components/ui/button";
 import {
-  confirmManualWorkoutMove,
-  moveManualWorkoutWithinActivePlan,
-  reviewManualWorkoutMove,
+  confirmWorkoutCommandAction,
+  reviewWorkoutCommandAction,
 } from "@/lib/manual-workout-authoring";
 import type {
-  ManualWorkoutDirectMoveResult,
-  ManualWorkoutMoveConfirmResult,
-  ManualWorkoutMoveReviewResult,
   ManualWorkoutMoveTargetDayKind,
+  ReviewedWorkoutCommandCandidate,
+  WorkoutCommand,
 } from "@/lib/manual-workout-authoring";
-import {
-  MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-  MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
-} from "@/lib/manual-workout-authoring/schema";
 
 const MANUAL_MOVE_TOAST_ID = "manual-workout-move";
 const MOVE_UNAVAILABLE_MESSAGE =
@@ -40,8 +34,32 @@ export type ManualWorkoutMoveRequest = {
   title: string;
 };
 
+export type ManualWorkoutMoveReviewReady = {
+  reviewChecksum: string;
+  sourceWorkoutDate: string;
+  sourceWorkoutId: string;
+  targetDate: string;
+};
+
+export type ManualWorkoutMoveSuccess = {
+  displacedWorkoutId: string | null;
+  plannedWorkoutId: string;
+  sourceWorkoutDate: string;
+  targetDate: string;
+  title: string;
+  undoExpiresAt: string | null;
+};
+
+type ReviewedMoveCommandCandidate = ReviewedWorkoutCommandCandidate & {
+  command: Extract<WorkoutCommand, { operation: "move" }>;
+};
+
+type ManualWorkoutMoveReady = {
+  candidate: ReviewedMoveCommandCandidate;
+  request: ManualWorkoutMoveRequest;
+};
+
 type ManualWorkoutMoveStatus = "idle" | "reviewing" | "confirming";
-type ManualWorkoutMoveReady = Extract<ManualWorkoutMoveReviewResult, { ok: true }>;
 
 export function ManualWorkoutMoveController({
   onDirectMoveSucceeded,
@@ -53,23 +71,112 @@ export function ManualWorkoutMoveController({
   request,
 }: {
   request: ManualWorkoutMoveRequest | null;
-  onDirectMoveSucceeded: (result: Extract<ManualWorkoutDirectMoveResult, { ok: true }>) => void;
+  onDirectMoveSucceeded: (result: ManualWorkoutMoveSuccess) => void;
   onRequestHandled: () => void;
   onOptimisticMoveRejected: () => void;
-  onReplacementConfirming: (review: ManualWorkoutMoveReady) => void;
-  onReplacementMoveSucceeded: (
-    result: Extract<ManualWorkoutMoveConfirmResult, { ok: true }>,
-  ) => void;
+  onReplacementConfirming: (review: ManualWorkoutMoveReviewReady) => void;
+  onReplacementMoveSucceeded: (result: ManualWorkoutMoveSuccess) => void;
   onMoved: () => void | Promise<void>;
 }) {
-  const moveManualWorkoutWithinActivePlanFn = useServerFn(moveManualWorkoutWithinActivePlan);
-  const reviewManualWorkoutMoveFn = useServerFn(reviewManualWorkoutMove);
-  const confirmManualWorkoutMoveFn = useServerFn(confirmManualWorkoutMove);
+  const reviewWorkoutCommandFn = useServerFn(reviewWorkoutCommandAction);
+  const confirmWorkoutCommandFn = useServerFn(confirmWorkoutCommandAction);
   const moveInFlightRef = useRef(false);
   const lastRequestIdRef = useRef<string | null>(null);
   const confirmInFlightRef = useRef(false);
-  const [reviewResult, setReviewResult] = useState<ManualWorkoutMoveReviewResult | null>(null);
+  const [reviewResult, setReviewResult] = useState<ManualWorkoutMoveReady | null>(null);
   const [status, setStatus] = useState<ManualWorkoutMoveStatus>("idle");
+
+  const confirmReviewedMove = useCallback(
+    async (ready: ManualWorkoutMoveReady, replacement: boolean) => {
+      if (confirmInFlightRef.current) return;
+
+      if (replacement) {
+        onReplacementConfirming({
+          reviewChecksum: ready.candidate.reviewChecksum,
+          sourceWorkoutDate: ready.request.sourceWorkoutDate,
+          sourceWorkoutId: ready.request.sourceWorkoutId,
+          targetDate: ready.request.targetDate,
+        });
+      }
+      confirmInFlightRef.current = true;
+      setStatus("confirming");
+      hitoToast.working({
+        id: MANUAL_MOVE_TOAST_ID,
+        title: replacement ? "Replacing workout" : "Moving workout",
+        description: replacement
+          ? "Hito is confirming the reviewed replacement."
+          : "Hito is confirming the reviewed move.",
+      });
+
+      try {
+        const candidate = ready.candidate;
+        const response = await confirmWorkoutCommandFn({
+          data: {
+            command: candidate.command,
+            candidateId: candidate.candidateId,
+            reviewToken: candidate.reviewToken,
+            reviewChecksum: candidate.reviewChecksum,
+          },
+        });
+
+        if (!response.ok || response.operation !== "move") {
+          onOptimisticMoveRejected();
+          hitoToast.error({
+            id: MANUAL_MOVE_TOAST_ID,
+            title: replacement ? "Workout not replaced" : "Workout not moved",
+            description: response.ok ? MOVE_UNAVAILABLE_MESSAGE : response.message,
+          });
+          return;
+        }
+
+        const persisted = parseMoveCommandResult(response.result);
+        if (!persisted) {
+          onOptimisticMoveRejected();
+          hitoToast.error({
+            id: MANUAL_MOVE_TOAST_ID,
+            title: replacement ? "Workout not replaced" : "Workout not moved",
+            description: MOVE_UNAVAILABLE_MESSAGE,
+          });
+          return;
+        }
+
+        const success: ManualWorkoutMoveSuccess = {
+          ...persisted,
+          title: ready.request.title,
+        };
+        if (replacement) {
+          onReplacementMoveSucceeded(success);
+        } else {
+          onDirectMoveSucceeded(success);
+        }
+        await onMoved();
+        hitoToast.success({
+          id: MANUAL_MOVE_TOAST_ID,
+          title: replacement ? "Workout replaced" : "Workout moved",
+          description: "Saved to your calendar.",
+        });
+      } catch {
+        onOptimisticMoveRejected();
+        hitoToast.error({
+          id: MANUAL_MOVE_TOAST_ID,
+          title: replacement ? "Workout not replaced" : "Workout not moved",
+          description: MOVE_UNAVAILABLE_MESSAGE,
+        });
+      } finally {
+        confirmInFlightRef.current = false;
+        setStatus("idle");
+        setReviewResult(null);
+      }
+    },
+    [
+      confirmWorkoutCommandFn,
+      onDirectMoveSucceeded,
+      onMoved,
+      onOptimisticMoveRejected,
+      onReplacementConfirming,
+      onReplacementMoveSucceeded,
+    ],
+  );
 
   useEffect(() => {
     if (!request || lastRequestIdRef.current === request.requestId) return;
@@ -83,312 +190,122 @@ export function ManualWorkoutMoveController({
     moveInFlightRef.current = true;
 
     async function runMove(nextRequest: ManualWorkoutMoveRequest) {
-      if (nextRequest.targetDayKind === "workout_day") {
-        try {
-          await runReplacementReview(nextRequest);
-        } finally {
-          moveInFlightRef.current = false;
-          onRequestHandled();
-        }
-        return;
-      }
-
-      try {
-        const response = await moveManualWorkoutWithinActivePlanFn({
-          data: {
-            ...(nextRequest.provenancePlanId ? { activePlanId: nextRequest.provenancePlanId } : {}),
-            sourceWorkoutId: nextRequest.sourceWorkoutId,
-            sourceWorkoutDate: nextRequest.sourceWorkoutDate,
-            targetDate: nextRequest.targetDate,
-          },
-        });
-        const result = isManualWorkoutDirectMoveResult(response)
-          ? response
-          : buildMoveUnavailableResult();
-
-        if (!result.ok) {
-          if (result.reason === "replacement_requires_review") {
-            onOptimisticMoveRejected();
-            await runReplacementReview(nextRequest);
-            return;
-          }
-
-          onOptimisticMoveRejected();
-          hitoToast.error({
-            id: MANUAL_MOVE_TOAST_ID,
-            title: "Move blocked",
-            description: result.message,
-          });
-          return;
-        }
-
-        onDirectMoveSucceeded(result);
-        await onMoved();
-        hitoToast.success({
-          id: MANUAL_MOVE_TOAST_ID,
-          title: "Workout moved",
-          description: "Saved to your calendar.",
-        });
-      } catch {
-        const result = buildMoveUnavailableResult();
-        onOptimisticMoveRejected();
-        hitoToast.error({
-          id: MANUAL_MOVE_TOAST_ID,
-          title: "Workout not moved",
-          description: result.message,
-        });
-      } finally {
-        moveInFlightRef.current = false;
-        onRequestHandled();
-      }
-    }
-
-    async function runReplacementReview(nextRequest: ManualWorkoutMoveRequest) {
       setStatus("reviewing");
       setReviewResult(null);
       hitoToast.working({
         id: MANUAL_MOVE_TOAST_ID,
-        title: "Reviewing replacement",
-        description: "Hito is checking the target workout before anything is replaced.",
+        title:
+          nextRequest.targetDayKind === "workout_day" ? "Reviewing replacement" : "Reviewing move",
+        description:
+          nextRequest.targetDayKind === "workout_day"
+            ? "Hito is checking the target workout before anything is replaced."
+            : "Hito is checking the Calendar before moving this workout.",
       });
 
       try {
-        const response = await reviewManualWorkoutMoveFn({
+        const response = await reviewWorkoutCommandFn({
           data: {
-            ...(nextRequest.provenancePlanId ? { activePlanId: nextRequest.provenancePlanId } : {}),
-            sourceWorkoutId: nextRequest.sourceWorkoutId,
-            sourceWorkoutDate: nextRequest.sourceWorkoutDate,
+            operation: "move",
+            workoutId: nextRequest.sourceWorkoutId,
             targetDate: nextRequest.targetDate,
           },
         });
-        const result = isManualWorkoutMoveReviewResult(response)
-          ? response
-          : buildMoveReviewUnavailableResult();
-
-        if (!result.ok) {
-          setStatus("idle");
+        if (!response.ok) {
+          onOptimisticMoveRejected();
           hitoToast.error({
             id: MANUAL_MOVE_TOAST_ID,
             title: "Move blocked",
-            description: result.message,
+            description: response.issues[0]?.message ?? MOVE_UNAVAILABLE_MESSAGE,
+          });
+          return;
+        }
+        if (!isReviewedMoveCommandCandidate(response.candidate)) {
+          onOptimisticMoveRejected();
+          hitoToast.error({
+            id: MANUAL_MOVE_TOAST_ID,
+            title: "Move blocked",
+            description: MOVE_UNAVAILABLE_MESSAGE,
           });
           return;
         }
 
-        setReviewResult(result);
-        setStatus("idle");
-        hitoToast.success({
-          id: MANUAL_MOVE_TOAST_ID,
-          title: "Replacement reviewed",
-          description: "Confirm before Hito replaces the target workout.",
-        });
+        const ready = { candidate: response.candidate, request: nextRequest };
+        if (ready.candidate.command.targetPolicy.targetDayKind === "workout_day") {
+          setReviewResult(ready);
+          setStatus("idle");
+          hitoToast.success({
+            id: MANUAL_MOVE_TOAST_ID,
+            title: "Replacement reviewed",
+            description: "Confirm before Hito replaces the target workout.",
+          });
+          return;
+        }
+
+        await confirmReviewedMove(ready, false);
       } catch {
-        const result = buildMoveReviewUnavailableResult();
-        setStatus("idle");
+        onOptimisticMoveRejected();
         hitoToast.error({
           id: MANUAL_MOVE_TOAST_ID,
           title: "Move review failed",
-          description: result.message,
+          description: MOVE_UNAVAILABLE_MESSAGE,
         });
+      } finally {
+        moveInFlightRef.current = false;
+        onRequestHandled();
+        setStatus((current) => (current === "reviewing" ? "idle" : current));
       }
     }
 
     void runMove(request);
   }, [
-    moveManualWorkoutWithinActivePlanFn,
-    onDirectMoveSucceeded,
-    onMoved,
+    confirmReviewedMove,
     onOptimisticMoveRejected,
     onRequestHandled,
     request,
-    reviewManualWorkoutMoveFn,
+    reviewWorkoutCommandFn,
   ]);
-
-  const confirmReplacement = async () => {
-    if (!reviewResult?.ok || confirmInFlightRef.current) return;
-
-    onReplacementConfirming(reviewResult);
-    confirmInFlightRef.current = true;
-    setStatus("confirming");
-    hitoToast.working({
-      id: MANUAL_MOVE_TOAST_ID,
-      title: "Replacing workout",
-      description: "Hito is confirming the reviewed replacement.",
-    });
-
-    try {
-      const response = await confirmManualWorkoutMoveFn({
-        data: {
-          ...(reviewResult.activePlanId ? { activePlanId: reviewResult.activePlanId } : {}),
-          sourceWorkoutId: reviewResult.sourceWorkoutId,
-          sourceWorkoutDate: reviewResult.sourceWorkoutDate,
-          targetDate: reviewResult.targetDate,
-          reviewToken: reviewResult.review.reviewToken,
-          reviewChecksum: reviewResult.review.reviewChecksum,
-        },
-      });
-      const result = isManualWorkoutMoveConfirmResult(response)
-        ? response
-        : buildMoveConfirmUnavailableResult();
-
-      if (!result.ok) {
-        onOptimisticMoveRejected();
-        confirmInFlightRef.current = false;
-        setStatus("idle");
-        setReviewResult(null);
-        hitoToast.error({
-          id: MANUAL_MOVE_TOAST_ID,
-          title: "Workout not replaced",
-          description: result.message,
-        });
-        return;
-      }
-
-      confirmInFlightRef.current = false;
-      setStatus("idle");
-      setReviewResult(null);
-      onReplacementMoveSucceeded(result);
-      await onMoved();
-      hitoToast.success({
-        id: MANUAL_MOVE_TOAST_ID,
-        title: "Workout replaced",
-        description: "Saved to your calendar.",
-      });
-    } catch {
-      const result = buildMoveConfirmUnavailableResult();
-      onOptimisticMoveRejected();
-      confirmInFlightRef.current = false;
-      setStatus("idle");
-      setReviewResult(null);
-      hitoToast.error({
-        id: MANUAL_MOVE_TOAST_ID,
-        title: "Workout not replaced",
-        description: result.message,
-      });
-    }
-  };
 
   return (
     <ManualWorkoutMoveReplacementDialog
-      onConfirm={() => void confirmReplacement()}
+      onConfirm={() => {
+        if (reviewResult) void confirmReviewedMove(reviewResult, true);
+      }}
       onOpenChange={(open) => {
         if (!open && status === "idle") {
           setReviewResult(null);
         }
       }}
-      review={reviewResult?.ok ? reviewResult : null}
+      review={reviewResult}
       status={status}
     />
   );
 }
 
-function buildMoveUnavailableResult(): ManualWorkoutDirectMoveResult {
+function isReviewedMoveCommandCandidate(
+  candidate: ReviewedWorkoutCommandCandidate,
+): candidate is ReviewedMoveCommandCandidate {
+  return candidate.command.operation === "move";
+}
+
+function parseMoveCommandResult(value: unknown): Omit<ManualWorkoutMoveSuccess, "title"> | null {
+  if (!isRecord(value)) return null;
+  if (
+    typeof value.plannedWorkoutId !== "string" ||
+    typeof value.sourceWorkoutDate !== "string" ||
+    typeof value.targetDate !== "string" ||
+    (value.displacedWorkoutId !== null && typeof value.displacedWorkoutId !== "string") ||
+    (value.undoExpiresAt !== null && typeof value.undoExpiresAt !== "string")
+  ) {
+    return null;
+  }
+
   return {
-    ok: false,
-    status: "blocked",
-    reason: "persistence_failed",
-    message: MOVE_UNAVAILABLE_MESSAGE,
-    persisted: false,
-    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-    workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+    displacedWorkoutId: value.displacedWorkoutId,
+    plannedWorkoutId: value.plannedWorkoutId,
+    sourceWorkoutDate: value.sourceWorkoutDate,
+    targetDate: value.targetDate,
+    undoExpiresAt: value.undoExpiresAt,
   };
-}
-
-function buildMoveReviewUnavailableResult(): ManualWorkoutMoveReviewResult {
-  return {
-    ok: false,
-    status: "blocked",
-    reason: "persistence_failed",
-    message: MOVE_UNAVAILABLE_MESSAGE,
-    persisted: false,
-    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-    workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
-  };
-}
-
-function buildMoveConfirmUnavailableResult(): ManualWorkoutMoveConfirmResult {
-  return {
-    ok: false,
-    status: "blocked",
-    reason: "persistence_failed",
-    message: MOVE_UNAVAILABLE_MESSAGE,
-    persisted: false,
-    sourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-    workoutSourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
-  };
-}
-
-function isManualWorkoutDirectMoveResult(value: unknown): value is ManualWorkoutDirectMoveResult {
-  if (!isRecord(value) || typeof value.ok !== "boolean") return false;
-  if (!value.ok) return isMoveBlockedResult(value);
-
-  return (
-    value.status === "moved" &&
-    value.persisted === true &&
-    (value.activePlanId === null || typeof value.activePlanId === "string") &&
-    typeof value.plannedWorkoutId === "string" &&
-    typeof value.sourceWorkoutDate === "string" &&
-    typeof value.targetDate === "string" &&
-    typeof value.targetWeekday === "string" &&
-    isManualWorkoutMoveTargetDayKind(value.targetDayKind) &&
-    typeof value.title === "string" &&
-    typeof value.templateKey === "string" &&
-    value.mutationMode === "direct_manual_edit" &&
-    (value.undoExpiresAt === null || typeof value.undoExpiresAt === "string")
-  );
-}
-
-function isManualWorkoutMoveReviewResult(value: unknown): value is ManualWorkoutMoveReviewResult {
-  if (!isRecord(value) || typeof value.ok !== "boolean") return false;
-  if (!value.ok) return isMoveBlockedResult(value);
-
-  return (
-    value.status === "review_ready" &&
-    value.persisted === false &&
-    (value.activePlanId === null || typeof value.activePlanId === "string") &&
-    typeof value.sourceWorkoutId === "string" &&
-    typeof value.sourceWorkoutDate === "string" &&
-    typeof value.targetDate === "string" &&
-    typeof value.targetWeekday === "string" &&
-    isManualWorkoutMoveTargetDayKind(value.targetDayKind) &&
-    typeof value.title === "string" &&
-    isRecord(value.review)
-  );
-}
-
-function isManualWorkoutMoveConfirmResult(value: unknown): value is ManualWorkoutMoveConfirmResult {
-  if (!isRecord(value) || typeof value.ok !== "boolean") return false;
-  if (!value.ok) return isMoveBlockedResult(value);
-
-  return (
-    value.status === "moved" &&
-    value.persisted === true &&
-    (value.activePlanId === null || typeof value.activePlanId === "string") &&
-    typeof value.plannedWorkoutId === "string" &&
-    typeof value.sourceWorkoutDate === "string" &&
-    typeof value.targetDate === "string" &&
-    typeof value.targetWeekday === "string" &&
-    isManualWorkoutMoveTargetDayKind(value.targetDayKind) &&
-    typeof value.title === "string" &&
-    typeof value.templateKey === "string" &&
-    (value.undoExpiresAt === null || typeof value.undoExpiresAt === "string")
-  );
-}
-
-function isManualWorkoutMoveTargetDayKind(value: unknown): value is ManualWorkoutMoveTargetDayKind {
-  return value === "rest_day" || value === "workout_day";
-}
-
-function isMoveBlockedResult(
-  value: Record<string, unknown>,
-): value is Extract<ManualWorkoutDirectMoveResult, { ok: false }> {
-  return (
-    value.ok === false &&
-    value.status === "blocked" &&
-    value.persisted === false &&
-    typeof value.reason === "string" &&
-    typeof value.message === "string"
-  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -409,8 +326,8 @@ function ManualWorkoutMoveReplacementDialog({
   const busy = status !== "idle";
   const returnFocusDateRef = useRef<string | null>(null);
 
-  if (review?.sourceWorkoutDate) {
-    returnFocusDateRef.current = review.sourceWorkoutDate;
+  if (review?.request.sourceWorkoutDate) {
+    returnFocusDateRef.current = review.request.sourceWorkoutDate;
   }
 
   return (

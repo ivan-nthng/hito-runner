@@ -605,7 +605,7 @@ function CalendarDaySlot({
         </Link>
       ) : null}
 
-      {sourceAction ? (
+      {sourceAction && workout ? (
         <ManualWorkoutSourceActionMenu
           provenancePlanId={sourceAction.provenancePlanId}
           canCopy={sourceAction.canDirectCopy}
@@ -617,6 +617,7 @@ function CalendarDaySlot({
           sourceWorkoutDate={sourceAction.sourceWorkoutDate}
           sourceWorkoutId={sourceAction.sourceWorkoutId}
           title={sourceAction.title}
+          workout={workout}
         >
           <button
             type="button"

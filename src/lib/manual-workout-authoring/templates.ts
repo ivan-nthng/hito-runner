@@ -4,13 +4,56 @@ import type {
   CanonicalWorkoutIdentity,
 } from "@/lib/rich-workout-model";
 import type { WorkoutType } from "@/lib/training";
+import { normalizeExecutableStepInstructions, type Step } from "@/lib/training";
 import type {
-  ManualWorkoutBlockInput,
-  ManualWorkoutConstructorEntryInput,
-  ManualWorkoutRepeatSafetyKind,
   ManualWorkoutTargetTruthMode,
   ManualWorkoutTemplateKey,
 } from "@/lib/manual-workout-authoring/schema";
+import type { WorkoutDocumentSection } from "@/lib/workout-document";
+
+type ManualWorkoutTemplateBlockKey =
+  | "warmup_block"
+  | "easy_run_block"
+  | "steady_run_block"
+  | "progression_block"
+  | "tempo_block"
+  | "threshold_block"
+  | "interval_work_block"
+  | "interval_recovery_block"
+  | "hill_work_block"
+  | "downhill_control_block"
+  | "strides_block"
+  | "long_run_body_block"
+  | "long_run_finish_block"
+  | "rest_walk_jog_recovery_block"
+  | "cooldown_block"
+  | "coach_cue_note_block";
+
+type ManualWorkoutTemplateBlock = {
+  blockKey: ManualWorkoutTemplateBlockKey;
+  durationSeconds?: number;
+  distanceMeters?: number;
+  noteText?: string;
+  label?: string;
+};
+
+type ManualWorkoutTemplateEntry =
+  | { kind: "block"; block: ManualWorkoutTemplateBlock }
+  | {
+      kind: "repeat_group";
+      group: {
+        repeatCount: number;
+        safetyKind:
+          | "intervals"
+          | "tempo_repeats"
+          | "hill_repeats"
+          | "downhill_control"
+          | "run_walk"
+          | "strides";
+        groupLabel: string;
+        children: ManualWorkoutTemplateBlock[];
+      };
+    };
 
 export interface ManualWorkoutTemplate {
   templateKey: ManualWorkoutTemplateKey;
@@ -23,7 +66,7 @@ export interface ManualWorkoutTemplate {
   defaultNotes: string | null;
   defaultTargetTruthMode: ManualWorkoutTargetTruthMode;
   allowedTargetTruthModes: ManualWorkoutTargetTruthMode[];
-  defaultEntries: ManualWorkoutConstructorEntryInput[];
+  defaultSteps: WorkoutDocumentSection[];
   requiresWarmupCooldown: boolean;
   requiresRepeatGroup: boolean;
   repeatedIntensityRequiresRecovery: boolean;
@@ -66,7 +109,7 @@ export const MANUAL_WORKOUT_TEMPLATE_REGISTRY = {
     defaultNotes: "Rest day.",
     defaultTargetTruthMode: "none",
     allowedTargetTruthModes: ["none"],
-    defaultEntries: [],
+    defaultSteps: [],
     requiresWarmupCooldown: false,
     requiresRepeatGroup: false,
     repeatedIntensityRequiresRecovery: false,
@@ -121,7 +164,7 @@ export const MANUAL_WORKOUT_TEMPLATE_REGISTRY = {
     defaultNotes: "Relaxed fast strides with full easy recoveries.",
     defaultTargetTruthMode: "structure_only",
     allowedTargetTruthModes: ["structure_only"],
-    defaultEntries: [
+    defaultSteps: templateSteps([
       entry(block("easy_run_block", { durationSeconds: 10 * 60, label: "Easy support" })),
       repeatEntry({
         repeatCount: 6,
@@ -134,7 +177,7 @@ export const MANUAL_WORKOUT_TEMPLATE_REGISTRY = {
         }),
       }),
       entry(block("cooldown_block", { durationSeconds: 5 * 60 })),
-    ],
+    ]),
     requiresWarmupCooldown: false,
     requiresRepeatGroup: true,
     repeatedIntensityRequiresRecovery: true,
@@ -151,7 +194,7 @@ export const MANUAL_WORKOUT_TEMPLATE_REGISTRY = {
     defaultNotes: "Move gradually from easy to steady, not maximal.",
     defaultTargetTruthMode: "structure_only",
     allowedTargetTruthModes: ["structure_only"],
-    defaultEntries: [
+    defaultSteps: templateSteps([
       entry(block("warmup_block", { durationSeconds: 10 * 60 })),
       entry(
         block("progression_block", {
@@ -172,7 +215,7 @@ export const MANUAL_WORKOUT_TEMPLATE_REGISTRY = {
         }),
       ),
       entry(block("cooldown_block", { durationSeconds: 5 * 60 })),
-    ],
+    ]),
     requiresWarmupCooldown: true,
     requiresRepeatGroup: false,
     repeatedIntensityRequiresRecovery: false,
@@ -335,7 +378,7 @@ export const MANUAL_WORKOUT_TEMPLATE_REGISTRY = {
     defaultNotes: "Adaptation through short run/walk repeats.",
     defaultTargetTruthMode: "structure_only",
     allowedTargetTruthModes: ["structure_only"],
-    defaultEntries: [
+    defaultSteps: templateSteps([
       repeatEntry({
         repeatCount: 10,
         safetyKind: "run_walk",
@@ -347,7 +390,7 @@ export const MANUAL_WORKOUT_TEMPLATE_REGISTRY = {
         }),
       }),
       entry(block("cooldown_block", { durationSeconds: 5 * 60, label: "Walk-jog cooldown" })),
-    ],
+    ]),
     requiresWarmupCooldown: false,
     requiresRepeatGroup: true,
     repeatedIntensityRequiresRecovery: true,
@@ -411,7 +454,7 @@ function supportTemplate(input: {
   calendarIconKey: CalendarIconKey;
   workoutType: WorkoutType;
   defaultTitle: string;
-  mainBlock: ManualWorkoutBlockInput;
+  mainBlock: ManualWorkoutTemplateBlock;
   warmupSeconds?: number;
   cooldownSeconds?: number;
   defaultNotes: string | null;
@@ -430,11 +473,11 @@ function supportTemplate(input: {
     defaultNotes: input.defaultNotes,
     defaultTargetTruthMode: input.defaultTargetTruthMode ?? "structure_only",
     allowedTargetTruthModes: input.allowedTargetTruthModes ?? ["structure_only"],
-    defaultEntries: [
+    defaultSteps: templateSteps([
       entry(block("warmup_block", { durationSeconds: input.warmupSeconds ?? 10 * 60 })),
       entry(input.mainBlock),
       entry(block("cooldown_block", { durationSeconds: input.cooldownSeconds ?? 5 * 60 })),
-    ],
+    ]),
     requiresWarmupCooldown: false,
     requiresRepeatGroup: false,
     repeatedIntensityRequiresRecovery: false,
@@ -453,8 +496,8 @@ function repeatWorkoutTemplate(input: {
   defaultNotes: string | null;
   safetyKind: "intervals" | "tempo_repeats" | "hill_repeats" | "downhill_control";
   groupLabel: string;
-  workBlock: ManualWorkoutBlockInput;
-  recoveryBlock: ManualWorkoutBlockInput;
+  workBlock: ManualWorkoutTemplateBlock;
+  recoveryBlock: ManualWorkoutTemplateBlock;
   repeatCount: number;
 }): ManualWorkoutTemplate {
   return {
@@ -468,7 +511,7 @@ function repeatWorkoutTemplate(input: {
     defaultNotes: input.defaultNotes,
     defaultTargetTruthMode: "structure_only",
     allowedTargetTruthModes: ["structure_only"],
-    defaultEntries: [
+    defaultSteps: templateSteps([
       entry(block("warmup_block", { durationSeconds: 15 * 60 })),
       repeatEntry({
         repeatCount: input.repeatCount,
@@ -478,7 +521,7 @@ function repeatWorkoutTemplate(input: {
         recoveryBlock: input.recoveryBlock,
       }),
       entry(block("cooldown_block", { durationSeconds: 10 * 60 })),
-    ],
+    ]),
     requiresWarmupCooldown: true,
     requiresRepeatGroup: true,
     repeatedIntensityRequiresRecovery: true,
@@ -493,7 +536,7 @@ function longRunTemplate(input: {
   defaultTitle: string;
   defaultNotes: string | null;
   bodySeconds: number;
-  finishBlock?: ManualWorkoutBlockInput;
+  finishBlock?: ManualWorkoutTemplateBlock;
 }): ManualWorkoutTemplate {
   return {
     templateKey: input.templateKey,
@@ -506,12 +549,12 @@ function longRunTemplate(input: {
     defaultNotes: input.defaultNotes,
     defaultTargetTruthMode: "structure_only",
     allowedTargetTruthModes: ["structure_only"],
-    defaultEntries: [
+    defaultSteps: templateSteps([
       entry(block("warmup_block", { durationSeconds: 10 * 60, label: "Opener" })),
       entry(block("long_run_body_block", { durationSeconds: input.bodySeconds })),
       ...(input.finishBlock ? [entry(input.finishBlock)] : []),
       entry(block("cooldown_block", { durationSeconds: 5 * 60 })),
-    ],
+    ]),
     requiresWarmupCooldown: false,
     requiresRepeatGroup: false,
     repeatedIntensityRequiresRecovery: false,
@@ -520,16 +563,16 @@ function longRunTemplate(input: {
 }
 
 function block(
-  blockKey: ManualWorkoutBlockInput["blockKey"],
-  value: Omit<ManualWorkoutBlockInput, "blockKey">,
-): ManualWorkoutBlockInput {
+  blockKey: ManualWorkoutTemplateBlock["blockKey"],
+  value: Omit<ManualWorkoutTemplateBlock, "blockKey">,
+): ManualWorkoutTemplateBlock {
   return {
     blockKey,
     ...value,
   };
 }
 
-function entry(blockValue: ManualWorkoutBlockInput): ManualWorkoutConstructorEntryInput {
+function entry(blockValue: ManualWorkoutTemplateBlock): ManualWorkoutTemplateEntry {
   return {
     kind: "block",
     block: blockValue,
@@ -538,18 +581,197 @@ function entry(blockValue: ManualWorkoutBlockInput): ManualWorkoutConstructorEnt
 
 function repeatEntry(group: {
   repeatCount: number;
-  safetyKind: ManualWorkoutRepeatSafetyKind;
+  safetyKind: Extract<ManualWorkoutTemplateEntry, { kind: "repeat_group" }>["group"]["safetyKind"];
   groupLabel: string;
-  workBlock: ManualWorkoutBlockInput;
-  recoveryBlock?: ManualWorkoutBlockInput;
-}): ManualWorkoutConstructorEntryInput {
+  workBlock: ManualWorkoutTemplateBlock;
+  recoveryBlock?: ManualWorkoutTemplateBlock;
+}): ManualWorkoutTemplateEntry {
   return {
     kind: "repeat_group",
     group: {
       ...group,
       children: [group.workBlock, group.recoveryBlock].filter(
-        (block): block is ManualWorkoutBlockInput => Boolean(block),
+        (block): block is ManualWorkoutTemplateBlock => Boolean(block),
       ),
     },
   };
+}
+
+function templateSteps(entries: ManualWorkoutTemplateEntry[]): WorkoutDocumentSection[] {
+  return normalizeExecutableStepInstructions(
+    entries.flatMap((entryValue, index) => {
+      const sequence = index + 1;
+      if (entryValue.kind === "block") {
+        return entryValue.block.blockKey === "coach_cue_note_block"
+          ? []
+          : [templateBlockToStep(entryValue.block, sequence)];
+      }
+
+      const children = entryValue.group.children.map((child, childIndex) => {
+        const prescription = templateBlockPrescription(child);
+        return {
+          segment_id: `manual-segment-${sequence}-child-${childIndex + 1}`,
+          role: templateRepeatRole(child.blockKey),
+          label: child.label ?? templateBlockLabel(child.blockKey),
+          sequence: childIndex + 1,
+          guidance: child.noteText ?? templateBlockGuidance(child.blockKey),
+          prescription,
+        };
+      });
+
+      return [
+        {
+          type: templateRepeatStepType(entryValue.group.safetyKind),
+          segment_id: `manual-segment-${sequence}`,
+          segment_type: templateRepeatSegmentType(entryValue.group.safetyKind),
+          sequence,
+          label: entryValue.group.groupLabel,
+          prescription: {
+            mode: "repeats" as const,
+            repeat_count: entryValue.group.repeatCount,
+            children,
+          },
+          repeats: entryValue.group.repeatCount,
+          children: children.map((child) => ({
+            type: templateRepeatChildStepType(child.role),
+            segment_id: child.segment_id,
+            segment_type: child.role,
+            sequence: child.sequence,
+            label: child.label,
+            prescription: child.prescription,
+            ...(child.prescription.duration_min
+              ? { duration_min: child.prescription.duration_min }
+              : {}),
+            ...(child.prescription.distance_km
+              ? { distance_km: child.prescription.distance_km }
+              : {}),
+            guidance: child.guidance,
+          })),
+        },
+      ];
+    }) as Step[],
+  );
+}
+
+function templateBlockToStep(
+  blockValue: ManualWorkoutTemplateBlock,
+  sequence: number,
+): WorkoutDocumentSection {
+  const prescription = templateBlockPrescription(blockValue);
+  return {
+    type: templateStepType(blockValue.blockKey),
+    segment_id: `manual-segment-${sequence}`,
+    segment_type: templateSegmentType(blockValue.blockKey),
+    sequence,
+    label: blockValue.label ?? templateBlockLabel(blockValue.blockKey),
+    prescription,
+    guidance: blockValue.noteText ?? templateBlockGuidance(blockValue.blockKey),
+    ...(prescription.duration_min ? { duration_min: prescription.duration_min } : {}),
+    ...(prescription.distance_km ? { distance_km: prescription.distance_km } : {}),
+    target: { hint: templateBlockGuidance(blockValue.blockKey) },
+  };
+}
+
+function templateBlockPrescription(blockValue: ManualWorkoutTemplateBlock) {
+  if (blockValue.distanceMeters) {
+    return {
+      mode: "distance" as const,
+      distance_km: Number((blockValue.distanceMeters / 1000).toFixed(3)),
+    };
+  }
+  if (blockValue.durationSeconds) {
+    return {
+      mode: "time" as const,
+      duration_min: Number((blockValue.durationSeconds / 60).toFixed(2)),
+    };
+  }
+  return { mode: "none" as const };
+}
+
+function templateRepeatRole(blockKey: ManualWorkoutTemplateBlockKey) {
+  if (blockKey === "warmup_block") return "warm_up" as const;
+  if (blockKey === "rest_walk_jog_recovery_block") return "walk" as const;
+  if (blockKey === "interval_recovery_block") return "recover" as const;
+  if (blockKey === "cooldown_block") return "cooldown" as const;
+  if (blockKey === "long_run_finish_block") return "finish" as const;
+  if (blockKey === "steady_run_block" || blockKey === "easy_run_block") return "run" as const;
+  return "work" as const;
+}
+
+function templateRepeatChildStepType(role: ReturnType<typeof templateRepeatRole>) {
+  if (role === "warm_up") return "warmup";
+  if (role === "recover") return "recovery";
+  if (role === "cooldown") return "cooldown";
+  return role;
+}
+
+function templateStepType(blockKey: ManualWorkoutTemplateBlockKey) {
+  if (blockKey === "warmup_block") return "warmup";
+  if (blockKey === "cooldown_block") return "cooldown";
+  if (blockKey === "steady_run_block") return "steady";
+  if (blockKey === "progression_block") return "progression";
+  if (blockKey === "tempo_block") return "tempo";
+  if (blockKey === "threshold_block") return "threshold";
+  if (blockKey === "hill_work_block") return "hills";
+  if (blockKey === "long_run_body_block") return "long_run_body";
+  if (blockKey === "long_run_finish_block") return "long_run_finish";
+  if (blockKey === "strides_block") return "strides";
+  if (blockKey === "rest_walk_jog_recovery_block" || blockKey === "interval_recovery_block")
+    return "recovery";
+  return "easy";
+}
+
+function templateSegmentType(blockKey: ManualWorkoutTemplateBlockKey) {
+  if (blockKey === "warmup_block") return "warmup";
+  if (blockKey === "cooldown_block") return "cooldown";
+  if (blockKey === "long_run_finish_block") return "finish";
+  if (blockKey === "interval_recovery_block" || blockKey === "rest_walk_jog_recovery_block")
+    return "recovery";
+  if (blockKey === "strides_block") return "strides";
+  if (blockKey === "tempo_block" || blockKey === "threshold_block") return "tempo_block";
+  if (
+    blockKey === "hill_work_block" ||
+    blockKey === "downhill_control_block" ||
+    blockKey === "interval_work_block"
+  )
+    return "interval_block";
+  return "main";
+}
+
+function templateRepeatStepType(
+  kind: Extract<ManualWorkoutTemplateEntry, { kind: "repeat_group" }>["group"]["safetyKind"],
+) {
+  if (kind === "tempo_repeats") return "tempo";
+  if (kind === "hill_repeats" || kind === "downhill_control") return "hills";
+  if (kind === "run_walk") return "easy";
+  if (kind === "strides") return "strides";
+  return "intervals";
+}
+
+function templateRepeatSegmentType(
+  kind: Extract<ManualWorkoutTemplateEntry, { kind: "repeat_group" }>["group"]["safetyKind"],
+) {
+  if (kind === "tempo_repeats") return "tempo_block";
+  if (kind === "strides") return "strides";
+  if (kind === "run_walk") return "recovery_jog";
+  return "interval_block";
+}
+
+function templateBlockLabel(blockKey: ManualWorkoutTemplateBlockKey) {
+  return blockKey
+    .replace(/_block$/, "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function templateBlockGuidance(blockKey: ManualWorkoutTemplateBlockKey) {
+  if (blockKey === "warmup_block") return "Start easy and controlled.";
+  if (blockKey === "cooldown_block") return "Finish easy; jog or walk before stopping.";
+  if (blockKey === "interval_recovery_block" || blockKey === "rest_walk_jog_recovery_block")
+    return "Recover easily before the next repeat.";
+  if (blockKey === "hill_work_block")
+    return "Run uphill with controlled form; no exact grade target.";
+  if (blockKey === "long_run_finish_block") return "Keep the finish controlled, not race effort.";
+  if (blockKey === "strides_block") return "Relaxed fast running with full control.";
+  return "Use the numeric structure as the executable target.";
 }

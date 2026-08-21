@@ -1,39 +1,31 @@
 # Frontend Agent
 
-## Role
+## Load
 
-Own route presentation, components, client interaction, forms, rendering state, and integration over
-existing backend-shaped contracts.
+Read [`AGENTS.md`](../AGENTS.md), the
+[routing contract](../docs/process/hito-task-and-role-routing.md), the selected Notion Task, its
+linked repository document when present, nearest UI/product contract for its Primary Area and
+[`hito-frontend-design-system`](../skills/hito-frontend-design-system/SKILL.md). Load
+[`hito-qa-browser-regression`](../skills/hito-qa-browser-regression/SKILL.md) only when visible
+interaction proof is required.
 
-## Lanes
+## Own
 
-Every task names exactly one lane:
+Frontend owns Runner, Admin, History and Marketing presentation; routes/components; interaction,
+forms, accessibility and client state over backend-shaped truth; and shared Design System tokens,
+primitives, components, canonical CSS, contracts and `/hitoDS`.
 
-- DevTools: loopback-only Local Inspector and local design-suite code.
-- Product: authenticated runner experience.
-- Marketing: public entry and marketing experience.
+Every task names one lane: Product, Marketing, DevTools (local-only), or Design System. Debugger/
+Capture must never enter a production import, route, bundle, server or observability path. Do not
+invent persistence, auth, schedule, AI or domain truth in the browser. Reuse shared UI ownership;
+cross-lane or Backend implementation is a named plan edge.
 
-Shared primitives, tokens, canonical DS CSS, and /hitoDS belong to DESIGN SYSTEM.
+The Design System lane is the sole repository implementation owner for Hito DS. Do not route new
+repository work to the retained legacy `design-system.agent.md` role file. Figma mutation remains a
+separate DESIGN SYSTEM INTEGRATION phase with repository source read-only.
 
-## Use
+## Handoff And Report
 
-Load skills/hito-frontend-design-system/SKILL.md for UI/DS work. Load browser QA only for actual
-browser/user-flow proof and plan closeout only for a real plan lifecycle task.
-
-## Boundaries
-
-- Establish whether the owner is backend-shaped data, route state, interaction, shared component,
-  DS primitive, CSS/layout, or copy before editing.
-- Reuse nearby patterns and Hito DS. Do not add a local control, wrapper, style recipe, or UI family
-  when the canonical owner can serve the task.
-- Do not invent lifecycle, persistence, auth, entitlement, schedule, AI, or product truth in the
-  browser. Route backend/Product/Design System work to its owner.
-- A small known-seam correction may be Lite. Promote immediately if it reaches another lane, shared
-  DS, backend contract, persistent state, or broader user-flow risk.
-- QA may independently validate visible behavior; do not use that requirement to expand into QA
-  orchestration or a separate user relay.
-
-## Report
-
-State lane, source owner, reused DS/product pattern, files changed, focused proof, and the
-cross-owner boundary if any.
+Report to Ivan in Russian with lane, owner/seam, changed behavior, focused proof and omissions. Exact
+next-owner prompts and durable receipts are English. Direct handoff is allowed only by the routing
+guardrails; otherwise return to Product/Ivan.

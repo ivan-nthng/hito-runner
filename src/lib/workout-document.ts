@@ -66,7 +66,7 @@ export interface WorkoutDocumentTarget {
 export type WorkoutDocumentUnitPrescription = PlannedWorkoutUnitPrescription;
 type WorkoutDocumentRepeatChildRole = PlannedWorkoutRepeatChildRole;
 export type WorkoutDocumentRepeatChildPrescription =
-  PlannedWorkoutRepeatChildPrescription<WorkoutDocumentTarget>;
+  PlannedWorkoutRepeatChildPrescription<WorkoutDocumentTarget> & { segment_id: string };
 
 export interface WorkoutDocumentPrescription {
   mode: "time" | "distance" | "repeats" | "none";
@@ -123,8 +123,6 @@ export interface WorkoutDocument extends WorkoutDocumentContent {
   displayOrder: number;
 }
 
-export type WorkoutDocumentEditProjection = Omit<WorkoutDocumentContent, "sourceWorkoutType">;
-
 export type WorkoutDocumentValidationResult<T> =
   | { ok: true; value: T }
   | { ok: false; message: string };
@@ -149,6 +147,39 @@ export interface PersistedWorkoutDocumentRow {
   recovery_priority: unknown;
   steps: unknown;
   display_order: unknown;
+}
+
+/** Strict authoring-boundary parser for the canonical camel-case document vocabulary. */
+export function normalizeWorkoutDocument(
+  value: unknown,
+): WorkoutDocumentValidationResult<WorkoutDocument> {
+  const document = unknownRecord(value);
+
+  if (!document) {
+    return invalidDocument("The workout document is invalid.");
+  }
+
+  return normalizePersistedWorkoutDocument({
+    workout_date: document.workoutDate,
+    weekday: document.weekday,
+    week_number: document.weekNumber,
+    phase: document.phase,
+    workout_type: document.workoutType,
+    source_workout_id: document.sourceWorkoutId,
+    source_workout_type: document.sourceWorkoutType,
+    workout_family: document.workoutFamily,
+    workout_identity: document.workoutIdentity,
+    calendar_icon_key: document.calendarIconKey,
+    goal_context: document.goalContext,
+    metric_mode: document.metricMode,
+    title: document.title,
+    notes: document.notes,
+    planned_rpe: document.plannedRpe,
+    estimated_fatigue: document.estimatedFatigue,
+    recovery_priority: document.recoveryPriority,
+    steps: document.steps,
+    display_order: document.displayOrder,
+  });
 }
 
 /** Strict write-boundary parser. Readback callers should keep using readWorkoutDocumentSections. */
@@ -213,43 +244,6 @@ export function normalizePersistedWorkoutDocument(
       estimatedFatigue,
       recoveryPriority,
       displayOrder,
-    },
-  };
-}
-
-export function buildWorkoutDocumentEditProjection(
-  document: WorkoutDocument,
-): WorkoutDocumentEditProjection {
-  return {
-    workoutType: document.workoutType,
-    workoutFamily: document.workoutFamily,
-    workoutIdentity: document.workoutIdentity,
-    calendarIconKey: document.calendarIconKey,
-    metricMode: document.metricMode,
-    title: document.title,
-    notes: document.notes,
-    steps: document.steps,
-  };
-}
-
-export function buildEditedWorkoutDocument(
-  source: WorkoutDocument,
-  projection: unknown,
-): WorkoutDocumentValidationResult<WorkoutDocument> {
-  const content = normalizeWorkoutDocumentContent({
-    ...unknownRecord(projection),
-    sourceWorkoutType: source.sourceWorkoutType,
-  });
-
-  if (!content.ok) {
-    return content;
-  }
-
-  return {
-    ok: true,
-    value: {
-      ...source,
-      ...content.value,
     },
   };
 }
@@ -323,6 +317,146 @@ export function readWorkoutDocumentSections(value: unknown): WorkoutDocumentSect
   }
 
   return value.filter(isRecord) as unknown as WorkoutDocumentSection[];
+}
+
+export type WorkoutDocumentNestedSegmentIdentityBackfillResult =
+  | { ok: true; value: unknown[]; changed: boolean }
+  | { ok: false; message: string };
+
+/**
+ * Adds identity only to legacy Repeat children that do not yet have it. The caller owns
+ * eligibility and persistence; this helper deliberately does not normalize or rewrite any
+ * other persisted workout truth.
+ */
+export function backfillWorkoutDocumentNestedSegmentIds(
+  value: unknown,
+  createSegmentId: () => string = () => globalThis.crypto.randomUUID(),
+): WorkoutDocumentNestedSegmentIdentityBackfillResult {
+  if (!Array.isArray(value)) {
+    return invalidDocument("The persisted workout requires an ordered steps array.");
+  }
+
+  const usedIds = new Set<string>();
+  for (const section of value) {
+    const record = unknownRecord(section);
+    const sectionId = readString(record?.segment_id);
+    if (sectionId && usedIds.has(sectionId)) {
+      return invalidDocument("Workout sections require globally unique stable segment IDs.");
+    }
+    if (sectionId) usedIds.add(sectionId);
+
+    const prescription = unknownRecord(record?.prescription);
+    if (prescription?.mode !== "repeats") continue;
+    if (!Array.isArray(prescription.children)) {
+      return invalidDocument(
+        "Repeat prescriptions require ordered children before identity backfill.",
+      );
+    }
+
+    const materializedChildren = record?.children;
+    if (
+      materializedChildren !== undefined &&
+      (!Array.isArray(materializedChildren) ||
+        materializedChildren.length !== prescription.children.length)
+    ) {
+      return invalidDocument("Materialized repeat children do not match authoritative children.");
+    }
+
+    for (let index = 0; index < prescription.children.length; index += 1) {
+      const childRecord = unknownRecord(prescription.children[index]);
+      const materializedRecord = Array.isArray(materializedChildren)
+        ? unknownRecord(materializedChildren[index])
+        : null;
+      if (!childRecord) {
+        return invalidDocument("Repeat children must be objects before identity backfill.");
+      }
+      if (Array.isArray(materializedChildren) && !materializedRecord) {
+        return invalidDocument("Materialized repeat children must be objects.");
+      }
+
+      const authoritativeId = readString(childRecord.segment_id);
+      const materializedId = readString(materializedRecord?.segment_id);
+      if (
+        (childRecord.segment_id !== undefined && !authoritativeId) ||
+        (materializedRecord?.segment_id !== undefined && !materializedId) ||
+        (authoritativeId && materializedId && authoritativeId !== materializedId)
+      ) {
+        return invalidDocument("Materialized repeat child identity conflicts with its authority.");
+      }
+      const existingId = authoritativeId ?? materializedId;
+      if (existingId) {
+        if (usedIds.has(existingId)) {
+          return invalidDocument("Repeat children require globally unique stable segment IDs.");
+        }
+        usedIds.add(existingId);
+      }
+    }
+  }
+
+  let changed = false;
+  let steps: unknown[];
+  try {
+    steps = value.map((section) => {
+      const record = unknownRecord(section)!;
+      const prescription = unknownRecord(record.prescription);
+      if (prescription?.mode !== "repeats" || !Array.isArray(prescription.children)) {
+        return section;
+      }
+
+      const sourceMaterializedChildren = Array.isArray(record.children) ? record.children : null;
+      const assignedChildIds: string[] = [];
+      const children = prescription.children.map((child, index) => {
+        const childRecord = unknownRecord(child)!;
+        const existingId =
+          readString(childRecord.segment_id) ??
+          readString(unknownRecord(sourceMaterializedChildren?.[index])?.segment_id);
+        if (existingId) {
+          assignedChildIds.push(existingId);
+          if (readString(childRecord.segment_id)) return child;
+          changed = true;
+          return { ...childRecord, segment_id: existingId };
+        }
+
+        const segmentId = createUniqueSegmentId(createSegmentId, usedIds);
+        assignedChildIds.push(segmentId);
+        usedIds.add(segmentId);
+        changed = true;
+        return { ...childRecord, segment_id: segmentId };
+      });
+
+      let materializedChildren: unknown = sourceMaterializedChildren ?? record.children;
+      if (sourceMaterializedChildren) {
+        materializedChildren = sourceMaterializedChildren.map((child, index) => {
+          const childRecord = unknownRecord(child);
+          const existingId = readString(childRecord?.segment_id);
+          if (existingId) return child;
+          changed = true;
+          return { ...childRecord, segment_id: assignedChildIds[index] };
+        });
+      }
+
+      return {
+        ...record,
+        prescription: { ...prescription, children },
+        ...(materializedChildren !== undefined ? { children: materializedChildren } : {}),
+      };
+    });
+  } catch (error) {
+    return invalidDocument(
+      error instanceof Error ? error.message : "Nested segment identity backfill failed.",
+    );
+  }
+
+  return { ok: true, value: steps, changed };
+}
+
+function createUniqueSegmentId(createSegmentId: () => string, usedIds: ReadonlySet<string>) {
+  for (let attempt = 0; attempt < 32; attempt += 1) {
+    const candidate = createSegmentId().trim();
+    if (candidate && !usedIds.has(candidate)) return candidate;
+  }
+
+  throw new Error("A unique nested segment ID could not be generated.");
 }
 
 export function normalizeWorkoutDocumentTarget(value: unknown): WorkoutDocumentTarget | undefined {
@@ -465,12 +599,13 @@ export function workoutDocumentExecutableDurationForSections(
 }
 
 function workoutDocumentRepeatChildToSection(
-  child: WorkoutDocumentRepeatChildPrescription,
+  child: PlannedWorkoutRepeatChildPrescription<WorkoutDocumentTarget>,
 ): WorkoutDocumentSection {
   const prescription = { ...child.prescription };
 
   return {
     type: workoutDocumentSectionTypeForRepeatChild(child.role),
+    ...(child.segment_id ? { segment_id: child.segment_id } : {}),
     segment_type: child.role,
     label: child.label ?? plannedWorkoutRepeatChildLabel(child.role),
     sequence: child.sequence,
@@ -537,12 +672,15 @@ function normalizeWorkoutDocumentSectionsForWrite(
       return section;
     }
 
-    const segmentId = section.value.segment_id;
-    if (!segmentId || segmentIds.has(segmentId)) {
-      return invalidDocument("Workout sections require unique stable segment IDs.");
+    const sectionIds = [
+      section.value.segment_id,
+      ...workoutDocumentRepeatChildren(section.value).map((child) => child.segment_id),
+    ];
+    if (sectionIds.some((segmentId) => !segmentId || segmentIds.has(segmentId))) {
+      return invalidDocument("Workout sections require globally unique stable segment IDs.");
     }
 
-    segmentIds.add(segmentId);
+    sectionIds.forEach((segmentId) => segmentIds.add(segmentId!));
     sections.push(section.value);
   }
 
@@ -694,11 +832,16 @@ function normalizeWorkoutDocumentPrescriptionForWrite(
   }
 
   const children: WorkoutDocumentRepeatChildPrescription[] = [];
+  const childSegmentIds = new Set<string>();
   for (let index = 0; index < record.children.length; index += 1) {
     const child = normalizeWorkoutDocumentRepeatChildForWrite(record.children[index], index);
     if (!child.ok) {
       return child;
     }
+    if (childSegmentIds.has(child.value.segment_id)) {
+      return invalidDocument("Repeat children require unique stable segment IDs.");
+    }
+    childSegmentIds.add(child.value.segment_id);
     children.push(child.value);
   }
 
@@ -710,6 +853,7 @@ function normalizeWorkoutDocumentRepeatChildForWrite(
   index: number,
 ): WorkoutDocumentValidationResult<WorkoutDocumentRepeatChildPrescription> {
   const record = unknownRecord(value);
+  const segmentId = readString(record?.segment_id);
   const role = readString(record?.role);
   const label = readOptionalString(record?.label);
   const sequence = readPositiveInteger(record?.sequence);
@@ -719,6 +863,7 @@ function normalizeWorkoutDocumentRepeatChildForWrite(
 
   if (
     !record ||
+    !segmentId ||
     !role ||
     !["warm_up", "run", "walk", "work", "recover", "finish", "cooldown"].includes(role) ||
     label === INVALID_NULLABLE_STRING ||
@@ -735,6 +880,7 @@ function normalizeWorkoutDocumentRepeatChildForWrite(
   return {
     ok: true,
     value: {
+      segment_id: segmentId,
       role: role as WorkoutDocumentRepeatChildRole,
       ...(label ? { label } : {}),
       sequence,
@@ -756,6 +902,7 @@ function normalizeMaterializedRepeatChildren(
   for (let index = 0; index < value.length; index += 1) {
     const record = unknownRecord(value[index]);
     const type = readString(record?.type);
+    const segmentId = readString(record?.segment_id);
     const segmentType = readOptionalString(record?.segment_type);
     const label = readOptionalNullableString(record?.label);
     const sequence = readPositiveInteger(record?.sequence);
@@ -765,6 +912,7 @@ function normalizeMaterializedRepeatChildren(
     if (
       !record ||
       !type ||
+      !segmentId ||
       !sequence ||
       segmentType === INVALID_NULLABLE_STRING ||
       label === INVALID_NULLABLE_STRING ||
@@ -779,6 +927,7 @@ function normalizeMaterializedRepeatChildren(
 
     normalized.push({
       type,
+      segment_id: segmentId,
       ...(segmentType ? { segment_type: segmentType } : {}),
       ...(label !== undefined ? { label } : {}),
       sequence,
@@ -816,6 +965,9 @@ function normalizeWorkoutDocumentTargetForWrite(
 
   for (const [key, entry] of Object.entries(record)) {
     if (key === "extra") continue;
+    if (!WORKOUT_DOCUMENT_TARGET_KEY_SET.has(key)) {
+      return invalidDocument(`Workout target field ${key} is unknown.`);
+    }
     if (typeof entry !== "string" && !(typeof entry === "number" && Number.isFinite(entry))) {
       return invalidDocument(`Workout target field ${key} is invalid.`);
     }
@@ -840,10 +992,208 @@ function normalizeWorkoutDocumentTargetForWrite(
     return invalidDocument("The workout target execution mode is invalid.");
   }
 
+  const shapeIssue = validateWorkoutDocumentTargetShape(record);
+  if (shapeIssue) {
+    return invalidDocument(shapeIssue);
+  }
+
   const normalized = normalizeWorkoutDocumentTarget(record);
   return normalized && Object.keys(normalized).length > 0
     ? { ok: true, value: normalized }
     : invalidDocument("Workout targets cannot be empty.");
+}
+
+function validateWorkoutDocumentTargetShape(record: Record<string, unknown>): string | null {
+  const mode = record.primary_execution_mode as PrimaryExecutionMode | undefined;
+  const targetSource = readString(record.target_source);
+  const hrTargetSource = readString(record.hr_target_source);
+  const pace = readString(record.pace);
+  const canonicalPaceRange = readString(record.pace_min_per_km_range);
+  const legacyPaceRange = readString(record.pace_range_min_km);
+  const paceRange = canonicalPaceRange ?? legacyPaceRange;
+  const hasPaceValues = Boolean(
+    pace ||
+    paceRange ||
+    record.pace_seconds_per_km !== undefined ||
+    record.pace_min_seconds_per_km !== undefined ||
+    record.pace_max_seconds_per_km !== undefined,
+  );
+  const hasHrValues = Boolean(
+    readString(record.hr_bpm_range) ||
+    readString(record.hr_bpm) ||
+    record.hr_bpm_cap !== undefined ||
+    record.hr_bpm_min !== undefined ||
+    record.hr_bpm_max !== undefined,
+  );
+  const hasRpe = record.rpe !== undefined;
+
+  if (canonicalPaceRange && legacyPaceRange && canonicalPaceRange !== legacyPaceRange) {
+    return "Workout pace range aliases conflict.";
+  }
+  if (
+    record.hr_target_source !== undefined &&
+    (!hrTargetSource || !WORKOUT_DOCUMENT_HR_TARGET_SOURCE_VALUES.has(hrTargetSource))
+  ) {
+    return "Workout targets require a known heart-rate provenance source.";
+  }
+  if (!mode) {
+    if (targetSource || hrTargetSource) {
+      return "Supplemental target context cannot claim executable target provenance.";
+    }
+    return hasPaceValues || hasHrValues || hasRpe
+      ? "Executable workout targets require an explicit execution mode."
+      : null;
+  }
+  if (!targetSource) {
+    return "Executable workout targets require target provenance.";
+  }
+
+  if (mode === "pace") {
+    if (hasHrValues || hasRpe) {
+      return "Pace targets cannot contain heart-rate or RPE values.";
+    }
+    if (Boolean(pace) === Boolean(paceRange)) {
+      return "Pace targets require exactly one exact pace or pace range.";
+    }
+    if (hrTargetSource && hrTargetSource !== "effort_only") {
+      return "Pace targets may retain only effort-only heart-rate context.";
+    }
+
+    const exactSeconds = pace ? parsePaceSeconds(pace) : null;
+    const rangeSeconds = paceRange
+      ? parsePaceRangeSeconds(paceRange)
+      : pace
+        ? parsePaceRangeSeconds(pace)
+        : null;
+    if ((pace && exactSeconds == null && !rangeSeconds) || (paceRange && !rangeSeconds)) {
+      return "Workout pace targets must use a valid min:sec per kilometre shape.";
+    }
+    if (
+      record.pace_seconds_per_km !== undefined &&
+      (!Number.isInteger(record.pace_seconds_per_km) ||
+        (record.pace_seconds_per_km as number) <= 0 ||
+        exactSeconds == null ||
+        record.pace_seconds_per_km !== exactSeconds)
+    ) {
+      return "Exact pace seconds must match the canonical pace value.";
+    }
+    const minSeconds = record.pace_min_seconds_per_km;
+    const maxSeconds = record.pace_max_seconds_per_km;
+    if ((minSeconds === undefined) !== (maxSeconds === undefined)) {
+      return "Pace range seconds must include both endpoints.";
+    }
+    if (
+      minSeconds !== undefined &&
+      (!Number.isInteger(minSeconds) ||
+        !Number.isInteger(maxSeconds) ||
+        (minSeconds as number) <= 0 ||
+        (maxSeconds as number) <= (minSeconds as number) ||
+        !rangeSeconds ||
+        minSeconds !== rangeSeconds.min ||
+        maxSeconds !== rangeSeconds.max)
+    ) {
+      return "Pace range seconds must match the canonical pace range.";
+    }
+    return null;
+  }
+
+  if (mode === "heart_rate") {
+    if (hasPaceValues || hasRpe || readString(record.intensity)) {
+      return "Heart-rate targets cannot contain pace, effort, or RPE values.";
+    }
+    if (!hrTargetSource || hrTargetSource === "effort_only") {
+      return "Heart-rate targets require a known heart-rate provenance source.";
+    }
+    const cap = record.hr_bpm_cap;
+    const range = readString(record.hr_bpm_range);
+    if (Boolean(cap !== undefined) === Boolean(range)) {
+      return "Heart-rate targets require exactly one cap or range.";
+    }
+    if (cap !== undefined) {
+      if (!isPlausibleBpm(cap)) return "Heart-rate caps must be whole numbers from 30 to 250.";
+      const display = readString(record.hr_bpm);
+      if (display && !new RegExp(`^${cap}\\s*bpm$`, "i").test(display)) {
+        return "Heart-rate cap display must match the canonical cap.";
+      }
+      if (record.hr_bpm_min !== undefined || record.hr_bpm_max !== undefined) {
+        return "Heart-rate caps cannot contain range endpoints.";
+      }
+      return null;
+    }
+
+    const parsedRange = parseBpmRange(range!);
+    if (!parsedRange) return "Heart-rate ranges must be increasing values from 30 to 250 BPM.";
+    const min = record.hr_bpm_min;
+    const max = record.hr_bpm_max;
+    if ((min === undefined) !== (max === undefined)) {
+      return "Heart-rate ranges must include both numeric endpoints when materialized.";
+    }
+    if (min !== undefined && (min !== parsedRange.min || max !== parsedRange.max)) {
+      return "Heart-rate range endpoints must match the canonical range.";
+    }
+    if (record.hr_bpm !== undefined) {
+      return "Heart-rate ranges cannot also contain a cap display.";
+    }
+    return null;
+  }
+
+  if (hasPaceValues || hasHrValues) {
+    return "Effort and run-walk targets cannot contain pace or heart-rate values.";
+  }
+  if (hrTargetSource) {
+    return "Effort and run-walk targets cannot claim heart-rate target provenance.";
+  }
+  if (mode === "effort") {
+    const intensity = readString(record.intensity);
+    if (Boolean(intensity) === hasRpe) {
+      return "Effort targets require exactly one RPE or intensity value.";
+    }
+    if (hasRpe && !isValidRpe(record.rpe)) {
+      return "RPE targets must be whole numbers from 0 to 10.";
+    }
+    return null;
+  }
+
+  if (!readString(record.intensity) || hasRpe) {
+    return "Run-walk targets require one intensity value and cannot contain RPE.";
+  }
+  return null;
+}
+
+function parsePaceSeconds(value: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})\s*\/\s*km$/i.exec(value.trim());
+  if (!match) return null;
+  const minutes = Number(match[1]);
+  const seconds = Number(match[2]);
+  return seconds < 60 ? minutes * 60 + seconds : null;
+}
+
+function parsePaceRangeSeconds(value: string): { min: number; max: number } | null {
+  const normalized = value.trim();
+  const match = /^(\d{1,2}:\d{2})(?:\s*\/\s*km)?\s*-\s*(\d{1,2}:\d{2})\s*\/\s*km$/i.exec(
+    normalized,
+  );
+  if (!match) return null;
+  const min = parsePaceSeconds(`${match[1]}/km`);
+  const max = parsePaceSeconds(`${match[2]}/km`);
+  return min != null && max != null && min < max ? { min, max } : null;
+}
+
+function parseBpmRange(value: string): { min: number; max: number } | null {
+  const match = /^(\d{2,3})\s*-\s*(\d{2,3})(?:\s*bpm)?$/i.exec(value.trim());
+  if (!match) return null;
+  const min = Number(match[1]);
+  const max = Number(match[2]);
+  return isPlausibleBpm(min) && isPlausibleBpm(max) && min < max ? { min, max } : null;
+}
+
+function isPlausibleBpm(value: unknown): value is number {
+  return Number.isInteger(value) && (value as number) >= 30 && (value as number) <= 250;
+}
+
+function isValidRpe(value: unknown) {
+  const parsed = typeof value === "string" ? Number(value) : value;
+  return Number.isInteger(parsed) && (parsed as number) >= 0 && (parsed as number) <= 10;
 }
 
 function readWorkoutDocumentType(value: unknown): WorkoutDocumentType | null {
@@ -949,6 +1299,13 @@ const WORKOUT_DOCUMENT_TARGET_KEYS = [
 ] as const;
 
 const WORKOUT_DOCUMENT_TARGET_KEY_SET = new Set<string>(WORKOUT_DOCUMENT_TARGET_KEYS);
+const WORKOUT_DOCUMENT_HR_TARGET_SOURCE_VALUES = new Set([
+  "personal_hr_zone",
+  "user_entered",
+  "runner_entered",
+  "default_estimated_hr",
+  "effort_only",
+]);
 
 function unknownRecord(value: unknown): Record<string, unknown> | null {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value)

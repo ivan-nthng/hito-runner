@@ -12,11 +12,16 @@ import {
   buildAiGeneratedRunningPlanQaFixtureAuthoringInput,
 } from "../../src/lib/ai-generated-running-plan-dev-fixture";
 import { buildReviewedAiGeneratedRunningPlanPreviewForUser } from "../../src/lib/running-plan-engine-actions";
+import { retainImportedPlanCandidateForUser } from "../../src/lib/active-plan-persistence";
 import {
-  materializeFirstReviewedPlanForUser,
-  retainImportedPlanCandidateForUser,
-} from "../../src/lib/active-plan-persistence";
-import { importedPlanSchema, type ImportedPlan } from "../../src/lib/imported-plan";
+  buildImportedPlanSeed,
+  importedPlanSchema,
+  type ImportedPlan,
+} from "../../src/lib/imported-plan";
+import {
+  confirmWorkoutCommandForUser,
+  reviewWorkoutCommandForUser,
+} from "../../src/lib/manual-workout-authoring/actions";
 import { DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE } from "../../src/lib/local-auth-account-registry.server";
 import { digestSha256Hex, stableJsonStringify } from "../../src/lib/review-token-signing";
 import {
@@ -119,7 +124,9 @@ export async function seedRunnerCoreFileFlowFixture(input: {
     canonicalPlan,
     reviewChecksum: await digestSha256Hex(stableJsonStringify(canonicalPlan)),
   });
-  const materialized = await materializeFirstReviewedPlanForUser(input.userId, canonicalPlan, {
+  const materialized = await materializeSourceWorkoutBatchForFixture({
+    userId: input.userId,
+    canonicalPlan,
     sourcePlanId: sourcePlan.id,
     calendarInstant: new Date(`${asOfDate}T12:00:00.000Z`),
   });
@@ -287,6 +294,38 @@ function buildRunnerCoreFileFlowPlan(templatePlan: ImportedPlan, asOfDate: strin
   });
 }
 
+async function materializeSourceWorkoutBatchForFixture(input: {
+  userId: string;
+  canonicalPlan: ImportedPlan;
+  sourcePlanId: string;
+  calendarInstant: Date;
+}) {
+  const documents = buildImportedPlanSeed(input.canonicalPlan).workouts;
+  const review = await reviewWorkoutCommandForUser(input.userId, {
+    operation: "materialize",
+    documents,
+    provenanceReferences: documents.map((document) => ({
+      sourcePlanId: input.sourcePlanId,
+      sourceKind: input.canonicalPlan.source_kind,
+      sourceWorkoutId: document.sourceWorkoutId,
+    })),
+  });
+  assert.equal(review.ok, true);
+  if (!review.ok) throw new Error("Fixture Workout batch review failed.");
+  const confirmed = await confirmWorkoutCommandForUser(
+    input.userId,
+    {
+      command: review.candidate.command,
+      candidateId: review.candidate.candidateId,
+      reviewToken: review.candidate.reviewToken,
+      reviewChecksum: review.candidate.reviewChecksum,
+    },
+    { sourceBatchCalendarInstant: input.calendarInstant },
+  );
+  assert.equal(confirmed.ok, true, confirmed.ok ? "" : confirmed.message);
+  return confirmed;
+}
+
 const ACTIVITY_SPECS = Object.freeze<FixtureActivitySpec[]>([
   activity("w8-recovery", 55, "Recovery run", 30, 32, 4.8, 134, 18, true),
   activity("w8-easy", 53, "Easy run", 42, 44, 7, 142, 30, true),
@@ -409,14 +448,12 @@ export async function createRunnerDesignProfilePlan(input: {
   const historicalMaterializationInstant = new Date(
     `${reviewed.draft.canonicalPlan.start_date}T12:00:00`,
   );
-  const materialized = await materializeFirstReviewedPlanForUser(
-    input.userId,
-    reviewed.draft.canonicalPlan,
-    {
-      sourcePlanId: reviewed.savedPlanId,
-      calendarInstant: historicalMaterializationInstant,
-    },
-  );
+  const materialized = await materializeSourceWorkoutBatchForFixture({
+    userId: input.userId,
+    canonicalPlan: reviewed.draft.canonicalPlan,
+    sourcePlanId: reviewed.savedPlanId,
+    calendarInstant: historicalMaterializationInstant,
+  });
   assert.equal(materialized.ok, true);
   assert.equal(providerDispatchCount, 0);
 

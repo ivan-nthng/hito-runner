@@ -20,11 +20,11 @@ import {
 } from "@/lib/request-persisted-user";
 import {
   resolveCalendarWorkoutEditability,
+  resolveCalendarWorkoutSourceEditingCapabilities,
   resolvePlanProvenanceSourceStatus,
   type CalendarWorkoutEditOperation,
   type CalendarWorkoutEditabilityResult,
-} from "@/lib/active-plan-workout-editing/policy";
-import { resolveCalendarWorkoutSourceEditingCapabilities } from "@/lib/active-plan-workout-editing/source-capabilities";
+} from "@/lib/runner-calendar-mutations";
 import { findLocalAuthAccountByUserId } from "@/lib/local-auth";
 import {
   deriveWeekStatus,

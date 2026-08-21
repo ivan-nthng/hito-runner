@@ -4,8 +4,13 @@ import { retainImportedPlanCandidateForUser } from "@/lib/active-plan-persistenc
 import {
   CalendarPersistenceRejection,
   clearAtomicCalendarFutureWorkouts,
-} from "@/lib/active-plan-lifecycle-persistence";
-import { importedPlanSchema, validateImportedPlanJson } from "@/lib/imported-plan";
+} from "@/lib/runner-calendar-mutations";
+import {
+  TRAINING_PLAN_V2_IMPORT_SOURCE_KIND,
+  buildImportedPlanSeed,
+  importedPlanSchema,
+  validateImportedPlanJson,
+} from "@/lib/imported-plan";
 import {
   buildCalendarWorkoutExportPayload,
   buildPlanExportDocument,
@@ -15,6 +20,7 @@ import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted
 import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
 import { getCalendarWorkoutsWithLogsForUser } from "@/lib/runner-calendar-persistence";
 import { digestSha256Hex, stableJsonStringify } from "@/lib/review-token-signing";
+import { reviewWorkoutCommand } from "@/lib/workout-authoring-review";
 
 const uploadCalendarPlanJsonInputSchema = z.object({ rawJson: z.string().trim().min(1) }).strict();
 const deleteCalendarFutureWorkoutsInputSchema = z
@@ -75,11 +81,32 @@ export const uploadCalendarPlanJson = createServerFn({ method: "POST" })
 
     try {
       const canonicalPlan = importedPlanSchema.parse(parsed.data);
+      const workoutDocuments = buildImportedPlanSeed(canonicalPlan).workouts;
       const record = await retainImportedPlanCandidateForUser({
         userId,
         canonicalPlan,
         reviewChecksum: await digestSha256Hex(stableJsonStringify(canonicalPlan)),
       });
+      const candidateReview = reviewWorkoutCommand({
+        command: {
+          operation: "materialize",
+          documents: workoutDocuments,
+          provenanceReferences: workoutDocuments.map((document) => ({
+            sourcePlanId: record.id,
+            sourceKind: TRAINING_PLAN_V2_IMPORT_SOURCE_KIND,
+            sourceWorkoutId: document.sourceWorkoutId,
+          })),
+        },
+      });
+      if (!candidateReview.ok || candidateReview.candidate.collisions.length > 0) {
+        return {
+          ok: false as const,
+          status: "blocked" as const,
+          reason: "invalid_plan" as const,
+          message: "The selected plan does not contain a valid canonical workout candidate.",
+          calendarMutated: false as const,
+        };
+      }
 
       return {
         ok: true as const,
@@ -91,6 +118,8 @@ export const uploadCalendarPlanJson = createServerFn({ method: "POST" })
             (workout) => workout.workout_type !== "rest",
           ).length,
         },
+        workoutDocuments,
+        candidate: candidateReview.candidate,
         calendarMutated: false as const,
         callsOpenAi: false as const,
       };

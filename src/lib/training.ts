@@ -1,5 +1,5 @@
 import { signedOutPreviewPlanSeed } from "@/data/signed-out-preview-plan";
-import type { CalendarWorkoutSourceEditingCapabilities } from "@/lib/active-plan-workout-editing/source-capabilities";
+import type { CalendarWorkoutSourceEditingCapabilities } from "@/lib/runner-calendar-mutations";
 import type { BodyNote } from "@/lib/body-notes";
 import { heartRateGuidanceBandLabel } from "@/lib/heart-rate-zones";
 import {

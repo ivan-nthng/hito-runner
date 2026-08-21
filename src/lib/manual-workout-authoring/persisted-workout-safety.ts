@@ -1,10 +1,3 @@
-import type { PersistedPlannedWorkoutRow } from "@/lib/runner-calendar-persistence";
-import { getManualWorkoutRepeatGroupChildren } from "@/lib/manual-workout-authoring/repeat-groups";
-import {
-  manualWorkoutDraftInputSchema,
-  type ManualWorkoutBlockInput,
-} from "@/lib/manual-workout-authoring/schema";
-import { stableManualWorkoutChecksum64Hex } from "@/lib/manual-workout-authoring/review-exactness";
 import { stableJsonEqual } from "@/lib/review-token-signing";
 import {
   AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
@@ -21,12 +14,12 @@ type AiTargetPreservationResult =
       message: string;
     };
 
-export function persistedManualWorkoutHasUnsafeMetricTruth(workout: PersistedPlannedWorkoutRow) {
-  return hasUnsafeMetricTruth(workout.metric_mode) || hasUnsafeMetricTruth(workout.steps);
+export function workoutDocumentHasUnsafeMetricTruth(document: WorkoutDocument) {
+  return workoutDocumentValuesHaveUnsafeMetricTruth(document.metricMode, document.steps);
 }
 
-export function workoutDocumentHasUnsafeMetricTruth(document: WorkoutDocument) {
-  return hasUnsafeMetricTruth(document.metricMode) || hasUnsafeMetricTruth(document.steps);
+export function workoutDocumentValuesHaveUnsafeMetricTruth(metricMode: unknown, steps: unknown) {
+  return hasUnsafeMetricTruth(metricMode) || hasUnsafeMetricTruth(steps);
 }
 
 export function validateWorkoutDocumentTargetEdit(
@@ -93,40 +86,6 @@ export function validateWorkoutDocumentTargetEdit(
   return { ok: true };
 }
 
-export function validatePreservedAiAuthoredTargetTruth(
-  candidateInput: unknown,
-  sourceInput: unknown,
-): AiTargetPreservationResult {
-  const candidate = manualWorkoutDraftInputSchema.safeParse(candidateInput);
-  const source = manualWorkoutDraftInputSchema.safeParse(sourceInput);
-
-  if (!candidate.success || !source.success) {
-    return {
-      ok: false,
-      message: "The persisted workout target truth could not be verified.",
-    };
-  }
-
-  const sourceTargetCounts = countAiAuthoredTargets(source.data.entries ?? []);
-
-  for (const target of collectAiAuthoredTargets(candidate.data.entries ?? [])) {
-    const checksum = stableManualWorkoutChecksum64Hex(target);
-    const remaining = sourceTargetCounts.get(checksum) ?? 0;
-
-    if (remaining === 0) {
-      return {
-        ok: false,
-        message:
-          "AI-authored target guidance must remain unchanged or be replaced by runner-entered guidance.",
-      };
-    }
-
-    sourceTargetCounts.set(checksum, remaining - 1);
-  }
-
-  return { ok: true };
-}
-
 function hasUnsafeMetricTruth(value: unknown): boolean {
   if (Array.isArray(value)) {
     return value.some(hasUnsafeMetricTruth);
@@ -175,59 +134,20 @@ function hasUnsafeMetricTruth(value: unknown): boolean {
   return Object.values(record).some(hasUnsafeMetricTruth);
 }
 
-function countAiAuthoredTargets(
-  entries: Parameters<typeof collectAiAuthoredTargets>[0],
-): Map<string, number> {
-  const counts = new Map<string, number>();
-
-  for (const target of collectAiAuthoredTargets(entries)) {
-    const checksum = stableManualWorkoutChecksum64Hex(target);
-    counts.set(checksum, (counts.get(checksum) ?? 0) + 1);
-  }
-
-  return counts;
-}
-
-function collectAiAuthoredTargets(
-  entries: NonNullable<ReturnType<typeof manualWorkoutDraftInputSchema.parse>["entries"]>,
-): Array<NonNullable<ManualWorkoutBlockInput["target"]>> {
-  const targets: Array<NonNullable<ManualWorkoutBlockInput["target"]>> = [];
-
-  for (const entry of entries) {
-    const blocks =
-      entry.kind === "block" ? [entry.block] : getManualWorkoutRepeatGroupChildren(entry.group);
-
-    for (const block of blocks) {
-      const target = block.target;
-      if (
-        target &&
-        [target.targetSource, target.paceTargetSource, target.hrTargetSource].includes(
-          AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
-        )
-      ) {
-        targets.push(target);
-      }
-    }
-  }
-
-  return targets;
-}
-
 function collectWorkoutDocumentTargets(
   sections: readonly WorkoutDocumentSection[],
-  prefix = "steps",
 ): Map<string, WorkoutDocumentTarget> {
   const targets = new Map<string, WorkoutDocumentTarget>();
 
-  sections.forEach((section, index) => {
-    const sectionPath = `${prefix}.${index}`;
+  sections.forEach((section) => {
+    const sectionAddress = `section:${section.segment_id}`;
     if (section.target) {
-      targets.set(`${sectionPath}.target`, section.target);
+      targets.set(sectionAddress, section.target);
     }
 
-    workoutDocumentRepeatChildren(section).forEach((child, childIndex) => {
+    workoutDocumentRepeatChildren(section).forEach((child) => {
       if (child.target) {
-        targets.set(`${sectionPath}.children.${childIndex}.target`, child.target);
+        targets.set(`${sectionAddress}/child:${child.segment_id}`, child.target);
       }
     });
   });

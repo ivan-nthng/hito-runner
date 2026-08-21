@@ -22,13 +22,16 @@ import {
 } from "@/lib/workout-duration-title-contract";
 import type { RunnerProfileSummary } from "@/lib/training";
 import type { Json } from "@/lib/supabase/database";
-import { reduceRepeatChildrenToChildFirst } from "@/lib/planned-workout-block-contract";
 import {
+  reduceRepeatChildrenToChildFirst,
+  type PlannedWorkoutRepeatChildPrescription,
+} from "@/lib/planned-workout-block-contract";
+import {
+  normalizeWorkoutDocument,
   normalizeWorkoutDocumentTarget,
   workoutDocumentRepeatChildren,
   type WorkoutDocument,
   type WorkoutDocumentPrescription,
-  type WorkoutDocumentRepeatChildPrescription,
   type WorkoutDocumentSection,
   type WorkoutDocumentTarget,
   type WorkoutDocumentType,
@@ -284,6 +287,7 @@ const v2RepeatChildRoleSchema = z.enum([
 
 const v2RepeatChildSchema = z
   .object({
+    segment_id: z.string().trim().min(1).max(160).optional(),
     role: v2RepeatChildRoleSchema,
     label: z.string().trim().min(1).max(120).optional(),
     sequence: z.number().int().min(1).optional(),
@@ -631,7 +635,7 @@ function buildTrainingPlanV2Seed(plan: TrainingPlanV2): ImportedPlanSeed {
         steps,
       });
 
-      return {
+      const document = {
         workoutDate: entry.date,
         weekday: entry.weekday,
         weekNumber: entry.week_number,
@@ -652,7 +656,14 @@ function buildTrainingPlanV2Seed(plan: TrainingPlanV2): ImportedPlanSeed {
         recoveryPriority: entry.recovery_priority ?? null,
         steps,
         displayOrder: index,
-      };
+      } as WorkoutDocument;
+
+      const normalizedDocument = normalizeWorkoutDocument(document);
+      if (!normalizedDocument.ok) {
+        throw new Error(`Imported workout ${index + 1} is not a canonical WorkoutDocument.`);
+      }
+
+      return normalizedDocument.value;
     });
 
   const profile = buildImportedProfile(plan.plan_name, plan.generated_for, workouts, plan);
@@ -1023,7 +1034,7 @@ function normalizeV2Segment(
   const guidanceText = guidance.guidance;
   const segmentId = segment.segment_id ?? `segment-${sequence}`;
   const label = segment.label ?? buildDefaultSegmentLabel(segment.segment_type, sequence);
-  const prescription = buildSegmentPrescription(segment);
+  const prescription = buildSegmentPrescription(segment, segmentId);
 
   if (
     segment.segment_type === "interval_block" ||
@@ -1070,8 +1081,8 @@ function buildRepeatChildrenFromPrescription(
 }
 
 function normalizeRepeatChildrenFromPrescription(input: {
-  children?: WorkoutDocumentRepeatChildPrescription[];
-}): WorkoutDocumentRepeatChildPrescription[] {
+  children?: readonly unknown[];
+}): PlannedWorkoutRepeatChildPrescription<WorkoutDocumentTarget>[] {
   return reduceRepeatChildrenToChildFirst<WorkoutDocumentTarget>({
     children: input.children,
   }).children;
@@ -1079,6 +1090,7 @@ function normalizeRepeatChildrenFromPrescription(input: {
 
 function buildSegmentPrescription(
   segment: TrainingPlanV2["planned_workouts"][number]["segments"][number],
+  parentSegmentId: string,
 ): WorkoutDocumentPrescription {
   if (segment.prescription) {
     return {
@@ -1096,7 +1108,9 @@ function buildSegmentPrescription(
         ? {
             children: normalizeRepeatChildrenFromPrescription({
               children: segment.prescription.children,
-            }).map((child) => ({
+            }).map((child, childIndex) => ({
+              segment_id:
+                child.segment_id ?? `${parentSegmentId}-child-${child.sequence ?? childIndex + 1}`,
               role: child.role,
               ...(child.label ? { label: child.label } : {}),
               ...(child.sequence ? { sequence: child.sequence } : {}),

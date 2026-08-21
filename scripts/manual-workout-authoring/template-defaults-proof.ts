@@ -231,7 +231,7 @@ function assertExpectedTemplateSkeleton(expected: ExpectedTemplateSkeleton) {
 
   if (expected.maxTotalDurationMin) {
     assert.ok(
-      review.draft.totalDurationMin <= expected.maxTotalDurationMin,
+      review.reviewMetadata.totalDurationMin <= expected.maxTotalDurationMin,
       `${expected.templateKey} should stay short enough for its runner-facing type`,
     );
   }
@@ -260,7 +260,7 @@ function languageForReview(
   return buildPlannedWorkoutLanguage({
     workoutType: review.draft.workoutType,
     sourceWorkoutType: review.draft.sourceWorkoutType,
-    sourceKind: review.draft.sourceKind,
+    sourceKind: review.reviewMetadata.sourceKind,
     workoutFamily: review.draft.workoutFamily,
     workoutIdentity: review.draft.workoutIdentity,
     calendarIconKey: review.draft.calendarIconKey,

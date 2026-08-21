@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {
   CALENDAR_WORKOUT_MUTATION_KIND,
   CALENDAR_WORKOUT_MUTATION_SOURCE_KIND,
-} from "../../src/lib/active-plan-workout-editing/policy";
+} from "../../src/lib/runner-calendar-mutations";
 import {
   MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
@@ -50,7 +50,12 @@ export async function validateStandaloneManualCalendarAddContract() {
 
   const success = await addManualWorkoutToActivePlanForUser(
     userId,
-    buildReviewConfirmInput(input, reviewed),
+    {
+      document: reviewed.document,
+      candidateId: reviewed.candidate.candidateId,
+      reviewToken: reviewed.reviewToken,
+      reviewChecksum: reviewed.reviewChecksum,
+    },
     buildFakeAddDependencies({
       activePlan,
       workouts: [firstWorkout],

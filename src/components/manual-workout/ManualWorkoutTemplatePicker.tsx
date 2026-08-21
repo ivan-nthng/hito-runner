@@ -14,10 +14,7 @@ import {
 import { Icon } from "@/components/ui/icon";
 import { HitoButton } from "@/components/ui/button";
 import { ManualWorkoutTemplateColorIndicator } from "@/components/manual-workout/ManualWorkoutTemplateColorIndicator";
-import {
-  targetTruthModeLabel,
-  templateRunnerFacingLabel,
-} from "@/components/manual-workout/manual-workout-authoring-utils";
+import { templateRunnerFacingLabel } from "@/components/manual-workout/manual-workout-authoring-utils";
 import type { ManualWorkoutSavedTemplateView } from "@/lib/manual-workout-authoring";
 import type { ManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
 import { formatDistanceMeters, formatDurationMin } from "@/lib/training";
@@ -292,7 +289,7 @@ function TemplateActionMenu({
 
 function savedTemplateSummary(template: ManualWorkoutSavedTemplateView) {
   const parts = [
-    targetTruthModeLabel(template.targetTruthMode),
+    template.sourceWorkoutFamily === "rest" ? "Rest / no run" : "Workout guidance",
     formatDurationMin(template.draftPayload.totalDurationMin),
   ];
 

@@ -53,7 +53,6 @@ function proveAuthenticatedSourceWiring() {
     "src/lib/manual-workout-authoring/edit-workout.ts",
     "src/lib/manual-workout-authoring/move-workout.ts",
     "src/lib/manual-workout-authoring/delete-clear.ts",
-    "src/lib/manual-workout-authoring/copy-paste-reconstruction.ts",
   ];
 
   for (const file of noHostClockOwners) {

@@ -1,17 +1,16 @@
 import { type DragEvent, useEffect, useRef, useState } from "react";
 import type { ManualCopiedWorkoutSource } from "@/components/manual-workout/ManualWorkoutSourceActionMenu";
-import type { ManualWorkoutMoveRequest } from "@/components/manual-workout/ManualWorkoutMoveControls";
+import type {
+  ManualWorkoutMoveRequest,
+  ManualWorkoutMoveReviewReady,
+  ManualWorkoutMoveSuccess,
+} from "@/components/manual-workout/ManualWorkoutMoveControls";
 import {
   resolveCalendarMoveTargetDayKind,
   type CalendarMoveUndoAffordance,
   type CalendarOptimisticMoveDisplay,
   type CalendarWorkoutActionContext,
 } from "@/components/calendar/calendar-projection";
-import type {
-  ManualWorkoutDirectMoveResult,
-  ManualWorkoutMoveConfirmResult,
-  ManualWorkoutMoveReviewResult,
-} from "@/lib/manual-workout-authoring";
 import { type TrainingSnapshot, type Workout } from "@/lib/training";
 
 export type ManualCalendarActionState = {
@@ -31,10 +30,6 @@ export type ManualCalendarActionState = {
   onMoveWorkout: (source: ManualCopiedWorkoutSource) => void;
   onUndoLastMove: (undo: CalendarMoveUndoAffordance) => void;
 };
-
-type ManualWorkoutDirectMoveSuccess = Extract<ManualWorkoutDirectMoveResult, { ok: true }>;
-type ManualWorkoutMoveConfirmSuccess = Extract<ManualWorkoutMoveConfirmResult, { ok: true }>;
-type ManualWorkoutMoveSuccess = ManualWorkoutDirectMoveSuccess | ManualWorkoutMoveConfirmSuccess;
 
 const MANUAL_MOVE_UNDO_REFRESH_GRACE_MS = 30000;
 const MANUAL_MOVE_UNDO_STORAGE_KEY = "hito.manual-calendar.last-move-undo.v1";
@@ -233,7 +228,7 @@ export function useManualCalendarActions(
     const expiresAt =
       Number.isFinite(serverExpiresAt) && serverExpiresAt > now
         ? serverExpiresAt
-        : result.targetReplacement === null
+        : result.displacedWorkoutId === null
           ? now + MANUAL_MOVE_UNDO_REFRESH_GRACE_MS
           : null;
 
@@ -417,9 +412,9 @@ export function useManualCalendarActions(
         setManualOptimisticMove(null);
       },
       onDirectMoveSucceeded: recordManualMoveUndo,
-      onReplacementConfirming: (review: Extract<ManualWorkoutMoveReviewResult, { ok: true }>) =>
+      onReplacementConfirming: (review: ManualWorkoutMoveReviewReady) =>
         projectManualOptimisticMove({
-          requestId: `replacement:${review.sourceWorkoutId}:${review.targetDate}:${review.review.reviewChecksum}`,
+          requestId: `replacement:${review.sourceWorkoutId}:${review.targetDate}:${review.reviewChecksum}`,
           sourceWorkoutDate: review.sourceWorkoutDate,
           sourceWorkoutId: review.sourceWorkoutId,
           targetDate: review.targetDate,

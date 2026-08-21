@@ -1,27 +1,23 @@
 import assert from "node:assert/strict";
-import { access, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
+
 import {
-  MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
-  MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-  reviewManualWorkoutDraft,
-  type ManualWorkoutDraftInput,
-  type ManualWorkoutDraftReviewResult,
+  initializeWorkoutDocument,
+  initializeWorkoutDocumentForUser,
+  listSupportedManualWorkoutTemplates,
+  type ManualWorkoutSavedTemplateRepository,
 } from "../src/lib/manual-workout-authoring";
-import { buildManualWorkoutDraftInputFromPersistedWorkout } from "../src/lib/manual-workout-authoring/copy-paste-reconstruction";
-import { AI_AUTHORED_PLAN_FIRST_WORKOUT_IDENTITY_VALUES } from "../src/lib/ai-authored-plan-first-provider-contract";
-import type { PersistedPlannedWorkoutRow } from "../src/lib/runner-calendar-persistence";
+import type { Json } from "../src/lib/supabase/database";
 import {
-  isContentCopyableCalendarWorkoutSourceKind,
-  isEditableCalendarWorkoutSourceKind,
-  resolveCalendarWorkoutEditability,
-} from "../src/lib/active-plan-workout-editing/policy";
-import { addDaysIso, todayIso, type Step } from "../src/lib/training";
+  confirmWorkoutCommand,
+  reviewWorkoutCommand,
+  WORKOUT_COMMAND_SAVED_TEMPLATE_PAYLOAD_VERSION,
+} from "../src/lib/workout-authoring-review";
 import {
-  canonicalFamilyToLegacyWorkoutType,
-  resolveCanonicalWorkoutModel,
-} from "../src/lib/rich-workout-model";
-import { AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE } from "../src/lib/workout-document";
-import { formatReadableDate } from "../src/components/manual-workout/manual-workout-authoring-utils";
+  normalizeWorkoutDocument,
+  normalizeWorkoutDocumentContent,
+  type WorkoutDocument,
+} from "../src/lib/workout-document";
 import {
   buildSkippedDisposablePersistenceResult,
   formatDisposablePersistenceBlocker,
@@ -31,1086 +27,428 @@ import {
   resolveManualPersistencePreflight,
   validateManualWorkoutDisposablePersistenceProof,
 } from "./manual-workout-authoring/persistence-proof";
-import { validateStandaloneManualCalendarAddContract } from "./manual-workout-authoring/active-plan-add-proof";
-import { validateManualConstructorSegmentTargetContract } from "./manual-workout-authoring/constructor-contract-proof";
-import { validateManualConstructorDndContract } from "./manual-workout-authoring/constructor-dnd-contract-proof";
-import { validateManualCopyPasteContract } from "./manual-workout-authoring/copy-paste-proof";
-import { validateManualDeleteClearContract } from "./manual-workout-authoring/delete-clear-proof";
-import { validateManualActivePlanExportContract } from "./manual-workout-authoring/export-proof";
-import { validateManualMoveWorkoutContract } from "./manual-workout-authoring/move-proof";
-import {
-  assertNoFakePaceOrHr,
-  assertRepeatWithRecovery,
-  flattenSteps,
-  formatJsonResult,
-  hasExecutableStructure,
-  readStepsForAssertion,
-} from "./manual-workout-authoring/move-proof-assertions";
-import { validateManualPersistedTodayAndFutureWorkoutEditContract } from "./manual-workout-authoring/persisted-edit-proof";
-import { validateManualSavedTemplateContract } from "./manual-workout-authoring/saved-template-proof";
-import { validateManualSourceEditingCapabilityReadback } from "./manual-workout-authoring/source-capability-proof";
-import { validateManualTemplateDefaultSkeletons } from "./manual-workout-authoring/template-defaults-proof";
-import { validateManualWorkoutTemplateCatalogContract } from "./manual-workout-authoring/template-catalog-proof";
-import {
-  assertReady,
-  buildOrderedRepeatDraftInput,
-  buildFakePlanCycle,
-  buildFakePlannedWorkout,
-  buildFakePlannedWorkoutFromReview,
-} from "./manual-workout-authoring/move-proof-fixtures";
-import { validateManualLongRunExecutionPolicyContract } from "./long-run-execution-policy-proof";
 
 async function main() {
   const options = readManualPersistenceCliOptions();
-  await validateStandaloneCalendarSourceBoundary();
-  validateManualLongRunExecutionPolicyContract();
-  validateAcceptedFixtures();
-  validateManualTitleDurationContract();
-  validateManualUserEnteredTargetFixtures();
-  validateOrderedRepeatChildrenRoundtrip();
-  validateRejectedFixtures();
-  validateManualConstructorSegmentTargetContract();
-  validateManualConstructorDndContract();
-  validateManualTemplateDefaultSkeletons();
-  await validateManualWorkoutTemplateCatalogContract();
-  validateManualDateOnlyLabels();
-  validateCalendarWorkoutContentEditabilityPolicy();
-  validateClosedAiPersistedEditorIdentitySet();
-  validateAiAuthoredOrderedRepeatRoleRoundtrip();
-  validateManualSourceEditingCapabilityReadback();
-  await validateManualSavedTemplateContract();
-  await validateStandaloneManualCalendarAddContract();
-  await validateManualCopyPasteContract();
-  await validateManualDeleteClearContract();
-  await validateManualMoveWorkoutContract();
-  await validateManualPersistedTodayAndFutureWorkoutEditContract();
-  validateManualActivePlanExportContract();
+  validateCanonicalInitializers();
+  validateCalendarLifecycleCommandReview();
+  await validateCanonicalSavedTemplateInitializer();
+  await validateAuthoringDeletionGates();
 
-  const persistenceInput: ManualWorkoutDraftInput = {
-    templateKey: "easy_aerobic_run",
-    workoutDate: addDaysIso(todayIso(), 1),
-    notes: "Keep it easy.",
-  };
-  const persistenceReview = assertReady("manual disposable persistence review", persistenceInput);
-  const persistencePreflight = resolveManualPersistencePreflight(options);
-
-  if (!persistencePreflight.shouldRun && options.requirePersistence) {
+  const preflight = resolveManualPersistencePreflight(options);
+  if (!preflight.shouldRun && options.requirePersistence) {
     throw new Error(
-      formatDisposablePersistenceBlocker(
-        "Manual workout confirm persistence proof",
-        persistencePreflight,
-      ),
+      formatDisposablePersistenceBlocker("Canonical Workout persistence proof", preflight),
     );
   }
+  const persistence = preflight.shouldRun
+    ? await validateManualWorkoutDisposablePersistenceProof({ preflight })
+    : buildSkippedDisposablePersistenceResult(preflight);
 
-  const persistenceProof = persistencePreflight.shouldRun
-    ? await validateManualWorkoutDisposablePersistenceProof({
-        input: persistenceInput,
-        review: persistenceReview,
-        preflight: persistencePreflight,
-      })
-    : buildSkippedDisposablePersistenceResult(persistencePreflight);
-  console.log("Manual workout authoring review contract invariants passed.", {
-    persistence: persistenceProof,
+  console.log("Canonical Workout authoring contract passed.", {
+    initializers: { scratch: 1, builtIns: 18 },
+    persistence,
   });
 }
 
-async function validateStandaloneCalendarSourceBoundary() {
-  const root = new URL("../", import.meta.url);
-  const [
-    retirementMigration,
-    overflowMigration,
-    occupiedUndoMigration,
-    persistence,
-    persistedPlanReplacement,
-    runnerCalendarPersistence,
-    sourceProvenancePersistence,
-    trainingApi,
-    databaseTypes,
-  ] = await Promise.all([
-    readFile(
-      new URL(
-        "../supabase/migrations/20260810132840_retire_active_plan_calendar_authority.sql",
-        import.meta.url,
-      ),
-      "utf8",
-    ),
-    readFile(
-      new URL(
-        "../supabase/migrations/20260811125538_clear_calendar_future_workouts.sql",
-        import.meta.url,
-      ),
-      "utf8",
-    ),
-    readFile(
-      new URL(
-        "../supabase/migrations/20260816171845_occupied_move_replace_durable_undo.sql",
-        import.meta.url,
-      ),
-      "utf8",
-    ),
-    readFile(new URL("../src/lib/active-plan-persistence.ts", import.meta.url), "utf8"),
-    readFile(new URL("../src/lib/persisted-plan-replacement.ts", import.meta.url), "utf8"),
-    readFile(new URL("../src/lib/runner-calendar-persistence.ts", import.meta.url), "utf8"),
-    readFile(new URL("../src/lib/source-plan-provenance-persistence.ts", import.meta.url), "utf8"),
-    readFile(new URL("../src/lib/training-api.ts", import.meta.url), "utf8"),
-    readFile(new URL("../src/lib/supabase/database.ts", import.meta.url), "utf8"),
-  ]);
-  const [sourceCapabilities, calendarOverflowActions, planExport, planExportRoute] =
-    await Promise.all([
-      readFile(
-        new URL("../src/lib/active-plan-workout-editing/source-capabilities.ts", import.meta.url),
-        "utf8",
-      ),
-      readFile(new URL("../src/lib/calendar-overflow-actions.ts", import.meta.url), "utf8"),
-      readFile(new URL("../src/lib/plan-export.ts", import.meta.url), "utf8"),
-      readFile(new URL("../src/routes/api.plan.export.tsx", import.meta.url), "utf8"),
-    ]);
-
-  for (const path of [
-    "src/lib/active-plan-lifecycle-actions.ts",
-    "src/lib/active-plan-schedule-edit-contract.ts",
-    "src/lib/active-plan-schedule-edit-preview.ts",
-    "src/lib/active-plan-transition-actions.ts",
-    "src/lib/active-plan-replacement-carry-forward.ts",
-    "src/lib/plan-replacement-actions.ts",
-  ]) {
-    await assert.rejects(access(new URL(path, root)), undefined, `${path} must stay deleted`);
-  }
-
-  assert.match(
-    retirementMigration,
-    /update public\.plan_cycles[\s\S]*status = 'archived'[\s\S]*status = 'active'/,
-  );
-  assert.match(retirementMigration, /alter column status set default 'archived'/);
-  assert.match(
-    retirementMigration,
-    /drop index if exists public\.plan_cycles_one_active_per_user_idx/,
-  );
-  assert.match(
-    retirementMigration,
-    /drop function if exists public\.apply_active_plan_schedule_reflow/,
-  );
-  assert.match(retirementMigration, /rename to apply_calendar_workout_mutation/);
-  assert.match(retirementMigration, /rename to apply_calendar_workout_content_edit/);
-  assert.match(
-    retirementMigration,
-    /create function public\.apply_reviewed_future_schedule_persistence/,
-  );
-  assert.match(
-    overflowMigration,
-    /create or replace function public\.clear_calendar_future_workouts/,
-  );
-  assert.match(overflowMigration, /pg_advisory_xact_lock/);
-  assert.match(overflowMigration, /protected_future_schedule/);
-  assert.match(
-    overflowMigration,
-    /revoke execute[\s\S]*from public, anon, authenticated;[\s\S]*grant execute[\s\S]*to service_role;/,
-  );
-  assert.match(
-    occupiedUndoMigration,
-    /create or replace function public\.apply_calendar_workout_mutation/,
-  );
-  assert.match(occupiedUndoMigration, /jsonb_typeof\(displaced_workout\) = 'object'/);
-  assert.match(
-    occupiedUndoMigration,
-    /v_restore := to_jsonb\(v_target\);\s+v_undo_expires_at := clock_timestamp\(\) \+ interval '45 seconds';/,
-  );
-  assert.match(occupiedUndoMigration, /\(v_restore->>'workout_type'\)::public\.workout_type/);
-  assert.doesNotMatch(
-    occupiedUndoMigration,
-    /displaced_workout->>'workout_type' = 'rest'|if v_target\.workout_type = 'rest'/,
-  );
-  assert.doesNotMatch(occupiedUndoMigration, /create table|alter table|create policy/i);
-  assert.match(
-    occupiedUndoMigration,
-    /revoke execute[\s\S]*from public, anon, authenticated;[\s\S]*grant execute[\s\S]*to service_role;/,
-  );
-
-  assert.doesNotMatch(persistence, /export async function getActivePlan/);
-  assert.doesNotMatch(persistence, /getExistingPlanContext|replaceActivePlan|carry.forward/i);
-  assert.doesNotMatch(
-    persistence,
-    /getLatestMaterializedPlanProvenance|getMaterializedPlanProvenancesForUser|getPlanWorkouts/,
-  );
-  assert.doesNotMatch(
-    persistence,
-    /export async function getSourcePlanProvenancesForUser/,
-    "the source library owner must not keep a provenance lookup export",
-  );
-  assert.doesNotMatch(persistence, /source-plan-provenance-persistence|sourcePlansById/);
-  assert.match(persistence, /from "@\/lib\/runner-calendar-persistence"/);
-  assert.match(runnerCalendarPersistence, /sourcePlansById/);
-  assert.match(runnerCalendarPersistence, /from "@\/lib\/source-plan-provenance-persistence"/);
-  for (const exportName of [
-    "PersistedPlannedWorkoutRow",
-    "PersistedWorkoutLogRow",
-    "CalendarWorkoutContext",
-    "getCalendarWorkoutsWithLogsForUser",
-    "getCalendarWorkoutMutationContext",
-  ]) {
-    assert.match(
-      runnerCalendarPersistence,
-      new RegExp(`export (?:type |async function )${exportName}`),
-    );
-    assert.doesNotMatch(persistence, new RegExp(`export (?:type |async function )${exportName}`));
-  }
-  for (const rowType of ["PersistedPlannedWorkoutRow", "PersistedWorkoutLogRow"]) {
-    assert.match(runnerCalendarPersistence, new RegExp(`export type ${rowType}`));
-    assert.doesNotMatch(persistedPlanReplacement, new RegExp(`(?:export )?type ${rowType}\\s*=`));
-  }
-  assert.match(persistedPlanReplacement, /from "@\/lib\/runner-calendar-persistence"/);
-  assert.match(
-    sourceProvenancePersistence,
-    /export type SourcePlanProvenanceRow = Pick<[\s\S]*"id" \| "source_kind" \| "goal_metadata"/,
-  );
-  assert.match(
-    sourceProvenancePersistence,
-    /\.select\("id, source_kind, goal_metadata"\)[\s\S]*\.eq\("user_id", userId\)/,
-  );
-  assert.doesNotMatch(
-    sourceProvenancePersistence,
-    /active-plan-persistence|runner-calendar-persistence|\.select\("\*"\)/,
-  );
-  assert.doesNotMatch(trainingApi, /clearUpcomingSchedule|previewActivePlan|ScheduleReflow/);
-  assert.doesNotMatch(
-    trainingApi,
-    /getLatestMaterializedPlanProvenance|getMaterializedPlanProvenancesForUser|getResolvedPlanWorkoutsWithLogs/,
-  );
-  assert.match(trainingApi, /getCalendarWorkoutsWithLogsForUser/);
-  assert.match(trainingApi, /calendarContext:\s*\{/);
-  assert.match(trainingApi, /planMeta:\s*null/);
-  assert.match(databaseTypes, /apply_calendar_workout_mutation/);
-  assert.match(databaseTypes, /apply_reviewed_future_schedule_persistence/);
-  assert.doesNotMatch(databaseTypes, /apply_active_plan_workout|apply_active_plan_schedule_reflow/);
-  assert.match(sourceCapabilities, /provenancePlan/);
-  assert.doesNotMatch(sourceCapabilities, /provenancePlan\.status|status === "active"/);
-  assert.match(calendarOverflowActions, /validateImportedPlanJson/);
-  assert.match(calendarOverflowActions, /retainImportedPlanCandidateForUser/);
-  assert.match(calendarOverflowActions, /getRunnerCalendarDateForUserId/);
-  assert.match(calendarOverflowActions, /clearAtomicCalendarFutureWorkouts/);
-  assert.match(calendarOverflowActions, /buildCalendarWorkoutExportPayload/);
-  assert.doesNotMatch(
-    calendarOverflowActions,
-    /getMaterializedPlanProvenancesForUser|buildFutureCalendarExportProvenance/,
-  );
-  assert.match(calendarOverflowActions, /z\.literal\("delete_future_workouts"\)/);
-  assert.match(calendarOverflowActions, /z\.literal\("start_new_plan"\)/);
-  assert.doesNotMatch(calendarOverflowActions, /status:\s*["']active["']/);
-  assert.match(planExport, /hito_calendar_workout_export_v1/);
-  assert.match(planExportRoute, /scope:\s*z\.literal\("future-calendar"\)/);
-}
-
-function validateManualDateOnlyLabels() {
-  assert.equal(
-    formatReadableDate("2026-06-14"),
-    "Sun, Jun 14",
-    "manual date-only labels must not drift through UTC timezone conversion",
-  );
-}
-
-function validateManualTitleDurationContract() {
-  const input: ManualWorkoutDraftInput = {
-    templateKey: "easy_aerobic_run",
-    workoutDate: "2026-06-16",
-    title: "70 min easy aerobic run",
-    entries: [
-      {
-        kind: "block",
-        block: { blockKey: "easy_run_block", durationSeconds: 70 * 60, label: "Easy run" },
+function validateCalendarLifecycleCommandReview() {
+  const sourceFingerprint: Json = { id: "source", workout_date: "2026-07-02" };
+  const targetFingerprint: Json = { id: "target", workout_date: "2026-07-03" };
+  const commands = [
+    {
+      operation: "copy" as const,
+      workoutId: "00000000-0000-4000-8000-000000000401",
+      targetDate: "2026-07-03",
+      expectedFingerprint: sourceFingerprint,
+    },
+    {
+      operation: "move" as const,
+      workoutId: "00000000-0000-4000-8000-000000000401",
+      targetDate: "2026-07-03",
+      targetPolicy: {
+        targetDayKind: "workout_day" as const,
+        targetReplacementWorkoutId: "00000000-0000-4000-8000-000000000402",
+        restDisplacement: "none" as const,
       },
-    ],
-  };
-  const exact = reviewManualWorkoutDraft(input);
-  assert.equal(exact.ok, true, exact.ok ? "" : formatJsonResult(exact));
-
-  const mismatch = reviewManualWorkoutDraft({ ...input, title: "60 min easy aerobic run" });
-  assert.equal(mismatch.ok, false);
-  if (!mismatch.ok) {
-    assert.equal(mismatch.reason, "unsafe_block_structure");
-    assert.ok(mismatch.issues.some((issue) => issue.path?.[0] === "title"));
-  }
-}
-
-function validateCalendarWorkoutContentEditabilityPolicy() {
-  const userId = "00000000-0000-4000-8000-000000000010";
-  const lifecycleEditableSources = [
-    MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-    "ai_authored_plan_first_v1",
-    "training_plan_v2_import",
+      expectedFingerprints: { source: sourceFingerprint, target: targetFingerprint },
+    },
+    {
+      operation: "delete" as const,
+      workoutId: "00000000-0000-4000-8000-000000000401",
+      expectedFingerprint: sourceFingerprint,
+    },
+    {
+      operation: "clear" as const,
+      workoutDate: "2026-07-02",
+      expectedFingerprint: sourceFingerprint,
+    },
   ];
 
-  for (const sourceKind of lifecycleEditableSources) {
-    const activePlan = buildFakePlanCycle({
-      userId,
-      id: "00000000-0000-4000-8000-000000000011",
-      sourceKind,
-      startDate: "2026-06-16",
-      endDate: "2026-06-30",
+  for (const command of commands) {
+    const review = reviewWorkoutCommand({ command });
+    assert.equal(review.ok, true, JSON.stringify(review));
+    if (!review.ok) continue;
+    assert.deepEqual(review.candidate.command, command);
+    const confirmed = confirmWorkoutCommand({
+      candidate: review.candidate,
+      candidateId: review.candidate.candidateId,
+      reviewToken: review.candidate.reviewToken,
+      reviewChecksum: review.candidate.reviewChecksum,
     });
+    assert.equal(confirmed.ok, true, JSON.stringify(confirmed));
 
-    assert.equal(
-      isEditableCalendarWorkoutSourceKind(sourceKind),
-      true,
-      `${sourceKind} should remain editable provenance for a runner-owned workout`,
-    );
-
-    for (const operation of ["add_workout", "clear_workout", "move_workout"] as const) {
-      const editability = resolveCalendarWorkoutEditability(activePlan, operation);
-      assert.equal(editability.ok, true, `${sourceKind} ${operation} editability should pass.`);
-      if (editability.ok) {
-        assert.equal(editability.sourceKind, sourceKind);
-        assert.equal(editability.operation, operation);
-      }
+    const tampered = structuredClone(review.candidate);
+    tampered.command =
+      tampered.command.operation === "copy"
+        ? { ...tampered.command, targetDate: "2026-07-04" }
+        : tampered.command;
+    if (command.operation === "copy") {
+      const rejected = confirmWorkoutCommand({
+        candidate: tampered,
+        candidateId: review.candidate.candidateId,
+        reviewToken: review.candidate.reviewToken,
+        reviewChecksum: review.candidate.reviewChecksum,
+      });
+      assert.equal(rejected.ok, false, "signed lifecycle payload changes must fail closed");
     }
-
-    const copyEditability = resolveCalendarWorkoutEditability(activePlan, "copy_workout");
-    const contentEditability = resolveCalendarWorkoutEditability(activePlan, "edit_workout");
-    assert.equal(
-      copyEditability.ok,
-      true,
-      `${sourceKind} copy_workout editability should reach persisted reconstruction guards.`,
-    );
-    assert.equal(isContentCopyableCalendarWorkoutSourceKind(sourceKind), true);
-    assert.equal(
-      contentEditability.ok,
-      true,
-      `${sourceKind} edit_workout editability should not depend on plan origin.`,
-    );
   }
 
   assert.equal(
-    isEditableCalendarWorkoutSourceKind("external_partner_import"),
-    true,
-    "plan origin is provenance and must not gate materialized workout actions",
-  );
-  assert.equal(
-    isContentCopyableCalendarWorkoutSourceKind("external_partner_import"),
-    true,
-    "every persisted non-Rest prescription remains copyable across plan origins",
-  );
-
-  const unknownPlan = buildFakePlanCycle({
-    userId,
-    id: "00000000-0000-4000-8000-000000000012",
-    sourceKind: "legacy_unreviewed_plan_v0",
-    startDate: "2026-06-16",
-    endDate: "2026-06-30",
-  });
-  const unknown = resolveCalendarWorkoutEditability(unknownPlan, "add_workout");
-  assert.equal(unknown.ok, true, "unknown saved-plan provenance must not govern calendar actions");
-  assert.equal(
-    resolveCalendarWorkoutEditability(unknownPlan, "edit_workout").ok,
-    true,
-    "confirmed workout content editing should not inherit lifecycle source allowlists",
-  );
-
-  const noSourceArtifact = resolveCalendarWorkoutEditability(null, "add_workout");
-  assert.equal(
-    noSourceArtifact.ok,
-    true,
-    "a direct runner-owned Calendar workout must not require a source artifact",
-  );
-  if (noSourceArtifact.ok) {
-    assert.equal(noSourceArtifact.sourceKind, "runner_owned_calendar_workout");
-    assert.equal(noSourceArtifact.sourceStatus, null);
-  }
-}
-
-function validateClosedAiPersistedEditorIdentitySet() {
-  for (const [index, workoutIdentity] of AI_AUTHORED_PLAN_FIRST_WORKOUT_IDENTITY_VALUES.entries()) {
-    const model = resolveCanonicalWorkoutModel({
-      workoutType: "quality",
-      sourceWorkoutType: workoutIdentity,
-      workoutIdentity,
-      title: workoutIdentity,
-      steps: [],
-    });
-    const workout = buildFakePlannedWorkout({
-      userId: "00000000-0000-4000-8000-000000000041",
-      planCycleId: "00000000-0000-4000-8000-000000000042",
-      id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
-      date: "2026-07-22",
-      displayOrder: index,
-      title: workoutIdentity,
-      workoutType: canonicalFamilyToLegacyWorkoutType(model.workoutFamily, model.workoutIdentity),
-      sourceWorkoutType: workoutIdentity,
-      workoutFamily: model.workoutFamily,
-      workoutIdentity: model.workoutIdentity,
-      calendarIconKey: model.calendarIconKey,
-      steps: buildClosedIdentityProofSteps(workoutIdentity),
-    });
-    const reconstructed = buildManualWorkoutDraftInputFromPersistedWorkout(
-      workout,
-      workout.workout_date,
-      {
-        activePlanId: workout.plan_cycle_id,
-        activePlanSourceKind: "ai_authored_plan_first_v1",
+    reviewWorkoutCommand({
+      command: {
+        operation: "move",
+        workoutId: "00000000-0000-4000-8000-000000000401",
+        targetDate: "2026-07-03",
+        targetPolicy: {
+          targetDayKind: "rest_day",
+          targetReplacementWorkoutId: null,
+          restDisplacement: "stored_rest",
+        },
+        expectedFingerprints: { source: sourceFingerprint, target: null },
       },
-    );
-    assert.equal(
-      reconstructed.ok,
-      true,
-      `${workoutIdentity} should reconstruct through the full manual editor contract`,
-    );
-    if (!reconstructed.ok) continue;
-
-    const reviewed = reviewManualWorkoutDraft(reconstructed.draftInput, {
-      allowPreservedAiAuthoredTargets: true,
-      allowPersistedTemplateShape: true,
-      ...reconstructed.processingOptions,
-    });
-    assert.equal(reviewed.ok, true, `${workoutIdentity} reconstructed review should pass`);
-    if (!reviewed.ok) continue;
-    assert.equal(reviewed.draft.workoutIdentity, workoutIdentity);
-    assert.equal(
-      reviewed.draft.steps[0]?.target?.primary_execution_mode,
-      "effort",
-      `${workoutIdentity} should retain AI primary execution mode`,
-    );
-    assert.equal(
-      reviewed.draft.steps[0]?.target?.target_source,
-      AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
-      `${workoutIdentity} should retain AI target provenance`,
-    );
-  }
+    }).ok,
+    false,
+    "inconsistent Move displacement policy must fail before signing",
+  );
 }
 
-function buildClosedIdentityProofSteps(
-  workoutIdentity: (typeof AI_AUTHORED_PLAN_FIRST_WORKOUT_IDENTITY_VALUES)[number],
-): Step[] {
-  const runnable = (sequence: number): Step => ({
-    type: "run",
-    segment_type: "main",
-    sequence,
-    label: "AI-authored runnable block",
-    prescription: { mode: "time", duration_min: 30 },
-    duration_min: 30,
-    target: {
-      primary_execution_mode: "effort",
-      target_source: AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
-      intensity: "Easy conversational effort",
-    },
-  });
+function validateCanonicalInitializers() {
+  const workoutDate = "2026-07-02";
+  const templates = listSupportedManualWorkoutTemplates();
+  assert.equal(templates.length, 18, "the accepted built-in catalog must retain all 18 templates");
+  assert.equal(new Set(templates.map((template) => template.templateKey)).size, 18);
 
-  if (workoutIdentity === "progression_run") {
-    return [runnable(1), runnable(2)];
-  }
+  const inputs = [
+    { origin: "scratch" as const, workoutDate },
+    ...templates.map((template) => ({
+      origin: "built_in" as const,
+      templateKey: template.templateKey,
+      workoutDate,
+    })),
+  ];
 
-  if (
-    workoutIdentity === "hike_run_endurance" ||
-    workoutIdentity === "mountain_long_run_time_on_feet" ||
-    workoutIdentity === "ultra_time_on_feet_durability"
-  ) {
-    return [
-      runnable(1),
-      {
-        type: "hydration",
-        segment_type: "fueling",
-        sequence: 2,
-        label: "Hydration",
-        guidance: "Take water.",
-        prescription: { mode: "none" },
+  for (const input of inputs) {
+    const initialized = initializeWorkoutDocument(input);
+    assert.equal(initialized.ok, true, JSON.stringify({ input, initialized }));
+    if (!initialized.ok) continue;
+    const normalized = normalizeWorkoutDocument(initialized.document);
+    assert.equal(normalized.ok, true, JSON.stringify(normalized));
+    if (!normalized.ok) continue;
+    assert.deepEqual(normalized.value, initialized.document);
+    assert.equal(initialized.document.workoutDate, workoutDate);
+    assert.equal(initialized.safety.serverOwned, true);
+    assert.equal(initialized.safety.callsOpenAi, false);
+    assert.equal(
+      new Set(allSegmentIds(initialized.document)).size,
+      allSegmentIds(initialized.document).length,
+      `${initialized.document.sourceWorkoutType} segment identities must be globally unique`,
+    );
+
+    const review = reviewWorkoutCommand({
+      command: {
+        operation: "materialize",
+        documents: [initialized.document],
+        provenanceReferences: [initialized.provenanceReference],
       },
-      runnable(3),
-    ];
+    });
+    assert.equal(review.ok, true, JSON.stringify(review));
+    if (!review.ok) continue;
+    const confirmed = confirmWorkoutCommand({
+      candidate: review.candidate,
+      candidateId: review.candidate.candidateId,
+      reviewToken: review.candidate.reviewToken,
+      reviewChecksum: review.candidate.reviewChecksum,
+    });
+    assert.equal(confirmed.ok, true, JSON.stringify(confirmed));
   }
 
-  return [runnable(1)];
-}
-
-function validateAiAuthoredOrderedRepeatRoleRoundtrip() {
-  const model = resolveCanonicalWorkoutModel({
-    workoutType: "quality",
-    sourceWorkoutType: "time_intervals",
-    workoutIdentity: "time_intervals",
-    title: "AI-authored ordered repeat",
-    steps: [],
+  const unsupported = initializeWorkoutDocument({
+    origin: "built_in",
+    templateKey: "not_a_template",
+    workoutDate,
   });
-  const target = {
-    primary_execution_mode: "effort" as const,
-    target_source: AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
-    intensity: "AI-authored controlled effort",
+  assert.equal(unsupported.ok, false, "unknown built-in keys must fail closed");
+
+  const easy = initializeWorkoutDocument({
+    origin: "built_in",
+    templateKey: "easy_aerobic_run",
+    workoutDate,
+  });
+  assert.equal(easy.ok, true);
+  if (!easy.ok) return;
+  const malformed = structuredClone(easy.document);
+  const first = malformed.steps[0];
+  assert.ok(first, "Easy initializer must contain one executable section");
+  if (!first) return;
+  first.target = {
+    ...(first.target ?? {}),
+    primary_execution_mode: "pace",
+    target_source: "user_entered",
+    pace: "5:00/km",
+    rpe: 5,
   };
-  const children = [
-    { role: "warm_up" as const, label: "Warm-up", duration: 5 },
-    { role: "run" as const, label: "Run", duration: 4 },
-    { role: "walk" as const, label: "Walk", duration: 1 },
-    { role: "work" as const, label: "Work", duration: 3 },
-    { role: "recover" as const, label: "Recover", duration: 2 },
-    { role: "finish" as const, label: "Finish", duration: 2 },
-    { role: "cooldown" as const, label: "Cooldown", duration: 5 },
-  ].map((child, index) => ({
-    role: child.role,
-    label: child.label,
-    sequence: index + 1,
-    prescription: { mode: "time" as const, duration_min: child.duration },
-    target,
-  }));
-  const workout = buildFakePlannedWorkout({
-    userId: "00000000-0000-4000-8000-000000000051",
-    planCycleId: "00000000-0000-4000-8000-000000000052",
-    id: "00000000-0000-4000-8000-000000000053",
-    date: "2026-07-22",
-    displayOrder: 1,
-    title: "AI-authored ordered repeat",
-    workoutType: canonicalFamilyToLegacyWorkoutType(model.workoutFamily, model.workoutIdentity),
-    sourceWorkoutType: "time_intervals",
-    workoutFamily: model.workoutFamily,
-    workoutIdentity: model.workoutIdentity,
-    calendarIconKey: model.calendarIconKey,
-    steps: [
-      {
-        type: "intervals",
-        segment_type: "interval_block",
-        sequence: 1,
-        label: "AI-authored ordered repeat",
-        prescription: {
-          mode: "repeats",
-          repeat_count: 2,
-          children,
-        },
-        repeats: 2,
-        children: children.map((child) => ({
-          type: child.role,
-          segment_type: child.role,
-          sequence: child.sequence,
-          label: child.label,
-          prescription: child.prescription,
-          duration_min: child.prescription.duration_min,
-          target: child.target,
-        })),
-      },
-    ],
-  });
-  const reconstructed = buildManualWorkoutDraftInputFromPersistedWorkout(
-    workout,
-    workout.workout_date,
-    {
-      activePlanId: workout.plan_cycle_id,
-      activePlanSourceKind: "ai_authored_plan_first_v1",
-    },
+  assert.equal(
+    normalizeWorkoutDocument(malformed).ok,
+    false,
+    "conflicting target kinds must fail strict server validation",
   );
 
-  assert.equal(reconstructed.ok, true, "AI ordered Repeat should reconstruct");
-  if (!reconstructed.ok) return;
-
-  const reviewed = reviewManualWorkoutDraft(reconstructed.draftInput, {
-    allowPreservedAiAuthoredTargets: true,
-    allowPersistedTemplateShape: true,
-    ...reconstructed.processingOptions,
-  });
-  assert.equal(reviewed.ok, true, "AI ordered Repeat should pass reconstructed review");
-  if (!reviewed.ok) return;
-
-  const repeat = reviewed.draft.steps[0];
-  assert.equal(repeat?.target, undefined, "Repeat parent must stay structural");
-  assert.deepEqual(
-    repeat?.prescription?.children?.map((child) => child.role),
-    ["warm_up", "run", "walk", "work", "recover", "finish", "cooldown"],
-    "all canonical Repeat child roles must round-trip in order",
-  );
-  assert.ok(
-    repeat?.prescription?.children?.every(
-      (child) =>
-        child.target?.primary_execution_mode === "effort" &&
-        child.target.target_source === AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
-    ),
-    "unchanged AI Repeat child targets must retain mode and provenance",
+  const unknownTarget = structuredClone(easy.document);
+  const unknownFirst = unknownTarget.steps[0];
+  assert.ok(unknownFirst);
+  if (!unknownFirst) return;
+  unknownFirst.target = {
+    ...(unknownFirst.target ?? {}),
+    unsupported_target_field: "unsafe",
+  } as typeof unknownFirst.target;
+  assert.equal(
+    normalizeWorkoutDocument(unknownTarget).ok,
+    false,
+    "unknown target fields must fail strict server validation",
   );
 }
 
-function validateAcceptedFixtures() {
-  const rest = assertReady("rest day", {
-    templateKey: "rest_day",
-    workoutDate: "2026-06-15",
-  });
-  assert.equal(rest.draft.workoutIdentity, "rest_and_recovery");
-  assert.equal(rest.draft.steps.length, 0);
-  assert.equal(rest.draft.metricMode.executable_mode, "none");
-
-  const easy = assertReady("easy aerobic", {
-    templateKey: "easy_aerobic_run",
-    workoutDate: "2026-06-16",
-  });
-  assert.equal(easy.draft.workoutIdentity, "easy_aerobic_run");
-  assert.equal(easy.draft.metricMode.executable_mode, "structure_only_executable");
-  assertNumericStructure(easy.draft.steps, "easy aerobic");
-  assertNoFakePaceOrHr(easy.draft.steps, "easy aerobic");
-
-  const longRun = assertReady("long run multi-block", {
-    templateKey: "long_aerobic_run",
-    workoutDate: "2026-06-21",
-    entries: [
-      {
-        kind: "block",
-        block: { blockKey: "warmup_block", durationSeconds: 10 * 60, label: "Opener" },
-      },
-      {
-        kind: "block",
-        block: { blockKey: "long_run_body_block", durationSeconds: 75 * 60 },
-      },
-      {
-        kind: "block",
-        block: { blockKey: "cooldown_block", durationSeconds: 5 * 60 },
-      },
-    ],
-  });
-  assert.equal(longRun.draft.workoutIdentity, "long_aerobic_run");
-  assert.equal(longRun.draft.steps.length, 3);
-  assert.ok(longRun.draft.totalDurationMin > 60);
-  assertNumericStructure(longRun.draft.steps, "long run");
-
-  const intervals = assertReady("interval repeat with recovery", {
+async function validateCanonicalSavedTemplateInitializer() {
+  const userId = "00000000-0000-4000-8000-000000000301";
+  const otherUserId = "00000000-0000-4000-8000-000000000302";
+  const source = initializeWorkoutDocument({
+    origin: "built_in",
     templateKey: "time_intervals",
-    workoutDate: "2026-06-18",
+    workoutDate: "2026-07-02",
   });
-  assert.equal(intervals.draft.workoutIdentity, "time_intervals");
-  assertRepeatWithRecovery(intervals.draft.steps, "time intervals");
+  assert.equal(source.ok, true);
+  if (!source.ok) return;
+  const content = workoutDocumentContent(source.document);
+  const row = canonicalTemplateRow({
+    id: "66666666-6666-4666-8666-666666666666",
+    userId,
+    document: source.document,
+    content,
+  });
+  const malformed = {
+    ...row,
+    id: "77777777-7777-4777-8777-777777777777",
+    draft_payload: {
+      version: WORKOUT_COMMAND_SAVED_TEMPLATE_PAYLOAD_VERSION,
+      content: { malformed: true },
+      provenance: null,
+    } as Json,
+  };
+  const repository = fakeSavedTemplateRepository([row, malformed]);
 
-  const hills = assertReady("hill repeat with recovery", {
-    templateKey: "uphill_repeats",
-    workoutDate: "2026-06-19",
-  });
-  assert.equal(hills.draft.workoutIdentity, "uphill_repeats");
-  assertRepeatWithRecovery(hills.draft.steps, "uphill repeats");
-
-  const runWalk = assertReady("run-walk repeat", {
-    templateKey: "run_walk_adaptation",
-    workoutDate: "2026-06-17",
-  });
-  assert.equal(runWalk.draft.workoutIdentity, "recovery_jog");
-  assert.ok(
-    runWalk.draft.mappingGaps.some((gap) => gap.includes("run_walk_adaptation")),
-    "Run-walk accepted fixture should report the canonical identity mapping gap.",
+  const initialized = await initializeWorkoutDocumentForUser(
+    userId,
+    {
+      origin: "saved_template",
+      templateId: row.id,
+      workoutDate: "2026-07-16",
+    },
+    { savedTemplateRepository: repository },
   );
-  assertRepeatWithRecovery(runWalk.draft.steps, "run-walk");
-}
-
-function validateOrderedRepeatChildrenRoundtrip() {
-  const input = buildOrderedRepeatDraftInput("2026-06-18");
-  const review = assertReady("ordered 3-child repeat", input);
-  const children = assertOrderedRepeatChildren(review.draft.steps, "ordered 3-child repeat");
-
-  assert.deepEqual(
-    children.map((child) => child.label),
-    ["Settle", "Tempo press", "Float"],
-    "ordered 3-child repeat should preserve child order in normalized draft",
-  );
-  assert.deepEqual(
-    children.map((child) => child.type),
-    ["run", "work", "recovery"],
-    "ordered 3-child repeat should preserve child section roles in normalized draft",
-  );
-  assertManualUserEnteredTarget(review.draft.steps, "rpe", "ordered child RPE target");
-
-  const persisted = buildFakePlannedWorkoutFromReview({
-    userId: "00000000-0000-4000-8000-000000000020",
-    planCycleId: "00000000-0000-4000-8000-000000000021",
-    id: "00000000-0000-4000-8000-000000000022",
-    date: "2026-06-18",
-    displayOrder: 1,
-    review,
-  });
-  const reconstructed = buildManualWorkoutDraftInputFromPersistedWorkout(persisted, "2026-06-25", {
-    activePlanId: "00000000-0000-4000-8000-000000000021",
-    activePlanSourceKind: MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
-  });
-
-  assert.equal(reconstructed.ok, true, "ordered repeat should reconstruct from persisted steps");
-  if (!reconstructed.ok) {
-    throw new Error(`ordered repeat reconstruction failed: ${JSON.stringify(reconstructed)}`);
+  assert.equal(initialized.ok, true, JSON.stringify(initialized));
+  if (initialized.ok) {
+    assert.equal(initialized.document.workoutDate, "2026-07-16");
+    assert.deepEqual(initialized.document.steps, source.document.steps);
+    assert.equal(initialized.safety.canonicalDocumentOnly, true);
   }
 
-  const reconstructedRepeat = reconstructed.draftInput.entries?.find(
-    (entryValue) => entryValue.kind === "repeat_group",
+  const foreign = await initializeWorkoutDocumentForUser(
+    otherUserId,
+    {
+      origin: "saved_template",
+      templateId: row.id,
+      workoutDate: "2026-07-16",
+    },
+    { savedTemplateRepository: repository },
   );
-  assert.equal(
-    reconstructedRepeat?.kind,
-    "repeat_group",
-    "ordered repeat reconstruction should keep repeat entry",
+  assert.equal(foreign.ok, false);
+  if (!foreign.ok) assert.equal(foreign.reason, "not_found");
+
+  const invalid = await initializeWorkoutDocumentForUser(
+    userId,
+    {
+      origin: "saved_template",
+      templateId: malformed.id,
+      workoutDate: "2026-07-16",
+    },
+    { savedTemplateRepository: repository },
   );
-  if (reconstructedRepeat?.kind === "repeat_group") {
-    assert.deepEqual(
-      reconstructedRepeat.group.children?.map((block) => block.label),
-      ["Settle", "Tempo press", "Float"],
-      "ordered repeat reconstruction should preserve all child blocks",
-    );
+  assert.equal(invalid.ok, false);
+  if (!invalid.ok) assert.equal(invalid.reason, "unsupported_payload");
+}
+
+async function validateAuthoringDeletionGates() {
+  const files = await Promise.all(
+    [
+      "../src/lib/manual-workout-authoring/actions.ts",
+      "../src/lib/manual-workout-authoring/edit-workout.ts",
+      "../src/lib/manual-workout-authoring/index.ts",
+      "../src/lib/manual-workout-authoring/saved-templates.ts",
+      "../src/lib/manual-workout-authoring/schema.ts",
+      "../src/lib/manual-workout-authoring/copy-paste.ts",
+      "../src/lib/manual-workout-authoring/move-workout.ts",
+      "../src/lib/manual-workout-authoring/delete-clear.ts",
+      "../src/lib/active-plan-persistence.ts",
+      "../src/lib/running-plan-engine-actions.ts",
+      "../src/lib/workout-document.ts",
+    ].map(
+      async (relative) =>
+        [relative, await readFile(new URL(relative, import.meta.url), "utf8")] as const,
+    ),
+  );
+  const joined = files.map(([path, source]) => `\n// ${path}\n${source}`).join("\n");
+  for (const obsolete of [
+    "ManualWorkoutDraftInput",
+    "ManualWorkoutConstructorEntryInput",
+    "manualWorkoutDraftInputSchema",
+    "reviewManualWorkoutDraftAction",
+    "addManualWorkoutToActivePlan",
+    "reviewManualWorkoutSavedTemplate",
+    "saveManualWorkoutSavedTemplate",
+    "legacyEditorProjection",
+    "draftInput",
+    "editProjection",
+    "WorkoutDocumentEditProjection",
+    "buildWorkoutDocumentEditProjection",
+    "reconstructManualWorkoutPersistedEditDraft",
+    "reviewManualWorkoutPersistedEditDraft",
+    "confirmManualWorkoutPersistedEdit",
+    "manual_saved_workout_template_payload_v1",
+    "manual_saved_workout_template_payload_v2",
+    "copyManualWorkoutWithinActivePlan",
+    "moveManualWorkoutWithinActivePlan",
+    "reviewManualWorkoutMove",
+    "confirmManualWorkoutMove",
+    "reviewManualWorkoutDeleteClear",
+    "confirmManualWorkoutDeleteClear",
+    "ManualWorkoutDirectCopyResult",
+    "ManualWorkoutDirectMoveResult",
+    "ManualWorkoutMoveReviewResult",
+    "ManualWorkoutMoveConfirmResult",
+    "ManualWorkoutDeleteClearReviewResult",
+    "ManualWorkoutDeleteClearConfirmResult",
+    "manualWorkoutDirectCopyInputSchema",
+    "manualWorkoutMoveReviewInputSchema",
+    "manualWorkoutMoveConfirmInputSchema",
+    "manualWorkoutDirectMoveInputSchema",
+    "manualWorkoutDeleteClearReviewInputSchema",
+    "manualWorkoutDeleteClearConfirmInputSchema",
+    "manual-workout-move-review-v1",
+    "manual-workout-delete-review-v1",
+    "materializeFirstReviewedPlanForUser",
+  ]) {
+    assert.doesNotMatch(joined, new RegExp(obsolete), `${obsolete} must be absent after Batch A`);
   }
-
-  const rereview = assertReady("reconstructed ordered 3-child repeat", reconstructed.draftInput);
-  const rereviewChildren = assertOrderedRepeatChildren(
-    rereview.draft.steps,
-    "reconstructed ordered 3-child repeat",
-  );
-  assert.deepEqual(
-    rereviewChildren.map((child) => child.label),
-    ["Settle", "Tempo press", "Float"],
-    "reconstructed ordered repeat should review without child loss",
-  );
+  assert.match(joined, /WORKOUT_COMMAND_SAVED_TEMPLATE_PAYLOAD_VERSION/);
+  assert.match(joined, /executeReviewedSourceWorkoutBatchMaterializationForUser/);
 }
 
-function validateManualUserEnteredTargetFixtures() {
-  const paceExact = assertReady("runner-entered exact pace", {
-    templateKey: "easy_aerobic_run",
-    workoutDate: "2026-06-16",
-    entries: [
-      {
-        kind: "block",
-        block: {
-          blockKey: "easy_run_block",
-          durationSeconds: 30 * 60,
-          target: { targetSource: "user_entered", pace: "5:20/km" },
-        },
-      },
-    ],
+function allSegmentIds(document: WorkoutDocument): string[] {
+  return document.steps.flatMap((section) => [
+    section.segment_id,
+    ...(section.prescription?.children?.map((child) => child.segment_id) ?? []),
+  ]);
+}
+
+function workoutDocumentContent(document: WorkoutDocument) {
+  const content = normalizeWorkoutDocumentContent({
+    workoutType: document.workoutType,
+    sourceWorkoutType: document.sourceWorkoutType,
+    workoutFamily: document.workoutFamily,
+    workoutIdentity: document.workoutIdentity,
+    calendarIconKey: document.calendarIconKey,
+    metricMode: document.metricMode,
+    title: document.title,
+    notes: document.notes,
+    steps: document.steps,
   });
-  assert.equal(paceExact.draft.metricMode.executable_mode, "pace_executable");
-  assert.equal(paceExact.draft.metricMode.pace_targets_allowed, true);
-  assertManualUserEnteredTarget(paceExact.draft.steps, "pace", "runner-entered exact pace");
-  assert.equal(
-    paceExact.draft.steps.find((step) => step.target?.pace)?.target?.primary_execution_mode,
-    "pace",
-  );
-  assert.equal(
-    paceExact.draft.steps.find((step) => step.target?.pace)?.target?.pace,
-    "5:20/km",
-    "canonical reviewed draft should preserve exact runner-entered pace",
-  );
-
-  const paceRange = assertReady("runner-entered pace range", {
-    templateKey: "easy_aerobic_run",
-    workoutDate: "2026-06-16",
-    entries: [
-      {
-        kind: "block",
-        block: {
-          blockKey: "easy_run_block",
-          durationSeconds: 30 * 60,
-          target: { paceMinPerKmRange: "5:10-5:25/km" },
-        },
-      },
-    ],
-  });
-  assertManualUserEnteredTarget(paceRange.draft.steps, "pace_min_per_km_range", "pace range");
-
-  const hrCap = assertReady("runner-entered HR cap", {
-    templateKey: "steady_aerobic_run",
-    workoutDate: "2026-06-17",
-    entries: [
-      {
-        kind: "block",
-        block: {
-          blockKey: "steady_run_block",
-          durationSeconds: 35 * 60,
-          target: { hrBpmCap: 155 },
-        },
-      },
-    ],
-  });
-  assert.equal(hrCap.draft.metricMode.executable_mode, "hr_executable");
-  assert.equal(hrCap.draft.metricMode.hr_targets_allowed, true);
-  assert.equal(hrCap.draft.metricMode.hr_target_source, "user_entered");
-  assertManualUserEnteredTarget(hrCap.draft.steps, "hr_bpm", "HR cap");
-  assert.equal(
-    hrCap.draft.steps.find((step) => step.target?.hr_bpm)?.target?.primary_execution_mode,
-    "heart_rate",
-  );
-
-  const hrRange = assertReady("runner-entered HR range", {
-    templateKey: "steady_aerobic_run",
-    workoutDate: "2026-06-17",
-    entries: [
-      {
-        kind: "block",
-        block: {
-          blockKey: "steady_run_block",
-          durationSeconds: 35 * 60,
-          target: { hrTargetSource: "user_entered", hrBpmRange: "145-155 bpm" },
-        },
-      },
-    ],
-  });
-  assertManualUserEnteredTarget(hrRange.draft.steps, "hr_bpm_range", "HR range");
-
-  const rpeLow = assertReady("runner-entered RPE zero", {
-    templateKey: "easy_aerobic_run",
-    workoutDate: "2026-06-18",
-    entries: [
-      {
-        kind: "block",
-        block: {
-          blockKey: "easy_run_block",
-          durationSeconds: 20 * 60,
-          target: { rpe: 0, cue: "Keep this restorative." },
-        },
-      },
-    ],
-  });
-  assertManualUserEnteredTarget(rpeLow.draft.steps, "rpe", "RPE zero");
-  assert.equal(
-    rpeLow.draft.steps.find((step) => step.target?.rpe === 0)?.target?.primary_execution_mode,
-    "effort",
-  );
-
-  const rpeHigh = assertReady("runner-entered RPE ten", {
-    templateKey: "controlled_tempo_session",
-    workoutDate: "2026-06-18",
-    entries: [
-      {
-        kind: "block",
-        block: { blockKey: "warmup_block", durationSeconds: 10 * 60 },
-      },
-      {
-        kind: "repeat_group",
-        group: {
-          repeatCount: 3,
-          safetyKind: "tempo_repeats",
-          workBlock: {
-            blockKey: "tempo_block",
-            durationSeconds: 5 * 60,
-            target: { rpe: 10, label: "Runner-entered hard effort" },
-          },
-          recoveryBlock: { blockKey: "interval_recovery_block", durationSeconds: 2 * 60 },
-        },
-      },
-      {
-        kind: "block",
-        block: { blockKey: "cooldown_block", durationSeconds: 10 * 60 },
-      },
-    ],
-  });
-  assertManualUserEnteredTarget(rpeHigh.draft.steps, "rpe", "RPE ten");
+  assert.equal(content.ok, true, JSON.stringify(content));
+  if (!content.ok) throw new Error(content.message);
+  return content.value;
 }
 
-function validateRejectedFixtures() {
-  assertRejected(
-    "nested repeat",
-    {
-      templateKey: "time_intervals",
-      workoutDate: "2026-06-18",
-      entries: [
-        {
-          kind: "repeat_group",
-          group: {
-            repeatCount: 4,
-            safetyKind: "intervals",
-            workBlock: { blockKey: "interval_work_block", durationSeconds: 60 },
-            recoveryBlock: { blockKey: "interval_recovery_block", durationSeconds: 60 },
-            nestedRepeatGroup: { repeatCount: 2 },
-          },
-        },
-      ],
+function canonicalTemplateRow(input: {
+  id: string;
+  userId: string;
+  document: WorkoutDocument;
+  content: ReturnType<typeof workoutDocumentContent>;
+}) {
+  return {
+    id: input.id,
+    user_id: input.userId,
+    display_name: input.document.title,
+    icon_key: input.document.calendarIconKey,
+    template_key: input.document.sourceWorkoutType ?? "workout_document",
+    template_version: "manual_workout_template_registry_v1",
+    source_kind: "manual_saved_workout_template_v1",
+    source_status: "saved_from_reviewed_manual_workout",
+    workout_source_kind: "manual_workout_authoring_v1",
+    review_payload_version: "manual_workout_review_payload_v1",
+    source_review_checksum: "c".repeat(64),
+    source_workout_identity: input.document.workoutIdentity,
+    source_workout_family: input.document.workoutFamily,
+    target_truth_mode: input.document.workoutType === "rest" ? "none" : "structure_only",
+    draft_payload: {
+      version: WORKOUT_COMMAND_SAVED_TEMPLATE_PAYLOAD_VERSION,
+      content: input.content,
+      provenance: { initializer: "built_in" },
+    } as Json,
+    created_at: "2026-07-01T00:00:00.000Z",
+    updated_at: "2026-07-01T00:00:00.000Z",
+  };
+}
+
+function fakeSavedTemplateRepository(
+  initialRows: ReturnType<typeof canonicalTemplateRow>[],
+): ManualWorkoutSavedTemplateRepository {
+  const rows = [...initialRows];
+  return {
+    async insertTemplate(insert) {
+      const row = {
+        ...insert,
+        id: insert.id ?? crypto.randomUUID(),
+        created_at: "2026-07-01T00:00:00.000Z",
+        updated_at: "2026-07-01T00:00:00.000Z",
+      };
+      rows.push(row as ReturnType<typeof canonicalTemplateRow>);
+      return row as ReturnType<typeof canonicalTemplateRow>;
     },
-    "nested_repeat_not_supported",
-  );
-
-  assertRejected(
-    "generated pace source",
-    {
-      templateKey: "easy_aerobic_run",
-      workoutDate: "2026-06-16",
-      entries: [
-        {
-          kind: "block",
-          block: {
-            blockKey: "easy_run_block",
-            durationSeconds: 30 * 60,
-            target: { paceTargetSource: "hito_generated", paceMinPerKmRange: "5:10-5:25/km" },
-          },
-        },
-      ],
+    async listTemplatesForUser(userId) {
+      return rows.filter((row) => row.user_id === userId);
     },
-    "unsafe_metric_truth",
-  );
-
-  assertRejected(
-    "inferred pace source",
-    {
-      templateKey: "easy_aerobic_run",
-      workoutDate: "2026-06-16",
-      entries: [
-        {
-          kind: "block",
-          block: {
-            blockKey: "easy_run_block",
-            durationSeconds: 30 * 60,
-            target: { paceTargetSource: "inferred", pace: "5:10/km" },
-          },
-        },
-      ],
+    async getTemplateForUser(userId, templateId) {
+      return rows.find((row) => row.user_id === userId && row.id === templateId) ?? null;
     },
-    "unsafe_metric_truth",
-  );
-
-  assertRejected(
-    "fake personal HR",
-    {
-      templateKey: "easy_aerobic_run",
-      workoutDate: "2026-06-16",
-      entries: [
-        {
-          kind: "block",
-          block: {
-            blockKey: "easy_run_block",
-            durationSeconds: 30 * 60,
-            target: { hrTargetSource: "personal_hr_zone", hrBpmRange: "145-155" },
-          },
-        },
-      ],
+    async deleteTemplateForUser(userId, templateId) {
+      const index = rows.findIndex((row) => row.user_id === userId && row.id === templateId);
+      if (index < 0) return false;
+      rows.splice(index, 1);
+      return true;
     },
-    "unsafe_metric_truth",
-  );
-
-  assertRejected(
-    "out of range RPE",
-    {
-      templateKey: "easy_aerobic_run",
-      workoutDate: "2026-06-16",
-      entries: [
-        {
-          kind: "block",
-          block: {
-            blockKey: "easy_run_block",
-            durationSeconds: 30 * 60,
-            target: { rpe: "11" },
-          },
-        },
-      ],
-    },
-    "invalid_input",
-  );
-
-  assertRejected(
-    "unknown manual-only identity",
-    {
-      templateKey: "manual_only_magic_session",
-      workoutDate: "2026-06-16",
-    },
-    "invalid_input",
-  );
+  };
 }
 
-function assertRejected(
-  label: string,
-  input: unknown,
-  expectedIssueCode: string,
-): Extract<ManualWorkoutDraftReviewResult, { ok: false }> {
-  const result = reviewManualWorkoutDraft(input);
-
-  assert.equal(result.ok, false, `${label} should be rejected.`);
-  assert.equal(result.status, "draft_rejected");
-  assert.equal(result.persisted, false);
-  assert.ok(
-    result.issues.some((issue) => issue.code === expectedIssueCode),
-    `${label} should include ${expectedIssueCode}; got ${formatJsonResult(result)}`,
-  );
-
-  return result;
-}
-
-function assertNumericStructure(steps: Step[], label: string) {
-  assert.ok(steps.length > 0, `${label} should have steps.`);
-
-  for (const step of steps) {
-    assert.ok(
-      hasExecutableStructure(step),
-      `${label} step ${step.label ?? step.type} should have numeric executable structure.`,
-    );
-  }
-}
-
-function assertOrderedRepeatChildren(steps: Step[], label: string): Step[] {
-  const repeatStep = steps.find((step) => step.repeats);
-
-  assert.ok(repeatStep, `${label} should include a repeat step.`);
-  assert.equal(Object.hasOwn(repeatStep, "work"), false, `${label} should not persist work.`);
-  assert.equal(
-    Object.hasOwn(repeatStep, "recovery"),
-    false,
-    `${label} should not persist recovery.`,
-  );
-  assert.equal(
-    repeatStep.prescription?.children?.length,
-    3,
-    `${label} repeat prescription should preserve 3 ordered children.`,
-  );
-  assert.equal(
-    repeatStep.children?.length,
-    3,
-    `${label} repeat readback should preserve 3 ordered children.`,
-  );
-  assert.ok(
-    repeatStep.children?.every((child) => hasExecutableStructure(child)),
-    `${label} repeat children should be numeric.`,
-  );
-
-  return repeatStep.children ?? [];
-}
-
-function assertCanonicalPersistedStridesShape(
-  steps: PersistedPlannedWorkoutRow["steps"],
-  label: string,
-) {
-  assert.ok(Array.isArray(steps), `${label} should store persisted executable steps.`);
-  const repeatStep = steps.find(
-    (step): step is Step =>
-      Boolean(step) &&
-      typeof step === "object" &&
-      "segment_type" in step &&
-      step.segment_type === "strides",
-  );
-
-  assert.equal(repeatStep?.segment_type, "strides");
-  assert.equal(
-    repeatStep?.type,
-    "intervals",
-    `${label} should preserve canonical imported strides repeat type.`,
-  );
-  const [workChild, recoveryChild] = repeatStep?.children ?? [];
-
-  assert.equal(
-    Object.hasOwn(repeatStep ?? {}, "work"),
-    false,
-    `${label} should not persist legacy nested work block.`,
-  );
-  assert.equal(
-    workChild?.type,
-    "work",
-    `${label} persisted strides work block should use canonical child work type.`,
-  );
-  assert.equal(
-    recoveryChild?.type,
-    "recovery",
-    `${label} persisted strides recovery child should stay canonical.`,
-  );
-}
-
-function assertManualUserEnteredTarget(
-  steps: Step[],
-  key: "pace" | "pace_min_per_km_range" | "hr_bpm" | "hr_bpm_range" | "rpe",
-  label: string,
-) {
-  const allTargets = flattenSteps(steps).flatMap((step) => (step.target ? [step.target] : []));
-  const target = allTargets.find((candidate) => key in candidate);
-
-  assert.ok(target, `${label} should include ${key}.`);
-  assert.equal(
-    target.target_source,
-    "user_entered",
-    `${label} target should preserve user-entered source semantics.`,
-  );
-
-  if (key === "hr_bpm" || key === "hr_bpm_range") {
-    assert.equal(
-      target.hr_target_source,
-      "user_entered",
-      `${label} HR target should preserve user-entered HR source semantics.`,
-    );
-  }
-}
-
-void main().catch((error) => {
+main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });

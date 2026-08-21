@@ -7,11 +7,8 @@ import type {
 import type { PersistedPlanCycleRow } from "../../src/lib/active-plan-persistence";
 import type { Database } from "../../src/lib/supabase/database";
 import type { ManualWorkoutActivePlanAddDependencies } from "../../src/lib/manual-workout-authoring/active-plan-add";
-import { buildImportedPlanSeed } from "../../src/lib/imported-plan";
 import {
-  buildManualWorkoutUserBuiltTrainingPlan,
   reviewManualWorkoutDraft,
-  reviewManualWorkoutMoveForUser,
   type ManualWorkoutDraftInput,
   type ManualWorkoutDraftReviewResult,
 } from "../../src/lib/manual-workout-authoring";
@@ -22,7 +19,6 @@ import {
 import { buildPersistedWorkoutInsertRows } from "../../src/lib/persisted-plan-replacement";
 import { formatResult } from "./move-proof-assertions";
 
-export type MoveDependencies = NonNullable<Parameters<typeof reviewManualWorkoutMoveForUser>[2]>;
 type CalendarWorkoutMutationEventRow =
   Database["public"]["Tables"]["calendar_workout_mutation_events"]["Row"];
 type FakeAddPersistRecord = Parameters<
@@ -59,8 +55,14 @@ export function assertReady(
 
   assert.equal(result.ok, true, `${label} should be accepted: ${formatResult(result)}`);
   assert.equal(result.status, "draft_ready");
-  assert.equal(result.draft.persisted, false);
-  assert.equal(result.reviewToken.startsWith("manual-workout-review-v1."), true);
+  assert.equal(result.persisted, false);
+  assert.equal(result.candidate.command.operation, "materialize");
+  assert.deepEqual(result.document, result.draft);
+  if (result.candidate.command.operation !== "materialize") {
+    throw new Error(`${label} did not produce a materialize command.`);
+  }
+  assert.deepEqual(result.candidate.command.documents, [result.draft]);
+  assert.equal(result.reviewToken.startsWith("workout-command-review-v1."), true);
   assert.equal(result.reviewChecksum.length, 64);
 
   return result;
@@ -165,60 +167,6 @@ export function buildFakeAddDependencies(input: {
   };
 }
 
-export function buildFakeMoveDependencies(input: {
-  activePlan: PersistedPlanCycleRow | null;
-  workouts: PersistedPlannedWorkoutRow[];
-  logsByWorkoutId?: Map<string, PersistedWorkoutLogRow>;
-  evidenceWorkoutIds?: Set<string>;
-  persistError?: Error;
-  now?: () => Date;
-  onPersist?: (record: Parameters<NonNullable<MoveDependencies["persistWorkoutMove"]>>[0]) => void;
-}): MoveDependencies {
-  return {
-    currentDate: "2026-06-10",
-    getCalendarWorkoutContextForUser: async () =>
-      ({
-        sourcePlansById: input.activePlan
-          ? new Map([[input.activePlan.id, input.activePlan]])
-          : new Map(),
-        existingWorkouts: {
-          workouts: input.workouts,
-          logsByWorkoutId: input.logsByWorkoutId ?? new Map(),
-        },
-      }) satisfies CalendarWorkoutContext,
-    fetchEvidenceWorkoutIds: async () => input.evidenceWorkoutIds ?? new Set(),
-    persistWorkoutMove: async (record) => {
-      if (input.persistError) {
-        throw input.persistError;
-      }
-
-      input.onPersist?.(record);
-
-      const movedWorkout = {
-        ...record.sourceWorkout,
-        workout_date: record.review.targetDate,
-        weekday: record.review.targetWeekday,
-        week_number: record.targetWeekNumber,
-      };
-
-      return {
-        movedWorkout,
-        restoredWorkout: null,
-        mutationEvent: buildFakeMutationEvent({
-          userId: record.userId,
-          plannedWorkoutId: record.sourceWorkout.id,
-          mutationKind: "user_moved_workout",
-          sourceWorkoutId: record.sourceWorkout.id,
-          sourceWorkoutDate: record.sourceWorkout.workout_date,
-          targetDate: record.review.targetDate,
-          eventPayload: record.review,
-        }),
-        undoExpiresAt: record.targetReplacementWorkout ? "2026-06-10T00:00:45.000Z" : null,
-      };
-    },
-  };
-}
-
 export function buildCanonicalPersistedPlannedWorkoutFromReview({
   userId,
   planCycleId,
@@ -230,12 +178,10 @@ export function buildCanonicalPersistedPlannedWorkoutFromReview({
   id: string;
   review: Extract<ManualWorkoutDraftReviewResult, { ok: true }>;
 }): PersistedPlannedWorkoutRow {
-  const canonicalPlan = buildManualWorkoutUserBuiltTrainingPlan(review.draft);
-  const importedSeed = buildImportedPlanSeed(canonicalPlan);
   const [insertRow] = buildPersistedWorkoutInsertRows(
     planCycleId,
     userId,
-    importedSeed.workouts,
+    [review.draft],
     "manual",
   );
 

@@ -1,11 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import {
-  applySavedPlanRecordForUser,
-  retainReviewedPlanCandidateForUser,
-} from "@/lib/active-plan-persistence";
-import { CalendarPersistenceRejection } from "@/lib/active-plan-lifecycle-persistence";
+import { retainReviewedPlanCandidateForUser } from "@/lib/active-plan-persistence";
+import { CalendarPersistenceRejection } from "@/lib/runner-calendar-mutations";
 import { getRequestAuthContext } from "@/lib/backend/auth";
 import { parseDurationSeconds, parsePaceSecondsPerKm } from "@/lib/first-plan-authoring-utils";
 import {
@@ -33,6 +30,11 @@ import {
 } from "@/lib/plan-creation-engine";
 import { RUNNING_PLAN_RUNNER_LEVEL_VALUES } from "@/lib/plan-creation-engine/source-types";
 import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
+import { buildImportedPlanSeed } from "@/lib/imported-plan";
+import {
+  confirmWorkoutCommandForUser,
+  reviewWorkoutCommandForUser,
+} from "@/lib/manual-workout-authoring/actions";
 import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
 import {
   RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
@@ -149,6 +151,7 @@ type RunningPlanPreviewProductDraft = {
   };
   calendarRows: readonly RunningPlanPreviewProductCalendarRow[];
   workoutDocuments: AiGeneratedRunningPlanPreviewDraft["workoutDocuments"];
+  candidate: AiGeneratedRunningPlanPreviewDraft["candidate"];
   savedPlanId: string | null;
   reviewToken: string;
   reviewChecksum: string;
@@ -393,20 +396,56 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
   }
 
   try {
-    const applyResult = await applySavedPlanRecordForUser(
-      userId,
-      savedPlan.id,
-      "apply_if_future_empty",
-    );
-
-    if (!applyResult.ok) {
+    const documents = buildImportedPlanSeed(exactness.canonicalPlan).workouts;
+    const command = {
+      operation: "materialize" as const,
+      documents,
+      provenanceReferences: documents.map((document) => ({
+        sourcePlanId: savedPlan.id,
+        sourceKind: request.sourceKind,
+        sourceStatus: RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
+        sourceWorkoutId: document.sourceWorkoutId,
+      })),
+    };
+    const commandReview = await reviewWorkoutCommandForUser(userId, command);
+    if (!commandReview.ok) {
       return buildConfirmFailure({
-        reason: "replacement_required",
-        message:
-          "Future Calendar workouts already exist. Apply this saved plan only after explicitly choosing Replace future workouts.",
+        reason: commandReview.issues.some((issue) => issue.code === "calendar_collision")
+          ? "replacement_required"
+          : "stale_review",
+        message: commandReview.issues[0]?.message ?? "The reviewed workouts could not be verified.",
         sourceKind: request.sourceKind,
       });
     }
+    const materialized = await confirmWorkoutCommandForUser(userId, {
+      command: commandReview.candidate.command,
+      candidateId: commandReview.candidate.candidateId,
+      reviewToken: commandReview.candidate.reviewToken,
+      reviewChecksum: commandReview.candidate.reviewChecksum,
+    });
+    if (!materialized.ok) {
+      return buildConfirmFailure({
+        reason: materialized.reason === "collision" ? "replacement_required" : "persistence_failed",
+        message: materialized.message,
+        sourceKind: request.sourceKind,
+      });
+    }
+    const materializedResult = jsonRecord(materialized.result);
+    const appliedStartDate = stringResultField(
+      materializedResult,
+      "appliedStartDate",
+      exactness.canonicalPlan.start_date,
+    );
+    const workoutCount = numberResultField(
+      materializedResult,
+      "workoutCount",
+      documents.filter((document) => document.workoutType !== "rest").length,
+    );
+    const calendarRowCount = numberResultField(
+      materializedResult,
+      "calendarRowCount",
+      documents.length,
+    );
 
     await markAiPlanGenerationPersisted({
       trace: exactness.draft.aiGeneration.generationTrace,
@@ -420,11 +459,11 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
       sourceStatus: RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
       savedPlanId: savedPlan.id,
       schemaVersion: exactness.canonicalPlan.schema_version,
-      effectiveStartDate: applyResult.appliedStartDate,
-      appliedStartDate: applyResult.appliedStartDate,
-      workoutCount: applyResult.workoutCount,
-      calendarRowCount: applyResult.calendarRowCount,
-      nonRestWorkoutCount: applyResult.workoutCount,
+      effectiveStartDate: appliedStartDate,
+      appliedStartDate,
+      workoutCount,
+      calendarRowCount,
+      nonRestWorkoutCount: workoutCount,
       reviewChecksum: exactness.reviewChecksum,
       safety: {
         requiresExplicitConfirm: true,
@@ -636,6 +675,7 @@ export function projectRunningPlanPreviewResultForProduct(
         endpointDistanceMeters: row.endpointDistanceMeters,
       })),
       workoutDocuments: draft.workoutDocuments,
+      candidate: draft.candidate,
       savedPlanId: result.savedPlanId ?? null,
       reviewToken: draft.reviewToken,
       reviewChecksum: draft.reviewChecksum,
@@ -669,4 +709,20 @@ function isLocalQaFixtureReviewedDraft(draft: AiGeneratedRunningPlanPreviewDraft
     draft.aiGeneration.generationTrace?.provider.kind === "local_dev_fixture" ||
     isAiGeneratedRunningPlanDevFixtureModel(draft.aiGeneration.model)
   );
+}
+
+function jsonRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function stringResultField(value: Record<string, unknown>, key: string, fallback: string) {
+  const field = value[key];
+  return typeof field === "string" && field ? field : fallback;
+}
+
+function numberResultField(value: Record<string, unknown>, key: string, fallback: number) {
+  const field = value[key];
+  return typeof field === "number" && Number.isFinite(field) ? field : fallback;
 }

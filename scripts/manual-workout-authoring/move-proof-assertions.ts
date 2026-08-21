@@ -1,10 +1,5 @@
 import assert from "node:assert/strict";
-import type {
-  ManualWorkoutDirectMoveResult,
-  ManualWorkoutDraftReviewResult,
-  ManualWorkoutMoveConfirmResult,
-  ManualWorkoutMoveReviewResult,
-} from "../../src/lib/manual-workout-authoring";
+import type { ManualWorkoutDraftReviewResult } from "../../src/lib/manual-workout-authoring";
 import type { PersistedPlannedWorkoutRow } from "../../src/lib/runner-calendar-persistence";
 import type { Step } from "../../src/lib/training";
 
@@ -27,30 +22,6 @@ export function assertManualBlockedResult<Result extends { ok: boolean }, Reason
     assert.equal(blocked.persisted, false);
     assert.equal(blocked.reason, reason, `${label} should fail with ${reason}.`);
   }
-}
-
-export function assertMoveReviewBlocked(
-  result: ManualWorkoutMoveReviewResult,
-  reason: Extract<ManualWorkoutMoveReviewResult, { ok: false }>["reason"],
-  label: string,
-) {
-  assertManualBlockedResult(result, reason, label, formatMoveReviewResult);
-}
-
-export function assertMoveConfirmBlocked(
-  result: ManualWorkoutMoveConfirmResult,
-  reason: Extract<ManualWorkoutMoveConfirmResult, { ok: false }>["reason"],
-  label: string,
-) {
-  assertManualBlockedResult(result, reason, label, formatMoveConfirmResult);
-}
-
-export function assertDirectMoveBlocked(
-  result: ManualWorkoutDirectMoveResult,
-  reason: Extract<ManualWorkoutDirectMoveResult, { ok: false }>["reason"],
-  label: string,
-) {
-  assertManualBlockedResult(result, reason, label, formatDirectMoveResult);
 }
 
 export function assertRepeatWithRecovery(steps: Step[], label: string) {
@@ -91,18 +62,6 @@ export function readStepsForAssertion(value: PersistedPlannedWorkoutRow["steps"]
 }
 
 export function formatResult(result: ManualWorkoutDraftReviewResult) {
-  return formatJsonResult(result);
-}
-
-export function formatMoveReviewResult(result: ManualWorkoutMoveReviewResult) {
-  return formatJsonResult(result);
-}
-
-export function formatMoveConfirmResult(result: ManualWorkoutMoveConfirmResult) {
-  return formatJsonResult(result);
-}
-
-export function formatDirectMoveResult(result: ManualWorkoutDirectMoveResult) {
   return formatJsonResult(result);
 }
 

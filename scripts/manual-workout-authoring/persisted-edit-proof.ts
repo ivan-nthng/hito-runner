@@ -2,21 +2,23 @@ import assert from "node:assert/strict";
 import type { PersistedPlanCycleRow } from "../../src/lib/active-plan-persistence";
 import type { PersistedPlannedWorkoutRow } from "../../src/lib/runner-calendar-persistence";
 import {
-  confirmManualWorkoutPersistedEditForUser,
-  reconstructManualWorkoutPersistedEditDraftForUser,
-  reviewManualWorkoutPersistedEditDraftForUser,
-  type ManualWorkoutPersistedEditDependencies,
+  confirmWorkoutDocumentPersistedEditForUser,
+  initializeWorkoutDocumentForUser,
+  reconstructWorkoutDocumentPersistedEditForUser,
+  reviewWorkoutDocumentPersistedEditForUser,
+  type WorkoutDocumentPersistedEditDependencies,
 } from "../../src/lib/manual-workout-authoring";
 import {
   CALENDAR_WORKOUT_MUTATION_KIND,
   CALENDAR_WORKOUT_MUTATION_SOURCE_KIND,
-} from "../../src/lib/active-plan-workout-editing/policy";
+} from "../../src/lib/runner-calendar-mutations";
 import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "../../src/lib/manual-workout-authoring/schema";
 import { stableJsonEqual } from "../../src/lib/review-token-signing";
 import type { Json } from "../../src/lib/supabase/database";
-import type {
-  WorkoutDocument,
-  WorkoutDocumentEditProjection,
+import {
+  normalizePersistedWorkoutDocument,
+  type WorkoutDocument,
+  type WorkoutDocumentEditProjection,
 } from "../../src/lib/workout-document";
 import {
   assertReady,
@@ -91,6 +93,7 @@ export async function validateManualPersistedTodayAndFutureWorkoutEditContract()
   }
 
   await assertRichTargetAndRepeatExactness(aiPlan, aiWorkout);
+  await assertNestedRepeatIdentityBackfill(aiPlan, aiWorkout);
   await assertReviewAndFailureProtection(manualPlan, manualWorkout);
   await assertProtectedAndMalformedNegatives(manualPlan, manualWorkout);
   await assertRepeatedEditRootProvenance(aiPlan, aiWorkout);
@@ -102,7 +105,25 @@ async function assertOriginNeutralPositive(
   workout: PersistedPlannedWorkoutRow,
 ) {
   const dependencies = buildFakeEditDependencies({ plan, workouts: [workout] });
-  const reconstructed = await reconstructManualWorkoutPersistedEditDraftForUser(
+  const initialized = await initializeWorkoutDocumentForUser(
+    USER_ID,
+    { origin: "calendar", workoutId: workout.id },
+    { calendarEditDependencies: dependencies },
+  );
+  assert.equal(initialized.ok, true, `${label} Calendar document should initialize`);
+  if (!initialized.ok || initialized.origin !== "calendar") return;
+  assert.ok(
+    stableJsonEqual(initialized.document, normalizeExpectedDocument(workout)),
+    `${label} initializer must return the complete persisted document`,
+  );
+  assert.ok(
+    stableJsonEqual(initialized.expectedFingerprint, workout),
+    `${label} initializer must return the complete persisted row fingerprint`,
+  );
+  assert.equal(initialized.safety.rootProvenanceVerified, true);
+  assert.equal(initialized.safety.editProtectionVerified, true);
+
+  const reconstructed = await reconstructWorkoutDocumentPersistedEditForUser(
     USER_ID,
     sourceInput(plan, workout),
     dependencies,
@@ -115,24 +136,45 @@ async function assertOriginNeutralPositive(
   assert.equal(reconstructed.safety.strictDocumentVerified, true);
   assert.equal(reconstructed.safety.originNeutral, true);
 
-  const editProjection = {
-    ...reconstructed.editProjection,
+  const document = {
+    ...reconstructed.document,
     title: `${label} title-only edit`,
-  } satisfies WorkoutDocumentEditProjection;
-  const reviewed = await reviewManualWorkoutPersistedEditDraftForUser(
+  } satisfies WorkoutDocument;
+  const reviewed = await reviewWorkoutDocumentPersistedEditForUser(
     USER_ID,
-    { ...sourceInput(plan, workout), editProjection },
+    { ...sourceInput(plan, workout), document },
     dependencies,
   );
   assert.equal(reviewed.ok, true, `${label} document should review`);
   if (!reviewed.ok) return;
+  assert.deepEqual(reviewed.document, reviewed.candidateDocument);
+  assert.deepEqual(reviewed.candidate, reviewed.review);
+  assert.equal(reviewed.candidate.command.operation, "replace_document");
+  if (reviewed.candidate.command.operation !== "replace_document") return;
+  assert.deepEqual(reviewed.candidate.command.document, reviewed.document);
+  assert.equal(reviewed.review.command.operation, "replace_document");
+  if (reviewed.review.command.operation !== "replace_document") return;
+  assert.deepEqual(reviewed.review.command.document, reviewed.candidateDocument);
+  assert.ok(
+    stableJsonEqual(reviewed.review.command.provenanceReference, initialized.provenanceReference),
+    `${label} initializer and reviewed command must share root provenance`,
+  );
+  assert.ok(
+    stableJsonEqual(reviewed.review.command.expectedFingerprint, initialized.expectedFingerprint),
+    `${label} initializer and reviewed command must share the source fingerprint`,
+  );
+  assert.ok(
+    stableJsonEqual(reviewed.review.command.expectedFingerprint, workout),
+    `${label} review must sign the complete current source row`,
+  );
 
   let persistedCandidate: WorkoutDocument | null = null;
-  const confirmed = await confirmManualWorkoutPersistedEditForUser(
+  const confirmed = await confirmWorkoutDocumentPersistedEditForUser(
     USER_ID,
     {
       ...sourceInput(plan, workout),
-      editProjection,
+      document,
+      candidateId: reviewed.candidate.candidateId,
       reviewChecksum: reviewed.review.reviewChecksum,
       reviewToken: reviewed.review.reviewToken,
     },
@@ -156,6 +198,16 @@ async function assertOriginNeutralPositive(
   assert.equal(confirmed.safety.updatesSamePlannedWorkoutRow, true);
   assert.equal(persistedCandidate.title, `${label} title-only edit`);
   assertStableWorkoutIdentity(workout, workoutRowFromDocument(workout, persistedCandidate));
+
+  const changedProvenance = await reviewWorkoutDocumentPersistedEditForUser(
+    USER_ID,
+    {
+      ...sourceInput(plan, workout),
+      document: { ...document, sourceWorkoutId: "client-replaced-root" },
+    },
+    dependencies,
+  );
+  assertBlocked(changedProvenance, "client_payload_rejected", `${label} server-owned provenance`);
 }
 
 async function assertRichTargetAndRepeatExactness(
@@ -164,7 +216,7 @@ async function assertRichTargetAndRepeatExactness(
 ) {
   const before = structuredClone(workout);
   const dependencies = buildFakeEditDependencies({ plan, workouts: [workout] });
-  const reconstructed = await reconstructManualWorkoutPersistedEditDraftForUser(
+  const reconstructed = await reconstructWorkoutDocumentPersistedEditForUser(
     USER_ID,
     sourceInput(plan, workout),
     dependencies,
@@ -172,7 +224,7 @@ async function assertRichTargetAndRepeatExactness(
   assert.equal(reconstructed.ok, true);
   if (!reconstructed.ok) return;
 
-  const noOpReview = await reviewManualWorkoutPersistedEditDraftForUser(
+  const noOpReview = await reviewWorkoutDocumentPersistedEditForUser(
     USER_ID,
     { ...sourceInput(plan, workout), editProjection: reconstructed.editProjection },
     dependencies,
@@ -188,7 +240,7 @@ async function assertRichTargetAndRepeatExactness(
     ...reconstructed.editProjection,
     title: "Rich title-only edit",
   } satisfies WorkoutDocumentEditProjection;
-  const titleReview = await reviewManualWorkoutPersistedEditDraftForUser(
+  const titleReview = await reviewWorkoutDocumentPersistedEditForUser(
     USER_ID,
     { ...sourceInput(plan, workout), editProjection: titleProjection },
     dependencies,
@@ -200,11 +252,31 @@ async function assertRichTargetAndRepeatExactness(
     "ordered repeats, child targets, provenance, and arbitrary extras must remain exact",
   );
 
+  const reorderedProjection = structuredClone(reconstructed.editProjection);
+  const repeat = reorderedProjection.steps[1];
+  assert.equal(repeat?.prescription?.mode, "repeats");
+  if (repeat?.prescription?.mode === "repeats" && repeat.prescription.children) {
+    repeat.prescription.children = [...repeat.prescription.children]
+      .reverse()
+      .map((child, index) => ({ ...child, sequence: index + 1 }));
+    delete repeat.children;
+  }
+  const reorderedReview = await reviewWorkoutDocumentPersistedEditForUser(
+    USER_ID,
+    { ...sourceInput(plan, workout), editProjection: reorderedProjection },
+    dependencies,
+  );
+  assert.equal(
+    reorderedReview.ok,
+    true,
+    "AI target provenance should follow nested segment identity across reorder",
+  );
+
   const tamperedProjection = structuredClone(reconstructed.editProjection);
   const repeatTarget = readRepeatTarget(tamperedProjection);
   repeatTarget.pace = "3:30/km";
   delete tamperedProjection.steps[1]?.children;
-  const tamperedReview = await reviewManualWorkoutPersistedEditDraftForUser(
+  const tamperedReview = await reviewWorkoutDocumentPersistedEditForUser(
     USER_ID,
     { ...sourceInput(plan, workout), editProjection: tamperedProjection },
     dependencies,
@@ -217,7 +289,7 @@ async function assertRichTargetAndRepeatExactness(
   runnerTarget.pace = "5:05/km";
   delete runnerTarget.hr_target_source;
   delete runnerProjection.steps[1]?.children;
-  const runnerReview = await reviewManualWorkoutPersistedEditDraftForUser(
+  const runnerReview = await reviewWorkoutDocumentPersistedEditForUser(
     USER_ID,
     { ...sourceInput(plan, workout), editProjection: runnerProjection },
     dependencies,
@@ -226,13 +298,109 @@ async function assertRichTargetAndRepeatExactness(
   assert.ok(stableJsonEqual(workout, before), "review/cancel must not mutate source bytes");
 }
 
+async function assertNestedRepeatIdentityBackfill(
+  plan: PersistedPlanCycleRow,
+  workout: PersistedPlannedWorkoutRow,
+) {
+  const legacyWorkout = structuredClone(workout);
+  removeNestedSegmentIds(legacyWorkout.steps);
+  const before = structuredClone(legacyWorkout);
+  let persistedCalls = 0;
+  let persistedWorkout: PersistedPlannedWorkoutRow | null = null;
+  const generatedIds = ["calendar-child-a", "calendar-child-b", "calendar-child-c"];
+  const initialized = await initializeWorkoutDocumentForUser(
+    USER_ID,
+    { origin: "calendar", workoutId: legacyWorkout.id },
+    {
+      calendarEditDependencies: buildFakeEditDependencies({
+        plan,
+        workouts: [legacyWorkout],
+        createNestedSegmentId: () => generatedIds.shift() ?? "unexpected-child-id",
+        persistNestedSegmentIdentityBackfill: async (input) => {
+          persistedCalls += 1;
+          assert.deepEqual(
+            stripNestedSegmentIds(input.upgradedSteps),
+            stripNestedSegmentIds(legacyWorkout.steps),
+            "identity retention may add only missing nested segment IDs",
+          );
+          persistedWorkout = { ...input.sourceWorkout, steps: input.upgradedSteps as Json };
+          return { ok: true, editedWorkout: persistedWorkout, mutationEventId: 7 };
+        },
+      }),
+    },
+  );
+  assert.equal(initialized.ok, true, "eligible Calendar Repeat identity should persist");
+  assert.equal(persistedCalls, 1, "eligible legacy identity should persist exactly once");
+  assert.ok(
+    stableJsonEqual(legacyWorkout, before),
+    "backfill preparation must not mutate source bytes",
+  );
+  assert.ok(persistedWorkout, "backfill should return the authoritative upgraded row");
+  if (!initialized.ok || initialized.origin !== "calendar" || !persistedWorkout) return;
+
+  const childIds = initialized.document.steps[1]?.prescription?.children?.map(
+    (child) => child.segment_id,
+  );
+  assert.deepEqual(childIds, ["calendar-child-a", "calendar-child-b", "calendar-child-c"]);
+  assert.equal(new Set(childIds).size, childIds?.length, "nested IDs must be unique");
+  assert.ok(
+    stableJsonEqual(initialized.expectedFingerprint, persistedWorkout),
+    "Calendar initializer must sign the upgraded authoritative row",
+  );
+
+  const reloaded = await initializeWorkoutDocumentForUser(
+    USER_ID,
+    { origin: "calendar", workoutId: legacyWorkout.id },
+    {
+      calendarEditDependencies: buildFakeEditDependencies({
+        plan,
+        workouts: [persistedWorkout],
+        persistNestedSegmentIdentityBackfill: async () => {
+          throw new Error("stable nested identity must not be persisted twice");
+        },
+      }),
+    },
+  );
+  assert.equal(reloaded.ok, true, "persisted nested identity should reload");
+  if (reloaded.ok && reloaded.origin === "calendar") {
+    assert.deepEqual(
+      reloaded.document.steps[1]?.prescription?.children?.map((child) => child.segment_id),
+      childIds,
+      "nested identity must survive reload",
+    );
+  }
+
+  let protectedPersistCalls = 0;
+  const protectedResult = await initializeWorkoutDocumentForUser(
+    USER_ID,
+    { origin: "calendar", workoutId: legacyWorkout.id },
+    {
+      calendarEditDependencies: buildFakeEditDependencies({
+        plan,
+        workouts: [legacyWorkout],
+        evidence: new Set([legacyWorkout.id]),
+        persistNestedSegmentIdentityBackfill: async () => {
+          protectedPersistCalls += 1;
+          throw new Error("protected identity backfill must not run");
+        },
+      }),
+    },
+  );
+  assertBlocked(protectedResult, "protected", "protected nested identity backfill");
+  assert.equal(protectedPersistCalls, 0);
+  assert.ok(
+    stableJsonEqual(legacyWorkout, before),
+    "protected Calendar workout must remain byte-for-byte unchanged",
+  );
+}
+
 async function assertReviewAndFailureProtection(
   plan: PersistedPlanCycleRow,
   workout: PersistedPlannedWorkoutRow,
 ) {
   const before = structuredClone(workout);
   const dependencies = buildFakeEditDependencies({ plan, workouts: [workout] });
-  const reconstructed = await reconstructManualWorkoutPersistedEditDraftForUser(
+  const reconstructed = await reconstructWorkoutDocumentPersistedEditForUser(
     USER_ID,
     sourceInput(plan, workout),
     dependencies,
@@ -244,7 +412,7 @@ async function assertReviewAndFailureProtection(
     ...reconstructed.editProjection,
     title: "Reviewed title",
   } satisfies WorkoutDocumentEditProjection;
-  const reviewed = await reviewManualWorkoutPersistedEditDraftForUser(
+  const reviewed = await reviewWorkoutDocumentPersistedEditForUser(
     USER_ID,
     { ...sourceInput(plan, workout), editProjection },
     dependencies,
@@ -252,7 +420,7 @@ async function assertReviewAndFailureProtection(
   assert.equal(reviewed.ok, true);
   if (!reviewed.ok) return;
 
-  const invalidToken = await confirmManualWorkoutPersistedEditForUser(
+  const invalidToken = await confirmWorkoutDocumentPersistedEditForUser(
     USER_ID,
     {
       ...sourceInput(plan, workout),
@@ -265,7 +433,7 @@ async function assertReviewAndFailureProtection(
   assertBlocked(invalidToken, "invalid_review", "invalid review token");
 
   const staleProjection = { ...editProjection, title: "Changed after review" };
-  const staleReview = await confirmManualWorkoutPersistedEditForUser(
+  const staleReview = await confirmWorkoutDocumentPersistedEditForUser(
     USER_ID,
     {
       ...sourceInput(plan, workout),
@@ -277,7 +445,7 @@ async function assertReviewAndFailureProtection(
   );
   assertBlocked(staleReview, "stale_review", "stale candidate review");
 
-  const raceRejected = await confirmManualWorkoutPersistedEditForUser(
+  const raceRejected = await confirmWorkoutDocumentPersistedEditForUser(
     USER_ID,
     {
       ...sourceInput(plan, workout),
@@ -297,7 +465,7 @@ async function assertReviewAndFailureProtection(
   );
   assertBlocked(raceRejected, "protected_day", "atomic eligibility race");
 
-  const persistenceFailure = await confirmManualWorkoutPersistedEditForUser(
+  const persistenceFailure = await confirmWorkoutDocumentPersistedEditForUser(
     USER_ID,
     {
       ...sourceInput(plan, workout),
@@ -322,8 +490,14 @@ async function assertProtectedAndMalformedNegatives(
   workout: PersistedPlannedWorkoutRow,
 ) {
   const past = { ...workout, workout_date: "2026-06-17" };
+  await assertCalendarInitializerBlocked(
+    past,
+    buildFakeEditDependencies({ plan, workouts: [past] }),
+    "protected",
+    "past workout initializer",
+  );
   assertBlocked(
-    await reconstructManualWorkoutPersistedEditDraftForUser(
+    await reconstructWorkoutDocumentPersistedEditForUser(
       USER_ID,
       sourceInput(plan, past),
       buildFakeEditDependencies({ plan, workouts: [past] }),
@@ -340,7 +514,7 @@ async function assertProtectedAndMalformedNegatives(
     ]),
   });
   assertBlocked(
-    await reconstructManualWorkoutPersistedEditDraftForUser(
+    await reconstructWorkoutDocumentPersistedEditForUser(
       USER_ID,
       sourceInput(plan, workout),
       loggedDependencies,
@@ -348,9 +522,15 @@ async function assertProtectedAndMalformedNegatives(
     "logged_workout",
     "logged workout",
   );
+  await assertCalendarInitializerBlocked(
+    workout,
+    loggedDependencies,
+    "protected",
+    "logged workout initializer",
+  );
 
   assertBlocked(
-    await reconstructManualWorkoutPersistedEditDraftForUser(
+    await reconstructWorkoutDocumentPersistedEditForUser(
       USER_ID,
       sourceInput(plan, workout),
       buildFakeEditDependencies({ plan, workouts: [workout], evidence: new Set([workout.id]) }),
@@ -358,16 +538,28 @@ async function assertProtectedAndMalformedNegatives(
     "evidence_backed_workout",
     "evidence-backed workout",
   );
+  await assertCalendarInitializerBlocked(
+    workout,
+    buildFakeEditDependencies({ plan, workouts: [workout], evidence: new Set([workout.id]) }),
+    "protected",
+    "evidence-backed initializer",
+  );
 
   const malformed = { ...workout, steps: [{ type: "work" }] as Json };
   assertBlocked(
-    await reconstructManualWorkoutPersistedEditDraftForUser(
+    await reconstructWorkoutDocumentPersistedEditForUser(
       USER_ID,
       sourceInput(plan, malformed),
       buildFakeEditDependencies({ plan, workouts: [malformed] }),
     ),
     "source_workout_not_supported",
     "malformed document",
+  );
+  await assertCalendarInitializerBlocked(
+    malformed,
+    buildFakeEditDependencies({ plan, workouts: [malformed] }),
+    "unsupported_payload",
+    "malformed initializer",
   );
 
   const rest = {
@@ -380,7 +572,7 @@ async function assertProtectedAndMalformedNegatives(
     steps: [],
   };
   assertBlocked(
-    await reconstructManualWorkoutPersistedEditDraftForUser(
+    await reconstructWorkoutDocumentPersistedEditForUser(
       USER_ID,
       sourceInput(plan, rest),
       buildFakeEditDependencies({ plan, workouts: [rest] }),
@@ -388,6 +580,42 @@ async function assertProtectedAndMalformedNegatives(
     "source_workout_not_supported",
     "Rest document",
   );
+  await assertCalendarInitializerBlocked(
+    rest,
+    buildFakeEditDependencies({ plan, workouts: [rest] }),
+    "unsupported_payload",
+    "Rest initializer",
+  );
+
+  await assertCalendarInitializerBlocked(
+    workout,
+    buildFakeEditDependencies({ plan, workouts: [] }),
+    "not_found",
+    "missing initializer",
+  );
+  await assertCalendarInitializerBlocked(
+    { ...workout, user_id: "00000000-0000-4000-8000-000000000899" },
+    buildFakeEditDependencies({
+      plan,
+      workouts: [{ ...workout, user_id: "00000000-0000-4000-8000-000000000899" }],
+    }),
+    "not_found",
+    "foreign initializer",
+  );
+}
+
+async function assertCalendarInitializerBlocked(
+  workout: PersistedPlannedWorkoutRow,
+  dependencies: WorkoutDocumentPersistedEditDependencies,
+  reason: string,
+  label: string,
+) {
+  const initialized = await initializeWorkoutDocumentForUser(
+    USER_ID,
+    { origin: "calendar", workoutId: workout.id },
+    { calendarEditDependencies: dependencies },
+  );
+  assertBlocked(initialized, reason, label);
 }
 
 async function assertRepeatedEditRootProvenance(
@@ -408,7 +636,7 @@ async function assertRepeatedEditRootProvenance(
     original_workout_identity: "controlled_tempo_session",
   };
   const repeatedPlan = plan;
-  const reconstructed = await reconstructManualWorkoutPersistedEditDraftForUser(
+  const reconstructed = await reconstructWorkoutDocumentPersistedEditForUser(
     USER_ID,
     sourceInput(repeatedPlan, workout),
     buildFakeEditDependencies({
@@ -420,7 +648,7 @@ async function assertRepeatedEditRootProvenance(
   assert.equal(reconstructed.ok, true);
   if (!reconstructed.ok) return;
 
-  const reviewed = await reviewManualWorkoutPersistedEditDraftForUser(
+  const reviewed = await reviewWorkoutDocumentPersistedEditForUser(
     USER_ID,
     { ...sourceInput(repeatedPlan, workout), editProjection: reconstructed.editProjection },
     buildFakeEditDependencies({
@@ -432,7 +660,7 @@ async function assertRepeatedEditRootProvenance(
   assert.equal(reviewed.ok, true);
   if (!reviewed.ok) return;
 
-  const confirmed = await confirmManualWorkoutPersistedEditForUser(
+  const confirmed = await confirmWorkoutDocumentPersistedEditForUser(
     USER_ID,
     {
       ...sourceInput(repeatedPlan, workout),
@@ -465,8 +693,14 @@ function buildFakeEditDependencies(input: {
   logs?: Map<string, ReturnType<typeof buildFakeWorkoutLog>>;
   evidence?: Set<string>;
   earliestMutationEvent?: { event_payload: Json } | null;
-  persistWorkoutEdit?: NonNullable<ManualWorkoutPersistedEditDependencies["persistWorkoutEdit"]>;
-}): ManualWorkoutPersistedEditDependencies {
+  persistWorkoutEdit?: NonNullable<WorkoutDocumentPersistedEditDependencies["persistWorkoutEdit"]>;
+  createNestedSegmentId?: NonNullable<
+    WorkoutDocumentPersistedEditDependencies["createNestedSegmentId"]
+  >;
+  persistNestedSegmentIdentityBackfill?: NonNullable<
+    WorkoutDocumentPersistedEditDependencies["persistNestedSegmentIdentityBackfill"]
+  >;
+}): WorkoutDocumentPersistedEditDependencies {
   return {
     currentDate: CURRENT_DATE,
     getCalendarWorkoutContextForUser: async () => ({
@@ -478,8 +712,45 @@ function buildFakeEditDependencies(input: {
     }),
     fetchEvidenceWorkoutIds: async () => input.evidence ?? new Set(),
     getEarliestMutationEventForWorkout: async () => input.earliestMutationEvent ?? null,
+    ...(input.createNestedSegmentId ? { createNestedSegmentId: input.createNestedSegmentId } : {}),
+    ...(input.persistNestedSegmentIdentityBackfill
+      ? { persistNestedSegmentIdentityBackfill: input.persistNestedSegmentIdentityBackfill }
+      : {}),
     ...(input.persistWorkoutEdit ? { persistWorkoutEdit: input.persistWorkoutEdit } : {}),
   };
+}
+
+function removeNestedSegmentIds(steps: Json) {
+  if (!Array.isArray(steps)) return;
+  for (const step of steps) {
+    if (!step || typeof step !== "object" || Array.isArray(step)) continue;
+    const prescription = step.prescription;
+    if (
+      prescription &&
+      typeof prescription === "object" &&
+      !Array.isArray(prescription) &&
+      Array.isArray(prescription.children)
+    ) {
+      for (const child of prescription.children) {
+        if (child && typeof child === "object" && !Array.isArray(child)) {
+          delete child.segment_id;
+        }
+      }
+    }
+    if (Array.isArray(step.children)) {
+      for (const child of step.children) {
+        if (child && typeof child === "object" && !Array.isArray(child)) {
+          delete child.segment_id;
+        }
+      }
+    }
+  }
+}
+
+function stripNestedSegmentIds(value: unknown): unknown {
+  const clone = structuredClone(value);
+  removeNestedSegmentIds(clone as Json);
+  return clone;
 }
 
 function sourceInput(plan: PersistedPlanCycleRow, workout: PersistedPlannedWorkoutRow) {
@@ -505,6 +776,13 @@ function workoutRowFromDocument(
     notes: document.notes,
     steps: document.steps as unknown as Json,
   };
+}
+
+function normalizeExpectedDocument(workout: PersistedPlannedWorkoutRow) {
+  const normalized = normalizePersistedWorkoutDocument(workout);
+  assert.equal(normalized.ok, true, normalized.ok ? undefined : normalized.message);
+  if (!normalized.ok) throw new Error(normalized.message);
+  return normalized.value;
 }
 
 function assertStableWorkoutIdentity(
@@ -610,6 +888,7 @@ function buildRichWorkout(input: {
           repeat_count: 3,
           children: [
             {
+              segment_id: "tempo-repeat-1-child-1",
               role: "work",
               label: "Tempo work",
               sequence: 1,
@@ -625,6 +904,7 @@ function buildRichWorkout(input: {
               },
             },
             {
+              segment_id: "tempo-repeat-1-child-2",
               role: "recover",
               label: "Easy jog",
               sequence: 2,
@@ -637,6 +917,7 @@ function buildRichWorkout(input: {
               },
             },
             {
+              segment_id: "tempo-repeat-1-child-3",
               role: "work",
               label: "Tempo close",
               sequence: 3,

@@ -20,16 +20,19 @@ import { Icon } from "@/components/ui/icon";
 import { HitoButton } from "@/components/ui/button";
 import { hitoToast } from "@/components/ui/hito-toast";
 import {
-  confirmManualWorkoutDeleteClear,
-  reviewManualWorkoutDeleteClear,
+  confirmWorkoutCommandAction,
+  reviewWorkoutCommandAction,
 } from "@/lib/manual-workout-authoring";
-import type { ManualWorkoutDeleteClearReviewResult } from "@/lib/manual-workout-authoring";
+import type {
+  ReviewedWorkoutCommandCandidate,
+  WorkoutCommand,
+} from "@/lib/manual-workout-authoring";
 import {
   formatManualDraftStructure,
   formatReadableDate,
   manualTemplateRunnerLabelFromKey,
-  targetTruthModeLabel,
 } from "@/components/manual-workout/manual-workout-authoring-utils";
+import { workoutDistanceKm, workoutDuration, type Workout } from "@/lib/training";
 
 export type ManualCopiedWorkoutSource = {
   provenancePlanId: string | null;
@@ -43,7 +46,9 @@ export const MANUAL_COPY_PASTE_TOAST_ID = "manual-workout-copy-paste";
 const MANUAL_DELETE_CLEAR_TOAST_ID = "manual-workout-delete-clear";
 
 type ManualSourceActionStatus = "idle" | "reviewing" | "creating";
-type ManualWorkoutDeleteClearReady = Extract<ManualWorkoutDeleteClearReviewResult, { ok: true }>;
+type ManualWorkoutDeleteClearReady = ReviewedWorkoutCommandCandidate & {
+  command: Extract<WorkoutCommand, { operation: "delete" | "clear" }>;
+};
 
 export type ManualWorkoutSourceActionMenuProps = {
   provenancePlanId: string | null;
@@ -58,6 +63,7 @@ export type ManualWorkoutSourceActionMenuProps = {
   sourceWorkoutDate: string;
   sourceWorkoutId: string;
   title: string;
+  workout: Workout;
 };
 
 export function ManualWorkoutSourceActionMenu({
@@ -73,13 +79,14 @@ export function ManualWorkoutSourceActionMenu({
   sourceWorkoutDate,
   sourceWorkoutId,
   title,
+  workout,
 }: ManualWorkoutSourceActionMenuProps) {
-  const reviewManualWorkoutDeleteClearFn = useServerFn(reviewManualWorkoutDeleteClear);
-  const confirmManualWorkoutDeleteClearFn = useServerFn(confirmManualWorkoutDeleteClear);
+  const reviewWorkoutCommandFn = useServerFn(reviewWorkoutCommandAction);
+  const confirmWorkoutCommandFn = useServerFn(confirmWorkoutCommandAction);
   const confirmInFlightRef = useRef(false);
   const [status, setStatus] = useState<ManualSourceActionStatus>("idle");
   const [deleteReviewResult, setDeleteReviewResult] =
-    useState<ManualWorkoutDeleteClearReviewResult | null>(null);
+    useState<ManualWorkoutDeleteClearReady | null>(null);
   const [confirmMessage, setConfirmMessage] = useState<string | null>(null);
   const isBusy = status !== "idle";
 
@@ -125,10 +132,10 @@ export function ManualWorkoutSourceActionMenu({
     });
 
     try {
-      const result = await reviewManualWorkoutDeleteClearFn({
+      const result = await reviewWorkoutCommandFn({
         data: {
-          ...(provenancePlanId ? { activePlanId: provenancePlanId } : {}),
-          plannedWorkoutId: sourceWorkoutId,
+          operation: "delete",
+          workoutId: sourceWorkoutId,
         },
       });
       setStatus("idle");
@@ -138,12 +145,22 @@ export function ManualWorkoutSourceActionMenu({
         hitoToast.error({
           id: MANUAL_DELETE_CLEAR_TOAST_ID,
           title: "Clear blocked",
-          description: result.message,
+          description: result.issues[0]?.message ?? "Could not review this workout for clearing.",
         });
         return;
       }
 
-      setDeleteReviewResult(result);
+      if (!isReviewedDeleteClearCommandCandidate(result.candidate)) {
+        setDeleteReviewResult(null);
+        hitoToast.error({
+          id: MANUAL_DELETE_CLEAR_TOAST_ID,
+          title: "Clear blocked",
+          description: "Could not review this workout for clearing.",
+        });
+        return;
+      }
+
+      setDeleteReviewResult(result.candidate);
       hitoToast.success({
         id: MANUAL_DELETE_CLEAR_TOAST_ID,
         title: "Clear reviewed",
@@ -163,7 +180,7 @@ export function ManualWorkoutSourceActionMenu({
   };
 
   const confirmDeleteReview = async () => {
-    if (!deleteReviewResult?.ok || confirmInFlightRef.current) return;
+    if (!deleteReviewResult || confirmInFlightRef.current) return;
 
     confirmInFlightRef.current = true;
     setStatus("creating");
@@ -175,16 +192,17 @@ export function ManualWorkoutSourceActionMenu({
     });
 
     try {
-      const result = await confirmManualWorkoutDeleteClearFn({
+      const candidate = deleteReviewResult;
+      const result = await confirmWorkoutCommandFn({
         data: {
-          ...(provenancePlanId ? { activePlanId: provenancePlanId } : {}),
-          plannedWorkoutId: deleteReviewResult.plannedWorkoutId,
-          reviewToken: deleteReviewResult.review.reviewToken,
-          reviewChecksum: deleteReviewResult.review.reviewChecksum,
+          command: candidate.command,
+          candidateId: candidate.candidateId,
+          reviewToken: candidate.reviewToken,
+          reviewChecksum: candidate.reviewChecksum,
         },
       });
 
-      if (!result.ok) {
+      if (!result.ok || (result.operation !== "delete" && result.operation !== "clear")) {
         confirmInFlightRef.current = false;
         setStatus("idle");
         setConfirmMessage(null);
@@ -192,7 +210,7 @@ export function ManualWorkoutSourceActionMenu({
         hitoToast.error({
           id: MANUAL_DELETE_CLEAR_TOAST_ID,
           title: "Workout not cleared",
-          description: result.message,
+          description: result.ok ? "The Calendar workout could not be cleared." : result.message,
         });
         return;
       }
@@ -272,8 +290,9 @@ export function ManualWorkoutSourceActionMenu({
             }
           }}
           open={Boolean(deleteReviewResult)}
-          result={deleteReviewResult}
           status={status}
+          title={title}
+          workout={workout}
         />
       ) : null}
     </>
@@ -287,8 +306,9 @@ function ManualDeleteClearReviewDialog({
   onConfirm,
   onOpenChange,
   open,
-  result,
   status,
+  title,
+  workout,
 }: {
   confirmMessage: string | null;
   fallbackDate: string;
@@ -296,14 +316,11 @@ function ManualDeleteClearReviewDialog({
   onConfirm: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
-  result: ManualWorkoutDeleteClearReviewResult;
   status: ManualSourceActionStatus;
+  title: string;
+  workout: Workout;
 }) {
-  const dateLabel = formatReadableDate(result.ok ? result.workoutDate : fallbackDate);
-
-  if (!result.ok) {
-    return null;
-  }
+  const dateLabel = formatReadableDate(fallbackDate);
 
   return (
     <ManualDeleteClearReadyDialog
@@ -313,10 +330,17 @@ function ManualDeleteClearReviewDialog({
       onConfirm={onConfirm}
       onOpenChange={onOpenChange}
       open={open}
-      result={result}
       status={status}
+      title={title}
+      workout={workout}
     />
   );
+}
+
+function isReviewedDeleteClearCommandCandidate(
+  candidate: ReviewedWorkoutCommandCandidate,
+): candidate is ManualWorkoutDeleteClearReady {
+  return candidate.command.operation === "delete" || candidate.command.operation === "clear";
 }
 
 function ManualDeleteClearReadyDialog({
@@ -326,8 +350,9 @@ function ManualDeleteClearReadyDialog({
   onConfirm,
   onOpenChange,
   open,
-  result,
   status,
+  title,
+  workout,
 }: {
   confirmMessage: string | null;
   dateLabel: string;
@@ -335,8 +360,9 @@ function ManualDeleteClearReadyDialog({
   onConfirm: () => void;
   onOpenChange: (open: boolean) => void;
   open: boolean;
-  result: ManualWorkoutDeleteClearReady;
   status: ManualSourceActionStatus;
+  title: string;
+  workout: Workout;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -368,13 +394,13 @@ function ManualDeleteClearReadyDialog({
 
             <div className="hito-list-row items-start">
               <div className="min-w-0">
-                <p className="hito-body-md text-foreground">{result.title}</p>
+                <p className="hito-body-md text-foreground">{title}</p>
                 <p className="hito-body-sm mt-1 text-secondary">
-                  {formatDeleteClearWorkoutSummary(result)}
+                  {formatDeleteClearWorkoutSummary(workout)}
                 </p>
               </div>
               <span className="hito-status-pill shrink-0" data-tone="muted">
-                {manualTemplateRunnerLabelFromKey(result.templateKey)}
+                {manualTemplateRunnerLabelFromKey(workout.workoutIdentity)}
               </span>
             </div>
 
@@ -394,13 +420,12 @@ function ManualDeleteClearReadyDialog({
               <div className="min-w-0">
                 <p className="hito-body-md text-foreground">If you need it again</p>
                 <p className="hito-body-sm mt-1 text-secondary">
-                  {result.restore.available
-                    ? "Add it again from the Calendar later. Hito will review it as a new workout before saving anything."
-                    : "This clears only the Calendar row. Hito will not recreate unsupported workout sources automatically."}
+                  Add it again from the Calendar later. Hito will review it as a new workout before
+                  saving anything.
                 </p>
               </div>
               <span className="hito-status-pill shrink-0" data-tone="muted">
-                {result.restore.available ? "Add later" : "Clear only"}
+                Add later
               </span>
             </div>
 
@@ -448,13 +473,6 @@ function ManualDeleteClearReadyDialog({
   );
 }
 
-function formatDeleteClearWorkoutSummary(result: ManualWorkoutDeleteClearReady) {
-  if (!result.restore.available) {
-    return "Workout content stays protected; clearing removes only this Calendar row.";
-  }
-
-  const draft = result.restore.review.draft;
-  const metricPolicy = targetTruthModeLabel(result.restore.draftInput.targetTruthMode);
-
-  return `${formatManualDraftStructure(draft.totalDurationMin, draft.totalDistanceKm)} · ${metricPolicy}`;
+function formatDeleteClearWorkoutSummary(workout: Workout) {
+  return `${formatManualDraftStructure(workoutDuration(workout), workoutDistanceKm(workout) ?? 0)} · Workout guidance`;
 }

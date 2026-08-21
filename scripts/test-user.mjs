@@ -22,11 +22,18 @@ import {
   resetQaPoolUserData,
 } from "./lib/qa-test-user-lifecycle.mjs";
 
-const { materializeFirstReviewedPlanForUser, retainImportedPlanCandidateForUser } = await tsImport(
+const { retainImportedPlanCandidateForUser } = await tsImport(
   "../src/lib/active-plan-persistence.ts",
   import.meta.url,
 );
-const { importedPlanSchema } = await tsImport("../src/lib/imported-plan.ts", import.meta.url);
+const { buildImportedPlanSeed, importedPlanSchema } = await tsImport(
+  "../src/lib/imported-plan.ts",
+  import.meta.url,
+);
+const { confirmWorkoutCommandForUser, reviewWorkoutCommandForUser } = await tsImport(
+  "../src/lib/manual-workout-authoring/actions.ts",
+  import.meta.url,
+);
 const { digestSha256Hex, stableJsonStringify } = await tsImport(
   "../src/lib/review-token-signing.ts",
   import.meta.url,
@@ -1062,10 +1069,29 @@ async function importPlanForUser(userId, planPath) {
     reviewChecksum: await digestSha256Hex(stableJsonStringify(plan)),
   });
 
-  await materializeFirstReviewedPlanForUser(userId, plan, {
-    sourcePlanId: sourcePlan.id,
-    calendarInstant: fixtureMaterializationInstant,
+  const documents = buildImportedPlanSeed(plan).workouts;
+  const review = await reviewWorkoutCommandForUser(userId, {
+    operation: "materialize",
+    documents,
+    provenanceReferences: documents.map((document) => ({
+      sourcePlanId: sourcePlan.id,
+      sourceKind: plan.source_kind,
+      sourceWorkoutId: document.sourceWorkoutId,
+    })),
   });
+  assert.equal(review.ok, true);
+  if (!review.ok) throw new Error("Imported fixture Workout batch review failed.");
+  const confirmed = await confirmWorkoutCommandForUser(
+    userId,
+    {
+      command: review.candidate.command,
+      candidateId: review.candidate.candidateId,
+      reviewToken: review.candidate.reviewToken,
+      reviewChecksum: review.candidate.reviewChecksum,
+    },
+    { sourceBatchCalendarInstant: fixtureMaterializationInstant },
+  );
+  assert.equal(confirmed.ok, true, confirmed.ok ? "" : confirmed.message);
   const appliedPlan = await readImportedPlanForUser(userId);
 
   const richWorkoutCount = appliedPlan.workouts.filter(

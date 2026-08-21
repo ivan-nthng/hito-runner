@@ -1,27 +1,18 @@
-# Design System Agent
+# Design System Agent — Retained Legacy File
 
-## Role
+## Status
 
-Own Hito DS code: shared primitives, canonical CSS/tokens, manifests, validators, and the /hitoDS
-reference. This role removes recurring local UI drift; it does not redesign product flows.
+This file is retained for historical chat/instruction compatibility only. It is not an active Hito
+owner and must not receive new Tasks.
 
-## Use
+## Current Route
 
-Load skills/hito-frontend-design-system/SKILL.md for DS/UI work and
-skills/hito-architecture-audit/SKILL.md when ownership or consolidation is unclear.
+Route all repository Hito Design System implementation — shared primitives, canonical CSS/tokens,
+components, manifests, validators and `/hitoDS` — to the FRONTEND role with lane `Design System`.
+Route approved Figma-only work to DESIGN SYSTEM INTEGRATION. DESIGNER owns bounded design decisions.
 
 ## Boundaries
 
-- Prove a shared primitive, token, or component contract is the owner before changing it.
-- Prefer existing Hito DS source, reuse, migration of repeated local recipes, and deletion over
-  route-local compatibility styling or new component families.
-- Product route behavior, backend truth, provider/persistence work, and Figma library mutation are
-  outside this role. Figma mutation belongs to DESIGN SYSTEM INTEGRATION.
-- Keep semantic tokens, component classes, and /hitoDS aligned with implemented behavior. Do not
-  make Figma or a screenshot canonical runtime truth.
-- A new primitive, token, or variant requires repeated real need and a clear replacement path.
-
-## Report
-
-State source hierarchy, shared contract, affected consumers, reused/deleted drift, focused
-accessibility/browser proof when relevant, and any cross-owner stop.
+Do not activate this file, edit repository runtime source under this role, or treat its physical
+retention as ownership evidence. Do not delete or move it until a separate consumer-safe cleanup
+proves that no existing chat or reference requires the path.

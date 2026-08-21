@@ -18,6 +18,7 @@ export interface PlannedWorkoutUnitPrescription {
 }
 
 export interface PlannedWorkoutRepeatChildPrescription<TTarget = Record<string, unknown>> {
+  segment_id?: string;
   role: PlannedWorkoutRepeatChildRole;
   label?: string;
   sequence?: number;
@@ -132,12 +133,16 @@ function normalizeRepeatChild<TTarget>(
     return null;
   }
   const target = normalizeTarget(record.target);
+  const segmentId = readString(record.segment_id);
+  const label = readString(record.label);
+  const guidance = readString(record.guidance);
 
   return {
+    ...(segmentId ? { segment_id: segmentId } : {}),
     role,
-    ...(readString(record.label) ? { label: readString(record.label) } : {}),
+    ...(label ? { label } : {}),
     sequence: readPositiveInteger(record.sequence) ?? index + 1,
-    ...(readString(record.guidance) ? { guidance: readString(record.guidance) } : {}),
+    ...(guidance ? { guidance } : {}),
     prescription,
     ...(target ? { target } : {}),
   };
@@ -155,6 +160,7 @@ function normalizeRepeatChildRole(value: unknown): PlannedWorkoutRepeatChildRole
 
 function normalizeUnitPrescription(value: unknown): PlannedWorkoutUnitPrescription | null {
   const record = recordValue(value);
+  if (!record) return null;
   const mode = readString(record?.mode);
 
   if (mode === "time") {
@@ -198,6 +204,6 @@ function readPositiveInteger(value: unknown) {
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : null;
 }
 
-function isPositiveNumber(value: unknown) {
+function isPositiveNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value > 0;
 }

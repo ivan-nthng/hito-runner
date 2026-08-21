@@ -4,7 +4,7 @@ import type {
   PersistedPlannedWorkoutRow,
   PersistedWorkoutLogRow,
 } from "../../src/lib/runner-calendar-persistence";
-import { resolveCalendarWorkoutSourceEditingCapabilities } from "../../src/lib/active-plan-workout-editing/source-capabilities";
+import { resolveCalendarWorkoutSourceEditingCapabilities } from "../../src/lib/runner-calendar-mutations";
 import { type ManualWorkoutDraftInput } from "../../src/lib/manual-workout-authoring";
 import { MANUAL_USER_BUILT_PLAN_SOURCE_KIND } from "../../src/lib/manual-workout-authoring/schema";
 import {
@@ -84,8 +84,6 @@ export function validateManualSourceEditingCapabilityReadback() {
     }),
     "skipped_logged_workout",
     "persisted skipped results should block direct source affordances",
-    false,
-    true,
   );
 
   assertSourceEditingBlocked(
@@ -98,8 +96,6 @@ export function validateManualSourceEditingCapabilityReadback() {
     }),
     "logged_workout",
     "completed logged results should block direct source affordances",
-    false,
-    true,
   );
 
   assertSourceEditingBlocked(
@@ -112,8 +108,6 @@ export function validateManualSourceEditingCapabilityReadback() {
     }),
     "evidence_backed_workout",
     "provider/comparison/AI evidence should block direct source affordances",
-    false,
-    true,
   );
 
   const unsafeMetricWorkout = {
@@ -129,7 +123,7 @@ export function validateManualSourceEditingCapabilityReadback() {
       },
     ],
   } satisfies PersistedPlannedWorkoutRow;
-  assertSourceEditingAllowed(
+  assertSourceEditingBlocked(
     resolveCalendarWorkoutSourceEditingCapabilities({
       provenancePlan: activePlan,
       workout: unsafeMetricWorkout,
@@ -137,14 +131,8 @@ export function validateManualSourceEditingCapabilityReadback() {
       evidenceWorkoutIds: new Set(),
       currentDate,
     }),
-    {
-      canClear: true,
-      canCopy: true,
-      canEditContent: false,
-      canMove: true,
-      eligibility: "eligible_future_unlogged",
-    },
-    "metric target truth should allow prescription copy while content edit remains blocked",
+    "unsupported_source_workout",
+    "unsafe metric target truth should block all mutation affordances",
   );
 
   const unsupportedWorkout = {
@@ -161,16 +149,10 @@ export function validateManualSourceEditingCapabilityReadback() {
     evidenceWorkoutIds: new Set(),
     currentDate,
   });
-  assertSourceEditingAllowed(
+  assertSourceEditingBlocked(
     unsupportedCapability,
-    {
-      canClear: true,
-      canCopy: true,
-      canEditContent: false,
-      canMove: true,
-      eligibility: "eligible_future_unlogged",
-    },
-    "unsupported source metadata should still allow prescription copy and row move/clear",
+    "unsupported_source_workout",
+    "unsupported canonical source metadata should block all mutation affordances",
   );
 
   const restWorkout = buildFakePlannedWorkout({
@@ -216,30 +198,10 @@ export function validateManualSourceEditingCapabilityReadback() {
     evidenceWorkoutIds: new Set(),
     currentDate,
   });
-  assert.deepEqual(
-    {
-      canMove: missedCapability.canMove,
-      canClear: missedCapability.canClear,
-      canCopy: missedCapability.canCopy,
-      canEditContent: missedCapability.canEditContent,
-      canDirectCopy: missedCapability.canDirectCopy,
-      canDirectMove: missedCapability.canDirectMove,
-      canDragInitiate: missedCapability.canDragInitiate,
-      eligibility: missedCapability.eligibility,
-      reason: missedCapability.reason,
-    },
-    {
-      canMove: true,
-      canClear: true,
-      canCopy: true,
-      canEditContent: false,
-      canDirectCopy: true,
-      canDirectMove: true,
-      canDragInitiate: true,
-      eligibility: "eligible_past_unlogged",
-      reason: null,
-    },
-    "past missed unlogged rows should expose move/clear/drag source capability for valid Rest-day targets",
+  assertSourceEditingBlocked(
+    missedCapability,
+    "protected_history",
+    "past missed unlogged rows should block all mutation affordances",
   );
 
   const oldMissedReview = assertReady("source editing older past unlogged source", {
@@ -253,7 +215,7 @@ export function validateManualSourceEditingCapabilityReadback() {
     id: "00000000-0000-4000-8000-000000000027",
     review: oldMissedReview,
   });
-  assertSourceEditingAllowed(
+  assertSourceEditingBlocked(
     resolveCalendarWorkoutSourceEditingCapabilities({
       provenancePlan: activePlan,
       workout: oldMissedWorkout,
@@ -261,14 +223,8 @@ export function validateManualSourceEditingCapabilityReadback() {
       evidenceWorkoutIds: new Set(),
       currentDate,
     }),
-    {
-      canClear: true,
-      canCopy: true,
-      canEditContent: false,
-      canMove: true,
-      eligibility: "eligible_past_unlogged",
-    },
-    "older missed unlogged rows should remain mutable when they have no log or evidence",
+    "protected_history",
+    "older past rows should remain protected even without log or evidence",
   );
 
   const todayReview = assertReady("source editing today source", {
@@ -324,9 +280,7 @@ export function validateManualSourceEditingCapabilityReadback() {
       currentDate,
     }),
     "logged_workout",
-    "today logged rows should preserve lifecycle protection while exposing content edit",
-    false,
-    true,
+    "today logged rows should preserve lifecycle protection",
   );
   assertSourceEditingBlocked(
     resolveCalendarWorkoutSourceEditingCapabilities({
@@ -337,9 +291,7 @@ export function validateManualSourceEditingCapabilityReadback() {
       currentDate,
     }),
     "evidence_backed_workout",
-    "today evidence-backed rows should preserve lifecycle protection while exposing content edit",
-    false,
-    true,
+    "today evidence-backed rows should preserve lifecycle protection",
   );
 
   const presetPlan = buildFakePlanCycle({
@@ -379,11 +331,13 @@ export function validateManualSourceEditingCapabilityReadback() {
           repeat_count: 3,
           children: [
             {
+              segment_id: "ai-tempo-repeat-child-1",
               role: "work",
               label: "Tempo work",
               sequence: 1,
               prescription: { mode: "time", duration_min: 8 },
               target: {
+                primary_execution_mode: "pace",
                 target_source: "ai_authored_plan_guidance",
                 pace: "4:50-5:00/km",
                 intensity: "Controlled tempo effort",
@@ -392,6 +346,7 @@ export function validateManualSourceEditingCapabilityReadback() {
               },
             },
             {
+              segment_id: "ai-tempo-repeat-child-2",
               role: "recover",
               label: "Easy jog",
               sequence: 2,
@@ -455,7 +410,7 @@ export function validateManualSourceEditingCapabilityReadback() {
         sequence: 1,
         prescription: { mode: "time", duration_min: 30 },
         duration_min: 30,
-        target: { effort: "easy" },
+        target: { intensity: "easy" },
       },
     ] as PersistedPlannedWorkoutRow["steps"],
   });
@@ -546,7 +501,7 @@ export function validateManualSourceEditingCapabilityReadback() {
     source_workout_type: "generated_freeform_workout",
     workout_identity: "unmapped_generated_workout",
   } satisfies PersistedPlannedWorkoutRow;
-  assertSourceEditingAllowed(
+  assertSourceEditingBlocked(
     resolveCalendarWorkoutSourceEditingCapabilities({
       provenancePlan: selectedPlan,
       workout: unsupportedGeneratedWorkout,
@@ -554,14 +509,8 @@ export function validateManualSourceEditingCapabilityReadback() {
       evidenceWorkoutIds: new Set(),
       currentDate,
     }),
-    {
-      canClear: true,
-      canCopy: true,
-      canEditContent: false,
-      canMove: true,
-      eligibility: "eligible_future_unlogged",
-    },
-    "generated rows without reconstructable template identity still copy their persisted prescription",
+    "unsupported_source_workout",
+    "generated rows without canonical identity must stay blocked",
   );
 }
 
@@ -569,29 +518,23 @@ function assertSourceEditingBlocked(
   result: ReturnType<typeof resolveCalendarWorkoutSourceEditingCapabilities>,
   reason: NonNullable<ReturnType<typeof resolveCalendarWorkoutSourceEditingCapabilities>["reason"]>,
   label: string,
-  canEditContent = false,
-  canCopy = false,
 ) {
-  assert.equal(
-    result.canDirectCopy,
-    canCopy,
-    `${label}: direct copy capability should be truthful`,
-  );
+  assert.equal(result.canClear, false, `${label}: clear capability should be blocked`);
+  assert.equal(result.canCopy, false, `${label}: copy capability should be blocked`);
+  assert.equal(result.canMove, false, `${label}: move capability should be blocked`);
+  assert.equal(result.canDirectCopy, false, `${label}: direct copy capability should be truthful`);
   assert.equal(result.canDirectMove, false, `${label}: direct move should be blocked`);
   assert.equal(result.canDragInitiate, false, `${label}: drag initiation should be blocked`);
   assert.equal(result.eligibility, "blocked", `${label}: eligibility should be blocked`);
   assert.equal(result.reason, reason, `${label}: blocked reason should be ${reason}`);
   assert.equal(typeof result.message, "string", `${label}: blocked message should be present`);
-  assert.equal(
-    result.canEditContent,
-    canEditContent,
-    `${label}: content edit should follow its date-based contract`,
-  );
+  assert.equal(result.canEditContent, false, `${label}: content edit should be blocked`);
   assert.equal(
     result.editContentReason,
-    canEditContent ? null : reason,
-    `${label}: content edit reason should be independent from lifecycle protection`,
+    reason,
+    `${label}: content edit reason should match the protection boundary`,
   );
+  assert.equal(result.copyReason, reason, `${label}: copy reason should match the boundary`);
 }
 
 function assertSourceEditingAllowed(

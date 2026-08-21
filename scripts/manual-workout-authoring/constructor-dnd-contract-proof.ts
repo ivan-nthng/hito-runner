@@ -1,237 +1,122 @@
 import assert from "node:assert/strict";
 import { pathToFileURL } from "node:url";
 import {
-  manualWorkoutActiveInsertionIndex,
-  manualWorkoutDragTargetIndex,
-  manualWorkoutInsertionIndex,
-  moveEntry,
-  moveRepeatGroupChild,
-  type ManualWorkoutDropPosition,
-} from "../../src/components/manual-workout/ManualWorkoutConstructorEditor.helpers";
-import {
-  getManualWorkoutRepeatGroupChildren,
-  isManualWorkoutRepeatRecoveryBlock,
-} from "../../src/lib/manual-workout-authoring/repeat-groups";
-import {
-  type ManualWorkoutConstructorEntryInput,
-  type ManualWorkoutDraftInput,
-  type ManualWorkoutRepeatGroupInput,
-} from "../../src/lib/manual-workout-authoring";
-import { repeatChildSteps, repeatCountForStep } from "../../src/lib/training";
-import { assertReady } from "./move-proof-fixtures";
+  moveWorkoutRepeatChildById,
+  moveWorkoutSectionById,
+  updateWorkoutRepeatChild,
+  workoutDocumentEditorIssues,
+} from "../../src/components/manual-workout/workout-editor-state";
+import type { WorkoutDocument } from "../../src/lib/workout-document";
 
 export function validateManualConstructorDndContract() {
-  assertCanonicalInsertionIndex();
-  assertTopLevelSectionReorder();
-  assertRepeatContainerReorder();
-  assertRepeatChildReorder();
-}
-
-function assertCanonicalInsertionIndex() {
-  const total = 4;
-
-  assert.equal(
-    manualWorkoutActiveInsertionIndex({
-      fromIndex: 2,
-      overIndex: 0,
-      position: "after",
-      total,
-    }),
-    1,
-    "after previous card should resolve to the gap insertion index",
-  );
-  assert.equal(
-    manualWorkoutActiveInsertionIndex({
-      fromIndex: 2,
-      overIndex: 1,
-      position: "before",
-      total,
-    }),
-    1,
-    "before next card should resolve to the same physical gap insertion index",
-  );
-  assert.equal(
-    manualWorkoutActiveInsertionIndex({
-      fromIndex: 2,
-      overIndex: 2,
-      position: "after",
-      total,
-    }),
-    null,
-    "dragging over the source card's no-op insertion should not render a slot",
-  );
-}
-
-function assertTopLevelSectionReorder() {
-  const entries = fixtureEntries();
-  const reordered = moveEntryByDrop(entries, 2, 1, "before");
-
+  const document = fixtureDocument();
+  const moved = moveWorkoutSectionById(document, "cooldown", "warmup", "before");
   assert.deepEqual(
-    entryLabels(reordered),
-    ["Warm-up", "Easy aerobic", "Repeat set", "Cooldown"],
-    "top-level section drag should commit entry order through the shared drop-index math",
-  );
-
-  assertReady("top-level section DnD review", {
-    entries: reordered,
-    templateKey: "time_intervals",
-    workoutDate: "2026-07-14",
-  });
-}
-
-function assertRepeatContainerReorder() {
-  const entries = fixtureEntries();
-  const reordered = moveEntryByDrop(entries, 1, 2, "after");
-
-  assert.deepEqual(
-    entryLabels(reordered),
-    ["Warm-up", "Easy aerobic", "Repeat set", "Cooldown"],
-    "repeat container drag should behave as a normal top-level constructor entry",
+    moved.steps.map((step) => step.segment_id),
+    ["cooldown", "warmup", "repeat"],
   );
   assert.deepEqual(
-    repeatChildLabels(reordered),
-    ["Work", "Recover", "Easy steady"],
-    "repeat container drag should move the container without rewriting ordered children",
+    moved.steps.map((step) => step.sequence),
+    [1, 2, 3],
   );
 
-  assertReady("repeat container DnD review", {
-    entries: reordered,
-    templateKey: "time_intervals",
-    workoutDate: "2026-07-15",
-  });
-}
-
-function assertRepeatChildReorder() {
-  const entries = fixtureEntries();
-  const repeatEntry = entries.find(
-    (entry): entry is Extract<ManualWorkoutConstructorEntryInput, { kind: "repeat_group" }> =>
-      entry.kind === "repeat_group",
-  );
-
-  assert.ok(repeatEntry, "fixture should include a repeat group");
-
-  const reorderedGroup = moveRepeatChildByDrop(repeatEntry.group, 1, 2, "after");
-  const children = getManualWorkoutRepeatGroupChildren(reorderedGroup);
-
+  const childMoved = moveWorkoutRepeatChildById(document, "repeat", "recover", "work", "before");
+  const children = childMoved.steps[1]?.prescription?.children ?? [];
   assert.deepEqual(
-    children.map((child) => child.label),
-    ["Work", "Easy steady", "Recover"],
-    "repeat child drag should commit canonical group.children[] order",
+    children.map((child) => child.segment_id),
+    ["recover", "work"],
   );
-  assert.equal(
-    reorderedGroup.workBlock,
-    children[0],
-    "repeat child reorder should keep legacy workBlock synchronized to the first child",
-  );
-  assert.equal(
-    reorderedGroup.recoveryBlock,
-    children.find((child) => isManualWorkoutRepeatRecoveryBlock(child.blockKey)),
-    "repeat child reorder should keep legacy recoveryBlock synchronized to the recovery child",
-  );
-  assert.equal(
-    reorderedGroup.groupLabel,
-    undefined,
-    "repeat child reorder should clear stale groupLabel readback after child order changes",
-  );
-
-  const nextEntries = entries.map((entry) =>
-    entry === repeatEntry ? { kind: "repeat_group" as const, group: reorderedGroup } : entry,
-  );
-  const review = assertReady("repeat child DnD review", {
-    entries: nextEntries,
-    templateKey: "time_intervals",
-    workoutDate: "2026-07-16",
-  });
-  const repeatReadback = review.draft.steps.find((step) => repeatCountForStep(step) != null);
-
-  assert.ok(repeatReadback, "review readback should include the repeat group");
   assert.deepEqual(
-    repeatChildSteps(repeatReadback).map((child) => child.label),
-    ["Work", "Easy steady", "Recover"],
-    "review readback should preserve reordered repeat child labels",
+    children.map((child) => child.sequence),
+    [1, 2],
   );
-}
+  assert.equal(childMoved.steps[1]?.children, undefined);
 
-function moveEntryByDrop(
-  entries: ManualWorkoutConstructorEntryInput[],
-  fromIndex: number,
-  overIndex: number,
-  position: ManualWorkoutDropPosition,
-) {
-  const insertionIndex = manualWorkoutInsertionIndex(overIndex, position);
-  const targetIndex = manualWorkoutDragTargetIndex(fromIndex, insertionIndex, entries.length);
-  return moveEntry(entries, fromIndex, targetIndex);
-}
-
-function moveRepeatChildByDrop(
-  group: ManualWorkoutRepeatGroupInput,
-  fromIndex: number,
-  overIndex: number,
-  position: ManualWorkoutDropPosition,
-) {
-  const children = getManualWorkoutRepeatGroupChildren(group);
-  const insertionIndex = manualWorkoutInsertionIndex(overIndex, position);
-  const targetIndex = manualWorkoutDragTargetIndex(fromIndex, insertionIndex, children.length);
-  return moveRepeatGroupChild(group, fromIndex, targetIndex);
-}
-
-function fixtureEntries(): ManualWorkoutConstructorEntryInput[] {
-  return [
-    {
-      kind: "block",
-      block: { blockKey: "warmup_block", durationSeconds: 10 * 60, label: "Warm-up" },
+  const targeted = updateWorkoutRepeatChild(document, "repeat", "work", (child) => ({
+    ...child,
+    target: {
+      primary_execution_mode: "pace",
+      pace: "5:10/km",
+      target_source: "runner_entered",
     },
-    {
-      kind: "repeat_group",
-      group: {
-        repeatCount: 3,
-        safetyKind: "intervals",
-        groupLabel: "Intervals set",
-        children: [
-          { blockKey: "interval_work_block", durationSeconds: 2 * 60, label: "Work" },
-          {
-            blockKey: "interval_recovery_block",
-            durationSeconds: 60,
-            label: "Recover",
-          },
-          { blockKey: "easy_run_block", durationSeconds: 90, label: "Easy steady" },
-        ],
-        workBlock: { blockKey: "interval_work_block", durationSeconds: 2 * 60, label: "Work" },
-        recoveryBlock: {
-          blockKey: "interval_recovery_block",
-          durationSeconds: 60,
-          label: "Recover",
+  }));
+  const targetedChildren = targeted.steps[1]?.prescription?.children ?? [];
+  assert.equal(targetedChildren[0]?.segment_id, "work");
+  assert.equal(targetedChildren[0]?.target?.pace, "5:10/km");
+  assert.equal(targetedChildren[1]?.segment_id, "recover");
+  assert.deepEqual(workoutDocumentEditorIssues(targeted), []);
+
+  const invalid = updateWorkoutRepeatChild(targeted, "repeat", "work", (child) => ({
+    ...child,
+    target: {
+      primary_execution_mode: "pace",
+      target_source: "runner_entered",
+    },
+  }));
+  assert.deepEqual(workoutDocumentEditorIssues(invalid), ["Repeat section requires a pace value."]);
+}
+
+function fixtureDocument(): WorkoutDocument {
+  return {
+    workoutDate: "2026-08-21",
+    weekday: "Friday",
+    weekNumber: 1,
+    phase: "base",
+    sourceWorkoutId: null,
+    goalContext: null,
+    plannedRpe: null,
+    estimatedFatigue: null,
+    recoveryPriority: null,
+    displayOrder: 1,
+    workoutType: "quality",
+    sourceWorkoutType: "manual",
+    workoutFamily: "intervals",
+    workoutIdentity: "intervals",
+    calendarIconKey: "intervals",
+    metricMode: null,
+    title: "Intervals",
+    notes: null,
+    steps: [
+      {
+        type: "warmup",
+        segment_id: "warmup",
+        sequence: 1,
+        prescription: { mode: "time", duration_min: 10 },
+      },
+      {
+        type: "work",
+        segment_id: "repeat",
+        sequence: 2,
+        prescription: {
+          mode: "repeats",
+          repeat_count: 4,
+          children: [
+            {
+              segment_id: "work",
+              role: "work",
+              sequence: 1,
+              prescription: { mode: "time", duration_min: 2 },
+            },
+            {
+              segment_id: "recover",
+              role: "recover",
+              sequence: 2,
+              prescription: { mode: "time", duration_min: 1 },
+            },
+          ],
         },
       },
-    },
-    {
-      kind: "block",
-      block: { blockKey: "easy_run_block", durationSeconds: 10 * 60, label: "Easy aerobic" },
-    },
-    {
-      kind: "block",
-      block: { blockKey: "cooldown_block", durationSeconds: 5 * 60, label: "Cooldown" },
-    },
-  ];
-}
-
-function entryLabels(entries: ManualWorkoutConstructorEntryInput[]) {
-  return entries.map((entry) =>
-    entry.kind === "repeat_group" ? "Repeat set" : (entry.block.label ?? entry.block.blockKey),
-  );
-}
-
-function repeatChildLabels(entries: ManualWorkoutConstructorEntryInput[]) {
-  const repeatEntry = entries.find(
-    (entry): entry is Extract<ManualWorkoutConstructorEntryInput, { kind: "repeat_group" }> =>
-      entry.kind === "repeat_group",
-  );
-
-  assert.ok(repeatEntry, "entries should include a repeat group");
-  return getManualWorkoutRepeatGroupChildren(repeatEntry.group).map((child) => child.label);
+      {
+        type: "cooldown",
+        segment_id: "cooldown",
+        sequence: 3,
+        prescription: { mode: "time", duration_min: 5 },
+      },
+    ],
+  };
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
   validateManualConstructorDndContract();
-  console.log("Manual constructor DnD contract passed.");
+  console.log("Manual WorkoutDocument interaction contract proof passed.");
 }

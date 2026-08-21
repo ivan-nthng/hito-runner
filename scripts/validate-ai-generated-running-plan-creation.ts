@@ -1636,6 +1636,7 @@ function assertProductPreviewProjection(
 
   assert.deepEqual(Object.keys(product.draft).sort(), [
     "calendarRows",
+    "candidate",
     "goal",
     "previewInput",
     "previewOutcome",
@@ -1657,6 +1658,10 @@ function assertProductPreviewProjection(
   assert.equal(product.draft.savedPlanId, result.draft.savedPlanId ?? null);
   assert.deepEqual(product.draft.previewInput, result.draft.previewInput);
   assert.deepEqual(product.draft.workoutDocuments, result.draft.workoutDocuments);
+  assert.deepEqual(product.draft.candidate, result.draft.candidate);
+  assert.equal(product.draft.candidate.command.operation, "materialize");
+  if (product.draft.candidate.command.operation !== "materialize") return;
+  assert.deepEqual(product.draft.candidate.command.documents, product.draft.workoutDocuments);
   assert.deepEqual(Object.keys(product.draft.calendarRows[0] ?? {}).sort(), [
     "date",
     "endpointDistanceMeters",

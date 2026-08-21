@@ -15,10 +15,8 @@ import {
   buildRunningPlanCanonicalPlan,
   buildRunningPlanPersistenceMetadata,
 } from "../../src/lib/running-plan-engine-review";
-import {
-  CalendarPersistenceRejection,
-  applyAtomicReviewedPlanPersistence,
-} from "../../src/lib/active-plan-lifecycle-persistence";
+import { applyAtomicReviewedPlanPersistence } from "../../src/lib/active-plan-lifecycle-persistence";
+import { CalendarPersistenceRejection } from "../../src/lib/runner-calendar-mutations";
 import {
   applySavedPlanRecordForUser,
   getSavedPlanRecordForUser,

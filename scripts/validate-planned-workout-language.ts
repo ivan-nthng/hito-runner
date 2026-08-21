@@ -1,11 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { initializeWorkoutDocument } from "../src/lib/manual-workout-authoring";
 import {
-  reviewManualWorkoutDraft,
-  type ManualWorkoutDraftInput,
-  type ManualWorkoutDraftReviewResult,
-} from "../src/lib/manual-workout-authoring";
-import {
+  MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
   MANUAL_USER_BUILT_PLAN_SOURCE_KIND,
   type ManualWorkoutTemplateKey,
 } from "../src/lib/manual-workout-authoring/schema";
@@ -36,8 +33,16 @@ import { buildRunningPlanCanonicalPlan } from "../src/lib/running-plan-engine-re
 import { buildDeterministicWorkoutComparison } from "../src/lib/workout-result-import/compare-workout-result";
 import type { Database } from "../src/lib/supabase/database";
 import type { Step, StepTarget } from "../src/lib/training";
+import {
+  reviewWorkoutCommand,
+  type ReviewedWorkoutCommandCandidate,
+} from "../src/lib/workout-authoring-review";
+import {
+  normalizeWorkoutDocument,
+  workoutDocumentExecutableDurationForSections,
+  type WorkoutDocument,
+} from "../src/lib/workout-document";
 import { buildReviewedAiFixtureResult as buildReviewedAiFixture } from "./lib/generated-plan-proof-fixture";
-import { buildCanonicalPersistedPlannedWorkoutFromReview } from "./manual-workout-authoring/move-proof-fixtures";
 
 type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
 type TrainingPlanWorkout = TrainingPlanV2["planned_workouts"][number];
@@ -45,6 +50,15 @@ type TrainingPlanSegment = TrainingPlanWorkout["segments"][number];
 type TrainingPlanRepeatChild = NonNullable<
   NonNullable<TrainingPlanSegment["prescription"]>["children"]
 >[number];
+type CanonicalTemplateReview = {
+  document: WorkoutDocument;
+  candidate: ReviewedWorkoutCommandCandidate;
+  reviewMetadata: {
+    sourceKind: typeof MANUAL_WORKOUT_AUTHORING_SOURCE_KIND;
+    templateKey: ManualWorkoutTemplateKey;
+    totalDurationMin: number;
+  };
+};
 
 const ACCEPTED_WORKOUT_TYPES = new Set<string>(RUNNER_FACING_WORKOUT_TYPE_VALUES);
 const ACCEPTED_BLOCK_LABELS = new Set<string>(Object.values(RUNNER_FACING_BLOCK_TYPE_LABELS));
@@ -119,11 +133,11 @@ function validateAcceptedRunnerFacingTypesAreDerivable() {
 }
 
 function validateManualAndGeneratedRowsUseTheSameLanguage() {
-  const manual = readyManualDraft("manual tempo", {
+  const manual = readyCanonicalTemplate("manual tempo", {
     templateKey: "controlled_tempo_session",
     workoutDate: "2026-07-01",
     title: "Controlled tempo session",
-  }).draft;
+  }).document;
   const manualLanguage = buildPlannedWorkoutLanguage({
     workoutType: manual.workoutType,
     sourceWorkoutType: manual.sourceWorkoutType,
@@ -847,7 +861,7 @@ function validateInternalIdentityLabelsStayBackendOnly() {
 function validateExportKeepsCanonicalJsonAndRunnerFacingMarkdown() {
   const userId = "00000000-0000-4000-8000-000000000701";
   const planCycle = buildFakePlanCycle(userId);
-  const thresholdReview = readyManualDraft("manual threshold export", {
+  const thresholdReview = readyCanonicalTemplate("manual threshold export", {
     templateKey: "half_marathon_threshold_durability",
     workoutDate: "2026-07-02",
     title: "Threshold durability",
@@ -896,7 +910,7 @@ function validateExportKeepsCanonicalJsonAndRunnerFacingMarkdown() {
 }
 
 function validateComparisonUsesCanonicalPlannedTruthOnly() {
-  const review = readyManualDraft("comparison tempo", {
+  const review = readyCanonicalTemplate("comparison tempo", {
     templateKey: "controlled_tempo_session",
     workoutDate: "2026-07-03",
     title: "Controlled tempo session",
@@ -904,17 +918,17 @@ function validateComparisonUsesCanonicalPlannedTruthOnly() {
   const comparison = buildDeterministicWorkoutComparison({
     plannedWorkout: {
       id: "99999999-9999-4999-8999-000000000702",
-      workout_date: review.draft.workoutDate,
-      workout_type: review.draft.workoutType,
-      source_workout_type: review.draft.sourceWorkoutType,
-      title: review.draft.title,
-      steps: review.draft.steps,
+      workout_date: review.document.workoutDate,
+      workout_type: review.document.workoutType,
+      source_workout_type: review.document.sourceWorkoutType,
+      title: review.document.title,
+      steps: review.document.steps,
     },
     actualMetrics: {
       id: "99999999-9999-4999-8999-000000000703",
       source_kind: "garmin_fit",
-      activity_local_date: review.draft.workoutDate,
-      actual_duration_min: review.draft.totalDurationMin,
+      activity_local_date: review.document.workoutDate,
+      actual_duration_min: review.reviewMetadata.totalDurationMin,
       actual_distance_km: null,
       actual_interval_count: 3,
       actual_step_payload: null,
@@ -935,46 +949,57 @@ function validateComparisonUsesCanonicalPlannedTruthOnly() {
 function validateManualBlockContractRoundtripKeepsTargetSource() {
   const userId = "00000000-0000-4000-8000-000000000704";
   const planCycle = buildFakePlanCycle(userId);
-  const review = readyManualDraft("manual block contract roundtrip", {
+  const review = readyCanonicalTemplate("manual block contract roundtrip", {
     templateKey: "controlled_tempo_session",
     workoutDate: "2026-07-04",
     title: "Runner-entered target repeat set",
-    entries: [
-      {
-        kind: "block",
-        block: {
-          blockKey: "warmup_block",
-          durationSeconds: 10 * 60,
-          target: { rpe: 3, cue: "Start relaxed." },
-        },
-      },
-      {
-        kind: "repeat_group",
-        group: {
-          repeatCount: 3,
-          safetyKind: "tempo_repeats",
-          groupLabel: "3 x tempo with easy recovery",
-          workBlock: {
-            blockKey: "tempo_block",
-            durationSeconds: 5 * 60,
-            target: { targetSource: "user_entered", paceMinPerKmRange: "5:10-5:25/km" },
-          },
-          recoveryBlock: {
-            blockKey: "interval_recovery_block",
-            durationSeconds: 2 * 60,
-            target: { targetSource: "user_entered", hrBpmCap: 155 },
-          },
-        },
-      },
-      {
-        kind: "block",
-        block: {
-          blockKey: "cooldown_block",
-          durationSeconds: 8 * 60,
-          target: { rpe: 2, cue: "Let the effort drop." },
-        },
-      },
-    ],
+    mutate(document) {
+      const [warmup, repeat, cooldown] = document.steps;
+      assert.ok(warmup && repeat && cooldown, "tempo initializer should include three sections");
+      assert.ok(
+        repeat.prescription?.mode === "repeats" && repeat.prescription.children,
+        "tempo initializer should include canonical repeat children",
+      );
+      warmup.target = {
+        primary_execution_mode: "effort",
+        target_source: "user_entered",
+        rpe: 3,
+        cue: "Start relaxed.",
+      };
+      const work = repeat.prescription.children.find((child) => child.role === "work");
+      const recovery = repeat.prescription.children.find((child) => child.role === "recover");
+      assert.ok(work && recovery, "tempo repeat should retain work and recovery identities");
+      work.target = {
+        primary_execution_mode: "pace",
+        target_source: "user_entered",
+        pace_min_per_km_range: "5:10/km-5:25/km",
+        pace_min_seconds_per_km: 310,
+        pace_max_seconds_per_km: 325,
+      };
+      recovery.target = {
+        primary_execution_mode: "heart_rate",
+        target_source: "user_entered",
+        hr_target_source: "user_entered",
+        hr_bpm_cap: 155,
+        hr_bpm: "155 bpm",
+      };
+      for (const materializedChild of repeat.children ?? []) {
+        const authoritativeChild = repeat.prescription.children.find(
+          (child) => child.segment_id === materializedChild.segment_id,
+        );
+        assert.ok(
+          authoritativeChild,
+          "materialized repeat child should retain its canonical segment identity",
+        );
+        materializedChild.target = structuredClone(authoritativeChild.target);
+      }
+      cooldown.target = {
+        primary_execution_mode: "effort",
+        target_source: "user_entered",
+        rpe: 2,
+        cue: "Let the effort drop.",
+      };
+    },
   });
   const row = buildCanonicalPersistedPlannedWorkoutFromReview({
     userId,
@@ -1031,7 +1056,7 @@ function validateManualBlockContractRoundtripKeepsTargetSource() {
       id: "99999999-9999-4999-8999-000000000705",
       source_kind: "garmin_fit",
       activity_local_date: row.workout_date,
-      actual_duration_min: review.draft.totalDurationMin,
+      actual_duration_min: review.reviewMetadata.totalDurationMin,
       actual_distance_km: null,
       actual_interval_count: null,
       actual_step_payload: null,
@@ -1135,37 +1160,99 @@ function flattenBlocks(blocks: PlannedWorkoutLanguageReadModel["runnerFacingBloc
 }
 
 function languageForManualTemplate(templateKey: ManualWorkoutTemplateKey) {
-  const review = readyManualDraft(`manual ${templateKey}`, {
+  const review = readyCanonicalTemplate(`manual ${templateKey}`, {
     templateKey,
     workoutDate: "2026-07-01",
     title: `${templateKey} language proof`,
   });
 
   return buildPlannedWorkoutLanguage({
-    workoutType: review.draft.workoutType,
-    sourceWorkoutType: review.draft.sourceWorkoutType,
-    sourceKind: review.draft.sourceKind,
-    workoutFamily: review.draft.workoutFamily,
-    workoutIdentity: review.draft.workoutIdentity,
-    calendarIconKey: review.draft.calendarIconKey,
-    metricMode: review.draft.metricMode,
-    title: review.draft.title,
-    steps: review.draft.steps,
+    workoutType: review.document.workoutType,
+    sourceWorkoutType: review.document.sourceWorkoutType,
+    sourceKind: review.reviewMetadata.sourceKind,
+    workoutFamily: review.document.workoutFamily,
+    workoutIdentity: review.document.workoutIdentity,
+    calendarIconKey: review.document.calendarIconKey,
+    metricMode: review.document.metricMode,
+    title: review.document.title,
+    steps: review.document.steps,
   });
 }
 
-function readyManualDraft(
+function readyCanonicalTemplate(
   label: string,
-  input: ManualWorkoutDraftInput,
-): Extract<ManualWorkoutDraftReviewResult, { ok: true }> {
-  const result = reviewManualWorkoutDraft(input);
-  assert.equal(result.ok, true, `${label} should be reviewable`);
+  input: {
+    templateKey: ManualWorkoutTemplateKey;
+    workoutDate: string;
+    title?: string;
+    notes?: string | null;
+    mutate?: (document: WorkoutDocument) => void;
+  },
+): CanonicalTemplateReview {
+  const initialized = initializeWorkoutDocument({
+    origin: "built_in",
+    templateKey: input.templateKey,
+    workoutDate: input.workoutDate,
+  });
+  assert.equal(initialized.ok, true, `${label} should initialize canonically`);
+  if (!initialized.ok) throw new Error(`${label} initializer rejected unexpectedly.`);
 
-  if (!result.ok) {
-    throw new Error(`${label} rejected unexpectedly.`);
-  }
+  const document = structuredClone(initialized.document);
+  if (input.title !== undefined) document.title = input.title;
+  if (input.notes !== undefined) document.notes = input.notes;
+  input.mutate?.(document);
 
-  return result;
+  const normalized = normalizeWorkoutDocument(document);
+  assert.equal(normalized.ok, true, `${label} should pass strict document validation`);
+  if (!normalized.ok) throw new Error(`${label} canonical document rejected unexpectedly.`);
+
+  const reviewed = reviewWorkoutCommand({
+    command: {
+      operation: "materialize",
+      documents: [normalized.value],
+      provenanceReferences: [initialized.provenanceReference],
+    },
+  });
+  assert.equal(reviewed.ok, true, `${label} should enter canonical command review`);
+  if (!reviewed.ok) throw new Error(`${label} canonical review rejected unexpectedly.`);
+
+  return {
+    document: normalized.value,
+    candidate: reviewed.candidate,
+    reviewMetadata: {
+      sourceKind: MANUAL_WORKOUT_AUTHORING_SOURCE_KIND,
+      templateKey: input.templateKey,
+      totalDurationMin: Number(
+        workoutDocumentExecutableDurationForSections(normalized.value.steps).toFixed(2),
+      ),
+    },
+  };
+}
+
+function buildCanonicalPersistedPlannedWorkoutFromReview({
+  userId,
+  planCycleId,
+  id,
+  review,
+}: {
+  userId: string;
+  planCycleId: string;
+  id: string;
+  review: CanonicalTemplateReview;
+}): PersistedPlannedWorkoutRow {
+  const [insertRow] = buildPersistedWorkoutInsertRows(
+    planCycleId,
+    userId,
+    [review.document],
+    "manual",
+  );
+  assert.ok(insertRow, "canonical language fixture should produce one persisted row");
+
+  return {
+    id,
+    created_at: "2026-06-10T00:00:00.000Z",
+    ...insertRow,
+  } satisfies PersistedPlannedWorkoutRow;
 }
 
 function withoutProvenance(language: PlannedWorkoutLanguageReadModel) {

@@ -33,6 +33,7 @@ import {
   validateWorkoutsAgainstWeekdayRestInvariant,
 } from "@/lib/weekday-rest-invariants";
 import { stableJsonEqual } from "@/lib/review-token-signing";
+import type { WorkoutDocument } from "@/lib/workout-document";
 
 export type PersistedPlanCycleRow = Database["public"]["Tables"]["plan_cycles"]["Row"];
 
@@ -107,18 +108,19 @@ export function buildReviewedFirstPlanImportedSeed(
   return importedSeed;
 }
 
-export async function materializeFirstReviewedPlanForUser(
+export async function executeReviewedSourceWorkoutBatchMaterializationForUser(
   userId: string,
-  reviewedPlan: ImportedPlanInput,
-  options: {
+  input: {
     sourcePlanId: string;
+    sourceKind: "ai_authored_plan_first_v1" | "training_plan_v2_import";
+    documents: readonly WorkoutDocument[];
     expectedProfileRevision?: number;
     calendarInstant?: Date;
   },
-): Promise<PlanApplySuccessResult> {
+): Promise<PlanApplySuccessResult & { calendarRowCount: number }> {
   const [calendar, currentDate] = await Promise.all([
     getCalendarWorkoutsWithLogsForUser(userId),
-    getRunnerCalendarDateForUserId(userId, options.calendarInstant),
+    getRunnerCalendarDateForUserId(userId, input.calendarInstant),
   ]);
 
   if (calendar.workouts.some((workout) => workout.workout_date >= currentDate)) {
@@ -127,28 +129,41 @@ export async function materializeFirstReviewedPlanForUser(
     );
   }
 
-  const importedSeed = buildReviewedFirstPlanImportedSeed(reviewedPlan);
-  const sourcePlan = await getSavedPlanRecordForUser(userId, options.sourcePlanId);
-  if (!sourcePlan || !stableJsonEqual(sourcePlan.saved_plan_payload, reviewedPlan)) {
-    throw new Error("The reviewed plan does not match its immutable source record.");
+  const sourcePlan = await getSavedPlanRecordForUser(userId, input.sourcePlanId);
+  if (!sourcePlan || sourcePlan.source_kind !== input.sourceKind) {
+    throw new Error("The reviewed Workout batch does not match its immutable source record.");
   }
+  const canonicalPlan = readSavedPlanPayload(sourcePlan);
+  const reviewedSeed = buildReviewedFirstPlanImportedSeed(canonicalPlan);
+  if (!stableJsonEqual(reviewedSeed.workouts, input.documents)) {
+    throw new Error("The reviewed Workout batch changed after source retention.");
+  }
+  const currentTrainingPreferences =
+    await getCurrentRunnerTrainingPreferencesForMaterialization(userId);
+  const prepared = prepareSavedPlanFutureApplyPolicy(
+    canonicalPlan,
+    currentDate,
+    currentTrainingPreferences,
+  );
 
   await persistNewReviewedPlan({
     userId,
-    importedSeed,
+    importedSeed: prepared.importedSeed,
     sourcePlan,
     currentDate,
-    expectedProfileRevision: options.expectedProfileRevision,
+    expectedProfileRevision: input.expectedProfileRevision,
   });
 
   return {
     ok: true,
     status: "applied",
-    effectiveStartDate: importedSeed.startDate,
-    appliedStartDate: importedSeed.startDate,
-    normalizedFromStartDate: null,
+    effectiveStartDate: prepared.appliedStartDate,
+    appliedStartDate: prepared.appliedStartDate,
+    normalizedFromStartDate:
+      prepared.appliedStartDate === reviewedSeed.startDate ? null : reviewedSeed.startDate,
     firstDayResolution: null,
-    workoutCount: importedSeed.workouts.filter((workout) => workout.workoutType !== "rest").length,
+    workoutCount: prepared.workoutCount,
+    calendarRowCount: prepared.importedSeed.workouts.length,
   };
 }
 
@@ -528,6 +543,21 @@ async function getCurrentRunnerProfileForPlanApply(userId: string) {
   }
 
   return profile.data;
+}
+
+async function getCurrentRunnerTrainingPreferencesForMaterialization(userId: string) {
+  const supabase = createAdminSupabaseClient();
+  const profile = await supabase
+    .from("runner_profiles")
+    .select("training_preferences")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (profile.error) {
+    throw new Error(profile.error.message);
+  }
+
+  return profile.data?.training_preferences ?? null;
 }
 
 function jsonObject(value: Json) {

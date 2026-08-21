@@ -17,7 +17,7 @@ import {
 import type { CanonicalGoalContext, CanonicalMetricMode } from "@/lib/rich-workout-model";
 import type { PlannedWorkoutLanguageReadModel } from "@/lib/planned-workout-language";
 import { reduceRepeatChildrenToChildFirst } from "@/lib/planned-workout-block-contract";
-import { resolvePlanProvenanceSourceStatus } from "@/lib/active-plan-workout-editing/policy";
+import { resolvePlanProvenanceSourceStatus } from "@/lib/runner-calendar-mutations";
 import { parseStoredRunnerTrainingPreferences } from "@/lib/runner-training-preferences";
 import {
   readWorkoutDocumentSections,
@@ -592,7 +592,12 @@ function repeatPrescriptionChildrenForExport(
 ): StepRepeatChildPrescription[] {
   return reduceRepeatChildrenToChildFirst<StepTarget>({
     children: prescription.children,
-  }).children.map(repeatChildToTrainingPlanV2);
+  }).children.map((child) => {
+    if (!child.segment_id) {
+      throw new Error("Canonical Repeat children require stable segment identity before export.");
+    }
+    return repeatChildToTrainingPlanV2({ ...child, segment_id: child.segment_id });
+  });
 }
 
 function stepToRepeatChildPrescription(
@@ -606,8 +611,12 @@ function stepToRepeatChildPrescription(
   if (!prescription || !role) {
     return null;
   }
+  if (!step.segment_id) {
+    throw new Error("Canonical Repeat children require stable segment identity before export.");
+  }
 
   return {
+    segment_id: step.segment_id,
     role,
     ...(label ? { label } : {}),
     sequence: step.sequence ?? index + 1,

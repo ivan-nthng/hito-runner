@@ -23,6 +23,8 @@
     "local:logs": "node --import tsx ./scripts/query-local-runtime-events.ts",
     "supabase:local:configure": "node ./scripts/configure-local-supabase-env.mjs",
     "supabase:local:status": "node ./scripts/configure-local-supabase-env.mjs --check",
+    "supabase:local:start": "node ./scripts/configure-local-supabase-env.mjs --start",
+    "supabase:local:stop": "node ./scripts/configure-local-supabase-env.mjs --stop",
     "supabase:deployment:parity": "node ./scripts/validate-supabase-deployment-parity.mjs --linked",
     "artifact:hygiene": "node ./scripts/report-local-artifact-hygiene.mjs",
     "author-ai-first-plan-draft": "node --env-file=.env.local --import tsx ./scripts/author-ai-first-plan-draft.ts",

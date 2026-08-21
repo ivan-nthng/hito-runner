@@ -8,18 +8,20 @@ import {
 } from "../src/lib/calendar-overflow-actions";
 import {
   listSavedPlanLibraryForUser,
-  materializeFirstReviewedPlanForUser,
   retainImportedPlanCandidateForUser,
   retainReviewedPlanCandidateForUser,
 } from "../src/lib/active-plan-persistence";
 import { getCalendarWorkoutsWithLogsForUser } from "../src/lib/runner-calendar-persistence";
-import { validateImportedPlanJson, type TrainingPlanV2 } from "../src/lib/imported-plan";
 import {
-  addManualWorkoutToActivePlanForUser,
-  copyManualWorkoutWithinActivePlanForUser,
+  buildImportedPlanSeed,
+  validateImportedPlanJson,
+  type TrainingPlanV2,
+} from "../src/lib/imported-plan";
+import {
+  confirmWorkoutCommandForUser,
   createEmptyManualActivePlanForUser,
-  reviewManualWorkoutDraft,
-  type ManualWorkoutDraftInput,
+  initializeWorkoutDocument,
+  reviewWorkoutCommandForUser,
 } from "../src/lib/manual-workout-authoring";
 import { getRunnerCalendarDateForUserId } from "../src/lib/runner-calendar-context";
 import { digestSha256Hex, stableJsonStringify } from "../src/lib/review-token-signing";
@@ -96,33 +98,56 @@ async function validateMixedOriginCalendarReadbackAndExport(input: {
   });
   const aiSource = await retainAndMaterializeFixturePlan(input.lease.userId, aiPlan);
   const manualDate = addDaysIso(currentDate, 4);
-  const manualDraft: ManualWorkoutDraftInput = {
+  const manualInitializer = initializeWorkoutDocument({
+    origin: "built_in",
     templateKey: "easy_aerobic_run",
     workoutDate: manualDate,
-    notes: "Mixed-origin direct manual workout.",
+  });
+  assert.equal(manualInitializer.ok, true);
+  if (!manualInitializer.ok) throw new Error(manualInitializer.message);
+  const manualCommand = {
+    operation: "materialize" as const,
+    documents: [
+      {
+        ...manualInitializer.document,
+        notes: "Mixed-origin direct manual workout.",
+      },
+    ],
+    provenanceReferences: [manualInitializer.provenanceReference],
   };
-  const manualReview = reviewManualWorkoutDraft(manualDraft);
+  const manualReview = await reviewWorkoutCommandForUser(input.lease.userId, manualCommand);
   assert.equal(manualReview.ok, true);
   if (!manualReview.ok) throw new Error("Mixed-origin manual review failed.");
-  const manualAdd = await addManualWorkoutToActivePlanForUser(input.lease.userId, {
-    draftInput: manualDraft,
-    reviewToken: manualReview.reviewToken,
-    reviewChecksum: manualReview.reviewChecksum,
+  const manualAdd = await confirmWorkoutCommandForUser(input.lease.userId, {
+    command: manualReview.candidate.command,
+    candidateId: manualReview.candidate.candidateId,
+    reviewToken: manualReview.candidate.reviewToken,
+    reviewChecksum: manualReview.candidate.reviewChecksum,
   });
   assert.equal(manualAdd.ok, true);
   if (!manualAdd.ok) throw new Error(manualAdd.message);
 
   const beforeCopy = await getCalendarWorkoutsWithLogsForUser(input.lease.userId);
-  const importedWorkout = beforeCopy.workouts.find(
+  const copySourceWorkout = beforeCopy.workouts.find(
     (workout) =>
-      workout.origin_kind === "file_import" && workout.plan_cycle_id === importedSource.id,
+      workout.origin_kind === "ai" &&
+      workout.plan_cycle_id === aiSource.id &&
+      workout.workout_date >= currentDate,
   );
-  assert.ok(importedWorkout, "Mixed-origin proof requires one imported source workout.");
+  assert.ok(copySourceWorkout, "Mixed-origin proof requires one eligible future source workout.");
   const copiedDate = addDaysIso(currentDate, 5);
-  const copied = await copyManualWorkoutWithinActivePlanForUser(input.lease.userId, {
-    sourceWorkoutId: importedWorkout.id,
-    sourceWorkoutDate: importedWorkout.workout_date,
+  const copyReview = await reviewWorkoutCommandForUser(input.lease.userId, {
+    operation: "copy",
+    workoutId: copySourceWorkout.id,
     targetDate: copiedDate,
+  });
+  assert.equal(copyReview.ok, true);
+  if (!copyReview.ok) throw new Error("Mixed-origin Copy review failed.");
+  const copied = await confirmWorkoutCommandForUser(input.lease.userId, {
+    command: copyReview.candidate.command,
+    candidateId: copyReview.candidate.candidateId,
+    reviewToken: copyReview.candidate.reviewToken,
+    reviewChecksum: copyReview.candidate.reviewChecksum,
   });
   assert.equal(copied.ok, true);
   if (!copied.ok) throw new Error(copied.message);
@@ -141,7 +166,7 @@ async function validateMixedOriginCalendarReadbackAndExport(input: {
       },
       { manual: 0, ai: 0, file_import: 0 },
     ),
-    { manual: 1, ai: 3, file_import: 1 },
+    { manual: 1, ai: 4, file_import: 0 },
   );
   assert.ok(
     futureSnapshotWorkouts
@@ -154,7 +179,7 @@ async function validateMixedOriginCalendarReadbackAndExport(input: {
     null,
   );
   assert.equal(
-    futureSnapshotWorkouts.find((workout) => workout.sourceProvenance?.originKind === "file_import")
+    snapshot.workouts.find((workout) => workout.sourceProvenance?.originKind === "file_import")
       ?.sourceProvenance?.sourcePlanId,
     importedSource.id,
   );
@@ -182,7 +207,7 @@ async function validateMixedOriginCalendarReadbackAndExport(input: {
   return {
     calendarRows: snapshot.workouts.length,
     futureRowsExported: exportedPlan.planned_workouts.length,
-    origins: { manual: 1, ai: 3, fileImport: 1 },
+    origins: { manual: 1, ai: 4, fileImport: 0 },
     immutableSourceRows: sources.data.length,
     activeAuthorityRows: 0,
   };
@@ -509,10 +534,30 @@ async function retainAndMaterializeFixturePlan(
           reviewChecksum,
         });
 
-  await materializeFirstReviewedPlanForUser(userId, plan, {
-    sourcePlanId: sourcePlan.id,
-    ...(options.calendarInstant ? { calendarInstant: options.calendarInstant } : {}),
+  const documents = buildImportedPlanSeed(plan).workouts;
+  const review = await reviewWorkoutCommandForUser(userId, {
+    operation: "materialize",
+    documents,
+    provenanceReferences: documents.map((document) => ({
+      sourcePlanId: sourcePlan.id,
+      sourceKind: plan.source_kind,
+      sourceWorkoutId: document.sourceWorkoutId,
+    })),
   });
+  assert.equal(review.ok, true);
+  if (!review.ok) throw new Error("Source Workout batch review failed.");
+  const confirmed = await confirmWorkoutCommandForUser(
+    userId,
+    {
+      command: review.candidate.command,
+      candidateId: review.candidate.candidateId,
+      reviewToken: review.candidate.reviewToken,
+      reviewChecksum: review.candidate.reviewChecksum,
+    },
+    options.calendarInstant ? { sourceBatchCalendarInstant: options.calendarInstant } : {},
+  );
+  assert.equal(confirmed.ok, true, JSON.stringify(confirmed));
+  if (!confirmed.ok) throw new Error(confirmed.message);
 
   return sourcePlan;
 }

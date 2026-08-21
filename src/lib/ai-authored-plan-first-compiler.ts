@@ -540,8 +540,9 @@ function buildSegment({
   }
 
   if (section.kind === "repeat") {
+    const parentSegmentId = `ai-plan-first-${date}-segment-${sequence}`;
     return {
-      segment_id: `ai-plan-first-${date}-segment-${sequence}`,
+      segment_id: parentSegmentId,
       segment_type: section.segment_type,
       label: section.label,
       sequence,
@@ -552,6 +553,7 @@ function buildSegment({
         children: section.children.map((child, childIndex) =>
           buildRepeatChild({
             child,
+            segmentId: `${parentSegmentId}-child-${childIndex + 1}`,
             sequence: childIndex + 1,
             path: `${path}.children.${childIndex}`,
             workoutIdentity,
@@ -583,6 +585,7 @@ function buildSegment({
 
 function buildRepeatChild({
   child,
+  segmentId,
   sequence,
   path,
   workoutIdentity,
@@ -591,6 +594,7 @@ function buildRepeatChild({
   issues,
 }: {
   child: AiAuthoredPlanFirstCompilerUnit;
+  segmentId: string;
   sequence: number;
   path: string;
   workoutIdentity: CanonicalWorkoutIdentity;
@@ -606,6 +610,7 @@ function buildRepeatChild({
   });
 
   return {
+    segment_id: segmentId,
     role: child.role,
     label: child.label,
     sequence,

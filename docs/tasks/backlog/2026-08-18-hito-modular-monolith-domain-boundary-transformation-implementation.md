@@ -34,14 +34,15 @@ audit, reread unrelated domains, or turn this parent into a second task tracker.
 
 ## Stage
 
-Phase 2A independent QA rerun after duplicate Calendar row-type ownership removal
+Phase 2B Calendar mutation-owner extraction — tracked in
+[Hito Runner Calendar Mutation Owner Extraction](./2026-08-21-hito-runner-calendar-mutation-owner-extraction.md)
 
 ## Next Recommended Role
 
-QA
+BACKEND
 
 ## Blockers
 
-None. The hosted Runner Core reconciliation and deployment chain is terminal, and Phase 1 contract
-isolation plus its static-panel consumer cleanup are complete. Phase 2A starts with the bounded
-Calendar query owner extraction.
+None. Phase 2A's focused independent QA acceptance is complete after the duplicate Calendar
+row-type ownership repair. Phase 2B may now move only the three Calendar atomic mutations and their
+demonstrated policy inputs; reviewed source-materialisation commands remain outside that boundary.

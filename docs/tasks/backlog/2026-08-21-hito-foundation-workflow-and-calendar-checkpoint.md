@@ -1,7 +1,7 @@
 # Hito Foundation Workflow And Calendar Checkpoint
 
 Work Item ID: `2026-08-21-hito-foundation-workflow-and-calendar-checkpoint`
-Status: in_progress
+Status: completed
 Type: Release
 Priority: highest
 Owner: PRODUCT
@@ -33,7 +33,7 @@ hosted parity claim, or Global QA acceptance.
 
 ## Stage
 
-Release freeze — candidate inventory, staged hygiene, commit, and push
+Completed checkpoint publication
 
 ## Validation Expectations
 
@@ -47,3 +47,19 @@ return the first incorrect owner to PRODUCT.
 
 Ivan explicitly authorized commit and push. No deployment, Vercel, Supabase-hosted mutation,
 provider call, browser run, release promotion, or production-readiness claim is included.
+
+## Checkpoint Receipt — 2026-08-21
+
+- Branch: `codex/hito-foundation-workflow-calendar-checkpoint`
+- Base: `origin/main` and the pre-freeze `HEAD` were both
+  `9143336bf55905f6009f4e4cd53dd64c456ce89f`.
+- Candidate: 107 exact staged paths; staged path-manifest SHA-256
+  `8d128ae7e60f8d6b387a0e27c9bba53abf0b00207e69dbfee9409b3bb8d0578d`; index tree
+  `b1a79a1076739064b202c2f8fc52b16868a19d4a`.
+- Hygiene: no unstaged paths before commit; `git diff --cached --check` passed.
+- Commit: `c7367e229e653ba791f162874e7acd53daf60023`
+  (`feat(runner): establish unified workout foundation`).
+- Push: branch created at `origin/codex/hito-foundation-workflow-calendar-checkpoint`.
+
+No deployment, hosted mutation, provider call, release promotion, or production-readiness claim was
+made.

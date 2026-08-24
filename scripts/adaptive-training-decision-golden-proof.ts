@@ -417,6 +417,10 @@ function validateContinuationAuthoringCompilerModes() {
       /Those fixed recovery children use controlled_short_recovery/,
     );
     assert.match(noPaceAuthorityPrompt.systemPrompt, /Never use BPM as the primary command/);
+    assert.match(
+      noPaceAuthorityPrompt.systemPrompt,
+      /controlled_tempo_session.*exact full accepted Z4.*exact full accepted Z2/s,
+    );
     assert.doesNotMatch(
       prompt.systemPrompt,
       /neither a factual benchmark nor an explicit target finish time/,

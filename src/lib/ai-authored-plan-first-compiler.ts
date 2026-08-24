@@ -1522,6 +1522,17 @@ function buildTarget(
 ): TrainingPlanTarget | undefined {
   const paceProvenance = resolveAiAuthoredPaceProvenance(authoringInput);
   validateBoundedEffortTarget({ value, path, context, issues, paceProvenance });
+  const requiredTempoBand = resolveRequiredNoPaceControlledTempoBand({
+    context,
+    paceProvenance,
+  });
+  if (requiredTempoBand && value.primary_execution_mode !== "heart_rate") {
+    issues.push({
+      code: "ai_authored_plan_first_controlled_tempo_family_execution_invalid",
+      path,
+      message: `Sustained controlled-tempo ${requiredTempoBand.role} requires the exact full accepted ${requiredTempoBand.reference} heart-rate band when factual pace authority is absent.`,
+    });
+  }
   const target: TrainingPlanTarget = {
     primary_execution_mode: value.primary_execution_mode,
     target_source: AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
@@ -1596,6 +1607,14 @@ function buildTarget(
     return target;
   }
 
+  if (requiredTempoBand && value.band_reference !== requiredTempoBand.reference) {
+    issues.push({
+      code: "ai_authored_plan_first_controlled_tempo_family_execution_invalid",
+      path,
+      message: `Sustained controlled-tempo ${requiredTempoBand.role} requires ${requiredTempoBand.reference}, not ${value.band_reference}.`,
+    });
+  }
+
   const executionRange = parseBpmExecutionRange(value.command);
   if (!executionRange || executionRange.minBpm >= executionRange.maxBpm) {
     issues.push({
@@ -1609,6 +1628,33 @@ function buildTarget(
   const usesFullBand =
     executionRange.minBpm === resolvedGuidance.minBpm &&
     executionRange.maxBpm === resolvedGuidance.maxBpm;
+  if (requiredTempoBand && !usesFullBand) {
+    issues.push({
+      code: "ai_authored_plan_first_controlled_tempo_family_execution_invalid",
+      path,
+      message: `Sustained controlled-tempo ${requiredTempoBand.role} must use the full accepted ${requiredTempoBand.reference} band.`,
+    });
+  }
+  if (
+    requiredTempoBand?.role === "work" &&
+    !/controlled|tempo/i.test(context.authoredPurpose ?? "")
+  ) {
+    issues.push({
+      code: "ai_authored_plan_first_controlled_tempo_family_execution_invalid",
+      path,
+      message: "Sustained controlled-tempo work requires a local controlled-execution cue.",
+    });
+  }
+  if (
+    requiredTempoBand?.role === "recovery" &&
+    !/relax|recover|settle/i.test(context.authoredPurpose ?? "")
+  ) {
+    issues.push({
+      code: "ai_authored_plan_first_controlled_tempo_family_execution_invalid",
+      path,
+      message: "Controlled-tempo recovery requires a local relaxed-recovery cue.",
+    });
+  }
   if (
     executionRange.minBpm < resolvedGuidance.minBpm ||
     executionRange.maxBpm > resolvedGuidance.maxBpm
@@ -1662,6 +1708,34 @@ function buildTarget(
   };
 
   return target;
+}
+
+function resolveRequiredNoPaceControlledTempoBand(input: {
+  context: TargetExecutionContext;
+  paceProvenance: ReturnType<typeof resolveAiAuthoredPaceProvenance>;
+}): { reference: "Z4" | "Z2"; role: "work" | "recovery" } | null {
+  if (
+    input.paceProvenance !== "no_benchmark_ai_estimate" ||
+    input.context.workoutIdentity !== "controlled_tempo_session" ||
+    input.context.prescription.mode !== "time"
+  ) {
+    return null;
+  }
+  if (
+    input.context.repeatChildRole === "recover" &&
+    input.context.prescription.duration_min > 1.5
+  ) {
+    return { reference: "Z2", role: "recovery" };
+  }
+  if (
+    input.context.prescription.duration_min > 2 &&
+    (input.context.repeatChildRole === "work" ||
+      (input.context.repeatChildRole == null &&
+        !["warmup", "cooldown", "recovery", "recovery_jog"].includes(input.context.segmentType)))
+  ) {
+    return { reference: "Z4", role: "work" };
+  }
+  return null;
 }
 
 function validateBoundedEffortTarget(input: {

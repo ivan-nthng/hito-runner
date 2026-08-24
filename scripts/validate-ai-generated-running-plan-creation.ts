@@ -2600,6 +2600,180 @@ async function validateLocalDevFixtureAvailabilityGating() {
     if (!noPaceAuthorityCompile.ok) {
       throw new Error(noPaceAuthorityCompile.issues[0]?.message);
     }
+    const noPaceTempoDraft = buildAiGeneratedRunningPlanDevFixtureProviderDraft(
+      noPaceAuthorityInput,
+      "non_repeat_tempo",
+    );
+    const noPaceTempoDays = [
+      ...noPaceTempoDraft.detailed_block.workouts,
+      noPaceTempoDraft.detailed_block.final_workout,
+    ];
+    const noPaceTempoWorkout = noPaceTempoDays.find(
+      (workout) => workout.workout_identity === "controlled_tempo_session",
+    );
+    const noPaceTempoWork = noPaceTempoWorkout?.sections.find(
+      (section) =>
+        section.kind === "unit" &&
+        section.segment_type === "tempo_block" &&
+        section.prescription.mode === "time" &&
+        section.prescription.duration_min > 2,
+    );
+    const z2 = noPaceAuthorityInput.runnerFacts.heartRateProfile.zones.find(
+      (zone) => zone.reference === "Z2",
+    );
+    const z3 = noPaceAuthorityInput.runnerFacts.heartRateProfile.zones.find(
+      (zone) => zone.reference === "Z3",
+    );
+    const z4 = noPaceAuthorityInput.runnerFacts.heartRateProfile.zones.find(
+      (zone) => zone.reference === "Z4",
+    );
+    assert.ok(noPaceTempoWorkout && noPaceTempoWork && z2 && z3 && z4);
+    if (
+      !noPaceTempoWorkout ||
+      !noPaceTempoWork ||
+      noPaceTempoWork.kind !== "unit" ||
+      !z2 ||
+      !z3 ||
+      !z4
+    ) {
+      throw new Error("No-pace controlled-tempo fixture truth is unavailable.");
+    }
+    assert.deepEqual(noPaceTempoWork.target, {
+      primary_execution_mode: "heart_rate",
+      band_reference: "Z4",
+      command: `${z4.minBpm}-${z4.maxBpm} bpm`,
+    });
+    const noPaceTempoCompile = compileAiAuthoredPlanFirstDraft({
+      draft: noPaceTempoDraft,
+      authoringInput: noPaceAuthorityInput,
+    });
+    assert.equal(
+      noPaceTempoCompile.ok,
+      true,
+      noPaceTempoCompile.ok ? "" : noPaceTempoCompile.issues[0]?.message,
+    );
+
+    const wrongTempoBandDraft: AiAuthoredPlanFirstCompilerDraft = structuredClone(noPaceTempoDraft);
+    const wrongTempoWorkout = [
+      ...wrongTempoBandDraft.detailed_block.workouts,
+      wrongTempoBandDraft.detailed_block.final_workout,
+    ].find((workout) => workout.workout_identity === "controlled_tempo_session");
+    const wrongTempoWork = wrongTempoWorkout?.sections.find(
+      (section) => section.kind === "unit" && section.segment_type === "tempo_block",
+    );
+    assert.ok(wrongTempoWork && wrongTempoWork.kind === "unit");
+    if (!wrongTempoWork || wrongTempoWork.kind !== "unit") {
+      throw new Error("Wrong-band controlled-tempo fixture is unavailable.");
+    }
+    wrongTempoWork.target = {
+      primary_execution_mode: "heart_rate",
+      band_reference: "Z3",
+      command: `${z3.minBpm}-${z3.maxBpm} bpm`,
+    };
+    const wrongTempoBandCompile = compileAiAuthoredPlanFirstDraft({
+      draft: wrongTempoBandDraft,
+      authoringInput: noPaceAuthorityInput,
+    });
+    assert.equal(wrongTempoBandCompile.ok, false);
+    if (wrongTempoBandCompile.ok) {
+      throw new Error("No-pace controlled-tempo work compiled with an aerobic Z3 band.");
+    }
+    assert.ok(
+      wrongTempoBandCompile.issues.some(
+        (issue) =>
+          issue.code === "ai_authored_plan_first_controlled_tempo_family_execution_invalid",
+      ),
+    );
+
+    const repeatedTempoDraft: AiAuthoredPlanFirstCompilerDraft = structuredClone(noPaceTempoDraft);
+    const repeatedTempoWorkout = [
+      ...repeatedTempoDraft.detailed_block.workouts,
+      repeatedTempoDraft.detailed_block.final_workout,
+    ].find((workout) => workout.workout_identity === "controlled_tempo_session");
+    const repeatedTempoWorkIndex = repeatedTempoWorkout?.sections.findIndex(
+      (section) => section.kind === "unit" && section.segment_type === "tempo_block",
+    );
+    assert.ok(
+      repeatedTempoWorkout && repeatedTempoWorkIndex != null && repeatedTempoWorkIndex >= 0,
+    );
+    if (!repeatedTempoWorkout || repeatedTempoWorkIndex == null || repeatedTempoWorkIndex < 0) {
+      throw new Error("Repeated controlled-tempo fixture is unavailable.");
+    }
+    repeatedTempoWorkout.sections[repeatedTempoWorkIndex] = {
+      kind: "repeat",
+      segment_type: "interval_block",
+      label: "Controlled Tempo Repeats",
+      cue: "Stay controlled throughout the set.",
+      rounds: 3,
+      children: [
+        {
+          role: "work",
+          label: "Work",
+          cue: "Run at controlled tempo effort.",
+          prescription: { mode: "time", duration_min: 6 },
+          target: {
+            primary_execution_mode: "heart_rate",
+            band_reference: "Z4",
+            command: `${z4.minBpm}-${z4.maxBpm} bpm`,
+          },
+        },
+        {
+          role: "recover",
+          label: "Recovery",
+          cue: "Relax and recover before the next repeat.",
+          prescription: { mode: "time", duration_min: 2 },
+          target: {
+            primary_execution_mode: "heart_rate",
+            band_reference: "Z2",
+            command: `${z2.minBpm}-${z2.maxBpm} bpm`,
+          },
+        },
+      ],
+    };
+    const repeatedTempoCompile = compileAiAuthoredPlanFirstDraft({
+      draft: repeatedTempoDraft,
+      authoringInput: noPaceAuthorityInput,
+    });
+    assert.equal(
+      repeatedTempoCompile.ok,
+      true,
+      repeatedTempoCompile.ok ? "" : repeatedTempoCompile.issues[0]?.message,
+    );
+    const wrongTempoRecoveryDraft = structuredClone(repeatedTempoDraft);
+    const wrongTempoRecoveryWorkout = [
+      ...wrongTempoRecoveryDraft.detailed_block.workouts,
+      wrongTempoRecoveryDraft.detailed_block.final_workout,
+    ].find((workout) => workout.workout_identity === "controlled_tempo_session");
+    const wrongTempoRecoveryRepeat = wrongTempoRecoveryWorkout?.sections.find(
+      (section) => section.kind === "repeat" && section.segment_type === "interval_block",
+    );
+    const wrongTempoRecovery =
+      wrongTempoRecoveryRepeat?.kind === "repeat"
+        ? wrongTempoRecoveryRepeat.children.find((child) => child.role === "recover")
+        : null;
+    assert.ok(wrongTempoRecovery);
+    if (!wrongTempoRecovery) {
+      throw new Error("Wrong-band controlled-tempo recovery fixture is unavailable.");
+    }
+    wrongTempoRecovery.target = {
+      primary_execution_mode: "heart_rate",
+      band_reference: "Z3",
+      command: `${z3.minBpm}-${z3.maxBpm} bpm`,
+    };
+    const wrongTempoRecoveryCompile = compileAiAuthoredPlanFirstDraft({
+      draft: wrongTempoRecoveryDraft,
+      authoringInput: noPaceAuthorityInput,
+    });
+    assert.equal(wrongTempoRecoveryCompile.ok, false);
+    if (wrongTempoRecoveryCompile.ok) {
+      throw new Error("Controlled-tempo recovery compiled outside the full Z2 band.");
+    }
+    assert.ok(
+      wrongTempoRecoveryCompile.issues.some(
+        (issue) =>
+          issue.code === "ai_authored_plan_first_controlled_tempo_family_execution_invalid",
+      ),
+    );
     const noPaceAuthorityDays = [
       ...noPaceAuthorityDraft.detailed_block.workouts,
       noPaceAuthorityDraft.detailed_block.final_workout,

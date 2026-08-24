@@ -1153,7 +1153,7 @@ function buildTempoFixtureDay(date: string, context: ProviderFixtureTargetContex
         "tempo_block",
         "Work",
         timePrescription(20),
-        paceTarget("5:40-5:55/km", context, "Z3"),
+        paceTarget("5:40-5:55/km", context, "Z4"),
       ),
       cue: "Keep the effort controlled at RPE max 7/10.",
     },

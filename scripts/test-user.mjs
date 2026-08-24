@@ -98,6 +98,7 @@ const HOSTED_POOL_COMMANDS = new Set([
   "hosted-pool-recompile-technical",
   "hosted-pool-candidate-artifact",
   "hosted-pool-record-coach-verdict",
+  "hosted-pool-confirm-candidate",
   "hosted-pool-reset",
 ]);
 
@@ -127,6 +128,7 @@ if (
     "hosted-pool-recompile-technical",
     "hosted-pool-candidate-artifact",
     "hosted-pool-record-coach-verdict",
+    "hosted-pool-confirm-candidate",
     "hosted-pool-reset",
     "design-profile-seed",
     "design-profile-status",
@@ -147,7 +149,7 @@ if (
   ].includes(command)
 ) {
   throw new Error(
-    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-reset-plan|pool-reset|pool-delete|hosted-pool-adopt|hosted-pool-status|hosted-pool-auth-link|hosted-pool-checkpoint|hosted-pool-calendar-date|hosted-pool-fit-artifact|hosted-pool-profile-snapshot|hosted-pool-continuation-preflight|hosted-pool-attempt-ledger|hosted-pool-latest-diagnostic|hosted-pool-recompile-technical|hosted-pool-candidate-artifact|hosted-pool-record-coach-verdict|hosted-pool-reset|design-profile-seed|design-profile-status|design-profile-reset|adaptive-blueprint-seed|adaptive-blueprint-continuation-seed|adaptive-blueprint-status|adaptive-blueprint-continuation-prepare|adaptive-blueprint-continuation-proof|adaptive-blueprint-continuation-profile-proof|adaptive-blueprint-two-profile-replay|adaptive-blueprint-second-continuation-preflight|adaptive-blueprint-second-continuation-author|adaptive-blueprint-second-continuation-recompile|adaptive-blueprint-reset|runner-core-file-flow-seed|runner-core-file-flow-proof|create|reset-plan|reset|delete> [options]",
+    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-reset-plan|pool-reset|pool-delete|hosted-pool-adopt|hosted-pool-status|hosted-pool-auth-link|hosted-pool-checkpoint|hosted-pool-calendar-date|hosted-pool-fit-artifact|hosted-pool-profile-snapshot|hosted-pool-continuation-preflight|hosted-pool-attempt-ledger|hosted-pool-latest-diagnostic|hosted-pool-recompile-technical|hosted-pool-candidate-artifact|hosted-pool-record-coach-verdict|hosted-pool-confirm-candidate|hosted-pool-reset|design-profile-seed|design-profile-status|design-profile-reset|adaptive-blueprint-seed|adaptive-blueprint-continuation-seed|adaptive-blueprint-status|adaptive-blueprint-continuation-prepare|adaptive-blueprint-continuation-proof|adaptive-blueprint-continuation-profile-proof|adaptive-blueprint-two-profile-replay|adaptive-blueprint-second-continuation-preflight|adaptive-blueprint-second-continuation-author|adaptive-blueprint-second-continuation-recompile|adaptive-blueprint-reset|runner-core-file-flow-seed|runner-core-file-flow-proof|create|reset-plan|reset|delete> [options]",
   );
 }
 
@@ -204,6 +206,8 @@ if (command === "inventory") {
   await handleHostedPoolCandidateArtifact();
 } else if (command === "hosted-pool-record-coach-verdict") {
   await handleHostedPoolRecordCoachVerdict();
+} else if (command === "hosted-pool-confirm-candidate") {
+  await handleHostedPoolConfirmCandidate();
 } else if (command === "hosted-pool-reset") {
   await handleHostedPoolReset();
 } else if (command === "design-profile-seed") {
@@ -1656,6 +1660,237 @@ function recordHostedCoachVerdictThroughCanonicalOwner(input) {
       .slice(0, 240);
     throw new Error(
       `Canonical Coach verdict persistence failed with status ${child.status}${safeMessage ? ` (${safeMessage})` : ""}.`,
+    );
+  }
+  return JSON.parse(child.stdout);
+}
+
+async function handleHostedPoolConfirmCandidate() {
+  const { receiptPath, receipt } = await readCurrentHostedReceipt();
+  const candidateId = requireOption(options["candidate-id"], "--candidate-id");
+  const asOfDate = requireOption(options["as-of-date"], "--as-of-date");
+  const outputPath = requireExternalPrivatePath(options.output, "--output");
+  const verdictArtifactPath = requireExternalPrivatePath(
+    options["verdict-artifact"],
+    "--verdict-artifact",
+  );
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(asOfDate)) {
+    throw new Error("--as-of-date must be one ISO Calendar date.");
+  }
+  const verdictBytes = await readFile(verdictArtifactPath);
+  const verdictArtifact = JSON.parse(verdictBytes.toString("utf8"));
+  const verdictArtifactSha256 = createHash("sha256").update(verdictBytes).digest("hex");
+  const candidateRead = await supabase
+    .from("adaptive_training_detailed_candidates")
+    .select(
+      "id, candidate_sha256, candidate_content, blueprint_id, source_response_id, interval_start_date, interval_end_date",
+    )
+    .eq("user_id", receipt.userId)
+    .eq("id", candidateId)
+    .maybeSingle();
+  if (candidateRead.error || !candidateRead.data) {
+    throw new Error(candidateRead.error?.message ?? "Coach-approved candidate is unavailable.");
+  }
+  const responseRead = await supabase
+    .from("ai_plan_generation_responses")
+    .select("id, running_coach_verdict")
+    .eq("user_id", receipt.userId)
+    .eq("id", candidateRead.data.source_response_id)
+    .maybeSingle();
+  if (responseRead.error || !responseRead.data) {
+    throw new Error(responseRead.error?.message ?? "Candidate response lineage is unavailable.");
+  }
+  if (
+    verdictArtifact.verdict !== "APPROVED" ||
+    verdictArtifact.safeToConfirm !== true ||
+    verdictArtifact.responseId !== responseRead.data.id ||
+    verdictArtifact.blueprintId !== candidateRead.data.blueprint_id ||
+    verdictArtifact.candidateId !== candidateRead.data.id ||
+    verdictArtifact.candidateSha256 !== candidateRead.data.candidate_sha256 ||
+    responseRead.data.running_coach_verdict?.verdict !== "approved"
+  ) {
+    throw new Error("The candidate does not have one exact persisted Coach approval.");
+  }
+  const workoutDocuments = candidateRead.data.candidate_content?.workoutDocuments;
+  if (!Array.isArray(workoutDocuments) || workoutDocuments.length === 0) {
+    throw new Error("The Coach-approved candidate has no canonical WorkoutDocuments.");
+  }
+  const beforeCounts = await getQaUserOwnedCounts(supabase, receipt.userId);
+  const existingConfirmation = await supabase
+    .from("adaptive_training_block_confirmations")
+    .select("id, candidate_sha256, calendar_workout_ids")
+    .eq("user_id", receipt.userId)
+    .eq("detailed_candidate_id", candidateId)
+    .maybeSingle();
+  if (existingConfirmation.error) throw new Error(existingConfirmation.error.message);
+  const confirmationResult = existingConfirmation.data
+    ? {
+        resumed: true,
+        reviewChecksum: null,
+        reviewTokenSha256: null,
+        outcome: "confirmed",
+      }
+    : runHostedCandidateConfirmationThroughCanonicalOwner({
+        userId: receipt.userId,
+        candidateId,
+        asOfDate,
+      });
+  const confirmationRead = await supabase
+    .from("adaptive_training_block_confirmations")
+    .select(
+      "id, blueprint_id, detailed_candidate_id, predecessor_confirmation_id, candidate_sha256, block_mode, interval_start_date, interval_end_date, calendar_workout_ids",
+    )
+    .eq("user_id", receipt.userId)
+    .eq("detailed_candidate_id", candidateId)
+    .single();
+  if (confirmationRead.error) throw new Error(confirmationRead.error.message);
+  const afterCounts = await getQaUserOwnedCounts(supabase, receipt.userId);
+  assert.equal(confirmationRead.data.candidate_sha256, candidateRead.data.candidate_sha256);
+  assert.equal(confirmationRead.data.blueprint_id, candidateRead.data.blueprint_id);
+  assert.equal(confirmationRead.data.interval_start_date, candidateRead.data.interval_start_date);
+  assert.equal(confirmationRead.data.interval_end_date, candidateRead.data.interval_end_date);
+  assert.equal(confirmationRead.data.calendar_workout_ids.length, workoutDocuments.length);
+  assert.equal(
+    afterCounts.adaptive_training_block_confirmations,
+    beforeCounts.adaptive_training_block_confirmations + (existingConfirmation.data ? 0 : 1),
+  );
+  assert.equal(
+    afterCounts.planned_workouts,
+    beforeCounts.planned_workouts + (existingConfirmation.data ? 0 : workoutDocuments.length),
+  );
+  const readback = await readAdaptiveBlueprintProjectionFixture({
+    supabase,
+    userId: receipt.userId,
+    asOfDate,
+  });
+  assert.equal(readback.source.latestConfirmationId, confirmationRead.data.id);
+  assert.equal(readback.source.confirmedCalendarWorkoutCount, afterCounts.planned_workouts);
+  assert.equal(readback.projections.calendarRowCount, 0);
+  const artifact = {
+    artifactKind: "hito271_hosted_sealed_candidate_confirmation_v1",
+    task: "HITO-271",
+    createdAt: new Date().toISOString(),
+    candidate: {
+      id: candidateRead.data.id,
+      sha256: candidateRead.data.candidate_sha256,
+      intervalStartDate: candidateRead.data.interval_start_date,
+      intervalEndDate: candidateRead.data.interval_end_date,
+      workoutDocumentCount: workoutDocuments.length,
+    },
+    coachVerdict: {
+      verdict: "approved",
+      safeToConfirm: true,
+      artifactSha256: verdictArtifactSha256,
+    },
+    sealedCommand: confirmationResult,
+    confirmation: confirmationRead.data,
+    persistence: {
+      beforeCounts,
+      afterCounts,
+      futureProjectionCalendarRowCount: readback.projections.calendarRowCount,
+      projectionExecutableFieldsExposed: readback.projections.executableFieldsExposed,
+    },
+    providerDispatchCount: 0,
+    privacy: {
+      reviewTokenIncluded: false,
+      rawProviderContentIncluded: false,
+      credentialIncluded: false,
+      runnerPiiIncluded: false,
+    },
+  };
+  await mkdir(path.dirname(outputPath), { recursive: true, mode: 0o700 });
+  const artifactBytes = Buffer.from(`${JSON.stringify(artifact, null, 2)}\n`);
+  await writeFile(outputPath, artifactBytes, { mode: 0o600 });
+  await chmod(outputPath, 0o600);
+  const artifactSha256 = createHash("sha256").update(artifactBytes).digest("hex");
+  const next = appendHostedCheckpoint(
+    receipt,
+    hostedCheckpoint("sealed_candidate_confirmation", {
+      candidateId,
+      candidateSha256: candidateRead.data.candidate_sha256,
+      confirmationId: confirmationRead.data.id,
+      calendarWorkoutCount: afterCounts.planned_workouts,
+      providerDispatchCount: 0,
+      artifactSha256,
+    }),
+  );
+  await writeHostedReceipt(receiptPath, next);
+  console.log(
+    JSON.stringify({
+      ok: true,
+      action: "hosted-pool-confirm-candidate",
+      candidateId,
+      candidateSha256: candidateRead.data.candidate_sha256,
+      confirmationId: confirmationRead.data.id,
+      resumed: confirmationResult.resumed,
+      calendarWorkoutCount: afterCounts.planned_workouts,
+      futureProjectionCalendarRowCount: readback.projections.calendarRowCount,
+      providerDispatchCount: 0,
+      outputPath,
+      artifactSha256,
+      receiptSha256: hashStableJson(next),
+    }),
+  );
+}
+
+function runHostedCandidateConfirmationThroughCanonicalOwner(input) {
+  const script = String.raw`
+    import { createHash } from "node:crypto";
+    import { readFileSync } from "node:fs";
+    import { reviewWorkoutCommandForUser, confirmWorkoutCommandForUser } from "./src/lib/manual-workout-authoring/actions.ts";
+    const input = JSON.parse(readFileSync(0, "utf8"));
+    const review = await reviewWorkoutCommandForUser(
+      input.userId,
+      {
+        operation: "materialize_source_candidate",
+        source: { kind: "adaptive_continuation_candidate", candidateId: input.candidateId },
+      },
+      { adaptiveContinuationAsOfDate: input.asOfDate },
+    );
+    if (!review.ok) throw new Error(review.issues[0]?.message ?? "Candidate review failed.");
+    const confirmed = await confirmWorkoutCommandForUser(
+      input.userId,
+      {
+        command: review.candidate.command,
+        candidateId: review.candidate.candidateId,
+        reviewToken: review.candidate.reviewToken,
+        reviewChecksum: review.candidate.reviewChecksum,
+      },
+      { adaptiveContinuationAsOfDate: input.asOfDate },
+    );
+    if (!confirmed.ok) throw new Error(confirmed.message ?? "Candidate confirmation failed.");
+    console.log(JSON.stringify({
+      resumed: false,
+      reviewChecksum: review.candidate.reviewChecksum,
+      reviewTokenSha256: createHash("sha256").update(review.candidate.reviewToken).digest("hex"),
+      reviewedDocumentCount: review.candidate.command.documents.length,
+      outcome: "confirmed",
+    }));
+  `;
+  const child = spawnSync(
+    process.execPath,
+    ["--import", "tsx", "--input-type=module", "-e", script],
+    {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        NEXT_PUBLIC_SUPABASE_URL: config.supabaseUrl,
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: config.supabasePublishableKey,
+        SUPABASE_SECRET_KEY: config.supabaseServerKey,
+      },
+      input: JSON.stringify(input),
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+    },
+  );
+  if (child.status !== 0) {
+    const safeMessage = String(child.stderr ?? "")
+      .split("\n")
+      .find((line) => line.trim().startsWith("Error:"))
+      ?.trim()
+      .slice(0, 240);
+    throw new Error(
+      `Canonical sealed candidate confirmation failed with status ${child.status}${safeMessage ? ` (${safeMessage})` : ""}.`,
     );
   }
   return JSON.parse(child.stdout);

@@ -21,7 +21,7 @@ import {
 
 export const AI_AUTHORED_PLAN_FIRST_CONTRACT_VERSION = "adaptive-blueprint-four-week-v1" as const;
 export const AI_AUTHORED_PLAN_FIRST_PROVIDER_CONTRACT_VERSION =
-  "adaptive-blueprint-four-week-direct-v17" as const;
+  "adaptive-blueprint-four-week-direct-v18" as const;
 export const AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME =
   "hito_adaptive_blueprint_four_week_v1" as const;
 export const AI_AUTHORED_PLAN_FIRST_PACE_MIN_PER_KM_PATTERN =
@@ -646,7 +646,7 @@ export function buildAiAuthoredPlanFirstPrompt({
       : `For target.primary_execution_mode=pace, command is exactly one M:SS/km or M:SS-M:SS/km value. Hito classifies its factual provenance as ${paceProvenance} from the signed runner context and never derives the pace value.`;
   const numericModeInstruction =
     paceProvenance === "no_benchmark_ai_estimate"
-      ? "Because executable pace authority is absent, use complete accepted-profile BPM bands only for sustained non-terrain runnable leaves where heart rate can govern execution. A work Repeat child lasting at most 2 minutes in controlled_tempo_session, a work Repeat child of at most 400 m in distance_intervals, and a stride work child lasting at most 30 seconds must be effort-only: use controlled_short_repetition for tempo/distance work and controlled_stride for strides. Their fixed 1–1.5 minute recovery children must use controlled_short_recovery with relaxed, controlled, recover-fully wording. Retain the exact time or distance plus rounds. Never use BPM as the primary command for either side of those short work/recovery pairs. Terrain-dependent uphill work and downhill recovery remain effort-only."
+      ? "Because executable pace authority is absent, use complete accepted-profile BPM bands only for sustained non-terrain runnable leaves where heart rate can govern execution. A work Repeat child lasting at most 2 minutes in controlled_tempo_session, a work Repeat child of at most 400 m in distance_intervals, and a stride work child lasting at most 30 seconds must be effort-only: use controlled_short_repetition for tempo/distance work and controlled_stride for strides. A stride recovery child must be exactly 1 minute; a controlled_tempo_session or distance_intervals short-work recovery child must be exactly 1 or 1.5 minutes. Those fixed recovery children use controlled_short_recovery with relaxed, controlled, recover-fully wording; never author another fractional recovery duration between those accepted values. Retain the exact time or distance plus rounds. Never use BPM as the primary command for either side of those short work/recovery pairs. Terrain-dependent uphill work and downhill recovery remain effort-only."
       : "Choose the numeric mode as the coach: recovery usually uses accepted-profile BPM, otherwise broad estimated pace; easy may use BPM or pace; warm-up/cooldown use broad pace unless sustained enough for BPM; steady may use either; tempo/threshold usually use pace while sustained continuous blocks may use BPM; interval work and short flat movement recoveries use pace; strides use pace; race-pace work uses pace; race day uses pace unless explicitly authored as HR-controlled. Long-run identities follow the workout-wide substantive-mode rule below. Run/Walk Run and Walk children each use numeric pace. Heart-rate availability never forces its use, and one leaf never has both pace and BPM.";
   const systemPrompt = [
     "You are Hito's AI running coach authoring one immutable full-horizon Blueprint and one bounded detailed review block.",

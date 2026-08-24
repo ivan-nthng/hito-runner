@@ -3007,6 +3007,21 @@ async function validateLocalDevFixtureAvailabilityGating() {
       /Every detailed workout must use a canonical workout_identity whose resolved workout family is listed in the owning Blueprint phase\.workout_families/,
       "The provider contract must state the same detailed-family ownership rule that the compiler enforces.",
     );
+    assert.match(
+      buildAiAuthoredPlanFirstPrompt({
+        authoringInput: {
+          ...fixtureAuthoringInput,
+          runnerFacts: { ...fixtureAuthoringInput.runnerFacts, benchmark: null },
+          planGoalIntent: {
+            ...fixtureAuthoringInput.planGoalIntent,
+            targetFinishTime: null,
+          },
+        },
+        today: fixtureAuthoringInput.schedule.startDate,
+      }).systemPrompt,
+      /A stride recovery child must be exactly 1 minute; a controlled_tempo_session or distance_intervals short-work recovery child must be exactly 1 or 1\.5 minutes/,
+      "The provider contract must expose the exact short-recovery durations accepted by the delayed-metric safety validator.",
+    );
     for (const workout of fixtureCompile.canonicalPlan.planned_workouts) {
       if (workout.workout_family === "rest") continue;
       const phase = fixtureCompile.blueprint.phases.find(

@@ -416,6 +416,12 @@ function validateContinuationAuthoringCompilerModes() {
       prompt.systemPrompt,
       /neither a factual benchmark nor an explicit target finish time/,
     );
+    for (const zone of authoringInput.runnerFacts.heartRateProfile.zones) {
+      assert.match(
+        prompt.systemPrompt,
+        new RegExp(`${zone.reference} ${zone.minBpm}-${zone.maxBpm} bpm`),
+      );
+    }
     const payload = JSON.parse(prompt.userPrompt) as { brief: Record<string, unknown> };
     assert.deepEqual(Object.keys(payload.brief).sort(), [
       "blueprint",

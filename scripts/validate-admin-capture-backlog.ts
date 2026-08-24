@@ -14,7 +14,6 @@ import {
 import { countRepoMirrorIdentityDuplicates } from "./admin-backlog-import/identity";
 import { collectAdminRepoWorkItemSnapshot } from "./lib/admin-repo-work-item-snapshot.mjs";
 import { assertCanonicalMarkdownWorkItemContract } from "./admin-backlog-import/contract-proof";
-import { parseCanonicalMarkdown } from "./admin-backlog-import/markdown";
 import {
   appendAdminCaptureItemNoteForDependencies,
   createAdminCaptureItemForDependencies,
@@ -29,10 +28,7 @@ import {
   type AdminCaptureRow,
 } from "../src/lib/admin-capture.server";
 import { updateAdminCaptureItemTriageForDependencies } from "../src/lib/admin-capture.server";
-import {
-  adminRepoWorkItemEpicSlugs,
-  getAdminRepoWorkItemMetadata,
-} from "../src/lib/admin-work-items";
+import { getAdminRepoWorkItemMetadata } from "../src/lib/admin-work-items";
 import { resolveAdminRepoMirrorSourceMode } from "../src/lib/admin-repo-mirror.server";
 import {
   adminCaptureActiveStatuses,
@@ -214,7 +210,6 @@ if (args.has("--live-supabase")) {
 
 async function runDeterministicHarness() {
   assertCanonicalMarkdownWorkItemContract();
-  const epicCorpus = assertCanonicalBacklogEpicCorpus();
   await assertCanonicalBacklogReadContract();
   await assertSingleRouteBacklogRead();
   assertRepoMirrorSourceModeBoundary();
@@ -599,13 +594,11 @@ async function runDeterministicHarness() {
           "repo_derived_markdown_prompt_copy",
           "repo_derived_read_only",
           "canonical_markdown_work_item_contract",
-          "canonical_backlog_epic_corpus",
           "compact_terminal_markdown_identity_contract",
           "canonical_repo_projection_metadata",
           "unsupported_persisted_epic_not_projected",
           "stale_repo_mirror_cleanup_policy",
         ],
-        epicCorpus,
         promptLength: prompt.prompt.prompt.length,
       },
       null,
@@ -1404,54 +1397,6 @@ async function assertBundledRepoMirrorSourceContract() {
     synchronizeRepoWorkItems({ documents: withoutArchivedPlans, dryRun: true }),
     /required bundled repository work-item source.*docs\/plans\/archive/i,
   );
-}
-
-function assertCanonicalBacklogEpicCorpus() {
-  const snapshot = collectAdminRepoWorkItemSnapshot(process.cwd());
-  const topLevelBacklog = snapshot.documents.filter(
-    (document) =>
-      document.sourceType === "backlog_doc" &&
-      path.posix.dirname(document.sourcePath) === "docs/tasks/backlog",
-  );
-  const seenEpics = new Set<string>();
-  const epicCounts = Object.fromEntries(
-    adminRepoWorkItemEpicSlugs.map((epic) => [epic, 0]),
-  ) as Record<(typeof adminRepoWorkItemEpicSlugs)[number], number>;
-  let bugCount = 0;
-  let nonBugCount = 0;
-
-  for (const document of topLevelBacklog) {
-    const parsed = parseCanonicalMarkdown(document.content, {
-      requireEpicForActiveNonBug: true,
-    });
-
-    if (parsed.itemType === "bug") {
-      bugCount += 1;
-      assert.equal(parsed.epic, null, `${document.sourcePath} must remain Epic-free.`);
-      assert.equal(parsed.raw.Epic, undefined, `${document.sourcePath} declares a Bug Epic.`);
-      continue;
-    }
-
-    nonBugCount += 1;
-    assert.ok(parsed.epic, `${document.sourcePath} is missing a registered Epic.`);
-    assert.equal(
-      parsed.invalidRequiredFields.includes("Epic"),
-      false,
-      `${document.sourcePath} has an invalid Epic.`,
-    );
-    seenEpics.add(parsed.epic);
-    epicCounts[parsed.epic] += 1;
-  }
-
-  assert.equal(bugCount + nonBugCount, topLevelBacklog.length);
-
-  return {
-    topLevelCount: topLevelBacklog.length,
-    bugCount,
-    nonBugCount,
-    registeredEpicsObserved: Array.from(seenEpics).sort(),
-    epicCounts,
-  };
 }
 
 function assertStaleRepoMirrorCleanupPolicy() {

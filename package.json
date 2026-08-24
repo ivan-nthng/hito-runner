@@ -43,6 +43,9 @@
     "validate:backend:release": "node ./scripts/validate-backend.mjs --release",
     "import-admin-backlog-work-items": "node --env-file=.env.local --import tsx ./scripts/import-repo-work-items-to-admin-backlog-cli.ts",
     "test-user": "node --env-file=.env.local ./scripts/test-user.mjs",
+    "qa:adaptive-ui-replay:seed": "node --env-file=.env.local ./scripts/test-user.mjs adaptive-ui-replay-seed",
+    "qa:adaptive-ui-replay:status": "node --env-file=.env.local ./scripts/test-user.mjs adaptive-ui-replay-status",
+    "qa:adaptive-ui-replay:reset": "node --env-file=.env.local ./scripts/test-user.mjs adaptive-ui-replay-reset",
     "local:design-profile:seed": "node --env-file=.env.local ./scripts/test-user.mjs design-profile-seed",
     "local:design-profile:status": "node --env-file=.env.local ./scripts/test-user.mjs design-profile-status",
     "local:design-profile:reset": "node --env-file=.env.local ./scripts/test-user.mjs design-profile-reset",
@@ -58,6 +61,7 @@
     "local:adaptive-blueprint:continuation-proof": "node --env-file=.env.local ./scripts/test-user.mjs adaptive-blueprint-continuation-proof",
     "local:adaptive-blueprint:reset": "node --env-file=.env.local ./scripts/test-user.mjs adaptive-blueprint-reset",
     "validate-test-user-lifecycle": "node ./scripts/validate-qa-test-user-lifecycle.mjs",
+    "validate-restored-saved-plan-server-fn": "node --env-file=.env.local --import tsx ./scripts/validate-restored-saved-plan-server-fn.ts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

@@ -6,6 +6,7 @@ import {
   AdminDataTableStaticHeader,
   AdminDataTableToolbar,
 } from "@/components/admin/AdminOperationalComponents";
+import { SelectedRunningPlanPreviewDialog } from "@/components/onboarding/SelectedTenKPlanPreviewDialog";
 import { HitoButton } from "@/components/ui/button";
 import {
   Dialog,
@@ -36,50 +37,91 @@ import type {
   SavedPlanLibraryRecordState,
   SavedPlanLibrarySummary,
 } from "@/lib/active-plan-persistence";
+import {
+  confirmRunningPlanDraft,
+  listSavedPlanReviews,
+  restoreSavedPlanReview,
+  runningPlanConfirmInputSchema,
+  type RestoreSavedPlanReviewResult,
+  type RunningPlanConfirmActionResult,
+  type SavedPlanReviewSummary,
+} from "@/lib/running-plan-engine-actions";
 import { formatDate } from "@/lib/training";
 
 type SavedPlanSortKey = "createdAt" | "title" | "workoutCount";
 type SavedPlanSort = { key: SavedPlanSortKey; direction: "asc" | "desc" };
 type LibraryStatus = "loading" | "ready" | "error";
+type SavedPlanLibraryEntry = SavedPlanLibrarySummary | SavedPlanReviewSummary;
 type PendingDialog =
   | { type: "hide"; record: SavedPlanLibrarySummary }
   | { type: "replace"; record: SavedPlanLibrarySummary; futureWorkoutCount: number };
 type AppliedReceipt = Extract<SavedPlanApplyResult, { status: "applied" }> & { planTitle: string };
+type RestoredSavedPlanReview = Extract<RestoreSavedPlanReviewResult, { ok: true }>;
 
 const DEFAULT_SORT: SavedPlanSort = { key: "createdAt", direction: "desc" };
 
 export function SavedPlanLibraryPanel() {
   const router = useRouter();
   const listSavedPlanLibraryFn = useServerFn(listSavedPlanLibrary);
+  const listSavedPlanReviewsFn = useServerFn(listSavedPlanReviews);
   const removeSavedPlanRecordFn = useServerFn(removeSavedPlanRecord);
+  const restoreSavedPlanReviewFn = useServerFn(restoreSavedPlanReview);
   const startSavedPlanRecordFn = useServerFn(startSavedPlanRecord);
+  const confirmRunningPlanDraftFn = useServerFn(confirmRunningPlanDraft);
   const [status, setStatus] = useState<LibraryStatus>("loading");
   const [records, setRecords] = useState<SavedPlanLibrarySummary[]>([]);
+  const [generatedReviews, setGeneratedReviews] = useState<SavedPlanReviewSummary[]>([]);
+  const [generatedReviewError, setGeneratedReviewError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [recordState, setRecordState] = useState<SavedPlanLibraryRecordState | "all">("available");
   const [sort, setSort] = useState<SavedPlanSort>(DEFAULT_SORT);
   const [pendingDialog, setPendingDialog] = useState<PendingDialog | null>(null);
-  const [busyAction, setBusyAction] = useState<"hide" | "start" | null>(null);
+  const [busyAction, setBusyAction] = useState<"confirm" | "hide" | "restore" | "start" | null>(
+    null,
+  );
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<AppliedReceipt | null>(null);
+  const [restoredReview, setRestoredReview] = useState<RestoredSavedPlanReview | null>(null);
+  const [reviewConfirmResult, setReviewConfirmResult] =
+    useState<RunningPlanConfirmActionResult | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
   const loadRecords = useCallback(async () => {
     setStatus("loading");
     setError(null);
+    setGeneratedReviewError(null);
     try {
-      const result = await listSavedPlanLibraryFn({
-        data: { recordState: "all", sort: "created_at", direction: "desc" },
-      });
-      setRecords(result.records);
+      const [libraryResult, generatedReviewResult] = await Promise.allSettled([
+        listSavedPlanLibraryFn({
+          data: { recordState: "all", sort: "created_at", direction: "desc" },
+        }),
+        listSavedPlanReviewsFn(),
+      ]);
+
+      if (libraryResult.status === "rejected") {
+        throw libraryResult.reason;
+      }
+
+      setRecords(libraryResult.value.records);
+      if (generatedReviewResult.status === "fulfilled") {
+        setGeneratedReviews([...generatedReviewResult.value.records]);
+      } else {
+        setGeneratedReviews([]);
+        setGeneratedReviewError(
+          readableError(
+            generatedReviewResult.reason,
+            "Generated plans ready for review could not be loaded.",
+          ),
+        );
+      }
       setStatus("ready");
     } catch (loadError) {
       setStatus("error");
       setError(readableError(loadError, "We could not load saved plans. Try again shortly."));
     }
-  }, [listSavedPlanLibraryFn]);
+  }, [listSavedPlanLibraryFn, listSavedPlanReviewsFn]);
 
   useEffect(() => {
     void loadRecords();
@@ -87,13 +129,17 @@ export function SavedPlanLibraryPanel() {
 
   const visibleRecords = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase();
-    return records
-      .filter((record) => recordState === "all" || record.recordState === recordState)
+    return [...records, ...generatedReviews]
+      .filter((record) =>
+        isGeneratedPlanReview(record)
+          ? recordState !== "removed"
+          : recordState === "all" || record.recordState === recordState,
+      )
       .filter(
         (record) => !normalizedQuery || record.title.toLocaleLowerCase().includes(normalizedQuery),
       )
       .sort((left, right) => compareRecords(left, right, sort));
-  }, [query, recordState, records, sort]);
+  }, [generatedReviews, query, recordState, records, sort]);
 
   const activeFilters =
     recordState === "available"
@@ -200,6 +246,71 @@ export function SavedPlanLibraryPanel() {
     }
   };
 
+  const restoreGeneratedReview = async (
+    record: SavedPlanReviewSummary,
+    trigger: HTMLElement | null,
+  ) => {
+    if (busyAction) return;
+    returnFocusRef.current = trigger;
+    setBusyAction("restore");
+    setActionError(null);
+    setNotice(null);
+    setReceipt(null);
+    setRestoredReview(null);
+    setReviewConfirmResult(null);
+    try {
+      const result = await restoreSavedPlanReviewFn({
+        data: {
+          candidateId: record.candidate.id,
+          candidateVersion: record.candidate.version,
+        },
+      });
+      if (!result.ok) {
+        throw new Error(result.message);
+      }
+      setRestoredReview(result);
+    } catch (restoreError) {
+      setActionError(
+        readableError(restoreError, "We could not restore this generated plan review."),
+      );
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
+  const confirmGeneratedReview = async () => {
+    if (restoredReview?.status !== "review_ready" || busyAction) return;
+    const confirmInput = runningPlanConfirmInputSchema.parse({
+      previewInput: restoredReview.review.previewInput,
+      sourceKind: restoredReview.review.sourceKind,
+      reviewToken: restoredReview.review.reviewToken,
+      reviewChecksum: restoredReview.review.reviewChecksum,
+    });
+
+    setBusyAction("confirm");
+    setActionError(null);
+    setReviewConfirmResult(null);
+    try {
+      const result = await confirmRunningPlanDraftFn({ data: confirmInput });
+      setReviewConfirmResult(result);
+      if (!result.ok) {
+        return;
+      }
+      window.location.assign("/");
+    } catch (confirmError) {
+      setReviewConfirmResult({
+        ok: false,
+        status: "blocked",
+        persisted: false,
+        reason: "persistence_failed",
+        message: readableError(confirmError, "Calendar was not updated."),
+        sourceKind: confirmInput.sourceKind,
+      });
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
   if (status === "loading" && records.length === 0) {
     return <SavedPlanLibrarySkeleton />;
   }
@@ -232,8 +343,8 @@ export function SavedPlanLibraryPanel() {
           Plan library
         </h1>
         <p className="hito-body-md text-secondary max-w-3xl">
-          Saved plans are immutable records. Starting one creates ordinary future Calendar workouts
-          without giving the record authority over your Calendar or protected history.
+          Saved plans are immutable records. Legacy records can start ordinary future Calendar
+          workouts, while generated plans reopen the required Review and Confirm step first.
         </p>
       </header>
 
@@ -260,6 +371,12 @@ export function SavedPlanLibraryPanel() {
         </div>
       ) : null}
 
+      {generatedReviewError ? (
+        <div className="hito-state-surface py-3" data-tone="destructive" role="alert">
+          <p className="hito-body-md text-secondary">{generatedReviewError}</p>
+        </div>
+      ) : null}
+
       {busyAction && pendingDialog === null ? (
         <div
           className="hito-state-surface py-3"
@@ -268,7 +385,13 @@ export function SavedPlanLibraryPanel() {
           aria-live="polite"
         >
           <p className="hito-body-md text-secondary">
-            {busyAction === "start" ? "Checking the future Calendar…" : "Hiding saved plan…"}
+            {busyAction === "start"
+              ? "Checking the future Calendar…"
+              : busyAction === "hide"
+                ? "Hiding saved plan…"
+                : busyAction === "restore"
+                  ? "Restoring generated plan review…"
+                  : "Adding reviewed workouts to Calendar…"}
           </p>
         </div>
       ) : null}
@@ -301,7 +424,10 @@ export function SavedPlanLibraryPanel() {
         />
 
         {visibleRecords.length === 0 ? (
-          <SavedPlanEmptyState hasRecords={records.length > 0} query={query} />
+          <SavedPlanEmptyState
+            hasRecords={records.length > 0 || generatedReviews.length > 0}
+            query={query}
+          />
         ) : (
           <div className="hito-data-table-scroll" data-saved-plan-table-scroll>
             <table className="hito-data-table hito-data-table-min-md">
@@ -349,14 +475,19 @@ export function SavedPlanLibraryPanel() {
               </thead>
               <tbody>
                 {visibleRecords.map((record) => (
-                  <SavedPlanRow
-                    key={record.id}
+                  <SavedPlanLibraryRow
+                    key={savedPlanLibraryEntryKey(record)}
                     record={record}
                     busy={busyAction !== null}
-                    onHide={(trigger) => beginAction({ type: "hide", record }, trigger)}
-                    onStart={(trigger) => {
+                    onHide={(legacyRecord, trigger) =>
+                      beginAction({ type: "hide", record: legacyRecord }, trigger)
+                    }
+                    onRestore={(generatedRecord, trigger) =>
+                      void restoreGeneratedReview(generatedRecord, trigger)
+                    }
+                    onStart={(legacyRecord, trigger) => {
                       returnFocusRef.current = trigger;
-                      void startPlan(record);
+                      void startPlan(legacyRecord);
                     }}
                   />
                 ))}
@@ -385,11 +516,59 @@ export function SavedPlanLibraryPanel() {
           if (pendingDialog?.type === "replace") void replaceFutureAndStart();
         }}
       />
+
+      <SelectedRunningPlanPreviewDialog
+        open={restoredReview !== null}
+        onOpenChange={(open) => {
+          if (!open && busyAction !== "confirm") {
+            setRestoredReview(null);
+            setReviewConfirmResult(null);
+            setActionError(null);
+          }
+        }}
+        confirmResult={reviewConfirmResult}
+        createStatus={busyAction === "confirm" ? "creating" : "idle"}
+        result={restoredReview}
+        status="idle"
+        error={null}
+        goalLabel={restoredReview?.summary.goal.distanceLabel ?? "Generated"}
+        onCancel={() => {
+          setRestoredReview(null);
+          setReviewConfirmResult(null);
+        }}
+        onRefresh={() => undefined}
+        onCreate={() => void confirmGeneratedReview()}
+        description="Review the restored saved plan before adding its workouts to Calendar."
+        extraNotice={
+          restoredReview ? <SavedPlanReviewValidityNotice review={restoredReview} /> : null
+        }
+        returnFocusRef={returnFocusRef}
+      />
     </section>
   );
 }
 
-function SavedPlanRow({
+function SavedPlanLibraryRow({
+  record,
+  busy,
+  onHide,
+  onRestore,
+  onStart,
+}: {
+  record: SavedPlanLibraryEntry;
+  busy: boolean;
+  onHide: (record: SavedPlanLibrarySummary, trigger: HTMLElement | null) => void;
+  onRestore: (record: SavedPlanReviewSummary, trigger: HTMLElement | null) => void;
+  onStart: (record: SavedPlanLibrarySummary, trigger: HTMLElement | null) => void;
+}) {
+  return isGeneratedPlanReview(record) ? (
+    <GeneratedPlanReviewRow record={record} busy={busy} onRestore={onRestore} />
+  ) : (
+    <LegacySavedPlanRow record={record} busy={busy} onHide={onHide} onStart={onStart} />
+  );
+}
+
+function LegacySavedPlanRow({
   record,
   busy,
   onHide,
@@ -397,8 +576,8 @@ function SavedPlanRow({
 }: {
   record: SavedPlanLibrarySummary;
   busy: boolean;
-  onHide: (trigger: HTMLElement | null) => void;
-  onStart: (trigger: HTMLElement | null) => void;
+  onHide: (record: SavedPlanLibrarySummary, trigger: HTMLElement | null) => void;
+  onStart: (record: SavedPlanLibrarySummary, trigger: HTMLElement | null) => void;
 }) {
   const exportHref = `/api/plan/export?savedPlanId=${encodeURIComponent(record.id)}&format=json`;
   const actionTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -454,14 +633,14 @@ function SavedPlanRow({
                 Download JSON
               </a>
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => onStart(actionTriggerRef.current)}>
+            <DropdownMenuItem onSelect={() => onStart(record, actionTriggerRef.current)}>
               <Icon name="calendar-clock" size="xs" />
               Start plan
             </DropdownMenuItem>
             {record.recordState === "available" ? (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => onHide(actionTriggerRef.current)}>
+                <DropdownMenuItem onSelect={() => onHide(record, actionTriggerRef.current)}>
                   <Icon name="visibility-off" size="xs" />
                   Hide from library
                 </DropdownMenuItem>
@@ -472,6 +651,130 @@ function SavedPlanRow({
       </td>
     </tr>
   );
+}
+
+function GeneratedPlanReviewRow({
+  record,
+  busy,
+  onRestore,
+}: {
+  record: SavedPlanReviewSummary;
+  busy: boolean;
+  onRestore: (record: SavedPlanReviewSummary, trigger: HTMLElement | null) => void;
+}) {
+  const restoreButtonRef = useRef<HTMLButtonElement | null>(null);
+  const state = savedPlanReviewState(record);
+
+  return (
+    <tr
+      className="align-top"
+      data-saved-plan-review-id={record.candidate.id}
+      data-saved-plan-review-validity={record.validity.state}
+    >
+      <td className="hito-data-table-cell hito-data-table-cell-start">
+        <div className="grid max-w-xs gap-1">
+          <p className="hito-body-md text-foreground break-words">{record.title}</p>
+          <p className="hito-body-xs text-tertiary line-clamp-2">
+            {savedPlanReviewGoalSummary(record)}
+          </p>
+        </div>
+      </td>
+      <td className="hito-data-table-cell whitespace-nowrap">
+        {formatDate(record.createdAt.slice(0, 10), {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })}
+      </td>
+      <td className="hito-data-table-cell whitespace-nowrap">
+        {formatDate(record.schedule.startDate)} – {formatDate(record.schedule.endDate)}
+      </td>
+      <td className="hito-data-table-cell text-secondary">Review</td>
+      <td className="hito-data-table-cell">
+        <HitoMetadataTag tone={state.tone} tooltip={state.description}>
+          {state.label}
+        </HitoMetadataTag>
+      </td>
+      <td className="hito-data-table-cell hito-data-table-cell-end">
+        <HitoButton
+          ref={restoreButtonRef}
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={busy}
+          onClick={() => onRestore(record, restoreButtonRef.current)}
+        >
+          <Icon name="refresh" size="xs" />
+          Restore plan
+        </HitoButton>
+      </td>
+    </tr>
+  );
+}
+
+function SavedPlanReviewValidityNotice({ review }: { review: RestoredSavedPlanReview }) {
+  const state = savedPlanReviewState(review.summary);
+  return (
+    <div
+      className="hito-surface-wash"
+      data-tone={review.status === "review_ready" ? "success" : "warning"}
+      role="status"
+    >
+      <p className="hito-body-md text-foreground">{state.noticeTitle}</p>
+      <p className="hito-body-sm mt-1 text-secondary">{state.description}</p>
+    </div>
+  );
+}
+
+function savedPlanReviewState(record: SavedPlanReviewSummary): {
+  label: "Current" | "Expired" | "Stale";
+  noticeTitle: string;
+  description: string;
+  tone: "muted" | "success" | "warning";
+} {
+  if (record.validity.state === "current") {
+    return {
+      label: "Current",
+      noticeTitle: "Fresh review ready",
+      description:
+        "Hito rebuilt this review from the saved candidate and current runner facts. Confirming is still required before Calendar changes.",
+      tone: "success",
+    };
+  }
+
+  if (record.validity.state === "expired") {
+    return {
+      label: "Expired",
+      noticeTitle: "Previously confirmed review",
+      description:
+        "This saved review has already been confirmed. It remains available for reference, but it cannot be confirmed again.",
+      tone: "muted",
+    };
+  }
+
+  const reasonCopy =
+    record.validity.reason === "facts_changed"
+      ? "Runner facts have changed since this plan was prepared."
+      : record.validity.reason === "invalid_lineage"
+        ? "The saved candidate lineage is no longer valid for confirmation."
+        : "The saved candidate no longer passes the current plan contract.";
+  return {
+    label: "Stale",
+    noticeTitle: "Read-only saved review",
+    description: `${reasonCopy} Review remains available, but Confirm is disabled.`,
+    tone: "warning",
+  };
+}
+
+function savedPlanReviewGoalSummary(record: SavedPlanReviewSummary) {
+  const details = [record.goal.distanceLabel];
+  if (record.goal.targetDate) {
+    details.push(`target ${formatDate(record.goal.targetDate)}`);
+  }
+  if (record.goal.targetFinishTime) {
+    details.push(`finish ${record.goal.targetFinishTime}`);
+  }
+  return details.join(" · ");
 }
 
 function SavedPlanActionDialog({
@@ -616,17 +919,34 @@ function SavedPlanLibrarySkeleton() {
 }
 
 function compareRecords(
-  left: SavedPlanLibrarySummary,
-  right: SavedPlanLibrarySummary,
+  left: SavedPlanLibraryEntry,
+  right: SavedPlanLibraryEntry,
   sort: SavedPlanSort,
 ) {
   const comparison =
     sort.key === "title"
       ? left.title.localeCompare(right.title) || left.createdAt.localeCompare(right.createdAt)
       : sort.key === "workoutCount"
-        ? left.workoutCount - right.workoutCount || left.title.localeCompare(right.title)
+        ? compareWorkoutCounts(left, right) || left.title.localeCompare(right.title)
         : left.createdAt.localeCompare(right.createdAt) || left.title.localeCompare(right.title);
   return sort.direction === "asc" ? comparison : -comparison;
+}
+
+function compareWorkoutCounts(left: SavedPlanLibraryEntry, right: SavedPlanLibraryEntry) {
+  if (isGeneratedPlanReview(left) && isGeneratedPlanReview(right)) return 0;
+  if (isGeneratedPlanReview(left)) return 1;
+  if (isGeneratedPlanReview(right)) return -1;
+  return left.workoutCount - right.workoutCount;
+}
+
+function isGeneratedPlanReview(record: SavedPlanLibraryEntry): record is SavedPlanReviewSummary {
+  return "kind" in record && record.kind === "generated_review";
+}
+
+function savedPlanLibraryEntryKey(record: SavedPlanLibraryEntry) {
+  return isGeneratedPlanReview(record)
+    ? `generated-review:${record.candidate.id}:${record.candidate.version}`
+    : `saved-plan:${record.id}`;
 }
 
 function readableError(error: unknown, fallback: string) {

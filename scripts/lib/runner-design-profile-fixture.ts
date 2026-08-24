@@ -43,6 +43,9 @@ import {
 import {
   buildReviewedAiGeneratedRunningPlanPreviewForUser,
   confirmRunningPlanDraftForUser,
+  listSavedPlanReviewsForUser,
+  restoreSavedPlanReviewForUser,
+  type RunningPlanConfirmActionInput,
 } from "../../src/lib/running-plan-engine-actions";
 import { retainImportedPlanCandidateForUser } from "../../src/lib/active-plan-persistence";
 import {
@@ -97,6 +100,14 @@ export const RUNNER_DESIGN_PROFILE_FIXTURE_ROLE = "saved-plan-readback" as const
 export const ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE = "adaptive-training-quality" as const;
 export const ADAPTIVE_BLUEPRINT_PROJECTION_FIXTURE_VERSION =
   "adaptive_blueprint_projection_v1" as const;
+export const ADAPTIVE_ENGINE_UI_REPLAY_FIXTURE_VERSION = "adaptive_engine_ui_replay_v1" as const;
+export const ADAPTIVE_ENGINE_UI_REPLAY_CHECKPOINTS = [
+  "initial_plan_review",
+  "continuation_actions",
+  "complete_surface",
+] as const;
+export type AdaptiveEngineUiReplayCheckpoint =
+  (typeof ADAPTIVE_ENGINE_UI_REPLAY_CHECKPOINTS)[number];
 export const RUNNER_DESIGN_PROFILE_FIXTURE_STORAGE_BUCKET = WORKOUT_RESULT_STORAGE_BUCKET;
 export const RUNNER_CORE_FILE_FLOW_FIXTURE_ROLE = "isolation-a" as const;
 export const RUNNER_CORE_FILE_FLOW_FIXTURE_TEMPLATE =
@@ -555,89 +566,10 @@ export async function seedAdaptiveBlueprintProjectionFixture(input: {
   continuationProof?: boolean;
   goalPreset?: "10K" | "Half Marathon";
   targetDate?: string;
+  runtimeScope?: "local_proof" | "hosted_ui_replay";
 }) {
-  const asOfDate = normalizeAsOfDate(input.asOfDate);
-  const initialStartDate = input.continuationProof ? addDaysIso(asOfDate, -14) : asOfDate;
-  const targetDate =
-    input.targetDate ?? (input.continuationProof ? addDaysIso(initialStartDate, 69) : undefined);
-  const baseline = buildFirstTimeRunnerBaselineReadback({
-    age: 36,
-    weightKg: 72,
-    heightCm: 178,
-    fitnessLevel: "running_regularly",
-  });
-  await updateUserSettingsForUserId(input.userId, {
-    firstName: "QA",
-    lastName: "Adaptive",
-    displayName: "QA Adaptive Blueprint",
-    age: baseline.age,
-    weightKg: baseline.weightKg,
-    heightCm: baseline.heightCm,
-    fitnessLevel: baseline.fitnessLevel!,
-    calendarTimezone: "UTC",
-    heartRateProfile: {
-      zones: baseline.heartRateZones.zones.map(({ reference, minBpm, maxBpm }) => ({
-        reference,
-        minBpm,
-        maxBpm,
-      })),
-    },
-  });
-
-  const previewInput = {
-    age: 36,
-    heightCm: 178,
-    weightKg: 72,
-    runnerLevel: "runs_a_lot" as const,
-    daysPerWeek: 4,
-    fixedRestDays: ["Wednesday", "Friday", "Sunday"],
-    preferredLongRunDay: "Saturday" as const,
-    startDate: initialStartDate,
-    benchmark: { kind: "recent_5k_pace" as const, recent5kPace: "5:30" },
-    runnerComment: undefined,
-    planGoalIntent: {
-      distance: {
-        kind: "preset" as const,
-        preset: input.goalPreset ?? ("10K" as const),
-      },
-      targetDate,
-    },
-  };
-  const proofProfile = buildProofInitialPlanProfile(previewInput);
-  const authoring = buildAiGeneratedRunningPlanAuthoringInput(
-    previewInput,
-    proofProfile.initialPlanProfile,
-    proofProfile.acceptedHeartRateProfile,
-  );
-  assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);
-  if (!authoring.ok) throw new Error(authoring.message);
-
-  const reviewed = await withAdaptiveBlueprintFixtureEnv(() =>
-    buildReviewedAiGeneratedRunningPlanPreviewForUser(input.userId, previewInput, {
-      qaFixtureAuthorized: true,
-      localQaFixtureCurrentDate: initialStartDate,
-      aiPreview: {
-        apiKey: "local-adaptive-blueprint-fixture",
-        model: "gpt-5.2-adaptive-fixture-proof",
-        fetchImpl: buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
-          authoringInput: authoring.authoringInput,
-          today: initialStartDate,
-        }),
-        generationLedger: { disabled: true },
-      },
-    }),
-  );
-  assert.equal(reviewed.ok, true, reviewed.ok ? "" : JSON.stringify(reviewed.unavailable.error));
-  if (!reviewed.ok) throw new Error(reviewed.unavailable.error.message);
-  assert.ok(reviewed.draft.sourceCandidate, "The adaptive fixture candidate must be retained.");
-  assert.equal(reviewed.draft.canonicalRowCount, 28);
-  assert.equal(reviewed.draft.blueprint.detailedHorizon.calendarWeekCount, 4);
-  assert.equal(
-    reviewed.draft.aiGeneration.responseId,
-    input.goalPreset === "Half Marathon"
-      ? "local-dev-ai-plan-first-half-marathon"
-      : AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID,
-  );
+  const prepared = await prepareAdaptiveInitialPlanReviewFixture(input);
+  const { asOfDate, initialStartDate, reviewed } = prepared;
 
   const confirmed = await confirmRunningPlanDraftForUser(
     input.userId,
@@ -706,6 +638,102 @@ export async function seedAdaptiveBlueprintProjectionFixture(input: {
     assert.equal(fixture.continuation.dataQuality?.completedWithoutFitCount, 6);
   }
   return fixture;
+}
+
+async function prepareAdaptiveInitialPlanReviewFixture(input: {
+  supabase: SupabaseClient;
+  userId: string;
+  asOfDate?: string;
+  continuationProof?: boolean;
+  goalPreset?: "10K" | "Half Marathon";
+  targetDate?: string;
+  runtimeScope?: "local_proof" | "hosted_ui_replay";
+}) {
+  const asOfDate = normalizeAsOfDate(input.asOfDate);
+  const initialStartDate = input.continuationProof ? addDaysIso(asOfDate, -14) : asOfDate;
+  const targetDate =
+    input.targetDate ?? (input.continuationProof ? addDaysIso(initialStartDate, 69) : undefined);
+  const baseline = buildFirstTimeRunnerBaselineReadback({
+    age: 36,
+    weightKg: 72,
+    heightCm: 178,
+    fitnessLevel: "running_regularly",
+  });
+  await updateUserSettingsForUserId(input.userId, {
+    firstName: "QA",
+    lastName: "Adaptive",
+    displayName: "QA Adaptive Blueprint",
+    age: baseline.age,
+    weightKg: baseline.weightKg,
+    heightCm: baseline.heightCm,
+    fitnessLevel: baseline.fitnessLevel!,
+    calendarTimezone: "UTC",
+    heartRateProfile: {
+      zones: baseline.heartRateZones.zones.map(({ reference, minBpm, maxBpm }) => ({
+        reference,
+        minBpm,
+        maxBpm,
+      })),
+    },
+  });
+
+  const previewInput = {
+    age: 36,
+    heightCm: 178,
+    weightKg: 72,
+    runnerLevel: "runs_a_lot" as const,
+    daysPerWeek: 4,
+    fixedRestDays: ["Wednesday", "Friday", "Sunday"],
+    preferredLongRunDay: "Saturday" as const,
+    startDate: initialStartDate,
+    benchmark: { kind: "recent_5k_pace" as const, recent5kPace: "5:30" },
+    runnerComment: undefined,
+    planGoalIntent: {
+      distance: {
+        kind: "preset" as const,
+        preset: input.goalPreset ?? ("10K" as const),
+      },
+      targetDate,
+    },
+  };
+  const proofProfile = buildProofInitialPlanProfile(previewInput);
+  const authoring = buildAiGeneratedRunningPlanAuthoringInput(
+    previewInput,
+    proofProfile.initialPlanProfile,
+    proofProfile.acceptedHeartRateProfile,
+  );
+  assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);
+  if (!authoring.ok) throw new Error(authoring.message);
+
+  const reviewed = await withAdaptiveBlueprintFixtureEnv(
+    () =>
+      buildReviewedAiGeneratedRunningPlanPreviewForUser(input.userId, previewInput, {
+        qaFixtureAuthorized: true,
+        localQaFixtureCurrentDate: initialStartDate,
+        aiPreview: {
+          apiKey: "local-adaptive-blueprint-fixture",
+          model: "gpt-5.2-adaptive-fixture-proof",
+          fetchImpl: buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
+            authoringInput: authoring.authoringInput,
+            today: initialStartDate,
+          }),
+          generationLedger: { disabled: true },
+        },
+      }),
+    { allowHostedUiReplay: input.runtimeScope === "hosted_ui_replay" },
+  );
+  assert.equal(reviewed.ok, true, reviewed.ok ? "" : JSON.stringify(reviewed.unavailable.error));
+  if (!reviewed.ok) throw new Error(reviewed.unavailable.error.message);
+  assert.ok(reviewed.draft.sourceCandidate, "The adaptive fixture candidate must be retained.");
+  assert.equal(reviewed.draft.canonicalRowCount, 28);
+  assert.equal(reviewed.draft.blueprint.detailedHorizon.calendarWeekCount, 4);
+  assert.equal(
+    reviewed.draft.aiGeneration.responseId,
+    input.goalPreset === "Half Marathon"
+      ? "local-dev-ai-plan-first-half-marathon"
+      : AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID,
+  );
+  return { asOfDate, initialStartDate, reviewed };
 }
 
 function selectCompatibleAdaptiveFitWorkouts(
@@ -1327,6 +1355,8 @@ export async function confirmAdaptiveBlueprintContinuationFixture(input: {
       targetMode: targetPrepared.state.window.blockMode,
       targetMissingReasons: targetPrepared.state.reasons,
       noPrescriptionProviderDispatchCount: 0,
+      injectedStructuredResponseCount: providerDispatchCount,
+      externalProviderDispatchCount: 0,
     },
     inputRevisions: {
       unresolved: unresolvedRevision.revision,
@@ -1344,6 +1374,292 @@ export async function confirmAdaptiveBlueprintContinuationFixture(input: {
       calendarWorkoutCount: reloaded.source.confirmedCalendarWorkoutCount,
     },
     projections: reloaded.projections,
+  };
+}
+
+export async function seedAdaptiveEngineUiReplayFixture(input: {
+  supabase: SupabaseClient;
+  userId: string;
+  asOfDate?: string;
+  runtimeScope: "local_proof" | "hosted_ui_replay";
+  checkpoint?: AdaptiveEngineUiReplayCheckpoint;
+}) {
+  const checkpoint = input.checkpoint ?? "complete_surface";
+  const provenance = adaptiveEngineUiReplayProvenance(input.runtimeScope, checkpoint);
+  if (checkpoint === "initial_plan_review") {
+    const prepared = await prepareAdaptiveInitialPlanReviewFixture({
+      ...input,
+      continuationProof: false,
+      goalPreset: "10K",
+      targetDate: addDaysIso(normalizeAsOfDate(input.asOfDate), 84),
+    });
+    const sourceCandidate = prepared.reviewed.draft.sourceCandidate;
+    assert.ok(sourceCandidate);
+    const listed = await listSavedPlanReviewsForUser(input.userId);
+    assert.equal(listed.records.length, 1);
+    assert.deepEqual(listed.records[0]?.candidate, {
+      id: sourceCandidate.candidateId,
+      version: sourceCandidate.candidateVersion,
+      sha256: sourceCandidate.candidateSha256,
+    });
+    assert.deepEqual(listed.records[0]?.validity, { state: "current", reason: null });
+    const restored = await restoreSavedPlanReviewForUser(input.userId, {
+      candidateId: sourceCandidate.candidateId,
+      candidateVersion: sourceCandidate.candidateVersion,
+    });
+    assert.equal(restored.ok, true);
+    assert.equal(restored.ok && restored.status, "review_ready");
+    assert.equal(
+      restored.ok && restored.status === "review_ready" && restored.review.workoutDocuments.length,
+      28,
+    );
+    assert.equal(
+      restored.ok &&
+        restored.status === "review_ready" &&
+        restored.review.savedPlanReviewCandidate?.id,
+      sourceCandidate.candidateId,
+    );
+    if (!restored.ok || restored.status !== "review_ready") {
+      throw new Error("The saved generated-plan review is not confirmable.");
+    }
+    const directConfirmInput: RunningPlanConfirmActionInput = {
+      previewInput: restored.review.previewInput,
+      sourceKind: restored.review.sourceKind,
+      reviewToken: restored.review.reviewToken,
+      reviewChecksum: restored.review.reviewChecksum,
+    };
+    assert.deepEqual(directConfirmInput.previewInput, restored.review.previewInput);
+    assert.doesNotMatch(
+      JSON.stringify(restored),
+      /raw_response|provider_response_id|response_sha256|input_snapshot|input_provenance|request_context|version_context|running_coach_verdict|qa_verdict/i,
+    );
+    return {
+      fixtureVersion: ADAPTIVE_ENGINE_UI_REPLAY_FIXTURE_VERSION,
+      checkpoint,
+      provenance,
+      interactionMatrix: {
+        uiState: "initial_review_ready" as const,
+        initialCandidatePreseeded: true,
+        initialCandidateOwner: "saved_plan_generated_review" as const,
+        ordinaryAuthoringCoveredBy: "HITO-271" as const,
+        expectedControls: [
+          "saved_plan_restore",
+          "initial_plan_review",
+          "initial_plan_confirm",
+        ] as const,
+        candidate: listed.records[0]?.candidate,
+        validity: listed.records[0]?.validity,
+      },
+      finalState: {
+        confirmationCount: 0,
+        calendarWorkoutCount: 0,
+        projectionCount: 0,
+        projectionCalendarRowCount: 0,
+        projectionExecutableFieldsExposed: false,
+      },
+      invariants: adaptiveEngineUiReplayInvariants(0, false),
+    };
+  }
+
+  const initial = await seedAdaptiveBlueprintProjectionFixture({
+    ...input,
+    continuationProof: true,
+    goalPreset: "10K",
+  });
+  assert.equal(initial.source.confirmationCount, 1);
+  assert.equal(initial.source.confirmedCalendarWorkoutCount, 28);
+  const continuationInteraction = await readAdaptiveEngineUiReplayInteractionCheckpoint({
+    supabase: input.supabase,
+    userId: input.userId,
+    asOfDate: input.asOfDate,
+    initial,
+  });
+
+  if (checkpoint === "continuation_actions") {
+    return {
+      fixtureVersion: ADAPTIVE_ENGINE_UI_REPLAY_FIXTURE_VERSION,
+      checkpoint,
+      provenance,
+      interactionMatrix: continuationInteraction,
+      stages: {
+        initial: {
+          confirmationCount: initial.source.confirmationCount,
+          calendarWorkoutCount: initial.source.confirmedCalendarWorkoutCount,
+        },
+      },
+      finalState: {
+        confirmationCount: initial.source.confirmationCount,
+        calendarWorkoutCount: initial.source.confirmedCalendarWorkoutCount,
+        latestBlockMode: initial.source.latestBlockMode,
+        projectionCount: initial.projections.count,
+        projectionCalendarRowCount: initial.projections.calendarRowCount,
+        projectionExecutableFieldsExposed: initial.projections.executableFieldsExposed,
+      },
+      invariants: adaptiveEngineUiReplayInvariants(1, true),
+    };
+  }
+
+  const firstContinuation = await confirmAdaptiveBlueprintContinuationFixture(input);
+  assert.equal(firstContinuation.confirmation.confirmationCount, 2);
+  assert.equal(firstContinuation.confirmation.calendarWorkoutCount, 45);
+  assert.equal(firstContinuation.discriminators.targetMode, "target_taper_boundary");
+
+  const targetReadinessDate = addDaysIso(firstContinuation.readinessDate, 28);
+  const targetReadModel = await getAdaptiveBlueprintCalendarReadModelForUser(
+    input.userId,
+    targetReadinessDate,
+  );
+  assert.equal(targetReadModel.continuation.status, "candidate_ready");
+  assert.equal(targetReadModel.continuation.candidate?.blockMode, "target_taper_boundary");
+  const targetCandidateId = targetReadModel.continuation.candidate?.id;
+  assert.ok(targetCandidateId, "The UI replay requires one deterministic target/taper candidate.");
+
+  const secondProfile = await confirmAdaptiveBlueprintContinuationProfileFixture({
+    supabase: input.supabase,
+    userId: input.userId,
+    expectedCandidateId: targetCandidateId,
+  });
+  const finalState = await readAdaptiveBlueprintProjectionFixture({
+    supabase: input.supabase,
+    userId: input.userId,
+    asOfDate: targetReadinessDate,
+  });
+  assert.equal(finalState.source.confirmationCount, 3);
+  assert.equal(finalState.source.latestBlockMode, "target_taper_boundary");
+  assert.equal(finalState.source.confirmedCalendarWorkoutCount, 53);
+  assert.equal(finalState.projections.calendarRowCount, 0);
+
+  return {
+    fixtureVersion: ADAPTIVE_ENGINE_UI_REPLAY_FIXTURE_VERSION,
+    checkpoint,
+    provenance,
+    stages: {
+      initial: {
+        confirmationCount: initial.source.confirmationCount,
+        calendarWorkoutCount: initial.source.confirmedCalendarWorkoutCount,
+      },
+      firstContinuation: firstContinuation.confirmation,
+      secondProfile: {
+        confirmation: secondProfile.confirmation,
+        evidence: secondProfile.evidence,
+        snapshots: secondProfile.snapshots,
+      },
+    },
+    finalState: {
+      confirmationCount: finalState.source.confirmationCount,
+      calendarWorkoutCount: finalState.source.confirmedCalendarWorkoutCount,
+      latestBlockMode: finalState.source.latestBlockMode,
+      projectionCount: finalState.projections.count,
+      projectionCalendarRowCount: finalState.projections.calendarRowCount,
+      projectionExecutableFieldsExposed: finalState.projections.executableFieldsExposed,
+    },
+    invariants: adaptiveEngineUiReplayInvariants(
+      firstContinuation.discriminators.injectedStructuredResponseCount,
+      true,
+    ),
+  };
+}
+
+export async function readAdaptiveEngineUiReplayInteractionCheckpoint(input: {
+  supabase: SupabaseClient;
+  userId: string;
+  asOfDate?: string;
+  initial: Awaited<ReturnType<typeof readAdaptiveBlueprintProjectionFixture>>;
+}) {
+  assert.equal(input.initial.continuation.status, "check_in_needed");
+  assert.ok(input.initial.projections.count > 0);
+  const evidenceCutoffDate = addDaysIso(input.initial.source.confirmedInterval.startDate, 13);
+  const [workouts, logs] = await Promise.all([
+    input.supabase
+      .from("planned_workouts")
+      .select("id, workout_date, workout_type, title")
+      .eq("user_id", input.userId)
+      .neq("workout_type", "rest")
+      .lte("workout_date", evidenceCutoffDate)
+      .order("workout_date", { ascending: true }),
+    input.supabase
+      .from("workout_logs")
+      .select("planned_workout_id, outcome, rpe")
+      .eq("user_id", input.userId)
+      .eq("outcome", "completed"),
+  ]);
+  if (workouts.error) throw new Error(workouts.error.message);
+  if (logs.error) throw new Error(logs.error.message);
+  const fitWorkoutIds = await getFitCompletedPlannedWorkoutIds({
+    userId: input.userId,
+    plannedWorkoutIds: workouts.data.map((workout) => workout.id),
+  });
+  const completedLogs = new Map(logs.data.map((log) => [log.planned_workout_id, log]));
+  const fitRpeTarget = workouts.data.find((workout) => {
+    const log = completedLogs.get(workout.id);
+    return log?.outcome === "completed" && log.rpe === null && !fitWorkoutIds.has(workout.id);
+  });
+  assert.ok(
+    fitRpeTarget,
+    "The interaction checkpoint requires one completed workout without FIT/RPE.",
+  );
+
+  return {
+    uiState: "check_in_needed" as const,
+    asOfDate: normalizeAsOfDate(input.asOfDate),
+    expectedControls: [
+      "continuation_check_in",
+      "continuation_prepare",
+      "continuation_review",
+      "continuation_confirm",
+      "fit_upload",
+      "rpe_entry",
+      "calendar_workout_open",
+      "calendar_return",
+      "inert_projection",
+    ] as const,
+    fitRpeTarget: {
+      workoutId: fitRpeTarget.id,
+      workoutDate: fitRpeTarget.workout_date,
+      workoutType: fitRpeTarget.workout_type,
+      title: fitRpeTarget.title,
+      currentEvidenceState: "completed_without_fit_or_rpe" as const,
+    },
+    continuation: {
+      confirmationId: input.initial.source.latestConfirmationId,
+      status: input.initial.continuation.status,
+      projectionCount: input.initial.projections.count,
+      projectionStableIds: input.initial.projections.stableIds,
+      projectionCalendarRowCount: input.initial.projections.calendarRowCount,
+      projectionExecutableFieldsExposed: input.initial.projections.executableFieldsExposed,
+    },
+  };
+}
+
+function adaptiveEngineUiReplayProvenance(
+  runtimeScope: "local_proof" | "hosted_ui_replay",
+  checkpoint: AdaptiveEngineUiReplayCheckpoint,
+) {
+  return {
+    kind: "deterministic_server_owned_ui_replay" as const,
+    sourceFixtureVersion: ADAPTIVE_BLUEPRINT_PROJECTION_FIXTURE_VERSION,
+    runtimeScope,
+    checkpoint,
+    historicalAcceptanceClaimed: false,
+    hito271SealedLineageRestored: false,
+    rawProviderContentIncluded: false,
+    credentialsIncluded: false,
+    actionLinksIncluded: false,
+    personalDataIncluded: false,
+  };
+}
+
+function adaptiveEngineUiReplayInvariants(
+  injectedStructuredResponseCount: number,
+  canonicalReviewConfirmUsed: boolean,
+) {
+  return {
+    injectedStructuredResponseCount,
+    externalProviderDispatchCount: 0,
+    canonicalReviewConfirmUsed,
+    canonicalFitImporterUsed: canonicalReviewConfirmUsed,
+    canonicalRunnerOwnedCalendarUsed: canonicalReviewConfirmUsed,
+    ownerBound: true,
   };
 }
 
@@ -3603,10 +3919,18 @@ export async function withLocalDesignFixtureEnv<T>(run: () => Promise<T>) {
   }
 }
 
-async function withAdaptiveBlueprintFixtureEnv<T>(run: () => Promise<T>) {
+async function withAdaptiveBlueprintFixtureEnv<T>(
+  run: () => Promise<T>,
+  options: { allowHostedUiReplay?: boolean } = {},
+) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!supabaseUrl || !isLoopbackRuntimeUrl(supabaseUrl)) {
-    throw new Error("Adaptive Blueprint fixture requires loopback Supabase.");
+  if (
+    !supabaseUrl ||
+    (!isLoopbackRuntimeUrl(supabaseUrl) && options.allowHostedUiReplay !== true)
+  ) {
+    throw new Error(
+      "Adaptive Blueprint fixture requires loopback Supabase or explicit hosted UI-replay admission.",
+    );
   }
   const priorFixtureFlag = process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV];
   const priorProviderMode = process.env[AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV];

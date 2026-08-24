@@ -5,6 +5,7 @@ import {
 } from "@/lib/ai-first-plan-draft-service";
 import type { RetainedAdaptiveTrainingSourceCandidate } from "@/lib/adaptive-blueprint-persistence";
 import {
+  AI_AUTHORED_BLUEPRINT_VERSION,
   AI_AUTHORED_PLAN_FIRST_SOURCE_KIND,
   type AiAuthoredBlueprintReviewConflict,
   type AiAuthoredBlueprintSummary,
@@ -15,6 +16,8 @@ import {
   type AiPlanGenerationLedgerTrace,
 } from "@/lib/ai-plan-generation-ledger";
 import {
+  AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
+  AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID,
   buildAiGeneratedRunningPlanDevFixturePreviewOptions,
   buildProspectiveAiGeneratedRunningPlanQaFixtureAuthoringInput,
   isAiGeneratedRunningPlanDevFixtureEnabled,
@@ -22,7 +25,11 @@ import {
 } from "@/lib/ai-generated-running-plan-dev-fixture";
 import { parseDurationSeconds, parsePaceSecondsPerKm } from "@/lib/first-plan-authoring-utils";
 import type { AcceptedRunnerHeartRateProfile } from "@/lib/heart-rate-zones";
-import { buildImportedPlanSeed, type TrainingPlanV2 } from "@/lib/imported-plan";
+import {
+  buildImportedPlanSeed,
+  trainingPlanV2Schema,
+  type TrainingPlanV2,
+} from "@/lib/imported-plan";
 import {
   normalizePlanGoalIntent,
   type NormalizedPlanGoalIntent,
@@ -460,6 +467,109 @@ export async function buildAiGeneratedRunningPlanPreview(
   };
 }
 
+export type RestoredAiGeneratedRunningPlanPreviewFailureReason =
+  | "invalid_content"
+  | "invalid_lineage";
+
+export function buildRestoredAiGeneratedRunningPlanPreviewDraft(input: {
+  sourceCandidate: RetainedAdaptiveTrainingSourceCandidate;
+  blueprint: unknown;
+  candidateContent: unknown;
+  authoringInput: unknown;
+  intervalStartDate: string;
+  intervalEndDate: string;
+  retainedResponseProvenance?: {
+    providerResponseId: string | null;
+  };
+}):
+  | { ok: true; draft: AiGeneratedRunningPlanPreviewDraft }
+  | { ok: false; reason: RestoredAiGeneratedRunningPlanPreviewFailureReason } {
+  const blueprint = parseRestoredBlueprint(input.blueprint);
+  const candidateContent = parseRestoredCandidateContent(input.candidateContent);
+  const authoringInput = structuredPlanAuthoringInputSchema.safeParse(input.authoringInput);
+  if (!blueprint || !candidateContent || !authoringInput.success) {
+    return { ok: false, reason: "invalid_content" };
+  }
+  if (
+    blueprint.startDate !== candidateContent.canonicalPlan.start_date ||
+    blueprint.detailedHorizon.startDate !== input.intervalStartDate ||
+    blueprint.detailedHorizon.endDate !== input.intervalEndDate
+  ) {
+    return { ok: false, reason: "invalid_lineage" };
+  }
+
+  const canonicalPlan = candidateContent.canonicalPlan;
+  const calendarRows = projectCanonicalPlanToPreviewRows(canonicalPlan);
+  const workoutDocuments = buildImportedPlanSeed(canonicalPlan).workouts;
+  const candidateReview = reviewWorkoutCommand({
+    command: {
+      operation: "materialize",
+      documents: workoutDocuments,
+      provenanceReferences: workoutDocuments.map((document) => ({
+        sourceKind: AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
+        sourceStatus: "ai_authored" as const,
+        sourceWorkoutId: document.sourceWorkoutId,
+        adaptiveTrainingSourceCandidate: input.sourceCandidate,
+      })),
+    },
+  });
+  if (!candidateReview.ok || candidateReview.candidate.collisions.length > 0) {
+    return { ok: false, reason: "invalid_content" };
+  }
+
+  const normalizedInputSummary = buildRestoredNormalizedInputSummary(
+    authoringInput.data,
+    canonicalPlan,
+  );
+  const endpointProof = buildEndpointProof(calendarRows);
+  const endpointIssues = collectPreviewEndpointProofIssues({
+    rows: calendarRows,
+    distanceMeters: authoringInput.data.planGoalIntent.distance?.distanceMeters ?? null,
+    targetDate: canonicalPlan.target_date ?? null,
+    endpointProof,
+    targetInDetailedHorizon: blueprint.detailedHorizon.targetBoundary,
+  });
+
+  return {
+    ok: true,
+    draft: {
+      sourceKind: AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
+      source_kind: AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
+      sourceStatus: "ai_authored",
+      source_status: "ai_authored",
+      persisted: false,
+      mutates: false,
+      callsOpenAi: false,
+      planVersion: AI_GENERATED_RUNNING_PLAN_PREVIEW_VERSION,
+      previewOutcome: "preview_ready",
+      reviewSafety: {
+        persisted: false,
+        mutates: false,
+        confirmPathImplemented: true,
+        callsOpenAi: false,
+        confirmCallsOpenAi: false,
+        trustedClientRows: false,
+      },
+      blueprint,
+      reviewConflicts: candidateContent.reviewConflicts,
+      sourceCandidate: input.sourceCandidate,
+      previewInput: buildRestoredReviewedPreviewInput(authoringInput.data),
+      normalizedInputSummary,
+      calendarRows,
+      workoutDocuments,
+      candidate: candidateReview.candidate,
+      endpointProof,
+      validation: {
+        ok: true,
+        issues: endpointIssues,
+        forbiddenOutputGateIdsChecked: ["ai_authored_plan_first_compiled_to_training_plan_v2"],
+      },
+      canonicalPlan,
+      aiGeneration: restoredSavedPlanReviewMetadata(input.retainedResponseProvenance),
+    },
+  };
+}
+
 export function isAiGeneratedRunningPlanPreviewDraft(
   value: unknown,
 ): value is AiGeneratedRunningPlanPreviewDraft {
@@ -824,6 +934,220 @@ function buildLocalQaFixtureNormalizedInputSummary(
     normalizedBy: "backend_local_qa_fixture_input_v1",
     startDate: fixtureInput.schedule.startDate,
   };
+}
+
+function buildRestoredNormalizedInputSummary(
+  input: StructuredPlanAuthoringInput,
+  canonicalPlan: TrainingPlanV2,
+): RunningPlanPreviewNormalizedInputSummary {
+  const trainingWeekdays = uniqueWeekdays(
+    canonicalPlan.planned_workouts
+      .filter((workout) => workout.workout_type !== "rest")
+      .map((workout) => workout.weekday as WeekdayName),
+  );
+  const authoredLongRunDay = canonicalPlan.plan_preferences?.preferred_long_run_day;
+  const preferredLongRunDay =
+    typeof authoredLongRunDay === "string" &&
+    WEEKDAY_NAMES.includes(authoredLongRunDay as WeekdayName)
+      ? (authoredLongRunDay as WeekdayName)
+      : (input.availability.preferredLongRunDay ?? null);
+  const requestedLongRunDay = input.availability.preferredLongRunDay ?? null;
+
+  return {
+    normalizedBy: "backend_saved_plan_review_restore_v1",
+    age: input.runnerFacts.age,
+    heightCm: input.runnerFacts.heightCm,
+    weightKg: input.runnerFacts.weightKg,
+    runnerLevel: input.runnerFacts.selfReportedLevel,
+    daysPerWeek:
+      (input.availability.maxRunningDaysPerWeek as RunningPlanDaysPerWeek | null) ?? null,
+    fixedRestDays: input.availability.fixedRestDays,
+    preferredLongRunDay,
+    startDate: input.schedule.startDate,
+    benchmarkPaceTruth: input.runnerFacts.benchmark,
+    planGoalIntent: input.planGoalIntent,
+    longRunDaySource:
+      preferredLongRunDay == null
+        ? "not_supplied"
+        : preferredLongRunDay === requestedLongRunDay
+          ? "runner_preference"
+          : "ai_authored",
+    trainingWeekdays,
+    loadContext: "ai_authored",
+    heartRateProfile: input.runnerFacts.heartRateProfile,
+    initialPlanProfile:
+      input.initialPlanProfile as unknown as RunnerFitnessProfileInitialPlanProjectionV1,
+    initialPlanAdmission: input.initialPlanAdmission,
+  };
+}
+
+function buildRestoredReviewedPreviewInput(
+  input: StructuredPlanAuthoringInput,
+): RunningPlanReviewedPreviewInput {
+  const distance = input.planGoalIntent.distance;
+  if (!distance) {
+    throw new Error("A restored generated review requires its selected distance.");
+  }
+
+  return {
+    age: input.runnerFacts.age,
+    heightCm: input.runnerFacts.heightCm,
+    weightKg: input.runnerFacts.weightKg,
+    runnerLevel: input.runnerFacts.selfReportedLevel,
+    daysPerWeek:
+      (input.availability.maxRunningDaysPerWeek as RunningPlanDaysPerWeek | null) ?? null,
+    fixedRestDays: input.availability.fixedRestDays,
+    preferredLongRunDay: input.availability.preferredLongRunDay ?? null,
+    startDate: input.schedule.startDate,
+    benchmark: restoreReviewedBenchmark(input.runnerFacts.benchmark),
+    planGoalIntent: {
+      distance:
+        distance.kind === "preset" && distance.preset
+          ? { kind: "preset", preset: distance.preset }
+          : {
+              kind: "custom",
+              distanceKm: distance.distanceKm,
+              label: distance.label,
+            },
+      targetDate: input.planGoalIntent.targetDate,
+      targetFinishTime: input.planGoalIntent.targetFinishTime?.label ?? null,
+      targetOutcomePace: input.planGoalIntent.supplied.targetOutcomePace
+        ? (input.planGoalIntent.targetOutcomePace?.label ?? null)
+        : null,
+    },
+  };
+}
+
+function restoreReviewedBenchmark(
+  benchmark: StructuredPlanAuthoringInput["runnerFacts"]["benchmark"],
+): BuildRunningPlanPreviewInput["benchmark"] {
+  if (!benchmark) return { kind: "unknown" };
+  if (benchmark.source === "recent_5k_time") {
+    return {
+      kind: "recent_5k_time",
+      recent5kTime: benchmark.label.startsWith("Recent 5K ")
+        ? benchmark.label.slice("Recent 5K ".length)
+        : formatRestoredDuration(benchmark.paceSecondsPerKm * 5),
+    };
+  }
+  return {
+    kind: "recent_5k_pace",
+    recent5kPace: benchmark.label.startsWith("Recent 5K pace ")
+      ? benchmark.label.slice("Recent 5K pace ".length)
+      : `${formatRestoredDuration(benchmark.paceSecondsPerKm)}/km`,
+  };
+}
+
+function parseRestoredCandidateContent(value: unknown): {
+  canonicalPlan: TrainingPlanV2;
+  reviewConflicts: AiAuthoredBlueprintReviewConflict[];
+} | null {
+  const record = unknownRecord(value);
+  const canonicalPlan = trainingPlanV2Schema.safeParse(record?.canonicalPlan);
+  if (!record || !canonicalPlan.success || !Array.isArray(record.reviewConflicts)) return null;
+  const reviewConflicts = record.reviewConflicts.filter(isRestoredReviewConflict);
+  return reviewConflicts.length === record.reviewConflicts.length
+    ? { canonicalPlan: canonicalPlan.data, reviewConflicts }
+    : null;
+}
+
+function parseRestoredBlueprint(value: unknown): AiAuthoredBlueprintSummary | null {
+  const record = unknownRecord(value);
+  const detailedHorizon = unknownRecord(record?.detailedHorizon);
+  if (
+    !record ||
+    record.version !== AI_AUTHORED_BLUEPRINT_VERSION ||
+    typeof record.startDate !== "string" ||
+    typeof record.selectedTargetDate !== "string" ||
+    typeof record.targetAssumption !== "string" ||
+    !Array.isArray(record.phases) ||
+    !Array.isArray(record.projections) ||
+    !detailedHorizon ||
+    typeof detailedHorizon.startDate !== "string" ||
+    typeof detailedHorizon.endDate !== "string" ||
+    typeof detailedHorizon.calendarWeekCount !== "number" ||
+    typeof detailedHorizon.targetBoundary !== "boolean"
+  ) {
+    return null;
+  }
+  return value as AiAuthoredBlueprintSummary;
+}
+
+function isRestoredReviewConflict(value: unknown): value is AiAuthoredBlueprintReviewConflict {
+  const record = unknownRecord(value);
+  return Boolean(
+    record &&
+    (record.code === "fixed_rest_day_preference_conflict" ||
+      record.code === "preferred_long_run_day_conflict") &&
+    typeof record.date === "string" &&
+    typeof record.message === "string",
+  );
+}
+
+function restoredSavedPlanReviewMetadata(
+  retainedResponseProvenance:
+    | {
+        providerResponseId: string | null;
+      }
+    | undefined,
+): AiFirstPlanDraftPreviewMetadata {
+  const isExactLocalQaFixture =
+    retainedResponseProvenance?.providerResponseId ===
+    AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID;
+  return {
+    status: "ai_authored",
+    source: "openai_adaptive_blueprint_four_week_draft",
+    validationIssues: [],
+    model: isExactLocalQaFixture
+      ? AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL
+      : "saved-plan-review-restore-v1",
+    responseId: isExactLocalQaFixture ? AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID : null,
+    elapsedMs: 0,
+    validationIssueCount: 0,
+    generationTrace: null,
+    debug: {
+      timeoutMs: 0,
+      maxOutputTokens: 0,
+      contractMode: "adaptive_blueprint_four_week",
+      responseSchemaMode: "responses_json_schema_adaptive_blueprint_four_week_v1_strict",
+      requestPhase: "normalized",
+      abortReason: null,
+      abortFired: false,
+      transportMode: "not_started",
+      transportHeadersTimeoutMs: null,
+      transportBodyTimeoutMs: null,
+      transportFailureCode: null,
+      openAiElapsedMs: null,
+      promptCharEstimate: null,
+      systemPromptChars: null,
+      userPromptChars: null,
+      responseSchemaChars: null,
+      responseStatus: null,
+      responseIncompleteReason: null,
+      inputTokens: null,
+      outputTokens: null,
+      reasoningTokens: null,
+      totalTokens: null,
+      outputTextChars: null,
+      reasoningEffortSent: false,
+    },
+  };
+}
+
+function unknownRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function formatRestoredDuration(seconds: number) {
+  const rounded = Math.round(seconds);
+  const hours = Math.floor(rounded / 3600);
+  const minutes = Math.floor((rounded % 3600) / 60);
+  const remainder = rounded % 60;
+  return hours > 0
+    ? `${hours}:${minutes.toString().padStart(2, "0")}:${remainder.toString().padStart(2, "0")}`
+    : `${minutes}:${remainder.toString().padStart(2, "0")}`;
 }
 
 function normalizeStartDate(value: string | null | undefined) {

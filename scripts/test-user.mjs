@@ -1,17 +1,14 @@
 import assert from "node:assert/strict";
-import { chmod, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { createHash, randomBytes } from "node:crypto";
-import { spawnSync } from "node:child_process";
+import { chmod, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { tsImport } from "tsx/esm/api";
 import {
   QA_TESTER_POOL,
   acquireQaPoolLease,
-  adoptHostedQaPoolAuthUser,
   assertQaCleanupManifestMatches,
   assertQaPoolAuthUser,
-  assertQaPoolLease,
   buildQaCleanupManifest,
   buildQaTestUserInventory,
   classifyQaIdentity,
@@ -25,8 +22,35 @@ import {
   resetQaPoolUserData,
 } from "./lib/qa-test-user-lifecycle.mjs";
 
+const {
+  DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE,
+  normalizeLocalAuthAccount,
+  readLocalAuthAccountRegistry,
+  writeLocalAuthAccountRegistry,
+} = await tsImport("../src/lib/local-auth-account-registry.server.ts", import.meta.url);
+
+const command = process.argv[2];
+const options = parseArgs(process.argv.slice(3));
+const ADAPTIVE_UI_REPLAY_COMMANDS = new Set([
+  "adaptive-ui-replay-seed",
+  "adaptive-ui-replay-status",
+  "adaptive-ui-replay-reset",
+]);
+const HOSTED_CAPABLE_COMMANDS = ADAPTIVE_UI_REPLAY_COMMANDS;
+const config = await buildConfig();
+
+if (config.hostedProjectRef) {
+  process.env.NEXT_PUBLIC_SUPABASE_URL = config.supabaseUrl;
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = config.supabasePublishableKey;
+  process.env.SUPABASE_SECRET_KEY = config.supabaseServerKey;
+}
+
 const { retainImportedPlanCandidateForUser } = await tsImport(
   "../src/lib/active-plan-persistence.ts",
+  import.meta.url,
+);
+const { listSavedPlanReviewsForUser, restoreSavedPlanReviewForUser } = await tsImport(
+  "../src/lib/running-plan-engine-actions.ts",
   import.meta.url,
 );
 const { buildImportedPlanSeed, importedPlanSchema } = await tsImport(
@@ -52,6 +76,8 @@ const { ingestLocalQaFixtureWorkoutResult, removeWorkoutResultEvidence } = await
 );
 const {
   ADAPTIVE_BLUEPRINT_PROJECTION_FIXTURE_VERSION,
+  ADAPTIVE_ENGINE_UI_REPLAY_CHECKPOINTS,
+  ADAPTIVE_ENGINE_UI_REPLAY_FIXTURE_VERSION,
   ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE,
   RUNNER_CORE_FILE_FLOW_FIXTURE_ROLE,
   RUNNER_CORE_FILE_FLOW_FIXTURE_TEMPLATE,
@@ -65,42 +91,22 @@ const {
   buildAdaptiveTrainingQualityFitFile,
   recompileAdaptiveBlueprintSecondContinuationFixture,
   prepareAdaptiveBlueprintContinuationCandidateFixture,
+  readAdaptiveEngineUiReplayInteractionCheckpoint,
   readAdaptiveBlueprintProjectionFixture,
   readRunnerCoreFileFlowFixture,
   readRunnerDesignProfileFixture,
   seedAdaptiveBlueprintProjectionFixture,
+  seedAdaptiveEngineUiReplayFixture,
   seedRunnerCoreFileFlowFixture,
   seedRunnerDesignProfileFixture,
   verifyRunnerDesignProfileFixtureRuntime,
   withLocalDesignFixtureEnv,
 } = await tsImport("./lib/runner-design-profile-fixture.ts", import.meta.url);
 
-const {
-  DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE,
-  normalizeLocalAuthAccount,
-  readLocalAuthAccountRegistry,
-  writeLocalAuthAccountRegistry,
-} = await tsImport("../src/lib/local-auth-account-registry.server.ts", import.meta.url);
-
-const command = process.argv[2];
-const options = parseArgs(process.argv.slice(3));
-const HOSTED_POOL_COMMANDS = new Set([
-  "hosted-pool-adopt",
-  "hosted-pool-status",
-  "hosted-pool-auth-link",
-  "hosted-pool-checkpoint",
-  "hosted-pool-calendar-date",
-  "hosted-pool-fit-artifact",
-  "hosted-pool-profile-snapshot",
-  "hosted-pool-continuation-preflight",
-  "hosted-pool-attempt-ledger",
-  "hosted-pool-latest-diagnostic",
-  "hosted-pool-recompile-technical",
-  "hosted-pool-candidate-artifact",
-  "hosted-pool-record-coach-verdict",
-  "hosted-pool-confirm-candidate",
-  "hosted-pool-reset",
-]);
+const ADAPTIVE_UI_REPLAY_INTERACTION_ARTIFACT = path.resolve(
+  process.cwd(),
+  ".tanstack/qa-artifacts/hito-273/continuation-upload.fit",
+);
 
 if (
   ![
@@ -115,21 +121,9 @@ if (
     "pool-reset-plan",
     "pool-reset",
     "pool-delete",
-    "hosted-pool-adopt",
-    "hosted-pool-status",
-    "hosted-pool-auth-link",
-    "hosted-pool-checkpoint",
-    "hosted-pool-calendar-date",
-    "hosted-pool-fit-artifact",
-    "hosted-pool-profile-snapshot",
-    "hosted-pool-continuation-preflight",
-    "hosted-pool-attempt-ledger",
-    "hosted-pool-latest-diagnostic",
-    "hosted-pool-recompile-technical",
-    "hosted-pool-candidate-artifact",
-    "hosted-pool-record-coach-verdict",
-    "hosted-pool-confirm-candidate",
-    "hosted-pool-reset",
+    "adaptive-ui-replay-seed",
+    "adaptive-ui-replay-status",
+    "adaptive-ui-replay-reset",
     "design-profile-seed",
     "design-profile-status",
     "design-profile-reset",
@@ -149,16 +143,10 @@ if (
   ].includes(command)
 ) {
   throw new Error(
-    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-reset-plan|pool-reset|pool-delete|hosted-pool-adopt|hosted-pool-status|hosted-pool-auth-link|hosted-pool-checkpoint|hosted-pool-calendar-date|hosted-pool-fit-artifact|hosted-pool-profile-snapshot|hosted-pool-continuation-preflight|hosted-pool-attempt-ledger|hosted-pool-latest-diagnostic|hosted-pool-recompile-technical|hosted-pool-candidate-artifact|hosted-pool-record-coach-verdict|hosted-pool-confirm-candidate|hosted-pool-reset|design-profile-seed|design-profile-status|design-profile-reset|adaptive-blueprint-seed|adaptive-blueprint-continuation-seed|adaptive-blueprint-status|adaptive-blueprint-continuation-prepare|adaptive-blueprint-continuation-proof|adaptive-blueprint-continuation-profile-proof|adaptive-blueprint-two-profile-replay|adaptive-blueprint-second-continuation-preflight|adaptive-blueprint-second-continuation-author|adaptive-blueprint-second-continuation-recompile|adaptive-blueprint-reset|runner-core-file-flow-seed|runner-core-file-flow-proof|create|reset-plan|reset|delete> [options]",
+    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-reset-plan|pool-reset|pool-delete|adaptive-ui-replay-seed|adaptive-ui-replay-status|adaptive-ui-replay-reset|design-profile-seed|design-profile-status|design-profile-reset|adaptive-blueprint-seed|adaptive-blueprint-continuation-seed|adaptive-blueprint-status|adaptive-blueprint-continuation-prepare|adaptive-blueprint-continuation-proof|adaptive-blueprint-continuation-profile-proof|adaptive-blueprint-two-profile-replay|adaptive-blueprint-second-continuation-preflight|adaptive-blueprint-second-continuation-author|adaptive-blueprint-second-continuation-recompile|adaptive-blueprint-reset|runner-core-file-flow-seed|runner-core-file-flow-proof|create|reset-plan|reset|delete> [options]",
   );
 }
 
-const config = await buildConfig();
-if (HOSTED_POOL_COMMANDS.has(command)) {
-  process.env.NEXT_PUBLIC_SUPABASE_URL = config.supabaseUrl;
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = config.supabasePublishableKey;
-  process.env.SUPABASE_SECRET_KEY = config.supabaseServerKey;
-}
 const supabase = createClient(config.supabaseUrl, config.supabaseServerKey, {
   auth: {
     autoRefreshToken: false,
@@ -180,36 +168,12 @@ if (command === "inventory") {
   await handlePoolReset();
 } else if (command === "pool-delete") {
   await handlePoolDelete();
-} else if (command === "hosted-pool-adopt") {
-  await handleHostedPoolAdopt();
-} else if (command === "hosted-pool-status") {
-  await handleHostedPoolStatus();
-} else if (command === "hosted-pool-auth-link") {
-  await handleHostedPoolAuthLink();
-} else if (command === "hosted-pool-checkpoint") {
-  await handleHostedPoolCheckpoint();
-} else if (command === "hosted-pool-calendar-date") {
-  await handleHostedPoolCalendarDate();
-} else if (command === "hosted-pool-fit-artifact") {
-  await handleHostedPoolFitArtifact();
-} else if (command === "hosted-pool-profile-snapshot") {
-  await handleHostedPoolProfileSnapshot();
-} else if (command === "hosted-pool-continuation-preflight") {
-  await handleHostedPoolContinuationPreflight();
-} else if (command === "hosted-pool-attempt-ledger") {
-  await handleHostedPoolAttemptLedger();
-} else if (command === "hosted-pool-latest-diagnostic") {
-  await handleHostedPoolLatestDiagnostic();
-} else if (command === "hosted-pool-recompile-technical") {
-  await handleHostedPoolRecompileTechnical();
-} else if (command === "hosted-pool-candidate-artifact") {
-  await handleHostedPoolCandidateArtifact();
-} else if (command === "hosted-pool-record-coach-verdict") {
-  await handleHostedPoolRecordCoachVerdict();
-} else if (command === "hosted-pool-confirm-candidate") {
-  await handleHostedPoolConfirmCandidate();
-} else if (command === "hosted-pool-reset") {
-  await handleHostedPoolReset();
+} else if (command === "adaptive-ui-replay-seed") {
+  await handleAdaptiveUiReplaySeed();
+} else if (command === "adaptive-ui-replay-status") {
+  await handleAdaptiveUiReplayStatus();
+} else if (command === "adaptive-ui-replay-reset") {
+  await handleAdaptiveUiReplayReset();
 } else if (command === "design-profile-seed") {
   await handleDesignProfileSeed();
 } else if (command === "design-profile-status") {
@@ -365,1807 +329,6 @@ async function handlePoolEnsure() {
   );
 }
 
-async function handleHostedPoolAdopt() {
-  const role = requireHostedAdaptivePoolRole();
-  const userId = requireOption(options["user-id"], "--user-id");
-  const receiptPath = requireHostedReceiptPath();
-  const authUser = await adoptHostedQaPoolAuthUser({
-    supabase,
-    role,
-    userId,
-  });
-  const lease = await acquireQaPoolLease({ role });
-  const receipt = {
-    schemaVersion: 1,
-    task: "HITO-271",
-    environment: "hosted_preview",
-    projectRef: config.hostedProjectRef,
-    role,
-    userId: authUser.id,
-    leaseToken: lease.token,
-    identityRetainedAcrossStages: true,
-    authIdentityDeletionRequired: false,
-    checkpoints: [
-      hostedCheckpoint("identity_adopted", {
-        emailSuffix: ".invalid",
-        emailConfirmed: Boolean(authUser.email_confirmed_at),
-        ownedRows: await getQaUserOwnedCounts(supabase, authUser.id),
-      }),
-    ],
-  };
-  await writeHostedReceipt(receiptPath, receipt, { create: true });
-  console.log(
-    JSON.stringify({
-      ok: true,
-      action: "hosted-pool-adopt",
-      role,
-      userId: authUser.id,
-      receiptPath,
-      receiptSha256: hashStableJson(receipt),
-    }),
-  );
-}
-
-async function handleHostedPoolStatus() {
-  const { receiptPath, receipt, authUser } = await readCurrentHostedReceipt();
-  const next = appendHostedCheckpoint(
-    receipt,
-    hostedCheckpoint("identity_status", {
-      emailConfirmed: Boolean(authUser.email_confirmed_at),
-      ownedRows: await getQaUserOwnedCounts(supabase, authUser.id),
-    }),
-  );
-  await writeHostedReceipt(receiptPath, next);
-  console.log(
-    JSON.stringify({
-      ok: true,
-      action: "hosted-pool-status",
-      role: receipt.role,
-      userId: receipt.userId,
-      receiptPath,
-      receiptSha256: hashStableJson(next),
-    }),
-  );
-}
-
-async function handleHostedPoolAuthLink() {
-  const { receiptPath, receipt, authUser } = await readCurrentHostedReceipt();
-  const previewOrigin = requireHostedPreviewOrigin(options["preview-origin"]);
-  const callbackArtifactPath = requireExternalPrivatePath(
-    options["callback-artifact"],
-    "--callback-artifact",
-  );
-  const generated = await supabase.auth.admin.generateLink({
-    type: "magiclink",
-    email: authUser.email,
-    options: { redirectTo: new URL("/api/auth/confirm", previewOrigin).toString() },
-  });
-  const hashedToken = generated.data.properties?.hashed_token;
-  if (generated.error || !hashedToken) {
-    throw new Error(
-      generated.error?.message ?? "Supabase did not return a hosted auth token hash.",
-    );
-  }
-  await writeFile(
-    callbackArtifactPath,
-    `${JSON.stringify(
-      {
-        task: "HITO-271",
-        projectRef: config.hostedProjectRef,
-        userId: receipt.userId,
-        previewOrigin,
-        callbackPath: "/api/auth/confirm",
-        hashedToken,
-        type: "magiclink",
-        next: "/",
-      },
-      null,
-      2,
-    )}\n`,
-    { mode: 0o600 },
-  );
-  await chmod(callbackArtifactPath, 0o600);
-  const next = appendHostedCheckpoint(
-    receipt,
-    hostedCheckpoint("public_auth_callback_prepared", {
-      previewOrigin,
-      callbackPath: "/api/auth/confirm",
-      callbackArtifactPath,
-      secretValuesIncludedInReceipt: false,
-    }),
-  );
-  await writeHostedReceipt(receiptPath, next);
-  console.log(
-    JSON.stringify({
-      ok: true,
-      action: "hosted-pool-auth-link",
-      userId: receipt.userId,
-      callbackPrepared: true,
-      callbackArtifactPath,
-      receiptPath,
-      receiptSha256: hashStableJson(next),
-    }),
-  );
-}
-
-async function handleHostedPoolCheckpoint() {
-  const { receiptPath, receipt } = await readCurrentHostedReceipt();
-  const checkpoint = requireOption(options.checkpoint, "--checkpoint");
-  if (!/^[a-z0-9_]{3,80}$/.test(checkpoint)) {
-    throw new Error("--checkpoint must be a stable lower-case discriminator.");
-  }
-  const evidenceSha256 = requireOption(options["evidence-sha256"], "--evidence-sha256");
-  if (!/^[a-f0-9]{64}$/.test(evidenceSha256)) {
-    throw new Error("--evidence-sha256 must be one SHA-256 digest.");
-  }
-  const next = appendHostedCheckpoint(receipt, hostedCheckpoint(checkpoint, { evidenceSha256 }));
-  await writeHostedReceipt(receiptPath, next);
-  console.log(
-    JSON.stringify({
-      ok: true,
-      action: "hosted-pool-checkpoint",
-      checkpoint,
-      userId: receipt.userId,
-      receiptPath,
-      receiptSha256: hashStableJson(next),
-    }),
-  );
-}
-
-async function handleHostedPoolCalendarDate() {
-  const { receiptPath, receipt, authUser } = await readCurrentHostedReceipt();
-  const calendarDate = requireOption(options.date, "--date");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(calendarDate)) {
-    throw new Error("--date must be one ISO Calendar date.");
-  }
-  const instant = new Date(`${calendarDate}T12:00:00.000Z`);
-  if (Number.isNaN(instant.getTime()) || instant.toISOString().slice(0, 10) !== calendarDate) {
-    throw new Error("--date must be a valid ISO Calendar date.");
-  }
-  const updated = await supabase.auth.admin.updateUserById(receipt.userId, {
-    app_metadata: {
-      ...(authUser.app_metadata ?? {}),
-      hito_qa_calendar_date: calendarDate,
-    },
-  });
-  if (updated.error || !updated.data.user) {
-    throw new Error(updated.error?.message ?? "Unable to set the hosted QA Calendar date.");
-  }
-  if (updated.data.user.app_metadata?.hito_qa_calendar_date !== calendarDate) {
-    throw new Error("Hosted QA Calendar date did not persist exactly.");
-  }
-  const next = appendHostedCheckpoint(
-    receipt,
-    hostedCheckpoint("runner_calendar_date", { calendarDate }),
-  );
-  await writeHostedReceipt(receiptPath, next);
-  console.log(
-    JSON.stringify({
-      ok: true,
-      action: "hosted-pool-calendar-date",
-      calendarDate,
-      userId: receipt.userId,
-      receiptPath,
-      receiptSha256: hashStableJson(next),
-    }),
-  );
-}
-
-async function handleHostedPoolFitArtifact() {
-  const { receiptPath, receipt } = await readCurrentHostedReceipt();
-  const localDate = requireOption(options.date, "--date");
-  const evidenceKind = requireOption(options.kind, "--kind");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(localDate)) {
-    throw new Error("--date must be one ISO Calendar date.");
-  }
-  if (evidenceKind !== "compatible" && evidenceKind !== "incomplete") {
-    throw new Error("--kind must be compatible or incomplete.");
-  }
-  const outputPath = requireExternalPrivatePath(options.output, "--output");
-  if (!outputPath.toLowerCase().endsWith(".fit")) {
-    throw new Error("--output must name one external .fit file.");
-  }
-  const workoutRead = await supabase
-    .from("planned_workouts")
-    .select("id, workout_date, workout_type")
-    .eq("user_id", receipt.userId)
-    .eq("workout_date", localDate)
-    .neq("workout_type", "rest")
-    .maybeSingle();
-  if (workoutRead.error || !workoutRead.data) {
-    throw new Error(
-      workoutRead.error?.message ?? "The hosted FIT artifact requires one owned workout date.",
-    );
-  }
-  const fileBuffer = buildAdaptiveTrainingQualityFitFile({ localDate, evidenceKind });
-  await mkdir(path.dirname(outputPath), { recursive: true, mode: 0o700 });
-  await writeFile(outputPath, fileBuffer, { mode: 0o600 });
-  await chmod(outputPath, 0o600);
-  const fileSha256 = createHash("sha256").update(fileBuffer).digest("hex");
-  const next = appendHostedCheckpoint(
-    receipt,
-    hostedCheckpoint("synthetic_fit_artifact", {
-      localDate,
-      evidenceKind,
-      workoutId: workoutRead.data.id,
-      fileSha256,
-      databaseWritePerformed: false,
-    }),
-  );
-  await writeHostedReceipt(receiptPath, next);
-  console.log(
-    JSON.stringify({
-      ok: true,
-      action: "hosted-pool-fit-artifact",
-      localDate,
-      evidenceKind,
-      workoutId: workoutRead.data.id,
-      outputPath,
-      fileSha256,
-      databaseWritePerformed: false,
-      receiptSha256: hashStableJson(next),
-    }),
-  );
-}
-
-async function handleHostedPoolProfileSnapshot() {
-  const { receiptPath, receipt } = await readCurrentHostedReceipt();
-  const asOfDate = requireOption(options["as-of-date"], "--as-of-date");
-  const cutoffDate = requireOption(options["cutoff-date"], "--cutoff-date");
-  const outputPath = requireExternalPrivatePath(options.output, "--output");
-  for (const [label, value] of [
-    ["--as-of-date", asOfDate],
-    ["--cutoff-date", cutoffDate],
-  ]) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      throw new Error(`${label} must be one ISO Calendar date.`);
-    }
-  }
-  const facts = readHostedRunnerFitnessProfileSnapshotThroughCanonicalOwner({
-    userId: receipt.userId,
-    asOf: asOfDate,
-    cutoffDate,
-  });
-  if (!facts) {
-    throw new Error("The hosted Runner Fitness Profile source lineage is unavailable.");
-  }
-  const snapshot = facts.fitnessProfileSnapshot;
-  const artifact = {
-    artifactKind: "hito271_hosted_runner_fitness_profile_snapshot_v1",
-    generatedAt: new Date().toISOString(),
-    task: "HITO-271",
-    asOfDate,
-    snapshot: {
-      version: snapshot.version,
-      snapshotId: snapshot.snapshotId,
-      runnerFactsRevision: snapshot.runnerFactsRevision,
-      cutoffDate: snapshot.cutoffDate,
-      timeZone: snapshot.timeZone,
-      formulaVersions: snapshot.formulaVersions,
-      provenance: snapshot.provenance,
-      components: snapshot.components,
-    },
-    continuationProjection: facts.fitnessProfileProjection,
-    factualPackets: {
-      calendarOutcomeFingerprint: facts.calendar.calendarOutcomeFingerprint,
-      evidenceRevisionFingerprint: facts.evidence.evidenceRevisionFingerprint,
-      missingEvidenceStates: facts.evidence.workouts
-        .filter((workout) => workout.evidenceState !== "fit_current")
-        .map((workout) => ({ workoutDate: workout.workoutDate, state: workout.evidenceState })),
-    },
-    privacy: {
-      runnerIdIncluded: false,
-      rawProviderContentIncluded: false,
-      credentialIncluded: false,
-      personalIdentityIncluded: false,
-    },
-  };
-  await mkdir(path.dirname(outputPath), { recursive: true, mode: 0o700 });
-  const artifactBytes = Buffer.from(`${JSON.stringify(artifact, null, 2)}\n`);
-  await writeFile(outputPath, artifactBytes, { mode: 0o600 });
-  await chmod(outputPath, 0o600);
-  const artifactSha256 = createHash("sha256").update(artifactBytes).digest("hex");
-  const next = appendHostedCheckpoint(
-    receipt,
-    hostedCheckpoint("runner_fitness_profile_snapshot", {
-      snapshotId: snapshot.snapshotId,
-      runnerFactsRevision: snapshot.runnerFactsRevision,
-      cutoffDate: snapshot.cutoffDate,
-      artifactSha256,
-    }),
-  );
-  await writeHostedReceipt(receiptPath, next);
-  console.log(
-    JSON.stringify({
-      ok: true,
-      action: "hosted-pool-profile-snapshot",
-      snapshotId: snapshot.snapshotId,
-      runnerFactsRevision: snapshot.runnerFactsRevision,
-      cutoffDate: snapshot.cutoffDate,
-      componentStates: Object.fromEntries(
-        Object.entries(snapshot.components).map(([key, component]) => [key, component.state]),
-      ),
-      evidenceRevisionFingerprint: facts.evidence.evidenceRevisionFingerprint,
-      outputPath,
-      artifactSha256,
-      receiptSha256: hashStableJson(next),
-    }),
-  );
-}
-
-function readHostedRunnerFitnessProfileSnapshotThroughCanonicalOwner(input) {
-  const script = String.raw`
-    import { readFileSync } from "node:fs";
-    import { getAdaptiveBlueprintContinuationFactsForUser } from "./src/lib/adaptive-blueprint-read-model.ts";
-    const input = JSON.parse(readFileSync(0, "utf8"));
-    const facts = await getAdaptiveBlueprintContinuationFactsForUser(input);
-    console.log(JSON.stringify(facts));
-  `;
-  const child = spawnSync(
-    process.execPath,
-    ["--import", "tsx", "--input-type=module", "-e", script],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        NEXT_PUBLIC_SUPABASE_URL: config.supabaseUrl,
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: config.supabasePublishableKey,
-        SUPABASE_SECRET_KEY: config.supabaseServerKey,
-      },
-      input: JSON.stringify(input),
-      encoding: "utf8",
-      stdio: ["pipe", "pipe", "pipe"],
-    },
-  );
-  if (child.status !== 0) {
-    const safeMessage = String(child.stderr ?? "")
-      .split("\n")
-      .find((line) => line.trim().startsWith("Error:"))
-      ?.trim()
-      .slice(0, 240);
-    throw new Error(
-      `Canonical Runner Fitness Profile read failed with status ${child.status}${safeMessage ? ` (${safeMessage})` : ""}.`,
-    );
-  }
-  return JSON.parse(child.stdout);
-}
-
-async function handleHostedPoolContinuationPreflight() {
-  const { receiptPath, receipt } = await readCurrentHostedReceipt();
-  const outputPath = requireExternalPrivatePath(options.output, "--output");
-  const asOfDate = requireOption(options["as-of-date"], "--as-of-date");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(asOfDate)) {
-    throw new Error("--as-of-date must be one ISO Calendar date.");
-  }
-  const beforeCounts = await getQaUserOwnedCounts(supabase, receipt.userId);
-  const artifact = runHostedContinuationPreflightThroughCanonicalOwner({
-    userId: receipt.userId,
-    asOfDate,
-  });
-  const afterCounts = await getQaUserOwnedCounts(supabase, receipt.userId);
-  assert.deepEqual(
-    afterCounts,
-    beforeCounts,
-    "Hosted continuation preflight must not retain a provider response or candidate.",
-  );
-  if (
-    artifact.decision?.status !== "authoring_ready" ||
-    artifact.request?.externalProviderDispatchCount !== 0 ||
-    beforeCounts.adaptive_training_block_confirmations !== 2 ||
-    beforeCounts.planned_workouts !== 44
-  ) {
-    throw new Error("Hosted continuation preflight did not preserve the accepted 2/44/0 boundary.");
-  }
-  const hostedArtifact = {
-    ...artifact,
-    artifactVersion: "hito_271_hosted_second_continuation_preflight_v1",
-    environment: {
-      kind: "hosted_preview",
-      projectRef: receipt.projectRef,
-      providerDispatchPerformed: false,
-    },
-    invariants: {
-      ...artifact.invariants,
-      confirmationCount: beforeCounts.adaptive_training_block_confirmations,
-      calendarWorkoutCount: beforeCounts.planned_workouts,
-      futureProjectionCalendarRowCount: 0,
-      persistenceDelta: 0,
-      hostedAction: true,
-    },
-  };
-  await mkdir(path.dirname(outputPath), { recursive: true, mode: 0o700 });
-  const artifactBytes = Buffer.from(`${JSON.stringify(hostedArtifact, null, 2)}\n`);
-  await writeFile(outputPath, artifactBytes, { mode: 0o600 });
-  await chmod(outputPath, 0o600);
-  const artifactSha256 = createHash("sha256").update(artifactBytes).digest("hex");
-  const next = appendHostedCheckpoint(
-    receipt,
-    hostedCheckpoint("second_continuation_preflight", {
-      snapshotId: artifact.facts.snapshotId,
-      runnerFactsRevision: artifact.facts.runnerFactsRevision,
-      decisionStatus: artifact.decision.status,
-      authoringMode: artifact.decision.authoringMode,
-      exactReuseApplied: artifact.request.exactReuseApplied,
-      paidDispatchRequired: artifact.request.paidDispatchRequired,
-      externalProviderDispatchCount: 0,
-      artifactSha256,
-    }),
-  );
-  await writeHostedReceipt(receiptPath, next);
-  console.log(
-    JSON.stringify({
-      ok: true,
-      action: "hosted-pool-continuation-preflight",
-      facts: artifact.facts,
-      decision: artifact.decision,
-      request: artifact.request,
-      candidate: artifact.candidate,
-      invariants: hostedArtifact.invariants,
-      outputPath,
-      artifactSha256,
-      receiptSha256: hashStableJson(next),
-    }),
-  );
-}
-
-function runHostedContinuationPreflightThroughCanonicalOwner(input) {
-  const script = String.raw`
-    import { readFileSync } from "node:fs";
-    import { prepareAdaptiveContinuationCandidateForUser } from "./src/lib/adaptive-blueprint-actions.server.ts";
-    import { getAdaptiveBlueprintContinuationDecisionForUser } from "./src/lib/adaptive-blueprint-read-model.ts";
-    import {
-      ADAPTIVE_CONTINUATION_AUTHORING_BRIEF_VERSION,
-      ADAPTIVE_CONTINUATION_COMPILER_VERSION,
-      ADAPTIVE_CONTINUATION_PROMPT_VERSION,
-      ADAPTIVE_CONTINUATION_PROVIDER_CONTRACT_VERSION,
-      ADAPTIVE_CONTINUATION_RESPONSE_SCHEMA_NAME,
-    } from "./src/lib/adaptive-continuation-authoring.ts";
-    import { digestSha256Hex, stableJsonStringify } from "./src/lib/review-token-signing.ts";
-    const input = JSON.parse(readFileSync(0, "utf8"));
-    const current = await getAdaptiveBlueprintContinuationDecisionForUser({
-      userId: input.userId,
-      asOfDate: input.asOfDate,
-    });
-    if (!current?.decision || current.decision.status !== "authoring_ready" || !current.facts) {
-      throw new Error("Hosted production-current continuation decision is not authoring-ready.");
-    }
-    const providerModel = process.env.OPENAI_PLAN_MODEL?.trim() || "gpt-5.2";
-    const sentinel = new Error("hito_271_hosted_paid_dispatch_required");
-    let captured = null;
-    let prepared = null;
-    try {
-      prepared = await prepareAdaptiveContinuationCandidateForUser(
-        { userId: input.userId, asOfDate: input.asOfDate },
-        {
-          providerModel,
-          requestStructuredResponse: async ({ prompt, brief }) => {
-            captured = { prompt, brief };
-            throw sentinel;
-          },
-        },
-      );
-    } catch (error) {
-      if (error !== sentinel) throw error;
-    }
-    const exactReuseApplied = prepared?.ok === true && prepared.state.status === "candidate_ready";
-    if (Boolean(captured) === exactReuseApplied) {
-      throw new Error("Hosted exact-reuse/provider-dispatch preflight is inconsistent.");
-    }
-    const promptFingerprint = captured
-      ? await digestSha256Hex(stableJsonStringify({
-          systemPrompt: captured.prompt.systemPrompt,
-          userPrompt: captured.prompt.userPrompt,
-          responseSchema: captured.prompt.responseSchema,
-        }))
-      : null;
-    const requestFingerprint = await digestSha256Hex(stableJsonStringify({
-      ownerUserId: input.userId,
-      providerModel,
-      decision: current.decision,
-      promptFingerprint,
-      schemaVersion: ADAPTIVE_CONTINUATION_RESPONSE_SCHEMA_NAME,
-      promptVersion: ADAPTIVE_CONTINUATION_PROMPT_VERSION,
-      policyVersion: current.decision.policyVersion,
-      compilerVersion: ADAPTIVE_CONTINUATION_COMPILER_VERSION,
-      contractMode: ADAPTIVE_CONTINUATION_AUTHORING_BRIEF_VERSION,
-      responseSchemaMode: ADAPTIVE_CONTINUATION_PROVIDER_CONTRACT_VERSION,
-    }));
-    const snapshot = current.facts.fitnessProfileSnapshot;
-    const artifact = {
-      artifactVersion: "hito_271_hosted_second_continuation_preflight_v1",
-      createdAt: new Date().toISOString(),
-      facts: {
-        dueOutcomeCount: current.facts.calendar.workouts.length,
-        unresolvedOutcomeCount: current.facts.calendar.workouts.filter((workout) => workout.outcome === "unresolved").length,
-        fitCurrentCount: current.facts.evidence.workouts.filter((workout) => workout.evidenceState === "fit_current").length,
-        completedWithoutFitCount: current.facts.evidence.workouts.filter((workout) => workout.evidenceState === "completed_without_fit").length,
-        snapshotId: snapshot.snapshotId,
-        runnerFactsRevision: snapshot.runnerFactsRevision,
-        cutoffDate: snapshot.cutoffDate,
-        formulaVersions: snapshot.formulaVersions,
-        profileState: current.decision.fitnessProfile.quality,
-        missingReasons: current.decision.fitnessProfile.missingReasons,
-        comparableContextKeys: current.decision.comparableContextKeys,
-        calendarOutcomeFingerprint: current.facts.calendar.calendarOutcomeFingerprint,
-        evidenceRevisionFingerprint: current.facts.evidence.evidenceRevisionFingerprint,
-        targetIntervalOccupancyFingerprint: current.facts.targetIntervalOccupancy.calendarOccupancyFingerprint,
-      },
-      decision: {
-        version: current.decision.version,
-        policyVersion: current.decision.policyVersion,
-        status: current.decision.status,
-        authoringMode: current.decision.authoringMode,
-        interval: current.decision.interval,
-        projectionIds: current.decision.projectionIds,
-      },
-      request: {
-        providerModel,
-        requestFingerprint,
-        promptFingerprint,
-        schemaVersion: ADAPTIVE_CONTINUATION_RESPONSE_SCHEMA_NAME,
-        promptVersion: ADAPTIVE_CONTINUATION_PROMPT_VERSION,
-        policyVersion: current.decision.policyVersion,
-        compilerVersion: ADAPTIVE_CONTINUATION_COMPILER_VERSION,
-        contractMode: ADAPTIVE_CONTINUATION_AUTHORING_BRIEF_VERSION,
-        responseSchemaMode: ADAPTIVE_CONTINUATION_PROVIDER_CONTRACT_VERSION,
-        exactReuseApplied,
-        paidDispatchRequired: !exactReuseApplied,
-        externalProviderDispatchCount: 0,
-      },
-      candidate: exactReuseApplied ? {
-        id: prepared.state.candidate.id,
-        sha256: prepared.state.candidate.sha256,
-        blockMode: prepared.state.candidate.blockMode,
-        interval: prepared.state.candidate.interval,
-      } : null,
-      invariants: {
-        rawResponseIncluded: false,
-        rawPromptIncluded: false,
-        personalIdentityUsed: false,
-      },
-    };
-    console.log(JSON.stringify(artifact));
-  `;
-  const child = spawnSync(
-    process.execPath,
-    ["--import", "tsx", "--input-type=module", "-e", script],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        NEXT_PUBLIC_SUPABASE_URL: config.supabaseUrl,
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: config.supabasePublishableKey,
-        SUPABASE_SECRET_KEY: config.supabaseServerKey,
-      },
-      input: JSON.stringify(input),
-      encoding: "utf8",
-      stdio: ["pipe", "pipe", "pipe"],
-    },
-  );
-  if (child.status !== 0) {
-    const safeMessage = String(child.stderr ?? "")
-      .split("\n")
-      .find((line) => line.trim().startsWith("Error:") || line.includes("AssertionError"))
-      ?.trim()
-      .slice(0, 240);
-    throw new Error(
-      `Canonical continuation preflight failed with status ${child.status}${safeMessage ? ` (${safeMessage})` : ""}.`,
-    );
-  }
-  return JSON.parse(child.stdout);
-}
-
-async function handleHostedPoolAttemptLedger() {
-  const { receiptPath, receipt } = await readCurrentHostedReceipt();
-  const outputPath = requireExternalPrivatePath(options.output, "--output");
-  const attemptsRead = await supabase
-    .from("ai_plan_generation_responses")
-    .select(
-      "id, generation_id, provider_response_id, response_sha256, schema_outcome, compiler_outcome, diagnostic_code, diagnostic_path, request_fingerprint_sha256, version_context, version_fingerprint_sha256, provider_model, provider_attempt, attempt_result, created_at",
-    )
-    .eq("user_id", receipt.userId)
-    .order("created_at", { ascending: true });
-  if (attemptsRead.error) {
-    throw new Error(attemptsRead.error.message);
-  }
-  const attempts = (attemptsRead.data ?? []).map((row, index) => {
-    const usage = row.provider_attempt?.usage ?? {};
-    const inputTokens = Number(usage.inputTokens ?? 0);
-    const outputTokens = Number(usage.outputTokens ?? 0);
-    const derivedUsd = inputTokens * (1.75 / 1_000_000) + outputTokens * (14 / 1_000_000);
-    return {
-      ordinal: index + 1,
-      scenario: String(row.version_context?.promptVersion ?? "").startsWith(
-        "adaptive_continuation_",
-      )
-        ? "continuation"
-        : "initial_plan",
-      responseId: row.id,
-      providerResponseId: row.provider_response_id,
-      responseSha256: row.response_sha256,
-      requestFingerprintSha256: row.request_fingerprint_sha256,
-      versionFingerprintSha256: row.version_fingerprint_sha256,
-      providerModel: row.provider_model,
-      versionContext: row.version_context,
-      usage,
-      requestStartedAt: row.provider_attempt?.requestStartedAt ?? null,
-      responseReceivedAt: row.provider_attempt?.responseReceivedAt ?? null,
-      providerElapsedMs: row.provider_attempt?.providerElapsedMs ?? null,
-      schemaOutcome: row.schema_outcome,
-      compilerOutcome: row.compiler_outcome,
-      diagnosticCode: row.diagnostic_code,
-      diagnosticPath: row.diagnostic_path,
-      attemptResult: row.attempt_result,
-      cost: {
-        classification: "derived_rate_card",
-        currency: "USD",
-        derivedAmount: derivedUsd.toFixed(8),
-        actualSpend: false,
-      },
-    };
-  });
-  const ledger = {
-    artifactKind: "hito271_hosted_provider_attempt_ledger_v2",
-    generatedAt: new Date().toISOString(),
-    task: "HITO-271",
-    projectRef: receipt.projectRef,
-    userId: receipt.userId,
-    attempts,
-    privacy: {
-      rawProviderContentIncluded: false,
-      rawPromptIncluded: false,
-      credentialIncluded: false,
-      runnerPiiIncluded: false,
-    },
-  };
-  await mkdir(path.dirname(outputPath), { recursive: true, mode: 0o700 });
-  await writeFile(outputPath, `${JSON.stringify(ledger, null, 2)}\n`, { mode: 0o600 });
-  await chmod(outputPath, 0o600);
-  const ledgerSha256 = hashStableJson(ledger);
-  const next = appendHostedCheckpoint(
-    receipt,
-    hostedCheckpoint("provider_attempt_ledger", {
-      attemptCount: attempts.length,
-      ledgerSha256,
-      rawProviderContentIncluded: false,
-    }),
-  );
-  await writeHostedReceipt(receiptPath, next);
-  const latest = attempts.at(-1) ?? null;
-  console.log(
-    JSON.stringify({
-      ok: true,
-      action: "hosted-pool-attempt-ledger",
-      attemptCount: attempts.length,
-      latest,
-      outputPath,
-      ledgerSha256,
-      receiptSha256: hashStableJson(next),
-    }),
-  );
-}
-
-async function handleHostedPoolLatestDiagnostic() {
-  const { receiptPath, receipt } = await readCurrentHostedReceipt();
-  const outputPath = requireExternalPrivatePath(options.output, "--output");
-  const responseRead = await supabase
-    .from("ai_plan_generation_responses")
-    .select(
-      "id, response_sha256, response_body, diagnostic_code, diagnostic_path, compiler_outcome, created_at",
-    )
-    .eq("user_id", receipt.userId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (responseRead.error || !responseRead.data) {
-    throw new Error(responseRead.error?.message ?? "Hosted provider attempt is unavailable.");
-  }
-  const diagnosticPath = responseRead.data.diagnostic_path;
-  if (
-    responseRead.data.compiler_outcome !== "rejected" ||
-    typeof diagnosticPath !== "string" ||
-    !diagnosticPath
-  ) {
-    throw new Error("Latest hosted provider attempt has no rejected compiler diagnostic.");
-  }
-  const diagnostic = summarizeHostedProviderDiagnostic(
-    JSON.parse(responseRead.data.response_body),
-    diagnosticPath,
-  );
-  const artifact = {
-    artifactKind: "hito271_hosted_provider_diagnostic_v1",
-    task: "HITO-271",
-    responseId: responseRead.data.id,
-    responseSha256: responseRead.data.response_sha256,
-    diagnosticCode: responseRead.data.diagnostic_code,
-    diagnosticPath,
-    diagnostic,
-    privacy: {
-      rawProviderContentIncluded: false,
-      rawPromptIncluded: false,
-      credentialIncluded: false,
-      runnerPiiIncluded: false,
-    },
-  };
-  await mkdir(path.dirname(outputPath), { recursive: true, mode: 0o700 });
-  await writeFile(outputPath, `${JSON.stringify(artifact, null, 2)}\n`, { mode: 0o600 });
-  await chmod(outputPath, 0o600);
-  const artifactSha256 = hashStableJson(artifact);
-  const next = appendHostedCheckpoint(
-    receipt,
-    hostedCheckpoint("provider_attempt_diagnostic", {
-      responseId: responseRead.data.id,
-      diagnosticCode: responseRead.data.diagnostic_code,
-      diagnosticPath,
-      artifactSha256,
-      rawProviderContentIncluded: false,
-    }),
-  );
-  await writeHostedReceipt(receiptPath, next);
-  console.log(
-    JSON.stringify({
-      ok: true,
-      action: "hosted-pool-latest-diagnostic",
-      responseId: responseRead.data.id,
-      diagnosticCode: responseRead.data.diagnostic_code,
-      diagnosticPath,
-      diagnostic,
-      outputPath,
-      artifactSha256,
-      receiptSha256: hashStableJson(next),
-    }),
-  );
-}
-
-function summarizeHostedProviderDiagnostic(responseBody, diagnosticPath) {
-  const date = diagnosticPath.split(".")[0];
-  const detailed = responseBody?.detailed_block;
-  const workouts = [
-    ...(Array.isArray(detailed?.workouts) ? detailed.workouts : []),
-    ...(detailed?.final_workout ? [detailed.final_workout] : []),
-  ];
-  const workout = workouts.find((value) => value?.date === date);
-  const sectionIndex = Number(diagnosticPath.match(/sections\.(\d+)/)?.[1]);
-  const childIndex = Number(diagnosticPath.match(/children\.(\d+)/)?.[1]);
-  const section = Number.isInteger(sectionIndex) ? workout?.sections?.[sectionIndex] : null;
-  const child = Number.isInteger(childIndex) ? section?.children?.[childIndex] : null;
-  if (!workout || !section || !child) {
-    throw new Error("Latest provider diagnostic path does not resolve to one repeat child.");
-  }
-  return {
-    date,
-    workoutIdentity: workout.workout_identity ?? null,
-    sectionKind: section.kind ?? null,
-    rounds: section.rounds ?? null,
-    childRole: child.role ?? null,
-    prescription: child.prescription ?? null,
-    target: child.target ?? null,
-    authoredPurpose: child.cue ?? null,
-  };
-}
-
-async function handleHostedPoolRecompileTechnical() {
-  const { receiptPath, receipt } = await readCurrentHostedReceipt();
-  const outputPath = requireExternalPrivatePath(options.output, "--output");
-  const responseRecordId = requireOption(options["response-id"], "--response-id");
-  const asOfDate = requireOption(options["as-of-date"], "--as-of-date");
-  const expectedPromptVersion = requireOption(
-    options["expected-prompt-version"],
-    "--expected-prompt-version",
-  );
-  const expectedCompilerVersion = requireOption(
-    options["expected-compiler-version"],
-    "--expected-compiler-version",
-  );
-  const expectedDiagnosticCode = requireOption(
-    options["expected-diagnostic-code"],
-    "--expected-diagnostic-code",
-  );
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(asOfDate)) {
-    throw new Error("--as-of-date must be one ISO Calendar date.");
-  }
-  const responseRead = await supabase
-    .from("ai_plan_generation_responses")
-    .select(
-      "id, provider_model, response_sha256, schema_outcome, compiler_outcome, diagnostic_code, attempt_result, version_context, provider_attempt",
-    )
-    .eq("id", responseRecordId)
-    .eq("user_id", receipt.userId)
-    .maybeSingle();
-  if (responseRead.error || !responseRead.data) {
-    throw new Error(responseRead.error?.message ?? "Technical response is unavailable.");
-  }
-  const beforeCounts = await getQaUserOwnedCounts(supabase, receipt.userId);
-  const result = runHostedTechnicalRecompileThroughCanonicalOwner({
-    userId: receipt.userId,
-    asOfDate,
-    providerModel: responseRead.data.provider_model,
-    responseRecordId,
-    expectedPromptVersion,
-    expectedCompilerVersion,
-    expectedDiagnosticCode,
-  });
-  const afterCounts = await getQaUserOwnedCounts(supabase, receipt.userId);
-  assert.equal(result.ok, true);
-  assert.equal(result.recompiledFromRetainedResponse, true);
-  assert.equal(result.providerDispatchCount, 0);
-  assert.equal(afterCounts.ai_plan_generation_responses, beforeCounts.ai_plan_generation_responses);
-  assert.equal(
-    afterCounts.adaptive_training_block_confirmations,
-    beforeCounts.adaptive_training_block_confirmations,
-  );
-  assert.equal(afterCounts.planned_workouts, beforeCounts.planned_workouts);
-  assert.ok(
-    afterCounts.adaptive_training_detailed_candidates ===
-      beforeCounts.adaptive_training_detailed_candidates + 1 ||
-      afterCounts.adaptive_training_detailed_candidates ===
-        beforeCounts.adaptive_training_detailed_candidates,
-  );
-  const responseAfter = await supabase
-    .from("ai_plan_generation_responses")
-    .select(
-      "provider_model, response_sha256, compiler_outcome, diagnostic_code, attempt_result, version_context, provider_attempt",
-    )
-    .eq("id", responseRecordId)
-    .eq("user_id", receipt.userId)
-    .single();
-  if (responseAfter.error) throw new Error(responseAfter.error.message);
-  assert.equal(responseAfter.data.provider_model, responseRead.data.provider_model);
-  assert.equal(responseAfter.data.response_sha256, responseRead.data.response_sha256);
-  assert.deepEqual(responseAfter.data.attempt_result, responseRead.data.attempt_result);
-  assert.deepEqual(responseAfter.data.version_context, responseRead.data.version_context);
-  assert.deepEqual(responseAfter.data.provider_attempt, responseRead.data.provider_attempt);
-  assert.equal(responseAfter.data.compiler_outcome, "rejected");
-  assert.equal(responseAfter.data.diagnostic_code, expectedDiagnosticCode);
-  const artifact = {
-    artifactKind: "hito271_hosted_retained_technical_recompile_v1",
-    task: "HITO-271",
-    createdAt: new Date().toISOString(),
-    response: {
-      id: responseRecordId,
-      sha256: responseRead.data.response_sha256,
-      originalPromptVersion: expectedPromptVersion,
-      originalCompilerVersion: expectedCompilerVersion,
-      originalDiagnosticCode: expectedDiagnosticCode,
-      originalOutcomePreservedImmutably: true,
-      recompiledCandidateCompilerVersion: result.compilerVersion,
-    },
-    candidate: result.candidate,
-    providerDispatchCount: 0,
-    persistence: {
-      responseCountDelta: 0,
-      candidateCountDelta:
-        afterCounts.adaptive_training_detailed_candidates -
-        beforeCounts.adaptive_training_detailed_candidates,
-      confirmationCountDelta: 0,
-      calendarWorkoutCountDelta: 0,
-    },
-    privacy: {
-      rawProviderContentIncluded: false,
-      rawPromptIncluded: false,
-      credentialIncluded: false,
-      runnerPiiIncluded: false,
-    },
-  };
-  await mkdir(path.dirname(outputPath), { recursive: true, mode: 0o700 });
-  const artifactBytes = Buffer.from(`${JSON.stringify(artifact, null, 2)}\n`);
-  await writeFile(outputPath, artifactBytes, { mode: 0o600 });
-  await chmod(outputPath, 0o600);
-  const artifactSha256 = createHash("sha256").update(artifactBytes).digest("hex");
-  const next = appendHostedCheckpoint(
-    receipt,
-    hostedCheckpoint("retained_technical_recompile", {
-      responseId: responseRecordId,
-      candidateId: result.candidate.id,
-      candidateSha256: result.candidate.sha256,
-      originalCompilerVersion: expectedCompilerVersion,
-      recompileCompilerVersion: result.compilerVersion,
-      providerDispatchCount: 0,
-      artifactSha256,
-    }),
-  );
-  await writeHostedReceipt(receiptPath, next);
-  console.log(
-    JSON.stringify({
-      ok: true,
-      action: "hosted-pool-recompile-technical",
-      responseId: responseRecordId,
-      candidate: result.candidate,
-      originalOutcomePreservedImmutably: true,
-      providerDispatchCount: 0,
-      outputPath,
-      artifactSha256,
-      receiptSha256: hashStableJson(next),
-    }),
-  );
-}
-
-function runHostedTechnicalRecompileThroughCanonicalOwner(input) {
-  const script = String.raw`
-    import { readFileSync } from "node:fs";
-    import { prepareAdaptiveContinuationCandidateForUser } from "./src/lib/adaptive-blueprint-actions.server.ts";
-    import { ADAPTIVE_CONTINUATION_COMPILER_VERSION } from "./src/lib/adaptive-continuation-authoring.ts";
-    const input = JSON.parse(readFileSync(0, "utf8"));
-    const prepared = await prepareAdaptiveContinuationCandidateForUser(
-      { userId: input.userId, asOfDate: input.asOfDate },
-      {
-        providerModel: input.providerModel,
-        explicitTechnicallyRejectedRetainedResponseRecompile: {
-          responseRecordId: input.responseRecordId,
-          expectedPromptVersion: input.expectedPromptVersion,
-          expectedCompilerVersion: input.expectedCompilerVersion,
-          expectedDiagnosticCode: input.expectedDiagnosticCode,
-        },
-      },
-    );
-    if (!prepared.ok || prepared.state.status !== "candidate_ready") {
-      throw new Error("The retained technical response did not produce a current candidate.");
-    }
-    console.log(JSON.stringify({
-      ok: true,
-      candidate: {
-        id: prepared.state.candidate.id,
-        sha256: prepared.state.candidate.sha256,
-        version: prepared.state.candidate.version,
-        interval: prepared.state.candidate.interval,
-        blockMode: prepared.state.candidate.blockMode,
-      },
-      compilerVersion: ADAPTIVE_CONTINUATION_COMPILER_VERSION,
-      recompiledFromRetainedResponse: prepared.recompiledFromRetainedResponse,
-      providerDispatchCount: prepared.providerDispatchCount,
-    }));
-  `;
-  const child = spawnSync(
-    process.execPath,
-    ["--import", "tsx", "--input-type=module", "-e", script],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        NEXT_PUBLIC_SUPABASE_URL: config.supabaseUrl,
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: config.supabasePublishableKey,
-        SUPABASE_SECRET_KEY: config.supabaseServerKey,
-      },
-      input: JSON.stringify(input),
-      encoding: "utf8",
-      stdio: ["pipe", "pipe", "pipe"],
-    },
-  );
-  if (child.status !== 0) {
-    const safeMessage = String(child.stderr ?? "")
-      .split("\n")
-      .find((line) => line.trim().startsWith("Error:"))
-      ?.trim()
-      .slice(0, 240);
-    throw new Error(
-      `Canonical retained-response recompile failed with status ${child.status}${safeMessage ? ` (${safeMessage})` : ""}.`,
-    );
-  }
-  return JSON.parse(child.stdout);
-}
-
-async function handleHostedPoolCandidateArtifact() {
-  const { receiptPath, receipt } = await readCurrentHostedReceipt();
-  const outputPath = requireExternalPrivatePath(options.output, "--output");
-  const deploymentSha = requireOption(options["deployment-sha"], "--deployment-sha");
-  if (!/^[a-f0-9]{40}$/.test(deploymentSha)) {
-    throw new Error("--deployment-sha must be one full Git commit SHA.");
-  }
-  const previewOrigin = requireHostedPreviewOrigin(options["preview-origin"]);
-  const responseRead = await supabase
-    .from("ai_plan_generation_responses")
-    .select(
-      "id, generation_id, provider_response_id, response_sha256, schema_outcome, compiler_outcome, diagnostic_code, diagnostic_path, request_fingerprint_sha256, version_context, version_fingerprint_sha256, provider_model, provider_attempt, attempt_result, created_at",
-    )
-    .eq("user_id", receipt.userId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (responseRead.error || !responseRead.data) {
-    throw new Error(responseRead.error?.message ?? "Hosted provider response is unavailable.");
-  }
-  if (responseRead.data.schema_outcome !== "accepted") {
-    throw new Error("Latest hosted provider response is not schema-accepted.");
-  }
-  const blueprintRead = await supabase
-    .from("adaptive_training_blueprint_versions")
-    .select(
-      "id, version, content_sha256, blueprint_content, compiler_version, source_contract_version, source_response_id, created_at",
-    )
-    .eq("user_id", receipt.userId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (blueprintRead.error || !blueprintRead.data) {
-    throw new Error(blueprintRead.error?.message ?? "Hosted Blueprint is unavailable.");
-  }
-  const candidateRead = await supabase
-    .from("adaptive_training_detailed_candidates")
-    .select(
-      "id, version, candidate_sha256, candidate_content, blueprint_id, source_response_id, interval_start_date, interval_end_date, input_fingerprint_sha256, input_provenance, input_snapshot, fact_references, confirmation_lineage, created_at",
-    )
-    .eq("user_id", receipt.userId)
-    .eq("blueprint_id", blueprintRead.data.id)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (candidateRead.error || !candidateRead.data) {
-    throw new Error(candidateRead.error?.message ?? "Hosted candidate is unavailable.");
-  }
-  const retainedResponseId =
-    candidateRead.data.source_response_id ??
-    candidateRead.data.input_provenance?.retainedResponseId ??
-    null;
-  const inputProvenance = candidateRead.data.input_provenance ?? {};
-  const retainedTechnicalRecompile =
-    inputProvenance.retainedResponseOriginalCompilerOutcome === "rejected" &&
-    inputProvenance.recompiledFromCompilerVersion ===
-      responseRead.data.version_context?.compilerVersion &&
-    inputProvenance.recompiledDiagnosticCode === responseRead.data.diagnostic_code &&
-    inputProvenance.compilerVersion !== inputProvenance.recompiledFromCompilerVersion &&
-    responseRead.data.compiler_outcome === "rejected" &&
-    responseRead.data.attempt_result?.outcome === "technical_rejection" &&
-    responseRead.data.attempt_result?.candidateRecordId === null;
-  if (
-    candidateRead.data.blueprint_id !== blueprintRead.data.id ||
-    retainedResponseId !== responseRead.data.id ||
-    (responseRead.data.compiler_outcome !== "accepted" && !retainedTechnicalRecompile)
-  ) {
-    throw new Error("Hosted candidate lineage is not accepted and exact.");
-  }
-  const confirmationRead = await supabase
-    .from("adaptive_training_block_confirmations")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", receipt.userId)
-    .eq("detailed_candidate_id", candidateRead.data.id);
-  if (confirmationRead.error) {
-    throw new Error(confirmationRead.error.message);
-  }
-  const counts = await getQaUserOwnedCounts(supabase, receipt.userId);
-  const reviewPayload = {
-    blueprint: redactHostedEvidence(blueprintRead.data.blueprint_content),
-    candidate: {
-      intervalStart: candidateRead.data.interval_start_date,
-      intervalEnd: candidateRead.data.interval_end_date,
-      content: redactHostedEvidence(candidateRead.data.candidate_content),
-      inputSnapshot: redactHostedEvidence(candidateRead.data.input_snapshot),
-      factReferences: redactHostedEvidence(candidateRead.data.fact_references),
-      confirmationLineage: redactHostedEvidence(candidateRead.data.confirmation_lineage),
-    },
-  };
-  const reviewPayloadSha256 = hashStableJson(reviewPayload);
-  const artifact = {
-    artifactKind: "hito271_hosted_continuation_candidate_review_v2",
-    generatedAt: new Date().toISOString(),
-    task: "HITO-271",
-    runtimeBoundary: {
-      deploymentSha,
-      previewOrigin,
-      hostedProjectRef: receipt.projectRef,
-      providerMode: "openai_responses_api",
-      providerModel: responseRead.data.provider_model,
-      generationId: responseRead.data.generation_id,
-      providerResponseId: responseRead.data.provider_response_id,
-      externalProviderDispatchCount: 1,
-      responseAttemptExternalProviderDispatchCount: 1,
-      candidatePreparationExternalProviderDispatchCount: retainedTechnicalRecompile ? 0 : 1,
-    },
-    candidateIdentity: {
-      responseId: responseRead.data.id,
-      responseSha256: responseRead.data.response_sha256,
-      requestFingerprintSha256: responseRead.data.request_fingerprint_sha256,
-      versionFingerprintSha256: responseRead.data.version_fingerprint_sha256,
-      blueprintId: blueprintRead.data.id,
-      blueprintVersion: blueprintRead.data.version,
-      blueprintSha256: blueprintRead.data.content_sha256,
-      candidateId: candidateRead.data.id,
-      candidateVersion: candidateRead.data.version,
-      candidateSha256: candidateRead.data.candidate_sha256,
-    },
-    technicalOutcome: {
-      schemaOutcome: responseRead.data.schema_outcome,
-      compilerOutcome: responseRead.data.compiler_outcome,
-      candidateCompilerVersion: inputProvenance.compilerVersion ?? null,
-      retainedTechnicalRecompile,
-      diagnosticCode: responseRead.data.diagnostic_code,
-      diagnosticPath: responseRead.data.diagnostic_path,
-      versionContext: responseRead.data.version_context,
-      providerAttempt: responseRead.data.provider_attempt,
-      attemptResult: responseRead.data.attempt_result,
-    },
-    reviewPayload,
-    persistenceBoundary: {
-      counts,
-      candidateConfirmationCount: confirmationRead.count ?? 0,
-      candidateConfirmed: (confirmationRead.count ?? 0) > 0,
-      calendarRowsMaterialized: counts.planned_workouts,
-    },
-    privacyBoundary: {
-      providerContentIncluded: false,
-      rawPromptIncluded: false,
-      reviewTokenIncluded: false,
-      credentialIncluded: false,
-      runnerPiiIncluded: false,
-    },
-    reviewPayloadSha256,
-  };
-  await mkdir(path.dirname(outputPath), { recursive: true, mode: 0o700 });
-  const artifactBytes = Buffer.from(`${JSON.stringify(artifact, null, 2)}\n`);
-  await writeFile(outputPath, artifactBytes, { mode: 0o600 });
-  await chmod(outputPath, 0o600);
-  const artifactSha256 = createHash("sha256").update(artifactBytes).digest("hex");
-  const next = appendHostedCheckpoint(
-    receipt,
-    hostedCheckpoint("continuation_candidate_artifact", {
-      responseId: responseRead.data.id,
-      candidateId: candidateRead.data.id,
-      candidateSha256: candidateRead.data.candidate_sha256,
-      reviewPayloadSha256,
-      artifactSha256,
-      candidateConfirmed: false,
-    }),
-  );
-  await writeHostedReceipt(receiptPath, next);
-  console.log(
-    JSON.stringify({
-      ok: true,
-      action: "hosted-pool-candidate-artifact",
-      artifactPath: outputPath,
-      artifactSha256,
-      reviewPayloadSha256,
-      responseId: responseRead.data.id,
-      blueprintId: blueprintRead.data.id,
-      blueprintSha256: blueprintRead.data.content_sha256,
-      candidateId: candidateRead.data.id,
-      candidateSha256: candidateRead.data.candidate_sha256,
-      counts,
-      receiptSha256: hashStableJson(next),
-    }),
-  );
-}
-
-function redactHostedEvidence(value) {
-  if (Array.isArray(value)) return value.map(redactHostedEvidence);
-  if (!value || typeof value !== "object") return value;
-  const output = {};
-  for (const [key, child] of Object.entries(value)) {
-    if (
-      /(?:^|_)(?:user|owner)_?id$/i.test(key) ||
-      /email|password|credential|token|raw|prompt|response_body/i.test(key)
-    ) {
-      continue;
-    }
-    output[key] = redactHostedEvidence(child);
-  }
-  return output;
-}
-
-async function handleHostedPoolRecordCoachVerdict() {
-  const { receiptPath, receipt } = await readCurrentHostedReceipt();
-  const sourceArtifactPath = requireExternalPrivatePath(
-    options["source-artifact"],
-    "--source-artifact",
-  );
-  const verdictArtifactPath = requireExternalPrivatePath(
-    options["verdict-artifact"],
-    "--verdict-artifact",
-  );
-  const [sourceBytes, verdictBytes] = await Promise.all([
-    readFile(sourceArtifactPath),
-    readFile(verdictArtifactPath),
-  ]);
-  const sourceArtifact = JSON.parse(sourceBytes.toString("utf8"));
-  const verdictArtifact = JSON.parse(verdictBytes.toString("utf8"));
-  const sourceArtifactSha256 = createHash("sha256").update(sourceBytes).digest("hex");
-  const verdictArtifactSha256 = createHash("sha256").update(verdictBytes).digest("hex");
-  const candidateIdentity = sourceArtifact.candidateIdentity;
-  const approved = verdictArtifact.verdict === "APPROVED";
-  const rejected = verdictArtifact.verdict === "REJECTED";
-  if (
-    sourceArtifact.task !== "HITO-271" ||
-    verdictArtifact.task !== "HITO-271" ||
-    verdictArtifact.sourceArtifactSha256 !== sourceArtifactSha256 ||
-    verdictArtifact.reviewPayloadSha256 !== sourceArtifact.reviewPayloadSha256 ||
-    verdictArtifact.responseId !== candidateIdentity?.responseId ||
-    verdictArtifact.candidateId !== candidateIdentity?.candidateId ||
-    verdictArtifact.candidateSha256 !== candidateIdentity?.candidateSha256 ||
-    verdictArtifact.blueprintId !== candidateIdentity?.blueprintId ||
-    (!approved && !rejected) ||
-    verdictArtifact.safeToConfirm !== approved ||
-    typeof verdictArtifact.reviewedOn !== "string"
-  ) {
-    throw new Error("Running Coach verdict binding is not exact.");
-  }
-  const candidateRead = await supabase
-    .from("adaptive_training_detailed_candidates")
-    .select("id, candidate_sha256, blueprint_id, source_response_id")
-    .eq("user_id", receipt.userId)
-    .eq("id", candidateIdentity.candidateId)
-    .eq("candidate_sha256", candidateIdentity.candidateSha256)
-    .eq("blueprint_id", candidateIdentity.blueprintId)
-    .eq("source_response_id", candidateIdentity.responseId)
-    .maybeSingle();
-  if (candidateRead.error || !candidateRead.data) {
-    throw new Error(candidateRead.error?.message ?? "Coach-reviewed candidate is unavailable.");
-  }
-  const updated = recordHostedCoachVerdictThroughCanonicalOwner({
-    userId: receipt.userId,
-    responseRecordId: candidateIdentity.responseId,
-    reviewer: "running_coach",
-    verdict: {
-      verdict: approved ? "approved" : "rejected",
-      discriminator: approved ? null : verdictArtifact.discriminator,
-      reviewedAt: verdictArtifact.reviewedOn,
-    },
-  });
-  const recordedVerdict = updated.running_coach_verdict;
-  const next = appendHostedCheckpoint(
-    receipt,
-    hostedCheckpoint("running_coach_verdict", {
-      responseId: candidateIdentity.responseId,
-      candidateId: candidateIdentity.candidateId,
-      candidateSha256: candidateIdentity.candidateSha256,
-      verdict: approved ? "approved" : "rejected",
-      safeToConfirm: approved,
-      sourceArtifactSha256,
-      verdictArtifactSha256,
-    }),
-  );
-  await writeHostedReceipt(receiptPath, next);
-  console.log(
-    JSON.stringify({
-      ok: true,
-      action: "hosted-pool-record-coach-verdict",
-      responseId: candidateIdentity.responseId,
-      candidateId: candidateIdentity.candidateId,
-      verdict: approved ? "approved" : "rejected",
-      safeToConfirm: approved,
-      recordedVerdict,
-      sourceArtifactSha256,
-      verdictArtifactSha256,
-      receiptSha256: hashStableJson(next),
-    }),
-  );
-}
-
-function recordHostedCoachVerdictThroughCanonicalOwner(input) {
-  const script = String.raw`
-    import { readFileSync } from "node:fs";
-    import { recordAiPlanGenerationReviewVerdictForUser } from "./src/lib/ai-plan-generation-response-persistence.ts";
-    const input = JSON.parse(readFileSync(0, "utf8"));
-    const updated = await recordAiPlanGenerationReviewVerdictForUser(input);
-    console.log(JSON.stringify({ id: updated.id, running_coach_verdict: updated.running_coach_verdict }));
-  `;
-  const child = spawnSync(
-    process.execPath,
-    ["--import", "tsx", "--input-type=module", "-e", script],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        NEXT_PUBLIC_SUPABASE_URL: config.supabaseUrl,
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: config.supabasePublishableKey,
-        SUPABASE_SECRET_KEY: config.supabaseServerKey,
-      },
-      input: JSON.stringify(input),
-      encoding: "utf8",
-      stdio: ["pipe", "pipe", "pipe"],
-    },
-  );
-  if (child.status !== 0) {
-    const safeMessage = String(child.stderr ?? "")
-      .split("\n")
-      .find((line) => line.trim().startsWith("Error:"))
-      ?.trim()
-      .slice(0, 240);
-    throw new Error(
-      `Canonical Coach verdict persistence failed with status ${child.status}${safeMessage ? ` (${safeMessage})` : ""}.`,
-    );
-  }
-  return JSON.parse(child.stdout);
-}
-
-async function handleHostedPoolConfirmCandidate() {
-  const { receiptPath, receipt } = await readCurrentHostedReceipt();
-  const candidateId = requireOption(options["candidate-id"], "--candidate-id");
-  const asOfDate = requireOption(options["as-of-date"], "--as-of-date");
-  const outputPath = requireExternalPrivatePath(options.output, "--output");
-  const verdictArtifactPath = requireExternalPrivatePath(
-    options["verdict-artifact"],
-    "--verdict-artifact",
-  );
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(asOfDate)) {
-    throw new Error("--as-of-date must be one ISO Calendar date.");
-  }
-  const verdictBytes = await readFile(verdictArtifactPath);
-  const verdictArtifact = JSON.parse(verdictBytes.toString("utf8"));
-  const verdictArtifactSha256 = createHash("sha256").update(verdictBytes).digest("hex");
-  const candidateRead = await supabase
-    .from("adaptive_training_detailed_candidates")
-    .select(
-      "id, candidate_sha256, candidate_content, blueprint_id, source_response_id, interval_start_date, interval_end_date",
-    )
-    .eq("user_id", receipt.userId)
-    .eq("id", candidateId)
-    .maybeSingle();
-  if (candidateRead.error || !candidateRead.data) {
-    throw new Error(candidateRead.error?.message ?? "Coach-approved candidate is unavailable.");
-  }
-  const responseRead = await supabase
-    .from("ai_plan_generation_responses")
-    .select("id, running_coach_verdict")
-    .eq("user_id", receipt.userId)
-    .eq("id", candidateRead.data.source_response_id)
-    .maybeSingle();
-  if (responseRead.error || !responseRead.data) {
-    throw new Error(responseRead.error?.message ?? "Candidate response lineage is unavailable.");
-  }
-  if (
-    verdictArtifact.verdict !== "APPROVED" ||
-    verdictArtifact.safeToConfirm !== true ||
-    verdictArtifact.responseId !== responseRead.data.id ||
-    verdictArtifact.blueprintId !== candidateRead.data.blueprint_id ||
-    verdictArtifact.candidateId !== candidateRead.data.id ||
-    verdictArtifact.candidateSha256 !== candidateRead.data.candidate_sha256 ||
-    responseRead.data.running_coach_verdict?.verdict !== "approved"
-  ) {
-    throw new Error("The candidate does not have one exact persisted Coach approval.");
-  }
-  const workoutDocuments = candidateRead.data.candidate_content?.workoutDocuments;
-  if (!Array.isArray(workoutDocuments) || workoutDocuments.length === 0) {
-    throw new Error("The Coach-approved candidate has no canonical WorkoutDocuments.");
-  }
-  const beforeCounts = await getQaUserOwnedCounts(supabase, receipt.userId);
-  const existingConfirmation = await supabase
-    .from("adaptive_training_block_confirmations")
-    .select("id, candidate_sha256, calendar_workout_ids")
-    .eq("user_id", receipt.userId)
-    .eq("detailed_candidate_id", candidateId)
-    .maybeSingle();
-  if (existingConfirmation.error) throw new Error(existingConfirmation.error.message);
-  const confirmationResult = existingConfirmation.data
-    ? {
-        resumed: true,
-        reviewChecksum: null,
-        reviewTokenSha256: null,
-        outcome: "confirmed",
-      }
-    : runHostedCandidateConfirmationThroughCanonicalOwner({
-        userId: receipt.userId,
-        candidateId,
-        asOfDate,
-      });
-  const confirmationRead = await supabase
-    .from("adaptive_training_block_confirmations")
-    .select(
-      "id, blueprint_id, detailed_candidate_id, predecessor_confirmation_id, candidate_sha256, block_mode, interval_start_date, interval_end_date, calendar_workout_ids",
-    )
-    .eq("user_id", receipt.userId)
-    .eq("detailed_candidate_id", candidateId)
-    .single();
-  if (confirmationRead.error) throw new Error(confirmationRead.error.message);
-  const afterCounts = await getQaUserOwnedCounts(supabase, receipt.userId);
-  assert.equal(confirmationRead.data.candidate_sha256, candidateRead.data.candidate_sha256);
-  assert.equal(confirmationRead.data.blueprint_id, candidateRead.data.blueprint_id);
-  assert.equal(confirmationRead.data.interval_start_date, candidateRead.data.interval_start_date);
-  assert.equal(confirmationRead.data.interval_end_date, candidateRead.data.interval_end_date);
-  assert.equal(confirmationRead.data.calendar_workout_ids.length, workoutDocuments.length);
-  assert.equal(
-    afterCounts.adaptive_training_block_confirmations,
-    beforeCounts.adaptive_training_block_confirmations + (existingConfirmation.data ? 0 : 1),
-  );
-  assert.equal(
-    afterCounts.planned_workouts,
-    beforeCounts.planned_workouts + (existingConfirmation.data ? 0 : workoutDocuments.length),
-  );
-  const readback = readHostedAdaptiveProjectionThroughCanonicalOwner({
-    userId: receipt.userId,
-    asOfDate,
-  });
-  assert.equal(readback.source.latestConfirmationId, confirmationRead.data.id);
-  assert.equal(readback.source.confirmedCalendarWorkoutCount, afterCounts.planned_workouts);
-  assert.equal(readback.projections.calendarRowCount, 0);
-  const collisionWorkouts = await supabase
-    .from("planned_workouts")
-    .select("id, workout_date")
-    .eq("user_id", receipt.userId)
-    .neq("workout_type", "rest")
-    .gte("workout_date", candidateRead.data.interval_start_date)
-    .order("workout_date", { ascending: true })
-    .limit(2);
-  if (collisionWorkouts.error || collisionWorkouts.data.length !== 2) {
-    throw new Error(
-      collisionWorkouts.error?.message ?? "Collision proof requires two owned workouts.",
-    );
-  }
-  const protectedLog = await supabase
-    .from("workout_logs")
-    .select("planned_workout_id")
-    .eq("user_id", receipt.userId)
-    .eq("outcome", "completed")
-    .limit(1)
-    .maybeSingle();
-  if (protectedLog.error || !protectedLog.data) {
-    throw new Error(protectedLog.error?.message ?? "Protection proof requires one completed row.");
-  }
-  const negativeProof = runHostedWorkoutCommandNegativeProofThroughCanonicalOwner({
-    userId: receipt.userId,
-    foreignUserId: crypto.randomUUID(),
-    candidateId,
-    asOfDate,
-    collisionSourceWorkoutId: collisionWorkouts.data[0].id,
-    collisionTargetDate: collisionWorkouts.data[1].workout_date,
-    protectedWorkoutId: protectedLog.data.planned_workout_id,
-  });
-  assert.equal(negativeProof.stale.ok, false);
-  assert.equal(negativeProof.foreignOwner.ok, false);
-  assert.equal(negativeProof.collision.ok, false);
-  assert.equal(negativeProof.protection.ok, false);
-  const afterNegativeCounts = await getQaUserOwnedCounts(supabase, receipt.userId);
-  assert.deepEqual(afterNegativeCounts, afterCounts);
-  const artifact = {
-    artifactKind: "hito271_hosted_sealed_candidate_confirmation_v1",
-    task: "HITO-271",
-    createdAt: new Date().toISOString(),
-    candidate: {
-      id: candidateRead.data.id,
-      sha256: candidateRead.data.candidate_sha256,
-      intervalStartDate: candidateRead.data.interval_start_date,
-      intervalEndDate: candidateRead.data.interval_end_date,
-      workoutDocumentCount: workoutDocuments.length,
-    },
-    coachVerdict: {
-      verdict: "approved",
-      safeToConfirm: true,
-      artifactSha256: verdictArtifactSha256,
-    },
-    sealedCommand: confirmationResult,
-    negativeProof,
-    confirmation: confirmationRead.data,
-    persistence: {
-      beforeCounts,
-      afterCounts,
-      futureProjectionCalendarRowCount: readback.projections.calendarRowCount,
-      projectionExecutableFieldsExposed: readback.projections.executableFieldsExposed,
-    },
-    providerDispatchCount: 0,
-    privacy: {
-      reviewTokenIncluded: false,
-      rawProviderContentIncluded: false,
-      credentialIncluded: false,
-      runnerPiiIncluded: false,
-    },
-  };
-  await mkdir(path.dirname(outputPath), { recursive: true, mode: 0o700 });
-  const artifactBytes = Buffer.from(`${JSON.stringify(artifact, null, 2)}\n`);
-  await writeFile(outputPath, artifactBytes, { mode: 0o600 });
-  await chmod(outputPath, 0o600);
-  const artifactSha256 = createHash("sha256").update(artifactBytes).digest("hex");
-  const next = appendHostedCheckpoint(
-    receipt,
-    hostedCheckpoint("sealed_candidate_confirmation", {
-      candidateId,
-      candidateSha256: candidateRead.data.candidate_sha256,
-      confirmationId: confirmationRead.data.id,
-      calendarWorkoutCount: afterCounts.planned_workouts,
-      providerDispatchCount: 0,
-      artifactSha256,
-    }),
-  );
-  await writeHostedReceipt(receiptPath, next);
-  console.log(
-    JSON.stringify({
-      ok: true,
-      action: "hosted-pool-confirm-candidate",
-      candidateId,
-      candidateSha256: candidateRead.data.candidate_sha256,
-      confirmationId: confirmationRead.data.id,
-      resumed: confirmationResult.resumed,
-      calendarWorkoutCount: afterCounts.planned_workouts,
-      futureProjectionCalendarRowCount: readback.projections.calendarRowCount,
-      providerDispatchCount: 0,
-      outputPath,
-      artifactSha256,
-      receiptSha256: hashStableJson(next),
-    }),
-  );
-}
-
-function runHostedWorkoutCommandNegativeProofThroughCanonicalOwner(input) {
-  const script = String.raw`
-    import { readFileSync } from "node:fs";
-    import { reviewWorkoutCommandForUser } from "./src/lib/manual-workout-authoring/actions.ts";
-    const input = JSON.parse(readFileSync(0, "utf8"));
-    const summarize = (result) => ({
-      ok: result.ok,
-      issueCodes: result.ok ? [] : result.issues.map((issue) => issue.code),
-      issuePaths: result.ok ? [] : result.issues.map((issue) => issue.path),
-    });
-    const stale = await reviewWorkoutCommandForUser(
-      input.userId,
-      {
-        operation: "materialize_source_candidate",
-        source: { kind: "adaptive_continuation_candidate", candidateId: input.candidateId },
-      },
-      { adaptiveContinuationAsOfDate: input.asOfDate },
-    );
-    const foreignOwner = await reviewWorkoutCommandForUser(
-      input.foreignUserId,
-      {
-        operation: "materialize_source_candidate",
-        source: { kind: "adaptive_continuation_candidate", candidateId: input.candidateId },
-      },
-      { adaptiveContinuationAsOfDate: input.asOfDate },
-    );
-    const collision = await reviewWorkoutCommandForUser(input.userId, {
-      operation: "copy",
-      workoutId: input.collisionSourceWorkoutId,
-      targetDate: input.collisionTargetDate,
-    });
-    const protection = await reviewWorkoutCommandForUser(input.userId, {
-      operation: "delete",
-      workoutId: input.protectedWorkoutId,
-    });
-    console.log(JSON.stringify({
-      stale: summarize(stale),
-      foreignOwner: summarize(foreignOwner),
-      collision: summarize(collision),
-      protection: summarize(protection),
-      confirmationAttempted: false,
-    }));
-  `;
-  const child = spawnSync(
-    process.execPath,
-    ["--import", "tsx", "--input-type=module", "-e", script],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        NEXT_PUBLIC_SUPABASE_URL: config.supabaseUrl,
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: config.supabasePublishableKey,
-        SUPABASE_SECRET_KEY: config.supabaseServerKey,
-      },
-      input: JSON.stringify(input),
-      encoding: "utf8",
-      stdio: ["pipe", "pipe", "pipe"],
-    },
-  );
-  if (child.status !== 0) {
-    const safeMessage = String(child.stderr ?? "")
-      .split("\n")
-      .find((line) => line.trim().startsWith("Error:"))
-      ?.trim()
-      .slice(0, 240);
-    throw new Error(
-      `Canonical WorkoutCommand negative proof failed with status ${child.status}${safeMessage ? ` (${safeMessage})` : ""}.`,
-    );
-  }
-  return JSON.parse(child.stdout);
-}
-
-function runHostedCandidateConfirmationThroughCanonicalOwner(input) {
-  const script = String.raw`
-    import { createHash } from "node:crypto";
-    import { readFileSync } from "node:fs";
-    import { reviewWorkoutCommandForUser, confirmWorkoutCommandForUser } from "./src/lib/manual-workout-authoring/actions.ts";
-    const input = JSON.parse(readFileSync(0, "utf8"));
-    const review = await reviewWorkoutCommandForUser(
-      input.userId,
-      {
-        operation: "materialize_source_candidate",
-        source: { kind: "adaptive_continuation_candidate", candidateId: input.candidateId },
-      },
-      { adaptiveContinuationAsOfDate: input.asOfDate },
-    );
-    if (!review.ok) throw new Error(review.issues[0]?.message ?? "Candidate review failed.");
-    const confirmed = await confirmWorkoutCommandForUser(
-      input.userId,
-      {
-        command: review.candidate.command,
-        candidateId: review.candidate.candidateId,
-        reviewToken: review.candidate.reviewToken,
-        reviewChecksum: review.candidate.reviewChecksum,
-      },
-      { adaptiveContinuationAsOfDate: input.asOfDate },
-    );
-    if (!confirmed.ok) throw new Error(confirmed.message ?? "Candidate confirmation failed.");
-    console.log(JSON.stringify({
-      resumed: false,
-      reviewChecksum: review.candidate.reviewChecksum,
-      reviewTokenSha256: createHash("sha256").update(review.candidate.reviewToken).digest("hex"),
-      reviewedDocumentCount: review.candidate.command.documents.length,
-      outcome: "confirmed",
-    }));
-  `;
-  const child = spawnSync(
-    process.execPath,
-    ["--import", "tsx", "--input-type=module", "-e", script],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        NEXT_PUBLIC_SUPABASE_URL: config.supabaseUrl,
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: config.supabasePublishableKey,
-        SUPABASE_SECRET_KEY: config.supabaseServerKey,
-      },
-      input: JSON.stringify(input),
-      encoding: "utf8",
-      stdio: ["pipe", "pipe", "pipe"],
-    },
-  );
-  if (child.status !== 0) {
-    const safeMessage = String(child.stderr ?? "")
-      .split("\n")
-      .find((line) => line.trim().startsWith("Error:"))
-      ?.trim()
-      .slice(0, 240);
-    throw new Error(
-      `Canonical sealed candidate confirmation failed with status ${child.status}${safeMessage ? ` (${safeMessage})` : ""}.`,
-    );
-  }
-  return JSON.parse(child.stdout);
-}
-
-function readHostedAdaptiveProjectionThroughCanonicalOwner(input) {
-  const script = String.raw`
-    import { readFileSync } from "node:fs";
-    import { createClient } from "@supabase/supabase-js";
-    import { readAdaptiveBlueprintProjectionFixture } from "./scripts/lib/runner-design-profile-fixture.ts";
-    const input = JSON.parse(readFileSync(0, "utf8"));
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SECRET_KEY,
-      { auth: { autoRefreshToken: false, persistSession: false } },
-    );
-    const readback = await readAdaptiveBlueprintProjectionFixture({
-      supabase,
-      userId: input.userId,
-      asOfDate: input.asOfDate,
-    });
-    console.log(JSON.stringify(readback));
-  `;
-  const child = spawnSync(
-    process.execPath,
-    ["--import", "tsx", "--input-type=module", "-e", script],
-    {
-      cwd: process.cwd(),
-      env: {
-        ...process.env,
-        NEXT_PUBLIC_SUPABASE_URL: config.supabaseUrl,
-        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: config.supabasePublishableKey,
-        SUPABASE_SECRET_KEY: config.supabaseServerKey,
-      },
-      input: JSON.stringify(input),
-      encoding: "utf8",
-      stdio: ["pipe", "pipe", "pipe"],
-    },
-  );
-  if (child.status !== 0) {
-    const safeMessage = String(child.stderr ?? "")
-      .split("\n")
-      .find((line) => line.trim().startsWith("Error:"))
-      ?.trim()
-      .slice(0, 240);
-    throw new Error(
-      `Canonical adaptive readback failed with status ${child.status}${safeMessage ? ` (${safeMessage})` : ""}.`,
-    );
-  }
-  return JSON.parse(child.stdout);
-}
-
-async function handleHostedPoolReset() {
-  const { receiptPath, receipt } = await readCurrentHostedReceipt();
-  const beforeCounts = await getQaUserOwnedCounts(supabase, receipt.userId);
-  const afterCounts = await resetQaPoolUserData({
-    supabase,
-    userId: receipt.userId,
-    preserveProfile: options["preserve-profile"] === "true",
-    preserveAiPlanGenerationResponseIds: [],
-  });
-  if (Object.values(afterCounts).some((count) => count !== 0)) {
-    throw new Error("Hosted QA pool reset did not reach zero.");
-  }
-  await releaseQaPoolLease({ role: receipt.role, token: receipt.leaseToken });
-  const next = {
-    ...appendHostedCheckpoint(
-      receipt,
-      hostedCheckpoint("domain_state_reset", { beforeCounts, afterCounts }),
-    ),
-    leaseReleasedAt: new Date().toISOString(),
-  };
-  await writeHostedReceipt(receiptPath, next);
-  console.log(
-    JSON.stringify({
-      ok: true,
-      action: "hosted-pool-reset",
-      userId: receipt.userId,
-      authIdentityRetained: true,
-      afterCounts,
-      receiptPath,
-      receiptSha256: hashStableJson(next),
-    }),
-  );
-}
-
-async function readCurrentHostedReceipt() {
-  const role = requireHostedAdaptivePoolRole();
-  const receiptPath = requireHostedReceiptPath();
-  const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
-  if (
-    receipt.task !== "HITO-271" ||
-    receipt.projectRef !== config.hostedProjectRef ||
-    receipt.role !== role ||
-    typeof receipt.userId !== "string" ||
-    typeof receipt.leaseToken !== "string"
-  ) {
-    throw new Error("Hosted QA pool receipt identity mismatch.");
-  }
-  const authUser = await assertQaPoolAuthUser({
-    supabase,
-    role,
-    userId: receipt.userId,
-  });
-  await assertQaPoolLease({ role, token: receipt.leaseToken });
-  if (
-    !String(authUser.email ?? "")
-      .toLowerCase()
-      .endsWith(".invalid")
-  ) {
-    throw new Error("Hosted QA pool receipt no longer names a .invalid identity.");
-  }
-  return { receiptPath, receipt, authUser };
-}
-
-function requireHostedAdaptivePoolRole() {
-  const role = requireQaPoolRole(options.role);
-  if (role !== "adaptive-training-quality") {
-    throw new Error("Hosted HITO-271 lifecycle is restricted to adaptive-training-quality.");
-  }
-  return role;
-}
-
-function requireHostedReceiptPath() {
-  return requireExternalPrivatePath(options.receipt, "--receipt");
-}
-
-function requireExternalPrivatePath(value, label) {
-  const resolved = path.resolve(requireOption(value, label));
-  const relative = path.relative(process.cwd(), resolved);
-  if (relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))) {
-    throw new Error(`${label} must be outside the repository checkout.`);
-  }
-  return resolved;
-}
-
-function requireHostedPreviewOrigin(value) {
-  const parsed = new URL(requireOption(value, "--preview-origin"));
-  if (parsed.protocol !== "https:" || !parsed.hostname.endsWith(".vercel.app")) {
-    throw new Error("--preview-origin must be an HTTPS Vercel Preview origin.");
-  }
-  return parsed.origin;
-}
-
-function hostedCheckpoint(name, evidence) {
-  return { name, recordedAt: new Date().toISOString(), evidence };
-}
-
-function appendHostedCheckpoint(receipt, checkpoint) {
-  return { ...receipt, checkpoints: [...receipt.checkpoints, checkpoint] };
-}
-
-async function writeHostedReceipt(receiptPath, receipt, { create = false } = {}) {
-  await mkdir(path.dirname(receiptPath), { recursive: true, mode: 0o700 });
-  await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, {
-    mode: 0o600,
-    ...(create ? { flag: "wx" } : {}),
-  });
-  await chmod(receiptPath, 0o600);
-  const receiptStat = await stat(receiptPath);
-  if ((receiptStat.mode & 0o777) !== 0o600) {
-    throw new Error("Hosted QA pool receipt mode must be 0600.");
-  }
-}
-
 async function handlePoolReset({ preserveProfile = false } = {}) {
   const role = requireQaPoolRole(options.role);
   await assertPoolRoleIsNotLeased(role);
@@ -2250,6 +413,288 @@ async function handlePoolDelete() {
       2,
     ),
   );
+}
+
+async function handleAdaptiveUiReplaySeed() {
+  await withAdaptiveUiReplayIdentity(async ({ userId, runtimeScope, environment }) => {
+    const checkpoint = adaptiveUiReplayCheckpoint();
+    const beforeCounts = await getQaUserOwnedCounts(supabase, userId);
+    await resetQaPoolUserData({ supabase, userId });
+    await removeAdaptiveUiReplayInteractionArtifact();
+    let fixture;
+    let interactionArtifact = null;
+    try {
+      fixture = await seedAdaptiveEngineUiReplayFixture({
+        supabase,
+        userId,
+        asOfDate: options["as-of-date"],
+        runtimeScope,
+        checkpoint,
+      });
+      if (checkpoint === "continuation_actions") {
+        const fitBuffer = buildAdaptiveTrainingQualityFitFile({
+          localDate: fixture.interactionMatrix.fitRpeTarget.workoutDate,
+          evidenceKind: "compatible",
+        });
+        await mkdir(path.dirname(ADAPTIVE_UI_REPLAY_INTERACTION_ARTIFACT), {
+          recursive: true,
+          mode: 0o700,
+        });
+        await writeFile(ADAPTIVE_UI_REPLAY_INTERACTION_ARTIFACT, fitBuffer, { mode: 0o600 });
+        await chmod(ADAPTIVE_UI_REPLAY_INTERACTION_ARTIFACT, 0o600);
+        interactionArtifact = await adaptiveUiReplayInteractionArtifactReceipt(fitBuffer);
+      }
+    } catch (error) {
+      const cleanup = await resetQaPoolUserData({ supabase, userId });
+      assertAllOwnedCountsZero(cleanup, "Adaptive UI replay failed seed cleanup");
+      await assertUserStorageEmpty(userId);
+      await removeAdaptiveUiReplayInteractionArtifact();
+      throw error;
+    }
+    const afterCounts = await getQaUserOwnedCounts(supabase, userId);
+    if (checkpoint === "initial_plan_review") {
+      assert.equal(afterCounts.ai_plan_generation_responses, 1);
+      assert.equal(afterCounts.adaptive_training_blueprint_versions, 1);
+      assert.equal(afterCounts.adaptive_training_detailed_candidates, 1);
+      assert.equal(afterCounts.adaptive_training_block_confirmations, 0);
+      assert.equal(afterCounts.planned_workouts, 0);
+      assert.equal(afterCounts.runner_capability_usage, 0);
+    }
+    const provenance = await readAdaptiveUiReplayProvenance(userId, checkpoint);
+    assert.equal(fixture.invariants.externalProviderDispatchCount, 0);
+    assert.equal(provenance.providerResponseIdsAreDeterministicFixtures, true);
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          action: "adaptive-ui-replay-seed",
+          environment,
+          fixtureVersion: ADAPTIVE_ENGINE_UI_REPLAY_FIXTURE_VERSION,
+          checkpoint,
+          beforeCounts,
+          fixture,
+          interactionArtifact,
+          provenance,
+          afterCounts,
+        },
+        null,
+        2,
+      ),
+    );
+  });
+}
+
+async function handleAdaptiveUiReplayStatus() {
+  await withAdaptiveUiReplayIdentity(async ({ userId, runtimeScope, environment }) => {
+    const checkpoint = adaptiveUiReplayCheckpoint();
+    const ownedRows = await getQaUserOwnedCounts(supabase, userId);
+    const hasConfirmedSource = ownedRows.adaptive_training_block_confirmations > 0;
+    const savedPlanReviews =
+      checkpoint === "initial_plan_review" ? await listSavedPlanReviewsForUser(userId) : null;
+    const savedPlanReview = savedPlanReviews?.records[0] ?? null;
+    const restore = savedPlanReview
+      ? await restoreSavedPlanReviewForUser(userId, {
+          candidateId: savedPlanReview.candidate.id,
+          candidateVersion: savedPlanReview.candidate.version,
+        })
+      : null;
+    let fixture = hasConfirmedSource
+      ? await readAdaptiveBlueprintProjectionFixture({
+          supabase,
+          userId,
+          asOfDate: options["as-of-date"],
+        })
+      : {
+          fixtureVersion: ADAPTIVE_ENGINE_UI_REPLAY_FIXTURE_VERSION,
+          checkpoint,
+          uiState:
+            ownedRows.adaptive_training_detailed_candidates > 0
+              ? "initial_candidate_persisted_unconfirmed"
+              : "onboarding_ready",
+          initialCandidatePreseeded: Boolean(savedPlanReview),
+          savedPlanReview: savedPlanReview
+            ? {
+                candidate: savedPlanReview.candidate,
+                validity: savedPlanReview.validity,
+                restoreStatus: restore?.status ?? "unavailable",
+                canonicalRowCount:
+                  restore?.ok && restore.status === "review_ready"
+                    ? restore.review.workoutDocuments.length
+                    : null,
+              }
+            : null,
+        };
+    if (
+      checkpoint === "continuation_actions" &&
+      hasConfirmedSource &&
+      fixture.continuation.status === "check_in_needed"
+    ) {
+      fixture = {
+        ...fixture,
+        interactionMatrix: await readAdaptiveEngineUiReplayInteractionCheckpoint({
+          supabase,
+          userId,
+          asOfDate: options["as-of-date"],
+          initial: fixture,
+        }),
+      };
+    }
+    const { userId: _technicalOwnerId, ...redactedFixture } = fixture;
+    const provenance = await readAdaptiveUiReplayProvenance(userId, checkpoint);
+    const interactionArtifact =
+      checkpoint === "continuation_actions"
+        ? await adaptiveUiReplayInteractionArtifactReceipt()
+        : null;
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          action: "adaptive-ui-replay-status",
+          environment,
+          fixtureVersion: ADAPTIVE_ENGINE_UI_REPLAY_FIXTURE_VERSION,
+          checkpoint,
+          runtimeScope,
+          fixture: redactedFixture,
+          interactionArtifact,
+          provenance,
+          ownedRows,
+        },
+        null,
+        2,
+      ),
+    );
+  });
+}
+
+async function handleAdaptiveUiReplayReset() {
+  const confirmation = requireOption(
+    options["confirm-fixture-version"],
+    "--confirm-fixture-version",
+  );
+  if (confirmation !== ADAPTIVE_ENGINE_UI_REPLAY_FIXTURE_VERSION) {
+    throw new Error(
+      `--confirm-fixture-version must exactly equal ${ADAPTIVE_ENGINE_UI_REPLAY_FIXTURE_VERSION}.`,
+    );
+  }
+  await withAdaptiveUiReplayIdentity(async ({ userId, environment }) => {
+    const beforeCounts = await getQaUserOwnedCounts(supabase, userId);
+    const afterCounts = await resetQaPoolUserData({ supabase, userId });
+    assertAllOwnedCountsZero(afterCounts, "Adaptive UI replay reset");
+    await assertUserStorageEmpty(userId);
+    await removeAdaptiveUiReplayInteractionArtifact();
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          action: "adaptive-ui-replay-reset",
+          environment,
+          fixtureVersion: ADAPTIVE_ENGINE_UI_REPLAY_FIXTURE_VERSION,
+          authIdentityRetained: true,
+          beforeCounts,
+          afterCounts,
+          storageObjects: 0,
+          interactionArtifactRemoved: true,
+        },
+        null,
+        2,
+      ),
+    );
+  });
+}
+
+async function withAdaptiveUiReplayIdentity(action) {
+  const role = ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE;
+  const lease = await acquireQaPoolLease({ role });
+  try {
+    if (config.hostedProjectRef) {
+      const userId = requireOption(options["user-id"], "--user-id");
+      const authUser = await assertQaPoolAuthUser({ supabase, role, userId });
+      if (
+        !String(authUser.email ?? "")
+          .toLowerCase()
+          .endsWith(".invalid")
+      ) {
+        throw new Error("Hosted adaptive UI replay requires the retained .invalid identity.");
+      }
+      return await action({
+        userId,
+        environment: "hosted",
+        runtimeScope: "hosted_ui_replay",
+      });
+    }
+
+    const authUser = await ensureQaPoolUserWithLocalAccount(role);
+    return await action({
+      userId: authUser.id,
+      environment: "local",
+      runtimeScope: "local_proof",
+    });
+  } finally {
+    await releaseQaPoolLease({ role, token: lease.token });
+  }
+}
+
+async function readAdaptiveUiReplayProvenance(userId, checkpoint) {
+  const responses = await supabase
+    .from("ai_plan_generation_responses")
+    .select("provider_response_id, provider_model, schema_outcome, compiler_outcome")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true });
+  if (responses.error) throw new Error(responses.error.message);
+  const minimumResponseCount = checkpoint === "complete_surface" ? 3 : 1;
+  assert.ok(responses.data.length >= minimumResponseCount);
+  const providerResponseIdsAreDeterministicFixtures = responses.data.every(
+    (response) =>
+      typeof response.provider_response_id === "string" &&
+      response.provider_response_id.startsWith("local-dev-") &&
+      response.schema_outcome === "accepted" &&
+      response.compiler_outcome === "accepted",
+  );
+  return {
+    fixtureVersion: ADAPTIVE_ENGINE_UI_REPLAY_FIXTURE_VERSION,
+    checkpoint,
+    sourceFixtureVersion: ADAPTIVE_BLUEPRINT_PROJECTION_FIXTURE_VERSION,
+    responseCount: responses.data.length,
+    providerModels: [...new Set(responses.data.map((response) => response.provider_model))],
+    providerResponseIdsAreDeterministicFixtures,
+    externalProviderDispatchCount: 0,
+    rawResponseIncluded: false,
+    rawPromptIncluded: false,
+    credentialsIncluded: false,
+    actionLinksIncluded: false,
+    personalDataIncluded: false,
+    hito271SealedLineageRestored: false,
+  };
+}
+
+function adaptiveUiReplayCheckpoint() {
+  const checkpoint = options.checkpoint ?? "complete_surface";
+  if (!ADAPTIVE_ENGINE_UI_REPLAY_CHECKPOINTS.includes(checkpoint)) {
+    throw new Error(
+      `--checkpoint must be one of ${ADAPTIVE_ENGINE_UI_REPLAY_CHECKPOINTS.join(", ")}.`,
+    );
+  }
+  return checkpoint;
+}
+
+async function adaptiveUiReplayInteractionArtifactReceipt(buffer) {
+  const fileBuffer = buffer ?? (await readFile(ADAPTIVE_UI_REPLAY_INTERACTION_ARTIFACT));
+  const metadata = await stat(ADAPTIVE_UI_REPLAY_INTERACTION_ARTIFACT);
+  assert.equal(metadata.mode & 0o777, 0o600);
+  return {
+    kind: "synthetic_fit_upload_input",
+    relativePath: path.relative(process.cwd(), ADAPTIVE_UI_REPLAY_INTERACTION_ARTIFACT),
+    sha256: createHash("sha256").update(fileBuffer).digest("hex"),
+    sizeBytes: fileBuffer.length,
+    mode: "0600",
+    rawProviderContentIncluded: false,
+    credentialsIncluded: false,
+    personalDataIncluded: false,
+  };
+}
+
+async function removeAdaptiveUiReplayInteractionArtifact() {
+  await rm(ADAPTIVE_UI_REPLAY_INTERACTION_ARTIFACT, { force: true });
 }
 
 async function handleDesignProfileSeed() {
@@ -3457,7 +1902,7 @@ async function buildConfig() {
   );
   const hostedProjectRef = options["trusted-hosted-project-ref"] ?? null;
   const hostedKeyInventory =
-    HOSTED_POOL_COMMANDS.has(command) && options["api-key-inventory-stdin"] === "true"
+    HOSTED_CAPABLE_COMMANDS.has(command) && options["api-key-inventory-stdin"] === "true"
       ? JSON.parse(await readStdin())
       : null;
   const suppliedServerKey = readEnv("SUPABASE_SECRET_KEY");
@@ -3467,11 +1912,14 @@ async function buildConfig() {
     readEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY") ??
     (hostedKeyInventory ? findCurrentPublishableKey(hostedKeyInventory) : null);
   requireOption(supabaseServerKey, "SUPABASE_SECRET_KEY");
+  const parsed = new URL(supabaseUrl);
+  const isLoopbackRuntime = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]).has(
+    parsed.hostname.toLowerCase(),
+  );
 
-  if (!isLoopbackRuntimeUrl(supabaseUrl)) {
-    const parsed = new URL(supabaseUrl);
+  if (!isLoopbackRuntime) {
     if (
-      !HOSTED_POOL_COMMANDS.has(command) ||
+      !HOSTED_CAPABLE_COMMANDS.has(command) ||
       typeof hostedProjectRef !== "string" ||
       !/^[a-z0-9]{20}$/.test(hostedProjectRef) ||
       parsed.protocol !== "https:" ||
@@ -3493,12 +1941,6 @@ async function buildConfig() {
     };
   }
 
-  if (HOSTED_POOL_COMMANDS.has(command)) {
-    throw new Error(
-      "Hosted pool commands require a non-loopback Supabase target and exact project admission.",
-    );
-  }
-
   return {
     supabaseUrl,
     supabaseServerKey,
@@ -3514,7 +1956,7 @@ async function buildConfig() {
 function findCurrentSecretKey(value) {
   const values = [];
   visitValues(value, values);
-  const secret = values.find((candidate) => candidate.startsWith("sb_secret_"));
+  const secret = values.find((candidate) => isCompleteCurrentApiKey(candidate, "sb_secret_"));
   if (!secret) {
     throw new Error("The current hosted Supabase secret-key class is unavailable.");
   }
@@ -3524,11 +1966,17 @@ function findCurrentSecretKey(value) {
 function findCurrentPublishableKey(value) {
   const values = [];
   visitValues(value, values);
-  const publishable = values.find((candidate) => candidate.startsWith("sb_publishable_"));
+  const publishable = values.find((candidate) =>
+    isCompleteCurrentApiKey(candidate, "sb_publishable_"),
+  );
   if (!publishable) {
     throw new Error("The current hosted Supabase publishable-key class is unavailable.");
   }
   return publishable;
+}
+
+function isCompleteCurrentApiKey(value, prefix) {
+  return value.length >= 32 && value.startsWith(prefix) && /^[A-Za-z0-9_-]+$/.test(value);
 }
 
 function visitValues(value, output) {
@@ -3551,10 +1999,6 @@ async function readStdin() {
   const value = Buffer.concat(chunks).toString("utf8").trim();
   if (!value) throw new Error("Hosted Supabase key inventory input is empty.");
   return value;
-}
-
-function hashStableJson(value) {
-  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
 async function loadLocalAccounts() {

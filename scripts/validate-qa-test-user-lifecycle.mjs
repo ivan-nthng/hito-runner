@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -25,6 +26,41 @@ const { readLocalAuthAccountRegistry, writeLocalAuthAccountRegistry } = await ts
 
 const target = { origin: "http://127.0.0.1:54321", loopback: true };
 const zeroRows = Object.fromEntries(QA_TEST_USER_OWNED_TABLES.map((table) => [table, 0]));
+
+const maskedHostedInventory = spawnSync(
+  process.execPath,
+  [
+    "scripts/test-user.mjs",
+    "adaptive-ui-replay-status",
+    "--trusted-hosted-project-ref",
+    "abcdefghijklmnopqrst",
+    "--user-id",
+    "00000000-0000-4000-8000-000000000001",
+    "--api-key-inventory-stdin",
+    "true",
+  ],
+  {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      NEXT_PUBLIC_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co",
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "",
+      SUPABASE_SECRET_KEY: "",
+    },
+    encoding: "utf8",
+    input: JSON.stringify([
+      { type: "secret", api_key: "sb_secret_REDACTED-VALUE", prefix: "sb_secret_fake" },
+      {
+        type: "publishable",
+        api_key: "sb_publishable_REDACTED-VALUE",
+        prefix: "sb_publishable_fake",
+      },
+    ]),
+  },
+);
+assert.notEqual(maskedHostedInventory.status, 0);
+assert.match(maskedHostedInventory.stderr, /secret-key class is unavailable/);
+assert.doesNotMatch(maskedHostedInventory.stderr, /REDACTED-VALUE/);
 
 assert.equal(
   classifyQaIdentity(user("admin", { hito_local_role: "admin", hito_test_user: true })).kind,
@@ -327,6 +363,63 @@ assert.deepEqual(Object.keys(QA_TESTER_POOL), [
   "isolation-b",
 ]);
 
+const [
+  testUserSource,
+  adaptiveFixtureSource,
+  packageSource,
+  lifecycleContract,
+  runningPlanEngineSource,
+  activePlanActionsSource,
+] = await Promise.all([
+  readFile(path.resolve("scripts/test-user.mjs"), "utf8"),
+  readFile(path.resolve("scripts/lib/runner-design-profile-fixture.ts"), "utf8"),
+  readFile(path.resolve("package.json"), "utf8"),
+  readFile(path.resolve("docs/process/test-user-lifecycle.md"), "utf8"),
+  readFile(path.resolve("src/lib/running-plan-engine-actions.ts"), "utf8"),
+  readFile(path.resolve("src/lib/active-plan-persistence.ts"), "utf8"),
+]);
+for (const command of [
+  "adaptive-ui-replay-seed",
+  "adaptive-ui-replay-status",
+  "adaptive-ui-replay-reset",
+]) {
+  assert.match(testUserSource, new RegExp(`command === "${command}"`));
+  assert.match(packageSource, new RegExp(command));
+}
+assert.doesNotMatch(testUserSource, /hosted-pool-/);
+assert.doesNotMatch(testUserSource, /generateLink\(|hashed_token|magiclink/);
+assert.match(adaptiveFixtureSource, /adaptive_engine_ui_replay_v1/);
+for (const checkpoint of ["initial_plan_review", "continuation_actions", "complete_surface"]) {
+  assert.match(adaptiveFixtureSource, new RegExp(`"${checkpoint}"`));
+}
+assert.match(testUserSource, /--checkpoint must be one of/);
+assert.match(testUserSource, /synthetic_fit_upload_input/);
+assert.match(testUserSource, /interactionArtifactRemoved: true/);
+assert.match(adaptiveFixtureSource, /externalProviderDispatchCount:\s*0/);
+assert.match(adaptiveFixtureSource, /hito271SealedLineageRestored:\s*false/);
+assert.match(adaptiveFixtureSource, /initialCandidateOwner:\s*"saved_plan_generated_review"/);
+assert.match(adaptiveFixtureSource, /listSavedPlanReviewsForUser/);
+assert.match(adaptiveFixtureSource, /restoreSavedPlanReviewForUser/);
+assert.match(testUserSource, /initialCandidatePreseeded:\s*Boolean\(savedPlanReview\)/);
+assert.match(runningPlanEngineSource, /export const listSavedPlanReviews/);
+assert.match(runningPlanEngineSource, /export const restoreSavedPlanReview/);
+assert.match(
+  runningPlanEngineSource,
+  /normalizeRunningPlanReviewDraftForConfirmation\(state\.draft\)/,
+);
+assert.match(runningPlanEngineSource, /addRunningPlanReviewProof\(confirmableDraft\)/);
+assert.match(
+  runningPlanEngineSource,
+  /previewInput:\s*runningPlanReviewedPreviewInputSchema\.parse\(draft\.previewInput\)/,
+);
+assert.match(activePlanActionsSource, /\.from\("plan_cycles"\)/);
+assert.doesNotMatch(activePlanActionsSource, /adaptive_training_detailed_candidates/);
+assert.match(lifecycleContract, /single deterministic, provider-free source/);
+assert.match(
+  lifecycleContract,
+  /Local `adaptive-blueprint-\*` commands remain focused Backend proofs/,
+);
+
 console.log(
   JSON.stringify(
     {
@@ -341,6 +434,12 @@ console.log(
       adminFacadePoolDeletionRefused: true,
       adminMetadataWinsLocalTesterConflict: true,
       randomIdentityLifecycleRemoved: true,
+      adaptiveUiReplayFixtureVersion: "adaptive_engine_ui_replay_v1",
+      adaptiveUiReplayCheckpointSelector: 1,
+      adaptiveUiReplayCheckpoints: 3,
+      adaptiveUiReplayHostedCommandFamily: 1,
+      supersededHostedPoolCommands: 0,
+      alternateHostedAuthBootstrapPaths: 0,
     },
     null,
     2,

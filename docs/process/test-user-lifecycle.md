@@ -10,8 +10,8 @@ Use this document instead of ad hoc Supabase dashboard work.
 
 ## Local Runtime Prerequisite
 
-Test-user mutation is local-only. Start the repository Supabase stack and write its loopback
-credentials into the ignored `.env.local` before using this lifecycle:
+Generic test-user mutation is local-only. Start the repository Supabase stack and write its
+loopback credentials into the ignored `.env.local` before using this lifecycle:
 
 ```bash
 npx --yes supabase@2.109.1 start
@@ -19,9 +19,11 @@ npm run supabase:local:configure
 npm run supabase:local:status
 ```
 
-`test-user` refuses every non-loopback Supabase URL before opening a Supabase client. Hosted
-Supabase credentials belong only in deployment environments and are never an override for this
-workflow.
+`test-user` refuses every non-loopback Supabase URL except the single adaptive UI-replay command
+family documented below. That exception requires an exact trusted project reference, the retained
+metadata-proven `.invalid` technical runner ID, and process-local server credentials. It cannot
+create or adopt Auth users. Hosted Supabase credentials belong only in deployment environments and
+are never copied into repository files.
 
 Fresh local resets receive canonical table privileges from the migration history. Those grants
 remain paired with existing own-row RLS policies for `authenticated`; server-only access stays
@@ -39,6 +41,7 @@ This repo supports one narrow test-user lifecycle path:
 - inventory metadata-classified testers and all app-owned rows
 - generate a stable cleanup manifest before destructive maintenance
 - delete a tester safely
+- seed, inspect, and exactly reset one versioned provider-free adaptive UI-replay fixture
 
 The canonical command entrypoint is:
 
@@ -58,13 +61,14 @@ classification conflict.
 
 Normal QA reuses these roles:
 
-| Role | Purpose |
-| --- | --- |
-| `baseline-no-plan` | Saved baseline/profile with no active plan |
-| `saved-plan-readback` | Review, confirm, persistence, export, and readback proof |
-| `provider-engine` | Direct backend/provider-engine proof without browser creation |
-| `isolation-a` | First identity for bounded RLS/collision proof |
-| `isolation-b` | Second identity for bounded RLS/collision proof |
+| Role                        | Purpose                                                                  |
+| --------------------------- | ------------------------------------------------------------------------ |
+| `baseline-no-plan`          | Saved baseline/profile with no active plan                               |
+| `saved-plan-readback`       | Review, confirm, persistence, export, and readback proof                 |
+| `provider-engine`           | Direct backend/provider-engine proof without browser creation            |
+| `adaptive-training-quality` | Versioned adaptive-engine UI replay through canonical persistence owners |
+| `isolation-a`               | First identity for bounded RLS/collision proof                           |
+| `isolation-b`               | Second identity for bounded RLS/collision proof                          |
 
 Persistence validators lease these identities and reset their app-owned rows on release. A
 concurrent attempt to use the same role fails closed instead of minting another timestamp/random
@@ -101,7 +105,7 @@ npm run test-user -- cleanup-manifest \
   --output .tanstack/qa-test-user-local-cleanup-manifest.json
 ```
 
-The ignored manifest records the exact loopback target, Auth identity, metadata basis, all eleven
+The ignored manifest records the exact loopback target, Auth identity, metadata basis, all
 app-owned table counts, credential drift, protected identities, and a stable selection hash. Apply
 re-reads the target and candidates and refuses any drift:
 
@@ -111,10 +115,69 @@ npm run test-user -- cleanup-apply \
   --confirm-selection '<reviewed selectionHash>'
 ```
 
-The local CLI never accepts a hosted target. Linked cleanup is a controlled release operation: the
-exact linked project and metadata-only candidate manifest must be verified independently before
-apply. Admin and unclassified identities remain protected, and this loopback workflow never
-provisions a linked reusable pool.
+Generic inventory and cleanup commands never accept a hosted target. The adaptive UI-replay reset
+is the only hosted cleanup exception and is restricted to the exact metadata-proven technical
+runner. Admin and unclassified identities remain protected, and this workflow never provisions a
+linked reusable pool.
+
+## Adaptive Engine UI Replay
+
+`adaptive_engine_ui_replay_v1` is the single deterministic, provider-free source for later adaptive
+engine UI regression. It creates new fixture-owned lineage through the existing initial authoring,
+signed Review/Confirm, Runner Calendar, FIT importer, RPE and Runner Fitness Profile owners. It does
+not read or restore HITO-271 response IDs, candidates, review seals, Coach verdicts or provider
+content, and it does not claim to repeat HITO-271 Global QA.
+
+Local proof uses the existing `adaptive-training-quality` pool identity:
+
+```bash
+npm run qa:adaptive-ui-replay:seed -- --as-of-date 2026-08-23
+npm run qa:adaptive-ui-replay:status -- --as-of-date 2026-08-23
+npm run qa:adaptive-ui-replay:reset -- \
+  --confirm-fixture-version adaptive_engine_ui_replay_v1
+```
+
+The same commands may target the retained hosted technical runner only when the process already has
+the approved server configuration and supplies both the exact project reference and technical
+runner ID:
+
+```bash
+npm run qa:adaptive-ui-replay:seed -- \
+  --trusted-hosted-project-ref '<approved project ref>' \
+  --user-id '<retained technical runner id>' \
+  --as-of-date 2026-08-23
+```
+
+Hosted status and reset use the same two identity arguments; reset additionally requires the exact
+fixture-version confirmation shown above. The seed resets only that runner's owned rows/storage,
+creates three deterministic confirmed Calendar horizons plus factual FIT/RPE/Profile state, and
+fails back to zero on any error. The reset preserves the Auth identity and requires zero owned rows,
+storage objects and leases. Receipts expose only version/provenance, counts, public factual states
+and zero-dispatch assertions; they contain no credentials, action links, raw provider content or
+personal data.
+
+The same seed command has one deterministic `--checkpoint` selector for bounded UI action proof;
+it does not add commands or a second fixture family:
+
+- `initial_plan_review` leaves the technical runner at canonical zero. The normal onboarding server
+  action may then create one fresh provider-free reviewed candidate only while the app runs in the
+  approved `qa_fixture` mode. No candidate or client state is preseeded.
+- `continuation_actions` creates one fresh fixture-owned initial confirmation, eight resolved
+  factual outcomes and inert future projections, then stops at `check_in_needed`. It also writes one
+  mode-`0600` synthetic FIT upload input to the ignored HITO-273 QA-artifact directory. QA can use the
+  normal Calendar detail, FIT/RPE, check-in, prepare, Review and Confirm controls from that state.
+- `complete_surface` is the default HITO-272 readback fixture and retains its three-confirmation
+  stable-surface behavior.
+
+`status` receives the same selector. Exact version-confirmed `reset` deletes only the runner-owned
+domain rows/storage, releases the existing adaptive lease, removes the synthetic HITO-273 upload
+artifact and preserves the technical Auth identity. The selector never restores HITO-271 IDs,
+provider content, prompts, Coach verdicts, credentials, action links or personal data.
+
+The retired `hosted-pool-*` stage commands are not compatibility aliases. They were reachable only
+from their own dispatcher and were removed after this one fixture lifecycle replaced their hosted
+bootstrap/stage writer surface. Local `adaptive-blueprint-*` commands remain focused Backend proofs;
+they are not a second hosted UI-replay source.
 
 ## Legacy Explicit Commands
 
@@ -289,6 +352,7 @@ What delete removes:
 - `public.workout_logs` through cascade
 
 Delete fails unless the auth user and all counted canonical rows read back as zero afterward.
+
 - the local credentials account entry
 
 What delete preserves:

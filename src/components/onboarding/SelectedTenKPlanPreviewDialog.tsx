@@ -28,21 +28,24 @@ import { useGeneratedPlanReadyTransition } from "@/components/onboarding/generat
 import { buildGeneratedPlanReviewHeaderModel } from "@/components/onboarding/generated-plan-review-header-model";
 import { GeneratedPlanWorkoutSummary } from "@/components/onboarding/GeneratedPlanWorkoutSummary";
 import type {
+  RestoreSavedPlanReviewResult,
   RunningPlanConfirmActionResult,
   RunningPlanPreviewActionResult,
+  RunningPlanPreviewProductDraft,
 } from "@/lib/running-plan-engine-actions";
 import { formatDistanceMeters } from "@/lib/training";
 import type { WorkoutDocument } from "@/lib/workout-document";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-type SelectedRunningPlanPreviewResult = RunningPlanPreviewActionResult;
-type SelectedRunningPlanPreviewDraft = Extract<
-  SelectedRunningPlanPreviewResult,
-  { ok: true }
->["draft"];
+type SelectedRunningPlanPreviewResult =
+  | RunningPlanPreviewActionResult
+  | Extract<RestoreSavedPlanReviewResult, { ok: true }>;
+type SelectedRunningPlanPreviewDraft =
+  | RunningPlanPreviewProductDraft
+  | Omit<RunningPlanPreviewProductDraft, "reviewToken" | "reviewChecksum">;
 type SelectedRunningPlanPreviewUnavailable = Extract<
-  SelectedRunningPlanPreviewResult,
+  RunningPlanPreviewActionResult,
   { ok: false }
 >["unavailable"];
 type SelectedRunningPlanCalendarRow = SelectedRunningPlanPreviewDraft["calendarRows"][number];
@@ -96,9 +99,16 @@ export function SelectedRunningPlanPreviewDialog({
   const wasLoadingExperienceVisibleRef = useRef(false);
   const loading = status === "previewing_plan";
   const creating = createStatus === "creating";
-  const draft = result?.ok ? result.draft : null;
-  const unavailable = result && !result.ok ? result.unavailable : null;
-  const reviewReady = Boolean(draft?.reviewToken && draft?.reviewChecksum);
+  const draft = resolveSelectedRunningPlanPreviewDraft(result);
+  const unavailable = resolveSelectedRunningPlanPreviewUnavailable(result);
+  const readOnly = result?.ok === true && "status" in result && result.status === "read_only";
+  const reviewReady = Boolean(
+    draft &&
+    "reviewToken" in draft &&
+    "reviewChecksum" in draft &&
+    draft.reviewToken &&
+    draft.reviewChecksum,
+  );
   const initialLoading = loading && !draft;
   const showLoadingCompletion = useGeneratedPlanReadyTransition({
     hasReviewedDraft: reviewReady,
@@ -176,7 +186,7 @@ export function SelectedRunningPlanPreviewDialog({
           fallbackReturnFocusRef.current =
             activeElement instanceof HTMLElement ? activeElement : null;
 
-          if (reviewReady) {
+          if (reviewReady || readOnly) {
             event.preventDefault();
             readyFocusTargetRef.current?.focus();
           }
@@ -282,6 +292,18 @@ export function SelectedRunningPlanPreviewDialog({
               Cancel
             </HitoButton>
           </DialogFooter>
+        ) : reviewVisible && draft && readOnly ? (
+          <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
+            <HitoButton
+              ref={readyFocusTargetRef}
+              type="button"
+              size="md"
+              variant="secondary"
+              onClick={() => onOpenChange(false)}
+            >
+              Close
+            </HitoButton>
+          </DialogFooter>
         ) : reviewVisible && draft ? (
           <DialogFooter className="hito-product-dialog-footer grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:space-x-0">
             <p className="hito-body-xs text-tertiary min-w-0">
@@ -326,6 +348,26 @@ export function SelectedRunningPlanPreviewDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function resolveSelectedRunningPlanPreviewDraft(
+  result: SelectedRunningPlanPreviewResult | null,
+): SelectedRunningPlanPreviewDraft | null {
+  if (!result?.ok) {
+    return null;
+  }
+
+  return "draft" in result ? result.draft : result.review;
+}
+
+function resolveSelectedRunningPlanPreviewUnavailable(
+  result: SelectedRunningPlanPreviewResult | null,
+): SelectedRunningPlanPreviewUnavailable | null {
+  if (!result || result.ok || !("unavailable" in result)) {
+    return null;
+  }
+
+  return result.unavailable;
 }
 
 function GeneratedPlanReadyReviewHeader({ draft }: { draft: SelectedRunningPlanPreviewDraft }) {
@@ -526,10 +568,14 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
   const missingWorkoutDocumentRow =
     draft.calendarRows.find((row) => !workoutDocumentsById.has(row.rowId)) ?? null;
   const [activeCalendarRowId, setActiveCalendarRowId] = useState<string | null>(null);
+  const reviewIdentity =
+    ("reviewChecksum" in draft ? draft.reviewChecksum : null) ??
+    draft.savedPlanReviewCandidate?.sha256 ??
+    `${draft.schedule.startDate}:${draft.schedule.endDate}:${draft.calendarRows.length}`;
 
   useEffect(() => {
     setActiveCalendarRowId(null);
-  }, [draft.reviewChecksum]);
+  }, [reviewIdentity]);
 
   if (missingWorkoutDocumentRow) {
     return (

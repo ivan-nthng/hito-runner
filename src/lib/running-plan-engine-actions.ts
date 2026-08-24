@@ -1,7 +1,17 @@
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { getAdaptiveTrainingSourceCandidateForUser } from "@/lib/adaptive-blueprint-persistence";
+import {
+  getAdaptiveTrainingInitialReviewRecordForUser,
+  getAdaptiveTrainingSourceCandidateForUser,
+  listAdaptiveTrainingInitialReviewRecordsForUser,
+  type AdaptiveTrainingInitialReviewRecord,
+  type RetainedAdaptiveTrainingSourceCandidate,
+} from "@/lib/adaptive-blueprint-persistence";
+import {
+  AI_AUTHORED_PLAN_FIRST_COMPILER_VERSION,
+  AI_AUTHORED_PLAN_FIRST_SOURCE_KIND,
+} from "@/lib/ai-authored-plan-first-compiler";
 import {
   applyAtomicAdaptiveInitialDetailedBlockMaterialization,
   buildCalendarWorkoutMutationEvent,
@@ -13,6 +23,7 @@ import { acceptedRunnerHeartRateProfileSchema } from "@/lib/heart-rate-zones";
 import { parseDurationSeconds, parsePaceSecondsPerKm } from "@/lib/first-plan-authoring-utils";
 import {
   AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
+  buildRestoredAiGeneratedRunningPlanPreviewDraft,
   buildAiGeneratedRunningPlanPreviewUnavailable,
   buildAiGeneratedRunningPlanPreview,
   isAiGeneratedRunningPlanPreviewDraft,
@@ -116,6 +127,12 @@ export const runningPlanPreviewInputSchema = z
   .strict();
 
 const runningPlanSourceKindSchema = z.literal(AI_GENERATED_RUNNING_PLAN_SOURCE_KIND);
+const savedPlanReviewSelectionSchema = z
+  .object({
+    candidateId: z.string().uuid(),
+    candidateVersion: z.number().int().positive(),
+  })
+  .strict();
 export const CURRENT_RUNNING_LIMITATION_VALUES = ["no", "yes", "unsure"] as const;
 
 const runningPlanReviewedPreviewInputSchema = runningPlanPreviewInputSchema.omit({
@@ -153,10 +170,16 @@ type RunningPlanPreviewProductCalendarRow = {
   endpointDistanceMeters: InternalPreviewCalendarRow["endpointDistanceMeters"];
 };
 
-type RunningPlanPreviewProductDraft = {
+export type SavedPlanReviewCandidateIdentity = {
+  id: string;
+  version: number;
+  sha256: string;
+};
+
+export type RunningPlanPreviewProductDraft = {
   sourceKind: AiGeneratedRunningPlanPreviewDraft["sourceKind"];
   previewOutcome: "preview_ready";
-  previewInput: AiGeneratedRunningPlanPreviewDraft["previewInput"];
+  previewInput: z.output<typeof runningPlanReviewedPreviewInputSchema>;
   goal: {
     distanceLabel: string;
     targetDate: string | null;
@@ -169,9 +192,50 @@ type RunningPlanPreviewProductDraft = {
   calendarRows: readonly RunningPlanPreviewProductCalendarRow[];
   workoutDocuments: AiGeneratedRunningPlanPreviewDraft["workoutDocuments"];
   candidate: AiGeneratedRunningPlanPreviewDraft["candidate"];
+  savedPlanReviewCandidate: SavedPlanReviewCandidateIdentity | null;
   reviewToken: string;
   reviewChecksum: string;
 };
+
+export type SavedPlanReviewValidity =
+  | { state: "current"; reason: null }
+  | { state: "stale"; reason: "facts_changed" | "invalid_lineage" | "invalid_content" }
+  | { state: "expired"; reason: "already_confirmed" };
+
+export type SavedPlanReviewSummary = {
+  kind: "generated_review";
+  candidate: SavedPlanReviewCandidateIdentity;
+  title: string;
+  goal: {
+    distanceLabel: string;
+    targetDate: string | null;
+    targetFinishTime: string | null;
+  };
+  schedule: { startDate: string; endDate: string };
+  createdAt: string;
+  validity: SavedPlanReviewValidity;
+  generationLedgerReference: { generationId: string };
+};
+
+export type RestoreSavedPlanReviewResult =
+  | {
+      ok: true;
+      status: "review_ready";
+      summary: SavedPlanReviewSummary;
+      review: RunningPlanPreviewProductDraft;
+    }
+  | {
+      ok: true;
+      status: "read_only";
+      summary: SavedPlanReviewSummary;
+      review: Omit<RunningPlanPreviewProductDraft, "reviewToken" | "reviewChecksum">;
+    }
+  | {
+      ok: false;
+      status: "unavailable";
+      reason: "unauthenticated" | "not_found" | "foreign";
+      message: string;
+    };
 
 type RunningPlanPreviewProductUnavailable = {
   previewOutcome: AiGeneratedRunningPlanPreviewUnavailable["previewOutcome"];
@@ -249,6 +313,89 @@ export const previewRunningPlanDraft = createServerFn({ method: "POST" })
       }),
     );
   });
+
+export const listSavedPlanReviews = createServerFn({ method: "GET" }).handler(async () => {
+  const userId = await resolvePersistedUserIdForSavedPlanReview();
+  if (!userId) {
+    throw new Error("Sign in before reviewing saved generated plans.");
+  }
+  return listSavedPlanReviewsForUser(userId);
+});
+
+export const restoreSavedPlanReview = createServerFn({ method: "POST" })
+  .validator((value: unknown) => savedPlanReviewSelectionSchema.parse(value))
+  .handler(async ({ data }): Promise<RestoreSavedPlanReviewResult> => {
+    const userId = await resolvePersistedUserIdForSavedPlanReview();
+    if (!userId) {
+      return savedPlanReviewUnavailable("unauthenticated");
+    }
+    return restoreSavedPlanReviewForUser(userId, data);
+  });
+
+export async function listSavedPlanReviewsForUser(userId: string) {
+  const records = await listAdaptiveTrainingInitialReviewRecordsForUser(userId);
+  const states = await Promise.all(
+    records.map((record) => buildSavedPlanReviewState(userId, record)),
+  );
+  return {
+    ok: true as const,
+    records: states.map((state) => state.summary),
+  };
+}
+
+export async function restoreSavedPlanReviewForUser(
+  userId: string,
+  input: { candidateId: string; candidateVersion: number },
+): Promise<RestoreSavedPlanReviewResult> {
+  const data = savedPlanReviewSelectionSchema.parse(input);
+  const record = await getAdaptiveTrainingInitialReviewRecordForUser({
+    userId,
+    candidateId: data.candidateId,
+    candidateVersion: data.candidateVersion,
+  });
+  if (!record) {
+    return savedPlanReviewUnavailable("not_found");
+  }
+
+  const state = await buildSavedPlanReviewState(userId, record);
+  if (!state.draft) {
+    return savedPlanReviewUnavailable("not_found");
+  }
+  if (state.summary.validity.state !== "current") {
+    return {
+      ok: true,
+      status: "read_only",
+      summary: state.summary,
+      review: projectRunningPlanDraftForProduct(state.draft),
+    };
+  }
+
+  const confirmableDraft = normalizeRunningPlanReviewDraftForConfirmation(state.draft);
+  const reviewed = await addRunningPlanReviewProof(confirmableDraft);
+  const exactness = await validateRunningPlanReviewExactness({
+    draft: reviewed,
+    reviewToken: reviewed.reviewToken,
+    reviewChecksum: reviewed.reviewChecksum,
+  });
+  if (!exactness.ok) {
+    return {
+      ok: true,
+      status: "read_only",
+      summary: {
+        ...state.summary,
+        validity: { state: "stale", reason: "invalid_content" },
+      },
+      review: projectRunningPlanDraftForProduct(state.draft),
+    };
+  }
+
+  return {
+    ok: true,
+    status: "review_ready",
+    summary: state.summary,
+    review: projectRunningPlanReviewedDraftForProduct(reviewed),
+  };
+}
 
 export const confirmRunningPlanDraft = createServerFn({ method: "POST" })
   .validator((value: unknown) => runningPlanConfirmInputSchema.parse(value))
@@ -839,6 +986,194 @@ async function getInitialPlanAuthoringFactsForUser(input: {
   };
 }
 
+async function buildSavedPlanReviewState(
+  userId: string,
+  record: AdaptiveTrainingInitialReviewRecord,
+) {
+  const sourceReference = buildSavedPlanReviewSourceReference(record);
+  const lineageIsCurrent = savedPlanReviewLineageIsCurrent(userId, record, sourceReference);
+  const restored =
+    sourceReference && record.blueprint
+      ? buildRestoredAiGeneratedRunningPlanPreviewDraft({
+          sourceCandidate: sourceReference,
+          blueprint: record.blueprint.blueprint_content,
+          candidateContent: record.candidate.candidate_content,
+          authoringInput: record.candidate.input_snapshot,
+          intervalStartDate: record.candidate.interval_start_date,
+          intervalEndDate: record.candidate.interval_end_date,
+          retainedResponseProvenance: record.response
+            ? {
+                providerResponseId: record.response.provider_response_id,
+              }
+            : undefined,
+        })
+      : ({ ok: false, reason: "invalid_lineage" } as const);
+  const draft = restored.ok ? restored.draft : null;
+  let validity: SavedPlanReviewValidity;
+  if (!lineageIsCurrent) {
+    validity = { state: "stale", reason: "invalid_lineage" };
+  } else if (!draft) {
+    validity = { state: "stale", reason: "invalid_content" };
+  } else if (record.confirmation) {
+    validity = { state: "expired", reason: "already_confirmed" };
+  } else {
+    const frozenProfile = draft.normalizedInputSummary.initialPlanProfile;
+    let currentFacts: Awaited<ReturnType<typeof getInitialPlanAuthoringFactsForUser>> = null;
+    try {
+      currentFacts = await getInitialPlanAuthoringFactsForUser({
+        userId,
+        asOf: frozenProfile.asOf,
+        cutoffDate: frozenProfile.cutoffDate,
+      });
+    } catch {
+      currentFacts = null;
+    }
+    validity = savedPlanReviewFactsMatch(currentFacts, draft)
+      ? { state: "current", reason: null }
+      : { state: "stale", reason: "facts_changed" };
+  }
+
+  return {
+    draft,
+    summary: buildSavedPlanReviewSummary(record, draft, validity),
+  };
+}
+
+function buildSavedPlanReviewSourceReference(
+  record: AdaptiveTrainingInitialReviewRecord,
+): RetainedAdaptiveTrainingSourceCandidate | null {
+  if (!record.blueprint) return null;
+  return {
+    blueprintId: record.blueprint.id,
+    blueprintVersion: record.blueprint.version,
+    blueprintSha256: record.blueprint.content_sha256,
+    candidateId: record.candidate.id,
+    candidateVersion: record.candidate.version,
+    candidateSha256: record.candidate.candidate_sha256,
+    inputFingerprintSha256: record.candidate.input_fingerprint_sha256,
+  };
+}
+
+function savedPlanReviewLineageIsCurrent(
+  userId: string,
+  record: AdaptiveTrainingInitialReviewRecord,
+  sourceReference: RetainedAdaptiveTrainingSourceCandidate | null,
+) {
+  const provenance = jsonObject(record.candidate.input_provenance);
+  const lineage = jsonObject(record.candidate.confirmation_lineage);
+  const attemptResult = jsonObject(record.response?.attempt_result ?? null);
+  return Boolean(
+    sourceReference &&
+    record.blueprint &&
+    record.response &&
+    record.candidate.user_id === userId &&
+    record.blueprint.user_id === userId &&
+    record.response.user_id === userId &&
+    record.candidate.blueprint_id === record.blueprint.id &&
+    (record.candidate.source_response_id === null ||
+      record.candidate.source_response_id === record.response.id) &&
+    record.blueprint.source_response_id === record.response.id &&
+    record.blueprint.source_contract_version === AI_AUTHORED_PLAN_FIRST_SOURCE_KIND &&
+    record.blueprint.compiler_version === AI_AUTHORED_PLAN_FIRST_COMPILER_VERSION &&
+    record.response.schema_outcome === "accepted" &&
+    record.response.compiler_outcome === "accepted" &&
+    provenance?.kind === "structured_authoring_input" &&
+    provenance.retainedResponseId === record.response.id &&
+    provenance.retainedResponseSha256 === record.response.response_sha256 &&
+    provenance.sourceContractVersion === AI_AUTHORED_PLAN_FIRST_SOURCE_KIND &&
+    provenance.compilerVersion === AI_AUTHORED_PLAN_FIRST_COMPILER_VERSION &&
+    lineage?.kind === "initial_detailed_block_candidate" &&
+    lineage.state === "unconfirmed" &&
+    lineage.predecessorCandidateId === null &&
+    lineage.predecessorConfirmationId === null &&
+    attemptResult?.outcome === "candidate_ready" &&
+    attemptResult.candidateRecordId === record.candidate.id &&
+    attemptResult.candidateSha256 === record.candidate.candidate_sha256,
+  );
+}
+
+function savedPlanReviewFactsMatch(
+  currentFacts: Awaited<ReturnType<typeof getInitialPlanAuthoringFactsForUser>>,
+  draft: AiGeneratedRunningPlanPreviewDraft,
+) {
+  return Boolean(
+    currentFacts &&
+    stableJsonEqual(
+      currentFacts.initialPlanProfile,
+      draft.normalizedInputSummary.initialPlanProfile,
+    ) &&
+    stableJsonEqual(
+      currentFacts.acceptedHeartRateProfile,
+      draft.normalizedInputSummary.heartRateProfile,
+    ) &&
+    currentFacts.settings.age === draft.normalizedInputSummary.age &&
+    currentFacts.settings.heightCm === draft.normalizedInputSummary.heightCm &&
+    currentFacts.settings.weightKg === draft.normalizedInputSummary.weightKg,
+  );
+}
+
+function buildSavedPlanReviewSummary(
+  record: AdaptiveTrainingInitialReviewRecord,
+  draft: AiGeneratedRunningPlanPreviewDraft | null,
+  validity: SavedPlanReviewValidity,
+): SavedPlanReviewSummary {
+  const plan = draft?.canonicalPlan;
+  const goal = draft?.normalizedInputSummary.planGoalIntent;
+  return {
+    kind: "generated_review",
+    candidate: {
+      id: record.candidate.id,
+      version: record.candidate.version,
+      sha256: record.candidate.candidate_sha256,
+    },
+    title: plan?.plan_name ?? "Generated running plan",
+    goal: {
+      distanceLabel: goal?.distance?.label ?? "Generated distance plan",
+      targetDate: goal?.targetDate ?? null,
+      targetFinishTime: goal?.targetFinishTime?.label ?? null,
+    },
+    schedule: {
+      startDate: plan?.start_date ?? record.candidate.interval_start_date,
+      endDate: plan?.planned_workouts.at(-1)?.date ?? record.candidate.interval_end_date,
+    },
+    createdAt: record.candidate.created_at,
+    validity,
+    generationLedgerReference: {
+      generationId: record.response?.generation_id ?? "unavailable",
+    },
+  };
+}
+
+async function resolvePersistedUserIdForSavedPlanReview() {
+  const auth = getRequestAuthContext();
+  if (!auth.userId) return null;
+  try {
+    return await getPersistedUserIdForAuthContext(auth);
+  } catch {
+    return null;
+  }
+}
+
+function savedPlanReviewUnavailable(
+  reason: Extract<RestoreSavedPlanReviewResult, { ok: false }>["reason"],
+): Extract<RestoreSavedPlanReviewResult, { ok: false }> {
+  return {
+    ok: false,
+    status: "unavailable",
+    reason,
+    message:
+      reason === "unauthenticated"
+        ? "Sign in before restoring a saved generated-plan review."
+        : "The saved generated-plan review is unavailable.",
+  };
+}
+
+function jsonObject(value: Json | null): Record<string, Json> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, Json>)
+    : null;
+}
+
 export function projectRunningPlanPreviewResultForProduct(
   result: RunningPlanReviewedPreviewResult,
 ): RunningPlanPreviewActionResult {
@@ -866,39 +1201,68 @@ export function projectRunningPlanPreviewResultForProduct(
     };
   }
 
-  const draft = result.draft;
+  return {
+    ok: true,
+    draft: projectRunningPlanReviewedDraftForProduct(result.draft),
+  };
+}
+
+function projectRunningPlanDraftForProduct(
+  draft: AiGeneratedRunningPlanPreviewDraft,
+): Omit<RunningPlanPreviewProductDraft, "reviewToken" | "reviewChecksum"> {
   const goalIntent = draft.normalizedInputSummary.planGoalIntent;
   const startDate = draft.canonicalPlan.start_date;
 
   return {
-    ok: true,
-    draft: {
-      sourceKind: draft.sourceKind,
-      previewOutcome: draft.previewOutcome,
-      previewInput: draft.previewInput,
-      goal: {
-        distanceLabel: goalIntent.distance?.label ?? "Distance unavailable",
-        targetDate: goalIntent.targetDate,
-        targetFinishTime: goalIntent.targetFinishTime?.label ?? null,
-      },
-      schedule: {
-        startDate,
-        endDate: draft.canonicalPlan.planned_workouts.at(-1)?.date ?? startDate,
-      },
-      calendarRows: draft.calendarRows.map((row) => ({
-        rowId: row.rowId,
-        date: row.date,
-        weekNumber: row.weekNumber,
-        weekday: row.weekday,
-        isRestDay: row.isRestDay,
-        title: row.title,
-        endpointDistanceMeters: row.endpointDistanceMeters,
-      })),
-      workoutDocuments: draft.workoutDocuments,
-      candidate: draft.candidate,
-      reviewToken: draft.reviewToken,
-      reviewChecksum: draft.reviewChecksum,
+    sourceKind: draft.sourceKind,
+    previewOutcome: draft.previewOutcome,
+    previewInput: runningPlanReviewedPreviewInputSchema.parse(draft.previewInput),
+    goal: {
+      distanceLabel: goalIntent.distance?.label ?? "Distance unavailable",
+      targetDate: goalIntent.targetDate,
+      targetFinishTime: goalIntent.targetFinishTime?.label ?? null,
     },
+    schedule: {
+      startDate,
+      endDate: draft.canonicalPlan.planned_workouts.at(-1)?.date ?? startDate,
+    },
+    calendarRows: draft.calendarRows.map((row) => ({
+      rowId: row.rowId,
+      date: row.date,
+      weekNumber: row.weekNumber,
+      weekday: row.weekday,
+      isRestDay: row.isRestDay,
+      title: row.title,
+      endpointDistanceMeters: row.endpointDistanceMeters,
+    })),
+    workoutDocuments: draft.workoutDocuments,
+    candidate: draft.candidate,
+    savedPlanReviewCandidate: draft.sourceCandidate
+      ? {
+          id: draft.sourceCandidate.candidateId,
+          version: draft.sourceCandidate.candidateVersion,
+          sha256: draft.sourceCandidate.candidateSha256,
+        }
+      : null,
+  };
+}
+
+function normalizeRunningPlanReviewDraftForConfirmation(
+  draft: AiGeneratedRunningPlanPreviewDraft,
+): AiGeneratedRunningPlanPreviewDraft {
+  return {
+    ...draft,
+    previewInput: runningPlanReviewedPreviewInputSchema.parse(draft.previewInput),
+  };
+}
+
+function projectRunningPlanReviewedDraftForProduct(
+  draft: RunningPlanReviewedPreviewDraft<AiGeneratedRunningPlanPreviewDraft>,
+): RunningPlanPreviewProductDraft {
+  return {
+    ...projectRunningPlanDraftForProduct(draft),
+    reviewToken: draft.reviewToken,
+    reviewChecksum: draft.reviewChecksum,
   };
 }
 

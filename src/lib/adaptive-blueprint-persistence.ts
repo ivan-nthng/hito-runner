@@ -45,6 +45,13 @@ export type AdaptiveTrainingSourceCandidateSnapshot = {
   candidate: AdaptiveTrainingDetailedCandidateRow;
 };
 
+export type AdaptiveTrainingInitialReviewRecord = {
+  blueprint: AdaptiveTrainingBlueprintVersionRow | null;
+  candidate: AdaptiveTrainingDetailedCandidateRow;
+  confirmation: AdaptiveTrainingBlockConfirmationRow | null;
+  response: AiPlanGenerationResponseRow | null;
+};
+
 export type AdaptiveTrainingContinuationSourceState = {
   blueprint: AdaptiveTrainingBlueprintVersionRow;
   confirmation: AdaptiveTrainingBlockConfirmationRow;
@@ -319,6 +326,104 @@ export async function getAdaptiveTrainingDetailedCandidateForUser(input: {
   return (result.data as AdaptiveTrainingDetailedCandidateRow | null) ?? null;
 }
 
+export async function listAdaptiveTrainingInitialReviewRecordsForUser(
+  userId: string,
+): Promise<AdaptiveTrainingInitialReviewRecord[]> {
+  const supabase = createAdminSupabaseClient();
+  const candidatesResult = await supabase
+    .from("adaptive_training_detailed_candidates")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false });
+  if (candidatesResult.error) throw new Error(candidatesResult.error.message);
+
+  const candidates = (candidatesResult.data as AdaptiveTrainingDetailedCandidateRow[]).filter(
+    (candidate) => isInitialDetailedCandidate(candidate.confirmation_lineage),
+  );
+  if (candidates.length === 0) return [];
+
+  const blueprintIds = [...new Set(candidates.map((candidate) => candidate.blueprint_id))];
+  const candidateIds = candidates.map((candidate) => candidate.id);
+  const [blueprintsResult, confirmationsResult] = await Promise.all([
+    supabase
+      .from("adaptive_training_blueprint_versions")
+      .select("*")
+      .eq("user_id", userId)
+      .in("id", blueprintIds),
+    supabase
+      .from("adaptive_training_block_confirmations")
+      .select("*")
+      .eq("user_id", userId)
+      .in("detailed_candidate_id", candidateIds),
+  ]);
+  if (blueprintsResult.error) throw new Error(blueprintsResult.error.message);
+  if (confirmationsResult.error) throw new Error(confirmationsResult.error.message);
+
+  const blueprints = new Map(
+    (blueprintsResult.data as AdaptiveTrainingBlueprintVersionRow[]).map((blueprint) => [
+      blueprint.id,
+      blueprint,
+    ]),
+  );
+  const responseIds = [
+    ...new Set(
+      candidates.flatMap((candidate) => {
+        const blueprint = blueprints.get(candidate.blueprint_id);
+        const responseId = candidate.source_response_id ?? blueprint?.source_response_id;
+        return responseId ? [responseId] : [];
+      }),
+    ),
+  ];
+  const responsesResult =
+    responseIds.length > 0
+      ? await supabase
+          .from("ai_plan_generation_responses")
+          .select("*")
+          .eq("user_id", userId)
+          .in("id", responseIds)
+      : { data: [], error: null };
+  if (responsesResult.error) throw new Error(responsesResult.error.message);
+  const responses = new Map(
+    (responsesResult.data as AiPlanGenerationResponseRow[]).map((response) => [
+      response.id,
+      response,
+    ]),
+  );
+  const confirmations = new Map(
+    (confirmationsResult.data as AdaptiveTrainingBlockConfirmationRow[]).map((confirmation) => [
+      confirmation.detailed_candidate_id,
+      confirmation,
+    ]),
+  );
+
+  return candidates.map((candidate) => {
+    const blueprint = blueprints.get(candidate.blueprint_id) ?? null;
+    const responseId = candidate.source_response_id ?? blueprint?.source_response_id ?? null;
+    return {
+      blueprint,
+      candidate,
+      confirmation: confirmations.get(candidate.id) ?? null,
+      response: responseId ? (responses.get(responseId) ?? null) : null,
+    };
+  });
+}
+
+export async function getAdaptiveTrainingInitialReviewRecordForUser(input: {
+  userId: string;
+  candidateId: string;
+  candidateVersion: number;
+}): Promise<AdaptiveTrainingInitialReviewRecord | null> {
+  const records = await listAdaptiveTrainingInitialReviewRecordsForUser(input.userId);
+  return (
+    records.find(
+      (record) =>
+        record.candidate.id === input.candidateId &&
+        record.candidate.version === input.candidateVersion,
+    ) ?? null
+  );
+}
+
 export async function getAdaptiveTrainingContinuationSourceStateForUser(
   userId: string,
 ): Promise<AdaptiveTrainingContinuationSourceState | null> {
@@ -427,4 +532,14 @@ function jsonRecord(value: Json): Record<string, Json> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, Json>)
     : null;
+}
+
+function isInitialDetailedCandidate(value: Json) {
+  const lineage = jsonRecord(value);
+  return (
+    lineage?.kind === "initial_detailed_block_candidate" &&
+    lineage.state === "unconfirmed" &&
+    lineage.predecessorCandidateId === null &&
+    lineage.predecessorConfirmationId === null
+  );
 }

@@ -1973,7 +1973,7 @@ async function validateFirstPlanGenerationLifecycle() {
   assert.equal(providerFailureCallCount, 1);
   assert.equal(providerFailure.metadata.debug.abortReason, null);
 
-  let canonicalTransportCallCount = 0;
+  const canonicalTransportCallCount = 0;
   const canonicalTransport = await generateAiFirstPlanDraftPreview({
     input: resolved.authoringInput,
     apiKey: "canonical-transport-plan-first-proof",
@@ -2221,6 +2221,7 @@ function assertProductPreviewProjection(
     "previewOutcome",
     "reviewChecksum",
     "reviewToken",
+    "savedPlanReviewCandidate",
     "schedule",
     "sourceKind",
     "workoutDocuments",
@@ -2233,6 +2234,16 @@ function assertProductPreviewProjection(
   assert.deepEqual(Object.keys(product.draft.schedule).sort(), ["endDate", "startDate"]);
   assert.equal(product.draft.reviewToken, result.draft.reviewToken);
   assert.equal(product.draft.reviewChecksum, result.draft.reviewChecksum);
+  assert.deepEqual(
+    product.draft.savedPlanReviewCandidate,
+    result.draft.sourceCandidate
+      ? {
+          id: result.draft.sourceCandidate.candidateId,
+          version: result.draft.sourceCandidate.candidateVersion,
+          sha256: result.draft.sourceCandidate.candidateSha256,
+        }
+      : null,
+  );
   assert.deepEqual(product.draft.previewInput, result.draft.previewInput);
   assert.deepEqual(product.draft.workoutDocuments, result.draft.workoutDocuments);
   assert.deepEqual(product.draft.candidate, result.draft.candidate);

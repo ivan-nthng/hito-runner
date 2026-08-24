@@ -318,6 +318,44 @@ export async function ensureQaPoolAuthUser({ supabase, role, password }) {
   return created.data.user;
 }
 
+export async function adoptHostedQaPoolAuthUser({
+  supabase,
+  role,
+  userId,
+  requiredEmailSuffix = ".invalid",
+}) {
+  const poolRole = requireQaPoolRole(role);
+  const result = await supabase.auth.admin.getUserById(userId);
+  if (result.error || !result.data.user) {
+    throw new Error(result.error?.message ?? `QA pool user ${userId} was not found.`);
+  }
+  const user = result.data.user;
+  const email = normalizeEmail(user.email ?? "");
+  if (!email.endsWith(requiredEmailSuffix)) {
+    throw new Error(`Hosted QA pool adoption requires a ${requiredEmailSuffix} identity.`);
+  }
+  const classification = classifyQaIdentity(user);
+  if (classification.kind === "protected_admin" || classification.kind === "manual_review") {
+    throw new Error("Refusing to adopt a non-test hosted identity into the QA pool.");
+  }
+  if (classification.poolRole && classification.poolRole !== poolRole) {
+    throw new Error(`Hosted QA identity is already assigned to ${classification.poolRole}.`);
+  }
+
+  const update = await supabase.auth.admin.updateUserById(user.id, {
+    app_metadata: {
+      ...(user.app_metadata ?? {}),
+      hito_test_user: true,
+      hito_qa_pool_version: QA_TESTER_POOL_VERSION,
+      hito_qa_pool_role: poolRole,
+    },
+  });
+  if (update.error || !update.data.user) {
+    throw new Error(update.error?.message ?? "Unable to adopt the hosted QA pool identity.");
+  }
+  return update.data.user;
+}
+
 export async function assertQaPoolAuthUser({ supabase, role, userId }) {
   const poolRole = requireQaPoolRole(role);
   const result = await supabase.auth.admin.getUserById(userId);
@@ -499,6 +537,16 @@ export async function releaseQaPoolLease({ role, token, cwd = process.cwd() }) {
   }
 
   await rm(leasePath, { recursive: true });
+}
+
+export async function assertQaPoolLease({ role, token, cwd = process.cwd() }) {
+  const poolRole = requireQaPoolRole(role);
+  const leasePath = path.resolve(cwd, LEASE_ROOT, `${poolRole}.lock`);
+  const lease = JSON.parse(await readFile(path.join(leasePath, "lease.json"), "utf8"));
+  if (lease.role !== poolRole || lease.token !== token) {
+    throw new Error(`QA pool lease token mismatch for ${poolRole}.`);
+  }
+  return { role: poolRole, token, leasePath };
 }
 
 export async function readQaPoolLeases({ cwd = process.cwd() } = {}) {

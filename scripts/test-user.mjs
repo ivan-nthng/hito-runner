@@ -1,14 +1,16 @@
 import assert from "node:assert/strict";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { randomBytes } from "node:crypto";
+import { chmod, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { createHash, randomBytes } from "node:crypto";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { tsImport } from "tsx/esm/api";
 import {
   QA_TESTER_POOL,
   acquireQaPoolLease,
+  adoptHostedQaPoolAuthUser,
   assertQaCleanupManifestMatches,
   assertQaPoolAuthUser,
+  assertQaPoolLease,
   buildQaCleanupManifest,
   buildQaTestUserInventory,
   classifyQaIdentity,
@@ -80,6 +82,13 @@ const {
 
 const command = process.argv[2];
 const options = parseArgs(process.argv.slice(3));
+const HOSTED_POOL_COMMANDS = new Set([
+  "hosted-pool-adopt",
+  "hosted-pool-status",
+  "hosted-pool-auth-link",
+  "hosted-pool-checkpoint",
+  "hosted-pool-reset",
+]);
 
 if (
   ![
@@ -94,6 +103,11 @@ if (
     "pool-reset-plan",
     "pool-reset",
     "pool-delete",
+    "hosted-pool-adopt",
+    "hosted-pool-status",
+    "hosted-pool-auth-link",
+    "hosted-pool-checkpoint",
+    "hosted-pool-reset",
     "design-profile-seed",
     "design-profile-status",
     "design-profile-reset",
@@ -113,11 +127,11 @@ if (
   ].includes(command)
 ) {
   throw new Error(
-    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-reset-plan|pool-reset|pool-delete|design-profile-seed|design-profile-status|design-profile-reset|adaptive-blueprint-seed|adaptive-blueprint-continuation-seed|adaptive-blueprint-status|adaptive-blueprint-continuation-prepare|adaptive-blueprint-continuation-proof|adaptive-blueprint-continuation-profile-proof|adaptive-blueprint-two-profile-replay|adaptive-blueprint-second-continuation-preflight|adaptive-blueprint-second-continuation-author|adaptive-blueprint-second-continuation-recompile|adaptive-blueprint-reset|runner-core-file-flow-seed|runner-core-file-flow-proof|create|reset-plan|reset|delete> [options]",
+    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-reset-plan|pool-reset|pool-delete|hosted-pool-adopt|hosted-pool-status|hosted-pool-auth-link|hosted-pool-checkpoint|hosted-pool-reset|design-profile-seed|design-profile-status|design-profile-reset|adaptive-blueprint-seed|adaptive-blueprint-continuation-seed|adaptive-blueprint-status|adaptive-blueprint-continuation-prepare|adaptive-blueprint-continuation-proof|adaptive-blueprint-continuation-profile-proof|adaptive-blueprint-two-profile-replay|adaptive-blueprint-second-continuation-preflight|adaptive-blueprint-second-continuation-author|adaptive-blueprint-second-continuation-recompile|adaptive-blueprint-reset|runner-core-file-flow-seed|runner-core-file-flow-proof|create|reset-plan|reset|delete> [options]",
   );
 }
 
-const config = buildConfig();
+const config = await buildConfig();
 const supabase = createClient(config.supabaseUrl, config.supabaseServerKey, {
   auth: {
     autoRefreshToken: false,
@@ -139,6 +153,16 @@ if (command === "inventory") {
   await handlePoolReset();
 } else if (command === "pool-delete") {
   await handlePoolDelete();
+} else if (command === "hosted-pool-adopt") {
+  await handleHostedPoolAdopt();
+} else if (command === "hosted-pool-status") {
+  await handleHostedPoolStatus();
+} else if (command === "hosted-pool-auth-link") {
+  await handleHostedPoolAuthLink();
+} else if (command === "hosted-pool-checkpoint") {
+  await handleHostedPoolCheckpoint();
+} else if (command === "hosted-pool-reset") {
+  await handleHostedPoolReset();
 } else if (command === "design-profile-seed") {
   await handleDesignProfileSeed();
 } else if (command === "design-profile-status") {
@@ -292,6 +316,266 @@ async function handlePoolEnsure() {
       2,
     ),
   );
+}
+
+async function handleHostedPoolAdopt() {
+  const role = requireHostedAdaptivePoolRole();
+  const userId = requireOption(options["user-id"], "--user-id");
+  const receiptPath = requireHostedReceiptPath();
+  const authUser = await adoptHostedQaPoolAuthUser({
+    supabase,
+    role,
+    userId,
+  });
+  const lease = await acquireQaPoolLease({ role });
+  const receipt = {
+    schemaVersion: 1,
+    task: "HITO-271",
+    environment: "hosted_preview",
+    projectRef: config.hostedProjectRef,
+    role,
+    userId: authUser.id,
+    leaseToken: lease.token,
+    identityRetainedAcrossStages: true,
+    authIdentityDeletionRequired: false,
+    checkpoints: [
+      hostedCheckpoint("identity_adopted", {
+        emailSuffix: ".invalid",
+        emailConfirmed: Boolean(authUser.email_confirmed_at),
+        ownedRows: await getQaUserOwnedCounts(supabase, authUser.id),
+      }),
+    ],
+  };
+  await writeHostedReceipt(receiptPath, receipt, { create: true });
+  console.log(
+    JSON.stringify({
+      ok: true,
+      action: "hosted-pool-adopt",
+      role,
+      userId: authUser.id,
+      receiptPath,
+      receiptSha256: hashStableJson(receipt),
+    }),
+  );
+}
+
+async function handleHostedPoolStatus() {
+  const { receiptPath, receipt, authUser } = await readCurrentHostedReceipt();
+  const next = appendHostedCheckpoint(
+    receipt,
+    hostedCheckpoint("identity_status", {
+      emailConfirmed: Boolean(authUser.email_confirmed_at),
+      ownedRows: await getQaUserOwnedCounts(supabase, authUser.id),
+    }),
+  );
+  await writeHostedReceipt(receiptPath, next);
+  console.log(
+    JSON.stringify({
+      ok: true,
+      action: "hosted-pool-status",
+      role: receipt.role,
+      userId: receipt.userId,
+      receiptPath,
+      receiptSha256: hashStableJson(next),
+    }),
+  );
+}
+
+async function handleHostedPoolAuthLink() {
+  const { receiptPath, receipt, authUser } = await readCurrentHostedReceipt();
+  const previewOrigin = requireHostedPreviewOrigin(options["preview-origin"]);
+  const callbackArtifactPath = requireExternalPrivatePath(
+    options["callback-artifact"],
+    "--callback-artifact",
+  );
+  const generated = await supabase.auth.admin.generateLink({
+    type: "magiclink",
+    email: authUser.email,
+    options: { redirectTo: new URL("/api/auth/confirm", previewOrigin).toString() },
+  });
+  const hashedToken = generated.data.properties?.hashed_token;
+  if (generated.error || !hashedToken) {
+    throw new Error(
+      generated.error?.message ?? "Supabase did not return a hosted auth token hash.",
+    );
+  }
+  await writeFile(
+    callbackArtifactPath,
+    `${JSON.stringify(
+      {
+        task: "HITO-271",
+        projectRef: config.hostedProjectRef,
+        userId: receipt.userId,
+        previewOrigin,
+        callbackPath: "/api/auth/confirm",
+        hashedToken,
+        type: "magiclink",
+        next: "/",
+      },
+      null,
+      2,
+    )}\n`,
+    { mode: 0o600 },
+  );
+  await chmod(callbackArtifactPath, 0o600);
+  const next = appendHostedCheckpoint(
+    receipt,
+    hostedCheckpoint("public_auth_callback_prepared", {
+      previewOrigin,
+      callbackPath: "/api/auth/confirm",
+      callbackArtifactPath,
+      secretValuesIncludedInReceipt: false,
+    }),
+  );
+  await writeHostedReceipt(receiptPath, next);
+  console.log(
+    JSON.stringify({
+      ok: true,
+      action: "hosted-pool-auth-link",
+      userId: receipt.userId,
+      callbackPrepared: true,
+      callbackArtifactPath,
+      receiptPath,
+      receiptSha256: hashStableJson(next),
+    }),
+  );
+}
+
+async function handleHostedPoolCheckpoint() {
+  const { receiptPath, receipt } = await readCurrentHostedReceipt();
+  const checkpoint = requireOption(options.checkpoint, "--checkpoint");
+  if (!/^[a-z0-9_]{3,80}$/.test(checkpoint)) {
+    throw new Error("--checkpoint must be a stable lower-case discriminator.");
+  }
+  const evidenceSha256 = requireOption(options["evidence-sha256"], "--evidence-sha256");
+  if (!/^[a-f0-9]{64}$/.test(evidenceSha256)) {
+    throw new Error("--evidence-sha256 must be one SHA-256 digest.");
+  }
+  const next = appendHostedCheckpoint(receipt, hostedCheckpoint(checkpoint, { evidenceSha256 }));
+  await writeHostedReceipt(receiptPath, next);
+  console.log(
+    JSON.stringify({
+      ok: true,
+      action: "hosted-pool-checkpoint",
+      checkpoint,
+      userId: receipt.userId,
+      receiptPath,
+      receiptSha256: hashStableJson(next),
+    }),
+  );
+}
+
+async function handleHostedPoolReset() {
+  const { receiptPath, receipt } = await readCurrentHostedReceipt();
+  const beforeCounts = await getQaUserOwnedCounts(supabase, receipt.userId);
+  const afterCounts = await resetQaPoolUserData({
+    supabase,
+    userId: receipt.userId,
+    preserveProfile: options["preserve-profile"] === "true",
+    preserveAiPlanGenerationResponseIds: [],
+  });
+  if (Object.values(afterCounts).some((count) => count !== 0)) {
+    throw new Error("Hosted QA pool reset did not reach zero.");
+  }
+  await releaseQaPoolLease({ role: receipt.role, token: receipt.leaseToken });
+  const next = {
+    ...appendHostedCheckpoint(
+      receipt,
+      hostedCheckpoint("domain_state_reset", { beforeCounts, afterCounts }),
+    ),
+    leaseReleasedAt: new Date().toISOString(),
+  };
+  await writeHostedReceipt(receiptPath, next);
+  console.log(
+    JSON.stringify({
+      ok: true,
+      action: "hosted-pool-reset",
+      userId: receipt.userId,
+      authIdentityRetained: true,
+      afterCounts,
+      receiptPath,
+      receiptSha256: hashStableJson(next),
+    }),
+  );
+}
+
+async function readCurrentHostedReceipt() {
+  const role = requireHostedAdaptivePoolRole();
+  const receiptPath = requireHostedReceiptPath();
+  const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+  if (
+    receipt.task !== "HITO-271" ||
+    receipt.projectRef !== config.hostedProjectRef ||
+    receipt.role !== role ||
+    typeof receipt.userId !== "string" ||
+    typeof receipt.leaseToken !== "string"
+  ) {
+    throw new Error("Hosted QA pool receipt identity mismatch.");
+  }
+  const authUser = await assertQaPoolAuthUser({
+    supabase,
+    role,
+    userId: receipt.userId,
+  });
+  await assertQaPoolLease({ role, token: receipt.leaseToken });
+  if (
+    !String(authUser.email ?? "")
+      .toLowerCase()
+      .endsWith(".invalid")
+  ) {
+    throw new Error("Hosted QA pool receipt no longer names a .invalid identity.");
+  }
+  return { receiptPath, receipt, authUser };
+}
+
+function requireHostedAdaptivePoolRole() {
+  const role = requireQaPoolRole(options.role);
+  if (role !== "adaptive-training-quality") {
+    throw new Error("Hosted HITO-271 lifecycle is restricted to adaptive-training-quality.");
+  }
+  return role;
+}
+
+function requireHostedReceiptPath() {
+  return requireExternalPrivatePath(options.receipt, "--receipt");
+}
+
+function requireExternalPrivatePath(value, label) {
+  const resolved = path.resolve(requireOption(value, label));
+  const relative = path.relative(process.cwd(), resolved);
+  if (relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))) {
+    throw new Error(`${label} must be outside the repository checkout.`);
+  }
+  return resolved;
+}
+
+function requireHostedPreviewOrigin(value) {
+  const parsed = new URL(requireOption(value, "--preview-origin"));
+  if (parsed.protocol !== "https:" || !parsed.hostname.endsWith(".vercel.app")) {
+    throw new Error("--preview-origin must be an HTTPS Vercel Preview origin.");
+  }
+  return parsed.origin;
+}
+
+function hostedCheckpoint(name, evidence) {
+  return { name, recordedAt: new Date().toISOString(), evidence };
+}
+
+function appendHostedCheckpoint(receipt, checkpoint) {
+  return { ...receipt, checkpoints: [...receipt.checkpoints, checkpoint] };
+}
+
+async function writeHostedReceipt(receiptPath, receipt, { create = false } = {}) {
+  await mkdir(path.dirname(receiptPath), { recursive: true, mode: 0o700 });
+  await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, {
+    mode: 0o600,
+    ...(create ? { flag: "wx" } : {}),
+  });
+  await chmod(receiptPath, 0o600);
+  const receiptStat = await stat(receiptPath);
+  if ((receiptStat.mode & 0o777) !== 0o600) {
+    throw new Error("Hosted QA pool receipt mode must be 0600.");
+  }
 }
 
 async function handlePoolReset({ preserveProfile = false } = {}) {
@@ -1578,27 +1862,92 @@ async function handleDelete() {
   );
 }
 
-function buildConfig() {
+async function buildConfig() {
   const supabaseUrl = requireOption(
     readEnv("NEXT_PUBLIC_SUPABASE_URL"),
     "NEXT_PUBLIC_SUPABASE_URL",
   );
-  const supabaseServerKey = requireOption(readEnv("SUPABASE_SECRET_KEY"), "SUPABASE_SECRET_KEY");
+  const hostedProjectRef = options["trusted-hosted-project-ref"] ?? null;
+  const suppliedServerKey = readEnv("SUPABASE_SECRET_KEY");
+  const supabaseServerKey =
+    suppliedServerKey ??
+    (HOSTED_POOL_COMMANDS.has(command) && options["api-key-inventory-stdin"] === "true"
+      ? findCurrentSecretKey(JSON.parse(await readStdin()))
+      : null);
+  requireOption(supabaseServerKey, "SUPABASE_SECRET_KEY");
 
   if (!isLoopbackRuntimeUrl(supabaseUrl)) {
+    const parsed = new URL(supabaseUrl);
+    if (
+      !HOSTED_POOL_COMMANDS.has(command) ||
+      typeof hostedProjectRef !== "string" ||
+      !/^[a-z0-9]{20}$/.test(hostedProjectRef) ||
+      parsed.protocol !== "https:" ||
+      parsed.hostname !== `${hostedProjectRef}.supabase.co`
+    ) {
+      throw new Error(
+        "Refusing hosted test-user access without an exact hosted pool command and matching --trusted-hosted-project-ref.",
+      );
+    }
+    return {
+      supabaseUrl: parsed.origin,
+      supabaseServerKey,
+      hostedProjectRef,
+      accountsFilePath: null,
+    };
+  }
+
+  if (HOSTED_POOL_COMMANDS.has(command)) {
     throw new Error(
-      "Refusing to run test-user against non-loopback Supabase. Start local Supabase and run npm run supabase:local:configure.",
+      "Hosted pool commands require a non-loopback Supabase target and exact project admission.",
     );
   }
 
   return {
     supabaseUrl,
     supabaseServerKey,
+    hostedProjectRef: null,
     accountsFilePath: path.resolve(
       process.cwd(),
       readEnv("LOCAL_AUTH_BYPASS_ACCOUNTS_FILE") ?? DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE,
     ),
   };
+}
+
+function findCurrentSecretKey(value) {
+  const values = [];
+  visitValues(value, values);
+  const secret = values.find((candidate) => candidate.startsWith("sb_secret_"));
+  if (!secret) {
+    throw new Error("The current hosted Supabase secret-key class is unavailable.");
+  }
+  return secret;
+}
+
+function visitValues(value, output) {
+  if (typeof value === "string") {
+    output.push(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) visitValues(item, output);
+    return;
+  }
+  if (value && typeof value === "object") {
+    for (const item of Object.values(value)) visitValues(item, output);
+  }
+}
+
+async function readStdin() {
+  const chunks = [];
+  for await (const chunk of process.stdin) chunks.push(chunk);
+  const value = Buffer.concat(chunks).toString("utf8").trim();
+  if (!value) throw new Error("Hosted Supabase key inventory input is empty.");
+  return value;
+}
+
+function hashStableJson(value) {
+  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
 async function loadLocalAccounts() {

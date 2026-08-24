@@ -8,6 +8,7 @@ import {
   QA_TESTER_POOL,
   QA_TESTER_POOL_VERSION,
   acquireQaPoolLease,
+  adoptHostedQaPoolAuthUser,
   assertQaCleanupManifestMatches,
   buildQaCleanupManifest,
   classifyQaIdentity,
@@ -48,6 +49,65 @@ assert.deepEqual(
       "app_metadata:hito_qa_pool_role=provider-engine",
     ],
   },
+);
+
+let adoptedHostedMetadata = null;
+const adoptedHosted = await adoptHostedQaPoolAuthUser({
+  supabase: {
+    auth: {
+      admin: {
+        async getUserById() {
+          return {
+            error: null,
+            data: {
+              user: user(
+                "hosted-adaptive",
+                {
+                  hito_test_user: true,
+                  hito_qa_pool_role: "adaptive-training-quality",
+                },
+                "qa-hito271@hito.invalid",
+              ),
+            },
+          };
+        },
+        async updateUserById(_id, update) {
+          adoptedHostedMetadata = update.app_metadata;
+          return {
+            error: null,
+            data: {
+              user: user("hosted-adaptive", update.app_metadata, "qa-hito271@hito.invalid"),
+            },
+          };
+        },
+      },
+    },
+  },
+  role: "adaptive-training-quality",
+  userId: "hosted-adaptive",
+});
+assert.equal(adoptedHosted.email, "qa-hito271@hito.invalid");
+assert.equal(adoptedHostedMetadata.hito_qa_pool_version, QA_TESTER_POOL_VERSION);
+assert.equal(adoptedHostedMetadata.hito_qa_pool_role, "adaptive-training-quality");
+assert.equal(adoptedHostedMetadata.hito_local_bypass, undefined);
+await assert.rejects(
+  adoptHostedQaPoolAuthUser({
+    supabase: {
+      auth: {
+        admin: {
+          async getUserById() {
+            return {
+              error: null,
+              data: { user: user("wrong-domain", { hito_test_user: true }) },
+            };
+          },
+        },
+      },
+    },
+    role: "adaptive-training-quality",
+    userId: "wrong-domain",
+  }),
+  /requires a \.invalid identity/,
 );
 assert.deepEqual(
   classifyQaIdentity(
@@ -287,10 +347,10 @@ console.log(
   ),
 );
 
-function user(id, appMetadata) {
+function user(id, appMetadata, email = `${id}@local.test`) {
   return {
     id,
-    email: `${id}@local.test`,
+    email,
     app_metadata: appMetadata,
   };
 }

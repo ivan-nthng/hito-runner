@@ -58,7 +58,6 @@ insight pipeline.
 
 See also:
 
-- [Product history digest](../../history/product-history-digest.md)
 - [Current product](../../current-product.md)
 - [Current system](../../current-system.md)
 
@@ -117,7 +116,6 @@ behavior.
 
 - Current evidence/comparison behavior: `docs/current-product.md`.
 - Current evidence/comparison architecture: `docs/current-system.md`.
-- Historical narrative: `docs/history/product-history-digest.md`.
 
 ## Boundaries
 

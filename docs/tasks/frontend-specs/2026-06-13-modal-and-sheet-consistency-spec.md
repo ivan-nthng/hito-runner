@@ -73,8 +73,8 @@ Design System
 - [src/styles.css](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/styles.css:939)
 - [src/routes/hitoDS.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/routes/hitoDS.tsx:3012)
 - [src/components/hito-ds/specimen-previews.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/hito-ds/specimen-previews.tsx:150)
-- [src/components/PlanManagementDialog.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/PlanManagementDialog.tsx:742)
-- [src/components/UploadJsonDialog.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/UploadJsonDialog.tsx:111)
+- `src/components/PlanManagementDialog.tsx` (historical consumer retained in Git)
+- `src/components/UploadJsonDialog.tsx` (historical consumer retained in Git)
 - [src/components/workout-completion/BodyNotesEditor.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/workout-completion/BodyNotesEditor.tsx:133)
 - [src/components/onboarding/StructuredPlanConstructor.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/onboarding/StructuredPlanConstructor.tsx:591)
 - [src/components/onboarding/SelectedTenKPlanPreviewDialog.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/onboarding/SelectedTenKPlanPreviewDialog.tsx:77)
@@ -146,8 +146,8 @@ Reference:
 
 Some product dialogs are already clean:
 
-- [src/components/PlanManagementDialog.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/PlanManagementDialog.tsx:742)
-- [src/components/UploadJsonDialog.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/UploadJsonDialog.tsx:111)
+- `src/components/PlanManagementDialog.tsx` (historical consumer retained in Git)
+- `src/components/UploadJsonDialog.tsx` (historical consumer retained in Git)
 - [src/components/workout-completion/BodyNotesEditor.tsx](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/src/components/workout-completion/BodyNotesEditor.tsx:133)
 
 These already use:

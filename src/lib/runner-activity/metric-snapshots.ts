@@ -1,6 +1,5 @@
 import "@tanstack/react-start/server-only";
 
-import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
@@ -351,7 +350,7 @@ async function reconcileRunnerActivityAdvancedMetrics(input: {
   creationCause?: RunnerActivityMetricCreationCause;
 }) {
   const { activities, asOfDate } = input;
-  const inputFingerprint = gate4InputFingerprint({ activities });
+  const inputFingerprint = await gate4InputFingerprint({ activities });
   const supabase = createAdminSupabaseClient();
   const existing = await supabase
     .from("runner_activity_metric_snapshots")
@@ -367,9 +366,9 @@ async function reconcileRunnerActivityAdvancedMetrics(input: {
   const observations = await persistObservations({
     userId: input.userId,
     activities,
-    drafts: buildGate4ObservationDrafts(activities),
+    drafts: await buildGate4ObservationDrafts(activities),
   });
-  const snapshotId = randomUUID();
+  const snapshotId = crypto.randomUUID();
   const evidenceRevisionIds = Array.from(
     new Set(
       activities.flatMap((activity) => [

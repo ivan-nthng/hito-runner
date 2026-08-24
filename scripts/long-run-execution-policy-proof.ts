@@ -6,14 +6,28 @@ import {
   type AiAuthoredPlanFirstCompilerStep,
 } from "../src/lib/ai-authored-plan-first-provider-contract";
 import { resolveEffectiveHeartRateGuidance } from "../src/lib/heart-rate-zones";
-import type { CanonicalWorkoutIdentity } from "../src/lib/rich-workout-model";
+import {
+  resolveCanonicalWorkoutModel,
+  type CanonicalWorkoutIdentity,
+} from "../src/lib/rich-workout-model";
 import { validateLongRunExecutionPolicy } from "../src/lib/long-run-execution-policy";
 import { buildDefaultAuthoringInput } from "./ai-first-plan-draft-ops/fixtures";
 
 type ProviderSection = AiAuthoredPlanFirstCompilerStep;
 type ProviderTarget = Extract<ProviderSection, { kind: "unit" }>["target"];
 
-const authoringInput = buildDefaultAuthoringInput("representative_10k");
+const baseAuthoringInput = buildDefaultAuthoringInput("representative_10k");
+const authoringInput = {
+  ...baseAuthoringInput,
+  planGoalIntent: {
+    ...baseAuthoringInput.planGoalIntent,
+    targetDate: "2026-07-11",
+  },
+  availability: {
+    ...baseAuthoringInput.availability,
+    maxRunningDaysPerWeek: null,
+  },
+};
 const z2Command = requireHeartRateCommand("Z2");
 const z3Command = requireHeartRateCommand("Z3");
 const z4Command = requireHeartRateCommand("Z4");
@@ -164,14 +178,35 @@ export function validateGeneratedLongRunExecutionPolicyContract() {
   }
 
   for (const identity of ["long_run_with_steady_finish", "marathon_steady_specificity"] as const) {
-    const controlled = assertGeneratedAccepted(`${identity} controlled change`, identity, [
-      providerUnit("main", 60, bpmTarget(z2Command), "body"),
-      providerUnit("main", 15, bpmTarget(z3Command), "finish"),
-    ]);
-    assert.equal(
-      controlled.canonicalPlan.planned_workouts[0]?.segments[1]?.segment_type,
-      "finish",
-      `${identity} must retain the explicit finish segment in canonical plan truth.`,
+    assert.deepEqual(
+      validateLongRunExecutionPolicy({
+        workoutIdentity: identity,
+        stages: [
+          {
+            role: "body",
+            runnable: true,
+            durationSeconds: 60 * 60,
+            target: { mode: "heart_rate", command: z2Command },
+          },
+          {
+            role: "finish",
+            runnable: true,
+            durationSeconds: 15 * 60,
+            target: { mode: "heart_rate", command: z3Command },
+          },
+        ],
+      }),
+      [],
+      `${identity} must remain a structurally valid controlled-change long-run strategy.`,
+    );
+    assertGeneratedRejected(
+      `${identity} missing-baseline initial block`,
+      identity,
+      [
+        providerUnit("main", 60, bpmTarget(z2Command), "body"),
+        providerUnit("main", 15, bpmTarget(z3Command), "finish"),
+      ],
+      "ai_authored_plan_first_missing_baseline_long_run_quality_forbidden",
     );
     assertGeneratedRejected(
       `${identity} changed body without finish role`,
@@ -210,10 +245,36 @@ export function validateGeneratedLongRunExecutionPolicyContract() {
       ],
       "ai_authored_plan_first_long_run_target_mode_mixed",
     );
-    assertGeneratedAccepted(`${identity} distance-based pace finish`, identity, [
-      providerDistanceUnit("main", 12, paceTarget(paceOne), "body"),
-      providerDistanceUnit("main", 3, paceTarget(paceTwo), "finish"),
-    ]);
+    assert.deepEqual(
+      validateLongRunExecutionPolicy({
+        workoutIdentity: identity,
+        stages: [
+          {
+            role: "body",
+            runnable: true,
+            distanceMeters: 12_000,
+            target: { mode: "pace", command: paceOne },
+          },
+          {
+            role: "finish",
+            runnable: true,
+            distanceMeters: 3_000,
+            target: { mode: "pace", command: paceTwo },
+          },
+        ],
+      }),
+      [],
+      `${identity} distance-based pace finish must remain structurally valid.`,
+    );
+    assertGeneratedRejected(
+      `${identity} distance-based missing-baseline initial block`,
+      identity,
+      [
+        providerDistanceUnit("main", 12, paceTarget(paceOne), "body"),
+        providerDistanceUnit("main", 3, paceTarget(paceTwo), "finish"),
+      ],
+      "ai_authored_plan_first_missing_baseline_long_run_quality_forbidden",
+    );
     assertGeneratedRejected(
       `${identity} distance-based BPM finish`,
       identity,
@@ -314,32 +375,59 @@ function providerDraft(
   sections: ProviderSection[],
 ): AiAuthoredPlanFirstCompilerDraft {
   return {
-    workouts: [
-      {
-        date: "2026-07-06",
-        phase: "Policy proof",
-        workout_identity: identity,
-        title: "Authored strategy proof",
-        cue: "Execute the authored ordered stages.",
-        sections,
-      },
-    ],
-    endpoint: {
-      date: "2026-07-11",
-      phase: "Goal",
-      workout_identity: "selected_distance_completion_or_checkpoint",
-      title: "10K endpoint",
-      cue: "Complete the selected distance.",
-      sections: [
+    blueprint: {
+      start_date: "2026-07-06",
+      selected_target_date: "2026-07-11",
+      target_assumption: "10K target on 2026-07-11",
+      phases: [
         {
-          kind: "unit",
-          segment_type: "main",
-          label: "Selected distance",
-          cue: null,
-          prescription: { mode: "distance", distance_km: 10 },
-          target: paceTarget("5:30-5:45/km"),
+          phase: "Policy proof",
+          start_date: "2026-07-06",
+          end_date: "2026-07-11",
+          expected_weekly_cadence: 2,
+          workout_families: [
+            ...new Set([
+              resolveCanonicalWorkoutModel({
+                workoutType: "quality",
+                workoutIdentity: identity,
+              }).workoutFamily,
+              "race" as const,
+            ]),
+          ],
         },
       ],
+      projections: [],
+    },
+    detailed_block: {
+      start_date: "2026-07-06",
+      end_date: "2026-07-11",
+      workouts: [
+        {
+          date: "2026-07-06",
+          phase: "Policy proof",
+          workout_identity: identity,
+          title: "Authored strategy proof",
+          cue: "Execute the authored ordered stages.",
+          sections,
+        },
+      ],
+      final_workout: {
+        date: "2026-07-11",
+        phase: "Policy proof",
+        workout_identity: "selected_distance_completion_or_checkpoint",
+        title: "10K endpoint",
+        cue: "Complete the selected distance.",
+        sections: [
+          {
+            kind: "unit",
+            segment_type: "main",
+            label: "Selected distance",
+            cue: null,
+            prescription: { mode: "distance", distance_km: 10 },
+            target: paceTarget("5:30-5:45/km"),
+          },
+        ],
+      },
     },
   };
 }

@@ -76,6 +76,127 @@ export async function applyAtomicCalendarWorkoutMutation(input: {
   };
 }
 
+export async function applyAtomicAdaptiveInitialDetailedBlockMaterialization(input: {
+  userId: string;
+  currentDate: string;
+  blueprintId: string;
+  blueprintVersion: number;
+  blueprintSha256: string;
+  candidateId: string;
+  candidateVersion: number;
+  candidateSha256: string;
+  inputFingerprintSha256: string;
+  expectedBlueprintContent: Json;
+  expectedCandidateContent: Json;
+  expectedInputSnapshot: Json;
+  sourceReviewChecksum: string;
+  workoutReviewChecksum: string;
+  workoutInserts: Json[];
+  mutationEvents: Json[];
+}) {
+  const supabase = createAdminSupabaseClient();
+  const result = await supabase.rpc("apply_adaptive_initial_detailed_block_materialization", {
+    p_user_id: input.userId,
+    p_current_date: input.currentDate,
+    p_blueprint_id: input.blueprintId,
+    p_blueprint_version: input.blueprintVersion,
+    p_blueprint_sha256: input.blueprintSha256,
+    p_candidate_id: input.candidateId,
+    p_candidate_version: input.candidateVersion,
+    p_candidate_sha256: input.candidateSha256,
+    p_input_fingerprint_sha256: input.inputFingerprintSha256,
+    p_expected_blueprint_content: input.expectedBlueprintContent,
+    p_expected_candidate_content: input.expectedCandidateContent,
+    p_expected_input_snapshot: input.expectedInputSnapshot,
+    p_source_review_checksum: input.sourceReviewChecksum,
+    p_workout_review_checksum: input.workoutReviewChecksum,
+    p_workout_inserts: input.workoutInserts,
+    p_mutation_events: input.mutationEvents,
+  });
+
+  if (result.error) {
+    throw new Error(result.error.message);
+  }
+
+  const payload = readRpcPayload(result.data, "Adaptive detailed-block materialisation");
+  const insertedWorkouts = readObjectArrayField(
+    payload,
+    "inserted_workouts",
+  ) as PersistedPlannedWorkoutRow[];
+  const mutationEvents = readObjectArrayField(
+    payload,
+    "mutation_events",
+  ) as CalendarWorkoutMutationEventRow[];
+
+  return {
+    blueprintId: readStringField(payload, "blueprint_id"),
+    detailedCandidateId: readStringField(payload, "detailed_candidate_id"),
+    blockConfirmationId: readStringField(payload, "block_confirmation_id"),
+    calendarRowCount: readNonNegativeIntegerField(payload, "calendar_row_count"),
+    insertedWorkouts,
+    mutationEvents,
+  };
+}
+
+export async function applyAtomicAdaptiveContinuationDetailedBlockMaterialization(input: {
+  userId: string;
+  currentDate: string;
+  blueprintId: string;
+  blueprintVersion: number;
+  blueprintSha256: string;
+  predecessorConfirmationId: string;
+  candidateId: string;
+  candidateVersion: number;
+  candidateSha256: string;
+  inputFingerprintSha256: string;
+  expectedCandidateContent: Json;
+  expectedInputSnapshot: Json;
+  reviewSealSha256: string;
+  workoutInserts: Json[];
+  mutationEvents: Json[];
+}) {
+  const result = await createAdminSupabaseClient().rpc(
+    "apply_adaptive_continuation_detailed_block_materialization",
+    {
+      p_user_id: input.userId,
+      p_current_date: input.currentDate,
+      p_blueprint_id: input.blueprintId,
+      p_blueprint_version: input.blueprintVersion,
+      p_blueprint_sha256: input.blueprintSha256,
+      p_predecessor_confirmation_id: input.predecessorConfirmationId,
+      p_candidate_id: input.candidateId,
+      p_candidate_version: input.candidateVersion,
+      p_candidate_sha256: input.candidateSha256,
+      p_input_fingerprint_sha256: input.inputFingerprintSha256,
+      p_expected_candidate_content: input.expectedCandidateContent,
+      p_expected_input_snapshot: input.expectedInputSnapshot,
+      p_review_seal_sha256: input.reviewSealSha256,
+      p_workout_inserts: input.workoutInserts,
+      p_mutation_events: input.mutationEvents,
+    },
+  );
+
+  if (result.error) throw new Error(result.error.message);
+  const payload = readRpcPayload(result.data, "Adaptive continuation materialisation");
+  return {
+    blueprintId: readStringField(payload, "blueprint_id"),
+    detailedCandidateId: readStringField(payload, "detailed_candidate_id"),
+    blockConfirmationId: readStringField(payload, "block_confirmation_id"),
+    predecessorConfirmationId: readStringField(payload, "predecessor_confirmation_id"),
+    continuationInputRevisionId: readStringField(payload, "continuation_input_revision_id"),
+    calendarRowCount: readNonNegativeIntegerField(payload, "calendar_row_count"),
+    consumedPreferenceCount: readNonNegativeIntegerField(payload, "consumed_preference_count"),
+    insertedWorkouts: readObjectArrayField(
+      payload,
+      "inserted_workouts",
+    ) as PersistedPlannedWorkoutRow[],
+    mutationEvents: readObjectArrayField(
+      payload,
+      "mutation_events",
+    ) as CalendarWorkoutMutationEventRow[],
+  };
+}
+
 export async function applyAtomicCalendarWorkoutContentEdit(input: {
   userId: string;
   workoutId: string;
@@ -587,6 +708,19 @@ function readOptionalObjectField(value: RpcPayload, key: string) {
   }
 
   if (typeof field !== "object" || Array.isArray(field)) {
+    throw new Error(`Atomic persistence result has an invalid ${key}.`);
+  }
+
+  return field;
+}
+
+function readObjectArrayField(value: RpcPayload, key: string) {
+  const field = value[key];
+
+  if (
+    !Array.isArray(field) ||
+    field.some((entry) => !entry || typeof entry !== "object" || Array.isArray(entry))
+  ) {
     throw new Error(`Atomic persistence result has an invalid ${key}.`);
   }
 

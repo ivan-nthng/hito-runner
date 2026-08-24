@@ -111,7 +111,7 @@ export interface WorkoutSourceProvenanceSummary {
   sourceStatus: string | null;
 }
 
-export interface PlanMeta {
+interface SignedOutPreviewPlanMeta {
   id: string | null;
   title: string;
   createdFor: string;
@@ -119,18 +119,10 @@ export interface PlanMeta {
   startDate: string;
   raceDate: string | null;
   goal: string;
-  source: "preview" | "persisted";
-  sourceKind: string | null;
-  schedulePreferences: PlanSchedulePreferencesSummary | null;
-  workoutEditing: CalendarWorkoutEditingCapabilities | null;
-}
-
-export interface PlanSchedulePreferencesSummary {
-  fixedRestDays: string[];
-  maxRunningDaysPerWeek: number | null;
-  /** Peak authored weekly frequency, not the runner's availability ceiling. */
-  runningDaysPerWeek: number | null;
-  preferredLongRunDay: string | null;
+  source: "preview";
+  sourceKind: null;
+  schedulePreferences: null;
+  workoutEditing: null;
 }
 
 type CalendarWorkoutEditingOperation =
@@ -185,17 +177,43 @@ export interface PersistedRunnerProfileSummary extends RunnerProfileSummary {
   calendarTimezoneSource: "fallback_utc" | "browser" | "user";
 }
 
-export interface TrainingSnapshot {
-  mode: TrainingMode;
-  source: "preview" | "persisted";
-  backend: "preview" | "supabase";
+interface TrainingSnapshotBase {
   currentDate: string;
   weekStatus: WeekStatus;
-  planMeta: PlanMeta | null;
-  calendarContext: RunnerCalendarSnapshotContext | null;
-  profile: PersistedRunnerProfileSummary | null;
   workouts: Workout[];
 }
+
+interface PreviewTrainingSnapshot extends TrainingSnapshotBase {
+  mode: "preview";
+  source: "preview";
+  backend: "preview";
+  planMeta: SignedOutPreviewPlanMeta;
+  calendarContext: null;
+  profile: null;
+}
+
+interface OnboardingTrainingSnapshot extends TrainingSnapshotBase {
+  mode: "onboarding";
+  source: "persisted";
+  backend: "supabase";
+  planMeta?: never;
+  calendarContext: null;
+  profile: PersistedRunnerProfileSummary | null;
+}
+
+interface AuthenticatedTrainingSnapshot extends TrainingSnapshotBase {
+  mode: "authenticated";
+  source: "persisted";
+  backend: "supabase";
+  planMeta?: never;
+  calendarContext: RunnerCalendarSnapshotContext;
+  profile: PersistedRunnerProfileSummary;
+}
+
+export type TrainingSnapshot =
+  | PreviewTrainingSnapshot
+  | OnboardingTrainingSnapshot
+  | AuthenticatedTrainingSnapshot;
 
 interface ShellSnapshot {
   currentDate: string;
@@ -456,29 +474,6 @@ export const WEEK_STATUS_META: Record<WeekStatus, { label: string; helper: strin
     helper: "Too much of the week shifted to keep following it blindly.",
   },
 };
-
-export function feedbackMarkerMeta(marker: WorkoutFeedbackMarkerSummary | null) {
-  if (!marker) {
-    return null;
-  }
-
-  switch (marker.state) {
-    case "evidence_attached":
-      return {
-        state: marker.state,
-        label: "Evidence attached",
-        shortLabel: "Evidence",
-      };
-    case "feedback_ready":
-      return {
-        state: marker.state,
-        label: "Feedback ready",
-        shortLabel: "Feedback",
-      };
-    default:
-      return null;
-  }
-}
 
 export function getPreviewSnapshot(): TrainingSnapshot {
   const currentDate = todayIso();

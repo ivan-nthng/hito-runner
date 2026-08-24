@@ -7,9 +7,10 @@ import {
   dateIsoInRunnerTimezone,
 } from "../src/lib/runner-calendar-timezone";
 import { getRunnerCalendarContextForUserId } from "../src/lib/runner-calendar-context";
+import { getPersistedRunnerCalendarSnapshot } from "../src/lib/runner-calendar-snapshot";
 import { getRunnerActivityProgressForUser } from "../src/lib/runner-activity/read-model";
 import { createAdminSupabaseClient } from "../src/lib/supabase/server";
-import { getPersistedSnapshot } from "../src/lib/training-api";
+import { getPreviewSnapshot } from "../src/lib/training";
 import { updateRunnerCalendarTimezoneForUserId } from "../src/lib/user-settings-actions";
 
 const FIXED_INSTANT = new Date("2026-08-09T23:30:00.000Z");
@@ -18,6 +19,8 @@ const REQUIRE_PERSISTENCE = process.argv.includes("--require-persistence");
 async function main() {
   proveTimezoneDateContract();
   proveAuthenticatedSourceWiring();
+  proveAdaptiveBlueprintCalendarDateWiring();
+  proveRunnerCalendarSnapshotOwnership();
 
   if (!REQUIRE_PERSISTENCE) {
     console.log("Runner calendar context source validation passed.");
@@ -45,6 +48,7 @@ function proveAuthenticatedSourceWiring() {
     "src/lib/training-api.ts",
     "src/lib/active-plan-persistence.ts",
     "src/lib/runner-calendar-persistence.ts",
+    "src/lib/runner-calendar-snapshot.ts",
     "src/lib/running-plan-engine-actions.ts",
     "src/lib/runner-activity/read-model.ts",
     "src/lib/runner-activity/fact-snapshots.ts",
@@ -68,6 +72,96 @@ function proveAuthenticatedSourceWiring() {
     savedPlanSource,
     /const currentDate = await getRunnerCalendarDateForUserId\(userId\)/,
   );
+}
+
+function proveAdaptiveBlueprintCalendarDateWiring() {
+  const readModelSource = readFileSync(
+    new URL("../src/lib/adaptive-blueprint-read-model.ts", import.meta.url),
+    "utf8",
+  );
+  const trainingApiSource = readFileSync(
+    new URL("../src/lib/training-api.ts", import.meta.url),
+    "utf8",
+  );
+  const prepareSource = readFileSync(
+    new URL("../src/lib/adaptive-blueprint-actions.server.ts", import.meta.url),
+    "utf8",
+  );
+  const confirmationSource = readFileSync(
+    new URL("../src/lib/adaptive-blueprint-confirmation.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    readModelSource,
+    /getAdaptiveBlueprintCalendarReadModelForUser\(\s*userId: string,\s*asOfDate: string,/,
+    "The adaptive Calendar read model must require the runner-owned Calendar date.",
+  );
+  assert.doesNotMatch(
+    readModelSource,
+    /asOfDate\s*=\s*new Date\(/,
+    "The adaptive Calendar read model must not fall back to the host UTC clock.",
+  );
+  assert.match(
+    trainingApiSource,
+    /const asOfDate = await getRunnerCalendarDateForUserId\(userId\)/,
+    "Calendar GET composition must resolve the runner-owned Calendar date.",
+  );
+  assert.match(
+    trainingApiSource,
+    /getAdaptiveBlueprintCalendarReadModelForUser\(userId, asOfDate\)/,
+    "Calendar GET composition must pass its runner-owned date to the adaptive read model.",
+  );
+  assert.match(
+    prepareSource,
+    /asOfDate: await getRunnerCalendarDateForUserId\(userId\)/,
+    "Continuation preparation must use the same runner-owned Calendar date.",
+  );
+  assert.match(
+    confirmationSource,
+    /input\.asOfDate \?\? \(await getRunnerCalendarDateForUserId\(input\.userId\)\)/,
+    "Continuation review and confirmation must use the same runner-owned Calendar date.",
+  );
+}
+
+function proveRunnerCalendarSnapshotOwnership() {
+  const trainingApiSource = readFileSync(
+    new URL("../src/lib/training-api.ts", import.meta.url),
+    "utf8",
+  );
+  const calendarSnapshotSource = readFileSync(
+    new URL("../src/lib/runner-calendar-snapshot.ts", import.meta.url),
+    "utf8",
+  );
+  const trainingContractSource = readFileSync(
+    new URL("../src/lib/training.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(
+    trainingApiSource,
+    /getPersistedRunnerCalendarSnapshot/,
+    "Server transport must consume the Runner Calendar snapshot owner.",
+  );
+  assert.doesNotMatch(
+    trainingApiSource,
+    /export async function getPersistedSnapshot|from\("planned_workouts"\)|planMeta:\s*null/,
+    "Server transport must not retain persisted Calendar snapshot assembly or plan metadata.",
+  );
+  assert.match(
+    calendarSnapshotSource,
+    /export async function getPersistedRunnerCalendarSnapshot/,
+    "Runner Calendar must own persisted snapshot assembly.",
+  );
+  assert.doesNotMatch(
+    trainingContractSource,
+    /export interface PlanMeta|export interface PlanSchedulePreferencesSummary/,
+    "The shared snapshot contract must not expose the retired plan-shaped metadata types.",
+  );
+
+  const preview = getPreviewSnapshot();
+  assert.equal(preview.mode, "preview");
+  assert.equal(preview.planMeta.source, "preview");
 }
 
 async function proveLocalPersistenceContract() {
@@ -136,10 +230,14 @@ async function proveLocalPersistenceContract() {
       calendarTimezone: "America/New_York",
       calendarTimezoneSource: "browser",
     });
-    const initializedNewRunnerSnapshot = await getPersistedSnapshot(newRunnerUser.id, {
-      instant: FIXED_INSTANT,
-    });
+    const initializedNewRunnerSnapshot = await getPersistedRunnerCalendarSnapshot(
+      newRunnerUser.id,
+      {
+        instant: FIXED_INSTANT,
+      },
+    );
     assert.equal(initializedNewRunnerSnapshot.mode, "onboarding");
+    assert.equal("planMeta" in initializedNewRunnerSnapshot, false);
     assert.equal(initializedNewRunnerSnapshot.profile?.calendarTimezone, "America/New_York");
     assert.equal(initializedNewRunnerSnapshot.profile?.calendarTimezoneSource, "browser");
 
@@ -151,11 +249,13 @@ async function proveLocalPersistenceContract() {
     assert.equal(tokyoContext.currentDate, "2026-08-10");
 
     const [saoPauloSnapshot, tokyoSnapshot] = await Promise.all([
-      getPersistedSnapshot(saoPauloUser.id, { instant: FIXED_INSTANT }),
-      getPersistedSnapshot(tokyoUser.id, { instant: FIXED_INSTANT }),
+      getPersistedRunnerCalendarSnapshot(saoPauloUser.id, { instant: FIXED_INSTANT }),
+      getPersistedRunnerCalendarSnapshot(tokyoUser.id, { instant: FIXED_INSTANT }),
     ]);
     assert.equal(saoPauloSnapshot.currentDate, saoPauloContext.currentDate);
     assert.equal(tokyoSnapshot.currentDate, tokyoContext.currentDate);
+    assert.equal("planMeta" in saoPauloSnapshot, false);
+    assert.equal("planMeta" in tokyoSnapshot, false);
     assert.equal(saoPauloSnapshot.workouts[0]?.date, "2026-08-09");
     assert.equal(tokyoSnapshot.workouts[0]?.date, "2026-08-09");
     assert.equal(saoPauloSnapshot.workouts[0]?.status, "today");

@@ -4,7 +4,7 @@ Work Item ID: `2026-08-17-hito-ds-foundations-light-token-specimen-surface-contr
 Status: backlog
 Type: Bug batch — Design System Foundations reference surface contrast
 Priority: medium
-Owner: DESIGN SYSTEM
+Owner: FRONTEND / Design System
 Scope: Correct the shared Light-theme fill for every existing `.hito-ds-token-specimen-surface` reference card; retain its current shared selector and semantic token model.
 Archive Intent: Retain through one DESIGN SYSTEM fix and focused Light/Dark reference acceptance; compact to cause, affected shared selector, token choice, and proof.
 Evidence From: [Foundations Reference Specimen Surface Unification](./2026-08-11-hito-ds-foundations-reference-specimen-surface-unification.md)

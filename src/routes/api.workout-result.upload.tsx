@@ -1,13 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getRequestAuthContext } from "@/lib/backend/auth";
 import { readBoundedMultipartFormData } from "@/lib/bounded-multipart-form-data";
-import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
 import {
   LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_FIELD,
   LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE,
+} from "@/lib/local-activity-file-design-fixture";
+import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
+import {
   MAX_WORKOUT_RESULT_MULTIPART_BYTES,
-  runnerSafeWorkoutResultMessage,
   workoutResultErrorResponseHeaders,
+} from "@/lib/workout-result-import/internal-types";
+import {
+  runnerSafeWorkoutResultMessage,
   WorkoutResultImportError,
 } from "@/lib/workout-result-import/types";
 

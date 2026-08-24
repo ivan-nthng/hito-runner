@@ -177,12 +177,12 @@ exclusive account types.
 
 ### Four different product objects
 
-| Object | Canonical owner | Purpose | Must not become |
-| --- | --- | --- | --- |
-| Coach assignment | Coach or Organization | Private offer pinned to one immutable content version and one runner | Direct write access to runner plan rows |
-| Club event/schedule | Organization/Club | Communal event truth and published occurrences | A personal training plan or Rest/workout placeholder |
-| Runner-owned snapshot | Runner | Confirmed personal copy persisted through current plan/workout lifecycle | A live subscription to publisher edits |
-| Personal-calendar overlay | Runner participation read model | Show joined future events beside personal workouts | A second calendar or hidden `planned_workouts` mutation |
+| Object                    | Canonical owner                 | Purpose                                                                  | Must not become                                         |
+| ------------------------- | ------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------- |
+| Coach assignment          | Coach or Organization           | Private offer pinned to one immutable content version and one runner     | Direct write access to runner plan rows                 |
+| Club event/schedule       | Organization/Club               | Communal event truth and published occurrences                           | A personal training plan or Rest/workout placeholder    |
+| Runner-owned snapshot     | Runner                          | Confirmed personal copy persisted through current plan/workout lifecycle | A live subscription to publisher edits                  |
+| Personal-calendar overlay | Runner participation read model | Show joined future events beside personal workouts                       | A second calendar or hidden `planned_workouts` mutation |
 
 ### Minimum durable concepts
 
@@ -228,13 +228,13 @@ source artifacts; only explicit runner adoption creates personal calendar truth.
 
 ### Minimal visibility matrix
 
-| Actor | May see | Must not see by implication |
-| --- | --- | --- |
-| Runner | Their connections, offers, source identity/version, participation, adopted provenance | Other runners or publisher-private drafts |
-| Coach | Own programs/versions, active connection identity, assignment delivery/decision state | Runner profile, HR, calendar, plan content, logs, results, notes |
-| Organization admin | Organization members, Clubs, owned programs/schedules, bounded publication state | Runner personal data or unrelated Coach drafts |
-| Club manager | Club schedule and minimum participation state needed to operate an event | Runner training, health, HR, logs, private notes |
-| Future API principal | Only actions and resources granted through the same actor/relationship policy | Direct database or broader service-role access |
+| Actor                | May see                                                                               | Must not see by implication                                      |
+| -------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Runner               | Their connections, offers, source identity/version, participation, adopted provenance | Other runners or publisher-private drafts                        |
+| Coach                | Own programs/versions, active connection identity, assignment delivery/decision state | Runner profile, HR, calendar, plan content, logs, results, notes |
+| Organization admin   | Organization members, Clubs, owned programs/schedules, bounded publication state      | Runner personal data or unrelated Coach drafts                   |
+| Club manager         | Club schedule and minimum participation state needed to operate an event              | Runner training, health, HR, logs, private notes                 |
+| Future API principal | Only actions and resources granted through the same actor/relationship policy         | Direct database or broader service-role access                   |
 
 ### Verb semantics
 
@@ -304,17 +304,17 @@ effect of joining.
 
 ## Existing Seams To Reuse
 
-| Current owner | Safe reuse | Unsafe reuse |
-| --- | --- | --- |
-| [request auth context](../../../src/lib/backend/auth.ts) and [persisted runner resolver](../../../src/lib/request-persisted-user.ts) | Authenticate the principal and resolve the acting account | Encode Coach/Club authority in current runner/admin identity |
-| Existing own-row [RLS foundation](../../../supabase/migrations/20260506025058_phase_2_phase_3_backend_foundation.sql) | Preserve runner ownership and deny-by-default posture | Add policies that let Coach select runner rows |
-| [WorkoutDocument](../../../src/lib/workout-document.ts) and pure manual schema/normalization/validation | Canonical workout structure for assignment content | Reuse runner-bound manual review, persistence, or actions as Coach writes |
-| [review token signing](../../../src/lib/review-token-signing.ts) and reviewed action patterns | Build an assignment-specific signed review over recipient, connection, offer, immutable version, selected date, content digest, provenance, and expected plan revision | Reuse the current manual checksum/token as assignment authority or trust client-supplied rows |
-| [training-plan-v2 schema](../../../src/lib/imported-plan.ts) | Profile-free program snapshot validation and future full-plan adoption | Use advanced import action as the assignment endpoint or include runner profile/HR envelope |
-| [active-plan persistence](../../../src/lib/active-plan-persistence.ts) and atomic lifecycle patterns | Persist only after the authenticated runner confirms adoption; atomically consume the offer and create any required empty manual plan, workout, and provenance | Let publisher call persistence for a target runner or split first adoption across multiple mutations |
-| [active-plan transition](../../../src/lib/active-plan-transition-actions.ts) | Future explicit full-plan replacement after separate approval | Merge/replace an active plan when an offer is accepted |
-| [plan export shaping](../../../src/lib/plan-export.ts) | Canonical structural serialization and stable source identifiers | Publish a runner's active-plan export wholesale; it may carry personal truth |
-| Current calendar/readback projection | Merge future event overlays at read-model time | Store Club occurrences as `planned_workouts` |
+| Current owner                                                                                                                        | Safe reuse                                                                                                                                                             | Unsafe reuse                                                                                         |
+| ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| [request auth context](../../../src/lib/backend/auth.ts) and [persisted runner resolver](../../../src/lib/request-persisted-user.ts) | Authenticate the principal and resolve the acting account                                                                                                              | Encode Coach/Club authority in current runner/admin identity                                         |
+| Existing own-row [RLS foundation](../../../supabase/migrations/20260506025058_phase_2_phase_3_backend_foundation.sql)                | Preserve runner ownership and deny-by-default posture                                                                                                                  | Add policies that let Coach select runner rows                                                       |
+| [WorkoutDocument](../../../src/lib/workout-document.ts) and pure manual schema/normalization/validation                              | Canonical workout structure for assignment content                                                                                                                     | Reuse runner-bound manual review, persistence, or actions as Coach writes                            |
+| [review token signing](../../../src/lib/review-token-signing.ts) and reviewed action patterns                                        | Build an assignment-specific signed review over recipient, connection, offer, immutable version, selected date, content digest, provenance, and expected plan revision | Reuse the current manual checksum/token as assignment authority or trust client-supplied rows        |
+| [training-plan-v2 schema](../../../src/lib/imported-plan.ts)                                                                         | Profile-free program snapshot validation and future full-plan adoption                                                                                                 | Use advanced import action as the assignment endpoint or include runner profile/HR envelope          |
+| [active-plan persistence](../../../src/lib/active-plan-persistence.ts) and atomic lifecycle patterns                                 | Persist only after the authenticated runner confirms adoption; atomically consume the offer and create any required empty manual plan, workout, and provenance         | Let publisher call persistence for a target runner or split first adoption across multiple mutations |
+| Historical active-plan transition, retained in Git                                                                                   | Future explicit full-plan replacement after separate approval                                                                                                          | Merge/replace an active plan when an offer is accepted                                               |
+| [plan export shaping](../../../src/lib/plan-export.ts)                                                                               | Canonical structural serialization and stable source identifiers                                                                                                       | Publish a runner's active-plan export wholesale; it may carry personal truth                         |
+| Current calendar/readback projection                                                                                                 | Merge future event overlays at read-model time                                                                                                                         | Store Club occurrences as `planned_workouts`                                                         |
 
 Manual authoring primitives are useful content grammar. Personal saved templates, add/edit server
 actions, and personal persistence remain runner-owned and cannot become publisher storage.
@@ -375,17 +375,17 @@ confirm mutation, not a preliminary side effect.
 
 ## Staged Roadmap
 
-| Stage | Primary owner | Bounded outcome | Gate to advance |
-| --- | --- | --- | --- |
-| 0. Relationship decision | Product | Coach eligibility and private invitation acceptance semantics approved | Accepted Product decision recorded in this plan |
-| 1. Private assignment backend | Backend | Actor/connection authorization, immutable single-workout version, addressed offer, assignment-specific signed review, atomic runner adoption/provenance, deny-by-default persistence | Backend validators, stale/revoked/partial-write proof, local migration/RLS proof, independent QA subagent; no UI |
-| 2. Private assignment product UI | Frontend Product | Coach authoring/send surface and runner inbox/view/decline/review/copy using backend-owned states and Hito DS | Desktop/exact-375px browser, auth denial, persistence/readback, cleanup |
-| 3. First-slice acceptance | QA | Cross-owner relationship, privacy, revocation, adoption, provenance, responsive, and cleanup matrix | Global QA Acceptance |
-| 4. Full program publishing | Backend | Multi-workout immutable versions and explicit runner full-plan adoption using existing plan review/replacement | Separate Product approval for active-plan replacement UX |
-| 5. Organization and Club decision | Product | Define commercial/admin roles, membership, event participation, and minimum visibility | Product contract recorded before schema or UI work |
-| 6. Organization and Club backend | Backend | Implement Organization/Club/schedule/occurrence boundaries under the accepted contract | Authorization, RLS, versioning, and participation proof |
-| 7. Club calendar overlay | Frontend Product | Project joined events into the one calendar without changing personal workouts | Overlay/readback and leave/cancellation QA |
-| 8. External boundary readiness | Integration Manager | Confirm stable transport-neutral actions, scopes, idempotency, observability, and revocation before any API design | Separate Product approval for public API/provider work |
+| Stage                             | Primary owner       | Bounded outcome                                                                                                                                                                      | Gate to advance                                                                                                  |
+| --------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| 0. Relationship decision          | Product             | Coach eligibility and private invitation acceptance semantics approved                                                                                                               | Accepted Product decision recorded in this plan                                                                  |
+| 1. Private assignment backend     | Backend             | Actor/connection authorization, immutable single-workout version, addressed offer, assignment-specific signed review, atomic runner adoption/provenance, deny-by-default persistence | Backend validators, stale/revoked/partial-write proof, local migration/RLS proof, independent QA subagent; no UI |
+| 2. Private assignment product UI  | Frontend Product    | Coach authoring/send surface and runner inbox/view/decline/review/copy using backend-owned states and Hito DS                                                                        | Desktop/exact-375px browser, auth denial, persistence/readback, cleanup                                          |
+| 3. First-slice acceptance         | QA                  | Cross-owner relationship, privacy, revocation, adoption, provenance, responsive, and cleanup matrix                                                                                  | Global QA Acceptance                                                                                             |
+| 4. Full program publishing        | Backend             | Multi-workout immutable versions and explicit runner full-plan adoption using existing plan review/replacement                                                                       | Separate Product approval for active-plan replacement UX                                                         |
+| 5. Organization and Club decision | Product             | Define commercial/admin roles, membership, event participation, and minimum visibility                                                                                               | Product contract recorded before schema or UI work                                                               |
+| 6. Organization and Club backend  | Backend             | Implement Organization/Club/schedule/occurrence boundaries under the accepted contract                                                                                               | Authorization, RLS, versioning, and participation proof                                                          |
+| 7. Club calendar overlay          | Frontend Product    | Project joined events into the one calendar without changing personal workouts                                                                                                       | Overlay/readback and leave/cancellation QA                                                                       |
+| 8. External boundary readiness    | Integration Manager | Confirm stable transport-neutral actions, scopes, idempotency, observability, and revocation before any API design                                                                   | Separate Product approval for public API/provider work                                                           |
 
 Stages are sequential gates, not one implementation batch. Each execution owner completes local
 validation with internal reviewers; Product is not the relay between implementation and QA.
@@ -425,15 +425,15 @@ Architecture planning is complete when:
 
 ## Architecture Validation Inventory
 
-| Check | Scenario / environment | Required result |
-| --- | --- | --- |
-| Current boundary scan | Current docs and source | Coach/Club/API remain future-only; one active plan remains canonical |
-| Auth/RLS review | Current migration and request auth source | Own-row runner boundary preserved; no current Coach authority claimed |
-| Lifecycle review | Review/confirm, active-plan, manual, import/export source | Reuse and unsafe-reuse boundaries are exact |
-| Integration review | Consent/version/revocation/API boundary | No implied data access or second authorization path |
-| Source links | All linked repository paths | Existing and resolvable |
-| Admin importer | Dry-run only | Canonical metadata parses; no Supabase writes |
-| Diff hygiene | This Markdown file and generated dashboard if refreshed | No whitespace errors |
+| Check                 | Scenario / environment                                    | Required result                                                       |
+| --------------------- | --------------------------------------------------------- | --------------------------------------------------------------------- |
+| Current boundary scan | Current docs and source                                   | Coach/Club/API remain future-only; one active plan remains canonical  |
+| Auth/RLS review       | Current migration and request auth source                 | Own-row runner boundary preserved; no current Coach authority claimed |
+| Lifecycle review      | Review/confirm, active-plan, manual, import/export source | Reuse and unsafe-reuse boundaries are exact                           |
+| Integration review    | Consent/version/revocation/API boundary                   | No implied data access or second authorization path                   |
+| Source links          | All linked repository paths                               | Existing and resolvable                                               |
+| Admin importer        | Dry-run only                                              | Canonical metadata parses; no Supabase writes                         |
+| Diff hygiene          | This Markdown file and generated dashboard if refreshed   | No whitespace errors                                                  |
 
 Runtime, browser, provider, migration, and hosted Supabase checks are intentionally out of scope
 because this task changes documentation only.

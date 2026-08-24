@@ -78,8 +78,6 @@ The following queued documents own no current runtime/source diff and remain non
 stage, terminalize, or absorb them into this release:
 
 - `docs/tasks/backlog/2026-08-12-hito-ds-navigation-and-async-toast-demo-clarity.md`
-- `docs/tasks/backlog/2026-08-13-hito-ds-reference-link-inspector-registration-and-compact-geometry.md`
-- `docs/tasks/backlog/2026-08-13-hito-local-inspector-spacing-readback-and-custom-geometry-clarity.md`
 - `docs/tasks/backlog/2026-08-13-hito-public-landing-google-pagespeed-audit.md`
 
 ## Required Discriminator
@@ -127,7 +125,7 @@ Read AGENTS.md, agents/backend.agent.md, skills/hito-backend-supabase-contract/S
 
 Do not reuse prior release snapshots or admission maps. Begin a completely fresh repository-wide freeze: prove every repository/runtime writer is idle; fetch origin/main; prove branch, HEAD, remote baseline, ahead/behind, and empty index; then take two fresh matching full path/content snapshots. Rebuild the entire whole-file owner map.
 
-Admit only paths with current terminal owners, historical release-receipt status, this completed exhaustive audit as an explicit integration dependency, or another directly proven terminal shared-integration dependency. Explicitly exclude and do not stage these queued-only documents: 2026-08-12-hito-ds-navigation-and-async-toast-demo-clarity.md, 2026-08-13-hito-ds-reference-link-inspector-registration-and-compact-geometry.md, 2026-08-13-hito-local-inspector-spacing-readback-and-custom-geometry-clarity.md, and 2026-08-13-hito-public-landing-google-pagespeed-audit.md. Preserve them as nonterminal work.
+Admit only paths with current terminal owners, historical release-receipt status, this completed exhaustive audit as an explicit integration dependency, or another directly proven terminal shared-integration dependency. Explicitly exclude and do not stage these queued-only documents: 2026-08-12-hito-ds-navigation-and-async-toast-demo-clarity.md and 2026-08-13-hito-public-landing-google-pagespeed-audit.md. Preserve them as nonterminal work.
 
 Only after complete admission: stage the exact admitted whole-file inventory, re-prove staged path/content identity, and run git diff --cached --check. Then run the existing applicable source, build, integrity, and read-only hosted-parity gates. If every gate passes, create exactly one commit, push exactly once, prove local HEAD and origin/main equal the resulting SHA, and inspect the matching Git-backed Vercel production deployment until READY.
 
@@ -234,12 +232,10 @@ recorded in their terminal continuation receipt.
 
 ### Exact Exclusions
 
-| Queued-only document                                                                                  | Current status | Frozen SHA-256                                                     |
-| ----------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------ |
-| `docs/tasks/backlog/2026-08-12-hito-ds-navigation-and-async-toast-demo-clarity.md`                    | `backlog`      | `33eb885d02053459a6eeac457b0994d3248502e2247921cf46982ee55ead9932` |
-| `docs/tasks/backlog/2026-08-13-hito-ds-reference-link-inspector-registration-and-compact-geometry.md` | `ready`        | `72b4a0c5c08cd81e1982d2f60fcf3e67831b1b84e3072059fe99581ad91c93fd` |
-| `docs/tasks/backlog/2026-08-13-hito-local-inspector-spacing-readback-and-custom-geometry-clarity.md`  | `ready`        | `26f4aaf516abffb25998e4d68a220e1bc7110a09bdb3aefd77ab0e175e237464` |
-| `docs/tasks/backlog/2026-08-13-hito-public-landing-google-pagespeed-audit.md`                         | `backlog`      | `676d21bdacd794a1f0bb16ecbd5d747b4723c9292951f6bac415c49eca27b7d3` |
+| Queued-only document                                                               | Current status | Frozen SHA-256                                                     |
+| ---------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------ |
+| `docs/tasks/backlog/2026-08-12-hito-ds-navigation-and-async-toast-demo-clarity.md` | `backlog`      | `33eb885d02053459a6eeac457b0994d3248502e2247921cf46982ee55ead9932` |
+| `docs/tasks/backlog/2026-08-13-hito-public-landing-google-pagespeed-audit.md`      | `backlog`      | `676d21bdacd794a1f0bb16ecbd5d747b4723c9292951f6bac415c49eca27b7d3` |
 
 All four exclusions are documentation-only, own no current source hunk, and were stable across both
 initial snapshots. They remain outside staging and retain their current lifecycle truth.

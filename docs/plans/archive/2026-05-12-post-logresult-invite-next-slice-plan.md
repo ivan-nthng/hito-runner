@@ -74,7 +74,6 @@ comparison-ready, AI-ready, rest-day, and preview-mode states.
 
 - Current product truth: `docs/current-product.md`
 - Current system truth: `docs/current-system.md`
-- Product history digest: `docs/history/product-history-digest.md`
 
 ## Do Not Continue By Default
 

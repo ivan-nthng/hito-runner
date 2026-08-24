@@ -3,10 +3,10 @@ import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { HitoButton } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
+import { feedbackMarkerMeta } from "@/components/workout-feedback-marker-presentation";
 import {
   displayExecutableTargetEntries,
   displayWorkoutStructureEntries,
-  feedbackMarkerMeta,
   formatDistanceKm,
   formatDate,
   formatDurationMin,

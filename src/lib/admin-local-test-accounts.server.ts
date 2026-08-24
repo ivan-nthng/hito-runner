@@ -7,7 +7,7 @@ import type {
   DeleteAdminLocalTestAccountInput,
   DeleteAdminLocalTestAccountResult,
 } from "@/lib/admin-local-test-accounts";
-import { classifyAdminAnalyticsUser } from "@/lib/admin-user-classification";
+import { classifyActor } from "@/lib/actor-classification";
 import { requireAdminAccessForDependencies } from "@/lib/admin-access.server";
 import type { RequestAuthContext } from "@/lib/backend/auth";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
@@ -129,7 +129,7 @@ export async function deleteAdminLocalTestAccountForDependencies(
     const authUser = await dependencies.supabaseAdmin.findAuthUserByEmail(email);
 
     if (authUser) {
-      const classification = classifyAdminAnalyticsUser({
+      const classification = classifyActor({
         email: authUser.email,
         appMetadata: authUser.appMetadata,
         localAccountRole: localAccount.role,
@@ -238,7 +238,7 @@ async function buildAccountView(
     linked.authUser?.appMetadata.hito_role === "admin" ||
     linked.authUser?.appMetadata.hito_local_role === "admin" ||
     Boolean(linked.authUser?.appMetadata.hito_qa_pool_version);
-  const classification = classifyAdminAnalyticsUser({
+  const classification = classifyActor({
     email: account.email,
     appMetadata: linked.authUser?.appMetadata,
     localAccountRole: account.role,

@@ -9,11 +9,15 @@ import {
   type RunningPlanPreviewActionInput,
 } from "../../src/lib/running-plan-engine-actions";
 import { DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE } from "../../src/lib/local-auth-account-registry.server";
-import { buildProofRunnerProfileSnapshot } from "../runner-profile-snapshot-proof-helpers";
+import { buildProofInitialPlanProfile } from "../runner-fitness-profile-initial-plan-proof-helpers";
 
 export async function buildReviewedAiFixtureResult(input: RunningPlanPreviewActionInput) {
-  const runnerProfileSnapshot = buildProofRunnerProfileSnapshot(input);
-  const authoring = buildAiGeneratedRunningPlanAuthoringInput(input, runnerProfileSnapshot);
+  const profile = buildProofInitialPlanProfile(input);
+  const authoring = buildAiGeneratedRunningPlanAuthoringInput(
+    input,
+    profile.initialPlanProfile,
+    profile.acceptedHeartRateProfile,
+  );
   assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);
   if (!authoring.ok) throw new Error(authoring.message);
 
@@ -31,7 +35,8 @@ export async function buildReviewedAiFixtureResult(input: RunningPlanPreviewActi
       today,
       fetchImpl,
     },
-    runnerProfileSnapshot,
+    initialPlanProfile: profile.initialPlanProfile,
+    acceptedHeartRateProfile: profile.acceptedHeartRateProfile,
   });
 }
 

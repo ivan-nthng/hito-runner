@@ -57,7 +57,6 @@ truth lives in current source and docs.
 
 See also:
 
-- [Product history digest](../../history/product-history-digest.md)
 - [Current system](../../current-system.md)
 - [Current product](../../current-product.md)
 - [Current functional map](../../current-functional-map.md)
@@ -114,7 +113,6 @@ persistence/readback, export, selected-plan, manual-plan, and generated-plan beh
 - Implemented architecture: `docs/current-system.md`.
 - Runner-facing behavior: `docs/current-product.md`.
 - Business-flow map: `docs/current-functional-map.md`.
-- Historical narrative: `docs/history/product-history-digest.md`.
 
 ## Boundaries
 

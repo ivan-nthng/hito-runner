@@ -104,3 +104,6 @@ UI may introduce a plan as the intended runner-facing schedule container.
 All runner surfaces reuse canonical Hito design-system tokens, primitives, typography,
 and documented patterns. Product-specific schedule, result, and evidence behaviour
 remains Product/Backend-owned; `/hitoDS` is not a second runner lifecycle.
+Product routes compose the shared system and do not invent route-local components, tokens, CSS
+recipes or parallel interaction truth. A reusable visual gap belongs to the Frontend Design System
+lane; DESIGNER owns visual direction and Design System Integration is Figma-only.

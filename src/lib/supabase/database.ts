@@ -1,6 +1,11 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5";
+  };
   graphql_public: {
     Tables: {
       [_ in never]: never;
@@ -28,6 +33,245 @@ export type Database = {
   };
   public: {
     Tables: {
+      adaptive_training_block_confirmations: {
+        Row: {
+          block_mode: string;
+          blueprint_id: string;
+          blueprint_sha256: string;
+          blueprint_version: number;
+          calendar_fingerprint_sha256: string;
+          calendar_workout_ids: string[];
+          candidate_sha256: string;
+          candidate_version: number;
+          confirmed_at: string;
+          detailed_candidate_id: string;
+          evidence_revision_fingerprint_sha256: string;
+          id: string;
+          input_fingerprint_sha256: string;
+          interval_end_date: string;
+          interval_start_date: string;
+          predecessor_confirmation_id: string | null;
+          user_id: string;
+        };
+        Insert: {
+          block_mode: string;
+          blueprint_id: string;
+          blueprint_sha256: string;
+          blueprint_version: number;
+          calendar_fingerprint_sha256: string;
+          calendar_workout_ids: string[];
+          candidate_sha256: string;
+          candidate_version: number;
+          confirmed_at?: string;
+          detailed_candidate_id: string;
+          evidence_revision_fingerprint_sha256: string;
+          id?: string;
+          input_fingerprint_sha256: string;
+          interval_end_date: string;
+          interval_start_date: string;
+          predecessor_confirmation_id?: string | null;
+          user_id: string;
+        };
+        Update: {
+          block_mode?: string;
+          blueprint_id?: string;
+          blueprint_sha256?: string;
+          blueprint_version?: number;
+          calendar_fingerprint_sha256?: string;
+          calendar_workout_ids?: string[];
+          candidate_sha256?: string;
+          candidate_version?: number;
+          confirmed_at?: string;
+          detailed_candidate_id?: string;
+          evidence_revision_fingerprint_sha256?: string;
+          id?: string;
+          input_fingerprint_sha256?: string;
+          interval_end_date?: string;
+          interval_start_date?: string;
+          predecessor_confirmation_id?: string | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "adaptive_training_block_confirmations_owner_blueprint_fkey";
+            columns: ["user_id", "blueprint_id"];
+            isOneToOne: false;
+            referencedRelation: "adaptive_training_blueprint_versions";
+            referencedColumns: ["user_id", "id"];
+          },
+          {
+            foreignKeyName: "adaptive_training_block_confirmations_owner_candidate_fkey";
+            columns: ["user_id", "detailed_candidate_id"];
+            isOneToOne: true;
+            referencedRelation: "adaptive_training_detailed_candidates";
+            referencedColumns: ["user_id", "id"];
+          },
+          {
+            foreignKeyName: "adaptive_training_block_confirmations_owner_predecessor_fkey";
+            columns: ["user_id", "predecessor_confirmation_id"];
+            isOneToOne: false;
+            referencedRelation: "adaptive_training_block_confirmations";
+            referencedColumns: ["user_id", "id"];
+          },
+        ];
+      };
+      adaptive_training_blueprint_versions: {
+        Row: {
+          blueprint_content: Json;
+          compiler_version: string;
+          content_sha256: string;
+          created_at: string;
+          id: string;
+          source_contract_version: string;
+          source_response_id: string;
+          user_id: string;
+          version: number;
+        };
+        Insert: {
+          blueprint_content: Json;
+          compiler_version: string;
+          content_sha256: string;
+          created_at?: string;
+          id?: string;
+          source_contract_version: string;
+          source_response_id: string;
+          user_id: string;
+          version: number;
+        };
+        Update: {
+          blueprint_content?: Json;
+          compiler_version?: string;
+          content_sha256?: string;
+          created_at?: string;
+          id?: string;
+          source_contract_version?: string;
+          source_response_id?: string;
+          user_id?: string;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "adaptive_training_blueprint_versions_owner_response_fkey";
+            columns: ["user_id", "source_response_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_plan_generation_responses";
+            referencedColumns: ["user_id", "id"];
+          },
+        ];
+      };
+      adaptive_training_continuation_input_revisions: {
+        Row: {
+          active_projection_preferences: Json;
+          blueprint_id: string;
+          content_sha256: string;
+          created_at: string;
+          horizon_check_in: Json | null;
+          id: string;
+          revision: number;
+          supersedes_revision: number | null;
+          user_id: string;
+        };
+        Insert: {
+          active_projection_preferences?: Json;
+          blueprint_id: string;
+          content_sha256: string;
+          created_at?: string;
+          horizon_check_in?: Json | null;
+          id?: string;
+          revision: number;
+          supersedes_revision?: number | null;
+          user_id: string;
+        };
+        Update: {
+          active_projection_preferences?: Json;
+          blueprint_id?: string;
+          content_sha256?: string;
+          created_at?: string;
+          horizon_check_in?: Json | null;
+          id?: string;
+          revision?: number;
+          supersedes_revision?: number | null;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "adaptive_training_continuation_input_revisions_owner_blueprint_";
+            columns: ["user_id", "blueprint_id"];
+            isOneToOne: false;
+            referencedRelation: "adaptive_training_blueprint_versions";
+            referencedColumns: ["user_id", "id"];
+          },
+        ];
+      };
+      adaptive_training_detailed_candidates: {
+        Row: {
+          blueprint_id: string;
+          candidate_content: Json;
+          candidate_sha256: string;
+          confirmation_lineage: Json;
+          created_at: string;
+          fact_references: Json;
+          id: string;
+          input_fingerprint_sha256: string;
+          input_provenance: Json;
+          input_snapshot: Json;
+          interval_end_date: string;
+          interval_start_date: string;
+          source_response_id: string | null;
+          user_id: string;
+          version: number;
+        };
+        Insert: {
+          blueprint_id: string;
+          candidate_content: Json;
+          candidate_sha256: string;
+          confirmation_lineage: Json;
+          created_at?: string;
+          fact_references: Json;
+          id?: string;
+          input_fingerprint_sha256: string;
+          input_provenance: Json;
+          input_snapshot: Json;
+          interval_end_date: string;
+          interval_start_date: string;
+          source_response_id?: string | null;
+          user_id: string;
+          version: number;
+        };
+        Update: {
+          blueprint_id?: string;
+          candidate_content?: Json;
+          candidate_sha256?: string;
+          confirmation_lineage?: Json;
+          created_at?: string;
+          fact_references?: Json;
+          id?: string;
+          input_fingerprint_sha256?: string;
+          input_provenance?: Json;
+          input_snapshot?: Json;
+          interval_end_date?: string;
+          interval_start_date?: string;
+          source_response_id?: string | null;
+          user_id?: string;
+          version?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "adaptive_training_detailed_candidates_owner_blueprint_fkey";
+            columns: ["user_id", "blueprint_id"];
+            isOneToOne: false;
+            referencedRelation: "adaptive_training_blueprint_versions";
+            referencedColumns: ["user_id", "id"];
+          },
+          {
+            foreignKeyName: "adaptive_training_detailed_candidates_owner_response_fkey";
+            columns: ["user_id", "source_response_id"];
+            isOneToOne: false;
+            referencedRelation: "ai_plan_generation_responses";
+            referencedColumns: ["user_id", "id"];
+          },
+        ];
+      };
       admin_capture_items: {
         Row: {
           archived_at: string | null;
@@ -105,46 +349,73 @@ export type Database = {
       };
       ai_plan_generation_responses: {
         Row: {
+          attempt_result: Json | null;
           compiler_outcome: string;
           created_at: string;
           diagnostic_code: string | null;
           diagnostic_path: string | null;
           generation_id: string;
           id: string;
+          provider_attempt: Json | null;
+          provider_model: string | null;
           provider_response_id: string | null;
+          qa_verdict: Json | null;
+          request_context: Json | null;
+          request_fingerprint_sha256: string | null;
           response_body: string;
           response_sha256: string;
+          running_coach_verdict: Json | null;
           schema_outcome: string;
           updated_at: string;
           user_id: string;
+          version_context: Json | null;
+          version_fingerprint_sha256: string | null;
         };
         Insert: {
+          attempt_result?: Json | null;
           compiler_outcome?: string;
           created_at?: string;
           diagnostic_code?: string | null;
           diagnostic_path?: string | null;
           generation_id: string;
           id?: string;
+          provider_attempt?: Json | null;
+          provider_model?: string | null;
           provider_response_id?: string | null;
+          qa_verdict?: Json | null;
+          request_context?: Json | null;
+          request_fingerprint_sha256?: string | null;
           response_body: string;
           response_sha256: string;
+          running_coach_verdict?: Json | null;
           schema_outcome?: string;
           updated_at?: string;
           user_id: string;
+          version_context?: Json | null;
+          version_fingerprint_sha256?: string | null;
         };
         Update: {
+          attempt_result?: Json | null;
           compiler_outcome?: string;
           created_at?: string;
           diagnostic_code?: string | null;
           diagnostic_path?: string | null;
           generation_id?: string;
           id?: string;
+          provider_attempt?: Json | null;
+          provider_model?: string | null;
           provider_response_id?: string | null;
+          qa_verdict?: Json | null;
+          request_context?: Json | null;
+          request_fingerprint_sha256?: string | null;
           response_body?: string;
           response_sha256?: string;
+          running_coach_verdict?: Json | null;
           schema_outcome?: string;
           updated_at?: string;
           user_id?: string;
+          version_context?: Json | null;
+          version_fingerprint_sha256?: string | null;
         };
         Relationships: [];
       };
@@ -1596,6 +1867,47 @@ export type Database = {
           revision_number: number;
         }[];
       };
+      apply_adaptive_continuation_detailed_block_materialization: {
+        Args: {
+          p_blueprint_id: string;
+          p_blueprint_sha256: string;
+          p_blueprint_version: number;
+          p_candidate_id: string;
+          p_candidate_sha256: string;
+          p_candidate_version: number;
+          p_current_date: string;
+          p_expected_candidate_content: Json;
+          p_expected_input_snapshot: Json;
+          p_input_fingerprint_sha256: string;
+          p_mutation_events: Json;
+          p_predecessor_confirmation_id: string;
+          p_review_seal_sha256: string;
+          p_user_id: string;
+          p_workout_inserts: Json;
+        };
+        Returns: Json;
+      };
+      apply_adaptive_initial_detailed_block_materialization: {
+        Args: {
+          p_blueprint_id: string;
+          p_blueprint_sha256: string;
+          p_blueprint_version: number;
+          p_candidate_id: string;
+          p_candidate_sha256: string;
+          p_candidate_version: number;
+          p_current_date: string;
+          p_expected_blueprint_content: Json;
+          p_expected_candidate_content: Json;
+          p_expected_input_snapshot: Json;
+          p_input_fingerprint_sha256: string;
+          p_mutation_events: Json;
+          p_source_review_checksum: string;
+          p_user_id: string;
+          p_workout_inserts: Json;
+          p_workout_review_checksum: string;
+        };
+        Returns: Json;
+      };
       apply_calendar_workout_content_edit: {
         Args: {
           p_current_date: string;
@@ -1715,6 +2027,72 @@ export type Database = {
           reused_exact_source: boolean;
           source_id: string;
           source_revision_id: string;
+        }[];
+      };
+      retain_adaptive_training_continuation_candidate: {
+        Args: {
+          p_blueprint_id: string;
+          p_blueprint_sha256: string;
+          p_blueprint_version: number;
+          p_candidate_content: Json;
+          p_confirmation_lineage: Json;
+          p_fact_references: Json;
+          p_input_provenance: Json;
+          p_input_snapshot: Json;
+          p_interval_end_date: string;
+          p_interval_start_date: string;
+          p_predecessor_confirmation_id: string;
+          p_source_response_id: string;
+          p_user_id: string;
+        };
+        Returns: {
+          candidate_id: string;
+          candidate_sha256: string;
+          candidate_version: number;
+          input_fingerprint_sha256: string;
+        }[];
+      };
+      retain_adaptive_training_continuation_input_revision: {
+        Args: {
+          p_active_projection_preferences: Json;
+          p_blueprint_id: string;
+          p_blueprint_sha256: string;
+          p_blueprint_version: number;
+          p_horizon_check_in: Json;
+          p_user_id: string;
+        };
+        Returns: {
+          content_sha256: string;
+          revision: number;
+          revision_id: string;
+          supersedes_revision: number;
+        }[];
+      };
+      retain_adaptive_training_source_candidate: {
+        Args: {
+          p_blueprint_content: Json;
+          p_blueprint_version: number;
+          p_candidate_content: Json;
+          p_candidate_version: number;
+          p_compiler_version: string;
+          p_confirmation_lineage: Json;
+          p_fact_references: Json;
+          p_input_provenance: Json;
+          p_input_snapshot: Json;
+          p_interval_end_date: string;
+          p_interval_start_date: string;
+          p_source_contract_version: string;
+          p_source_response_id: string;
+          p_user_id: string;
+        };
+        Returns: {
+          blueprint_id: string;
+          blueprint_sha256: string;
+          blueprint_version: number;
+          candidate_id: string;
+          candidate_sha256: string;
+          candidate_version: number;
+          input_fingerprint_sha256: string;
         }[];
       };
       sync_workout_log_runner_activity_rpe: {

@@ -111,8 +111,6 @@ Calendar rows.
 
 Current validators reinforce the same intent:
 
-- [validate-active-plan-schedule-edit-preview.ts](../../../scripts/validate-active-plan-schedule-edit-preview.ts)
-  requires archived plan status and removal of the active-plan index.
 - [validate-runner-activity-read-models.ts](../../../scripts/validate-runner-activity-read-models.ts)
   requires Calendar readback without active-plan authority.
 - [validate-manual-workout-authoring.ts](../../../scripts/validate-manual-workout-authoring.ts)

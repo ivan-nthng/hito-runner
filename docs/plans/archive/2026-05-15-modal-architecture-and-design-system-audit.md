@@ -74,7 +74,6 @@ mobile overflow, and route-specific adoption without changing persistence or bac
 
 - Current Hito DS route and primitives: `/hitoDS`
 - Current styling contract: `src/styles.css`
-- Product history digest: `docs/history/product-history-digest.md`
 
 ## Do Not Continue By Default
 

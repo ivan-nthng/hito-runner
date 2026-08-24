@@ -7,6 +7,23 @@ import {
   confirmRunningPlanDraftForUser,
   type RunningPlanConfirmActionInput,
 } from "../../src/lib/running-plan-engine-actions";
+import {
+  getAdaptiveBlueprintCalendarReadModelForUser,
+  getAdaptiveBlueprintContinuationFactsForUser,
+} from "../../src/lib/adaptive-blueprint-read-model";
+import {
+  getAdaptiveTrainingDetailedCandidateForUser,
+  retainAdaptiveTrainingContinuationInputRevisionForUser,
+} from "../../src/lib/adaptive-blueprint-persistence";
+import {
+  prepareAdaptiveContinuationCandidateForUser,
+  submitAdaptiveContinuationInputForUser,
+} from "../../src/lib/adaptive-blueprint-actions.server";
+import {
+  ADAPTIVE_CONTINUATION_AUTHORING_BRIEF_VERSION,
+  ADAPTIVE_CONTINUATION_PROVIDER_CONTRACT_VERSION,
+  ADAPTIVE_CONTINUATION_RESPONSE_SCHEMA_NAME,
+} from "../../src/lib/adaptive-continuation-authoring";
 import type {
   RunningPlanPreviewDraft,
   RunningPlanReviewedPreviewDraft,
@@ -35,11 +52,20 @@ import {
   AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
   AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV,
   AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV,
+  buildAiGeneratedContinuationDevFixtureProviderResponse,
+  buildAiGeneratedContinuationDevFixtureOpenAiFetch,
   buildAiGeneratedRunningPlanDevFixtureOpenAiFetch,
 } from "../../src/lib/ai-generated-running-plan-dev-fixture";
+import { requestAiPlanStructuredResponse } from "../../src/lib/ai-first-plan-draft-service";
 import { AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID } from "../../src/lib/ai-generated-running-plan-dev-fixture";
 import { buildAiGeneratedRunningPlanAuthoringInput } from "../../src/lib/ai-generated-running-plan";
+import { acceptedRunnerHeartRateProfileSchema } from "../../src/lib/heart-rate-zones";
 import { buildImportedPlanSeed, type TrainingPlanV2 } from "../../src/lib/imported-plan";
+import {
+  confirmWorkoutCommandForUser,
+  reviewWorkoutCommandForUser,
+} from "../../src/lib/manual-workout-authoring/actions";
+import { buildPersistedWorkoutInsertRows } from "../../src/lib/persisted-plan-replacement";
 import { prepareSavedPlanFutureApplyPolicy } from "../../src/lib/plan-apply-policy";
 import { DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE } from "../../src/lib/local-auth-account-registry.server";
 import { getRunnerCalendarDateForUserId } from "../../src/lib/runner-calendar-context";
@@ -55,9 +81,9 @@ import {
 import { createAdminSupabaseClient } from "../../src/lib/supabase/server";
 import { addDaysIso, startOfWeekIso, weekdayLong } from "../../src/lib/training";
 import type { Database, Json } from "../../src/lib/supabase/database";
+import { projectContinuationEvidenceState } from "../../src/lib/workout-result-import/read-workout-result-feedback";
 import {
   buildFirstTimeRunnerBaselineReadback,
-  getRunnerPlanAuthoringProfileSnapshotForUserId,
   getUserSettingsForUserId,
   updateUserSettingsForUserId,
 } from "../../src/lib/user-settings-actions";
@@ -75,8 +101,7 @@ import {
   type DisposablePersistencePreflight,
   type QaPoolSupabaseCleanupProof,
 } from "../lib/qa-pool-persistence-proof";
-import { buildLargeReadbackProviderFixture } from "../plan-first-provider-representation-proof";
-import { buildProofPersonalRunnerProfileSnapshot } from "../runner-profile-snapshot-proof-helpers";
+import { buildProofInitialPlanProfile } from "../runner-fitness-profile-initial-plan-proof-helpers";
 
 type DisposableCleanupProof = QaPoolSupabaseCleanupProof;
 type QaPoolUserLease = Awaited<ReturnType<typeof acquireQaPoolSupabaseUser>>;
@@ -136,192 +161,1388 @@ export async function validatePersistenceContract(
   buildConfirmInputForConfirm: BuildConfirmInputForConfirm,
 ) {
   const supabase = createAdminSupabaseClient();
-  const largeReadbackDraft = await buildLargeReadbackReviewedDraft();
-  const persistedDistanceGoals: Array<{
-    goalLabel: string;
-    distanceMeters: number | null;
-    savedSourceRows: number;
-    materializedCalendarRows: number;
-    omittedLeadingRows: number;
-    runnerCurrentDate: string;
-    sourceKind: string;
-    availability: {
-      fixedRestDays: string[] | null;
-      maxRunningDaysPerWeek: number | null;
+  const sourceDraft = reviewedDrafts.find(
+    (draft) =>
+      draft.normalizedInputSummary.planGoalIntent.distance?.distanceMeters === 42_195 &&
+      draft.normalizedInputSummary.planGoalIntent.targetDate != null,
+  );
+  assert.ok(
+    sourceDraft,
+    "Adaptive confirmation proof requires one target-dated Marathon source draft.",
+  );
+  const owner = await acquireQaPoolSupabaseUser({
+    supabase,
+    poolRole: "provider-engine",
+    password: DISPOSABLE_TEST_PASSWORD,
+    creationErrorMessage: "Adaptive confirmation owner could not be acquired.",
+  });
+  const otherRunner = await acquireQaPoolSupabaseUser({
+    supabase,
+    poolRole: "isolation-a",
+    password: DISPOSABLE_TEST_PASSWORD,
+    creationErrorMessage: "Adaptive confirmation isolation runner could not be acquired.",
+  });
+  const priorFixtureFlag = process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV];
+  const priorProviderMode = process.env[AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV];
+  const priorFixtureScenario = process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV];
+  let ownerCleanup: DisposableCleanupProof | null = null;
+  let otherCleanup: DisposableCleanupProof | null = null;
+
+  try {
+    delete process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV];
+    process.env[AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV] = "real";
+    delete process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV];
+
+    await persistReviewedDraftProfileSnapshot(owner.userId, sourceDraft);
+    await persistReviewedDraftProfileSnapshot(otherRunner.userId, sourceDraft);
+    const runnerCurrentDate = await getRunnerCalendarDateForUserId(owner.userId);
+    const previewInput = {
+      ...sourceDraft.previewInput,
+      startDate: runnerCurrentDate,
+      runnerComment: null,
     };
-    cleanup: DisposableCleanupProof;
-  }> = [];
-
-  for (const draft of [...reviewedDrafts, largeReadbackDraft]) {
-    const distanceGoal = distanceGoalSummary(draft);
-    const disposableUser = await acquireQaPoolSupabaseUser({
-      supabase,
-      poolRole: "provider-engine",
-      creationErrorMessage: "Disposable user creation failed.",
-    });
-    const userId = disposableUser.userId;
-    let distanceGoalProof: Omit<(typeof persistedDistanceGoals)[number], "cleanup"> | null = null;
-    let cleanupProof: DisposableCleanupProof | null = null;
-
-    try {
-      await persistReviewedDraftProfileSnapshot(userId, draft);
-      const result = await confirmRunningPlanDraftForUser(
-        userId,
-        buildConfirmInputForConfirm(draft),
-        { allowLocalQaFixture: true },
-      );
-      assert.equal(
-        result.ok,
-        true,
-        `${distanceGoal.goalLabel} confirm should persist: ${JSON.stringify(result)}`,
-      );
-      if (!result.ok) throw new Error(result.message);
-
-      const expectedMaterialization = await prepareExpectedSavedPlanMaterialization({
-        supabase,
-        userId,
-        savedPlanId: result.savedPlanId,
-      });
-      const persisted = await loadPersistedPlanForUser(supabase, userId, result.savedPlanId);
-      assert.equal(persisted.plan.source_kind, draft.sourceKind);
-      assert.equal(
-        expectedMaterialization.savedPlan.planned_workouts.length,
-        draft.canonicalRowCount,
-      );
-      assert.equal(
-        expectedMaterialization.savedPlan.planned_workouts.filter(
-          (workout) => workout.workout_type !== "rest",
-        ).length,
-        draft.canonicalNonRestRowCount,
-      );
-      assert.equal(
-        persisted.workouts.length,
-        expectedMaterialization.prepared.importedSeed.workouts.length,
-      );
-      assert.equal(
-        persisted.workouts.filter((workout) => workout.workout_type !== "rest").length,
-        expectedMaterialization.prepared.workoutCount,
-      );
-      assert.equal(
-        result.calendarRowCount,
-        expectedMaterialization.prepared.importedSeed.workouts.length,
-      );
-      assert.equal(result.appliedStartDate, expectedMaterialization.prepared.appliedStartDate);
-      assert.deepEqual(
-        persisted.workouts.map((workout) => workout.source_workout_id),
-        expectedMaterialization.prepared.importedSeed.workouts.map(
-          (workout) => workout.sourceWorkoutId,
-        ),
-        "Calendar materialization must preserve the retained source-row order after leading omission.",
-      );
-      assert.equal(
-        (persisted.plan.goal_metadata as { selected_plan_engine?: { source_status?: string } })
-          .selected_plan_engine?.source_status,
-        "confirmed_selected_plan",
-      );
-      assert.equal(
-        (persisted.plan.goal_metadata as { selected_plan_engine?: { review_checksum?: string } })
-          .selected_plan_engine?.review_checksum,
-        draft.reviewChecksum,
-      );
-      validateAiAuthoredPrimaryExecutionGuidance(persisted.workouts);
-      validateNoClientRowsTrusted(persisted.workouts);
-
-      if (draft.canonicalRowCount >= 210) {
-        const exportPayload = buildActivePlanExportPayload({
-          planCycle: persisted.plan,
-          workouts: persisted.workouts,
-          exportedAt: "2026-07-27T12:00:00.000Z",
-        });
-        const reimported = activePlanExportToTrainingPlanV2(exportPayload);
-        assert.equal(reimported.planned_workouts.length, persisted.workouts.length);
-        assert.equal(buildImportedPlanSeed(reimported).workouts.length, persisted.workouts.length);
-      }
-      const persistedPlanPreferences = asJsonRecord(persisted.plan.plan_preferences);
-      const expectedFixedRestDays = draft.normalizedInputSummary.fixedRestDays;
-      const expectedMaxRunningDaysPerWeek = draft.normalizedInputSummary.daysPerWeek;
-      assert.equal(
-        Object.hasOwn(persistedPlanPreferences ?? {}, "blocked_days"),
-        expectedFixedRestDays != null,
-      );
-      assert.deepEqual(persistedPlanPreferences?.blocked_days, expectedFixedRestDays ?? undefined);
-      assert.equal(
-        Object.hasOwn(persistedPlanPreferences ?? {}, "max_running_days_per_week"),
-        expectedMaxRunningDaysPerWeek != null,
-      );
-      assert.equal(
-        persistedPlanPreferences?.max_running_days_per_week,
-        expectedMaxRunningDaysPerWeek ?? undefined,
-      );
-      assert.equal(persistedPlanPreferences?.preferred_running_days, undefined);
-      assert.equal(
-        persistedPlanPreferences?.preferred_long_run_day,
-        draft.normalizedInputSummary.preferredLongRunDay ?? undefined,
-      );
-      assert.deepEqual(expectedMaterialization.savedPlan, draft.canonicalPlan);
-
-      const duplicate = await confirmRunningPlanDraftForUser(
-        userId,
-        buildConfirmInputForConfirm(draft),
-        { allowLocalQaFixture: true },
-      );
-      assert.equal(duplicate.ok, false);
-      if (!duplicate.ok) {
-        assert.equal(duplicate.reason, "replacement_required", JSON.stringify(duplicate));
-      }
-
-      distanceGoalProof = {
-        goalLabel: distanceGoal.goalLabel,
-        distanceMeters: distanceGoal.distanceMeters,
-        savedSourceRows: expectedMaterialization.savedPlan.planned_workouts.length,
-        materializedCalendarRows: persisted.workouts.length,
-        omittedLeadingRows: expectedMaterialization.prepared.omittedLeadingDayCount,
-        runnerCurrentDate: expectedMaterialization.prepared.currentDate,
-        sourceKind: draft.sourceKind,
-        availability: {
-          fixedRestDays: expectedFixedRestDays,
-          maxRunningDaysPerWeek: expectedMaxRunningDaysPerWeek,
+    const authoring = buildAiGeneratedRunningPlanAuthoringInput(
+      previewInput,
+      sourceDraft.normalizedInputSummary.initialPlanProfile,
+      sourceDraft.normalizedInputSummary.heartRateProfile,
+    );
+    assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);
+    if (!authoring.ok) throw new Error(authoring.message);
+    const prepareContinuationCandidate = (asOfDate: string) =>
+      prepareAdaptiveContinuationCandidateForUser(
+        { userId: owner.userId, asOfDate },
+        {
+          requestStructuredResponse: ({ prompt, brief }) =>
+            requestAiPlanStructuredResponse({
+              apiKey: "synthetic-adaptive-continuation-proof",
+              model: AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
+              prompt,
+              responseSchemaName: ADAPTIVE_CONTINUATION_RESPONSE_SCHEMA_NAME,
+              contractMode: ADAPTIVE_CONTINUATION_AUTHORING_BRIEF_VERSION,
+              responseSchemaMode: ADAPTIVE_CONTINUATION_PROVIDER_CONTRACT_VERSION,
+              fetchImpl: buildAiGeneratedContinuationDevFixtureOpenAiFetch({
+                authoringInput: authoring.authoringInput,
+                brief,
+              }),
+              generationLedger: { disabled: true },
+            }),
         },
-      };
-    } finally {
-      cleanupProof = await cleanupDisposableUser(supabase, disposableUser);
+      );
+    let mismatchedBaselineProviderCalls = 0;
+    const mismatchedBaseline = await buildReviewedAiGeneratedRunningPlanPreviewForUser(
+      owner.userId,
+      { ...previewInput, age: previewInput.age + 1 },
+      {
+        aiPreview: {
+          apiKey: "must-not-dispatch-for-mismatched-runner-baseline",
+          model: "must-not-dispatch-for-mismatched-runner-baseline",
+          fetchImpl: async () => {
+            mismatchedBaselineProviderCalls += 1;
+            throw new Error("Mismatched runner baseline reached provider dispatch.");
+          },
+          generationLedger: { disabled: true },
+        },
+      },
+    );
+    assert.equal(mismatchedBaseline.ok, false);
+    if (mismatchedBaseline.ok) {
+      throw new Error("A mismatched persisted runner baseline produced a signed preview.");
     }
+    assert.equal(mismatchedBaseline.unavailable.error.code, "structured_input_invalid");
+    assert.equal(mismatchedBaseline.unavailable.callsOpenAi, false);
+    assert.equal(mismatchedBaselineProviderCalls, 0);
+    assert.equal(
+      await countOwnedRows(supabase, "adaptive_training_detailed_candidates", owner.userId),
+      0,
+    );
+    assert.equal(await countOwnedRows(supabase, "ai_plan_generation_responses", owner.userId), 0);
 
-    if (distanceGoalProof && cleanupProof) {
-      persistedDistanceGoals.push({
-        ...distanceGoalProof,
-        cleanup: cleanupProof,
+    const reviewed = await buildReviewedAiGeneratedRunningPlanPreviewForUser(
+      owner.userId,
+      previewInput,
+      {
+        aiPreview: {
+          apiKey: "synthetic-adaptive-confirmation-proof",
+          model: "gpt-5.2-adaptive-confirmation-proof",
+          fetchImpl: buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
+            authoringInput: authoring.authoringInput,
+            today: runnerCurrentDate,
+          }),
+          generationLedger: { disabled: true },
+        },
+      },
+    );
+    assert.equal(reviewed.ok, true, reviewed.ok ? "" : reviewed.unavailable.error.message);
+    if (!reviewed.ok) throw new Error(reviewed.unavailable.error.message);
+    assert.ok(reviewed.draft.sourceCandidate, "Reviewed source candidate must be retained.");
+    assert.equal(reviewed.draft.canonicalRowCount, 28);
+    assert.equal(reviewed.draft.blueprint.detailedHorizon.calendarWeekCount, 4);
+
+    const confirmInput = buildConfirmInputForConfirm(reviewed.draft);
+    for (const limitationInput of [
+      { ...confirmInput, currentRunningLimitation: "yes" as const },
+      { ...confirmInput, currentRunningLimitation: "unsure" as const },
+    ]) {
+      const blockedForLimitation = await confirmRunningPlanDraftForUser(
+        owner.userId,
+        limitationInput,
+        { allowLocalQaFixture: true },
+      );
+      assert.equal(blockedForLimitation.ok, false);
+      if (!blockedForLimitation.ok) {
+        assert.equal(blockedForLimitation.reason, "invalid_review");
+      }
+      assert.equal(await countOwnedRows(supabase, "planned_workouts", owner.userId), 0);
+      assert.equal(
+        await countOwnedRows(supabase, "adaptive_training_block_confirmations", owner.userId),
+        0,
+      );
+    }
+    const invalidReview = await confirmRunningPlanDraftForUser(
+      owner.userId,
+      { ...confirmInput, reviewChecksum: "0".repeat(64) },
+      { allowLocalQaFixture: true },
+    );
+    assert.equal(invalidReview.ok, false);
+    assert.equal(await countOwnedRows(supabase, "planned_workouts", owner.userId), 0);
+
+    const foreignConfirmation = await confirmRunningPlanDraftForUser(
+      otherRunner.userId,
+      confirmInput,
+      { allowLocalQaFixture: true },
+    );
+    assert.equal(foreignConfirmation.ok, false);
+    assert.equal(await countOwnedRows(supabase, "planned_workouts", otherRunner.userId), 0);
+
+    const confirmed = await confirmRunningPlanDraftForUser(owner.userId, confirmInput, {
+      allowLocalQaFixture: true,
+    });
+    assert.equal(confirmed.ok, true, JSON.stringify(confirmed));
+    if (!confirmed.ok) throw new Error(confirmed.message);
+    assert.equal(confirmed.blueprintId, reviewed.draft.sourceCandidate!.blueprintId);
+    assert.equal(confirmed.detailedCandidateId, reviewed.draft.sourceCandidate!.candidateId);
+    assert.equal(confirmed.calendarRowCount, reviewed.draft.canonicalRowCount);
+
+    const confirmations = await supabase
+      .from("adaptive_training_block_confirmations")
+      .select("*")
+      .eq("user_id", owner.userId)
+      .eq("detailed_candidate_id", confirmed.detailedCandidateId);
+    if (confirmations.error) throw new Error(confirmations.error.message);
+    assert.equal(confirmations.data.length, 1);
+    const blockConfirmation = confirmations.data[0]!;
+    assert.equal(blockConfirmation.blueprint_id, confirmed.blueprintId);
+    assert.equal(blockConfirmation.block_mode, "initial_four_week");
+    assert.equal(blockConfirmation.predecessor_confirmation_id, null);
+    assert.equal(blockConfirmation.calendar_workout_ids.length, confirmed.calendarRowCount);
+
+    const projections = await getAdaptiveBlueprintCalendarReadModelForUser(
+      owner.userId,
+      runnerCurrentDate,
+    );
+    assert.equal(projections.projections.length, reviewed.draft.blueprint.projections.length);
+    assert.ok(
+      projections.projections.every(
+        (projection) =>
+          projection.date > blockConfirmation.interval_end_date &&
+          projection.status === "planned" &&
+          projection.capabilities.canOpenWorkout === false &&
+          projection.capabilities.canMutateWorkout === false &&
+          projection.capabilities.canAttachResultOrEvidence === false,
+      ),
+    );
+    assert.deepEqual(Object.keys(projections.projections[0] ?? {}).sort(), [
+      "activePreferenceIds",
+      "blueprint",
+      "capabilities",
+      "date",
+      "goalAssumption",
+      "kind",
+      "phase",
+      "phaseCadence",
+      "projectionId",
+      "reviewTiming",
+      "status",
+      "workoutFamily",
+    ]);
+    assert.deepEqual(
+      await getAdaptiveBlueprintCalendarReadModelForUser(owner.userId, runnerCurrentDate),
+      projections,
+      "Source projection readback must be idempotent and preserve stable identities.",
+    );
+
+    const firstProjection = projections.projections[0];
+    const secondProjection = projections.projections[1];
+    assert.ok(firstProjection && secondProjection);
+    const firstRevision = await retainAdaptiveTrainingContinuationInputRevisionForUser({
+      userId: owner.userId,
+      blueprint: firstProjection.blueprint,
+      activeProjectionPreferences: [
+        {
+          kind: "avoid_projection_date",
+          projectionId: firstProjection.projectionId,
+          date: firstProjection.date,
+        },
+        {
+          kind: "swap_projection_slots",
+          firstProjectionId: firstProjection.projectionId,
+          secondProjectionId: secondProjection.projectionId,
+        },
+      ],
+    });
+    const repeatedRevision = await retainAdaptiveTrainingContinuationInputRevisionForUser({
+      userId: owner.userId,
+      blueprint: firstProjection.blueprint,
+      activeProjectionPreferences: [
+        {
+          kind: "avoid_projection_date",
+          projectionId: firstProjection.projectionId,
+          date: firstProjection.date,
+        },
+        {
+          kind: "swap_projection_slots",
+          firstProjectionId: firstProjection.projectionId,
+          secondProjectionId: secondProjection.projectionId,
+        },
+      ],
+    });
+    assert.deepEqual(repeatedRevision, firstRevision);
+    const secondRevision = await retainAdaptiveTrainingContinuationInputRevisionForUser({
+      userId: owner.userId,
+      blueprint: firstProjection.blueprint,
+      activeProjectionPreferences: [
+        {
+          kind: "avoid_projection_date",
+          projectionId: secondProjection.projectionId,
+          date: secondProjection.date,
+        },
+      ],
+    });
+    assert.equal(secondRevision.revision, firstRevision.revision + 1);
+    assert.equal(secondRevision.supersedesRevision, firstRevision.revision);
+    const preferredProjectionReadback = await getAdaptiveBlueprintCalendarReadModelForUser(
+      owner.userId,
+      runnerCurrentDate,
+    );
+    assert.deepEqual(
+      preferredProjectionReadback.projections.find(
+        (projection) => projection.projectionId === secondProjection.projectionId,
+      )?.activePreferenceIds,
+      [`${secondRevision.id}:0`],
+    );
+
+    const invalidForeignRevision = await supabase.rpc(
+      "retain_adaptive_training_continuation_input_revision",
+      {
+        p_user_id: otherRunner.userId,
+        p_blueprint_id: firstProjection.blueprint.id,
+        p_blueprint_version: firstProjection.blueprint.version,
+        p_blueprint_sha256: firstProjection.blueprint.sha256,
+        p_active_projection_preferences: [],
+        p_horizon_check_in: null,
+      },
+    );
+    assert.ok(invalidForeignRevision.error, "Cross-owner continuation input must be rejected.");
+
+    const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    assert.ok(publishableKey, "Adaptive Source RLS proof requires a publishable key.");
+    const ownerClient = createClient<Database>(preflight.target.url, publishableKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const otherClient = createClient<Database>(preflight.target.url, publishableKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    assert.equal(
+      (
+        await ownerClient.auth.signInWithPassword({
+          email: owner.email,
+          password: DISPOSABLE_TEST_PASSWORD,
+        })
+      ).error,
+      null,
+    );
+    assert.equal(
+      (
+        await otherClient.auth.signInWithPassword({
+          email: otherRunner.email,
+          password: DISPOSABLE_TEST_PASSWORD,
+        })
+      ).error,
+      null,
+    );
+    const ownerConfirmationRead = await ownerClient
+      .from("adaptive_training_block_confirmations")
+      .select("id")
+      .eq("id", blockConfirmation.id);
+    assert.equal(ownerConfirmationRead.error, null);
+    assert.equal(ownerConfirmationRead.data.length, 1);
+    const foreignConfirmationRead = await otherClient
+      .from("adaptive_training_block_confirmations")
+      .select("id")
+      .eq("id", blockConfirmation.id);
+    assert.equal(foreignConfirmationRead.error, null);
+    assert.equal(foreignConfirmationRead.data.length, 0);
+    const authenticatedRevisionInsert = await ownerClient
+      .from("adaptive_training_continuation_input_revisions")
+      .insert({
+        user_id: owner.userId,
+        blueprint_id: confirmed.blueprintId,
+        revision: 999,
+        content_sha256: "9".repeat(64),
+        active_projection_preferences: [],
       });
-    }
-  }
-  const creationFailureAtomic = await validateReviewedPlanPersistenceFailureAtomicity(supabase);
-  const qaFixtureRuntime = await validateQaFixtureRuntimePersistence({
-    supabase,
-    preflight,
-    previewInput: reviewedDrafts[0]!.previewInput,
-    buildConfirmInputForConfirm,
-  });
-  const personalHeartRateProfile = await validatePersonalHeartRateProfilePersistence({
-    supabase,
-    preflight,
-    previewInput: reviewedDrafts[0]!.previewInput,
-    buildConfirmInputForConfirm,
-  });
-  const savedPlanLibrary = await validateSavedPlanLibraryPersistence({
-    supabase,
-    preflight,
-    reviewedDrafts: [reviewedDrafts[0]!, reviewedDrafts[2]!],
-  });
+    assert.ok(authenticatedRevisionInsert.error, "Authenticated Source writes must be denied.");
+    const immutableConfirmation = await supabase
+      .from("adaptive_training_block_confirmations")
+      .update({ block_mode: "normal_four_week" })
+      .eq("id", blockConfirmation.id);
+    assert.ok(immutableConfirmation.error, "Block confirmation mutation must be rejected.");
+    const immutableRevision = await supabase
+      .from("adaptive_training_continuation_input_revisions")
+      .update({ active_projection_preferences: [] })
+      .eq("id", secondRevision.id);
+    assert.ok(immutableRevision.error, "Continuation-input mutation must be rejected.");
 
-  return {
-    mode: preflight.mode,
-    target: preflight.target,
-    persistedDistanceGoals,
-    creationFailureAtomic,
-    qaFixtureRuntime,
-    personalHeartRateProfile,
-    savedPlanLibrary,
-  };
+    const persistedWorkouts = await supabase
+      .from("planned_workouts")
+      .select("*")
+      .eq("user_id", owner.userId)
+      .order("workout_date", { ascending: true });
+    if (persistedWorkouts.error) throw new Error(persistedWorkouts.error.message);
+    assert.equal(persistedWorkouts.data.length, reviewed.draft.canonicalRowCount);
+    assert.deepEqual(
+      persistedWorkouts.data.map((workout) => workout.source_workout_id),
+      reviewed.draft.workoutDocuments.map((document) => document.sourceWorkoutId),
+    );
+    assert.ok(
+      persistedWorkouts.data.every(
+        (workout) => workout.plan_cycle_id === null && workout.origin_kind === "ai",
+      ),
+    );
+    validateAiAuthoredPrimaryExecutionGuidance(persistedWorkouts.data);
+    validateNoClientRowsTrusted(persistedWorkouts.data);
+    assert.equal(await countOwnedRows(supabase, "plan_cycles", owner.userId), 0);
+
+    const projectionDates = new Set(reviewed.draft.blueprint.projections.map(({ date }) => date));
+    assert.equal(
+      persistedWorkouts.data.some((workout) => projectionDates.has(workout.workout_date)),
+      false,
+      "Future Blueprint projections must not become Calendar workouts.",
+    );
+
+    const events = await supabase
+      .from("calendar_workout_mutation_events")
+      .select("event_payload, planned_workout_id, review_checksum")
+      .eq("user_id", owner.userId)
+      .order("id", { ascending: true });
+    if (events.error) throw new Error(events.error.message);
+    assert.equal(events.data.length, persistedWorkouts.data.length);
+    for (const event of events.data) {
+      const payload = asJsonRecord(event.event_payload);
+      const lineage = asJsonRecord(payload?.adaptive_training_confirmation);
+      assert.equal(lineage?.blueprint_id, confirmed.blueprintId);
+      assert.equal(lineage?.detailed_candidate_id, confirmed.detailedCandidateId);
+      assert.equal(lineage?.source_preview_review_checksum, reviewed.draft.reviewChecksum);
+      assert.equal(lineage?.current_running_limitation, "no");
+      assert.match(String(lineage?.source_review_checksum), /^[0-9a-f]{64}$/);
+    }
+
+    const historicalWorkoutId = crypto.randomUUID();
+    const historicalWorkoutDate = addDaysIso(runnerCurrentDate, -60);
+    const historicalWorkout = await supabase.from("planned_workouts").insert({
+      id: historicalWorkoutId,
+      user_id: otherRunner.userId,
+      plan_cycle_id: null,
+      origin_kind: "manual",
+      phase: "base",
+      title: "Historical easy run",
+      display_order: 1,
+      week_number: 1,
+      weekday: weekdayLong(historicalWorkoutDate),
+      workout_date: historicalWorkoutDate,
+      workout_type: "easy",
+      workout_family: "easy",
+      workout_identity: "easy_aerobic_run",
+      source_workout_id: `historical-body-note-${historicalWorkoutId}`,
+      source_workout_type: "easy_aerobic_run",
+      steps: [],
+    });
+    if (historicalWorkout.error) throw new Error(historicalWorkout.error.message);
+    const historicalBodyNote = [
+      {
+        area: "L. Calf",
+        severity: 2,
+        timing: "after",
+        sensation: "Tight",
+        note: "Historical body-note confirmation non-authority proof.",
+      },
+    ];
+    const historicalLog = await supabase.from("workout_logs").insert({
+      user_id: otherRunner.userId,
+      planned_workout_id: historicalWorkoutId,
+      outcome: "completed",
+      body_notes: historicalBodyNote,
+    });
+    if (historicalLog.error) throw new Error(historicalLog.error.message);
+    process.env[AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV] = "qa_fixture";
+    process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV] = "true";
+    const otherReviewed = await (async () => {
+      try {
+        return await buildReviewedAiGeneratedRunningPlanPreviewForUser(
+          otherRunner.userId,
+          previewInput,
+          {
+            qaFixtureAuthorized: true,
+            aiPreview: { generationLedger: { disabled: true } },
+          },
+        );
+      } finally {
+        process.env[AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV] = "real";
+        delete process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV];
+      }
+    })();
+    assert.equal(
+      otherReviewed.ok,
+      true,
+      otherReviewed.ok ? "" : otherReviewed.unavailable.error.message,
+    );
+    if (!otherReviewed.ok) throw new Error(otherReviewed.unavailable.error.message);
+    assert.ok(otherReviewed.draft.sourceCandidate);
+    const otherFrozenCandidate = await supabase
+      .from("adaptive_training_detailed_candidates")
+      .select("input_snapshot")
+      .eq("user_id", otherRunner.userId)
+      .eq("id", otherReviewed.draft.sourceCandidate!.candidateId)
+      .single();
+    if (otherFrozenCandidate.error) throw new Error(otherFrozenCandidate.error.message);
+    const otherFrozenInput = asJsonRecord(otherFrozenCandidate.data.input_snapshot);
+    assert.deepEqual(
+      otherFrozenInput?.initialPlanProfile,
+      otherReviewed.draft.normalizedInputSummary.initialPlanProfile,
+      "The real QA fixture path must freeze the accepted server-owned initial-plan profile.",
+    );
+    assert.deepEqual(otherFrozenInput?.runnerFacts, {
+      age: otherReviewed.draft.normalizedInputSummary.age,
+      benchmark: otherReviewed.draft.normalizedInputSummary.benchmarkPaceTruth,
+      heartRateProfile: otherReviewed.draft.normalizedInputSummary.heartRateProfile,
+      heightCm: otherReviewed.draft.normalizedInputSummary.heightCm,
+      selfReportedLevel: otherReviewed.draft.normalizedInputSummary.runnerLevel,
+      weightKg: otherReviewed.draft.normalizedInputSummary.weightKg,
+    });
+    const otherConfirmed = await confirmRunningPlanDraftForUser(
+      otherRunner.userId,
+      {
+        ...buildConfirmInputForConfirm(otherReviewed.draft),
+        currentRunningLimitation: "no",
+      },
+      { allowLocalQaFixture: true },
+    );
+    assert.equal(otherConfirmed.ok, true, JSON.stringify(otherConfirmed));
+    const historicalLogReadback = await supabase
+      .from("workout_logs")
+      .select("body_notes")
+      .eq("user_id", otherRunner.userId)
+      .eq("planned_workout_id", historicalWorkoutId)
+      .single();
+    if (historicalLogReadback.error) throw new Error(historicalLogReadback.error.message);
+    assert.deepEqual(historicalLogReadback.data.body_notes, historicalBodyNote);
+
+    const evidenceCutoffDate = addDaysIso(blockConfirmation.interval_start_date, 13);
+    const readinessDate = addDaysIso(blockConfirmation.interval_end_date, -13);
+    const dueWorkouts = persistedWorkouts.data.filter(
+      (workout) => workout.workout_type !== "rest" && workout.workout_date <= evidenceCutoffDate,
+    );
+    const protectedWorkout = dueWorkouts[0];
+    assert.ok(protectedWorkout);
+    const protectedLog = await supabase.from("workout_logs").insert(
+      dueWorkouts.map((workout) => ({
+        user_id: owner.userId,
+        planned_workout_id: workout.id,
+        outcome: "completed" as const,
+      })),
+    );
+    if (protectedLog.error) throw new Error(protectedLog.error.message);
+    const continuationFacts = await getAdaptiveBlueprintContinuationFactsForUser({
+      userId: owner.userId,
+      asOf: readinessDate,
+      cutoffDate: evidenceCutoffDate,
+    });
+    assert.ok(continuationFacts);
+    assert.equal(continuationFacts!.calendar.workouts.length, dueWorkouts.length);
+    assert.equal(continuationFacts!.evidence.dueWorkoutCount, dueWorkouts.length);
+    assert.equal(continuationFacts!.evidence.resolvedOutcomeCount, dueWorkouts.length);
+    assert.ok(
+      continuationFacts!.evidence.workouts.some(
+        (workout) => workout.evidenceState === "completed_without_fit",
+      ),
+    );
+    assert.equal(
+      projectContinuationEvidenceState({
+        outcome: "unresolved",
+        parseStatus: "uploaded",
+        rawState: "available",
+        hasMetrics: false,
+      }),
+      "updating",
+    );
+    assert.equal(
+      projectContinuationEvidenceState({
+        outcome: "completed",
+        parseStatus: "parsed",
+        rawState: "removed",
+        hasMetrics: true,
+      }),
+      "removed",
+    );
+
+    const missingCheckIn = await prepareContinuationCandidate(readinessDate);
+    assert.equal(missingCheckIn.ok, false);
+    assert.equal(missingCheckIn.state.status, "check_in_needed");
+    assert.equal(
+      await countOwnedRows(supabase, "adaptive_training_detailed_candidates", owner.userId),
+      1,
+      "Readiness without a check-in must not retain a candidate.",
+    );
+
+    const horizonCheckIn = {
+      confirmationId: blockConfirmation.id,
+      goalAssumptionCurrent: true,
+      availabilityConfirmed: true,
+      manageability: "manageable" as const,
+      materialChangeReason: null,
+      healthLimitation: "no" as const,
+      interruptionStatus: "none" as const,
+      clinicianGuidance: "not_applicable" as const,
+    };
+    const staleInputRevision = await submitAdaptiveContinuationInputForUser(owner.userId, {
+      expectedBlueprint: { ...firstProjection.blueprint, sha256: "0".repeat(64) },
+      expectedConfirmationId: blockConfirmation.id,
+      activeProjectionPreferences: [
+        {
+          kind: "avoid_projection_date",
+          projectionId: secondProjection.projectionId,
+          date: secondProjection.date,
+        },
+      ],
+      horizonCheckIn,
+    });
+    assert.deepEqual(staleInputRevision, { ok: false, reason: "source_stale" });
+    assert.equal(
+      await countOwnedRows(
+        supabase,
+        "adaptive_training_continuation_input_revisions",
+        owner.userId,
+      ),
+      2,
+      "A stale public Source identity must append no continuation input revision.",
+    );
+    const submittedCheckIn = await submitAdaptiveContinuationInputForUser(owner.userId, {
+      expectedBlueprint: firstProjection.blueprint,
+      expectedConfirmationId: blockConfirmation.id,
+      activeProjectionPreferences: [
+        {
+          kind: "avoid_projection_date",
+          projectionId: secondProjection.projectionId,
+          date: secondProjection.date,
+        },
+      ],
+      horizonCheckIn,
+    });
+    assert.equal(submittedCheckIn.ok, true);
+    if (!submittedCheckIn.ok) throw new Error(submittedCheckIn.reason);
+    const checkInRevision = submittedCheckIn.retained;
+    assert.equal(checkInRevision.revision, secondRevision.revision + 1);
+
+    let rejectedProviderDispatchCount = 0;
+    const rejectedProviderModel = `${AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL}-rejection-proof`;
+    const requestCompilerRejectedContinuation = ({
+      prompt,
+      brief,
+    }: Parameters<
+      NonNullable<
+        Parameters<
+          typeof prepareAdaptiveContinuationCandidateForUser
+        >[1]["requestStructuredResponse"]
+      >
+    >[0]) => {
+      rejectedProviderDispatchCount += 1;
+      const rejectedResponse = buildAiGeneratedContinuationDevFixtureProviderResponse({
+        authoringInput: authoring.authoringInput,
+        brief,
+      });
+      rejectedResponse.detailed_block.final_workout.phase = "Wrong phase";
+      return requestAiPlanStructuredResponse({
+        apiKey: "synthetic-adaptive-continuation-rejection-proof",
+        model: rejectedProviderModel,
+        prompt,
+        responseSchemaName: ADAPTIVE_CONTINUATION_RESPONSE_SCHEMA_NAME,
+        contractMode: ADAPTIVE_CONTINUATION_AUTHORING_BRIEF_VERSION,
+        responseSchemaMode: ADAPTIVE_CONTINUATION_PROVIDER_CONTRACT_VERSION,
+        fetchImpl: async () =>
+          new Response(
+            JSON.stringify({
+              id: `local-dev-adaptive-continuation-rejected-${crypto.randomUUID()}`,
+              status: "completed",
+              output_text: JSON.stringify(rejectedResponse),
+            }),
+            { status: 200, headers: { "content-type": "application/json" } },
+          ),
+        generationLedger: { disabled: true },
+      });
+    };
+    const compilerRejectedCandidate = await prepareAdaptiveContinuationCandidateForUser(
+      { userId: owner.userId, asOfDate: readinessDate },
+      {
+        providerModel: rejectedProviderModel,
+        requestStructuredResponse: requestCompilerRejectedContinuation,
+      },
+    );
+    assert.equal(compilerRejectedCandidate.ok, false);
+    if (compilerRejectedCandidate.ok) {
+      throw new Error("The invalid continuation response was unexpectedly accepted.");
+    }
+    assert.equal(compilerRejectedCandidate.reason, "compiler_rejection");
+    assert.equal(
+      await countOwnedRows(supabase, "adaptive_training_detailed_candidates", owner.userId),
+      1,
+      "A compiler-rejected continuation response must retain no review candidate.",
+    );
+    assert.equal(
+      await countOwnedRows(supabase, "planned_workouts", owner.userId),
+      persistedWorkouts.data.length,
+      "A compiler-rejected continuation response must write no Calendar rows.",
+    );
+    const rejectedResponseRows = await supabase
+      .from("ai_plan_generation_responses")
+      .select(
+        "schema_outcome, compiler_outcome, diagnostic_code, diagnostic_path, request_context, version_context, request_fingerprint_sha256",
+      )
+      .eq("user_id", owner.userId)
+      .eq("schema_outcome", "accepted")
+      .eq("compiler_outcome", "rejected");
+    if (rejectedResponseRows.error) throw new Error(rejectedResponseRows.error.message);
+    assert.equal(rejectedResponseRows.data.length, 1);
+    assert.equal(
+      rejectedResponseRows.data[0]?.diagnostic_code,
+      "adaptive_continuation_phase_mismatch",
+    );
+    const retainedRequestContext = asJsonRecord(rejectedResponseRows.data[0]?.request_context);
+    assert.deepEqual(Object.keys(retainedRequestContext ?? {}), ["brief"]);
+    const compactRetainedRequestJson = JSON.stringify(retainedRequestContext);
+    for (const forbidden of [
+      "acceptedFitDays",
+      "compatibleRpeDays",
+      "originalAuthoringInput",
+      "planned_workouts",
+      "providerHistory",
+      "requestContext",
+      "response_body",
+      "workoutDocuments",
+    ]) {
+      assert.equal(
+        compactRetainedRequestJson.includes(forbidden),
+        false,
+        `The retained continuation request must exclude ${forbidden}.`,
+      );
+    }
+    const retainedVersionContext = asJsonRecord(rejectedResponseRows.data[0]?.version_context);
+    const retainedProviderSettings = asJsonRecord(retainedVersionContext?.providerSettings);
+    assert.deepEqual(Object.keys(retainedProviderSettings ?? {}).sort(), [
+      "contractMode",
+      "maxOutputTokens",
+      "reasoningEffort",
+      "responseSchemaMode",
+      "responseSchemaName",
+      "textVerbosity",
+      "timeoutMs",
+    ]);
+    assert.match(rejectedResponseRows.data[0]?.request_fingerprint_sha256 ?? "", /^[0-9a-f]{64}$/);
+    const repeatedCompilerRejectedCandidate = await prepareAdaptiveContinuationCandidateForUser(
+      { userId: owner.userId, asOfDate: readinessDate },
+      {
+        providerModel: rejectedProviderModel,
+        requestStructuredResponse: requestCompilerRejectedContinuation,
+      },
+    );
+    assert.deepEqual(repeatedCompilerRejectedCandidate, compilerRejectedCandidate);
+    assert.equal(
+      rejectedProviderDispatchCount,
+      1,
+      "An exact owner/context/model/prompt/schema/compiler/policy/provider-settings match must reuse the retained response with zero second dispatch.",
+    );
+    const reusedRejectedResponseRows = await supabase
+      .from("ai_plan_generation_responses")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", owner.userId)
+      .eq("schema_outcome", "accepted")
+      .eq("compiler_outcome", "rejected");
+    if (reusedRejectedResponseRows.error) {
+      throw new Error(reusedRejectedResponseRows.error.message);
+    }
+    assert.equal(reusedRejectedResponseRows.count, 1);
+
+    const preparedCandidate = await prepareContinuationCandidate(readinessDate);
+    assert.equal(preparedCandidate.ok, true, JSON.stringify(preparedCandidate));
+    assert.equal(preparedCandidate.state.status, "candidate_ready");
+    assert.equal(preparedCandidate.retainedCandidate?.candidateVersion, 2);
+    if (!preparedCandidate.ok || preparedCandidate.state.status !== "candidate_ready") {
+      throw new Error("The continuation candidate was not prepared after the exact check-in.");
+    }
+    assert.equal(preparedCandidate.state.context.blueprint.id, confirmed.blueprintId);
+    assert.equal(preparedCandidate.state.context.confirmation.id, blockConfirmation.id);
+    assert.equal(preparedCandidate.state.context.currentInputRevision?.id, checkInRevision.id);
+    assert.equal(preparedCandidate.state.context.capabilities.canReviewCandidate, true);
+    assert.equal(preparedCandidate.state.context.capabilities.canConfirmCandidate, true);
+    assert.equal(preparedCandidate.state.candidate.sourceResponseBound, true);
+    assert.equal(preparedCandidate.state.context.dataQuality?.dueWorkoutCount, dueWorkouts.length);
+    assert.ok(preparedCandidate.state.candidate.workoutDocuments.length > 0);
+    const publicCandidateJson = JSON.stringify(preparedCandidate.state);
+    for (const privateField of [
+      "sourceResponseId",
+      "source_response_id",
+      "retainedResponseId",
+      "retainedResponseSha256",
+      "acceptedActualMetrics",
+      "calendarWorkoutId",
+      "input_snapshot",
+      "inputProvenance",
+    ]) {
+      assert.equal(
+        publicCandidateJson.includes(privateField),
+        false,
+        `The public continuation DTO must exclude ${privateField}.`,
+      );
+    }
+    const preparedCandidateRow = await getAdaptiveTrainingDetailedCandidateForUser({
+      userId: owner.userId,
+      candidateId: preparedCandidate.state.candidate.id,
+    });
+    assert.ok(preparedCandidateRow);
+    const preparedContent = asJsonRecord(preparedCandidateRow!.candidate_content);
+    const preparedDocuments = preparedContent?.workoutDocuments;
+    assert.ok(Array.isArray(preparedDocuments));
+    assert.ok(preparedDocuments.length > 0);
+    assert.ok(
+      preparedDocuments.every((document) => {
+        const record = asJsonRecord(document);
+        return (
+          typeof record?.workoutDate === "string" &&
+          record.workoutDate >= preparedCandidate.state.window.startDate &&
+          record.workoutDate <= preparedCandidate.state.window.endDate
+        );
+      }),
+    );
+    assert.equal(
+      await countOwnedRows(supabase, "planned_workouts", owner.userId),
+      persistedWorkouts.data.length,
+      "Preparing a continuation candidate must create zero Calendar rows.",
+    );
+    const repeatedCandidate = await prepareContinuationCandidate(readinessDate);
+    assert.equal(repeatedCandidate.ok, true);
+    assert.equal(repeatedCandidate.state.status, "candidate_ready");
+    assert.equal(repeatedCandidate.retained, false);
+    assert.deepEqual(repeatedCandidate.state.candidate, preparedCandidate.state.candidate);
+    assert.equal(
+      await countOwnedRows(supabase, "adaptive_training_detailed_candidates", owner.userId),
+      2,
+      "An identical frozen input must reuse the immutable candidate version.",
+    );
+    const firstContinuationReview = await reviewWorkoutCommandForUser(
+      owner.userId,
+      {
+        operation: "materialize_source_candidate",
+        source: {
+          kind: "adaptive_continuation_candidate",
+          candidateId: preparedCandidate.state.candidate.id,
+        },
+      },
+      { adaptiveContinuationAsOfDate: readinessDate },
+    );
+    assert.equal(firstContinuationReview.ok, true, JSON.stringify(firstContinuationReview));
+    if (!firstContinuationReview.ok) {
+      throw new Error(firstContinuationReview.issues[0]?.message);
+    }
+    const repeatedContinuationReview = await reviewWorkoutCommandForUser(
+      owner.userId,
+      {
+        operation: "materialize_source_candidate",
+        source: {
+          kind: "adaptive_continuation_candidate",
+          candidateId: preparedCandidate.state.candidate.id,
+        },
+      },
+      { adaptiveContinuationAsOfDate: readinessDate },
+    );
+    assert.deepEqual(
+      repeatedContinuationReview,
+      firstContinuationReview,
+      "An unchanged sealed continuation candidate must produce one idempotent review payload.",
+    );
+
+    const ownerContinuationCandidateRead = await ownerClient
+      .from("adaptive_training_detailed_candidates")
+      .select("id, candidate_content, input_snapshot")
+      .eq("id", preparedCandidate.state.candidate.id);
+    assert.equal(ownerContinuationCandidateRead.error, null);
+    assert.equal(ownerContinuationCandidateRead.data.length, 1);
+    assert.deepEqual(
+      ownerContinuationCandidateRead.data[0]?.candidate_content,
+      preparedCandidateRow!.candidate_content,
+    );
+    assert.deepEqual(
+      ownerContinuationCandidateRead.data[0]?.input_snapshot,
+      preparedCandidateRow!.input_snapshot,
+    );
+    const foreignContinuationCandidateRead = await otherClient
+      .from("adaptive_training_detailed_candidates")
+      .select("id")
+      .eq("id", preparedCandidate.state.candidate.id);
+    assert.equal(foreignContinuationCandidateRead.error, null);
+    assert.equal(foreignContinuationCandidateRead.data.length, 0);
+
+    const changedInputRevision = await retainAdaptiveTrainingContinuationInputRevisionForUser({
+      userId: owner.userId,
+      blueprint: firstProjection.blueprint,
+      activeProjectionPreferences: [
+        {
+          kind: "avoid_projection_date",
+          projectionId: secondProjection.projectionId,
+          date: secondProjection.date,
+        },
+      ],
+      horizonCheckIn: {
+        ...horizonCheckIn,
+        materialChangeReason: "Availability changed after the prior review snapshot.",
+      },
+    });
+    assert.equal(changedInputRevision.revision, checkInRevision.revision + 1);
+    const changedInputCandidate = await prepareContinuationCandidate(readinessDate);
+    assert.equal(changedInputCandidate.ok, true);
+    assert.equal(changedInputCandidate.state.status, "candidate_ready");
+    assert.equal(changedInputCandidate.retainedCandidate?.candidateVersion, 3);
+    assert.notEqual(
+      changedInputCandidate.retainedCandidate?.inputFingerprintSha256,
+      preparedCandidate.retainedCandidate?.inputFingerprintSha256,
+      "Every frozen continuation-input change must stale the prior candidate.",
+    );
+    assert.equal(
+      await countOwnedRows(supabase, "adaptive_training_detailed_candidates", owner.userId),
+      3,
+    );
+    const staleContinuationConfirmation = await confirmWorkoutCommandForUser(
+      owner.userId,
+      {
+        command: firstContinuationReview.candidate.command,
+        candidateId: firstContinuationReview.candidate.candidateId,
+        reviewToken: firstContinuationReview.candidate.reviewToken,
+        reviewChecksum: firstContinuationReview.candidate.reviewChecksum,
+      },
+      { adaptiveContinuationAsOfDate: readinessDate },
+    );
+    assert.equal(staleContinuationConfirmation.ok, false);
+    if (!staleContinuationConfirmation.ok) {
+      assert.equal(staleContinuationConfirmation.reason, "stale_review");
+    }
+    assert.equal(
+      await countOwnedRows(supabase, "adaptive_training_block_confirmations", owner.userId),
+      1,
+      "A stale frozen-input review must create no continuation lineage.",
+    );
+    assert.equal(
+      await countOwnedRows(
+        supabase,
+        "adaptive_training_continuation_input_revisions",
+        owner.userId,
+      ),
+      4,
+      "A stale review must consume no continuation preference or check-in.",
+    );
+    assert.equal(
+      await countOwnedRows(supabase, "planned_workouts", owner.userId),
+      persistedWorkouts.data.length,
+      "A stale frozen-input review must create no Calendar rows.",
+    );
+
+    if (!changedInputCandidate.ok || changedInputCandidate.state.status !== "candidate_ready") {
+      throw new Error("The changed-input continuation candidate is unavailable.");
+    }
+    const changedCandidateRow = await getAdaptiveTrainingDetailedCandidateForUser({
+      userId: owner.userId,
+      candidateId: changedInputCandidate.state.candidate.id,
+    });
+    const changedContent = asJsonRecord(changedCandidateRow?.candidate_content);
+    const changedDocuments = changedContent?.workoutDocuments;
+    assert.ok(Array.isArray(changedDocuments));
+    const collisionDocument = changedDocuments[0];
+    assert.ok(collisionDocument && typeof collisionDocument === "object");
+    const collisionWorkout = {
+      ...buildPersistedWorkoutInsertRows(
+        null,
+        owner.userId,
+        [collisionDocument as Parameters<typeof buildPersistedWorkoutInsertRows>[2][number]],
+        "manual",
+      )[0]!,
+      id: crypto.randomUUID(),
+    };
+    const collisionInsert = await supabase.from("planned_workouts").insert(collisionWorkout);
+    if (collisionInsert.error) throw new Error(collisionInsert.error.message);
+    const collisionLog = await supabase.from("workout_logs").insert({
+      user_id: owner.userId,
+      planned_workout_id: collisionWorkout.id,
+      outcome: "completed",
+    });
+    if (collisionLog.error) throw new Error(collisionLog.error.message);
+
+    const collisionCandidate = await prepareContinuationCandidate(readinessDate);
+    assert.equal(collisionCandidate.ok, true);
+    assert.equal(collisionCandidate.state.status, "candidate_ready");
+    assert.equal(collisionCandidate.retainedCandidate?.candidateVersion, 4);
+    if (!collisionCandidate.ok || collisionCandidate.state.status !== "candidate_ready") {
+      throw new Error("The protected-collision continuation candidate is unavailable.");
+    }
+    const collisionReview = await reviewWorkoutCommandForUser(
+      owner.userId,
+      {
+        operation: "materialize_source_candidate",
+        source: {
+          kind: "adaptive_continuation_candidate",
+          candidateId: collisionCandidate.state.candidate.id,
+        },
+      },
+      { adaptiveContinuationAsOfDate: readinessDate },
+    );
+    assert.equal(collisionReview.ok, true, JSON.stringify(collisionReview));
+    if (!collisionReview.ok) throw new Error(collisionReview.issues[0]?.message);
+    assert.equal(collisionReview.candidate.collisions.length, 1);
+    const protectedCollision = await confirmWorkoutCommandForUser(
+      owner.userId,
+      {
+        command: collisionReview.candidate.command,
+        candidateId: collisionReview.candidate.candidateId,
+        reviewToken: collisionReview.candidate.reviewToken,
+        reviewChecksum: collisionReview.candidate.reviewChecksum,
+      },
+      { adaptiveContinuationAsOfDate: readinessDate },
+    );
+    assert.equal(protectedCollision.ok, false);
+    if (!protectedCollision.ok) assert.equal(protectedCollision.reason, "collision");
+    assert.equal(
+      await countOwnedRows(supabase, "planned_workouts", owner.userId),
+      persistedWorkouts.data.length + 1,
+      "A protected occupied date must receive no partial continuation writes.",
+    );
+    assert.equal(
+      await countOwnedRows(supabase, "adaptive_training_block_confirmations", owner.userId),
+      1,
+    );
+    assert.equal(
+      await countOwnedRows(
+        supabase,
+        "adaptive_training_continuation_input_revisions",
+        owner.userId,
+      ),
+      4,
+      "A protected collision must consume no continuation preference or check-in.",
+    );
+    const removeCollision = await supabase
+      .from("planned_workouts")
+      .delete()
+      .eq("user_id", owner.userId)
+      .eq("id", collisionWorkout.id);
+    if (removeCollision.error) throw new Error(removeCollision.error.message);
+
+    const finalContinuationCandidate = await prepareContinuationCandidate(readinessDate);
+    assert.equal(finalContinuationCandidate.ok, true);
+    assert.equal(finalContinuationCandidate.state.status, "candidate_ready");
+    assert.equal(
+      finalContinuationCandidate.state.status === "candidate_ready"
+        ? finalContinuationCandidate.state.candidate.version
+        : null,
+      3,
+      "Returning to an identical frozen input must reuse its immutable candidate.",
+    );
+    if (
+      !finalContinuationCandidate.ok ||
+      finalContinuationCandidate.state.status !== "candidate_ready"
+    ) {
+      throw new Error("The final collision-free continuation candidate is unavailable.");
+    }
+    const finalContinuationReview = await reviewWorkoutCommandForUser(
+      owner.userId,
+      {
+        operation: "materialize_source_candidate",
+        source: {
+          kind: "adaptive_continuation_candidate",
+          candidateId: finalContinuationCandidate.state.candidate.id,
+        },
+      },
+      { adaptiveContinuationAsOfDate: readinessDate },
+    );
+    assert.equal(finalContinuationReview.ok, true, JSON.stringify(finalContinuationReview));
+    if (!finalContinuationReview.ok) {
+      throw new Error(finalContinuationReview.issues[0]?.message);
+    }
+    const foreignContinuationReview = await reviewWorkoutCommandForUser(
+      otherRunner.userId,
+      {
+        operation: "materialize_source_candidate",
+        source: {
+          kind: "adaptive_continuation_candidate",
+          candidateId: finalContinuationCandidate.state.candidate.id,
+        },
+      },
+      { adaptiveContinuationAsOfDate: readinessDate },
+    );
+    assert.equal(foreignContinuationReview.ok, false);
+    const continuationConfirmation = await confirmWorkoutCommandForUser(
+      owner.userId,
+      {
+        command: finalContinuationReview.candidate.command,
+        candidateId: finalContinuationReview.candidate.candidateId,
+        reviewToken: finalContinuationReview.candidate.reviewToken,
+        reviewChecksum: finalContinuationReview.candidate.reviewChecksum,
+      },
+      { adaptiveContinuationAsOfDate: readinessDate },
+    );
+    assert.equal(continuationConfirmation.ok, true, JSON.stringify(continuationConfirmation));
+    if (!continuationConfirmation.ok) throw new Error(continuationConfirmation.message);
+    const continuationResult = asJsonRecord(continuationConfirmation.result);
+    assert.equal(continuationResult?.predecessorConfirmationId, blockConfirmation.id);
+    assert.equal(continuationResult?.consumedPreferenceCount, 1);
+    assert.equal(
+      continuationResult?.calendarRowCount,
+      finalContinuationReview.candidate.command.documents.length,
+    );
+
+    const continuationConfirmations = await supabase
+      .from("adaptive_training_block_confirmations")
+      .select("*")
+      .eq("user_id", owner.userId)
+      .order("confirmed_at", { ascending: true });
+    if (continuationConfirmations.error) {
+      throw new Error(continuationConfirmations.error.message);
+    }
+    assert.equal(continuationConfirmations.data.length, 2);
+    const continuationLineage = continuationConfirmations.data.find(
+      (confirmation) => confirmation.predecessor_confirmation_id === blockConfirmation.id,
+    );
+    assert.ok(continuationLineage);
+    assert.equal(continuationLineage!.block_mode, "normal_four_week");
+    assert.equal(
+      continuationLineage!.interval_start_date,
+      addDaysIso(blockConfirmation.interval_end_date, 1),
+    );
+    assert.equal(
+      continuationLineage!.interval_end_date,
+      addDaysIso(continuationLineage!.interval_start_date, 27),
+    );
+    const consumedInput = await supabase
+      .from("adaptive_training_continuation_input_revisions")
+      .select("*")
+      .eq("user_id", owner.userId)
+      .order("revision", { ascending: false })
+      .limit(1)
+      .single();
+    if (consumedInput.error) throw new Error(consumedInput.error.message);
+    assert.deepEqual(consumedInput.data.active_projection_preferences, []);
+    assert.equal(consumedInput.data.horizon_check_in, null);
+    assert.equal(consumedInput.data.supersedes_revision, changedInputRevision.revision);
+
+    const afterContinuationReadModel = await getAdaptiveBlueprintCalendarReadModelForUser(
+      owner.userId,
+      readinessDate,
+    );
+    assert.ok(
+      afterContinuationReadModel.projections.every(
+        (projection) => projection.date > continuationLineage!.interval_end_date,
+      ),
+      "Only Source projections after the new confirmed horizon may remain public.",
+    );
+    const remainingProjectionDates = new Set(
+      afterContinuationReadModel.projections.map((projection) => projection.date),
+    );
+    const futureProjectionCalendarRows = await supabase
+      .from("planned_workouts")
+      .select("workout_date")
+      .eq("user_id", owner.userId)
+      .in("workout_date", [...remainingProjectionDates]);
+    if (futureProjectionCalendarRows.error) {
+      throw new Error(futureProjectionCalendarRows.error.message);
+    }
+    assert.equal(
+      futureProjectionCalendarRows.data.length,
+      0,
+      "Later Source projections must remain absent from Runner Calendar.",
+    );
+    const confirmedCalendarCount = await countOwnedRows(supabase, "planned_workouts", owner.userId);
+    assert.equal(
+      confirmedCalendarCount,
+      persistedWorkouts.data.length + continuationLineage!.calendar_workout_ids.length,
+    );
+    const duplicateContinuation = await confirmWorkoutCommandForUser(
+      owner.userId,
+      {
+        command: finalContinuationReview.candidate.command,
+        candidateId: finalContinuationReview.candidate.candidateId,
+        reviewToken: finalContinuationReview.candidate.reviewToken,
+        reviewChecksum: finalContinuationReview.candidate.reviewChecksum,
+      },
+      { adaptiveContinuationAsOfDate: readinessDate },
+    );
+    assert.equal(duplicateContinuation.ok, false);
+    assert.equal(
+      await countOwnedRows(supabase, "planned_workouts", owner.userId),
+      confirmedCalendarCount,
+      "A duplicate reviewed continuation must be idempotently rejected.",
+    );
+
+    const immutableContinuationCandidate = await supabase
+      .from("adaptive_training_detailed_candidates")
+      .update({ candidate_content: { tampered: true } })
+      .eq("id", preparedCandidate.state.candidate.id);
+    assert.ok(
+      immutableContinuationCandidate.error,
+      "A retained continuation candidate must remain immutable.",
+    );
+
+    const preparedReadModel = await getAdaptiveBlueprintCalendarReadModelForUser(
+      owner.userId,
+      readinessDate,
+    );
+    assert.ok(
+      preparedReadModel.projections.every((projection) => projection.status !== "ready_for_review"),
+      "A confirmed candidate must no longer remain reviewable.",
+    );
+
+    const duplicate = await confirmRunningPlanDraftForUser(owner.userId, confirmInput, {
+      allowLocalQaFixture: true,
+    });
+    assert.equal(duplicate.ok, false);
+    if (!duplicate.ok) assert.equal(duplicate.reason, "stale_review");
+    assert.equal(
+      await countOwnedRows(supabase, "planned_workouts", owner.userId),
+      confirmedCalendarCount,
+    );
+    assert.equal(await countOwnedRows(supabase, "workout_logs", owner.userId), dueWorkouts.length);
+
+    const immutableUpdate = await supabase
+      .from("adaptive_training_detailed_candidates")
+      .update({ candidate_content: { tampered: true } })
+      .eq("user_id", owner.userId)
+      .eq("id", confirmed.detailedCandidateId);
+    assert.ok(immutableUpdate.error, "Detailed candidate mutation must be rejected.");
+    const reloadedWorkouts = await supabase
+      .from("planned_workouts")
+      .select("id, source_workout_id, steps")
+      .eq("user_id", owner.userId)
+      .order("workout_date", { ascending: true });
+    if (reloadedWorkouts.error) throw new Error(reloadedWorkouts.error.message);
+    assert.equal(
+      reloadedWorkouts.data.length,
+      confirmedCalendarCount,
+      "Initial and continuation Calendar rows must reload after confirmation.",
+    );
+    const confirmedReloadSnapshot = reloadedWorkouts.data;
+    const confirmedEventCount = await countOwnedRows(
+      supabase,
+      "calendar_workout_mutation_events",
+      owner.userId,
+    );
+
+    const continuationResponseLineage = await supabase
+      .from("adaptive_training_detailed_candidates")
+      .select("source_response_id, input_provenance, confirmation_lineage")
+      .eq("user_id", owner.userId);
+    if (continuationResponseLineage.error) {
+      throw new Error(continuationResponseLineage.error.message);
+    }
+    const providerAuthoredCandidates = continuationResponseLineage.data.filter(
+      (candidate) =>
+        asJsonRecord(candidate.confirmation_lineage)?.kind ===
+        "continuation_detailed_block_candidate",
+    );
+    assert.equal(providerAuthoredCandidates.length, 3);
+    const continuationResponseIds = providerAuthoredCandidates.map((candidate) => {
+      assert.ok(candidate.source_response_id);
+      assert.equal(
+        asJsonRecord(candidate.input_provenance)?.retainedResponseId,
+        candidate.source_response_id,
+      );
+      return candidate.source_response_id!;
+    });
+    assert.equal(new Set(continuationResponseIds).size, continuationResponseIds.length);
+    const ownerContinuationResponses = await ownerClient
+      .from("ai_plan_generation_responses")
+      .select("id, schema_outcome, compiler_outcome")
+      .in("id", continuationResponseIds);
+    if (ownerContinuationResponses.error) {
+      throw new Error(ownerContinuationResponses.error.message);
+    }
+    assert.equal(ownerContinuationResponses.data.length, continuationResponseIds.length);
+    assert.ok(
+      ownerContinuationResponses.data.every(
+        (response) =>
+          response.schema_outcome === "accepted" && response.compiler_outcome === "accepted",
+      ),
+    );
+    const foreignContinuationResponses = await otherClient
+      .from("ai_plan_generation_responses")
+      .select("id")
+      .in("id", continuationResponseIds);
+    if (foreignContinuationResponses.error) {
+      throw new Error(foreignContinuationResponses.error.message);
+    }
+    assert.equal(foreignContinuationResponses.data.length, 0);
+
+    const sourceResponse = await supabase
+      .from("adaptive_training_blueprint_versions")
+      .select("source_response_id")
+      .eq("user_id", owner.userId)
+      .eq("id", confirmed.blueprintId)
+      .single();
+    if (sourceResponse.error) throw new Error(sourceResponse.error.message);
+    const sourceRemoval = await supabase
+      .from("ai_plan_generation_responses")
+      .delete()
+      .eq("user_id", owner.userId)
+      .eq("id", sourceResponse.data.source_response_id);
+    if (sourceRemoval.error) throw new Error(sourceRemoval.error.message);
+    assert.equal(
+      await countOwnedRows(supabase, "adaptive_training_blueprint_versions", owner.userId),
+      0,
+    );
+    assert.equal(
+      await countOwnedRows(supabase, "adaptive_training_detailed_candidates", owner.userId),
+      0,
+    );
+    assert.equal(
+      await countOwnedRows(supabase, "adaptive_training_block_confirmations", owner.userId),
+      0,
+    );
+    assert.equal(
+      await countOwnedRows(
+        supabase,
+        "adaptive_training_continuation_input_revisions",
+        owner.userId,
+      ),
+      0,
+    );
+    const removedSourceConfirmation = await confirmRunningPlanDraftForUser(
+      owner.userId,
+      confirmInput,
+      { allowLocalQaFixture: true },
+    );
+    assert.equal(removedSourceConfirmation.ok, false);
+    if (!removedSourceConfirmation.ok) {
+      assert.equal(removedSourceConfirmation.reason, "stale_review");
+    }
+    assert.equal(
+      await countOwnedRows(supabase, "planned_workouts", owner.userId),
+      confirmedCalendarCount,
+      "Removing disposable source intent must not mutate confirmed Calendar rows.",
+    );
+    const afterSourceRemovalWorkouts = await supabase
+      .from("planned_workouts")
+      .select("id, source_workout_id, steps")
+      .eq("user_id", owner.userId)
+      .order("workout_date", { ascending: true });
+    if (afterSourceRemovalWorkouts.error) {
+      throw new Error(afterSourceRemovalWorkouts.error.message);
+    }
+    assert.deepEqual(
+      afterSourceRemovalWorkouts.data,
+      confirmedReloadSnapshot,
+      "Removing immutable Source lineage must not alter confirmed Calendar documents.",
+    );
+    assert.equal(
+      await countOwnedRows(supabase, "calendar_workout_mutation_events", owner.userId),
+      confirmedEventCount,
+      "Removing disposable source intent must not erase confirmation lineage.",
+    );
+
+    return {
+      mode: preflight.mode,
+      target: preflight.target,
+      initialDetailedBlock: {
+        blueprintId: confirmed.blueprintId,
+        detailedCandidateId: confirmed.detailedCandidateId,
+        blockConfirmationId: blockConfirmation.id,
+        calendarRows: confirmedCalendarCount,
+        futureProjectionRows: 0,
+        standaloneRows: true,
+        ownershipRejected: !foreignConfirmation.ok,
+        invalidReviewRejected: !invalidReview.ok,
+        protectedCollisionRejected: !duplicate.ok,
+        removedSourceRejected: !removedSourceConfirmation.ok,
+        sourceImmutable: true,
+        immutableBlockConfirmation: true,
+        continuationInputRevisions: 5,
+        continuationCandidateVersions: 4,
+        projectionReadbackStable: true,
+        continuationPackets: true,
+        continuationConfirmation: true,
+        continuationCollisionAtomic: !protectedCollision.ok,
+        continuationStaleReviewRejected: !staleContinuationConfirmation.ok,
+        continuationDuplicateRejected: !duplicateContinuation.ok,
+        continuationOwnershipRejected: !foreignContinuationReview.ok,
+        consumedPreferenceCount: continuationResult?.consumedPreferenceCount,
+      },
+    };
+  } finally {
+    if (priorFixtureFlag === undefined)
+      delete process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV];
+    else process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV] = priorFixtureFlag;
+    if (priorProviderMode === undefined)
+      delete process.env[AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV];
+    else process.env[AI_GENERATED_RUNNING_PLAN_PROVIDER_MODE_ENV] = priorProviderMode;
+    if (priorFixtureScenario === undefined)
+      delete process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV];
+    else process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV] = priorFixtureScenario;
+
+    for (const userId of [owner.userId, otherRunner.userId]) {
+      const sourceCleanup = await supabase
+        .from("ai_plan_generation_responses")
+        .delete()
+        .eq("user_id", userId);
+      if (sourceCleanup.error) throw new Error(sourceCleanup.error.message);
+    }
+    ownerCleanup = await cleanupDisposableUser(supabase, owner);
+    otherCleanup = await cleanupDisposableUser(supabase, otherRunner);
+    assert.ok(ownerCleanup && otherCleanup);
+    assert.equal(
+      await countOwnedRows(supabase, "adaptive_training_blueprint_versions", owner.userId),
+      0,
+    );
+    assert.equal(
+      await countOwnedRows(supabase, "adaptive_training_detailed_candidates", owner.userId),
+      0,
+    );
+    assert.equal(
+      await countOwnedRows(supabase, "adaptive_training_block_confirmations", owner.userId),
+      0,
+    );
+    assert.equal(
+      await countOwnedRows(
+        supabase,
+        "adaptive_training_continuation_input_revisions",
+        owner.userId,
+      ),
+      0,
+    );
+  }
+}
+
+async function countOwnedRows(
+  supabase: ReturnType<typeof createAdminSupabaseClient>,
+  table: keyof Database["public"]["Tables"],
+  userId: string,
+) {
+  const result = await supabase
+    .from(table)
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", userId);
+  if (result.error) throw new Error(result.error.message);
+  return result.count ?? 0;
 }
 
 async function validateSavedPlanLibraryPersistence(input: {
@@ -1087,36 +2308,6 @@ function nextDateForWeekday(currentDate: string, expectedWeekday: string) {
   throw new Error(`Could not resolve the next ${expectedWeekday} from ${currentDate}.`);
 }
 
-async function buildLargeReadbackReviewedDraft() {
-  const fixture = buildLargeReadbackProviderFixture();
-  const reviewed = await buildReviewedAiGeneratedRunningPlanPreview(fixture.input, {
-    runnerProfileSnapshot: buildProofPersonalRunnerProfileSnapshot(fixture.input),
-    aiPreview: {
-      apiKey: "large-readback-capacity-proof",
-      model: "large-readback-capacity-proof",
-      generationLedger: { disabled: true },
-      fetchImpl: async () =>
-        new Response(
-          JSON.stringify({
-            id: "resp_large_readback_capacity",
-            status: "completed",
-            output_text: JSON.stringify(fixture.draft),
-            usage: { input_tokens: 100, output_tokens: 100, total_tokens: 200 },
-          }),
-          { status: 200, headers: { "content-type": "application/json" } },
-        ),
-    },
-  });
-  assert.equal(reviewed.ok, true, reviewed.ok ? "" : reviewed.unavailable.error.message);
-  if (!reviewed.ok) throw new Error(reviewed.unavailable.error.message);
-  assert.equal(reviewed.draft.canonicalNonRestRowCount, 211);
-  assert.ok(
-    reviewed.draft.canonicalRowCount >= 210,
-    "Large readback proof must retain at least the reported 210 persisted calendar rows.",
-  );
-  return reviewed.draft;
-}
-
 async function validateQaFixtureRuntimePersistence(input: {
   supabase: ReturnType<typeof createAdminSupabaseClient>;
   preflight: Extract<PersistencePreflight, { shouldRun: true }>;
@@ -1326,22 +2517,27 @@ async function persistReviewedDraftProfileSnapshot(
   userId: string,
   draft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
 ) {
-  const snapshot = draft.normalizedInputSummary.runnerProfileSnapshot;
+  const profile = draft.normalizedInputSummary.initialPlanProfile;
+  const fitnessLevel = profile.components.constraints.fitnessLevel;
+  if (!fitnessLevel) throw new Error("Reviewed initial-plan profile is missing fitness level.");
 
   await updateUserSettingsForUserId(userId, {
     firstName: null,
     lastName: null,
     displayName: null,
-    age: snapshot.age,
-    weightKg: snapshot.weightKg,
-    heightCm: snapshot.heightCm,
-    fitnessLevel: snapshot.fitnessLevel,
+    age: draft.normalizedInputSummary.age,
+    weightKg: draft.normalizedInputSummary.weightKg,
+    heightCm: draft.normalizedInputSummary.heightCm,
+    fitnessLevel,
+    trainingPreferences: profile.components.constraints.trainingPreferences,
     heartRateProfile: {
-      zones: snapshot.heartRateProfile.zones.map(({ reference, minBpm, maxBpm }) => ({
-        reference,
-        minBpm,
-        maxBpm,
-      })),
+      zones: draft.normalizedInputSummary.heartRateProfile.zones.map(
+        ({ reference, minBpm, maxBpm }) => ({
+          reference,
+          minBpm,
+          maxBpm,
+        }),
+      ),
     },
   });
 }
@@ -1550,10 +2746,10 @@ async function validatePersonalHeartRateProfilePersistence(input: {
       fitnessLevel: "running_regularly",
     });
 
-    const profileSnapshot = await getRunnerPlanAuthoringProfileSnapshotForUserId(owner.userId);
-    assert.equal(profileSnapshot?.heartRateProfile.source, "personal");
+    const reloadedSettings = await getUserSettingsForUserId(owner.userId, null);
+    assert.equal(reloadedSettings?.heartRateZones.source, "personal");
     assert.deepEqual(
-      profileSnapshot?.heartRateProfile.zones.map(({ reference, minBpm, maxBpm }) => ({
+      reloadedSettings?.heartRateZones.zones.map(({ reference, minBpm, maxBpm }) => ({
         reference,
         minBpm,
         maxBpm,
@@ -1565,7 +2761,25 @@ async function validatePersonalHeartRateProfilePersistence(input: {
       ...input.previewInput,
       benchmark: { kind: "recent_5k_pace" as const, recent5kPace: "5:30/km" },
     };
-    const authoring = buildAiGeneratedRunningPlanAuthoringInput(watchCanaryInput, profileSnapshot);
+    const acceptedHeartRateProfile = acceptedRunnerHeartRateProfileSchema.parse({
+      source: reloadedSettings?.heartRateZones.source,
+      accepted: reloadedSettings?.heartRateZones.accepted,
+      sourceNote: reloadedSettings?.heartRateZones.sourceNote,
+      zones: reloadedSettings?.heartRateZones.zones.map((zone) => ({
+        reference: zone.reference,
+        label: zone.label,
+        minBpm: zone.minBpm,
+        maxBpm: zone.maxBpm,
+      })),
+    });
+    const proofProfile = buildProofInitialPlanProfile(watchCanaryInput, {
+      personalZones: PERSONAL_HEART_RATE_ZONES,
+    });
+    const authoring = buildAiGeneratedRunningPlanAuthoringInput(
+      watchCanaryInput,
+      proofProfile.initialPlanProfile,
+      acceptedHeartRateProfile,
+    );
     assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);
     if (!authoring.ok) {
       throw new Error(authoring.message);
@@ -2113,7 +3327,7 @@ function buildPersonalHeartRateSubrangeFixtureFetch(fetchImpl: typeof fetch): ty
     const draft = JSON.parse(providerResponse.output_text) as AiAuthoredPlanFirstCompilerDraft;
     let authoredSubrange = false;
 
-    for (const workout of draft.workouts) {
+    for (const workout of [...draft.detailed_block.workouts, draft.detailed_block.final_workout]) {
       for (const section of workout.sections) {
         if (section.kind !== "unit") continue;
         const target = section.target;

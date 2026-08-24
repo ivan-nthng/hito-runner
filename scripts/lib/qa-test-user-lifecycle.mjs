@@ -3,10 +3,7 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { tsImport } from "tsx/esm/api";
 
-const { classifyAdminAnalyticsUser } = await tsImport(
-  "../../src/lib/admin-user-classification.ts",
-  import.meta.url,
-);
+const { classifyActor } = await tsImport("../../src/lib/actor-classification.ts", import.meta.url);
 
 export const QA_TESTER_POOL_VERSION = "hito_qa_tester_pool_v1";
 export const QA_TESTER_POOL = Object.freeze({
@@ -25,6 +22,11 @@ export const QA_TESTER_POOL = Object.freeze({
     email: "qa-provider-engine@local.test",
     displayName: "QA Provider Engine",
   }),
+  "adaptive-training-quality": Object.freeze({
+    username: "qa-adaptive-quality",
+    email: "qa-adaptive-quality@local.test",
+    displayName: "QA Adaptive Training Quality",
+  }),
   "isolation-a": Object.freeze({
     username: "qa-isolation-a",
     email: "qa-isolation-a@local.test",
@@ -39,6 +41,11 @@ export const QA_TESTER_POOL = Object.freeze({
 
 export const QA_TEST_USER_OWNED_TABLES = Object.freeze([
   "runner_profiles",
+  "ai_plan_generation_responses",
+  "adaptive_training_blueprint_versions",
+  "adaptive_training_detailed_candidates",
+  "adaptive_training_block_confirmations",
+  "adaptive_training_continuation_input_revisions",
   "plan_cycles",
   "planned_workouts",
   "calendar_workout_mutation_events",
@@ -328,7 +335,12 @@ export async function assertQaPoolAuthUser({ supabase, role, userId }) {
   return result.data.user;
 }
 
-export async function resetQaPoolUserData({ supabase, userId, preserveProfile = false }) {
+export async function resetQaPoolUserData({
+  supabase,
+  userId,
+  preserveProfile = false,
+  preserveAiPlanGenerationResponseIds = [],
+}) {
   const [assets, activitySourceRevisions] = await Promise.all([
     listQaOwnedRows(supabase, "workout_result_assets", "storage_bucket, storage_path", userId),
     listQaOwnedRows(
@@ -368,6 +380,7 @@ export async function resetQaPoolUserData({ supabase, userId, preserveProfile = 
   for (const table of [
     // Unplanned Garmin intake is not deleted by a plan-cycle cascade.
     "workout_result_assets",
+    "ai_plan_generation_responses",
     "runner_activity_metric_snapshots",
     "runner_activity_metric_observations",
     "runner_activity_evidence_revisions",
@@ -380,7 +393,22 @@ export async function resetQaPoolUserData({ supabase, userId, preserveProfile = 
     "runner_capability_usage",
     "runner_entitlements",
   ]) {
-    const deletion = await supabase.from(table).delete().eq("user_id", userId);
+    let deletion;
+    if (table === "ai_plan_generation_responses" && preserveAiPlanGenerationResponseIds.length) {
+      const existing = await supabase.from(table).select("id").eq("user_id", userId);
+      if (existing.error) {
+        throw new Error(`Unable to inspect ${table}: ${existing.error.message}`);
+      }
+      const preserve = new Set(preserveAiPlanGenerationResponseIds);
+      const removableIds = (existing.data ?? [])
+        .map((row) => row.id)
+        .filter((id) => !preserve.has(id));
+      deletion = removableIds.length
+        ? await supabase.from(table).delete().eq("user_id", userId).in("id", removableIds)
+        : { error: null };
+    } else {
+      deletion = await supabase.from(table).delete().eq("user_id", userId);
+    }
     if (deletion.error) {
       throw new Error(`Unable to reset ${table}: ${deletion.error.message}`);
     }
@@ -511,7 +539,7 @@ export function poolLocalAccount(role, password, userId) {
 
 export function classifyQaIdentity(user) {
   const appMetadata = user.app_metadata ?? {};
-  const adminClassification = classifyAdminAnalyticsUser({
+  const actorClassification = classifyActor({
     email: user.email ?? null,
     appMetadata,
   });
@@ -523,13 +551,13 @@ export function classifyQaIdentity(user) {
       : null;
 
   if (
-    adminClassification.classification === "local_admin" ||
-    adminClassification.classification === "supabase_admin"
+    actorClassification.classification === "local_admin" ||
+    actorClassification.classification === "supabase_admin"
   ) {
     return {
       kind: "protected_admin",
       poolRole: null,
-      metadataBasis: [`app_metadata:${adminClassification.classificationReason}`],
+      metadataBasis: [`app_metadata:${actorClassification.classificationReason}`],
     };
   }
 
@@ -567,7 +595,7 @@ export function classifyQaIdentity(user) {
     kind: "manual_review",
     poolRole: null,
     metadataBasis: [
-      `${adminClassification.classificationSource}:${adminClassification.classificationReason}`,
+      `${actorClassification.classificationSource}:${actorClassification.classificationReason}`,
     ],
   };
 }

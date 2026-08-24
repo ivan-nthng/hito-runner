@@ -106,8 +106,8 @@ Git stage/commit/push action; if not, return the first demonstrated boundary.
 ## Blockers
 
 The explicitly authorized whole-checkout checkpoint staged 470 paths, but
-`git diff --cached --check` failed on eight trailing-whitespace diagnostics in
-`2026-08-16-hito-shell-profile-trigger-opaque-background.md`. Source/document repair was outside
+`git diff --cached --check` failed on eight trailing-whitespace diagnostics in a subsequently
+retired source receipt. Source/document repair was outside
 the Git-release authority, so no commit or push occurred and the index was restored to empty.
 
 ## PRODUCT Reconciliation — 2026-08-18 (Language Menu)
@@ -421,10 +421,9 @@ demonstrated nonterminal dependency:
   `HitoLanguageMenuItems`; the export exists only in the current modified file, SHA-256
   `64293633290385c639cac85d016911ed0ca1aa5748e1e7f0551789736b591606`.
   Excluding that file therefore leaves the required current `AppShell.tsx` import unresolved.
-- The canonical source owner
-  `2026-08-16-hito-shared-language-dropdown-surface-adoption.md`, SHA-256
-  `33b2f8f1ea4ef55b6307331526e48f086f4d56d89ae7df7fb0fd6f53ecc401b3`, remains `Status: blocked`,
-  Owner `DESIGN SYSTEM`. Its own Files changed receipt assigns the export to the shared module and
+- The then-current source receipt, SHA-256
+  `33b2f8f1ea4ef55b6307331526e48f086f4d56d89ae7df7fb0fd6f53ecc401b3`, remained `Status: blocked`.
+  Its Files changed receipt assigned the export to the shared module and
   records omitted full-DS-validator and managed-browser acceptance.
 - The later completed consumer record
   `2026-08-16-hito-language-dropdown-runner-and-admin-adoption.md`, SHA-256
@@ -488,8 +487,7 @@ authority.
 ### Failed Gate, Git Result, And Preservation
 
 `git diff --cached --check` failed with eight trailing-whitespace diagnostics at lines 263, 264,
-357, 359, 360, 419, 420, and 421 of
-`docs/tasks/backlog/2026-08-16-hito-shell-profile-trigger-opaque-background.md`. Repairing that
+357, 359, 360, 419, 420, and 421 of a subsequently retired source receipt. Repairing that
 foreign canonical document was not authorized in this Git-only action.
 
 - Commit message reserved but not used: `chore: checkpoint runner core readiness`.

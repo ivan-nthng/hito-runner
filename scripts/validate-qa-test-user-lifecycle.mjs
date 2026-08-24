@@ -49,6 +49,23 @@ assert.deepEqual(
     ],
   },
 );
+assert.deepEqual(
+  classifyQaIdentity(
+    user("adaptive-quality", {
+      hito_test_user: true,
+      hito_qa_pool_version: QA_TESTER_POOL_VERSION,
+      hito_qa_pool_role: "adaptive-training-quality",
+    }),
+  ),
+  {
+    kind: "pool_member",
+    poolRole: "adaptive-training-quality",
+    metadataBasis: [
+      `app_metadata:hito_qa_pool_version=${QA_TESTER_POOL_VERSION}`,
+      "app_metadata:hito_qa_pool_role=adaptive-training-quality",
+    ],
+  },
+);
 
 const inventory = {
   schemaVersion: 1,
@@ -245,6 +262,7 @@ assert.deepEqual(Object.keys(QA_TESTER_POOL), [
   "baseline-no-plan",
   "saved-plan-readback",
   "provider-engine",
+  "adaptive-training-quality",
   "isolation-a",
   "isolation-b",
 ]);

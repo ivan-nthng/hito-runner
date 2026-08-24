@@ -69,7 +69,6 @@ copy, no plan/log mutation, no new evidence types, and loaded-state readability.
 ## Current Owner Links
 
 - Current product truth: `docs/current-product.md`
-- Product history digest: `docs/history/product-history-digest.md`
 
 ## Do Not Continue By Default
 

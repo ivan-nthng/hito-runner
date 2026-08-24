@@ -26,8 +26,6 @@ platform-and-operations
 
 ## Parent
 
-[Hito DS Depth, Overview, And Factual Chart Batch](./2026-08-17-hito-ds-two-layer-elevation-token-system.md)
-
 ## Scope
 
 Recover one fresh, managed, loopback-only `qa_fixture` for the blocked Design System browser
@@ -53,9 +51,9 @@ terminate. Ivan authorized sending QA to resolve the runtime lifecycle directly.
 
 ## Evidence
 
-- [Hito DS Depth, Overview, And Factual Chart Batch](./2026-08-17-hito-ds-two-layer-elevation-token-system.md)
-  records the exact evidence: PID `32568`, `artifact_missing`, failed managed stop, and sandbox
-  `operation not permitted` termination result.
+records the exact evidence: PID `32568`, `artifact_missing`, failed managed stop, and sandbox
+`operation not permitted` termination result.
+
 - The DS source/build/static contract is already accepted; no Design System source defect is
   demonstrated.
 
@@ -150,7 +148,6 @@ ROLE: QA
 Task: Managed qa_fixture Runtime Admission Recovery for DS Browser Acceptance
 Mode: Tracked
 Canonical item: docs/tasks/backlog/2026-08-17-hito-qa-fixture-runtime-admission-recovery.md
-Parent: docs/tasks/backlog/2026-08-17-hito-ds-two-layer-elevation-token-system.md
 Stage: Local runtime ownership and fresh browser-admission recovery
 
 Read AGENTS.md, agents/qa.agent.md, and skills/hito-qa-browser-regression/SKILL.md.

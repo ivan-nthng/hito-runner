@@ -1,6 +1,6 @@
 import { getGlobalStartContext } from "@tanstack/react-start";
 import { isLoopbackRuntimeUrl } from "@/lib/supabase/env";
-import { WORKOUT_RESULT_OBSERVABILITY_OUTCOME_HEADER } from "@/lib/workout-result-import/types";
+import { WORKOUT_RESULT_OBSERVABILITY_OUTCOME_HEADER } from "@/lib/workout-result-import/internal-types";
 
 export const LOCAL_RUNTIME_OBSERVABILITY_ROOT_ENV = "HITO_LOCAL_RUNTIME_OBSERVABILITY_ROOT";
 export const LOCAL_RUNTIME_URL_ENV = "HITO_LOCAL_RUNTIME_URL";

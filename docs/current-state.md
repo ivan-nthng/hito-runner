@@ -7,7 +7,7 @@ below; detailed implementation evidence remains in canonical backlog items.
 
 ## Last Updated
 
-2026-08-12
+2026-08-21
 
 ## Current Released Baseline
 
@@ -23,15 +23,28 @@ below; detailed implementation evidence remains in canonical backlog items.
 
 - Hito Running is one React/TanStack Start application with authenticated saved mode backed by
   Supabase and an explicitly untrusted signed-out preview boundary.
-- Runner profile, active plan, planned workouts, workout logs, schedule operations, plan
-  review/confirm, exports, and settings use the existing Backend-owned persistence seams.
-- Manual and generated plan creation share reviewed canonical workout-document truth while keeping
-  their operation-specific lifecycle and safety contracts separate.
-- Workout completion, body notes, FIT evidence, normalized actual metrics, factual Plan-vs-Run
-  comparison, and bounded feedback remain separate evidence layers. Runner-authored subjective
-  input never becomes provider-derived fact.
-- `/progress` exposes canonical Activity History, immutable factual snapshots, whole-activity
-  records, and session-RPE load from Runner Activity Intelligence Gates 1-4.
+- Explicit review/confirm materializes manual, template, AI and imported source content as
+  independently runner-owned Calendar workouts. Source records remain immutable provenance and do
+  not control current Calendar permissions, visibility or lifecycle under the accepted
+  [Calendar snapshot boundary](tasks/backlog/2026-08-21-hito-runner-calendar-public-snapshot-cleanup.md).
+- `planned_workouts`, `plan_cycles` and `active-plan-*` remain temporary physical implementation
+  names only. The Calendar owner assembles persisted snapshots; `training-api.ts` remains transport
+  and route composition rather than a second Calendar authority.
+- The accepted [Result/Evidence contract](tasks/backlog/2026-08-21-hito-result-evidence-public-contract.md)
+  exposes provider-neutral factual results while FIT/upload/parser/storage mechanics stay private.
+  Calendar consumes only completion/protection truth, and runner-authored subjective input never
+  becomes provider-derived fact.
+- `/progress` and shared factual visualizations consume only the accepted
+  [Progress Product contract](tasks/backlog/2026-08-21-hito-evidence-progress-product-contract.md):
+  Activity History, immutable factual snapshots, whole-activity records, session-RPE load and
+  explicit missingness from Runner Activity Intelligence Gates 1-4. They do not import private
+  provider read models or reconstruct formulas.
+- Actor classification is owned by Identity; Runner persisted-user resolution and Admin consume the
+  explicit result under the accepted
+  [Identity boundary](tasks/backlog/2026-08-21-hito-identity-owned-actor-classification.md).
+- Feedback marker state remains Result/Evidence truth, while its unchanged labels are owned by the
+  accepted [Frontend presentation contract](tasks/backlog/2026-08-21-hito-feedback-marker-presentation-owner-extraction.md),
+  not `training.ts`.
 - `/hitoDS` is the production-shipped public interactive reference for the same Hito tokens and
   component contracts used by Product; it is not a second Product lifecycle.
 - `/admin/capture` is an Admin capture and triage inbox. It does not own operational work-item
@@ -66,15 +79,10 @@ runtime and ownership boundaries belong in [current-system.md](current-system.md
 
 ## Operational Work
 
-`docs/tasks/backlog/` is the only live operational queue. Current documents, supporting plans,
-specifications, briefs, dashboards, Admin mirrors, and historical receipts cannot independently
-dispatch work or override backlog lifecycle.
-
-The completed cleanup parent makes
-[Developer Velocity And Proportional Verification](tasks/backlog/2026-08-05-developer-velocity-and-proportional-verification.md)
-eligible as the next Architect-owned backlog item. That successor has not started in this Slice 8H
-task. It alone owns the later refresh of `current-functional-map.md` and the proportional local
-verification work.
+The `Hito Running` Notion database is the sole operational lifecycle writer under the
+[current operating map](../AGENTS.md). Current documents, repository tasks, supporting plans,
+specifications, briefs, dashboards, Admin mirrors and historical receipts remain linked technical
+documentation or evidence; they cannot independently dispatch work or change current lifecycle.
 
 ## Canonical References
 

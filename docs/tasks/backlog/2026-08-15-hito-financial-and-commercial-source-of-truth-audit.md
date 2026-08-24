@@ -67,10 +67,10 @@ their projections.
   plan, workout, Garmin, entitlement, capability-usage, exclusion, and per-user fields only.
   There are no money, billing, subscription, receipt, expense, cash, currency, reconciliation, or
   forecast fields.
-- [`admin-user-classification.ts`](../../../src/lib/admin-user-classification.ts) treats explicit
-  local/Auth metadata as authoritative for admin/test classification, but it also uses email
-  domain/prefix heuristics as `suspected_test`. That heuristic is useful for review; it is not a
-  sufficient financial exclusion authority.
+- The retired Admin identity-classification implementation treated explicit local/Auth metadata as
+  authoritative for admin/test classification, but also used email domain/prefix heuristics as
+  `suspected_test`. That historical heuristic is useful for review; it is not sufficient financial
+  exclusion authority.
 - Current Admin queries aggregate all rows at request time. `generatedAt` dates the read, not the
   underlying membership of a historical cohort. Historical user/subscription charts therefore need
   dated source events or an attributable snapshot contract; current totals cannot be backfilled as

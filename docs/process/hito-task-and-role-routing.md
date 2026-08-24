@@ -9,23 +9,39 @@ Admin Capture, repository Markdown, plans, briefs, specifications, prompts and h
 linked technical documentation or evidence; none may independently dispatch or change lifecycle.
 Permanent dual writing and a Markdown lifecycle fallback are prohibited.
 
+### Source-Of-Truth Split
+
+- **Notion owns operational lifecycle and routing only:** current Status, Phase, Owner, concise Latest
+  update and Next action, short immutable history, Delivery steps and links. A Notion page must not
+  become the technical contract or require an agent to read a long lifecycle transcript before work.
+- **Repository Markdown owns technical documentation:** final domain contracts, plans, ADRs,
+  runbooks, technical evidence and residual boundaries. A terminal technical task record keeps one
+  compact final summary, final contract/evidence links and unresolved boundary; it does not retain
+  consumed prompts or intermediate lifecycle chronology as current context.
+- **Git owns code history.** Do not reproduce an implementation diary in Notion or Markdown to
+  replace the repository's version history.
+- **Supabase owns runtime data truth** for its admitted environment. Notion and Markdown may link to
+  evidence but cannot substitute for current database, RLS, RPC or fixture readback.
+
+This split is applied when a document is directly touched. It does not authorize a retroactive
+mass-compaction, another mirror, generated export, registry or second tracker.
+
+### Portable Contract Adoption
+
+Hito adopts version `1.0.1` of the
+[Portable Project Agent Operating Model](portable-project-agent-operating-model.md). That file is a
+pure cross-project bootstrap contract and has no Hito lifecycle authority. This routing document is
+the sole Hito adapter: its existing sections continue to own Hito's vocabulary, Areas, roles,
+reporting convention, lifecycle credential boundary, environment routes and release route without
+copying them into the portable core. A future local deviation is recorded here only after Product
+acceptance and names the portable version it adopts; do not create a second adapter document.
+
 ## Instruction Precedence And Load Order
 
-Precedence is direct user instruction, root [`AGENTS.md`](../../AGENTS.md), the assigned canonical
-role card, then a directly matching project skill. Stable product/domain contracts and operation
-runbooks supply facts; they do not override that order.
-
-A normal task loads only:
-
-1. root `AGENTS.md`;
-2. its one Notion Task and linked Repository document when present;
-3. its one canonical role card;
-4. the nearest stable domain/product contract;
-5. a direct boundary or operation runbook only when affected;
-6. one matching skill when its procedure is actually needed.
-
-Do not read terminal receipts, historical plans, unrelated roles, templates or broad documentation
-to reconstruct authority unless the task names a factual discriminator that requires them.
+Root [`AGENTS.md`](../../AGENTS.md) owns instruction precedence and progressive loading. Load this
+contract only when admission/classification, owner or lane selection, handoff, same-task QA return,
+concurrency, external authority or release freeze is materially in scope. Do not reconstruct
+authority from terminal receipts, historical plans, unrelated roles or broad documentation.
 
 ## Task Admission And Risk
 
@@ -51,7 +67,7 @@ outcome.
 Ivan or Product selects the exact current Notion Task. Agents do not poll the database, infer work
 from dirty files, wake from webhooks or scan unrelated backlog/history for something to execute. One
 Task has one Primary Area, Current owner, admitted outcome, files/data/environment, proof boundary,
-rollback and Repository link. Supporting Markdown and plans add technical detail but never own
+rollback and Repository document. Supporting Markdown and plans add technical detail but never own
 status.
 
 Use Lite only for one known owner, one known seam, no persisted/auth/external/release risk and one
@@ -64,13 +80,27 @@ change, proposed new artifact or `none`, removed/simplified responsibility, proo
 A reported defect needs a reproducing artifact or exact missing discriminator; a hypothesis is not a
 confirmed cause.
 
+### Owner-Boundary Admission
+
+Before extracting or moving an owner, map every direct production and focused-proof consumer, then
+recursively prove the intended dependency direction across runtime and type-only imports. The move
+is not admitted while an unexpected reverse edge, unowned consumer, second writer or compatibility
+projection remains. Remove the old export/responsibility only after its direct imports are zero; do
+not hide it behind a re-export, alias or facade.
+
+A Frontend consumer migration starts only after the server-owned initializer and command contract
+losslessly represent every origin and interaction admitted by the Task. A partial route/read model,
+client reconstruction, compatibility state or source-specific DTO cannot fill a missing canonical
+fact. If the initializer or command cannot carry that fact, return the exact Backend or Product
+discriminator before Frontend source work.
+
 ### Same-Task Lifecycle And History
 
 At each material claim, owner/phase handoff, blocker, QA return, implementation result, release result
 or final acceptance, the active owner performs one lifecycle update on the same Notion Task:
 
 1. atomically set truthful `Status`, `Phase`, `Owner`, `Latest update`, `Next action` and
-   `Repository link` values; and
+   `Repository document` values; and
 2. append one concise, timestamped, immutable history line to that Task page.
 
 Routine commands, commentary and unchanged retries do not create history entries. A retry changes
@@ -102,22 +132,11 @@ stage or receipt as a fallback.
 
 ### Local Notion Lifecycle Seam
 
-Every named local Hito role reads and writes Notion lifecycle only through process-local Node loading
-from `/Users/ivan/.config/hito/notion.env`:
-
-```text
-node --env-file=/Users/ivan/.config/hito/notion.env ...
-```
-
-The machine file is the sole local credential owner. Never inspect or print its value, commit or copy
-it into a repository `.env` file, pass the credential as a command argument, expose it to browser or
-product runtime code, or render it in logs, reports or Notion content. Vercel is not a Notion
-lifecycle credential dependency. Missing/unreadable local loading is an execution-environment failure
-returned to PRODUCT; it never authorizes Markdown lifecycle writes.
-
-The seam changes no lifecycle semantics: one Current owner remains mandatory, and each material
-transition atomically updates Status, Phase, Owner, Latest update, Next action and Repository link,
-then appends one history line on the same live Notion Task.
+Root [`AGENTS.md`](../../AGENTS.md) owns the single process-local credential seam and its secret
+boundary. This contract adds no alternate credential source. Missing access returns the environment
+failure to PRODUCT and never authorizes Markdown lifecycle writes. One Current owner remains
+mandatory; each material transition atomically updates Status, Phase, Owner, Latest update, Next
+action and Repository document, then appends one history line on the same live Task.
 
 ## Active Role Matrix
 
@@ -151,10 +170,8 @@ the next named role.
 | ------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | DESIGN SYSTEM INTEGRATION | Product-approved Figma target discovery, code-to-Figma mapping, Figma mutation and Figma-side verification | Repository runtime source, CSS, tokens, components, scripts and configuration are read-only |
 
-Design System repository implementation is the FRONTEND Design System lane, not a separate engineer
-owner. `agents/design-system.agent.md` is a retained legacy instruction file and cannot receive new
-Task ownership. Other non-matrix role files, chats, prompts, skills and templates remain retained
-legacy material until consumer-safe cleanup; physical retention does not activate them.
+Design System repository implementation belongs solely to the FRONTEND Design System lane; no
+separate repository engineer role may own it.
 
 ## Bounded Autonomous Owner Chain
 
@@ -219,54 +236,44 @@ Mixed-lane production changes are separate named plan edges.
 
 ## Local, External And Secret Safety
 
-Routine source inspection, local edits, loopback runtime control, disposable `qa_fixture` identities,
-local validation and supported local browser use are standing-authorized inside the assigned task.
-Do not ask Ivan for local test credentials or browser choice. Never use Ivan's personal session or
-hosted account for local QA. Abandon a tool path that opens a platform permission dialog and use a
-supported non-prompting local path.
-
-Never print or persist secrets. Hosted/production mutation, provider calls, new recurring cost,
-staging, commit, push, deployment, material deletion and destructive reset require exact authority.
-Every Supabase action must first resolve through the
-[environment register](hito-supabase-environment-register.md) and fail closed on identity conflict.
+Root [`AGENTS.md`](../../AGENTS.md) owns the shared local/external/secret safety boundary. Supabase
+work additionally resolves through the
+[environment register](hito-supabase-environment-register.md); release work uses its separate
+runbook. This contract introduces no alternate authorization or credential path.
 
 ## Validation And Reporting
 
-Validation is risk-derived and proves the changed contract. Record required checks not run and their
-coverage consequence. Implementation DoD, independent QA, Global QA and release are separate layers;
-none implies another.
+After ownership and the public contract are stable, independent QA proves the changed contract,
+negative dependency direction and risk-derived direct boundary. Previously accepted evidence for an
+unaffected branch remains valid unless the changed edge can invalidate it; QA states that reason
+instead of replaying an unrelated domain or the whole product. This is proportional evidence, not a
+token, file, elapsed-time, checklist or test-count limit.
 
-Tracked implementation/QA uses a compact `Check | Scenario / environment | Result | Evidence`
-inventory. Browser proof is required only for affected visible behavior. Database/auth proof is
-required only when those contracts are affected. Do not run unrelated known-red checks as ceremony.
+Before Verification ownership moves, the sending owner proves that the receiving context can read
+and update the same Notion Task and that any required managed artifact is fresh, healthy, compatible
+and tied to the current source receipt. A missing Notion seam, stale/missing artifact or environment
+identity conflict is an execution-environment stop before product validation. It does not create a
+new Task, authorize a Markdown lifecycle fallback or prove a product defect.
 
-Messages and reports visible to Ivan are Russian. Exact execution handoff prompts and durable
-repository contracts/receipts are English. Every completion states outcome, changed files, proof,
-omissions, residual boundary and next owner or final-acceptance return.
+Root [`AGENTS.md`](../../AGENTS.md) owns shared validation layers, evidence inventory and reporting
+language. Do not run unrelated known-red checks as ceremony.
 
 ## Release
 
-Release work follows the [Hito Release Quality Sweep Runbook](hito-release-quality-sweep-runbook.md).
-A freeze begins only with one in-progress release item, all other writers idle, and a recorded branch,
-HEAD, remote baseline, empty index, completed owners, admitted paths/exclusions, environment and stable
-content digests. During the freeze the release owner is the sole repository/runtime writer.
-
-When staging is exactly authorized, stage only the admitted inventory, verify path/content identity
-and run `git diff --cached --check` before expensive release work. If staging is not authorized, stop;
-do not simulate the gate. Recompute candidate identity before commit and push. Unexpected source,
-index, remote, runtime, generated output or environment movement invalidates the candidate.
-
-At a failed gate, restore an empty index without changing working-tree bytes, record the first
-incorrect owner and do not repair another owner's work. A retry creates a fresh freeze and digests.
-The freeze ends only with a truthful terminal release receipt. Agents do not stage, commit, push,
-deploy, apply hosted migrations or delete production data without exact authority; Ivan/Product owns
-final acceptance.
+The [Hito Release Quality Sweep Runbook](hito-release-quality-sweep-runbook.md) exclusively owns
+candidate admission, sole-writer freeze, staging, invalidation, retry and terminal release proof.
+Nothing in this contract weakens its explicit authority boundary.
 
 ## Retained And Superseded Material
 
-The following remain retained until later consumer-safe work: all backlog records, plans, history,
-Admin mirror/Capture data and code, prompt files, skills, noncanonical role files, `Template Agents/`
-and `Template Skills/`. Backlog metadata and receipts are frozen linked evidence, not current
-lifecycle. Their old general operating prose is superseded for new work by `AGENTS.md`, this contract,
-the environment register and the active role cards. Retention does not grant competing task or role
-authority.
+Backlog metadata, plans, history and receipts are linked evidence, not current lifecycle. Their old
+operating prose is superseded by `AGENTS.md`, this contract, the environment register and active role
+cards. Physical retention never grants task or role authority.
+
+## HITO-245 Recovery Evidence
+
+The three recoverable cleanup slices retain their path/hash/mode manifests and consumer originals
+outside the repository under
+`/Users/ivan/Developer/hito-running-hito245-recovery/HITO-245-slice-{1,2,3}-2026-08-22` until
+independent QA and Product acceptance are terminal. This operating contract does not duplicate
+those recovery manifests.

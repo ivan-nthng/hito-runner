@@ -157,7 +157,7 @@ Items, and Marketing remain unchanged until real Product work supplies a contrac
 | 1     | Workout detail sidebar public contract isolated from server query internals                 | BACKEND                                                                  |
 | 2     | Runner Calendar queries/mutations separated from source provenance/materialisation          | BACKEND -> FRONTEND Product if required -> QA if behavior changes        |
 | 3     | Result/evidence DTO separated from storage/parser/provider internals                        | BACKEND -> FRONTEND Product if required                                  |
-| 4     | Progress/DS/Product consumers use `runner-activity/product-contract.ts` only                | BACKEND -> DESIGN SYSTEM -> FRONTEND Product -> BACKEND -> QA            |
+| 4     | Progress/DS/Product consumers use `runner-activity/product-contract.ts` only                | BACKEND -> FRONTEND Design System -> FRONTEND Product -> BACKEND -> QA   |
 | 5     | Shared actor classification moves upstream of Admin and runner identity                     | FRONTEND Product -> BACKEND -> focused QA if observable behavior changes |
 | 6     | Shared facades shrink from proven replacements; current-system truth follows implementation | BACKEND/consumer owner -> ARCHITECT -> Epic QA/release                   |
 

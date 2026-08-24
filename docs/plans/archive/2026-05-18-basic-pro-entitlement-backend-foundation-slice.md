@@ -74,7 +74,6 @@ Archived evidence recorded migration application to the linked Supabase project,
 - [Current product](../../current-product.md)
 - [Current system](../../current-system.md)
 - [Changelog](../../history/changelog.md)
-- [Product history digest](../../history/product-history-digest.md)
 
 ## Do Not Continue By Default
 

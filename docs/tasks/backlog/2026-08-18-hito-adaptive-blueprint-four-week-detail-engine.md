@@ -60,6 +60,9 @@ four-week detailed block`; do not add Agents SDK, provider tools, raw-plan strea
 - Hard rejection remains limited to unsafe or unprocessable output: invalid contract shape,
   non-unique placement, unsupported workout anatomy, invalid endpoint, or persistence/security
   invariant failure.
+- Without provider-neutral terrain or gradient facts, hill repeats retain explicit repetitions,
+  uphill distance and recovery duration but use controlled effort only; they never carry executable
+  pace or heart-rate targets.
 - The visible target date is a plan assumption, never a performance guarantee.
 - Every continuation reports the facts used, conflicts, and intended changes. Missing or
   contradictory evidence produces an honest check-in/review state, never invented adaptation.
@@ -163,6 +166,170 @@ race/taper/interruption/missing-data cases, migration implications, and focused 
 Preserve the runner-owned Calendar model and forbid active-plan compatibility authority or fake
 future workouts. Update only the canonical item with an English architecture receipt and
 implementation sequence. Return to PRODUCT; do not implement or dispatch another role.
+```
+
+## Cost And Latency Decision — 2026-08-22
+
+### Evidence And Cost Classification
+
+HITO-252 used only the redacted HITO-249 attempt ledger and current public contracts. The retained
+cost summary has SHA-256
+`7ceb42be447711c3cbd7f0c49d05faf489a49e9b2591c515e7912fb1405e5c69`, contains no raw provider
+content, prompt, credential or personal data, and records 15 paid `gpt-5.2` requests:
+
+| Metric                 | Aggregate   | Median    | P25–P75          | Range            |
+| ---------------------- | ----------- | --------- | ---------------- | ---------------- |
+| Input tokens           | 75,643      | 4,754     | 4,523–5,428.5    | 3,458–6,999      |
+| Output tokens          | 141,880     | 10,234    | 9,549–11,315.5   | 3,842–12,283     |
+| Reasoning tokens       | 21,617      | 1,513     | 1,249–1,772      | 417–2,476        |
+| Total tokens           | 217,523     | 15,564    | 14,555–16,233    | 7,523–19,153     |
+| Provider latency       | 1,388.567 s | 100.181 s | 91.369–112.563 s | 34.694–119.334 s |
+| End-to-end latency     | 1,391.347 s | 100.181 s | 91.369–112.563 s | 35.096–119.334 s |
+| Post-provider residual | 2.780 s     | 0 s       | 0–0.401 s        | 0–0.594 s        |
+
+Compiler-specific elapsed time was not independently reported, so the post-provider residual is not
+claimed as compiler time. Five schema/compiler rejections consumed 23,043 input, 39,385 output and
+5,962 reasoning tokens, 379.310 seconds of provider time and `$0.59171525` of the derived estimate:
+27.9% of derived cost, 27.8% of output tokens and 27.3% of provider latency. Ten responses were
+technically accepted; eight were later rejected by Running Coach, and two initial candidates were
+approved. No normal continuation candidate reached Coach approval.
+
+The provider reported no request-level cost. Authoritative request-level actual billing attribution
+was unavailable. `$2.11869525` is only `derived_rate_card`, calculated from the artifact's
+2026-08-22 standard `gpt-5.2` rate card as
+`(75,643 × $1.75 + 141,880 × $14) / 1,000,000`; reasoning is already included in output and is not
+counted twice. Cached-input usage was not reported, so all input uses the standard rate. Actual spend
+remains unavailable.
+
+The 12 initial calls account for 64,087 input, 129,179 output and 20,256 reasoning tokens,
+1,267.780 seconds of provider time and `$1.92065825` derived cost. The final accepted initial call
+used 5,467 input, 9,970 output and 1,438 reasoning tokens, took 93.807 seconds and derives to
+`$0.14914725`. The three normal-continuation calls used 11,556 input, 12,701 output and 1,361
+reasoning tokens, took 120.787 seconds total and derive to `$0.198037`; their technically accepted
+third response still failed Coach review. These are observed values, not evidence that token or
+latency scales linearly with workout count.
+
+### Horizon Decision
+
+Keep **A: one compact full Blueprint plus exactly four initial detailed calendar weeks**. Keep a
+normal continuation at four weeks; retain the accepted two-week exceptions only for the target/taper
+boundary and one resolved-interruption bridge.
+
+Reject **B: one initial detailed week plus rolling weekly detail**. It cannot satisfy the existing
+server-owned timing contract: continuation needs the closed two-week factual window and compatible
+RPE/FIT evidence, while a reviewable next block must exist seven days before the current horizon
+ends. A one-week horizon expires before either fact window or review lead time exists. It would also
+replace one four-week authoring event with up to four events without evidence that aggregate cost,
+latency or Coach quality improves.
+
+Do not introduce **C**. A three-week horizon is the first arithmetically possible shorter option, but
+the current cutoff and review deadline leave only about one day between two closed factual weeks and
+the seven-day review boundary. No matched deterministic, Coach or provider corpus proves that this
+reduced recovery margin is safe. The evidence therefore warrants eliminating retry waste and
+duplicate context, not changing the accepted training cadence.
+
+The historical 15-call sequence measured contract and quality-rule discovery, not steady-state
+authoring. The steady-state goal is one paid request per authoring candidate after deterministic
+admission. Future reports must distinguish this target from achieved provider evidence.
+
+### Minimum Payload And Reuse Contract
+
+1. **Initial response:** one compact immutable Blueprint through the selected target date plus only
+   the first four weeks of canonical detailed WorkoutDocuments. Projections retain only stable ID,
+   date, phase, family/cadence, goal assumption and review timing; they never gain prescription,
+   Calendar identity or evidence capability.
+2. **Continuation request:** the versioned Training Decision authoring brief sends the immutable
+   Blueprint identity/hash, exact next projection interval, applicable phase/family/goal constraints,
+   normalized factual progress profile, current check-in/preferences and current constraints. It
+   does not resend raw provider material, the full evidence history, prior detailed WorkoutDocuments
+   or unrelated Blueprint intervals.
+3. **Continuation response:** exactly one normal four-week detailed block, or the accepted bounded
+   two-week taper/bridge block. It contains canonical WorkoutDocuments only and cannot rewrite the
+   Blueprint, facts, source lineage, Calendar or Result/Evidence.
+4. **Idempotent reuse:** before a provider call, look up the existing retained owner response only by
+   an exact content hash over owner, complete normalized context, model, prompt version, response
+   schema version, compiler/policy version and provider settings. A hit still passes current owner,
+   schema, compiler, lineage, staleness and review checks. It is an optimization, never authority.
+5. **Cache boundary:** provider-native exact-prefix caching may be observed when the provider reports
+   it. Hito adds no cache service, table or mutable cache record; a miss or eviction cannot change
+   product behavior. A partial, similar, cross-owner or cross-version match is forbidden.
+
+After parity, remove any continuation payload assembly that serializes the complete Blueprint,
+unrelated projection windows, raw evidence rows or prior WorkoutDocuments into the provider request.
+Do not preserve them through aliases, compatibility DTOs or a second authoring path. The existing
+retained-response lineage, strict compiler, candidate, Coach review and explicit Calendar confirm
+owners remain unchanged.
+
+### Serial Delivery And Proof Before Paid Retry
+
+1. **BACKEND — compact request and deterministic admission.** Inventory the exact initial and
+   continuation provider payload, remove context outside the contract above, add the exact request
+   content hash/idempotent retained-response lookup, and make all HITO-249 schema/compiler and
+   accepted Coach invariants deterministic before network admission. Preserve four-week/two-week
+   horizon semantics. Delete old payload builders only after direct runtime and type-only consumers
+   are zero.
+2. **BACKEND — zero-provider replay.** Run stable fixtures for initial, normal, target/taper, one
+   bridge and no-prescription through the real schema/compiler/retention/review boundary with
+   injected responses. Prove full projection coverage, exact detailed cardinality, no raw/private
+   facts in public DTOs, request-hash idempotency, stale rejection, zero unreviewed Calendar writes
+   and unchanged retained lineage. Old four-week artifacts remain immutable historical evidence;
+   they are not rewritten or accepted through a compatibility parser.
+3. **FRONTEND Product — only if the public DTO changes.** Reuse the current check-in/review/confirm
+   route. Prove full Blueprint visibility, non-workout projections, existing editable confirmed
+   workouts and truthful waiting/missing/stale states. Do not add client authoring, cache state or a
+   new horizon mode.
+4. **RUNNING COACH then QA — serial paid acceptance.** After deterministic proof, admit at most one
+   paid candidate at a time: initial, normal continuation, target/taper, bridge; no-prescription is a
+   zero-call control. Record exact usage, provider/end-to-end timing, schema/compiler result,
+   `reported_actual | derived_rate_card | unavailable`, candidate hash and Coach verdict. A rejection
+   requires one material owner hypothesis and another zero-provider replay before a retry.
+5. **Independent QA:** prove retained-response/request lineage, strict compiler, signed review,
+   explicit confirmation, reload, collision/stale/no-overwrite behavior, projection non-authority,
+   managed fixture cleanup and the complete browser journey. Global QA, hosted parity, release and
+   deployment remain separate.
+
+Paid call 16 stays forbidden until Step 2 passes and PRODUCT separately re-admits provider use.
+Rollback removes the compact payload/idempotency admission from the provider path and restores the
+last accepted four-week request builder while no new paid response or confirmed candidate exists;
+retained responses are never deleted or mutated. Stop on a lossy public DTO, cross-owner cache hit,
+hash ambiguity, schema/compiler rule not reproducible without a provider, reverse dependency, raw
+fact leakage or any need for a second store/provider/Calendar writer.
+
+### HITO-252 Next Implementation Edge
+
+The decision is complete with no remaining horizon choice. The next implementation owner after
+PRODUCT acceptance is **BACKEND**. No provider, source, schema, runtime, fixture, browser, database,
+hosted, Git, release or deployment action was performed by this decision.
+
+```text
+ROLE: BACKEND
+
+Task: HITO-252 — Reduce Adaptive Authoring Cost and Latency
+Mode: Tracked
+Stage: Compact request and deterministic authoring admission
+
+Read AGENTS.md, agents/backend.agent.md, the live HITO-252 Task, the HITO-216 cost/latency decision,
+the redacted HITO-249 evidence and only the direct initial/continuation request, schema/compiler,
+retained-response and focused-proof consumers. Preserve HITO-249/HITO-250 and unrelated dirty work.
+
+Keep the accepted compact full Blueprint plus four initial detailed weeks, four-week normal
+continuation and bounded two-week taper/bridge exceptions. Implement one Backend slice that removes
+unrelated Blueprint intervals, prior WorkoutDocuments, raw evidence rows and provider-private
+history from continuation request assembly; retains only the versioned Training Decision brief and
+exact target projection interval; and adds an idempotent retained-response lookup keyed by an exact
+owner/context/model/prompt/schema/compiler/policy/provider-settings content hash. A cache/reuse hit is
+never authority and must pass current ownership, schema, compiler, lineage, staleness and review.
+
+Before any paid provider request, prove with injected deterministic fixtures that initial, normal,
+target/taper, one bridge and no-prescription pass the real schema/compiler/retention/review boundary;
+all HITO-249 technical and accepted Coach invariants are executable gates; duplicate exact requests
+make zero provider calls; public DTOs contain no raw/private facts; unreviewed Calendar writes remain
+zero; and runtime plus type-only imports are acyclic. Remove superseded payload builders only after
+their direct consumers are zero. Add no provider, cache service/table, compatibility DTO, second
+authoring path or Calendar writer. Do not call a paid provider, implement Frontend, mutate hosted
+state, deploy or perform Git lifecycle work. Return the same Task to PRODUCT with exact before/after
+payload cardinality, deterministic proof, deletions, omissions and the separately authorised paid
+replay boundary.
 ```
 
 ## Running Coach Continuation Cadence Decision — 2026-08-19
@@ -534,6 +701,9 @@ does not mutate an already prepared candidate unless it changes an admitted inva
 3. **BACKEND — Initial confirmation boundary.** Compile only the first four weeks into canonical
    `WorkoutDocument` rows and use Runner Calendar's collision and atomic materialisation seam.
    Preserve source provenance without plan-controlled permissions.
+   Initial confirmation treats an omitted current running limitation as the healthy default and
+   blocks only an explicitly supplied `yes` or `unsure`. Historical workout BodyNotes remain factual
+   workout history and never become a current restriction by inference.
 4. **BACKEND — Projection and continuation query.** Expose non-authoritative projections and the
    14/7-day state. Compose continuation inputs only from Runner Calendar, Results/Evidence, Progress
    and profile public contracts; retain the review candidate without applying it.
@@ -590,4 +760,593 @@ fallback, create an active-plan compatibility path, call a provider during valid
 Frontend. Preserve unrelated dirty work and the runner-owned Calendar boundary. Run focused schema,
 compiler, retained-response, target/taper, soft weekday-conflict, and exact four-week-horizon proof;
 return any newly demonstrated persistence or Product decision to PRODUCT rather than widening.
+```
+
+## Slice 4 Projection, Readiness And Scheduling-Preference Decision — 2026-08-22
+
+This receipt is the controlling technical decision for Slice 4. It supersedes only the earlier
+projection/readiness input and next-handoff text above. Slices 1–3 are accepted evidence: the
+Blueprint/four-week compiler, owner-bound immutable persistence and atomic initial Calendar
+materialisation are complete. Operational lifecycle remains in Notion HITO-216.
+
+### Demonstrated Current Boundary
+
+- The accepted Blueprint already persists stable projection IDs, dates, phase, one workout family,
+  target assumption, review timing and the fixed planned label. The compiler rejects duplicate IDs
+  or dates and executable fields do not exist in the projection schema.
+- The current compiler proves at least one projection per future phase and one target projection,
+  but does not yet prove that every provisional future workout slot implied by phase cadence is
+  represented through the target date. Slice 4 must close that completeness gap before the public
+  Calendar read model is admitted.
+- `adaptive_training_blueprint_versions` and `adaptive_training_detailed_candidates` are immutable
+  Source Authoring records. Initial confirmation creates standalone Calendar workouts and Calendar
+  mutation events, but Source Authoring has no immutable confirmed-block receipt from which to
+  select the confirmed Blueprint and detailed horizon for continuation.
+- `projectRunningPlanPreviewResultForProduct` currently omits the Blueprint, while the signed-in
+  `TrainingSnapshot` and `calendar-projection.ts` contain Calendar workouts only. No production
+  post-confirmation query currently exposes future Blueprint projections or continuation status.
+- `runner_profiles.training_preferences` stores recurring profile-wide fixed weekdays, preferred
+  long-run weekday and weekly capacity. It has no Blueprint/projection identity, exact date,
+  one-off swap, independent revision or candidate-consumption state. Reusing it for a future
+  projection preference would silently change global availability and is rejected.
+- Result/Evidence already exposes factual per-workout completion/evidence, accepted actual metrics,
+  comparison and explicit missingness. Its current Progress projection is an aggregate UI read
+  model and is not an authoring prerequisite. Continuation must consume a narrow factual packet
+  directly from the Result/Evidence public owner.
+
+### Source Of Truth And Public Read Model
+
+Source Authoring owns future projections and continuation readiness. Runner Calendar continues to
+own only confirmed workouts. The post-confirmation Source read model is derived from:
+
+1. one immutable, owner-bound Blueprint version and hash;
+2. one immutable confirmed-block receipt for the current detailed horizon;
+3. the latest immutable continuation-input revision;
+4. one frozen Result/Evidence packet and Calendar outcome/collision fingerprint; and
+5. an optional immutable next-block candidate and review seal.
+
+The Source public query is conceptually
+`getAdaptiveBlueprintCalendarReadModelForUser(userId, asOfDate)`. It returns a separate Source
+projection collection beside the Runner Calendar snapshot; it does not add projections to
+`TrainingSnapshot.workouts` or to `planned_workouts`.
+
+```text
+BlueprintCalendarProjection {
+  kind: "blueprint_projection";
+  blueprint: { id; version; sha256 };
+  projectionId;
+  date;
+  phase;
+  phaseCadence;
+  workoutFamily;
+  goalAssumption;
+  reviewTiming;
+  status;
+  activePreferenceIds;
+  capabilities: {
+    canOpenWorkout: false;
+    canMutateWorkout: false;
+    canAttachResultOrEvidence: false;
+    canExpressSchedulingPreference: true;
+  };
+}
+```
+
+The DTO must not contain a Calendar workout ID, `WorkoutDocument`, distance, duration, pace, HR,
+RPE, load, steps, target, completion, mutation token, evidence/result identity or workout-detail
+destination. The immutable projection ID is stable only within its Blueprint version. A replacement
+Blueprint never reuses it as hidden cross-version authority.
+
+Before exposing this query, Backend must strengthen projection completeness: every provisional
+future workout slot authored for the period after the confirmed detailed horizon through the target
+date has exactly one unique projection; every projection belongs to its phase and permitted family;
+phase cadence and partial target-week coverage are internally consistent; and no projection exists
+inside a confirmed detailed interval. The compiler remains the sole validator; Frontend does not
+repair sparse or conflicting projection data.
+
+### Visible Status Contract
+
+| Value                          | Exact runner-facing state              | Discriminator                                                                                                 |
+| ------------------------------ | -------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `planned`                      | `Planned · details closer to the date` | The 14-day readiness window has not opened and no current review action is required.                          |
+| `check_in_needed`              | `Check-in needed`                      | The window is open and the required horizon-bound check-in is absent, incomplete or superseded.               |
+| `evidence_incomplete`          | `Evidence incomplete`                  | The check-in is current, but a due non-Rest outcome or required Result/Evidence fact is unresolved or stale.  |
+| `ready_for_review`             | `Ready for review`                     | A fresh immutable candidate exists and has not yet been reviewed into a sealed confirmation request.          |
+| `awaiting_runner_confirmation` | `Awaiting runner confirmation`         | The runner reviewed the facts/conflicts and the server sealed a still-current candidate for explicit confirm. |
+
+`Pending` is forbidden. Provider preparation/retry is transient operation feedback, not a sixth
+persisted projection status. By seven days before the next block, the public state must be one of
+`check_in_needed`, `evidence_incomplete`, `ready_for_review` or
+`awaiting_runner_confirmation`; failure to reach one is an operational error, never a fake workout.
+
+A projection may be focused and read, and may expose a non-workout Blueprint summary, check-in,
+review or scheduling-preference action. The projection card itself has no workout-detail link.
+Calendar Add/Edit/Move/Copy/Clear, drag-and-drop, completion, upload, evidence and result actions
+must ignore it. A confirmed Calendar workout on the same surface retains the full accepted Calendar
+editing contract.
+
+### Scheduling Preferences And Minimal Persistence
+
+Profile-wide recurring availability remains in `runner_profiles.training_preferences` and enters
+continuation as a current global constraint. Slice 4 adds no recurring preference vocabulary.
+Blueprint-bound scheduling preferences are one-off Source Authoring inputs:
+
+```text
+AvoidProjectionDate {
+  kind: "avoid_projection_date";
+  projectionId;
+  date;
+}
+
+SwapProjectionSlots {
+  kind: "swap_projection_slots";
+  firstProjectionId;
+  secondProjectionId;
+}
+```
+
+They never contain a Calendar workout ID and never execute a Calendar Move. The exact minimal new
+model is one owner-bound, append-only `adaptive_training_continuation_input_revisions` aggregate per
+Blueprint. Each revision stores its Blueprint ID, revision, content hash, superseded revision,
+active projection preferences, and an optional horizon-bound check-in. The server validates exact
+projection IDs/dates against the immutable Blueprint. Owner-select RLS and server-only writes match
+the accepted Blueprint persistence boundary.
+
+The latest revision is current input; every candidate freezes its revision and hash. Editing or
+withdrawing a preference appends a revision and stales an unconfirmed candidate. A preference stays
+active until withdrawn or until a confirmed block materialises its projection interval. Rejected or
+stale candidates do not consume it. The candidate review reports each preference as `applied` or
+`not_applied` with a concrete conflict reason. Preferences do not make an otherwise safe candidate
+structurally invalid.
+
+An exact-date preference and a swap are admitted. A recurring weekday change remains the existing
+global profile setting. Automatic carry-over to a replacement Blueprint is forbidden; the runner
+must restate it against the replacement projections. These boundaries resolve the admitted Slice 4
+behavior without a remaining Product choice.
+
+### Confirmed Horizon And Continuation Inputs
+
+Add one immutable, owner-bound `adaptive_training_block_confirmations` Source lineage record in the
+same transaction that materialises a reviewed block. It contains Blueprint/candidate IDs, versions
+and hashes; exact confirmed interval; ordered created Calendar workout IDs; input/evidence/calendar
+fingerprints; confirmation timestamp; block mode; and predecessor confirmation ID. It is history
+and continuation lineage only. It never grants Calendar permission or controls a workout after
+materialisation.
+
+The current Source read model follows predecessor IDs to one unique leaf confirmation for one
+Blueprint. Zero or multiple unsuperseded leaf lineages fail closed; it never chooses a plan by newest
+timestamp. Replacing a Blueprint or defining cross-Blueprint preference carry-over is outside Slice 4.
+
+Result/Evidence owns and returns a server-only `ContinuationEvidencePacket` for every due non-Rest
+Calendar workout in the accepted cutoff interval:
+
+```text
+ContinuationEvidencePacket {
+  asOf;
+  cutoffDate;
+  calendarOutcomeFingerprint;
+  evidenceRevisionFingerprint;
+  dueWorkoutCount;
+  resolvedOutcomeCount;
+  workouts: [{
+    calendarWorkoutId;
+    workoutDate;
+    outcome;
+    outcomeRevision;
+    sessionRpe;
+    evidenceState: "fit_current" | "completed_without_fit" |
+      "missing" | "updating" | "removed";
+    acceptedActualMetrics;
+    comparisonStatus;
+    missingReasons;
+  }];
+}
+```
+
+The packet carries facts and explicit missingness, not Progress UI aggregates, readiness scores,
+performance conclusions or provider/storage/parser types. Every eligible accepted FIT activity in
+the interval remains represented; there is no sampling cap. Calendar supplies lifecycle outcomes
+and workout fingerprints. Result/Evidence supplies current factual evidence. Source Authoring joins
+those packets with the immutable Blueprint, current normalized profile constraints and the latest
+continuation-input revision.
+
+The continuation composer outputs either an explicit missing state or one immutable
+`DetailedBlockReviewCandidate` with:
+
+- the next exact interval and `normal_four_week`, `target_taper_boundary` or
+  `resolved_interruption_bridge` mode;
+- canonical `WorkoutDocument` drafts, never Calendar rows;
+- frozen Blueprint, confirmation, profile-constraint, preference/check-in, Calendar and evidence
+  fingerprints;
+- facts used, facts missing, conflicts and preference application explanations; and
+- candidate/review identity, version and hash.
+
+Normal output is four calendar weeks. A target/taper block may end on the target with an exact
+shorter remainder of at most two weeks. One resolved post-interruption bridge may be two weeks and
+records that the bridge exception was used. No other missing-data or provider case authorises a
+short block.
+
+### Staleness And No-Cycle Rules
+
+An unconfirmed candidate becomes stale when any admitted input changes: Blueprint or confirmation
+lineage; continuation-input revision; normalized global preference hash; required check-in; a due
+Calendar document/date/outcome; target-interval occupancy; Result/Evidence source revision,
+availability or correction; health limitation; or review seal. A fact outside the frozen membership
+and cutoff does not silently mutate the candidate.
+
+Runtime and type-only direction is one-way:
+
+```text
+Result/Evidence public facts -----------+
+Runner Calendar public outcomes --------+--> Source Authoring continuation
+Runner profile public constraints ------+        |
+                                                v
+                                      Source public projection/readiness
+                                                |
+                                                v
+                                  route transport/composition -> Frontend
+```
+
+Runner Calendar and Result/Evidence must not import Source Authoring runtime or types. Source
+Authoring may import their public server contracts and client-safe public types only. The route
+transport composes the Calendar snapshot and separate Source read model. Frontend may import only
+the Source public DTO type. It must not import persistence, candidate, evidence or compiler internals.
+No alias, adapter, duplicate DTO, fake Calendar row, active-plan projection or compatibility fallback
+is admitted.
+
+Direct current consumers and the admitted Slice 4 consumers are bounded as follows:
+
+| Contract                                  | Current direct production consumers                                                                                                    | Focused proof consumers                                                 | Slice 4 consumer/change                                                                                   |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Blueprint compiler/result                 | `ai-first-plan-draft-service.ts`, `ai-generated-running-plan.ts`, `running-plan-engine-review.ts` and `running-plan-engine-actions.ts` | provider-representation and generated-plan-creation validators          | Source public read-model builder; no Calendar import back into the compiler                               |
+| Immutable Blueprint/candidate persistence | draft service retention and running-plan confirmation exactness check                                                                  | persistence and generated-plan-creation proofs                          | confirmation-lineage and continuation-input queries owned beside this persistence                         |
+| Runner Calendar snapshot/outcomes         | `training-api.ts`, route data, AppShell, Calendar, Today and workout views                                                             | Calendar context, overflow and mutation validators                      | server-only continuation outcome packet plus unchanged Calendar snapshot                                  |
+| Result/Evidence facts                     | workout routes, Calendar marker readback, completion and Progress fact builders                                                        | evidence comparison, upload/remove/retry and activity read-model proofs | server-only `ContinuationEvidencePacket`; no Progress UI dependency                                       |
+| Global training preferences               | Settings, onboarding structured input and initial authoring compiler                                                                   | plan-authoring and running-plan confirm proofs                          | normalized hash is a continuation constraint; one-off projection preferences use the new Source aggregate |
+| Source projection/readiness DTO           | none after initial confirmation                                                                                                        | none                                                                    | `training-api.ts` route composition, then Calendar/`calendar-projection.ts` presentation only             |
+
+### Serial Delivery And Proof
+
+1. **BACKEND — Slice 4A, source lineage and public facts.** Strengthen projection completeness;
+   persist immutable block confirmations and continuation-input revisions; expose the narrow
+   Calendar outcome and Result/Evidence packets; implement the owner-bound Source projection and
+   readiness query. Do not prepare or confirm a continuation yet. Migration proof must start from
+   the accepted 49-migration baseline and preserve zero runtime data, owner/RLS isolation and zero
+   projection rows in Calendar.
+2. **BACKEND — Slice 4B, candidate preparation.** Reuse the existing immutable candidate table with
+   incremented versions and frozen inputs. Implement 14/7-day readiness, ordinary four-week and two
+   bounded exception modes, preference application readback and staleness. It produces a review
+   candidate only; Step 5 continuation confirmation remains a separate admitted slice.
+3. **FRONTEND Product — Slice 4C, truthful Calendar composition.** Render the separate projection
+   DTO through route composition, exact statuses, focus/readback and one-off preference/check-in and
+   review entry points. Prove that projection cards have no workout route or Calendar/result action
+   while current detailed workouts remain editable. No client reconstruction or readiness logic.
+4. **QA — proportional independent acceptance.** After stable Backend and Frontend ownership,
+   replay the changed public contracts, local persistence and focused browser states. Epic-wide
+   continuation confirmation, Global QA, hosted parity, release and deployment remain later gates.
+
+| Boundary                  | Focused proof                                                                                                                                      |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Compiler/read model       | Full target-date projection coverage; stable IDs; exact allowed fields; no detailed-interval projection; exact status mapping                      |
+| Persistence/RLS           | Owner isolation; immutable lineage/input revisions; idempotent readback; candidate stales on a new revision; no Calendar projection row            |
+| Calendar/Result contracts | Every due outcome and evidence state; missing/updating/removed preserved; no private import; recursive runtime and type-only graph remains acyclic |
+| Continuation              | 14/7 timing; complete, missing and stale packets; four-week normal; target/taper and one bridge only; all preference outcomes explained            |
+| Frontend                  | No workout navigation/mutation/evidence; accessible status/readback; preference is not DnD; confirmed workouts retain full interaction             |
+
+Rollback is slice-local before release: remove the Slice 4 route/read-model admission and leave
+immutable Blueprints, accepted initial candidates, confirmed Calendar workouts, results and evidence
+untouched. Schema rollback is allowed only in a disposable local replay with zero retained Slice 4
+rows; otherwise the additive lineage/input records remain inert evidence until a separately reviewed
+forward fix. Stop before implementation if atomic block lineage cannot be recorded with Calendar
+materialisation, a public packet requires private provider/storage types, the input model would
+mutate global preferences, projection completeness cannot be deterministic, or a runtime or
+type-only cycle appears.
+
+### Decision Outcome
+
+The Slice 4 contract is complete with no unresolved Product choice inside the accepted exact-date
+and projection-swap scope. The next recommended owner is **BACKEND** for Slice 4A only. PRODUCT must
+admit that bounded implementation; this ARCHITECT task does not dispatch it. Browser, runtime,
+database replay, independent QA, hosted, provider, Global QA, release and deployment evidence were
+not produced by this read-only decision.
+
+## Dynamic Continuation Authoring Decision — 2026-08-22
+
+### Root Cause And Accepted Boundary
+
+Final Epic acceptance proved two separate gaps after Slices 1–5:
+
+- `adaptive-blueprint-continuation.ts` indexes WorkoutDocuments from the first confirmed candidate
+  by `workoutFamily`, clones/rebases one for each later projection, and returns
+  `blueprint_family_source_missing` when a later target/taper/race family was absent from the first
+  four weeks. This is not later prescription authoring; it is a legacy reconstruction from an
+  unrelated earlier block.
+- `getAdaptiveBlueprintCalendarReadModelForUser()` currently prepares and retains a candidate during
+  a read, while the production chain `training-api.ts` -> route -> `Calendar.tsx` renders projections
+  only. No user-facing check-in, candidate review or explicit continuation-confirm action is wired.
+
+The accepted projection, lineage, input-revision, reviewed-confirmation and atomic Calendar
+materialisation contracts remain valid. This decision replaces only the first-horizon cloning
+responsibility and completes the server-to-Frontend journey. Future projections remain non-workouts.
+
+### One Training Decision Module
+
+Source Authoring owns one server-only Training Decision module, initially the narrow seam
+`adaptive-training-decision.ts`. It is the sole policy owner between factual inputs and AI
+authoring. It has no UI, route, Calendar mutation, provider request, private-response storage,
+database access or `Map`-shaped dependency. Its contracts are plain serialisable values:
+
+```text
+ContinuationDecisionInputV1 {
+  contractVersion;
+  policyVersion;
+  blueprint: { id; version; sha256; immutableContent };
+  confirmationLineage: { leafId; predecessorIds; confirmedIntervals; candidateHashes };
+  progressProfile: ContinuationProgressProfileV1;
+  continuationInput: { id; revision; sha256; checkIn; activePreferences };
+  constraints: { normalizedProfileHash; currentValues };
+  targetIntervalOccupancyFingerprint;
+}
+
+ContinuationDecisionResultV1 =
+  | {
+      status: "authoring_ready";
+      contractVersion;
+      policyVersion;
+      inputFingerprintSha256;
+      adaptationMode: "blueprint_faithful" | "constraint_only" | "fact_shaped";
+      authoringBrief: ContinuationAuthoringBriefV1;
+      factsUsed;
+      factsMissing;
+      uncertainty;
+      preferenceApplications;
+    }
+  | {
+      status: "no_prescription";
+      contractVersion;
+      policyVersion;
+      inputFingerprintSha256;
+      reason: "check_in_missing" | "evidence_unresolved" | "input_stale" |
+        "lineage_invalid" | "target_context_unsupported";
+      missingOrConflictingFacts;
+    };
+```
+
+The authoring brief identifies the exact Blueprint version, next projection IDs/interval, block
+mode, phase/family/goal assumptions, constraint applications and bounded factual rationale. It is
+not a WorkoutDocument, Calendar row, second plan, predicted race result or provider payload. Changing
+the decision algorithm changes only `policyVersion` and its deterministic implementation; the
+factual, provider-retention, compiler, review and Calendar contracts remain stable.
+
+The module is independently testable with stable JSON fixtures and golden input/output hashes. An
+output is reproducible for one complete input and policy version. It does not read current time or
+mutable state internally; the caller supplies `asOf`, cutoffs and all fingerprints through the
+versioned input.
+
+### Provider-Neutral Factual Progress Profile
+
+Activity Capture / Result-Evidence remains the sole owner of accepted actual metrics, evidence
+state, source lineage, data quality and missingness. Runner Calendar remains the sole owner of
+workout date, lifecycle outcome, RPE and mutation fingerprints. Source Authoring joins those public
+packets to the immutable confirmed WorkoutDocuments only to add intended family/identity/target
+context; it cannot rewrite the facts. The Training Decision module normalises that complete frozen
+input into:
+
+```text
+ContinuationProgressProfileV1 {
+  asOf;
+  cutoffDate;
+  calendarOutcomeFingerprint;
+  evidenceRevisionFingerprint;
+  confirmedCandidateSha256;
+  quality: { due; resolved; fitCurrent; completedWithoutFit; missing; updating; removed };
+  comparableGroups: [{
+    context: { workoutFamily; workoutIdentity; intendedTargetKind };
+    observations: [{
+      calendarWorkoutId;
+      workoutDate;
+      outcome;
+      outcomeRevision;
+      sessionRpe;
+      evidenceState;
+      actual: {
+        durationMin; distanceKm; averageHeartRate; maximumHeartRate;
+        averagePower; maximumPower; averageCadence; elevationGainMetres;
+        elevationLossMetres; intervalCount;
+      } | null;
+      comparisonStatus;
+      missingReasons;
+    }];
+    relevantFitDays;
+    detailChangeEligible;
+  }];
+  unresolvedOrContradictoryFacts;
+}
+```
+
+Only dimensions actually present in accepted provider-neutral facts are included; missing is never
+zero. Observations are comparable only inside the same factual intended family/identity/target
+context. Terrain or another context dimension may be added only after Activity Capture owns a
+provider-neutral fact for it; it cannot be inferred from pace or elevation. The decision must not
+naively average unrelated session types, terrain or targets and must preserve dates, source
+revisions, quality and uncertainty.
+
+A `fact_shaped` detail change requires at least two relevant accepted FIT-backed completed/partial
+outcomes on separate days, compatible reported session RPE and no contradictory check-in. This is a
+Product floor, not a fitness score. The policy may conservatively change only the affected detail
+inside the immutable Blueprint phase and must cite the exact observations used. With insufficient
+FIT, the result may still be `blueprint_faithful` or `constraint_only` after a complete check-in; it
+must say that no performance adaptation occurred. Missing outcomes, stale/updating evidence or an
+unresolved health limitation produce `no_prescription`, never invented facts or an implicit
+fallback. No universal fitness coefficient, health/fitness claim, race prediction or promised
+finish result is admitted. A future Progress UI may present the same facts; it is not an input owner
+or prerequisite.
+
+### Shared Authoring Infrastructure And Persistence
+
+Normal, target/taper/race and the one admitted bridge all use the same path:
+
+```text
+Result/Evidence facts + Calendar outcomes + immutable Source lineage
+  -> Training Decision V1
+  -> continuation-specific authoring brief or no-prescription
+  -> existing AI authoring infrastructure
+  -> continuation response compiler
+  -> immutable reviewed candidate
+  -> sealed explicit confirmation
+  -> atomic runner-owned Calendar materialisation
+```
+
+Initial plan authoring and continuation authoring have distinct typed inputs, prompts and bounded
+outputs, but reuse the existing structured request envelope, one admitted provider call, completed
+raw-response retention, schema/compiler outcome recording and owner checks. The continuation
+response contains exactly the next detailed block. Its strict server compiler must require one
+canonical WorkoutDocument per exact projection, validate interval/cardinality, projection/family/
+phase/target boundary, sections/repeats/targets and all decision constraints, and reject provider
+Blueprint changes, Calendar identity, results or evidence. Raw provider content never reaches
+Frontend or becomes authority.
+
+`adaptive_training_detailed_candidates` remains the one candidate store. Before a provider-authored
+continuation can be accepted, it needs an owner-bound `source_response_id` relation to the existing
+accepted `ai_plan_generation_responses` row; no second table or source store is justified. Its frozen
+`input_snapshot` and `input_provenance` record the decision input fingerprint, decision contract and
+policy versions, decision-output hash, progress-profile fingerprints, authoring contract/compiler
+versions and response ID. Candidate content retains only canonical documents and client-safe
+rationale. Existing immutable versions and confirmation lineage supply audit history; no mutable
+"current fitness" row is added.
+
+### Lossless Public Journey
+
+The Source public read model adds a client-safe `continuation` union beside projections. It contains
+only the Blueprint/confirmation/window identity, exact visible status and missing reasons, data-
+quality counts, current input revision, capabilities, candidate ID/version/hash and canonical
+WorkoutDocuments plus facts/preferences/conflicts used for review. It excludes the private evidence
+packet, actual-metric source rows, provider response, policy internals and persistence types.
+
+Server actions are one ordered family:
+
+1. `submitAdaptiveContinuationInputAction` validates the expected Blueprint/leaf confirmation and
+   appends the check-in/preferences revision.
+2. `prepareAdaptiveContinuationCandidateAction` reloads the complete current facts, computes the
+   deterministic decision, and only for `authoring_ready` performs the one admitted provider call,
+   compiles and retains the candidate idempotently. The client cannot supply `asOf`, facts or a
+   decision result.
+3. Existing `reviewWorkoutCommandAction` reviews
+   `adaptive_continuation_candidate` and seals the still-current facts.
+4. Existing `confirmWorkoutCommandAction` performs the accepted atomic Calendar materialisation.
+
+`getAdaptiveBlueprintCalendarReadModelForUser()` becomes read-only: remove candidate preparation and
+persistence from GET. Frontend renders and invokes these server contracts; it never computes
+adaptation, creates details or writes Calendar rows. The projection status vocabulary remains the
+accepted five states; provider progress is transient action feedback, not a sixth projection state.
+
+### Dependency Direction And Removal
+
+```text
+Activity Capture / Result-Evidence public facts ----+
+Runner Calendar public outcomes/occupancy ----------+--> Source orchestration
+Immutable Blueprint/confirmation/input revision ----+          |
+                                                               v
+                                                    Training Decision V1
+                                                               |
+                                                               v
+                                              shared AI authoring infrastructure
+                                                               |
+                                                               v
+                                            compiler -> candidate -> review
+                                                               |
+                                                               v
+                                                    Calendar confirmation
+
+Source client-safe DTO/actions -> route composition -> Frontend
+```
+
+Result/Evidence and Calendar import no Source or Training Decision runtime/type. Training Decision
+imports only plain public fact and Source contract types, never persistence/provider/route/UI or
+Calendar mutation. AI authoring consumes the decision output; it does not call Calendar. Frontend
+imports only client-safe DTO/action types. Recursive runtime and type-only graphs must remain
+acyclic.
+
+After parity, delete `readCandidateWorkoutDocuments`, `sourceByFamily`, family cursors,
+`rebaseSourceDocument` and their section-rekey cloning path from continuation composition. Remove
+the preparation/retention call from the GET read model. No adapter, alias, static race recipe,
+projection-as-workout, client fallback, second Calendar writer or compatibility path remains.
+
+### Serial Delivery, Proof And Rollback
+
+1. **BACKEND — decision, authoring and persistence contract.** Add the pure versioned Training
+   Decision boundary and golden proofs; add the continuation provider schema/compiler through the
+   existing authoring infrastructure; bind accepted raw response to the existing candidate row;
+   implement the input/prepare/read DTO actions; remove cloning and the side-effectful GET path.
+2. **FRONTEND Product — complete runner journey.** After the server DTO/actions are lossless and
+   command-ready, add check-in/preferences, explicit missing/data-quality states, candidate review
+   and explicit confirmation. Projections remain non-navigable/non-mutable.
+3. **BACKEND/QA — managed fixture/readback only where needed.** Inject deterministic provider
+   responses through the real request/compiler/retention seam for normal, target/taper/race and one
+   bridge. Never seed a candidate, fake a missing family or use a static prescription recipe.
+4. **QA — independent Epic acceptance.** Replay the full server-to-Frontend journey after stable
+   ownership. Global QA, hosted parity, release and deployment remain separate.
+
+Focused Backend proof covers deterministic decision golden cases; comparable versus unrelated
+facts; explicit missingness/quality; the two-relevant-FIT-days plus compatible-RPE gate; no-FIT
+Blueprint-faithful and constraint-only paths; stale fingerprint rejection; target/taper/race/normal/
+one-bridge compilation; one bounded provider call; raw-response/candidate owner linkage; strict
+compiler rejection; idempotency; immutable lineage; no overwrite/collision; atomic confirmation;
+and recursive runtime/type-only cycle checks. Frontend proof covers all five statuses, accessible
+check-in/review/confirm, stale retry, no projection detail/mutation/evidence action and unchanged
+editing of confirmed Calendar workouts.
+
+Rollback before release disables the new prepare action and client admission while leaving accepted
+Blueprints, immutable inputs/candidates/confirmations, Calendar workouts and factual evidence intact.
+An additive response relation remains inert if retained rows exist; destructive rollback is allowed
+only in a disposable zero-row local replay. Stop before provider execution or Frontend handoff if
+the decision is not reproducible, factual lineage cannot be frozen, the candidate cannot bind to an
+accepted owner response, the compiler cannot cover an exact Blueprint family/target interval, any
+private fact crosses the DTO, or either dependency graph cycles.
+
+This architecture decision leaves no unresolved Product choice inside HITO-216. The first owner is
+**BACKEND** for the bounded decision/authoring/persistence contract. No implementation, provider
+call, database/runtime/browser proof, independent QA, hosted validation, release or deployment was
+performed here.
+
+### Exact Next-Owner Prompt
+
+```text
+ROLE: BACKEND
+
+Task: HITO-216 — Build Adaptive Four-Week Training
+Mode: Tracked
+Stage: Dynamic continuation decision, authoring, persistence and public server contract
+
+Read AGENTS.md, agents/backend.agent.md, the live HITO-216 Task, this canonical technical decision,
+and only the direct Source Authoring, Result/Evidence public facts, Runner Calendar public packets,
+existing AI authoring/retained-response/compiler, adaptive candidate persistence and signed
+review-confirm seams named here. Preserve unrelated dirty work.
+
+Implement one bounded Backend slice:
+1. Add the pure, versioned Training Decision module with ContinuationDecisionInputV1,
+   ContinuationProgressProfileV1, ContinuationDecisionResultV1 and deterministic golden proofs. It
+   must have no UI, Calendar mutation, provider, persistence, route or private-source dependency.
+2. Replace first-horizon WorkoutDocument family cloning with a continuation-specific typed authoring
+   brief, strict provider response contract and compiler that reuse the existing one-call authoring,
+   completed raw-response retention and outcome-recording infrastructure. Use injected responses in
+   proof; do not call a live provider.
+3. Bind every provider-authored continuation candidate to its accepted owner response in the
+   existing immutable candidate store, freezing decision/policy/compiler versions and all factual
+   fingerprints. Add no second store, plan, Calendar writer or compatibility representation.
+4. Add lossless server actions/read DTOs for check-in/preferences, explicit candidate preparation,
+   existing signed review and explicit confirmation. Make the Calendar projection GET path
+   read-only.
+5. After focused parity proves normal, target/taper/race and one bridge, remove the old family
+   clone/rebase/rekey path and its read-side preparation consumer. Do not retain an adapter or
+   fallback recipe.
+
+Preserve Blueprint projections as non-workouts and Calendar ownership only after reviewed explicit
+confirmation. Prove comparable-context facts, explicit missingness, two relevant FIT days plus
+compatible RPE before fact-shaped detail changes, no-FIT Blueprint-faithful/constraint-only output,
+staleness, private-response ownership, compiler rejection, idempotency, RLS/type parity, atomic
+confirmation and recursive runtime/type-only acyclicity. Do not implement Frontend, fixture/browser
+QA, hosted work, deployment or release. On success, atomically return the same HITO-216 Task to
+FRONTEND with one exact unchanged-edge prompt; return any new Product decision or unsafe external
+authority to PRODUCT.
 ```

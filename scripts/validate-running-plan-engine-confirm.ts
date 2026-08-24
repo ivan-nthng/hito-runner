@@ -69,7 +69,10 @@ const scenarios = [
     name: "10K distance goal",
     input: {
       ...baseInput,
-      planGoalIntent: { distance: { kind: "preset", preset: "10K" } },
+      planGoalIntent: {
+        distance: { kind: "preset", preset: "10K" },
+        targetDate: "2026-08-02",
+      },
     },
     expectedEndpointMeters: 10_000,
   },
@@ -98,7 +101,10 @@ const scenarios = [
     name: "21.1K distance goal",
     input: {
       ...baseInput,
-      planGoalIntent: { distance: { kind: "preset", preset: "Half Marathon" } },
+      planGoalIntent: {
+        distance: { kind: "preset", preset: "Half Marathon" },
+        targetDate: "2026-10-04",
+      },
     },
     expectedEndpointMeters: 21_100,
   },
@@ -143,7 +149,7 @@ async function main() {
     reviewedDrafts.push(await validateAiGeneratedDistanceGoalScenario(scenario));
   }
   const nonTenKDraft = reviewedDrafts.find(
-    (draft) => draft.endpointProof.endpointDistanceMeters === 21_100,
+    (draft) => draft.normalizedInputSummary.planGoalIntent.distance?.distanceMeters === 21_100,
   );
   assert.notEqual(
     nonTenKDraft,
@@ -208,7 +214,7 @@ async function buildAvailabilityPersistenceDrafts() {
       name: "Availability both",
       input: {
         ...baseInput,
-        daysPerWeek: 6 as const,
+        daysPerWeek: 5 as const,
         fixedRestDays: ["Tuesday", "Saturday"],
         preferredLongRunDay: null,
       },
@@ -238,7 +244,10 @@ async function buildAvailabilityPersistenceDrafts() {
         name: state.name,
         input: {
           ...state.input,
-          planGoalIntent: { distance: { kind: "preset", preset: "10K" } },
+          planGoalIntent: {
+            distance: { kind: "preset", preset: "10K" },
+            targetDate: "2026-08-02",
+          },
         },
         expectedEndpointMeters: 10_000,
       }),
@@ -498,13 +507,23 @@ async function validateAiGeneratedDistanceGoalScenario(scenario: {
   assert.equal(draft.persisted, false);
   assert.equal(draft.mutates, false);
   assert.equal(draft.reviewSafety.confirmCallsOpenAi, false);
-  assert.equal(draft.endpointProof.endpointDistanceMeters, scenario.expectedEndpointMeters);
-  assertSelectedDistanceEndpointProof({
-    scenarioName: scenario.name,
-    canonicalPlan,
-    draft,
-    expectedEndpointMeters: scenario.expectedEndpointMeters,
-  });
+  if (draft.blueprint.detailedHorizon.targetBoundary) {
+    assert.equal(draft.endpointProof.endpointDistanceMeters, scenario.expectedEndpointMeters);
+    assertSelectedDistanceEndpointProof({
+      scenarioName: scenario.name,
+      canonicalPlan,
+      draft,
+      expectedEndpointMeters: scenario.expectedEndpointMeters,
+    });
+  } else {
+    assert.equal(draft.endpointProof.endpointDistanceMeters, null);
+    assert.ok(
+      draft.blueprint.projections.some(
+        (projection) => projection.date === draft.blueprint.selectedTargetDate,
+      ),
+      `${scenario.name} future target must remain non-executable Blueprint projection intent.`,
+    );
+  }
   assert.equal(canonicalPlan.source_kind, AI_GENERATED_RUNNING_PLAN_SOURCE_KIND);
   assert.equal(importedSeed.workouts.length, canonicalPlan.planned_workouts.length);
   assert.doesNotMatch(JSON.stringify(canonicalPlan), /repeat_unit|recovery_unit/);

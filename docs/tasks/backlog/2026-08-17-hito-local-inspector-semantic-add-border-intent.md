@@ -30,8 +30,6 @@ DevTools
 
 ## Depends On
 
-[Hito DS Card Zero-Border Policy](./2026-08-17-hito-ds-card-zero-border-policy-and-inspector-border-intent.md)
-
 ## Scope
 
 Let the loopback-only Local Inspector record one semantic border intent for an eligible card, on all

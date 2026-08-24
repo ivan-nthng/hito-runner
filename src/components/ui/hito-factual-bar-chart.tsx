@@ -15,7 +15,7 @@ import type {
   RunnerActivityFitChartPeriod,
   RunnerActivityFitChartPoint,
   RunnerActivityFitChartSeries,
-} from "@/lib/runner-activity/read-model-types";
+} from "@/lib/runner-activity/product-contract";
 import { formatDate } from "@/lib/training";
 
 type ReadySeries = Extract<RunnerActivityFitChartSeries, { status: "ready" }>;

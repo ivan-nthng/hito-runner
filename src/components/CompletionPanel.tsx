@@ -15,8 +15,8 @@ import {
 import {
   LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_FIELD,
   LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE,
-  type WorkoutResultFeedbackSummary,
-} from "@/lib/workout-result-import/types";
+} from "@/lib/local-activity-file-design-fixture";
+import { type WorkoutResultFeedbackSummary } from "@/lib/workout-result-import/types";
 import { HitoButton } from "@/components/ui/button";
 import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
 import { Input } from "@/components/ui/input";

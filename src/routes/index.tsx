@@ -31,6 +31,7 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const {
+    blueprintCalendarReadModel,
     snapshot,
     viewer,
     onboardingDefaults,
@@ -67,6 +68,7 @@ function Index() {
           <div className="hito-route-stack">
             <TodayHero snapshot={snapshot} />
             <Calendar
+              blueprintReadModel={blueprintCalendarReadModel}
               snapshot={snapshot}
               runnerScopeKey={runnerViewer?.email ?? null}
               localActivityFileDesignFixtureEnabled={localActivityFileDesignFixtureEnabled}

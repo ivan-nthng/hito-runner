@@ -8,10 +8,7 @@ import type {
   AdminAnalyticsUserRow,
   AdminAnalyticsView,
 } from "@/lib/admin-analytics";
-import {
-  classifyAdminAnalyticsUser,
-  type AdminUserClassificationInfo,
-} from "@/lib/admin-user-classification";
+import { classifyActor, type ActorClassificationInfo } from "@/lib/actor-classification";
 import { requireAdminAccessForDependencies } from "@/lib/admin-access.server";
 import type { RequestAuthContext } from "@/lib/backend/auth";
 import { readLocalAuthAccountsFile } from "@/lib/local-auth";
@@ -62,7 +59,7 @@ interface ClassifiedUser {
   userId: string;
   authUser: AuthUserSummary | null;
   localAccount: LocalAccountSummary | null;
-  classification: AdminUserClassificationInfo;
+  classification: ActorClassificationInfo;
 }
 
 interface AdminAnalyticsDependencies {
@@ -402,7 +399,7 @@ function buildClassifiedUsers({
         localByUserId.get(userId) ??
         (authUser?.email ? localByEmail.get(authUser.email) : null) ??
         null;
-      const classification = classifyAdminAnalyticsUser({
+      const classification = classifyActor({
         email: authUser?.email ?? localAccount?.email ?? null,
         appMetadata: authUser?.appMetadata,
         localAccountRole: localAccount?.role ?? null,

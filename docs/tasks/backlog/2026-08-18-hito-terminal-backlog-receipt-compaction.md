@@ -154,10 +154,8 @@ canonical filename:
 | `2026-08-15-hito-workout-move-undo-stored-rest-reversibility.md`                             | Calendar Move acceptance                                          |
 | `2026-08-17-hito-local-inspector-semantic-add-border-intent.md`                              | DS surface-system consolidation                                   |
 | `2026-08-17-hito-running-coach-activity-sequence-progress-metrics-review.md`                 | Factual line-chart usage discovery                                |
-| `2026-08-17-hito-ds-factual-bar-chart-contract.md`                                           | Factual line-chart usage discovery                                |
 | `2026-08-17-hito-runner-calendar-tail-rebase-backend-contract.md`                            | Local schema parity gate                                          |
 | `2026-08-15-hito-workout-interaction-recovery.md`                                            | iPad Calendar recovery                                            |
-| `2026-08-17-hito-ds-navigation-card-quiet-surface-composition.md`                            | DS surface-system consolidation                                   |
 | `2026-08-15-hito-technical-history-ledger-restoration-and-release-highlights.md`             | History ledger reconciliation                                     |
 
 ### Stable-Status But Retained Exclusions — 46
@@ -166,9 +164,8 @@ No direct filename inbound was found for these records, but compaction was not a
 current successor/acceptance surface or unique uncommitted evidence remained. The complete exact
 partition is:
 
-- **Runner Core, local schema, final QA, and candidate evidence — 23:**
+- **Runner Core, local schema, final QA, and candidate evidence:**
   `2026-06-06-authenticated-saved-mode-workout-readback-browser-smoke-fixture.md`,
-  `2026-06-07-plan-preset-active-plan-replacement-refresh.md`,
   `2026-08-15-hito-calendar-rest-projection-and-move-undo-regression-recovery.md`,
   `2026-08-15-hito-runner-calendar-standalone-runtime-completion-and-legacy-cleanup.md`,
   `2026-08-15-hito-runner-core-standalone-calendar-write-foundation.md`,
@@ -192,29 +189,22 @@ partition is:
   `2026-08-17-hito-runner-core-scheduled-completion-authority-copy-closure.md`. Their detailed
   source/migration/fixture/QA receipts remain required until local schema parity, final cross-flow
   QA, and candidate admission are terminal.
-- **Runner Evidence and Progress — nine:**
+- **Runner Evidence and Progress:**
   `2026-08-16-hito-ds-runner-progress-charts-and-records-discovery.md`,
   `2026-08-16-hito-runner-progress-fit-results-and-chart-payload-readiness.md`,
-  `2026-08-17-hito-ds-factual-activity-point-sequence-contract.md`,
   `2026-08-17-hito-ds-factual-activity-sequence-display-unit-deduplication.md`,
-  `2026-08-17-hito-ds-two-layer-elevation-token-system.md`,
   `2026-08-17-hito-runner-progress-chart-composition-and-period-controls-redesign.md`,
   `2026-08-17-hito-runner-progress-complete-fit-activity-sequence-readiness.md`,
   `2026-08-17-hito-runner-progress-factual-activity-sequence-frontend-adoption.md`, and
   `2026-08-17-hito-runner-progress-factual-chart-controls-adoption.md`. Factual line-chart usage and
   final Progress acceptance remain nonterminal, so their contracts and QA facts stay detailed.
-- **Admin, locale, Inspector, Design System, and related successor work — 12:**
+- **Admin, locale, Inspector, Design System, and related successor work:**
   `2026-08-15-hito-backlog-epic-taxonomy-and-admin-projection.md`,
-  `2026-08-15-hito-ds-mobile-responsive-component-preview-batch.md`,
-  `2026-08-15-hito-ds-state-surface-borderless-fill-treatment.md`,
   `2026-08-15-hito-financial-and-commercial-source-of-truth-audit.md`,
   `2026-08-15-hito-local-inspector-computed-geometry-overlay.md`,
   `2026-08-16-hito-admin-persistent-runner-identity-and-elevated-access-alignment.md`,
-  `2026-08-16-hito-compound-range-field-optional-visible-label.md`,
   `2026-08-16-hito-language-dropdown-runner-and-admin-adoption.md`,
-  `2026-08-16-hito-shell-profile-trigger-opaque-background.md`,
   `2026-08-17-hito-admin-work-items-authority-and-usability-consolidation.md`,
-  `2026-08-17-hito-ds-card-zero-border-policy-and-inspector-border-intent.md`, and
   `2026-08-17-hito-ipad-dynamic-viewport-sidebar-profile-discovery.md`. Active Admin/Inspector,
   blocked language/iPad, queued Navigation Card/surface, or missing Product-browser acceptance
   keeps these receipts outside this batch.

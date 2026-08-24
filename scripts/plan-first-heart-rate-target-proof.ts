@@ -10,7 +10,7 @@ import type { CanonicalWorkoutIdentity } from "../src/lib/rich-workout-model";
 import { buildDefaultAuthoringInput } from "./ai-first-plan-draft-ops/fixtures";
 
 type ProviderTarget =
-  AiAuthoredPlanFirstCompilerDraft["workouts"][number]["sections"][number] extends infer Section
+  AiAuthoredPlanFirstCompilerDraft["detailed_block"]["workouts"][number]["sections"][number] extends infer Section
     ? Section extends { kind: "unit"; target: infer Target }
       ? Target
       : never
@@ -291,7 +291,9 @@ function assertSchemaRejected(label: string, mutate: (target: Record<string, str
     baseAuthoringInput.runnerFacts.heartRateProfile,
     heartRateTarget("Z2", "110-130 bpm"),
   );
-  const target = (draft.workouts[0]!.sections[0] as { target: Record<string, string> }).target;
+  const target = (
+    draft.detailed_block.workouts[0]!.sections[0] as { target: Record<string, string> }
+  ).target;
   mutate(target);
   const result = aiAuthoredPlanFirstCompilerDraftSchema.safeParse(draft);
   assert.equal(result.success, false, `${label} must fail the provider schema.`);
@@ -353,32 +355,51 @@ function providerDraft(
       ];
 
   return {
-    workouts: [
-      {
-        date: "2026-07-06",
-        phase: "Proof",
-        workout_identity: options.workoutIdentity ?? "easy_aerobic_run",
-        title: "Heart-rate target proof",
-        cue: "Execute the authored target.",
-        sections,
-      },
-    ],
-    endpoint: {
-      date: "2026-07-14",
-      phase: "Endpoint",
-      workout_identity: "selected_distance_completion_or_checkpoint",
-      title: "10K endpoint",
-      cue: "Complete the selected distance.",
-      sections: [
+    blueprint: {
+      start_date: "2026-07-06",
+      selected_target_date: "2026-07-14",
+      target_assumption: "10K target on 2026-07-14",
+      phases: [
         {
-          kind: "unit",
-          segment_type: "main",
-          label: "10K",
-          cue: "Hold the authored pace.",
-          prescription: { mode: "distance", distance_km: 10 },
-          target: paceTarget("5:30-5:45/km"),
+          phase: "Proof",
+          start_date: "2026-07-06",
+          end_date: "2026-07-14",
+          expected_weekly_cadence: 2,
+          workout_families: ["easy", "race"],
         },
       ],
+      projections: [],
+    },
+    detailed_block: {
+      start_date: "2026-07-06",
+      end_date: "2026-07-14",
+      workouts: [
+        {
+          date: "2026-07-06",
+          phase: "Proof",
+          workout_identity: options.workoutIdentity ?? "easy_aerobic_run",
+          title: "Heart-rate target proof",
+          cue: "Execute the authored target.",
+          sections,
+        },
+      ],
+      final_workout: {
+        date: "2026-07-14",
+        phase: "Proof",
+        workout_identity: "selected_distance_completion_or_checkpoint",
+        title: "10K endpoint",
+        cue: "Complete the selected distance.",
+        sections: [
+          {
+            kind: "unit",
+            segment_type: "main",
+            label: "10K",
+            cue: "Hold the authored pace.",
+            prescription: { mode: "distance", distance_km: 10 },
+            target: paceTarget("5:30-5:45/km"),
+          },
+        ],
+      },
     },
   };
 }
@@ -401,6 +422,14 @@ function paceTarget(command: string): ProviderTarget {
 function withProfile(heartRateProfile: EffectiveRunnerHeartRateProfile) {
   return {
     ...baseAuthoringInput,
+    planGoalIntent: {
+      ...baseAuthoringInput.planGoalIntent,
+      targetDate: "2026-07-14",
+    },
+    availability: {
+      ...baseAuthoringInput.availability,
+      maxRunningDaysPerWeek: null,
+    },
     runnerFacts: {
       ...baseAuthoringInput.runnerFacts,
       heartRateProfile,

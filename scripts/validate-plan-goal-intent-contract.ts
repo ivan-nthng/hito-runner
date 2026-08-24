@@ -34,7 +34,10 @@ const baseInput = {
   preferredLongRunDay: "Sunday",
   startDate: "2026-06-08",
   benchmark: { kind: "unknown" },
-  planGoalIntent: { distance: { kind: "preset", preset: "10K" } },
+  planGoalIntent: {
+    distance: { kind: "preset", preset: "10K" },
+    targetDate: "2026-08-02",
+  },
 } satisfies RunningPlanPreviewActionInput;
 
 async function main() {

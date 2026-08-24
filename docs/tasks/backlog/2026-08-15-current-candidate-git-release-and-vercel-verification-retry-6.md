@@ -79,8 +79,6 @@ These queued documents own no current runtime/source diff. Preserve their nonter
 not stage them:
 
 - `docs/tasks/backlog/2026-08-12-hito-ds-navigation-and-async-toast-demo-clarity.md`
-- `docs/tasks/backlog/2026-08-13-hito-ds-reference-link-inspector-registration-and-compact-geometry.md`
-- `docs/tasks/backlog/2026-08-13-hito-local-inspector-spacing-readback-and-custom-geometry-clarity.md`
 - `docs/tasks/backlog/2026-08-13-hito-public-landing-google-pagespeed-audit.md`
 
 ## Required Discriminator
@@ -235,12 +233,10 @@ missing, extra, duplicate, mixed, or unmapped path.
 
 ### Exact Exclusions
 
-| Queued-only document                                                                                  | Current status | Frozen SHA-256                                                     |
-| ----------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------ |
-| `docs/tasks/backlog/2026-08-12-hito-ds-navigation-and-async-toast-demo-clarity.md`                    | `backlog`      | `33eb885d02053459a6eeac457b0994d3248502e2247921cf46982ee55ead9932` |
-| `docs/tasks/backlog/2026-08-13-hito-ds-reference-link-inspector-registration-and-compact-geometry.md` | `ready`        | `72b4a0c5c08cd81e1982d2f60fcf3e67831b1b84e3072059fe99581ad91c93fd` |
-| `docs/tasks/backlog/2026-08-13-hito-local-inspector-spacing-readback-and-custom-geometry-clarity.md`  | `ready`        | `26f4aaf516abffb25998e4d68a220e1bc7110a09bdb3aefd77ab0e175e237464` |
-| `docs/tasks/backlog/2026-08-13-hito-public-landing-google-pagespeed-audit.md`                         | `backlog`      | `676d21bdacd794a1f0bb16ecbd5d747b4723c9292951f6bac415c49eca27b7d3` |
+| Queued-only document                                                               | Current status | Frozen SHA-256                                                     |
+| ---------------------------------------------------------------------------------- | -------------- | ------------------------------------------------------------------ |
+| `docs/tasks/backlog/2026-08-12-hito-ds-navigation-and-async-toast-demo-clarity.md` | `backlog`      | `33eb885d02053459a6eeac457b0994d3248502e2247921cf46982ee55ead9932` |
+| `docs/tasks/backlog/2026-08-13-hito-public-landing-google-pagespeed-audit.md`      | `backlog`      | `676d21bdacd794a1f0bb16ecbd5d747b4723c9292951f6bac415c49eca27b7d3` |
 
 All four exclusions are documentation-only, own no current source hunk, and were byte-stable across
 the initial snapshots and owner census. They remain outside release staging and retain their

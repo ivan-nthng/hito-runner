@@ -75,7 +75,6 @@ lives in slice reports, current plans, changelog, and protected `qa-artifacts/`.
 - Current product truth: `docs/current-product.md`
 - Current system truth: `docs/current-system.md`
 - Shipped-history source: `docs/history/changelog.md`
-- Product evolution digest: `docs/history/product-history-digest.md`
 
 ## Do Not Continue By Default
 

@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { readdir, readFile } from "node:fs/promises";
+import { join, relative } from "node:path";
 import { recordRunnerActivitySessionRpeForUser } from "../src/lib/runner-activity/activity-evidence";
 import { getRunnerActivityProgressFactsForUser } from "../src/lib/runner-activity/fact-snapshots";
 import {
@@ -13,11 +15,21 @@ import {
   projectRunnerActivityHistoryForProduct,
   projectRunnerActivityMutationReadbackForProduct,
   projectRunnerActivityProgressForProduct,
+  projectRunnerFitnessProfileForContinuation,
+  projectRunnerFitnessProfileForInitialPlan,
+  projectRunnerFitnessProfileForOneOff,
+  projectRunnerFitnessProfileForProgress,
+  RUNNER_FITNESS_PROFILE_COMPONENT_STATES,
+  type RunnerActivityHistoryProductPage,
+  type RunnerActivityProgressProductModel,
 } from "../src/lib/runner-activity/product-contract";
-import { getRunnerActivityProgressForUser } from "../src/lib/runner-activity/read-model";
-import { getPersistedSnapshot } from "../src/lib/training-api";
+import {
+  assembleRunnerFitnessProfileSnapshotV1,
+  getRunnerActivityProgressForUser,
+} from "../src/lib/runner-activity/read-model";
+import { getPersistedRunnerCalendarSnapshot } from "../src/lib/runner-calendar-snapshot";
 import { updateUserSettingsForUserId } from "../src/lib/user-settings-actions";
-import { WORKOUT_RESULT_STORAGE_BUCKET } from "../src/lib/workout-result-import/types";
+import { WORKOUT_RESULT_STORAGE_BUCKET } from "../src/lib/workout-result-import/internal-types";
 import {
   addDaysIso,
   diffDaysIso,
@@ -38,8 +50,10 @@ import {
 import { seedRunnerDesignProfileFixture } from "./lib/runner-design-profile-fixture";
 import { persistGate4SyntheticActivity } from "./lib/runner-activity-gate-4-fixture";
 
+const boundaryOnly = process.argv.includes("--boundary-only");
+const proofRuntime = boundaryOnly ? null : createRunnerActivityProofRuntime("gate2");
 const { supabaseUrl, supabase, ensureUser, signedInClient } =
-  createRunnerActivityProofRuntime("gate2");
+  proofRuntime ?? ({} as ReturnType<typeof createRunnerActivityProofRuntime>);
 const AS_OF_DATE = todayIso();
 const runtimeUrl =
   process.argv
@@ -48,9 +62,567 @@ const runtimeUrl =
   process.env.RUNNER_ACTIVITY_RUNTIME_URL?.trim() ??
   null;
 const scaleActivityCounts = parseScaleActivityCounts(process.argv.slice(2));
+const PRIVATE_RUNNER_ACTIVITY_READ_MODEL = "runner-activity/read-model-types";
+const PRODUCT_SOURCE_ROOTS = ["src/routes", "src/components"] as const;
 
 async function main() {
+  await proveProductReadModelImportBoundary();
+  await proveRunnerFitnessProfileSnapshotContract();
+  if (boundaryOnly) {
+    console.log("Runner activity Product/read-model and fitness-profile boundaries passed.");
+    return;
+  }
   await withRunnerActivityProofLeases(["provider-engine", "isolation-a"], runValidation);
+}
+
+async function proveRunnerFitnessProfileSnapshotContract() {
+  assert.deepEqual(RUNNER_FITNESS_PROFILE_COMPONENT_STATES, [
+    "available",
+    "partial",
+    "unavailable",
+    "updating",
+    "not_applicable",
+    "contradictory",
+  ]);
+  const history = fitnessProfileHistoryFixture();
+  const fixture = fitnessProfileAssemblyFixture(history);
+  const first = await assembleRunnerFitnessProfileSnapshotV1(fixture);
+  const replay = await assembleRunnerFitnessProfileSnapshotV1(fixture);
+  assert.deepEqual(replay, first);
+  assert.equal(Object.isFrozen(first), true);
+  assert.equal(Object.isFrozen(first.components.recent28Day.data), true);
+  assert.match(first.snapshotId, /^[0-9a-f]{64}$/);
+  assert.match(first.runnerFactsRevision, /^[0-9a-f]{64}$/);
+  assert.equal(first.components.latestFive.data?.items.length, 5);
+  assert.equal(first.components.latestFive.data?.inspectionOnly, true);
+  assert.equal(first.components.rolling90Day.data?.acceptedActivityCount, 2);
+  assert.equal(first.components.comparablePerformance.state, "unavailable");
+  assert.deepEqual(first.components.comparablePerformance.reasonCodes, [
+    "normalized_stream_not_persisted",
+  ]);
+  const serialized = JSON.stringify(first);
+  assert.equal(serialized.includes("manual_garmin_fit"), false);
+  assert.equal(serialized.includes("fit_current"), false);
+  assert.equal(serialized.includes("detailChangeEligible"), false);
+
+  const transportEquivalent = await assembleRunnerFitnessProfileSnapshotV1({
+    ...fixture,
+    history: {
+      ...history,
+      items: history.items.map((item) => ({
+        ...item,
+        source: {
+          ...item.source,
+          rawState: "removed" as const,
+          originalRetained: false,
+          reprocessingAvailable: false,
+        },
+        capabilities: { canRemoveOriginalFile: false },
+      })),
+    },
+  });
+  assert.deepEqual(transportEquivalent, first);
+
+  const progressProjection = projectRunnerFitnessProfileForProgress(first);
+  const initialPlanProjection = projectRunnerFitnessProfileForInitialPlan(first);
+  const continuationProjection = projectRunnerFitnessProfileForContinuation(first);
+  const oneOffProjection = projectRunnerFitnessProfileForOneOff(first);
+  assert.equal(progressProjection.snapshotId, first.snapshotId);
+  for (const projection of [
+    progressProjection,
+    initialPlanProjection,
+    continuationProjection,
+    oneOffProjection,
+  ]) {
+    assert.equal(projection.snapshotDefinitionVersion, first.version);
+    assert.deepEqual(projection.formulaVersions, first.formulaVersions);
+  }
+  assert.equal(initialPlanProjection.runnerFactsRevision, first.runnerFactsRevision);
+  assert.deepEqual(
+    {
+      state: initialPlanProjection.components.recent28Day.state,
+      coverage: initialPlanProjection.components.recent28Day.coverage,
+      reasonCodes: initialPlanProjection.components.recent28Day.reasonCodes,
+    },
+    {
+      state: first.components.recent28Day.state,
+      coverage: first.components.recent28Day.coverage,
+      reasonCodes: first.components.recent28Day.reasonCodes,
+    },
+  );
+  assert.deepEqual(
+    initialPlanProjection.components.recent28Day.current,
+    first.components.recent28Day.data?.current ?? null,
+  );
+  assert.deepEqual(
+    initialPlanProjection.components.recent28Day.previous,
+    first.components.recent28Day.data?.previous ?? null,
+  );
+  assert.deepEqual(
+    initialPlanProjection.components.latestFive.coveredDates,
+    first.components.latestFive.coverage.coveredDates,
+  );
+  assert.equal("items" in initialPlanProjection.components.latestFive, false);
+  assert.equal("records" in initialPlanProjection.components.rolling90Day, false);
+  assert.deepEqual(continuationProjection.comparableGroups, [
+    {
+      contextKey: "easy",
+      acceptedActualDays: ["2026-08-01", "2026-08-08"],
+      compatibleRpeDays: ["2026-08-01", "2026-08-08"],
+    },
+  ]);
+  assert.equal("detailChangeEligible" in (continuationProjection.comparableGroups[0] ?? {}), false);
+  assert.deepEqual(oneOffProjection.rolling90DayLongestDuration, {
+    localDate: "2026-08-08",
+    minutes: 60,
+  });
+
+  const changedRevision = await assembleRunnerFitnessProfileSnapshotV1({
+    ...fixture,
+    settings: fixture.settings
+      ? { ...fixture.settings, profileRevision: fixture.settings.profileRevision + 1 }
+      : null,
+  });
+  assert.notEqual(changedRevision.runnerFactsRevision, first.runnerFactsRevision);
+  assert.notEqual(changedRevision.snapshotId, first.snapshotId);
+  const contradictory = await assembleRunnerFitnessProfileSnapshotV1({
+    ...fixture,
+    evidence: { ...fixture.evidence, calendarOutcomeFingerprint: "9".repeat(64) },
+  });
+  assert.equal(contradictory.components.recent28Day.state, "contradictory");
+
+  for (const [evidenceState, expectedState] of [
+    ["completed_without_fit", "partial"],
+    ["missing", "partial"],
+    ["removed", "partial"],
+    ["updating", "updating"],
+  ] as const) {
+    const stateSnapshot = await assembleRunnerFitnessProfileSnapshotV1({
+      ...fixture,
+      evidence: {
+        ...fixture.evidence,
+        workouts: fixture.evidence.workouts.map((workout, index) =>
+          index === 0
+            ? {
+                ...workout,
+                evidenceState,
+                acceptedActualMetrics: null,
+                missingReasons: [
+                  evidenceState === "completed_without_fit"
+                    ? "actual_metrics_missing"
+                    : evidenceState === "updating"
+                      ? "evidence_updating"
+                      : evidenceState === "removed"
+                        ? "evidence_removed"
+                        : "evidence_missing",
+                ],
+              }
+            : workout,
+        ),
+      },
+    });
+    assert.equal(stateSnapshot.components.recent28Day.state, expectedState);
+    assert.equal(
+      projectRunnerFitnessProfileForContinuation(stateSnapshot).comparableGroups[0]
+        ?.acceptedActualDays.length,
+      1,
+    );
+  }
+}
+
+function fitnessProfileAssemblyFixture(history: RunnerActivityHistoryProductPage) {
+  const progress = fitnessProfileProgressFixture();
+  const calendarOutcomeFingerprint = "a".repeat(64);
+  return {
+    userId: "00000000-0000-4000-8000-000000000253",
+    asOf: "2026-08-10T12:00:00.000Z",
+    cutoffDate: "2026-08-10",
+    timeZone: "America/Sao_Paulo",
+    settings: {
+      firstName: null,
+      lastName: null,
+      displayName: null,
+      email: null,
+      avatarUrl: null,
+      age: 35,
+      weightKg: 70,
+      heightCm: 175,
+      fitnessLevel: "intermediate" as const,
+      profileRevision: 7,
+      trainingPreferences: {
+        blocked_days: [],
+        preferred_long_run_day: "Sunday" as const,
+        max_running_days_per_week: 4,
+      },
+      heartRateZones: {
+        source: "age_estimate" as const,
+        bands: [],
+      },
+      calendarTimezone: "America/Sao_Paulo",
+      calendarTimezoneSource: "runner_preference" as const,
+      uiLocalePreference: null,
+      uiLocalePreferenceContractViolation: false,
+    },
+    calendar: {
+      asOf: "2026-08-10T12:00:00.000Z",
+      cutoffDate: "2026-08-10",
+      calendarOutcomeFingerprint,
+      workouts: [
+        continuationCalendarWorkout("workout-1", "2026-08-01", 4),
+        continuationCalendarWorkout("workout-2", "2026-08-08", 5),
+      ],
+    },
+    evidence: {
+      asOf: "2026-08-10T12:00:00.000Z",
+      cutoffDate: "2026-08-10",
+      calendarOutcomeFingerprint,
+      evidenceRevisionFingerprint: "b".repeat(64),
+      dueWorkoutCount: 2,
+      resolvedOutcomeCount: 2,
+      workouts: [
+        continuationEvidenceWorkout("workout-1", "2026-08-01"),
+        continuationEvidenceWorkout("workout-2", "2026-08-08"),
+      ],
+    },
+    progress,
+    history,
+  };
+}
+
+function continuationCalendarWorkout(id: string, workoutDate: string, sessionRpe: number) {
+  return {
+    calendarWorkoutId: id,
+    workoutDate,
+    workoutType: "easy",
+    outcome: "completed" as const,
+    outcomeRevision: `${id}:outcome-v1`,
+    sessionRpe,
+    lifecycleState: "scheduled" as const,
+    workoutFingerprint: `${id}:fingerprint`,
+  };
+}
+
+function continuationEvidenceWorkout(id: string, workoutDate: string) {
+  return {
+    calendarWorkoutId: id,
+    workoutDate,
+    outcome: "completed" as const,
+    outcomeRevision: `${id}:outcome-v1`,
+    sessionRpe: id === "workout-1" ? 4 : 5,
+    evidenceState: "fit_current" as const,
+    acceptedActualMetrics: {
+      activityStartedAt: `${workoutDate}T10:00:00.000Z`,
+      activityLocalDate: workoutDate,
+      durationMin: id === "workout-1" ? 45 : 60,
+      distanceKm: id === "workout-1" ? 8 : 10,
+      averageHeartRate: 142,
+      maximumHeartRate: 160,
+      averagePower: null,
+      maximumPower: null,
+      averageCadence: 170,
+      calories: null,
+      elevationGainMetres: 50,
+      elevationLossMetres: 50,
+      intervalCount: null,
+    },
+    comparisonStatus: "complete" as const,
+    missingReasons: [],
+  };
+}
+
+function fitnessProfileHistoryFixture(): RunnerActivityHistoryProductPage {
+  return {
+    items: Array.from({ length: 6 }, (_, index) => {
+      const day = String(8 - index).padStart(2, "0");
+      const workoutId = index < 2 ? `workout-${index + 1}` : null;
+      return {
+        id: `activity-${index + 1}`,
+        identity: { label: "Run" as const },
+        historicalTime: {
+          localDate: `2026-08-${day}`,
+          startedAt: `2026-08-${day}T10:00:00.000Z`,
+          timezone: "America/Sao_Paulo",
+        },
+        distanceKm: 8 + index,
+        duration: { minutes: 45 + index, basis: "timer" as const },
+        pace: { secondsPerKm: 330, basis: "timer" as const },
+        observedHeartRate: { averageBpm: 140 + index },
+        plannedWorkout: workoutId
+          ? {
+              id: workoutId,
+              title: "Easy",
+              workoutDate: index === 0 ? "2026-08-01" : "2026-08-08",
+            }
+          : null,
+        source: {
+          kind: "manual_garmin_fit" as const,
+          rawState: "available" as const,
+          originalRetained: true,
+          reprocessingAvailable: true,
+        },
+        quality: { updating: false },
+        capabilities: { canRemoveOriginalFile: true },
+      };
+    }),
+    nextCursor: null,
+  };
+}
+
+function fitnessProfileProgressFixture(): RunnerActivityProgressProductModel {
+  const period = {
+    id: "custom" as const,
+    label: "Custom" as const,
+    startDate: "2026-05-13",
+    endDate: "2026-08-10",
+    asOfDate: "2026-08-10",
+    timezoneBasis: {
+      period: "runner_calendar_timezone" as const,
+      activities: "historical_local_date" as const,
+      timeZone: "America/Sao_Paulo",
+    },
+    futureInterval: null,
+  };
+  const quickPeriod = (
+    id: "this_week" | "last_7_days" | "last_1_month" | "last_6_months",
+    label: "This week" | "Last 7 days" | "Last 1 month" | "Last 6 months",
+  ) => ({ ...period, id, label });
+  const points = [
+    fitnessProfileSequencePoint("activity-1", 0, "2026-08-01", 45, 8),
+    fitnessProfileSequencePoint("activity-2", 1, "2026-08-08", 60, 10),
+  ];
+  const sequenceCoverage = {
+    distance: sequenceCoverageMetric(2, 2),
+    timer_duration: sequenceCoverageMetric(2, 2),
+    observed_average_pace: sequenceCoverageMetric(2, 2),
+    elevation_gain: sequenceCoverageMetric(2, 2),
+    reported_load: sequenceCoverageMetric(2, 2),
+  };
+  const currentLoad = sessionLoadWindow("2026-07-14", "2026-08-10", 360);
+  const previousLoad = sessionLoadWindow("2026-06-16", "2026-07-13", 300);
+  return {
+    status: "current",
+    asOfDate: "2026-08-10",
+    rolling28Day: {
+      current: progressSnapshot("2026-07-14", "2026-08-10", 2),
+      previous: progressSnapshot("2026-06-16", "2026-07-13", 1),
+    },
+    calendarWeeks: [],
+    fitProgress: {
+      status: "unavailable",
+      reason: "historical_formula_version_without_fit_progress",
+    },
+    fitActivitySequence: {
+      formulaVersion: "runner_activity_fit_sequence_v1",
+      evidenceLabel: "From FIT file",
+      advertisedPeriods: [
+        quickPeriod("this_week", "This week"),
+        quickPeriod("last_7_days", "Last 7 days"),
+        quickPeriod("last_1_month", "Last 1 month"),
+        quickPeriod("last_6_months", "Last 6 months"),
+      ],
+      selectedPeriod: period,
+      status: "ready",
+      completeness: {
+        state: "complete",
+        eligibleActivityCount: 2,
+        returnedPointCount: 2,
+      },
+      coverage: sequenceCoverage,
+      points,
+    },
+    advancedMetrics: {
+      status: "current",
+      historical: false,
+      asOfDate: "2026-08-10",
+      sessionRpeLoad: {
+        formulaVersion: "runner_activity_session_rpe_load_v1",
+        rolling28Day: { current: currentLoad, previous: previousLoad },
+        calendarWeeks: [],
+      },
+      records: {
+        availability: "available",
+        items: [],
+        unavailableReasons: [],
+      },
+      detailedMetrics: {
+        status: "unavailable",
+        reason: "normalized_stream_not_persisted",
+      },
+    },
+  };
+}
+
+function progressSnapshot(startDate: string, endDate: string, count: number) {
+  const metric = (value: number, unit: "sessions" | "minutes" | "kilometers" | "meters") => ({
+    availability: "available" as const,
+    confidence: "complete" as const,
+    value,
+    unit,
+    includedActivityCount: count,
+    missingActivityCount: 0,
+    missingReasons: [],
+  });
+  return {
+    window: {
+      startDate,
+      endDate,
+      cutoffDate: "2026-08-10",
+      timezoneBasis: "historical_local_date" as const,
+      weekStartsOn: "monday" as const,
+    },
+    formulaVersion: "runner_activity_progress_facts_v1",
+    eligibleActivityCount: count,
+    facts: {
+      sessions: metric(count, "sessions"),
+      runningTime: metric(count * 50, "minutes"),
+      distance: metric(count * 9, "kilometers"),
+      elevationGain: metric(count * 50, "meters"),
+      longestDistance: metric(count === 0 ? 0 : 10, "kilometers"),
+      longestDuration: metric(count === 0 ? 0 : 60, "minutes"),
+    },
+  };
+}
+
+function sessionLoadWindow(startDate: string, endDate: string, value: number) {
+  return {
+    startDate,
+    endDate,
+    metric: {
+      availability: "available" as const,
+      confidence: "complete" as const,
+      value,
+      displayValue: value,
+      unit: "arbitrary_units" as const,
+      includedObservationCount: 2,
+      unavailableObservationCount: 0,
+      unavailableReasons: [],
+    },
+  };
+}
+
+function sequenceCoverageMetric(includedCount: number, eligibleActivityCount: number) {
+  return {
+    includedCount,
+    eligibleActivityCount,
+    missingCount: eligibleActivityCount - includedCount,
+    label: `${includedCount}/${eligibleActivityCount}`,
+  };
+}
+
+function fitnessProfileSequencePoint(
+  id: string,
+  sequenceIndex: number,
+  localDate: string,
+  durationMin: number,
+  distanceKm: number,
+) {
+  const observation = (
+    observationId:
+      | "distance"
+      | "timer_duration"
+      | "observed_average_pace"
+      | "elevation_gain"
+      | "reported_load",
+    value: number,
+    unit: "kilometers" | "minutes" | "seconds_per_kilometer" | "meters" | "arbitrary_units",
+    unitLabel: "km" | "min" | "/km" | "m" | "AU",
+  ) => ({
+    id: observationId,
+    label: observationId,
+    state: "available" as const,
+    value,
+    displayValue: String(value),
+    unit,
+    unitLabel,
+    reason: null,
+    reasonLabel: null,
+    coverage: { includedCount: 1 as const, candidateCount: 1 as const, missingCount: 0 as const },
+    basis: {
+      duration: observationId === "timer_duration" ? ("timer" as const) : null,
+      distance: observationId === "distance" ? ("whole_activity" as const) : null,
+      effort: observationId === "reported_load" ? ("session_rpe" as const) : null,
+    },
+  });
+  return {
+    id,
+    sequenceIndex,
+    sameDayOrder: 0,
+    label: "Run" as const,
+    historicalTime: { localDate, startedAt: `${localDate}T10:00:00.000Z`, timezone: "UTC" },
+    context: { state: "available" as const, runningContext: "easy" },
+    evidence: { state: "current" as const, label: "From FIT file" as const },
+    observations: {
+      distance: observation("distance", distanceKm, "kilometers", "km"),
+      timer_duration: observation("timer_duration", durationMin, "minutes", "min"),
+      observed_average_pace: observation(
+        "observed_average_pace",
+        330,
+        "seconds_per_kilometer",
+        "/km",
+      ),
+      elevation_gain: observation("elevation_gain", 50, "meters", "m"),
+      reported_load: observation("reported_load", 180, "arbitrary_units", "AU"),
+    },
+  };
+}
+
+async function proveProductReadModelImportBoundary() {
+  const candidates = (
+    await Promise.all(PRODUCT_SOURCE_ROOTS.map((root) => readSourceFilesRecursively(root)))
+  ).flat();
+  assertNoProductReadModelImports(
+    await Promise.all(
+      candidates.map(async (file) => ({
+        file,
+        source: await readFile(file, "utf8"),
+      })),
+    ),
+  );
+
+  assert.throws(
+    () =>
+      assertNoProductReadModelImports([
+        {
+          file: "src/components/__runner-activity-boundary-negative-fixture.tsx",
+          source:
+            'import type { RunnerActivityFitChartPoint } from "@/lib/runner-activity/read-model-types";',
+        },
+      ]),
+    /must import @\/lib\/runner-activity\/product-contract/,
+  );
+}
+
+function assertNoProductReadModelImports(candidates: Array<{ file: string; source: string }>) {
+  const violations = candidates
+    .filter(({ source }) => importedModuleSpecifiers(source).length > 0)
+    .map(({ file }) => relative(process.cwd(), file))
+    .sort();
+  assert.deepEqual(
+    violations,
+    [],
+    `Runner Activity public boundary violation: ${violations.join(", ")} imports provider-private ${PRIVATE_RUNNER_ACTIVITY_READ_MODEL}. Product routes/components and Design System source must import @/lib/runner-activity/product-contract; Backend-private runner-activity modules and proof-only scripts remain allowed.`,
+  );
+}
+
+function importedModuleSpecifiers(source: string) {
+  return Array.from(
+    source.matchAll(/(?:\bfrom\s*|\bimport\s*(?:\(\s*)?)["']([^"']+)["']/g),
+    (match) => match[1],
+  ).filter((specifier) => specifier.includes(PRIVATE_RUNNER_ACTIVITY_READ_MODEL));
+}
+
+async function readSourceFilesRecursively(root: string): Promise<string[]> {
+  const entries = await readdir(root, { withFileTypes: true });
+  const files = await Promise.all(
+    entries.map(async (entry) => {
+      const path = join(root, entry.name);
+      if (entry.isDirectory()) return readSourceFilesRecursively(path);
+      return entry.isFile() && (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx"))
+        ? [path]
+        : [];
+    }),
+  );
+  return files.flat();
 }
 
 async function runValidation() {
@@ -430,7 +1002,7 @@ async function measureSnapshotReconciliation(userId: string, activityCount: numb
 
 async function proveDesignProfilePlanAuthorityRetirement(userId: string) {
   const [snapshot, planCycles, plannedWorkouts, firstHistoryPage] = await Promise.all([
-    getPersistedSnapshot(userId),
+    getPersistedRunnerCalendarSnapshot(userId),
     supabase.from("plan_cycles").select("id, status, saved_plan_payload").eq("user_id", userId),
     supabase.from("planned_workouts").select("id, plan_cycle_id").eq("user_id", userId),
     listRunnerActivityHistoryForUser({ userId }),

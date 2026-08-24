@@ -36,8 +36,6 @@ runner-evidence-and-progress
 
 [Runner Progress Complete FIT Activity Sequence Readiness](./2026-08-17-hito-runner-progress-complete-fit-activity-sequence-readiness.md)
 
-[Hito DS Factual Activity Point Sequence Contract](./2026-08-17-hito-ds-factual-activity-point-sequence-contract.md)
-
 [Hito DS Factual Activity Sequence Display-Unit Deduplication](./2026-08-17-hito-ds-factual-activity-sequence-display-unit-deduplication.md)
 
 ## Evidence From

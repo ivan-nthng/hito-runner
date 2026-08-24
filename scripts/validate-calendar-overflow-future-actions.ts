@@ -24,10 +24,10 @@ import {
   reviewWorkoutCommandForUser,
 } from "../src/lib/manual-workout-authoring";
 import { getRunnerCalendarDateForUserId } from "../src/lib/runner-calendar-context";
+import { getPersistedRunnerCalendarSnapshot } from "../src/lib/runner-calendar-snapshot";
 import { digestSha256Hex, stableJsonStringify } from "../src/lib/review-token-signing";
 import { createAdminSupabaseClient } from "../src/lib/supabase/server";
 import { addDaysIso, weekdayLong } from "../src/lib/training";
-import { getPersistedSnapshot } from "../src/lib/training-api";
 import {
   acquireQaPoolSupabaseUser,
   releaseQaPoolSupabaseUser,
@@ -152,9 +152,8 @@ async function validateMixedOriginCalendarReadbackAndExport(input: {
   assert.equal(copied.ok, true);
   if (!copied.ok) throw new Error(copied.message);
 
-  const snapshot = await getPersistedSnapshot(input.lease.userId);
+  const snapshot = await getPersistedRunnerCalendarSnapshot(input.lease.userId);
   assert.equal(snapshot.mode, "authenticated");
-  assert.equal(snapshot.planMeta, null);
   assert.equal(snapshot.calendarContext?.workoutEditing.addWorkout.allowed, true);
   const futureSnapshotWorkouts = snapshot.workouts.filter((workout) => workout.date >= currentDate);
   assert.deepEqual(

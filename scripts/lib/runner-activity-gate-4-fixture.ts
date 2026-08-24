@@ -6,8 +6,10 @@ import {
   persistGarminFitActivitySource,
 } from "../../src/lib/runner-activity/garmin-fit-source";
 import { addDaysIso, weekdayLong } from "../../src/lib/training";
-import type { ParsedGarminWorkout } from "../../src/lib/workout-result-import/types";
-import { WORKOUT_RESULT_STORAGE_BUCKET } from "../../src/lib/workout-result-import/types";
+import {
+  type ParsedGarminWorkout,
+  WORKOUT_RESULT_STORAGE_BUCKET,
+} from "../../src/lib/workout-result-import/internal-types";
 
 export type Gate4SyntheticActivity = Awaited<ReturnType<typeof persistGate4SyntheticActivity>>;
 

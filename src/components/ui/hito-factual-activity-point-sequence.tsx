@@ -11,13 +11,11 @@ import { HitoButton } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type {
+  RunnerActivityFitSequenceMetricId,
+  RunnerActivityFitSequenceObservation,
   RunnerActivityFitSequenceProductModel,
   RunnerActivityFitSequenceProductPoint,
 } from "@/lib/runner-activity/product-contract";
-import type {
-  RunnerActivityFitSequenceMetricId,
-  RunnerActivityFitSequenceObservation,
-} from "@/lib/runner-activity/read-model-types";
 import { formatDate } from "@/lib/training";
 import { cn } from "@/lib/utils";
 

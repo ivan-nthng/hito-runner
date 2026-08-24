@@ -1,12 +1,13 @@
 # Hito Runner Profile Constitution
 
 **Date:** 2026-07-30  
-**Version:** 1.1
-**Amended:** 2026-08-02
+**Version:** 1.2
+**Amended:** 2026-08-23
 **Owner:** Running Coach for athlete-profile and progress meaning; Architect for system boundaries;
 Backend for canonical computation  
-**Status:** Canonical normative contract for athlete-profile and progress semantics; future
-capabilities in this document are not implemented behavior  
+**Status:** Canonical normative contract for runner-profile, progress, future Fitness Index and
+Training Readiness semantics. The public Snapshot v1 contract is implemented; explicitly future
+capabilities remain non-implementation policy.
 **Plan file:** none
 
 ## 1. Authority
@@ -37,6 +38,16 @@ aerobic metrics. It supersedes any less-specific or conflicting formula language
 This document does not define a database schema, API shape, UI layout, medical assessment, or
 training-plan algorithm.
 
+The current implemented factual boundary is
+[`RunnerFitnessProfileSnapshotV1`](../../../src/lib/runner-activity/product-contract.ts) and its
+purpose-limited projections in the Runner Activity Product contract. The
+[Dynamic Continuation Authoring Decision](../backlog/2026-08-18-hito-adaptive-blueprint-four-week-detail-engine.md#dynamic-continuation-authoring-decision--2026-08-22)
+retains `ContinuationProgressProfileV1` as historical pre-HITO-253 decision vocabulary. It is
+superseded for current consumers by `RunnerFitnessProfileContinuationProjectionV1`, as defined by
+the HITO-253 Architecture Receipt below and implemented in the public contract. The engine consumes
+that frozen factual projection and versioned policy inputs; it never consumes Progress UI
+aggregates, a Fitness Index, a Training Readiness label, or an AI-created score as source truth.
+
 ### Related source-of-truth boundaries
 
 - The
@@ -60,8 +71,9 @@ planned target is never evidence that the runner actually achieved that HR or pa
    is not a ranking against other runners.
 2. **Observed facts stay separate from derived estimates.** Distance, duration, pace samples, and
    heart-rate samples are observations. Aerobic efficiency, durability, and load are calculations.
-3. **No single metric is fitness.** Hito reports a small explainable profile: performance,
-   aerobic efficiency, durability, consistency, load, and confidence.
+3. **No raw metric or opaque composite is fitness.** Hito reports an explainable factual profile.
+   A future optional Fitness Index may derive a long-term view only under one Product-accepted,
+   versioned and fully attributable formula; it never replaces the profile.
 4. **Comparable evidence before conclusions.** Faster running at the same heart rate is meaningful
    only when the activity portions and conditions are sufficiently comparable.
 5. **Personal trend before population norm.** Hito compares the runner with their own prior
@@ -79,27 +91,45 @@ planned target is never evidence that the runner actually achieved that HR or pa
 
 ### Implementation reality
 
-Current Hito supports local Garmin FIT/ZIP upload, workout-scoped actual summaries and laps,
-planned-versus-actual comparison, and compact plan/log progress. It does not yet implement the
-provider-neutral multi-source activity lifecycle, record-stream progress analysis, immutable
-fitness snapshots, or the metrics defined below. All `must` statements for those capabilities are
-normative future requirements, not claims about current runtime behavior.
+Current Hito implements one provider-neutral `RunnerFitnessProfileSnapshotV1` public factual
+contract and accepted purpose-limited projections from existing Calendar, Result/Evidence, Runner
+Activity and Identity/Profile facts. FIT remains the current actual-evidence adapter. Normalized
+record streams, stream-derived comparable performance, a Fitness Index formula and a named Training
+Readiness product contract are not established by this coaching policy. Their `must` statements
+below are normative future requirements unless a later accepted source receipt proves otherwise.
 
 ## 3. Canonical Profile Layers
 
-The canonical athlete-profile model must be composed of five linked layers.
+The canonical athlete-profile model is composed of seven linked layers. The last two are derived
+consumers and never become a second factual profile.
 
 | Layer | Meaning | Mutability |
 | --- | --- | --- |
 | Runner facts | User-approved identity, setup, goals, availability, and preferences | Versioned when changed |
 | Activity truth | Canonical recorded or manually entered training events | Immutable event plus explicit corrections |
 | Observation streams | Time-aligned distance, speed, heart rate, movement, elevation, and related samples | Immutable source evidence |
-| Fitness snapshot | Derived state for a defined date/window using a named formula version | Immutable and reproducible |
+| Runner Fitness Profile Snapshot | Provider-neutral factual and derived metric state for a defined cutoff/window using named formula versions | Immutable and reproducible |
 | Progress comparison | Difference between two compatible snapshots | Recomputed only under an explicit metric-version amendment |
+| Fitness Index | Future optional explainable long-term view derived from one frozen Snapshot and an accepted Index formula | Immutable result per Snapshot/formula version; may be unavailable |
+| Training Readiness | Short-term decision state for one requested planning action using a frozen Snapshot plus fresh check-in and current decision facts | Recomputed per request; retained only as decision provenance, never as mutable fitness state |
 
-The current profile is the latest valid snapshot plus the latest runner facts. Historical snapshots
-must remain readable after runner settings, body mass, heart-rate guidance, goals, or formulas
-change.
+The current Profile is the latest valid Snapshot. A newer runner fact creates a new Snapshot rather
+than being joined as mutable side state. Historical snapshots must remain readable after runner
+settings, body mass, heart-rate guidance, goals, or formulas change. Fitness Index is not an input
+to the Profile, and Training Readiness is not a long-term metric.
+
+### 3.1 Profile, Fitness Index and Training Readiness
+
+- **Runner Fitness Profile** answers `What factual runner, training, evidence, coverage and
+  constraint state did Hito know at this cutoff?` It is the single source of reusable factual input.
+- **Fitness Index** may later answer `What long-term direction do the accepted comparable components
+  support?` It is a transparent derived view tied to one Snapshot, reference/current windows,
+  formula version, source coverage, exclusions, confidence and reasons. It may be unavailable and
+  must not feed the engine as a stronger fact than its components.
+- **Training Readiness** answers `Does Hito have current, non-conflicting facts and a fresh runner
+  check-in to prepare this specific proposal for review?` It is a purpose-versioned admission or
+  abstention state, not a claim that the runner is healthy, recovered, safe to train or fit for a
+  race.
 
 ## 4. Runner Facts
 
@@ -460,20 +490,36 @@ exist.
 
 ## 9. Snapshot Windows
 
-The future profile lifecycle must maintain compatible snapshots rather than continually mutating one
-score.
+The profile lifecycle maintains compatible snapshots rather than continually mutating one score.
 
 | Snapshot | Window | Purpose |
 | --- | --- | --- |
 | Weekly activity | Calendar week | Frequency, time, distance, elevation, completion |
-| Current training | Rolling 28 days | Volume, consistency, RPE load, current comparable-aerobic evidence |
-| Baseline fitness | First qualifying 28-day window or explicit re-baseline | Personal reference for efficiency, pace-at-HR, HR-at-pace |
-| Current fitness | Latest qualifying 28-day window | Current aerobic proxy and durability |
-| Long trend | Rolling 90 days | Direction and stability, not an additional fitness score |
+| Current training | Rolling 28 days | **Primary evidence for current training:** volume, consistency, outcomes, RPE-load coverage and current comparable-performance eligibility |
+| Latest-five inspection | Latest five eligible accepted actual activities, regardless of the exact date span | Fresh context and factual inspection only; never a standalone trend, confidence denominator or current-state replacement |
+| Comparable baseline | First qualifying 28-day window or explicit re-baseline | Personal reference for efficiency, pace-at-HR, HR-at-pace and a future accepted Fitness Index |
+| Current comparable | Current qualifying rolling 28-day window | Current comparable metric evidence against the fixed reference |
+| Long context | Rolling 90 days | Baseline/stability, weekly-distribution and observed-longest context; never a mechanical average or an additional fitness score |
 | Lifetime records | Entire accepted history | Personal bests and longest efforts |
 
 A 28-day window without enough eligible activities still produces volume and consistency. It must
 show aerobic metrics as unavailable rather than carrying forward an old value as current.
+
+Window precedence is unambiguous:
+
+1. The rolling current 28 days owns the current-training statement.
+2. Latest five may explain what happened most recently, but it cannot create an independent trend,
+   denominator, confidence level or override of the 28-day state.
+3. Rolling 90 days supplies baseline, stability, weekly-distribution and observed-ceiling context.
+   It must not average older weak or strong weeks into a conclusion that outweighs current 28-day
+   evidence.
+
+Current Calendar outcomes and runner constraints participate as attributed factual context. A
+completion-only outcome does not become actual performance evidence, and a missed/skipped outcome
+is not a negative pace or fitness value. Comparable performance participates only when its
+metric-specific intent, stream, terrain/context, duration and coverage gates pass. Missingness and
+confidence remain per component or metric; no window can silently repair another window's missing
+fact.
 
 ## 10. Confidence
 
@@ -517,6 +563,31 @@ result.
 Hito must not assign “declining” from one activity. The runner-facing explanation must name the
 metrics and comparison windows that produced the state.
 
+### 10.4 Fitness Index availability and confidence
+
+The future Fitness Index uses its own state, not the Profile component-state vocabulary as a hidden
+score:
+
+| State | Required meaning |
+| --- | --- |
+| `unavailable` | No Product-accepted Index formula exists, or a formula-required component/window is missing, updating, contradictory or below its admitted evidence floor. Show the exact reason. |
+| `provisional` | An accepted formula can be evaluated, but at least one required contributing comparison is provisional or has a declared material coverage/context limitation. Name the limiting components and counts. |
+| `established` | Every formula-required component meets its established evidence rule in the named reference/current windows, required coverage is present and no material conflict remains. This is still a training-evidence classification, not physiological certainty. |
+
+An optional component may be absent without blocking the Index only when the accepted formula names
+it as optional and defines the missing-data behavior. Frontend or AI cannot make that decision at
+runtime. The Index result retains Snapshot ID, Index formula version, component formula versions,
+current/reference windows, source coverage, eligible/excluded counts, confidence inputs and every
+unavailable/provisional reason.
+
+**Undecided Product gate:** before any Fitness Index implementation or runner-facing label, PRODUCT
+must accept the user question and output form (categorical or numeric), required versus optional
+components, exact combination arithmetic and any weights/scaling, reference and re-baseline rules,
+minimum coverage, missing/conflict propagation, historical freeze versus recomputation policy, and
+safe explanatory wording. Until that complete versioned decision exists, the Fitness Index is
+`unavailable` with `fitness_index_formula_not_accepted`; no Backend, Frontend or AI fallback is
+permitted.
+
 ## 11. Profile Comparison
 
 A progress comparison contains:
@@ -553,12 +624,14 @@ Based on 7 comparable runs in each period.
 
 Never show a positive percentage without the original units and comparison context.
 
-## 12. Hito Athlete Progress Summary
+## 12. Fitness Index And Runner Progress Explanation
 
-Hito may present one summary state, but it is a narrative classification, not a hidden arithmetic
-score.
+The former `Hito Athlete Progress Summary` is the runner-facing explanation layer for the future
+Fitness Index, not a fourth profile/readiness concept. Until PRODUCT accepts the complete Index gate
+in Section 10.4, Progress may narrate individual factual components but must not label a composite
+Fitness Index or imply one was calculated.
 
-The summary considers:
+An accepted Index formula may consider:
 
 - pace at comparable HR;
 - HR at comparable pace;
@@ -569,9 +642,11 @@ The summary considers:
 - consistency and training continuity;
 - confidence and context.
 
-The summary must not average unlike metrics into `0-100`, assign a league, predict race time without
-a separate accepted prediction contract, or imply that more weekly load always means better
-fitness.
+The explanation must show whether the Index is unavailable, provisional or established; name the
+current and reference windows; list the components used and missing; retain formula/source coverage
+and confidence; and say why the state was produced. It must not average unlike metrics into `0-100`
+without the undecided Product formula gate, assign a league, predict race time, or imply that more
+weekly load always means better fitness.
 
 ## 13. Planned-versus-Actual and Coaching Recommendations
 
@@ -594,6 +669,54 @@ Recommendations may use profile metrics only when:
 AI may explain accepted profile truth. It must not calculate a competing metric, invent missing
 samples, overwrite the canonical snapshot, or treat an estimated provider value as measured Hito
 truth.
+
+### 13.1 Training Readiness
+
+Training Readiness is a short-term Training Decision state for one named request, such as an
+adaptive continuation or one-off workout. It answers whether Hito has sufficient current factual
+and runner-entered context to prepare a proposal for review. It does not answer whether the runner
+is medically safe, recovered, injury-free or physiologically ready, and it is independent of
+whether a Fitness Index is available.
+
+Every readiness evaluation requires:
+
+1. one current `RunnerFitnessProfileSnapshotV1` assembled and frozen at the request's runner-local
+   cutoff, with current source fingerprints and policy/formula versions;
+2. the rolling current 28-day component as primary training evidence, latest-five as complete
+   inspection context through that cutoff, and rolling 90 days only as baseline/stability/observed-
+   ceiling context;
+3. every purpose-required recent Calendar outcome and evidence fact resolved according to that
+   decision policy; an absent result is never inferred as missed or completed;
+4. one request-specific check-in submitted on the same runner-local date as the decision and after
+   the latest relevant Calendar, Result/Evidence or constraint revision. It must explicitly confirm
+   current goal/intent, availability/constraints and whether injury, sickness, pain or a clinician
+   restriction currently affects running as `no`, `yes` or `unsure`.
+
+A new relevant outcome, evidence correction/removal, Calendar mutation, constraint change or local-
+date rollover makes the readiness input stale. A reviewed candidate retains the old decision only
+as provenance and must be re-evaluated before confirmation under the existing freshness contract.
+
+The purpose-versioned decision returns one of these non-medical states:
+
+| State | Meaning and permitted behavior |
+| --- | --- |
+| `review_ready_factual` | All request-required facts and check-in fields are current and non-contradictory, and the purpose-specific factual evidence floor passes. Hito may prepare a reviewable proposal and cite the exact facts used. |
+| `review_ready_constraint_only` | The purpose policy explicitly allows a conservative/Blueprint-faithful proposal from current constraints and check-in while performance evidence is unavailable or insufficient. Hito must say that no performance adaptation occurred. |
+| `follow_up_required` | A resolvable explicit choice, recent outcome or check-in field is missing, or a required factual component is updating. Ask one exact question or wait for refresh; create no candidate. |
+| `no_prescription` | The check-in is `yes`/`unsure` for a current limitation, required evidence is stale/contradictory, or the request is unsupported by its accepted policy. Explain the exact reason; create no candidate and make no AI/provider call. |
+
+Purpose-specific evidence floors remain distinct. Adaptive continuation retains its accepted
+complete-outcome/check-in and bounded fact-shaped change gates. The Section 21 Rest-day one-off rule
+retains its stricter current-duration evidence gate. A missing Fitness Index never blocks an
+otherwise admitted constraint-only decision, and an established Fitness Index never overrides a
+missing check-in, current constraint or `no_prescription` result.
+
+The decision record retains Snapshot ID, readiness policy version, check-in revision/time, Calendar
+and Result/Evidence fingerprints, facts used, facts missing, conflicts and abstention reasons. The
+engine consumes the frozen Profile projection plus these explicit decision inputs. Progress UI
+aggregates, Fitness Index output and AI-generated conclusions are never engine evidence. Readiness
+cannot mutate a plan or Calendar; only the existing Review and explicit Confirm flow may
+materialise a runner-owned workout.
 
 ## 14. Heart-Rate Truth
 
@@ -750,3 +873,405 @@ laws:
 - no opaque composite fitness score.
 
 These choices require product evidence and versioned amendment before they are relaxed or changed.
+
+## 21. HITO-253 Runner Fitness Profile Snapshot v1 Decision — 2026-08-23
+
+### Decision
+
+Hito uses one immutable, provider-neutral **Runner Fitness Profile Snapshot v1** public contract. It
+is the reusable factual context envelope for Progress, adaptive continuation and future planning
+decisions. It is not a Fitness Index, health/readiness score, injury-risk model or race prediction.
+
+The Snapshot reuses accepted Result/Evidence and Calendar facts. It must not parse raw provider
+content, calculate a second version of an existing metric, treat a Blueprint projection as a
+workout, or authorize a Calendar mutation. Current Progress facts are available through the
+[Evidence and Progress Product contract](../backlog/2026-08-21-hito-evidence-progress-product-contract.md),
+while normalized record streams and stream-derived aerobic metrics remain unavailable in the
+[current system](../../current-system.md). The continuation engine consumes the frozen
+`RunnerFitnessProfileContinuationProjectionV1`, not a competing profile, Fitness Index or UI
+aggregate.
+
+### Minimum Snapshot Components
+
+| Component | Minimum factual content | Coaching meaning and boundary |
+| --- | --- | --- |
+| Identity and cutoff | Runner ID; runner-local timezone; `as_of` and inclusive cutoff; snapshot/profile-definition version; runner-facts revision | Fixes whose facts and which historical day the snapshot represents. It carries no coaching conclusion. |
+| Constraints and self-report | Running-history category; current goal/style; availability and fixed/flexible Rest constraints; preferred units; current check-in limitation state; source, consent and last-confirmed time for every runner-entered fact | Self-report stays attributed and separate from device observation. Stale, missing or contradictory constraints are explicit. |
+| Recent state | Current rolling 28 days and immediately preceding 28 days: accepted running days/sessions, timer duration, distance, evidence-backed elevation gain, longest observed distance/duration, weekly distribution, factual Calendar outcomes and session-RPE-load coverage | Describes recent recorded training. It does not assert fitness, readiness or safe capacity. Missing actual evidence is not zero. |
+| Recent activity inspection | The latest five eligible accepted actual-running activities, in runner-local chronological order, with date, outcome/evidence state and only the observed duration, distance, average pace/HR, elevation and reported RPE that are present | **Valid only as a recent-facts inspection slice.** Five activities are not a time window, denominator, trend or confidence threshold. Show fewer when fewer exist, state the exact covered dates and never silently replace the 28-day view. |
+| Observed training history and load | Rolling 90-day weekly running-day/duration/distance distribution; longest accepted actual duration and distance with date; current/prior 28-day session-RPE load with activity and RPE coverage; accepted record facts with date and evidence source | This is evidence of what was recorded, not proof of what the runner can now sustain. A record is not a current-fitness conclusion. Session-RPE load remains an internal-load estimate, never an injury-risk model. |
+| Comparable performance | Accepted pace/HR, HR/pace, aerobic-efficiency or durability observations only inside a versioned comparable cohort with required stream quality, workout intent, duration and terrain/context gates | Current v1 must return `unavailable` for stream-derived comparisons while normalized streams are absent. Per-activity summary pace or average HR may be shown as an observation, but must not be converted into a trend or improvement claim. |
+| Missingness and confidence | Per component: `available`, `partial`, `unavailable`, `updating`, `not_applicable` or `contradictory`; included/excluded counts and reasons; source coverage and staleness | Factual totals use completeness/coverage, not a confidence score. Comparative metrics alone use the existing `<3 insufficient`, `3–5 provisional`, `6+ established` rule in each cohort/window. There is no overall profile confidence. |
+
+At current product capability, an actual-performance observation must be accepted current
+Result/Evidence. FIT is the current actual-evidence adapter; its raw shape never enters the profile.
+A non-FIT completed, partial, skipped or missed Calendar workout may contribute only its factual
+outcome and runner-reported RPE/check-in. It must not manufacture actual duration, distance, pace,
+HR, terrain or execution quality.
+
+### Permitted Evidence And Prohibited Inference
+
+The snapshot may use canonical activity identity and revision, timer duration, distance, accepted
+average pace/HR observations, normalized terrain/context when a future provider-neutral fact owns
+them, elevation, Calendar outcome, runner-reported RPE, and provider-neutral provenance/quality
+states created from the available FIT/provider structure. Comparable metrics may use record-stream
+facts only after the accepted normalization, quality and cohort gates are satisfied.
+
+It must never infer or backfill:
+
+- health, illness, injury, recovery, readiness, safe training capacity or medical clearance;
+- VO2max, threshold, maximum HR, race time, body-composition effect or an opaque fitness score;
+- workout intent, terrain, surface, weather, RPE, completion or effort from pace, title or absence
+  of evidence;
+- a zero from a missing observation, a trend from one activity, or improvement from unrelated
+  workout types, terrain, duration or conditions;
+- a prescription from a Blueprint projection, a provider estimate, an unmatched activity, or a
+  scheduled completion without accepted actual evidence.
+
+Contradictory evidence is retained as a conflict between attributed revisions. Hito must not choose
+the more convenient value or ask AI to reconcile it.
+
+### Formula, Provenance And Reuse Rules
+
+Every snapshot is immutable and reproducible from one complete cutoff. A new or corrected fact
+creates a new snapshot/revision; there is no mutable `current fitness` row. Each calculated field
+records its formula version independently. The snapshot also records the profile-definition and
+constitution versions, `as_of`, timezone/cutoff, runner-facts revision, contributing canonical
+activity/evidence/outcome revisions or their deterministic fingerprints, eligibility/exclusion
+results, missing/conflict reasons, calculation time and calculation owner.
+
+Provider source remains provenance, not model structure. Equivalent normalized facts produce the
+same profile meaning regardless of source. A formula, eligibility or meaning change requires a new
+version and preserves the historical snapshot under its original version.
+
+Progress, continuation and future one-off authoring receive purpose-limited projections of the same
+snapshot, with the same fact values, versions and missing states. Backend owns calculation. A
+deterministic policy gate decides whether an authoring request is admitted before AI is called. AI
+may explain or compose from supplied admitted facts; it may not calculate the profile, fill missing
+facts, reinterpret a conflict or override a `no_prescription` result.
+
+### Future Rest-Day Request Policy
+
+For a request such as `I want to run 90 minutes`, the number `90` is a runner preference, not proof
+that the duration is suitable. Before a reviewable preview can be prepared, Hito needs these
+explicit runner choices:
+
+1. the intended Calendar date, unless the runner invoked the request from one unambiguous date;
+2. the intended effort/purpose; automatic v1 admission is limited to a runner-selected
+   easy/conversational run, with no pace or HR target inferred;
+3. confirmation that the Rest constraint is flexible for this one request; existing nearby
+   Calendar workouts remain unchanged regardless;
+4. a current limitation check-in of `none`; `present`, `unsure` or unanswered is not medical input
+   for Hito to interpret and produces no prescription.
+
+Hito may safely reuse timezone, units, selected-date occupancy, current goal/constraints and the
+accepted snapshot. It must not infer why the Rest day exists, that the runner can safely tolerate
+90 minutes, a suitable pace/HR, or permission to move another workout.
+
+The deterministic v1 gate may return a reviewable **easy-duration preview** only when all explicit
+inputs above are resolved, the snapshot is current and non-contradictory, at least three accepted
+actual-duration runs exist in the current 28-day window, and the requested duration does not exceed
+the longest accepted actual duration in the rolling 90-day window. These are conservative Hito
+product admission rules, not physiological laws or safety guarantees. The preview must cite the
+dates/counts used and continue through the existing server-owned Review and explicit Confirm flow
+before one runner-owned Calendar workout exists.
+
+Ask one focused follow-up when a user choice is missing or when the runner says a recent qualifying
+activity is absent and may need factual correction. Return `no_prescription`, create no review
+candidate and explain the exact reason when the limitation check is `present`/`unsure`, the snapshot
+is stale or contradictory, fewer than three current actual-duration runs exist, the requested
+duration exceeds the accepted 90-day longest duration, or the only support is a schedule,
+projection, self-estimate or missing evidence. Hito may offer a shorter runner-chosen duration or
+stop, but must not invent a substitute prescription.
+
+### Runner Explanation And Coach Acceptance
+
+The runner-facing explanation should remain one compact evidence card:
+
+> Based on [count] accepted recorded runs from [date] to [date]. Duration is available for [count]
+> and RPE for [count]. Your longest accepted recorded duration in the last 90 days is [value] on
+> [date]. [Metric] is unavailable because [specific missing/comparability reason]. This is recorded
+> training context, not a health or readiness score.
+
+For a one-off request, add the requested date/duration, the Rest override, the exact admission or
+abstention reason, and `No Calendar workout is created until you review and confirm.` Do not expose
+raw provider fields, internal fingerprints or formula internals.
+
+RUNNING COACH acceptance requires all of the following:
+
+- the same versioned normalized facts produce the same snapshot and explanation;
+- the latest-five slice names its exact dates/count and never drives a trend, load or fitness claim;
+- non-FIT completion never creates actual performance evidence, and missing never becomes zero;
+- absent streams keep pace/HR efficiency and durability unavailable rather than estimated;
+- conflicting revisions remain visible and block affected advice;
+- every comparison shows cohort, denominator, window, exclusions, confidence and factual wording;
+- the 90-minute policy has review-ready, focused-follow-up and no-prescription fixtures at every
+  boundary, with no pace/HR inference;
+- a preview, rejected request or future Blueprint projection cannot write or mutate Calendar;
+- only explicit confirmation materialises the reviewed one-off WorkoutDocument as one runner-owned
+  Calendar workout.
+
+The scientific support and conservative metric thresholds remain those in
+[Section 20](#20-evidence-basis). The 28/90-day composition, latest-five inspection rule and
+one-off admission floor above are explicit Hito product/coaching policies; they must not be
+presented as universal physiology.
+
+### Finite Delivery Sequence
+
+After PRODUCT accepts this decision:
+
+1. **ARCHITECT** defines one public, immutable snapshot boundary and its consumer projections,
+   reconciles it with the existing continuation progress packet, and proves that Result/Evidence,
+   Calendar, Source/Blueprint and authoring retain their existing authorities. Do not create a
+   parallel profile or metric owner.
+2. **BACKEND** computes and versions the snapshot from current public factual packets, exposes
+   purpose-limited Progress/continuation/one-off projections, implements deterministic admission
+   and abstention, and leaves unsupported stream metrics explicitly unavailable. AI is downstream
+   of admission and cannot be a fallback.
+3. **FRONTEND** renders Backend-owned facts, coverage, conflicts and explanations; collects only the
+   missing Rest-day choices; and uses the existing Review/Confirm command family without client
+   formulas, hidden scheduling changes or projection interactivity.
+4. **QA** independently proves provider-neutral equivalence, revision reproducibility, dedupe,
+   missing/partial/updating/contradictory states, latest-five versus window truth, current
+   FIT/non-FIT boundaries, one-off abstention and explicit-confirm-only Calendar materialisation.
+
+The next owner of HITO-253 is **PRODUCT** for decision acceptance. If accepted unchanged, PRODUCT
+should route the first delivery step to **ARCHITECT**; this coaching receipt claims no architecture,
+schema, implementation, runtime, provider, browser, database or QA acceptance.
+
+### HITO-253 Architecture Receipt — Snapshot v1 Public Boundary
+
+**Decision.** Backend's existing Runner Activity product-contract owner,
+`src/lib/runner-activity/product-contract.ts`, owns one immutable, provider-neutral
+`RunnerFitnessProfileSnapshotV1`. It is a factual read value, not a score, diagnosis, prediction,
+Calendar authority or second persistence model. Identity/Profile, Runner Calendar and
+Result/Evidence remain the sole owners of their source facts; the Snapshot owner only composes their
+public contracts. Progress, adaptive continuation and a future one-off workout flow receive
+purpose-limited projections from this same Snapshot. No second profile module or public read facade
+is admitted.
+
+#### Existing Continuation Consumer Census
+
+| Current seam                                 | Responsibility                                                                                                    | v1 disposition                                                                                                                                          |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `adaptive-training-decision.ts`              | Defines and builds `ContinuationProgressProfileV1`; applies the two-relevant-FIT-days plus compatible-RPE policy. | Replace factual input with the continuation projection; keep the threshold in versioned Training Decision policy; then delete the old type and builder. |
+| `adaptive-blueprint-read-model.ts`           | Supplies Calendar and Result/Evidence packets to the builder and passes the result to Training Decision.          | Request one Snapshot at the same cutoff and pass only its continuation projection.                                                                      |
+| `adaptive-blueprint-actions.server.ts`       | Maps profile quality, reasons and cohort counts into the continuation authoring brief and receipt.                | Consume the sealed Training Decision result and Snapshot identity; do not reconstruct facts.                                                            |
+| `adaptive-continuation-authoring.ts`         | Carries the old profile quality in the server-owned authoring brief.                                              | Carry the purpose projection state and Snapshot identity only.                                                                                          |
+| `adaptive-training-decision-golden-proof.ts` | Proves missing, eligible and incompatible-RPE decisions.                                                          | Rebase fixtures on Snapshot/projection inputs before deleting the old builder.                                                                          |
+
+No Calendar, Result/Evidence, Progress or Frontend production consumer imports
+`ContinuationProgressProfileV1` directly. It is therefore a continuation-private duplicate owner,
+not the reusable public profile.
+
+#### Canonical Snapshot Contract
+
+`RunnerFitnessProfileSnapshotV1` contains:
+
+- `snapshotId`: SHA-256 of canonical serialized v1 content; identical input facts and versions yield
+  the same identity;
+- `runnerId`, runner timezone, `asOf`, inclusive runner-local `cutoffDate`, and `calculatedAt`;
+- `profileDefinitionVersion`, component formula versions and a composite `runnerFactsRevision`;
+- upstream revision/fingerprint provenance for Identity/Profile, Calendar outcomes and
+  Result/Evidence facts, with covered dates, included/excluded counts and factual exclusion reasons;
+- separately stateful components for confirmed constraints/self-report, current and preceding
+  rolling 28 days, latest five eligible accepted activities, rolling 90 days and comparable
+  performance cohorts;
+- for every component, exactly one of `available`, `partial`, `unavailable`, `updating`,
+  `not_applicable` or `contradictory`, plus coverage, staleness and reason codes. There is no overall
+  confidence or readiness score.
+
+The Snapshot is an immutable content-addressed value. V1 needs no new mutable profile row or second
+store. A changed/corrected upstream revision or cutoff produces a new Snapshot identity. A reviewed
+continuation or one-off candidate freezes the Snapshot identity, definition/formula versions and its
+purpose projection in the existing review lineage; later facts cannot rewrite that decision input.
+
+Latest-five is an inspection-only, runner-local chronological slice. It may contain fewer than five
+eligible activities, retains exact covered dates and never supplies a denominator, trend or
+threshold. `removed` evidence remains provenance/exclusion detail and maps to the appropriate
+component state; it is not a seventh public state.
+
+#### Reuse And Explicit Unavailability
+
+- Reuse Calendar's cutoff-bound workout outcome, outcome revision, session-RPE and lifecycle facts;
+  the Snapshot neither schedules nor mutates a workout.
+- Reuse only accepted provider-neutral Result/Evidence actuals and their revision, quality,
+  missingness and lineage. FIT is the current adapter, not a public type.
+- Reuse existing factual rolling-window, weekly, load and record calculations from the Runner
+  Activity product contract. One formula has one owner; the Snapshot must not recalculate a second
+  version.
+- Non-FIT completed, partial, skipped or missed work contributes outcome and compatible RPE only,
+  never invented distance, duration, pace, heart rate or elevation.
+- Stream-derived terrain cohorts, aerobic efficiency, durability and reliable comparable-context
+  pace/heart-rate change remain `unavailable` with
+  `normalized_stream_not_persisted` until a separately accepted normalized-stream contract exists.
+  Any per-activity field absent from an upstream public contract remains explicitly unavailable; the
+  Snapshot may not read private provider rows to fill it.
+
+#### Purpose-Limited Projections
+
+1. `RunnerFitnessProfileProgressProjectionV1` supplies the current Progress presentation with the
+   same dated window, history, load, record and availability facts. Progress remains a presentation
+   consumer, not a second calculator.
+2. `RunnerFitnessProfileContinuationProjectionV1` supplies dated Calendar outcomes, factual
+   accepted-activity cohorts, RPE coverage, constraints and component states. Training Decision owns
+   the versioned eligibility/adaptation policy and produces an authoring brief or explicit
+   no-prescription result; the projection does not carry `detailChangeEligible` as factual truth.
+3. `RunnerFitnessProfileOneOffProjectionV1` supplies only current constraints, accepted-duration
+   coverage and the dated rolling-90-day longest-duration fact. The future one-off decision combines
+   it with the explicit request and a current Calendar occupancy read; it never writes Calendar and
+   cannot bypass Review/Confirm.
+
+All projections retain `snapshotId`, cutoff and definition/formula versions. They may omit facts but
+cannot rename, recompute or strengthen them.
+
+#### Dependency Direction And Removal Gate
+
+`Identity/Profile public facts + Calendar outcome packet + Result/Evidence and Runner Activity public
+facts -> Runner Fitness Profile Snapshot -> purpose projection -> Progress or Source Training
+Decision -> reviewed authoring -> explicit confirmation -> Calendar materialisation`.
+
+There are no reverse imports: the Snapshot owner does not import Source/Blueprint, provider request
+or raw-retention code, UI, Calendar mutations or private Result/Evidence storage. Calendar and
+Result/Evidence never import the Snapshot. Frontend never computes profile or training policy.
+
+`ContinuationProgressProfileV1` has one final disposition: **remove**, without alias or compatibility
+projection. Deletion is admitted only after all five direct seams above consume the v1 continuation
+projection, golden proofs preserve missing/updating/contradictory and eligible/ineligible outcomes,
+and recursive runtime plus type-only import census is zero for the old type and builder.
+
+#### Smallest Delivery Sequence
+
+1. **BACKEND:** extend `src/lib/runner-activity/product-contract.ts` with the single v1 public types
+   and pure purpose projections; assemble them in the existing private Runner Activity read-model
+   owner from public upstream facts. Prove deterministic identity, cutoff/revision reproduction,
+   provider-neutral equivalence, state and latest-five/window separation. Add no table, second
+   public profile module or Calendar mutation.
+2. **BACKEND:** migrate the continuation read model, Training Decision and authoring receipt to the
+   purpose projection; preserve the two-FIT-day plus compatible-RPE rule in policy; migrate golden
+   fixtures; delete `ContinuationProgressProfileV1` and its builder after the zero-consumer proof.
+3. **BACKEND:** project the same Snapshot into Progress and define the future one-off read/admission
+   seam only where accepted public fields are lossless. Stop on a missing upstream public fact rather
+   than reading private storage or inventing a value.
+4. **QA:** independently prove reproducibility, correction/new-revision behavior, provider-neutral
+   equivalence, latest-five inspection isolation, missing/partial/updating/contradictory states,
+   non-FIT limits, continuation parity and no Calendar/source-authority regression.
+
+Rollback is source-level: revert the not-yet-released consumer slice together with its new contract.
+Do not retain both factual profile owners. This receipt changes architecture documentation only; it
+claims no implementation, schema, persistence, runtime, provider, UI or QA acceptance.
+
+## 22. HITO-262 Initial-Plan Projection Decision — 2026-08-23
+
+### Decision
+
+Initial plan authoring must consume one
+`RunnerFitnessProfileInitialPlanProjectionV1` projected from the existing immutable
+`RunnerFitnessProfileSnapshotV1`. The projection is a purpose-limited factual input to the existing
+server-owned first-plan review/confirm pipeline. It is not another snapshot, calculator, persistence
+row, provider DTO or authoring authority.
+
+The existing explicit initial request remains the sole owner of the selected plan start, distance,
+target date/finish time, optional runner-entered benchmark, runner comment and explicit per-plan
+schedule choices. Age, height, weight and an accepted heart-rate guidance profile remain attributed,
+review-sealed runner-entered facts required by the current initial request; the fitness projection
+does not copy or reinterpret them. Persisted `fitnessLevel` is owned once by the Snapshot constraints
+component and replaces request-derived `runnerLevel` as authoring truth. Persisted training
+preferences remain settings-owned constraints: Backend must reconcile them with explicit per-plan
+choices before authoring and send only one resolved availability value to the provider.
+
+### Minimum Public Contract
+
+`RunnerFitnessProfileInitialPlanProjectionV1` contains exactly:
+
+- `version: runner_fitness_profile_initial_plan_projection_v1`;
+- `snapshotDefinitionVersion`, `snapshotId`, `runnerFactsRevision`, `asOf`, runner-local inclusive
+  `cutoffDate`, `timeZone` and all Snapshot `formulaVersions`;
+- component `state`, `coverage` and sorted `reasonCodes` for constraints, recent 28 days, latest five,
+  rolling 90 days and comparable performance; there is no aggregate quality/readiness score;
+- settings-owned `fitnessLevel` and training preferences from the constraints component, with their
+  source revision/fingerprint; null stays null and cannot be filled by AI;
+- current and preceding 28-day windows with accepted activity count and the existing factual
+  sessions, running-time, distance, elevation, longest-distance and longest-duration metrics,
+  including each metric's availability, coverage and missing reasons;
+- current-window Calendar outcome counts and session-RPE coverage, plus accepted/completion-only/
+  missing/updating/removed evidence counts; it carries no Calendar mutation identity;
+- rolling-90-day weekly distribution, dated longest accepted duration/distance and current/prior
+  session-RPE-load facts with coverage;
+- latest-five state, coverage and exact covered dates with `inspectionOnly: true`, but no activity
+  items in the authoring projection; they cannot become a trend, threshold or provider shortcut;
+- comparable-performance state and reason codes only. V1 keeps it `unavailable` with
+  `normalized_stream_not_persisted` and supplies no inferred pace/HR trend.
+
+The pure projection may omit Snapshot detail, but it cannot rename, recompute or strengthen a fact.
+The reviewed candidate freezes the complete projection plus its Snapshot identity and versions.
+Confirmation reassembles the Snapshot at that same cutoff and rejects a changed identity, runner
+facts revision or formula version as stale. A later cutoff is a new request, not an in-place update.
+
+### Deterministic Admission Before Provider Authoring
+
+Backend returns one of four policy results before retained-response lookup or a paid provider call:
+
+| Result                            | Exact discriminator                                                                                                                                                                             | Authoring behavior                                                                                                                                |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `authoring_ready_factual`         | Required explicit request/settings facts are present; constraints are usable; recent/90-day components are `available` or usable `partial`; no relevant contradiction or updating input exists. | Supply only present facts and every missing/coverage reason. Provider may shape detail within the accepted goal but cannot infer missing history. |
+| `authoring_ready_constraint_only` | Required explicit request/settings facts are present, while observed recent/90-day facts are honestly `unavailable`, `not_applicable` or insufficient to establish a baseline.                  | Preserve the existing conservative no-observed-baseline policy. Do not invent volume, longest run, pace, HR response or capacity.                 |
+| `follow_up_required`              | A required explicit choice or settings-owned fact is absent, request availability conflicts with persisted constraints, or a required component is `updating`.                                  | Ask one exact question or wait for factual refresh; create no candidate and make no provider call.                                                |
+| `no_prescription`                 | Required constraints or current factual packets are `contradictory`, the projection/Snapshot identity is stale, or accepted request facts cannot be verified losslessly.                        | State the exact conflicting/stale fact; create no candidate and make no provider call.                                                            |
+
+A `partial` component is not automatically failure: present facts remain usable only with their
+coverage and missing reasons. An unavailable comparable-performance component never becomes an AI
+estimate. No numeric minimum activity threshold is introduced for initial-plan admission: zero or
+insufficient accepted history selects the conservative constraint-only path rather than pretending
+fitness evidence exists. Medical, injury, readiness and race-performance inference remain forbidden.
+
+### Direct Consumer And Deletion Census
+
+| Current owner/consumer                                                                                                 | Current settings-only responsibility                                                                                           | Required migration                                                                                                                                                                                               |
+| ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `user-settings-actions.ts`                                                                                             | Defines and loads `RunnerPlanAuthoringProfileSnapshot` from age/body/level/HR settings.                                        | Keep settings getters and accepted runner facts; delete this composite snapshot type/getter after all consumers move.                                                                                            |
+| `running-plan-engine-actions.ts`                                                                                       | Loads the old snapshot for preview and compares it again at confirm.                                                           | Assemble one Fitness Snapshot/projection for preview; at confirm reassemble at the frozen cutoff and compare Snapshot identity/versions plus the sealed explicit request.                                        |
+| `ai-generated-running-plan.ts`                                                                                         | Requires the old snapshot, duplicates age/body/level equality checks, supplies HR and stores the object in normalized summary. | Accept explicit request plus initial-plan projection; use Snapshot-owned fitness level, run deterministic admission, and retain the projection identity/content in review input.                                 |
+| `plan-creation-engine/preview-builder-shared.ts` and `running-plan-engine-review.ts`                                   | Carry and sign the old snapshot in normalized/review payloads.                                                                 | Carry and sign the explicit request plus initial-plan projection; do not retain both objects.                                                                                                                    |
+| `structured-plan-authoring-schema.ts`, `ai-authored-plan-first-provider-contract.ts`, `ai-first-plan-draft-service.ts` | Indirectly receive only settings/request facts and unconditionally declare that no recent-volume baseline exists.              | Add the admitted initial-plan projection to the same structured request; branch factual versus constraint-only instructions deterministically and retain it in the existing exact request hash/response lineage. |
+| Focused scripts/fixtures                                                                                               | Construct, load or persist the old snapshot in provider, confirmation and design-profile proofs.                               | Rebuild fixtures from immutable Snapshot/projection inputs and delete the helper after zero imports.                                                                                                             |
+
+`RunnerPlanAuthoringProfileSnapshot` and
+`getRunnerPlanAuthoringProfileSnapshotForUserId` have one final disposition: **delete**, without an
+alias, adapter or compatibility field. Deletion is admitted only when production preview, structured
+input, provider context, review payload and confirm freshness checks consume the new projection;
+provider/confirmation/design fixtures prove parity; and recursive runtime plus type-only search is
+zero for the old type, getter, normalized-summary field and proof helper. Settings persistence and
+its accepted HR/body/profile facts remain; only the duplicate authoring snapshot responsibility is
+removed.
+
+### Backend Slice, Proof And Rollback
+
+One serial **BACKEND** slice must:
+
+1. add the pure initial-plan projection beside the other Snapshot projections in
+   `runner-activity/product-contract.ts` and assemble the existing Snapshot through the current
+   private Runner Activity read model at an explicit cutoff;
+2. add the deterministic four-result admission to the existing first-plan normalization boundary;
+3. migrate preview, structured provider request, retained-response request context, review payload
+   and confirmation freshness to explicit request plus the frozen projection;
+4. remove the unconditional `no_recent_volume_or_longest_run_baseline` responsibility when factual
+   inputs are available, preserve it only for constraint-only admission, then delete every old
+   settings-only snapshot consumer in the same slice.
+
+Focused zero-provider proof covers deterministic projection replay; available, partial,
+unavailable, updating and contradictory components; settings/request conflict; no-call follow-up and
+no-prescription; conservative zero-history authoring; exact request-hash change when Snapshot facts
+change; stale review after fact/formula revision; same-cutoff confirm parity; provider payload
+missingness; and recursive runtime/type-only zero reachability for the retired snapshot. Existing
+schema/compiler, retained raw response, Running Coach review, signed explicit confirmation and
+runner-owned Calendar materialisation remain downstream and unchanged.
+
+Rollback is one unreleased source revert of the whole consumer migration. Do not retain both input
+paths as fallback. Stop before implementation if the existing explicit request cannot carry a
+currently required runner-entered fact losslessly or if the Snapshot cannot be assembled at the
+review cutoff without private provider storage. No Product decision remains for this bounded
+contract. HITO-263 may begin only after PRODUCT accepts this decision.
+
+This is an architecture/documentation decision only. It claims no source, schema, persistence,
+provider, fixture, runtime, UI, browser, QA, hosted or release acceptance.

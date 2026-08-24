@@ -39,8 +39,6 @@ forcing a fake waterfall.
 
 ## Evidence
 
-- [Notion operational task-control pilot](2026-08-19-hito-notion-operational-task-control-pilot-and-cutover.md)
-- [Legacy reachability audit](2026-08-19-hito-canonical-backlog-legacy-reachability-prune.md)
 - [Existing Notion discovery](2026-08-18-hito-notion-project-management-interface-and-canonical-backlog-discovery.md)
 - The prior broad Notion import was halted; terminal and legacy mirrors were moved to the Notion
   trash so the current workflow can be defined before current-only reconciliation resumes.

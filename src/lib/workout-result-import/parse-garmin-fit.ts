@@ -1,11 +1,11 @@
 import FitParser from "fit-file-parser";
 import type { Json } from "@/lib/supabase/database";
-import {
+import type {
   ParsedActualWorkoutLap,
   ParsedActualWorkoutStep,
   ParsedGarminWorkout,
-  WorkoutResultImportError,
-} from "@/lib/workout-result-import/types";
+} from "@/lib/workout-result-import/internal-types";
+import { WorkoutResultImportError } from "@/lib/workout-result-import/types";
 
 export async function parseGarminFitActivity(fileBuffer: Buffer): Promise<ParsedGarminWorkout> {
   const parser = new FitParser({

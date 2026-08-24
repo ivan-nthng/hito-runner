@@ -128,4 +128,3 @@ backend evidence path is validated.
 
 - Current product truth: `docs/current-product.md`
 - Current system truth: `docs/current-system.md`
-- Product history digest: `docs/history/product-history-digest.md`

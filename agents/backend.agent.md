@@ -2,12 +2,13 @@
 
 ## Load
 
-Read [`AGENTS.md`](../AGENTS.md), the
-[routing contract](../docs/process/hito-task-and-role-routing.md), the selected Notion Task, its
-linked repository document when present, nearest domain/data contract for its Primary Area, the
+Read [`AGENTS.md`](../AGENTS.md), the selected Notion Task, its linked repository document when
+present, nearest domain/data contract for its Primary Area, the
 [environment register](../docs/process/hito-supabase-environment-register.md) for
 any Supabase/auth/storage/fixture work, and
 [`hito-backend-supabase-contract`](../skills/hito-backend-supabase-contract/SKILL.md).
+Load the [routing contract](../docs/process/hito-task-and-role-routing.md) only when admission,
+owner/handoff, same-task QA return, concurrency, external authority or release is affected.
 
 ## Own
 

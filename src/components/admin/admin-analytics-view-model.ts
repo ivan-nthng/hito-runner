@@ -8,7 +8,10 @@ import type {
   AdminLocalTestAccountRole,
   AdminLocalTestAccountView,
 } from "@/lib/admin-local-test-accounts";
-import type { AdminUserClassification } from "@/lib/admin-user-classification";
+
+type AdminPresentationClassification =
+  | AdminAnalyticsUserRow["classification"]
+  | AdminAnalyticsExcludedUserRow["classification"];
 
 export type SortDirection = AdminSortDirection;
 
@@ -46,7 +49,7 @@ export type TestAccountsFilters = {
   role: "all" | AdminLocalTestAccountRole;
   linkStatus: "all" | AdminLocalTestAccountLinkStatus;
   deletable: "all" | "deletable" | "protected";
-  classification: "all" | AdminUserClassification;
+  classification: "all" | AdminPresentationClassification;
 };
 
 export type TestAccountsSortState = {
@@ -66,7 +69,7 @@ export type TestAccountOpsRow = {
   linkedUserId: string | null;
   protectedFromDeletion: boolean;
   deletable: boolean;
-  classification: AdminUserClassification;
+  classification: AdminPresentationClassification;
   classificationReason: string;
   classificationSource: string;
   localAccount: AdminLocalTestAccountView | null;
@@ -459,7 +462,7 @@ export function compareTestAccountRows(
 }
 
 function inferExcludedUserRole(
-  classification: AdminUserClassification,
+  classification: AdminPresentationClassification,
   localRole: AdminLocalTestAccountRole | null,
 ): TestAccountOpsRow["role"] {
   if (localRole) {
@@ -620,7 +623,7 @@ function linkedStatusRank(status: AdminLocalTestAccountLinkStatus) {
   }
 }
 
-export function classificationLabel(classification: AdminUserClassification) {
+export function classificationLabel(classification: AdminPresentationClassification) {
   switch (classification) {
     case "real":
       return "Real user";
@@ -637,7 +640,7 @@ export function classificationLabel(classification: AdminUserClassification) {
   }
 }
 
-export function classificationTone(classification: AdminUserClassification) {
+export function classificationTone(classification: AdminPresentationClassification) {
   switch (classification) {
     case "local_admin":
     case "supabase_admin":

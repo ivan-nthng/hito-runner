@@ -183,7 +183,10 @@ async function validateGeneratedAndAiPlansUseUnifiedBlockContract() {
     fixedRestDays: ["Wednesday", "Saturday"],
     preferredLongRunDay: "Sunday",
     startDate: "2026-06-23",
-    planGoalIntent: { distance: { kind: "preset", preset: "10K" } },
+    planGoalIntent: {
+      distance: { kind: "preset", preset: "10K" },
+      targetDate: "2026-08-16",
+    },
   } satisfies RunningPlanPreviewActionInput);
 
   assert.equal(selectedPreview.ok, true, "selected-plan generated preview should be reviewable.");

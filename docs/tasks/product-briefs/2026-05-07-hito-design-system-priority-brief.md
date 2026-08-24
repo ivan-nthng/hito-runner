@@ -117,8 +117,6 @@ This does not mean pausing all product work for a large design-system program. I
 
 The frontend-facing design artifact already exists here:
 
-- `docs/tasks/frontend-specs/2026-05-06-hito-ds-spec.md`
-
 This brief establishes the product priority and scope boundary around that work. The DS spec should now be treated as a near-term execution target rather than a deferred design exercise.
 
 ## Success Signals

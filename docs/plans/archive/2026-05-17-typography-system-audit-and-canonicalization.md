@@ -57,7 +57,6 @@ boundaries, and validation evidence without acting as current implementation tru
 
 See also:
 
-- [Product history digest](../../history/product-history-digest.md)
 - [Current product](../../current-product.md)
 - [Current system](../../current-system.md)
 - Active Hito DS IA/specimen plan in `docs/plans/active/`
@@ -117,7 +116,6 @@ Historical validation included:
 - Live typography/source truth: current `src/styles.css`, shared UI components, and `/hitoDS`.
 - Current DS rollout truth: active Hito DS IA/specimen plan.
 - Current product/system docs: `docs/current-product.md` and `docs/current-system.md`.
-- Historical narrative: `docs/history/product-history-digest.md`.
 
 ## Boundaries
 

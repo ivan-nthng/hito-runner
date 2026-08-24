@@ -10,14 +10,12 @@ import {
   type HitoFactualActivityPointSequenceModel,
 } from "@/components/ui/hito-factual-activity-point-sequence";
 import type {
-  RunnerActivityFitSequenceProductModel,
-  RunnerActivityFitSequenceProductPoint,
-} from "@/lib/runner-activity/product-contract";
-import type {
   RunnerActivityFitSequenceMetricId,
   RunnerActivityFitSequenceObservation,
   RunnerActivityFitSequencePeriod,
-} from "@/lib/runner-activity/read-model-types";
+  RunnerActivityFitSequenceProductModel,
+  RunnerActivityFitSequenceProductPoint,
+} from "@/lib/runner-activity/product-contract";
 
 const SEQUENCE_STATES = [
   { label: "Ready", value: "ready" },

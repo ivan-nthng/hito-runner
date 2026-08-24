@@ -2,7 +2,7 @@
 
 ## 1. Task
 
-Run `docs/plans/active/2026-05-26-plan-creation-visual-variety-regression-qa.md`.
+Run the accepted plan-creation visual-variety regression scenario retained in Git history.
 
 ## 2. Stage
 

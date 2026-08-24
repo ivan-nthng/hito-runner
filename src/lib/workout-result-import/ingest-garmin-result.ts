@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { isAiGeneratedRunningPlanDevFixtureEnabled } from "@/lib/ai-generated-running-plan-dev-fixture";
+import { LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE } from "@/lib/local-activity-file-design-fixture";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import {
   findRunnerActivityPlanMatch,
@@ -20,9 +21,10 @@ import {
 import { getLatestWorkoutResultFeedback } from "@/lib/workout-result-import/read-workout-result-feedback";
 import {
   type ExtractedGarminFitFile,
-  LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE,
   MAX_WORKOUT_RESULT_UPLOAD_BYTES,
   WORKOUT_RESULT_STORAGE_BUCKET,
+} from "@/lib/workout-result-import/internal-types";
+import {
   type WorkoutResultAssetKind,
   runnerSafeWorkoutResultMessage,
   WorkoutResultImportError,

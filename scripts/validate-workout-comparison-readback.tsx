@@ -7,6 +7,7 @@ import {
   getComparisonCoverageMeta,
   RunCapturedReadback,
 } from "../src/components/workout-completion/WorkoutComparisonReadback";
+import { feedbackMarkerMeta } from "../src/components/workout-feedback-marker-presentation";
 import type {
   WorkoutActualMetricsSummary,
   WorkoutComparisonSignal,
@@ -14,6 +15,21 @@ import type {
 } from "../src/lib/workout-result-import/types";
 
 const COMPLETION_ID = "10000000-0000-4000-8000-000000000001";
+
+assert.equal(feedbackMarkerMeta(null), null);
+assert.deepEqual(
+  feedbackMarkerMeta({ state: "evidence_attached", sourceKind: "garmin_feedback" }),
+  {
+    state: "evidence_attached",
+    label: "Evidence attached",
+    shortLabel: "Evidence",
+  },
+);
+assert.deepEqual(feedbackMarkerMeta({ state: "feedback_ready", sourceKind: "garmin_feedback" }), {
+  state: "feedback_ready",
+  label: "Feedback ready",
+  shortLabel: "Feedback",
+});
 
 const complete = comparison({
   comparisonStatus: "complete",

@@ -118,8 +118,8 @@ Use this tracker as the numbered index and keep each bug in its own backlog file
 5. [Bug 05: Protected source workout still exposes direct edit affordances](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/2026-06-13-manual-authoring-bug-05-protected-source-direct-edit-affordance-leak.md) — closed, QA-passed 2026-06-15
 6. [Bug 06: Choose template second-level menu is not visible](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/2026-06-13-manual-authoring-bug-06-template-submenu-second-level-visibility.md)
 7. [Bug 07: Clear blocked should use top toast, not a blocking dialog](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/2026-06-13-manual-authoring-bug-07-clear-blocked-should-be-toast-not-dialog.md)
-8. [Bug 08: Missed unlogged workout cannot be moved to today](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/2026-06-14-manual-authoring-bug-08-missed-unlogged-workout-move-contract.md)
-9. [Bug 09: Missed-unlogged move-to-today contract is still not exposed in the calendar UI](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/2026-06-15-manual-authoring-bug-09-missed-move-target-not-exposed.md)
+8. Bug 08: Missed unlogged workout cannot be moved to today; historical detail remains in Git.
+9. Bug 09: Missed-unlogged move-to-today contract is not exposed in the Calendar UI; historical detail remains in Git.
 10. [Bug 10: Direct move shows success toast before the calendar visually reconciles](/Users/ivan/Library/Mobile%20Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/2026-06-15-manual-authoring-bug-10-move-success-visual-lag.md)
 
 ## What Not To Touch

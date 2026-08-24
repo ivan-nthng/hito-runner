@@ -4,10 +4,8 @@ import { createHash } from "node:crypto";
 import { runningContextFromGarminSummaryPayload } from "@/lib/runner-activity/running-context";
 import type { Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
-import type {
-  ParsedGarminWorkout,
-  WorkoutResultAssetKind,
-} from "@/lib/workout-result-import/types";
+import type { ParsedGarminWorkout } from "@/lib/workout-result-import/internal-types";
+import type { WorkoutResultAssetKind } from "@/lib/workout-result-import/types";
 
 export const GARMIN_FIT_ACTIVITY_NORMALIZER_VERSION = "garmin_fit_activity_v1";
 

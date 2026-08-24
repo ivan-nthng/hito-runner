@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
+import { workoutResultErrorResponseHeaders } from "@/lib/workout-result-import/internal-types";
 import {
   runnerSafeWorkoutResultMessage,
-  workoutResultErrorResponseHeaders,
   WorkoutResultImportError,
 } from "@/lib/workout-result-import/types";
 

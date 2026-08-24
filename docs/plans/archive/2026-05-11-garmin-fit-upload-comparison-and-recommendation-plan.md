@@ -58,7 +58,6 @@ before AI, additive AI interpretation, and no silent plan mutation.
 
 See also:
 
-- [Product history digest](../../history/product-history-digest.md)
 - [Current product](../../current-product.md)
 - [Current system](../../current-system.md)
 - [Changelog](../../history/changelog.md)
@@ -111,7 +110,6 @@ Historical validation included source and behavior proof for:
 - Current provider/evidence behavior: `docs/current-product.md`.
 - Current architecture owners: `docs/current-system.md`.
 - Shipped history: `docs/history/changelog.md`.
-- Historical narrative: `docs/history/product-history-digest.md`.
 
 ## Boundaries
 

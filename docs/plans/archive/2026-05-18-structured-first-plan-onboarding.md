@@ -78,7 +78,6 @@ The archived implementation updates recorded backend contract tightening, fronte
 
 - [Current product](../../current-product.md)
 - [Current system](../../current-system.md)
-- [Product history digest](../../history/product-history-digest.md)
 
 ## Do Not Continue By Default
 

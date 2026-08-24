@@ -11,9 +11,8 @@ coherent feature or release family in plain language. Links open the canonical e
 the detailed chronology.
 
 Routine receipts, superseded paths, no-op work, validation transcripts, and nonterminal tasks do
-not become separate history entries. The [Product History Digest](./product-history-digest.md)
-groups the foundational chronology, while the [Public Changelog](./changelog.md) contains only
-shipped runner-facing highlights.
+not become separate history entries. Foundational chronology is grouped here, while the
+[Public Changelog](./changelog.md) contains only shipped runner-facing highlights.
 
 ## 2026-08-15
 
@@ -28,7 +27,7 @@ shipped runner-facing highlights.
   Rest persistence, and a deterministic disposable FIT prerequisite. These slices are grouped here
   without implying a later release. See
   [locale resolution](../tasks/backlog/2026-08-13-hito-ui-locale-profile-preference-and-server-resolution.md),
-  [State Surface and Navigation Card](../tasks/backlog/2026-08-15-hito-ds-mobile-responsive-component-preview-batch.md),
+  State Surface and Navigation Card,
   [Workout summary](../tasks/backlog/2026-08-15-hito-workout-overview-sidebar-summary-deduplication.md),
   and [Rest and FIT recovery](../tasks/backlog/2026-08-15-hito-workout-rest-and-fit-fixture-lifecycle-recovery.md).
 
@@ -180,7 +179,6 @@ shipped runner-facing highlights.
   backend-reviewed workout-document grammar. Direct Calendar Move gained immediate projection and
   bounded Undo, shared action orchestration replaced duplicate flows, and Product accepted a
   deterministic training-process compiler boundary ahead of AI or local detail authoring. See the
-  [July evolution](./product-history-digest.md#2026-07-07-to-2026-07-13-shared-workout-documents-calendar-move-ux-and-compiler-gate)
   and [compiler plan](../tasks/backlog/2026-07-13-hito-compiler-architecture-plan.md).
 
 ## 2026-06
@@ -189,9 +187,9 @@ shipped runner-facing highlights.
   UI, and JSON or Markdown export converged on backend-shaped mutation eligibility. Plan Presets
   became discovery cards rather than a second creation engine, while `/hitoDS` became the canonical
   specimen and Figma bridge. See the
-  [manual authoring family](./product-history-digest.md#2026-06-09-to-2026-06-13-manual-builder-active-plan-editing-export-and-running-plan-quality),
-  [preset family](./product-history-digest.md#2026-06-06-to-2026-06-07-plan-presets-and-no-active-plan-shortcuts),
-  and [Design System cleanup](./product-history-digest.md#2026-06-15-to-2026-06-20-hito-ds-test-calendar-and-core-stack-simplification).
+  manual authoring family,
+  preset family,
+  and Design System cleanup.
 
 ## 2026-05
 
@@ -199,6 +197,6 @@ shipped runner-facing highlights.
   logs, and evidence, with `training-plan-v2` as the canonical plan artifact. Login-first saved
   mode, FIT comparison, bounded AI interpretation, protected plan management, reviewed first-plan
   creation, and compact AI blueprint intent all converged on backend-owned persisted truth. See the
-  [saved-mode foundation](./product-history-digest.md#2026-05-05-to-2026-05-12-baseline-import-and-saved-mode-foundation),
-  [auth and feedback family](./product-history-digest.md#2026-05-13-to-2026-05-22-product-simplification-auth-feedback-and-entitlement-foundations),
-  and [first-plan family](./product-history-digest.md#2026-05-23-to-2026-06-01-structured-first-plan-and-ai-blueprint-wave).
+  saved-mode foundation,
+  auth and feedback family,
+  and first-plan family.

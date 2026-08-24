@@ -79,7 +79,6 @@ AI guardrail output, `/body` retirement, and no silent mutation from body-note c
 
 - Current product truth: `docs/current-product.md`
 - Current system truth: `docs/current-system.md`
-- Product history digest: `docs/history/product-history-digest.md`
 
 ## Do Not Continue By Default
 

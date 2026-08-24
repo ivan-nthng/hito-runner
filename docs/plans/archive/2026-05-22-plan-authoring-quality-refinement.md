@@ -74,7 +74,6 @@ persisted DB truth was correct.
 
 - Current running-plan truth: `docs/current-product.md`
 - Current system truth: `docs/current-system.md`
-- Product history digest: `docs/history/product-history-digest.md`
 
 ## Do Not Continue By Default
 

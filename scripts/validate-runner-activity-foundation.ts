@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { crc32, deflateRawSync } from "node:zlib";
 import { deleteRunnerActivityFromHistory } from "../src/lib/runner-activity/garmin-fit-source";
-import { getPersistedSnapshot } from "../src/lib/training-api";
+import { getPersistedRunnerCalendarSnapshot } from "../src/lib/runner-calendar-snapshot";
 import {
   inferWorkoutStatus,
   projectWorkoutCompletionLog,
@@ -22,8 +22,8 @@ import {
   MAX_WORKOUT_RESULT_MULTIPART_BYTES,
   MAX_WORKOUT_RESULT_UPLOAD_BYTES,
   WORKOUT_RESULT_STORAGE_BUCKET,
-  WorkoutResultImportError,
-} from "../src/lib/workout-result-import/types";
+} from "../src/lib/workout-result-import/internal-types";
+import { WorkoutResultImportError } from "../src/lib/workout-result-import/types";
 import {
   QA_TESTER_POOL,
   getQaUserOwnedCounts,
@@ -1289,7 +1289,7 @@ async function proveFeedbackMarkerAloneDoesNotComplete(input: {
 }
 
 async function readSnapshotWorkout(userId: string, plannedWorkoutId: string) {
-  const snapshot = await getPersistedSnapshot(userId);
+  const snapshot = await getPersistedRunnerCalendarSnapshot(userId);
   const workout = snapshot.workouts.find((candidate) => candidate.id === plannedWorkoutId);
   assert.ok(workout, `Snapshot must include planned workout ${plannedWorkoutId}.`);
   return workout;

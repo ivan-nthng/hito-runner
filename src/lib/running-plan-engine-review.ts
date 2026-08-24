@@ -313,7 +313,8 @@ function buildDistanceFirstNormalizedInputMetadata(draft: RunningPlanPreviewDraf
     trainingWeekdays: normalizedInput.trainingWeekdays,
     startDate: normalizedInput.startDate,
     benchmarkPaceTruth: normalizedInput.benchmarkPaceTruth,
-    runnerProfileSnapshot: normalizedInput.runnerProfileSnapshot,
+    initialPlanProfile: normalizedInput.initialPlanProfile,
+    initialPlanAdmission: normalizedInput.initialPlanAdmission,
     distanceGoal: buildDistanceGoalMetadata(intent),
     planGoalIntent: intent,
   };
@@ -327,6 +328,9 @@ function buildRunningPlanReviewPayload(
     contractVersion: RUNNING_PLAN_REVIEW_CONTRACT_VERSION,
     sourceKind: draft.sourceKind,
     sourceStatus: draft.sourceStatus,
+    blueprint: draft.blueprint,
+    reviewConflicts: draft.reviewConflicts,
+    sourceCandidate: draft.sourceCandidate,
     normalizedInputSummary: draft.normalizedInputSummary,
     endpointProof: draft.endpointProof,
     validation: draft.validation,
@@ -573,6 +577,8 @@ function collectDistanceGoalEndpointExactnessIssues(
   draft: RunningPlanPreviewDraft,
   canonicalPlan: TrainingPlanV2,
 ) {
+  if (!draft.blueprint.detailedHorizon.targetBoundary) return [];
+
   const distanceMeters =
     draft.normalizedInputSummary.planGoalIntent.distance?.distanceMeters ?? null;
 

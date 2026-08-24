@@ -1,20 +1,123 @@
-import type { Database } from "@/lib/supabase/database";
+import type { AiPlanGenerationLedgerTrace } from "@/lib/ai-plan-generation-ledger";
+import { digestSha256Hex, stableJsonStringify } from "@/lib/review-token-signing";
+import type { Database, Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 
 export type AiPlanGenerationResponseRow =
   Database["public"]["Tables"]["ai_plan_generation_responses"]["Row"];
 export type AiPlanGenerationValidationOutcome = "not_run" | "accepted" | "rejected";
+export type AiPlanGenerationAttemptResult =
+  | {
+      outcome: "technical_rejection";
+      candidateRecordId: null;
+      candidateSha256: null;
+      noPrescriptionReason: null;
+    }
+  | {
+      outcome: "candidate_ready";
+      candidateRecordId: string;
+      candidateSha256: string;
+      noPrescriptionReason: null;
+    }
+  | {
+      outcome: "no_prescription";
+      candidateRecordId: null;
+      candidateSha256: null;
+      noPrescriptionReason: string;
+    };
 
-export async function retainCompletedAiPlanGenerationResponseForUser(input: {
+export type AiPlanGenerationReviewVerdict = {
+  verdict: "approved" | "rejected";
+  discriminator: string | null;
+  reviewedAt: string;
+};
+
+export type AiPlanGenerationAttemptVersionContext = {
+  schemaVersion: string;
+  promptVersion: string;
+  policyVersion: string;
+  compilerVersion: string;
+  providerSettings: {
+    contractMode: string;
+    responseSchemaMode: string;
+    responseSchemaName: string;
+    timeoutMs: number;
+    maxOutputTokens: number;
+    reasoningEffort: "low" | null;
+    textVerbosity: "low";
+  };
+};
+
+type AiPlanGenerationAttemptLineageInput = {
+  requestContext: unknown;
+  versionContext: AiPlanGenerationAttemptVersionContext;
+  generationTrace: AiPlanGenerationLedgerTrace;
+};
+
+export async function getReusableAiPlanGenerationResponseForUser(input: {
   userId: string;
-  generationId: string;
-  providerResponseId: string | null;
-  responseBody: string;
-}): Promise<AiPlanGenerationResponseRow> {
+  requestContext: unknown;
+  versionContext: AiPlanGenerationAttemptVersionContext;
+  providerModel: string;
+  prompt: {
+    systemPrompt: string;
+    userPrompt: string;
+    responseSchema: unknown;
+  };
+}): Promise<AiPlanGenerationResponseRow | null> {
+  const identity = await buildRequestIdentity({
+    userId: input.userId,
+    requestContext: input.requestContext,
+    versionContext: input.versionContext,
+    providerModel: input.providerModel,
+    promptHash: await digestSha256Hex(
+      stableJsonStringify({
+        systemPrompt: input.prompt.systemPrompt,
+        userPrompt: input.prompt.userPrompt,
+        responseSchema: input.prompt.responseSchema,
+      }),
+    ),
+  });
+  const result = await createAdminSupabaseClient()
+    .from("ai_plan_generation_responses")
+    .select("*")
+    .eq("user_id", input.userId)
+    .eq("request_fingerprint_sha256", identity.requestFingerprintSha256)
+    .eq("version_fingerprint_sha256", identity.versionFingerprintSha256)
+    .eq("provider_model", identity.providerModel)
+    .order("created_at", { ascending: true })
+    .limit(20);
+
+  if (result.error) {
+    throw new Error(result.error.message);
+  }
+
+  return (
+    result.data.find((row) => {
+      const providerAttempt = jsonObject(row.provider_attempt);
+      return (
+        stableJsonStringify(row.request_context) === stableJsonStringify(identity.requestContext) &&
+        stableJsonStringify(row.version_context) === stableJsonStringify(identity.versionContext) &&
+        providerAttempt?.promptHash === identity.promptHash &&
+        isParseableJson(row.response_body)
+      );
+    }) ?? null
+  );
+}
+
+export async function retainCompletedAiPlanGenerationResponseForUser(
+  input: {
+    userId: string;
+    generationId: string;
+    providerResponseId: string | null;
+    responseBody: string;
+  } & AiPlanGenerationAttemptLineageInput,
+): Promise<AiPlanGenerationResponseRow> {
   assertResponseIdentity(input.generationId, input.providerResponseId);
   assertParseableJson(input.responseBody);
 
   const responseSha256 = await digestSha256Hex(input.responseBody);
+  const lineage = await buildAttemptLineage(input);
   const supabase = createAdminSupabaseClient();
   const inserted = await supabase
     .from("ai_plan_generation_responses")
@@ -24,6 +127,12 @@ export async function retainCompletedAiPlanGenerationResponseForUser(input: {
       provider_response_id: input.providerResponseId,
       response_body: input.responseBody,
       response_sha256: responseSha256,
+      request_context: lineage.requestContext,
+      request_fingerprint_sha256: lineage.requestFingerprintSha256,
+      version_context: lineage.versionContext,
+      version_fingerprint_sha256: lineage.versionFingerprintSha256,
+      provider_model: lineage.providerModel,
+      provider_attempt: lineage.providerAttempt,
       schema_outcome: "not_run",
       compiler_outcome: "not_run",
       diagnostic_code: null,
@@ -40,22 +149,76 @@ export async function retainCompletedAiPlanGenerationResponseForUser(input: {
     throw new Error(inserted.error.message);
   }
 
-  const existing = await getMatchingRetainedResponse({
+  let existing = await getMatchingRetainedResponse({
     userId: input.userId,
     generationId: input.generationId,
     providerResponseId: input.providerResponseId,
   });
+  if (existing && existing.request_context === null) {
+    const attached = await supabase
+      .from("ai_plan_generation_responses")
+      .update({
+        request_context: lineage.requestContext,
+        request_fingerprint_sha256: lineage.requestFingerprintSha256,
+        version_context: lineage.versionContext,
+        version_fingerprint_sha256: lineage.versionFingerprintSha256,
+        provider_model: lineage.providerModel,
+        provider_attempt: lineage.providerAttempt,
+      })
+      .eq("id", existing.id)
+      .eq("user_id", input.userId)
+      .is("request_context", null)
+      .select("*")
+      .maybeSingle();
+
+    if (attached.error) {
+      throw new Error(attached.error.message);
+    }
+    existing = attached.data ?? (await getMatchingRetainedResponse(input));
+  }
   if (
     !existing ||
     existing.response_body !== input.responseBody ||
     existing.response_sha256 !== responseSha256 ||
     existing.generation_id !== input.generationId ||
-    existing.provider_response_id !== input.providerResponseId
+    existing.provider_response_id !== input.providerResponseId ||
+    !attemptLineageMatches(existing, lineage)
   ) {
     throw new Error("The retained AI plan response conflicts with an existing owner record.");
   }
 
   return existing;
+}
+
+export async function recordAiPlanGenerationAttemptResultForUser(input: {
+  userId: string;
+  responseRecordId: string;
+  result: AiPlanGenerationAttemptResult;
+}): Promise<AiPlanGenerationResponseRow> {
+  assertAttemptResult(input.result);
+  return updateFinalJsonField({
+    userId: input.userId,
+    responseRecordId: input.responseRecordId,
+    field: "attempt_result",
+    value: toJson(input.result),
+    notFoundMessage: "The retained AI plan response was not found for its attempt result.",
+  });
+}
+
+export async function recordAiPlanGenerationReviewVerdictForUser(input: {
+  userId: string;
+  responseRecordId: string;
+  reviewer: "running_coach" | "qa";
+  verdict: AiPlanGenerationReviewVerdict;
+}): Promise<AiPlanGenerationResponseRow> {
+  const verdict = sanitizeReviewVerdict(input.verdict);
+  return updateFinalJsonField({
+    userId: input.userId,
+    responseRecordId: input.responseRecordId,
+    field: input.reviewer === "running_coach" ? "running_coach_verdict" : "qa_verdict",
+    value: toJson(verdict),
+    notFoundMessage: "The retained AI plan response was not found for its review verdict.",
+  });
 }
 
 export async function recordAiPlanGenerationResponseOutcomeForUser(input: {
@@ -161,6 +324,171 @@ async function getMatchingRetainedResponse(input: {
   return byProvider.data;
 }
 
+async function buildAttemptLineage(
+  input: AiPlanGenerationAttemptLineageInput & { userId: string },
+) {
+  const identity = await buildRequestIdentity({
+    userId: input.userId,
+    requestContext: input.requestContext,
+    versionContext: input.versionContext,
+    providerModel: input.generationTrace.provider.model,
+    promptHash: input.generationTrace.request.promptHash,
+  });
+  const providerAttempt = toJsonObject(
+    {
+      contractMode: input.generationTrace.request.contractMode,
+      responseSchemaMode: input.generationTrace.request.responseSchemaMode,
+      promptHash: input.generationTrace.request.promptHash,
+      systemPromptHash: input.generationTrace.request.systemPromptHash,
+      userPromptHash: input.generationTrace.request.userPromptHash,
+      responseSchemaHash: input.generationTrace.request.responseSchemaHash,
+      timeoutMs: input.generationTrace.request.timeoutMs,
+      maxOutputTokens: input.generationTrace.request.maxOutputTokens,
+      requestStartedAt: input.generationTrace.timings.requestStartedAt,
+      responseReceivedAt: input.generationTrace.timings.responseReceivedAt,
+      providerElapsedMs: elapsedMilliseconds(
+        input.generationTrace.timings.requestStartedAt,
+        input.generationTrace.timings.responseReceivedAt,
+      ),
+      usage: input.generationTrace.usage,
+    },
+    "provider attempt",
+  );
+
+  return {
+    ...identity,
+    providerAttempt,
+  };
+}
+
+async function buildRequestIdentity(input: {
+  userId: string;
+  requestContext: unknown;
+  versionContext: AiPlanGenerationAttemptVersionContext;
+  providerModel: string;
+  promptHash: string;
+}) {
+  const requestContext = toJsonObject(input.requestContext, "request context");
+  const versionContext = toJsonObject(input.versionContext, "version context");
+  const providerModel = input.providerModel.trim();
+  if (!providerModel || providerModel.length > 160) {
+    throw new Error("The AI plan generation provider model is invalid.");
+  }
+  if (!/^[0-9a-f]{64}$/.test(input.promptHash)) {
+    throw new Error("The AI plan generation prompt fingerprint is invalid.");
+  }
+  const versionFingerprintSha256 = await digestSha256Hex(stableJsonStringify(versionContext));
+  const requestFingerprintSha256 = await digestSha256Hex(
+    stableJsonStringify({
+      identityVersion: "ai_plan_request_identity_v2",
+      ownerUserId: input.userId,
+      providerModel,
+      promptHash: input.promptHash,
+      requestContext,
+      versionContext,
+    }),
+  );
+  return {
+    requestContext,
+    requestFingerprintSha256,
+    versionContext,
+    versionFingerprintSha256,
+    providerModel,
+    promptHash: input.promptHash,
+  };
+}
+
+function attemptLineageMatches(
+  row: AiPlanGenerationResponseRow,
+  lineage: Awaited<ReturnType<typeof buildAttemptLineage>>,
+) {
+  return (
+    stableJsonStringify(row.request_context) === stableJsonStringify(lineage.requestContext) &&
+    row.request_fingerprint_sha256 === lineage.requestFingerprintSha256 &&
+    stableJsonStringify(row.version_context) === stableJsonStringify(lineage.versionContext) &&
+    row.version_fingerprint_sha256 === lineage.versionFingerprintSha256 &&
+    row.provider_model === lineage.providerModel &&
+    stableJsonStringify(row.provider_attempt) === stableJsonStringify(lineage.providerAttempt)
+  );
+}
+
+async function updateFinalJsonField(input: {
+  userId: string;
+  responseRecordId: string;
+  field: "attempt_result" | "running_coach_verdict" | "qa_verdict";
+  value: Json;
+  notFoundMessage: string;
+}) {
+  const patch =
+    input.field === "attempt_result"
+      ? { attempt_result: input.value }
+      : input.field === "running_coach_verdict"
+        ? { running_coach_verdict: input.value }
+        : { qa_verdict: input.value };
+  const updated = await createAdminSupabaseClient()
+    .from("ai_plan_generation_responses")
+    .update(patch)
+    .eq("id", input.responseRecordId)
+    .eq("user_id", input.userId)
+    .select("*")
+    .maybeSingle();
+
+  if (updated.error) {
+    throw new Error(updated.error.message);
+  }
+  if (!updated.data) {
+    throw new Error(input.notFoundMessage);
+  }
+  return updated.data;
+}
+
+function assertAttemptResult(result: AiPlanGenerationAttemptResult) {
+  if (result.outcome === "candidate_ready") {
+    if (!isUuid(result.candidateRecordId) || !/^[0-9a-f]{64}$/.test(result.candidateSha256)) {
+      throw new Error("The AI plan generation candidate result is invalid.");
+    }
+    return;
+  }
+  if (result.outcome === "no_prescription") {
+    if (!sanitizeDiagnostic({ code: result.noPrescriptionReason, path: "root" })?.code) {
+      throw new Error("The AI plan generation no-prescription reason is invalid.");
+    }
+  }
+}
+
+function sanitizeReviewVerdict(verdict: AiPlanGenerationReviewVerdict) {
+  const reviewedAt = new Date(verdict.reviewedAt);
+  if (Number.isNaN(reviewedAt.valueOf())) {
+    throw new Error("The AI plan generation review timestamp is invalid.");
+  }
+  const discriminator = verdict.discriminator
+    ? (sanitizeDiagnostic({ code: verdict.discriminator, path: "root" })?.code ?? null)
+    : null;
+  return { ...verdict, discriminator, reviewedAt: reviewedAt.toISOString() };
+}
+
+function elapsedMilliseconds(startedAt: string | null, completedAt: string | null) {
+  if (!startedAt || !completedAt) return null;
+  const elapsed = new Date(completedAt).valueOf() - new Date(startedAt).valueOf();
+  return Number.isFinite(elapsed) && elapsed >= 0 ? elapsed : null;
+}
+
+function toJsonObject(value: unknown, label: string): Json {
+  const normalized = JSON.parse(stableJsonStringify(value)) as Json;
+  if (!normalized || Array.isArray(normalized) || typeof normalized !== "object") {
+    throw new Error(`The AI plan generation ${label} must be a JSON object.`);
+  }
+  return normalized;
+}
+
+function toJson(value: unknown): Json {
+  return JSON.parse(stableJsonStringify(value)) as Json;
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 function assertParseableJson(responseBody: string) {
   if (!responseBody) {
     throw new Error("The completed AI plan response body is empty.");
@@ -171,6 +499,21 @@ function assertParseableJson(responseBody: string) {
   } catch {
     throw new Error("The completed AI plan response body is not parseable JSON.");
   }
+}
+
+function isParseableJson(responseBody: string) {
+  try {
+    JSON.parse(responseBody);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function jsonObject(value: Json | null): Record<string, Json | undefined> | null {
+  return value && !Array.isArray(value) && typeof value === "object"
+    ? (value as Record<string, Json | undefined>)
+    : null;
 }
 
 function assertResponseIdentity(generationId: string, providerResponseId: string | null) {
@@ -201,12 +544,4 @@ function sanitizeDiagnostic(diagnostic: { code: string; path: string } | null) {
     code: code || "unknown",
     path: path || "root",
   };
-}
-
-async function digestSha256Hex(payload: string) {
-  const data = new TextEncoder().encode(payload);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
 }

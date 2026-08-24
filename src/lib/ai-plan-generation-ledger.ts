@@ -74,7 +74,14 @@ export interface AiPlanGenerationLedgerTrace {
   usage: {
     inputTokens: number | null;
     outputTokens: number | null;
+    reasoningTokens: number | null;
     totalTokens: number | null;
+  };
+  timings: {
+    requestStartedAt: string | null;
+    responseReceivedAt: string | null;
+    compileCompletedAt: string | null;
+    reviewCompletedAt: string | null;
   };
   output: {
     rawOutputHash: string | null;
@@ -102,11 +109,12 @@ export interface AiPlanGenerationLedgerTrace {
 
 type AiPlanGenerationLedgerTracePatch = Omit<
   Partial<AiPlanGenerationLedgerTrace>,
-  "provider" | "request" | "usage" | "output" | "pipeline" | "artifacts"
+  "provider" | "request" | "usage" | "timings" | "output" | "pipeline" | "artifacts"
 > & {
   provider?: Partial<AiPlanGenerationLedgerTrace["provider"]>;
   request?: Partial<AiPlanGenerationLedgerTrace["request"]>;
   usage?: Partial<AiPlanGenerationLedgerTrace["usage"]>;
+  timings?: Partial<AiPlanGenerationLedgerTrace["timings"]>;
   output?: Partial<AiPlanGenerationLedgerTrace["output"]>;
   pipeline?: Partial<AiPlanGenerationLedgerTrace["pipeline"]>;
   artifacts?: Partial<AiPlanGenerationLedgerTrace["artifacts"]>;
@@ -163,7 +171,14 @@ export async function createAiPlanGenerationLedgerTrace(input: {
     usage: {
       inputTokens: null,
       outputTokens: null,
+      reasoningTokens: null,
       totalTokens: null,
+    },
+    timings: {
+      requestStartedAt: null,
+      responseReceivedAt: null,
+      compileCompletedAt: null,
+      reviewCompletedAt: null,
     },
     output: {
       rawOutputHash: null,
@@ -245,6 +260,10 @@ export async function updateAiPlanGenerationLedgerTrace(
       ...trace.usage,
       ...(patch.usage ?? {}),
     },
+    timings: {
+      ...trace.timings,
+      ...(patch.timings ?? {}),
+    },
     output: {
       ...trace.output,
       ...(patch.output ?? {}),
@@ -304,6 +323,9 @@ export async function markAiPlanGenerationReviewedDraftSigned(input: {
       pipeline: {
         ...input.trace?.pipeline,
         finalOutcome: "reviewed_draft_signed",
+      },
+      timings: {
+        reviewCompletedAt: new Date().toISOString(),
       },
     },
     input.options,

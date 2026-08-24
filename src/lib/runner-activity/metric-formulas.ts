@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
 import { addDaysIso, startOfWeekIso } from "@/lib/training";
+import { digestSha256Hex } from "@/lib/review-token-signing";
 import type {
   RunnerActivityAdvancedMetricsCurrent,
   RunnerActivityFitChartMetricId,
@@ -102,6 +102,8 @@ export type Gate4PersistedObservation = Gate4ObservationDraft & {
   localDate: string | null;
 };
 
+type Gate4ObservationDraftInput = Omit<Gate4ObservationDraft, "inputFingerprintSha256">;
+
 type StandardDistance = {
   key: string;
   meters: number;
@@ -139,13 +141,20 @@ const FIT_PERSONAL_BEST_SLOTS: ReadonlyArray<
   { id: "marathon", key: "marathon", label: "Marathon · 42.195 km", meters: 42195 },
 ]);
 
-export function buildGate4ObservationDrafts(
+export async function buildGate4ObservationDrafts(
   activities: Gate4ActivityInput[],
-): Gate4ObservationDraft[] {
-  return activities.flatMap((activity) => [
+): Promise<Gate4ObservationDraft[]> {
+  const observations = activities.flatMap((activity) => [
     buildSessionRpeObservation(activity),
     ...buildRecordObservations(activity),
   ]);
+
+  return Promise.all(
+    observations.map(async (observation) => ({
+      ...observation,
+      inputFingerprintSha256: await digestSha256Hex(JSON.stringify(observation)),
+    })),
+  );
 }
 
 export function buildGate4SnapshotPayload(input: {
@@ -238,35 +247,33 @@ export function buildGate4SnapshotPayload(input: {
   };
 }
 
-export function gate4InputFingerprint(input: {
+export async function gate4InputFingerprint(input: {
   activities: Gate4ActivityInput[];
   formulaSetVersion?: string;
 }) {
-  return createHash("sha256")
-    .update(
-      JSON.stringify({
-        formulaSetVersion: input.formulaSetVersion ?? RUNNER_ACTIVITY_GATE4_FORMULA_SET_VERSION,
-        activities: input.activities
-          .map((activity) => ({
-            id: activity.id,
-            revisionId: activity.activityRevisionId,
-            sourceRevisionId: activity.sourceRevisionId,
-            localDate: activity.localDate,
-            startedAt: activity.startedAt,
-            historicalTimezone: activity.historicalTimezone,
-            fitEvidence: activity.fitEvidence,
-            recordContext: activity.recordContext,
-            rpeLinkState: activity.rpeLinkState,
-            rpeInputPresent: activity.rpeInputPresent,
-            evidence: [
-              activity.evidence.sessionRpe?.id ?? null,
-              activity.evidence.officialResult?.id ?? null,
-            ],
-          }))
-          .sort((left, right) => left.id.localeCompare(right.id)),
-      }),
-    )
-    .digest("hex");
+  return digestSha256Hex(
+    JSON.stringify({
+      formulaSetVersion: input.formulaSetVersion ?? RUNNER_ACTIVITY_GATE4_FORMULA_SET_VERSION,
+      activities: input.activities
+        .map((activity) => ({
+          id: activity.id,
+          revisionId: activity.activityRevisionId,
+          sourceRevisionId: activity.sourceRevisionId,
+          localDate: activity.localDate,
+          startedAt: activity.startedAt,
+          historicalTimezone: activity.historicalTimezone,
+          fitEvidence: activity.fitEvidence,
+          recordContext: activity.recordContext,
+          rpeLinkState: activity.rpeLinkState,
+          rpeInputPresent: activity.rpeInputPresent,
+          evidence: [
+            activity.evidence.sessionRpe?.id ?? null,
+            activity.evidence.officialResult?.id ?? null,
+          ],
+        }))
+        .sort((left, right) => left.id.localeCompare(right.id)),
+    }),
+  );
 }
 
 export function buildRunnerActivityFitSequence(input: {
@@ -636,7 +643,7 @@ function fitSequenceCoverage(
   ) as RunnerActivityFitSequenceCoverage;
 }
 
-function buildSessionRpeObservation(activity: Gate4ActivityInput): Gate4ObservationDraft {
+function buildSessionRpeObservation(activity: Gate4ActivityInput): Gate4ObservationDraftInput {
   const evidence = activity.evidence.sessionRpe;
   const common = {
     activityId: activity.id,
@@ -661,7 +668,7 @@ function buildSessionRpeObservation(activity: Gate4ActivityInput): Gate4Observat
 
   const unavailableReason = sessionRpeUnavailableReason(activity, evidence);
   if (unavailableReason) {
-    return withObservationFingerprint({
+    return buildObservationDraftInput({
       ...common,
       availability: "unavailable",
       value: null,
@@ -675,7 +682,7 @@ function buildSessionRpeObservation(activity: Gate4ActivityInput): Gate4Observat
   if (duration == null || !evidence?.sessionRpe) {
     throw new Error("Session-RPE eligibility did not resolve its required evidence.");
   }
-  return withObservationFingerprint({
+  return buildObservationDraftInput({
     ...common,
     availability: "available",
     value: roundMetric(duration * evidence.sessionRpe),
@@ -724,8 +731,8 @@ function sessionRpeUnavailableReason(
   return null;
 }
 
-function buildRecordObservations(activity: Gate4ActivityInput): Gate4ObservationDraft[] {
-  const observations: Gate4ObservationDraft[] = [];
+function buildRecordObservations(activity: Gate4ActivityInput): Gate4ObservationDraftInput[] {
+  const observations: Gate4ObservationDraftInput[] = [];
   const exactDistance = standardDistanceForKm(activity.distanceKm);
   if (exactDistance && activity.elapsedDurationMin != null) {
     observations.push(
@@ -785,9 +792,9 @@ function availableRecordObservation(input: {
   context: string | null;
   confidence: "complete" | "partial";
   provenance: RunnerActivityRecordItem["provenance"];
-}): Gate4ObservationDraft {
+}): Gate4ObservationDraftInput {
   const contextIdentity = input.context ?? "context_unknown";
-  return withObservationFingerprint({
+  return buildObservationDraftInput({
     activityId: input.activity.id,
     activityRevisionId: input.activity.activityRevisionId,
     sourceRevisionId: input.activity.sourceRevisionId,
@@ -820,7 +827,7 @@ function unavailableOfficialRecordObservation(
   evidence: Gate4EvidenceInput,
   reason: "activity_revision_invalidated" | "official_result_not_confirmed",
 ) {
-  return withObservationFingerprint({
+  return buildObservationDraftInput({
     activityId: activity.id,
     activityRevisionId: activity.activityRevisionId,
     sourceRevisionId: activity.sourceRevisionId,
@@ -842,13 +849,10 @@ function unavailableOfficialRecordObservation(
   });
 }
 
-function withObservationFingerprint(
-  observation: Omit<Gate4ObservationDraft, "inputFingerprintSha256">,
-): Gate4ObservationDraft {
-  return {
-    ...observation,
-    inputFingerprintSha256: createHash("sha256").update(JSON.stringify(observation)).digest("hex"),
-  };
+function buildObservationDraftInput(
+  observation: Gate4ObservationDraftInput,
+): Gate4ObservationDraftInput {
+  return observation;
 }
 
 type FitChartMetricDefinition = {

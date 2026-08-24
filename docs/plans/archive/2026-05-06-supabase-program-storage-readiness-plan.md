@@ -69,7 +69,6 @@ The original plan was a readiness and implementation architecture artifact. Late
 
 - [Current product](../../current-product.md)
 - [Current system](../../current-system.md)
-- [Product history digest](../../history/product-history-digest.md)
 
 ## Do Not Continue By Default
 

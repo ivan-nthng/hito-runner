@@ -1,7 +1,7 @@
 import "@tanstack/react-start/server-only";
 
-import { createHash } from "node:crypto";
 import { z } from "zod";
+import { digestSha256Hex } from "@/lib/review-token-signing";
 import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
 import { addDaysIso, startOfWeekIso } from "@/lib/training";
 import type { Json } from "@/lib/supabase/database";
@@ -237,7 +237,7 @@ async function readOrCreateSnapshot(input: {
   const windowInputs = input.activities.filter(
     (activity) => activity.localDate >= input.startDate && activity.localDate <= input.cutoffDate,
   );
-  const inputFingerprint = fingerprintFor({
+  const inputFingerprint = await fingerprintFor({
     inputs: windowInputs,
     undatedActivityCount: input.undatedActivityCount,
     missingRevisionCount: input.missingRevisionDates.filter(
@@ -557,22 +557,20 @@ function objectValue(value: Json): Record<string, Json | undefined> | null {
     : null;
 }
 
-function fingerprintFor(input: {
+async function fingerprintFor(input: {
   inputs: SnapshotInput[];
   undatedActivityCount: number;
   missingRevisionCount: number;
 }) {
-  return createHash("sha256")
-    .update(
-      JSON.stringify({
-        revisions: input.inputs
-          .map((activity) => [activity.activityId, activity.activityRevisionId])
-          .sort(([left], [right]) => left.localeCompare(right)),
-        undatedActivityCount: input.undatedActivityCount,
-        missingRevisionCount: input.missingRevisionCount,
-      }),
-    )
-    .digest("hex");
+  return digestSha256Hex(
+    JSON.stringify({
+      revisions: input.inputs
+        .map((activity) => [activity.activityId, activity.activityRevisionId])
+        .sort(([left], [right]) => left.localeCompare(right)),
+      undatedActivityCount: input.undatedActivityCount,
+      missingRevisionCount: input.missingRevisionCount,
+    }),
+  );
 }
 
 function missingFieldReason(field: string, reason: string, count: number) {

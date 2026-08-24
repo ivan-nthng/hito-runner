@@ -58,7 +58,6 @@ IA/specimen plan.
 
 See also:
 
-- [Product history digest](../../history/product-history-digest.md)
 - [Current product](../../current-product.md)
 - [Current system](../../current-system.md)
 - Active Hito DS IA/specimen plan in `docs/plans/active/`
@@ -113,7 +112,6 @@ reference.
 - Shared style/token truth: current `src/styles.css` and current UI/DS primitives.
 - Current product/system docs: `docs/current-product.md` and `docs/current-system.md`.
 - Current Hito DS IA/specimen track: active Hito DS information architecture plan.
-- Historical narrative: `docs/history/product-history-digest.md`.
 
 ## Boundaries
 

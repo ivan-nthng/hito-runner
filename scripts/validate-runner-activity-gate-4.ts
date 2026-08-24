@@ -69,10 +69,10 @@ async function runValidation() {
   await resetQaPoolUserData({ supabase, userId: other.id });
 
   try {
-    proveFormulaBoundaryMatrix();
+    await proveFormulaBoundaryMatrix();
     proveFitActivitySequenceFormulaBoundaryMatrix();
-    proveRecordContextIdentity();
-    proveObservedRecordContextIdentity();
+    await proveRecordContextIdentity();
+    await proveObservedRecordContextIdentity();
     const fixtures = await createGate4LifecycleFixtures({
       supabase,
       userId: owner.id,
@@ -318,13 +318,13 @@ function roundForProof(value: number) {
   return Math.round(value * 10_000) / 10_000;
 }
 
-function proveFormulaBoundaryMatrix() {
+async function proveFormulaBoundaryMatrix() {
   const activity = syntheticFormulaActivity();
-  const [completed] = buildGate4ObservationDrafts([activity]);
+  const [completed] = await buildGate4ObservationDrafts([activity]);
   assert.equal(completed.value, 168);
   assert.equal(completed.confidence, "complete");
 
-  const [partial] = buildGate4ObservationDrafts([
+  const [partial] = await buildGate4ObservationDrafts([
     {
       ...activity,
       timerDurationMin: 28,
@@ -341,7 +341,7 @@ function proveFormulaBoundaryMatrix() {
   ]);
   assert.equal(partial.value, 196);
 
-  const [plannedDurationIgnored] = buildGate4ObservationDrafts([
+  const [plannedDurationIgnored] = await buildGate4ObservationDrafts([
     {
       ...activity,
       timerDurationMin: 38,
@@ -357,7 +357,7 @@ function proveFormulaBoundaryMatrix() {
   ]);
   assert.equal(plannedDurationIgnored.value, 190);
 
-  const [skipped] = buildGate4ObservationDrafts([
+  const [skipped] = await buildGate4ObservationDrafts([
     {
       ...activity,
       evidence: {
@@ -375,13 +375,13 @@ function proveFormulaBoundaryMatrix() {
   assert.equal(skipped.availability, "unavailable");
   assert.equal(skipped.unavailableReason, "skipped_has_no_session_load");
 
-  const currentFingerprint = gate4InputFingerprint({ activities: [activity] });
-  const priorFormulaFingerprint = gate4InputFingerprint({
+  const currentFingerprint = await gate4InputFingerprint({ activities: [activity] });
+  const priorFormulaFingerprint = await gate4InputFingerprint({
     activities: [activity],
     formulaSetVersion: "runner_activity_gate4_formula_set_v1",
   });
   assert.notEqual(currentFingerprint, priorFormulaFingerprint);
-  proveFitPersonalBestTieBreak();
+  await proveFitPersonalBestTieBreak();
 }
 
 function proveFitActivitySequenceFormulaBoundaryMatrix() {
@@ -516,7 +516,7 @@ function sequencePeriodForProof(startOffset: number) {
   };
 }
 
-function proveFitPersonalBestTieBreak() {
+async function proveFitPersonalBestTieBreak() {
   const preferredActivityId = "00000000-0000-4000-8000-000000000001";
   const laterActivityId = "00000000-0000-4000-8000-000000000002";
   const candidate = (id: string) => ({
@@ -533,8 +533,8 @@ function proveFitPersonalBestTieBreak() {
   });
   const preferred = candidate(preferredActivityId);
   const later = candidate(laterActivityId);
-  const build = (activities: Array<ReturnType<typeof candidate>>) => {
-    const observations = buildGate4ObservationDrafts(activities).map((observation) => ({
+  const build = async (activities: Array<ReturnType<typeof candidate>>) => {
+    const observations = (await buildGate4ObservationDrafts(activities)).map((observation) => ({
       ...observation,
       id: randomUUID(),
       localDate: AS_OF_DATE,
@@ -554,14 +554,14 @@ function proveFitPersonalBestTieBreak() {
     [later, preferred],
     [preferred, later],
   ]) {
-    const slot = requireFitSlot(build(activities), "5_km");
+    const slot = requireFitSlot(await build(activities), "5_km");
     assert.equal(slot.state, "available");
     if (slot.state !== "available") throw new Error("Expected available 5 km FIT result.");
     assert.equal(slot.result?.source.activityId, preferredActivityId);
   }
 }
 
-function proveRecordContextIdentity() {
+async function proveRecordContextIdentity() {
   const contexts = ["outdoor_road_flat_rolling", "track"];
   const activities = contexts.map((context, index) => {
     const activity = syntheticFormulaActivity();
@@ -585,7 +585,7 @@ function proveRecordContextIdentity() {
       },
     };
   });
-  const observations = buildGate4ObservationDrafts(activities).map((observation) => ({
+  const observations = (await buildGate4ObservationDrafts(activities)).map((observation) => ({
     ...observation,
     id: randomUUID(),
     localDate: AS_OF_DATE,
@@ -606,7 +606,7 @@ function proveRecordContextIdentity() {
   assert.deepEqual(records.map((record) => record.context).sort(), contexts.sort());
 }
 
-function proveObservedRecordContextIdentity() {
+async function proveObservedRecordContextIdentity() {
   const contexts = ["outdoor_road_flat_rolling", "track", "treadmill", "trail_mountain"];
   const activities = contexts.map((recordContext, index) => ({
     ...syntheticFormulaActivity(),
@@ -618,7 +618,7 @@ function proveObservedRecordContextIdentity() {
     recordContext,
     evidence: { sessionRpe: null, officialResult: null },
   }));
-  const observations = buildGate4ObservationDrafts(activities).map((observation) => ({
+  const observations = (await buildGate4ObservationDrafts(activities)).map((observation) => ({
     ...observation,
     id: randomUUID(),
     localDate: AS_OF_DATE,

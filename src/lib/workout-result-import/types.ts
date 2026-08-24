@@ -1,11 +1,3 @@
-import type { Json } from "@/lib/supabase/database";
-
-export const WORKOUT_RESULT_STORAGE_BUCKET = "workout-result-assets";
-export const MAX_WORKOUT_RESULT_UPLOAD_BYTES = 25 * 1024 * 1024;
-export const MAX_WORKOUT_RESULT_MULTIPART_BYTES = MAX_WORKOUT_RESULT_UPLOAD_BYTES + 1024 * 1024;
-export const LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_FIELD = "localQaFixture";
-export const LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE = "sample-fit-from-zip.fit";
-
 export type WorkoutResultAssetKind = "garmin_fit" | "garmin_zip";
 export type WorkoutResultParseStatus = "uploaded" | "extracted" | "parsed" | "failed";
 export type WorkoutFeedbackMarkerState = "evidence_attached" | "feedback_ready";
@@ -45,6 +37,55 @@ export type WorkoutComparisonSegmentGroupKey =
   | "recovery"
   | "other";
 
+export type ContinuationEvidenceState =
+  | "fit_current"
+  | "completed_without_fit"
+  | "missing"
+  | "updating"
+  | "removed";
+
+export interface ContinuationAcceptedActualMetrics {
+  activityStartedAt: string | null;
+  activityLocalDate: string | null;
+  durationMin: number | null;
+  distanceKm: number | null;
+  averageHeartRate: number | null;
+  maximumHeartRate: number | null;
+  averagePower: number | null;
+  maximumPower: number | null;
+  averageCadence: number | null;
+  calories: number | null;
+  elevationGainMetres: number | null;
+  elevationLossMetres: number | null;
+  intervalCount: number | null;
+}
+
+export interface ContinuationEvidencePacket {
+  asOf: string;
+  cutoffDate: string;
+  calendarOutcomeFingerprint: string;
+  evidenceRevisionFingerprint: string;
+  dueWorkoutCount: number;
+  resolvedOutcomeCount: number;
+  workouts: Array<{
+    calendarWorkoutId: string;
+    workoutDate: string;
+    outcome: "completed" | "partial" | "skipped" | "unresolved";
+    outcomeRevision: string;
+    sessionRpe: number | null;
+    evidenceState: ContinuationEvidenceState;
+    acceptedActualMetrics: ContinuationAcceptedActualMetrics | null;
+    comparisonStatus: WorkoutComparisonStatus | null;
+    missingReasons: Array<
+      | "outcome_missing"
+      | "evidence_missing"
+      | "evidence_updating"
+      | "evidence_removed"
+      | "actual_metrics_missing"
+    >;
+  }>;
+}
+
 export class WorkoutResultImportError extends Error {
   code:
     | "auth_required"
@@ -67,13 +108,6 @@ export class WorkoutResultImportError extends Error {
     this.code = code;
     this.status = status;
   }
-}
-
-/** Safe metadata for loopback request attribution; never includes parser or database details. */
-export const WORKOUT_RESULT_OBSERVABILITY_OUTCOME_HEADER = "x-hito-workout-result-outcome";
-
-export function workoutResultErrorResponseHeaders(code: WorkoutResultImportError["code"]) {
-  return { [WORKOUT_RESULT_OBSERVABILITY_OUTCOME_HEADER]: code };
 }
 
 /** The only error copy that may leave the workout-result server boundary. */
@@ -101,72 +135,6 @@ export function runnerSafeWorkoutResultMessage(error: unknown): string {
   };
 
   return messages[error.code];
-}
-
-export interface ExtractedGarminFitFile {
-  primaryFileKind: "fit";
-  primaryFileName: string;
-  fileBuffer: Buffer;
-}
-
-export interface ParsedActualWorkoutLap {
-  sequence: number;
-  workoutStepIndex: number | null;
-  startedAt: string | null;
-  durationMin: number | null;
-  distanceKm: number | null;
-  avgHeartRate: number | null;
-  maxHeartRate: number | null;
-  avgPower: number | null;
-  maxPower: number | null;
-  avgCadence: number | null;
-  calories: number | null;
-  elevationGainM: number | null;
-  elevationLossM: number | null;
-  intensity: string | null;
-  lapTrigger: string | null;
-}
-
-export interface ParsedActualWorkoutStep {
-  sequence: number;
-  workoutStepIndex: number | null;
-  lapCount: number;
-  durationMin: number | null;
-  distanceKm: number | null;
-  avgHeartRate: number | null;
-  maxHeartRate: number | null;
-  avgPower: number | null;
-  maxPower: number | null;
-  avgCadence: number | null;
-  calories: number | null;
-  elevationGainM: number | null;
-  elevationLossM: number | null;
-}
-
-export interface ParsedGarminWorkout {
-  sourceKind: "garmin_fit";
-  activityStartAt: string | null;
-  activityLocalDate: string | null;
-  totalDistanceKm: number | null;
-  totalTimerDurationMin: number | null;
-  totalElapsedDurationMin: number | null;
-  totalDurationMin: number | null;
-  avgHeartRate: number | null;
-  maxHeartRate: number | null;
-  avgPower: number | null;
-  maxPower: number | null;
-  totalCalories: number | null;
-  totalAscentM: number | null;
-  totalDescentM: number | null;
-  avgCadence: number | null;
-  avgTemperatureC: number | null;
-  gpsPointCount: number;
-  lapCount: number;
-  workoutName: string | null;
-  actualIntervalCount: number | null;
-  actualStepPayload: Json;
-  lapPayload: Json;
-  summaryPayload: Json;
 }
 
 export interface WorkoutResultAssetSummary {

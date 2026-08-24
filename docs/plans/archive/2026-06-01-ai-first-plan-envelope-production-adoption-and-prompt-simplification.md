@@ -72,7 +72,6 @@ Archived evidence recorded backend proof, review/confirm exactness QA on disposa
 
 - [Current product](../../current-product.md)
 - [Current system](../../current-system.md)
-- [Product history digest](../../history/product-history-digest.md)
 
 ## Do Not Continue By Default
 

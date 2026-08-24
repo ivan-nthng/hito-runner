@@ -70,7 +70,6 @@ The `Update plan from history` loop was treated as complete in planning terms:
 
 - Current product truth: `docs/current-product.md`
 - Current system truth: `docs/current-system.md`
-- Product history digest: `docs/history/product-history-digest.md`
 
 ## Do Not Continue By Default
 

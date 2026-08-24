@@ -10,6 +10,9 @@ import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
 import { Icon } from "@/components/ui/icon";
 import { Skeleton } from "@/components/ui/skeleton";
 import type {
+  RunnerActivityFitChartMetricId,
+  RunnerActivityFitSequenceMetricId,
+  RunnerActivityFitSequenceQuickPeriodId,
   RunnerActivityProgressProductAdvancedMetrics,
   RunnerActivityProgressProductFactMetric,
   RunnerActivityFitSequenceProductModel,
@@ -18,11 +21,6 @@ import type {
   RunnerActivityProgressProductSessionLoadWindow,
   RunnerActivityProgressProductSnapshot,
 } from "@/lib/runner-activity/product-contract";
-import type {
-  RunnerActivityFitChartMetricId,
-  RunnerActivityFitSequenceMetricId,
-  RunnerActivityFitSequenceQuickPeriodId,
-} from "@/lib/runner-activity/read-model-types";
 import { formatDate } from "@/lib/training";
 import type { ProgressSequenceSelection, ProgressState } from "./runner-activity-progress-types";
 import {

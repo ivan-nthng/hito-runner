@@ -2,7 +2,7 @@ import "@tanstack/react-start/server-only";
 
 import { requireAuthenticatedUser } from "@/lib/backend/auth";
 import type { RequestAuthContext } from "@/lib/backend/auth";
-import { classifyAdminAnalyticsUser } from "@/lib/admin-user-classification";
+import { classifyActor } from "@/lib/actor-classification";
 import { findLocalAuthAccountByUserId } from "@/lib/local-auth";
 import { ensureLocalAuthSupabaseUserId } from "@/lib/local-auth-supabase";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
@@ -74,7 +74,7 @@ async function resolveVerifiedAdminUserIdFromSupabase(userId: string) {
       return null;
     }
 
-    const classification = classifyAdminAnalyticsUser({
+    const classification = classifyActor({
       email: result.data.user.email ?? null,
       appMetadata: result.data.user.app_metadata,
     });

@@ -16,12 +16,14 @@ import {
 import type { TrainingPlanV2 } from "../../src/lib/imported-plan";
 import type { BuildRunningPlanPreviewInput } from "../../src/lib/plan-creation-engine";
 import { addDaysIso, diffDaysIso } from "../../src/lib/training";
-import { buildProofRunnerProfileSnapshot } from "../runner-profile-snapshot-proof-helpers";
+import { buildProofInitialPlanProfile } from "../runner-fitness-profile-initial-plan-proof-helpers";
 
 function buildAiGeneratedRunningPlanAuthoringInput(input: BuildRunningPlanPreviewInput) {
+  const profile = buildProofInitialPlanProfile(input);
   return buildAiGeneratedRunningPlanAuthoringInputRuntime(
     input,
-    buildProofRunnerProfileSnapshot(input),
+    profile.initialPlanProfile,
+    profile.acceptedHeartRateProfile,
   );
 }
 
@@ -73,11 +75,11 @@ export async function assertFirstPlanReleaseGateContracts() {
 
   assertPlanFirstCanonicalResult(serviceResult.canonicalPlan, "plan-first draft service");
   assert.equal(serviceResult.metadata.status, "ai_authored");
-  assert.equal(serviceResult.metadata.source, "openai_ai_authored_full_plan_draft");
-  assert.equal(serviceResult.metadata.debug.contractMode, "plan_first");
+  assert.equal(serviceResult.metadata.source, "openai_adaptive_blueprint_four_week_draft");
+  assert.equal(serviceResult.metadata.debug.contractMode, "adaptive_blueprint_four_week");
   assert.equal(
     serviceResult.metadata.debug.responseSchemaMode,
-    "responses_json_schema_plan_first_direct_v1_strict",
+    "responses_json_schema_adaptive_blueprint_four_week_v1_strict",
   );
   assert.doesNotMatch(
     JSON.stringify(serviceResult),
@@ -115,9 +117,10 @@ async function assertFirstSessionAdaptationContracts() {
       name: "new_to_running",
       expectedLevel: "new_to_running",
       runnerLevel: "beginner_new_runner" as const,
-      targetDate: "2026-07-12",
+      targetDate: "2026-08-30",
       startDate: "2026-07-06",
       fixedRestDays: ["Tuesday", "Saturday"] as const,
+      preferredLongRunDay: "Sunday" as const,
       benchmark: { kind: "unknown" } as const,
     },
     {
@@ -127,6 +130,7 @@ async function assertFirstSessionAdaptationContracts() {
       targetDate: null,
       startDate: "2026-07-06",
       fixedRestDays: ["Tuesday", "Saturday"] as const,
+      preferredLongRunDay: "Sunday" as const,
       benchmark: { kind: "unknown" } as const,
     },
     {
@@ -136,7 +140,8 @@ async function assertFirstSessionAdaptationContracts() {
       targetDate: null,
       startDate: "2026-07-08",
       fixedRestDays: ["Tuesday", "Thursday", "Saturday", "Sunday"] as const,
-      benchmark: { kind: "recent_5k_time", recent5kTime: "30:00" } as const,
+      preferredLongRunDay: "Friday" as const,
+      benchmark: { kind: "recent_5k_time", recent5kTime: "24:00" } as const,
     },
   ]) {
     const normalized = buildAiGeneratedRunningPlanAuthoringInput({
@@ -146,7 +151,7 @@ async function assertFirstSessionAdaptationContracts() {
       runnerLevel: scenario.runnerLevel,
       daysPerWeek: 3,
       fixedRestDays: [...scenario.fixedRestDays],
-      preferredLongRunDay: "Sunday",
+      preferredLongRunDay: scenario.preferredLongRunDay,
       startDate: scenario.startDate,
       benchmark: scenario.benchmark,
       planGoalIntent: {
@@ -170,7 +175,7 @@ async function assertFirstSessionAdaptationContracts() {
     assert.match(prompt.systemPrompt, /at least four adaptation contacts/i);
     assert.match(prompt.systemPrompt, /first true Long Run no earlier than calendar day 15/i);
     assert.match(prompt.systemPrompt, /gradual bridge/i);
-    assert.match(prompt.systemPrompt, /extend the authored horizon/i);
+    assert.match(prompt.systemPrompt, /Never move a supplied selected target date/i);
 
     const providerDraft = await readFixtureDraft(normalized.authoringInput);
     const serviceResult = await generateAiFirstPlanDraftPreview({
@@ -194,16 +199,12 @@ async function assertFirstSessionAdaptationContracts() {
       canonicalPlan: serviceResult.canonicalPlan,
     });
     assert.equal(serviceResult.metadata.status, "ai_authored");
-    assert.equal(serviceResult.metadata.source, "openai_ai_authored_full_plan_draft");
+    assert.equal(serviceResult.metadata.source, "openai_adaptive_blueprint_four_week_draft");
     if (scenario.targetDate) {
-      assert.ok(
-        (serviceResult.canonicalPlan.target_date ?? "") > scenario.targetDate,
-        "AI-authored adaptation bridge must be able to extend beyond a compressed requested date.",
-      );
       assert.equal(
         serviceResult.canonicalPlan.target_date,
-        providerDraft.endpoint.date,
-        "Compiler must preserve the AI-authored extended endpoint date.",
+        scenario.targetDate,
+        "The immutable Blueprint must preserve the selected target-date assumption.",
       );
       assert.doesNotMatch(
         JSON.stringify(serviceResult.canonicalPlan.goal),
@@ -233,7 +234,10 @@ async function assertFirstSessionAdaptationContracts() {
       preferredLongRunDay: "Sunday",
       startDate: "2026-07-06",
       benchmark: { kind: "unknown" },
-      planGoalIntent: { distance: { kind: "preset", preset: "10K" } },
+      planGoalIntent: {
+        distance: { kind: "preset", preset: "10K" },
+        targetDate: "2026-08-30",
+      },
     });
     assert.equal(normalized.ok, true, normalized.ok ? "" : normalized.message);
     if (!normalized.ok) throw new Error(normalized.message);
@@ -252,7 +256,7 @@ async function assertFirstSessionAdaptationContracts() {
     );
     assert.match(prompt.systemPrompt, /Author directly from the supplied runner facts/i);
     const providerDraft = await readFixtureDraft(normalized.authoringInput);
-    const firstFourteenTypes = providerDraft.workouts
+    const firstFourteenTypes = providerDraft.detailed_block.workouts
       .filter((day) => day.date <= addDaysIso(normalized.authoringInput.schedule.startDate, 13))
       .map((day) => day.title);
     assert.ok(
@@ -267,7 +271,7 @@ function assertAdaptationOpening(input: {
   providerDraft: AiAuthoredPlanFirstCompilerDraft;
   canonicalPlan: TrainingPlanV2;
 }) {
-  const authoredDays = input.providerDraft.workouts.sort((left, right) =>
+  const authoredDays = input.providerDraft.detailed_block.workouts.sort((left, right) =>
     left.date.localeCompare(right.date),
   );
   const firstFourteenDays = authoredDays.filter(
@@ -302,7 +306,7 @@ function assertAdaptationOpening(input: {
   assert.equal(compiledRunWalk?.workout_identity, "recovery_jog");
   assert.equal(compiledRunWalk?.workout_family, "recovery");
 
-  const providerRows = [...authoredDays, input.providerDraft.endpoint]
+  const providerRows = [...authoredDays, input.providerDraft.detailed_block.final_workout]
     .sort((left, right) => left.date.localeCompare(right.date))
     .map((day) => ({ date: day.date, title: day.title }));
   const compiledRows = input.canonicalPlan.planned_workouts

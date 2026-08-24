@@ -58,8 +58,8 @@ export function validateAiAuthoredPrimaryExecutionGuidance(rows: readonly unknow
     if (record.target_source !== "ai_authored_plan_guidance") return;
     targetCount += 1;
     assert.ok(
-      mode === "pace" || mode === "heart_rate",
-      "Generated runnable guidance must use numeric pace or BPM, never prose-only modes.",
+      mode === "pace" || mode === "heart_rate" || mode === "effort",
+      "Generated runnable guidance must use pace, BPM, or the bounded terrain-safe effort mode.",
     );
     assert.equal(
       record.target_source,
@@ -78,6 +78,21 @@ export function validateAiAuthoredPrimaryExecutionGuidance(rows: readonly unknow
         record.hr_target_source === "personal_hr_zone" ||
           record.hr_target_source === "default_estimated_hr",
         "HR-primary execution must retain accepted profile provenance.",
+      );
+    }
+    if (mode === "effort") {
+      assert.equal(hasPace || hasHeartRate, false);
+      assert.ok(
+        record.intensity === "Controlled uphill effort" ||
+          record.intensity === "Controlled downhill recovery" ||
+          record.intensity === "Controlled short repetition effort" ||
+          record.intensity === "Controlled stride effort" ||
+          record.intensity === "Controlled short recovery effort",
+        "Effort-only generation is limited to controlled terrain or bounded short-work execution.",
+      );
+      assert.match(
+        String(record.source_note),
+        /no executable pace(?:, heart rate, grade, or gradient| or heart rate) was inferred/i,
       );
     }
   });

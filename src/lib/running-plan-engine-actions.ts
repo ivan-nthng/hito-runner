@@ -1,9 +1,15 @@
-import { createServerFn } from "@tanstack/react-start";
+import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { retainReviewedPlanCandidateForUser } from "@/lib/active-plan-persistence";
-import { CalendarPersistenceRejection } from "@/lib/runner-calendar-mutations";
+import { getAdaptiveTrainingSourceCandidateForUser } from "@/lib/adaptive-blueprint-persistence";
+import {
+  applyAtomicAdaptiveInitialDetailedBlockMaterialization,
+  buildCalendarWorkoutMutationEvent,
+  CALENDAR_WORKOUT_MUTATION_KIND,
+  CalendarPersistenceRejection,
+} from "@/lib/runner-calendar-mutations";
 import { getRequestAuthContext } from "@/lib/backend/auth";
+import { acceptedRunnerHeartRateProfileSchema } from "@/lib/heart-rate-zones";
 import { parseDurationSeconds, parsePaceSecondsPerKm } from "@/lib/first-plan-authoring-utils";
 import {
   AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
@@ -15,6 +21,7 @@ import {
   type BuildAiGeneratedRunningPlanPreviewOptions,
 } from "@/lib/ai-generated-running-plan";
 import {
+  AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID,
   isAiGeneratedRunningPlanDevFixtureEnabled,
   isAiGeneratedRunningPlanDevFixtureModel,
 } from "@/lib/ai-generated-running-plan-dev-fixture";
@@ -31,23 +38,32 @@ import {
 import { RUNNING_PLAN_RUNNER_LEVEL_VALUES } from "@/lib/plan-creation-engine/source-types";
 import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
 import { buildImportedPlanSeed } from "@/lib/imported-plan";
-import {
-  confirmWorkoutCommandForUser,
-  reviewWorkoutCommandForUser,
-} from "@/lib/manual-workout-authoring/actions";
+import { reviewWorkoutCommandForUser } from "@/lib/manual-workout-authoring/actions";
+import { buildPersistedWorkoutInsertRows } from "@/lib/persisted-plan-replacement";
 import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
+import {
+  getCalendarWorkoutsWithLogsForUser,
+  getContinuationCalendarOutcomePacket,
+} from "@/lib/runner-calendar-persistence";
+import { projectRunnerFitnessProfileForInitialPlan } from "@/lib/runner-activity/product-contract";
 import {
   RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
   addRunningPlanReviewProof,
-  buildRunningPlanPersistenceMetadata,
   validateRunningPlanReviewExactness,
   validateSelfContainedRunningPlanReviewExactness,
   type RunningPlanReviewedPreviewDraft,
 } from "@/lib/running-plan-engine-review";
-import { stableJsonEqual } from "@/lib/review-token-signing";
+import { digestSha256Hex, stableJsonEqual, stableJsonStringify } from "@/lib/review-token-signing";
 import { generatedPlanRunnerCommentInputSchema } from "@/lib/structured-plan-authoring-schema";
-import { getRunnerPlanAuthoringProfileSnapshotForUserId } from "@/lib/user-settings-actions";
+import type { Json } from "@/lib/supabase/database";
+import { addDaysIso } from "@/lib/training";
+import { getUserSettingsForUserId } from "@/lib/user-settings-actions";
 import { WEEKDAY_NAMES } from "@/lib/weekday-rest-invariants";
+import { getContinuationEvidencePacket } from "@/lib/workout-result-import/read-workout-result-feedback";
+import {
+  confirmWorkoutCommand,
+  WORKOUT_COMMAND_REVIEW_PAYLOAD_VERSION,
+} from "@/lib/workout-authoring-review";
 
 const weekdayNameSchema = z.enum(WEEKDAY_NAMES);
 const recent5kTimeSchema = z
@@ -100,6 +116,7 @@ export const runningPlanPreviewInputSchema = z
   .strict();
 
 const runningPlanSourceKindSchema = z.literal(AI_GENERATED_RUNNING_PLAN_SOURCE_KIND);
+export const CURRENT_RUNNING_LIMITATION_VALUES = ["no", "yes", "unsure"] as const;
 
 const runningPlanReviewedPreviewInputSchema = runningPlanPreviewInputSchema.omit({
   runnerComment: true,
@@ -111,13 +128,13 @@ export const runningPlanConfirmInputSchema = z
     sourceKind: runningPlanSourceKindSchema,
     reviewToken: z.string().trim().min(16),
     reviewChecksum: z.string().trim().length(64),
+    currentRunningLimitation: z.enum(CURRENT_RUNNING_LIMITATION_VALUES).optional(),
   })
   .strict();
 
 type RunningPlanReviewedPreviewReadyResult = {
   ok: true;
   draft: RunningPlanReviewedPreviewDraft<AiGeneratedRunningPlanPreviewDraft>;
-  savedPlanId?: string;
 };
 
 type RunningPlanReviewedPreviewResult =
@@ -152,7 +169,6 @@ type RunningPlanPreviewProductDraft = {
   calendarRows: readonly RunningPlanPreviewProductCalendarRow[];
   workoutDocuments: AiGeneratedRunningPlanPreviewDraft["workoutDocuments"];
   candidate: AiGeneratedRunningPlanPreviewDraft["candidate"];
-  savedPlanId: string | null;
   reviewToken: string;
   reviewChecksum: string;
 };
@@ -189,7 +205,8 @@ export type RunningPlanConfirmActionResult =
       persisted: true;
       sourceKind: RunningPlanConfirmActionInput["sourceKind"];
       sourceStatus: typeof RUNNING_PLAN_CONFIRMED_SOURCE_STATUS;
-      savedPlanId: string;
+      blueprintId: string;
+      detailedCandidateId: string;
       schemaVersion: "training-plan-v2";
       effectiveStartDate: string;
       appliedStartDate: string;
@@ -272,7 +289,10 @@ export const confirmRunningPlanDraft = createServerFn({ method: "POST" })
 export async function confirmRunningPlanDraftForUser(
   userId: string,
   input: unknown,
-  options: { allowLocalQaFixture?: boolean } = {},
+  options: {
+    allowLocalQaFixture?: boolean;
+    localQaFixtureCurrentDate?: string;
+  } = {},
 ): Promise<RunningPlanConfirmActionResult> {
   const parsed = runningPlanConfirmInputSchema.safeParse(input);
 
@@ -285,13 +305,32 @@ export async function confirmRunningPlanDraftForUser(
 
   const request = parsed.data;
 
-  return confirmReviewedAiGeneratedRunningPlanDraftForUser(userId, request, options);
+  if (request.currentRunningLimitation === "yes" || request.currentRunningLimitation === "unsure") {
+    return buildConfirmFailure({
+      reason: "invalid_review",
+      message:
+        "This plan cannot be confirmed while a current running limitation needs review. No workouts were added.",
+      sourceKind: request.sourceKind,
+    });
+  }
+
+  return confirmReviewedAiGeneratedRunningPlanDraftForUser(
+    userId,
+    {
+      ...request,
+      currentRunningLimitation: request.currentRunningLimitation ?? "no",
+    },
+    options,
+  );
 }
 
 async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
   userId: string,
-  request: RunningPlanConfirmActionInput,
-  options: { allowLocalQaFixture?: boolean },
+  request: RunningPlanConfirmActionInput & { currentRunningLimitation: "no" },
+  options: {
+    allowLocalQaFixture?: boolean;
+    localQaFixtureCurrentDate?: string;
+  },
 ): Promise<RunningPlanConfirmActionResult> {
   const exactness = await validateSelfContainedRunningPlanReviewExactness({
     reviewToken: request.reviewToken,
@@ -331,6 +370,28 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
     });
   }
 
+  const signedLocalQaFixtureCurrentDate =
+    options.allowLocalQaFixture === true &&
+    isLocalQaFixtureReviewedDraft(exactness.draft) &&
+    exactness.draft.aiGeneration.responseId === AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID
+      ? exactness.canonicalPlan.start_date
+      : undefined;
+  const localQaFixtureCurrentDate =
+    options.localQaFixtureCurrentDate ?? signedLocalQaFixtureCurrentDate;
+  if (
+    localQaFixtureCurrentDate !== undefined &&
+    (options.allowLocalQaFixture !== true ||
+      exactness.draft.aiGeneration.responseId !==
+        AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID ||
+      !z.string().date().safeParse(localQaFixtureCurrentDate).success)
+  ) {
+    return buildConfirmFailure({
+      reason: "fixture_not_authorized",
+      message: "The local QA fixture confirmation date is unavailable for this reviewed plan.",
+      sourceKind: request.sourceKind,
+    });
+  }
+
   if (!stableJsonEqual(request.previewInput, exactness.draft.previewInput)) {
     return buildConfirmFailure({
       reason: "stale_review",
@@ -340,74 +401,103 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
     });
   }
 
-  let currentProfileSnapshot: Awaited<
-    ReturnType<typeof getRunnerPlanAuthoringProfileSnapshotForUserId>
-  >;
+  let currentProfileFacts: Awaited<ReturnType<typeof getInitialPlanAuthoringFactsForUser>>;
   try {
-    currentProfileSnapshot = await getRunnerPlanAuthoringProfileSnapshotForUserId(userId);
+    const frozenProfile = exactness.draft.normalizedInputSummary.initialPlanProfile;
+    currentProfileFacts = await getInitialPlanAuthoringFactsForUser({
+      userId,
+      asOf: frozenProfile.asOf,
+      cutoffDate: frozenProfile.cutoffDate,
+    });
   } catch {
     return buildConfirmFailure({
       reason: "persistence_failed",
-      message: "The runner baseline could not be verified before confirmation.",
+      message: "The runner fitness profile could not be verified before confirmation.",
       sourceKind: request.sourceKind,
     });
   }
 
   if (
-    !currentProfileSnapshot ||
+    !currentProfileFacts ||
     !stableJsonEqual(
-      currentProfileSnapshot,
-      exactness.draft.normalizedInputSummary.runnerProfileSnapshot,
-    )
+      currentProfileFacts.initialPlanProfile,
+      exactness.draft.normalizedInputSummary.initialPlanProfile,
+    ) ||
+    !stableJsonEqual(
+      currentProfileFacts.acceptedHeartRateProfile,
+      exactness.draft.normalizedInputSummary.heartRateProfile,
+    ) ||
+    currentProfileFacts.settings.age !== exactness.draft.normalizedInputSummary.age ||
+    currentProfileFacts.settings.heightCm !== exactness.draft.normalizedInputSummary.heightCm ||
+    currentProfileFacts.settings.weightKg !== exactness.draft.normalizedInputSummary.weightKg
   ) {
     return buildConfirmFailure({
       reason: "stale_review",
-      message: "The runner baseline changed after review. Refresh the plan before confirming.",
+      message: "The runner fitness facts changed after review. Refresh the plan before confirming.",
       sourceKind: request.sourceKind,
     });
   }
 
-  let savedPlan: Awaited<ReturnType<typeof retainReviewedPlanCandidateForUser>>;
+  const sourceReference = exactness.draft.sourceCandidate;
+  if (!sourceReference) {
+    return buildConfirmFailure({
+      reason: "invalid_review",
+      message: "The reviewed adaptive source candidate is unavailable. Refresh the preview.",
+      sourceKind: request.sourceKind,
+    });
+  }
+
   try {
-    savedPlan = await retainReviewedPlanCandidateForUser({
+    const sourceSnapshot = await getAdaptiveTrainingSourceCandidateForUser({
       userId,
+      reference: sourceReference,
+    });
+    const expectedCandidateContent = {
       canonicalPlan: exactness.canonicalPlan,
-      reviewChecksum: exactness.reviewChecksum,
-      planMetadata: buildRunningPlanPersistenceMetadata({
-        draft: exactness.draft,
-        canonicalPlan: exactness.canonicalPlan,
-        reviewChecksum: exactness.reviewChecksum,
-      }),
-    });
-  } catch {
-    return buildConfirmFailure({
-      reason: "persistence_failed",
-      message: "The selected running plan could not verify its private saved record before apply.",
-      sourceKind: request.sourceKind,
-    });
-  }
-
-  if (!savedPlan || !stableJsonEqual(savedPlan.saved_plan_payload, exactness.canonicalPlan)) {
-    return buildConfirmFailure({
-      reason: "stale_review",
-      message: "The reviewed plan no longer matches its private saved record. Refresh the preview.",
-      sourceKind: request.sourceKind,
-    });
-  }
-
-  try {
-    const documents = buildImportedPlanSeed(exactness.canonicalPlan).workouts;
-    const command = {
-      operation: "materialize" as const,
-      documents,
-      provenanceReferences: documents.map((document) => ({
-        sourcePlanId: savedPlan.id,
-        sourceKind: request.sourceKind,
-        sourceStatus: RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
-        sourceWorkoutId: document.sourceWorkoutId,
-      })),
+      reviewConflicts: exactness.draft.reviewConflicts,
     };
-    const commandReview = await reviewWorkoutCommandForUser(userId, command);
+    if (
+      !sourceSnapshot ||
+      !stableJsonEqual(sourceSnapshot.blueprint.blueprint_content, exactness.draft.blueprint) ||
+      !stableJsonEqual(sourceSnapshot.candidate.candidate_content, expectedCandidateContent)
+    ) {
+      return buildConfirmFailure({
+        reason: "stale_review",
+        message: "The reviewed adaptive source no longer matches its immutable candidate.",
+        sourceKind: request.sourceKind,
+      });
+    }
+
+    const seed = buildImportedPlanSeed(exactness.canonicalPlan);
+    const documents = seed.workouts;
+    if (!stableJsonEqual(documents, exactness.draft.workoutDocuments)) {
+      return buildConfirmFailure({
+        reason: "stale_review",
+        message: "The reviewed detailed workouts no longer match the canonical candidate.",
+        sourceKind: request.sourceKind,
+      });
+    }
+
+    const signedCommand = exactness.draft.candidate.command;
+    const expectedProvenanceReferences = documents.map((document) => ({
+      sourceKind: request.sourceKind,
+      sourceStatus: exactness.draft.sourceStatus,
+      sourceWorkoutId: document.sourceWorkoutId,
+      adaptiveTrainingSourceCandidate: sourceReference,
+    }));
+    if (
+      signedCommand.operation !== "materialize" ||
+      !stableJsonEqual(signedCommand.documents, documents) ||
+      !stableJsonEqual(signedCommand.provenanceReferences, expectedProvenanceReferences)
+    ) {
+      return buildConfirmFailure({
+        reason: "invalid_review",
+        message: "The signed detailed-block command is invalid. Refresh the preview.",
+        sourceKind: request.sourceKind,
+      });
+    }
+
+    const commandReview = await reviewWorkoutCommandForUser(userId, signedCommand);
     if (!commandReview.ok) {
       return buildConfirmFailure({
         reason: commandReview.issues.some((issue) => issue.code === "calendar_collision")
@@ -417,35 +507,88 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
         sourceKind: request.sourceKind,
       });
     }
-    const materialized = await confirmWorkoutCommandForUser(userId, {
-      command: commandReview.candidate.command,
-      candidateId: commandReview.candidate.candidateId,
-      reviewToken: commandReview.candidate.reviewToken,
-      reviewChecksum: commandReview.candidate.reviewChecksum,
+    const commandProof = confirmWorkoutCommand({
+      candidate: commandReview.candidate,
+      candidateId: exactness.draft.candidate.candidateId,
+      reviewToken: exactness.draft.candidate.reviewToken,
+      reviewChecksum: exactness.draft.candidate.reviewChecksum,
     });
-    if (!materialized.ok) {
+    if (!commandProof.ok) {
       return buildConfirmFailure({
-        reason: materialized.reason === "collision" ? "replacement_required" : "persistence_failed",
-        message: materialized.message,
+        reason: commandProof.reason === "collision" ? "replacement_required" : commandProof.reason,
+        message: commandProof.message,
         sourceKind: request.sourceKind,
       });
     }
-    const materializedResult = jsonRecord(materialized.result);
-    const appliedStartDate = stringResultField(
-      materializedResult,
-      "appliedStartDate",
-      exactness.canonicalPlan.start_date,
+
+    const confirmationReviewChecksum = await digestSha256Hex(
+      stableJsonStringify({
+        version: "adaptive_initial_confirmation_review_v2",
+        sourcePreviewReviewChecksum: exactness.reviewChecksum,
+        currentRunningLimitation: request.currentRunningLimitation,
+      }),
     );
-    const workoutCount = numberResultField(
-      materializedResult,
-      "workoutCount",
-      documents.filter((document) => document.workoutType !== "rest").length,
+
+    const currentDate = localQaFixtureCurrentDate ?? (await getRunnerCalendarDateForUserId(userId));
+    const workoutInserts = buildPersistedWorkoutInsertRows(null, userId, seed.workouts, "ai").map(
+      (row) => ({ ...row, id: crypto.randomUUID() }),
     );
-    const calendarRowCount = numberResultField(
-      materializedResult,
-      "calendarRowCount",
-      documents.length,
-    );
+    const mutationEvents = workoutInserts.map((row) => ({
+      ...buildCalendarWorkoutMutationEvent({
+        mutationKind: CALENDAR_WORKOUT_MUTATION_KIND.addWorkout,
+        originKind: "ai",
+        reviewPayloadVersion: WORKOUT_COMMAND_REVIEW_PAYLOAD_VERSION,
+        reviewChecksum: commandProof.candidate.reviewChecksum,
+        workoutAuthoringSourceKind: request.sourceKind,
+        plannedWorkoutId: row.id,
+        targetWorkoutId: row.id,
+        targetDate: row.workout_date,
+        title: row.title,
+        mutationPayloadVersion: "adaptive_initial_detailed_block_materialization_v1",
+        mutationChecksum: exactness.reviewChecksum,
+        trustedClientRows: false,
+        originalPlanSourceKind: request.sourceKind,
+        originalPlanSourceStatus: RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
+        originalWorkoutSourceId: row.source_workout_id,
+        originalWorkoutSourceType: row.source_workout_type,
+        originalWorkoutFamily: row.workout_family,
+        originalWorkoutIdentity: row.workout_identity,
+      }),
+      adaptive_training_confirmation: {
+        contract_version: "adaptive_initial_detailed_block_confirmation_v2",
+        blueprint_id: sourceReference.blueprintId,
+        blueprint_version: sourceReference.blueprintVersion,
+        blueprint_sha256: sourceReference.blueprintSha256,
+        detailed_candidate_id: sourceReference.candidateId,
+        detailed_candidate_version: sourceReference.candidateVersion,
+        detailed_candidate_sha256: sourceReference.candidateSha256,
+        input_fingerprint_sha256: sourceReference.inputFingerprintSha256,
+        source_preview_review_checksum: exactness.reviewChecksum,
+        source_review_checksum: confirmationReviewChecksum,
+        current_running_limitation: request.currentRunningLimitation,
+        workout_review_checksum: commandProof.candidate.reviewChecksum,
+        source_workout_id: row.source_workout_id,
+      },
+    }));
+    const materialized = await applyAtomicAdaptiveInitialDetailedBlockMaterialization({
+      userId,
+      currentDate,
+      blueprintId: sourceReference.blueprintId,
+      blueprintVersion: sourceReference.blueprintVersion,
+      blueprintSha256: sourceReference.blueprintSha256,
+      candidateId: sourceReference.candidateId,
+      candidateVersion: sourceReference.candidateVersion,
+      candidateSha256: sourceReference.candidateSha256,
+      inputFingerprintSha256: sourceReference.inputFingerprintSha256,
+      expectedBlueprintContent: sourceSnapshot.blueprint.blueprint_content,
+      expectedCandidateContent: sourceSnapshot.candidate.candidate_content,
+      expectedInputSnapshot: sourceSnapshot.candidate.input_snapshot,
+      sourceReviewChecksum: confirmationReviewChecksum,
+      workoutReviewChecksum: commandProof.candidate.reviewChecksum,
+      workoutInserts: workoutInserts as unknown as Json[],
+      mutationEvents: mutationEvents as unknown as Json[],
+    });
+    const workoutCount = documents.filter((document) => document.workoutType !== "rest").length;
 
     await markAiPlanGenerationPersisted({
       trace: exactness.draft.aiGeneration.generationTrace,
@@ -457,12 +600,13 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
       persisted: true,
       sourceKind: request.sourceKind,
       sourceStatus: RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
-      savedPlanId: savedPlan.id,
+      blueprintId: materialized.blueprintId,
+      detailedCandidateId: materialized.detailedCandidateId,
       schemaVersion: exactness.canonicalPlan.schema_version,
-      effectiveStartDate: appliedStartDate,
-      appliedStartDate,
+      effectiveStartDate: exactness.canonicalPlan.start_date,
+      appliedStartDate: exactness.canonicalPlan.start_date,
       workoutCount,
-      calendarRowCount,
+      calendarRowCount: materialized.calendarRowCount,
       nonRestWorkoutCount: workoutCount,
       reviewChecksum: exactness.reviewChecksum,
       safety: {
@@ -473,13 +617,18 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
       },
     };
   } catch (error) {
-    if (error instanceof CalendarPersistenceRejection && error.reason === "stale_review") {
+    if (error instanceof CalendarPersistenceRejection) {
       await markAiPlanGenerationPersistenceFailed({
         trace: exactness.draft.aiGeneration.generationTrace,
-        reason: "stale_review",
+        reason: error.reason,
       });
       return buildConfirmFailure({
-        reason: "stale_review",
+        reason:
+          error.reason === "calendar_collision"
+            ? "replacement_required"
+            : error.reason === "invalid_candidate"
+              ? "invalid_review"
+              : "stale_review",
         message: error.message,
         sourceKind: request.sourceKind,
       });
@@ -554,69 +703,140 @@ export async function buildReviewedAiGeneratedRunningPlanPreview(
 export async function buildReviewedAiGeneratedRunningPlanPreviewForUser(
   userId: string | null,
   data: RunningPlanPreviewActionInput,
-  options: BuildAiGeneratedRunningPlanPreviewOptions = {},
+  options: BuildAiGeneratedRunningPlanPreviewOptions & {
+    localQaFixtureCurrentDate?: string;
+  } = {},
 ): Promise<RunningPlanReviewedPreviewResult> {
-  const calendarDate = userId ? await getRunnerCalendarDateForUserId(userId) : null;
-  let runnerProfileSnapshot: Awaited<
-    ReturnType<typeof getRunnerPlanAuthoringProfileSnapshotForUserId>
-  > = null;
+  if (
+    options.localQaFixtureCurrentDate &&
+    (options.qaFixtureAuthorized !== true ||
+      !z.string().date().safeParse(options.localQaFixtureCurrentDate).success)
+  ) {
+    throw new Error("A local QA fixture date requires explicit fixture authorization.");
+  }
+  const { localQaFixtureCurrentDate, ...previewOptions } = options;
+  const calendarDate = userId
+    ? (localQaFixtureCurrentDate ?? (await getRunnerCalendarDateForUserId(userId)))
+    : null;
+  const authoringInstant = localQaFixtureCurrentDate
+    ? `${localQaFixtureCurrentDate}T12:00:00.000Z`
+    : new Date().toISOString();
+  let initialPlanFacts: Awaited<ReturnType<typeof getInitialPlanAuthoringFactsForUser>> = null;
   try {
-    runnerProfileSnapshot = userId
-      ? await getRunnerPlanAuthoringProfileSnapshotForUserId(userId)
-      : null;
+    initialPlanFacts =
+      userId && calendarDate
+        ? await getInitialPlanAuthoringFactsForUser({
+            userId,
+            asOf: authoringInstant,
+            cutoffDate: calendarDate,
+          })
+        : null;
   } catch {
-    runnerProfileSnapshot = null;
+    initialPlanFacts = null;
+  }
+
+  const acceptedRequestFactsMatch = Boolean(
+    initialPlanFacts &&
+    initialPlanFacts.settings.age === data.age &&
+    initialPlanFacts.settings.heightCm === data.heightCm &&
+    initialPlanFacts.settings.weightKg === data.weightKg,
+  );
+
+  if (userId && (!initialPlanFacts || !acceptedRequestFactsMatch)) {
+    return {
+      ok: false,
+      unavailable: buildAiGeneratedRunningPlanPreviewUnavailable({
+        code: "structured_input_invalid",
+        message:
+          "The saved runner baseline no longer matches these plan answers. Refresh the setup before creating a preview.",
+        issues: [
+          "Authenticated initial-plan preview requires the current persisted runner baseline before provider dispatch.",
+        ],
+        generationTrace: null,
+        input: data,
+        normalizedInputSummary: null,
+        previewOutcome: "invalid_structural_input",
+      }),
+    };
   }
 
   const reviewed = await buildReviewedAiGeneratedRunningPlanPreview(
     calendarDate && !data.startDate?.trim() ? { ...data, startDate: calendarDate } : data,
     {
-      ...options,
+      ...previewOptions,
       aiPreview: {
-        ...(options.aiPreview ?? {}),
+        ...(previewOptions.aiPreview ?? {}),
         candidateOwnerUserId: userId,
       },
-      ...(runnerProfileSnapshot ? { runnerProfileSnapshot } : {}),
+      ...(initialPlanFacts && acceptedRequestFactsMatch
+        ? {
+            initialPlanProfile: initialPlanFacts.initialPlanProfile,
+            acceptedHeartRateProfile: initialPlanFacts.acceptedHeartRateProfile,
+          }
+        : {}),
     },
   );
 
-  if (!userId || !reviewed.ok) {
-    return reviewed;
-  }
+  return reviewed;
+}
 
-  try {
-    const savedPlan = await retainReviewedPlanCandidateForUser({
-      userId,
-      canonicalPlan: reviewed.draft.canonicalPlan,
-      reviewChecksum: reviewed.draft.reviewChecksum,
-      planMetadata: buildRunningPlanPersistenceMetadata({
-        draft: reviewed.draft,
-        canonicalPlan: reviewed.draft.canonicalPlan,
-        reviewChecksum: reviewed.draft.reviewChecksum,
-      }),
+async function getInitialPlanAuthoringFactsForUser(input: {
+  userId: string;
+  asOf: string;
+  cutoffDate: string;
+}) {
+  const settings = await getUserSettingsForUserId(input.userId, null);
+  if (!settings) return null;
+  const acceptedHeartRateProfile = acceptedRunnerHeartRateProfileSchema.safeParse({
+    source: settings.heartRateZones.source,
+    accepted: settings.heartRateZones.accepted,
+    sourceNote: settings.heartRateZones.sourceNote,
+    zones: settings.heartRateZones.zones.map((zone) => ({
+      reference: zone.reference,
+      label: zone.label,
+      minBpm: zone.minBpm,
+      maxBpm: zone.maxBpm,
+    })),
+  });
+  if (!acceptedHeartRateProfile.success) return null;
+  const existing = await getCalendarWorkoutsWithLogsForUser(input.userId);
+  const recentWindowStart = addDaysIso(input.cutoffDate, -27);
+  const calendar = await getContinuationCalendarOutcomePacket({
+    userId: input.userId,
+    calendarWorkoutIds: existing.workouts
+      .filter(
+        (workout) =>
+          workout.workout_date >= recentWindowStart && workout.workout_date <= input.cutoffDate,
+      )
+      .map((workout) => workout.id),
+    asOf: input.asOf,
+    cutoffDate: input.cutoffDate,
+  });
+  const evidence = await getContinuationEvidencePacket({
+    userId: input.userId,
+    asOf: input.asOf,
+    cutoffDate: input.cutoffDate,
+    calendarOutcomeFingerprint: calendar.calendarOutcomeFingerprint,
+    workouts: calendar.workouts,
+  });
+  const snapshot = await createServerOnlyFn(async () => {
+    const { getRunnerFitnessProfileSnapshotForUser } =
+      await import("@/lib/runner-activity/read-model");
+
+    return getRunnerFitnessProfileSnapshotForUser({
+      userId: input.userId,
+      asOf: input.asOf,
+      cutoffDate: input.cutoffDate,
+      settings,
+      calendar,
+      evidence,
     });
-
-    return { ...reviewed, savedPlanId: savedPlan.id };
-  } catch {
-    const generationTrace = await markAiPlanGenerationPersistenceFailed({
-      trace: reviewed.draft.aiGeneration.generationTrace,
-      reason: "saved_plan_candidate_persistence_failed",
-      options: options.aiPreview?.generationLedger,
-    });
-
-    return {
-      ok: false,
-      unavailable: buildAiGeneratedRunningPlanPreviewUnavailable({
-        code: "ai_generated_plan_unavailable",
-        message: "The generated plan could not be retained in the private saved-plan library.",
-        issues: ["The reviewed candidate was not returned because persistence did not complete."],
-        generationTrace,
-        input: data,
-        normalizedInputSummary: reviewed.draft.normalizedInputSummary,
-        previewOutcome: "candidate_persistence_failure",
-      }),
-    };
-  }
+  })();
+  return {
+    settings,
+    acceptedHeartRateProfile: acceptedHeartRateProfile.data,
+    initialPlanProfile: projectRunnerFitnessProfileForInitialPlan(snapshot),
+  };
 }
 
 export function projectRunningPlanPreviewResultForProduct(
@@ -676,7 +896,6 @@ export function projectRunningPlanPreviewResultForProduct(
       })),
       workoutDocuments: draft.workoutDocuments,
       candidate: draft.candidate,
-      savedPlanId: result.savedPlanId ?? null,
       reviewToken: draft.reviewToken,
       reviewChecksum: draft.reviewChecksum,
     },
@@ -709,20 +928,4 @@ function isLocalQaFixtureReviewedDraft(draft: AiGeneratedRunningPlanPreviewDraft
     draft.aiGeneration.generationTrace?.provider.kind === "local_dev_fixture" ||
     isAiGeneratedRunningPlanDevFixtureModel(draft.aiGeneration.model)
   );
-}
-
-function jsonRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {};
-}
-
-function stringResultField(value: Record<string, unknown>, key: string, fallback: string) {
-  const field = value[key];
-  return typeof field === "string" && field ? field : fallback;
-}
-
-function numberResultField(value: Record<string, unknown>, key: string, fallback: number) {
-  const field = value[key];
-  return typeof field === "number" && Number.isFinite(field) ? field : fallback;
 }

@@ -29,6 +29,7 @@ const METRICS_ID = "10000000-0000-4000-8000-000000000003";
 const COMPARISON_ID = "10000000-0000-4000-8000-000000000004";
 
 async function main() {
+  await validateResultEvidencePublicBoundary();
   await validateFitParserBoundary();
   const indexedComparison = validateStructuredProviderStepBoundary();
   validateActivityTypeBoundary();
@@ -38,6 +39,65 @@ async function main() {
   validateWorkoutSidebarWeekSummaryContract();
 
   console.log("Workout evidence comparison contract passed.");
+}
+
+async function validateResultEvidencePublicBoundary() {
+  const publicContract = await readFile(
+    new URL("../src/lib/workout-result-import/types.ts", import.meta.url),
+    "utf8",
+  );
+  const internalContract = await readFile(
+    new URL("../src/lib/workout-result-import/internal-types.ts", import.meta.url),
+    "utf8",
+  );
+  const completionConsumer = await readFile(
+    new URL("../src/components/CompletionPanel.tsx", import.meta.url),
+    "utf8",
+  );
+
+  for (const privateSymbol of [
+    "WORKOUT_RESULT_STORAGE_BUCKET",
+    "MAX_WORKOUT_RESULT_UPLOAD_BYTES",
+    "MAX_WORKOUT_RESULT_MULTIPART_BYTES",
+    "WORKOUT_RESULT_OBSERVABILITY_OUTCOME_HEADER",
+    "workoutResultErrorResponseHeaders",
+    "ExtractedGarminFitFile",
+    "ParsedActualWorkoutLap",
+    "ParsedActualWorkoutStep",
+    "ParsedGarminWorkout",
+  ]) {
+    assert.doesNotMatch(
+      publicContract,
+      new RegExp(`\\b${privateSymbol}\\b`),
+      `${privateSymbol} must remain Backend-private`,
+    );
+    assert.match(
+      internalContract,
+      new RegExp(`\\b${privateSymbol}\\b`),
+      `${privateSymbol} must have one internal owner`,
+    );
+  }
+
+  assert.doesNotMatch(
+    publicContract,
+    /workout-result-import\/internal-types/,
+    "the public contract must not depend on Backend-private implementation types",
+  );
+  assert.match(
+    internalContract,
+    /import type \{ WorkoutResultImportError \} from "@\/lib\/workout-result-import\/types"/,
+    "the internal contract may depend type-only on the safe public action error",
+  );
+  assert.doesNotMatch(
+    completionConsumer,
+    /workout-result-import\/internal-types/,
+    "Product UI must not import the Backend-private Result/Evidence owner",
+  );
+  assert.match(
+    completionConsumer,
+    /local-activity-file-design-fixture/,
+    "the local-only fixture protocol must use its existing owner",
+  );
 }
 
 function validateWorkoutSidebarWeekSummaryContract() {

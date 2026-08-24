@@ -2,11 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getRequestAuthContext } from "@/lib/backend/auth";
 import {
-  buildAcceptedEffectiveRunnerHeartRateProfile,
   buildHeartRateZonesSummary,
   normalizeAcceptedHeartRateProfileForStorage,
   personalHeartRateProfileInputSchema,
-  type AcceptedRunnerHeartRateProfile,
   type HeartRateZonesSummary,
 } from "@/lib/heart-rate-zones";
 import {
@@ -70,15 +68,6 @@ export interface UserSettingsSummary {
 export interface RunnerCalendarTimezonePreference {
   calendarTimezone: string;
   calendarTimezoneSource: Exclude<RunnerCalendarTimezoneSource, "fallback_utc">;
-}
-
-export interface RunnerPlanAuthoringProfileSnapshot {
-  profileRevision: number;
-  age: number;
-  weightKg: number;
-  heightCm: number;
-  fitnessLevel: RunnerFitnessLevel;
-  heartRateProfile: AcceptedRunnerHeartRateProfile;
 }
 
 type SettingsViewerSummary = {
@@ -453,40 +442,6 @@ export async function updateRunnerCalendarTimezoneForUserId(
   return {
     calendarTimezone: persistedPreference.calendar_timezone,
     calendarTimezoneSource: source,
-  };
-}
-
-export async function getRunnerPlanAuthoringProfileSnapshotForUserId(
-  userId: string,
-): Promise<RunnerPlanAuthoringProfileSnapshot | null> {
-  const profile = await getSettingsProfileRow(userId);
-  const fitnessLevel = parseFitnessLevel(profile?.fitness_level);
-
-  if (
-    !profile ||
-    profile.age == null ||
-    profile.weight_kg == null ||
-    profile.height_cm == null ||
-    !fitnessLevel
-  ) {
-    return null;
-  }
-
-  const heartRateProfile = buildAcceptedEffectiveRunnerHeartRateProfile({
-    age: profile.age,
-    storedProfile: profile.heart_rate_profile,
-  });
-  if (!heartRateProfile) {
-    return null;
-  }
-
-  return {
-    profileRevision: profile.baseline_revision,
-    age: profile.age,
-    weightKg: profile.weight_kg,
-    heightCm: profile.height_cm,
-    fitnessLevel,
-    heartRateProfile,
   };
 }
 

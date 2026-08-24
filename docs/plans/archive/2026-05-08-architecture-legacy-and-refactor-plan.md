@@ -58,7 +58,6 @@ are historical; current truth belongs to current docs, active plans, and source.
 
 See also:
 
-- [Product history digest](../../history/product-history-digest.md)
 - [Current system](../../current-system.md)
 - [Current functional map](../../current-functional-map.md)
 - [Current state](../../current-state.md)
@@ -115,7 +114,6 @@ more specific cleanup tracks.
 - Implemented architecture: `docs/current-system.md`.
 - Business-flow and cleanup source hierarchy: `docs/current-functional-map.md`.
 - Current project snapshot: `docs/current-state.md`.
-- Historical narrative: `docs/history/product-history-digest.md`.
 
 ## Boundaries
 

@@ -2,14 +2,15 @@
 
 ## Load
 
-Read [`AGENTS.md`](../AGENTS.md), the
-[routing contract](../docs/process/hito-task-and-role-routing.md), the selected Notion Task, its
-linked repository document and accepted contract plus direct public boundaries for its Primary Area. Load
+Read [`AGENTS.md`](../AGENTS.md), the selected Notion Task, its linked repository document and
+accepted contract plus direct public boundaries for its Primary Area. Load
 [`hito-qa-browser-regression`](../skills/hito-qa-browser-regression/SKILL.md) only for
 browser/user-flow proof and
 [`hito-backend-supabase-contract`](../skills/hito-backend-supabase-contract/SKILL.md) plus the
 [environment register](../docs/process/hito-supabase-environment-register.md) only for Supabase/auth/
 integration validation.
+Load the [routing contract](../docs/process/hito-task-and-role-routing.md) only when admission,
+owner/QA return, concurrency, external authority or release is affected.
 
 ## Own
 

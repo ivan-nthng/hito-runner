@@ -1,5 +1,6 @@
 import "@tanstack/react-start/server-only";
 
+import { digestSha256Hex } from "@/lib/review-token-signing";
 import type { Database } from "@/lib/supabase/database";
 import { collectRowsForIdBatches } from "@/lib/supabase/batched-in-filter";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
@@ -9,6 +10,7 @@ import {
 } from "@/lib/workout-result-import/comparison-payload";
 import { buildWorkoutResultEvidenceBundle } from "@/lib/workout-result-import/evidence-bundle";
 import type {
+  ContinuationEvidencePacket,
   WorkoutAiInsightSummary,
   WorkoutActualMetricsSummary,
   WorkoutComparisonSummary,
@@ -21,6 +23,8 @@ type PersistedWorkoutActualMetricsRow =
   Database["public"]["Tables"]["workout_actual_metrics"]["Row"];
 type PersistedWorkoutComparisonRow = Database["public"]["Tables"]["workout_comparisons"]["Row"];
 type PersistedWorkoutAiInsightRow = Database["public"]["Tables"]["workout_ai_insights"]["Row"];
+type PersistedRunnerActivitySourceRevisionRow =
+  Database["public"]["Tables"]["runner_activity_source_revisions"]["Row"];
 
 export async function getLatestWorkoutResultFeedback(input: {
   userId: string;
@@ -156,13 +160,15 @@ export async function getWorkoutFeedbackMarkerMap(input: {
   }
 
   const supabase = createAdminSupabaseClient();
-  const assetRows = await collectRowsForIdBatches(uniqueWorkoutIds, (ids) =>
-    supabase
-      .from("workout_result_assets")
-      .select("*")
-      .eq("user_id", input.userId)
-      .in("planned_workout_id", ids)
-      .order("created_at", { ascending: false }),
+  const assetRows = await collectRowsForIdBatches<PersistedWorkoutResultAssetRow>(
+    uniqueWorkoutIds,
+    async (ids) =>
+      await supabase
+        .from("workout_result_assets")
+        .select("*")
+        .eq("user_id", input.userId)
+        .in("planned_workout_id", ids)
+        .order("created_at", { ascending: false }),
   );
 
   const latestAssetByWorkoutId = newestByPlannedWorkoutId(
@@ -171,25 +177,29 @@ export async function getWorkoutFeedbackMarkerMap(input: {
     ),
   );
   const latestAssetIds = Array.from(latestAssetByWorkoutId.values(), (row) => row.id);
-  const metricRows = await collectRowsForIdBatches(latestAssetIds, (ids) =>
-    supabase
-      .from("workout_actual_metrics")
-      .select("*")
-      .eq("user_id", input.userId)
-      .in("result_asset_id", ids)
-      .neq("status", "superseded")
-      .order("created_at", { ascending: false }),
+  const metricRows = await collectRowsForIdBatches<PersistedWorkoutActualMetricsRow>(
+    latestAssetIds,
+    async (ids) =>
+      await supabase
+        .from("workout_actual_metrics")
+        .select("*")
+        .eq("user_id", input.userId)
+        .in("result_asset_id", ids)
+        .neq("status", "superseded")
+        .order("created_at", { ascending: false }),
   );
 
   const latestMetricsByAssetId = newestByResultAssetId(metricRows);
   const comparisonIds = Array.from(new Set(metricRows.map((row) => row.id)));
-  const comparisonRows = await collectRowsForIdBatches(comparisonIds, (ids) =>
-    supabase
-      .from("workout_comparisons")
-      .select("*")
-      .eq("user_id", input.userId)
-      .in("actual_metrics_id", ids)
-      .order("created_at", { ascending: false }),
+  const comparisonRows = await collectRowsForIdBatches<PersistedWorkoutComparisonRow>(
+    comparisonIds,
+    async (ids) =>
+      await supabase
+        .from("workout_comparisons")
+        .select("*")
+        .eq("user_id", input.userId)
+        .in("actual_metrics_id", ids)
+        .order("created_at", { ascending: false }),
   );
 
   const latestComparisonByActualMetricsId = newestByActualMetricsId(comparisonRows);
@@ -216,6 +226,177 @@ export async function getWorkoutFeedbackMarkerMap(input: {
   }
 
   return markerByWorkoutId;
+}
+
+export async function getContinuationEvidencePacket(input: {
+  userId: string;
+  asOf: string;
+  cutoffDate: string;
+  calendarOutcomeFingerprint: string;
+  workouts: Array<{
+    calendarWorkoutId: string;
+    workoutDate: string;
+    workoutType: string;
+    outcome: "completed" | "partial" | "skipped" | "unresolved";
+    outcomeRevision: string;
+    sessionRpe: number | null;
+  }>;
+}): Promise<ContinuationEvidencePacket> {
+  const dueWorkouts = input.workouts.filter(
+    (workout) => workout.workoutType !== "rest" && workout.workoutDate <= input.cutoffDate,
+  );
+  const workoutIds = dueWorkouts.map((workout) => workout.calendarWorkoutId);
+  const supabase = createAdminSupabaseClient();
+  const assetRows = await collectRowsForIdBatches<PersistedWorkoutResultAssetRow>(
+    workoutIds,
+    async (ids) =>
+      await supabase
+        .from("workout_result_assets")
+        .select("*")
+        .eq("user_id", input.userId)
+        .in("planned_workout_id", ids)
+        .order("created_at", { ascending: false }),
+  );
+  const latestAssetByWorkoutId = newestByPlannedWorkoutId(
+    assetRows.filter((row): row is typeof row & { planned_workout_id: string } =>
+      Boolean(row.planned_workout_id),
+    ),
+  );
+  const assetIds = Array.from(latestAssetByWorkoutId.values(), (asset) => asset.id);
+  const sourceRevisionIds = Array.from(
+    new Set(
+      Array.from(latestAssetByWorkoutId.values()).flatMap((asset) =>
+        asset.activity_source_revision_id ? [asset.activity_source_revision_id] : [],
+      ),
+    ),
+  );
+  const [metricRows, sourceRevisionRows] = await Promise.all([
+    collectRowsForIdBatches<PersistedWorkoutActualMetricsRow>(
+      assetIds,
+      async (ids) =>
+        await supabase
+          .from("workout_actual_metrics")
+          .select("*")
+          .eq("user_id", input.userId)
+          .in("result_asset_id", ids)
+          .neq("status", "superseded")
+          .order("created_at", { ascending: false }),
+    ),
+    collectRowsForIdBatches<PersistedRunnerActivitySourceRevisionRow>(
+      sourceRevisionIds,
+      async (ids) =>
+        await supabase
+          .from("runner_activity_source_revisions")
+          .select("*")
+          .eq("user_id", input.userId)
+          .in("id", ids),
+    ),
+  ]);
+  const latestMetricsByAssetId = newestByResultAssetId(metricRows);
+  const metricIds = Array.from(latestMetricsByAssetId.values(), (metrics) => metrics.id);
+  const comparisonRows = await collectRowsForIdBatches<PersistedWorkoutComparisonRow>(
+    metricIds,
+    async (ids) =>
+      await supabase
+        .from("workout_comparisons")
+        .select("*")
+        .eq("user_id", input.userId)
+        .in("actual_metrics_id", ids)
+        .order("created_at", { ascending: false }),
+  );
+  const latestComparisonByActualMetricsId = newestByActualMetricsId(comparisonRows);
+  const sourceRevisionById = new Map(sourceRevisionRows.map((row) => [row.id, row]));
+
+  const workouts: ContinuationEvidencePacket["workouts"] = dueWorkouts.map((workout) => {
+    const asset = latestAssetByWorkoutId.get(workout.calendarWorkoutId) ?? null;
+    const sourceRevision = asset?.activity_source_revision_id
+      ? (sourceRevisionById.get(asset.activity_source_revision_id) ?? null)
+      : null;
+    const metrics = asset ? (latestMetricsByAssetId.get(asset.id) ?? null) : null;
+    const comparison = metrics ? (latestComparisonByActualMetricsId.get(metrics.id) ?? null) : null;
+    const evidenceState = projectContinuationEvidenceState({
+      outcome: workout.outcome,
+      parseStatus: asset?.parse_status ?? null,
+      rawState: sourceRevision?.raw_state ?? null,
+      hasMetrics: Boolean(metrics),
+    });
+    const missingReasons: ContinuationEvidencePacket["workouts"][number]["missingReasons"] = [];
+    if (workout.outcome === "unresolved") missingReasons.push("outcome_missing");
+    if (evidenceState === "missing") missingReasons.push("evidence_missing");
+    if (evidenceState === "updating") missingReasons.push("evidence_updating");
+    if (evidenceState === "removed") missingReasons.push("evidence_removed");
+    if (asset && !metrics && evidenceState !== "updating" && evidenceState !== "removed") {
+      missingReasons.push("actual_metrics_missing");
+    }
+
+    return {
+      calendarWorkoutId: workout.calendarWorkoutId,
+      workoutDate: workout.workoutDate,
+      outcome: workout.outcome,
+      outcomeRevision: workout.outcomeRevision,
+      sessionRpe: workout.sessionRpe,
+      evidenceState,
+      acceptedActualMetrics: metrics
+        ? {
+            activityStartedAt: metrics.activity_started_at,
+            activityLocalDate: metrics.activity_local_date,
+            durationMin: metrics.actual_duration_min,
+            distanceKm: metrics.actual_distance_km,
+            averageHeartRate: metrics.actual_avg_hr,
+            maximumHeartRate: metrics.actual_max_hr,
+            averagePower: metrics.actual_avg_power,
+            maximumPower: metrics.actual_max_power,
+            averageCadence: metrics.actual_avg_cadence,
+            calories: metrics.actual_calories,
+            elevationGainMetres: metrics.actual_elevation_gain_m,
+            elevationLossMetres: metrics.actual_elevation_loss_m,
+            intervalCount: metrics.actual_interval_count,
+          }
+        : null,
+      comparisonStatus:
+        comparison?.comparison_status === "complete" ||
+        comparison?.comparison_status === "partial" ||
+        comparison?.comparison_status === "insufficient_data"
+          ? comparison.comparison_status
+          : null,
+      missingReasons,
+    };
+  });
+
+  return {
+    asOf: input.asOf,
+    cutoffDate: input.cutoffDate,
+    calendarOutcomeFingerprint: input.calendarOutcomeFingerprint,
+    evidenceRevisionFingerprint: await stableEvidenceSha256(workouts),
+    dueWorkoutCount: workouts.length,
+    resolvedOutcomeCount: workouts.filter((workout) => workout.outcome !== "unresolved").length,
+    workouts,
+  };
+}
+
+export function projectContinuationEvidenceState(input: {
+  outcome: "completed" | "partial" | "skipped" | "unresolved";
+  parseStatus: string | null;
+  rawState: string | null;
+  hasMetrics: boolean;
+}): ContinuationEvidencePacket["workouts"][number]["evidenceState"] {
+  if (input.rawState === "removed") return "removed";
+  if (
+    input.rawState === "removal_pending" ||
+    input.parseStatus === "uploaded" ||
+    input.parseStatus === "extracted"
+  ) {
+    return "updating";
+  }
+  if (input.hasMetrics) return "fit_current";
+  if (input.outcome === "completed" || input.outcome === "partial") {
+    return "completed_without_fit";
+  }
+  return "missing";
+}
+
+function stableEvidenceSha256(value: unknown) {
+  return digestSha256Hex(JSON.stringify(value));
 }
 
 export function resultAssetRowToSummary(

@@ -32,10 +32,6 @@ runner-evidence-and-progress
 
 [Hito DS Runner Progress Charts And Records Discovery](./2026-08-16-hito-ds-runner-progress-charts-and-records-discovery.md)
 
-[Hito DS Factual Bar Chart Contract](./2026-08-17-hito-ds-factual-bar-chart-contract.md)
-
-[Hito DS Factual Activity Point Sequence Contract](./2026-08-17-hito-ds-factual-activity-point-sequence-contract.md)
-
 [Runner Progress Factual Activity Sequence Frontend Adoption](./2026-08-17-hito-runner-progress-factual-activity-sequence-frontend-adoption.md)
 
 ## Scope
@@ -45,7 +41,7 @@ the FIT activity point sequence, their `/hitoDS` references, and the Progress pa
 controls. Keep the existing factual visual primitives and Backend contract boundaries; this task
 does not introduce a line chart, new metric, new analytics interpretation, or a generic dashboard.
 
-The first stage is DESIGNER discovery/specification. After Product accepts it, DESIGN SYSTEM owns
+The first stage is DESIGNER discovery/specification. After Product accepts it, FRONTEND Design System owns
 the shared reference/primitive composition changes and FRONTEND Product adopts the accepted
 composition in `/progress` without changing Backend facts.
 
@@ -113,7 +109,7 @@ days`, `Last 1 month`, `Last 6 months`), one selected metric, and a validated cu
 
 The first incorrect ownership is split by contract, not by symptom:
 
-- DESIGN SYSTEM owns the shared factual figure captions and `/hitoDS` Overview showcase layout.
+- FRONTEND Design System owns the shared factual figure captions and `/hitoDS` Overview showcase layout.
 - FRONTEND Product owns the existing period/metric/custom-date composition in
   `src/components/progress/FactualProgressPanel.tsx`.
 
@@ -159,7 +155,7 @@ needed to start the bounded design discovery afterward.
 
 ## Closure
 
-Superseded by the [DS Depth, Overview, And Factual Chart Batch](./2026-08-17-hito-ds-two-layer-elevation-token-system.md).
-Its source investigation, factual constraints, screenshot evidence, and serial DESIGN SYSTEM →
+Superseded by the DS Depth, Overview, And Factual Chart Batch.
+Its source investigation, factual constraints, screenshot evidence, and serial FRONTEND Design System →
 FRONTEND Product boundary remain historical evidence; this record no longer owns a parallel
 workstream.

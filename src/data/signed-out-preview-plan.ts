@@ -1,14 +1,14 @@
-import type { Step, WorkoutType } from "@/lib/training";
+import type { WorkoutDocumentSection, WorkoutDocumentType } from "@/lib/workout-document";
 
 export type SignedOutPreviewWorkoutSeed = {
   id: string;
   dayOffset: number;
   week: number;
   phase: string;
-  type: WorkoutType;
+  type: WorkoutDocumentType;
   title: string;
   notes: string | null;
-  steps: Step[];
+  steps: WorkoutDocumentSection[];
 };
 
 export const signedOutPreviewPlanSeed = {

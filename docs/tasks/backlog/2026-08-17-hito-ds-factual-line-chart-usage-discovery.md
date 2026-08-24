@@ -30,8 +30,6 @@ runner-evidence-and-progress
 
 ## Depends On
 
-[Hito DS Factual Bar Chart Contract](./2026-08-17-hito-ds-factual-bar-chart-contract.md)
-
 [Hito Running Coach Activity-Sequence Progress Metrics Review](./2026-08-17-hito-running-coach-activity-sequence-progress-metrics-review.md)
 
 ## Evidence From

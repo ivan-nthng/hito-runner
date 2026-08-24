@@ -37,7 +37,7 @@ RUNNING COACH doctrine / advanced performance cadence
 
 CONTEXT:
 - Source path: docs/tasks/backlog/2026-06-01-advanced-performance-cadence-doctrine-and-implementation.md
-- The completed production blueprint wave is archived at docs/plans/archive/2026-05-26-ai-authored-first-plan-pipeline.md.
+- The completed production blueprint wave is retained in Git history.
 - Beginner/new-runner run/walk adaptation is already implemented.
 - Beginner/recreational supported cadence is already implemented.
 - Supported half/marathon goal-specific specificity is already implemented.

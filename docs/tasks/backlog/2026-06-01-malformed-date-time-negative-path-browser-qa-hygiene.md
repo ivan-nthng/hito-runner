@@ -77,10 +77,7 @@ date/time negative paths.
 
 ## Evidence
 
-- Archived production blueprint plan:
-  `docs/plans/archive/2026-05-26-ai-authored-first-plan-pipeline.md`
-- Completed Date Picker spec:
-  `docs/tasks/frontend-specs/2026-05-30-hito-ds-date-picker-correction.md`
+- The completed Date Picker correction is retained in Git history.
 - Routine QA screenshots are under `qa-artifacts/` and are not committed by default.
 
 ## Observed Behavior

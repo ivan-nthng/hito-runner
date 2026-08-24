@@ -95,6 +95,11 @@ export type WorkoutDocumentInitializerDependencies = {
 
 export type WorkoutCommandExecutionDependencies = {
   sourceBatchCalendarInstant?: Date;
+  adaptiveContinuationAsOfDate?: string;
+};
+
+type WorkoutCommandReviewDependencies = {
+  adaptiveContinuationAsOfDate?: string;
 };
 
 type ManualEmptyPlanCreateDependencies = {
@@ -481,7 +486,16 @@ export const confirmWorkoutCommandAction = createServerFn({ method: "POST" })
 export async function reviewWorkoutCommandForUser(
   userId: string,
   input: unknown,
+  dependencies: WorkoutCommandReviewDependencies = {},
 ): Promise<WorkoutCommandReviewResult> {
+  const { isAdaptiveContinuationReviewRequest, reviewAdaptiveContinuationCandidateForUser } =
+    await import("@/lib/adaptive-blueprint-confirmation");
+  if (isAdaptiveContinuationReviewRequest(input)) {
+    return reviewAdaptiveContinuationCandidateForUser(userId, input, {
+      asOfDate: dependencies.adaptiveContinuationAsOfDate,
+    });
+  }
+
   const parsed = workoutCommandSchema.safeParse(input);
   if (!parsed.success) {
     return rejectWorkoutCommand("The Workout command payload is invalid.");
@@ -536,6 +550,15 @@ export async function reviewWorkoutCommandForUser(
   }
 
   if (command.operation === "materialize") {
+    const {
+      isAdaptiveContinuationMaterializeCommand,
+      reviewAdaptiveContinuationMaterializeCommandForUser,
+    } = await import("@/lib/adaptive-blueprint-confirmation");
+    if (isAdaptiveContinuationMaterializeCommand(command)) {
+      return reviewAdaptiveContinuationMaterializeCommandForUser(userId, command, {
+        asOfDate: dependencies.adaptiveContinuationAsOfDate,
+      });
+    }
     const { getCalendarWorkoutMutationContext } = await import("@/lib/runner-calendar-persistence");
     try {
       const context = await getCalendarWorkoutMutationContext(userId);
@@ -577,7 +600,9 @@ export async function confirmWorkoutCommandForUser(
     };
   }
 
-  const reviewed = await reviewWorkoutCommandForUser(userId, parsed.data.command);
+  const reviewed = await reviewWorkoutCommandForUser(userId, parsed.data.command, {
+    adaptiveContinuationAsOfDate: dependencies.adaptiveContinuationAsOfDate,
+  });
   if (!reviewed.ok) {
     return {
       ok: false,
@@ -672,6 +697,41 @@ async function executeMaterializeWorkoutCommand(
       reason: "unsupported_operation",
       message: "The reviewed command is not a materialize operation.",
     };
+  }
+  const {
+    executeAdaptiveContinuationMaterializeCommandForUser,
+    isAdaptiveContinuationMaterializeCommand,
+  } = await import("@/lib/adaptive-blueprint-confirmation");
+  if (isAdaptiveContinuationMaterializeCommand(candidate.command)) {
+    try {
+      const result = await executeAdaptiveContinuationMaterializeCommandForUser(userId, candidate, {
+        asOfDate: dependencies.adaptiveContinuationAsOfDate,
+      });
+      return {
+        ok: true,
+        operation: candidate.command.operation,
+        result: {
+          ...result,
+          reviewChecksum: candidate.reviewChecksum,
+          explicitConfirm: true,
+          trustedClientRows: false,
+        } as unknown as Json,
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        reason:
+          error instanceof Error && /occupied|collision/u.test(error.message)
+            ? "collision"
+            : error instanceof Error && /stale|changed|current|confirmed/u.test(error.message)
+              ? "stale_review"
+              : "persistence_failed",
+        message:
+          error instanceof Error
+            ? error.message
+            : "The reviewed adaptive continuation could not be materialized.",
+      };
+    }
   }
   const sourceBatch = resolveReviewedSourceWorkoutBatch(candidate);
   if (sourceBatch.kind === "invalid") {

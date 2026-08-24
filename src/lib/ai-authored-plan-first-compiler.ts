@@ -1,4 +1,6 @@
 import {
+  AI_AUTHORED_PLAN_FIRST_ENDPOINT_IDENTITY,
+  aiAuthoredDetailedBlockSchema,
   aiAuthoredPlanFirstCompilerDraftSchema,
   resolveAiAuthoredPaceProvenance,
   type AiAuthoredPlanFirstCompilerDraft,
@@ -9,6 +11,7 @@ import {
 import { resolveEffectiveHeartRateGuidance } from "@/lib/heart-rate-zones";
 import {
   FUTURE_TEMPLATE_VERSION,
+  buildImportedPlanSeed,
   trainingPlanV2Schema,
   type TrainingPlanV2,
 } from "@/lib/imported-plan";
@@ -34,7 +37,9 @@ import {
   WORKOUT_DOCUMENT_HYDRATION_CUE,
   WORKOUT_DOCUMENT_HYDRATION_LABEL,
 } from "@/lib/workout-document";
+import { stableJsonStringify } from "@/lib/review-token-signing";
 import type { ZodIssue } from "zod";
+import type { WorkoutDocument } from "@/lib/workout-document";
 
 type CompilerIssue = { code: string; message: string; path?: string };
 type StructuredAuthoringInput = Omit<StructuredPlanAuthoringInput, "requestContext">;
@@ -48,13 +53,40 @@ type TargetExecutionContext = {
   segmentType: string;
   repeatChildRole?: AiAuthoredPlanFirstCompilerUnit["role"];
   authoredPurpose: string | null;
+  prescription: AiAuthoredPlanFirstCompilerUnit["prescription"];
 };
 
-export const AI_AUTHORED_PLAN_FIRST_SOURCE_KIND = "ai_authored_plan_first_v1" as const;
+export const AI_AUTHORED_PLAN_FIRST_SOURCE_KIND = "adaptive_blueprint_four_week_v1" as const;
+export const AI_AUTHORED_BLUEPRINT_VERSION = "adaptive_blueprint_v1" as const;
+export const AI_AUTHORED_PLAN_FIRST_COMPILER_VERSION = "adaptive_blueprint_compiler_v10" as const;
+
+export interface AiAuthoredBlueprintSummary {
+  version: typeof AI_AUTHORED_BLUEPRINT_VERSION;
+  startDate: string;
+  selectedTargetDate: string;
+  targetAssumption: string;
+  phases: AiAuthoredPlanFirstCompilerDraft["blueprint"]["phases"];
+  projections: AiAuthoredPlanFirstCompilerDraft["blueprint"]["projections"];
+  detailedHorizon: {
+    startDate: string;
+    endDate: string;
+    calendarWeekCount: number;
+    targetBoundary: boolean;
+  };
+}
+
+export interface AiAuthoredBlueprintReviewConflict {
+  code: "fixed_rest_day_preference_conflict" | "preferred_long_run_day_conflict";
+  date: string;
+  message: string;
+}
+
 type AiAuthoredPlanFirstCompileResult =
   | {
       ok: true;
       canonicalPlan: TrainingPlanV2;
+      blueprint: AiAuthoredBlueprintSummary;
+      reviewConflicts: AiAuthoredBlueprintReviewConflict[];
       validationIssues: string[];
     }
   | {
@@ -91,10 +123,12 @@ export function compileAiAuthoredPlanFirstDraft({
   }
 
   const issues = [...normalized.issues];
+  const reviewConflicts: AiAuthoredBlueprintReviewConflict[] = [];
   const compiled = compileProviderDraft({
     draft: normalized.draft,
     authoringInput,
     issues,
+    reviewConflicts,
   });
 
   if (issues.length > 0) {
@@ -136,8 +170,221 @@ export function compileAiAuthoredPlanFirstDraft({
   return {
     ok: true,
     canonicalPlan: canonicalResult.data,
+    blueprint: buildBlueprintSummary(normalized.draft),
+    reviewConflicts,
     validationIssues: [],
   };
+}
+
+export type AiAuthoredContinuationCompileResult =
+  | {
+      ok: true;
+      workoutDocuments: WorkoutDocument[];
+      reviewConflicts: AiAuthoredBlueprintReviewConflict[];
+    }
+  | { ok: false; reason: string; issues: CompilerIssue[] };
+
+export function compileAiAuthoredContinuationDetailedBlock(input: {
+  response: unknown;
+  authoringInput: StructuredAuthoringInput;
+  blueprint: AiAuthoredBlueprintSummary;
+  interval: {
+    startDate: string;
+    endDate: string;
+    blockMode: "normal_four_week" | "target_taper_boundary" | "resolved_interruption_bridge";
+  };
+  projections: Array<{
+    projectionId: string;
+    date: string;
+    phase: string;
+    workoutFamily: string;
+  }>;
+}): AiAuthoredContinuationCompileResult {
+  const parsed = aiAuthoredDetailedBlockSchema.safeParse(input.response);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      reason: "adaptive_continuation_provider_schema_invalid",
+      issues: parsed.error.issues.slice(0, 16).map((issue) => ({
+        code: "adaptive_continuation_provider_schema_invalid",
+        path: issue.path.join(".") || "root",
+        message: issue.message,
+      })),
+    };
+  }
+  const block = parsed.data;
+  const authoredDays = [...block.workouts, block.final_workout].sort((left, right) =>
+    left.date.localeCompare(right.date),
+  );
+  const expected = [...input.projections].sort((left, right) =>
+    left.date.localeCompare(right.date),
+  );
+  const issues: CompilerIssue[] = [];
+  if (block.start_date !== input.interval.startDate || block.end_date !== input.interval.endDate) {
+    issues.push({
+      code: "adaptive_continuation_interval_mismatch",
+      path: "detailed_block",
+      message: "The authored continuation block must match the exact reviewed interval.",
+    });
+  }
+  if (
+    authoredDays.length !== expected.length ||
+    authoredDays.some((day, index) => day.date !== expected[index]?.date)
+  ) {
+    issues.push({
+      code: "adaptive_continuation_projection_coverage_mismatch",
+      path: "detailed_block",
+      message: "The authored continuation must cover each reviewed projection exactly once.",
+    });
+  }
+  for (const [index, day] of authoredDays.entries()) {
+    const projection = expected[index];
+    if (!projection) continue;
+    if (day.phase !== projection.phase) {
+      issues.push({
+        code: "adaptive_continuation_phase_mismatch",
+        path: `detailed_block.workouts.${index}.phase`,
+        message: "The authored workout phase does not match its immutable Blueprint projection.",
+      });
+    }
+    if (familyForIdentity(day.workout_identity) !== projection.workoutFamily) {
+      issues.push({
+        code: "adaptive_continuation_family_mismatch",
+        path: `detailed_block.workouts.${index}.workout_identity`,
+        message: "The authored workout family does not match its immutable Blueprint projection.",
+      });
+    }
+  }
+  validateContinuationSteadyFamilyFidelity({ authoredDays, issues });
+  if (input.interval.blockMode === "resolved_interruption_bridge") {
+    validateResolvedInterruptionBridgeDensity({
+      authoredDays,
+      intervalStartDate: input.interval.startDate,
+      issues,
+    });
+  }
+  if (block.final_workout.date !== authoredDays.at(-1)?.date) {
+    issues.push({
+      code: "adaptive_continuation_final_workout_not_last",
+      path: "detailed_block.final_workout.date",
+      message: "The continuation final_workout must be the chronologically last reviewed workout.",
+    });
+  }
+  if (issues.length > 0) {
+    return { ok: false, reason: issues[0]!.code, issues };
+  }
+
+  const compilerInput: StructuredAuthoringInput = {
+    ...input.authoringInput,
+    schedule: { ...input.authoringInput.schedule, startDate: input.interval.startDate },
+  };
+  const reviewConflicts: AiAuthoredBlueprintReviewConflict[] = [];
+  const compiled = compileProviderDraft({
+    draft: {
+      blueprint: {
+        start_date: input.blueprint.startDate,
+        selected_target_date: input.blueprint.selectedTargetDate,
+        target_assumption: input.blueprint.targetAssumption,
+        phases: input.blueprint.phases,
+        projections: input.blueprint.projections,
+      },
+      detailed_block: block,
+    },
+    authoringInput: compilerInput,
+    issues,
+    reviewConflicts,
+  });
+  if (issues.length > 0) {
+    return { ok: false, reason: issues[0]!.code, issues };
+  }
+  const canonical = trainingPlanV2Schema.safeParse({
+    ...compiled,
+    planned_workouts: compiled.planned_workouts.filter(
+      (workout) => workout.workout_type !== "rest",
+    ),
+  });
+  if (!canonical.success) {
+    return {
+      ok: false,
+      reason: "adaptive_continuation_compiler_output_invalid",
+      issues: canonical.error.issues.slice(0, 16).map((issue) => ({
+        code: "adaptive_continuation_compiler_output_invalid",
+        path: issue.path.join(".") || "root",
+        message: issue.message,
+      })),
+    };
+  }
+  return {
+    ok: true,
+    workoutDocuments: buildImportedPlanSeed(canonical.data).workouts,
+    reviewConflicts,
+  };
+}
+
+function validateContinuationSteadyFamilyFidelity(input: {
+  authoredDays: readonly AiAuthoredPlanFirstCompilerWorkout[];
+  issues: CompilerIssue[];
+}) {
+  const easyCommandSignatures = new Set(
+    input.authoredDays
+      .filter((day) => familyForIdentity(day.workout_identity) === "easy")
+      .map((day) => stableJsonStringify(day.sections)),
+  );
+  for (const [index, day] of input.authoredDays.entries()) {
+    if (
+      day.workout_identity === "steady_aerobic_run" &&
+      easyCommandSignatures.has(stableJsonStringify(day.sections))
+    ) {
+      input.issues.push({
+        code: "adaptive_continuation_steady_aerobic_matches_easy_signature",
+        path: `detailed_block.workouts.${index}.sections`,
+        message:
+          "A steady aerobic continuation must preserve a controlled-steady command distinct from every easy command.",
+      });
+    }
+  }
+}
+
+function validateResolvedInterruptionBridgeDensity(input: {
+  authoredDays: AiAuthoredPlanFirstCompilerWorkout[];
+  intervalStartDate: string;
+  issues: CompilerIssue[];
+}) {
+  let firstWeekDurationMinutes = 0;
+  for (const [index, day] of input.authoredDays.entries()) {
+    const dayOffset = diffDaysIso(day.date, input.intervalStartDate);
+    const durationMinutes = completeRunnableDurationMinutes(day);
+    if (durationMinutes == null) {
+      continue;
+    }
+    const isLong = familyForIdentity(day.workout_identity) === "long";
+    if (dayOffset < 7) {
+      firstWeekDurationMinutes += durationMinutes;
+      const maximumDurationMinutes = isLong ? 60 : 35;
+      if (durationMinutes > maximumDurationMinutes + Number.EPSILON) {
+        input.issues.push({
+          code: isLong
+            ? "adaptive_continuation_bridge_opening_long_too_dense"
+            : "adaptive_continuation_bridge_opening_session_too_dense",
+          path: `detailed_block.workouts.${index}.sections`,
+          message: `The opening bridge ${isLong ? "long" : "non-long"} workout exceeds ${maximumDurationMinutes} runnable minutes.`,
+        });
+      }
+    } else if (isLong && durationMinutes > 75 + Number.EPSILON) {
+      input.issues.push({
+        code: "adaptive_continuation_bridge_second_long_too_dense",
+        path: `detailed_block.workouts.${index}.sections`,
+        message: "The second bridge long workout exceeds 75 runnable minutes.",
+      });
+    }
+  }
+  if (firstWeekDurationMinutes > 165 + Number.EPSILON) {
+    input.issues.push({
+      code: "adaptive_continuation_bridge_opening_week_too_dense",
+      path: "detailed_block.workouts",
+      message: "The opening bridge week exceeds 165 runnable minutes.",
+    });
+  }
 }
 
 function normalizeProviderDraft({
@@ -165,12 +412,21 @@ function normalizeProviderDraft({
 
   const issues: CompilerIssue[] = [];
   const startDate = authoringInput.schedule.startDate;
-  const endDate = providerResult.data.endpoint.date;
-  const authoredDays = [...providerResult.data.workouts, providerResult.data.endpoint];
+  const latestDate = addDaysIso(startDate, 363);
+  const targetDate = providerResult.data.blueprint.selected_target_date;
+  const fourWeekEndDate = addDaysIso(startDate, 27);
+  const detailedEndDate = targetDate < fourWeekEndDate ? targetDate : fourWeekEndDate;
+  const authoredDays = [
+    ...providerResult.data.detailed_block.workouts,
+    providerResult.data.detailed_block.final_workout,
+  ];
   const authoredDates = new Set<string>();
 
   for (const [index, day] of authoredDays.entries()) {
-    const path = index === authoredDays.length - 1 ? "endpoint.date" : `workouts.${index}.date`;
+    const path =
+      index === authoredDays.length - 1
+        ? "detailed_block.final_workout.date"
+        : `detailed_block.workouts.${index}.date`;
 
     if (authoredDates.has(day.date)) {
       issues.push({
@@ -181,13 +437,114 @@ function normalizeProviderDraft({
     }
     authoredDates.add(day.date);
 
-    if (day.date < startDate || day.date > endDate) {
+    if (day.date < startDate || day.date > detailedEndDate) {
       issues.push({
         code: "ai_authored_plan_first_date_out_of_range",
         path,
-        message: `${day.date} falls outside ${startDate} through ${endDate}.`,
+        message: `${day.date} falls outside the detailed horizon ${startDate} through ${detailedEndDate}.`,
       });
     }
+  }
+
+  if (providerResult.data.blueprint.start_date !== startDate) {
+    issues.push({
+      code: "ai_authored_blueprint_start_date_mismatch",
+      path: "blueprint.start_date",
+      message: `Blueprint start ${providerResult.data.blueprint.start_date} must equal ${startDate}.`,
+    });
+  }
+  if (targetDate < startDate || targetDate > latestDate) {
+    issues.push({
+      code: "ai_authored_blueprint_target_date_out_of_range",
+      path: "blueprint.selected_target_date",
+      message: `Blueprint target ${targetDate} must fall between ${startDate} and ${latestDate}.`,
+    });
+  }
+  if (!authoringInput.planGoalIntent.targetDate) {
+    issues.push({
+      code: "ai_authored_blueprint_selected_target_missing",
+      path: "authoringInput.planGoalIntent.targetDate",
+      message: "A Blueprint requires the runner-selected target date before provider review.",
+    });
+  } else if (targetDate !== authoringInput.planGoalIntent.targetDate) {
+    issues.push({
+      code: "ai_authored_blueprint_selected_target_mismatch",
+      path: "blueprint.selected_target_date",
+      message: `Blueprint target ${targetDate} must preserve the selected target ${authoringInput.planGoalIntent.targetDate}.`,
+    });
+  }
+  if (authoringInput.initialPlanProfile.cutoffDate > startDate) {
+    issues.push({
+      code: "ai_authored_blueprint_profile_cutoff_after_detailed_start",
+      path: "authoringInput.initialPlanProfile.cutoffDate",
+      message: `Runner facts cutoff ${authoringInput.initialPlanProfile.cutoffDate} cannot post-date the prospective detailed start ${startDate}.`,
+    });
+  }
+  if (
+    providerResult.data.detailed_block.start_date !== startDate ||
+    providerResult.data.detailed_block.end_date !== detailedEndDate
+  ) {
+    issues.push({
+      code: "ai_authored_blueprint_detailed_horizon_invalid",
+      path: "detailed_block",
+      message: `Detailed block must cover ${startDate} through ${detailedEndDate}.`,
+    });
+  }
+
+  validateBlueprintPhases({
+    phases: providerResult.data.blueprint.phases,
+    startDate,
+    targetDate,
+    requestedWeeklyCadence: resolveRequestedExactWeeklyCadence(
+      authoringInput.availability.maxRunningDaysPerWeek,
+    ),
+    issues,
+  });
+  validateBlueprintProjections({
+    projections: providerResult.data.blueprint.projections,
+    phases: providerResult.data.blueprint.phases,
+    detailedEndDate,
+    targetDate,
+    issues,
+  });
+  validateDetailedWorkoutPhases({
+    authoredDays,
+    phases: providerResult.data.blueprint.phases,
+    issues,
+  });
+
+  const finalWorkout = providerResult.data.detailed_block.final_workout;
+  if (authoredDays.some((day) => day !== finalWorkout && day.date >= finalWorkout.date)) {
+    issues.push({
+      code: "ai_authored_blueprint_final_detailed_workout_invalid",
+      path: "detailed_block.final_workout.date",
+      message: "final_workout must be the unique chronologically last detailed workout.",
+    });
+  }
+  const targetInDetailedHorizon = targetDate <= fourWeekEndDate;
+  const endpointDays = authoredDays.filter(
+    (day) => day.workout_identity === AI_AUTHORED_PLAN_FIRST_ENDPOINT_IDENTITY,
+  );
+  if (targetInDetailedHorizon) {
+    if (
+      endpointDays.length !== 1 ||
+      finalWorkout.workout_identity !== AI_AUTHORED_PLAN_FIRST_ENDPOINT_IDENTITY ||
+      finalWorkout.date !== targetDate
+    ) {
+      issues.push({
+        code: "ai_authored_blueprint_target_boundary_endpoint_invalid",
+        path: "detailed_block.final_workout",
+        message:
+          "A target inside the first four weeks requires one exact target-date final workout.",
+      });
+    }
+  } else if (endpointDays.length > 0) {
+    issues.push({
+      code: "ai_authored_blueprint_future_endpoint_detail_forbidden",
+      path: "detailed_block",
+      message:
+        "A future target must remain non-executable Blueprint intent outside the first detailed block.",
+    });
   }
 
   const authoredContactsByWeek = new Map<number, number>();
@@ -206,20 +563,38 @@ function normalizeProviderDraft({
       });
     }
   }
+  validateRequestedDetailedCadence({
+    authoredContactsByWeek,
+    startDate,
+    detailedEndDate,
+    weekOneStart,
+    requestedWeeklyCadence: resolveRequestedExactWeeklyCadence(
+      authoringInput.availability.maxRunningDaysPerWeek,
+    ),
+    issues,
+  });
+  validateFourDayWeekQualityDensity({
+    authoredDays,
+    weekOneStart,
+    maxRunningDaysPerWeek: authoringInput.availability.maxRunningDaysPerWeek,
+    issues,
+  });
+  validateMissingBaselineProgressionSafety({
+    authoredDays,
+    startDate,
+    detailedEndDate,
+    weekOneStart,
+    issues,
+  });
 
-  if (endDate < startDate) {
-    issues.push({
-      code: "ai_authored_plan_first_date_out_of_range",
-      path: "endpoint.date",
-      message: `Endpoint date ${endDate} is before plan start date ${startDate}.`,
-    });
-  }
-
-  const preparationHorizonWeeks = Math.max(1, Math.ceil((diffDaysIso(endDate, startDate) + 1) / 7));
+  const preparationHorizonWeeks = Math.max(
+    1,
+    Math.ceil((diffDaysIso(targetDate, startDate) + 1) / 7),
+  );
   if (preparationHorizonWeeks > 52) {
     issues.push({
       code: "ai_authored_plan_first_horizon_out_of_range",
-      path: "endpoint.date",
+      path: "blueprint.selected_target_date",
       message: "Provider draft exceeds the canonical 52-week plan horizon.",
     });
   }
@@ -229,37 +604,513 @@ function normalizeProviderDraft({
     issues,
     draft: {
       ...providerResult.data,
-      workouts: [...providerResult.data.workouts].sort((left, right) =>
-        left.date.localeCompare(right.date),
-      ),
+      blueprint: {
+        ...providerResult.data.blueprint,
+        phases: [...providerResult.data.blueprint.phases],
+        projections: [...providerResult.data.blueprint.projections].sort((left, right) =>
+          left.date.localeCompare(right.date),
+        ),
+      },
+      detailed_block: {
+        ...providerResult.data.detailed_block,
+        workouts: [...providerResult.data.detailed_block.workouts].sort((left, right) =>
+          left.date.localeCompare(right.date),
+        ),
+      },
     },
   };
+}
+
+function resolveRequestedExactWeeklyCadence(maxRunningDaysPerWeek: number | null) {
+  return maxRunningDaysPerWeek === 4 ? 4 : null;
+}
+
+function validateRequestedDetailedCadence(input: {
+  authoredContactsByWeek: ReadonlyMap<number, number>;
+  startDate: string;
+  detailedEndDate: string;
+  weekOneStart: string;
+  requestedWeeklyCadence: number | null;
+  issues: CompilerIssue[];
+}) {
+  if (input.requestedWeeklyCadence == null) return;
+
+  for (
+    let weekStart = input.weekOneStart;
+    weekStart <= input.detailedEndDate;
+    weekStart = addDaysIso(weekStart, 7)
+  ) {
+    const weekEnd = addDaysIso(weekStart, 6);
+    if (weekStart < input.startDate || weekEnd > input.detailedEndDate) continue;
+    const weekNumber = Math.floor(diffDaysIso(weekStart, input.weekOneStart) / 7) + 1;
+    const contactCount = input.authoredContactsByWeek.get(weekNumber) ?? 0;
+    if (contactCount === input.requestedWeeklyCadence) continue;
+    input.issues.push({
+      code: "ai_authored_plan_first_requested_weekly_cadence_mismatch",
+      path: `weeks.${weekNumber}`,
+      message: `Full detailed calendar week ${weekNumber} must contain exactly the runner-requested ${input.requestedWeeklyCadence} workouts; received ${contactCount}.`,
+    });
+  }
+}
+
+const MAX_MISSING_BASELINE_LONG_RUN_BUILD_MINUTES = 10;
+const MAX_MISSING_BASELINE_WEEKLY_DURATION_INCREASE_RATIO = 0.15;
+const MINIMUM_MISSING_BASELINE_CUTBACK_RATIO = 0.15;
+const MISSING_BASELINE_LONG_RUN_QUALITY_IDENTITIES = new Set<CanonicalWorkoutIdentity>([
+  "long_run_with_steady_finish",
+  "marathon_steady_specificity",
+]);
+
+function validateMissingBaselineProgressionSafety(input: {
+  authoredDays: readonly AiAuthoredPlanFirstCompilerWorkout[];
+  startDate: string;
+  detailedEndDate: string;
+  weekOneStart: string;
+  issues: CompilerIssue[];
+}) {
+  const longRuns = input.authoredDays
+    .filter((day) => familyForIdentity(day.workout_identity) === "long")
+    .sort((left, right) => left.date.localeCompare(right.date));
+
+  for (const day of input.authoredDays) {
+    if (!MISSING_BASELINE_LONG_RUN_QUALITY_IDENTITIES.has(day.workout_identity)) continue;
+    input.issues.push({
+      code: "ai_authored_plan_first_missing_baseline_long_run_quality_forbidden",
+      path: `${day.date}.workout_identity`,
+      message:
+        "Without a recent volume and longest-run baseline, the first detailed block cannot prescribe a long-run quality finish.",
+    });
+  }
+
+  let previousTimedLongRun: { date: string; durationMinutes: number } | null = null;
+  for (const day of longRuns) {
+    const durationMinutes = completeRunnableDurationMinutes(day);
+    if (durationMinutes == null) continue;
+    if (
+      previousTimedLongRun &&
+      durationMinutes - previousTimedLongRun.durationMinutes >
+        MAX_MISSING_BASELINE_LONG_RUN_BUILD_MINUTES + Number.EPSILON
+    ) {
+      input.issues.push({
+        code: "ai_authored_plan_first_missing_baseline_long_run_progression_exceeded",
+        path: `${day.date}.sections`,
+        message: `Without a recent volume and longest-run baseline, a timed long run may increase by at most ${MAX_MISSING_BASELINE_LONG_RUN_BUILD_MINUTES} minutes from the previous timed long run (${previousTimedLongRun.date}).`,
+      });
+    }
+    previousTimedLongRun = { date: day.date, durationMinutes };
+  }
+
+  const weeks = new Map<string, AiAuthoredPlanFirstCompilerWorkout[]>();
+  for (const day of input.authoredDays) {
+    const weekStart = startOfWeekIso(day.date);
+    const days = weeks.get(weekStart) ?? [];
+    days.push(day);
+    weeks.set(weekStart, days);
+  }
+  let previousTimedWeek: {
+    weekStart: string;
+    durationMinutes: number;
+    contactCount: number;
+  } | null = null;
+  const timedWeeks: Array<{
+    weekStart: string;
+    durationMinutes: number;
+    contactCount: number;
+    longRunDurationMinutes: number | null;
+  }> = [];
+  for (const [weekStart, days] of [...weeks.entries()].sort(([left], [right]) =>
+    left.localeCompare(right),
+  )) {
+    const durationMinutes = days
+      .map(knownTimedRunnableDurationMinutes)
+      .reduce((sum, duration) => sum + duration, 0);
+    const timedLongRuns = days
+      .filter((day) => familyForIdentity(day.workout_identity) === "long")
+      .map(completeRunnableDurationMinutes)
+      .filter((duration): duration is number => duration != null);
+    timedWeeks.push({
+      weekStart,
+      durationMinutes,
+      contactCount: days.length,
+      longRunDurationMinutes: timedLongRuns.length === 1 ? timedLongRuns[0]! : null,
+    });
+    if (
+      previousTimedWeek &&
+      days.length === previousTimedWeek.contactCount &&
+      durationMinutes >
+        previousTimedWeek.durationMinutes *
+          (1 + MAX_MISSING_BASELINE_WEEKLY_DURATION_INCREASE_RATIO) +
+          Number.EPSILON
+    ) {
+      input.issues.push({
+        code: "ai_authored_plan_first_missing_baseline_weekly_duration_progression_exceeded",
+        path: `weeks.${Math.floor(diffDaysIso(weekStart, input.weekOneStart) / 7) + 1}`,
+        message:
+          "Without a recent volume baseline, summed explicitly timed runnable minutes may increase by at most 15 percent from the previous comparable calendar week.",
+      });
+    }
+    previousTimedWeek = { weekStart, durationMinutes, contactCount: days.length };
+  }
+
+  const fullTimedWeeks = timedWeeks.filter(
+    (week) =>
+      week.weekStart >= input.startDate && addDaysIso(week.weekStart, 6) <= input.detailedEndDate,
+  );
+  if (fullTimedWeeks.length === 4) {
+    const thirdWeek = fullTimedWeeks[2]!;
+    const fourthWeek = fullTimedWeeks[3]!;
+    const maximumCutbackDuration =
+      thirdWeek.durationMinutes * (1 - MINIMUM_MISSING_BASELINE_CUTBACK_RATIO);
+    if (fourthWeek.contactCount > thirdWeek.contactCount) {
+      input.issues.push({
+        code: "ai_authored_plan_first_missing_baseline_fourth_week_contact_cutback_missing",
+        path: `weeks.${Math.floor(diffDaysIso(fourthWeek.weekStart, input.weekOneStart) / 7) + 1}`,
+        message:
+          "Without a recent volume baseline, the fourth full detailed week must not increase runnable contacts above week three.",
+      });
+    }
+    if (fourthWeek.durationMinutes > maximumCutbackDuration + Number.EPSILON) {
+      input.issues.push({
+        code: "ai_authored_plan_first_missing_baseline_fourth_week_cutback_missing",
+        path: `weeks.${Math.floor(diffDaysIso(fourthWeek.weekStart, input.weekOneStart) / 7) + 1}`,
+        message:
+          "Without a recent volume baseline, the fourth full detailed week must cut summed explicitly timed runnable minutes by at least 15 percent from week three.",
+      });
+    }
+    if (
+      thirdWeek.longRunDurationMinutes != null &&
+      fourthWeek.longRunDurationMinutes != null &&
+      fourthWeek.longRunDurationMinutes >
+        thirdWeek.longRunDurationMinutes * (1 - MINIMUM_MISSING_BASELINE_CUTBACK_RATIO) +
+          Number.EPSILON
+    ) {
+      input.issues.push({
+        code: "ai_authored_plan_first_missing_baseline_fourth_week_long_run_cutback_missing",
+        path: `weeks.${Math.floor(diffDaysIso(fourthWeek.weekStart, input.weekOneStart) / 7) + 1}`,
+        message:
+          "Without a recent longest-run baseline, the fourth full detailed week must cut the timed long run by at least 15 percent from week three.",
+      });
+    }
+  }
+}
+
+function knownTimedRunnableDurationMinutes(workout: AiAuthoredPlanFirstCompilerWorkout): number {
+  let total = 0;
+  for (const section of workout.sections) {
+    if (section.kind === "hydration") continue;
+    if (section.kind === "unit") {
+      if (section.prescription.mode === "time") total += section.prescription.duration_min;
+      continue;
+    }
+    for (const child of section.children) {
+      if (child.prescription.mode === "time") {
+        total += child.prescription.duration_min * section.rounds;
+      }
+    }
+  }
+  return total;
+}
+
+function completeRunnableDurationMinutes(
+  workout: AiAuthoredPlanFirstCompilerWorkout,
+): number | null {
+  let total = 0;
+  for (const section of workout.sections) {
+    if (section.kind === "hydration") continue;
+    if (section.kind === "unit") {
+      if (section.prescription.mode !== "time") return null;
+      total += section.prescription.duration_min;
+      continue;
+    }
+    for (const child of section.children) {
+      if (child.prescription.mode !== "time") return null;
+      total += child.prescription.duration_min * section.rounds;
+    }
+  }
+  return total;
+}
+
+const FOUR_DAY_WEEK_QUALITY_FAMILIES = new Set([
+  "steady",
+  "tempo",
+  "intervals",
+  "progression",
+  "race",
+  "hills",
+]);
+
+function validateFourDayWeekQualityDensity(input: {
+  authoredDays: readonly AiAuthoredPlanFirstCompilerWorkout[];
+  weekOneStart: string;
+  maxRunningDaysPerWeek: number | null;
+  issues: CompilerIssue[];
+}) {
+  if (input.maxRunningDaysPerWeek == null || input.maxRunningDaysPerWeek > 4) return;
+
+  const daysByWeek = new Map<number, AiAuthoredPlanFirstCompilerWorkout[]>();
+  for (const day of input.authoredDays) {
+    const weekNumber = Math.floor(diffDaysIso(day.date, input.weekOneStart) / 7) + 1;
+    const days = daysByWeek.get(weekNumber) ?? [];
+    days.push(day);
+    daysByWeek.set(weekNumber, days);
+  }
+
+  for (const [weekNumber, days] of daysByWeek) {
+    const qualityDays = days.filter((day) =>
+      FOUR_DAY_WEEK_QUALITY_FAMILIES.has(familyForIdentity(day.workout_identity)),
+    );
+    const longRunDays = days.filter((day) => familyForIdentity(day.workout_identity) === "long");
+    if (qualityDays.length <= 1 && longRunDays.length <= 1) continue;
+
+    input.issues.push({
+      code: "ai_authored_plan_first_four_day_week_quality_density_exceeded",
+      path: `weeks.${weekNumber}`,
+      message:
+        "A plan with at most four running days may contain at most one non-long quality session and one long run per calendar week; remaining sessions must be easy or recovery.",
+    });
+  }
+}
+
+function validateBlueprintPhases({
+  phases,
+  startDate,
+  targetDate,
+  requestedWeeklyCadence,
+  issues,
+}: {
+  phases: AiAuthoredPlanFirstCompilerDraft["blueprint"]["phases"];
+  startDate: string;
+  targetDate: string;
+  requestedWeeklyCadence: number | null;
+  issues: CompilerIssue[];
+}) {
+  let expectedStart = startDate;
+  for (const [index, phase] of phases.entries()) {
+    if (phase.start_date !== expectedStart || phase.end_date < phase.start_date) {
+      issues.push({
+        code: "ai_authored_blueprint_phase_bounds_invalid",
+        path: `blueprint.phases.${index}`,
+        message: `Blueprint phase ${phase.phase} must start on ${expectedStart} and have ordered bounds.`,
+      });
+    }
+    if (
+      requestedWeeklyCadence != null &&
+      phase.expected_weekly_cadence !== requestedWeeklyCadence
+    ) {
+      issues.push({
+        code: "ai_authored_blueprint_requested_weekly_cadence_mismatch",
+        path: `blueprint.phases.${index}.expected_weekly_cadence`,
+        message: `Blueprint phase ${phase.phase} must preserve the runner-requested cadence of ${requestedWeeklyCadence} workouts per full calendar week.`,
+      });
+    }
+    expectedStart = addDaysIso(phase.end_date, 1);
+  }
+  if (phases.at(-1)?.end_date !== targetDate) {
+    issues.push({
+      code: "ai_authored_blueprint_phase_horizon_incomplete",
+      path: "blueprint.phases",
+      message: `Blueprint phases must end on selected target ${targetDate}.`,
+    });
+  }
+}
+
+function validateBlueprintProjections({
+  projections,
+  phases,
+  detailedEndDate,
+  targetDate,
+  issues,
+}: {
+  projections: AiAuthoredPlanFirstCompilerDraft["blueprint"]["projections"];
+  phases: AiAuthoredPlanFirstCompilerDraft["blueprint"]["phases"];
+  detailedEndDate: string;
+  targetDate: string;
+  issues: CompilerIssue[];
+}) {
+  const ids = new Set<string>();
+  const dates = new Set<string>();
+  const projectionsByPhaseWeek = new Map<string, number>();
+  for (const [index, projection] of projections.entries()) {
+    if (ids.has(projection.projection_id) || dates.has(projection.date)) {
+      issues.push({
+        code: "ai_authored_blueprint_projection_identity_invalid",
+        path: `blueprint.projections.${index}`,
+        message: "Blueprint projections require unique IDs and dates.",
+      });
+    }
+    ids.add(projection.projection_id);
+    dates.add(projection.date);
+    const phase = phases.find(
+      (candidate) =>
+        candidate.phase === projection.phase &&
+        projection.date >= candidate.start_date &&
+        projection.date <= candidate.end_date,
+    );
+    if (projection.date <= detailedEndDate || projection.date > targetDate || !phase) {
+      issues.push({
+        code: "ai_authored_blueprint_projection_bounds_invalid",
+        path: `blueprint.projections.${index}`,
+        message: `${projection.projection_id} must be future non-executable intent inside its Blueprint phase.`,
+      });
+      continue;
+    }
+    if (!phase.workout_families.includes(projection.cadence_or_workout_family)) {
+      issues.push({
+        code: "ai_authored_blueprint_projection_family_invalid",
+        path: `blueprint.projections.${index}.cadence_or_workout_family`,
+        message: `${projection.projection_id} must use a workout family permitted by ${phase.phase}.`,
+      });
+    }
+    const phaseWeekKey = `${phase.phase}\u0000${startOfWeekIso(projection.date)}`;
+    projectionsByPhaseWeek.set(phaseWeekKey, (projectionsByPhaseWeek.get(phaseWeekKey) ?? 0) + 1);
+  }
+  if (targetDate > detailedEndDate) {
+    const targetProjection = projections.find(
+      (projection) =>
+        projection.date === targetDate && projection.review_timing === "target_review",
+    );
+    if (!targetProjection) {
+      issues.push({
+        code: "ai_authored_blueprint_target_projection_missing",
+        path: "blueprint.projections",
+        message: `Future Blueprint intent must include one target-review projection on ${targetDate}.`,
+      });
+    }
+    for (const [index, phase] of phases.entries()) {
+      if (phase.end_date <= detailedEndDate) continue;
+      if (
+        !projections.some(
+          (projection) =>
+            projection.phase === phase.phase &&
+            projection.date >= phase.start_date &&
+            projection.date <= phase.end_date,
+        )
+      ) {
+        issues.push({
+          code: "ai_authored_blueprint_phase_projection_missing",
+          path: `blueprint.phases.${index}`,
+          message: `Future phase ${phase.phase} requires at least one non-executable projection.`,
+        });
+      }
+    }
+    const futureStartDate = addDaysIso(detailedEndDate, 1);
+    for (const [phaseIndex, phase] of phases.entries()) {
+      const phaseFutureStart =
+        phase.start_date < futureStartDate ? futureStartDate : phase.start_date;
+      const phaseFutureEnd = phase.end_date > targetDate ? targetDate : phase.end_date;
+      if (phaseFutureStart > phaseFutureEnd) continue;
+
+      for (
+        let weekStart = startOfWeekIso(phaseFutureStart);
+        weekStart <= phaseFutureEnd;
+        weekStart = addDaysIso(weekStart, 7)
+      ) {
+        const weekEnd = addDaysIso(weekStart, 6);
+        const intervalStart = phaseFutureStart > weekStart ? phaseFutureStart : weekStart;
+        const intervalEnd = phaseFutureEnd < weekEnd ? phaseFutureEnd : weekEnd;
+        const availableDateCount = diffDaysIso(intervalEnd, intervalStart) + 1;
+        const expectedProjectionCount = Math.min(phase.expected_weekly_cadence, availableDateCount);
+        const actualProjectionCount =
+          projectionsByPhaseWeek.get(`${phase.phase}\u0000${weekStart}`) ?? 0;
+        if (actualProjectionCount !== expectedProjectionCount) {
+          issues.push({
+            code: "ai_authored_blueprint_projection_cadence_incomplete",
+            path: `blueprint.phases.${phaseIndex}`,
+            message: `${phase.phase} requires exactly ${expectedProjectionCount} provisional projection slots in the calendar week starting ${weekStart}; received ${actualProjectionCount}.`,
+          });
+        }
+      }
+    }
+  } else if (projections.length > 0) {
+    issues.push({
+      code: "ai_authored_blueprint_post_target_projection_forbidden",
+      path: "blueprint.projections",
+      message: "A target-boundary detailed block cannot create post-target projections.",
+    });
+  }
+}
+
+function validateDetailedWorkoutPhases({
+  authoredDays,
+  phases,
+  issues,
+}: {
+  authoredDays: AiAuthoredPlanFirstCompilerWorkout[];
+  phases: AiAuthoredPlanFirstCompilerDraft["blueprint"]["phases"];
+  issues: CompilerIssue[];
+}) {
+  for (const day of authoredDays) {
+    const phase = phases.find(
+      (candidate) => day.date >= candidate.start_date && day.date <= candidate.end_date,
+    );
+    if (!phase || phase.phase !== day.phase) {
+      issues.push({
+        code: "ai_authored_blueprint_detailed_phase_mismatch",
+        path: `detailed_block.days.${day.date}.phase`,
+        message: `${day.date} must use its owning Blueprint phase name.`,
+      });
+      continue;
+    }
+    const workoutFamily = familyForIdentity(day.workout_identity);
+    if (!phase.workout_families.includes(workoutFamily)) {
+      issues.push({
+        code: "ai_authored_blueprint_detailed_family_mismatch",
+        path: `detailed_block.days.${day.date}.workout_identity`,
+        message: `${day.date} uses ${workoutFamily}, which is not permitted by Blueprint phase ${phase.phase}.`,
+      });
+    }
+  }
 }
 
 function compileProviderDraft({
   draft,
   authoringInput,
   issues,
+  reviewConflicts,
 }: {
   draft: AiAuthoredPlanFirstCompilerDraft;
   authoringInput: StructuredAuthoringInput;
   issues: CompilerIssue[];
+  reviewConflicts: AiAuthoredBlueprintReviewConflict[];
 }): TrainingPlanV2 {
   const fixedRestDays = authoringInput.availability.fixedRestDays;
   const restDays = uniqueWeekdays(fixedRestDays ?? []);
   const weekOneStart = startOfWeekIso(authoringInput.schedule.startDate);
-  const targetDate = draft.endpoint.date;
+  const targetDate = draft.blueprint.selected_target_date;
+  const detailedEndDate = draft.detailed_block.end_date;
   const authoredDays = new Map<string, AiAuthoredPlanFirstCompilerWorkout>();
-  for (const day of [...draft.workouts, draft.endpoint]) {
+  for (const day of [...draft.detailed_block.workouts, draft.detailed_block.final_workout]) {
     authoredDays.set(day.date, day);
   }
   const workouts: TrainingPlanV2["planned_workouts"] = [];
 
-  validateEndpointDistance(draft.endpoint, authoringInput, issues);
+  if (targetDate <= detailedEndDate) {
+    validateEndpointDistance(draft.detailed_block.final_workout, authoringInput, issues);
+  } else {
+    const targetWeekday = weekdayLong(targetDate);
+    if (restDays.includes(targetWeekday as WeekdayName)) {
+      reviewConflicts.push({
+        code: "fixed_rest_day_preference_conflict",
+        date: targetDate,
+        message: `The selected target date is ${targetWeekday}, a preferred Rest day; preserve the target only after explicit review.`,
+      });
+    }
+  }
+
+  for (const projection of draft.blueprint.projections) {
+    if (projection.date === targetDate) continue;
+    const weekday = weekdayLong(projection.date);
+    if (!restDays.includes(weekday as WeekdayName)) continue;
+    reviewConflicts.push({
+      code: "fixed_rest_day_preference_conflict",
+      date: projection.date,
+      message: `Future ${projection.cadence_or_workout_family} intent is proposed on preferred Rest day ${weekday}; review placement when preparing its detailed block.`,
+    });
+  }
 
   for (
     let date = authoringInput.schedule.startDate;
-    date <= targetDate;
+    date <= detailedEndDate;
     date = addDaysIso(date, 1)
   ) {
     const weekday = weekdayLong(date);
@@ -267,10 +1118,22 @@ function compileProviderDraft({
     const day = authoredDays.get(date) ?? null;
 
     if (restDays.includes(weekday as WeekdayName) && day) {
-      issues.push({
-        code: "ai_authored_plan_first_fixed_rest_day_violation",
-        path: `days.${date}`,
-        message: `${weekday} is a fixed rest day but the provider draft scheduled ${day.title}.`,
+      reviewConflicts.push({
+        code: "fixed_rest_day_preference_conflict",
+        date,
+        message: `${day.title} is proposed on preferred Rest day ${weekday}; review placement before confirmation.`,
+      });
+    }
+    if (
+      day &&
+      authoringInput.availability.preferredLongRunDay &&
+      familyForIdentity(day.workout_identity) === "long" &&
+      weekday !== authoringInput.availability.preferredLongRunDay
+    ) {
+      reviewConflicts.push({
+        code: "preferred_long_run_day_conflict",
+        date,
+        message: `${day.title} is proposed on ${weekday}, not preferred long-run day ${authoringInput.availability.preferredLongRunDay}.`,
       });
     }
 
@@ -283,7 +1146,7 @@ function compileProviderDraft({
             weekNumber,
             authoringInput,
             targetDate,
-            isEndpoint: day === draft.endpoint,
+            isEndpoint: day.workout_identity === AI_AUTHORED_PLAN_FIRST_ENDPOINT_IDENTITY,
             issues,
           })
         : buildRestWorkout({ date, weekday, weekNumber, authoringInput, targetDate }),
@@ -338,6 +1201,30 @@ function compileProviderDraft({
         : {}),
     },
     planned_workouts: workouts,
+  };
+}
+
+function buildBlueprintSummary(
+  draft: AiAuthoredPlanFirstCompilerDraft,
+): AiAuthoredBlueprintSummary {
+  return {
+    version: AI_AUTHORED_BLUEPRINT_VERSION,
+    startDate: draft.blueprint.start_date,
+    selectedTargetDate: draft.blueprint.selected_target_date,
+    targetAssumption: draft.blueprint.target_assumption,
+    phases: draft.blueprint.phases.map((phase) => ({
+      ...phase,
+      workout_families: [...phase.workout_families],
+    })),
+    projections: draft.blueprint.projections.map((projection) => ({ ...projection })),
+    detailedHorizon: {
+      startDate: draft.detailed_block.start_date,
+      endDate: draft.detailed_block.end_date,
+      calendarWeekCount: Math.ceil(
+        (diffDaysIso(draft.detailed_block.end_date, draft.detailed_block.start_date) + 1) / 7,
+      ),
+      targetBoundary: draft.detailed_block.end_date === draft.blueprint.selected_target_date,
+    },
   };
 }
 
@@ -460,16 +1347,20 @@ function providerUnitToExecutionStage({
   target: AiAuthoredPlanFirstCompilerUnit["target"];
   path: string;
 }): LongRunExecutionStage {
+  const executionTarget =
+    target.primary_execution_mode === "pace" || target.primary_execution_mode === "heart_rate"
+      ? {
+          mode: target.primary_execution_mode,
+          command: target.command,
+        }
+      : undefined;
   return {
     role,
     runnable: true,
     ...(prescription.mode === "time"
       ? { durationSeconds: prescription.duration_min * 60 }
       : { distanceMeters: prescription.distance_km * 1000 }),
-    target: {
-      mode: target.primary_execution_mode,
-      command: target.command,
-    },
+    ...(executionTarget ? { target: executionTarget } : {}),
     path,
   };
 }
@@ -570,6 +1461,7 @@ function buildSegment({
     workoutIdentity,
     segmentType: section.segment_type,
     authoredPurpose: section.cue,
+    prescription: section.prescription,
   });
 
   return {
@@ -607,6 +1499,7 @@ function buildRepeatChild({
     segmentType,
     repeatChildRole: child.role,
     authoredPurpose: child.cue,
+    prescription: child.prescription,
   });
 
   return {
@@ -628,15 +1521,32 @@ function buildTarget(
   context: TargetExecutionContext,
 ): TrainingPlanTarget | undefined {
   const paceProvenance = resolveAiAuthoredPaceProvenance(authoringInput);
+  validateBoundedEffortTarget({ value, path, context, issues, paceProvenance });
   const target: TrainingPlanTarget = {
     primary_execution_mode: value.primary_execution_mode,
     target_source: AI_AUTHORED_PLAN_GUIDANCE_TARGET_SOURCE,
-    hr_target_source: "effort_only",
     source_note: "Target from the created plan.",
-    ...(value.primary_execution_mode === "pace" ? { pace: value.command } : {}),
+    ...(value.primary_execution_mode === "pace"
+      ? { pace: value.command, hr_target_source: "effort_only" as const }
+      : {}),
   };
 
   if (value.primary_execution_mode === "pace") {
+    if (paceProvenance === "no_benchmark_ai_estimate") {
+      issues.push({
+        code: "ai_authored_plan_first_executable_pace_without_factual_authority",
+        path,
+        message:
+          "Executable pace requires a runner benchmark or explicit target finish time; generic AI-estimated pace is not factual authority.",
+      });
+    }
+    validateBenchmarkRelativeQualityPace({
+      command: value.command,
+      path,
+      authoringInput,
+      issues,
+      context,
+    });
     target.source_note =
       paceProvenance === "benchmark_backed"
         ? "AI-authored pace informed by the runner benchmark."
@@ -644,6 +1554,22 @@ function buildTarget(
           ? "AI-estimated pace informed by the selected goal; no runner benchmark supplied."
           : "AI-estimated pace; no runner benchmark supplied.";
     target.extra = { pace_provenance: paceProvenance };
+    return target;
+  }
+
+  if (value.primary_execution_mode === "effort") {
+    target.intensity = {
+      controlled_uphill: "Controlled uphill effort",
+      controlled_downhill_recovery: "Controlled downhill recovery",
+      controlled_short_repetition: "Controlled short repetition effort",
+      controlled_stride: "Controlled stride effort",
+      controlled_short_recovery: "Controlled short recovery effort",
+    }[value.effort_kind];
+    target.source_note = ["controlled_short_repetition", "controlled_stride"].includes(
+      value.effort_kind,
+    )
+      ? "Short work is governed by controlled effort; no executable pace or heart rate was inferred."
+      : "Terrain-controlled effort; no executable pace, heart rate, grade, or gradient was inferred.";
     return target;
   }
 
@@ -738,6 +1664,213 @@ function buildTarget(
   return target;
 }
 
+function validateBoundedEffortTarget(input: {
+  value: AiAuthoredPlanFirstCompilerUnit["target"];
+  path: string;
+  context: TargetExecutionContext;
+  issues: CompilerIssue[];
+  paceProvenance: ReturnType<typeof resolveAiAuthoredPaceProvenance>;
+}) {
+  const isUphillRepeat = input.context.workoutIdentity === "uphill_repeats";
+  const isWork = input.context.repeatChildRole === "work";
+  const isRecovery = input.context.repeatChildRole === "recover";
+  const requiresTerrainEffort = isUphillRepeat && (isWork || isRecovery);
+  const shortRepeatEffortKind = resolveRequiredShortRepeatEffortKind(input.context);
+  const requiresShortRepeatEffort =
+    input.paceProvenance === "no_benchmark_ai_estimate" && shortRepeatEffortKind != null;
+
+  if (!requiresTerrainEffort && !requiresShortRepeatEffort) {
+    if (input.value.primary_execution_mode !== "effort") return;
+    input.issues.push({
+      code: "ai_authored_plan_first_effort_context_invalid",
+      path: input.path,
+      message:
+        "Effort targets are limited to bounded short work without factual pace authority and terrain-controlled uphill children.",
+    });
+    return;
+  }
+
+  if (requiresShortRepeatEffort) {
+    if (input.value.primary_execution_mode !== "effort") {
+      input.issues.push({
+        code: "ai_authored_plan_first_short_work_delayed_metric_invalid",
+        path: input.path,
+        message:
+          "Short work and its fixed-duration recovery without factual pace authority must use controlled effort because heart rate cannot govern the bout in time.",
+      });
+      return;
+    }
+    if (input.value.effort_kind !== shortRepeatEffortKind) {
+      input.issues.push({
+        code: "ai_authored_plan_first_short_work_effort_kind_mismatch",
+        path: input.path,
+        message: `This short repeat child requires effort_kind=${shortRepeatEffortKind}.`,
+      });
+    }
+    if (!/controlled|smooth|relaxed/i.test(input.context.authoredPurpose ?? "")) {
+      input.issues.push({
+        code: "ai_authored_plan_first_short_work_control_guidance_missing",
+        path: input.path,
+        message: "Short effort work requires a local controlled-execution cue.",
+      });
+    }
+    return;
+  }
+
+  if (input.value.primary_execution_mode !== "effort") {
+    input.issues.push({
+      code: isWork
+        ? "ai_authored_plan_first_uphill_executable_metric_without_terrain_evidence"
+        : "ai_authored_plan_first_downhill_recovery_metric_without_terrain_evidence",
+      path: input.path,
+      message:
+        "Uphill work and downhill recovery cannot use executable pace or heart rate without provider-neutral terrain or gradient evidence.",
+    });
+    return;
+  }
+
+  const expectedKind = isWork ? "controlled_uphill" : "controlled_downhill_recovery";
+  if (input.value.effort_kind !== expectedKind) {
+    input.issues.push({
+      code: "ai_authored_plan_first_terrain_effort_kind_mismatch",
+      path: input.path,
+      message: `This terrain child requires effort_kind=${expectedKind}.`,
+    });
+  }
+
+  if (isWork && input.context.prescription.mode !== "distance") {
+    input.issues.push({
+      code: "ai_authored_plan_first_uphill_distance_missing",
+      path: input.path,
+      message: "Uphill repeat work requires an explicit distance inside the repeated set.",
+    });
+  }
+  if (isRecovery && input.context.prescription.mode !== "time") {
+    input.issues.push({
+      code: "ai_authored_plan_first_downhill_recovery_duration_missing",
+      path: input.path,
+      message: "Uphill repeat recovery requires an explicit recovery duration.",
+    });
+  }
+
+  const cue = input.context.authoredPurpose ?? "";
+  const cueIsSafe = isWork
+    ? /controlled/i.test(cue) && /(?:not|never) (?:a )?sprint/i.test(cue)
+    : /control(?:led)?|under control/i.test(cue);
+  if (!cueIsSafe) {
+    input.issues.push({
+      code: isWork
+        ? "ai_authored_plan_first_uphill_non_sprinting_guidance_missing"
+        : "ai_authored_plan_first_downhill_control_guidance_missing",
+      path: input.path,
+      message: isWork
+        ? "Uphill work must state controlled effort and explicitly say it is not a sprint."
+        : "Downhill recovery must state that the descent remains controlled.",
+    });
+  }
+}
+
+function resolveRequiredShortRepeatEffortKind(
+  context: TargetExecutionContext,
+): "controlled_short_repetition" | "controlled_stride" | "controlled_short_recovery" | null {
+  if (
+    context.repeatChildRole === "recover" &&
+    context.prescription.mode === "time" &&
+    ((context.workoutIdentity === "easy_run_with_strides" &&
+      context.prescription.duration_min <= 1) ||
+      ((context.workoutIdentity === "controlled_tempo_session" ||
+        context.workoutIdentity === "distance_intervals") &&
+        context.prescription.duration_min <= 1.5))
+  ) {
+    return "controlled_short_recovery";
+  }
+  if (context.repeatChildRole !== "work") return null;
+  if (
+    context.workoutIdentity === "easy_run_with_strides" &&
+    context.prescription.mode === "time" &&
+    context.prescription.duration_min <= 0.5
+  ) {
+    return "controlled_stride";
+  }
+  if (
+    context.workoutIdentity === "controlled_tempo_session" &&
+    context.prescription.mode === "time" &&
+    context.prescription.duration_min <= 2
+  ) {
+    return "controlled_short_repetition";
+  }
+  if (
+    context.workoutIdentity === "distance_intervals" &&
+    context.prescription.mode === "distance" &&
+    context.prescription.distance_km <= 0.4
+  ) {
+    return "controlled_short_repetition";
+  }
+  return null;
+}
+
+function validateBenchmarkRelativeQualityPace(input: {
+  command: string;
+  path: string;
+  authoringInput: StructuredAuthoringInput;
+  issues: CompilerIssue[];
+  context: TargetExecutionContext;
+}) {
+  const rule = resolveBenchmarkRelativeQualityRule(input.context.workoutIdentity);
+  if (!rule || !isSubstantiveBenchmarkRelativeQualityLeaf(input.context)) return;
+
+  const benchmark = input.authoringInput.runnerFacts.benchmark;
+  if (!benchmark || benchmark.kind !== "recent_5k") return;
+
+  const paceRange = parsePaceExecutionRange(input.command);
+  if (!paceRange) return;
+
+  if (paceRange.fastestSecondsPerKm <= benchmark.paceSecondsPerKm) {
+    input.issues.push({
+      code:
+        rule.kind === "tempo"
+          ? "ai_authored_plan_first_tempo_pace_not_slower_than_recent_5k"
+          : "ai_authored_plan_first_10k_rhythm_pace_not_slower_than_recent_5k",
+      path: input.path,
+      message: `${rule.label} pace must be strictly slower than the factual recent 5K benchmark when no separate threshold truth is available.`,
+    });
+  }
+
+  const rpeCeiling = readBenchmarkRelativeRpeCeiling(input.context.authoredPurpose);
+  if (rpeCeiling == null || rpeCeiling > rule.maximumRpe) {
+    input.issues.push({
+      code:
+        rule.kind === "tempo"
+          ? "ai_authored_plan_first_tempo_rpe_ceiling_missing"
+          : "ai_authored_plan_first_10k_rhythm_rpe_ceiling_missing",
+      path: input.path,
+      message: `Benchmark-backed ${rule.label} pace requires a local cue with an explicit RPE max N/10 ceiling at or below ${rule.maximumRpe}/10.`,
+    });
+  }
+}
+
+function resolveBenchmarkRelativeQualityRule(identity: CanonicalWorkoutIdentity) {
+  if (familyForIdentity(identity) === "tempo") {
+    return { kind: "tempo", label: "Tempo", maximumRpe: 7 } as const;
+  }
+  if (identity === "10k_rhythm_intervals") {
+    return { kind: "10k_rhythm", label: "10K rhythm", maximumRpe: 8 } as const;
+  }
+  return null;
+}
+
+function isSubstantiveBenchmarkRelativeQualityLeaf(context: TargetExecutionContext) {
+  if (context.repeatChildRole != null) {
+    return ["work", "run", "finish"].includes(context.repeatChildRole);
+  }
+  return !["warmup", "cooldown", "recovery", "recovery_jog"].includes(context.segmentType);
+}
+
+function readBenchmarkRelativeRpeCeiling(cue: string | null) {
+  const match = /\bRPE max ([0-9]|10)\/10\b/i.exec(cue ?? "");
+  return match ? Number(match[1]) : null;
+}
+
 const ALWAYS_SHORT_STAGE_HR_SUBRANGE_IDENTITIES = new Set<CanonicalWorkoutIdentity>([
   "distance_intervals",
   "time_intervals",
@@ -766,6 +1899,18 @@ function parseBpmExecutionRange(command: string) {
   return {
     minBpm: Number(match[1]),
     maxBpm: Number(match[2]),
+  };
+}
+
+function parsePaceExecutionRange(command: string) {
+  const match = /^(\d{1,2}):([0-5]\d)(?:-(\d{1,2}):([0-5]\d))?\/km$/.exec(command);
+  if (!match) return null;
+
+  const first = Number(match[1]) * 60 + Number(match[2]);
+  const second = match[3] == null ? first : Number(match[3]) * 60 + Number(match[4]);
+  return {
+    fastestSecondsPerKm: Math.min(first, second),
+    slowestSecondsPerKm: Math.max(first, second),
   };
 }
 
@@ -799,7 +1944,7 @@ function validateEndpointDistance(
   if (Math.abs(actualKm - expectedKm) > 0.005) {
     issues.push({
       code: "ai_authored_plan_first_endpoint_distance_mismatch",
-      path: "endpoint.sections",
+      path: "detailed_block.final_workout.sections",
       message: `Endpoint main distance ${actualKm} km does not match selected distance ${expectedKm} km.`,
     });
   }

@@ -46,7 +46,6 @@ Current truth now lives in:
 - [Current system](../../current-system.md)
 - [Current product](../../current-product.md)
 - [Current functional map](../../current-functional-map.md)
-- [Product history digest](../../history/product-history-digest.md)
 
 ## Final Outcome
 

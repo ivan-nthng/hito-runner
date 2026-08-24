@@ -1,10 +1,10 @@
 # Current System
 
 This document describes the implemented architecture and current ownership boundaries. Product
-behavior belongs in [current-product.md](current-product.md), current status belongs in
-[current-state.md](current-state.md), operational lifecycle belongs only in
-[`docs/tasks/backlog/`](tasks/backlog/), and accepted execution detail remains in the technical log,
-canonical backlog receipts, and Git history.
+behavior belongs in [current-product.md](current-product.md), implemented and release state belong in
+[current-state.md](current-state.md), and operational lifecycle belongs only in the `Hito Running`
+Notion database under the [operating map](../AGENTS.md). Repository tasks, contracts and history are
+linked technical evidence rather than lifecycle writers.
 
 ## Runtime And Deployment
 
@@ -29,6 +29,10 @@ canonical backlog receipts, and Git history.
   into the same Supabase-backed saved mode and is not a production auth path.
 - Admin authentication and runner authentication remain separate authority boundaries. Admin
   sessions cannot silently become runner sessions, and tester credentials are not admin access.
+- Actor classification is an Identity-owned decision exposed through
+  [`actor-classification.ts`](tasks/backlog/2026-08-21-hito-identity-owned-actor-classification.md).
+  Runner persisted-user resolution and Admin consume that result; Admin presentation and analytics
+  do not own or reconstruct classification policy.
 - Public browser configuration uses `NEXT_PUBLIC_SUPABASE_URL` and
   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Canonical server access uses only
   `SUPABASE_SECRET_KEY`; secrets stay server-side.
@@ -39,52 +43,70 @@ canonical backlog receipts, and Git history.
 
 The persisted product path is:
 
-`authenticated runner -> runner profile -> reviewed plan -> active plan cycle -> planned workouts -> workout result/evidence -> backend read models`
+`authenticated runner -> identity/profile -> reviewed source or WorkoutDocument -> explicit confirmation -> runner-owned Calendar workout -> result/evidence -> public domain projections -> Product and Progress`
 
 The core owners are:
 
-- `runner_profiles` for runner baseline and future-authoring preferences;
-- `plan_cycles` and `planned_workouts` for active and historical plan truth;
+- Identity/profile for authenticated subject, actor classification, runner baseline and stable
+  preferences;
+- Runner Calendar persistence, mutations and snapshot assembly for each independently owned
+  confirmed workout. The physical `planned_workouts` name is a temporary legacy storage fact, not a
+  plan-owned permission or lifecycle boundary;
+- source records, including the physical `plan_cycles` name, for immutable proposal/provenance
+  history only;
 - `workout_logs` for runner-authored completion, notes, body notes, manual actuals, and RPE;
-- canonical activity/source/revision tables for imported or uploaded activity evidence;
-- result assets, normalized actual metrics, deterministic comparisons, and bounded saved insights for
-  FIT-backed feedback;
-- Backend projections for home, Calendar, workout detail, Activity History, and Progress.
+- Result/Evidence for provider-neutral action results, completion/evidence markers, comparisons,
+  availability and persisted insight projections; provider/storage/parser mechanics remain private;
+- the Runner Activity Product contract for factual Progress history, missingness and visualization
+  inputs.
 
-`src/lib/training.ts` remains the normalized Product snapshot seam. Route server functions in
-`src/lib/training-api.ts` delegate behavior to focused action/read owners; they are transport
-wrappers, not a second domain model. Signed-out preview data remains untrusted and never becomes
-saved history without an authenticated reviewed persistence action.
+The accepted [Runner Calendar snapshot boundary](tasks/backlog/2026-08-21-hito-runner-calendar-public-snapshot-cleanup.md)
+places persisted snapshot assembly in the Calendar owner. `src/lib/training.ts` retains shared
+snapshot types and Product utilities but does not own Calendar persistence or presentation labels.
+Route server functions in `src/lib/training-api.ts` are transport/authentication wrappers, and
+`src/lib/route-data-actions.ts` composes accepted projections without reconstructing domain policy.
+Signed-out preview data remains untrusted and never becomes saved history without an authenticated
+reviewed persistence action.
 
 ## Plan And Workout Lifecycle
 
-- Manual setup, generated Quick setup, active-plan replacement, and advanced JSON import retain
-  distinct entry contracts but converge on canonical reviewed workout documents and the existing
-  plan persistence owner.
-- Generated preview is non-persisting. Explicit review and confirm are required before creating or
-  replacing a saved plan; confirm persists the signed reviewed truth rather than regenerating it.
-- Add, Edit, Move, Copy, Clear, schedule reflow, plan replacement, and export keep separate safety
-  semantics. Shared plumbing may be reused only when operation-level behavior remains distinct.
+- Manual, template, AI and file-import entry routes supply initial content to the same reviewed
+  `WorkoutDocument` contract. Explicit confirmation materializes runner-owned Calendar workouts;
+  origin remains immutable provenance, not a live editor or mutation authority.
+- Generated preview is non-persisting. Source artifacts and physical `plan_cycles`/`active-plan-*`
+  names may retain historical proposal and review mechanics only; they cannot control current
+  Calendar visibility, permissions, schedule or lifecycle.
+- Add, Edit, Move, Copy, Clear, schedule reflow and completion act on Calendar workouts through
+  operation-specific safety contracts. Shared plumbing may be reused only when those semantics
+  remain distinct.
 - Confirmed non-rest workouts scheduled today or later can enter the reviewed content-edit lifecycle;
   past workouts remain non-editable. Logs and evidence remain durable history through allowed edits.
-- `training-plan-v2` is the canonical plan import/export contract. Runtime-only completion, provider,
-  comparison, and insight state is not canonical plan content.
+- `training-plan-v2` remains a source import/export contract. Runtime completion, provider,
+  comparison and insight state is not source content or Calendar authority.
 
-## Workout Results And FIT Evidence
+## Workout Results And Evidence
 
+- The accepted [Result/Evidence public contract](tasks/backlog/2026-08-21-hito-result-evidence-public-contract.md)
+  is provider-neutral. Product consumers receive safe action results, completion/evidence markers,
+  comparison, availability and persisted insight projections; upload limits, storage identifiers,
+  raw parser shapes, provider failures and observability mechanics remain Backend-private.
 - Manual result save owns runner-authored `completed`, `partial`, or `skipped` truth plus subjective
   notes, body notes, RPE, and supported manual actuals.
-- FIT/ZIP intake accepts one usable activity file, stores immutable source evidence, normalizes the
-  activity, reconciles its exact canonical source/revision, and projects trusted actual metrics and
-  factual comparison through Backend owners.
-- A complete current FIT projection can establish objective planned-workout completion. An explicit
+- FIT/ZIP intake is one adapter: it accepts one usable activity file, stores immutable source
+  evidence, normalizes the activity, reconciles its exact canonical source/revision, and projects
+  trusted actual metrics and factual comparison through Result/Evidence owners.
+- A complete current FIT projection can establish objective Calendar-workout completion. An explicit
   runner-authored partial correction remains allowed; FIT evidence never manufactures runner RPE or
   subjective notes.
 - Raw-source removal, source retry, activity correction/deletion, and projection recomputation use
   the canonical activity lifecycle. Product does not infer completion from a generic feedback marker.
-- Backend FIT completion truth is released. The separate Product presentation candidate is still
-  blocked on native browser attachment proof and is not part of current accepted runner-facing
-  behavior.
+- Calendar consumes only the Result/Evidence completion/protection decision. Progress consumes the
+  accepted [factual Product contract](tasks/backlog/2026-08-21-hito-evidence-progress-product-contract.md),
+  never provider-private read models or client-reconstructed facts.
+- Factual marker state remains Result/Evidence truth; the unchanged `Evidence attached` and
+  `Feedback ready` labels belong to the accepted
+  [Frontend presentation owner](tasks/backlog/2026-08-21-hito-feedback-marker-presentation-owner-extraction.md),
+  not `training.ts` or a provider adapter.
 
 ## Runner Activity Intelligence
 
@@ -95,14 +117,18 @@ saved history without an authenticated reviewed persistence action.
 - Gate 4 records and load expose only evidence-backed current observations. Recalculation may be
   represented as truthful `updating`; missing prerequisites remain unavailable rather than stale or
   fabricated.
+- Product, Progress and shared factual visualizations consume only
+  [`runner-activity/product-contract.ts`](tasks/backlog/2026-08-21-hito-evidence-progress-product-contract.md).
+  Read-model types, fact snapshots, formulas, FIT joins and scale mechanics remain Backend-private.
 - Gate 5 stream-dependent aerobic metrics are deliberately unavailable as
   `normalized_stream_not_persisted`. No normalized persisted sample-set truth, provider sync, or
   aerobic metric snapshot has been implemented.
 
 ## Product, Design System, DevTools, And Admin Boundaries
 
-- `/`, `/workout/$date`, `/progress`, `/settings`, and related authenticated routes consume
-  Backend-shaped Product contracts; Product does not own persistence or provider truth.
+- `/`, `/workout/$date`, `/progress`, `/settings`, and related authenticated routes consume public
+  domain contracts; Product does not own persistence, provider truth, classification policy or
+  Progress formulas.
 - `/hitoDS` is a production-shipped public interactive reference that consumes canonical Hito tokens,
   typography, primitives, and generated manifest projections. Its specimen state does not read or
   mutate runner data.
@@ -111,9 +137,11 @@ saved history without an authenticated reviewed persistence action.
 - Local Inspector/DevTools code is lazy, loopback-gated, and non-persisting. It cannot alter Product
   behavior to make inspection easier.
 - `/admin/analytics` and `/admin/capture` consume Backend-owned admin view models. Manual Admin rows
-  are capture/triage inbox entries only; repo-derived rows are read-only mirrors.
-- `docs/tasks/backlog/` is the sole operational queue. Plans, briefs, specs, dashboards, mirrors, and
-  current documents are supporting or historical sources and cannot independently dispatch work.
+  are capture/triage inbox entries only; repo-derived rows are read-only mirrors. Admin consumes the
+  Identity-owned actor classification result rather than importing an Admin-owned classifier.
+- The `Hito Running` Notion database is the sole operational lifecycle writer under
+  [AGENTS.md](../AGENTS.md). Repository tasks, plans, current documents, dashboards and mirrors are
+  linked technical evidence and cannot independently dispatch or change lifecycle.
 
 ## Validation And Evidence Owners
 
@@ -145,9 +173,12 @@ make them implemented.
 
 - one application runtime;
 - one Supabase-backed saved-mode truth;
-- one canonical plan/workout persistence model;
+- one runner-owned Calendar workout truth; source artifacts are provenance only;
+- one provider-neutral Result/Evidence public contract;
+- one factual Progress Product contract;
+- one Identity-owned actor classification decision;
 - one canonical activity/source/revision lifecycle;
 - one Vercel/Nitro deployment path;
 - preview remains explicit and untrusted;
 - unavailable evidence remains unavailable;
-- operational work remains in `docs/tasks/backlog/` only.
+- operational lifecycle remains in the `Hito Running` Notion database only.

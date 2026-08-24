@@ -17,6 +17,8 @@ import {
 import {
   type ExtractedGarminFitFile,
   WORKOUT_RESULT_STORAGE_BUCKET,
+} from "@/lib/workout-result-import/internal-types";
+import {
   type WorkoutResultFeedbackSummary,
   WorkoutResultImportError,
 } from "@/lib/workout-result-import/types";

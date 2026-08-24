@@ -34,8 +34,6 @@ runner-evidence-and-progress
 
 ## Depends On
 
-[Hito DS Depth, Overview, And Factual Chart Batch](./2026-08-17-hito-ds-two-layer-elevation-token-system.md)
-
 ## Evidence From
 
 [Runner Progress Factual Activity Sequence Frontend Adoption](./2026-08-17-hito-runner-progress-factual-activity-sequence-frontend-adoption.md)

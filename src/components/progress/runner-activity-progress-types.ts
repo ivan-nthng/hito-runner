@@ -1,12 +1,10 @@
 import type {
   RunnerActivityHistoryProductItem,
   RunnerActivityHistoryProductPage,
-  RunnerActivityProgressProductModel,
-} from "@/lib/runner-activity/product-contract";
-import type {
   RunnerActivityFitSequenceMetricId,
   RunnerActivityFitSequenceQuickPeriodId,
-} from "@/lib/runner-activity/read-model-types";
+  RunnerActivityProgressProductModel,
+} from "@/lib/runner-activity/product-contract";
 
 export type AsyncState<T> =
   | { status: "idle" | "loading"; data: T | null; error: null }

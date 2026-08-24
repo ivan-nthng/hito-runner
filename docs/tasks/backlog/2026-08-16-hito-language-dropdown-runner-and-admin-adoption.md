@@ -34,8 +34,6 @@ PRODUCT
 
 ## Evidence From
 
-[Shared Language Dropdown Surface Adoption](./2026-08-16-hito-shared-language-dropdown-surface-adoption.md)
-
 ## Scope
 
 Mount the existing `HitoLanguageMenuItems` in the authenticated Runner `AppShell` and Admin account
@@ -172,7 +170,6 @@ Canonical item:
 docs/tasks/backlog/2026-08-16-hito-language-dropdown-runner-and-admin-adoption.md
 
 Shared-control evidence:
-docs/tasks/backlog/2026-08-16-hito-shared-language-dropdown-surface-adoption.md
 src/components/ui/hito-language-menu.tsx
 
 Outcome:

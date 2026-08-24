@@ -1,8 +1,5 @@
 import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
-import type {
-  AdminUserClassification,
-  AdminUserClassificationSource,
-} from "@/lib/admin-user-classification";
+import type { ActorClassification, ActorClassificationSource } from "@/lib/actor-classification";
 
 export type AdminAnalyticsFailureReason =
   | "authentication_required"
@@ -75,14 +72,14 @@ export interface AdminAnalyticsUserRow {
   };
   classification: "real";
   classificationReason: string;
-  classificationSource: AdminUserClassificationSource;
+  classificationSource: ActorClassificationSource;
 }
 
 export interface AdminAnalyticsExcludedUserRow extends Omit<
   AdminAnalyticsUserRow,
   "classification"
 > {
-  classification: Exclude<AdminUserClassification, "real">;
+  classification: Exclude<ActorClassification, "real">;
   localAccount: {
     username: string;
     email: string;

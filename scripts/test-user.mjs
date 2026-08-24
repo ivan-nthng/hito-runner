@@ -48,13 +48,23 @@ const { ingestLocalQaFixtureWorkoutResult, removeWorkoutResultEvidence } = await
   import.meta.url,
 );
 const {
+  ADAPTIVE_BLUEPRINT_PROJECTION_FIXTURE_VERSION,
+  ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE,
   RUNNER_CORE_FILE_FLOW_FIXTURE_ROLE,
   RUNNER_CORE_FILE_FLOW_FIXTURE_TEMPLATE,
   RUNNER_DESIGN_PROFILE_FIXTURE_ROLE,
   RUNNER_DESIGN_PROFILE_FIXTURE_STORAGE_BUCKET,
   RUNNER_DESIGN_PROFILE_FIXTURE_VERSION,
+  confirmAdaptiveBlueprintContinuationFixture,
+  confirmAdaptiveBlueprintContinuationProfileFixture,
+  preflightAdaptiveBlueprintSecondContinuationFixture,
+  authorAdaptiveBlueprintSecondContinuationFixture,
+  recompileAdaptiveBlueprintSecondContinuationFixture,
+  prepareAdaptiveBlueprintContinuationCandidateFixture,
+  readAdaptiveBlueprintProjectionFixture,
   readRunnerCoreFileFlowFixture,
   readRunnerDesignProfileFixture,
+  seedAdaptiveBlueprintProjectionFixture,
   seedRunnerCoreFileFlowFixture,
   seedRunnerDesignProfileFixture,
   verifyRunnerDesignProfileFixtureRuntime,
@@ -87,12 +97,23 @@ if (
     "design-profile-seed",
     "design-profile-status",
     "design-profile-reset",
+    "adaptive-blueprint-seed",
+    "adaptive-blueprint-continuation-seed",
+    "adaptive-blueprint-status",
+    "adaptive-blueprint-continuation-proof",
+    "adaptive-blueprint-continuation-profile-proof",
+    "adaptive-blueprint-continuation-prepare",
+    "adaptive-blueprint-two-profile-replay",
+    "adaptive-blueprint-second-continuation-preflight",
+    "adaptive-blueprint-second-continuation-author",
+    "adaptive-blueprint-second-continuation-recompile",
+    "adaptive-blueprint-reset",
     "runner-core-file-flow-seed",
     "runner-core-file-flow-proof",
   ].includes(command)
 ) {
   throw new Error(
-    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-reset-plan|pool-reset|pool-delete|design-profile-seed|design-profile-status|design-profile-reset|runner-core-file-flow-seed|runner-core-file-flow-proof|create|reset-plan|reset|delete> [options]",
+    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-reset-plan|pool-reset|pool-delete|design-profile-seed|design-profile-status|design-profile-reset|adaptive-blueprint-seed|adaptive-blueprint-continuation-seed|adaptive-blueprint-status|adaptive-blueprint-continuation-prepare|adaptive-blueprint-continuation-proof|adaptive-blueprint-continuation-profile-proof|adaptive-blueprint-two-profile-replay|adaptive-blueprint-second-continuation-preflight|adaptive-blueprint-second-continuation-author|adaptive-blueprint-second-continuation-recompile|adaptive-blueprint-reset|runner-core-file-flow-seed|runner-core-file-flow-proof|create|reset-plan|reset|delete> [options]",
   );
 }
 
@@ -124,6 +145,32 @@ if (command === "inventory") {
   await handleDesignProfileStatus();
 } else if (command === "design-profile-reset") {
   await handleDesignProfileReset();
+} else if (command === "adaptive-blueprint-seed") {
+  await handleAdaptiveBlueprintSeed();
+} else if (command === "adaptive-blueprint-continuation-seed") {
+  await handleAdaptiveBlueprintSeed({ continuationProof: true });
+} else if (command === "adaptive-blueprint-status") {
+  await handleAdaptiveBlueprintStatus();
+} else if (command === "adaptive-blueprint-continuation-proof") {
+  await handleAdaptiveBlueprintContinuationProof();
+} else if (command === "adaptive-blueprint-continuation-profile-proof") {
+  await handleAdaptiveBlueprintContinuationProfileProof();
+} else if (command === "adaptive-blueprint-continuation-prepare") {
+  await handleAdaptiveBlueprintContinuationPrepare();
+} else if (command === "adaptive-blueprint-two-profile-replay") {
+  await handleAdaptiveBlueprintTwoProfileReplay();
+} else if (command === "adaptive-blueprint-second-continuation-preflight") {
+  await handleAdaptiveBlueprintSecondContinuationPreflight();
+} else if (command === "adaptive-blueprint-second-continuation-author") {
+  await handleAdaptiveBlueprintSecondContinuationAuthor();
+} else if (command === "adaptive-blueprint-second-continuation-recompile") {
+  await handleAdaptiveBlueprintSecondContinuationRecompile();
+} else if (command === "adaptive-blueprint-reset") {
+  await handleFixtureReset({
+    action: "adaptive-blueprint-reset",
+    role: ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE,
+    storageVersion: ADAPTIVE_BLUEPRINT_PROJECTION_FIXTURE_VERSION,
+  });
 } else if (command === "runner-core-file-flow-seed") {
   await handleRunnerCoreFileFlowSeed();
 } else if (command === "runner-core-file-flow-proof") {
@@ -369,6 +416,563 @@ async function handleDesignProfileSeed() {
   });
 }
 
+async function handleAdaptiveBlueprintSeed({ continuationProof = false } = {}) {
+  await withAdaptiveTrainingQualityLease(async () => {
+    const authUser = await ensureQaPoolUserWithLocalAccount(ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE);
+    const beforeCounts = await getQaUserOwnedCounts(supabase, authUser.id);
+    await resetQaPoolUserData({ supabase, userId: authUser.id });
+    let fixture;
+    try {
+      fixture = await seedAdaptiveBlueprintProjectionFixture({
+        supabase,
+        userId: authUser.id,
+        asOfDate: options["as-of-date"],
+        continuationProof,
+      });
+    } catch (error) {
+      await resetQaPoolUserData({ supabase, userId: authUser.id });
+      throw error;
+    }
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          action: continuationProof
+            ? "adaptive-blueprint-continuation-seed"
+            : "adaptive-blueprint-seed",
+          localOnly: true,
+          login: {
+            username: QA_TESTER_POOL[ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE].username,
+            path: "http://127.0.0.1:3000/login",
+          },
+          beforeCounts,
+          fixture,
+          afterCounts: await getQaUserOwnedCounts(supabase, authUser.id),
+        },
+        null,
+        2,
+      ),
+    );
+  });
+}
+
+async function handleAdaptiveBlueprintStatus() {
+  await withAdaptiveTrainingQualityLease(async () => {
+    const definition = QA_TESTER_POOL[ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE];
+    const authUser = await findAuthUserByEmail(definition.email);
+    if (!authUser) {
+      throw new Error(`Adaptive Blueprint fixture identity ${definition.email} was not found.`);
+    }
+    await assertQaPoolAuthUser({
+      supabase,
+      role: ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE,
+      userId: authUser.id,
+    });
+    const fixture = await readAdaptiveBlueprintProjectionFixture({
+      supabase,
+      userId: authUser.id,
+      asOfDate: options["as-of-date"],
+    });
+    const accounts = await loadLocalAccounts();
+    const localAccount = accounts.find((account) => account.email === definition.email) ?? null;
+    if (!localAccount) {
+      throw new Error(`Local login account ${definition.email} was not found.`);
+    }
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          action: "adaptive-blueprint-status",
+          localOnly: true,
+          login: {
+            username: localAccount.username,
+            path: "http://127.0.0.1:3000/login",
+          },
+          fixture,
+          ownedRows: await getQaUserOwnedCounts(supabase, authUser.id),
+        },
+        null,
+        2,
+      ),
+    );
+  });
+}
+
+async function handleAdaptiveBlueprintContinuationProof() {
+  await withAdaptiveTrainingQualityLease(async () => {
+    const definition = QA_TESTER_POOL[ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE];
+    const authUser = await findAuthUserByEmail(definition.email);
+    if (!authUser) {
+      throw new Error(`Adaptive Blueprint fixture identity ${definition.email} was not found.`);
+    }
+    await assertQaPoolAuthUser({
+      supabase,
+      role: ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE,
+      userId: authUser.id,
+    });
+    const fixture = await confirmAdaptiveBlueprintContinuationFixture({
+      supabase,
+      userId: authUser.id,
+    });
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          action: "adaptive-blueprint-continuation-proof",
+          localOnly: true,
+          fixture,
+          ownedRows: await getQaUserOwnedCounts(supabase, authUser.id),
+        },
+        null,
+        2,
+      ),
+    );
+  });
+}
+
+async function handleAdaptiveBlueprintContinuationProfileProof() {
+  await withAdaptiveTrainingQualityLease(async () => {
+    const definition = QA_TESTER_POOL[ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE];
+    const authUser = await findAuthUserByEmail(definition.email);
+    if (!authUser) {
+      throw new Error(`Adaptive Blueprint fixture identity ${definition.email} was not found.`);
+    }
+    await assertQaPoolAuthUser({
+      supabase,
+      role: ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE,
+      userId: authUser.id,
+    });
+    if (!options["candidate-id"] || !options["coach-artifact"] || !options.output) {
+      throw new Error(
+        "Adaptive continuation profile proof requires --candidate-id, --coach-artifact and --output inside .tanstack.",
+      );
+    }
+    const coachArtifactPath = requireEvidencePath(options["coach-artifact"], "--coach-artifact");
+    const coachArtifact = JSON.parse(await readFile(coachArtifactPath, "utf8"));
+    const coachCandidateId = coachArtifact.candidate?.id ?? coachArtifact.candidateId;
+    const coachCandidateSha256 = coachArtifact.candidate?.sha256 ?? coachArtifact.candidateSha256;
+    const coachReviewChecksum =
+      coachArtifact.review?.reviewChecksum ?? coachArtifact.reviewChecksum;
+    const coachReviewedOn = coachArtifact.coachVerdict?.reviewedOn ?? coachArtifact.reviewedOn;
+    const coachVerdict = coachArtifact.coachVerdict?.verdict ?? coachArtifact.verdict;
+    assert.equal(coachCandidateId, options["candidate-id"]);
+    assert.equal(coachArtifact.review?.sealed ?? true, true);
+    assert.equal(coachVerdict, "APPROVED");
+    assert.equal(
+      coachArtifact.coachVerdict?.candidateId ?? coachCandidateId,
+      options["candidate-id"],
+    );
+    assert.equal(
+      coachArtifact.coachVerdict?.candidateSha256 ?? coachCandidateSha256,
+      coachCandidateSha256,
+    );
+    assert.equal(
+      coachArtifact.coachVerdict?.reviewChecksum ?? coachReviewChecksum,
+      coachReviewChecksum,
+    );
+    const artifact = await confirmAdaptiveBlueprintContinuationProfileFixture({
+      supabase,
+      userId: authUser.id,
+      expectedCandidateId: options["candidate-id"],
+    });
+    assert.equal(artifact.candidate.sha256, coachCandidateSha256);
+    const completedArtifact = {
+      ...artifact,
+      candidate: {
+        ...artifact.candidate,
+        coachReview: {
+          verdict: coachVerdict,
+          reviewedOn: coachReviewedOn,
+          reviewChecksum: coachReviewChecksum,
+          reviewTokenSha256: coachArtifact.review?.reviewTokenSha256 ?? null,
+          sealed: coachArtifact.review?.sealed ?? true,
+        },
+      },
+    };
+    await writeOptionalEvidenceFile(options.output, completedArtifact);
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          action: "adaptive-blueprint-continuation-profile-proof",
+          localOnly: true,
+          output: requireEvidencePath(options.output, "--output"),
+          candidate: completedArtifact.candidate,
+          confirmation: artifact.confirmation,
+          evidence: artifact.evidence,
+          snapshots: artifact.snapshots,
+          omissions: artifact.omissions,
+          cleanup: artifact.cleanup,
+          ownedRows: await getQaUserOwnedCounts(supabase, authUser.id),
+        },
+        null,
+        2,
+      ),
+    );
+  });
+}
+
+async function handleAdaptiveBlueprintContinuationPrepare() {
+  await withAdaptiveTrainingQualityLease(async () => {
+    const definition = QA_TESTER_POOL[ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE];
+    const authUser = await findAuthUserByEmail(definition.email);
+    if (!authUser) {
+      throw new Error(`Adaptive Blueprint fixture identity ${definition.email} was not found.`);
+    }
+    await assertQaPoolAuthUser({
+      supabase,
+      role: ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE,
+      userId: authUser.id,
+    });
+    if (!options.output) {
+      throw new Error("Adaptive continuation preparation requires --output inside .tanstack.");
+    }
+    const artifact = await prepareAdaptiveBlueprintContinuationCandidateFixture({
+      supabase,
+      userId: authUser.id,
+    });
+    await writeOptionalEvidenceFile(options.output, artifact);
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          action: "adaptive-blueprint-continuation-prepare",
+          localOnly: true,
+          output: requireEvidencePath(options.output, "--output"),
+          candidate: {
+            id: artifact.candidate.id,
+            sha256: artifact.candidate.sha256,
+            sourceResponseId: artifact.source.response.recordId,
+            reviewChecksum: artifact.review.reviewChecksum,
+          },
+          invariants: artifact.invariants,
+          ownedRows: await getQaUserOwnedCounts(supabase, authUser.id),
+        },
+        null,
+        2,
+      ),
+    );
+  });
+}
+
+async function handleAdaptiveBlueprintTwoProfileReplay() {
+  await withAdaptiveTrainingQualityLease(async () => {
+    const definition = QA_TESTER_POOL[ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE];
+    const authUser = await findAuthUserByEmail(definition.email);
+    if (!authUser) {
+      throw new Error(`Adaptive Blueprint fixture identity ${definition.email} was not found.`);
+    }
+    await assertQaPoolAuthUser({
+      supabase,
+      role: ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE,
+      userId: authUser.id,
+    });
+    if (!options["candidate-artifact"] || !options["accepted-coach-artifact"] || !options.output) {
+      throw new Error(
+        "Adaptive two-profile replay requires --candidate-artifact, --accepted-coach-artifact and --output inside .tanstack.",
+      );
+    }
+    const candidateArtifactPath = requireEvidencePath(
+      options["candidate-artifact"],
+      "--candidate-artifact",
+    );
+    const acceptedCoachArtifactPath = requireEvidencePath(
+      options["accepted-coach-artifact"],
+      "--accepted-coach-artifact",
+    );
+    const candidateArtifactRaw = await readFile(candidateArtifactPath, "utf8");
+    const acceptedCoachArtifactRaw = await readFile(acceptedCoachArtifactPath, "utf8");
+    const candidateArtifact = JSON.parse(candidateArtifactRaw);
+    const acceptedCoachArtifact = JSON.parse(acceptedCoachArtifactRaw);
+
+    assert.equal(acceptedCoachArtifact.coachVerdict?.verdict, "APPROVED");
+    assert.equal(
+      acceptedCoachArtifact.coachVerdict?.candidateId,
+      acceptedCoachArtifact.candidate?.id,
+    );
+    assert.equal(
+      acceptedCoachArtifact.coachVerdict?.candidateSha256,
+      acceptedCoachArtifact.candidate?.sha256,
+    );
+    assert.equal(
+      acceptedCoachArtifact.coachVerdict?.reviewChecksum,
+      acceptedCoachArtifact.review?.reviewChecksum,
+    );
+    assert.equal(candidateArtifact.review?.sealed, true);
+    assert.equal(candidateArtifact.candidate?.blockMode, "normal_four_week");
+    assert.deepEqual(
+      canonicalCoachPrescription(candidateArtifact.candidate),
+      canonicalCoachPrescription(acceptedCoachArtifact.candidate),
+      "The replayed first continuation must preserve the terminal HITO-266 Coach-reviewed prescription exactly.",
+    );
+
+    const artifact = await confirmAdaptiveBlueprintContinuationProfileFixture({
+      supabase,
+      userId: authUser.id,
+      expectedCandidateId: candidateArtifact.candidate.id,
+    });
+    const completedArtifact = {
+      ...artifact,
+      qualityEvidence: {
+        mode: "terminal_hito_266_semantic_replay",
+        acceptedArtifactSha256: await digestSha256Hex(acceptedCoachArtifactRaw),
+        replayCandidateArtifactSha256: await digestSha256Hex(candidateArtifactRaw),
+        acceptedCandidate: {
+          id: acceptedCoachArtifact.candidate.id,
+          sha256: acceptedCoachArtifact.candidate.sha256,
+          reviewChecksum: acceptedCoachArtifact.review.reviewChecksum,
+        },
+        replayedCandidate: {
+          id: candidateArtifact.candidate.id,
+          sha256: candidateArtifact.candidate.sha256,
+          reviewChecksum: candidateArtifact.review.reviewChecksum,
+        },
+        semanticPrescriptionEqual: true,
+        acceptedCoachVerdict: "APPROVED",
+        newCoachVerdictClaimed: false,
+      },
+    };
+    await writeOptionalEvidenceFile(options.output, completedArtifact);
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          action: "adaptive-blueprint-two-profile-replay",
+          localOnly: true,
+          output: requireEvidencePath(options.output, "--output"),
+          qualityEvidence: completedArtifact.qualityEvidence,
+          confirmation: completedArtifact.confirmation,
+          snapshots: completedArtifact.snapshots,
+          cleanup: completedArtifact.cleanup,
+          ownedRows: await getQaUserOwnedCounts(supabase, authUser.id),
+        },
+        null,
+        2,
+      ),
+    );
+  });
+}
+
+function canonicalCoachPrescription(candidate) {
+  return {
+    blockMode: candidate.blockMode,
+    interval: candidate.interval,
+    performanceAdaptation: candidate.performanceAdaptation,
+    workoutDocuments: candidate.workoutDocuments.map((document) => ({
+      ...stripGeneratedIdentity(document),
+      steps: document.steps.map(stripGeneratedIdentity),
+    })),
+  };
+}
+
+function stripGeneratedIdentity(value) {
+  if (Array.isArray(value)) return value.map(stripGeneratedIdentity);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(
+        ([key]) =>
+          !["segment_id", "calendarWorkoutId", "plannedWorkoutId", "sourceWorkoutId"].includes(key),
+      )
+      .map(([key, child]) => [key, stripGeneratedIdentity(child)]),
+  );
+}
+
+async function handleAdaptiveBlueprintSecondContinuationPreflight() {
+  await withAdaptiveTrainingQualityLease(async () => {
+    const definition = QA_TESTER_POOL[ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE];
+    const authUser = await findAuthUserByEmail(definition.email);
+    if (!authUser) {
+      throw new Error(`Adaptive Blueprint fixture identity ${definition.email} was not found.`);
+    }
+    await assertQaPoolAuthUser({
+      supabase,
+      role: ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE,
+      userId: authUser.id,
+    });
+    if (!options.output) {
+      throw new Error("Adaptive second-continuation preflight requires --output inside .tanstack.");
+    }
+    const artifact = await preflightAdaptiveBlueprintSecondContinuationFixture({
+      supabase,
+      userId: authUser.id,
+    });
+    await writeOptionalEvidenceFile(options.output, artifact);
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          action: "adaptive-blueprint-second-continuation-preflight",
+          localOnly: true,
+          output: requireEvidencePath(options.output, "--output"),
+          facts: artifact.facts,
+          decision: artifact.decision,
+          request: artifact.request,
+          candidate: artifact.candidate,
+          invariants: artifact.invariants,
+          ownedRows: await getQaUserOwnedCounts(supabase, authUser.id),
+        },
+        null,
+        2,
+      ),
+    );
+  });
+}
+
+async function handleAdaptiveBlueprintSecondContinuationAuthor() {
+  await withAdaptiveTrainingQualityLease(async () => {
+    const definition = QA_TESTER_POOL[ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE];
+    const authUser = await findAuthUserByEmail(definition.email);
+    if (!authUser) {
+      throw new Error(`Adaptive Blueprint fixture identity ${definition.email} was not found.`);
+    }
+    await assertQaPoolAuthUser({
+      supabase,
+      role: ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE,
+      userId: authUser.id,
+    });
+    if (!options.preflight || !options.output) {
+      throw new Error(
+        "Adaptive second-continuation authoring requires --preflight and --output inside .tanstack.",
+      );
+    }
+    const preflightPath = requireEvidencePath(options.preflight, "--preflight");
+    const preflight = JSON.parse(await readFile(preflightPath, "utf8"));
+    assert.equal(preflight.request?.externalProviderDispatchCount, 0);
+    assert.equal(preflight.request?.exactReuseApplied, false);
+    assert.equal(preflight.request?.paidDispatchRequired, true);
+    assert.equal(preflight.decision?.status, "authoring_ready");
+    const artifact = await authorAdaptiveBlueprintSecondContinuationFixture({
+      supabase,
+      userId: authUser.id,
+    });
+    assert.equal(artifact.source.response.providerModel, preflight.request.providerModel);
+    assert.equal(artifact.source.response.promptVersion, preflight.request.promptVersion);
+    assert.equal(artifact.source.response.policyVersion, preflight.request.policyVersion);
+    assert.equal(artifact.source.response.compilerVersion, preflight.request.compilerVersion);
+    assert.equal(artifact.candidate.blockMode, preflight.decision.interval.blockMode);
+    assert.deepEqual(artifact.candidate.interval, {
+      startDate: preflight.decision.interval.startDate,
+      endDate: preflight.decision.interval.endDate,
+    });
+    await writeOptionalEvidenceFile(options.output, artifact);
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          action: "adaptive-blueprint-second-continuation-author",
+          localOnly: true,
+          output: requireEvidencePath(options.output, "--output"),
+          source: artifact.source,
+          attempt: artifact.attempt,
+          candidate: {
+            id: artifact.candidate.id,
+            sha256: artifact.candidate.sha256,
+            blockMode: artifact.candidate.blockMode,
+            interval: artifact.candidate.interval,
+          },
+          review: artifact.review,
+          invariants: artifact.invariants,
+          ownedRows: await getQaUserOwnedCounts(supabase, authUser.id),
+        },
+        null,
+        2,
+      ),
+    );
+  });
+}
+
+async function handleAdaptiveBlueprintSecondContinuationRecompile() {
+  await withAdaptiveTrainingQualityLease(async () => {
+    const definition = QA_TESTER_POOL[ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE];
+    const authUser = await findAuthUserByEmail(definition.email);
+    if (!authUser) {
+      throw new Error(`Adaptive Blueprint fixture identity ${definition.email} was not found.`);
+    }
+    await assertQaPoolAuthUser({
+      supabase,
+      role: ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE,
+      userId: authUser.id,
+    });
+    if (!options.candidate || !options.coach || !options.output) {
+      throw new Error(
+        "Adaptive second-continuation recompile requires --candidate, --coach and --output inside .tanstack.",
+      );
+    }
+    const candidateArtifact = JSON.parse(
+      await readFile(requireEvidencePath(options.candidate, "--candidate"), "utf8"),
+    );
+    const coachArtifact = JSON.parse(
+      await readFile(requireEvidencePath(options.coach, "--coach"), "utf8"),
+    );
+    assert.ok(
+      [
+        "hito_264_second_continuation_candidate_v1",
+        "hito_264_second_continuation_candidate_v2",
+      ].includes(candidateArtifact.artifactVersion),
+    );
+    assert.ok(
+      [
+        "hito_264_second_continuation_coach_review_v1",
+        "hito_264_second_continuation_coach_review_v2",
+      ].includes(coachArtifact.artifactVersion),
+    );
+    assert.equal(coachArtifact.verdict, "REJECTED");
+    assert.equal(coachArtifact.candidateId, candidateArtifact.candidate.id);
+    assert.equal(coachArtifact.candidateSha256, candidateArtifact.candidate.sha256);
+    assert.equal(coachArtifact.reviewChecksum, candidateArtifact.review.reviewChecksum);
+    assert.equal(
+      candidateArtifact.artifactVersion === "hito_264_second_continuation_candidate_v1"
+        ? candidateArtifact.invariants.paidProviderDispatchCount
+        : candidateArtifact.invariants.providerDispatchCount,
+      candidateArtifact.artifactVersion === "hito_264_second_continuation_candidate_v1" ? 1 : 0,
+    );
+    assert.equal(candidateArtifact.invariants.confirmationCount, 2);
+    assert.equal(candidateArtifact.invariants.calendarWorkoutCount, 44);
+    assert.equal(candidateArtifact.invariants.futureProjectionCalendarRowCount, 0);
+
+    const artifact = await recompileAdaptiveBlueprintSecondContinuationFixture({
+      supabase,
+      userId: authUser.id,
+      responseRecordId:
+        candidateArtifact.source?.response?.recordId ??
+        candidateArtifact.retainedLineage.responseRecordId,
+      rejectedCandidateId: candidateArtifact.candidate.id,
+      rejectedCandidateSha256: candidateArtifact.candidate.sha256,
+      rejectedReviewChecksum: candidateArtifact.review.reviewChecksum,
+      rejectedCandidateCompilerVersion:
+        candidateArtifact.source?.response?.compilerVersion ??
+        candidateArtifact.retainedLineage.recompileCompilerVersion,
+      coachReviewedAt: coachArtifact.reviewedOn,
+      coachDiscriminator: coachArtifact.discriminator,
+    });
+    await writeOptionalEvidenceFile(options.output, artifact);
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          action: "adaptive-blueprint-second-continuation-recompile",
+          localOnly: true,
+          output: requireEvidencePath(options.output, "--output"),
+          retainedLineage: artifact.retainedLineage,
+          candidate: {
+            id: artifact.candidate.id,
+            sha256: artifact.candidate.sha256,
+            blockMode: artifact.candidate.blockMode,
+            interval: artifact.candidate.interval,
+            endpoint: artifact.candidate.endpoint,
+          },
+          review: artifact.review,
+          invariants: artifact.invariants,
+          ownedRows: await getQaUserOwnedCounts(supabase, authUser.id),
+        },
+        null,
+        2,
+      ),
+    );
+  });
+}
+
 async function handleDesignProfileStatus() {
   await withDesignProfileLease(async () => {
     const definition = QA_TESTER_POOL[RUNNER_DESIGN_PROFILE_FIXTURE_ROLE];
@@ -414,16 +1018,28 @@ async function handleDesignProfileStatus() {
   });
 }
 
-async function handleDesignProfileReset() {
-  await withDesignProfileLease(async () => {
-    const definition = QA_TESTER_POOL[RUNNER_DESIGN_PROFILE_FIXTURE_ROLE];
+async function handleDesignProfileReset(action = "design-profile-reset") {
+  await handleFixtureReset({
+    action,
+    role: RUNNER_DESIGN_PROFILE_FIXTURE_ROLE,
+    storageVersion: RUNNER_DESIGN_PROFILE_FIXTURE_VERSION,
+  });
+}
+
+async function handleFixtureReset({ action, role, storageVersion }) {
+  const withLease =
+    role === ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE
+      ? withAdaptiveTrainingQualityLease
+      : withDesignProfileLease;
+  await withLease(async () => {
+    const definition = QA_TESTER_POOL[role];
     const authUser = await findAuthUserByEmail(definition.email);
     if (!authUser) {
       console.log(
         JSON.stringify(
           {
             ok: true,
-            action: "design-profile-reset",
+            action,
             localOnly: true,
             authUserPreserved: false,
             authUserId: null,
@@ -440,7 +1056,7 @@ async function handleDesignProfileReset() {
     }
     await assertQaPoolAuthUser({
       supabase,
-      role: RUNNER_DESIGN_PROFILE_FIXTURE_ROLE,
+      role,
       userId: authUser.id,
     });
     const beforeCounts = await getQaUserOwnedCounts(supabase, authUser.id);
@@ -450,7 +1066,7 @@ async function handleDesignProfileReset() {
     }
     const retainedStorage = await supabase.storage
       .from(RUNNER_DESIGN_PROFILE_FIXTURE_STORAGE_BUCKET)
-      .list(`${authUser.id}/${RUNNER_DESIGN_PROFILE_FIXTURE_VERSION}`);
+      .list(`${authUser.id}/${storageVersion}`);
     if (retainedStorage.error) throw new Error(retainedStorage.error.message);
     if (retainedStorage.data.length !== 0) {
       throw new Error("Runner design profile reset left raw storage objects behind.");
@@ -459,7 +1075,7 @@ async function handleDesignProfileReset() {
       JSON.stringify(
         {
           ok: true,
-          action: "design-profile-reset",
+          action,
           localOnly: true,
           authUserPreserved: true,
           authUserId: authUser.id,
@@ -733,6 +1349,17 @@ async function ensureDesignProfilePoolUser() {
 async function withDesignProfileLease(action) {
   const lease = await acquireQaPoolLease({
     role: RUNNER_DESIGN_PROFILE_FIXTURE_ROLE,
+  });
+  try {
+    return await action();
+  } finally {
+    await releaseQaPoolLease(lease);
+  }
+}
+
+async function withAdaptiveTrainingQualityLease(action) {
+  const lease = await acquireQaPoolLease({
+    role: ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE,
   });
   try {
     return await action();

@@ -71,7 +71,6 @@ The archived rollout included visible product review, Safari QA, and a final no-
 
 - [Current product](../../current-product.md)
 - [Current system](../../current-system.md)
-- [Product history digest](../../history/product-history-digest.md)
 
 ## Do Not Continue By Default
 

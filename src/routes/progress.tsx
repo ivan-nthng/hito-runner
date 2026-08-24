@@ -10,7 +10,7 @@ import { APP_NAME } from "@/lib/app-config";
 import type {
   RunnerActivityFitSequenceMetricId,
   RunnerActivityFitSequenceQuickPeriodId,
-} from "@/lib/runner-activity/read-model-types";
+} from "@/lib/runner-activity/product-contract";
 import { getProgressRouteData } from "@/lib/training-api";
 
 const PROGRESS_SEQUENCE_PERIODS = [

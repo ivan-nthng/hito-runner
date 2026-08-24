@@ -23,7 +23,7 @@ import {
   writeLocalRuntimeEvent,
   type LocalRuntimeEvent,
 } from "../src/lib/local-runtime-observability";
-import { WORKOUT_RESULT_OBSERVABILITY_OUTCOME_HEADER } from "../src/lib/workout-result-import/types";
+import { WORKOUT_RESULT_OBSERVABILITY_OUTCOME_HEADER } from "../src/lib/workout-result-import/internal-types";
 
 const root = await mkdtemp(join(tmpdir(), "hito-local-runtime-observability-"));
 const blockedRoot = `${root}-blocked`;

@@ -26,8 +26,6 @@ DESIGN SYSTEM
 
 ## Depends On
 
-[Hito DS Factual Activity Point Sequence Contract](./2026-08-17-hito-ds-factual-activity-point-sequence-contract.md)
-
 ## Evidence From
 
 [Runner Progress Factual Activity Sequence Frontend Adoption](./2026-08-17-hito-runner-progress-factual-activity-sequence-frontend-adoption.md)

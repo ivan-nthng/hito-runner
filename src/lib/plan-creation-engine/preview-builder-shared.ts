@@ -12,7 +12,8 @@ import type {
   RunningPlanWorkoutDayKind,
 } from "@/lib/plan-creation-engine/source-types";
 import type { WeekdayName } from "@/lib/weekday-rest-invariants";
-import type { RunnerPlanAuthoringProfileSnapshot } from "@/lib/user-settings-actions";
+import type { AcceptedRunnerHeartRateProfile } from "@/lib/heart-rate-zones";
+import type { RunnerFitnessProfileInitialPlanProjectionV1 } from "@/lib/runner-activity/product-contract";
 
 export const RUNNING_PLAN_PREVIEW_REST_DAY_KIND = "rest" as const;
 
@@ -73,5 +74,7 @@ export interface RunningPlanPreviewNormalizedInputSummary {
   longRunDaySource: "runner_preference" | "ai_authored" | "not_supplied";
   trainingWeekdays: readonly WeekdayName[];
   loadContext: RunningPlanPreviewLoadContext;
-  runnerProfileSnapshot: RunnerPlanAuthoringProfileSnapshot;
+  heartRateProfile: AcceptedRunnerHeartRateProfile;
+  initialPlanProfile: RunnerFitnessProfileInitialPlanProjectionV1;
+  initialPlanAdmission: "authoring_ready_factual" | "authoring_ready_constraint_only";
 }

@@ -75,7 +75,6 @@ same discipline for `training-api.ts`, local ops scripts, and duplicate residue 
 
 - Current implemented truth: `docs/current-system.md`
 - Current product truth: `docs/current-product.md`
-- Product evolution summary: `docs/history/product-history-digest.md`
 
 ## Do Not Continue By Default
 

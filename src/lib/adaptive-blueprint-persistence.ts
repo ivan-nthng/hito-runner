@@ -238,10 +238,22 @@ export async function retainAdaptiveTrainingContinuationCandidateForUser(input: 
   retainedResponse: AiPlanGenerationResponseRow;
   candidate: AdaptiveContinuationCandidateDraft;
 }): Promise<RetainedAdaptiveTrainingContinuationCandidate> {
+  const responseVersionContext = asJsonRecord(input.retainedResponse.version_context);
+  const responseAttemptResult = asJsonRecord(input.retainedResponse.attempt_result);
+  const provenance = input.candidate.inputProvenance;
+  const acceptedResponse = input.retainedResponse.compiler_outcome === "accepted";
+  const immutableTechnicalRecompile =
+    input.retainedResponse.compiler_outcome === "rejected" &&
+    input.retainedResponse.diagnostic_code === provenance.recompiledDiagnosticCode &&
+    provenance.retainedResponseOriginalCompilerOutcome === "rejected" &&
+    provenance.recompiledFromCompilerVersion === responseVersionContext?.compilerVersion &&
+    provenance.compilerVersion !== provenance.recompiledFromCompilerVersion &&
+    responseAttemptResult?.outcome === "technical_rejection" &&
+    responseAttemptResult.candidateRecordId === null;
   if (
     input.retainedResponse.user_id !== input.userId ||
     input.retainedResponse.schema_outcome !== "accepted" ||
-    input.retainedResponse.compiler_outcome !== "accepted" ||
+    (!acceptedResponse && !immutableTechnicalRecompile) ||
     input.candidate.inputProvenance.retainedResponseId !== input.retainedResponse.id ||
     input.candidate.inputProvenance.retainedResponseSha256 !==
       input.retainedResponse.response_sha256
@@ -280,6 +292,12 @@ export async function retainAdaptiveTrainingContinuationCandidateForUser(input: 
     candidateSha256: retained.candidate_sha256,
     inputFingerprintSha256: retained.input_fingerprint_sha256,
   };
+}
+
+function asJsonRecord(value: Json | null): Record<string, Json | undefined> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, Json | undefined>)
+    : null;
 }
 
 export async function getAdaptiveTrainingOriginalAuthoringInputForUser(input: {

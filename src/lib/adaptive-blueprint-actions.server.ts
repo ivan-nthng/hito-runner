@@ -43,7 +43,6 @@ import {
 import {
   getAiPlanGenerationResponseForUser,
   getReusableAiPlanGenerationResponseForUser,
-  recordAiPlanGenerationTechnicalRecompileForUser,
   recordAiPlanGenerationAttemptResultForUser,
   recordAiPlanGenerationResponseOutcomeForUser,
   retainCompletedAiPlanGenerationResponseForUser,
@@ -365,16 +364,7 @@ export async function prepareAdaptiveContinuationCandidateForUser(
     };
   }
   const acceptedResponse = technicallyRejectedRetainedResponse
-    ? await recordAiPlanGenerationTechnicalRecompileForUser({
-        userId: input.userId,
-        responseRecordId: technicallyRejectedRetainedResponse.id,
-        sourceCompilerVersion:
-          dependencies.explicitTechnicallyRejectedRetainedResponseRecompile!
-            .expectedCompilerVersion,
-        sourceDiagnosticCode:
-          dependencies.explicitTechnicallyRejectedRetainedResponseRecompile!.expectedDiagnosticCode,
-        recompileCompilerVersion: ADAPTIVE_CONTINUATION_COMPILER_VERSION,
-      })
+    ? technicallyRejectedRetainedResponse
     : explicitRetainedResponse
       ? explicitRetainedResponse
       : await recordAiPlanGenerationResponseOutcomeForUser({
@@ -455,29 +445,13 @@ async function requireTechnicallyRejectedRetainedResponseForRecompile(input: {
   const response = await getAiPlanGenerationResponseForUser(input.userId, input.responseRecordId);
   const versionContext = response?.version_context;
   const attemptResult = response?.attempt_result;
-  const providerAttempt = response?.provider_attempt;
-  const compilerRecompiles =
-    isRecord(providerAttempt) && Array.isArray(providerAttempt.compilerRecompiles)
-      ? providerAttempt.compilerRecompiles
-      : [];
-  const recordedRecompile = compilerRecompiles.some(
-    (entry) =>
-      isRecord(entry) &&
-      entry.sourceCompilerVersion === input.expectedCompilerVersion &&
-      entry.sourceDiagnosticCode === input.expectedDiagnosticCode &&
-      entry.recompileCompilerVersion === ADAPTIVE_CONTINUATION_COMPILER_VERSION &&
-      entry.outcome === "accepted",
-  );
-  const pendingTechnicalRejection =
-    response?.compiler_outcome === "rejected" &&
-    response.diagnostic_code === input.expectedDiagnosticCode;
-  const recordedTechnicalRecompile = response?.compiler_outcome === "accepted" && recordedRecompile;
   if (
     !response ||
     response.user_id !== input.userId ||
     response.provider_model !== input.providerModel ||
     response.schema_outcome !== "accepted" ||
-    (!pendingTechnicalRejection && !recordedTechnicalRecompile) ||
+    response.compiler_outcome !== "rejected" ||
+    response.diagnostic_code !== input.expectedDiagnosticCode ||
     !isRecord(versionContext) ||
     versionContext.promptVersion !== input.expectedPromptVersion ||
     versionContext.compilerVersion !== input.expectedCompilerVersion ||

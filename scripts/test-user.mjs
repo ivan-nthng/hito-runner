@@ -1210,19 +1210,9 @@ async function handleHostedPoolRecompileTechnical() {
   assert.equal(responseAfter.data.response_sha256, responseRead.data.response_sha256);
   assert.deepEqual(responseAfter.data.attempt_result, responseRead.data.attempt_result);
   assert.deepEqual(responseAfter.data.version_context, responseRead.data.version_context);
-  assert.equal(responseAfter.data.compiler_outcome, "accepted");
-  assert.equal(responseAfter.data.diagnostic_code, null);
-  const compilerRecompiles = responseAfter.data.provider_attempt?.compilerRecompiles;
-  assert.ok(Array.isArray(compilerRecompiles));
-  assert.ok(
-    compilerRecompiles.some(
-      (entry) =>
-        entry?.sourceCompilerVersion === expectedCompilerVersion &&
-        entry?.sourceDiagnosticCode === expectedDiagnosticCode &&
-        entry?.recompileCompilerVersion === result.compilerVersion &&
-        entry?.outcome === "accepted",
-    ),
-  );
+  assert.deepEqual(responseAfter.data.provider_attempt, responseRead.data.provider_attempt);
+  assert.equal(responseAfter.data.compiler_outcome, "rejected");
+  assert.equal(responseAfter.data.diagnostic_code, expectedDiagnosticCode);
   const artifact = {
     artifactKind: "hito271_hosted_retained_technical_recompile_v1",
     task: "HITO-271",
@@ -1233,7 +1223,8 @@ async function handleHostedPoolRecompileTechnical() {
       originalPromptVersion: expectedPromptVersion,
       originalCompilerVersion: expectedCompilerVersion,
       originalDiagnosticCode: expectedDiagnosticCode,
-      originalOutcomePreservedInAttemptResultAndCompilerHistory: true,
+      originalOutcomePreservedImmutably: true,
+      recompiledCandidateCompilerVersion: result.compilerVersion,
     },
     candidate: result.candidate,
     providerDispatchCount: 0,
@@ -1276,7 +1267,7 @@ async function handleHostedPoolRecompileTechnical() {
       action: "hosted-pool-recompile-technical",
       responseId: responseRecordId,
       candidate: result.candidate,
-      originalOutcomePreservedInAttemptResultAndCompilerHistory: true,
+      originalOutcomePreservedImmutably: true,
       providerDispatchCount: 0,
       outputPath,
       artifactSha256,
@@ -1402,24 +1393,19 @@ async function handleHostedPoolCandidateArtifact() {
     candidateRead.data.input_provenance?.retainedResponseId ??
     null;
   const inputProvenance = candidateRead.data.input_provenance ?? {};
-  const compilerRecompiles = Array.isArray(responseRead.data.provider_attempt?.compilerRecompiles)
-    ? responseRead.data.provider_attempt.compilerRecompiles
-    : [];
   const retainedTechnicalRecompile =
     inputProvenance.retainedResponseOriginalCompilerOutcome === "rejected" &&
     inputProvenance.recompiledFromCompilerVersion ===
       responseRead.data.version_context?.compilerVersion &&
-    compilerRecompiles.some(
-      (entry) =>
-        entry?.sourceCompilerVersion === inputProvenance.recompiledFromCompilerVersion &&
-        entry?.sourceDiagnosticCode === inputProvenance.recompiledDiagnosticCode &&
-        entry?.recompileCompilerVersion === inputProvenance.compilerVersion &&
-        entry?.outcome === "accepted",
-    );
+    inputProvenance.recompiledDiagnosticCode === responseRead.data.diagnostic_code &&
+    inputProvenance.compilerVersion !== inputProvenance.recompiledFromCompilerVersion &&
+    responseRead.data.compiler_outcome === "rejected" &&
+    responseRead.data.attempt_result?.outcome === "technical_rejection" &&
+    responseRead.data.attempt_result?.candidateRecordId === null;
   if (
     candidateRead.data.blueprint_id !== blueprintRead.data.id ||
     retainedResponseId !== responseRead.data.id ||
-    responseRead.data.compiler_outcome !== "accepted"
+    (responseRead.data.compiler_outcome !== "accepted" && !retainedTechnicalRecompile)
   ) {
     throw new Error("Hosted candidate lineage is not accepted and exact.");
   }

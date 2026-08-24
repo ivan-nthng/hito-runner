@@ -109,6 +109,11 @@ function proveAdaptiveBlueprintCalendarDateWiring() {
   );
   assert.match(
     trainingApiSource,
+    /getPersistedRunnerCalendarSnapshot\(userId, \{\s*currentDate: await getRunnerCalendarDateForUserId\(userId\),\s*\}\)/,
+    "The public Calendar snapshot must classify workouts on the same runner-owned date.",
+  );
+  assert.match(
+    trainingApiSource,
     /getAdaptiveBlueprintCalendarReadModelForUser\(userId, asOfDate\)/,
     "Calendar GET composition must pass its runner-owned date to the adaptive read model.",
   );

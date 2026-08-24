@@ -143,9 +143,10 @@ async function getSnapshotForRequest() {
     return getPreviewSnapshot();
   }
 
-  return getPersistedRunnerCalendarSnapshot(
-    (await getPersistedUserIdForAuthContext(auth)) ?? auth.userId,
-  );
+  const userId = (await getPersistedUserIdForAuthContext(auth)) ?? auth.userId;
+  return getPersistedRunnerCalendarSnapshot(userId, {
+    currentDate: await getRunnerCalendarDateForUserId(userId),
+  });
 }
 
 async function getViewerForRequest(): Promise<ViewerSummary | null> {

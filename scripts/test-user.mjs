@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { chmod, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { createHash, randomBytes } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { tsImport } from "tsx/esm/api";
@@ -87,8 +88,11 @@ const HOSTED_POOL_COMMANDS = new Set([
   "hosted-pool-status",
   "hosted-pool-auth-link",
   "hosted-pool-checkpoint",
+  "hosted-pool-calendar-date",
   "hosted-pool-attempt-ledger",
   "hosted-pool-latest-diagnostic",
+  "hosted-pool-candidate-artifact",
+  "hosted-pool-record-coach-verdict",
   "hosted-pool-reset",
 ]);
 
@@ -109,8 +113,11 @@ if (
     "hosted-pool-status",
     "hosted-pool-auth-link",
     "hosted-pool-checkpoint",
+    "hosted-pool-calendar-date",
     "hosted-pool-attempt-ledger",
     "hosted-pool-latest-diagnostic",
+    "hosted-pool-candidate-artifact",
+    "hosted-pool-record-coach-verdict",
     "hosted-pool-reset",
     "design-profile-seed",
     "design-profile-status",
@@ -131,7 +138,7 @@ if (
   ].includes(command)
 ) {
   throw new Error(
-    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-reset-plan|pool-reset|pool-delete|hosted-pool-adopt|hosted-pool-status|hosted-pool-auth-link|hosted-pool-checkpoint|hosted-pool-attempt-ledger|hosted-pool-latest-diagnostic|hosted-pool-reset|design-profile-seed|design-profile-status|design-profile-reset|adaptive-blueprint-seed|adaptive-blueprint-continuation-seed|adaptive-blueprint-status|adaptive-blueprint-continuation-prepare|adaptive-blueprint-continuation-proof|adaptive-blueprint-continuation-profile-proof|adaptive-blueprint-two-profile-replay|adaptive-blueprint-second-continuation-preflight|adaptive-blueprint-second-continuation-author|adaptive-blueprint-second-continuation-recompile|adaptive-blueprint-reset|runner-core-file-flow-seed|runner-core-file-flow-proof|create|reset-plan|reset|delete> [options]",
+    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-reset-plan|pool-reset|pool-delete|hosted-pool-adopt|hosted-pool-status|hosted-pool-auth-link|hosted-pool-checkpoint|hosted-pool-calendar-date|hosted-pool-attempt-ledger|hosted-pool-latest-diagnostic|hosted-pool-candidate-artifact|hosted-pool-record-coach-verdict|hosted-pool-reset|design-profile-seed|design-profile-status|design-profile-reset|adaptive-blueprint-seed|adaptive-blueprint-continuation-seed|adaptive-blueprint-status|adaptive-blueprint-continuation-prepare|adaptive-blueprint-continuation-proof|adaptive-blueprint-continuation-profile-proof|adaptive-blueprint-two-profile-replay|adaptive-blueprint-second-continuation-preflight|adaptive-blueprint-second-continuation-author|adaptive-blueprint-second-continuation-recompile|adaptive-blueprint-reset|runner-core-file-flow-seed|runner-core-file-flow-proof|create|reset-plan|reset|delete> [options]",
   );
 }
 
@@ -165,10 +172,16 @@ if (command === "inventory") {
   await handleHostedPoolAuthLink();
 } else if (command === "hosted-pool-checkpoint") {
   await handleHostedPoolCheckpoint();
+} else if (command === "hosted-pool-calendar-date") {
+  await handleHostedPoolCalendarDate();
 } else if (command === "hosted-pool-attempt-ledger") {
   await handleHostedPoolAttemptLedger();
 } else if (command === "hosted-pool-latest-diagnostic") {
   await handleHostedPoolLatestDiagnostic();
+} else if (command === "hosted-pool-candidate-artifact") {
+  await handleHostedPoolCandidateArtifact();
+} else if (command === "hosted-pool-record-coach-verdict") {
+  await handleHostedPoolRecordCoachVerdict();
 } else if (command === "hosted-pool-reset") {
   await handleHostedPoolReset();
 } else if (command === "design-profile-seed") {
@@ -473,6 +486,45 @@ async function handleHostedPoolCheckpoint() {
   );
 }
 
+async function handleHostedPoolCalendarDate() {
+  const { receiptPath, receipt, authUser } = await readCurrentHostedReceipt();
+  const calendarDate = requireOption(options.date, "--date");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(calendarDate)) {
+    throw new Error("--date must be one ISO Calendar date.");
+  }
+  const instant = new Date(`${calendarDate}T12:00:00.000Z`);
+  if (Number.isNaN(instant.getTime()) || instant.toISOString().slice(0, 10) !== calendarDate) {
+    throw new Error("--date must be a valid ISO Calendar date.");
+  }
+  const updated = await supabase.auth.admin.updateUserById(receipt.userId, {
+    app_metadata: {
+      ...(authUser.app_metadata ?? {}),
+      hito_qa_calendar_date: calendarDate,
+    },
+  });
+  if (updated.error || !updated.data.user) {
+    throw new Error(updated.error?.message ?? "Unable to set the hosted QA Calendar date.");
+  }
+  if (updated.data.user.app_metadata?.hito_qa_calendar_date !== calendarDate) {
+    throw new Error("Hosted QA Calendar date did not persist exactly.");
+  }
+  const next = appendHostedCheckpoint(
+    receipt,
+    hostedCheckpoint("runner_calendar_date", { calendarDate }),
+  );
+  await writeHostedReceipt(receiptPath, next);
+  console.log(
+    JSON.stringify({
+      ok: true,
+      action: "hosted-pool-calendar-date",
+      calendarDate,
+      userId: receipt.userId,
+      receiptPath,
+      receiptSha256: hashStableJson(next),
+    }),
+  );
+}
+
 async function handleHostedPoolAttemptLedger() {
   const { receiptPath, receipt } = await readCurrentHostedReceipt();
   const outputPath = requireExternalPrivatePath(options.output, "--output");
@@ -660,6 +712,315 @@ function summarizeHostedProviderDiagnostic(responseBody, diagnosticPath) {
     target: child.target ?? null,
     authoredPurpose: child.cue ?? null,
   };
+}
+
+async function handleHostedPoolCandidateArtifact() {
+  const { receiptPath, receipt } = await readCurrentHostedReceipt();
+  const outputPath = requireExternalPrivatePath(options.output, "--output");
+  const deploymentSha = requireOption(options["deployment-sha"], "--deployment-sha");
+  if (!/^[a-f0-9]{40}$/.test(deploymentSha)) {
+    throw new Error("--deployment-sha must be one full Git commit SHA.");
+  }
+  const previewOrigin = requireHostedPreviewOrigin(options["preview-origin"]);
+  const responseRead = await supabase
+    .from("ai_plan_generation_responses")
+    .select(
+      "id, generation_id, provider_response_id, response_sha256, schema_outcome, compiler_outcome, diagnostic_code, diagnostic_path, request_fingerprint_sha256, version_context, version_fingerprint_sha256, provider_model, provider_attempt, attempt_result, created_at",
+    )
+    .eq("user_id", receipt.userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (responseRead.error || !responseRead.data) {
+    throw new Error(responseRead.error?.message ?? "Hosted provider response is unavailable.");
+  }
+  if (
+    responseRead.data.schema_outcome !== "accepted" ||
+    responseRead.data.compiler_outcome !== "accepted"
+  ) {
+    throw new Error("Latest hosted provider response is not compiler-accepted.");
+  }
+  const blueprintRead = await supabase
+    .from("adaptive_training_blueprint_versions")
+    .select(
+      "id, version, content_sha256, blueprint_content, compiler_version, source_contract_version, source_response_id, created_at",
+    )
+    .eq("user_id", receipt.userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (blueprintRead.error || !blueprintRead.data) {
+    throw new Error(blueprintRead.error?.message ?? "Hosted Blueprint is unavailable.");
+  }
+  const candidateRead = await supabase
+    .from("adaptive_training_detailed_candidates")
+    .select(
+      "id, version, candidate_sha256, candidate_content, blueprint_id, source_response_id, interval_start_date, interval_end_date, input_fingerprint_sha256, input_provenance, input_snapshot, fact_references, confirmation_lineage, created_at",
+    )
+    .eq("user_id", receipt.userId)
+    .eq("blueprint_id", blueprintRead.data.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (candidateRead.error || !candidateRead.data) {
+    throw new Error(candidateRead.error?.message ?? "Hosted candidate is unavailable.");
+  }
+  const retainedResponseId =
+    candidateRead.data.source_response_id ??
+    candidateRead.data.input_provenance?.retainedResponseId ??
+    null;
+  if (
+    candidateRead.data.blueprint_id !== blueprintRead.data.id ||
+    retainedResponseId !== responseRead.data.id
+  ) {
+    throw new Error("Hosted candidate lineage is not accepted and exact.");
+  }
+  const confirmationRead = await supabase
+    .from("adaptive_training_block_confirmations")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", receipt.userId)
+    .eq("detailed_candidate_id", candidateRead.data.id);
+  if (confirmationRead.error) {
+    throw new Error(confirmationRead.error.message);
+  }
+  const counts = await getQaUserOwnedCounts(supabase, receipt.userId);
+  const reviewPayload = {
+    blueprint: redactHostedEvidence(blueprintRead.data.blueprint_content),
+    candidate: {
+      intervalStart: candidateRead.data.interval_start_date,
+      intervalEnd: candidateRead.data.interval_end_date,
+      content: redactHostedEvidence(candidateRead.data.candidate_content),
+      inputSnapshot: redactHostedEvidence(candidateRead.data.input_snapshot),
+      factReferences: redactHostedEvidence(candidateRead.data.fact_references),
+      confirmationLineage: redactHostedEvidence(candidateRead.data.confirmation_lineage),
+    },
+  };
+  const reviewPayloadSha256 = hashStableJson(reviewPayload);
+  const artifact = {
+    artifactKind: "hito271_hosted_continuation_candidate_review_v2",
+    generatedAt: new Date().toISOString(),
+    task: "HITO-271",
+    runtimeBoundary: {
+      deploymentSha,
+      previewOrigin,
+      hostedProjectRef: receipt.projectRef,
+      providerMode: "openai_responses_api",
+      providerModel: responseRead.data.provider_model,
+      generationId: responseRead.data.generation_id,
+      providerResponseId: responseRead.data.provider_response_id,
+      externalProviderDispatchCount: 1,
+    },
+    candidateIdentity: {
+      responseId: responseRead.data.id,
+      responseSha256: responseRead.data.response_sha256,
+      requestFingerprintSha256: responseRead.data.request_fingerprint_sha256,
+      versionFingerprintSha256: responseRead.data.version_fingerprint_sha256,
+      blueprintId: blueprintRead.data.id,
+      blueprintVersion: blueprintRead.data.version,
+      blueprintSha256: blueprintRead.data.content_sha256,
+      candidateId: candidateRead.data.id,
+      candidateVersion: candidateRead.data.version,
+      candidateSha256: candidateRead.data.candidate_sha256,
+    },
+    technicalOutcome: {
+      schemaOutcome: responseRead.data.schema_outcome,
+      compilerOutcome: responseRead.data.compiler_outcome,
+      diagnosticCode: responseRead.data.diagnostic_code,
+      diagnosticPath: responseRead.data.diagnostic_path,
+      versionContext: responseRead.data.version_context,
+      providerAttempt: responseRead.data.provider_attempt,
+      attemptResult: responseRead.data.attempt_result,
+    },
+    reviewPayload,
+    persistenceBoundary: {
+      counts,
+      candidateConfirmationCount: confirmationRead.count ?? 0,
+      candidateConfirmed: (confirmationRead.count ?? 0) > 0,
+      calendarRowsMaterialized: counts.planned_workouts,
+    },
+    privacyBoundary: {
+      providerContentIncluded: false,
+      rawPromptIncluded: false,
+      reviewTokenIncluded: false,
+      credentialIncluded: false,
+      runnerPiiIncluded: false,
+    },
+    reviewPayloadSha256,
+  };
+  await mkdir(path.dirname(outputPath), { recursive: true, mode: 0o700 });
+  const artifactBytes = Buffer.from(`${JSON.stringify(artifact, null, 2)}\n`);
+  await writeFile(outputPath, artifactBytes, { mode: 0o600 });
+  await chmod(outputPath, 0o600);
+  const artifactSha256 = createHash("sha256").update(artifactBytes).digest("hex");
+  const next = appendHostedCheckpoint(
+    receipt,
+    hostedCheckpoint("continuation_candidate_artifact", {
+      responseId: responseRead.data.id,
+      candidateId: candidateRead.data.id,
+      candidateSha256: candidateRead.data.candidate_sha256,
+      reviewPayloadSha256,
+      artifactSha256,
+      candidateConfirmed: false,
+    }),
+  );
+  await writeHostedReceipt(receiptPath, next);
+  console.log(
+    JSON.stringify({
+      ok: true,
+      action: "hosted-pool-candidate-artifact",
+      artifactPath: outputPath,
+      artifactSha256,
+      reviewPayloadSha256,
+      responseId: responseRead.data.id,
+      blueprintId: blueprintRead.data.id,
+      blueprintSha256: blueprintRead.data.content_sha256,
+      candidateId: candidateRead.data.id,
+      candidateSha256: candidateRead.data.candidate_sha256,
+      counts,
+      receiptSha256: hashStableJson(next),
+    }),
+  );
+}
+
+function redactHostedEvidence(value) {
+  if (Array.isArray(value)) return value.map(redactHostedEvidence);
+  if (!value || typeof value !== "object") return value;
+  const output = {};
+  for (const [key, child] of Object.entries(value)) {
+    if (
+      /(?:^|_)(?:user|owner)_?id$/i.test(key) ||
+      /email|password|credential|token|raw|prompt|response_body/i.test(key)
+    ) {
+      continue;
+    }
+    output[key] = redactHostedEvidence(child);
+  }
+  return output;
+}
+
+async function handleHostedPoolRecordCoachVerdict() {
+  const { receiptPath, receipt } = await readCurrentHostedReceipt();
+  const sourceArtifactPath = requireExternalPrivatePath(
+    options["source-artifact"],
+    "--source-artifact",
+  );
+  const verdictArtifactPath = requireExternalPrivatePath(
+    options["verdict-artifact"],
+    "--verdict-artifact",
+  );
+  const [sourceBytes, verdictBytes] = await Promise.all([
+    readFile(sourceArtifactPath),
+    readFile(verdictArtifactPath),
+  ]);
+  const sourceArtifact = JSON.parse(sourceBytes.toString("utf8"));
+  const verdictArtifact = JSON.parse(verdictBytes.toString("utf8"));
+  const sourceArtifactSha256 = createHash("sha256").update(sourceBytes).digest("hex");
+  const verdictArtifactSha256 = createHash("sha256").update(verdictBytes).digest("hex");
+  const candidateIdentity = sourceArtifact.candidateIdentity;
+  const approved = verdictArtifact.verdict === "APPROVED";
+  const rejected = verdictArtifact.verdict === "REJECTED";
+  if (
+    sourceArtifact.task !== "HITO-271" ||
+    verdictArtifact.task !== "HITO-271" ||
+    verdictArtifact.sourceArtifactSha256 !== sourceArtifactSha256 ||
+    verdictArtifact.reviewPayloadSha256 !== sourceArtifact.reviewPayloadSha256 ||
+    verdictArtifact.responseId !== candidateIdentity?.responseId ||
+    verdictArtifact.candidateId !== candidateIdentity?.candidateId ||
+    verdictArtifact.candidateSha256 !== candidateIdentity?.candidateSha256 ||
+    verdictArtifact.blueprintId !== candidateIdentity?.blueprintId ||
+    (!approved && !rejected) ||
+    verdictArtifact.safeToConfirm !== approved ||
+    typeof verdictArtifact.reviewedOn !== "string"
+  ) {
+    throw new Error("Running Coach verdict binding is not exact.");
+  }
+  const candidateRead = await supabase
+    .from("adaptive_training_detailed_candidates")
+    .select("id, candidate_sha256, blueprint_id, source_response_id")
+    .eq("user_id", receipt.userId)
+    .eq("id", candidateIdentity.candidateId)
+    .eq("candidate_sha256", candidateIdentity.candidateSha256)
+    .eq("blueprint_id", candidateIdentity.blueprintId)
+    .eq("source_response_id", candidateIdentity.responseId)
+    .maybeSingle();
+  if (candidateRead.error || !candidateRead.data) {
+    throw new Error(candidateRead.error?.message ?? "Coach-reviewed candidate is unavailable.");
+  }
+  const updated = recordHostedCoachVerdictThroughCanonicalOwner({
+    userId: receipt.userId,
+    responseRecordId: candidateIdentity.responseId,
+    reviewer: "running_coach",
+    verdict: {
+      verdict: approved ? "approved" : "rejected",
+      discriminator: approved ? null : verdictArtifact.discriminator,
+      reviewedAt: verdictArtifact.reviewedOn,
+    },
+  });
+  const recordedVerdict = updated.running_coach_verdict;
+  const next = appendHostedCheckpoint(
+    receipt,
+    hostedCheckpoint("running_coach_verdict", {
+      responseId: candidateIdentity.responseId,
+      candidateId: candidateIdentity.candidateId,
+      candidateSha256: candidateIdentity.candidateSha256,
+      verdict: approved ? "approved" : "rejected",
+      safeToConfirm: approved,
+      sourceArtifactSha256,
+      verdictArtifactSha256,
+    }),
+  );
+  await writeHostedReceipt(receiptPath, next);
+  console.log(
+    JSON.stringify({
+      ok: true,
+      action: "hosted-pool-record-coach-verdict",
+      responseId: candidateIdentity.responseId,
+      candidateId: candidateIdentity.candidateId,
+      verdict: approved ? "approved" : "rejected",
+      safeToConfirm: approved,
+      recordedVerdict,
+      sourceArtifactSha256,
+      verdictArtifactSha256,
+      receiptSha256: hashStableJson(next),
+    }),
+  );
+}
+
+function recordHostedCoachVerdictThroughCanonicalOwner(input) {
+  const script = String.raw`
+    import { readFileSync } from "node:fs";
+    import { recordAiPlanGenerationReviewVerdictForUser } from "./src/lib/ai-plan-generation-response-persistence.ts";
+    const input = JSON.parse(readFileSync(0, "utf8"));
+    const updated = await recordAiPlanGenerationReviewVerdictForUser(input);
+    console.log(JSON.stringify({ id: updated.id, running_coach_verdict: updated.running_coach_verdict }));
+  `;
+  const child = spawnSync(
+    process.execPath,
+    ["--import", "tsx", "--input-type=module", "-e", script],
+    {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        NEXT_PUBLIC_SUPABASE_URL: config.supabaseUrl,
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: config.supabasePublishableKey,
+        SUPABASE_SECRET_KEY: config.supabaseServerKey,
+      },
+      input: JSON.stringify(input),
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+    },
+  );
+  if (child.status !== 0) {
+    const safeMessage = String(child.stderr ?? "")
+      .split("\n")
+      .find((line) => line.trim().startsWith("Error:"))
+      ?.trim()
+      .slice(0, 240);
+    throw new Error(
+      `Canonical Coach verdict persistence failed with status ${child.status}${safeMessage ? ` (${safeMessage})` : ""}.`,
+    );
+  }
+  return JSON.parse(child.stdout);
 }
 
 async function handleHostedPoolReset() {
@@ -2065,12 +2426,16 @@ async function buildConfig() {
     "NEXT_PUBLIC_SUPABASE_URL",
   );
   const hostedProjectRef = options["trusted-hosted-project-ref"] ?? null;
+  const hostedKeyInventory =
+    HOSTED_POOL_COMMANDS.has(command) && options["api-key-inventory-stdin"] === "true"
+      ? JSON.parse(await readStdin())
+      : null;
   const suppliedServerKey = readEnv("SUPABASE_SECRET_KEY");
   const supabaseServerKey =
-    suppliedServerKey ??
-    (HOSTED_POOL_COMMANDS.has(command) && options["api-key-inventory-stdin"] === "true"
-      ? findCurrentSecretKey(JSON.parse(await readStdin()))
-      : null);
+    suppliedServerKey ?? (hostedKeyInventory ? findCurrentSecretKey(hostedKeyInventory) : null);
+  const supabasePublishableKey =
+    readEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY") ??
+    (hostedKeyInventory ? findCurrentPublishableKey(hostedKeyInventory) : null);
   requireOption(supabaseServerKey, "SUPABASE_SECRET_KEY");
 
   if (!isLoopbackRuntimeUrl(supabaseUrl)) {
@@ -2089,6 +2454,10 @@ async function buildConfig() {
     return {
       supabaseUrl: parsed.origin,
       supabaseServerKey,
+      supabasePublishableKey: requireOption(
+        supabasePublishableKey,
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+      ),
       hostedProjectRef,
       accountsFilePath: null,
     };
@@ -2103,6 +2472,7 @@ async function buildConfig() {
   return {
     supabaseUrl,
     supabaseServerKey,
+    supabasePublishableKey: null,
     hostedProjectRef: null,
     accountsFilePath: path.resolve(
       process.cwd(),
@@ -2119,6 +2489,16 @@ function findCurrentSecretKey(value) {
     throw new Error("The current hosted Supabase secret-key class is unavailable.");
   }
   return secret;
+}
+
+function findCurrentPublishableKey(value) {
+  const values = [];
+  visitValues(value, values);
+  const publishable = values.find((candidate) => candidate.startsWith("sb_publishable_"));
+  if (!publishable) {
+    throw new Error("The current hosted Supabase publishable-key class is unavailable.");
+  }
+  return publishable;
 }
 
 function visitValues(value, output) {

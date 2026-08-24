@@ -18,7 +18,7 @@ import { z } from "zod";
 
 export const ADAPTIVE_CONTINUATION_AUTHORING_BRIEF_VERSION =
   "adaptive_continuation_authoring_brief_v2" as const;
-export const ADAPTIVE_CONTINUATION_PROMPT_VERSION = "adaptive_continuation_prompt_v7" as const;
+export const ADAPTIVE_CONTINUATION_PROMPT_VERSION = "adaptive_continuation_prompt_v8" as const;
 export const ADAPTIVE_CONTINUATION_PROVIDER_CONTRACT_VERSION =
   "adaptive_continuation_provider_response_v3" as const;
 export const ADAPTIVE_CONTINUATION_COMPILER_VERSION = "adaptive_continuation_compiler_v5" as const;
@@ -104,6 +104,10 @@ export function buildAdaptiveContinuationAuthoringPrompt(input: {
     throw new Error("A continuation projection uses a workout family with no canonical identity.");
   }
   const targetBoundaryEndpointInstruction = buildTargetBoundaryEndpointInstruction(input);
+  const hasFactualPaceAuthority = Boolean(
+    input.originalAuthoringInput.runnerFacts.benchmark ||
+    input.originalAuthoringInput.planGoalIntent.targetFinishTime,
+  );
   const schemaInput: StructuredPlanAuthoringInput = {
     ...input.originalAuthoringInput,
     schedule: {
@@ -146,6 +150,11 @@ export function buildAdaptiveContinuationAuthoringPrompt(input: {
     "Return every supplied projection date exactly once across detailed_block.workouts and detailed_block.final_workout. The final_workout date must not also appear in workouts; do not omit, duplicate, or add a date.",
     "Use the supplied decision mode. fact_shaped may change detail only for comparable contexts explicitly marked detailChangeEligible. blueprint_faithful and constraint_only must not invent performance adaptation from missing FIT or RPE facts.",
     "FIT/RPE fact shaping is permitted only for workout families named in comparableContextKeys. Every other family must keep a distinct family-faithful executable command; a steady command must never duplicate an easy command signature.",
+    ...(!hasFactualPaceAuthority
+      ? [
+          "The runner has neither a factual benchmark nor an explicit target finish time. Do not use primary_execution_mode=pace or emit an executable pace command on any runnable unit or Repeat child. Use only the available provider-neutral heart-rate or controlled-effort execution truth permitted by the strict schema; never infer pace precision from the goal distance, age, generic level, or prior authored workouts.",
+        ]
+      : []),
     ...(targetBoundaryEndpointInstruction ? [targetBoundaryEndpointInstruction] : []),
     ...(targetBoundaryEndpointInstruction
       ? [

@@ -393,6 +393,29 @@ function validateContinuationAuthoringCompilerModes() {
       brief,
       originalAuthoringInput: authoringInput,
     });
+    const noPaceAuthorityPrompt = buildAdaptiveContinuationAuthoringPrompt({
+      brief,
+      originalAuthoringInput: {
+        ...authoringInput,
+        runnerFacts: {
+          ...authoringInput.runnerFacts,
+          benchmark: null,
+        },
+        planGoalIntent: {
+          ...authoringInput.planGoalIntent,
+          targetFinishTime: null,
+        },
+      },
+    });
+    assert.match(
+      noPaceAuthorityPrompt.systemPrompt,
+      /neither a factual benchmark nor an explicit target finish time/,
+    );
+    assert.match(noPaceAuthorityPrompt.systemPrompt, /Do not use primary_execution_mode=pace/);
+    assert.doesNotMatch(
+      prompt.systemPrompt,
+      /neither a factual benchmark nor an explicit target finish time/,
+    );
     const payload = JSON.parse(prompt.userPrompt) as { brief: Record<string, unknown> };
     assert.deepEqual(Object.keys(payload.brief).sort(), [
       "blueprint",

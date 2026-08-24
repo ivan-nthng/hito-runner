@@ -5,6 +5,29 @@ import { createAdminSupabaseClient } from "@/lib/supabase/server";
 
 export type AiPlanGenerationResponseRow =
   Database["public"]["Tables"]["ai_plan_generation_responses"]["Row"];
+
+export function isAcceptedOrImmutablyRecompiledAiPlanGenerationResponseForCandidate(
+  response: AiPlanGenerationResponseRow,
+  candidateProvenance: Json | null,
+) {
+  if (response.schema_outcome !== "accepted") return false;
+  if (response.compiler_outcome === "accepted") return true;
+  const provenance = jsonObject(candidateProvenance);
+  const versionContext = jsonObject(response.version_context);
+  const attemptResult = jsonObject(response.attempt_result);
+  return (
+    response.compiler_outcome === "rejected" &&
+    provenance?.retainedResponseOriginalCompilerOutcome === "rejected" &&
+    provenance.recompiledFromCompilerVersion === versionContext?.compilerVersion &&
+    typeof provenance.compilerVersion === "string" &&
+    /^adaptive_continuation_compiler_v\d+$/.test(provenance.compilerVersion) &&
+    provenance.compilerVersion !== provenance.recompiledFromCompilerVersion &&
+    provenance.recompiledDiagnosticCode === response.diagnostic_code &&
+    attemptResult?.outcome === "technical_rejection" &&
+    attemptResult.candidateRecordId === null
+  );
+}
+
 export type AiPlanGenerationValidationOutcome = "not_run" | "accepted" | "rejected";
 export type AiPlanGenerationAttemptResult =
   | {

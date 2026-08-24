@@ -1758,8 +1758,7 @@ async function handleHostedPoolConfirmCandidate() {
     afterCounts.planned_workouts,
     beforeCounts.planned_workouts + (existingConfirmation.data ? 0 : workoutDocuments.length),
   );
-  const readback = await readAdaptiveBlueprintProjectionFixture({
-    supabase,
+  const readback = readHostedAdaptiveProjectionThroughCanonicalOwner({
     userId: receipt.userId,
     asOfDate,
   });
@@ -1891,6 +1890,53 @@ function runHostedCandidateConfirmationThroughCanonicalOwner(input) {
       .slice(0, 240);
     throw new Error(
       `Canonical sealed candidate confirmation failed with status ${child.status}${safeMessage ? ` (${safeMessage})` : ""}.`,
+    );
+  }
+  return JSON.parse(child.stdout);
+}
+
+function readHostedAdaptiveProjectionThroughCanonicalOwner(input) {
+  const script = String.raw`
+    import { readFileSync } from "node:fs";
+    import { createClient } from "@supabase/supabase-js";
+    import { readAdaptiveBlueprintProjectionFixture } from "./scripts/lib/runner-design-profile-fixture.ts";
+    const input = JSON.parse(readFileSync(0, "utf8"));
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SECRET_KEY,
+      { auth: { autoRefreshToken: false, persistSession: false } },
+    );
+    const readback = await readAdaptiveBlueprintProjectionFixture({
+      supabase,
+      userId: input.userId,
+      asOfDate: input.asOfDate,
+    });
+    console.log(JSON.stringify(readback));
+  `;
+  const child = spawnSync(
+    process.execPath,
+    ["--import", "tsx", "--input-type=module", "-e", script],
+    {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        NEXT_PUBLIC_SUPABASE_URL: config.supabaseUrl,
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: config.supabasePublishableKey,
+        SUPABASE_SECRET_KEY: config.supabaseServerKey,
+      },
+      input: JSON.stringify(input),
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+    },
+  );
+  if (child.status !== 0) {
+    const safeMessage = String(child.stderr ?? "")
+      .split("\n")
+      .find((line) => line.trim().startsWith("Error:"))
+      ?.trim()
+      .slice(0, 240);
+    throw new Error(
+      `Canonical adaptive readback failed with status ${child.status}${safeMessage ? ` (${safeMessage})` : ""}.`,
     );
   }
   return JSON.parse(child.stdout);

@@ -9,7 +9,10 @@ import {
   getAdaptiveBlueprintContinuationDecisionForUser,
 } from "@/lib/adaptive-blueprint-read-model";
 import { getAdaptiveTrainingDetailedCandidateForUser } from "@/lib/adaptive-blueprint-persistence";
-import { getAiPlanGenerationResponseForUser } from "@/lib/ai-plan-generation-response-persistence";
+import {
+  getAiPlanGenerationResponseForUser,
+  isAcceptedOrImmutablyRecompiledAiPlanGenerationResponseForCandidate,
+} from "@/lib/ai-plan-generation-response-persistence";
 import { buildPersistedWorkoutInsertRows } from "@/lib/persisted-plan-replacement";
 import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
 import {
@@ -240,10 +243,13 @@ async function resolveCurrentAdaptiveContinuationCandidate(input: {
     input.userId,
     stored.source_response_id,
   );
+  const provenance = readRecord(stored.input_provenance);
   if (
     !retainedResponse ||
-    retainedResponse.schema_outcome !== "accepted" ||
-    retainedResponse.compiler_outcome !== "accepted"
+    !isAcceptedOrImmutablyRecompiledAiPlanGenerationResponseForCandidate(
+      retainedResponse,
+      stored.input_provenance,
+    )
   ) {
     return {
       ok: false as const,
@@ -257,7 +263,6 @@ async function resolveCurrentAdaptiveContinuationCandidate(input: {
       message: "The adaptive continuation candidate is malformed.",
     };
   }
-  const provenance = readRecord(stored.input_provenance);
   if (
     provenance?.retainedResponseId !== retainedResponse.id ||
     provenance.retainedResponseSha256 !== retainedResponse.response_sha256

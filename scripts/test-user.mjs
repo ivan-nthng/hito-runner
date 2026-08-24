@@ -1765,6 +1765,44 @@ async function handleHostedPoolConfirmCandidate() {
   assert.equal(readback.source.latestConfirmationId, confirmationRead.data.id);
   assert.equal(readback.source.confirmedCalendarWorkoutCount, afterCounts.planned_workouts);
   assert.equal(readback.projections.calendarRowCount, 0);
+  const collisionWorkouts = await supabase
+    .from("planned_workouts")
+    .select("id, workout_date")
+    .eq("user_id", receipt.userId)
+    .neq("workout_type", "rest")
+    .gte("workout_date", candidateRead.data.interval_start_date)
+    .order("workout_date", { ascending: true })
+    .limit(2);
+  if (collisionWorkouts.error || collisionWorkouts.data.length !== 2) {
+    throw new Error(
+      collisionWorkouts.error?.message ?? "Collision proof requires two owned workouts.",
+    );
+  }
+  const protectedLog = await supabase
+    .from("workout_logs")
+    .select("planned_workout_id")
+    .eq("user_id", receipt.userId)
+    .eq("outcome", "completed")
+    .limit(1)
+    .maybeSingle();
+  if (protectedLog.error || !protectedLog.data) {
+    throw new Error(protectedLog.error?.message ?? "Protection proof requires one completed row.");
+  }
+  const negativeProof = runHostedWorkoutCommandNegativeProofThroughCanonicalOwner({
+    userId: receipt.userId,
+    foreignUserId: crypto.randomUUID(),
+    candidateId,
+    asOfDate,
+    collisionSourceWorkoutId: collisionWorkouts.data[0].id,
+    collisionTargetDate: collisionWorkouts.data[1].workout_date,
+    protectedWorkoutId: protectedLog.data.planned_workout_id,
+  });
+  assert.equal(negativeProof.stale.ok, false);
+  assert.equal(negativeProof.foreignOwner.ok, false);
+  assert.equal(negativeProof.collision.ok, false);
+  assert.equal(negativeProof.protection.ok, false);
+  const afterNegativeCounts = await getQaUserOwnedCounts(supabase, receipt.userId);
+  assert.deepEqual(afterNegativeCounts, afterCounts);
   const artifact = {
     artifactKind: "hito271_hosted_sealed_candidate_confirmation_v1",
     task: "HITO-271",
@@ -1782,6 +1820,7 @@ async function handleHostedPoolConfirmCandidate() {
       artifactSha256: verdictArtifactSha256,
     },
     sealedCommand: confirmationResult,
+    negativeProof,
     confirmation: confirmationRead.data,
     persistence: {
       beforeCounts,
@@ -1830,6 +1869,78 @@ async function handleHostedPoolConfirmCandidate() {
       receiptSha256: hashStableJson(next),
     }),
   );
+}
+
+function runHostedWorkoutCommandNegativeProofThroughCanonicalOwner(input) {
+  const script = String.raw`
+    import { readFileSync } from "node:fs";
+    import { reviewWorkoutCommandForUser } from "./src/lib/manual-workout-authoring/actions.ts";
+    const input = JSON.parse(readFileSync(0, "utf8"));
+    const summarize = (result) => ({
+      ok: result.ok,
+      issueCodes: result.ok ? [] : result.issues.map((issue) => issue.code),
+      issuePaths: result.ok ? [] : result.issues.map((issue) => issue.path),
+    });
+    const stale = await reviewWorkoutCommandForUser(
+      input.userId,
+      {
+        operation: "materialize_source_candidate",
+        source: { kind: "adaptive_continuation_candidate", candidateId: input.candidateId },
+      },
+      { adaptiveContinuationAsOfDate: input.asOfDate },
+    );
+    const foreignOwner = await reviewWorkoutCommandForUser(
+      input.foreignUserId,
+      {
+        operation: "materialize_source_candidate",
+        source: { kind: "adaptive_continuation_candidate", candidateId: input.candidateId },
+      },
+      { adaptiveContinuationAsOfDate: input.asOfDate },
+    );
+    const collision = await reviewWorkoutCommandForUser(input.userId, {
+      operation: "copy",
+      workoutId: input.collisionSourceWorkoutId,
+      targetDate: input.collisionTargetDate,
+    });
+    const protection = await reviewWorkoutCommandForUser(input.userId, {
+      operation: "delete",
+      workoutId: input.protectedWorkoutId,
+    });
+    console.log(JSON.stringify({
+      stale: summarize(stale),
+      foreignOwner: summarize(foreignOwner),
+      collision: summarize(collision),
+      protection: summarize(protection),
+      confirmationAttempted: false,
+    }));
+  `;
+  const child = spawnSync(
+    process.execPath,
+    ["--import", "tsx", "--input-type=module", "-e", script],
+    {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        NEXT_PUBLIC_SUPABASE_URL: config.supabaseUrl,
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: config.supabasePublishableKey,
+        SUPABASE_SECRET_KEY: config.supabaseServerKey,
+      },
+      input: JSON.stringify(input),
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+    },
+  );
+  if (child.status !== 0) {
+    const safeMessage = String(child.stderr ?? "")
+      .split("\n")
+      .find((line) => line.trim().startsWith("Error:"))
+      ?.trim()
+      .slice(0, 240);
+    throw new Error(
+      `Canonical WorkoutCommand negative proof failed with status ${child.status}${safeMessage ? ` (${safeMessage})` : ""}.`,
+    );
+  }
+  return JSON.parse(child.stdout);
 }
 
 function runHostedCandidateConfirmationThroughCanonicalOwner(input) {

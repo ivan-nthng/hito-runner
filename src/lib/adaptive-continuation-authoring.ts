@@ -5,6 +5,7 @@ import {
 } from "@/lib/ai-authored-plan-first-compiler";
 import {
   AI_AUTHORED_PLAN_FIRST_WORKOUT_IDENTITY_VALUES,
+  NO_PACE_SHORT_REPEAT_EXECUTION_INSTRUCTION,
   aiAuthoredDetailedBlockSchema,
   buildAiAuthoredPlanFirstOpenAiSchema,
 } from "@/lib/ai-authored-plan-first-provider-contract";
@@ -18,7 +19,7 @@ import { z } from "zod";
 
 export const ADAPTIVE_CONTINUATION_AUTHORING_BRIEF_VERSION =
   "adaptive_continuation_authoring_brief_v2" as const;
-export const ADAPTIVE_CONTINUATION_PROMPT_VERSION = "adaptive_continuation_prompt_v9" as const;
+export const ADAPTIVE_CONTINUATION_PROMPT_VERSION = "adaptive_continuation_prompt_v10" as const;
 export const ADAPTIVE_CONTINUATION_PROVIDER_CONTRACT_VERSION =
   "adaptive_continuation_provider_response_v3" as const;
 export const ADAPTIVE_CONTINUATION_COMPILER_VERSION = "adaptive_continuation_compiler_v5" as const;
@@ -159,6 +160,7 @@ export function buildAdaptiveContinuationAuthoringPrompt(input: {
     ...(!hasFactualPaceAuthority
       ? [
           "The runner has neither a factual benchmark nor an explicit target finish time. Do not use primary_execution_mode=pace or emit an executable pace command on any runnable unit or Repeat child. Use only the available provider-neutral heart-rate or controlled-effort execution truth permitted by the strict schema; never infer pace precision from the goal distance, age, generic level, or prior authored workouts.",
+          NO_PACE_SHORT_REPEAT_EXECUTION_INSTRUCTION,
         ]
       : []),
     ...(targetBoundaryEndpointInstruction ? [targetBoundaryEndpointInstruction] : []),

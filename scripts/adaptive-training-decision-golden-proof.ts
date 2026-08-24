@@ -412,6 +412,11 @@ function validateContinuationAuthoringCompilerModes() {
       /neither a factual benchmark nor an explicit target finish time/,
     );
     assert.match(noPaceAuthorityPrompt.systemPrompt, /Do not use primary_execution_mode=pace/);
+    assert.match(
+      noPaceAuthorityPrompt.systemPrompt,
+      /Those fixed recovery children use controlled_short_recovery/,
+    );
+    assert.match(noPaceAuthorityPrompt.systemPrompt, /Never use BPM as the primary command/);
     assert.doesNotMatch(
       prompt.systemPrompt,
       /neither a factual benchmark nor an explicit target finish time/,

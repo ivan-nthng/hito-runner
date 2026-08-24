@@ -416,6 +416,17 @@ function validateContinuationAuthoringCompilerModes() {
       noPaceAuthorityPrompt.systemPrompt,
       /Those fixed recovery children use controlled_short_recovery/,
     );
+    assert.match(
+      noPaceAuthorityPrompt.systemPrompt,
+      /cue exactly to Relaxed controlled recovery; recover fully/,
+    );
+    const repeatChildCueSchema = (
+      noPaceAuthorityPrompt.responseSchema.$defs as {
+        repeat_child?: { properties?: { cue?: { type?: string; anyOf?: unknown } } };
+      }
+    ).repeat_child?.properties?.cue;
+    assert.equal(repeatChildCueSchema?.type, "string");
+    assert.equal(repeatChildCueSchema?.anyOf, undefined);
     assert.match(noPaceAuthorityPrompt.systemPrompt, /Never use BPM as the primary command/);
     assert.match(
       noPaceAuthorityPrompt.systemPrompt,
@@ -457,7 +468,7 @@ function validateContinuationAuthoringCompilerModes() {
       );
     }
     const legacyPromptChars = JSON.stringify({
-      contractVersion: "adaptive_continuation_provider_response_v3",
+      contractVersion: "adaptive_continuation_provider_response_v4",
       brief: {
         ...brief,
         decision: {

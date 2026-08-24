@@ -52,7 +52,7 @@ export const AI_AUTHORED_PLAN_FIRST_SHORT_WORK_EFFORT_VALUES = [
   "controlled_short_recovery",
 ] as const;
 export const NO_PACE_SHORT_REPEAT_EXECUTION_INSTRUCTION =
-  "Because executable pace authority is absent, use complete accepted-profile BPM bands only for sustained non-terrain runnable leaves where heart rate can govern execution. A work Repeat child lasting at most 2 minutes in controlled_tempo_session, a work Repeat child of at most 400 m in distance_intervals, and a stride work child lasting at most 30 seconds must be effort-only: use controlled_short_repetition for tempo/distance work and controlled_stride for strides. A stride recovery child must be exactly 1 minute; a controlled_tempo_session or distance_intervals short-work recovery child must be exactly 1 or 1.5 minutes. Those fixed recovery children use controlled_short_recovery with relaxed, controlled, recover-fully wording; never author another fractional recovery duration between those accepted values. Retain the exact time or distance plus rounds. Never use BPM as the primary command for either side of those short work/recovery pairs. Terrain-dependent uphill work and downhill recovery remain effort-only." as const;
+  "Because executable pace authority is absent, use complete accepted-profile BPM bands only for sustained non-terrain runnable leaves where heart rate can govern execution. A work Repeat child lasting at most 2 minutes in controlled_tempo_session, a work Repeat child of at most 400 m in distance_intervals, and a stride work child lasting at most 30 seconds must be effort-only: use controlled_short_repetition for tempo/distance work and controlled_stride for strides. Set the cue on each controlled_short_repetition child exactly to Controlled smooth repetition. Set the cue on each controlled_stride child exactly to Controlled smooth stride. A stride recovery child must be exactly 1 minute; a controlled_tempo_session or distance_intervals short-work recovery child must be exactly 1 or 1.5 minutes. Those fixed recovery children use controlled_short_recovery and must set cue exactly to Relaxed controlled recovery; recover fully. Never author another fractional recovery duration between those accepted values. Retain the exact time or distance plus rounds. Never use BPM as the primary command for either side of those short work/recovery pairs. Terrain-dependent uphill work and downhill recovery remain effort-only." as const;
 export const AI_AUTHORED_PLAN_FIRST_EFFORT_VALUES = [
   ...AI_AUTHORED_PLAN_FIRST_TERRAIN_EFFORT_VALUES,
   ...AI_AUTHORED_PLAN_FIRST_SHORT_WORK_EFFORT_VALUES,
@@ -371,7 +371,7 @@ export function buildAiAuthoredPlanFirstOpenAiSchema(authoringInput: StructuredP
     properties: {
       role: { type: "string", enum: [...PLANNED_WORKOUT_REPEAT_CHILD_ROLE_VALUES] },
       label: text(80),
-      cue: nullableText(160),
+      cue: text(160),
       prescription: { $ref: "#/$defs/prescription" },
       target: { $ref: "#/$defs/target" },
     },

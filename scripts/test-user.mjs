@@ -87,6 +87,8 @@ const HOSTED_POOL_COMMANDS = new Set([
   "hosted-pool-status",
   "hosted-pool-auth-link",
   "hosted-pool-checkpoint",
+  "hosted-pool-attempt-ledger",
+  "hosted-pool-latest-diagnostic",
   "hosted-pool-reset",
 ]);
 
@@ -107,6 +109,8 @@ if (
     "hosted-pool-status",
     "hosted-pool-auth-link",
     "hosted-pool-checkpoint",
+    "hosted-pool-attempt-ledger",
+    "hosted-pool-latest-diagnostic",
     "hosted-pool-reset",
     "design-profile-seed",
     "design-profile-status",
@@ -127,7 +131,7 @@ if (
   ].includes(command)
 ) {
   throw new Error(
-    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-reset-plan|pool-reset|pool-delete|hosted-pool-adopt|hosted-pool-status|hosted-pool-auth-link|hosted-pool-checkpoint|hosted-pool-reset|design-profile-seed|design-profile-status|design-profile-reset|adaptive-blueprint-seed|adaptive-blueprint-continuation-seed|adaptive-blueprint-status|adaptive-blueprint-continuation-prepare|adaptive-blueprint-continuation-proof|adaptive-blueprint-continuation-profile-proof|adaptive-blueprint-two-profile-replay|adaptive-blueprint-second-continuation-preflight|adaptive-blueprint-second-continuation-author|adaptive-blueprint-second-continuation-recompile|adaptive-blueprint-reset|runner-core-file-flow-seed|runner-core-file-flow-proof|create|reset-plan|reset|delete> [options]",
+    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-reset-plan|pool-reset|pool-delete|hosted-pool-adopt|hosted-pool-status|hosted-pool-auth-link|hosted-pool-checkpoint|hosted-pool-attempt-ledger|hosted-pool-latest-diagnostic|hosted-pool-reset|design-profile-seed|design-profile-status|design-profile-reset|adaptive-blueprint-seed|adaptive-blueprint-continuation-seed|adaptive-blueprint-status|adaptive-blueprint-continuation-prepare|adaptive-blueprint-continuation-proof|adaptive-blueprint-continuation-profile-proof|adaptive-blueprint-two-profile-replay|adaptive-blueprint-second-continuation-preflight|adaptive-blueprint-second-continuation-author|adaptive-blueprint-second-continuation-recompile|adaptive-blueprint-reset|runner-core-file-flow-seed|runner-core-file-flow-proof|create|reset-plan|reset|delete> [options]",
   );
 }
 
@@ -161,6 +165,10 @@ if (command === "inventory") {
   await handleHostedPoolAuthLink();
 } else if (command === "hosted-pool-checkpoint") {
   await handleHostedPoolCheckpoint();
+} else if (command === "hosted-pool-attempt-ledger") {
+  await handleHostedPoolAttemptLedger();
+} else if (command === "hosted-pool-latest-diagnostic") {
+  await handleHostedPoolLatestDiagnostic();
 } else if (command === "hosted-pool-reset") {
   await handleHostedPoolReset();
 } else if (command === "design-profile-seed") {
@@ -463,6 +471,195 @@ async function handleHostedPoolCheckpoint() {
       receiptSha256: hashStableJson(next),
     }),
   );
+}
+
+async function handleHostedPoolAttemptLedger() {
+  const { receiptPath, receipt } = await readCurrentHostedReceipt();
+  const outputPath = requireExternalPrivatePath(options.output, "--output");
+  const attemptsRead = await supabase
+    .from("ai_plan_generation_responses")
+    .select(
+      "id, generation_id, provider_response_id, response_sha256, schema_outcome, compiler_outcome, diagnostic_code, diagnostic_path, request_fingerprint_sha256, version_context, version_fingerprint_sha256, provider_model, provider_attempt, attempt_result, created_at",
+    )
+    .eq("user_id", receipt.userId)
+    .order("created_at", { ascending: true });
+  if (attemptsRead.error) {
+    throw new Error(attemptsRead.error.message);
+  }
+  const attempts = (attemptsRead.data ?? []).map((row, index) => {
+    const usage = row.provider_attempt?.usage ?? {};
+    const inputTokens = Number(usage.inputTokens ?? 0);
+    const outputTokens = Number(usage.outputTokens ?? 0);
+    const derivedUsd = inputTokens * (1.75 / 1_000_000) + outputTokens * (14 / 1_000_000);
+    return {
+      ordinal: index + 1,
+      scenario: String(row.version_context?.promptVersion ?? "").startsWith(
+        "adaptive_continuation_",
+      )
+        ? "continuation"
+        : "initial_plan",
+      responseId: row.id,
+      providerResponseId: row.provider_response_id,
+      responseSha256: row.response_sha256,
+      requestFingerprintSha256: row.request_fingerprint_sha256,
+      versionFingerprintSha256: row.version_fingerprint_sha256,
+      providerModel: row.provider_model,
+      versionContext: row.version_context,
+      usage,
+      requestStartedAt: row.provider_attempt?.requestStartedAt ?? null,
+      responseReceivedAt: row.provider_attempt?.responseReceivedAt ?? null,
+      providerElapsedMs: row.provider_attempt?.providerElapsedMs ?? null,
+      schemaOutcome: row.schema_outcome,
+      compilerOutcome: row.compiler_outcome,
+      diagnosticCode: row.diagnostic_code,
+      diagnosticPath: row.diagnostic_path,
+      attemptResult: row.attempt_result,
+      cost: {
+        classification: "derived_rate_card",
+        currency: "USD",
+        derivedAmount: derivedUsd.toFixed(8),
+        actualSpend: false,
+      },
+    };
+  });
+  const ledger = {
+    artifactKind: "hito271_hosted_provider_attempt_ledger_v2",
+    generatedAt: new Date().toISOString(),
+    task: "HITO-271",
+    projectRef: receipt.projectRef,
+    userId: receipt.userId,
+    attempts,
+    privacy: {
+      rawProviderContentIncluded: false,
+      rawPromptIncluded: false,
+      credentialIncluded: false,
+      runnerPiiIncluded: false,
+    },
+  };
+  await mkdir(path.dirname(outputPath), { recursive: true, mode: 0o700 });
+  await writeFile(outputPath, `${JSON.stringify(ledger, null, 2)}\n`, { mode: 0o600 });
+  await chmod(outputPath, 0o600);
+  const ledgerSha256 = hashStableJson(ledger);
+  const next = appendHostedCheckpoint(
+    receipt,
+    hostedCheckpoint("provider_attempt_ledger", {
+      attemptCount: attempts.length,
+      ledgerSha256,
+      rawProviderContentIncluded: false,
+    }),
+  );
+  await writeHostedReceipt(receiptPath, next);
+  const latest = attempts.at(-1) ?? null;
+  console.log(
+    JSON.stringify({
+      ok: true,
+      action: "hosted-pool-attempt-ledger",
+      attemptCount: attempts.length,
+      latest,
+      outputPath,
+      ledgerSha256,
+      receiptSha256: hashStableJson(next),
+    }),
+  );
+}
+
+async function handleHostedPoolLatestDiagnostic() {
+  const { receiptPath, receipt } = await readCurrentHostedReceipt();
+  const outputPath = requireExternalPrivatePath(options.output, "--output");
+  const responseRead = await supabase
+    .from("ai_plan_generation_responses")
+    .select(
+      "id, response_sha256, response_body, diagnostic_code, diagnostic_path, compiler_outcome, created_at",
+    )
+    .eq("user_id", receipt.userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (responseRead.error || !responseRead.data) {
+    throw new Error(responseRead.error?.message ?? "Hosted provider attempt is unavailable.");
+  }
+  const diagnosticPath = responseRead.data.diagnostic_path;
+  if (
+    responseRead.data.compiler_outcome !== "rejected" ||
+    typeof diagnosticPath !== "string" ||
+    !diagnosticPath
+  ) {
+    throw new Error("Latest hosted provider attempt has no rejected compiler diagnostic.");
+  }
+  const diagnostic = summarizeHostedProviderDiagnostic(
+    JSON.parse(responseRead.data.response_body),
+    diagnosticPath,
+  );
+  const artifact = {
+    artifactKind: "hito271_hosted_provider_diagnostic_v1",
+    task: "HITO-271",
+    responseId: responseRead.data.id,
+    responseSha256: responseRead.data.response_sha256,
+    diagnosticCode: responseRead.data.diagnostic_code,
+    diagnosticPath,
+    diagnostic,
+    privacy: {
+      rawProviderContentIncluded: false,
+      rawPromptIncluded: false,
+      credentialIncluded: false,
+      runnerPiiIncluded: false,
+    },
+  };
+  await mkdir(path.dirname(outputPath), { recursive: true, mode: 0o700 });
+  await writeFile(outputPath, `${JSON.stringify(artifact, null, 2)}\n`, { mode: 0o600 });
+  await chmod(outputPath, 0o600);
+  const artifactSha256 = hashStableJson(artifact);
+  const next = appendHostedCheckpoint(
+    receipt,
+    hostedCheckpoint("provider_attempt_diagnostic", {
+      responseId: responseRead.data.id,
+      diagnosticCode: responseRead.data.diagnostic_code,
+      diagnosticPath,
+      artifactSha256,
+      rawProviderContentIncluded: false,
+    }),
+  );
+  await writeHostedReceipt(receiptPath, next);
+  console.log(
+    JSON.stringify({
+      ok: true,
+      action: "hosted-pool-latest-diagnostic",
+      responseId: responseRead.data.id,
+      diagnosticCode: responseRead.data.diagnostic_code,
+      diagnosticPath,
+      diagnostic,
+      outputPath,
+      artifactSha256,
+      receiptSha256: hashStableJson(next),
+    }),
+  );
+}
+
+function summarizeHostedProviderDiagnostic(responseBody, diagnosticPath) {
+  const date = diagnosticPath.split(".")[0];
+  const detailed = responseBody?.detailed_block;
+  const workouts = [
+    ...(Array.isArray(detailed?.workouts) ? detailed.workouts : []),
+    ...(detailed?.final_workout ? [detailed.final_workout] : []),
+  ];
+  const workout = workouts.find((value) => value?.date === date);
+  const sectionIndex = Number(diagnosticPath.match(/sections\.(\d+)/)?.[1]);
+  const childIndex = Number(diagnosticPath.match(/children\.(\d+)/)?.[1]);
+  const section = Number.isInteger(sectionIndex) ? workout?.sections?.[sectionIndex] : null;
+  const child = Number.isInteger(childIndex) ? section?.children?.[childIndex] : null;
+  if (!workout || !section || !child) {
+    throw new Error("Latest provider diagnostic path does not resolve to one repeat child.");
+  }
+  return {
+    date,
+    workoutIdentity: workout.workout_identity ?? null,
+    sectionKind: section.kind ?? null,
+    rounds: section.rounds ?? null,
+    childRole: child.role ?? null,
+    prescription: child.prescription ?? null,
+    target: child.target ?? null,
+    authoredPurpose: child.cue ?? null,
+  };
 }
 
 async function handleHostedPoolReset() {

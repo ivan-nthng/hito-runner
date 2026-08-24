@@ -19,9 +19,9 @@ import { z } from "zod";
 
 export const ADAPTIVE_CONTINUATION_AUTHORING_BRIEF_VERSION =
   "adaptive_continuation_authoring_brief_v2" as const;
-export const ADAPTIVE_CONTINUATION_PROMPT_VERSION = "adaptive_continuation_prompt_v11" as const;
+export const ADAPTIVE_CONTINUATION_PROMPT_VERSION = "adaptive_continuation_prompt_v12" as const;
 export const ADAPTIVE_CONTINUATION_PROVIDER_CONTRACT_VERSION =
-  "adaptive_continuation_provider_response_v3" as const;
+  "adaptive_continuation_provider_response_v4" as const;
 export const ADAPTIVE_CONTINUATION_COMPILER_VERSION = "adaptive_continuation_compiler_v6" as const;
 export const ADAPTIVE_CONTINUATION_RESPONSE_SCHEMA_NAME =
   "hito_adaptive_continuation_block_v1" as const;

@@ -237,24 +237,11 @@ export async function retainAdaptiveTrainingContinuationCandidateForUser(input: 
   predecessorConfirmationId: string;
   retainedResponse: AiPlanGenerationResponseRow;
   candidate: AdaptiveContinuationCandidateDraft;
-  technicalRecompile?: {
-    sourceCompilerVersion: `adaptive_continuation_compiler_v${number}`;
-    diagnosticCode: string;
-  };
 }): Promise<RetainedAdaptiveTrainingContinuationCandidate> {
-  const technicalRecompileIsExact = Boolean(
-    input.technicalRecompile &&
-    input.retainedResponse.compiler_outcome === "rejected" &&
-    input.candidate.inputProvenance.retainedResponseOriginalCompilerOutcome === "rejected" &&
-    input.candidate.inputProvenance.recompiledFromCompilerVersion ===
-      input.technicalRecompile?.sourceCompilerVersion &&
-    input.candidate.inputProvenance.recompiledDiagnosticCode ===
-      input.technicalRecompile?.diagnosticCode,
-  );
   if (
     input.retainedResponse.user_id !== input.userId ||
     input.retainedResponse.schema_outcome !== "accepted" ||
-    (input.retainedResponse.compiler_outcome !== "accepted" && !technicalRecompileIsExact) ||
+    input.retainedResponse.compiler_outcome !== "accepted" ||
     input.candidate.inputProvenance.retainedResponseId !== input.retainedResponse.id ||
     input.candidate.inputProvenance.retainedResponseSha256 !==
       input.retainedResponse.response_sha256

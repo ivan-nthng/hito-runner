@@ -2999,6 +2999,14 @@ async function validateLocalDevFixtureAvailabilityGating() {
         (issue) => issue.code === "ai_authored_plan_first_downhill_recovery_duration_missing",
       ),
     );
+    assert.match(
+      buildAiAuthoredPlanFirstPrompt({
+        authoringInput: fixtureAuthoringInput,
+        today: fixtureAuthoringInput.schedule.startDate,
+      }).systemPrompt,
+      /Every detailed workout must use a canonical workout_identity whose resolved workout family is listed in the owning Blueprint phase\.workout_families/,
+      "The provider contract must state the same detailed-family ownership rule that the compiler enforces.",
+    );
     for (const workout of fixtureCompile.canonicalPlan.planned_workouts) {
       if (workout.workout_family === "rest") continue;
       const phase = fixtureCompile.blueprint.phases.find(

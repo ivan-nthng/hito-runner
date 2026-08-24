@@ -21,7 +21,7 @@ import {
 
 export const AI_AUTHORED_PLAN_FIRST_CONTRACT_VERSION = "adaptive-blueprint-four-week-v1" as const;
 export const AI_AUTHORED_PLAN_FIRST_PROVIDER_CONTRACT_VERSION =
-  "adaptive-blueprint-four-week-direct-v16" as const;
+  "adaptive-blueprint-four-week-direct-v17" as const;
 export const AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME =
   "hito_adaptive_blueprint_four_week_v1" as const;
 export const AI_AUTHORED_PLAN_FIRST_PACE_MIN_PER_KM_PATTERN =
@@ -654,6 +654,7 @@ export function buildAiAuthoredPlanFirstPrompt({
     "Return one self-contained object with blueprint and detailed_block. The Blueprint carries intent through the selected target date; detailed_block carries executable workouts only for the first four calendar weeks, or the exact shorter target-boundary remainder. Omit rest days from detailed_block; every omitted detailed date is rest. Do not return catalogs, references, contract-version fields, or alternate representations.",
     "Blueprint phases must form one ordered, gap-free horizon from blueprint.start_date through blueprint.selected_target_date. Future projections may contain only projection_id, date, phase, cadence_or_workout_family, target_assumption, review_timing, and the fixed label Planned · details closer to the date. Never place a WorkoutDocument, steps, targets, metrics, duration, distance, mutation identity, evidence identity, completion state, or navigation destination in a projection.",
     "Every future projection cadence_or_workout_family must exactly equal one value listed in the owning Blueprint phase.workout_families. Do not use a generic recovery, easy, long, quality, or race family unless that exact value is present in that phase's list.",
+    "Every detailed workout must use a canonical workout_identity whose resolved workout family is listed in the owning Blueprint phase.workout_families. Build each phase family list from both its detailed workouts and future projections before returning; never leave a detailed family unexplained by its immutable Blueprint phase.",
     "For every future phase calendar-week slice, return exactly phase.expected_weekly_cadence unique projection dates, reduced only when fewer calendar dates remain in that phase-week slice. Never return extra recovery or target-week slots beyond that exact cadence.",
     "When blueprint.selected_target_date is later than detailed_block.end_date, projections must contain exactly one slot on that exact selected target date with review_timing=target_review. That target-date slot counts inside its owning phase expected_weekly_cadence and must use one workout family listed by that phase. Every other projection uses review_timing=details_closer_to_date.",
     "Set detailed_block.start_date to calendar.start_date. Set detailed_block.end_date to the earlier of calendar.start_date plus 27 days and blueprint.selected_target_date. Every detailed workout date, including detailed_block.final_workout, must fall inside that inclusive range. final_workout is the chronologically last non-rest detailed workout and is not a future-horizon placeholder.",

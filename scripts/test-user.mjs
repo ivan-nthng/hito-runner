@@ -62,6 +62,7 @@ const {
   confirmAdaptiveBlueprintContinuationProfileFixture,
   preflightAdaptiveBlueprintSecondContinuationFixture,
   authorAdaptiveBlueprintSecondContinuationFixture,
+  buildAdaptiveTrainingQualityFitFile,
   recompileAdaptiveBlueprintSecondContinuationFixture,
   prepareAdaptiveBlueprintContinuationCandidateFixture,
   readAdaptiveBlueprintProjectionFixture,
@@ -89,8 +90,12 @@ const HOSTED_POOL_COMMANDS = new Set([
   "hosted-pool-auth-link",
   "hosted-pool-checkpoint",
   "hosted-pool-calendar-date",
+  "hosted-pool-fit-artifact",
+  "hosted-pool-profile-snapshot",
+  "hosted-pool-continuation-preflight",
   "hosted-pool-attempt-ledger",
   "hosted-pool-latest-diagnostic",
+  "hosted-pool-recompile-technical",
   "hosted-pool-candidate-artifact",
   "hosted-pool-record-coach-verdict",
   "hosted-pool-reset",
@@ -114,8 +119,12 @@ if (
     "hosted-pool-auth-link",
     "hosted-pool-checkpoint",
     "hosted-pool-calendar-date",
+    "hosted-pool-fit-artifact",
+    "hosted-pool-profile-snapshot",
+    "hosted-pool-continuation-preflight",
     "hosted-pool-attempt-ledger",
     "hosted-pool-latest-diagnostic",
+    "hosted-pool-recompile-technical",
     "hosted-pool-candidate-artifact",
     "hosted-pool-record-coach-verdict",
     "hosted-pool-reset",
@@ -138,11 +147,16 @@ if (
   ].includes(command)
 ) {
   throw new Error(
-    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-reset-plan|pool-reset|pool-delete|hosted-pool-adopt|hosted-pool-status|hosted-pool-auth-link|hosted-pool-checkpoint|hosted-pool-calendar-date|hosted-pool-attempt-ledger|hosted-pool-latest-diagnostic|hosted-pool-candidate-artifact|hosted-pool-record-coach-verdict|hosted-pool-reset|design-profile-seed|design-profile-status|design-profile-reset|adaptive-blueprint-seed|adaptive-blueprint-continuation-seed|adaptive-blueprint-status|adaptive-blueprint-continuation-prepare|adaptive-blueprint-continuation-proof|adaptive-blueprint-continuation-profile-proof|adaptive-blueprint-two-profile-replay|adaptive-blueprint-second-continuation-preflight|adaptive-blueprint-second-continuation-author|adaptive-blueprint-second-continuation-recompile|adaptive-blueprint-reset|runner-core-file-flow-seed|runner-core-file-flow-proof|create|reset-plan|reset|delete> [options]",
+    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-reset-plan|pool-reset|pool-delete|hosted-pool-adopt|hosted-pool-status|hosted-pool-auth-link|hosted-pool-checkpoint|hosted-pool-calendar-date|hosted-pool-fit-artifact|hosted-pool-profile-snapshot|hosted-pool-continuation-preflight|hosted-pool-attempt-ledger|hosted-pool-latest-diagnostic|hosted-pool-recompile-technical|hosted-pool-candidate-artifact|hosted-pool-record-coach-verdict|hosted-pool-reset|design-profile-seed|design-profile-status|design-profile-reset|adaptive-blueprint-seed|adaptive-blueprint-continuation-seed|adaptive-blueprint-status|adaptive-blueprint-continuation-prepare|adaptive-blueprint-continuation-proof|adaptive-blueprint-continuation-profile-proof|adaptive-blueprint-two-profile-replay|adaptive-blueprint-second-continuation-preflight|adaptive-blueprint-second-continuation-author|adaptive-blueprint-second-continuation-recompile|adaptive-blueprint-reset|runner-core-file-flow-seed|runner-core-file-flow-proof|create|reset-plan|reset|delete> [options]",
   );
 }
 
 const config = await buildConfig();
+if (HOSTED_POOL_COMMANDS.has(command)) {
+  process.env.NEXT_PUBLIC_SUPABASE_URL = config.supabaseUrl;
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = config.supabasePublishableKey;
+  process.env.SUPABASE_SECRET_KEY = config.supabaseServerKey;
+}
 const supabase = createClient(config.supabaseUrl, config.supabaseServerKey, {
   auth: {
     autoRefreshToken: false,
@@ -174,10 +188,18 @@ if (command === "inventory") {
   await handleHostedPoolCheckpoint();
 } else if (command === "hosted-pool-calendar-date") {
   await handleHostedPoolCalendarDate();
+} else if (command === "hosted-pool-fit-artifact") {
+  await handleHostedPoolFitArtifact();
+} else if (command === "hosted-pool-profile-snapshot") {
+  await handleHostedPoolProfileSnapshot();
+} else if (command === "hosted-pool-continuation-preflight") {
+  await handleHostedPoolContinuationPreflight();
 } else if (command === "hosted-pool-attempt-ledger") {
   await handleHostedPoolAttemptLedger();
 } else if (command === "hosted-pool-latest-diagnostic") {
   await handleHostedPoolLatestDiagnostic();
+} else if (command === "hosted-pool-recompile-technical") {
+  await handleHostedPoolRecompileTechnical();
 } else if (command === "hosted-pool-candidate-artifact") {
   await handleHostedPoolCandidateArtifact();
 } else if (command === "hosted-pool-record-coach-verdict") {
@@ -525,6 +547,410 @@ async function handleHostedPoolCalendarDate() {
   );
 }
 
+async function handleHostedPoolFitArtifact() {
+  const { receiptPath, receipt } = await readCurrentHostedReceipt();
+  const localDate = requireOption(options.date, "--date");
+  const evidenceKind = requireOption(options.kind, "--kind");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(localDate)) {
+    throw new Error("--date must be one ISO Calendar date.");
+  }
+  if (evidenceKind !== "compatible" && evidenceKind !== "incomplete") {
+    throw new Error("--kind must be compatible or incomplete.");
+  }
+  const outputPath = requireExternalPrivatePath(options.output, "--output");
+  if (!outputPath.toLowerCase().endsWith(".fit")) {
+    throw new Error("--output must name one external .fit file.");
+  }
+  const workoutRead = await supabase
+    .from("planned_workouts")
+    .select("id, workout_date, workout_type")
+    .eq("user_id", receipt.userId)
+    .eq("workout_date", localDate)
+    .neq("workout_type", "rest")
+    .maybeSingle();
+  if (workoutRead.error || !workoutRead.data) {
+    throw new Error(
+      workoutRead.error?.message ?? "The hosted FIT artifact requires one owned workout date.",
+    );
+  }
+  const fileBuffer = buildAdaptiveTrainingQualityFitFile({ localDate, evidenceKind });
+  await mkdir(path.dirname(outputPath), { recursive: true, mode: 0o700 });
+  await writeFile(outputPath, fileBuffer, { mode: 0o600 });
+  await chmod(outputPath, 0o600);
+  const fileSha256 = createHash("sha256").update(fileBuffer).digest("hex");
+  const next = appendHostedCheckpoint(
+    receipt,
+    hostedCheckpoint("synthetic_fit_artifact", {
+      localDate,
+      evidenceKind,
+      workoutId: workoutRead.data.id,
+      fileSha256,
+      databaseWritePerformed: false,
+    }),
+  );
+  await writeHostedReceipt(receiptPath, next);
+  console.log(
+    JSON.stringify({
+      ok: true,
+      action: "hosted-pool-fit-artifact",
+      localDate,
+      evidenceKind,
+      workoutId: workoutRead.data.id,
+      outputPath,
+      fileSha256,
+      databaseWritePerformed: false,
+      receiptSha256: hashStableJson(next),
+    }),
+  );
+}
+
+async function handleHostedPoolProfileSnapshot() {
+  const { receiptPath, receipt } = await readCurrentHostedReceipt();
+  const asOfDate = requireOption(options["as-of-date"], "--as-of-date");
+  const cutoffDate = requireOption(options["cutoff-date"], "--cutoff-date");
+  const outputPath = requireExternalPrivatePath(options.output, "--output");
+  for (const [label, value] of [
+    ["--as-of-date", asOfDate],
+    ["--cutoff-date", cutoffDate],
+  ]) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      throw new Error(`${label} must be one ISO Calendar date.`);
+    }
+  }
+  const facts = readHostedRunnerFitnessProfileSnapshotThroughCanonicalOwner({
+    userId: receipt.userId,
+    asOf: asOfDate,
+    cutoffDate,
+  });
+  if (!facts) {
+    throw new Error("The hosted Runner Fitness Profile source lineage is unavailable.");
+  }
+  const snapshot = facts.fitnessProfileSnapshot;
+  const artifact = {
+    artifactKind: "hito271_hosted_runner_fitness_profile_snapshot_v1",
+    generatedAt: new Date().toISOString(),
+    task: "HITO-271",
+    asOfDate,
+    snapshot: {
+      version: snapshot.version,
+      snapshotId: snapshot.snapshotId,
+      runnerFactsRevision: snapshot.runnerFactsRevision,
+      cutoffDate: snapshot.cutoffDate,
+      timeZone: snapshot.timeZone,
+      formulaVersions: snapshot.formulaVersions,
+      provenance: snapshot.provenance,
+      components: snapshot.components,
+    },
+    continuationProjection: facts.fitnessProfileProjection,
+    factualPackets: {
+      calendarOutcomeFingerprint: facts.calendar.calendarOutcomeFingerprint,
+      evidenceRevisionFingerprint: facts.evidence.evidenceRevisionFingerprint,
+      missingEvidenceStates: facts.evidence.workouts
+        .filter((workout) => workout.evidenceState !== "fit_current")
+        .map((workout) => ({ workoutDate: workout.workoutDate, state: workout.evidenceState })),
+    },
+    privacy: {
+      runnerIdIncluded: false,
+      rawProviderContentIncluded: false,
+      credentialIncluded: false,
+      personalIdentityIncluded: false,
+    },
+  };
+  await mkdir(path.dirname(outputPath), { recursive: true, mode: 0o700 });
+  const artifactBytes = Buffer.from(`${JSON.stringify(artifact, null, 2)}\n`);
+  await writeFile(outputPath, artifactBytes, { mode: 0o600 });
+  await chmod(outputPath, 0o600);
+  const artifactSha256 = createHash("sha256").update(artifactBytes).digest("hex");
+  const next = appendHostedCheckpoint(
+    receipt,
+    hostedCheckpoint("runner_fitness_profile_snapshot", {
+      snapshotId: snapshot.snapshotId,
+      runnerFactsRevision: snapshot.runnerFactsRevision,
+      cutoffDate: snapshot.cutoffDate,
+      artifactSha256,
+    }),
+  );
+  await writeHostedReceipt(receiptPath, next);
+  console.log(
+    JSON.stringify({
+      ok: true,
+      action: "hosted-pool-profile-snapshot",
+      snapshotId: snapshot.snapshotId,
+      runnerFactsRevision: snapshot.runnerFactsRevision,
+      cutoffDate: snapshot.cutoffDate,
+      componentStates: Object.fromEntries(
+        Object.entries(snapshot.components).map(([key, component]) => [key, component.state]),
+      ),
+      evidenceRevisionFingerprint: facts.evidence.evidenceRevisionFingerprint,
+      outputPath,
+      artifactSha256,
+      receiptSha256: hashStableJson(next),
+    }),
+  );
+}
+
+function readHostedRunnerFitnessProfileSnapshotThroughCanonicalOwner(input) {
+  const script = String.raw`
+    import { readFileSync } from "node:fs";
+    import { getAdaptiveBlueprintContinuationFactsForUser } from "./src/lib/adaptive-blueprint-read-model.ts";
+    const input = JSON.parse(readFileSync(0, "utf8"));
+    const facts = await getAdaptiveBlueprintContinuationFactsForUser(input);
+    console.log(JSON.stringify(facts));
+  `;
+  const child = spawnSync(
+    process.execPath,
+    ["--import", "tsx", "--input-type=module", "-e", script],
+    {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        NEXT_PUBLIC_SUPABASE_URL: config.supabaseUrl,
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: config.supabasePublishableKey,
+        SUPABASE_SECRET_KEY: config.supabaseServerKey,
+      },
+      input: JSON.stringify(input),
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+    },
+  );
+  if (child.status !== 0) {
+    const safeMessage = String(child.stderr ?? "")
+      .split("\n")
+      .find((line) => line.trim().startsWith("Error:"))
+      ?.trim()
+      .slice(0, 240);
+    throw new Error(
+      `Canonical Runner Fitness Profile read failed with status ${child.status}${safeMessage ? ` (${safeMessage})` : ""}.`,
+    );
+  }
+  return JSON.parse(child.stdout);
+}
+
+async function handleHostedPoolContinuationPreflight() {
+  const { receiptPath, receipt } = await readCurrentHostedReceipt();
+  const outputPath = requireExternalPrivatePath(options.output, "--output");
+  const asOfDate = requireOption(options["as-of-date"], "--as-of-date");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(asOfDate)) {
+    throw new Error("--as-of-date must be one ISO Calendar date.");
+  }
+  const beforeCounts = await getQaUserOwnedCounts(supabase, receipt.userId);
+  const artifact = runHostedContinuationPreflightThroughCanonicalOwner({
+    userId: receipt.userId,
+    asOfDate,
+  });
+  const afterCounts = await getQaUserOwnedCounts(supabase, receipt.userId);
+  assert.deepEqual(
+    afterCounts,
+    beforeCounts,
+    "Hosted continuation preflight must not retain a provider response or candidate.",
+  );
+  if (
+    artifact.decision?.status !== "authoring_ready" ||
+    artifact.request?.externalProviderDispatchCount !== 0 ||
+    beforeCounts.adaptive_training_block_confirmations !== 2 ||
+    beforeCounts.planned_workouts !== 44
+  ) {
+    throw new Error("Hosted continuation preflight did not preserve the accepted 2/44/0 boundary.");
+  }
+  const hostedArtifact = {
+    ...artifact,
+    artifactVersion: "hito_271_hosted_second_continuation_preflight_v1",
+    environment: {
+      kind: "hosted_preview",
+      projectRef: receipt.projectRef,
+      providerDispatchPerformed: false,
+    },
+    invariants: {
+      ...artifact.invariants,
+      confirmationCount: beforeCounts.adaptive_training_block_confirmations,
+      calendarWorkoutCount: beforeCounts.planned_workouts,
+      futureProjectionCalendarRowCount: 0,
+      persistenceDelta: 0,
+      hostedAction: true,
+    },
+  };
+  await mkdir(path.dirname(outputPath), { recursive: true, mode: 0o700 });
+  const artifactBytes = Buffer.from(`${JSON.stringify(hostedArtifact, null, 2)}\n`);
+  await writeFile(outputPath, artifactBytes, { mode: 0o600 });
+  await chmod(outputPath, 0o600);
+  const artifactSha256 = createHash("sha256").update(artifactBytes).digest("hex");
+  const next = appendHostedCheckpoint(
+    receipt,
+    hostedCheckpoint("second_continuation_preflight", {
+      snapshotId: artifact.facts.snapshotId,
+      runnerFactsRevision: artifact.facts.runnerFactsRevision,
+      decisionStatus: artifact.decision.status,
+      authoringMode: artifact.decision.authoringMode,
+      exactReuseApplied: artifact.request.exactReuseApplied,
+      paidDispatchRequired: artifact.request.paidDispatchRequired,
+      externalProviderDispatchCount: 0,
+      artifactSha256,
+    }),
+  );
+  await writeHostedReceipt(receiptPath, next);
+  console.log(
+    JSON.stringify({
+      ok: true,
+      action: "hosted-pool-continuation-preflight",
+      facts: artifact.facts,
+      decision: artifact.decision,
+      request: artifact.request,
+      candidate: artifact.candidate,
+      invariants: hostedArtifact.invariants,
+      outputPath,
+      artifactSha256,
+      receiptSha256: hashStableJson(next),
+    }),
+  );
+}
+
+function runHostedContinuationPreflightThroughCanonicalOwner(input) {
+  const script = String.raw`
+    import { readFileSync } from "node:fs";
+    import { prepareAdaptiveContinuationCandidateForUser } from "./src/lib/adaptive-blueprint-actions.server.ts";
+    import { getAdaptiveBlueprintContinuationDecisionForUser } from "./src/lib/adaptive-blueprint-read-model.ts";
+    import {
+      ADAPTIVE_CONTINUATION_AUTHORING_BRIEF_VERSION,
+      ADAPTIVE_CONTINUATION_COMPILER_VERSION,
+      ADAPTIVE_CONTINUATION_PROMPT_VERSION,
+      ADAPTIVE_CONTINUATION_PROVIDER_CONTRACT_VERSION,
+      ADAPTIVE_CONTINUATION_RESPONSE_SCHEMA_NAME,
+    } from "./src/lib/adaptive-continuation-authoring.ts";
+    import { digestSha256Hex, stableJsonStringify } from "./src/lib/review-token-signing.ts";
+    const input = JSON.parse(readFileSync(0, "utf8"));
+    const current = await getAdaptiveBlueprintContinuationDecisionForUser({
+      userId: input.userId,
+      asOfDate: input.asOfDate,
+    });
+    if (!current?.decision || current.decision.status !== "authoring_ready" || !current.facts) {
+      throw new Error("Hosted production-current continuation decision is not authoring-ready.");
+    }
+    const providerModel = process.env.OPENAI_PLAN_MODEL?.trim() || "gpt-5.2";
+    const sentinel = new Error("hito_271_hosted_paid_dispatch_required");
+    let captured = null;
+    let prepared = null;
+    try {
+      prepared = await prepareAdaptiveContinuationCandidateForUser(
+        { userId: input.userId, asOfDate: input.asOfDate },
+        {
+          providerModel,
+          requestStructuredResponse: async ({ prompt, brief }) => {
+            captured = { prompt, brief };
+            throw sentinel;
+          },
+        },
+      );
+    } catch (error) {
+      if (error !== sentinel) throw error;
+    }
+    const exactReuseApplied = prepared?.ok === true && prepared.state.status === "candidate_ready";
+    if (Boolean(captured) === exactReuseApplied) {
+      throw new Error("Hosted exact-reuse/provider-dispatch preflight is inconsistent.");
+    }
+    const promptFingerprint = captured
+      ? await digestSha256Hex(stableJsonStringify({
+          systemPrompt: captured.prompt.systemPrompt,
+          userPrompt: captured.prompt.userPrompt,
+          responseSchema: captured.prompt.responseSchema,
+        }))
+      : null;
+    const requestFingerprint = await digestSha256Hex(stableJsonStringify({
+      ownerUserId: input.userId,
+      providerModel,
+      decision: current.decision,
+      promptFingerprint,
+      schemaVersion: ADAPTIVE_CONTINUATION_RESPONSE_SCHEMA_NAME,
+      promptVersion: ADAPTIVE_CONTINUATION_PROMPT_VERSION,
+      policyVersion: current.decision.policyVersion,
+      compilerVersion: ADAPTIVE_CONTINUATION_COMPILER_VERSION,
+      contractMode: ADAPTIVE_CONTINUATION_AUTHORING_BRIEF_VERSION,
+      responseSchemaMode: ADAPTIVE_CONTINUATION_PROVIDER_CONTRACT_VERSION,
+    }));
+    const snapshot = current.facts.fitnessProfileSnapshot;
+    const artifact = {
+      artifactVersion: "hito_271_hosted_second_continuation_preflight_v1",
+      createdAt: new Date().toISOString(),
+      facts: {
+        dueOutcomeCount: current.facts.calendar.workouts.length,
+        unresolvedOutcomeCount: current.facts.calendar.workouts.filter((workout) => workout.outcome === "unresolved").length,
+        fitCurrentCount: current.facts.evidence.workouts.filter((workout) => workout.evidenceState === "fit_current").length,
+        completedWithoutFitCount: current.facts.evidence.workouts.filter((workout) => workout.evidenceState === "completed_without_fit").length,
+        snapshotId: snapshot.snapshotId,
+        runnerFactsRevision: snapshot.runnerFactsRevision,
+        cutoffDate: snapshot.cutoffDate,
+        formulaVersions: snapshot.formulaVersions,
+        profileState: current.decision.fitnessProfile.quality,
+        missingReasons: current.decision.fitnessProfile.missingReasons,
+        comparableContextKeys: current.decision.comparableContextKeys,
+        calendarOutcomeFingerprint: current.facts.calendar.calendarOutcomeFingerprint,
+        evidenceRevisionFingerprint: current.facts.evidence.evidenceRevisionFingerprint,
+        targetIntervalOccupancyFingerprint: current.facts.targetIntervalOccupancy.calendarOccupancyFingerprint,
+      },
+      decision: {
+        version: current.decision.version,
+        policyVersion: current.decision.policyVersion,
+        status: current.decision.status,
+        authoringMode: current.decision.authoringMode,
+        interval: current.decision.interval,
+        projectionIds: current.decision.projectionIds,
+      },
+      request: {
+        providerModel,
+        requestFingerprint,
+        promptFingerprint,
+        schemaVersion: ADAPTIVE_CONTINUATION_RESPONSE_SCHEMA_NAME,
+        promptVersion: ADAPTIVE_CONTINUATION_PROMPT_VERSION,
+        policyVersion: current.decision.policyVersion,
+        compilerVersion: ADAPTIVE_CONTINUATION_COMPILER_VERSION,
+        contractMode: ADAPTIVE_CONTINUATION_AUTHORING_BRIEF_VERSION,
+        responseSchemaMode: ADAPTIVE_CONTINUATION_PROVIDER_CONTRACT_VERSION,
+        exactReuseApplied,
+        paidDispatchRequired: !exactReuseApplied,
+        externalProviderDispatchCount: 0,
+      },
+      candidate: exactReuseApplied ? {
+        id: prepared.state.candidate.id,
+        sha256: prepared.state.candidate.sha256,
+        blockMode: prepared.state.candidate.blockMode,
+        interval: prepared.state.candidate.interval,
+      } : null,
+      invariants: {
+        rawResponseIncluded: false,
+        rawPromptIncluded: false,
+        personalIdentityUsed: false,
+      },
+    };
+    console.log(JSON.stringify(artifact));
+  `;
+  const child = spawnSync(
+    process.execPath,
+    ["--import", "tsx", "--input-type=module", "-e", script],
+    {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        NEXT_PUBLIC_SUPABASE_URL: config.supabaseUrl,
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: config.supabasePublishableKey,
+        SUPABASE_SECRET_KEY: config.supabaseServerKey,
+      },
+      input: JSON.stringify(input),
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+    },
+  );
+  if (child.status !== 0) {
+    const safeMessage = String(child.stderr ?? "")
+      .split("\n")
+      .find((line) => line.trim().startsWith("Error:") || line.includes("AssertionError"))
+      ?.trim()
+      .slice(0, 240);
+    throw new Error(
+      `Canonical continuation preflight failed with status ${child.status}${safeMessage ? ` (${safeMessage})` : ""}.`,
+    );
+  }
+  return JSON.parse(child.stdout);
+}
+
 async function handleHostedPoolAttemptLedger() {
   const { receiptPath, receipt } = await readCurrentHostedReceipt();
   const outputPath = requireExternalPrivatePath(options.output, "--output");
@@ -714,6 +1140,206 @@ function summarizeHostedProviderDiagnostic(responseBody, diagnosticPath) {
   };
 }
 
+async function handleHostedPoolRecompileTechnical() {
+  const { receiptPath, receipt } = await readCurrentHostedReceipt();
+  const outputPath = requireExternalPrivatePath(options.output, "--output");
+  const responseRecordId = requireOption(options["response-id"], "--response-id");
+  const asOfDate = requireOption(options["as-of-date"], "--as-of-date");
+  const expectedPromptVersion = requireOption(
+    options["expected-prompt-version"],
+    "--expected-prompt-version",
+  );
+  const expectedCompilerVersion = requireOption(
+    options["expected-compiler-version"],
+    "--expected-compiler-version",
+  );
+  const expectedDiagnosticCode = requireOption(
+    options["expected-diagnostic-code"],
+    "--expected-diagnostic-code",
+  );
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(asOfDate)) {
+    throw new Error("--as-of-date must be one ISO Calendar date.");
+  }
+  const responseRead = await supabase
+    .from("ai_plan_generation_responses")
+    .select(
+      "id, provider_model, response_sha256, schema_outcome, compiler_outcome, diagnostic_code, attempt_result, version_context",
+    )
+    .eq("id", responseRecordId)
+    .eq("user_id", receipt.userId)
+    .maybeSingle();
+  if (responseRead.error || !responseRead.data) {
+    throw new Error(responseRead.error?.message ?? "Technical response is unavailable.");
+  }
+  const beforeCounts = await getQaUserOwnedCounts(supabase, receipt.userId);
+  const result = runHostedTechnicalRecompileThroughCanonicalOwner({
+    userId: receipt.userId,
+    asOfDate,
+    providerModel: responseRead.data.provider_model,
+    responseRecordId,
+    expectedPromptVersion,
+    expectedCompilerVersion,
+    expectedDiagnosticCode,
+  });
+  const afterCounts = await getQaUserOwnedCounts(supabase, receipt.userId);
+  assert.equal(result.ok, true);
+  assert.equal(result.recompiledFromRetainedResponse, true);
+  assert.equal(result.providerDispatchCount, 0);
+  assert.equal(afterCounts.ai_plan_generation_responses, beforeCounts.ai_plan_generation_responses);
+  assert.equal(
+    afterCounts.adaptive_training_block_confirmations,
+    beforeCounts.adaptive_training_block_confirmations,
+  );
+  assert.equal(afterCounts.planned_workouts, beforeCounts.planned_workouts);
+  assert.ok(
+    afterCounts.adaptive_training_detailed_candidates ===
+      beforeCounts.adaptive_training_detailed_candidates + 1 ||
+      afterCounts.adaptive_training_detailed_candidates ===
+        beforeCounts.adaptive_training_detailed_candidates,
+  );
+  const responseAfter = await supabase
+    .from("ai_plan_generation_responses")
+    .select("compiler_outcome, diagnostic_code, attempt_result, version_context")
+    .eq("id", responseRecordId)
+    .eq("user_id", receipt.userId)
+    .single();
+  if (responseAfter.error) throw new Error(responseAfter.error.message);
+  assert.deepEqual(
+    responseAfter.data,
+    {
+      compiler_outcome: responseRead.data.compiler_outcome,
+      diagnostic_code: responseRead.data.diagnostic_code,
+      attempt_result: responseRead.data.attempt_result,
+      version_context: responseRead.data.version_context,
+    },
+    "A retained technical attempt must remain immutable after recompilation.",
+  );
+  const artifact = {
+    artifactKind: "hito271_hosted_retained_technical_recompile_v1",
+    task: "HITO-271",
+    createdAt: new Date().toISOString(),
+    response: {
+      id: responseRecordId,
+      sha256: responseRead.data.response_sha256,
+      originalPromptVersion: expectedPromptVersion,
+      originalCompilerVersion: expectedCompilerVersion,
+      originalDiagnosticCode: expectedDiagnosticCode,
+      originalOutcomePreserved: true,
+    },
+    candidate: result.candidate,
+    providerDispatchCount: 0,
+    persistence: {
+      responseCountDelta: 0,
+      candidateCountDelta:
+        afterCounts.adaptive_training_detailed_candidates -
+        beforeCounts.adaptive_training_detailed_candidates,
+      confirmationCountDelta: 0,
+      calendarWorkoutCountDelta: 0,
+    },
+    privacy: {
+      rawProviderContentIncluded: false,
+      rawPromptIncluded: false,
+      credentialIncluded: false,
+      runnerPiiIncluded: false,
+    },
+  };
+  await mkdir(path.dirname(outputPath), { recursive: true, mode: 0o700 });
+  const artifactBytes = Buffer.from(`${JSON.stringify(artifact, null, 2)}\n`);
+  await writeFile(outputPath, artifactBytes, { mode: 0o600 });
+  await chmod(outputPath, 0o600);
+  const artifactSha256 = createHash("sha256").update(artifactBytes).digest("hex");
+  const next = appendHostedCheckpoint(
+    receipt,
+    hostedCheckpoint("retained_technical_recompile", {
+      responseId: responseRecordId,
+      candidateId: result.candidate.id,
+      candidateSha256: result.candidate.sha256,
+      originalCompilerVersion: expectedCompilerVersion,
+      recompileCompilerVersion: result.compilerVersion,
+      providerDispatchCount: 0,
+      artifactSha256,
+    }),
+  );
+  await writeHostedReceipt(receiptPath, next);
+  console.log(
+    JSON.stringify({
+      ok: true,
+      action: "hosted-pool-recompile-technical",
+      responseId: responseRecordId,
+      candidate: result.candidate,
+      originalOutcomePreserved: true,
+      providerDispatchCount: 0,
+      outputPath,
+      artifactSha256,
+      receiptSha256: hashStableJson(next),
+    }),
+  );
+}
+
+function runHostedTechnicalRecompileThroughCanonicalOwner(input) {
+  const script = String.raw`
+    import { readFileSync } from "node:fs";
+    import { prepareAdaptiveContinuationCandidateForUser } from "./src/lib/adaptive-blueprint-actions.server.ts";
+    import { ADAPTIVE_CONTINUATION_COMPILER_VERSION } from "./src/lib/adaptive-continuation-authoring.ts";
+    const input = JSON.parse(readFileSync(0, "utf8"));
+    const prepared = await prepareAdaptiveContinuationCandidateForUser(
+      { userId: input.userId, asOfDate: input.asOfDate },
+      {
+        providerModel: input.providerModel,
+        explicitTechnicallyRejectedRetainedResponseRecompile: {
+          responseRecordId: input.responseRecordId,
+          expectedPromptVersion: input.expectedPromptVersion,
+          expectedCompilerVersion: input.expectedCompilerVersion,
+          expectedDiagnosticCode: input.expectedDiagnosticCode,
+        },
+      },
+    );
+    if (!prepared.ok || prepared.state.status !== "candidate_ready") {
+      throw new Error("The retained technical response did not produce a current candidate.");
+    }
+    console.log(JSON.stringify({
+      ok: true,
+      candidate: {
+        id: prepared.state.candidate.id,
+        sha256: prepared.state.candidate.sha256,
+        version: prepared.state.candidate.version,
+        interval: prepared.state.candidate.interval,
+        blockMode: prepared.state.candidate.blockMode,
+      },
+      compilerVersion: ADAPTIVE_CONTINUATION_COMPILER_VERSION,
+      recompiledFromRetainedResponse: prepared.recompiledFromRetainedResponse,
+      providerDispatchCount: prepared.providerDispatchCount,
+    }));
+  `;
+  const child = spawnSync(
+    process.execPath,
+    ["--import", "tsx", "--input-type=module", "-e", script],
+    {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        NEXT_PUBLIC_SUPABASE_URL: config.supabaseUrl,
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: config.supabasePublishableKey,
+        SUPABASE_SECRET_KEY: config.supabaseServerKey,
+      },
+      input: JSON.stringify(input),
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+    },
+  );
+  if (child.status !== 0) {
+    const safeMessage = String(child.stderr ?? "")
+      .split("\n")
+      .find((line) => line.trim().startsWith("Error:"))
+      ?.trim()
+      .slice(0, 240);
+    throw new Error(
+      `Canonical retained-response recompile failed with status ${child.status}${safeMessage ? ` (${safeMessage})` : ""}.`,
+    );
+  }
+  return JSON.parse(child.stdout);
+}
+
 async function handleHostedPoolCandidateArtifact() {
   const { receiptPath, receipt } = await readCurrentHostedReceipt();
   const outputPath = requireExternalPrivatePath(options.output, "--output");
@@ -734,11 +1360,8 @@ async function handleHostedPoolCandidateArtifact() {
   if (responseRead.error || !responseRead.data) {
     throw new Error(responseRead.error?.message ?? "Hosted provider response is unavailable.");
   }
-  if (
-    responseRead.data.schema_outcome !== "accepted" ||
-    responseRead.data.compiler_outcome !== "accepted"
-  ) {
-    throw new Error("Latest hosted provider response is not compiler-accepted.");
+  if (responseRead.data.schema_outcome !== "accepted") {
+    throw new Error("Latest hosted provider response is not schema-accepted.");
   }
   const blueprintRead = await supabase
     .from("adaptive_training_blueprint_versions")
@@ -769,9 +1392,17 @@ async function handleHostedPoolCandidateArtifact() {
     candidateRead.data.source_response_id ??
     candidateRead.data.input_provenance?.retainedResponseId ??
     null;
+  const inputProvenance = candidateRead.data.input_provenance ?? {};
+  const retainedTechnicalRecompile =
+    responseRead.data.compiler_outcome === "rejected" &&
+    inputProvenance.retainedResponseOriginalCompilerOutcome === "rejected" &&
+    inputProvenance.recompiledFromCompilerVersion ===
+      responseRead.data.version_context?.compilerVersion &&
+    inputProvenance.recompiledDiagnosticCode === responseRead.data.diagnostic_code;
   if (
     candidateRead.data.blueprint_id !== blueprintRead.data.id ||
-    retainedResponseId !== responseRead.data.id
+    retainedResponseId !== responseRead.data.id ||
+    (responseRead.data.compiler_outcome !== "accepted" && !retainedTechnicalRecompile)
   ) {
     throw new Error("Hosted candidate lineage is not accepted and exact.");
   }
@@ -809,6 +1440,8 @@ async function handleHostedPoolCandidateArtifact() {
       generationId: responseRead.data.generation_id,
       providerResponseId: responseRead.data.provider_response_id,
       externalProviderDispatchCount: 1,
+      responseAttemptExternalProviderDispatchCount: 1,
+      candidatePreparationExternalProviderDispatchCount: retainedTechnicalRecompile ? 0 : 1,
     },
     candidateIdentity: {
       responseId: responseRead.data.id,
@@ -825,6 +1458,8 @@ async function handleHostedPoolCandidateArtifact() {
     technicalOutcome: {
       schemaOutcome: responseRead.data.schema_outcome,
       compilerOutcome: responseRead.data.compiler_outcome,
+      candidateCompilerVersion: inputProvenance.compilerVersion ?? null,
+      retainedTechnicalRecompile,
       diagnosticCode: responseRead.data.diagnostic_code,
       diagnosticPath: responseRead.data.diagnostic_path,
       versionContext: responseRead.data.version_context,

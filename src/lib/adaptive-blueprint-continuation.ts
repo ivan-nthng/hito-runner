@@ -120,6 +120,9 @@ export interface AdaptiveContinuationCandidateDraft {
     compilerVersion: `adaptive_continuation_compiler_v${number}`;
     retainedResponseId: string;
     retainedResponseSha256: string;
+    retainedResponseOriginalCompilerOutcome?: "rejected";
+    recompiledFromCompilerVersion?: `adaptive_continuation_compiler_v${number}`;
+    recompiledDiagnosticCode?: string;
   };
   factReferences: Array<{ kind: string; sha256: string }>;
   confirmationLineage: {

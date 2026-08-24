@@ -3423,6 +3423,31 @@ function buildFixtureSource(spec: FixtureActivitySpec, localDate: string) {
   return Buffer.concat([header, data, fileCrc]);
 }
 
+export function buildAdaptiveTrainingQualityFitFile(input: {
+  localDate: string;
+  evidenceKind: "compatible" | "incomplete";
+}) {
+  const localDate = AS_OF_DATE_SCHEMA.parse(input.localDate);
+  const compatible = input.evidenceKind === "compatible";
+  return buildFixtureSource(
+    {
+      key: `hosted-${input.evidenceKind}`,
+      daysAgo: 0,
+      title: compatible ? "Hosted adaptive factual run" : "Hosted adaptive incomplete factual run",
+      timerDurationMin: compatible ? 42 : 38,
+      elapsedDurationMin: compatible ? 43 : 40,
+      distanceKm: compatible ? 7.2 : null,
+      averageHeartRate: compatible ? 142 : null,
+      elevationGainM: compatible ? 35 : null,
+      planned: true,
+      sourceState: "available",
+      sessionRpe: null,
+      runningContext: null,
+    },
+    localDate,
+  );
+}
+
 function assertParsedFixtureSource(
   parsed: Awaited<ReturnType<typeof parseGarminFitActivity>>,
   spec: FixtureActivitySpec,

@@ -1850,8 +1850,7 @@ function resolveRequiredShortRepeatEffortKind(
   if (
     context.repeatChildRole === "recover" &&
     context.prescription.mode === "time" &&
-    ((context.workoutIdentity === "easy_run_with_strides" &&
-      context.prescription.duration_min <= 1) ||
+    ((context.segmentType === "strides" && context.prescription.duration_min <= 1) ||
       ((context.workoutIdentity === "controlled_tempo_session" ||
         context.workoutIdentity === "distance_intervals") &&
         context.prescription.duration_min <= 1.5))
@@ -1860,7 +1859,7 @@ function resolveRequiredShortRepeatEffortKind(
   }
   if (context.repeatChildRole !== "work") return null;
   if (
-    context.workoutIdentity === "easy_run_with_strides" &&
+    context.segmentType === "strides" &&
     context.prescription.mode === "time" &&
     context.prescription.duration_min <= 0.5
   ) {

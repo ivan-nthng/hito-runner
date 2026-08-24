@@ -315,6 +315,17 @@ function validateSteadyFamilyFidelity(input: {
 function validateContinuationAuthoringCompilerModes() {
   const structuredInput = buildAiGeneratedRunningPlanQaFixtureAuthoringInput("2026-06-15");
   const { requestContext: _requestContext, ...authoringInput } = structuredInput;
+  const noPaceAuthoringInput = {
+    ...authoringInput,
+    runnerFacts: {
+      ...authoringInput.runnerFacts,
+      benchmark: null,
+    },
+    planGoalIntent: {
+      ...authoringInput.planGoalIntent,
+      targetFinishTime: null,
+    },
+  };
   const initial = compileAiAuthoredPlanFirstDraft({
     draft: buildAiGeneratedRunningPlanDevFixtureProviderDraft(structuredInput),
     authoringInput,
@@ -395,17 +406,7 @@ function validateContinuationAuthoringCompilerModes() {
     });
     const noPaceAuthorityPrompt = buildAdaptiveContinuationAuthoringPrompt({
       brief,
-      originalAuthoringInput: {
-        ...authoringInput,
-        runnerFacts: {
-          ...authoringInput.runnerFacts,
-          benchmark: null,
-        },
-        planGoalIntent: {
-          ...authoringInput.planGoalIntent,
-          targetFinishTime: null,
-        },
-      },
+      originalAuthoringInput: noPaceAuthoringInput,
     });
     assert.match(
       noPaceAuthorityPrompt.systemPrompt,
@@ -520,6 +521,72 @@ function validateContinuationAuthoringCompilerModes() {
       compiled.workoutDocuments.map((document) => document.workoutDate),
       projections.map((projection) => projection.date),
     );
+
+    if (selection.mode === "normal_four_week") {
+      const noPaceResponse = buildAiGeneratedContinuationDevFixtureProviderResponse({
+        authoringInput: noPaceAuthoringInput,
+        brief,
+      });
+      const strideSource = buildAiGeneratedRunningPlanDevFixtureProviderDraft({
+        ...structuredInput,
+        runnerFacts: noPaceAuthoringInput.runnerFacts,
+        planGoalIntent: noPaceAuthoringInput.planGoalIntent,
+      }).detailed_block.workouts.find(
+        (workout) => workout.workout_identity === "easy_run_with_strides",
+      );
+      const recoveryStrideResponse = structuredClone(noPaceResponse);
+      const recoveryStrideWorkout = recoveryStrideResponse.detailed_block.workouts[0];
+      assert.ok(strideSource && recoveryStrideWorkout);
+      recoveryStrideWorkout.workout_identity = "recovery_jog";
+      recoveryStrideWorkout.title = "Recovery with controlled strides";
+      recoveryStrideWorkout.sections = structuredClone(strideSource.sections);
+      const recoveryBrief = structuredClone(brief);
+      recoveryBrief.projections[0]!.workoutFamily = "recovery";
+      const recoveryBlueprint = structuredClone(initial.blueprint);
+      const recoveryProjection = recoveryBlueprint.projections.find(
+        (projection) => projection.date === recoveryStrideWorkout.date,
+      );
+      assert.ok(recoveryProjection);
+      recoveryProjection.cadence_or_workout_family = "recovery";
+      const recoveryCompiled = compileAdaptiveContinuationProviderResponse({
+        response: recoveryStrideResponse,
+        brief: recoveryBrief,
+        blueprint: recoveryBlueprint,
+        originalAuthoringInput: noPaceAuthoringInput,
+      });
+      assert.equal(
+        recoveryCompiled.ok,
+        true,
+        recoveryCompiled.ok ? "" : recoveryCompiled.issues[0]?.message,
+      );
+
+      const overlongStride = structuredClone(recoveryStrideResponse);
+      const overlongStrideSection = overlongStride.detailed_block.workouts[0]?.sections.find(
+        (section) => section.kind === "repeat" && section.segment_type === "strides",
+      );
+      const overlongWork =
+        overlongStrideSection?.kind === "repeat"
+          ? overlongStrideSection.children.find((child) => child.role === "work")
+          : null;
+      assert.ok(overlongWork && overlongWork.prescription.mode === "time");
+      if (overlongWork.prescription.mode === "time") {
+        overlongWork.prescription.duration_min = 0.75;
+      }
+      const overlongRejected = compileAdaptiveContinuationProviderResponse({
+        response: overlongStride,
+        brief: recoveryBrief,
+        blueprint: recoveryBlueprint,
+        originalAuthoringInput: noPaceAuthoringInput,
+      });
+      assert.equal(overlongRejected.ok, false);
+      if (overlongRejected.ok)
+        throw new Error("An overlong effort-only stride unexpectedly compiled.");
+      assert.ok(
+        overlongRejected.issues.some(
+          (issue) => issue.code === "ai_authored_plan_first_effort_context_invalid",
+        ),
+      );
+    }
 
     if (selection.mode === "resolved_interruption_bridge") {
       const unsafeBridge = structuredClone(response);

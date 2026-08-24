@@ -120,6 +120,12 @@ export type AdaptiveContinuationPreparationDependencies = {
     expectedPromptVersion: "adaptive_continuation_prompt_v5";
     expectedCompilerVersion: "adaptive_continuation_compiler_v3";
   };
+  explicitTechnicallyRejectedRetainedResponseRecompile?: {
+    responseRecordId: string;
+    expectedPromptVersion: `adaptive_continuation_prompt_v${number}`;
+    expectedCompilerVersion: `adaptive_continuation_compiler_v${number}`;
+    expectedDiagnosticCode: string;
+  };
 };
 
 type ContinuationDecisionContext = NonNullable<
@@ -142,13 +148,20 @@ export async function prepareAdaptiveContinuationCandidateForUser(
   input: { userId: string; asOfDate: string },
   dependencies: AdaptiveContinuationPreparationDependencies = {},
 ) {
+  if (
+    dependencies.explicitRetainedResponseRecompile &&
+    dependencies.explicitTechnicallyRejectedRetainedResponseRecompile
+  ) {
+    throw new Error("A continuation response may use only one explicit recompile mode.");
+  }
   const publicBefore = await getAdaptiveBlueprintCalendarReadModelForUser(
     input.userId,
     input.asOfDate,
   );
   if (
     publicBefore.continuation.status === "candidate_ready" &&
-    !dependencies.explicitRetainedResponseRecompile
+    !dependencies.explicitRetainedResponseRecompile &&
+    !dependencies.explicitTechnicallyRejectedRetainedResponseRecompile
   ) {
     return { ok: true as const, state: publicBefore.continuation, retained: false as const };
   }
@@ -244,7 +257,7 @@ export async function prepareAdaptiveContinuationCandidateForUser(
     }),
   };
   const requestContext = { brief };
-  const explicitRetainedResponse = dependencies.explicitRetainedResponseRecompile
+  const coachRejectedRetainedResponse = dependencies.explicitRetainedResponseRecompile
     ? await requireRejectedRetainedResponseForRecompile({
         userId: input.userId,
         current: current as ReadyContinuationContext,
@@ -253,6 +266,17 @@ export async function prepareAdaptiveContinuationCandidateForUser(
         ...dependencies.explicitRetainedResponseRecompile,
       })
     : null;
+  const technicallyRejectedRetainedResponse =
+    dependencies.explicitTechnicallyRejectedRetainedResponseRecompile
+      ? await requireTechnicallyRejectedRetainedResponseForRecompile({
+          userId: input.userId,
+          requestContext,
+          providerModel,
+          ...dependencies.explicitTechnicallyRejectedRetainedResponseRecompile,
+        })
+      : null;
+  const explicitRetainedResponse =
+    coachRejectedRetainedResponse ?? technicallyRejectedRetainedResponse;
   const reusableResponse = explicitRetainedResponse
     ? null
     : await getReusableAiPlanGenerationResponseForUser({
@@ -296,7 +320,7 @@ export async function prepareAdaptiveContinuationCandidateForUser(
     brief,
     blueprint: current.blueprint,
     originalAuthoringInput,
-    explicitRetainedTargetBoundaryRepair: Boolean(explicitRetainedResponse),
+    explicitRetainedTargetBoundaryRepair: Boolean(coachRejectedRetainedResponse),
   });
   if (!compiled.ok) {
     if (explicitRetainedResponse) {
@@ -356,6 +380,16 @@ export async function prepareAdaptiveContinuationCandidateForUser(
     authoringBriefSha256,
     decisionSha256,
     retainedResponse: acceptedResponse,
+    technicalRecompile: technicallyRejectedRetainedResponse
+      ? {
+          sourceCompilerVersion:
+            dependencies.explicitTechnicallyRejectedRetainedResponseRecompile!
+              .expectedCompilerVersion,
+          diagnosticCode:
+            dependencies.explicitTechnicallyRejectedRetainedResponseRecompile!
+              .expectedDiagnosticCode,
+        }
+      : null,
   });
   const retained = await retainAdaptiveTrainingContinuationCandidateForUser({
     userId: input.userId,
@@ -367,6 +401,16 @@ export async function prepareAdaptiveContinuationCandidateForUser(
     predecessorConfirmationId: current.state.confirmation.id,
     retainedResponse: acceptedResponse,
     candidate,
+    technicalRecompile: technicallyRejectedRetainedResponse
+      ? {
+          sourceCompilerVersion:
+            dependencies.explicitTechnicallyRejectedRetainedResponseRecompile!
+              .expectedCompilerVersion,
+          diagnosticCode:
+            dependencies.explicitTechnicallyRejectedRetainedResponseRecompile!
+              .expectedDiagnosticCode,
+        }
+      : undefined,
   });
   if (!explicitRetainedResponse) {
     await recordAiPlanGenerationAttemptResultForUser({
@@ -395,6 +439,40 @@ export async function prepareAdaptiveContinuationCandidateForUser(
     recompiledFromRetainedResponse: Boolean(explicitRetainedResponse),
     providerDispatchCount: explicitRetainedResponse ? (0 as const) : requested ? 1 : 0,
   };
+}
+
+async function requireTechnicallyRejectedRetainedResponseForRecompile(input: {
+  userId: string;
+  requestContext: { brief: AdaptiveContinuationAuthoringBriefV2 };
+  providerModel: string;
+  responseRecordId: string;
+  expectedPromptVersion: `adaptive_continuation_prompt_v${number}`;
+  expectedCompilerVersion: `adaptive_continuation_compiler_v${number}`;
+  expectedDiagnosticCode: string;
+}) {
+  const response = await getAiPlanGenerationResponseForUser(input.userId, input.responseRecordId);
+  const versionContext = response?.version_context;
+  const attemptResult = response?.attempt_result;
+  if (
+    !response ||
+    response.user_id !== input.userId ||
+    response.provider_model !== input.providerModel ||
+    response.schema_outcome !== "accepted" ||
+    response.compiler_outcome !== "rejected" ||
+    response.diagnostic_code !== input.expectedDiagnosticCode ||
+    !isRecord(versionContext) ||
+    versionContext.promptVersion !== input.expectedPromptVersion ||
+    versionContext.compilerVersion !== input.expectedCompilerVersion ||
+    !isRecord(attemptResult) ||
+    attemptResult.outcome !== "technical_rejection" ||
+    attemptResult.candidateRecordId !== null ||
+    stableJsonStringify(response.request_context) !== stableJsonStringify(input.requestContext)
+  ) {
+    throw new Error(
+      "The retained response does not match the current owner-bound technical rejection.",
+    );
+  }
+  return response;
 }
 
 async function requireRejectedRetainedResponseForRecompile(input: {
@@ -503,6 +581,10 @@ function buildCandidateDraft(input: {
   authoringBriefSha256: string;
   decisionSha256: string;
   retainedResponse: Awaited<ReturnType<typeof recordAiPlanGenerationResponseOutcomeForUser>>;
+  technicalRecompile: {
+    sourceCompilerVersion: `adaptive_continuation_compiler_v${number}`;
+    diagnosticCode: string;
+  } | null;
 }): AdaptiveContinuationCandidateDraft {
   const { current } = input;
   if (!current.window || !current.facts || !current.state.latestInputRevision) {
@@ -594,6 +676,13 @@ function buildCandidateDraft(input: {
       compilerVersion: ADAPTIVE_CONTINUATION_COMPILER_VERSION,
       retainedResponseId: input.retainedResponse.id,
       retainedResponseSha256: input.retainedResponse.response_sha256,
+      ...(input.technicalRecompile
+        ? {
+            retainedResponseOriginalCompilerOutcome: "rejected" as const,
+            recompiledFromCompilerVersion: input.technicalRecompile.sourceCompilerVersion,
+            recompiledDiagnosticCode: input.technicalRecompile.diagnosticCode,
+          }
+        : {}),
     },
     factReferences: [
       { kind: "calendar_outcomes", sha256: current.facts.calendar.calendarOutcomeFingerprint },

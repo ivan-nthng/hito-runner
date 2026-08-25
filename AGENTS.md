@@ -30,10 +30,17 @@ immutable history line. One Task has one current owner; same-task QA fix-forward
 A Task with multiple admitted steps uses one page-level `Delivery steps` checklist; do not mirror
 percentages or create phase Tasks.
 
+For an already admitted Task, distinguish a missing or changed lifecycle decision from a broken
+execution host. The former stops for PRODUCT. A role context that cannot reach the approved Notion
+API, admitted worktree, fixture or managed runtime returns the same Task directly to BACKEND for
+recovery or re-homing in a canonical local context with the same Task identity and approved seam.
+Only that context may write the terminal Notion result; this never permits a Markdown lifecycle
+fallback, an unapproved secret path or destructive/hosted mutation.
+
 Local lifecycle access uses process-local Node loading from
 `/Users/ivan/.config/hito/notion.env`. Never inspect, print, commit, copy, expose or log its secret;
-Vercel is not its dependency. If the seam is unavailable, return the environment failure to PRODUCT
-and never fall back to Markdown lifecycle writes.
+Vercel is not its dependency. Missing access on an already admitted Task follows the execution-host
+recovery rule above and never authorizes Markdown lifecycle writes.
 
 Core owners: [`PRODUCT`](agents/product.agent.md), [`ARCHITECT`](agents/architect.agent.md),
 [`FRONTEND`](agents/frontend.agent.md), [`BACKEND`](agents/backend.agent.md), and

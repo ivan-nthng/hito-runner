@@ -126,17 +126,22 @@ statuses: `Done / (all related Tasks except Cancelled)`. It is a navigation proj
 lifecycle state. Notion owns any percentage/bar presentation of that computed number; agents never
 write a text bar. A Task without an admitted delivery checklist shows no invented percentage.
 
-If an active role context cannot update the live Notion Task, stop before execution or handoff and
-return that execution-environment gap to PRODUCT. Do not silently change a Markdown `Status`, owner,
-stage or receipt as a fallback.
+For an already admitted Task, first distinguish a missing or changed lifecycle decision from a
+broken execution host. The former stops before execution and returns to PRODUCT. The latter—a role
+context that cannot reach the approved Notion API, admitted worktree, fixture or managed
+runtime—is a same-Task QA-environment defect returned directly to BACKEND for recovery or re-homing,
+not a Product blocker. The same acceptance may continue from a canonical local context with the same
+Task identity and approved seam; only that context may write the terminal Notion result. Never use
+Markdown lifecycle state, an unapproved secret path or destructive/hosted mutation as a fallback.
 
 ### Local Notion Lifecycle Seam
 
 Root [`AGENTS.md`](../../AGENTS.md) owns the single process-local credential seam and its secret
-boundary. This contract adds no alternate credential source. Missing access returns the environment
-failure to PRODUCT and never authorizes Markdown lifecycle writes. One Current owner remains
-mandatory; each material transition atomically updates Status, Phase, Owner, Latest update, Next
-action and Repository document, then appends one history line on the same live Task.
+boundary. This contract adds no alternate credential source. Missing access on an already admitted
+Task follows the execution-host recovery rule above and never authorizes Markdown lifecycle writes.
+One Current owner remains mandatory; each material transition atomically updates Status, Phase,
+Owner, Latest update, Next action and Repository document, then appends one history line on the same
+live Task.
 
 ## Active Role Matrix
 

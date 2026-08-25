@@ -23,6 +23,7 @@ export type EditableValueFieldProps<Key extends string = string> = {
   step: number;
   inputMode: EditableValueInputMode;
   unit?: string;
+  error?: string | null;
   demoState?: "hover" | "active" | "focus";
 };
 
@@ -156,11 +157,14 @@ export function EditableValueField<Key extends string = string>({
   step,
   inputMode,
   unit,
+  error,
   demoState,
 }: EditableValueFieldProps<Key>) {
   const hasValue = value.trim().length > 0;
   const hasSavedValue = isEditableValueValid(value, { min, max, step });
   const hasInvalidValue = hasValue && !hasSavedValue;
+  const hasExternalError = Boolean(error);
+  const hasClosedError = hasInvalidValue || hasExternalError;
   const lifecycle = useEditableValueFieldLifecycle<Key, HTMLInputElement>({
     activeEditableKey,
     fieldKey,
@@ -181,18 +185,23 @@ export function EditableValueField<Key extends string = string>({
     .toLowerCase()
     .replace(/[^a-z0-9-]+/g, "-")}`;
   const errorId = `${fieldId}-error`;
+  const draftError = hasInvalidDraft ? editableValueErrorMessage({ min, max, step, unit }) : error;
 
   if (!isEditing) {
     return (
-      <div className="hito-editable-value-field-frame" data-hito-component="editable-value-field">
+      <div
+        className="hito-editable-value-field-frame"
+        data-hito-component="editable-value-field"
+        data-state={hasClosedError ? "invalid" : undefined}
+      >
         <HitoButton
           type="button"
           size="sm"
           variant="secondary"
-          tone={hasInvalidValue ? "error" : "default"}
+          tone={hasClosedError ? "error" : "default"}
           aria-label={
-            hasInvalidValue
-              ? `Edit ${label.toLowerCase()}, invalid value ${value}`
+            hasClosedError
+              ? `Edit ${label.toLowerCase()}: ${error ?? `invalid value ${value}`}`
               : hasSavedValue
                 ? `Edit ${label.toLowerCase()}`
                 : `Add ${label.toLowerCase()}`
@@ -201,8 +210,11 @@ export function EditableValueField<Key extends string = string>({
           className="hito-editable-value-field"
           data-editable-value-key={fieldKey}
           data-demo-state={demoState}
-          data-state={hasSavedValue ? "saved" : hasInvalidValue ? "invalid" : "empty"}
-          aria-invalid={hasInvalidValue || undefined}
+          data-state={
+            hasSavedValue && !hasExternalError ? "saved" : hasClosedError ? "invalid" : "empty"
+          }
+          aria-invalid={hasClosedError || undefined}
+          aria-describedby={hasExternalError ? errorId : undefined}
         >
           {!hasValue ? (
             <Icon name="plus" size="sm" className="hito-editable-value-field-icon" />
@@ -220,7 +232,7 @@ export function EditableValueField<Key extends string = string>({
               <span>{label}</span>
             )}
           </span>
-          {hasInvalidValue ? (
+          {hasClosedError ? (
             <Icon name="warning" size="sm" className="hito-editable-value-field-icon" />
           ) : hasValue ? (
             <Icon
@@ -230,6 +242,11 @@ export function EditableValueField<Key extends string = string>({
             />
           ) : null}
         </HitoButton>
+        {error ? (
+          <span id={errorId} className="hito-editable-value-field-error">
+            {error}
+          </span>
+        ) : null}
       </div>
     );
   }
@@ -239,7 +256,7 @@ export function EditableValueField<Key extends string = string>({
       className="hito-editable-value-field-frame"
       data-hito-component="editable-value-field"
       data-state="editing"
-      data-invalid={hasInvalidDraft || undefined}
+      data-invalid={Boolean(draftError) || undefined}
       onBlur={lifecycle.handleFrameBlur}
     >
       <div className="hito-editable-value-field-input-shell">
@@ -255,11 +272,11 @@ export function EditableValueField<Key extends string = string>({
           }
           onKeyDown={(event) => lifecycle.handleControlKeyDown(event, canSave)}
           aria-label={label}
-          aria-invalid={hasInvalidDraft || undefined}
-          aria-describedby={hasInvalidDraft ? errorId : undefined}
+          aria-invalid={Boolean(draftError) || undefined}
+          aria-describedby={draftError ? errorId : undefined}
           placeholder={placeholder}
           className="hito-field-has-right-icon hito-editable-value-field-input"
-          feedback={hasInvalidDraft ? "error" : "neutral"}
+          feedback={draftError ? "error" : "neutral"}
           size="sm"
           variant="secondary"
         />
@@ -288,9 +305,13 @@ export function EditableValueField<Key extends string = string>({
       >
         <Icon name="check" size="xs" />
       </HitoButton>
-      {hasInvalidDraft ? (
-        <span id={errorId} className="hito-editable-value-field-error" role="alert">
-          {editableValueErrorMessage({ min, max, step, unit })}
+      {draftError ? (
+        <span
+          id={errorId}
+          className="hito-editable-value-field-error"
+          role={hasInvalidDraft ? "alert" : undefined}
+        >
+          {draftError}
         </span>
       ) : null}
     </div>

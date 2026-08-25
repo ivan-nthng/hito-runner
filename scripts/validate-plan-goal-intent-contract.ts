@@ -22,6 +22,11 @@ import {
   weekdayShort,
 } from "../src/lib/training";
 import type { TrainingPlanV2 } from "../src/lib/imported-plan";
+import type { StructuredConstructorState } from "../src/components/onboarding/onboarding-form-model";
+import {
+  buildRunningPlanPreviewInput,
+  mapRunningPlanPreviewResultToAdmissionFailure,
+} from "../src/components/onboarding/selected-running-plan-flow-utils";
 import { buildReviewedAiFixtureResult as buildReviewedAiFixture } from "./lib/generated-plan-proof-fixture";
 
 const baseInput = {
@@ -43,10 +48,141 @@ const baseInput = {
 async function main() {
   validateDateOnlyContract();
   validateActionSchemaBoundary();
+  validateBrowserAdmissionBoundary();
   validatePlanGoalIntentNormalizer();
   await validateSelectedPlanReviewAndReadback();
 
   console.log("Plan goal intent contract validator passed.");
+}
+
+function validateBrowserAdmissionBoundary() {
+  const validHalfMarathonState = {
+    age: "36",
+    heightCm: "178",
+    weightKg: "74",
+    fitnessLevel: "running_regularly",
+    recent5kTime: "",
+    recent5kPace: "",
+    fixedRestDays: ["Wednesday", "Saturday"],
+    maxRunningDaysPerWeek: "5",
+    preferredLongRunDay: "Sunday",
+    startDate: "2026-08-31",
+    planGoalChoice: "half_marathon",
+    planGoalCustomDistanceKm: "",
+    planGoalCustomDistanceLabel: "",
+    planGoalFinishTime: "1:45:00",
+    planGoalTargetDate: "2026-11-15",
+    runnerComment: "",
+  } satisfies StructuredConstructorState;
+
+  const missingCoreFacts = buildRunningPlanPreviewInput(
+    { ...validHalfMarathonState, age: "", heightCm: "", weightKg: "" },
+    "half_marathon",
+  );
+  assert.equal(missingCoreFacts.ok, false);
+  if (!missingCoreFacts.ok) {
+    assert.deepEqual(
+      missingCoreFacts.issues.map((issue) => issue.field),
+      ["age", "heightCm", "weightKg"],
+    );
+  }
+
+  const fieldCases: readonly {
+    state: StructuredConstructorState;
+    goal: StructuredConstructorState["planGoalChoice"];
+    expectedField: string;
+  }[] = [
+    {
+      state: { ...validHalfMarathonState, age: "101" },
+      goal: "half_marathon",
+      expectedField: "age",
+    },
+    {
+      state: { ...validHalfMarathonState, heightCm: "119" },
+      goal: "half_marathon",
+      expectedField: "heightCm",
+    },
+    {
+      state: { ...validHalfMarathonState, weightKg: "invalid" },
+      goal: "half_marathon",
+      expectedField: "weightKg",
+    },
+    {
+      state: { ...validHalfMarathonState, planGoalChoice: "" },
+      goal: "",
+      expectedField: "goal",
+    },
+    {
+      state: {
+        ...validHalfMarathonState,
+        planGoalChoice: "custom",
+        planGoalCustomDistanceKm: "0",
+      },
+      goal: "custom",
+      expectedField: "customDistance",
+    },
+    {
+      state: { ...validHalfMarathonState, planGoalFinishTime: "not-a-time" },
+      goal: "half_marathon",
+      expectedField: "finishTime",
+    },
+    {
+      state: { ...validHalfMarathonState, planGoalTargetDate: "" },
+      goal: "half_marathon",
+      expectedField: "targetDate",
+    },
+    {
+      state: { ...validHalfMarathonState, planGoalTargetDate: "2026-02-31" },
+      goal: "half_marathon",
+      expectedField: "targetDate",
+    },
+  ];
+
+  for (const fieldCase of fieldCases) {
+    const result = buildRunningPlanPreviewInput(fieldCase.state, fieldCase.goal);
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.firstField, fieldCase.expectedField);
+      assert.equal(result.title, "Plan preparation request cancelled");
+    }
+  }
+
+  const valid = buildRunningPlanPreviewInput(validHalfMarathonState, "half_marathon");
+  assert.equal(valid.ok, true);
+  if (!valid.ok) throw new Error("Valid dated Half Marathon input was rejected.");
+  assert.doesNotThrow(() => runningPlanPreviewInputSchema.parse(valid.input));
+  assert.equal(valid.input.planGoalIntent.distance.kind, "preset");
+  assert.equal(valid.input.planGoalIntent.targetDate, "2026-11-15");
+
+  const persistedBaselineMessage =
+    "The saved runner baseline no longer matches these plan answers. Refresh the setup before creating a preview.";
+  const serverFailure = mapRunningPlanPreviewResultToAdmissionFailure({
+    ok: false,
+    unavailable: {
+      previewOutcome: "invalid_structural_input",
+      error: {
+        code: "structured_input_invalid",
+        message: persistedBaselineMessage,
+        compilerDiagnostic: null,
+      },
+    },
+  });
+  assert.equal(serverFailure?.source, "server");
+  assert.equal(serverFailure?.firstField, null);
+  assert.equal(serverFailure?.issues[0]?.correction, persistedBaselineMessage);
+
+  const missingTargetFailure = mapRunningPlanPreviewResultToAdmissionFailure({
+    ok: false,
+    unavailable: {
+      previewOutcome: "invalid_structural_input",
+      error: {
+        code: "invalid_plan_goal_intent",
+        message: "Choose a target date before creating a generated plan.",
+        compilerDiagnostic: null,
+      },
+    },
+  });
+  assert.equal(missingTargetFailure?.firstField, "targetDate");
 }
 
 function validateDateOnlyContract() {

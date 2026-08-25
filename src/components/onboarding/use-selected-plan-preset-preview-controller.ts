@@ -3,8 +3,11 @@ import { useServerFn } from "@tanstack/react-start";
 import type { StructuredConstructorState } from "@/components/onboarding/onboarding-form-model";
 import {
   buildRunningPlanPreviewInput,
+  mapRunningPlanPreviewResultToAdmissionFailure,
   planGoalChoiceLabel,
   type PlanGoalSelectionId,
+  type RunningPlanAdmissionFailure,
+  type RunningPlanAdmissionField,
 } from "@/components/onboarding/selected-running-plan-flow-utils";
 import { hitoToast } from "@/components/ui/hito-toast";
 import {
@@ -15,23 +18,21 @@ import {
 
 interface SelectedPlanPresetPreviewControllerOptions {
   state: StructuredConstructorState;
-  hasRequiredPlanBasics: boolean;
   toastId: string;
   previewReadyDescription: string;
   previewContextKey?: string;
-  requiredBasicsMessage?: string;
   resetOnInputChange?: boolean;
+  onAdmissionRejected?: (field: RunningPlanAdmissionField | null) => void;
   onPreviewDispatch?: () => void;
   onResetExternalState?: () => void;
 }
 
 export function useSelectedPlanPresetPreviewController({
-  hasRequiredPlanBasics,
+  onAdmissionRejected,
   onPreviewDispatch,
   onResetExternalState,
   previewContextKey = "default",
   previewReadyDescription,
-  requiredBasicsMessage = "Add Age, Height, and Weight before previewing a generated plan.",
   resetOnInputChange = false,
   state,
   toastId,
@@ -45,6 +46,7 @@ export function useSelectedPlanPresetPreviewController({
   const [selectedGoalId, setSelectedGoalId] = useState<PlanGoalSelectionId | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [requestResult, setRequestResult] = useState<RunningPlanAdmissionFailure | null>(null);
   const [previewOpen, setPreviewOpenState] = useState(false);
   const previewOpenRef = useRef(false);
   const [previewResult, setPreviewResult] = useState<RunningPlanPreviewActionResult | null>(null);
@@ -55,14 +57,10 @@ export function useSelectedPlanPresetPreviewController({
   }, []);
 
   const previewInputFingerprint = useMemo(() => {
-    if (!state.planGoalChoice) {
-      return `${previewContextKey}:no_goal`;
-    }
-
     const inputResult = buildRunningPlanPreviewInput(state, state.planGoalChoice);
     return inputResult.ok
       ? `${previewContextKey}:${JSON.stringify(inputResult.input)}`
-      : `${previewContextKey}:invalid:${state.planGoalChoice}:${inputResult.error}`;
+      : `${previewContextKey}:invalid:${JSON.stringify(inputResult.issues)}`;
   }, [previewContextKey, state]);
   const previousPreviewInputFingerprintRef = useRef(previewInputFingerprint);
   const resetExternalState = useEffectEvent(() => {
@@ -71,6 +69,25 @@ export function useSelectedPlanPresetPreviewController({
   const clearTransientPreviewInput = useEffectEvent(() => {
     onPreviewDispatch?.();
   });
+  const focusRejectedAdmission = useEffectEvent((field: RunningPlanAdmissionField | null) => {
+    onAdmissionRejected?.(field);
+  });
+
+  const applyAdmissionFailure = useCallback(
+    (failure: RunningPlanAdmissionFailure) => {
+      setStatus("idle");
+      setPreviewOpen(false);
+      setPreviewResult(null);
+      setPreviewInput(null);
+      postDispatchInputFingerprintRef.current = null;
+      resetExternalState();
+      setNotice(null);
+      setError(null);
+      setRequestResult(failure);
+      window.requestAnimationFrame(() => focusRejectedAdmission(failure.firstField));
+    },
+    [focusRejectedAdmission, resetExternalState, setPreviewOpen],
+  );
 
   const abortActivePreviewRequest = useCallback(() => {
     const activeRequest = activePreviewRequestRef.current;
@@ -87,6 +104,7 @@ export function useSelectedPlanPresetPreviewController({
     setSelectedGoalId(null);
     setError(null);
     setNotice(null);
+    setRequestResult(null);
     setPreviewOpen(false);
     setPreviewResult(null);
     setPreviewInput(null);
@@ -99,6 +117,7 @@ export function useSelectedPlanPresetPreviewController({
     setSelectedGoalId(null);
     setError(null);
     setNotice(null);
+    setRequestResult(null);
     setPreviewOpen(false);
     setPreviewResult(null);
     setPreviewInput(null);
@@ -116,6 +135,7 @@ export function useSelectedPlanPresetPreviewController({
     setStatus("idle");
     setError(null);
     setNotice("Plan preparation request cancelled. Nothing was created or saved.");
+    setRequestResult(null);
     setPreviewOpen(false);
     setPreviewResult(null);
     setPreviewInput(null);
@@ -130,41 +150,15 @@ export function useSelectedPlanPresetPreviewController({
 
     const goalId = goalIdOverride ?? selectedGoalId;
 
-    if (!hasRequiredPlanBasics) {
-      setStatus("idle");
-      setPreviewOpen(false);
-      setPreviewResult(null);
-      setPreviewInput(null);
-      postDispatchInputFingerprintRef.current = null;
-      resetExternalState();
-      setNotice(null);
-      setError(requiredBasicsMessage);
+    const inputResult = buildRunningPlanPreviewInput(state, goalId);
+
+    if (!inputResult.ok) {
+      applyAdmissionFailure(inputResult);
       return;
     }
 
     if (!goalId) {
-      setStatus("idle");
-      setPreviewResult(null);
-      setPreviewInput(null);
-      postDispatchInputFingerprintRef.current = null;
-      resetExternalState();
-      setNotice(null);
-      setError("Choose a goal before previewing it.");
-      return;
-    }
-
-    const inputResult = buildRunningPlanPreviewInput(state, goalId);
-
-    if (!inputResult.ok) {
-      setStatus("idle");
-      setPreviewOpen(false);
-      setPreviewResult(null);
-      setPreviewInput(null);
-      postDispatchInputFingerprintRef.current = null;
-      resetExternalState();
-      setNotice(null);
-      setError(inputResult.error);
-      return;
+      throw new Error("Running-plan goal selection was not narrowed after validation.");
     }
 
     const activeRequest = {
@@ -177,6 +171,7 @@ export function useSelectedPlanPresetPreviewController({
     })}`;
     setError(null);
     setNotice(null);
+    setRequestResult(null);
     resetExternalState();
     setStatus("previewing_plan");
 
@@ -194,14 +189,24 @@ export function useSelectedPlanPresetPreviewController({
 
       activePreviewRequestRef.current = null;
       postDispatchInputFingerprintRef.current = null;
-      setPreviewResult(result);
-      setPreviewInput(result.ok ? result.draft.previewInput : null);
       setStatus("idle");
 
       if (!result.ok) {
+        const admissionFailure = mapRunningPlanPreviewResultToAdmissionFailure(result);
+
+        if (admissionFailure) {
+          applyAdmissionFailure(admissionFailure);
+          return;
+        }
+
+        setPreviewResult(result);
+        setPreviewInput(null);
         setError(null);
         return;
       }
+
+      setPreviewResult(result);
+      setPreviewInput(result.draft.previewInput);
 
       if (!previewOpenRef.current) {
         hitoToast.success({
@@ -232,37 +237,39 @@ export function useSelectedPlanPresetPreviewController({
       return;
     }
 
-    if (!hasRequiredPlanBasics) {
-      setStatus("idle");
-      setSelectedGoalId(null);
-      setPreviewOpen(false);
-      setPreviewResult(null);
-      setPreviewInput(null);
-      postDispatchInputFingerprintRef.current = null;
-      resetExternalState();
-      setNotice(null);
-      setError(requiredBasicsMessage);
-      return;
-    }
-
     setSelectedGoalId(goalId);
     setPreviewResult(null);
     setPreviewInput(null);
     postDispatchInputFingerprintRef.current = null;
     resetExternalState();
     setNotice(null);
+    setRequestResult(null);
 
     const inputResult = buildRunningPlanPreviewInput(state, goalId);
 
     if (!inputResult.ok) {
-      setStatus("idle");
-      setPreviewOpen(false);
-      setError(inputResult.error);
+      applyAdmissionFailure(inputResult);
       return;
     }
 
     setPreviewOpen(true);
     void refreshPreview(goalId);
+  }
+
+  function validatePreviewRequest() {
+    const result = buildRunningPlanPreviewInput(state, state.planGoalChoice);
+
+    if (!result.ok) {
+      applyAdmissionFailure(result);
+      return { ok: false } as const;
+    }
+
+    if (!state.planGoalChoice) {
+      throw new Error("Running-plan goal selection was not narrowed after validation.");
+    }
+
+    setRequestResult(null);
+    return { ok: true, goalId: state.planGoalChoice } as const;
   }
 
   useEffect(() => {
@@ -290,8 +297,22 @@ export function useSelectedPlanPresetPreviewController({
     setPreviewInput(null);
     setError(null);
     setNotice(null);
+    setRequestResult((current) => {
+      if (current?.source !== "client") {
+        return null;
+      }
+
+      const result = buildRunningPlanPreviewInput(state, state.planGoalChoice);
+      return result.ok ? null : result;
+    });
     resetExternalState();
-  }, [abortActivePreviewRequest, previewInputFingerprint, resetExternalState, resetOnInputChange]);
+  }, [
+    abortActivePreviewRequest,
+    previewInputFingerprint,
+    resetExternalState,
+    resetOnInputChange,
+    state,
+  ]);
 
   useEffect(() => abortActivePreviewRequest, [abortActivePreviewRequest]);
 
@@ -304,6 +325,7 @@ export function useSelectedPlanPresetPreviewController({
     previewInput,
     previewOpen,
     previewResult,
+    requestResult,
     refreshPreview,
     resetPreviewState,
     selectedGoalId,
@@ -311,5 +333,6 @@ export function useSelectedPlanPresetPreviewController({
     setError,
     setPreviewOpen,
     status,
+    validatePreviewRequest,
   };
 }

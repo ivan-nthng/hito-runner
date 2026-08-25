@@ -34,6 +34,7 @@ type QuickSetupPlanSetupSectionsProps = {
   heartRateProfile?: ReactNode;
   firstSectionNumber?: number;
   firstSectionHasDivider?: boolean;
+  fieldErrors?: Partial<Record<"age" | "heightCm" | "weightKg", string>>;
 };
 
 const RECENT_5K_TIME_OPTIONS = [
@@ -58,6 +59,7 @@ export function QuickSetupPlanSetupSections({
   heartRateProfile,
   firstSectionNumber = 1,
   firstSectionHasDivider = false,
+  fieldErrors = {},
 }: QuickSetupPlanSetupSectionsProps) {
   const [activeEditableKey, setActiveEditableKey] = useState<QuickSetupEditableKey | null>(null);
   const primaryFitnessLevel = normalizePresetPrimaryFitnessLevel(state.fitnessLevel);
@@ -102,6 +104,7 @@ export function QuickSetupPlanSetupSections({
                 max={100}
                 step={1}
                 inputMode="numeric"
+                error={fieldErrors.age}
               />
               <EditableValueField
                 fieldKey="heightCm"
@@ -115,6 +118,7 @@ export function QuickSetupPlanSetupSections({
                 max={230}
                 step={1}
                 inputMode="numeric"
+                error={fieldErrors.heightCm}
               />
               <EditableValueField
                 fieldKey="weightKg"
@@ -129,6 +133,7 @@ export function QuickSetupPlanSetupSections({
                 step={0.5}
                 inputMode="decimal"
                 unit="kg"
+                error={fieldErrors.weightKg}
               />
             </div>
           </div>

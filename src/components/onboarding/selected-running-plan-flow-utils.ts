@@ -5,7 +5,7 @@ import {
   type StructuredConstructorState,
 } from "@/components/onboarding/onboarding-form-model";
 import { isRealIsoDate, parseDurationSeconds } from "@/lib/first-plan-authoring-utils";
-import type { PlanGoalIntentInput, RunningPlanRunnerLevel } from "@/lib/plan-creation-engine";
+import type { RunningPlanRunnerLevel } from "@/lib/plan-creation-engine";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 import { generatedPlanRunnerCommentInputSchema } from "@/lib/structured-plan-authoring-schema";
 import type {
@@ -24,66 +24,101 @@ export type PlanGoalIntentDraftState = Pick<
 >;
 export type PlanGoalSelectionId = Exclude<PlanGoalChoice, "">;
 
+export type RunningPlanAdmissionField =
+  | "age"
+  | "heightCm"
+  | "weightKg"
+  | "goal"
+  | "customDistance"
+  | "finishTime"
+  | "targetDate"
+  | "recent5kTime"
+  | "recent5kPace"
+  | "runnerComment";
+
+export type RunningPlanAdmissionIssue = {
+  field: RunningPlanAdmissionField | null;
+  correction: string;
+};
+
+type RunningPlanGoalAdmissionIssue = RunningPlanAdmissionIssue & {
+  field: "goal" | "customDistance" | "finishTime" | "targetDate";
+};
+
+export type RunningPlanAdmissionFailure = {
+  ok: false;
+  source: "client" | "server";
+  title: "Plan preparation request cancelled";
+  issues: readonly RunningPlanAdmissionIssue[];
+  firstField: RunningPlanAdmissionField | null;
+};
+
+export type RunningPlanAdmissionResult =
+  | { ok: true; input: RunningPlanPreviewActionInput }
+  | RunningPlanAdmissionFailure;
+
 export function buildRunningPlanPreviewInput(
   state: StructuredConstructorState,
-  goalSelection: PlanGoalSelectionId,
-): { ok: true; input: RunningPlanPreviewActionInput } | { ok: false; error: string } {
+  goalSelection: PlanGoalChoice | null,
+): RunningPlanAdmissionResult {
   const age = requiredNumber(state.age, {
-    label: "Age",
     min: 13,
     max: 100,
     integer: true,
   });
   const heightCm = requiredNumber(state.heightCm, {
-    label: "Height",
     min: 120,
     max: 230,
     integer: true,
   });
   const weightKg = requiredNumber(state.weightKg, {
-    label: "Weight",
     min: 30,
     max: 250,
   });
-
-  if (!age.ok) {
-    return { ok: false, error: age.error };
-  }
-  if (!heightCm.ok) {
-    return { ok: false, error: heightCm.error };
-  }
-  if (!weightKg.ok) {
-    return { ok: false, error: weightKg.error };
-  }
-
-  const daysPerWeek = optionalPlanPresetNumber(state.maxRunningDaysPerWeek, {
-    min: 1,
-    max: 7,
-    integer: true,
-  });
+  const daysPerWeek = optionalRunningDaysPerWeek(state.maxRunningDaysPerWeek);
   const benchmark = buildRunningPlanBenchmarkInput(state);
   const runnerComment = generatedPlanRunnerCommentInputSchema.safeParse(state.runnerComment);
+  const issues: RunningPlanAdmissionIssue[] = [];
+
+  if (!age.ok) {
+    issues.push({ field: "age", correction: "Add an age from 13 to 100." });
+  }
+  if (!heightCm.ok) {
+    issues.push({ field: "heightCm", correction: "Add a height from 120 to 230 cm." });
+  }
+  if (!weightKg.ok) {
+    issues.push({ field: "weightKg", correction: "Add a weight from 30 to 250 kg." });
+  }
+
+  issues.push(...collectPlanGoalAdmissionIssues(state, goalSelection));
 
   if (!benchmark.ok) {
-    return { ok: false, error: benchmark.error };
+    issues.push({ field: benchmark.field, correction: benchmark.error });
   }
   if (!runnerComment.success) {
-    return {
-      ok: false,
-      error: runnerComment.error.issues.at(0)?.message ?? "Review the plan comment.",
-    };
+    issues.push({
+      field: "runnerComment",
+      correction: runnerComment.error.issues.at(0)?.message ?? "Review the optional plan context.",
+    });
   }
 
-  const goalGate = resolveSelectedPlanGoalPreviewGate(state, goalSelection);
+  if (issues.length > 0) {
+    return buildRunningPlanAdmissionFailure("client", issues);
+  }
 
-  if (!goalGate.ok) {
-    return { ok: false, error: goalGate.error };
+  if (!age.ok || !heightCm.ok || !weightKg.ok || !benchmark.ok || !runnerComment.success) {
+    throw new Error("Running-plan admission invariants were not narrowed after validation.");
+  }
+  if (!goalSelection) {
+    throw new Error("Running-plan goal selection was not narrowed after validation.");
   }
 
   const planGoalIntent = buildSelectedPlanGoalIntentInput(state, goalSelection);
 
   if (!planGoalIntent.ok) {
-    return { ok: false, error: planGoalIntent.error };
+    return buildRunningPlanAdmissionFailure("client", [
+      { field: "goal", correction: planGoalIntent.error },
+    ]);
   }
 
   return {
@@ -104,6 +139,48 @@ export function buildRunningPlanPreviewInput(
   };
 }
 
+export function mapRunningPlanPreviewResultToAdmissionFailure(
+  result: RunningPlanPreviewActionResult,
+): RunningPlanAdmissionFailure | null {
+  if (result.ok || result.unavailable.previewOutcome !== "invalid_structural_input") {
+    return null;
+  }
+
+  const { code, compilerDiagnostic, message } = result.unavailable.error;
+
+  if (code === "invalid_plan_goal_intent") {
+    return buildRunningPlanAdmissionFailure("server", [
+      {
+        field: "targetDate",
+        correction: message || "Add your target date.",
+      },
+    ]);
+  }
+
+  const diagnosticField = mapCompilerDiagnosticPathToAdmissionField(compilerDiagnostic?.path);
+
+  return buildRunningPlanAdmissionFailure("server", [
+    {
+      field: diagnosticField,
+      correction: message,
+    },
+  ]);
+}
+
+export function runningPlanAdmissionFieldErrors(
+  failure: RunningPlanAdmissionFailure | null,
+): Partial<Record<RunningPlanAdmissionField, string>> {
+  if (!failure) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    failure.issues.flatMap((issue) =>
+      issue.field ? ([[issue.field, issue.correction]] as const) : [],
+    ),
+  );
+}
+
 export type SelectedPlanGoalPreviewGate =
   | { ok: true }
   | {
@@ -116,34 +193,39 @@ export function resolveSelectedPlanGoalPreviewGate(
   state: PlanGoalIntentDraftState,
   goalSelection: PlanGoalSelectionId | null,
 ): SelectedPlanGoalPreviewGate {
+  const issue = collectPlanGoalAdmissionIssues(state, goalSelection).at(0);
+
+  return issue?.field ? { ok: false, field: issue.field, error: issue.correction } : { ok: true };
+}
+
+function collectPlanGoalAdmissionIssues(
+  state: PlanGoalIntentDraftState,
+  goalSelection: PlanGoalChoice | null,
+): RunningPlanGoalAdmissionIssue[] {
+  const issues: RunningPlanGoalAdmissionIssue[] = [];
   const goalChoice = state.planGoalChoice;
 
   if (!goalChoice) {
-    return {
-      ok: false,
-      field: "goal",
-      error: "Choose what you are training for before previewing.",
-    };
+    issues.push({ field: "goal", correction: "Choose a training goal." });
+    return issues;
   }
 
   if (goalChoice === "custom") {
     const customDistance = parsePlanGoalCustomDistanceKm(state.planGoalCustomDistanceKm);
 
     if (customDistance == null) {
-      return {
-        ok: false,
+      issues.push({
         field: "customDistance",
-        error: "Enter a distance greater than 0 and up to 500 km.",
-      };
+        correction: "Add a custom distance greater than 0 and up to 500 km.",
+      });
     }
   }
 
   if (goalSelection && goalChoice !== goalSelection) {
-    return {
-      ok: false,
+    issues.push({
       field: "goal",
-      error: `Choose ${planGoalChoiceLabel(goalChoice)} before previewing this goal.`,
-    };
+      correction: `Choose ${planGoalChoiceLabel(goalSelection)} before creating this plan.`,
+    });
   }
 
   const targetFinishTime = state.planGoalFinishTime.trim();
@@ -152,25 +234,57 @@ export function resolveSelectedPlanGoalPreviewGate(
     const seconds = parseDurationSeconds(targetFinishTime);
 
     if (seconds == null || seconds <= 0) {
-      return {
-        ok: false,
+      issues.push({
         field: "finishTime",
-        error: "Use a positive finish time such as 45:00 or 3:50:00.",
-      };
+        correction: "Use a positive finish time such as 45:00 or 3:50:00.",
+      });
     }
   }
 
   const targetDate = state.planGoalTargetDate.trim();
 
-  if (targetDate && !isRealIsoDate(targetDate)) {
-    return {
-      ok: false,
-      field: "targetDate",
-      error: "Use a real date.",
-    };
+  if (!targetDate) {
+    issues.push({ field: "targetDate", correction: "Add your target date." });
+  } else if (!isRealIsoDate(targetDate)) {
+    issues.push({ field: "targetDate", correction: "Use a real target date." });
   }
 
-  return { ok: true };
+  return issues;
+}
+
+function buildRunningPlanAdmissionFailure(
+  source: RunningPlanAdmissionFailure["source"],
+  issues: readonly RunningPlanAdmissionIssue[],
+): RunningPlanAdmissionFailure {
+  return {
+    ok: false,
+    source,
+    title: "Plan preparation request cancelled",
+    issues,
+    firstField: issues.find((issue) => issue.field)?.field ?? null,
+  };
+}
+
+function mapCompilerDiagnosticPathToAdmissionField(
+  path: string | null | undefined,
+): RunningPlanAdmissionField | null {
+  if (!path) {
+    return null;
+  }
+
+  const fieldByPath: readonly [string, RunningPlanAdmissionField][] = [
+    ["age", "age"],
+    ["height", "heightCm"],
+    ["weight", "weightKg"],
+    ["distance", "customDistance"],
+    ["targetFinishTime", "finishTime"],
+    ["targetDate", "targetDate"],
+    ["recent5kTime", "recent5kTime"],
+    ["recent5kPace", "recent5kPace"],
+    ["runnerComment", "runnerComment"],
+  ];
+
+  return fieldByPath.find(([fragment]) => path.includes(fragment))?.[1] ?? null;
 }
 
 export function planGoalChoiceLabel(choice: Exclude<PlanGoalChoice, "">) {
@@ -262,18 +376,26 @@ function buildRunningPlanBenchmarkInput(state: StructuredConstructorState):
       ok: true;
       input: NonNullable<RunningPlanPreviewActionInput["benchmark"]>;
     }
-  | { ok: false; error: string } {
+  | { ok: false; field: "recent5kTime" | "recent5kPace"; error: string } {
   const recent5kTime = state.recent5kTime.trim();
   const recent5kPace = state.recent5kPace.trim();
   const hasRecent5kTime = recent5kTime.length > 0;
   const hasRecent5kPace = recent5kPace.length > 0;
 
   if (hasRecent5kTime && !isPositiveRecent5kTime(recent5kTime)) {
-    return { ok: false, error: "Use a positive recent 5K time such as 25:00." };
+    return {
+      ok: false,
+      field: "recent5kTime",
+      error: "Use a positive recent 5K time such as 25:00.",
+    };
   }
 
   if (hasRecent5kPace && !isPositiveRecent5kPace(recent5kPace)) {
-    return { ok: false, error: "Use a positive recent 5K pace such as 5:00/km." };
+    return {
+      ok: false,
+      field: "recent5kPace",
+      error: "Use a positive recent 5K pace such as 5:00/km.",
+    };
   }
 
   if (hasRecent5kTime) {
@@ -307,7 +429,9 @@ function buildRunningPlanBenchmarkInput(state: StructuredConstructorState):
 function buildSelectedPlanGoalIntentInput(
   state: StructuredConstructorState,
   goalSelection: PlanGoalSelectionId,
-): { ok: true; input: PlanGoalIntentInput } | { ok: false; error: string } {
+):
+  | { ok: true; input: RunningPlanPreviewActionInput["planGoalIntent"] }
+  | { ok: false; error: string } {
   const targetFinishTime = state.planGoalFinishTime.trim();
   const targetDate = state.planGoalTargetDate.trim();
   const distance = selectedPlanGoalDistanceInput(state, goalSelection);
@@ -329,7 +453,12 @@ function buildSelectedPlanGoalIntentInput(
 function selectedPlanGoalDistanceInput(
   state: StructuredConstructorState,
   goalSelection: PlanGoalSelectionId,
-): { ok: true; input: PlanGoalIntentInput["distance"] } | { ok: false; error: string } {
+):
+  | {
+      ok: true;
+      input: NonNullable<RunningPlanPreviewActionInput["planGoalIntent"]["distance"]>;
+    }
+  | { ok: false; error: string } {
   if (goalSelection !== "custom") {
     return {
       ok: true,
@@ -414,20 +543,18 @@ function requiredNumber(
   value: string,
   {
     integer = false,
-    label,
     max,
     min,
   }: {
-    label: string;
     min: number;
     max: number;
     integer?: boolean;
   },
-): { ok: true; value: number } | { ok: false; error: string } {
+): { ok: true; value: number } | { ok: false } {
   const parsed = optionalPlanPresetNumber(value, { min, max, integer });
 
   if (parsed == null) {
-    return { ok: false, error: `${label} must be filled before selecting a plan preview.` };
+    return { ok: false };
   }
 
   return { ok: true, value: parsed };
@@ -462,4 +589,21 @@ function optionalPlanPresetNumber(
   }
 
   return parsed;
+}
+
+function optionalRunningDaysPerWeek(value: string): RunningPlanPreviewActionInput["daysPerWeek"] {
+  const parsed = optionalPlanPresetNumber(value, { min: 1, max: 7, integer: true });
+
+  switch (parsed) {
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+    case 5:
+    case 6:
+    case 7:
+      return parsed;
+    default:
+      return null;
+  }
 }

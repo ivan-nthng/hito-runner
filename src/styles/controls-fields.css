@@ -663,9 +663,14 @@
     gap: 0.375rem;
   }
 
-  .hito-editable-value-field-frame[data-state="editing"] {
+  .hito-editable-value-field-frame[data-state="editing"],
+  .hito-editable-value-field-frame[data-state="invalid"] {
     flex: 0 1 auto;
     flex-wrap: wrap;
+  }
+
+  .hito-editable-value-field-frame[data-state="invalid"] {
+    width: 100%;
   }
 
   .hito-editable-value-field {

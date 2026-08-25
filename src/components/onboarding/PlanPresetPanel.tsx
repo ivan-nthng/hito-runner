@@ -10,7 +10,8 @@ import {
   planGoalChoiceLabel,
   type PlanGoalIntentDraftState,
   parsePlanGoalCustomDistanceKm,
-  resolveSelectedPlanGoalPreviewGate,
+  runningPlanAdmissionFieldErrors,
+  type RunningPlanAdmissionFailure,
 } from "@/components/onboarding/selected-running-plan-flow-utils";
 import type {
   RunningPlanConfirmActionResult,
@@ -58,6 +59,7 @@ interface PlanPresetPanelProps {
   previewResult: RunningPlanPreviewActionResult | null;
   createStatus: RunningPlanCreateStatus;
   error: string | null;
+  requestResult: RunningPlanAdmissionFailure | null;
   status: "idle" | "previewing_plan";
   hasRequiredPlanBasics: boolean;
   requiredBasicsCopy?: string;
@@ -104,6 +106,7 @@ export function PlanPresetPanel({
   confirmResult,
   createStatus,
   error,
+  requestResult,
   hasRequiredPlanBasics,
   requiredBasicsCopy = "Age, height, and weight are required before Hito can prepare a reviewed plan.",
   onCancelPreview,
@@ -132,6 +135,7 @@ export function PlanPresetPanel({
   onRunnerCommentChange,
   status,
 }: PlanPresetPanelProps) {
+  const fieldErrors = runningPlanAdmissionFieldErrors(requestResult);
   const previewGoalLabel = planGoalChoice
     ? planGoalChoice === "custom" && planGoalCustomDistanceLabel.trim()
       ? planGoalCustomDistanceLabel.trim()
@@ -157,6 +161,7 @@ export function PlanPresetPanel({
           customDistanceLabel={planGoalCustomDistanceLabel}
           finishTime={planGoalFinishTime}
           targetDate={planGoalTargetDate}
+          fieldErrors={fieldErrors}
           focusRef={planGoalFocusRef}
           onGoalChoiceChange={onPlanGoalChoiceChange}
           onCustomDistanceKmChange={onPlanGoalCustomDistanceKmChange}
@@ -168,19 +173,44 @@ export function PlanPresetPanel({
         <label className="grid min-w-0 gap-2">
           <span className="hito-label-md text-foreground">Plan context (optional)</span>
           <Textarea
+            id="plan-context"
             className="min-h-24 resize-y"
             name="runnerComment"
             onChange={(event) => onRunnerCommentChange(event.target.value)}
             placeholder="For example, I ran an even 8K yesterday and recovered well."
             rows={3}
             value={runnerComment}
+            aria-invalid={Boolean(fieldErrors.runnerComment) || undefined}
+            aria-describedby={fieldErrors.runnerComment ? "plan-context-error" : undefined}
           />
+          {fieldErrors.runnerComment ? (
+            <span id="plan-context-error" className="hito-body-md font-medium text-negative">
+              {fieldErrors.runnerComment}
+            </span>
+          ) : null}
         </label>
 
         {!hasRequiredPlanBasics ? (
           <div className="hito-surface-wash">
             <p className="hito-body-md text-foreground">Add a few basics before previewing</p>
             <p className="hito-body-sm mt-1 text-secondary">{requiredBasicsCopy}</p>
+          </div>
+        ) : null}
+
+        {requestResult ? (
+          <div
+            id="plan-preparation-request-result"
+            className="hito-surface-wash"
+            data-tone="negative"
+            role="alert"
+            tabIndex={-1}
+          >
+            <p className="hito-body-md font-medium text-negative">{requestResult.title}</p>
+            <ul className="hito-body-sm mt-2 grid gap-1 text-negative">
+              {requestResult.issues.map((issue, index) => (
+                <li key={`${issue.field ?? "request"}-${index}`}>{issue.correction}</li>
+              ))}
+            </ul>
           </div>
         ) : null}
 
@@ -221,6 +251,7 @@ function PlanGoalIntentControls({
   onGoalChoiceChange,
   onTargetDateChange,
   targetDate,
+  fieldErrors,
 }: {
   goalChoice: PlanGoalChoice;
   customDistanceKm: string;
@@ -228,6 +259,7 @@ function PlanGoalIntentControls({
   focusRef?: RefObject<HTMLButtonElement | null>;
   finishTime: string;
   targetDate: string;
+  fieldErrors: ReturnType<typeof runningPlanAdmissionFieldErrors>;
   onGoalChoiceChange: (value: PlanGoalChoice) => void;
   onCustomDistanceKmChange: (value: string) => void;
   onCustomDistanceLabelChange: (value: string) => void;
@@ -241,18 +273,15 @@ function PlanGoalIntentControls({
     planGoalFinishTime: finishTime,
     planGoalTargetDate: targetDate,
   };
-  const localGate = resolveSelectedPlanGoalPreviewGate(draftState, null);
-  const localGateField = localGate.ok ? null : localGate.field;
-  const localGateError = localGate.ok ? null : localGate.error;
   const customDistanceIsValid = parsePlanGoalCustomDistanceKm(customDistanceKm) != null;
   const derivedPace = derivePlanGoalPaceReadback(draftState);
   const showsPresetRefinements =
     goalChoice === "10k" || goalChoice === "half_marathon" || goalChoice === "marathon";
   const showsCustomRefinements = goalChoice === "custom" && customDistanceIsValid;
-  const customDistanceError =
-    goalChoice === "custom" && localGateField === "customDistance" ? localGateError : null;
-  const finishTimeError = localGateField === "finishTime" ? localGateError : null;
-  const targetDateError = localGateField === "targetDate" ? localGateError : null;
+  const customDistanceError = goalChoice === "custom" ? fieldErrors.customDistance : undefined;
+  const finishTimeError = fieldErrors.finishTime;
+  const targetDateError = fieldErrors.targetDate;
+  const goalError = fieldErrors.goal;
   const goalGroup = useHitoRadioGroup({
     items: PLAN_GOAL_CHOICES.map((choice) => ({ value: choice.value })),
     value: goalChoice || null,
@@ -264,6 +293,8 @@ function PlanGoalIntentControls({
         className="grid gap-3 sm:grid-cols-2"
         {...goalGroup.groupProps}
         aria-label="Training goal"
+        aria-invalid={Boolean(goalError) || undefined}
+        aria-describedby={goalError ? "plan-goal-error" : undefined}
       >
         {PLAN_GOAL_CHOICES.map((choice) => (
           <PlanGoalCard
@@ -278,12 +309,18 @@ function PlanGoalIntentControls({
           />
         ))}
       </div>
+      {goalError ? (
+        <p id="plan-goal-error" className="hito-body-md font-medium text-negative">
+          {goalError}
+        </p>
+      ) : null}
 
       {goalChoice === "custom" ? (
         <div className="hito-form-two-column-grid">
           <label className="grid gap-2">
             <span className="hito-label-md text-foreground">Custom distance</span>
             <Input
+              id="plan-goal-custom-distance"
               type="text"
               inputMode="decimal"
               autoComplete="off"
@@ -291,11 +328,18 @@ function PlanGoalIntentControls({
               onChange={(event) => onCustomDistanceKmChange(event.target.value)}
               placeholder="12.5"
               feedback={customDistanceError ? "error" : "neutral"}
+              aria-invalid={Boolean(customDistanceError) || undefined}
+              aria-describedby={customDistanceError ? "plan-goal-custom-distance-error" : undefined}
               size="md"
               variant="primary"
             />
             {customDistanceError ? (
-              <span className="hito-body-md font-medium text-negative">{customDistanceError}</span>
+              <span
+                id="plan-goal-custom-distance-error"
+                className="hito-body-md font-medium text-negative"
+              >
+                {customDistanceError}
+              </span>
             ) : (
               <span className="hito-body-xs text-secondary">Kilometers. For example: 12.5.</span>
             )}
@@ -324,8 +368,9 @@ function PlanGoalIntentControls({
               label="Race day"
               value={targetDate}
               onChange={onTargetDateChange}
-              helper="Optional. Leave blank if you just want a normal preparation horizon."
+              helper="Required. Choose the race day for this generated plan."
               error={targetDateError}
+              required
             />
             <HitoMaskedTimeField
               id="plan-goal-finish-time"

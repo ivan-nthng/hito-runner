@@ -25,7 +25,9 @@ import { createEmptyManualActivePlan } from "@/lib/manual-workout-authoring";
 import type { ManualEmptyPlanSetupInput } from "@/lib/manual-workout-authoring/schema";
 import {
   buildRunningPlanConfirmInput,
+  runningPlanAdmissionFieldErrors,
   resolveSelectedPlanGoalPreviewGate,
+  type RunningPlanAdmissionField,
 } from "@/components/onboarding/selected-running-plan-flow-utils";
 import { useSelectedPlanPresetPreviewController } from "@/components/onboarding/use-selected-plan-preset-preview-controller";
 
@@ -85,6 +87,35 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false);
   const [planStartMode, setPlanStartMode] = useState<PlanStartMode>("generated");
 
+  const focusRunningPlanAdmissionField = (field: RunningPlanAdmissionField | null) => {
+    if (field === "recent5kTime" || field === "recent5kPace") {
+      setAdvancedSettingsOpen(true);
+    }
+
+    window.requestAnimationFrame(() => {
+      if (field === "goal") {
+        planGoalFocusRef.current?.focus();
+        return;
+      }
+
+      const selectorByField: Partial<Record<RunningPlanAdmissionField, string>> = {
+        age: '[data-editable-value-key="age"]',
+        heightCm: '[data-editable-value-key="heightCm"]',
+        weightKg: '[data-editable-value-key="weightKg"]',
+        customDistance: "#plan-goal-custom-distance",
+        finishTime: "#plan-goal-finish-time",
+        targetDate: "#plan-goal-target-date",
+        recent5kTime: '[data-editable-value-key="recent5kTime"]',
+        recent5kPace: '[data-editable-value-key="recent5kTime"]',
+        runnerComment: "#plan-context",
+      };
+      const target = field
+        ? document.querySelector<HTMLElement>(selectorByField[field] ?? "")
+        : null;
+      (target ?? document.querySelector<HTMLElement>("#plan-preparation-request-result"))?.focus();
+    });
+  };
+
   const hasRequiredPlanBasics = isPresetPrimarySetupReady(constructorState);
   const runnerBaseline = useOnboardingRunnerBaseline({
     defaults,
@@ -94,13 +125,11 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   const isManualSetupReady = isManualProfileReady(constructorState) && runnerBaseline.isReady;
   const selectedPlanPreview = useSelectedPlanPresetPreviewController({
     state: constructorState,
-    hasRequiredPlanBasics: hasAcceptedRunnerBaseline,
     toastId: STRUCTURED_REVIEW_TOAST_ID,
     previewReadyDescription: "Review the saved plan before adding its workouts to Calendar.",
     previewContextKey: runnerBaseline.previewContextKey,
-    requiredBasicsMessage:
-      "Save your runner baseline and accept the BPM guidance before previewing a generated plan.",
     resetOnInputChange: true,
+    onAdmissionRejected: focusRunningPlanAdmissionField,
     onPreviewDispatch: () => setRunnerComment(""),
     onResetExternalState: () => setRunningPlanConfirmResult(null),
   });
@@ -133,10 +162,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     selectedPreviewMatchesGoal && selectedPlanPreview.previewResult?.ok === true;
   const generatedCreateDisabled =
     (isBusy && !pendingPreviewCanReopen) ||
-    !hasAcceptedRunnerBaseline ||
-    !selectedGoalId ||
-    !selectedPlanGoalPreviewGate.ok ||
     (selectedPlanPreview.previewOpen && selectedPreviewIsReady);
+  const admissionFieldErrors = runningPlanAdmissionFieldErrors(selectedPlanPreview.requestResult);
   const footerHint = generatedCreateFooterHint({
     error: selectedPlanPreview.error,
     hasRequiredPlanBasics,
@@ -166,8 +193,9 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   };
 
   const handleCreatePlanClick = async (trigger?: HTMLElement) => {
-    if (!selectedGoalId) {
-      selectedPlanPreview.setError("Choose a training distance before creating a generated plan.");
+    const admission = selectedPlanPreview.validatePreviewRequest();
+
+    if (!admission.ok) {
       return;
     }
 
@@ -191,7 +219,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
       return;
     }
 
-    selectedPlanPreview.selectPlanPreview(selectedGoalId);
+    selectedPlanPreview.selectPlanPreview(admission.goalId);
   };
 
   const openSavedHome = () => {
@@ -364,6 +392,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
         <QuickSetupPlanSetupSections
           state={constructorState}
           setState={constructorSetters}
+          fieldErrors={admissionFieldErrors}
           includeTrainingSetup={false}
           includeScheduleRhythm={false}
           heartRateProfile={
@@ -379,192 +408,187 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
           }
         />
 
-        {hasAcceptedRunnerBaseline ? (
-          <section className="grid min-w-0 gap-6 rounded-3xl bg-surface p-5 dark:bg-background lg:p-6">
-            <div
-              className="hito-tabs hito-tabs-enclosed mx-auto w-fit max-w-full"
-              {...planStartTabs.tabListProps}
-              aria-label="Training setup method"
-            >
-              {PLAN_START_TABS.map((tab) => (
-                <button
-                  key={tab.value}
-                  type="button"
-                  {...planStartTabs.getTabProps(tab.value)}
-                  disabled={isBusy}
-                  onClick={() => setPlanStartMode(tab.value)}
-                  data-active={planStartMode === tab.value}
-                  className="hito-tab"
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
+        <section className="grid min-w-0 gap-6 rounded-3xl bg-surface p-5 dark:bg-background lg:p-6">
+          <div
+            className="hito-tabs hito-tabs-enclosed mx-auto w-fit max-w-full"
+            {...planStartTabs.tabListProps}
+            aria-label="Training setup method"
+          >
+            {PLAN_START_TABS.map((tab) => (
+              <button
+                key={tab.value}
+                type="button"
+                {...planStartTabs.getTabProps(tab.value)}
+                disabled={isBusy}
+                onClick={() => setPlanStartMode(tab.value)}
+                data-active={planStartMode === tab.value}
+                className="hito-tab"
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-            <div className="min-w-0" {...planStartTabs.getPanelProps(planStartMode)}>
-              {planStartMode === "generated" ? (
-                <div className="grid gap-8">
-                  <PlanPresetPanel
-                    confirmResult={runningPlanConfirmResult}
-                    previewResult={selectedPlanPreview.previewResult}
-                    createStatus={runningPlanCreateStatus}
-                    error={selectedPlanPreview.error}
-                    status={selectedPlanPreview.status}
-                    hasRequiredPlanBasics={hasAcceptedRunnerBaseline}
-                    requiredBasicsCopy="Save your runner baseline and accept the BPM guidance before Hito prepares a reviewed plan."
-                    previewOpen={selectedPlanPreview.previewOpen}
-                    onCancelPreview={selectedPlanPreview.cancelPreview}
-                    onPreviewOpenChange={selectedPlanPreview.setPreviewOpen}
-                    planGoalChoice={planGoalChoice}
-                    planGoalCustomDistanceKm={planGoalCustomDistanceKm}
-                    planGoalCustomDistanceLabel={planGoalCustomDistanceLabel}
-                    planGoalFinishTime={planGoalFinishTime}
-                    planGoalTargetDate={planGoalTargetDate}
-                    runnerComment={runnerComment}
-                    onPlanGoalChoiceChange={changePlanGoalChoice}
-                    onPlanGoalCustomDistanceKmChange={setPlanGoalCustomDistanceKm}
-                    onPlanGoalCustomDistanceLabelChange={setPlanGoalCustomDistanceLabel}
-                    onPlanGoalFinishTimeChange={setPlanGoalFinishTime}
-                    onPlanGoalTargetDateChange={setPlanGoalTargetDate}
-                    onRunnerCommentChange={setRunnerComment}
-                    onRefreshPreview={() => {
-                      void selectedPlanPreview.refreshPreview();
-                    }}
-                    onCreatePlan={() => {
-                      void confirmSelectedRunningPlan();
-                    }}
-                    previewReturnFocusRef={previewReturnFocusRef}
-                    planGoalFocusRef={planGoalFocusRef}
-                  />
+          <div className="min-w-0" {...planStartTabs.getPanelProps(planStartMode)}>
+            {planStartMode === "generated" ? (
+              <div className="grid gap-8">
+                <PlanPresetPanel
+                  confirmResult={runningPlanConfirmResult}
+                  previewResult={selectedPlanPreview.previewResult}
+                  createStatus={runningPlanCreateStatus}
+                  error={selectedPlanPreview.error}
+                  requestResult={selectedPlanPreview.requestResult}
+                  status={selectedPlanPreview.status}
+                  hasRequiredPlanBasics={hasAcceptedRunnerBaseline}
+                  requiredBasicsCopy="Save your runner baseline and accept the BPM guidance before Hito prepares a reviewed plan."
+                  previewOpen={selectedPlanPreview.previewOpen}
+                  onCancelPreview={selectedPlanPreview.cancelPreview}
+                  onPreviewOpenChange={selectedPlanPreview.setPreviewOpen}
+                  planGoalChoice={planGoalChoice}
+                  planGoalCustomDistanceKm={planGoalCustomDistanceKm}
+                  planGoalCustomDistanceLabel={planGoalCustomDistanceLabel}
+                  planGoalFinishTime={planGoalFinishTime}
+                  planGoalTargetDate={planGoalTargetDate}
+                  runnerComment={runnerComment}
+                  onPlanGoalChoiceChange={changePlanGoalChoice}
+                  onPlanGoalCustomDistanceKmChange={setPlanGoalCustomDistanceKm}
+                  onPlanGoalCustomDistanceLabelChange={setPlanGoalCustomDistanceLabel}
+                  onPlanGoalFinishTimeChange={setPlanGoalFinishTime}
+                  onPlanGoalTargetDateChange={setPlanGoalTargetDate}
+                  onRunnerCommentChange={setRunnerComment}
+                  onRefreshPreview={() => {
+                    void selectedPlanPreview.refreshPreview();
+                  }}
+                  onCreatePlan={() => {
+                    void confirmSelectedRunningPlan();
+                  }}
+                  previewReturnFocusRef={previewReturnFocusRef}
+                  planGoalFocusRef={planGoalFocusRef}
+                />
 
-                  <div className="flex justify-center">
-                    <HitoButton
-                      type="button"
-                      size="md"
-                      variant="ghost"
-                      aria-expanded={advancedSettingsOpen}
-                      aria-controls="advanced-generated-plan-setup"
-                      disabled={isBusy}
-                      onClick={toggleAdvancedSettings}
-                    >
-                      <span>Advanced settings</span>
-                      <Icon name={advancedSettingsOpen ? "chevron-up" : "chevron-down"} size="xs" />
-                    </HitoButton>
+                <div className="flex justify-center">
+                  <HitoButton
+                    type="button"
+                    size="md"
+                    variant="ghost"
+                    aria-expanded={advancedSettingsOpen}
+                    aria-controls="advanced-generated-plan-setup"
+                    disabled={isBusy}
+                    onClick={toggleAdvancedSettings}
+                  >
+                    <span>Advanced settings</span>
+                    <Icon name={advancedSettingsOpen ? "chevron-up" : "chevron-down"} size="xs" />
+                  </HitoButton>
+                </div>
+
+                {advancedSettingsOpen ? (
+                  <div id="advanced-generated-plan-setup">
+                    <StructuredPlanConstructor
+                      formRef={structuredFormRef}
+                      state={constructorState}
+                      setState={constructorSetters}
+                      isBusy={isBusy}
+                      isConstructorReady={hasRequiredPlanBasics}
+                      onSubmit={() => handleCreatePlanClick()}
+                      quickSetupSections={{
+                        includeBaseline: false,
+                        includeRunningLevel: false,
+                        includeTrainingSetup: true,
+                        includeScheduleRhythm: true,
+                        firstSectionNumber: 4,
+                        firstSectionHasDivider: false,
+                      }}
+                    />
                   </div>
-
-                  {advancedSettingsOpen ? (
-                    <div id="advanced-generated-plan-setup">
-                      <StructuredPlanConstructor
-                        formRef={structuredFormRef}
-                        state={constructorState}
-                        setState={constructorSetters}
-                        isBusy={isBusy}
-                        isConstructorReady={hasRequiredPlanBasics}
-                        onSubmit={() => handleCreatePlanClick()}
-                        quickSetupSections={{
-                          includeBaseline: false,
-                          includeRunningLevel: false,
-                          includeTrainingSetup: true,
-                          includeScheduleRhythm: true,
-                          firstSectionNumber: 4,
-                          firstSectionHasDivider: false,
-                        }}
-                      />
-                    </div>
-                  ) : null}
-                </div>
-              ) : (
-                <div className="pt-6">
-                  <p className="hito-body-md text-center text-text-secondary">
-                    Create workouts independently, or use a workout from a coach or friend.
-                  </p>
-                </div>
-              )}
-            </div>
-          </section>
-        ) : null}
+                ) : null}
+              </div>
+            ) : (
+              <div className="pt-6">
+                <p className="hito-body-md text-center text-text-secondary">
+                  Create workouts independently, or use a workout from a coach or friend.
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
       </div>
 
-      {hasAcceptedRunnerBaseline ? (
-        <div className="hito-onboarding-submit-footer">
-          <div className="hito-onboarding-submit-footer-inner">
-            {planStartMode === "generated" ? (
-              <>
-                <div className="min-w-0">
-                  <p
-                    className={
-                      footerHint.tone === "error"
-                        ? "hito-body-md font-medium text-negative"
-                        : "hito-body-xs text-secondary"
-                    }
-                    role={
-                      selectedPreviewIsReady && !selectedPlanPreview.previewOpen
-                        ? "status"
-                        : undefined
-                    }
-                  >
-                    {footerHint.message}
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center">
-                  {selectedPreviewIsReady && !selectedPlanPreview.previewOpen ? (
-                    <HitoButton
-                      type="button"
-                      size="lg"
-                      variant="secondary"
-                      disabled={isBusy}
-                      onClick={clearGeneratedPlanSetup}
-                    >
-                      Clear plan
-                    </HitoButton>
-                  ) : null}
+      <div className="hito-onboarding-submit-footer">
+        <div className="hito-onboarding-submit-footer-inner">
+          {planStartMode === "generated" ? (
+            <>
+              <div className="min-w-0">
+                <p
+                  className={
+                    footerHint.tone === "error"
+                      ? "hito-body-md font-medium text-negative"
+                      : "hito-body-xs text-secondary"
+                  }
+                  role={
+                    selectedPreviewIsReady && !selectedPlanPreview.previewOpen
+                      ? "status"
+                      : undefined
+                  }
+                >
+                  {footerHint.message}
+                </p>
+              </div>
+              <div className="flex shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+                {selectedPreviewIsReady && !selectedPlanPreview.previewOpen ? (
                   <HitoButton
                     type="button"
                     size="lg"
-                    variant="primary"
-                    disabled={generatedCreateDisabled}
-                    loading={isBusy && !pendingPreviewCanReopen}
-                    onClick={(event) => handleCreatePlanClick(event.currentTarget)}
+                    variant="secondary"
+                    disabled={isBusy}
+                    onClick={clearGeneratedPlanSetup}
                   >
-                    {selectedPreviewIsReady && !selectedPlanPreview.previewOpen
-                      ? "Review plan"
-                      : "Create plan"}
+                    Clear plan
                   </HitoButton>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="min-w-0">
-                  <p
-                    className={
-                      manualCreateError
-                        ? "hito-body-md font-medium text-negative"
-                        : "hito-body-xs text-secondary"
-                    }
-                  >
-                    {manualCreateError ??
-                      "Your saved runner baseline is ready. Your Calendar will open without adding workouts."}
-                  </p>
-                </div>
+                ) : null}
                 <HitoButton
                   type="button"
                   size="lg"
                   variant="primary"
-                  disabled={isBusy || !isManualSetupReady}
-                  loading={manualCreateStatus === "creating"}
-                  onClick={() => {
-                    void createManualPlan();
-                  }}
+                  disabled={generatedCreateDisabled}
+                  loading={isBusy && !pendingPreviewCanReopen}
+                  onClick={(event) => handleCreatePlanClick(event.currentTarget)}
                 >
-                  {manualCreateStatus === "creating"
-                    ? "Opening manual calendar..."
-                    : "Open Calendar"}
+                  {selectedPreviewIsReady && !selectedPlanPreview.previewOpen
+                    ? "Review plan"
+                    : "Create plan"}
                 </HitoButton>
-              </>
-            )}
-          </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="min-w-0">
+                <p
+                  className={
+                    manualCreateError
+                      ? "hito-body-md font-medium text-negative"
+                      : "hito-body-xs text-secondary"
+                  }
+                >
+                  {manualCreateError ??
+                    "Your saved runner baseline is ready. Your Calendar will open without adding workouts."}
+                </p>
+              </div>
+              <HitoButton
+                type="button"
+                size="lg"
+                variant="primary"
+                disabled={isBusy || !isManualSetupReady}
+                loading={manualCreateStatus === "creating"}
+                onClick={() => {
+                  void createManualPlan();
+                }}
+              >
+                {manualCreateStatus === "creating" ? "Opening manual calendar..." : "Open Calendar"}
+              </HitoButton>
+            </>
+          )}
         </div>
-      ) : null}
+      </div>
     </section>
   );
 }

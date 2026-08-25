@@ -1,17 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { buildHitoProductApiFailure } from "@/lib/product-api-error-contract";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
 
 export const Route = createFileRoute("/api/runner-activity-progress")({
   server: {
     handlers: {
       GET: async ({ request }) => {
+        const search = new URL(request.url).searchParams;
         try {
           const userId = await requirePersistedUserIdForCurrentRequest();
           const { getRunnerActivityProgressForUser, parseRunnerActivityFitSequencePeriodRequest } =
             await import("@/lib/runner-activity/read-model");
           const { projectRunnerActivityProgressForProduct } =
             await import("@/lib/runner-activity/product-contract");
-          const search = new URL(request.url).searchParams;
           const period = search.get("period") ?? "this_week";
           const sequencePeriod = parseRunnerActivityFitSequencePeriodRequest(
             period === "custom"
@@ -32,11 +33,9 @@ export const Route = createFileRoute("/api/runner-activity-progress")({
             error.message === "Authentication is required for this action."
           ) {
             return Response.json(
-              {
-                ok: false,
-                code: "auth_required",
-                message: "Sign in again before opening running progress.",
-              },
+              buildHitoProductApiFailure("runner_activity_auth_required", {
+                operation: "progress_read",
+              }),
               { status: 401 },
             );
           }
@@ -45,20 +44,14 @@ export const Route = createFileRoute("/api/runner-activity-progress")({
             error.name === "RunnerActivityFitSequencePeriodInputError"
           ) {
             return Response.json(
-              {
-                ok: false,
-                code: "invalid_activity_sequence_period",
-                message: error.message,
-              },
+              buildHitoProductApiFailure("runner_activity_progress_period_invalid", {
+                period: search.get("period") ?? "this_week",
+              }),
               { status: 400 },
             );
           }
           return Response.json(
-            {
-              ok: false,
-              code: "activity_progress_unavailable",
-              message: "We could not load running progress. Try again shortly.",
-            },
+            buildHitoProductApiFailure("runner_activity_progress_unavailable", {}),
             { status: 500 },
           );
         }

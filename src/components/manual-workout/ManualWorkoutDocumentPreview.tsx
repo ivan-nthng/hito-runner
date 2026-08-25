@@ -10,6 +10,7 @@ import {
   type WorkoutDocumentNote,
 } from "@/components/workout-structure/WorkoutDocumentReadback";
 import type { WorkoutStructureTimelineItem } from "@/components/workout-structure/WorkoutStructureTimeline";
+import { useHitoProductMessage } from "@/components/ui/hito-ui-locale-provider";
 import type { WorkoutType } from "@/lib/training";
 
 export function ManualWorkoutDocumentPreview({
@@ -17,7 +18,7 @@ export function ManualWorkoutDocumentPreview({
   iconTone,
   notes,
   readbackEntries,
-  statusLabel = "Preview",
+  statusLabel,
   timelineItems,
   timelineSummary,
   title,
@@ -35,10 +36,13 @@ export function ManualWorkoutDocumentPreview({
   typeLabel: string;
   workoutType: WorkoutType;
 }) {
+  const t = useHitoProductMessage();
+  const visibleStatusLabel = statusLabel ?? t("Preview");
+
   return (
     <section className="hito-manual-workout-document-preview">
       <ManualWorkoutDocumentLead
-        ariaLabel={`${dateLabel} workout preview`}
+        ariaLabel={t("{date} workout preview", { date: dateLabel })}
         icon={
           <span style={iconTone ? { color: iconTone } : undefined}>
             <WorkoutGlyph type={workoutType} className="h-5 w-5" />
@@ -49,14 +53,14 @@ export function ManualWorkoutDocumentPreview({
             {dateLabel} · {typeLabel}
           </>
         }
-        statusLabel={statusLabel}
+        statusLabel={visibleStatusLabel}
         title={<h3 className="hito-body-md text-foreground min-w-0 truncate">{title}</h3>}
       />
 
       <ManualWorkoutStructurePreview
         emptyState={{
-          badge: "No structure",
-          copy: "No extra workout structure was provided for this manual workout.",
+          badge: t("No structure"),
+          copy: t("No extra workout structure was provided for this manual workout."),
         }}
         items={timelineItems}
         summary={timelineSummary}

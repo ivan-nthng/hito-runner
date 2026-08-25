@@ -13,6 +13,7 @@ import {
   workoutDuration,
 } from "@/lib/training";
 import type { CamelotSimulatedFitOutcomeV1 } from "@/lib/camelot-interactive-qa-fixture";
+import type { HitoProductApiFailure } from "@/lib/product-api-error-contract";
 import { type WorkoutResultFeedbackSummary } from "@/lib/workout-result-import/types";
 import { HitoButton } from "@/components/ui/button";
 import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
@@ -35,6 +36,13 @@ import {
 } from "@/components/workout-completion/WorkoutComparisonReadback";
 import { WorkoutAiInsightReadback } from "@/components/workout-completion/WorkoutAiInsightReadback";
 import { formatWorkoutFeedbackTimestamp } from "@/components/workout-completion/workout-feedback-time";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
+import { formatUiNumber, type ResolvedUiLocale } from "@/lib/ui-locale";
+import {
+  formatHitoProductMessage,
+  getHitoKnownProductMessage,
+  getHitoProductApiFailureMessage,
+} from "@/lib/ui-locale-messages";
 
 type Outcome = "completed" | "partial" | "skipped";
 type CompletionFormState = {
@@ -59,6 +67,8 @@ export function CompletionPanel({
   feedback: WorkoutResultFeedbackSummary | null;
   onOpenActivityFile?: () => void;
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   const router = useRouter();
   const saveWorkoutLogFn = useServerFn(saveWorkoutLog);
   const [isSaving, setIsSaving] = useState(false);
@@ -169,19 +179,19 @@ export function CompletionPanel({
   const isSkipped = outcome === "skipped";
   const saveButtonLabel = isFitCompleted
     ? isSaving
-      ? "Saving feedback..."
+      ? t("Saving feedback...")
       : hasSavedLog && !isDirty
-        ? "Feedback saved"
-        : "Save feedback"
+        ? t("Feedback saved")
+        : t("Save feedback")
     : snapshot.source !== "persisted"
-      ? "Preview result"
+      ? t("Preview result")
       : isSaving
-        ? "Saving result..."
+        ? t("Saving result...")
         : hasSavedResult && !isDirty
-          ? "Saved result"
+          ? t("Saved result")
           : hasSavedResult
-            ? "Save changes"
-            : "Save result";
+            ? t("Save changes")
+            : t("Save result");
 
   const openBodyNotesModal = () => {
     const currentBodyNotes = cloneBodyNoteDrafts(formRef.current.bodyNotes);
@@ -211,10 +221,11 @@ export function CompletionPanel({
   if (workout.type === "rest") {
     return (
       <div className="hito-surface-flat p-5">
-        <div className="hito-label-md text-foreground">Rest day</div>
+        <div className="hito-label-md text-foreground">{t("Rest day")}</div>
         <p className="hito-body-md text-secondary mt-2">
-          Rest days do not need a workout result. If a mobility or strength assignment is added
-          later, you can log it here.
+          {t(
+            "Rest days do not need a workout result. If a mobility or strength assignment is added later, you can log it here.",
+          )}
         </p>
       </div>
     );
@@ -231,91 +242,110 @@ export function CompletionPanel({
         <div className="hito-label-md text-foreground">
           {isSaving
             ? isFitCompleted
-              ? "Saving feedback"
-              : "Saving result"
+              ? t("Saving feedback")
+              : t("Saving result")
             : error
-              ? "Couldn't save"
+              ? t("Couldn't save")
               : hasSavedResult && isDirty
-                ? "Unsaved changes"
+                ? t("Unsaved changes")
                 : message
-                  ? "Saved"
+                  ? t("Saved")
                   : isFitCompleted
                     ? form.outcome === "partial"
-                      ? "Partial result"
-                      : "Completed from activity file"
+                      ? t("Partial result")
+                      : t("Completed from activity file")
                     : snapshot.source === "persisted"
                       ? hasSavedResult
-                        ? "Saved result"
-                        : "Ready to save"
-                      : "Preview only"}
+                        ? t("Saved result")
+                        : t("Ready to save")
+                      : t("Preview only")}
         </div>
         <p className="hito-body-md text-secondary mt-2">
           {isSaving
             ? isFitCompleted
-              ? "Saving your personal feedback now."
-              : `Saving your ${outcome} result now.`
+              ? t("Saving your personal feedback now.")
+              : t("Saving your {outcome} result now.", {
+                  outcome: localizeOutcome(locale, outcome),
+                })
             : error
               ? error
               : hasSavedResult && isDirty
-                ? `You changed this ${outcome} result. Save to update the workout and this week's status.`
+                ? t(
+                    "You changed this {outcome} result. Save to update the workout and this week's status.",
+                    { outcome: localizeOutcome(locale, outcome) },
+                  )
                 : message
                   ? message
                   : isFitCompleted
                     ? form.outcome === "partial"
-                      ? "Your recorded activity remains attached. This partial result is your explicit correction."
-                      : "Your recorded activity completed this workout. Distance, duration, and intervals stay with the activity file."
+                      ? t(
+                          "Your recorded activity remains attached. This partial result is your explicit correction.",
+                        )
+                      : t(
+                          "Your recorded activity completed this workout. Distance, duration, and intervals stay with the activity file.",
+                        )
                     : snapshot.source === "persisted"
                       ? hasSavedResult
-                        ? `This workout already has a saved ${workout.log?.outcome ?? outcome} result. ${
-                            hasSavedLog && workout.log?.loggedAt
-                              ? `Last updated ${formatWorkoutFeedbackTimestamp(workout.log.loggedAt)}.`
-                              : "This result is already saved."
-                          }`
-                        : "Save this result to update the workout and this week's status."
-                      : "You can try the form here, but preview results are not saved."}
+                        ? t("This workout already has a saved {outcome} result. {detail}", {
+                            outcome: localizeOutcome(locale, workout.log?.outcome ?? outcome),
+                            detail:
+                              hasSavedLog && workout.log?.loggedAt
+                                ? t("Last updated {date}.", {
+                                    date: formatWorkoutFeedbackTimestamp(
+                                      workout.log.loggedAt,
+                                      locale,
+                                    ),
+                                  })
+                                : t("This result is already saved."),
+                          })
+                        : t("Save this result to update the workout and this week's status.")
+                      : t("You can try the form here, but preview results are not saved.")}
         </p>
         <div className="hito-body-xs text-tertiary mt-3 flex flex-wrap items-center gap-3">
           <span>
-            This week <span className="text-text-secondary">{weekStatus.label}</span>
+            {t("This week")}{" "}
+            <span className="text-text-secondary">
+              {getHitoKnownProductMessage(locale, weekStatus.label)}
+            </span>
           </span>
           <span className="opacity-50">·</span>
           <span>
             {snapshot.source === "persisted"
               ? isFitCompleted
                 ? form.outcome === "partial"
-                  ? "Partial correction"
-                  : "Activity file"
+                  ? t("Partial correction")
+                  : t("Activity file")
                 : hasSavedResult && isDirty
-                  ? "Changes not saved"
+                  ? t("Changes not saved")
                   : hasSavedResult
-                    ? "Saved"
-                    : "Ready to save"
-              : "Preview"}
+                    ? t("Saved")
+                    : t("Ready to save")
+              : t("Preview")}
           </span>
         </div>
       </div>
 
       {!isFitCompleted ? (
         <div>
-          <Label>How did it go?</Label>
+          <Label>{t("How did it go?")}</Label>
           <div
             className="mt-3 grid grid-cols-3 gap-2"
             {...outcomeGroup.groupProps}
-            aria-label="Workout outcome"
+            aria-label={t("Workout outcome")}
           >
             {(
               [
                 {
                   v: "completed",
                   icon: "check-circle",
-                  label: "Complete",
+                  label: t("Complete"),
                   c: "var(--success)",
                 },
-                { v: "partial", icon: "minus", label: "Partial", c: "var(--warn)" },
+                { v: "partial", icon: "minus", label: t("Partial"), c: "var(--warn)" },
                 {
                   v: "skipped",
                   icon: "x-circle",
-                  label: "Skipped",
+                  label: t("Skipped"),
                   c: "var(--destructive)",
                 },
               ] satisfies {
@@ -355,10 +385,11 @@ export function CompletionPanel({
 
       {isSkipped ? (
         <div className="hito-surface-flat p-4">
-          <div className="hito-label-md text-foreground">Skipped result</div>
+          <div className="hito-label-md text-foreground">{t("Skipped result")}</div>
           <p className="hito-body-md text-secondary mt-2">
-            A skipped result saves without distance, duration, reps, or RPE. You can still leave a
-            note for context.
+            {t(
+              "A skipped result saves without distance, duration, reps, or RPE. You can still leave a note for context.",
+            )}
           </p>
         </div>
       ) : !isFitCompleted ? (
@@ -379,11 +410,11 @@ export function CompletionPanel({
           <div className="mt-6 space-y-6">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline pb-4">
               <div>
-                <div className="hito-label-md text-foreground">Completion correction</div>
+                <div className="hito-label-md text-foreground">{t("Completion correction")}</div>
                 <p className="hito-body-md text-secondary mt-1">
                   {form.outcome === "partial"
-                    ? "This activity is recorded as partial by your choice."
-                    : "Recorded activity remains completed unless you mark it partial."}
+                    ? t("This activity is recorded as partial by your choice.")
+                    : t("Recorded activity remains completed unless you mark it partial.")}
                 </p>
               </div>
               <HitoButton
@@ -397,69 +428,78 @@ export function CompletionPanel({
                   }))
                 }
               >
-                {form.outcome === "partial" ? "Use completed" : "Mark as partial"}
+                {form.outcome === "partial" ? t("Use completed") : t("Mark as partial")}
               </HitoButton>
             </div>
 
             <HitoSlider
-              label="Effort (RPE)"
+              label={t("Effort (RPE)")}
               value={form.rpe ?? 6}
               min={1}
               max={10}
               step={1}
               previousValue={syncedFormState.rpe ?? 6}
-              previousValueLabel={`Restore session effort ${syncedFormState.rpe ?? 6} out of 10`}
+              previousValueLabel={t("Restore session effort {value} out of 10", {
+                value: syncedFormState.rpe ?? 6,
+              })}
               onValueChange={(value) => updateForm((current) => ({ ...current, rpe: value }))}
-              valueLabel={form.rpe == null ? "Not recorded" : `${form.rpe}/10`}
+              valueLabel={
+                form.rpe == null ? t("Not recorded") : `${formatUiNumber(form.rpe, locale)}/10`
+              }
               ariaValueText={
-                form.rpe == null ? "Effort not recorded" : `Effort ${form.rpe} out of 10`
+                form.rpe == null
+                  ? t("Effort not recorded")
+                  : t("Effort {value} out of 10", { value: formatUiNumber(form.rpe, locale) })
               }
             />
 
             <div>
-              <Label>Notes</Label>
+              <Label>{t("Notes")}</Label>
               <Textarea
                 rows={3}
                 value={form.notes}
                 onChange={(event) =>
                   updateForm((current) => ({ ...current, notes: event.target.value }))
                 }
-                placeholder="Felt strong on the climb, slight tightness in right calf at km 6..."
+                placeholder={t(
+                  "Felt strong on the climb, slight tightness in right calf at km 6...",
+                )}
                 size="md"
                 variant="primary"
                 className="mt-3 min-h-28 resize-none"
               />
               <p className="hito-body-xs text-tertiary mt-3">
-                This saves personal feedback. Distance, duration, and intervals remain with the
-                recorded activity.
+                {t(
+                  "This saves personal feedback. Distance, duration, and intervals remain with the recorded activity.",
+                )}
               </p>
             </div>
           </div>
         ) : (
           <details className={cn("hito-disclosure", !isSkipped && "mt-6")}>
             <summary className="hito-disclosure-summary">
-              <span className="hito-body-md text-foreground">Manually add details</span>
+              <span className="hito-body-md text-foreground">{t("Manually add details")}</span>
               <Icon name="chevron-down" className="hito-disclosure-chevron" />
             </summary>
             <div className="hito-disclosure-body">
               {!isSkipped ? (
                 <>
                   <div>
-                    <Label>Planned vs actual</Label>
+                    <Label>{t("Planned vs actual")}</Label>
                     <div className="mt-3 grid grid-cols-2 gap-3">
                       <NumField
-                        label="Distance"
+                        label={t("Distance")}
                         suffix="km"
-                        planned={plannedKm.toString()}
+                        planned={formatUiNumber(plannedKm, locale)}
                         value={form.actualKm}
                         onChange={(value) =>
                           updateForm((current) => ({ ...current, actualKm: value }))
                         }
                       />
                       <NumField
-                        label="Duration"
+                        label={t("Duration")}
                         suffix="min"
-                        planned={plannedMin.toString()}
+                        planned={formatUiNumber(plannedMin, locale)}
                         value={form.actualMin}
                         onChange={(value) =>
                           updateForm((current) => ({ ...current, actualMin: value }))
@@ -470,12 +510,12 @@ export function CompletionPanel({
                     {plannedRepeats > 0 && (
                       <div className="mt-4">
                         <div className="hito-label-md text-foreground mb-2">
-                          Intervals completed
+                          {t("Intervals completed")}
                         </div>
                         <div
                           className="hito-choice-toggle-group flex-nowrap"
                           {...intervalGroup.groupProps}
-                          aria-label="Intervals completed"
+                          aria-label={t("Intervals completed")}
                         >
                           {intervalValues.map((intervalValue) => (
                             <HitoChoiceToggle
@@ -496,46 +536,58 @@ export function CompletionPanel({
                           ))}
                         </div>
                         <p className="hito-body-xs text-secondary mt-2">
-                          Tap to mark how many reps were completed.
+                          {t("Tap to mark how many reps were completed.")}
                         </p>
                       </div>
                     )}
                   </div>
 
                   <HitoSlider
-                    label="Effort (RPE)"
+                    label={t("Effort (RPE)")}
                     value={form.rpe ?? 6}
                     min={1}
                     max={10}
                     step={1}
                     previousValue={syncedFormState.rpe ?? 6}
-                    previousValueLabel={`Restore session effort ${syncedFormState.rpe ?? 6} out of 10`}
+                    previousValueLabel={t("Restore session effort {value} out of 10", {
+                      value: syncedFormState.rpe ?? 6,
+                    })}
                     onValueChange={(value) => updateForm((current) => ({ ...current, rpe: value }))}
-                    valueLabel={form.rpe == null ? "Not recorded" : `${form.rpe}/10`}
+                    valueLabel={
+                      form.rpe == null
+                        ? t("Not recorded")
+                        : `${formatUiNumber(form.rpe, locale)}/10`
+                    }
                     ariaValueText={
-                      form.rpe == null ? "Effort not recorded" : `Effort ${form.rpe} out of 10`
+                      form.rpe == null
+                        ? t("Effort not recorded")
+                        : t("Effort {value} out of 10", {
+                            value: formatUiNumber(form.rpe, locale),
+                          })
                     }
                   />
                 </>
               ) : null}
 
               <div>
-                <Label>Notes</Label>
+                <Label>{t("Notes")}</Label>
                 <Textarea
                   rows={3}
                   value={form.notes}
                   onChange={(event) =>
                     updateForm((current) => ({ ...current, notes: event.target.value }))
                   }
-                  placeholder="Felt strong on the climb, slight tightness in right calf at km 6…"
+                  placeholder={t(
+                    "Felt strong on the climb, slight tightness in right calf at km 6…",
+                  )}
                   size="md"
                   variant="primary"
                   className="mt-3 min-h-28 resize-none"
                 />
                 <p className="hito-body-xs text-tertiary mt-3">
                   {snapshot.source === "persisted"
-                    ? "This saves your workout result. Garmin uploads live in Feedback."
-                    : "Preview only. Results entered here are not saved."}
+                    ? t("This saves your workout result. Garmin uploads live in Feedback.")
+                    : t("Preview only. Results entered here are not saved.")}
                 </p>
               </div>
             </div>
@@ -570,7 +622,7 @@ export function CompletionPanel({
           type="button"
           onClick={async () => {
             if (snapshot.source !== "persisted") {
-              setMessage("Preview result updated locally. Sign in to save it.");
+              setMessage(t("Preview result updated locally. Sign in to save it."));
               setError(null);
               return;
             }
@@ -593,12 +645,14 @@ export function CompletionPanel({
               setOptimisticSavedPayloadKey(reconciledPayloadKey);
               setMessage(
                 isFitCompleted
-                  ? "Personal feedback saved. The recorded activity remains the workout result."
-                  : `Saved as ${nextPayload.outcome}. This page now shows the latest result.`,
+                  ? t("Personal feedback saved. The recorded activity remains the workout result.")
+                  : t("Saved as {outcome}. This page now shows the latest result.", {
+                      outcome: localizeOutcome(locale, nextPayload.outcome),
+                    }),
               );
               void router.invalidate().catch(() => undefined);
             } catch (saveError) {
-              setError(saveError instanceof Error ? saveError.message : "Could not save log.");
+              setError(saveError instanceof Error ? saveError.message : t("Could not save log."));
             } finally {
               setIsSaving(false);
             }
@@ -612,10 +666,10 @@ export function CompletionPanel({
         </HitoButton>
         <span className="hito-body-xs text-tertiary ml-auto">
           {isFitCompleted
-            ? "Personal feedback only. Run data stays with the activity file."
+            ? t("Personal feedback only. Run data stays with the activity file.")
             : snapshot.source === "persisted"
-              ? "Saved to this workout."
-              : "Preview only."}
+              ? t("Saved to this workout.")
+              : t("Preview only.")}
         </span>
       </div>
     </div>
@@ -633,7 +687,8 @@ function LogResultFeedbackBridge({
   feedback: WorkoutResultFeedbackSummary | null;
   onOpenActivityFile?: () => void;
 }) {
-  const state = getFeedbackInviteState(snapshot, feedback);
+  const locale = useHitoUiLocale();
+  const state = getFeedbackInviteState(snapshot, feedback, locale);
 
   if (!state) {
     return null;
@@ -697,6 +752,8 @@ export function WorkoutFeedbackPanel({
   onUploadInProgressChange?: (isUploading: boolean) => void;
   onUploadSucceeded?: (notice: string) => void;
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -717,6 +774,7 @@ export function WorkoutFeedbackPanel({
     isUploading,
     uploadError,
     feedback: feedbackState,
+    locale,
   });
   const hasLoadedEvidence = Boolean(
     attachedGarminAsset &&
@@ -728,17 +786,17 @@ export function WorkoutFeedbackPanel({
   const headerPill = attachedGarminAsset
     ? hasLoadedEvidence
       ? {
-          label: "Ready",
+          label: t("Ready"),
           tone: "success" as const,
         }
       : (uploadSummary.pill ?? {
-          label: "Attached",
+          label: t("Attached"),
           tone: "signal" as const,
         })
     : canUploadResult
       ? null
       : {
-          label: "Saved mode only",
+          label: t("Saved mode only"),
           tone: "signal" as const,
         };
   const showUploadSummaryInEmptyState =
@@ -763,7 +821,7 @@ export function WorkoutFeedbackPanel({
         selectedFileName.endsWith(".fit") || selectedFileName.endsWith(".zip");
 
       if (!isSupportedGarminFile) {
-        setUploadError("Choose one Garmin .fit file or .zip archive.");
+        setUploadError(t("Choose one Garmin .fit file or .zip archive."));
         setOperationNotice(null);
         return;
       }
@@ -772,7 +830,7 @@ export function WorkoutFeedbackPanel({
     setIsUploading(true);
     setUploadError(null);
     setRemoveError(null);
-    setOperationNotice("Uploading activity file.");
+    setOperationNotice(t("Uploading activity file."));
 
     try {
       const formData = new FormData();
@@ -793,14 +851,14 @@ export function WorkoutFeedbackPanel({
             latestAiInsight: NonNullable<WorkoutResultFeedbackSummary>["latestAiInsight"];
             fixtureOutcome: CamelotSimulatedFitOutcomeV1 | null;
           }
-        | { ok: false; message?: string }
-      >(response, "The Garmin result upload could not be completed.");
+        | HitoProductApiFailure
+      >(response, t("The Garmin result upload could not be completed."));
 
       if (!response.ok || !payload.ok) {
         throw new RunnerSafeWorkoutResultClientError(
-          "message" in payload && typeof payload.message === "string"
-            ? payload.message
-            : "The Garmin result upload could not be completed.",
+          !payload.ok
+            ? getHitoProductApiFailureMessage(locale, payload)
+            : t("The Garmin result upload could not be completed."),
         );
       }
 
@@ -828,12 +886,15 @@ export function WorkoutFeedbackPanel({
       }
 
       const successNotice = payload.fixtureOutcome
-        ? `${payload.fixtureOutcome.presentationFileName} selected. Camelot used canonical synthetic evidence; the selected bytes were not parsed or stored.`
+        ? t(
+            "{fileName} selected. Camelot used canonical synthetic evidence; the selected bytes were not parsed or stored.",
+            { fileName: payload.fixtureOutcome.presentationFileName },
+          )
         : payload.latestComparison
-          ? "Activity file uploaded. Plan versus run is ready to review."
+          ? t("Activity file uploaded. Plan versus run is ready to review.")
           : payload.latestActualMetrics
-            ? "Activity file uploaded. Run captured; plan comparison is unavailable."
-            : "Activity file uploaded.";
+            ? t("Activity file uploaded. Run captured; plan comparison is unavailable.")
+            : t("Activity file uploaded.");
       setOperationNotice(successNotice);
 
       try {
@@ -850,7 +911,7 @@ export function WorkoutFeedbackPanel({
       setUploadError(
         uploadFailure instanceof RunnerSafeWorkoutResultClientError
           ? uploadFailure.message
-          : "The Garmin result upload could not be completed.",
+          : t("The Garmin result upload could not be completed."),
       );
     } finally {
       setIsUploading(false);
@@ -860,10 +921,11 @@ export function WorkoutFeedbackPanel({
   if (workout.type === "rest") {
     return (
       <div className="hito-surface-flat p-5">
-        <div className="hito-label-md text-foreground">Feedback unavailable</div>
+        <div className="hito-label-md text-foreground">{t("Feedback unavailable")}</div>
         <p className="hito-body-md text-secondary mt-2">
-          Rest days do not support Garmin review right now. If you need to log something, keep it in
-          the workout result instead.
+          {t(
+            "Rest days do not support Garmin review right now. If you need to log something, keep it in the workout result instead.",
+          )}
         </p>
       </div>
     );
@@ -879,14 +941,14 @@ export function WorkoutFeedbackPanel({
       <header className="space-y-3 max-w-3xl">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="hito-label-md text-foreground">Feedback</div>
+            <div className="hito-label-md text-foreground">{t("Feedback")}</div>
             <h2 className="hito-ui-title-sm text-foreground mt-2">
-              Compare your run with the plan.
+              {t("Compare your run with the plan.")}
             </h2>
             <p className="hito-body-md text-secondary mt-2">
               {attachedGarminAsset
-                ? "Your Garmin file and review live here."
-                : "Add an activity file if you want a deeper review."}
+                ? t("Your Garmin file and review live here.")
+                : t("Add an activity file if you want a deeper review.")}
             </p>
           </div>
           {headerPill ? (
@@ -929,7 +991,9 @@ export function WorkoutFeedbackPanel({
                 }
 
                 const confirmed = window.confirm(
-                  "Remove the attached Garmin evidence for this workout? The manual workout log will stay as it is.",
+                  t(
+                    "Remove the attached Garmin evidence for this workout? The manual workout log will stay as it is.",
+                  ),
                 );
 
                 if (!confirmed) {
@@ -939,7 +1003,7 @@ export function WorkoutFeedbackPanel({
                 setIsRemoving(true);
                 setRemoveError(null);
                 setUploadError(null);
-                setOperationNotice("Removing activity file.");
+                setOperationNotice(t("Removing activity file."));
 
                 try {
                   const response = await fetch("/api/workout-result/remove", {
@@ -957,20 +1021,20 @@ export function WorkoutFeedbackPanel({
                         ok: true;
                         feedback: WorkoutResultFeedbackSummary;
                       }
-                    | { ok: false; message?: string }
-                  >(response, "The Garmin evidence could not be removed.");
+                    | HitoProductApiFailure
+                  >(response, t("The Garmin evidence could not be removed."));
 
                   if (!response.ok || !payload.ok) {
                     throw new RunnerSafeWorkoutResultClientError(
-                      "message" in payload && typeof payload.message === "string"
-                        ? payload.message
-                        : "The Garmin evidence could not be removed.",
+                      !payload.ok
+                        ? getHitoProductApiFailureMessage(locale, payload)
+                        : t("The Garmin evidence could not be removed."),
                     );
                   }
 
                   setFeedbackState(payload.feedback);
                   setOperationNotice(
-                    "Activity file removed. Your manual workout log is unchanged.",
+                    t("Activity file removed. Your manual workout log is unchanged."),
                   );
 
                   try {
@@ -983,7 +1047,7 @@ export function WorkoutFeedbackPanel({
                   setRemoveError(
                     removalFailure instanceof RunnerSafeWorkoutResultClientError
                       ? removalFailure.message
-                      : "The Garmin evidence could not be removed.",
+                      : t("The Garmin evidence could not be removed."),
                   );
                 } finally {
                   setIsRemoving(false);
@@ -997,20 +1061,21 @@ export function WorkoutFeedbackPanel({
                   <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-hairline bg-surface/40">
                     <Icon name="file-up" size="md" className="text-foreground" />
                   </div>
-                  <div className="hito-label-md text-foreground">Upload activity file</div>
+                  <div className="hito-label-md text-foreground">{t("Upload activity file")}</div>
                   <h3 className="hito-ui-title-xs text-foreground mt-3">
-                    Add an activity file to compare it with the plan.
+                    {t("Add an activity file to compare it with the plan.")}
                   </h3>
                   <p className="hito-body-md text-secondary mt-3 max-w-xl">
-                    Hito currently accepts one Garmin{" "}
-                    <span className="hito-technical-sm text-secondary">.fit</span> activity or one{" "}
-                    <span className="hito-technical-sm text-secondary">.zip</span> archive
-                    containing exactly one FIT activity. That unlocks the comparison below.
+                    {t(
+                      "Hito currently accepts one Garmin {fit} activity or one {zip} archive containing exactly one FIT activity. That unlocks the comparison below.",
+                      { fit: ".fit", zip: ".zip" },
+                    )}
                   </p>
                   {localActivityFileDesignFixtureEnabled ? (
                     <p className="hito-body-xs mt-3 max-w-xl text-muted-foreground">
-                      Local QA fixture. Choose a local file through the ordinary upload control. The
-                      server keeps only the authorized safe presentation result.
+                      {t(
+                        "Local QA fixture. Choose a local file through the ordinary upload control. The server keeps only the authorized safe presentation result.",
+                      )}
                     </p>
                   ) : null}
                   <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
@@ -1030,10 +1095,10 @@ export function WorkoutFeedbackPanel({
                     >
                       <Icon name="file-up" size="sm" />
                       {isUploading
-                        ? "Uploading file..."
+                        ? t("Uploading file...")
                         : localActivityFileDesignFixtureEnabled
-                          ? "Choose local file"
-                          : "Upload activity file"}
+                          ? t("Choose local file")
+                          : t("Upload activity file")}
                     </HitoButton>
                   </div>
                 </div>
@@ -1072,12 +1137,12 @@ export function WorkoutFeedbackPanel({
         {latestComparison ? (
           <section className="border-t border-hairline pt-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <h3 className="hito-ui-title-xs text-foreground">Plan vs run</h3>
+              <h3 className="hito-ui-title-xs text-foreground">{t("Plan vs run")}</h3>
               <span
                 className="hito-status-pill"
-                data-tone={getComparisonCoverageMeta(latestComparison).tone}
+                data-tone={getComparisonCoverageMeta(latestComparison, locale).tone}
               >
-                {getComparisonCoverageMeta(latestComparison).label}
+                {getComparisonCoverageMeta(latestComparison, locale).label}
               </span>
             </div>
             <DeterministicComparisonReadback comparison={latestComparison} />
@@ -1086,7 +1151,7 @@ export function WorkoutFeedbackPanel({
 
         {latestAiInsight ? (
           <section className="border-t border-hairline pt-6">
-            <h3 className="hito-ui-title-xs text-foreground">Saved coach note</h3>
+            <h3 className="hito-ui-title-xs text-foreground">{t("Saved coach note")}</h3>
             <WorkoutAiInsightReadback insight={latestAiInsight} comparison={latestComparison} />
           </section>
         ) : null}
@@ -1223,21 +1288,24 @@ function AttachedEvidenceReadback({
   isRemoving: boolean;
   onRemove: () => Promise<void>;
 }) {
+  const t = useHitoProductMessage();
   const fileTypeLabel = asset.assetKind === "garmin_zip" ? "Garmin ZIP" : "Garmin FIT";
 
   return (
     <div className="group rounded-xl bg-background/16 px-4 py-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
-          <div className="hito-label-md text-foreground">Attached file</div>
+          <div className="hito-label-md text-foreground">{t("Attached file")}</div>
           <p className="hito-body-md text-foreground mt-2">{asset.originalFileName}</p>
           <p className="hito-body-xs text-tertiary mt-2">{fileTypeLabel}</p>
           <p className="hito-body-xs text-tertiary mt-1">
-            Remove this file before uploading a replacement. Your manual result stays as it is.
+            {t(
+              "Remove this file before uploading a replacement. Your manual result stays as it is.",
+            )}
           </p>
           {asset.primaryFileName && asset.primaryFileName !== asset.originalFileName ? (
             <p className="hito-body-xs text-tertiary mt-1">
-              Extracted activity: {asset.primaryFileName}
+              {t("Extracted activity: {fileName}", { fileName: asset.primaryFileName })}
             </p>
           ) : null}
         </div>
@@ -1253,7 +1321,7 @@ function AttachedEvidenceReadback({
           className="w-full shrink-0 opacity-100 transition-opacity sm:w-auto sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 focus-visible:opacity-100"
         >
           <Icon name="trash" size="sm" />
-          {isRemoving ? "Removing..." : "Remove file"}
+          {isRemoving ? t("Removing...") : t("Remove file")}
         </HitoButton>
       </div>
 
@@ -1306,12 +1374,15 @@ function getFeedbackUploadSummary({
   isUploading,
   uploadError,
   feedback,
+  locale,
 }: {
   canUploadResult: boolean;
   isUploading: boolean;
   uploadError: string | null;
   feedback: WorkoutResultFeedbackSummary | null;
+  locale: ResolvedUiLocale;
 }) {
+  const copy = (value: string) => getHitoKnownProductMessage(locale, value);
   const latestAsset = feedback?.latestAsset;
   const latestActualMetrics = feedback?.latestActualMetrics;
   const latestComparison = feedback?.latestComparison;
@@ -1321,15 +1392,15 @@ function getFeedbackUploadSummary({
       ? "Garmin ZIP"
       : "Garmin FIT"
     : "Garmin file";
-  const actualSnapshot = describeActualSnapshot(feedback);
+  const actualSnapshot = describeActualSnapshot(feedback, locale);
 
   if (!canUploadResult) {
     return {
-      label: "Sign in to use Garmin upload",
-      body: "FIT and ZIP upload only work on saved workouts.",
-      detailLine: "Upload is not available in preview mode.",
+      label: copy("Sign in to use Garmin upload"),
+      body: copy("FIT and ZIP upload only work on saved workouts."),
+      detailLine: copy("Upload is not available in preview mode."),
       pill: {
-        label: "Saved mode only",
+        label: copy("Saved mode only"),
         tone: "signal" as const,
       },
       tone: "signal" as const,
@@ -1338,11 +1409,11 @@ function getFeedbackUploadSummary({
 
   if (isUploading) {
     return {
-      label: "Processing your run",
-      body: "Your Garmin file is uploading now.",
-      detailLine: "Upload in progress · comparison not ready yet.",
+      label: copy("Processing your run"),
+      body: copy("Your Garmin file is uploading now."),
+      detailLine: copy("Upload in progress · comparison not ready yet."),
       pill: {
-        label: "Working",
+        label: copy("Working"),
         tone: "signal" as const,
       },
       tone: "signal" as const,
@@ -1351,16 +1422,20 @@ function getFeedbackUploadSummary({
 
   if (uploadError || latestAsset?.parseStatus === "failed") {
     return {
-      label: "We could not read that run yet",
+      label: copy("We could not read that run yet"),
       body:
         uploadError ??
         latestAsset?.parseError ??
-        "The last Garmin file did not finish processing. Your manual workout log is unchanged.",
+        copy(
+          "The last Garmin file did not finish processing. Your manual workout log is unchanged.",
+        ),
       detailLine: latestAsset
-        ? `${assetLabel} attached · comparison not ready.`
-        : "Try another Garmin FIT or ZIP file.",
+        ? formatHitoProductMessage(locale, "{subject} attached · comparison not ready.", {
+            subject: assetLabel,
+          })
+        : copy("Try another Garmin FIT or ZIP file."),
       pill: {
-        label: "Retry",
+        label: copy("Retry"),
         tone: "signal" as const,
       },
       tone: "destructive" as const,
@@ -1369,13 +1444,17 @@ function getFeedbackUploadSummary({
 
   if (latestAiInsight && latestComparison && latestActualMetrics) {
     return {
-      label: "Your run is ready to review",
-      body: "The comparison and saved coach note are ready to review.",
+      label: copy("Your run is ready to review"),
+      body: copy("The comparison and saved coach note are ready to review."),
       detailLine: actualSnapshot
-        ? `${actualSnapshot} · Plan vs run is ready.`
-        : `${assetLabel} processed · Plan vs run is ready.`,
+        ? formatHitoProductMessage(locale, "{subject} · Plan vs run is ready.", {
+            subject: actualSnapshot,
+          })
+        : formatHitoProductMessage(locale, "{subject} processed · Plan vs run is ready.", {
+            subject: assetLabel,
+          }),
       pill: {
-        label: "Ready",
+        label: copy("Ready"),
         tone: "success" as const,
       },
       tone: "success" as const,
@@ -1384,13 +1463,17 @@ function getFeedbackUploadSummary({
 
   if (latestComparison && latestActualMetrics) {
     return {
-      label: "Your run is ready to compare",
-      body: "The comparison is ready below.",
+      label: copy("Your run is ready to compare"),
+      body: copy("The comparison is ready below."),
       detailLine: actualSnapshot
-        ? `${actualSnapshot} · Plan vs run is ready.`
-        : `${assetLabel} processed · Plan vs run is ready.`,
+        ? formatHitoProductMessage(locale, "{subject} · Plan vs run is ready.", {
+            subject: actualSnapshot,
+          })
+        : formatHitoProductMessage(locale, "{subject} processed · Plan vs run is ready.", {
+            subject: assetLabel,
+          }),
       pill: {
-        label: "Plan vs run ready",
+        label: copy("Plan vs run ready"),
         tone: "success" as const,
       },
       tone: "success" as const,
@@ -1399,13 +1482,17 @@ function getFeedbackUploadSummary({
 
   if (latestActualMetrics) {
     return {
-      label: "Run captured",
-      body: "The activity is ready to review. A plan comparison is unavailable.",
+      label: copy("Run captured"),
+      body: copy("The activity is ready to review. A plan comparison is unavailable."),
       detailLine: actualSnapshot
-        ? `${actualSnapshot} · comparison not ready yet.`
-        : `${assetLabel} processed · comparison not ready yet.`,
+        ? formatHitoProductMessage(locale, "{subject} · comparison not ready yet.", {
+            subject: actualSnapshot,
+          })
+        : formatHitoProductMessage(locale, "{subject} processed · comparison not ready yet.", {
+            subject: assetLabel,
+          }),
       pill: {
-        label: "Run captured",
+        label: copy("Run captured"),
         tone: "signal" as const,
       },
       tone: "success" as const,
@@ -1414,11 +1501,15 @@ function getFeedbackUploadSummary({
 
   if (latestAsset) {
     return {
-      label: "Your Garmin file is attached",
-      body: "The file is here, but the run summary is not ready yet.",
-      detailLine: `${assetLabel} attached · run summary not ready yet.`,
+      label: copy("Your Garmin file is attached"),
+      body: copy("The file is here, but the run summary is not ready yet."),
+      detailLine: formatHitoProductMessage(
+        locale,
+        "{subject} attached · run summary not ready yet.",
+        { subject: assetLabel },
+      ),
       pill: {
-        label: "Attached",
+        label: copy("Attached"),
         tone: "signal" as const,
       },
       tone: "signal" as const,
@@ -1426,15 +1517,18 @@ function getFeedbackUploadSummary({
   }
 
   return {
-    label: "No Garmin file yet",
-    body: "Upload is optional. Add a FIT or ZIP file here to compare the run with the plan.",
-    detailLine: "No file attached yet.",
+    label: copy("No Garmin file yet"),
+    body: copy("Upload is optional. Add a FIT or ZIP file here to compare the run with the plan."),
+    detailLine: copy("No file attached yet."),
     pill: null,
     tone: "default" as const,
   };
 }
 
-function describeActualSnapshot(feedback: WorkoutResultFeedbackSummary | null) {
+function describeActualSnapshot(
+  feedback: WorkoutResultFeedbackSummary | null,
+  locale: ResolvedUiLocale,
+) {
   const actual = feedback?.latestActualMetrics;
   const asset = feedback?.latestAsset;
 
@@ -1444,9 +1538,18 @@ function describeActualSnapshot(feedback: WorkoutResultFeedbackSummary | null) {
 
   const details = [
     asset.assetKind === "garmin_zip" ? "Garmin ZIP" : "Garmin FIT",
-    actual.actualDistanceKm != null ? `${actual.actualDistanceKm.toFixed(2)} km` : null,
+    actual.actualDistanceKm != null
+      ? `${formatUiNumber(actual.actualDistanceKm, locale, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })} km`
+      : null,
     actual.actualDurationMin != null ? formatDurationMin(actual.actualDurationMin) : null,
-    actual.actualIntervalCount != null ? `${actual.actualIntervalCount} structured steps` : null,
+    actual.actualIntervalCount != null
+      ? locale === "pt-BR"
+        ? `${formatUiNumber(actual.actualIntervalCount, locale)} etapas estruturadas`
+        : `${formatUiNumber(actual.actualIntervalCount, locale)} structured steps`
+      : null,
   ].filter(Boolean);
 
   return details.join(" · ");
@@ -1455,14 +1558,16 @@ function describeActualSnapshot(feedback: WorkoutResultFeedbackSummary | null) {
 function getFeedbackInviteState(
   snapshot: TrainingSnapshot,
   feedback: WorkoutResultFeedbackSummary | null,
+  locale: ResolvedUiLocale,
 ) {
+  const copy = (value: string) => getHitoKnownProductMessage(locale, value);
   if (snapshot.source !== "persisted") {
     return {
-      label: "Garmin review opens after sign-in",
-      body: "Saved workouts can use Feedback for Garmin FIT or ZIP review.",
-      cta: "Open Feedback",
+      label: copy("Garmin review opens after sign-in"),
+      body: copy("Saved workouts can use Feedback for Garmin FIT or ZIP review."),
+      cta: copy("Open Feedback"),
       pill: {
-        label: "Saved mode only",
+        label: copy("Saved mode only"),
         tone: "signal" as const,
       },
     };
@@ -1478,11 +1583,11 @@ function getFeedbackInviteState(
 
   if (hasFeedbackReady) {
     return {
-      label: "Garmin feedback is ready",
-      body: "Review the plan-vs-run comparison and short next-step note.",
-      cta: "Review Feedback",
+      label: copy("Garmin feedback is ready"),
+      body: copy("Review the plan-vs-run comparison and short next-step note."),
+      cta: copy("Review Feedback"),
       pill: {
-        label: "Ready",
+        label: copy("Ready"),
         tone: "success" as const,
       },
     };
@@ -1490,11 +1595,11 @@ function getFeedbackInviteState(
 
   if (parseFailed) {
     return {
-      label: "Garmin upload needs attention",
-      body: "Check the upload result in Feedback. Your manual result stays separate.",
-      cta: "Open Feedback",
+      label: copy("Garmin upload needs attention"),
+      body: copy("Check the upload result in Feedback. Your manual result stays separate."),
+      cta: copy("Open Feedback"),
       pill: {
-        label: "Retry",
+        label: copy("Retry"),
         tone: "signal" as const,
       },
     };
@@ -1502,20 +1607,20 @@ function getFeedbackInviteState(
 
   if (hasEvidenceAttached) {
     return {
-      label: "Garmin file is attached",
-      body: "Continue in Feedback to review the attached run file.",
-      cta: "Continue in Feedback",
+      label: copy("Garmin file is attached"),
+      body: copy("Continue in Feedback to review the attached run file."),
+      cta: copy("Continue in Feedback"),
       pill: {
-        label: "In progress",
+        label: copy("In progress"),
         tone: "signal" as const,
       },
     };
   }
 
   return {
-    label: "Add an activity file for deeper review",
-    body: "Optional: compare the planned workout with the actual run in Feedback.",
-    cta: "Add activity file",
+    label: copy("Add an activity file for deeper review"),
+    body: copy("Optional: compare the planned workout with the actual run in Feedback."),
+    cta: copy("Add activity file"),
     pill: null,
   };
 }
@@ -1537,11 +1642,14 @@ function NumField({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const t = useHitoProductMessage();
   return (
     <label className="grid gap-2">
       <div className="flex items-center justify-between gap-3">
         <span className="hito-label-md text-foreground">{label}</span>
-        <span className="hito-technical-sm text-tertiary">plan {planned}</span>
+        <span className="hito-technical-sm text-tertiary">
+          {t("Planned")} {planned}
+        </span>
       </div>
       <span className="relative block">
         <Input
@@ -1563,4 +1671,16 @@ function NumField({
       </span>
     </label>
   );
+}
+
+function localizeOutcome(locale: ResolvedUiLocale, outcome: Outcome | string) {
+  const label =
+    outcome === "completed"
+      ? "Complete"
+      : outcome === "partial"
+        ? "Partial"
+        : outcome === "skipped"
+          ? "Skipped"
+          : outcome;
+  return getHitoKnownProductMessage(locale, label);
 }

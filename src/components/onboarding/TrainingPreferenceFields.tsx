@@ -11,6 +11,8 @@ import {
 } from "./onboarding-form-model";
 import type { RunnerFitnessLevel } from "@/lib/runner-training-preferences";
 import { useHitoRadioGroup } from "@/components/ui/hito-radio-group";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
+import { getHitoKnownProductMessage } from "@/lib/ui-locale-messages";
 
 type PreferredLongRunMode = "optional-any" | "default-sunday";
 type RunningDaysPreferenceMode = "ceiling" | "frequency";
@@ -64,6 +66,8 @@ export function TrainingPreferenceFields({
   showRunningDays = true,
   runningDaysMode = "ceiling",
 }: TrainingPreferenceFieldsProps) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const allowedRunningDayCount = WEEKDAY_OPTIONS.length - fixedRestDays.length;
   const canShowFitnessBenchmark =
     showFitnessBenchmark && Boolean(fitnessLevel && onFitnessLevelChange);
@@ -107,22 +111,26 @@ export function TrainingPreferenceFields({
   return (
     <>
       <TrainingPreferenceField
-        label="Fixed rest days"
+        label={message("Fixed rest days")}
         helper={
           fixedRestDaysHelper ??
           (runningDaysMode === "ceiling"
-            ? "Optional. Choose only weekdays that must stay free."
-            : "Choose weekdays that must stay free in this schedule.")
+            ? message("Optional. Choose only weekdays that must stay free.")
+            : message("Choose weekdays that must stay free in this schedule."))
         }
       >
-        <div className="hito-choice-toggle-group" role="group" aria-label="Fixed rest days">
+        <div
+          className="hito-choice-toggle-group"
+          role="group"
+          aria-label={message("Fixed rest days")}
+        >
           <HitoChoiceToggle
             type="button"
             size="sm"
             selected={fixedRestDays.length === 0}
             onClick={() => commitFixedRestDays([])}
           >
-            {runningDaysMode === "ceiling" ? "Flexible" : "No fixed rest days"}
+            {runningDaysMode === "ceiling" ? message("Flexible") : message("No fixed rest days")}
           </HitoChoiceToggle>
           {WEEKDAY_OPTIONS.map((weekday) => {
             const active = fixedRestDays.includes(weekday.value);
@@ -141,9 +149,15 @@ export function TrainingPreferenceFields({
                     : [...fixedRestDays, weekday.value];
                   commitFixedRestDays(nextRestDays);
                 }}
-                aria-label={`${weekday.value}${active ? " fixed rest day" : ""}`}
+                aria-label={
+                  active
+                    ? message("{day} fixed rest day", {
+                        day: getHitoKnownProductMessage(locale, weekday.value),
+                      })
+                    : getHitoKnownProductMessage(locale, weekday.value)
+                }
               >
-                {weekday.label}
+                {getHitoKnownProductMessage(locale, weekday.label)}
               </HitoChoiceToggle>
             );
           })}
@@ -162,18 +176,18 @@ export function TrainingPreferenceFields({
       ) : null}
 
       <TrainingPreferenceField
-        label="Preferred long-run day"
+        label={message("Preferred long-run day")}
         helper={
           preferredLongRunHelper ??
           (preferredLongRunMode === "default-sunday"
-            ? "Leave unselected to keep Sunday as the default."
-            : "Optional. Leave open if any available day is fine.")
+            ? message("Leave unselected to keep Sunday as the default.")
+            : message("Optional. Leave open if any available day is fine."))
         }
       >
         <div
           className="hito-choice-toggle-group"
           {...preferredLongRunGroup.groupProps}
-          aria-label="Preferred long-run day"
+          aria-label={message("Preferred long-run day")}
         >
           {preferredLongRunMode === "optional-any" || preferredLongRunMode === "default-sunday" ? (
             <HitoChoiceToggle
@@ -183,7 +197,7 @@ export function TrainingPreferenceFields({
               selected={preferredLongRunDay === ""}
               onClick={() => onPreferredLongRunDayChange("")}
             >
-              {preferredLongRunMode === "default-sunday" ? "Use default" : "Any"}
+              {preferredLongRunMode === "default-sunday" ? message("Use default") : message("Any")}
             </HitoChoiceToggle>
           ) : null}
           {WEEKDAY_OPTIONS.map((weekday) => {
@@ -199,7 +213,7 @@ export function TrainingPreferenceFields({
                 disabled={disabled}
                 onClick={() => onPreferredLongRunDayChange(weekday.value)}
               >
-                {weekday.label}
+                {getHitoKnownProductMessage(locale, weekday.label)}
               </HitoChoiceToggle>
             );
           })}
@@ -207,11 +221,14 @@ export function TrainingPreferenceFields({
       </TrainingPreferenceField>
 
       {canShowFitnessBenchmark && fitnessLevel && onFitnessLevelChange ? (
-        <TrainingPreferenceField label="Fitness benchmark" helper={fitnessBenchmarkHelper}>
+        <TrainingPreferenceField
+          label={message("Fitness benchmark")}
+          helper={fitnessBenchmarkHelper}
+        >
           <div
             className="grid gap-2"
             {...fitnessBenchmarkGroup.groupProps}
-            aria-label="Fitness benchmark"
+            aria-label={message("Fitness benchmark")}
           >
             {FITNESS_LEVEL_OPTIONS.map((option) => {
               const active = fitnessLevel === option.value;
@@ -227,9 +244,11 @@ export function TrainingPreferenceFields({
                   onClick={() => onFitnessLevelChange(option.value)}
                 >
                   <span className="min-w-0">
-                    <span className="block">{option.label}</span>
+                    <span className="block">
+                      {getHitoKnownProductMessage(locale, option.label)}
+                    </span>
                     <span className="mt-1 block hito-body-xs text-secondary text-current/75">
-                      {option.copy}
+                      {getHitoKnownProductMessage(locale, option.copy)}
                     </span>
                   </span>
                 </HitoChoiceToggle>
@@ -268,6 +287,8 @@ export function RunningDaysPreferenceField({
   mode?: RunningDaysPreferenceMode;
   onMaxRunningDaysPerWeekChange: (value: string) => void;
 }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const allowedRunningDayCount =
     mode === "ceiling" ? WEEKDAY_OPTIONS.length : WEEKDAY_OPTIONS.length - fixedRestDays.length;
   const selectedRunningDays = Number.parseInt(maxRunningDaysPerWeek, 10);
@@ -281,8 +302,10 @@ export function RunningDaysPreferenceField({
     ],
     value: maxRunningDaysPerWeek,
   });
-  const resolvedLabel =
-    label ?? (mode === "ceiling" ? "Weekly running ceiling" : "Running days per week");
+  const resolvedLabel = getHitoKnownProductMessage(
+    locale,
+    label ?? (mode === "ceiling" ? "Weekly running ceiling" : "Running days per week"),
+  );
 
   return (
     <TrainingPreferenceField
@@ -290,10 +313,10 @@ export function RunningDaysPreferenceField({
       helper={
         helper ??
         (mode === "ceiling"
-          ? "Optional. This is a maximum, not a target workout count."
-          : `Choose 1-${allowedRunningDayCount} running day${
-              allowedRunningDayCount === 1 ? "" : "s"
-            } per week.`)
+          ? message("Optional. This is a maximum, not a target workout count.")
+          : message("Choose 1-{count} running days per week.", {
+              count: allowedRunningDayCount,
+            }))
       }
     >
       <div
@@ -309,7 +332,7 @@ export function RunningDaysPreferenceField({
             selected={maxRunningDaysPerWeek === ""}
             onClick={() => onMaxRunningDaysPerWeekChange("")}
           >
-            Flexible
+            {message("Flexible")}
           </HitoChoiceToggle>
         ) : null}
         {runningDayOptions.map((count) => {
@@ -321,11 +344,16 @@ export function RunningDaysPreferenceField({
               {...runningDaysGroup.getRadioProps(count)}
               size="sm"
               selected={active}
-              aria-label={
+              aria-label={message(
                 mode === "ceiling"
-                  ? `Up to ${count} running day${count === "1" ? "" : "s"} per week`
-                  : `${count} running day${count === "1" ? "" : "s"} per week`
-              }
+                  ? count === "1"
+                    ? "Up to {count} running day per week"
+                    : "Up to {count} running days per week"
+                  : count === "1"
+                    ? "{count} running day per week"
+                    : "{count} running days per week",
+                { count },
+              )}
               onClick={() => onMaxRunningDaysPerWeekChange(count)}
             >
               {count}
@@ -352,6 +380,8 @@ export function RecentFiveKBenchmarkFields({
   recent5kPace?: string;
   onRecent5kPaceChange: (value: string) => void;
 }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const trimmedTime = recent5kTime.trim();
   const trimmedPace = recent5kPace.trim();
   const hasTime = trimmedTime.length > 0;
@@ -375,7 +405,7 @@ export function RecentFiveKBenchmarkFields({
     <div className={cn("grid gap-2", className)}>
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-2">
-          <span className="hito-label-md text-foreground">Recent 5K time</span>
+          <span className="hito-label-md text-foreground">{message("Recent 5K time")}</span>
           <Input
             value={recent5kTime}
             onChange={(event) => onRecent5kTimeChange(event.target.value)}
@@ -387,7 +417,7 @@ export function RecentFiveKBenchmarkFields({
         </label>
 
         <label className="grid gap-2">
-          <span className="hito-label-md text-foreground">Recent 5K pace</span>
+          <span className="hito-label-md text-foreground">{message("Recent 5K pace")}</span>
           <Input
             value={recent5kPace}
             onChange={(event) => onRecent5kPaceChange(event.target.value)}
@@ -398,7 +428,7 @@ export function RecentFiveKBenchmarkFields({
           />
         </label>
       </div>
-      <span className={helperTone}>{helperText}</span>
+      <span className={helperTone}>{getHitoKnownProductMessage(locale, helperText)}</span>
     </div>
   );
 }
@@ -412,11 +442,18 @@ function TrainingPreferenceField({
   helper?: string;
   children: ReactNode;
 }) {
+  const locale = useHitoUiLocale();
   return (
     <div className="grid gap-2">
-      <span className="hito-label-md text-foreground">{label}</span>
+      <span className="hito-label-md text-foreground">
+        {getHitoKnownProductMessage(locale, label)}
+      </span>
       {children}
-      {helper ? <span className="hito-body-xs text-secondary">{helper}</span> : null}
+      {helper ? (
+        <span className="hito-body-xs text-secondary">
+          {getHitoKnownProductMessage(locale, helper)}
+        </span>
+      ) : null}
     </div>
   );
 }

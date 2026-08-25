@@ -23,6 +23,9 @@ import type {
   WorkoutDocumentTarget,
   WorkoutDocumentUnitPrescription,
 } from "@/lib/workout-document";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
+import { formatUiNumber } from "@/lib/ui-locale";
+import { getHitoKnownProductMessage } from "@/lib/ui-locale-messages";
 
 type TargetMode = "none" | "pace" | "pace_range" | "hr_cap" | "hr_range" | "rpe";
 type DropPosition = "before" | "after";
@@ -53,6 +56,8 @@ export function WorkoutDocumentEditor({
   onChange: (document: WorkoutDocument) => void;
   readOnly?: boolean;
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   const [drag, setDrag] = useState<DragState>(null);
   const [announcement, setAnnouncement] = useState("");
   const focusIdRef = useRef<string | null>(null);
@@ -65,7 +70,12 @@ export function WorkoutDocumentEditor({
     const next = moveWorkoutSectionById(document, sourceId, targetId, position);
     commit(
       next,
-      `Moved section to position ${next.steps.findIndex((step) => step.segment_id === sourceId) + 1}.`,
+      t("Moved section to position {position}.", {
+        position: formatUiNumber(
+          next.steps.findIndex((step) => step.segment_id === sourceId) + 1,
+          locale,
+        ),
+      }),
       sourceId,
     );
   };
@@ -74,7 +84,7 @@ export function WorkoutDocumentEditor({
       <p className="sr-only" aria-live="polite">
         {announcement}
       </p>
-      <Field label="Workout title">
+      <Field label={t("Workout title")}>
         <Input
           size="md"
           variant="primary"
@@ -83,7 +93,7 @@ export function WorkoutDocumentEditor({
           onChange={(event) => commit({ ...document, title: event.target.value })}
         />
       </Field>
-      <section className="grid gap-3" aria-label="Workout structure">
+      <section className="grid gap-3" aria-label={t("Workout structure")}>
         {!readOnly && document.workoutType !== "rest" ? (
           <HitoButton
             type="button"
@@ -93,12 +103,12 @@ export function WorkoutDocumentEditor({
               const section = newSection();
               commit(
                 { ...document, steps: [...document.steps, section] },
-                `Added ${section.label}.`,
+                t("Added {label}.", { label: section.label ?? t("section") }),
                 section.segment_id,
               );
             }}
           >
-            Add workout section
+            {t("Add workout section")}
           </HitoButton>
         ) : null}
         <div className="hito-manual-workout-entry-stack">
@@ -124,7 +134,7 @@ export function WorkoutDocumentEditor({
                 const focus = remaining[index]?.segment_id ?? remaining[index - 1]?.segment_id;
                 commit(
                   { ...document, steps: remaining },
-                  `Deleted ${section.label ?? "section"}.`,
+                  t("Deleted {label}.", { label: section.label ?? t("section") }),
                   focus,
                 );
               }}
@@ -134,7 +144,7 @@ export function WorkoutDocumentEditor({
                 steps.splice(index + 1, 0, copy);
                 commit(
                   { ...document, steps },
-                  `Duplicated ${section.label ?? "section"}.`,
+                  t("Duplicated {label}.", { label: section.label ?? t("section") }),
                   copy.segment_id,
                 );
               }}
@@ -159,13 +169,13 @@ export function WorkoutDocumentEditor({
           <div className="hito-list-row">
             <p className="hito-body-sm text-secondary">
               {document.workoutType === "rest"
-                ? "Rest day has no running sections."
-                : "Add at least one section before review."}
+                ? t("Rest day has no running sections.")
+                : t("Add at least one section before review.")}
             </p>
           </div>
         ) : null}
       </section>
-      <Field label="Notes or cues">
+      <Field label={t("Notes or cues")}>
         <Textarea
           rows={3}
           size="md"
@@ -208,6 +218,8 @@ function SectionRow({
   onDrop: (targetId: string, position: DropPosition) => void;
   onDocumentChange: (document: WorkoutDocument, message?: string, focusId?: string) => void;
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   const id = requiredId(section.segment_id);
   const prescription = section.prescription ?? { mode: "time", duration_min: 10 };
   return (
@@ -226,7 +238,7 @@ function SectionRow({
     >
       <div className="grid min-w-0 flex-1 gap-3">
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Section label">
+          <Field label={t("Section label")}>
             <Input
               size="sm"
               variant="secondary"
@@ -235,14 +247,16 @@ function SectionRow({
               onChange={(event) => onChange({ ...section, label: event.target.value || null })}
             />
           </Field>
-          <Field label="Section type">
+          <Field label={t("Section type")}>
             <Select
               disabled={readOnly}
               value={sectionType(section)}
               onValueChange={(type) => onChange(changeSectionType(section, type))}
             >
               <SelectTrigger
-                aria-label={`Section ${index + 1} type`}
+                aria-label={t("Section {count} type", {
+                  count: formatUiNumber(index + 1, locale),
+                })}
                 className="hito-field hito-field-secondary hito-field-sm"
               >
                 <SelectValue />
@@ -250,7 +264,7 @@ function SectionRow({
               <SelectContent>
                 {SECTION_TYPES.map(([value, label]) => (
                   <SelectItem key={value} value={value}>
-                    {label}
+                    {getHitoKnownProductMessage(locale, label)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -275,11 +289,13 @@ function SectionRow({
           <TargetEditor
             target={section.target}
             readOnly={readOnly}
-            roleLabel={`Section ${index + 1}`}
+            roleLabel={t("Section {count}", {
+              count: formatUiNumber(index + 1, locale),
+            })}
             onChange={(target) => onChange({ ...section, target })}
           />
         )}
-        <Field label="Guidance">
+        <Field label={t("Guidance")}>
           <Input
             size="sm"
             variant="secondary"
@@ -294,27 +310,31 @@ function SectionRow({
               type="button"
               size="sm"
               variant="ghost"
-              aria-label={`Move ${section.label ?? "section"} up`}
+              aria-label={t("Move {label} up", {
+                label: section.label ?? t("section"),
+              })}
               disabled={index === 0}
               onClick={() => onMove(-1)}
             >
-              Move up
+              {t("Move up")}
             </HitoButton>
             <HitoButton
               type="button"
               size="sm"
               variant="ghost"
-              aria-label={`Move ${section.label ?? "section"} down`}
+              aria-label={t("Move {label} down", {
+                label: section.label ?? t("section"),
+              })}
               disabled={index === document.steps.length - 1}
               onClick={() => onMove(1)}
             >
-              Move down
+              {t("Move down")}
             </HitoButton>
             <HitoButton type="button" size="sm" variant="ghost" onClick={onDuplicate}>
-              Duplicate
+              {t("Duplicate")}
             </HitoButton>
             <HitoButton type="button" size="sm" variant="ghost" onClick={onDelete}>
-              Delete section
+              {t("Delete section")}
             </HitoButton>
           </div>
         ) : null}
@@ -338,6 +358,8 @@ function RepeatChildren({
   setDrag: (drag: DragState) => void;
   onDocumentChange: (document: WorkoutDocument, message?: string, focusId?: string) => void;
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   const parentId = requiredId(parent.segment_id);
   const children =
     parent.prescription?.mode === "repeats" ? (parent.prescription.children ?? []) : [];
@@ -347,13 +369,18 @@ function RepeatChildren({
       next.steps.find((step) => step.segment_id === parentId)?.prescription?.children ?? [];
     onDocumentChange(
       next,
-      `Moved repeat child to position ${nextChildren.findIndex((child) => child.segment_id === sourceId) + 1}.`,
+      t("Moved repeat child to position {position}.", {
+        position: formatUiNumber(
+          nextChildren.findIndex((child) => child.segment_id === sourceId) + 1,
+          locale,
+        ),
+      }),
       sourceId,
     );
   };
   return (
     <div className="grid gap-3">
-      <p className="hito-label-md text-foreground">Repeat sections</p>
+      <p className="hito-label-md text-foreground">{t("Repeat sections")}</p>
       {children.map((child, index) => {
         const id = child.segment_id;
         return (
@@ -373,7 +400,7 @@ function RepeatChildren({
             }}
           >
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Repeat label">
+              <Field label={t("Repeat label")}>
                 <Input
                   size="sm"
                   variant="secondary"
@@ -389,7 +416,7 @@ function RepeatChildren({
                   }
                 />
               </Field>
-              <Field label="Repeat role">
+              <Field label={t("Repeat role")}>
                 <Select
                   disabled={readOnly}
                   value={child.role}
@@ -403,7 +430,9 @@ function RepeatChildren({
                   }
                 >
                   <SelectTrigger
-                    aria-label={`Repeat section ${index + 1} role`}
+                    aria-label={t("Repeat section {count} role", {
+                      count: formatUiNumber(index + 1, locale),
+                    })}
                     className="hito-field hito-field-secondary hito-field-sm"
                   >
                     <SelectValue />
@@ -411,7 +440,7 @@ function RepeatChildren({
                   <SelectContent>
                     {CHILD_ROLES.map(([value, label]) => (
                       <SelectItem key={value} value={value}>
-                        {label}
+                        {getHitoKnownProductMessage(locale, label)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -433,7 +462,9 @@ function RepeatChildren({
             <TargetEditor
               target={child.target}
               readOnly={readOnly}
-              roleLabel={`Repeat section ${index + 1}`}
+              roleLabel={t("Repeat section {count}", {
+                count: formatUiNumber(index + 1, locale),
+              })}
               onChange={(target) =>
                 onDocumentChange(
                   updateWorkoutRepeatChild(document, parentId, id, (value) => ({
@@ -443,7 +474,7 @@ function RepeatChildren({
                 )
               }
             />
-            <Field label="Guidance">
+            <Field label={t("Guidance")}>
               <Input
                 size="sm"
                 variant="secondary"
@@ -471,7 +502,7 @@ function RepeatChildren({
                     if (target) commitMove(id, target.segment_id, "before");
                   }}
                 >
-                  Move up
+                  {t("Move up")}
                 </HitoButton>
                 <HitoButton
                   type="button"
@@ -483,7 +514,7 @@ function RepeatChildren({
                     if (target) commitMove(id, target.segment_id, "after");
                   }}
                 >
-                  Move down
+                  {t("Move down")}
                 </HitoButton>
                 <HitoButton
                   type="button"
@@ -499,12 +530,14 @@ function RepeatChildren({
                           ...children.slice(index + 1),
                         ]),
                       ),
-                      `Duplicated ${child.label ?? "repeat section"}.`,
+                      t("Duplicated {label}.", {
+                        label: child.label ?? t("repeat section"),
+                      }),
                       copy.segment_id,
                     );
                   }}
                 >
-                  Duplicate
+                  {t("Duplicate")}
                 </HitoButton>
                 <HitoButton
                   type="button"
@@ -517,12 +550,12 @@ function RepeatChildren({
                       updateWorkoutSection(document, parentId, (section) =>
                         repeatSectionWithChildren(section, remaining),
                       ),
-                      `Deleted ${child.label ?? "repeat section"}.`,
+                      t("Deleted {label}.", { label: child.label ?? t("repeat section") }),
                       remaining[index]?.segment_id ?? remaining[index - 1]?.segment_id,
                     );
                   }}
                 >
-                  Delete
+                  {t("Delete")}
                 </HitoButton>
               </div>
             ) : null}
@@ -540,12 +573,12 @@ function RepeatChildren({
               updateWorkoutSection(document, parentId, (section) =>
                 repeatSectionWithChildren(section, [...children, child]),
               ),
-              `Added ${child.label}.`,
+              t("Added {label}.", { label: child.label ?? t("repeat section") }),
               child.segment_id,
             );
           }}
         >
-          Add repeat section
+          {t("Add repeat section")}
         </HitoButton>
       ) : null}
     </div>
@@ -561,6 +594,7 @@ function PrescriptionEditor({
   readOnly: boolean;
   onChange: (value: WorkoutDocumentPrescription) => void;
 }) {
+  const t = useHitoProductMessage();
   const value =
     prescription.mode === "time"
       ? prescription.duration_min
@@ -571,7 +605,7 @@ function PrescriptionEditor({
           : "";
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <Field label="Duration mode">
+      <Field label={t("Duration mode")}>
         <Select
           disabled={readOnly}
           value={prescription.mode}
@@ -580,16 +614,16 @@ function PrescriptionEditor({
           }
         >
           <SelectTrigger
-            aria-label="Section duration mode"
+            aria-label={t("Section duration mode")}
             className="hito-field hito-field-secondary hito-field-sm"
           >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="time">Minutes</SelectItem>
-            <SelectItem value="distance">Distance</SelectItem>
-            <SelectItem value="repeats">Repeats</SelectItem>
-            <SelectItem value="none">No quantity</SelectItem>
+            <SelectItem value="time">{t("Minutes")}</SelectItem>
+            <SelectItem value="distance">{t("Distance")}</SelectItem>
+            <SelectItem value="repeats">{t("Repeats")}</SelectItem>
+            <SelectItem value="none">{t("No quantity")}</SelectItem>
           </SelectContent>
         </Select>
       </Field>
@@ -597,10 +631,10 @@ function PrescriptionEditor({
         <Field
           label={
             prescription.mode === "time"
-              ? "Minutes"
+              ? t("Minutes")
               : prescription.mode === "distance"
-                ? "Kilometres"
-                : "Repeat count"
+                ? t("Kilometres")
+                : t("Repeat count")
           }
         >
           <Input
@@ -625,6 +659,7 @@ function UnitPrescriptionEditor({
   readOnly: boolean;
   onChange: (value: WorkoutDocumentUnitPrescription) => void;
 }) {
+  const t = useHitoProductMessage();
   const value =
     prescription.mode === "time"
       ? prescription.duration_min
@@ -633,7 +668,7 @@ function UnitPrescriptionEditor({
         : "";
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <Field label="Duration mode">
+      <Field label={t("Duration mode")}>
         <Select
           disabled={readOnly}
           value={prescription.mode}
@@ -648,20 +683,20 @@ function UnitPrescriptionEditor({
           }
         >
           <SelectTrigger
-            aria-label="Repeat section duration mode"
+            aria-label={t("Repeat section duration mode")}
             className="hito-field hito-field-secondary hito-field-sm"
           >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="time">Minutes</SelectItem>
-            <SelectItem value="distance">Distance</SelectItem>
-            <SelectItem value="none">No quantity</SelectItem>
+            <SelectItem value="time">{t("Minutes")}</SelectItem>
+            <SelectItem value="distance">{t("Distance")}</SelectItem>
+            <SelectItem value="none">{t("No quantity")}</SelectItem>
           </SelectContent>
         </Select>
       </Field>
       {prescription.mode !== "none" ? (
-        <Field label={prescription.mode === "time" ? "Minutes" : "Kilometres"}>
+        <Field label={prescription.mode === "time" ? t("Minutes") : t("Kilometres")}>
           <Input
             size="sm"
             variant="secondary"
@@ -692,12 +727,13 @@ function TargetEditor({
   roleLabel: string;
   onChange: (target: WorkoutDocumentTarget | undefined) => void;
 }) {
+  const t = useHitoProductMessage();
   const mode = targetMode(target);
   const targetInputRef = useRef<HTMLInputElement | null>(null);
   const focusTargetAfterCloseRef = useRef(false);
   return (
     <div className="grid gap-3 sm:grid-cols-2">
-      <Field label="Target">
+      <Field label={t("Target")}>
         <Select
           disabled={readOnly}
           value={mode}
@@ -714,23 +750,23 @@ function TargetEditor({
           }}
         >
           <SelectTrigger
-            aria-label={`${roleLabel} target type`}
+            aria-label={t("{role} target type", { role: roleLabel })}
             className="hito-field hito-field-secondary hito-field-sm"
           >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="none">No target</SelectItem>
-            <SelectItem value="pace">Pace</SelectItem>
-            <SelectItem value="pace_range">Pace range</SelectItem>
-            <SelectItem value="hr_cap">HR cap</SelectItem>
-            <SelectItem value="hr_range">HR range</SelectItem>
-            <SelectItem value="rpe">RPE</SelectItem>
+            <SelectItem value="none">{t("No target")}</SelectItem>
+            <SelectItem value="pace">{t("Pace")}</SelectItem>
+            <SelectItem value="pace_range">{t("Pace range")}</SelectItem>
+            <SelectItem value="hr_cap">{t("HR cap")}</SelectItem>
+            <SelectItem value="hr_range">{t("HR range")}</SelectItem>
+            <SelectItem value="rpe">{t("RPE")}</SelectItem>
           </SelectContent>
         </Select>
       </Field>
       {mode !== "none" ? (
-        <Field label="Value">
+        <Field label={t("Value")}>
           <Input
             size="sm"
             variant="secondary"

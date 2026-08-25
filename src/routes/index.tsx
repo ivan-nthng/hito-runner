@@ -8,6 +8,7 @@ import { HitoButton } from "@/components/ui/button";
 import { APP_NAME } from "@/lib/app-config";
 import { getHomeRouteData, type ViewerSummary } from "@/lib/training-api";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getHitoProductMessage } from "@/lib/ui-locale-messages";
 
 export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>): { createPlan?: true } => ({
@@ -114,31 +115,37 @@ function HomePendingState() {
 function HomeErrorState({ reset }: { error: Error; reset: () => void }) {
   return (
     <AppShell>
-      <div className="hito-route-gutter max-w-2xl py-20">
-        <section className="hito-state-surface" data-tone="destructive">
-          <p className="hito-label-md text-destructive">Home unavailable</p>
-          <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
-            We couldn&apos;t load this week&apos;s plan.
-          </h1>
-          <p className="hito-body-md mt-4 max-w-[40rem] text-text-secondary">
-            Try again to reopen the latest saved or preview state. If setup is still incomplete,
-            returning home will keep you in the onboarding flow.
-          </p>
-          <div className="hito-state-actions">
-            <HitoButton
-              type="button"
-              onClick={() => {
-                reset();
-                window.location.reload();
-              }}
-              size="lg"
-              variant="primary"
-            >
-              Try again
-            </HitoButton>
-          </div>
-        </section>
-      </div>
+      {(locale) => (
+        <div className="hito-route-gutter max-w-2xl py-20">
+          <section className="hito-state-surface" data-tone="destructive">
+            <p className="hito-label-md text-destructive">
+              {getHitoProductMessage(locale, "Home unavailable")}
+            </p>
+            <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
+              {getHitoProductMessage(locale, "We couldn't load this week's plan.")}
+            </h1>
+            <p className="hito-body-md mt-4 max-w-[40rem] text-text-secondary">
+              {getHitoProductMessage(
+                locale,
+                "Try again to reopen the latest saved or preview state. If setup is still incomplete, returning home will keep you in the onboarding flow.",
+              )}
+            </p>
+            <div className="hito-state-actions">
+              <HitoButton
+                type="button"
+                onClick={() => {
+                  reset();
+                  window.location.reload();
+                }}
+                size="lg"
+                variant="primary"
+              >
+                {getHitoProductMessage(locale, "Try again")}
+              </HitoButton>
+            </div>
+          </section>
+        </div>
+      )}
     </AppShell>
   );
 }

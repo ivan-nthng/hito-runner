@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Icon } from "@/components/ui/icon";
 import { hitoToast } from "@/components/ui/hito-toast";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
+import { formatUiNumber } from "@/lib/ui-locale";
 import {
   deleteCalendarFutureWorkouts,
   startNewCalendarPlan,
@@ -37,6 +39,8 @@ export function CalendarOverflowActions({
   localActivityFileDesignFixtureEnabled?: boolean;
   onCalendarRefresh: () => Promise<unknown>;
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   const uploadCalendarPlanJsonFn = useServerFn(uploadCalendarPlanJson);
   const deleteCalendarFutureWorkoutsFn = useServerFn(deleteCalendarFutureWorkouts);
   const startNewCalendarPlanFn = useServerFn(startNewCalendarPlan);
@@ -51,7 +55,7 @@ export function CalendarOverflowActions({
     if (!result.ok) {
       hitoToast.error({
         id: CALENDAR_OVERFLOW_TOAST_ID,
-        title: localFileFlow ? "Calendar JSON not saved" : "Plan not saved",
+        title: localFileFlow ? t("Calendar JSON not saved") : t("Plan not saved"),
         description: result.message,
       });
       return;
@@ -59,10 +63,20 @@ export function CalendarOverflowActions({
 
     hitoToast.success({
       id: CALENDAR_OVERFLOW_TOAST_ID,
-      title: localFileFlow ? "Calendar JSON flow ready" : "Plan saved to Plans",
+      title: localFileFlow ? t("Calendar JSON flow ready") : t("Plan saved to Plans"),
       description: localFileFlow
-        ? `${result.record.title} was exported and saved to Plans with ${result.record.workoutCount} ${result.record.workoutCount === 1 ? "workout" : "workouts"}. Your Calendar was not changed.`
-        : `${result.record.title} was saved. Your Calendar was not changed.`,
+        ? t(
+            result.record.workoutCount === 1
+              ? "{title} was exported and saved to Plans with {count} workout. Your Calendar was not changed."
+              : "{title} was exported and saved to Plans with {count} workouts. Your Calendar was not changed.",
+            {
+              title: result.record.title,
+              count: formatUiNumber(result.record.workoutCount, locale),
+            },
+          )
+        : t("{title} was saved. Your Calendar was not changed.", {
+            title: result.record.title,
+          }),
     });
   }
 
@@ -75,8 +89,8 @@ export function CalendarOverflowActions({
     setBusyAction("upload");
     hitoToast.working({
       id: CALENDAR_OVERFLOW_TOAST_ID,
-      title: "Saving plan to Plans",
-      description: "Your Calendar will not be changed.",
+      title: t("Saving plan to Plans"),
+      description: t("Your Calendar will not be changed."),
     });
 
     try {
@@ -84,8 +98,10 @@ export function CalendarOverflowActions({
     } catch {
       hitoToast.error({
         id: CALENDAR_OVERFLOW_TOAST_ID,
-        title: "Plan save not confirmed",
-        description: "The upload result could not be confirmed. Check Plans before trying again.",
+        title: t("Plan save not confirmed"),
+        description: t(
+          "The upload result could not be confirmed. Check Plans before trying again.",
+        ),
       });
     } finally {
       setBusyAction(null);
@@ -98,8 +114,8 @@ export function CalendarOverflowActions({
     setBusyAction("local-file-flow");
     hitoToast.working({
       id: CALENDAR_OVERFLOW_TOAST_ID,
-      title: "Checking Calendar JSON flow",
-      description: "Exporting the current future Calendar and saving that exact JSON to Plans.",
+      title: t("Checking Calendar JSON flow"),
+      description: t("Exporting the current future Calendar and saving that exact JSON to Plans."),
     });
 
     try {
@@ -115,9 +131,10 @@ export function CalendarOverflowActions({
     } catch {
       hitoToast.error({
         id: CALENDAR_OVERFLOW_TOAST_ID,
-        title: "Calendar JSON flow not confirmed",
-        description:
+        title: t("Calendar JSON flow not confirmed"),
+        description: t(
           "The future Calendar JSON could not be exported or saved. Nothing was changed.",
+        ),
       });
     } finally {
       setBusyAction(null);
@@ -132,11 +149,11 @@ export function CalendarOverflowActions({
     setBusyAction(action);
     hitoToast.working({
       id: CALENDAR_OVERFLOW_TOAST_ID,
-      title: action === "start" ? "Opening plan creation" : "Deleting future workouts",
+      title: action === "start" ? t("Opening plan creation") : t("Deleting future workouts"),
       description:
         action === "start"
-          ? "Removing eligible upcoming Calendar workouts first."
-          : "Removing eligible upcoming Calendar workouts.",
+          ? t("Removing eligible upcoming Calendar workouts first.")
+          : t("Removing eligible upcoming Calendar workouts."),
     });
 
     try {
@@ -150,7 +167,8 @@ export function CalendarOverflowActions({
       if (!result.ok) {
         hitoToast.error({
           id: CALENDAR_OVERFLOW_TOAST_ID,
-          title: action === "start" ? "Plan creation not opened" : "Future workouts not deleted",
+          title:
+            action === "start" ? t("Plan creation not opened") : t("Future workouts not deleted"),
           description: result.message,
         });
         return;
@@ -168,24 +186,35 @@ export function CalendarOverflowActions({
         await onCalendarRefresh();
         hitoToast.success({
           id: CALENDAR_OVERFLOW_TOAST_ID,
-          title: "Future workouts deleted",
-          description: `${result.clearedWorkoutCount} eligible upcoming ${result.clearedWorkoutCount === 1 ? "workout was" : "workouts were"} deleted.`,
+          title: t("Future workouts deleted"),
+          description: t(
+            result.clearedWorkoutCount === 1
+              ? "{count} eligible upcoming workout was deleted."
+              : "{count} eligible upcoming workouts were deleted.",
+            { count: formatUiNumber(result.clearedWorkoutCount, locale) },
+          ),
         });
       } catch {
         hitoToast.error({
           id: CALENDAR_OVERFLOW_TOAST_ID,
-          title: "Calendar needs refresh",
-          description: `${result.clearedWorkoutCount} eligible upcoming ${result.clearedWorkoutCount === 1 ? "workout was" : "workouts were"} deleted, but the latest Calendar could not be refreshed.`,
+          title: t("Calendar needs refresh"),
+          description: t(
+            result.clearedWorkoutCount === 1
+              ? "{count} eligible upcoming workout was deleted, but the latest Calendar could not be refreshed."
+              : "{count} eligible upcoming workouts were deleted, but the latest Calendar could not be refreshed.",
+            { count: formatUiNumber(result.clearedWorkoutCount, locale) },
+          ),
         });
       }
     } catch {
       hitoToast.error({
         id: CALENDAR_OVERFLOW_TOAST_ID,
-        title: action === "start" ? "Plan creation not opened" : "Future workouts not deleted",
+        title:
+          action === "start" ? t("Plan creation not opened") : t("Future workouts not deleted"),
         description:
           action === "start"
-            ? "The request result could not be confirmed. Refresh Calendar before trying again."
-            : "The delete result could not be confirmed. Refresh Calendar before trying again.",
+            ? t("The request result could not be confirmed. Refresh Calendar before trying again.")
+            : t("The delete result could not be confirmed. Refresh Calendar before trying again."),
       });
     } finally {
       setBusyAction(null);
@@ -199,7 +228,7 @@ export function CalendarOverflowActions({
           <HitoButton
             ref={menuTriggerRef}
             type="button"
-            aria-label="Open Calendar actions"
+            aria-label={t("Open Calendar actions")}
             disabled={busyAction !== null}
             iconOnly
             size="sm"
@@ -212,7 +241,7 @@ export function CalendarOverflowActions({
           <DropdownMenuItem asChild>
             <a href={FUTURE_CALENDAR_JSON_URL} download data-calendar-future-download>
               <Icon name="download" size="xs" />
-              Download future workouts JSON
+              {t("Download future workouts JSON")}
             </a>
           </DropdownMenuItem>
           <DropdownMenuItem
@@ -220,7 +249,7 @@ export function CalendarOverflowActions({
             onSelect={() => fileInputRef.current?.click()}
           >
             <Icon name="upload" size="xs" />
-            Upload plan JSON
+            {t("Upload plan JSON")}
           </DropdownMenuItem>
           {localActivityFileDesignFixtureEnabled ? (
             <DropdownMenuItem
@@ -229,7 +258,7 @@ export function CalendarOverflowActions({
               onSelect={() => void runLocalFileFlowBridge()}
             >
               <Icon name="check-circle" size="xs" />
-              Check Calendar JSON flow
+              {t("Check Calendar JSON flow")}
             </DropdownMenuItem>
           ) : null}
           <DropdownMenuItem
@@ -237,7 +266,7 @@ export function CalendarOverflowActions({
             onSelect={() => setPendingAction("start")}
           >
             <Icon name="calendar-clock" size="xs" />
-            Start a new plan
+            {t("Start a new plan")}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
@@ -246,7 +275,7 @@ export function CalendarOverflowActions({
             onSelect={() => setPendingAction("delete")}
           >
             <Icon name="trash" size="xs" />
-            Delete future workouts
+            {t("Delete future workouts")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -283,17 +312,17 @@ export function CalendarOverflowActions({
         >
           <DialogHeader className="hito-product-dialog-header">
             <DialogTitle className="hito-ui-title-md text-foreground">
-              {pendingAction === "start" ? "Start a new plan?" : "Delete future workouts?"}
+              {pendingAction === "start" ? t("Start a new plan?") : t("Delete future workouts?")}
             </DialogTitle>
             <DialogDescription className="hito-body-md text-secondary">
               {pendingAction === "start"
-                ? "Eligible upcoming workouts will be removed before plan creation opens."
-                : "This removes eligible upcoming Calendar workouts."}
+                ? t("Eligible upcoming workouts will be removed before plan creation opens.")
+                : t("This removes eligible upcoming Calendar workouts.")}
             </DialogDescription>
           </DialogHeader>
           <div className="hito-product-dialog-body">
             <p className="hito-body-md text-secondary">
-              Past workouts, results, and FIT records are not touched.
+              {t("Past workouts, results, and FIT records are not touched.")}
             </p>
           </div>
           <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
@@ -304,7 +333,7 @@ export function CalendarOverflowActions({
               disabled={busyAction !== null}
               onClick={() => setPendingAction(null)}
             >
-              Cancel
+              {t("Cancel")}
             </HitoButton>
             <HitoButton
               type="button"
@@ -315,7 +344,7 @@ export function CalendarOverflowActions({
               disabled={busyAction !== null}
               onClick={() => void confirmAction()}
             >
-              {pendingAction === "start" ? "Start a new plan" : "Delete future workouts"}
+              {pendingAction === "start" ? t("Start a new plan") : t("Delete future workouts")}
             </HitoButton>
           </DialogFooter>
         </DialogContent>

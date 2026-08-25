@@ -1,6 +1,14 @@
 /* eslint-disable react-refresh/only-export-components */
-import { formatDate, formatDurationMin } from "@/lib/training";
+import { formatDurationMin } from "@/lib/training";
 import { Icon } from "@/components/ui/icon";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
+import {
+  DEFAULT_RESOLVED_UI_LOCALE,
+  formatUiDate,
+  formatUiNumber,
+  type ResolvedUiLocale,
+} from "@/lib/ui-locale";
+import { formatHitoProductMessage, getHitoKnownProductMessage } from "@/lib/ui-locale-messages";
 import type {
   WorkoutActualMetricsSummary,
   WorkoutComparisonDifferencePayload,
@@ -32,23 +40,25 @@ export function DeterministicComparisonReadback({
 }: {
   comparison: WorkoutComparisonSummary;
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   const payload = getComparisonPayload(comparison);
-  const rows = buildPlanRunDifferenceRows(comparison);
+  const rows = buildPlanRunDifferenceRows(comparison, locale);
   const structureGroups = getStructureGroups(payload);
-  const detailLines = buildComparisonDetailLines(comparison, payload);
+  const detailLines = buildComparisonDetailLines(comparison, payload, locale);
 
   return (
     <div className="mt-4 space-y-4">
-      <ComparisonRowGroup rows={rows} />
+      <ComparisonRowGroup rows={rows} locale={locale} />
 
       {structureGroups.length > 0 ? (
         <details className="hito-disclosure">
           <summary className="hito-disclosure-summary">
-            <span className="hito-label-md text-foreground">Workout structure</span>
+            <span className="hito-label-md text-foreground">{t("Workout structure")}</span>
             <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
           </summary>
           <div className="hito-disclosure-body">
-            <StructureReadback groups={structureGroups} />
+            <StructureReadback groups={structureGroups} locale={locale} />
           </div>
         </details>
       ) : null}
@@ -56,7 +66,7 @@ export function DeterministicComparisonReadback({
       {detailLines.length > 0 ? (
         <details className="hito-disclosure">
           <summary className="hito-disclosure-summary">
-            <span className="hito-label-md text-foreground">Comparison details</span>
+            <span className="hito-label-md text-foreground">{t("Comparison details")}</span>
             <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
           </summary>
           <div className="hito-disclosure-body">
@@ -79,44 +89,72 @@ export function RunCapturedReadback({
   actual: WorkoutActualMetricsSummary;
   comparisonAvailable?: boolean;
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   const rows = [
     actual.activityLocalDate
-      ? { label: "Workout day", value: formatDateValue(actual.activityLocalDate) }
+      ? { label: t("Workout day"), value: formatDateValue(actual.activityLocalDate, locale) }
       : null,
     actual.actualDurationMin != null
-      ? { label: "Duration", value: formatDurationMin(actual.actualDurationMin) }
+      ? { label: t("Duration"), value: formatDurationMin(actual.actualDurationMin) }
       : null,
     actual.actualDistanceKm != null
-      ? { label: "Distance", value: formatKilometres(actual.actualDistanceKm) }
+      ? { label: t("Distance"), value: formatKilometres(actual.actualDistanceKm, locale) }
       : null,
     actual.actualElevationGainM != null
-      ? { label: "Elevation gain", value: formatWholeNumber(actual.actualElevationGainM, "m") }
+      ? {
+          label: t("Elevation gain"),
+          value: formatWholeNumber(actual.actualElevationGainM, "m", locale),
+        }
       : null,
     actual.actualElevationLossM != null
-      ? { label: "Elevation loss", value: formatWholeNumber(actual.actualElevationLossM, "m") }
+      ? {
+          label: t("Elevation loss"),
+          value: formatWholeNumber(actual.actualElevationLossM, "m", locale),
+        }
       : null,
     actual.actualAvgHr != null
-      ? { label: "Average heart rate", value: formatWholeNumber(actual.actualAvgHr, "bpm") }
+      ? {
+          label: t("Average heart rate"),
+          value: formatWholeNumber(actual.actualAvgHr, "bpm", locale),
+        }
       : null,
     actual.actualMaxHr != null
-      ? { label: "Maximum heart rate", value: formatWholeNumber(actual.actualMaxHr, "bpm") }
+      ? {
+          label: t("Maximum heart rate"),
+          value: formatWholeNumber(actual.actualMaxHr, "bpm", locale),
+        }
       : null,
     actual.actualAvgPower != null
-      ? { label: "Average power", value: formatWholeNumber(actual.actualAvgPower, "W") }
+      ? {
+          label: t("Average power"),
+          value: formatWholeNumber(actual.actualAvgPower, "W", locale),
+        }
       : null,
     actual.actualMaxPower != null
-      ? { label: "Maximum power", value: formatWholeNumber(actual.actualMaxPower, "W") }
+      ? {
+          label: t("Maximum power"),
+          value: formatWholeNumber(actual.actualMaxPower, "W", locale),
+        }
       : null,
     actual.actualAvgCadence != null
-      ? { label: "Average cadence", value: formatWholeNumber(actual.actualAvgCadence, "spm") }
+      ? {
+          label: t("Average cadence"),
+          value: formatWholeNumber(actual.actualAvgCadence, "spm", locale),
+        }
       : null,
     actual.actualCalories != null
-      ? { label: "Calories", value: formatWholeNumber(actual.actualCalories, "kcal") }
+      ? {
+          label: t("Calories"),
+          value: formatWholeNumber(actual.actualCalories, "kcal", locale),
+        }
       : null,
     actual.actualIntervalCount != null
       ? {
-          label: "Structured intervals",
-          value: `${actual.actualIntervalCount} interval${actual.actualIntervalCount === 1 ? "" : "s"}`,
+          label: t("Structured intervals"),
+          value: t(actual.actualIntervalCount === 1 ? "{count} interval" : "{count} intervals", {
+            count: formatUiNumber(actual.actualIntervalCount, locale),
+          }),
         }
       : null,
   ].filter(notNull);
@@ -124,10 +162,10 @@ export function RunCapturedReadback({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="hito-ui-title-xs text-foreground">Observed run</h3>
+        <h3 className="hito-ui-title-xs text-foreground">{t("Observed run")}</h3>
         {!comparisonAvailable ? (
           <span className="hito-status-pill" data-tone="muted">
-            Comparison unavailable
+            {t("Comparison unavailable")}
           </span>
         ) : null}
       </div>
@@ -143,28 +181,34 @@ export function RunCapturedReadback({
       ) : null}
       {!comparisonAvailable ? (
         <p className="hito-body-sm text-secondary">
-          The activity was captured, but no plan comparison is available.
+          {t("The activity was captured, but no plan comparison is available.")}
         </p>
       ) : null}
     </div>
   );
 }
 
-export function getComparisonCoverageMeta(comparison: WorkoutComparisonSummary): {
+export function getComparisonCoverageMeta(
+  comparison: WorkoutComparisonSummary,
+  locale: ResolvedUiLocale = DEFAULT_RESOLVED_UI_LOCALE,
+): {
   label: string;
   tone: "muted" | "signal" | "warning";
 } {
   switch (comparison.comparisonStatus) {
     case "complete":
-      return { label: "Complete comparison", tone: "signal" };
+      return { label: getHitoKnownProductMessage(locale, "Complete comparison"), tone: "signal" };
     case "partial":
-      return { label: "Partial comparison", tone: "warning" };
+      return { label: getHitoKnownProductMessage(locale, "Partial comparison"), tone: "warning" };
     default:
-      return { label: "Limited comparison", tone: "muted" };
+      return { label: getHitoKnownProductMessage(locale, "Limited comparison"), tone: "muted" };
   }
 }
 
-export function buildPlanRunDifferenceRows(comparison: WorkoutComparisonSummary): ComparisonRow[] {
+export function buildPlanRunDifferenceRows(
+  comparison: WorkoutComparisonSummary,
+  locale: ResolvedUiLocale = DEFAULT_RESOLVED_UI_LOCALE,
+): ComparisonRow[] {
   const signalsByKey = new Map(
     getComparisonSignals(comparison).map((signal) => [signal.key, signal]),
   );
@@ -185,21 +229,22 @@ export function buildPlanRunDifferenceRows(comparison: WorkoutComparisonSummary)
       return [];
     }
 
-    return [buildComparisonRow(signal)];
+    return [buildComparisonRow(signal, locale)];
   });
 }
 
-function ComparisonRowGroup({ rows }: { rows: ComparisonRow[] }) {
+function ComparisonRowGroup({ rows, locale }: { rows: ComparisonRow[]; locale: ResolvedUiLocale }) {
+  const copy = (value: string) => getHitoKnownProductMessage(locale, value);
   return (
     <dl className="hito-row-group">
       <div
         aria-hidden="true"
         className="hidden grid-cols-[minmax(7rem,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-4 px-4 py-3 sm:grid"
       >
-        <div className="hito-body-xs text-tertiary">Metric</div>
-        <div className="hito-body-xs text-tertiary">Plan</div>
-        <div className="hito-body-xs text-tertiary">Run</div>
-        <div className="hito-body-xs text-tertiary">Difference</div>
+        <div className="hito-body-xs text-tertiary">{copy("Metric")}</div>
+        <div className="hito-body-xs text-tertiary">{copy("Plan")}</div>
+        <div className="hito-body-xs text-tertiary">{copy("Run")}</div>
+        <div className="hito-body-xs text-tertiary">{copy("Difference")}</div>
       </div>
       {rows.map((row) => (
         <div
@@ -209,9 +254,9 @@ function ComparisonRowGroup({ rows }: { rows: ComparisonRow[] }) {
           <dt className="min-w-0">
             <span className="hito-body-md text-foreground">{row.label}</span>
           </dt>
-          <ComparisonValue metric={row.label} label="Plan" value={row.plan} />
-          <ComparisonValue metric={row.label} label="Run" value={row.run} />
-          <ComparisonValue metric={row.label} label="Difference" value={row.difference} />
+          <ComparisonValue metric={row.label} label={copy("Plan")} value={row.plan} />
+          <ComparisonValue metric={row.label} label={copy("Run")} value={row.run} />
+          <ComparisonValue metric={row.label} label={copy("Difference")} value={row.difference} />
         </div>
       ))}
     </dl>
@@ -240,20 +285,27 @@ function ComparisonValue({
   );
 }
 
-function StructureReadback({ groups }: { groups: WorkoutComparisonSegmentGroup[] }) {
+function StructureReadback({
+  groups,
+  locale,
+}: {
+  groups: WorkoutComparisonSegmentGroup[];
+  locale: ResolvedUiLocale;
+}) {
+  const copy = (value: string) => getHitoKnownProductMessage(locale, value);
   return (
     <dl className="hito-row-group">
       <div
         aria-hidden="true"
         className="hidden grid-cols-[minmax(7rem,1.1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)] gap-4 px-4 py-3 sm:grid"
       >
-        <div className="hito-body-xs text-tertiary">Section</div>
-        <div className="hito-body-xs text-tertiary">Plan</div>
-        <div className="hito-body-xs text-tertiary">Run</div>
-        <div className="hito-body-xs text-tertiary">Difference</div>
+        <div className="hito-body-xs text-tertiary">{copy("Section")}</div>
+        <div className="hito-body-xs text-tertiary">{copy("Plan")}</div>
+        <div className="hito-body-xs text-tertiary">{copy("Run")}</div>
+        <div className="hito-body-xs text-tertiary">{copy("Difference")}</div>
       </div>
       {groups.map((group) => {
-        const row = buildStructureRow(group);
+        const row = buildStructureRow(group, locale);
 
         return (
           <div
@@ -263,9 +315,13 @@ function StructureReadback({ groups }: { groups: WorkoutComparisonSegmentGroup[]
             <dt className="min-w-0">
               <span className="hito-body-md text-foreground">{group.label}</span>
             </dt>
-            <ComparisonValue metric={group.label} label="Plan" value={row.plan} />
-            <ComparisonValue metric={group.label} label="Run" value={row.run} />
-            <ComparisonValue metric={group.label} label="Difference" value={row.difference} />
+            <ComparisonValue metric={group.label} label={copy("Plan")} value={row.plan} />
+            <ComparisonValue metric={group.label} label={copy("Run")} value={row.run} />
+            <ComparisonValue
+              metric={group.label}
+              label={copy("Difference")}
+              value={row.difference}
+            />
           </div>
         );
       })}
@@ -273,18 +329,22 @@ function StructureReadback({ groups }: { groups: WorkoutComparisonSegmentGroup[]
   );
 }
 
-function buildComparisonRow(signal: WorkoutComparisonSignal): ComparisonRow {
-  const label = humanizeSignalLabel(signal);
-  const plan = formatSignalValue(signal.plannedValue, signal.unit, "plan");
-  const run = formatSignalValue(signal.actualValue, signal.unit, "run");
+function buildComparisonRow(
+  signal: WorkoutComparisonSignal,
+  locale: ResolvedUiLocale,
+): ComparisonRow {
+  const copy = (value: string) => getHitoKnownProductMessage(locale, value);
+  const label = humanizeSignalLabel(signal, locale);
+  const plan = formatSignalValue(signal.plannedValue, signal.unit, "plan", locale);
+  const run = formatSignalValue(signal.actualValue, signal.unit, "run", locale);
 
   if (signal.status === "missing_actual") {
     return {
       key: signal.key,
       label,
       plan,
-      run: "Unavailable",
-      difference: "Run data unavailable",
+      run: copy("Unavailable"),
+      difference: copy("Run data unavailable"),
     };
   }
 
@@ -292,13 +352,13 @@ function buildComparisonRow(signal: WorkoutComparisonSignal): ComparisonRow {
     return {
       key: signal.key,
       label,
-      plan: signal.key === "distance" ? "No target" : plan,
+      plan: signal.key === "distance" ? copy("No target") : plan,
       run,
-      difference: "Not compared",
+      difference: copy("Not compared"),
     };
   }
 
-  const difference = formatSignalDifference(signal);
+  const difference = formatSignalDifference(signal, locale);
 
   return {
     key: signal.key,
@@ -311,81 +371,106 @@ function buildComparisonRow(signal: WorkoutComparisonSignal): ComparisonRow {
 
 function buildStructureRow(
   group: WorkoutComparisonSegmentGroup,
+  locale: ResolvedUiLocale,
 ): Omit<ComparisonRow, "key" | "label"> {
+  const copy = (value: string) => getHitoKnownProductMessage(locale, value);
   if (group.status === "missing_actual") {
     return {
-      plan: formatStructureValue(group.plannedStepCount, group.plannedDurationMin),
-      run: "Unavailable",
-      difference: "Run data unavailable",
+      plan: formatStructureValue(group.plannedStepCount, group.plannedDurationMin, locale),
+      run: copy("Unavailable"),
+      difference: copy("Run data unavailable"),
     };
   }
 
   if (group.status === "not_applicable") {
     return {
-      plan: formatStructureValue(group.plannedStepCount, group.plannedDurationMin),
-      run: formatStructureValue(group.actualStepCount, group.actualDurationMin),
-      difference: "Not compared",
+      plan: formatStructureValue(group.plannedStepCount, group.plannedDurationMin, locale),
+      run: formatStructureValue(group.actualStepCount, group.actualDurationMin, locale),
+      difference: copy("Not compared"),
     };
   }
 
-  const difference = formatStructuredDifference(group);
+  const difference = formatStructuredDifference(group, locale);
   return {
-    plan: formatStructureValue(group.plannedStepCount, group.plannedDurationMin),
-    run: formatStructureValue(group.actualStepCount, group.actualDurationMin),
+    plan: formatStructureValue(group.plannedStepCount, group.plannedDurationMin, locale),
+    run: formatStructureValue(group.actualStepCount, group.actualDurationMin, locale),
     difference,
   };
 }
 
-function formatSignalDifference(signal: WorkoutComparisonSignal) {
+function formatSignalDifference(signal: WorkoutComparisonSignal, locale: ResolvedUiLocale) {
+  const copy = (value: string) => getHitoKnownProductMessage(locale, value);
   if (signal.key === "activity_type") {
-    return signal.status === "matched" ? "Matched activity" : "Different activity";
+    return signal.status === "matched" ? copy("Matched activity") : copy("Different activity");
   }
 
   if (signal.key === "date_alignment") {
     if (signal.delta === 0) {
-      return "Same day";
+      return copy("Same day");
     }
 
     const days = typeof signal.delta === "number" ? Math.abs(signal.delta) : null;
-    const direction = signal.delta != null && signal.delta > 0 ? "Later" : "Earlier";
+    const later = signal.delta != null && signal.delta > 0;
+    const direction = copy(later ? "Later" : "Earlier");
     const value =
-      days == null ? direction : `${days} day${days === 1 ? "" : "s"} ${direction.toLowerCase()}`;
+      days == null
+        ? direction
+        : formatHitoProductMessage(
+            locale,
+            days === 1
+              ? later
+                ? "{count} day later"
+                : "{count} day earlier"
+              : later
+                ? "{count} days later"
+                : "{count} days earlier",
+            { count: formatUiNumber(days, locale) },
+          );
     return value;
   }
 
   if (signal.key === "structured_step_count") {
     const status =
       signal.status === "matched"
-        ? "Matched structure"
+        ? copy("Matched structure")
         : signal.status === "partial"
-          ? "Partly matched"
-          : "Different structure";
-    return appendSignedAmount(status, signal);
+          ? copy("Partly matched")
+          : copy("Different structure");
+    return appendSignedAmount(status, signal, locale);
   }
 
   if (signal.status === "matched") {
-    return appendSignedAmount("Within plan", signal);
+    return appendSignedAmount(copy("Within plan"), signal, locale);
   }
 
-  const direction =
-    typeof signal.delta === "number" && signal.delta < 0 ? "Below plan" : "Above plan";
-  return appendSignedAmount(direction, signal);
+  const direction = copy(
+    typeof signal.delta === "number" && signal.delta < 0 ? "Below plan" : "Above plan",
+  );
+  return appendSignedAmount(direction, signal, locale);
 }
 
-function formatStructuredDifference(group: WorkoutComparisonSegmentGroup) {
+function formatStructuredDifference(
+  group: WorkoutComparisonSegmentGroup,
+  locale: ResolvedUiLocale,
+) {
+  const copy = (value: string) => getHitoKnownProductMessage(locale, value);
   const status =
     group.status === "matched"
-      ? "Matched structure"
+      ? copy("Matched structure")
       : group.status === "partial"
-        ? "Partly matched"
-        : "Different structure";
-  const delta = formatSignedDuration(group.durationDeltaMin);
+        ? copy("Partly matched")
+        : copy("Different structure");
+  const delta = formatSignedDuration(group.durationDeltaMin, locale);
 
   return delta ? `${delta} · ${status}` : status;
 }
 
-function appendSignedAmount(status: string, signal: WorkoutComparisonSignal) {
-  const delta = formatSignedValue(signal.delta, signal.unit);
+function appendSignedAmount(
+  status: string,
+  signal: WorkoutComparisonSignal,
+  locale: ResolvedUiLocale,
+) {
+  const delta = formatSignedValue(signal.delta, signal.unit, locale);
   return delta ? `${delta} · ${status}` : status;
 }
 
@@ -393,34 +478,44 @@ function formatSignalValue(
   value: WorkoutComparisonSignal["plannedValue"],
   unit: WorkoutComparisonSignal["unit"],
   side: "plan" | "run",
+  locale: ResolvedUiLocale,
 ) {
   if (value == null || value === "") {
-    return side === "plan" ? "—" : "Unavailable";
+    return side === "plan" ? "—" : getHitoKnownProductMessage(locale, "Unavailable");
   }
 
   if (unit === "date" && typeof value === "string") {
-    return formatDateValue(value);
+    return formatDateValue(value, locale);
   }
 
   if (unit === "km" && typeof value === "number") {
-    return formatKilometres(value);
+    return formatKilometres(value, locale);
   }
 
   if (unit === "min" && typeof value === "number") {
     return formatDurationMin(value);
   }
 
-  return humanizeValue(String(value));
+  return getHitoKnownProductMessage(locale, humanizeValue(String(value)));
 }
 
-function formatStructureValue(stepCount: number, durationMin: number | null) {
-  const stepLabel = `${stepCount} step${stepCount === 1 ? "" : "s"}`;
+function formatStructureValue(
+  stepCount: number,
+  durationMin: number | null,
+  locale: ResolvedUiLocale,
+) {
+  const stepLabel = formatHitoProductMessage(
+    locale,
+    stepCount === 1 ? "{count} step" : "{count} steps",
+    { count: formatUiNumber(stepCount, locale) },
+  );
   return durationMin == null ? stepLabel : `${stepLabel} · ${formatDurationMin(durationMin)}`;
 }
 
 function formatSignedValue(
   value: number | null | undefined,
   unit: WorkoutComparisonSignal["unit"],
+  locale: ResolvedUiLocale,
 ) {
   if (typeof value !== "number" || !Number.isFinite(value) || value === 0) {
     return null;
@@ -430,35 +525,47 @@ function formatSignedValue(
   const magnitude = Math.abs(value);
 
   if (unit === "min") {
-    return `${sign}${magnitude.toFixed(1)} min`;
+    return `${sign}${formatUiNumber(magnitude, locale, {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    })} min`;
   }
 
   if (unit === "km") {
-    return `${sign}${magnitude.toFixed(2)} km`;
+    return `${sign}${formatUiNumber(magnitude, locale, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })} km`;
   }
 
   if (unit === "count") {
-    return `${sign}${magnitude}`;
+    return `${sign}${formatUiNumber(magnitude, locale)}`;
   }
 
   return null;
 }
 
-function formatSignedDuration(value: number | null) {
-  return formatSignedValue(value, "min");
+function formatSignedDuration(value: number | null, locale: ResolvedUiLocale) {
+  return formatSignedValue(value, "min", locale);
 }
 
 function buildComparisonDetailLines(
   comparison: WorkoutComparisonSummary,
   payload: WorkoutComparisonDifferencePayload | null,
+  locale: ResolvedUiLocale,
 ) {
   const signals = getComparisonSignals(comparison);
   const supportItems = getSupportItems(payload);
-  const coverage = getComparisonCoverageMeta(comparison);
+  const coverage = getComparisonCoverageMeta(comparison, locale);
   const details = [
-    `Coverage: ${coverage.label}.`,
-    `Confidence: ${Math.round(comparison.comparisonConfidence * 100)}%.`,
-    `Checks available: ${payload?.summary.comparedSignalCount ?? signals.length} of ${payload?.summary.visibleSignalCount ?? signals.length}.`,
+    formatHitoProductMessage(locale, "Coverage: {coverage}.", { coverage: coverage.label }),
+    formatHitoProductMessage(locale, "Confidence: {confidence}%.", {
+      confidence: formatUiNumber(Math.round(comparison.comparisonConfidence * 100), locale),
+    }),
+    formatHitoProductMessage(locale, "Checks available: {available} of {visible}.", {
+      available: formatUiNumber(payload?.summary.comparedSignalCount ?? signals.length, locale),
+      visible: formatUiNumber(payload?.summary.visibleSignalCount ?? signals.length, locale),
+    }),
   ];
 
   const reasons = signals
@@ -466,10 +573,16 @@ function buildComparisonDetailLines(
       (signal) =>
         signal.reason && (signal.status === "missing_actual" || signal.status === "not_applicable"),
     )
-    .map((signal) => `${humanizeSignalLabel(signal)}: ${signal.reason}`);
+    .map(
+      (signal) =>
+        `${humanizeSignalLabel(signal, locale)}: ${getHitoKnownProductMessage(
+          locale,
+          signal.reason ?? "",
+        )}`,
+    );
   const unsupported = supportItems
     .filter((item) => item.status === "unsupported")
-    .map((item) => humanizeSupportSignalLabel(item));
+    .map((item) => humanizeSupportSignalLabel(item, locale));
   const tolerance = signals.find(
     (signal) =>
       typeof signal.matchedTolerancePct === "number" &&
@@ -477,12 +590,23 @@ function buildComparisonDetailLines(
   );
 
   if (unsupported.length > 0) {
-    details.push(`Not comparable in this upload: ${formatInlineList(unsupported)}.`);
+    details.push(
+      formatHitoProductMessage(locale, "Not comparable in this upload: {items}.", {
+        items: formatInlineList(unsupported, locale),
+      }),
+    );
   }
 
   if (tolerance?.matchedTolerancePct != null && tolerance.partialTolerancePct != null) {
     details.push(
-      `Duration and distance use the backend thresholds: within ${Math.round(tolerance.matchedTolerancePct * 100)}%, partial through ${Math.round(tolerance.partialTolerancePct * 100)}%.`,
+      formatHitoProductMessage(
+        locale,
+        "Duration and distance use the backend thresholds: within {matched}%, partial through {partial}%.",
+        {
+          matched: formatUiNumber(Math.round(tolerance.matchedTolerancePct * 100), locale),
+          partial: formatUiNumber(Math.round(tolerance.partialTolerancePct * 100), locale),
+        },
+      ),
     );
   }
 
@@ -540,77 +664,75 @@ function isSupportItem(value: unknown): value is WorkoutComparisonSupportItem {
   );
 }
 
-function humanizeSignalLabel(signal: WorkoutComparisonSignal) {
+function humanizeSignalLabel(signal: WorkoutComparisonSignal, locale: ResolvedUiLocale) {
   if (signal.key === "activity_type") {
-    return "Activity";
+    return getHitoKnownProductMessage(locale, "Activity");
   }
 
   if (signal.key === "date_alignment") {
-    return "Workout day";
+    return getHitoKnownProductMessage(locale, "Workout day");
   }
 
   if (signal.key === "duration") {
-    return "Duration";
+    return getHitoKnownProductMessage(locale, "Duration");
   }
 
   if (signal.key === "distance") {
-    return "Distance";
+    return getHitoKnownProductMessage(locale, "Distance");
   }
 
   if (signal.key === "structured_step_count") {
-    return "Workout structure";
+    return getHitoKnownProductMessage(locale, "Workout structure");
   }
 
-  return signal.label;
+  return getHitoKnownProductMessage(locale, signal.label);
 }
 
-function humanizeSupportSignalLabel(item: WorkoutComparisonSupportItem) {
+function humanizeSupportSignalLabel(item: WorkoutComparisonSupportItem, locale: ResolvedUiLocale) {
+  const copy = (value: string) => getHitoKnownProductMessage(locale, value);
   switch (item.key) {
     case "date_alignment":
-      return "workout day";
+      return copy("workout day");
     case "structured_step_count":
-      return "workout structure";
+      return copy("workout structure");
     case "step_duration":
-      return "step timing";
+      return copy("step timing");
     case "segment_group_duration":
-      return "workout sections";
+      return copy("workout sections");
     case "heart_rate":
-      return "heart rate";
+      return copy("heart rate");
     default:
       return item.label.trim() || item.key.replace(/_/g, " ");
   }
 }
 
-function formatDateValue(value: string) {
+function formatDateValue(value: string, locale: ResolvedUiLocale) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value)
-    ? formatDate(value, { month: "short", day: "numeric" })
+    ? formatUiDate(value, locale, { month: "short", day: "numeric" })
     : value;
 }
 
-function formatKilometres(value: number) {
-  return `${value.toFixed(2)} km`;
+function formatKilometres(value: number, locale: ResolvedUiLocale) {
+  return `${formatUiNumber(value, locale, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} km`;
 }
 
-function formatWholeNumber(value: number, unit: string) {
-  return `${Math.round(value)} ${unit}`;
+function formatWholeNumber(value: number, unit: string, locale: ResolvedUiLocale) {
+  return `${formatUiNumber(Math.round(value), locale)} ${unit}`;
 }
 
 function humanizeValue(value: string) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function formatInlineList(items: string[]) {
+function formatInlineList(items: string[], locale: ResolvedUiLocale) {
   const uniqueItems = Array.from(new Set(items));
-
-  if (uniqueItems.length <= 1) {
-    return uniqueItems[0] ?? "";
-  }
-
-  if (uniqueItems.length === 2) {
-    return `${uniqueItems[0]} and ${uniqueItems[1]}`;
-  }
-
-  return `${uniqueItems.slice(0, -1).join(", ")}, and ${uniqueItems.at(-1)}`;
+  return new Intl.ListFormat(locale === "pt-BR" ? "pt-BR" : "en-US", {
+    style: "long",
+    type: "conjunction",
+  }).format(uniqueItems);
 }
 
 function notNull<T>(value: T | null): value is T {

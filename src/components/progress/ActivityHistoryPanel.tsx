@@ -1,6 +1,7 @@
 import { useRef, type RefObject } from "react";
 import { Link } from "@tanstack/react-router";
 import { HitoButton } from "@/components/ui/button";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
 import {
   Dialog,
   DialogContent,
@@ -59,19 +60,20 @@ export function ActivityHistoryPanel({
     trigger?: HTMLElement,
   ) => void;
 }) {
+  const message = useHitoProductMessage();
   return (
     <section aria-labelledby="activity-history-title">
       <header className="hito-page-header">
-        <p className="hito-label-md text-foreground">Recorded running</p>
+        <p className="hito-label-md text-foreground">{message("Recorded running")}</p>
         <h1
           id="activity-history-title"
           className="hito-ui-title-xl mt-2 max-w-[44rem]"
           tabIndex={-1}
         >
-          Activity history
+          {message("Activity history")}
         </h1>
         <p className="hito-body-md mt-4 max-w-[40rem] text-secondary">
-          Your recorded runs, whether or not they matched a plan.
+          {message("Your recorded runs, whether or not they matched a plan.")}
         </p>
       </header>
 
@@ -87,7 +89,7 @@ export function ActivityHistoryPanel({
               <HistoryError message={state.error} onRetry={onRetry} compact />
             </div>
           ) : null}
-          <ul className="hito-row-group" aria-label="Recorded running activities">
+          <ul className="hito-row-group" aria-label={message("Recorded running activities")}>
             {state.data.items.map((activity) => (
               <ActivityHistoryRow
                 key={activity.id}
@@ -108,7 +110,7 @@ export function ActivityHistoryPanel({
                 onClick={onLoadMore}
               >
                 {state.loadingMore ? <Icon name="loader" size="sm" /> : null}
-                {state.loadingMore ? "Loading…" : "Load more"}
+                {state.loadingMore ? message("Loading…") : message("Load more")}
               </HitoButton>
             </div>
           ) : null}
@@ -131,10 +133,12 @@ function ActivityHistoryRow({
     trigger?: HTMLElement,
   ) => void;
 }) {
+  const message = useHitoProductMessage();
+  const locale = useHitoUiLocale();
   const primaryButtonRef = useRef<HTMLButtonElement | null>(null);
-  const dateRail = activityDateRail(activity);
-  const primaryFacts = activityPrimaryFacts(activity);
-  const supportingFacts = activitySupportingFacts(activity);
+  const dateRail = activityDateRail(activity, locale);
+  const primaryFacts = activityPrimaryFacts(activity, locale);
+  const supportingFacts = activitySupportingFacts(activity, locale);
   const localDate = activity.historicalTime.localDate;
   const sourceRemovalNeedsRetry = activity.source.rawState === "removal_pending";
 
@@ -144,7 +148,7 @@ function ActivityHistoryRow({
         ref={primaryButtonRef}
         type="button"
         className="grid min-w-0 flex-1 grid-cols-[3.25rem_minmax(0,1fr)] gap-3 px-4 py-4 text-left outline-none transition-colors hover:bg-chrome-subtle focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[4rem_minmax(0,1fr)_minmax(11rem,auto)] sm:items-center sm:gap-4"
-        aria-label={activityDisclosureLabel(activity)}
+        aria-label={activityDisclosureLabel(activity, locale)}
         onClick={(event) => onOpenActivity(activity, event.currentTarget)}
       >
         <time dateTime={localDate ?? undefined} className="text-center tabular-nums">
@@ -156,7 +160,7 @@ function ActivityHistoryRow({
             {activity.identity.label}
           </span>
           <span className="hito-body-sm mt-1 text-secondary block">
-            {activity.plannedWorkout ? activity.plannedWorkout.title : "Unplanned run"}
+            {activity.plannedWorkout ? activity.plannedWorkout.title : message("Unplanned run")}
           </span>
           {primaryFacts.length > 0 ? (
             <span className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-sm tabular-nums sm:hidden">
@@ -195,7 +199,10 @@ function ActivityHistoryRow({
           <DropdownMenuTrigger asChild>
             <HitoButton
               type="button"
-              aria-label={`Actions for ${activityDisplayDate(activity)} ${activity.identity.label}`}
+              aria-label={message("Actions for {date} {activity}", {
+                date: activityDisplayDate(activity, locale),
+                activity: activity.identity.label,
+              })}
               className="h-11 w-11"
               iconOnly
               size="sm"
@@ -211,7 +218,7 @@ function ActivityHistoryRow({
               }}
             >
               <Icon name="visibility" size="sm" />
-              View details
+              {message("View details")}
             </DropdownMenuItem>
             {activity.capabilities.canRemoveOriginalFile ? (
               <DropdownMenuItem
@@ -221,7 +228,9 @@ function ActivityHistoryRow({
                 }
               >
                 <Icon name="file-text" size="sm" />
-                {sourceRemovalNeedsRetry ? "Retry file removal" : "Remove original file"}
+                {sourceRemovalNeedsRetry
+                  ? message("Retry file removal")
+                  : message("Remove original file")}
               </DropdownMenuItem>
             ) : null}
             <DropdownMenuSeparator />
@@ -232,7 +241,7 @@ function ActivityHistoryRow({
               }
             >
               <Icon name="trash" size="sm" />
-              Delete activity
+              {message("Delete activity")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -257,6 +266,7 @@ export function ActivityDetailOverlay({
   ) => void;
 }) {
   const isMobile = useIsMobile();
+  const message = useHitoProductMessage();
   const headingRef = useRef<HTMLHeadingElement | null>(null);
   const content = activity ? (
     <ActivityDetailContent activity={activity} onRequestAction={onRequestAction} />
@@ -283,9 +293,11 @@ export function ActivityDetailOverlay({
         >
           <SheetHeader className="border-b border-hairline px-5 py-4 pr-14">
             <SheetTitle ref={headingRef} tabIndex={-1}>
-              {activity?.identity.label ?? "Activity"}
+              {activity?.identity.label ?? message("Activity")}
             </SheetTitle>
-            <SheetDescription>Recorded activity facts and source controls.</SheetDescription>
+            <SheetDescription>
+              {message("Recorded activity facts and source controls.")}
+            </SheetDescription>
           </SheetHeader>
           <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-5">
             {content}
@@ -304,9 +316,11 @@ export function ActivityDetailOverlay({
       >
         <DialogHeader className="hito-product-dialog-header">
           <DialogTitle ref={headingRef} className="hito-ui-title-md text-foreground" tabIndex={-1}>
-            {activity?.identity.label ?? "Activity"}
+            {activity?.identity.label ?? message("Activity")}
           </DialogTitle>
-          <DialogDescription>Recorded activity facts and source controls.</DialogDescription>
+          <DialogDescription>
+            {message("Recorded activity facts and source controls.")}
+          </DialogDescription>
         </DialogHeader>
         <div className="min-h-0 overflow-y-auto px-6 pb-6">{content}</div>
       </DialogContent>
@@ -325,18 +339,24 @@ function ActivityDetailContent({
     trigger?: HTMLElement,
   ) => void;
 }) {
-  const primaryFacts = activityPrimaryFacts(activity);
-  const supportingFacts = activitySupportingFacts(activity);
-  const startedTime = formatStartedTime(activity);
+  const message = useHitoProductMessage();
+  const locale = useHitoUiLocale();
+  const primaryFacts = activityPrimaryFacts(activity, locale);
+  const supportingFacts = activitySupportingFacts(activity, locale);
+  const startedTime = formatStartedTime(activity, locale);
   const sourceRemovalNeedsRetry = activity.source.rawState === "removal_pending";
 
   return (
     <div className="space-y-7">
       <section>
-        <p className="hito-label-md text-foreground">Activity</p>
-        <h2 className="hito-ui-title-sm text-foreground mt-2">{activityDisplayDate(activity)}</h2>
+        <p className="hito-label-md text-foreground">{message("Activity")}</p>
+        <h2 className="hito-ui-title-sm text-foreground mt-2">
+          {activityDisplayDate(activity, locale)}
+        </h2>
         {startedTime ? (
-          <p className="hito-body-xs text-tertiary mt-1">Started {startedTime}</p>
+          <p className="hito-body-xs text-tertiary mt-1">
+            {message("Started {time}", { time: startedTime })}
+          </p>
         ) : null}
         <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm tabular-nums">
           {[...primaryFacts, ...supportingFacts].map((fact) => (
@@ -346,7 +366,7 @@ function ActivityDetailContent({
       </section>
 
       <section className="border-t border-hairline pt-5">
-        <p className="hito-label-md text-foreground">Plan relationship</p>
+        <p className="hito-label-md text-foreground">{message("Plan relationship")}</p>
         {activity.plannedWorkout ? (
           <div className="mt-2">
             <Link
@@ -358,33 +378,37 @@ function ActivityDetailContent({
               {activity.plannedWorkout.title}
             </Link>
             <p className="hito-body-xs text-tertiary mt-1">
-              Open the workout for its exact Plan vs run comparison.
+              {message("Open the workout for its exact Plan vs run comparison.")}
             </p>
           </div>
         ) : (
-          <p className="hito-body-md text-secondary mt-2">Unplanned run</p>
+          <p className="hito-body-md text-secondary mt-2">{message("Unplanned run")}</p>
         )}
       </section>
 
       <section className="border-t border-hairline pt-5">
-        <p className="hito-label-md text-foreground">Source</p>
-        <p className="hito-body-md text-foreground mt-2">Garmin file</p>
+        <p className="hito-label-md text-foreground">{message("Source")}</p>
+        <p className="hito-body-md text-foreground mt-2">{message("Garmin file")}</p>
         <p className="hito-body-md text-secondary mt-2">
           {activity.source.rawState === "removed"
-            ? "Original file removed. Normalized activity facts remain in history and progress, but Hito cannot reprocess the source."
+            ? message(
+                "Original file removed. Normalized activity facts remain in history and progress, but Hito cannot reprocess the source.",
+              )
             : activity.source.rawState === "removal_pending"
-              ? "The previous removal did not finish. Try removing the original file again."
-              : "The original file is retained and can be reprocessed."}
+              ? message(
+                  "The previous removal did not finish. Try removing the original file again.",
+                )
+              : message("The original file is retained and can be reprocessed.")}
         </p>
         {activity.quality.updating ? (
           <span className="hito-status-pill mt-3" data-tone="signal">
-            Updating
+            {message("Updating")}
           </span>
         ) : null}
       </section>
 
       <section className="border-t border-hairline pt-5">
-        <p className="hito-label-md text-foreground">Privacy and deletion</p>
+        <p className="hito-label-md text-foreground">{message("Privacy and deletion")}</p>
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           {activity.capabilities.canRemoveOriginalFile ? (
             <HitoButton
@@ -395,7 +419,9 @@ function ActivityDetailContent({
               onClick={(event) => onRequestAction("remove-source", activity, event.currentTarget)}
             >
               <Icon name="file-text" size="sm" />
-              {sourceRemovalNeedsRetry ? "Retry file removal" : "Remove original file"}
+              {sourceRemovalNeedsRetry
+                ? message("Retry file removal")
+                : message("Remove original file")}
             </HitoButton>
           ) : null}
           <HitoButton
@@ -406,7 +432,7 @@ function ActivityDetailContent({
             onClick={(event) => onRequestAction("delete", activity, event.currentTarget)}
           >
             <Icon name="trash" size="sm" />
-            Delete activity
+            {message("Delete activity")}
           </HitoButton>
         </div>
       </section>
@@ -429,6 +455,8 @@ export function ActivityActionConfirmation({
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
 }) {
+  const message = useHitoProductMessage();
+  const locale = useHitoUiLocale();
   const removesSource = pendingAction?.action === "remove-source";
   const retriesSourceRemoval =
     removesSource && pendingAction?.activity.source.rawState === "removal_pending";
@@ -453,24 +481,30 @@ export function ActivityActionConfirmation({
         <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-ui-title-md text-foreground">
             {retriesSourceRemoval
-              ? "Retry original file removal?"
+              ? message("Retry original file removal?")
               : removesSource
-                ? "Remove original file?"
-                : "Delete activity from history?"}
+                ? message("Remove original file?")
+                : message("Delete activity from history?")}
           </DialogTitle>
           <DialogDescription>
             {pendingAction
-              ? `${activityDisplayDate(pendingAction.activity)} ${pendingAction.activity.identity.label}`
-              : "Activity"}
+              ? `${activityDisplayDate(pendingAction.activity, locale)} ${pendingAction.activity.identity.label}`
+              : message("Activity")}
           </DialogDescription>
         </DialogHeader>
         <div className="hito-product-dialog-body">
           <p className="hito-body-md text-secondary">
             {removesSource
               ? retriesSourceRemoval
-                ? "The previous removal did not finish. Retrying removes the original file while keeping the normalized activity in history and progress."
-                : "The normalized activity stays in history and continues to contribute to progress, but Hito can no longer reprocess the original file."
-              : "This removes the recorded activity, its observed evidence, comparisons, and profile contribution. A separate manually reported completion may remain."}
+                ? message(
+                    "The previous removal did not finish. Retrying removes the original file while keeping the normalized activity in history and progress.",
+                  )
+                : message(
+                    "The normalized activity stays in history and continues to contribute to progress, but Hito can no longer reprocess the original file.",
+                  )
+              : message(
+                  "This removes the recorded activity, its observed evidence, comparisons, and profile contribution. A separate manually reported completion may remain.",
+                )}
           </p>
           {error ? (
             <div className="hito-state-surface mt-4 py-3" data-tone="destructive" role="alert">
@@ -486,7 +520,7 @@ export function ActivityActionConfirmation({
             disabled={pending}
             onClick={() => onOpenChange(false)}
           >
-            Cancel
+            {message("Cancel")}
           </HitoButton>
           <HitoButton
             type="button"
@@ -500,13 +534,13 @@ export function ActivityActionConfirmation({
             {pending ? <Icon name="loader" size="sm" /> : <Icon name="trash" size="sm" />}
             {pending
               ? removesSource
-                ? "Removing…"
-                : "Deleting…"
+                ? message("Removing…")
+                : message("Deleting…")
               : removesSource
                 ? retriesSourceRemoval
-                  ? "Retry removal"
-                  : "Remove file"
-                : "Delete activity"}
+                  ? message("Retry removal")
+                  : message("Remove file")
+                : message("Delete activity")}
           </HitoButton>
         </DialogFooter>
       </DialogContent>
@@ -515,8 +549,9 @@ export function ActivityActionConfirmation({
 }
 
 function HistorySkeleton() {
+  const message = useHitoProductMessage();
   return (
-    <div aria-busy="true" aria-label="Loading activity history">
+    <div aria-busy="true" aria-label={message("Loading activity history")}>
       <div className="hito-row-group" aria-hidden="true">
         {Array.from({ length: 4 }, (_, index) => (
           <div key={index} className="hito-list-row">
@@ -529,24 +564,25 @@ function HistorySkeleton() {
           </div>
         ))}
       </div>
-      <span className="sr-only">Loading recorded activities.</span>
+      <span className="sr-only">{message("Loading recorded activities.")}</span>
     </div>
   );
 }
 
 function HistoryEmptyState() {
+  const message = useHitoProductMessage();
   return (
     <div className="hito-state-surface">
-      <p className="hito-label-md text-foreground">No recorded activities</p>
+      <p className="hito-label-md text-foreground">{message("No recorded activities")}</p>
       <h2 className="hito-ui-title-sm text-foreground mt-2">
-        Your running history will appear here.
+        {message("Your running history will appear here.")}
       </h2>
       <p className="hito-body-md text-secondary mt-2">
-        Record a run from its workout when you are ready.
+        {message("Record a run from its workout when you are ready.")}
       </p>
       <div className="hito-state-actions">
         <HitoButton asChild size="md" variant="primary">
-          <Link to="/">Open Calendar</Link>
+          <Link to="/">{message("Open Calendar")}</Link>
         </HitoButton>
       </div>
     </div>
@@ -562,18 +598,21 @@ function HistoryError({
   onRetry: () => void;
   compact?: boolean;
 }) {
+  const productMessage = useHitoProductMessage();
   return (
     <div
       className={cn("hito-state-surface", compact && "py-3")}
       data-tone="destructive"
       role="alert"
     >
-      <p className="hito-label-md text-destructive">Could not load activity history</p>
+      <p className="hito-label-md text-destructive">
+        {productMessage("Could not load activity history")}
+      </p>
       <p className="hito-body-md text-secondary mt-2">{message}</p>
       <div className="hito-state-actions">
         <HitoButton type="button" size="md" variant="secondary" onClick={onRetry}>
           <Icon name="refresh" size="sm" />
-          Try again
+          {productMessage("Try again")}
         </HitoButton>
       </div>
     </div>

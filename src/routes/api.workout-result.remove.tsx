@@ -1,8 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { buildHitoProductApiFailure } from "@/lib/product-api-error-contract";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
-import { workoutResultErrorResponseHeaders } from "@/lib/workout-result-import/internal-types";
 import {
-  runnerSafeWorkoutResultMessage,
+  MAX_WORKOUT_RESULT_UPLOAD_BYTES,
+  workoutResultErrorResponseHeaders,
+} from "@/lib/workout-result-import/internal-types";
+import {
+  buildWorkoutResultProductApiFailure,
   WorkoutResultImportError,
 } from "@/lib/workout-result-import/types";
 
@@ -40,11 +44,11 @@ export const Route = createFileRoute("/api/workout-result/remove")({
         } catch (error) {
           if (error instanceof WorkoutResultImportError) {
             return Response.json(
-              {
-                ok: false,
-                code: error.code,
-                message: runnerSafeWorkoutResultMessage(error),
-              },
+              buildWorkoutResultProductApiFailure({
+                error,
+                operation: "remove",
+                maxUploadBytes: MAX_WORKOUT_RESULT_UPLOAD_BYTES,
+              }),
               { status: error.status, headers: workoutResultErrorResponseHeaders(error.code) },
             );
           }
@@ -54,21 +58,19 @@ export const Route = createFileRoute("/api/workout-result/remove")({
             error.message === "Authentication is required for this action."
           ) {
             return Response.json(
-              {
-                ok: false,
-                code: "auth_required",
-                message: "Sign in again before changing Garmin evidence.",
-              },
+              buildHitoProductApiFailure("workout_result_auth_required", {
+                operation: "remove",
+              }),
               { status: 401, headers: workoutResultErrorResponseHeaders("auth_required") },
             );
           }
 
           return Response.json(
-            {
-              ok: false,
-              code: "persistence_failed",
-              message: runnerSafeWorkoutResultMessage(error),
-            },
+            buildWorkoutResultProductApiFailure({
+              error,
+              operation: "remove",
+              maxUploadBytes: MAX_WORKOUT_RESULT_UPLOAD_BYTES,
+            }),
             {
               status: 500,
               headers: workoutResultErrorResponseHeaders("persistence_failed"),

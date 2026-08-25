@@ -70,6 +70,9 @@ import {
   type ManualTemplateCatalogState,
 } from "@/components/manual-workout/ManualWorkoutTemplatePicker.model";
 import { ManualTemplatePickerDialog } from "@/components/manual-workout/ManualWorkoutTemplatePicker";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
+import { getHitoKnownProductMessage } from "@/lib/ui-locale-messages";
+import type { ResolvedUiLocale } from "@/lib/ui-locale";
 
 export { ManualWorkoutSourceActionMenu } from "@/components/manual-workout/ManualWorkoutSourceActionMenu";
 export type { ManualCopiedWorkoutSource } from "@/components/manual-workout/ManualWorkoutSourceActionMenu";
@@ -132,6 +135,9 @@ export function ManualWorkoutAddMenu({
   pasteTargetIsEmpty?: boolean;
   showRestDayOption?: boolean;
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
+  const pasteUnavailableMessage = t(PASTE_UNAVAILABLE_MESSAGE);
   const initializeWorkoutDocumentFn = useServerFn(initializeWorkoutDocumentAction);
   const reviewWorkoutCommandFn = useServerFn(reviewWorkoutCommandAction);
   const confirmWorkoutCommandFn = useServerFn(confirmWorkoutCommandAction);
@@ -241,7 +247,7 @@ export function ManualWorkoutAddMenu({
       const result = await initializeWorkoutDocumentFn({ data: input });
       if (!result.ok) return setConfirmMessage(result.message);
       if (result.origin === "calendar")
-        return setConfirmMessage("The Calendar initializer cannot open a create flow.");
+        return setConfirmMessage(t("The Calendar initializer cannot open a create flow."));
       setEditorState(
         createWorkoutEditorState({
           mode: "create",
@@ -252,7 +258,7 @@ export function ManualWorkoutAddMenu({
       );
     } catch (error) {
       setConfirmMessage(
-        error instanceof Error ? error.message : "The workout could not be initialized.",
+        error instanceof Error ? error.message : t("The workout could not be initialized."),
       );
     }
   };
@@ -270,7 +276,7 @@ export function ManualWorkoutAddMenu({
         setTemplateCatalogState({
           status: "failed",
           catalog: null,
-          message: result?.message ?? "Workout templates are not available right now.",
+          message: result?.message ?? t("Workout templates are not available right now."),
         });
         return;
       }
@@ -284,7 +290,8 @@ export function ManualWorkoutAddMenu({
       setTemplateCatalogState({
         status: "failed",
         catalog: null,
-        message: error instanceof Error ? error.message : "Workout templates could not be loaded.",
+        message:
+          error instanceof Error ? error.message : t("Workout templates could not be loaded."),
       });
     }
   };
@@ -295,8 +302,8 @@ export function ManualWorkoutAddMenu({
     setConfirmMessage(null);
     hitoToast.working({
       id: MANUAL_ADD_TOAST_ID,
-      title: "Reviewing workout",
-      description: "Hito is validating the manual draft before anything is saved.",
+      title: t("Reviewing workout"),
+      description: t("Hito is validating the manual draft before anything is saved."),
     });
 
     try {
@@ -316,25 +323,25 @@ export function ManualWorkoutAddMenu({
         });
         hitoToast.error({
           id: MANUAL_ADD_TOAST_ID,
-          title: "Workout needs changes",
-          description: result.issues[0]?.message ?? "The workout could not be reviewed.",
+          title: t("Workout needs changes"),
+          description: result.issues[0]?.message ?? t("The workout could not be reviewed."),
         });
         return;
       }
       setEditorState(applyWorkoutEditorReview(editorState, result.candidate));
       hitoToast.success({
         id: MANUAL_ADD_TOAST_ID,
-        title: "Workout reviewed",
-        description: "Check the reviewed workout before adding it to the Calendar.",
+        title: t("Workout reviewed"),
+        description: t("Check the reviewed workout before adding it to the Calendar."),
       });
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "Could not review this manual workout yet.";
+        error instanceof Error ? error.message : t("Could not review this manual workout yet.");
       setStatus("idle");
       setEditorState({ ...editorState, phase: "blocked", issues: [message] });
       hitoToast.error({
         id: MANUAL_ADD_TOAST_ID,
-        title: "Review failed",
+        title: t("Review failed"),
         description: message,
       });
     }
@@ -353,7 +360,7 @@ export function ManualWorkoutAddMenu({
     iconKey,
   }: ManualSaveTemplateRequest): Promise<void> => {
     if (!editorState) {
-      throw new Error("Review this manual workout before saving it as a template.");
+      throw new Error(t("Review this manual workout before saving it as a template."));
     }
     const reviewed = await reviewWorkoutCommandFn({
       data: {
@@ -365,7 +372,7 @@ export function ManualWorkoutAddMenu({
       },
     });
     if (!reviewed.ok)
-      throw new Error(reviewed.issues[0]?.message ?? "The template could not be reviewed.");
+      throw new Error(reviewed.issues[0]?.message ?? t("The template could not be reviewed."));
     const candidate = reviewed.candidate;
     const result = await confirmWorkoutCommandFn({
       data: {
@@ -380,8 +387,8 @@ export function ManualWorkoutAddMenu({
     await loadTemplateCatalog();
     hitoToast.success({
       id: MANUAL_ADD_TOAST_ID,
-      title: "Template saved",
-      description: `${displayName} is available in your template picker.`,
+      title: t("Template saved"),
+      description: t("{name} is available in your template picker.", { name: displayName }),
     });
   };
 
@@ -412,7 +419,7 @@ export function ManualWorkoutAddMenu({
     try {
       const result = await run();
       if (!result?.ok) {
-        throw new Error(result?.message ?? "The workout template catalog could not be updated.");
+        throw new Error(result?.message ?? t("The workout template catalog could not be updated."));
       }
       await loadTemplateCatalog();
       hitoToast.success({
@@ -423,11 +430,11 @@ export function ManualWorkoutAddMenu({
     } catch (error) {
       hitoToast.error({
         id: MANUAL_TEMPLATE_CATALOG_TOAST_ID,
-        title: "Template update failed",
+        title: t("Template update failed"),
         description:
           error instanceof Error
             ? error.message
-            : "The workout template catalog could not be updated.",
+            : t("The workout template catalog could not be updated."),
       });
     } finally {
       setTemplateCatalogAction(null);
@@ -443,8 +450,8 @@ export function ManualWorkoutAddMenu({
     setConfirmMessage(null);
     hitoToast.working({
       id: MANUAL_ADD_TOAST_ID,
-      title: "Adding workout",
-      description: "Hito is confirming the reviewed workout.",
+      title: t("Adding workout"),
+      description: t("Hito is confirming the reviewed workout."),
     });
 
     try {
@@ -463,7 +470,7 @@ export function ManualWorkoutAddMenu({
         setConfirmMessage(result.message);
         hitoToast.error({
           id: MANUAL_ADD_TOAST_ID,
-          title: "Workout not added",
+          title: t("Workout not added"),
           description: result.message,
         });
         return;
@@ -471,8 +478,8 @@ export function ManualWorkoutAddMenu({
 
       hitoToast.success({
         id: MANUAL_ADD_TOAST_ID,
-        title: "Workout added",
-        description: "Refreshing from saved Calendar truth.",
+        title: t("Workout added"),
+        description: t("Refreshing from saved Calendar truth."),
       });
       confirmInFlightRef.current = false;
       setStatus("idle");
@@ -482,13 +489,15 @@ export function ManualWorkoutAddMenu({
       await onAdded();
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "The workout could not be added to the Calendar.";
+        error instanceof Error
+          ? error.message
+          : t("The workout could not be added to the Calendar.");
       confirmInFlightRef.current = false;
       setStatus("idle");
       setConfirmMessage(message);
       hitoToast.error({
         id: MANUAL_ADD_TOAST_ID,
-        title: "Workout not added",
+        title: t("Workout not added"),
         description: message,
       });
     }
@@ -502,8 +511,8 @@ export function ManualWorkoutAddMenu({
     setConfirmMessage(null);
     hitoToast.working({
       id: MANUAL_COPY_PASTE_TOAST_ID,
-      title: "Pasting workout",
-      description: "Hito is copying from the saved source workout.",
+      title: t("Pasting workout"),
+      description: t("Hito is copying from the saved source workout."),
     });
 
     try {
@@ -518,8 +527,8 @@ export function ManualWorkoutAddMenu({
         setStatus("idle");
         hitoToast.error({
           id: MANUAL_COPY_PASTE_TOAST_ID,
-          title: "Paste blocked",
-          description: reviewed.issues[0]?.message ?? PASTE_UNAVAILABLE_MESSAGE,
+          title: t("Paste blocked"),
+          description: reviewed.issues[0]?.message ?? pasteUnavailableMessage,
         });
         return;
       }
@@ -538,28 +547,28 @@ export function ManualWorkoutAddMenu({
       if (!result.ok || result.operation !== "copy") {
         hitoToast.error({
           id: MANUAL_COPY_PASTE_TOAST_ID,
-          title: "Paste blocked",
-          description: result.ok ? PASTE_UNAVAILABLE_MESSAGE : result.message,
+          title: t("Paste blocked"),
+          description: result.ok ? pasteUnavailableMessage : result.message,
         });
         return;
       }
 
       hitoToast.success({
         id: MANUAL_COPY_PASTE_TOAST_ID,
-        title: "Workout pasted",
-        description: "Refreshing the calendar from saved workout truth.",
+        title: t("Workout pasted"),
+        description: t("Refreshing the calendar from saved workout truth."),
       });
       setConstructorOpen(false);
       setEditorState(null);
       setConfirmMessage(null);
       await onAdded();
     } catch {
-      const message = PASTE_UNAVAILABLE_MESSAGE;
+      const message = pasteUnavailableMessage;
       setStatus("idle");
       setConfirmMessage(message);
       hitoToast.error({
         id: MANUAL_COPY_PASTE_TOAST_ID,
-        title: "Workout not pasted",
+        title: t("Workout not pasted"),
         description: message,
       });
     }
@@ -572,7 +581,9 @@ export function ManualWorkoutAddMenu({
           {children}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className={MANUAL_ADD_MENU_CONTENT_CLASS}>
-          <DropdownMenuLabel className="px-3 py-2">{formatReadableDate(date)}</DropdownMenuLabel>
+          <DropdownMenuLabel className="px-3 py-2">
+            {formatReadableDate(date, locale)}
+          </DropdownMenuLabel>
           <DropdownMenuSeparator />
           {canMoveSelectedWorkout ? (
             <>
@@ -584,10 +595,10 @@ export function ManualWorkoutAddMenu({
                 <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="arrow-right" size="xs" />
                 <span className="min-w-0">
                   <span className="hito-body-md text-foreground block">
-                    Move selected workout here
+                    {t("Move selected workout here")}
                   </span>
                   <span className="hito-body-sm mt-1 text-secondary block">
-                    {moveTargetMenuCopy(moveTargetDayKind)}
+                    {moveTargetMenuCopy(moveTargetDayKind, locale)}
                   </span>
                 </span>
               </DropdownMenuItem>
@@ -598,9 +609,9 @@ export function ManualWorkoutAddMenu({
               >
                 <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="close" size="xs" />
                 <span className="min-w-0">
-                  <span className="hito-body-md text-foreground block">Cancel move</span>
+                  <span className="hito-body-md text-foreground block">{t("Cancel move")}</span>
                   <span className="hito-body-sm mt-1 text-secondary block">
-                    Keep the source workout where it is.
+                    {t("Keep the source workout where it is.")}
                   </span>
                 </span>
               </DropdownMenuItem>
@@ -616,9 +627,11 @@ export function ManualWorkoutAddMenu({
               >
                 <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="copy" size="xs" />
                 <span className="min-w-0">
-                  <span className="hito-body-md text-foreground block">Paste copied workout</span>
+                  <span className="hito-body-md text-foreground block">
+                    {t("Paste copied workout")}
+                  </span>
                   <span className="hito-body-sm mt-1 text-secondary block">
-                    Save the copied workout into this empty day.
+                    {t("Save the copied workout into this empty day.")}
                   </span>
                 </span>
               </DropdownMenuItem>
@@ -634,9 +647,11 @@ export function ManualWorkoutAddMenu({
               >
                 <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="edit" size="xs" />
                 <span className="min-w-0">
-                  <span className="hito-body-md text-foreground block">Start from scratch</span>
+                  <span className="hito-body-md text-foreground block">
+                    {t("Start from scratch")}
+                  </span>
                   <span className="hito-body-sm mt-1 text-secondary block">
-                    Start with a blank workout.
+                    {t("Start with a blank workout.")}
                   </span>
                 </span>
               </DropdownMenuItem>
@@ -647,9 +662,9 @@ export function ManualWorkoutAddMenu({
               >
                 <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="workout" size="xs" />
                 <span className="min-w-0">
-                  <span className="hito-body-md text-foreground block">Choose template</span>
+                  <span className="hito-body-md text-foreground block">{t("Choose template")}</span>
                   <span className="hito-body-sm mt-1 text-secondary block">
-                    Browse built-in and saved templates.
+                    {t("Browse built-in and saved templates.")}
                   </span>
                 </span>
               </DropdownMenuItem>
@@ -666,9 +681,9 @@ export function ManualWorkoutAddMenu({
                 >
                   <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="minus" size="xs" />
                   <span className="min-w-0">
-                    <span className="hito-body-md text-foreground block">Add rest day</span>
+                    <span className="hito-body-md text-foreground block">{t("Add rest day")}</span>
                     <span className="hito-body-sm mt-1 text-secondary block">
-                      Create an intentional no-run day.
+                      {t("Create an intentional no-run day.")}
                     </span>
                   </span>
                 </DropdownMenuItem>
@@ -686,50 +701,58 @@ export function ManualWorkoutAddMenu({
         onDeleteSavedTemplate={(template) => {
           void runTemplateCatalogAction({
             actionId: `delete:${template.id}`,
-            pendingTitle: "Deleting template",
-            pendingDescription: `Removing ${template.displayName} from your templates.`,
+            pendingTitle: t("Deleting template"),
+            pendingDescription: t("Removing {name} from your templates.", {
+              name: template.displayName,
+            }),
             run: () => deleteManualWorkoutSavedTemplateFn({ data: { templateId: template.id } }),
-            successTitle: "Template deleted",
-            successDescription: `${template.displayName} was removed from your templates.`,
+            successTitle: t("Template deleted"),
+            successDescription: t("{name} was removed from your templates.", {
+              name: template.displayName,
+            }),
           });
         }}
         onHideBuiltInTemplate={(template) => {
-          const label = templateRunnerFacingLabel(template);
+          const label = getHitoKnownProductMessage(locale, templateRunnerFacingLabel(template));
           void runTemplateCatalogAction({
             actionId: `hide:${template.templateKey}`,
-            pendingTitle: "Hiding template",
-            pendingDescription: `Removing ${label} from your visible built-in templates.`,
+            pendingTitle: t("Hiding template"),
+            pendingDescription: t("Removing {name} from your visible built-in templates.", {
+              name: label,
+            }),
             run: () =>
               hideManualWorkoutBuiltInTemplateFn({
                 data: { templateKey: template.templateKey },
               }),
-            successTitle: "Template hidden",
-            successDescription: `${label} is hidden for this account.`,
+            successTitle: t("Template hidden"),
+            successDescription: t("{name} is hidden for this account.", { name: label }),
           });
         }}
         onRefreshCatalog={() => void loadTemplateCatalog()}
         onRestoreAllBuiltInTemplates={() => {
           void runTemplateCatalogAction({
             actionId: "restore:all",
-            pendingTitle: "Restoring templates",
-            pendingDescription: "Restoring all built-in workout templates for this account.",
+            pendingTitle: t("Restoring templates"),
+            pendingDescription: t("Restoring all built-in workout templates for this account."),
             run: () => restoreAllManualWorkoutBuiltInTemplatesFn({ data: undefined }),
-            successTitle: "Templates restored",
-            successDescription: "All built-in workout templates are visible again.",
+            successTitle: t("Templates restored"),
+            successDescription: t("All built-in workout templates are visible again."),
           });
         }}
         onRestoreBuiltInTemplate={(template) => {
-          const label = templateRunnerFacingLabel(template);
+          const label = getHitoKnownProductMessage(locale, templateRunnerFacingLabel(template));
           void runTemplateCatalogAction({
             actionId: `restore:${template.templateKey}`,
-            pendingTitle: "Restoring template",
-            pendingDescription: `Restoring ${label} to your visible built-in templates.`,
+            pendingTitle: t("Restoring template"),
+            pendingDescription: t("Restoring {name} to your visible built-in templates.", {
+              name: label,
+            }),
             run: () =>
               restoreManualWorkoutBuiltInTemplateFn({
                 data: { templateKey: template.templateKey },
               }),
-            successTitle: "Template restored",
-            successDescription: `${label} is visible in the picker again.`,
+            successTitle: t("Template restored"),
+            successDescription: t("{name} is visible in the picker again.", { name: label }),
           });
         }}
         onSelectSavedTemplate={(template) => {
@@ -743,7 +766,7 @@ export function ManualWorkoutAddMenu({
       />
 
       <ManualWorkoutConstructorDialog
-        confirmLabel="Add workout"
+        confirmLabel={t("Add workout")}
         confirmMessage={confirmMessage}
         editorState={editorState}
         isBusy={isBusy}
@@ -766,7 +789,7 @@ export function ManualWorkoutAddMenu({
         }}
         onReview={() => void submitReview()}
         open={constructorOpen}
-        pendingLabel="Adding workout..."
+        pendingLabel={t("Adding workout...")}
         onSaveTemplate={saveReviewedTemplate}
         selection={selection}
         status={status}
@@ -806,6 +829,8 @@ export function ManualWorkoutConstructorDialog({
   selection: ManualDraftSelection | null;
   status: ManualDraftStatus;
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   const ready = editorState?.candidate;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -817,15 +842,17 @@ export function ManualWorkoutConstructorDialog({
       >
         {selection && editorState ? (
           <ManualWorkoutEditorDialogHeader
-            dateLabel={formatReadableDate(selection.date)}
-            statusLabel={ready ? "Reviewed" : "Draft"}
+            dateLabel={formatReadableDate(selection.date, locale)}
+            statusLabel={ready ? t("Reviewed") : t("Draft")}
             title={editorState.document.title}
           />
         ) : (
           <DialogHeader className="hito-product-dialog-header">
-            <DialogTitle className="hito-ui-title-md text-foreground">Manual workout</DialogTitle>
+            <DialogTitle className="hito-ui-title-md text-foreground">
+              {t("Manual workout")}
+            </DialogTitle>
             <DialogDescription className="hito-body-md text-secondary">
-              Loading the canonical workout document.
+              {t("Loading the canonical workout document.")}
             </DialogDescription>
           </DialogHeader>
         )}
@@ -839,17 +866,17 @@ export function ManualWorkoutConstructorDialog({
           ) : null}
           {editorState?.issues.map((issue) => (
             <p key={issue} className="hito-body-md text-negative" role="alert">
-              {issue}
+              {getHitoKnownProductMessage(locale, issue)}
             </p>
           ))}
           {ready?.warnings.map((warning) => (
             <p key={warning} className="hito-body-xs text-secondary">
-              Warning: {warning}
+              {t("Warning: {warning}", { warning })}
             </p>
           ))}
           {confirmMessage ? (
             <p className="hito-body-md font-medium text-negative" role="alert">
-              {confirmMessage}
+              {getHitoKnownProductMessage(locale, confirmMessage)}
             </p>
           ) : null}
         </div>
@@ -861,7 +888,7 @@ export function ManualWorkoutConstructorDialog({
             disabled={isBusy}
             onClick={() => onOpenChange(false)}
           >
-            Close
+            {t("Close")}
           </HitoButton>
           {ready ? (
             <>
@@ -892,7 +919,7 @@ export function ManualWorkoutConstructorDialog({
               disabled={!editorState || isBusy || editorState.issues.length > 0}
               onClick={onReview}
             >
-              {status === "reviewing" ? "Reviewing workout..." : "Review workout"}
+              {status === "reviewing" ? t("Reviewing workout...") : t("Review workout")}
             </HitoButton>
           )}
         </DialogFooter>
@@ -910,6 +937,8 @@ function ManualSaveTemplateAction({
   disabled: boolean;
   onSaveTemplate: (input: ManualSaveTemplateRequest) => Promise<void>;
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   const [open, setOpen] = useState(false);
   const [displayName, setDisplayName] = useState(defaultName);
   const [iconKey, setIconKey] = useState<CalendarIconKey>("easy");
@@ -930,7 +959,9 @@ function ManualSaveTemplateAction({
     } catch (saveError) {
       setStatus("idle");
       setError(
-        saveError instanceof Error ? saveError.message : "The workout template could not be saved.",
+        saveError instanceof Error
+          ? saveError.message
+          : t("The workout template could not be saved."),
       );
     }
   };
@@ -956,50 +987,53 @@ function ManualSaveTemplateAction({
         onClick={() => setOpen(true)}
       >
         <Icon name="workout" size="xs" />
-        Save as template
+        {t("Save as template")}
       </HitoButton>
       <DialogContent
         className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-compact"
         overlayClassName="hito-dialog-overlay-stable"
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-ui-title-md text-foreground">Save as template</DialogTitle>
+          <DialogTitle className="hito-ui-title-md text-foreground">
+            {t("Save as template")}
+          </DialogTitle>
           <DialogDescription className="hito-body-md text-secondary">
-            Save this reviewed workout as a personal template. Hito rebuilds and checks it before it
-            appears in your picker.
+            {t(
+              "Save this reviewed workout as a personal template. Hito rebuilds and checks it before it appears in your picker.",
+            )}
           </DialogDescription>
         </DialogHeader>
         <div className="hito-product-dialog-body grid gap-4">
           <label className="grid gap-2">
-            <span className="hito-label-md text-foreground">Template name</span>
+            <span className="hito-label-md text-foreground">{t("Template name")}</span>
             <Input
               size="md"
               variant="primary"
               value={displayName}
               onChange={(event) => setDisplayName(event.target.value)}
-              placeholder="Easy aerobic run"
+              placeholder={t("Easy aerobic run")}
             />
           </label>
 
           <label className="grid gap-2">
-            <span className="hito-label-md text-foreground">Calendar icon</span>
+            <span className="hito-label-md text-foreground">{t("Calendar icon")}</span>
             <Select value={iconKey} onValueChange={(value) => setIconKey(value as CalendarIconKey)}>
-              <SelectTrigger aria-label="Template calendar icon">
-                <SelectValue placeholder="Calendar icon" />
+              <SelectTrigger aria-label={t("Template calendar icon")}>
+                <SelectValue placeholder={t("Calendar icon")} />
               </SelectTrigger>
               <SelectContent>
                 {CALENDAR_ICON_KEY_VALUES.map((value) => (
                   <SelectItem key={value} value={value}>
                     <span className="inline-flex items-center gap-2">
                       <WorkoutGlyph kind={value as WorkoutGlyphKind} />
-                      {calendarIconLabel(value)}
+                      {getHitoKnownProductMessage(locale, calendarIconLabel(value))}
                     </span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <span className="hito-body-xs text-secondary">
-              This icon only changes how your personal template appears in the picker.
+              {t("This icon only changes how your personal template appears in the picker.")}
             </span>
           </label>
 
@@ -1013,7 +1047,7 @@ function ManualSaveTemplateAction({
             disabled={isSaving}
             onClick={() => setOpen(false)}
           >
-            Cancel
+            {t("Cancel")}
           </HitoButton>
           <HitoButton
             type="button"
@@ -1023,7 +1057,7 @@ function ManualSaveTemplateAction({
             disabled={!displayName.trim() || isSaving}
             onClick={() => void submitSave()}
           >
-            {isSaving ? "Saving..." : "Save template"}
+            {isSaving ? t("Saving...") : t("Save template")}
           </HitoButton>
         </DialogFooter>
       </DialogContent>
@@ -1031,12 +1065,15 @@ function ManualSaveTemplateAction({
   );
 }
 
-function moveTargetMenuCopy(dayKind: ManualWorkoutMoveTargetDayKind) {
+function moveTargetMenuCopy(dayKind: ManualWorkoutMoveTargetDayKind, locale: ResolvedUiLocale) {
   if (dayKind === "workout_day") {
-    return "Review before replacing the Calendar workout on this day.";
+    return getHitoKnownProductMessage(
+      locale,
+      "Review before replacing the Calendar workout on this day.",
+    );
   }
 
-  return "Use this Rest day as the target.";
+  return getHitoKnownProductMessage(locale, "Use this Rest day as the target.");
 }
 
 function calendarIconLabel(iconKey: CalendarIconKey) {

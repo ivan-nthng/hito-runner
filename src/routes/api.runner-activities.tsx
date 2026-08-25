@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { buildHitoProductApiFailure } from "@/lib/product-api-error-contract";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
 
 export const Route = createFileRoute("/api/runner-activities")({
@@ -26,30 +27,20 @@ export const Route = createFileRoute("/api/runner-activities")({
             error.message === "Authentication is required for this action."
           ) {
             return Response.json(
-              {
-                ok: false,
-                code: "auth_required",
-                message: "Sign in again before opening activity history.",
-              },
+              buildHitoProductApiFailure("runner_activity_auth_required", {
+                operation: "history_read",
+              }),
               { status: 401 },
             );
           }
           if (error instanceof Error && /page size|cursor/i.test(error.message)) {
             return Response.json(
-              {
-                ok: false,
-                code: "activity_history_request_invalid",
-                message: "Refresh activity history and try again.",
-              },
+              buildHitoProductApiFailure("runner_activity_history_request_invalid", {}),
               { status: 400 },
             );
           }
           return Response.json(
-            {
-              ok: false,
-              code: "activity_history_unavailable",
-              message: "We could not load activity history. Try again shortly.",
-            },
+            buildHitoProductApiFailure("runner_activity_history_unavailable", {}),
             { status: 500 },
           );
         }

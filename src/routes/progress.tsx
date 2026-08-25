@@ -12,6 +12,7 @@ import type {
   RunnerActivityFitSequenceQuickPeriodId,
 } from "@/lib/runner-activity/product-contract";
 import { getProgressRouteData } from "@/lib/training-api";
+import { getHitoProductMessage } from "@/lib/ui-locale-messages";
 
 const PROGRESS_SEQUENCE_PERIODS = [
   "this_week",
@@ -108,20 +109,24 @@ function ProgressPage() {
 function ProgressPendingState() {
   return (
     <AppShell>
-      <div className="hito-route-gutter max-w-5xl space-y-8 py-hito-6 sm:py-10" aria-busy="true">
-        <Skeleton className="h-10 w-full max-w-sm" />
-        <div>
-          <Skeleton className="h-4 w-28" />
-          <Skeleton className="mt-4 h-14 w-80 max-w-full" />
-          <Skeleton className="mt-4 h-5 w-full max-w-xl" />
+      {(locale) => (
+        <div className="hito-route-gutter max-w-5xl space-y-8 py-hito-6 sm:py-10" aria-busy="true">
+          <Skeleton className="h-10 w-full max-w-sm" />
+          <div>
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="mt-4 h-14 w-80 max-w-full" />
+            <Skeleton className="mt-4 h-5 w-full max-w-xl" />
+          </div>
+          <div className="space-y-3">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+          <span className="sr-only">
+            {getHitoProductMessage(locale, "Loading activity history, progress, and saved plans.")}
+          </span>
         </div>
-        <div className="space-y-3">
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-20 w-full" />
-        </div>
-        <span className="sr-only">Loading activity history, progress, and saved plans.</span>
-      </div>
+      )}
     </AppShell>
   );
 }
@@ -129,30 +134,34 @@ function ProgressPendingState() {
 function ProgressErrorState({ reset }: { error: Error; reset: () => void }) {
   return (
     <AppShell>
-      <div className="hito-route-gutter max-w-3xl py-20">
-        <section className="hito-state-surface" data-tone="destructive" role="alert">
-          <p className="hito-label-md text-destructive">Progress unavailable</p>
-          <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
-            We couldn&apos;t open this runner view.
-          </h1>
-          <p className="hito-body-md mt-4 max-w-[40rem] text-text-secondary">
-            Try again to reopen the latest activity truth.
-          </p>
-          <div className="hito-state-actions">
-            <HitoButton
-              type="button"
-              onClick={() => {
-                reset();
-                window.location.reload();
-              }}
-              size="lg"
-              variant="primary"
-            >
-              Try again
-            </HitoButton>
-          </div>
-        </section>
-      </div>
+      {(locale) => (
+        <div className="hito-route-gutter max-w-3xl py-20">
+          <section className="hito-state-surface" data-tone="destructive" role="alert">
+            <p className="hito-label-md text-destructive">
+              {getHitoProductMessage(locale, "Progress unavailable")}
+            </p>
+            <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
+              {getHitoProductMessage(locale, "We couldn't open this runner view.")}
+            </h1>
+            <p className="hito-body-md mt-4 max-w-[40rem] text-text-secondary">
+              {getHitoProductMessage(locale, "Try again to reopen the latest activity truth.")}
+            </p>
+            <div className="hito-state-actions">
+              <HitoButton
+                type="button"
+                onClick={() => {
+                  reset();
+                  window.location.reload();
+                }}
+                size="lg"
+                variant="primary"
+              >
+                {getHitoProductMessage(locale, "Try again")}
+              </HitoButton>
+            </div>
+          </section>
+        </div>
+      )}
     </AppShell>
   );
 }

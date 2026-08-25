@@ -3,6 +3,7 @@ import {
   type WorkoutStructureTimelineItem,
 } from "@/components/workout-structure/WorkoutStructureTimeline";
 import { cn } from "@/lib/utils";
+import { useHitoProductMessage } from "@/components/ui/hito-ui-locale-provider";
 
 export interface WorkoutDocumentNote {
   key: string;
@@ -12,7 +13,7 @@ export interface WorkoutDocumentNote {
 
 export function WorkoutDocumentReadback({
   className,
-  emptyCopy = "No workout structure available.",
+  emptyCopy,
   heading,
   items,
   notes = [],
@@ -29,6 +30,8 @@ export function WorkoutDocumentReadback({
   notes?: WorkoutDocumentNote[];
   summary: string;
 }) {
+  const t = useHitoProductMessage();
+
   return (
     <section className={cn("grid gap-5", className)}>
       {heading ? (
@@ -42,7 +45,10 @@ export function WorkoutDocumentReadback({
       ) : null}
 
       <WorkoutStructureTimeline
-        emptyState={{ badge: "No structure", copy: emptyCopy }}
+        emptyState={{
+          badge: t("No structure"),
+          copy: emptyCopy ?? t("No workout structure available."),
+        }}
         items={items}
         summary={summary}
       />
@@ -59,11 +65,13 @@ export function WorkoutDocumentNotes({
   labelClassName?: string;
   notes: WorkoutDocumentNote[];
 }) {
+  const t = useHitoProductMessage();
+
   if (notes.length === 0) return null;
 
   return (
     <section className="grid gap-3">
-      <p className={labelClassName}>Notes or cues</p>
+      <p className={labelClassName}>{t("Notes or cues")}</p>
       <div className="hito-row-group">
         {notes.map((note) => (
           <div key={note.key} className="hito-list-row items-start gap-3 py-3">

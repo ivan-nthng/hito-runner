@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
 import { HitoButton } from "@/components/ui/button";
 import { hitoFieldClasses } from "@/components/ui/hito-control-contract";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 
@@ -160,6 +161,8 @@ export function EditableValueField<Key extends string = string>({
   error,
   demoState,
 }: EditableValueFieldProps<Key>) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   const hasValue = value.trim().length > 0;
   const hasSavedValue = isEditableValueValid(value, { min, max, step });
   const hasInvalidValue = hasValue && !hasSavedValue;
@@ -185,7 +188,10 @@ export function EditableValueField<Key extends string = string>({
     .toLowerCase()
     .replace(/[^a-z0-9-]+/g, "-")}`;
   const errorId = `${fieldId}-error`;
-  const draftError = hasInvalidDraft ? editableValueErrorMessage({ min, max, step, unit }) : error;
+  const lowerLabel = label.toLocaleLowerCase(locale);
+  const draftError = hasInvalidDraft
+    ? editableValueErrorMessage({ min, max, step, t, unit })
+    : error;
 
   if (!isEditing) {
     return (
@@ -201,10 +207,13 @@ export function EditableValueField<Key extends string = string>({
           tone={hasClosedError ? "error" : "default"}
           aria-label={
             hasClosedError
-              ? `Edit ${label.toLowerCase()}: ${error ?? `invalid value ${value}`}`
+              ? t("Edit {label}: {error}", {
+                  label: lowerLabel,
+                  error: error ?? t("invalid value {value}", { value }),
+                })
               : hasSavedValue
-                ? `Edit ${label.toLowerCase()}`
-                : `Add ${label.toLowerCase()}`
+                ? t("Edit {label}", { label: lowerLabel })
+                : t("Add {label}", { label: lowerLabel })
           }
           onClick={lifecycle.openEditing}
           className="hito-editable-value-field"
@@ -288,7 +297,7 @@ export function EditableValueField<Key extends string = string>({
             size="xs"
             variant="ghost"
             onClick={() => lifecycle.clearValue()}
-            aria-label={`Clear ${label.toLowerCase()}`}
+            aria-label={t("Clear {label}", { label: lowerLabel })}
           >
             <Icon name="close" size="xs" />
           </HitoButton>
@@ -301,7 +310,7 @@ export function EditableValueField<Key extends string = string>({
         iconOnly
         size="sm"
         variant="primary"
-        aria-label={`Save ${label.toLowerCase()}`}
+        aria-label={t("Save {label}", { label: lowerLabel })}
       >
         <Icon name="check" size="xs" />
       </HitoButton>
@@ -339,6 +348,8 @@ export function EditableSelectValueField<Key extends string = string>({
   setValue: (value: string) => void;
   value: string;
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   const hasSavedValue = value.trim().length > 0;
   const lifecycle = useEditableValueFieldLifecycle<Key, HTMLSelectElement>({
     activeEditableKey,
@@ -350,6 +361,7 @@ export function EditableSelectValueField<Key extends string = string>({
   });
   const { draftValue, isEditing, setDraftValue } = lifecycle;
   const displayValue = editableSelectValueLabel(value, options);
+  const lowerLabel = label.toLocaleLowerCase(locale);
 
   if (!isEditing) {
     return (
@@ -358,7 +370,7 @@ export function EditableSelectValueField<Key extends string = string>({
           type="button"
           size="sm"
           variant="secondary"
-          aria-label={hasSavedValue ? `Edit ${label.toLowerCase()} result` : emptyLabel}
+          aria-label={hasSavedValue ? t("Edit {label} result", { label: lowerLabel }) : emptyLabel}
           onClick={lifecycle.openEditing}
           className="hito-editable-value-field"
           data-editable-value-key={fieldKey}
@@ -427,7 +439,7 @@ export function EditableSelectValueField<Key extends string = string>({
             iconOnly
             size="xs"
             variant="ghost"
-            aria-label={`Clear ${label.toLowerCase()} result`}
+            aria-label={t("Clear {label} result", { label: lowerLabel })}
           >
             <Icon name="close" size="xs" />
           </HitoButton>
@@ -440,7 +452,7 @@ export function EditableSelectValueField<Key extends string = string>({
         iconOnly
         size="sm"
         variant="primary"
-        aria-label={`Save ${label.toLowerCase()} result`}
+        aria-label={t("Save {label} result", { label: lowerLabel })}
       >
         <Icon name="check" size="xs" />
       </HitoButton>
@@ -497,18 +509,29 @@ function editableValueErrorMessage({
   min,
   max,
   step,
+  t,
   unit,
 }: {
   min: number;
   max: number;
   step: number;
+  t: ReturnType<typeof useHitoProductMessage>;
   unit?: string;
 }) {
   const unitSuffix = unit ? ` ${unit}` : "";
 
   if (step === 1) {
-    return `Use a whole number from ${min} to ${max}${unitSuffix}.`;
+    return t("Use a whole number from {min} to {max}{unit}.", {
+      min,
+      max,
+      unit: unitSuffix,
+    });
   }
 
-  return `Use ${min} to ${max}${unitSuffix} in ${step} increments.`;
+  return t("Use {min} to {max}{unit} in {step} increments.", {
+    min,
+    max,
+    step,
+    unit: unitSuffix,
+  });
 }

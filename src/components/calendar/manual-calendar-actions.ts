@@ -466,6 +466,7 @@ function findManualMoveSourceWorkout(
 export function manualMoveSourceDragProps(
   context: CalendarWorkoutActionContext | null,
   manualCalendarActionState: ManualCalendarActionState,
+  moveLabel = "Move workout",
 ) {
   return {
     draggable: Boolean(context?.canDragInitiate),
@@ -477,7 +478,7 @@ export function manualMoveSourceDragProps(
       event.dataTransfer.effectAllowed = "move";
       event.dataTransfer.setData("application/x-hito-manual-workout-move", context.sourceWorkoutId);
       event.dataTransfer.setData("text/plain", context.sourceWorkoutId);
-      setManualMoveDragImage(event, context);
+      setManualMoveDragImage(event, context, moveLabel);
     },
   };
 }
@@ -521,6 +522,7 @@ export function manualMoveTargetDragProps(
 function setManualMoveDragImage(
   event: DragEvent<HTMLElement>,
   context: CalendarWorkoutActionContext,
+  moveLabel: string,
 ) {
   if (typeof document === "undefined" || typeof window === "undefined") return;
 
@@ -538,7 +540,7 @@ function setManualMoveDragImage(
 
   const meta = document.createElement("div");
   meta.className = "hito-calendar-drag-preview-meta";
-  meta.textContent = "Move workout";
+  meta.textContent = moveLabel;
 
   dragImage.append(title, meta);
 

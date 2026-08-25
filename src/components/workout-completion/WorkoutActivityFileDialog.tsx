@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import type { TrainingSnapshot, Workout } from "@/lib/training";
 import type { WorkoutResultFeedbackSummary } from "@/lib/workout-result-import/types";
+import { useHitoProductMessage } from "@/components/ui/hito-ui-locale-provider";
 
 export function WorkoutActivityFileDialog({
   feedback,
@@ -27,6 +28,7 @@ export function WorkoutActivityFileDialog({
   snapshot: TrainingSnapshot;
   workout: Workout;
 }) {
+  const t = useHitoProductMessage();
   const fallbackReturnFocusRef = useRef<HTMLElement | null>(null);
   const [isUploadInProgress, setIsUploadInProgress] = useState(false);
   const [uploadNotice, setUploadNotice] = useState<string | null>(null);
@@ -69,10 +71,12 @@ export function WorkoutActivityFileDialog({
           onOpenAutoFocus={() => {
             const activeElement = document.activeElement;
             fallbackReturnFocusRef.current =
-              activeElement instanceof HTMLElement ? activeElement : null;
+              activeElement instanceof HTMLElement && activeElement !== document.body
+                ? activeElement
+                : null;
           }}
           onCloseAutoFocus={(event) => {
-            const returnTarget = returnFocusRef?.current ?? fallbackReturnFocusRef.current;
+            const returnTarget = fallbackReturnFocusRef.current ?? returnFocusRef?.current;
 
             if (!returnTarget?.isConnected) {
               return;
@@ -83,9 +87,9 @@ export function WorkoutActivityFileDialog({
           }}
         >
           <DialogHeader className="sr-only">
-            <DialogTitle>Activity file</DialogTitle>
+            <DialogTitle>{t("Activity file")}</DialogTitle>
             <DialogDescription>
-              Upload or review an activity file for this workout.
+              {t("Upload or review an activity file for this workout.")}
             </DialogDescription>
           </DialogHeader>
 

@@ -1,4 +1,5 @@
-import { formatDate } from "@/lib/training";
+import { formatUiDate, type ResolvedUiLocale } from "@/lib/ui-locale";
+import { formatHitoProductMessage } from "@/lib/ui-locale-messages";
 
 interface GeneratedPlanReviewHeaderInput {
   durationWeeks: number;
@@ -24,22 +25,35 @@ const REVIEW_DATE_OPTIONS = {
 
 export function buildGeneratedPlanReviewHeaderModel(
   input: GeneratedPlanReviewHeaderInput,
+  locale: ResolvedUiLocale,
 ): GeneratedPlanReviewHeaderModel {
-  const formattedEndDate = formatDate(input.endDate, REVIEW_DATE_OPTIONS);
+  const formattedEndDate = formatUiDate(input.endDate, locale, REVIEW_DATE_OPTIONS);
   const raceMatchesEndDate = input.raceDate === input.endDate;
   const modifiers = [
     input.raceDate && !raceMatchesEndDate
-      ? `Race day ${formatDate(input.raceDate, REVIEW_DATE_OPTIONS)}`
+      ? formatHitoProductMessage(locale, "Race day {date}", {
+          date: formatUiDate(input.raceDate, locale, REVIEW_DATE_OPTIONS),
+        })
       : null,
-    input.finishTime ? `Target finish ${input.finishTime}` : null,
+    input.finishTime
+      ? formatHitoProductMessage(locale, "Target finish {time}", { time: input.finishTime })
+      : null,
   ].filter((value): value is string => Boolean(value));
 
   return {
-    title: `${input.goalLabel} plan`,
-    startCopy: `Starts ${formatDate(input.startDate, REVIEW_DATE_OPTIONS)}`,
+    title: formatHitoProductMessage(locale, "{goal} plan", { goal: input.goalLabel }),
+    startCopy: formatHitoProductMessage(locale, "Starts {date}", {
+      date: formatUiDate(input.startDate, locale, REVIEW_DATE_OPTIONS),
+    }),
     rangeCopy: raceMatchesEndDate
-      ? `${input.durationWeeks} weeks · Ends on race day, ${formattedEndDate}`
-      : `${input.durationWeeks} weeks · Ends ${formattedEndDate}`,
+      ? formatHitoProductMessage(locale, "{weeks} weeks · Ends on race day, {date}", {
+          weeks: input.durationWeeks,
+          date: formattedEndDate,
+        })
+      : formatHitoProductMessage(locale, "{weeks} weeks · Ends {date}", {
+          weeks: input.durationWeeks,
+          date: formattedEndDate,
+        }),
     modifierCopy: modifiers.length > 0 ? modifiers.join(" · ") : null,
   };
 }

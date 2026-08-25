@@ -1284,7 +1284,11 @@ async function proveRuntimeRoutes(input: {
 
   const unauthorized = await fetch(new URL("/api/runner-activities", baseUrl));
   assert.equal(unauthorized.status, 401);
-  assert.equal((await unauthorized.json()).code, "auth_required");
+  assert.deepEqual(await unauthorized.json(), {
+    ok: false,
+    code: "runner_activity_auth_required",
+    params: { operation: "history_read" },
+  });
 
   const headers = { cookie: input.cookie };
 
@@ -1320,7 +1324,11 @@ async function proveRuntimeRoutes(input: {
     assert.equal(crossRunnerMutation.status, 404);
     const crossRunnerBody = await crossRunnerMutation.json();
     assert.equal(crossRunnerBody.ok, false);
-    assert.equal(crossRunnerBody.code, "activity_not_found");
+    assert.equal(crossRunnerBody.code, "runner_activity_not_found");
+    assert.equal("message" in crossRunnerBody, false);
+    assert.deepEqual(crossRunnerBody.params, {
+      operation: path.endsWith("/source") ? "source_remove" : "delete",
+    });
   }
   const unchangedOwnerActivities = await supabase
     .from("runner_activities")
@@ -1349,7 +1357,11 @@ async function proveRuntimeRoutes(input: {
     { headers },
   );
   assert.equal(invalidCursor.status, 400);
-  assert.equal((await invalidCursor.json()).code, "activity_history_request_invalid");
+  assert.deepEqual(await invalidCursor.json(), {
+    ok: false,
+    code: "runner_activity_history_request_invalid",
+    params: {},
+  });
 
   const progressResponse = await fetch(new URL("/api/runner-activity-progress", baseUrl), {
     headers,

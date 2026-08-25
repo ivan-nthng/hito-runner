@@ -46,7 +46,9 @@ import {
   type RunningPlanConfirmActionResult,
   type SavedPlanReviewSummary,
 } from "@/lib/running-plan-engine-actions";
-import { formatDate } from "@/lib/training";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
+import { formatUiDate, type ResolvedUiLocale } from "@/lib/ui-locale";
+import { formatHitoProductMessage, getHitoKnownProductMessage } from "@/lib/ui-locale-messages";
 
 type SavedPlanSortKey = "createdAt" | "title" | "workoutCount";
 type SavedPlanSort = { key: SavedPlanSortKey; direction: "asc" | "desc" };
@@ -61,6 +63,8 @@ type RestoredSavedPlanReview = Extract<RestoreSavedPlanReviewResult, { ok: true 
 const DEFAULT_SORT: SavedPlanSort = { key: "createdAt", direction: "desc" };
 
 export function SavedPlanLibraryPanel() {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const router = useRouter();
   const listSavedPlanLibraryFn = useServerFn(listSavedPlanLibrary);
   const listSavedPlanReviewsFn = useServerFn(listSavedPlanReviews);
@@ -112,16 +116,18 @@ export function SavedPlanLibraryPanel() {
         setGeneratedReviewError(
           readableError(
             generatedReviewResult.reason,
-            "Generated plans ready for review could not be loaded.",
+            message("Generated plans ready for review could not be loaded."),
           ),
         );
       }
       setStatus("ready");
     } catch (loadError) {
       setStatus("error");
-      setError(readableError(loadError, "We could not load saved plans. Try again shortly."));
+      setError(
+        readableError(loadError, message("We could not load saved plans. Try again shortly.")),
+      );
     }
-  }, [listSavedPlanLibraryFn, listSavedPlanReviewsFn]);
+  }, [listSavedPlanLibraryFn, listSavedPlanReviewsFn, message]);
 
   useEffect(() => {
     void loadRecords();
@@ -147,8 +153,8 @@ export function SavedPlanLibraryPanel() {
       : [
           {
             id: "record-state",
-            label: "Visibility",
-            value: recordState === "removed" ? "Hidden" : "All records",
+            label: message("Visibility"),
+            value: recordState === "removed" ? message("Hidden") : message("All records"),
             onRemove: () => setRecordState("available"),
           },
         ];
@@ -161,7 +167,7 @@ export function SavedPlanLibraryPanel() {
       setError(
         readableError(
           refreshError,
-          "The action succeeded, but the latest Calendar summary could not be refreshed.",
+          message("The action succeeded, but the latest Calendar summary could not be refreshed."),
         ),
       );
     }
@@ -193,13 +199,13 @@ export function SavedPlanLibraryPanel() {
         return;
       }
       if (result.status === "not_applied") {
-        throw new Error("The saved plan was not started and Calendar was not changed.");
+        throw new Error(message("The saved plan was not started and Calendar was not changed."));
       }
       setReceipt({ ...result, planTitle: record.title });
-      setNotice(`${record.title} was started from its saved record.`);
+      setNotice(message("{title} was started from its saved record.", { title: record.title }));
       await refreshAfterMutation();
     } catch (startError) {
-      setActionError(readableError(startError, "We could not start this saved plan."));
+      setActionError(readableError(startError, message("We could not start this saved plan.")));
     } finally {
       setBusyAction(null);
     }
@@ -216,14 +222,14 @@ export function SavedPlanLibraryPanel() {
         data: { savedPlanId: record.id, intent: "replace_future_workouts" },
       });
       if (result.status !== "applied") {
-        throw new Error("The saved plan was not started and Calendar was not changed.");
+        throw new Error(message("The saved plan was not started and Calendar was not changed."));
       }
       setPendingDialog(null);
       setReceipt({ ...result, planTitle: record.title });
-      setNotice(`${record.title} was started from its saved record.`);
+      setNotice(message("{title} was started from its saved record.", { title: record.title }));
       await refreshAfterMutation();
     } catch (startError) {
-      setActionError(readableError(startError, "We could not replace future workouts."));
+      setActionError(readableError(startError, message("We could not replace future workouts.")));
     } finally {
       setBusyAction(null);
     }
@@ -237,10 +243,14 @@ export function SavedPlanLibraryPanel() {
     try {
       await removeSavedPlanRecordFn({ data: { savedPlanId: record.id } });
       setPendingDialog(null);
-      setNotice(`${record.title} is hidden from the ordinary library view.`);
+      setNotice(
+        message("{title} is hidden from the ordinary library view.", {
+          title: record.title,
+        }),
+      );
       await refreshAfterMutation();
     } catch (hideError) {
-      setActionError(readableError(hideError, "We could not hide this saved plan."));
+      setActionError(readableError(hideError, message("We could not hide this saved plan.")));
     } finally {
       setBusyAction(null);
     }
@@ -271,7 +281,7 @@ export function SavedPlanLibraryPanel() {
       setRestoredReview(result);
     } catch (restoreError) {
       setActionError(
-        readableError(restoreError, "We could not restore this generated plan review."),
+        readableError(restoreError, message("We could not restore this generated plan review.")),
       );
     } finally {
       setBusyAction(null);
@@ -303,7 +313,7 @@ export function SavedPlanLibraryPanel() {
         status: "blocked",
         persisted: false,
         reason: "persistence_failed",
-        message: readableError(confirmError, "Calendar was not updated."),
+        message: readableError(confirmError, message("Calendar was not updated")),
         sourceKind: confirmInput.sourceKind,
       });
     } finally {
@@ -318,7 +328,7 @@ export function SavedPlanLibraryPanel() {
   if (status === "error" && records.length === 0) {
     return (
       <div className="hito-state-surface" data-tone="destructive" role="alert">
-        <p className="hito-label-md text-destructive">Could not load saved plans</p>
+        <p className="hito-label-md text-destructive">{message("Could not load saved plans")}</p>
         <p className="hito-body-md text-secondary mt-2">{error}</p>
         <div className="hito-state-actions">
           <HitoButton
@@ -328,7 +338,7 @@ export function SavedPlanLibraryPanel() {
             onClick={() => void loadRecords()}
           >
             <Icon name="refresh" size="sm" />
-            Try again
+            {message("Try again")}
           </HitoButton>
         </div>
       </div>
@@ -338,13 +348,14 @@ export function SavedPlanLibraryPanel() {
   return (
     <section className="grid min-w-0 gap-6" aria-labelledby="saved-plans-title">
       <header className="grid gap-2">
-        <p className="hito-label-md text-foreground">Saved plans</p>
+        <p className="hito-label-md text-foreground">{message("Saved plans")}</p>
         <h1 id="saved-plans-title" className="hito-ui-title-sm text-foreground">
-          Plan library
+          {message("Plan library")}
         </h1>
         <p className="hito-body-md text-secondary max-w-3xl">
-          Saved plans are immutable records. Legacy records can start ordinary future Calendar
-          workouts, while generated plans reopen the required Review and Confirm step first.
+          {message(
+            "Saved plans are immutable records. Legacy records can start ordinary future Calendar workouts, while generated plans reopen the required Review and Confirm step first.",
+          )}
         </p>
       </header>
 
@@ -386,12 +397,12 @@ export function SavedPlanLibraryPanel() {
         >
           <p className="hito-body-md text-secondary">
             {busyAction === "start"
-              ? "Checking the future Calendar…"
+              ? message("Checking the future Calendar…")
               : busyAction === "hide"
-                ? "Hiding saved plan…"
+                ? message("Hiding saved plan…")
                 : busyAction === "restore"
-                  ? "Restoring generated plan review…"
-                  : "Adding reviewed workouts to Calendar…"}
+                  ? message("Restoring generated plan review…")
+                  : message("Adding reviewed workouts to Calendar…")}
           </p>
         </div>
       ) : null}
@@ -401,26 +412,30 @@ export function SavedPlanLibraryPanel() {
       <div className="grid min-w-0 gap-4">
         <AdminDataTableToolbar
           activeFilters={activeFilters}
+          activeFiltersLabel={message("Active filters")}
           clearAllFilters={() => setRecordState("available")}
+          clearAllFiltersLabel={message("Clear all")}
           filterAriaSubject="library filters"
-          filterButtonAriaLabel="Filter saved plans by visibility"
+          filterButtonAriaLabel={message("Filter saved plans by visibility")}
+          filterButtonLabel={message("Filters")}
           filterSections={[
             {
               currentValue: recordState,
-              label: "Visibility",
+              label: message("Visibility"),
               onSelect: (value) => setRecordState(value as SavedPlanLibraryRecordState | "all"),
               options: [
-                { value: "available", label: "Available" },
-                { value: "removed", label: "Hidden" },
-                { value: "all", label: "All records" },
+                { value: "available", label: message("Available") },
+                { value: "removed", label: message("Hidden") },
+                { value: "all", label: message("All records") },
               ],
             },
           ]}
           onQueryChange={setQuery}
           query={query}
-          rowCountLabel={`${visibleRecords.length} ${visibleRecords.length === 1 ? "plan" : "plans"}`}
-          searchLabel="Search saved plans by name"
-          searchPlaceholder="Search plan names"
+          rowCountLabel={`${visibleRecords.length} ${message(visibleRecords.length === 1 ? "plan" : "plans")}`}
+          searchLabel={message("Search saved plans by name")}
+          searchClearLabel={message("Clear saved plan search")}
+          searchPlaceholder={message("Search plan names")}
         />
 
         {visibleRecords.length === 0 ? (
@@ -432,7 +447,7 @@ export function SavedPlanLibraryPanel() {
           <div className="hito-data-table-scroll" data-saved-plan-table-scroll>
             <table className="hito-data-table hito-data-table-min-md">
               <caption className="sr-only">
-                Saved plan library with factual summaries and selected-record actions.
+                {message("Saved plan library with factual summaries and selected-record actions.")}
               </caption>
               <thead>
                 <tr>
@@ -440,37 +455,43 @@ export function SavedPlanLibraryPanel() {
                     activeSort={sort}
                     column="title"
                     filterActive={false}
-                    label="Plan"
-                    menuLabel="Sort saved plans by name"
+                    label={message("Plan")}
+                    menuLabel={message("Sort saved plans by name")}
                     onSort={(key, direction) => setSort({ key, direction })}
-                    sortOptions={[{ key: "title", direction: "asc", label: "Name A to Z" }]}
+                    sortOptions={[
+                      { key: "title", direction: "asc", label: message("Name A to Z") },
+                    ]}
                   />
                   <AdminDataTableColumnHeader
                     activeSort={sort}
                     column="createdAt"
                     filterActive={false}
-                    label="Created"
-                    menuLabel="Sort saved plans by created date"
+                    label={message("Created")}
+                    menuLabel={message("Sort saved plans by created date")}
                     onSort={(key, direction) => setSort({ key, direction })}
                     sortOptions={[
-                      { key: "createdAt", direction: "desc", label: "Newest first" },
-                      { key: "createdAt", direction: "asc", label: "Oldest first" },
+                      { key: "createdAt", direction: "desc", label: message("Newest first") },
+                      { key: "createdAt", direction: "asc", label: message("Oldest first") },
                     ]}
                   />
-                  <AdminDataTableStaticHeader label="Schedule" />
+                  <AdminDataTableStaticHeader label={message("Schedule")} />
                   <AdminDataTableColumnHeader
                     activeSort={sort}
                     column="workoutCount"
                     filterActive={false}
-                    label="Workouts"
-                    menuLabel="Sort saved plans by workout count"
+                    label={message("Workouts")}
+                    menuLabel={message("Sort saved plans by workout count")}
                     onSort={(key, direction) => setSort({ key, direction })}
                     sortOptions={[
-                      { key: "workoutCount", direction: "desc", label: "Most workouts first" },
+                      {
+                        key: "workoutCount",
+                        direction: "desc",
+                        label: message("Most workouts first"),
+                      },
                     ]}
                   />
-                  <AdminDataTableStaticHeader label="State" />
-                  <AdminDataTableStaticHeader label="Actions" />
+                  <AdminDataTableStaticHeader label={message("State")} />
+                  <AdminDataTableStaticHeader label={message("Actions")} />
                 </tr>
               </thead>
               <tbody>
@@ -505,7 +526,7 @@ export function SavedPlanLibraryPanel() {
         onOpenChange={(open) => {
           if (!open && busyAction === null) {
             if (pendingDialog?.type === "replace") {
-              setNotice("Start was canceled. Calendar was not changed.");
+              setNotice(message("Start was canceled. Calendar was not changed."));
             }
             setPendingDialog(null);
             setActionError(null);
@@ -531,14 +552,16 @@ export function SavedPlanLibraryPanel() {
         result={restoredReview}
         status="idle"
         error={null}
-        goalLabel={restoredReview?.summary.goal.distanceLabel ?? "Generated"}
+        goalLabel={restoredReview?.summary.goal.distanceLabel ?? message("Generated")}
         onCancel={() => {
           setRestoredReview(null);
           setReviewConfirmResult(null);
         }}
         onRefresh={() => undefined}
         onCreate={() => void confirmGeneratedReview()}
-        description="Review the restored saved plan before adding its workouts to Calendar."
+        description={message(
+          "Review the restored saved plan before adding its workouts to Calendar.",
+        )}
         extraNotice={
           restoredReview ? <SavedPlanReviewValidityNotice review={restoredReview} /> : null
         }
@@ -579,6 +602,8 @@ function LegacySavedPlanRow({
   onHide: (record: SavedPlanLibrarySummary, trigger: HTMLElement | null) => void;
   onStart: (record: SavedPlanLibrarySummary, trigger: HTMLElement | null) => void;
 }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const exportHref = `/api/plan/export?savedPlanId=${encodeURIComponent(record.id)}&format=json`;
   const actionTriggerRef = useRef<HTMLButtonElement | null>(null);
   return (
@@ -594,19 +619,20 @@ function LegacySavedPlanRow({
         </div>
       </td>
       <td className="hito-data-table-cell whitespace-nowrap">
-        {formatDate(record.createdAt.slice(0, 10), {
+        {formatUiDate(record.createdAt.slice(0, 10), locale, {
           month: "short",
           day: "numeric",
           year: "numeric",
         })}
       </td>
       <td className="hito-data-table-cell whitespace-nowrap">
-        {formatDate(record.startDate)} – {formatDate(record.endDate)}
+        {formatUiDate(record.startDate, locale, { month: "short", day: "numeric" })} –{" "}
+        {formatUiDate(record.endDate, locale, { month: "short", day: "numeric" })}
       </td>
       <td className="hito-data-table-cell tabular-nums">{record.workoutCount}</td>
       <td className="hito-data-table-cell">
         <HitoMetadataTag tone={record.recordState === "available" ? "success" : "muted"}>
-          {record.recordState === "available" ? "Available" : "Hidden"}
+          {record.recordState === "available" ? message("Available") : message("Hidden")}
         </HitoMetadataTag>
       </td>
       <td className="hito-data-table-cell hito-data-table-cell-end">
@@ -615,7 +641,7 @@ function LegacySavedPlanRow({
             <HitoButton
               ref={actionTriggerRef}
               type="button"
-              aria-label={`Open actions for ${record.title}`}
+              aria-label={message("Open actions for {title}", { title: record.title })}
               disabled={busy}
               iconOnly
               size="sm"
@@ -630,19 +656,19 @@ function LegacySavedPlanRow({
             <DropdownMenuItem asChild>
               <a href={exportHref} download data-saved-plan-download={record.id}>
                 <Icon name="download" size="xs" />
-                Download JSON
+                {message("Download JSON")}
               </a>
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => onStart(record, actionTriggerRef.current)}>
               <Icon name="calendar-clock" size="xs" />
-              Start plan
+              {message("Start plan")}
             </DropdownMenuItem>
             {record.recordState === "available" ? (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={() => onHide(record, actionTriggerRef.current)}>
                   <Icon name="visibility-off" size="xs" />
-                  Hide from library
+                  {message("Hide from library")}
                 </DropdownMenuItem>
               </>
             ) : null}
@@ -662,6 +688,8 @@ function GeneratedPlanReviewRow({
   busy: boolean;
   onRestore: (record: SavedPlanReviewSummary, trigger: HTMLElement | null) => void;
 }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const restoreButtonRef = useRef<HTMLButtonElement | null>(null);
   const state = savedPlanReviewState(record);
 
@@ -675,24 +703,25 @@ function GeneratedPlanReviewRow({
         <div className="grid max-w-xs gap-1">
           <p className="hito-body-md text-foreground break-words">{record.title}</p>
           <p className="hito-body-xs text-tertiary line-clamp-2">
-            {savedPlanReviewGoalSummary(record)}
+            {savedPlanReviewGoalSummary(record, locale)}
           </p>
         </div>
       </td>
       <td className="hito-data-table-cell whitespace-nowrap">
-        {formatDate(record.createdAt.slice(0, 10), {
+        {formatUiDate(record.createdAt.slice(0, 10), locale, {
           month: "short",
           day: "numeric",
           year: "numeric",
         })}
       </td>
       <td className="hito-data-table-cell whitespace-nowrap">
-        {formatDate(record.schedule.startDate)} – {formatDate(record.schedule.endDate)}
+        {formatUiDate(record.schedule.startDate, locale, { month: "short", day: "numeric" })} –{" "}
+        {formatUiDate(record.schedule.endDate, locale, { month: "short", day: "numeric" })}
       </td>
-      <td className="hito-data-table-cell text-secondary">Review</td>
+      <td className="hito-data-table-cell text-secondary">{message("Review")}</td>
       <td className="hito-data-table-cell">
         <HitoMetadataTag tone={state.tone} tooltip={state.description}>
-          {state.label}
+          {getHitoKnownProductMessage(locale, state.label)}
         </HitoMetadataTag>
       </td>
       <td className="hito-data-table-cell hito-data-table-cell-end">
@@ -705,7 +734,7 @@ function GeneratedPlanReviewRow({
           onClick={() => onRestore(record, restoreButtonRef.current)}
         >
           <Icon name="refresh" size="xs" />
-          Restore plan
+          {message("Restore plan")}
         </HitoButton>
       </td>
     </tr>
@@ -713,6 +742,7 @@ function GeneratedPlanReviewRow({
 }
 
 function SavedPlanReviewValidityNotice({ review }: { review: RestoredSavedPlanReview }) {
+  const locale = useHitoUiLocale();
   const state = savedPlanReviewState(review.summary);
   return (
     <div
@@ -720,8 +750,12 @@ function SavedPlanReviewValidityNotice({ review }: { review: RestoredSavedPlanRe
       data-tone={review.status === "review_ready" ? "success" : "warning"}
       role="status"
     >
-      <p className="hito-body-md text-foreground">{state.noticeTitle}</p>
-      <p className="hito-body-sm mt-1 text-secondary">{state.description}</p>
+      <p className="hito-body-md text-foreground">
+        {getHitoKnownProductMessage(locale, state.noticeTitle)}
+      </p>
+      <p className="hito-body-sm mt-1 text-secondary">
+        {translateSavedPlanReviewDescription(state.description, locale)}
+      </p>
     </div>
   );
 }
@@ -766,13 +800,32 @@ function savedPlanReviewState(record: SavedPlanReviewSummary): {
   };
 }
 
-function savedPlanReviewGoalSummary(record: SavedPlanReviewSummary) {
+function translateSavedPlanReviewDescription(value: string, locale: ResolvedUiLocale) {
+  const suffix = " Review remains available, but Confirm is disabled.";
+  if (!value.endsWith(suffix)) return getHitoKnownProductMessage(locale, value);
+
+  const reason = value.slice(0, -suffix.length);
+  return `${getHitoKnownProductMessage(locale, reason)} ${getHitoKnownProductMessage(
+    locale,
+    suffix.trim(),
+  )}`;
+}
+
+function savedPlanReviewGoalSummary(record: SavedPlanReviewSummary, locale: ResolvedUiLocale) {
   const details = [record.goal.distanceLabel];
   if (record.goal.targetDate) {
-    details.push(`target ${formatDate(record.goal.targetDate)}`);
+    details.push(
+      formatHitoProductMessage(locale, "target {date}", {
+        date: formatUiDate(record.goal.targetDate, locale, { month: "short", day: "numeric" }),
+      }),
+    );
   }
   if (record.goal.targetFinishTime) {
-    details.push(`finish ${record.goal.targetFinishTime}`);
+    details.push(
+      formatHitoProductMessage(locale, "finish {time}", {
+        time: record.goal.targetFinishTime,
+      }),
+    );
   }
   return details.join(" · ");
 }
@@ -792,6 +845,7 @@ function SavedPlanActionDialog({
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
 }) {
+  const message = useHitoProductMessage();
   const isReplacement = dialog?.type === "replace";
   return (
     <Dialog open={dialog !== null} onOpenChange={onOpenChange}>
@@ -813,15 +867,22 @@ function SavedPlanActionDialog({
       >
         <DialogHeader className="hito-product-dialog-header">
           <DialogTitle className="hito-ui-title-md text-foreground">
-            {isReplacement ? "Replace future workouts?" : "Hide this saved plan?"}
+            {isReplacement ? message("Replace future workouts?") : message("Hide this saved plan?")}
           </DialogTitle>
-          <DialogDescription>{dialog?.record.title ?? "Saved plan"}</DialogDescription>
+          <DialogDescription>{dialog?.record.title ?? message("Saved plan")}</DialogDescription>
         </DialogHeader>
         <div className="hito-product-dialog-body">
           <p className="hito-body-md text-secondary">
             {isReplacement
-              ? `${dialog.futureWorkoutCount} future ${dialog.futureWorkoutCount === 1 ? "workout" : "workouts"} already exist. Only a positive replacement will start this plan; past and protected history are not replaceable here.`
-              : "This hides only the immutable library record from the ordinary view. Calendar workouts and history remain unchanged."}
+              ? message(
+                  dialog.futureWorkoutCount === 1
+                    ? "{count} future workout already exists. Only a positive replacement will start this plan; past and protected history are not replaceable here."
+                    : "{count} future workouts already exist. Only a positive replacement will start this plan; past and protected history are not replaceable here.",
+                  { count: dialog.futureWorkoutCount },
+                )
+              : message(
+                  "This hides only the immutable library record from the ordinary view. Calendar workouts and history remain unchanged.",
+                )}
           </p>
           {error ? (
             <div className="hito-state-surface mt-4 py-3" data-tone="destructive" role="alert">
@@ -837,7 +898,7 @@ function SavedPlanActionDialog({
             disabled={pending}
             onClick={() => onOpenChange(false)}
           >
-            Cancel
+            {message("Cancel")}
           </HitoButton>
           <HitoButton
             type="button"
@@ -849,7 +910,7 @@ function SavedPlanActionDialog({
             onClick={onConfirm}
           >
             {pending ? <Icon name="loader" size="sm" /> : null}
-            {isReplacement ? "Replace future workouts" : "Hide plan"}
+            {isReplacement ? message("Replace future workouts") : message("Hide plan")}
           </HitoButton>
         </DialogFooter>
       </DialogContent>
@@ -858,29 +919,45 @@ function SavedPlanActionDialog({
 }
 
 function SavedPlanStartReceipt({ receipt }: { receipt: AppliedReceipt }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   return (
     <section className="hito-state-surface" data-tone="signal" aria-labelledby="plan-start-receipt">
-      <p className="hito-label-md text-foreground">Plan started</p>
+      <p className="hito-label-md text-foreground">{message("Plan started")}</p>
       <h2 id="plan-start-receipt" className="hito-ui-title-sm text-foreground mt-2">
         {receipt.planTitle}
       </h2>
       <p className="hito-body-md text-secondary mt-2">
-        Starts {formatDate(receipt.resolvedStartDate)} with {receipt.workoutCount} non-Rest workouts
-        across {receipt.calendarRowCount} Calendar days.
+        {message("Starts {date} with {workouts} non-Rest workouts across {days} Calendar days.", {
+          date: formatUiDate(receipt.resolvedStartDate, locale, {
+            month: "short",
+            day: "numeric",
+          }),
+          workouts: receipt.workoutCount,
+          days: receipt.calendarRowCount,
+        })}
       </p>
       <ul className="mt-3 grid gap-1 text-sm text-text-secondary">
         {receipt.omittedLeadingDayCount > 0 ? (
           <li>
-            {receipt.omittedLeadingDayCount} leading source days were omitted by schedule alignment.
+            {message("{count} leading source days were omitted by schedule alignment.", {
+              count: receipt.omittedLeadingDayCount,
+            })}
           </li>
         ) : null}
         {receipt.replacedFutureWorkoutCount > 0 ? (
-          <li>{receipt.replacedFutureWorkoutCount} eligible future workouts were replaced.</li>
+          <li>
+            {message("{count} eligible future workouts were replaced.", {
+              count: receipt.replacedFutureWorkoutCount,
+            })}
+          </li>
         ) : (
-          <li>No existing future workouts needed replacement.</li>
+          <li>{message("No existing future workouts needed replacement.")}</li>
         )}
         <li>
-          The saved record stayed unchanged; the new Calendar workouts are independently editable.
+          {message(
+            "The saved record stayed unchanged; the new Calendar workouts are independently editable.",
+          )}
         </li>
       </ul>
     </section>
@@ -888,28 +965,32 @@ function SavedPlanStartReceipt({ receipt }: { receipt: AppliedReceipt }) {
 }
 
 function SavedPlanEmptyState({ hasRecords, query }: { hasRecords: boolean; query: string }) {
+  const message = useHitoProductMessage();
   return (
     <div className="hito-state-surface">
       <p className="hito-label-md text-foreground">
-        {hasRecords ? "No matching plans" : "No saved plans"}
+        {hasRecords ? message("No matching plans") : message("No saved plans")}
       </p>
       <h2 className="hito-ui-title-sm text-foreground mt-2">
-        {hasRecords ? "No plans match this library view." : "Your saved plan library is empty."}
+        {hasRecords
+          ? message("No plans match this library view.")
+          : message("Your saved plan library is empty.")}
       </h2>
       <p className="hito-body-md text-secondary mt-2">
         {query.trim()
-          ? "Clear the name search or change the visibility filter."
+          ? message("Clear the name search or change the visibility filter.")
           : hasRecords
-            ? "Change the visibility filter to review other saved records."
-            : "Successfully saved running plans will appear here as immutable records."}
+            ? message("Change the visibility filter to review other saved records.")
+            : message("Successfully saved running plans will appear here as immutable records.")}
       </p>
     </div>
   );
 }
 
 function SavedPlanLibrarySkeleton() {
+  const message = useHitoProductMessage();
   return (
-    <div className="grid gap-4" aria-busy="true" aria-label="Loading saved plans">
+    <div className="grid gap-4" aria-busy="true" aria-label={message("Loading saved plans")}>
       <Skeleton className="h-8 w-48" />
       <Skeleton className="h-10 w-full max-w-sm" />
       <Skeleton className="h-24 w-full" />

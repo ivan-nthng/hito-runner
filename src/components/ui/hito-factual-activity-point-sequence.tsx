@@ -8,6 +8,7 @@ import {
 } from "react";
 
 import { HitoButton } from "@/components/ui/button";
+import { useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
 import { Icon } from "@/components/ui/icon";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type {
@@ -16,7 +17,13 @@ import type {
   RunnerActivityFitSequenceProductModel,
   RunnerActivityFitSequenceProductPoint,
 } from "@/lib/runner-activity/product-contract";
-import { formatDate } from "@/lib/training";
+import { formatUiDate, type ResolvedUiLocale } from "@/lib/ui-locale";
+import {
+  formatHitoProductMessage,
+  getHitoKnownProductMessage,
+  getHitoProductMessage,
+  type HitoProductMessageKey,
+} from "@/lib/ui-locale-messages";
 import { cn } from "@/lib/utils";
 
 type ReadyOrEmptySequence = Extract<
@@ -48,7 +55,11 @@ export type HitoFactualActivityPointSequenceControls = {
 
 const METRIC_PRESENTATION: Record<
   RunnerActivityFitSequenceMetricId,
-  { purpose: string; title: string; unitLabel: RunnerActivityFitSequenceObservation["unitLabel"] }
+  {
+    purpose: HitoProductMessageKey;
+    title: HitoProductMessageKey;
+    unitLabel: RunnerActivityFitSequenceObservation["unitLabel"];
+  }
 > = {
   distance: {
     title: "Distance by FIT-recorded run",
@@ -97,7 +108,9 @@ export function HitoFactualActivityPointSequence({
   sequence: HitoFactualActivityPointSequenceModel;
   stateAction?: ReactNode;
 }) {
+  const locale = useHitoUiLocale();
   const metric = METRIC_PRESENTATION[metricId];
+  const metricTitle = getHitoProductMessage(locale, metric.title);
   const titleId = `hito-factual-activity-sequence-${metricId}-title`;
   const summaryId = `hito-factual-activity-sequence-${metricId}-summary`;
   const membershipComplete =
@@ -116,16 +129,16 @@ export function HitoFactualActivityPointSequence({
       <figcaption className="grid min-w-0 gap-2">
         <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <h3 id={titleId} className="hito-ui-title-sm">
-            {metric.title}
+            {metricTitle}
           </h3>
           <span className="hito-technical-sm text-secondary">{metric.unitLabel}</span>
         </div>
         <p id={summaryId} className="hito-body-sm text-secondary max-w-3xl">
-          {metric.purpose}
+          {getHitoProductMessage(locale, metric.purpose)}
         </p>
         {metricId === "observed_average_pace" ? (
           <p className="hito-body-xs text-secondary">
-            Different workouts are not directly comparable.
+            {getHitoProductMessage(locale, "Different workouts are not directly comparable.")}
           </p>
         ) : null}
       </figcaption>
@@ -142,9 +155,9 @@ export function HitoFactualActivityPointSequence({
       ) : null}
 
       <p className="hito-technical-sm text-tertiary">
-        {sequence.selectedPeriod.label} ·{" "}
+        {getHitoKnownProductMessage(locale, sequence.selectedPeriod.label)} ·{" "}
         <time dateTime={sequence.selectedPeriod.startDate}>
-          {formatDate(sequence.selectedPeriod.startDate, {
+          {formatUiDate(sequence.selectedPeriod.startDate, locale, {
             day: "numeric",
             month: "short",
             year: "numeric",
@@ -152,7 +165,7 @@ export function HitoFactualActivityPointSequence({
         </time>
         –
         <time dateTime={sequence.selectedPeriod.endDate}>
-          {formatDate(sequence.selectedPeriod.endDate, {
+          {formatUiDate(sequence.selectedPeriod.endDate, locale, {
             day: "numeric",
             month: "short",
             year: "numeric",
@@ -161,49 +174,60 @@ export function HitoFactualActivityPointSequence({
         {sequence.status === "ready" || sequence.status === "empty"
           ? " · " +
             sequence.completeness.returnedPointCount +
-            (sequence.completeness.returnedPointCount === 1 ? " activity" : " activities")
+            ` ${getHitoProductMessage(
+              locale,
+              sequence.completeness.returnedPointCount === 1 ? "activity" : "activities",
+            )}`
           : ""}{" "}
-        · {sequence.evidenceLabel}
+        · {getHitoKnownProductMessage(locale, sequence.evidenceLabel)}
       </p>
 
       {isReadySequence(sequence) && membershipComplete ? (
-        <ReadyFactualActivityPointSequence metricId={metricId} sequence={sequence} />
+        <ReadyFactualActivityPointSequence
+          locale={locale}
+          metricId={metricId}
+          sequence={sequence}
+        />
       ) : isEmptySequence(sequence) && membershipComplete ? (
         <SequenceState
-          label="No activity evidence"
-          message={
-            "No FIT-recorded runs from " +
-            formatDate(sequence.selectedPeriod.startDate, {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            }) +
-            " to " +
-            formatDate(sequence.selectedPeriod.endDate, {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            }) +
-            "."
-          }
+          label={getHitoProductMessage(locale, "No activity evidence")}
+          message={formatHitoProductMessage(
+            locale,
+            "No FIT-recorded runs from {startDate} to {endDate}.",
+            {
+              startDate: formatUiDate(sequence.selectedPeriod.startDate, locale, {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              }),
+              endDate: formatUiDate(sequence.selectedPeriod.endDate, locale, {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              }),
+            },
+          )}
           tone="neutral"
         />
       ) : sequence.status === "ready" || sequence.status === "empty" ? (
         <SequenceState
-          label="Sequence unavailable"
-          message="The supplied activity sequence is incomplete. No partial member set is shown."
+          label={getHitoProductMessage(locale, "Sequence unavailable")}
+          message={getHitoProductMessage(
+            locale,
+            "The supplied activity sequence is incomplete. No partial member set is shown.",
+          )}
           tone="warning"
         />
       ) : (
         <SequenceState
           label={
             sequence.status === "error"
-              ? "Sequence unavailable"
+              ? getHitoProductMessage(locale, "Sequence unavailable")
               : sequence.status === "updating"
-                ? "Updating sequence"
-                : "Sequence unavailable"
+                ? getHitoProductMessage(locale, "Updating sequence")
+                : getHitoProductMessage(locale, "Sequence unavailable")
           }
-          message={sequenceReasonLabel(sequence)}
+          message={sequenceReasonLabel(sequence, locale)}
           tone={sequence.status === "error" ? "destructive" : "warning"}
           action={stateAction}
         />
@@ -213,13 +237,16 @@ export function HitoFactualActivityPointSequence({
 }
 
 function ReadyFactualActivityPointSequence({
+  locale,
   metricId,
   sequence,
 }: {
+  locale: ResolvedUiLocale;
   metricId: RunnerActivityFitSequenceMetricId;
   sequence: ReadySequence;
 }) {
   const metric = METRIC_PRESENTATION[metricId];
+  const metricTitle = getHitoProductMessage(locale, metric.title);
   const [activeIndex, setActiveIndex] = useState(0);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -300,7 +327,9 @@ function ReadyFactualActivityPointSequence({
       <div className="grid min-w-0 gap-4">
         <div
           className="max-w-full overflow-x-auto overscroll-x-contain pb-1"
-          aria-label={`${metric.title} plot scroll region`}
+          aria-label={formatHitoProductMessage(locale, "{title} plot scroll region", {
+            title: metricTitle,
+          })}
         >
           <div
             className="relative h-[calc(var(--space-10)*6)] min-w-full border-b border-hairline"
@@ -310,7 +339,16 @@ function ReadyFactualActivityPointSequence({
                 "max(100%, calc(var(--hito-factual-sequence-day-count) * var(--space-3)), calc(var(--hito-factual-sequence-point-count) * (var(--space-10) + var(--space-1))))",
             }}
             role="group"
-            aria-label={`${metric.title}, ${sequence.selectedPeriod.label}, ${sequence.selectedPeriod.startDate} to ${sequence.selectedPeriod.endDate}`}
+            aria-label={formatHitoProductMessage(
+              locale,
+              "{title}, {period}, {startDate} to {endDate}",
+              {
+                title: metricTitle,
+                period: getHitoKnownProductMessage(locale, sequence.selectedPeriod.label),
+                startDate: sequence.selectedPeriod.startDate,
+                endDate: sequence.selectedPeriod.endDate,
+              },
+            )}
             data-hito-factual-activity-sequence-plot
           >
             <span className="pointer-events-none absolute inset-x-0 top-0 border-t border-hairline" />
@@ -357,7 +395,7 @@ function ReadyFactualActivityPointSequence({
                       className="absolute z-20 grid size-[calc(var(--space-10)+var(--space-1))] place-items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                       style={position}
                       tabIndex={activeIndex === index ? 0 : -1}
-                      aria-label={pointAccessibleName(point, observation)}
+                      aria-label={pointAccessibleName(point, observation, locale)}
                       aria-pressed={pinnedIndex === index}
                       data-point-id={point.id}
                       data-point-state={observation.state}
@@ -385,7 +423,11 @@ function ReadyFactualActivityPointSequence({
                     sideOffset={8}
                     className="pointer-events-none max-w-xs"
                   >
-                    <ActivityPointReadback point={point} observation={observation} />
+                    <ActivityPointReadback
+                      locale={locale}
+                      point={point}
+                      observation={observation}
+                    />
                   </TooltipContent>
                 </Tooltip>
               );
@@ -398,28 +440,47 @@ function ReadyFactualActivityPointSequence({
             className="hito-technical-sm text-tertiary"
             dateTime={sequence.selectedPeriod.startDate}
           >
-            {formatDate(sequence.selectedPeriod.startDate)}
+            {formatUiDate(sequence.selectedPeriod.startDate, locale, {
+              month: "short",
+              day: "numeric",
+            })}
           </time>
           <time
             className="hito-technical-sm text-tertiary"
             dateTime={sequence.selectedPeriod.endDate}
           >
-            {formatDate(sequence.selectedPeriod.endDate)}
+            {formatUiDate(sequence.selectedPeriod.endDate, locale, {
+              month: "short",
+              day: "numeric",
+            })}
           </time>
         </div>
 
         <div className="hito-body-xs text-secondary flex flex-wrap gap-x-4 gap-y-1">
-          <span>Available · solid point</span>
+          <span>{getHitoProductMessage(locale, "Available · solid point")}</span>
           {observations.some((observation) => observation.state === "partial") ? (
-            <span>Partial · outlined point</span>
+            <span>{getHitoProductMessage(locale, "Partial · outlined point")}</span>
           ) : null}
           {observations.some((observation) => observation.state === "unavailable") ? (
-            <span>Unavailable · N/A point</span>
+            <span>{getHitoProductMessage(locale, "Unavailable · N/A point")}</span>
           ) : null}
           {sequence.selectedPeriod.futureInterval ? (
             <span>
-              Future · {formatDate(sequence.selectedPeriod.futureInterval.startDate)}–
-              {formatDate(sequence.selectedPeriod.futureInterval.endDate)} · not missing data
+              {formatHitoProductMessage(
+                locale,
+                "Future · {startDate}–{endDate} · not missing data",
+                {
+                  startDate: formatUiDate(
+                    sequence.selectedPeriod.futureInterval.startDate,
+                    locale,
+                    { month: "short", day: "numeric" },
+                  ),
+                  endDate: formatUiDate(sequence.selectedPeriod.futureInterval.endDate, locale, {
+                    month: "short",
+                    day: "numeric",
+                  }),
+                },
+              )}
             </span>
           ) : null}
         </div>
@@ -434,6 +495,7 @@ function ReadyFactualActivityPointSequence({
             data-hito-factual-activity-sequence-pinned-readback
           >
             <ActivityPointReadback
+              locale={locale}
               point={sequence.points[pinnedIndex]}
               observation={sequence.points[pinnedIndex].observations[metricId]}
             />
@@ -441,7 +503,7 @@ function ReadyFactualActivityPointSequence({
               size="xs"
               variant="ghost"
               iconOnly
-              aria-label="Close active activity"
+              aria-label={getHitoProductMessage(locale, "Close active activity")}
               onClick={() => {
                 pointRefs.current[activeIndex]?.focus();
                 setPinnedIndex(null);
@@ -452,7 +514,7 @@ function ReadyFactualActivityPointSequence({
           </div>
         ) : null}
 
-        <ActivitySequenceDataTable metricId={metricId} sequence={sequence} />
+        <ActivitySequenceDataTable locale={locale} metricId={metricId} sequence={sequence} />
       </div>
     </TooltipProvider>
   );
@@ -504,38 +566,49 @@ function PointMark({ observation }: { observation: RunnerActivityFitSequenceObse
 }
 
 function ActivityPointReadback({
+  locale,
   observation,
   point,
 }: {
+  locale: ResolvedUiLocale;
   observation: RunnerActivityFitSequenceObservation;
   point: RunnerActivityFitSequenceProductPoint;
 }) {
   return (
     <div className="grid min-w-0 gap-1">
       <p className="hito-label-md">
-        {point.label} · {historicalTimeLabel(point)}
+        {getHitoKnownProductMessage(locale, point.label)} · {historicalTimeLabel(point, locale)}
       </p>
       <p className="hito-body-sm">
-        {observation.label}: {observationValue(observation)}
+        {getHitoKnownProductMessage(locale, observation.label)}:{" "}
+        {observationValue(observation, locale)}
       </p>
       <p className="hito-body-xs text-secondary">
-        {observationStateLabel(observation.state)} · {observationCoverageLabel(observation)}
+        {observationStateLabel(observation.state, locale)} ·{" "}
+        {observationCoverageLabel(observation, locale)}
       </p>
       <p className="hito-body-xs text-secondary">
-        {point.context.runningContext ?? "Running context unavailable"}
+        {point.context.runningContext ??
+          getHitoProductMessage(locale, "Running context unavailable")}
       </p>
       {observation.reasonLabel ? (
-        <p className="hito-body-xs text-secondary">{observation.reasonLabel}</p>
+        <p className="hito-body-xs text-secondary">
+          {getHitoKnownProductMessage(locale, observation.reasonLabel)}
+        </p>
       ) : null}
-      <p className="hito-technical-sm text-tertiary">{point.evidence.label}</p>
+      <p className="hito-technical-sm text-tertiary">
+        {getHitoKnownProductMessage(locale, point.evidence.label)}
+      </p>
     </div>
   );
 }
 
 function ActivitySequenceDataTable({
+  locale,
   metricId,
   sequence,
 }: {
+  locale: ResolvedUiLocale;
   metricId: RunnerActivityFitSequenceMetricId;
   sequence: ReadySequence;
 }) {
@@ -543,20 +616,26 @@ function ActivitySequenceDataTable({
   return (
     <details className="hito-disclosure">
       <summary className="hito-disclosure-summary min-h-11">
-        <span>View data</span>
+        <span>{getHitoProductMessage(locale, "View data")}</span>
         <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" decorative />
       </summary>
       <div className="hito-disclosure-body">
         <div
           className="hito-data-table-scroll"
           role="region"
-          aria-label={`${metric.title} data table`}
+          aria-label={formatHitoProductMessage(locale, "{title} data table", {
+            title: getHitoProductMessage(locale, metric.title),
+          })}
           tabIndex={0}
         >
           <table className="hito-data-table hito-data-table-min-lg">
             <caption className="sr-only">
-              {metric.title}, {sequence.selectedPeriod.label}, {sequence.selectedPeriod.startDate}{" "}
-              to {sequence.selectedPeriod.endDate}
+              {formatHitoProductMessage(locale, "{title}, {period}, {startDate} to {endDate}", {
+                title: getHitoProductMessage(locale, metric.title),
+                period: getHitoKnownProductMessage(locale, sequence.selectedPeriod.label),
+                startDate: sequence.selectedPeriod.startDate,
+                endDate: sequence.selectedPeriod.endDate,
+              })}
             </caption>
             <thead>
               <tr>
@@ -575,7 +654,7 @@ function ActivitySequenceDataTable({
                   "Reason",
                 ].map((heading) => (
                   <th key={heading} scope="col" className="hito-data-table-cell text-left">
-                    {heading}
+                    {getHitoKnownProductMessage(locale, heading)}
                   </th>
                 ))}
               </tr>
@@ -586,30 +665,45 @@ function ActivitySequenceDataTable({
                 return (
                   <tr key={point.id}>
                     <th scope="row" className="hito-data-table-cell hito-data-table-cell-start">
-                      {point.label} {point.sequenceIndex + 1}
+                      {getHitoKnownProductMessage(locale, point.label)} {point.sequenceIndex + 1}
                     </th>
                     <td className="hito-data-table-cell whitespace-nowrap">
-                      {historicalTimeLabel(point)}
+                      {historicalTimeLabel(point, locale)}
                     </td>
                     <td className="hito-data-table-cell whitespace-nowrap tabular-nums">
-                      {observationValue(observation)}
+                      {observationValue(observation, locale)}
                     </td>
                     <td className="hito-data-table-cell">
-                      {observationStateLabel(observation.state)}
+                      {observationStateLabel(observation.state, locale)}
                     </td>
-                    <ObservationCell observation={point.observations.distance} />
-                    <ObservationCell observation={point.observations.timer_duration} />
-                    <ObservationCell observation={point.observations.observed_average_pace} />
-                    <ObservationCell observation={point.observations.elevation_gain} />
-                    <ObservationCell observation={point.observations.reported_load} />
+                    <ObservationCell locale={locale} observation={point.observations.distance} />
+                    <ObservationCell
+                      locale={locale}
+                      observation={point.observations.timer_duration}
+                    />
+                    <ObservationCell
+                      locale={locale}
+                      observation={point.observations.observed_average_pace}
+                    />
+                    <ObservationCell
+                      locale={locale}
+                      observation={point.observations.elevation_gain}
+                    />
+                    <ObservationCell
+                      locale={locale}
+                      observation={point.observations.reported_load}
+                    />
                     <td className="hito-data-table-cell">
-                      {point.context.runningContext ?? "Unknown"}
+                      {point.context.runningContext ?? getHitoProductMessage(locale, "Unknown")}
                     </td>
                     <td className="hito-data-table-cell">
-                      {point.evidence.label} · {observationCoverageLabel(observation)}
+                      {getHitoKnownProductMessage(locale, point.evidence.label)} ·{" "}
+                      {observationCoverageLabel(observation, locale)}
                     </td>
                     <td className="hito-data-table-cell hito-data-table-cell-end">
-                      {observation.reasonLabel ?? "Not applicable"}
+                      {observation.reasonLabel
+                        ? getHitoKnownProductMessage(locale, observation.reasonLabel)
+                        : getHitoProductMessage(locale, "Not applicable")}
                     </td>
                   </tr>
                 );
@@ -622,15 +716,23 @@ function ActivitySequenceDataTable({
   );
 }
 
-function ObservationCell({ observation }: { observation: RunnerActivityFitSequenceObservation }) {
+function ObservationCell({
+  locale,
+  observation,
+}: {
+  locale: ResolvedUiLocale;
+  observation: RunnerActivityFitSequenceObservation;
+}) {
   return (
     <td className="hito-data-table-cell min-w-40 align-top">
       <span className="whitespace-nowrap tabular-nums">
-        {observationValue(observation)} · {observationStateLabel(observation.state)}
+        {observationValue(observation, locale)} · {observationStateLabel(observation.state, locale)}
       </span>
       <span className="hito-body-xs text-secondary mt-1 block">
-        {observationCoverageLabel(observation)}
-        {observation.reasonLabel ? ` · ${observation.reasonLabel}` : ""}
+        {observationCoverageLabel(observation, locale)}
+        {observation.reasonLabel
+          ? ` · ${getHitoKnownProductMessage(locale, observation.reasonLabel)}`
+          : ""}
       </span>
     </td>
   );
@@ -710,39 +812,62 @@ function clamp(value: number, minimum: number, maximum: number) {
   return Math.max(minimum, Math.min(value, maximum));
 }
 
-function historicalTimeLabel(point: RunnerActivityFitSequenceProductPoint) {
+function historicalTimeLabel(
+  point: RunnerActivityFitSequenceProductPoint,
+  locale: ResolvedUiLocale,
+) {
   const time = point.historicalTime.startedAt
-    ? new Intl.DateTimeFormat("en", {
+    ? formatUiDate(new Date(point.historicalTime.startedAt), locale, {
         hour: "2-digit",
         hour12: false,
         minute: "2-digit",
         timeZone: point.historicalTime.timezone ?? "UTC",
-      }).format(new Date(point.historicalTime.startedAt))
-    : "Time unavailable";
-  return `${point.historicalTime.localDate} · ${time}`;
+      })
+    : getHitoProductMessage(locale, "Time unavailable");
+  return `${formatUiDate(point.historicalTime.localDate, locale, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })} · ${time}`;
 }
 
-function observationValue(observation: RunnerActivityFitSequenceObservation) {
-  return observation.displayValue ?? "Unavailable";
+function observationValue(
+  observation: RunnerActivityFitSequenceObservation,
+  locale: ResolvedUiLocale,
+) {
+  return observation.displayValue ?? getHitoProductMessage(locale, "Unavailable");
 }
 
-function observationStateLabel(state: RunnerActivityFitSequenceObservation["state"]) {
-  if (state === "partial") return "Partial";
-  if (state === "unavailable") return "Unavailable";
-  return "Available";
+function observationStateLabel(
+  state: RunnerActivityFitSequenceObservation["state"],
+  locale: ResolvedUiLocale,
+) {
+  if (state === "partial") return getHitoProductMessage(locale, "Partial");
+  if (state === "unavailable") return getHitoProductMessage(locale, "Unavailable");
+  return getHitoProductMessage(locale, "Available");
 }
 
-function observationCoverageLabel(observation: RunnerActivityFitSequenceObservation) {
-  return `${observation.coverage.includedCount} of ${observation.coverage.candidateCount} included`;
+function observationCoverageLabel(
+  observation: RunnerActivityFitSequenceObservation,
+  locale: ResolvedUiLocale,
+) {
+  return formatHitoProductMessage(locale, "{includedCount} of {candidateCount} included", {
+    includedCount: observation.coverage.includedCount,
+    candidateCount: observation.coverage.candidateCount,
+  });
 }
 
 function pointAccessibleName(
   point: RunnerActivityFitSequenceProductPoint,
   observation: RunnerActivityFitSequenceObservation,
+  locale: ResolvedUiLocale,
 ) {
-  const reason = observation.reasonLabel ? ` ${observation.reasonLabel}` : "";
-  const context = point.context.runningContext ?? "Running context unavailable";
-  return `${point.label} ${point.sequenceIndex + 1}. ${historicalTimeLabel(point)}. ${observation.label}: ${observationValue(observation)}. ${observationStateLabel(observation.state)}. ${observationCoverageLabel(observation)}. ${context}. ${point.evidence.label}.${reason}`;
+  const reason = observation.reasonLabel
+    ? ` ${getHitoKnownProductMessage(locale, observation.reasonLabel)}`
+    : "";
+  const context =
+    point.context.runningContext ?? getHitoProductMessage(locale, "Running context unavailable");
+  return `${getHitoKnownProductMessage(locale, point.label)} ${point.sequenceIndex + 1}. ${historicalTimeLabel(point, locale)}. ${getHitoKnownProductMessage(locale, observation.label)}: ${observationValue(observation, locale)}. ${observationStateLabel(observation.state, locale)}. ${observationCoverageLabel(observation, locale)}. ${context}. ${getHitoKnownProductMessage(locale, point.evidence.label)}.${reason}`;
 }
 
 function isReadySequence(
@@ -757,6 +882,11 @@ function isEmptySequence(
   return sequence.status === "empty";
 }
 
-function sequenceReasonLabel(sequence: HitoFactualActivityPointSequenceModel) {
-  return "reasonLabel" in sequence ? sequence.reasonLabel : "The activity sequence is unavailable.";
+function sequenceReasonLabel(
+  sequence: HitoFactualActivityPointSequenceModel,
+  locale: ResolvedUiLocale,
+) {
+  return "reasonLabel" in sequence
+    ? getHitoKnownProductMessage(locale, sequence.reasonLabel)
+    : getHitoProductMessage(locale, "The activity sequence is unavailable.");
 }

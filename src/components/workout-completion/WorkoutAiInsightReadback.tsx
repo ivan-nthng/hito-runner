@@ -5,6 +5,9 @@ import type {
 import { hasPrimaryMatchedVerdict } from "@/components/workout-completion/WorkoutComparisonReadback";
 import { Icon } from "@/components/ui/icon";
 import { formatWorkoutFeedbackTimestamp } from "@/components/workout-completion/workout-feedback-time";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
+import { formatHitoProductMessage, getHitoKnownProductMessage } from "@/lib/ui-locale-messages";
+import type { ResolvedUiLocale } from "@/lib/ui-locale";
 
 export function WorkoutAiInsightReadback({
   insight,
@@ -13,30 +16,35 @@ export function WorkoutAiInsightReadback({
   insight: WorkoutAiInsightSummary;
   comparison?: WorkoutComparisonSummary | null;
 }) {
-  const matchedPrimaryVerdict = hasPrimaryMatchedVerdict(comparison);
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
+  const matchedPrimaryVerdict = hasPrimaryMatchedVerdict(comparison ?? null);
   const recommendationLabel = humanizeAiRecommendationLevelWithContext(
     insight.recommendationLevel,
     {
       matchedPrimaryVerdict,
+      locale,
     },
   );
   const recommendationTone = toneForAiRecommendation(insight, {
     matchedPrimaryVerdict,
   });
-  const analysisLabel = matchedPrimaryVerdict ? "Why it still helps" : "What stood out";
+  const analysisLabel = matchedPrimaryVerdict ? t("Why it still helps") : t("What stood out");
   const differenceLabel = matchedPrimaryVerdict
-    ? "Small difference note"
-    : "Why this is less certain";
-  const recommendationSectionLabel = matchedPrimaryVerdict ? "Next workout" : "Suggested next step";
+    ? t("Small difference note")
+    : t("Why this is less certain");
+  const recommendationSectionLabel = matchedPrimaryVerdict
+    ? t("Next workout")
+    : t("Suggested next step");
   const supportCopy = matchedPrimaryVerdict
-    ? "Use this as extra context on top of the factual comparison above."
-    : "Use this as a careful read of the facts above when some checks are mixed or incomplete.";
+    ? t("Use this as extra context on top of the factual comparison above.")
+    : t("Use this as a careful read of the facts above when some checks are mixed or incomplete.");
   const recommendationSupport = matchedPrimaryVerdict
-    ? "This stays secondary to the factual plan-vs-run section above."
-    : "This stays conservative and does not change your saved plan by itself.";
+    ? t("This stays secondary to the factual plan-vs-run section above.")
+    : t("This stays conservative and does not change your saved plan by itself.");
   const cautionSummary =
     insight.cautionFlags.length > 0 && !matchedPrimaryVerdict
-      ? summarizeAiCautionFlags(insight.cautionFlags)
+      ? summarizeAiCautionFlags(insight.cautionFlags, locale)
       : null;
 
   return (
@@ -46,7 +54,7 @@ export function WorkoutAiInsightReadback({
           {recommendationLabel}
         </span>
         <span className="hito-body-xs text-tertiary">
-          {formatWorkoutFeedbackTimestamp(insight.createdAt)}
+          {formatWorkoutFeedbackTimestamp(insight.createdAt, locale)}
         </span>
       </div>
 
@@ -72,7 +80,7 @@ export function WorkoutAiInsightReadback({
             <p className="hito-body-sm text-secondary">{insight.differenceExplanation}</p>
             {cautionSummary ? (
               <div className="rounded-lg bg-background/18 px-3 py-2">
-                <p className="hito-label-md text-foreground">Use with care</p>
+                <p className="hito-label-md text-foreground">{t("Use with care")}</p>
                 <p className="hito-body-sm text-secondary mt-2">{cautionSummary}</p>
               </div>
             ) : null}
@@ -96,15 +104,22 @@ function humanizeAiRecommendationLevelWithContext(
   level: WorkoutAiInsightSummary["recommendationLevel"],
   options: {
     matchedPrimaryVerdict: boolean;
+    locale: ResolvedUiLocale;
   },
 ) {
   switch (level) {
     case "keep":
-      return "Keep course";
+      return getHitoKnownProductMessage(options.locale, "Keep course");
     case "soft_adjust":
-      return options.matchedPrimaryVerdict ? "Minor note" : "Small caution";
+      return getHitoKnownProductMessage(
+        options.locale,
+        options.matchedPrimaryVerdict ? "Minor note" : "Small caution",
+      );
     default:
-      return options.matchedPrimaryVerdict ? "Review note" : "Review carefully";
+      return getHitoKnownProductMessage(
+        options.locale,
+        options.matchedPrimaryVerdict ? "Review note" : "Review carefully",
+      );
   }
 }
 
@@ -133,39 +148,39 @@ function toneForAiRecommendation(
   }
 }
 
-function describeAiCautionFlag(flag: string) {
+function describeAiCautionFlag(flag: string, locale: ResolvedUiLocale) {
+  const copy = (value: string) => getHitoKnownProductMessage(locale, value);
   switch (flag) {
     case "evidence_unclear":
-      return "the uploaded evidence is still limited";
+      return copy("the uploaded evidence is still limited");
     case "date_mismatch":
-      return "the run date may not line up cleanly with the planned day";
+      return copy("the run date may not line up cleanly with the planned day");
     case "duration_shorter_than_planned":
-      return "the run came in shorter than planned";
+      return copy("the run came in shorter than planned");
     case "duration_longer_than_planned":
-      return "the run ran longer than planned";
+      return copy("the run ran longer than planned");
     case "distance_mismatch":
-      return "distance did not line up cleanly";
+      return copy("distance did not line up cleanly");
     case "structured_steps_not_comparable":
-      return "structured steps could not be compared cleanly";
+      return copy("structured steps could not be compared cleanly");
     case "body_discomfort_context":
-      return "workout body notes add discomfort context";
+      return copy("workout body notes add discomfort context");
     case "manual_review_worthwhile":
-      return "a manual check is still worthwhile";
+      return copy("a manual check is still worthwhile");
     default:
       return flag.replace(/_/g, " ");
   }
 }
 
-function summarizeAiCautionFlags(flags: string[]) {
+function summarizeAiCautionFlags(flags: string[], locale: ResolvedUiLocale) {
   if (flags.length === 0) {
     return null;
   }
 
-  const uniqueClauses = Array.from(new Set(flags.map((flag) => describeAiCautionFlag(flag))));
-
-  if (uniqueClauses.length === 1) {
-    return `This note stays cautious because ${uniqueClauses[0]}.`;
-  }
-
-  return `This note stays cautious because ${uniqueClauses.join(", ")}.`;
+  const uniqueClauses = Array.from(
+    new Set(flags.map((flag) => describeAiCautionFlag(flag, locale))),
+  );
+  return formatHitoProductMessage(locale, "This note stays cautious because {reasons}.", {
+    reasons: uniqueClauses.join(", "),
+  });
 }

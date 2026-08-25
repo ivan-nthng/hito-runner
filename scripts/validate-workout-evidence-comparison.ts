@@ -95,8 +95,13 @@ async function validateResultEvidencePublicBoundary() {
   );
   assert.match(
     completionConsumer,
+    /import type \{ CamelotSimulatedFitOutcomeV1 \} from "@\/lib\/camelot-interactive-qa-fixture"/,
+    "Product UI may consume only the public Camelot fixture outcome type",
+  );
+  assert.doesNotMatch(
+    completionConsumer,
     /local-activity-file-design-fixture/,
-    "the local-only fixture protocol must use its existing owner",
+    "Product UI must not import the local fixture implementation owner",
   );
 }
 

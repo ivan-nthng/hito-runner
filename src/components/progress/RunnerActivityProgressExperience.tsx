@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/icon";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
 import { useHitoTabs } from "@/components/ui/hito-tabs";
+import type { HitoProductApiFailure } from "@/lib/product-api-error-contract";
 import type {
   RunnerActivityHistoryProductItem,
   RunnerActivityHistoryProductPage,
   RunnerActivityMutationProductReadback,
   RunnerActivityProgressProductModel,
 } from "@/lib/runner-activity/product-contract";
+import type { ResolvedUiLocale } from "@/lib/ui-locale";
+import { getHitoProductApiFailureMessage } from "@/lib/ui-locale-messages";
 import {
   ActivityActionConfirmation,
   ActivityDetailOverlay,
@@ -43,6 +47,8 @@ export function RunnerActivityProgressExperience({
   onSequenceSelectionChange: (selection: ProgressSequenceSelection) => void;
   sequenceSelection: ProgressSequenceSelection;
 }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const tabs = useHitoTabs({ items: PROGRESS_TABS, value: activeTab });
   const [history, setHistory] = useState<HistoryState>({
     status: "idle",
@@ -66,41 +72,50 @@ export function RunnerActivityProgressExperience({
   const confirmationReturnFocusRef = useRef<HTMLElement | null>(null);
   const progressFocusIntentRef = useRef<"custom" | "quick" | "retry" | null>(null);
 
-  const loadHistory = useCallback(async (cursor?: string | null) => {
-    const append = Boolean(cursor);
-    setHistory((current) =>
-      append && current.data
-        ? { status: "ready", data: current.data, error: null, loadingMore: true }
-        : { status: "loading", data: current.data, error: null, loadingMore: false },
-    );
-
-    try {
-      const url = new URL("/api/runner-activities", window.location.origin);
-      if (cursor) url.searchParams.set("cursor", cursor);
-      const nextPage = await requestJson<{ ok: true; history: RunnerActivityHistoryProductPage }>(
-        url,
+  const loadHistory = useCallback(
+    async (cursor?: string | null) => {
+      const append = Boolean(cursor);
+      setHistory((current) =>
+        append && current.data
+          ? { status: "ready", data: current.data, error: null, loadingMore: true }
+          : { status: "loading", data: current.data, error: null, loadingMore: false },
       );
-      setHistory((current) => ({
-        status: "ready",
-        data:
-          append && current.data
-            ? {
-                items: mergeActivities(current.data.items, nextPage.history.items),
-                nextCursor: nextPage.history.nextCursor,
-              }
-            : nextPage.history,
-        error: null,
-        loadingMore: false,
-      }));
-    } catch (error) {
-      setHistory((current) => ({
-        status: "error",
-        data: current.data,
-        error: readableError(error, "We could not load activity history. Try again shortly."),
-        loadingMore: false,
-      }));
-    }
-  }, []);
+
+      try {
+        const url = new URL("/api/runner-activities", window.location.origin);
+        if (cursor) url.searchParams.set("cursor", cursor);
+        const nextPage = await requestJson<{ ok: true; history: RunnerActivityHistoryProductPage }>(
+          url,
+          undefined,
+          message("This view is temporarily unavailable."),
+          locale,
+        );
+        setHistory((current) => ({
+          status: "ready",
+          data:
+            append && current.data
+              ? {
+                  items: mergeActivities(current.data.items, nextPage.history.items),
+                  nextCursor: nextPage.history.nextCursor,
+                }
+              : nextPage.history,
+          error: null,
+          loadingMore: false,
+        }));
+      } catch (error) {
+        setHistory((current) => ({
+          status: "error",
+          data: current.data,
+          error: readableError(
+            error,
+            message("We could not load activity history. Try again shortly."),
+          ),
+          loadingMore: false,
+        }));
+      }
+    },
+    [locale, message],
+  );
 
   const loadProgress = useCallback(
     async (signal?: AbortSignal) => {
@@ -119,18 +134,27 @@ export function RunnerActivityProgressExperience({
         const result = await requestJson<{
           ok: true;
           progress: RunnerActivityProgressProductModel;
-        }>(url, { signal });
+        }>(url, { signal }, message("This view is temporarily unavailable."), locale);
         setProgress({ status: "ready", data: result.progress, error: null });
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") return;
         setProgress({
           status: "error",
           data: null,
-          error: readableError(error, "We could not load running progress. Try again shortly."),
+          error: readableError(
+            error,
+            message("We could not load running progress. Try again shortly."),
+          ),
         });
       }
     },
-    [sequenceSelection.endDate, sequenceSelection.period, sequenceSelection.startDate],
+    [
+      locale,
+      message,
+      sequenceSelection.endDate,
+      sequenceSelection.period,
+      sequenceSelection.startDate,
+    ],
   );
 
   useEffect(() => {
@@ -199,7 +223,12 @@ export function RunnerActivityProgressExperience({
       const result = await requestJson<{
         ok: true;
         readback: RunnerActivityMutationProductReadback;
-      }>(new URL(endpoint, window.location.origin), { method: "DELETE" });
+      }>(
+        new URL(endpoint, window.location.origin),
+        { method: "DELETE" },
+        message("This view is temporarily unavailable."),
+        locale,
+      );
 
       setPendingAction(null);
       setSelectedActivity(null);
@@ -213,13 +242,13 @@ export function RunnerActivityProgressExperience({
         setProgress({ status: "ready", data: result.readback.progress, error: null });
         setNotice(
           completedAction.action === "remove-source"
-            ? "Original file removed. The activity and its progress facts remain."
-            : "Activity deleted. Progress facts now reflect the backend readback.",
+            ? message("Original file removed. The activity and its progress facts remain.")
+            : message("Activity deleted. Progress facts now reflect the backend readback."),
         );
       } else {
         setHistory((current) => ({ ...current, status: "loading", error: null }));
         setProgress({ status: "updating", data: null, error: null });
-        setNotice("Activity history is updating after this change.");
+        setNotice(message("Activity history is updating after this change."));
         await loadHistory();
       }
       window.requestAnimationFrame(() => {
@@ -230,8 +259,8 @@ export function RunnerActivityProgressExperience({
         readableError(
           error,
           completedAction.action === "remove-source"
-            ? "We could not remove the original file. Try again shortly."
-            : "We could not delete this activity. Try again shortly.",
+            ? message("We could not remove the original file. Try again shortly.")
+            : message("We could not delete this activity. Try again shortly."),
         ),
       );
     } finally {
@@ -245,7 +274,7 @@ export function RunnerActivityProgressExperience({
         <div
           className="hito-tabs hito-tabs-simple w-full"
           {...tabs.tabListProps}
-          aria-label="Running history, progress, and saved plans"
+          aria-label={message("Running history, progress, and saved plans")}
         >
           <button
             type="button"
@@ -254,7 +283,7 @@ export function RunnerActivityProgressExperience({
             data-active={activeTab === "history"}
             className="hito-tab flex-1 sm:flex-none"
           >
-            Activity history
+            {message("Activity history")}
           </button>
           <button
             type="button"
@@ -263,7 +292,7 @@ export function RunnerActivityProgressExperience({
             data-active={activeTab === "progress"}
             className="hito-tab flex-1 sm:flex-none"
           >
-            Progress
+            {message("Progress")}
           </button>
           <button
             type="button"
@@ -272,7 +301,7 @@ export function RunnerActivityProgressExperience({
             data-active={activeTab === "plans"}
             className="hito-tab flex-1 sm:flex-none"
           >
-            Plans
+            {message("Plans")}
           </button>
         </div>
       </div>
@@ -342,26 +371,26 @@ export function RunnerActivityProgressExperience({
   );
 }
 
-async function requestJson<T extends object>(url: URL, init?: RequestInit): Promise<T> {
+async function requestJson<T extends { ok: true }>(
+  url: URL,
+  init: RequestInit | undefined,
+  unavailableMessage: string,
+  locale: ResolvedUiLocale,
+): Promise<T> {
   const response = await fetch(url, {
     credentials: "same-origin",
     headers: { Accept: "application/json", ...init?.headers },
     ...init,
   });
-  const body = (await response.json().catch(() => null)) as
-    | T
-    | { ok?: false; message?: string }
-    | null;
+  const body = (await response.json().catch(() => null)) as T | HitoProductApiFailure | null;
 
-  if (!response.ok) {
+  if (!response.ok || !body || !body.ok) {
     throw new Error(
-      body && typeof body === "object" && "message" in body && typeof body.message === "string"
-        ? body.message
-        : "This view is temporarily unavailable.",
+      body && !body.ok ? getHitoProductApiFailureMessage(locale, body) : unavailableMessage,
     );
   }
 
-  return body as T;
+  return body;
 }
 
 function mergeActivities(

@@ -4,6 +4,7 @@ import {
   WorkoutStructureTimeline,
   type WorkoutStructureTimelineItem,
 } from "@/components/workout-structure/WorkoutStructureTimeline";
+import { useHitoProductMessage } from "@/components/ui/hito-ui-locale-provider";
 
 type ManualWorkoutReadbackSegmentEntry = Extract<ManualWorkoutReadbackEntry, { kind: "segment" }>;
 
@@ -44,7 +45,7 @@ export function ManualWorkoutDocumentLead({
 }
 
 export function ManualWorkoutStructurePreview({
-  ariaLabel = "Workout structure preview",
+  ariaLabel,
   emptyState,
   helper,
   items,
@@ -59,10 +60,12 @@ export function ManualWorkoutStructurePreview({
   items: WorkoutStructureTimelineItem[];
   summary: string;
 }) {
+  const t = useHitoProductMessage();
+
   return (
     <section className="hito-manual-workout-editor-surface-muted hito-manual-workout-structure-card">
       <WorkoutStructureTimeline
-        ariaLabel={ariaLabel}
+        ariaLabel={ariaLabel ?? t("Workout structure preview")}
         density="compact"
         emptyState={emptyState}
         items={items}
@@ -164,11 +167,13 @@ function ManualWorkoutRepeatReadbackRow({
 }: {
   entry: Extract<ManualWorkoutReadbackEntry, { kind: "repeat" }>;
 }) {
+  const t = useHitoProductMessage();
+
   return (
     <article className="hito-manual-workout-readback-repeat">
       <div
         className="hito-manual-workout-repeat-gutter"
-        aria-label={`${entry.repeatCount} repeats`}
+        aria-label={t("{count} repeats", { count: entry.repeatCount })}
       >
         x{entry.repeatCount}
       </div>

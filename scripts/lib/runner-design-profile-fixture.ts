@@ -3410,10 +3410,18 @@ export async function verifyRunnerDesignProfileFixtureRuntime(input: {
   const baseUrl = new URL(input.runtimeUrl);
   const unauthorizedHistory = await fetch(new URL("/api/runner-activities", baseUrl));
   assert.equal(unauthorizedHistory.status, 401);
-  assert.equal((await unauthorizedHistory.json()).code, "auth_required");
+  assert.deepEqual(await unauthorizedHistory.json(), {
+    ok: false,
+    code: "runner_activity_auth_required",
+    params: { operation: "history_read" },
+  });
   const unauthorizedProgress = await fetch(new URL("/api/runner-activity-progress", baseUrl));
   assert.equal(unauthorizedProgress.status, 401);
-  assert.equal((await unauthorizedProgress.json()).code, "auth_required");
+  assert.deepEqual(await unauthorizedProgress.json(), {
+    ok: false,
+    code: "runner_activity_auth_required",
+    params: { operation: "progress_read" },
+  });
 
   const { cookie } = await loginToLoopbackRuntime({
     runtimeUrl: input.runtimeUrl,

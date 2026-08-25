@@ -8,6 +8,8 @@ import {
 import { workoutTypeColorVar } from "@/lib/workout-color-tokens";
 import type { PlannedWorkoutLanguageReadModel } from "@/lib/planned-workout-language";
 import { workoutGlyphFromCalendarIconKey, type WorkoutGlyphKind } from "@/lib/workout-glyph";
+import { DEFAULT_RESOLVED_UI_LOCALE, formatUiDate, type ResolvedUiLocale } from "@/lib/ui-locale";
+import { getHitoKnownProductMessage } from "@/lib/ui-locale-messages";
 
 export const MANUAL_WORKOUT_TEMPLATES = listManualWorkoutTemplates();
 
@@ -41,14 +43,17 @@ export function manualTemplateRunnerLabelFromKey(templateKey: string) {
   return template ? templateRunnerFacingLabel(template) : "Workout";
 }
 
-export function formatReadableDate(iso: string) {
+export function formatReadableDate(
+  iso: string,
+  locale: ResolvedUiLocale = DEFAULT_RESOLVED_UI_LOCALE,
+) {
   const date = hitoDateFromIso(iso) ?? parseIsoDateAsLocalCalendarDay(iso);
 
-  return new Intl.DateTimeFormat("en", {
+  return formatUiDate(date, locale, {
     day: "numeric",
     month: "short",
     weekday: "short",
-  }).format(date);
+  });
 }
 
 export function templateWorkoutColorIndicatorStyle(template: ManualWorkoutTemplate) {
@@ -71,7 +76,11 @@ export function templateIconTone(template: ManualWorkoutTemplate | null | undefi
     : "var(--color-muted-foreground)";
 }
 
-export function formatManualDraftStructure(totalDurationMin: number, totalDistanceKm: number) {
+export function formatManualDraftStructure(
+  totalDurationMin: number,
+  totalDistanceKm: number,
+  locale: ResolvedUiLocale = DEFAULT_RESOLVED_UI_LOCALE,
+) {
   const parts: string[] = [];
 
   if (totalDurationMin > 0) {
@@ -82,7 +91,9 @@ export function formatManualDraftStructure(totalDurationMin: number, totalDistan
     parts.push(formatDistanceMeters(totalDistanceKm * 1000));
   }
 
-  return parts.length ? parts.join(" · ") : "Reviewed structure";
+  return parts.length
+    ? parts.join(" · ")
+    : getHitoKnownProductMessage(locale, "Reviewed structure");
 }
 
 function parseIsoDateAsLocalCalendarDay(iso: string) {

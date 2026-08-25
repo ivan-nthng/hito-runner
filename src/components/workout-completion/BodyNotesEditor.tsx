@@ -28,6 +28,9 @@ import { HitoSlider } from "@/components/ui/hito-slider";
 import { useHitoTabs } from "@/components/ui/hito-tabs";
 import { HitoNativeSelectField } from "@/components/ui/native-select-field";
 import { Textarea } from "@/components/ui/textarea";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
+import { DEFAULT_RESOLVED_UI_LOCALE, formatUiNumber, type ResolvedUiLocale } from "@/lib/ui-locale";
+import { formatHitoProductMessage, getHitoKnownProductMessage } from "@/lib/ui-locale-messages";
 
 export type BodyNoteDraft = {
   area: BodyNoteArea;
@@ -68,27 +71,31 @@ export function BodyNotesSummaryRow({
   bodyNotes: BodyNoteDraft[];
   onOpen: () => void;
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   const hasBodyNotes = bodyNotes.length > 0;
 
   return (
     <div className="border-t border-hairline pt-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <Label>Body notes</Label>
+          <Label>{t("Body notes")}</Label>
           <p className="hito-body-md text-secondary mt-2">
-            Add any pain, tightness, or discomfort that showed up during or after this run.
+            {t("Add any pain, tightness, or discomfort that showed up during or after this run.")}
           </p>
         </div>
         <HitoButton type="button" onClick={onOpen} size="sm" variant="secondary">
           <Icon name="plus" size="sm" />
-          {hasBodyNotes ? "Edit body notes" : "Add body note"}
+          {hasBodyNotes ? t("Edit body notes") : t("Add body note")}
         </HitoButton>
       </div>
 
       {!hasBodyNotes ? (
         <div className="hito-surface-flat mt-4 p-4">
           <p className="hito-body-md text-secondary">
-            No body notes saved with this workout result. Leave this empty when the run felt normal.
+            {t(
+              "No body notes saved with this workout result. Leave this empty when the run felt normal.",
+            )}
           </p>
         </div>
       ) : (
@@ -99,14 +106,18 @@ export function BodyNotesSummaryRow({
               className="hito-surface-flat flex flex-wrap items-center justify-between gap-3 p-4"
             >
               <div className="min-w-0 flex-1">
-                <p className="hito-body-md text-foreground">{bodyNote.area}</p>
+                <p className="hito-body-md text-foreground">
+                  {getHitoKnownProductMessage(locale, bodyNote.area)}
+                </p>
                 <p className="hito-body-sm text-secondary mt-1">
-                  {describeBodyNoteDraft(bodyNote)}
+                  {describeBodyNoteDraft(bodyNote, locale)}
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 <SeverityBars severity={bodyNote.severity} />
-                <span className="hito-technical-sm text-tertiary">{bodyNote.severity}/5</span>
+                <span className="hito-technical-sm text-tertiary">
+                  {formatUiNumber(bodyNote.severity, locale)}/5
+                </span>
               </div>
             </div>
           ))}
@@ -131,6 +142,8 @@ export function BodyNotesModal({
   onChange: (bodyNotes: BodyNoteDraft[]) => void;
   onSave: () => void;
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   const canAddMore = bodyNotes.length < 8;
 
   return (
@@ -140,10 +153,11 @@ export function BodyNotesModal({
         className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-workflow hito-dialog-height-workflow-relaxed"
       >
         <DialogHeader className="hito-product-dialog-header">
-          <DialogTitle className="hito-ui-title-md text-foreground">Body notes</DialogTitle>
+          <DialogTitle className="hito-ui-title-md text-foreground">{t("Body notes")}</DialogTitle>
           <DialogDescription className="hito-body-md text-secondary max-w-2xl">
-            These notes stay attached to this workout result only. Use them to mark where the run
-            felt off without turning the result into a second full form.
+            {t(
+              "These notes stay attached to this workout result only. Use them to mark where the run felt off without turning the result into a second full form.",
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -151,8 +165,13 @@ export function BodyNotesModal({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="hito-body-xs text-tertiary">
               {bodyNotes.length === 0
-                ? "No body notes yet."
-                : `${bodyNotes.length} body note${bodyNotes.length === 1 ? "" : "s"} in this workout result.`}
+                ? t("No body notes yet.")
+                : t(
+                    bodyNotes.length === 1
+                      ? "{count} body note in this workout result."
+                      : "{count} body notes in this workout result.",
+                    { count: formatUiNumber(bodyNotes.length, locale) },
+                  )}
             </p>
             {canAddMore ? (
               <HitoButton
@@ -162,7 +181,7 @@ export function BodyNotesModal({
                 variant="secondary"
               >
                 <Icon name="plus" size="sm" />
-                Add note
+                {t("Add note")}
               </HitoButton>
             ) : null}
           </div>
@@ -170,7 +189,7 @@ export function BodyNotesModal({
           {bodyNotes.length === 0 ? (
             <div className="hito-surface-flat mt-5 p-5">
               <p className="hito-body-md text-secondary">
-                No body notes will be saved with this workout unless you add one here.
+                {t("No body notes will be saved with this workout unless you add one here.")}
               </p>
               <HitoButton
                 type="button"
@@ -180,7 +199,7 @@ export function BodyNotesModal({
                 className="mt-4"
               >
                 <Icon name="plus" size="sm" />
-                Add body note
+                {t("Add body note")}
               </HitoButton>
             </div>
           ) : (
@@ -202,7 +221,9 @@ export function BodyNotesModal({
         <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
           <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="hito-body-xs text-tertiary">
-              Saved fields stay bounded to area, timing, sensation, severity, and an optional note.
+              {t(
+                "Saved fields stay bounded to area, timing, sensation, severity, and an optional note.",
+              )}
             </p>
             <div className="flex flex-col-reverse gap-3 sm:flex-row">
               <HitoButton
@@ -211,10 +232,10 @@ export function BodyNotesModal({
                 size="md"
                 variant="ghost"
               >
-                Cancel
+                {t("Cancel")}
               </HitoButton>
               <HitoButton type="button" onClick={onSave} size="md" variant="primary">
-                Save body notes
+                {t("Save body notes")}
               </HitoButton>
             </div>
           </div>
@@ -237,16 +258,22 @@ function BodyNoteEditorCard({
   onChange: (patch: Partial<BodyNoteDraft>) => void;
   onRemove: () => void;
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   return (
     <div className="hito-surface-flat space-y-5 p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="hito-label-md text-foreground">Body note {index + 1}</p>
-          <p className="hito-body-xs text-tertiary mt-1">{bodyNote.area}</p>
+          <p className="hito-label-md text-foreground">
+            {t("Body note {count}", { count: formatUiNumber(index + 1, locale) })}
+          </p>
+          <p className="hito-body-xs text-tertiary mt-1">
+            {getHitoKnownProductMessage(locale, bodyNote.area)}
+          </p>
         </div>
         <HitoButton type="button" onClick={onRemove} size="xs" variant="ghost">
           <Icon name="trash" size="xs" />
-          Remove
+          {t("Remove")}
         </HitoButton>
       </div>
 
@@ -254,49 +281,53 @@ function BodyNoteEditorCard({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <HitoNativeSelectField
-          label="When"
+          label={t("When")}
           value={bodyNote.timing}
           onValueChange={(value) => onChange({ timing: value as BodyNoteTiming })}
           options={BODY_NOTE_TIMINGS.map((timing) => ({
             value: timing,
-            label: timing === "during" ? "During the run" : "After the run",
+            label: timing === "during" ? t("During the run") : t("After the run"),
           }))}
         />
         <HitoNativeSelectField
-          label="Sensation"
+          label={t("Sensation")}
           value={bodyNote.sensation}
           onValueChange={(value) => onChange({ sensation: value as BodyNoteSensation | "" })}
           options={[
-            { value: "", label: "Choose one" },
+            { value: "", label: t("Choose one") },
             ...BODY_NOTE_SENSATIONS.map((sensation) => ({
               value: sensation,
-              label: sensation,
+              label: getHitoKnownProductMessage(locale, sensation),
             })),
           ]}
         />
       </div>
 
       <HitoSlider
-        label="Severity"
+        label={t("Severity")}
         min={1}
         max={5}
         step={1}
         previousValue={previousSeverity}
-        previousValueLabel={`Restore session severity ${previousSeverity} out of 5`}
+        previousValueLabel={t("Restore session severity {value} out of 5", {
+          value: formatUiNumber(previousSeverity, locale),
+        })}
         value={bodyNote.severity}
-        valueLabel={`${bodyNote.severity}/5`}
-        ariaValueText={`Severity ${bodyNote.severity} out of 5`}
-        helper="1 is light discomfort. 5 is the strongest note."
+        valueLabel={`${formatUiNumber(bodyNote.severity, locale)}/5`}
+        ariaValueText={t("Severity {value} out of 5", {
+          value: formatUiNumber(bodyNote.severity, locale),
+        })}
+        helper={t("1 is light discomfort. 5 is the strongest note.")}
         onValueChange={(value) => onChange({ severity: value as BodyNote["severity"] })}
       />
 
       <div>
-        <Label>Detail</Label>
+        <Label>{t("Detail")}</Label>
         <Textarea
           rows={3}
           value={bodyNote.note}
           onChange={(event) => onChange({ note: event.target.value })}
-          placeholder="What did you feel, and when did it show up?"
+          placeholder={t("What did you feel, and when did it show up?")}
           size="md"
           variant="primary"
           className="mt-3 min-h-24 resize-none"
@@ -313,6 +344,8 @@ function BodyAreaMapField({
   value: BodyNoteArea;
   onChange: (value: BodyNoteArea) => void;
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   const [view, setView] = useState<BodyNoteMapSide>(
     () => getBodyNoteAreaRegion(value)?.side ?? "front",
   );
@@ -336,12 +369,18 @@ function BodyAreaMapField({
       <div className="hito-surface-flat p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <Label>Body location</Label>
+            <Label>{t("Body location")}</Label>
             <p className="hito-body-md text-secondary mt-2">
-              Pick one bounded area for this note. Add another note if more than one spot felt off.
+              {t(
+                "Pick one bounded area for this note. Add another note if more than one spot felt off.",
+              )}
             </p>
           </div>
-          <div className="hito-tab-list" {...bodyMapTabs.tabListProps} aria-label="Body map side">
+          <div
+            className="hito-tab-list"
+            {...bodyMapTabs.tabListProps}
+            aria-label={t("Body map side")}
+          >
             {(["front", "back"] as const).map((side) => (
               <button
                 key={side}
@@ -351,7 +390,7 @@ function BodyAreaMapField({
                 data-active={view === side}
                 className="hito-tab capitalize"
               >
-                {side}
+                {side === "front" ? t("Front") : t("Back")}
               </button>
             ))}
           </div>
@@ -364,6 +403,7 @@ function BodyAreaMapField({
               <BodyMapPoint
                 key={region.area}
                 region={region}
+                locale={locale}
                 selected={region.area === value}
                 onSelect={onChange}
               />
@@ -372,7 +412,11 @@ function BodyAreaMapField({
         </div>
 
         <p className="hito-body-md text-secondary mt-4 text-center">
-          {selectedRegion ? `${selectedRegion.area} selected` : "Choose one area for this note."}
+          {selectedRegion
+            ? t("{area} selected", {
+                area: getHitoKnownProductMessage(locale, selectedRegion.area),
+              })
+            : t("Choose one area for this note.")}
         </p>
       </div>
 
@@ -387,9 +431,11 @@ function BodyAreaMapField({
               region.area === value ? "border-signal/35 bg-accent/35" : "hover:bg-accent/25",
             )}
           >
-            <span className="hito-body-md text-foreground">{region.area}</span>
+            <span className="hito-body-md text-foreground">
+              {getHitoKnownProductMessage(locale, region.area)}
+            </span>
             {region.area === value ? (
-              <span className="hito-body-xs text-tertiary text-signal">Selected</span>
+              <span className="hito-body-xs text-tertiary text-signal">{t("Selected")}</span>
             ) : null}
           </button>
         ))}
@@ -402,16 +448,18 @@ function BodyMapPoint({
   region,
   selected,
   onSelect,
+  locale,
 }: {
   region: BodyNoteAreaRegion;
   selected: boolean;
   onSelect: (value: BodyNoteArea) => void;
+  locale: ResolvedUiLocale;
 }) {
   return (
     <g
       role="button"
       tabIndex={0}
-      aria-label={region.area}
+      aria-label={getHitoKnownProductMessage(locale, region.area)}
       onClick={() => onSelect(region.area)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -462,8 +510,14 @@ function BodyMapSilhouette() {
 }
 
 function SeverityBars({ severity }: { severity: BodyNote["severity"] }) {
+  const locale = useHitoUiLocale();
   return (
-    <div className="hito-severity-bars" aria-label={`Severity ${severity} of 5`}>
+    <div
+      className="hito-severity-bars"
+      aria-label={formatHitoProductMessage(locale, "Severity {value} of 5", {
+        value: formatUiNumber(severity, locale),
+      })}
+    >
       {[1, 2, 3, 4, 5].map((level) => (
         <span
           key={level}
@@ -476,10 +530,18 @@ function SeverityBars({ severity }: { severity: BodyNote["severity"] }) {
   );
 }
 
-export function describeBodyNoteDraft(bodyNote: BodyNoteDraft) {
+export function describeBodyNoteDraft(
+  bodyNote: BodyNoteDraft,
+  locale: ResolvedUiLocale = DEFAULT_RESOLVED_UI_LOCALE,
+) {
   const parts = [
-    bodyNote.timing === "during" ? "During the run" : "After the run",
-    bodyNote.sensation || "No sensation selected",
+    getHitoKnownProductMessage(
+      locale,
+      bodyNote.timing === "during" ? "During the run" : "After the run",
+    ),
+    bodyNote.sensation
+      ? getHitoKnownProductMessage(locale, bodyNote.sensation)
+      : getHitoKnownProductMessage(locale, "No sensation selected"),
   ];
 
   if (bodyNote.note.trim()) {

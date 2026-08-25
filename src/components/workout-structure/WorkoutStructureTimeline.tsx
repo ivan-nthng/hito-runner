@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { StepTarget } from "@/lib/training";
 import { segmentColorMeta } from "@/lib/training";
 import { cn } from "@/lib/utils";
+import { useHitoProductMessage } from "@/components/ui/hito-ui-locale-provider";
 
 export interface WorkoutStructureTimelineReadbackEntry {
   key: string;
@@ -24,11 +25,11 @@ export interface WorkoutStructureTimelineItem {
 }
 
 export function WorkoutStructureTimeline({
-  ariaLabel = "Workout structure",
+  ariaLabel,
   density = "default",
   emptyState,
   items,
-  label = "Workout structure",
+  label,
   summary,
 }: {
   ariaLabel?: string;
@@ -41,6 +42,7 @@ export function WorkoutStructureTimeline({
   label?: string;
   summary: string;
 }) {
+  const t = useHitoProductMessage();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const activeItem = activeIndex == null ? null : items[activeIndex];
   const activePosition = activeIndex == null ? null : itemCenterPercent(items, activeIndex);
@@ -56,7 +58,7 @@ export function WorkoutStructureTimeline({
       )}
     >
       <div className="flex items-center justify-between gap-3 mb-3">
-        <span className="hito-label-md text-foreground">{label}</span>
+        <span className="hito-label-md text-foreground">{label ?? t("Workout structure")}</span>
         <span className="hito-technical-sm text-tertiary">{summary}</span>
       </div>
 
@@ -65,7 +67,7 @@ export function WorkoutStructureTimeline({
           <div className="relative">
             <div
               className="relative z-10 flex h-8 overflow-hidden rounded-md border border-hairline bg-background/25 sm:h-9"
-              aria-label={ariaLabel}
+              aria-label={ariaLabel ?? t("Workout structure")}
             >
               {items.map((item, index) => {
                 const colors = segmentColorMeta(item.semanticKind, item.target);
@@ -180,10 +182,10 @@ export function WorkoutStructureTimeline({
       ) : (
         <div className="hito-list-row items-start">
           <span className="hito-status-pill mt-0.5 shrink-0" data-tone="muted">
-            {emptyState?.badge ?? "Empty"}
+            {emptyState?.badge ?? t("Empty")}
           </span>
           <p className="hito-body-sm mt-1 text-secondary min-w-0">
-            {emptyState?.copy ?? "No running parts to preview."}
+            {emptyState?.copy ?? t("No running parts to preview.")}
           </p>
         </div>
       )}

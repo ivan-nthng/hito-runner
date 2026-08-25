@@ -29,7 +29,9 @@ import { workoutGlyphFromCalendarIconKey } from "@/lib/workout-glyph";
 
 export type CalendarDaySurfacePresentation = {
   feedback: HitoCalendarFeedbackState;
+  feedbackLabel?: string;
   result: HitoCalendarDayResultState;
+  resultLabel?: string;
   state: HitoCalendarDayBaseState;
   stateLabel?: string | null;
   supportingText?: string | null;

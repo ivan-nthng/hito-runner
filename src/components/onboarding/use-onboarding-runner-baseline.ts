@@ -8,6 +8,7 @@ import {
   type PersonalHeartRateProfileInput,
 } from "@/lib/heart-rate-zones";
 import { runnerFacingHeartRateSaveError } from "@/components/settings/heart-rate-profile-errors";
+import { useHitoProductMessage } from "@/components/ui/hito-ui-locale-provider";
 import {
   saveRunnerBaseline,
   type RunnerBaselineSaveInput,
@@ -26,6 +27,7 @@ export function useOnboardingRunnerBaseline({
   defaults: UserSettingsSummary | null;
   state: RunnerBaselineState;
 }) {
+  const t = useHitoProductMessage();
   const saveRunnerBaselineFn = useServerFn(saveRunnerBaseline);
   const [summary, setSummary] = useState<HeartRateZonesSummary | null>(() =>
     buildSavedGuidanceSummary(defaults),
@@ -55,7 +57,7 @@ export function useOnboardingRunnerBaseline({
 
   const persist = async (heartRateProfile?: PersonalHeartRateProfileInput) => {
     if (!input) {
-      setError("Add a valid age, height, weight, and running level first.");
+      setError(t("Add a valid age, height, weight, and running level first."));
       return false;
     }
 
@@ -72,7 +74,9 @@ export function useOnboardingRunnerBaseline({
       const persistedBaselineKey = runnerBaselineKey(result.settings);
       setSummary(persistedBaselineKey ? result.settings.heartRateZones : null);
       if (heartRateProfile && !result.settings.heartRateZones.accepted) {
-        setError("The saved BPM guidance could not be accepted. Review the ranges and try again.");
+        setError(
+          t("The saved BPM guidance could not be accepted. Review the ranges and try again."),
+        );
         return false;
       }
       return true;
@@ -81,8 +85,8 @@ export function useOnboardingRunnerBaseline({
         runnerFacingHeartRateSaveError(
           saveError,
           heartRateProfile
-            ? "Heart-rate guidance could not be saved. Check the highlighted BPM ranges."
-            : "Your runner baseline could not be saved.",
+            ? t("Heart-rate guidance could not be saved. Check the highlighted BPM ranges.")
+            : t("Your runner baseline could not be saved."),
         ),
       );
       return false;
@@ -93,7 +97,7 @@ export function useOnboardingRunnerBaseline({
 
   const persistHeartRateDraft = async () => {
     if (!summary || !heartRateDraftState?.canSubmit) {
-      setError("Check the highlighted BPM ranges before continuing.");
+      setError(t("Check the highlighted BPM ranges before continuing."));
       return false;
     }
 

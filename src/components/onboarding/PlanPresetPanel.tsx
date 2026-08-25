@@ -19,6 +19,8 @@ import type {
 } from "@/lib/running-plan-engine-actions";
 import { cn } from "@/lib/utils";
 import { useHitoRadioGroup, type HitoRadioOptionProps } from "@/components/ui/hito-radio-group";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
+import { getHitoKnownProductMessage } from "@/lib/ui-locale-messages";
 
 type RunningPlanCreateStatus = "idle" | "creating";
 
@@ -135,21 +137,24 @@ export function PlanPresetPanel({
   onRunnerCommentChange,
   status,
 }: PlanPresetPanelProps) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const fieldErrors = runningPlanAdmissionFieldErrors(requestResult);
   const previewGoalLabel = planGoalChoice
     ? planGoalChoice === "custom" && planGoalCustomDistanceLabel.trim()
       ? planGoalCustomDistanceLabel.trim()
-      : planGoalChoiceLabel(planGoalChoice)
-    : "Generated";
+      : getHitoKnownProductMessage(locale, planGoalChoiceLabel(planGoalChoice))
+    : message("Generated");
 
   return (
     <section className="hito-plan-preset-stage pt-8">
       <div className="flex flex-wrap items-start justify-center gap-4 text-center">
         <div className="max-w-2xl">
-          <h2 className="hito-ui-title-xs text-foreground">Choose your goal.</h2>
+          <h2 className="hito-ui-title-xs text-foreground">{message("Choose your goal.")}</h2>
           <p className="hito-body-xs text-secondary mt-2">
-            Pick one goal. A successful reviewed preview is saved in Plans before its workouts are
-            added to Calendar.
+            {message(
+              "Pick one goal. A successful reviewed preview is saved in Plans before its workouts are added to Calendar.",
+            )}
           </p>
         </div>
       </div>
@@ -171,13 +176,15 @@ export function PlanPresetPanel({
         />
 
         <label className="grid min-w-0 gap-2">
-          <span className="hito-label-md text-foreground">Plan context (optional)</span>
+          <span className="hito-label-md text-foreground">
+            {message("Plan context (optional)")}
+          </span>
           <Textarea
             id="plan-context"
             className="min-h-24 resize-y"
             name="runnerComment"
             onChange={(event) => onRunnerCommentChange(event.target.value)}
-            placeholder="For example, I ran an even 8K yesterday and recovered well."
+            placeholder={message("For example, I ran an even 8K yesterday and recovered well.")}
             rows={3}
             value={runnerComment}
             aria-invalid={Boolean(fieldErrors.runnerComment) || undefined}
@@ -185,14 +192,16 @@ export function PlanPresetPanel({
           />
           {fieldErrors.runnerComment ? (
             <span id="plan-context-error" className="hito-body-md font-medium text-negative">
-              {fieldErrors.runnerComment}
+              {getHitoKnownProductMessage(locale, fieldErrors.runnerComment)}
             </span>
           ) : null}
         </label>
 
         {!hasRequiredPlanBasics ? (
           <div className="hito-surface-wash">
-            <p className="hito-body-md text-foreground">Add a few basics before previewing</p>
+            <p className="hito-body-md text-foreground">
+              {message("Add a few basics before previewing")}
+            </p>
             <p className="hito-body-sm mt-1 text-secondary">{requiredBasicsCopy}</p>
           </div>
         ) : null}
@@ -205,16 +214,24 @@ export function PlanPresetPanel({
             role="alert"
             tabIndex={-1}
           >
-            <p className="hito-body-md font-medium text-negative">{requestResult.title}</p>
+            <p className="hito-body-md font-medium text-negative">
+              {getHitoKnownProductMessage(locale, requestResult.title)}
+            </p>
             <ul className="hito-body-sm mt-2 grid gap-1 text-negative">
               {requestResult.issues.map((issue, index) => (
-                <li key={`${issue.field ?? "request"}-${index}`}>{issue.correction}</li>
+                <li key={`${issue.field ?? "request"}-${index}`}>
+                  {getHitoKnownProductMessage(locale, issue.correction)}
+                </li>
               ))}
             </ul>
           </div>
         ) : null}
 
-        {error ? <p className="hito-body-md font-medium text-negative">{error}</p> : null}
+        {error ? (
+          <p className="hito-body-md font-medium text-negative">
+            {getHitoKnownProductMessage(locale, error)}
+          </p>
+        ) : null}
       </div>
 
       <SelectedRunningPlanPreviewDialog
@@ -266,6 +283,8 @@ function PlanGoalIntentControls({
   onFinishTimeChange: (value: string) => void;
   onTargetDateChange: (value: string) => void;
 }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const draftState: PlanGoalIntentDraftState = {
     planGoalChoice: goalChoice,
     planGoalCustomDistanceKm: customDistanceKm,
@@ -278,10 +297,19 @@ function PlanGoalIntentControls({
   const showsPresetRefinements =
     goalChoice === "10k" || goalChoice === "half_marathon" || goalChoice === "marathon";
   const showsCustomRefinements = goalChoice === "custom" && customDistanceIsValid;
-  const customDistanceError = goalChoice === "custom" ? fieldErrors.customDistance : undefined;
-  const finishTimeError = fieldErrors.finishTime;
-  const targetDateError = fieldErrors.targetDate;
-  const goalError = fieldErrors.goal;
+  const customDistanceError =
+    goalChoice === "custom" && fieldErrors.customDistance
+      ? getHitoKnownProductMessage(locale, fieldErrors.customDistance)
+      : undefined;
+  const finishTimeError = fieldErrors.finishTime
+    ? getHitoKnownProductMessage(locale, fieldErrors.finishTime)
+    : undefined;
+  const targetDateError = fieldErrors.targetDate
+    ? getHitoKnownProductMessage(locale, fieldErrors.targetDate)
+    : undefined;
+  const goalError = fieldErrors.goal
+    ? getHitoKnownProductMessage(locale, fieldErrors.goal)
+    : undefined;
   const goalGroup = useHitoRadioGroup({
     items: PLAN_GOAL_CHOICES.map((choice) => ({ value: choice.value })),
     value: goalChoice || null,
@@ -292,7 +320,7 @@ function PlanGoalIntentControls({
       <div
         className="grid gap-3 sm:grid-cols-2"
         {...goalGroup.groupProps}
-        aria-label="Training goal"
+        aria-label={message("Training goal")}
         aria-invalid={Boolean(goalError) || undefined}
         aria-describedby={goalError ? "plan-goal-error" : undefined}
       >
@@ -302,9 +330,9 @@ function PlanGoalIntentControls({
             active={goalChoice === choice.value}
             buttonRef={choice.value === "10k" ? focusRef : undefined}
             radioProps={goalGroup.getRadioProps(choice.value)}
-            distance={choice.distance}
-            label={choice.label}
-            copy={choice.copy}
+            distance={getHitoKnownProductMessage(locale, choice.distance)}
+            label={getHitoKnownProductMessage(locale, choice.label)}
+            copy={getHitoKnownProductMessage(locale, choice.copy)}
             onClick={() => onGoalChoiceChange(choice.value)}
           />
         ))}
@@ -318,7 +346,7 @@ function PlanGoalIntentControls({
       {goalChoice === "custom" ? (
         <div className="hito-form-two-column-grid">
           <label className="grid gap-2">
-            <span className="hito-label-md text-foreground">Custom distance</span>
+            <span className="hito-label-md text-foreground">{message("Custom distance")}</span>
             <Input
               id="plan-goal-custom-distance"
               type="text"
@@ -341,11 +369,13 @@ function PlanGoalIntentControls({
                 {customDistanceError}
               </span>
             ) : (
-              <span className="hito-body-xs text-secondary">Kilometers. For example: 12.5.</span>
+              <span className="hito-body-xs text-secondary">
+                {message("Kilometers. For example: 12.5.")}
+              </span>
             )}
           </label>
           <label className="grid gap-2">
-            <span className="hito-label-md text-foreground">Goal name</span>
+            <span className="hito-label-md text-foreground">{message("Goal name")}</span>
             <Input
               type="text"
               autoComplete="off"
@@ -355,7 +385,9 @@ function PlanGoalIntentControls({
               size="md"
               variant="primary"
             />
-            <span className="hito-body-xs text-secondary">Optional. For example: City 12.5K.</span>
+            <span className="hito-body-xs text-secondary">
+              {message("Optional. For example: City 12.5K.")}
+            </span>
           </label>
         </div>
       ) : null}
@@ -365,30 +397,30 @@ function PlanGoalIntentControls({
           <div className="hito-form-two-column-grid">
             <HitoDateField
               id="plan-goal-target-date"
-              label="Race day"
+              label={message("Race day")}
               value={targetDate}
               onChange={onTargetDateChange}
-              helper="Required. Choose the race day for this generated plan."
+              helper={message("Required. Choose the race day for this generated plan.")}
               error={targetDateError}
               required
             />
             <HitoMaskedTimeField
               id="plan-goal-finish-time"
-              label="Finish time"
+              label={message("Finish time")}
               value={finishTime}
               onChange={onFinishTimeChange}
               placeholder={finishTimePlaceholder(goalChoice)}
-              helper="Optional. Add this only if you have a result goal."
+              helper={message("Optional. Add this only if you have a result goal.")}
               error={finishTimeError}
             />
           </div>
           {derivedPace ? (
             <div className="hito-surface-wash" data-tone="signal">
               <p className="hito-body-md text-foreground">
-                That means about {derivedPace} on race day.
+                {message("That means about {pace} on race day.", { pace: derivedPace })}
               </p>
               <p className="hito-body-sm mt-1 text-secondary">
-                This is goal readback, not your workout pace target.
+                {message("This is goal readback, not your workout pace target.")}
               </p>
             </div>
           ) : null}
@@ -415,6 +447,8 @@ function PlanGoalCard({
   onClick: () => void;
   radioProps: HitoRadioOptionProps;
 }) {
+  const t = useHitoProductMessage();
+
   return (
     <HitoChoiceToggle
       ref={buttonRef}
@@ -436,11 +470,11 @@ function PlanGoalCard({
         </span>
         {active ? (
           <span className="hito-status-pill shrink-0" data-tone="muted">
-            Selected
+            {t("Selected")}
           </span>
         ) : (
           <span className="hito-status-pill shrink-0" data-tone="muted">
-            Preview
+            {t("Preview")}
           </span>
         )}
       </span>

@@ -4,6 +4,7 @@ import { HitoButton } from "@/components/ui/button";
 import { useHitoTabs } from "@/components/ui/hito-tabs";
 import { hitoToast } from "@/components/ui/hito-toast";
 import { Icon } from "@/components/ui/icon";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
 import { PlanPresetPanel } from "@/components/onboarding/PlanPresetPanel";
 import { QuickSetupPlanSetupSections } from "@/components/onboarding/QuickSetupPlanSetupSections";
 import { StructuredPlanConstructor } from "@/components/onboarding/StructuredPlanConstructor";
@@ -30,6 +31,7 @@ import {
   type RunningPlanAdmissionField,
 } from "@/components/onboarding/selected-running-plan-flow-utils";
 import { useSelectedPlanPresetPreviewController } from "@/components/onboarding/use-selected-plan-preset-preview-controller";
+import { getHitoKnownProductMessage } from "@/lib/ui-locale-messages";
 
 type ManualCreateStatus = "idle" | "creating";
 type PlanStartMode = "generated" | "manual";
@@ -42,6 +44,8 @@ const PLAN_START_TABS: { value: PlanStartMode; label: string }[] = [
 ];
 
 export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSummary | null }) {
+  const locale = useHitoUiLocale();
+  const translate = useHitoProductMessage();
   const createEmptyManualActivePlanFn = useServerFn(createEmptyManualActivePlan);
   const confirmRunningPlanDraftFn = useServerFn(confirmRunningPlanDraft);
   const structuredFormRef = useRef<HTMLFormElement | null>(null);
@@ -214,7 +218,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
 
     if (!(await runnerBaseline.persistHeartRateDraft())) {
       selectedPlanPreview.setError(
-        runnerBaseline.error ?? "Check the highlighted BPM ranges before creating this plan.",
+        runnerBaseline.error ??
+          translate("Check the highlighted BPM ranges before creating this plan."),
       );
       return;
     }
@@ -241,7 +246,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     const confirmInput = buildRunningPlanConfirmInput(
       draft,
       selectedPlanPreview.previewInput,
-      "Refresh the saved preview before adding its workouts to Calendar.",
+      translate("Refresh the saved preview before adding its workouts to Calendar."),
     );
 
     if (!confirmInput.ok) {
@@ -262,8 +267,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     selectedPlanPreview.setError(null);
     hitoToast.working({
       id: STRUCTURED_REVIEW_TOAST_ID,
-      title: "Adding workouts to Calendar",
-      description: "Hito is adding this saved plan's workouts to Calendar.",
+      title: translate("Adding workouts to Calendar"),
+      description: translate("Hito is adding this saved plan's workouts to Calendar."),
     });
 
     try {
@@ -278,7 +283,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
         setRunningPlanCreateStatus("idle");
         hitoToast.error({
           id: STRUCTURED_REVIEW_TOAST_ID,
-          title: "Calendar not updated",
+          title: translate("Calendar not updated"),
           description: result.message,
         });
         return;
@@ -286,14 +291,16 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
 
       hitoToast.success({
         id: STRUCTURED_REVIEW_TOAST_ID,
-        title: "Calendar workouts added",
-        description: "Opening Calendar now.",
+        title: translate("Calendar workouts added"),
+        description: translate("Opening Calendar now."),
         duration: 2600,
       });
       openSavedHome();
     } catch (submitError) {
       const message =
-        submitError instanceof Error ? submitError.message : "Could not create this plan.";
+        submitError instanceof Error
+          ? submitError.message
+          : translate("Could not create this plan.");
       runningPlanCreateInFlightRef.current = false;
       setRunningPlanCreateStatus("idle");
       setRunningPlanConfirmResult({
@@ -306,7 +313,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
       });
       hitoToast.error({
         id: STRUCTURED_REVIEW_TOAST_ID,
-        title: "Calendar not updated",
+        title: translate("Calendar not updated"),
         description: message,
       });
     }
@@ -328,7 +335,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     if (!(await runnerBaseline.persistHeartRateDraft())) {
       manualCreateInFlightRef.current = false;
       setManualCreateError(
-        runnerBaseline.error ?? "Check the highlighted BPM ranges before starting training.",
+        runnerBaseline.error ??
+          translate("Check the highlighted BPM ranges before starting training."),
       );
       return;
     }
@@ -337,8 +345,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     setManualCreateError(null);
     hitoToast.working({
       id: MANUAL_CREATE_TOAST_ID,
-      title: "Opening Calendar",
-      description: "Hito is opening an empty Calendar for manual building.",
+      title: translate("Opening Calendar"),
+      description: translate("Hito is opening an empty Calendar for manual building."),
     });
 
     try {
@@ -352,7 +360,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
         setManualCreateError(result.message);
         hitoToast.error({
           id: MANUAL_CREATE_TOAST_ID,
-          title: "Calendar not opened",
+          title: translate("Calendar not opened"),
           description: result.message,
         });
         return;
@@ -360,20 +368,22 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
 
       hitoToast.success({
         id: MANUAL_CREATE_TOAST_ID,
-        title: "Calendar ready",
-        description: "Opening your Calendar now.",
+        title: translate("Calendar ready"),
+        description: translate("Opening your Calendar now."),
         duration: 2600,
       });
       openSavedHome();
     } catch (submitError) {
       const message =
-        submitError instanceof Error ? submitError.message : "The Calendar could not be opened.";
+        submitError instanceof Error
+          ? submitError.message
+          : translate("The Calendar could not be opened.");
       manualCreateInFlightRef.current = false;
       setManualCreateStatus("idle");
       setManualCreateError(message);
       hitoToast.error({
         id: MANUAL_CREATE_TOAST_ID,
-        title: "Calendar not opened",
+        title: translate("Calendar not opened"),
         description: message,
       });
     }
@@ -382,9 +392,13 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
   return (
     <section className="hito-onboarding-surface">
       <div className="max-w-3xl">
-        <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">Choose how to start training.</h1>
+        <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
+          {translate("Choose how to start training.")}
+        </h1>
         <p className="hito-body-md mt-4 text-muted-foreground">
-          Add the basics once, then choose a training distance or open an empty manual calendar.
+          {translate(
+            "Add the basics once, then choose a training distance or open an empty manual calendar.",
+          )}
         </p>
       </div>
 
@@ -412,7 +426,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
           <div
             className="hito-tabs hito-tabs-enclosed mx-auto w-fit max-w-full"
             {...planStartTabs.tabListProps}
-            aria-label="Training setup method"
+            aria-label={translate("Training setup method")}
           >
             {PLAN_START_TABS.map((tab) => (
               <button
@@ -424,7 +438,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
                 data-active={planStartMode === tab.value}
                 className="hito-tab"
               >
-                {tab.label}
+                {getHitoKnownProductMessage(locale, tab.label)}
               </button>
             ))}
           </div>
@@ -440,7 +454,9 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
                   requestResult={selectedPlanPreview.requestResult}
                   status={selectedPlanPreview.status}
                   hasRequiredPlanBasics={hasAcceptedRunnerBaseline}
-                  requiredBasicsCopy="Save your runner baseline and accept the BPM guidance before Hito prepares a reviewed plan."
+                  requiredBasicsCopy={translate(
+                    "Save your runner baseline and accept the BPM guidance before Hito prepares a reviewed plan.",
+                  )}
                   previewOpen={selectedPlanPreview.previewOpen}
                   onCancelPreview={selectedPlanPreview.cancelPreview}
                   onPreviewOpenChange={selectedPlanPreview.setPreviewOpen}
@@ -476,7 +492,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
                     disabled={isBusy}
                     onClick={toggleAdvancedSettings}
                   >
-                    <span>Advanced settings</span>
+                    <span>{translate("Advanced settings")}</span>
                     <Icon name={advancedSettingsOpen ? "chevron-up" : "chevron-down"} size="xs" />
                   </HitoButton>
                 </div>
@@ -505,7 +521,9 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
             ) : (
               <div className="pt-6">
                 <p className="hito-body-md text-center text-text-secondary">
-                  Create workouts independently, or use a workout from a coach or friend.
+                  {translate(
+                    "Create workouts independently, or use a workout from a coach or friend.",
+                  )}
                 </p>
               </div>
             )}
@@ -530,7 +548,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
                       : undefined
                   }
                 >
-                  {footerHint.message}
+                  {getHitoKnownProductMessage(locale, footerHint.message)}
                 </p>
               </div>
               <div className="flex shrink-0 flex-col items-stretch gap-2 sm:flex-row sm:items-center">
@@ -542,7 +560,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
                     disabled={isBusy}
                     onClick={clearGeneratedPlanSetup}
                   >
-                    Clear plan
+                    {translate("Clear plan")}
                   </HitoButton>
                 ) : null}
                 <HitoButton
@@ -554,8 +572,8 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
                   onClick={(event) => handleCreatePlanClick(event.currentTarget)}
                 >
                   {selectedPreviewIsReady && !selectedPlanPreview.previewOpen
-                    ? "Review plan"
-                    : "Create plan"}
+                    ? translate("Review plan")
+                    : translate("Create plan")}
                 </HitoButton>
               </div>
             </>
@@ -570,7 +588,9 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
                   }
                 >
                   {manualCreateError ??
-                    "Your saved runner baseline is ready. Your Calendar will open without adding workouts."}
+                    translate(
+                      "Your saved runner baseline is ready. Your Calendar will open without adding workouts.",
+                    )}
                 </p>
               </div>
               <HitoButton
@@ -583,7 +603,9 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
                   void createManualPlan();
                 }}
               >
-                {manualCreateStatus === "creating" ? "Opening manual calendar..." : "Open Calendar"}
+                {manualCreateStatus === "creating"
+                  ? translate("Opening manual calendar...")
+                  : translate("Open Calendar")}
               </HitoButton>
             </>
           )}

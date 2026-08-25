@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { buildHitoProductApiFailure } from "@/lib/product-api-error-contract";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
 
 export const Route = createFileRoute("/api/runner-activities/$activityId")({
@@ -25,33 +26,24 @@ export const Route = createFileRoute("/api/runner-activities/$activityId")({
             error.message === "Authentication is required for this action."
           ) {
             return Response.json(
-              {
-                ok: false,
-                code: "auth_required",
-                message: "Sign in again before deleting activity history.",
-              },
+              buildHitoProductApiFailure("runner_activity_auth_required", {
+                operation: "delete",
+              }),
               { status: 401 },
             );
           }
           if (error instanceof Error && error.name === "RunnerActivityNotFoundError") {
             return Response.json(
-              {
-                ok: false,
-                code: "activity_not_found",
-                message: "This activity is not available.",
-              },
+              buildHitoProductApiFailure("runner_activity_not_found", {
+                operation: "delete",
+              }),
               { status: 404 },
             );
           }
 
-          return Response.json(
-            {
-              ok: false,
-              code: "activity_delete_failed",
-              message: "We could not delete this activity history. Try again shortly.",
-            },
-            { status: 500 },
-          );
+          return Response.json(buildHitoProductApiFailure("runner_activity_delete_failed", {}), {
+            status: 500,
+          });
         }
       },
     },

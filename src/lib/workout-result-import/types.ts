@@ -1,3 +1,8 @@
+import {
+  buildHitoProductApiFailure,
+  type HitoProductApiFailure,
+} from "@/lib/product-api-error-contract";
+
 export type WorkoutResultAssetKind = "garmin_fit" | "garmin_zip";
 export type WorkoutResultParseStatus = "uploaded" | "extracted" | "parsed" | "failed";
 export type WorkoutFeedbackMarkerState = "evidence_attached" | "feedback_ready";
@@ -107,6 +112,70 @@ export class WorkoutResultImportError extends Error {
     this.name = "WorkoutResultImportError";
     this.code = code;
     this.status = status;
+  }
+}
+
+export type WorkoutResultProductApiOperation = "upload" | "remove";
+
+export function buildWorkoutResultProductApiFailure(input: {
+  error: unknown;
+  operation: WorkoutResultProductApiOperation;
+  maxUploadBytes: number;
+}): HitoProductApiFailure {
+  const { error, operation } = input;
+
+  if (!(error instanceof WorkoutResultImportError)) {
+    return buildHitoProductApiFailure("workout_result_persistence_failed", { operation });
+  }
+
+  switch (error.code) {
+    case "auth_required":
+      return buildHitoProductApiFailure("workout_result_auth_required", { operation });
+    case "invalid_upload":
+      return buildHitoProductApiFailure("workout_result_invalid_request", { operation });
+    case "unsupported_file_type":
+      return operation === "upload"
+        ? buildHitoProductApiFailure("workout_result_file_type_unsupported", {
+            operation,
+            acceptedKinds: ["fit", "zip"],
+          })
+        : buildHitoProductApiFailure("workout_result_persistence_failed", { operation });
+    case "file_too_large":
+      return operation === "upload"
+        ? buildHitoProductApiFailure("workout_result_file_too_large", {
+            operation,
+            maxBytes: input.maxUploadBytes,
+          })
+        : buildHitoProductApiFailure("workout_result_persistence_failed", { operation });
+    case "planned_workout_not_found":
+      return buildHitoProductApiFailure("workout_result_workout_unavailable", { operation });
+    case "rest_day_not_supported":
+      return operation === "upload"
+        ? buildHitoProductApiFailure("workout_result_rest_day_unsupported", { operation })
+        : buildHitoProductApiFailure("workout_result_persistence_failed", { operation });
+    case "zip_missing_fit":
+      return operation === "upload"
+        ? buildHitoProductApiFailure("workout_result_archive_activity_missing", { operation })
+        : buildHitoProductApiFailure("workout_result_persistence_failed", { operation });
+    case "zip_multiple_fit":
+      return operation === "upload"
+        ? buildHitoProductApiFailure("workout_result_archive_multiple_activities", {
+            operation,
+            maxActivities: 1,
+          })
+        : buildHitoProductApiFailure("workout_result_persistence_failed", { operation });
+    case "fit_parse_failed":
+      return operation === "upload"
+        ? buildHitoProductApiFailure("workout_result_file_unreadable", { operation })
+        : buildHitoProductApiFailure("workout_result_persistence_failed", { operation });
+    case "activity_already_recorded":
+      return operation === "upload"
+        ? buildHitoProductApiFailure("workout_result_activity_already_recorded", { operation })
+        : buildHitoProductApiFailure("workout_result_persistence_failed", { operation });
+    case "storage_failed":
+      return buildHitoProductApiFailure("workout_result_storage_failed", { operation });
+    case "persistence_failed":
+      return buildHitoProductApiFailure("workout_result_persistence_failed", { operation });
   }
 }
 

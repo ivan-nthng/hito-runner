@@ -26,8 +26,6 @@ import { Icon } from "@/components/ui/icon";
 import { useHitoTabs } from "@/components/ui/hito-tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  formatDistanceKm,
-  formatDate,
   formatDurationMin,
   type TrainingSnapshot,
   type Workout,
@@ -39,6 +37,9 @@ import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/app-config";
 import { getWorkoutRouteData } from "@/lib/training-api";
 import type { WorkoutResultFeedbackSummary } from "@/lib/workout-result-import/types";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
+import { formatUiDate, formatUiNumber } from "@/lib/ui-locale";
+import { getHitoKnownProductMessage, getHitoProductMessage } from "@/lib/ui-locale-messages";
 
 export const Route = createFileRoute("/workout/$date")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -68,11 +69,21 @@ export const Route = createFileRoute("/workout/$date")({
 });
 
 function WorkoutPage() {
+  const { snapshot, viewer, settings } = Route.useLoaderData();
+
+  return (
+    <AppShell settings={settings} snapshot={snapshot} viewer={viewer}>
+      <WorkoutPageContent />
+    </AppShell>
+  );
+}
+
+function WorkoutPageContent() {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const {
     workout,
     snapshot,
-    viewer,
-    settings,
     prev,
     next,
     feedback,
@@ -98,41 +109,41 @@ function WorkoutPage() {
 
   if (!workout) {
     return (
-      <AppShell settings={settings} snapshot={snapshot} viewer={viewer}>
-        <div className="hito-route-gutter max-w-2xl py-20">
-          <section
-            className="hito-state-surface"
-            data-tone={snapshot.mode === "onboarding" ? "signal" : undefined}
-          >
-            {snapshot.mode === "onboarding" ? (
-              <>
-                <p className="hito-label-md text-foreground">Setup required</p>
-                <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
-                  Finish setup before opening workouts.
-                </h1>
-                <p className="hito-body-md mt-4 max-w-[40rem] text-secondary">
-                  Complete your runner setup first, then your workouts will open here.
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="hito-label-md text-foreground">No workout</p>
-                <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
-                  Nothing is scheduled for this day.
-                </h1>
-                <p className="hito-body-md mt-4 max-w-[40rem] text-secondary">
-                  There is no workout on this date in your Calendar. Go back and choose another day.
-                </p>
-              </>
-            )}
-            <div className="hito-state-actions">
-              <HitoButton asChild size="lg" variant="primary">
-                <Link to="/">Back to Calendar</Link>
-              </HitoButton>
-            </div>
-          </section>
-        </div>
-      </AppShell>
+      <div className="hito-route-gutter max-w-2xl py-20">
+        <section
+          className="hito-state-surface"
+          data-tone={snapshot.mode === "onboarding" ? "signal" : undefined}
+        >
+          {snapshot.mode === "onboarding" ? (
+            <>
+              <p className="hito-label-md text-foreground">{message("Setup required")}</p>
+              <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
+                {message("Finish setup before opening workouts.")}
+              </h1>
+              <p className="hito-body-md mt-4 max-w-[40rem] text-secondary">
+                {message("Complete your runner setup first, then your workouts will open here.")}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="hito-label-md text-foreground">{message("No workout")}</p>
+              <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
+                {message("Nothing is scheduled for this day.")}
+              </h1>
+              <p className="hito-body-md mt-4 max-w-[40rem] text-secondary">
+                {message(
+                  "There is no workout on this date in your Calendar. Go back and choose another day.",
+                )}
+              </p>
+            </>
+          )}
+          <div className="hito-state-actions">
+            <HitoButton asChild size="lg" variant="primary">
+              <Link to="/">{message("Back to Calendar")}</Link>
+            </HitoButton>
+          </div>
+        </section>
+      </div>
     );
   }
 
@@ -144,13 +155,19 @@ function WorkoutPage() {
   const restAssignment = restAssignmentFor(workout);
   const resultMeta = resultMetaForStatus(status);
   const phaseLabel = humanizeSnakeCase(workout.phase);
-  const weekLabel = `Week ${workout.week}`;
+  const weekLabel = message("Week {week}", { week: workout.week });
   const heroMetrics = isRestDay
     ? []
     : [
-        km != null ? { label: "Distance", value: formatDistanceKm(km), unit: "km" } : null,
+        km != null
+          ? {
+              label: message("Distance"),
+              value: formatUiNumber(km, locale, { maximumFractionDigits: 2 }),
+              unit: "km",
+            }
+          : null,
         structureDuration > 0
-          ? { label: "Duration", value: formatDurationMin(structureDuration) }
+          ? { label: message("Duration"), value: formatDurationMin(structureDuration) }
           : null,
       ].filter((metric): metric is { label: string; value: string; unit?: string } =>
         Boolean(metric),
@@ -163,192 +180,201 @@ function WorkoutPage() {
   );
 
   return (
-    <AppShell settings={settings} snapshot={snapshot} viewer={viewer}>
-      <div className="hito-route-gutter relative max-w-6xl pb-8 pt-2">
-        <WorkoutDetailTopBar
-          canEdit={canEditWorkout}
-          onCalendarChanged={() => router.invalidate()}
-          onOpenActivityFile={
-            localActivityFileDesignFixtureEnabled &&
-            snapshot.source === "persisted" &&
-            workout.type !== "rest"
-              ? () => setActivityFileDialogOpen(true)
-              : undefined
-          }
-          workoutActionsButtonRef={workoutActionsButtonRef}
-          workout={workout}
-        />
+    <div className="hito-route-gutter relative max-w-6xl pb-8 pt-2">
+      <WorkoutDetailTopBar
+        canEdit={canEditWorkout}
+        onCalendarChanged={() => router.invalidate()}
+        onOpenActivityFile={
+          localActivityFileDesignFixtureEnabled &&
+          snapshot.source === "persisted" &&
+          workout.type !== "rest"
+            ? () => setActivityFileDialogOpen(true)
+            : undefined
+        }
+        workoutActionsButtonRef={workoutActionsButtonRef}
+        workout={workout}
+      />
 
-        <section className="relative mt-5 overflow-hidden px-1 pb-3 pt-2 lg:pt-3">
-          <div className="hito-workout-hero-grid">
-            <div>
-              <div className="hito-technical-sm text-secondary flex flex-wrap items-center gap-2.5">
-                {resultMeta ? (
-                  <ResultBadge meta={resultMeta} mode="identity" />
-                ) : (
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: meta.color }} />
-                )}
-                <span style={{ color: meta.content }}>{meta.label}</span>
-                <span className="opacity-50">·</span>
-                <span className="text-muted-foreground">
-                  {formatDate(workout.date, {
-                    weekday: "long",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </span>
-                <span className="opacity-50">·</span>
-                <span>{phaseLabel}</span>
-                <span className="opacity-50">·</span>
-                <span>{weekLabel}</span>
-                {workout.date === snapshot.currentDate && (
-                  <span className="text-signal">· Today</span>
-                )}
-              </div>
-              <h1 className="hito-ui-title-lg mt-3 max-w-2xl text-foreground">
-                {isRestDay ? "Rest day" : workout.title}
-              </h1>
-              {!isRestDay && workout.notes?.trim() && (
-                <p className="hito-body-md text-secondary mt-4 max-w-xl">{workout.notes.trim()}</p>
+      <section className="relative mt-5 overflow-hidden px-1 pb-3 pt-2 lg:pt-3">
+        <div className="hito-workout-hero-grid">
+          <div>
+            <div className="hito-technical-sm text-secondary flex flex-wrap items-center gap-2.5">
+              {resultMeta ? (
+                <ResultBadge
+                  meta={{
+                    ...resultMeta,
+                    label: getHitoKnownProductMessage(locale, resultMeta.label),
+                  }}
+                  mode="identity"
+                />
+              ) : (
+                <span className="h-1.5 w-1.5 rounded-full" style={{ background: meta.color }} />
+              )}
+              <span style={{ color: meta.content }}>
+                {getHitoKnownProductMessage(locale, meta.label)}
+              </span>
+              <span className="opacity-50">·</span>
+              <span className="text-muted-foreground">
+                {formatUiDate(workout.date, locale, {
+                  weekday: "long",
+                  month: "long",
+                  day: "numeric",
+                })}
+              </span>
+              <span className="opacity-50">·</span>
+              <span>{phaseLabel}</span>
+              <span className="opacity-50">·</span>
+              <span>{weekLabel}</span>
+              {workout.date === snapshot.currentDate && (
+                <span className="text-signal">· {message("Today")}</span>
               )}
             </div>
-
-            {heroMetrics.length > 0 && (
-              <div className="flex flex-wrap justify-center gap-6 sm:justify-end sm:gap-8">
-                {heroMetrics.map((metric) => (
-                  <Stat
-                    key={metric.label}
-                    label={metric.label}
-                    value={metric.value}
-                    unit={metric.unit}
-                  />
-                ))}
-              </div>
+            <h1 className="hito-ui-title-lg mt-3 max-w-2xl text-foreground">
+              {isRestDay ? message("Rest day") : workout.title}
+            </h1>
+            {!isRestDay && workout.notes?.trim() && (
+              <p className="hito-body-md text-secondary mt-4 max-w-xl">{workout.notes.trim()}</p>
             )}
           </div>
-        </section>
 
-        {surfaceModel.tabs.length > 1 && (
-          <div className="mt-10 flex gap-6 border-b border-hairline/80 pb-3">
-            <div
-              className="hito-tab-list hito-tab-list-open"
-              {...workoutTabs.tabListProps}
-              aria-label="Workout detail view"
-            >
-              {surfaceModel.tabs.map((tabOption) => (
-                <button
-                  key={tabOption.id}
-                  type="button"
-                  {...workoutTabs.getTabProps(tabOption.id)}
-                  onClick={() =>
-                    navigate({
-                      search: (current) => ({
-                        ...current,
-                        tab: tabOption.id,
-                      }),
-                      replace: true,
-                    })
-                  }
-                  data-active={surfaceModel.activeSurface === tabOption.id}
-                  className="hito-tab"
-                >
-                  {tabOption.label}
-                </button>
+          {heroMetrics.length > 0 && (
+            <div className="flex flex-wrap justify-center gap-6 sm:justify-end sm:gap-8">
+              {heroMetrics.map((metric) => (
+                <Stat
+                  key={metric.label}
+                  label={metric.label}
+                  value={metric.value}
+                  unit={metric.unit}
+                />
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
+      </section>
 
-        <div className="hito-route-support-grid mt-8">
+      {surfaceModel.tabs.length > 1 && (
+        <div className="mt-10 flex gap-6 border-b border-hairline/80 pb-3">
           <div
-            className={cn(
-              "relative",
-              surfaceModel.activeSurface === "complete" && "overflow-hidden p-1",
-              surfaceModel.activeSurface === "feedback" && "p-1",
-            )}
-            {...(surfaceModel.tabs.length > 1
-              ? workoutTabs.getPanelProps(surfaceModel.activeSurface)
-              : {})}
+            className="hito-tab-list hito-tab-list-open"
+            {...workoutTabs.tabListProps}
+            aria-label={message("Workout detail view")}
           >
-            {surfaceModel.activeSurface === "overview" && (
-              <>
-                <Overview snapshot={snapshot} workout={workout} />
-                {lifecycle === "today_planned" && (
-                  <CompletionActionPanel
-                    snapshot={snapshot}
-                    workout={workout}
-                    variant="today"
-                    onOpenActivityFile={() => setActivityFileDialogOpen(true)}
-                  />
-                )}
-                {lifecycle === "past_unlogged" && (
-                  <CompletionActionPanel
-                    snapshot={snapshot}
-                    workout={workout}
-                    variant="past"
-                    onOpenActivityFile={() => setActivityFileDialogOpen(true)}
-                  />
-                )}
-              </>
-            )}
-            {surfaceModel.activeSurface === "complete" && (
-              <CompletionPanel
-                workout={workout}
-                snapshot={snapshot}
-                feedback={feedback}
-                onOpenActivityFile={
-                  canOpenGarminFeedback(workout, snapshot)
-                    ? () => setActivityFileDialogOpen(true)
-                    : undefined
+            {surfaceModel.tabs.map((tabOption) => (
+              <button
+                key={tabOption.id}
+                type="button"
+                {...workoutTabs.getTabProps(tabOption.id)}
+                onClick={() =>
+                  navigate({
+                    search: (current) => ({
+                      ...current,
+                      tab: tabOption.id,
+                    }),
+                    replace: true,
+                  })
                 }
-              />
-            )}
-            {surfaceModel.activeSurface === "feedback" && (
-              <WorkoutFeedbackPanel
-                workout={workout}
-                snapshot={snapshot}
-                feedback={feedback}
-                localActivityFileDesignFixtureEnabled={localActivityFileDesignFixtureEnabled}
-              />
-            )}
+                data-active={surfaceModel.activeSurface === tabOption.id}
+                className="hito-tab"
+              >
+                {getHitoKnownProductMessage(locale, tabOption.label)}
+              </button>
+            ))}
           </div>
+        </div>
+      )}
 
-          <aside>
-            <SidebarPanel>
-              <SidebarSection title="Future insights">
+      <div className="hito-route-support-grid mt-8">
+        <div
+          className={cn(
+            "relative",
+            surfaceModel.activeSurface === "complete" && "overflow-hidden p-1",
+            surfaceModel.activeSurface === "feedback" && "p-1",
+          )}
+          {...(surfaceModel.tabs.length > 1
+            ? workoutTabs.getPanelProps(surfaceModel.activeSurface)
+            : {})}
+        >
+          {surfaceModel.activeSurface === "overview" && (
+            <>
+              <Overview snapshot={snapshot} workout={workout} />
+              {lifecycle === "today_planned" && (
+                <CompletionActionPanel
+                  snapshot={snapshot}
+                  workout={workout}
+                  variant="today"
+                  onOpenActivityFile={() => setActivityFileDialogOpen(true)}
+                />
+              )}
+              {lifecycle === "past_unlogged" && (
+                <CompletionActionPanel
+                  snapshot={snapshot}
+                  workout={workout}
+                  variant="past"
+                  onOpenActivityFile={() => setActivityFileDialogOpen(true)}
+                />
+              )}
+            </>
+          )}
+          {surfaceModel.activeSurface === "complete" && (
+            <CompletionPanel
+              workout={workout}
+              snapshot={snapshot}
+              feedback={feedback}
+              onOpenActivityFile={
+                canOpenGarminFeedback(workout, snapshot)
+                  ? () => setActivityFileDialogOpen(true)
+                  : undefined
+              }
+            />
+          )}
+          {surfaceModel.activeSurface === "feedback" && (
+            <WorkoutFeedbackPanel
+              workout={workout}
+              snapshot={snapshot}
+              feedback={feedback}
+              localActivityFileDesignFixtureEnabled={localActivityFileDesignFixtureEnabled}
+            />
+          )}
+        </div>
+
+        <aside>
+          <SidebarPanel>
+            <SidebarSection title={message("Future insights")}>
+              <p className="hito-body-sm text-secondary">
+                {message(
+                  "There isn't enough data yet to provide these inputs and insights. This is a future feature.",
+                )}
+              </p>
+            </SidebarSection>
+            {sidebarReadModel ? (
+              <SidebarSection title={message("This week")}>
                 <p className="hito-body-sm text-secondary">
-                  There isn&apos;t enough data yet to provide these inputs and insights. This is a
-                  future feature.
+                  {message("{completed} of {scheduled} workouts completed", {
+                    completed: sidebarReadModel.week.completedWorkoutCount,
+                    scheduled: sidebarReadModel.week.scheduledWorkoutCount,
+                  })}
                 </p>
               </SidebarSection>
-              {sidebarReadModel ? (
-                <SidebarSection title="This week">
-                  <p className="hito-body-sm text-secondary">
-                    {sidebarReadModel.week.completedWorkoutCount} of{" "}
-                    {sidebarReadModel.week.scheduledWorkoutCount} workouts completed
-                  </p>
-                </SidebarSection>
-              ) : null}
-            </SidebarPanel>
-          </aside>
-        </div>
-
-        <WorkoutActivityFileDialog
-          feedback={feedback}
-          localActivityFileDesignFixtureEnabled={localActivityFileDesignFixtureEnabled}
-          onOpenChange={setActivityFileDialogOpen}
-          open={activityFileDialogOpen}
-          returnFocusRef={workoutActionsButtonRef}
-          snapshot={snapshot}
-          workout={workout}
-        />
-
-        <div className="mt-12 grid sm:grid-cols-2 gap-3">
-          {prev && <NavCard direction="prev" date={prev.date} title={prev.title} />}
-          {next && <NavCard direction="next" date={next.date} title={next.title} />}
-        </div>
+            ) : null}
+          </SidebarPanel>
+        </aside>
       </div>
-    </AppShell>
+
+      <WorkoutActivityFileDialog
+        feedback={feedback}
+        localActivityFileDesignFixtureEnabled={localActivityFileDesignFixtureEnabled}
+        onOpenChange={setActivityFileDialogOpen}
+        open={activityFileDialogOpen}
+        returnFocusRef={workoutActionsButtonRef}
+        snapshot={snapshot}
+        workout={workout}
+      />
+
+      <div className="mt-12 grid sm:grid-cols-2 gap-3">
+        {prev && <NavCard direction="prev" date={prev.date} title={prev.title} />}
+        {next && <NavCard direction="next" date={next.date} title={next.title} />}
+      </div>
+    </div>
   );
 }
 
@@ -388,36 +414,43 @@ function WorkoutPendingState() {
 function WorkoutErrorState({ reset }: { error: Error; reset: () => void }) {
   return (
     <AppShell>
-      <div className="hito-route-gutter max-w-2xl py-20">
-        <section className="hito-state-surface" data-tone="destructive">
-          <p className="hito-label-md text-destructive">Workout unavailable</p>
-          <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
-            We couldn&apos;t load this workout.
-          </h1>
-          <p className="hito-body-md mt-4 max-w-[40rem] text-text-secondary">
-            Try again. If setup is still incomplete, go back home first.
-          </p>
-          <div className="hito-state-actions">
-            <HitoButton
-              type="button"
-              onClick={() => {
-                reset();
-                window.location.reload();
-              }}
-              size="lg"
-              variant="primary"
-            >
-              Try again
-            </HitoButton>
-            <Link
-              to="/"
-              className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-            >
-              Back to Calendar
-            </Link>
-          </div>
-        </section>
-      </div>
+      {(locale) => (
+        <div className="hito-route-gutter max-w-2xl py-20">
+          <section className="hito-state-surface" data-tone="destructive">
+            <p className="hito-label-md text-destructive">
+              {getHitoProductMessage(locale, "Workout unavailable")}
+            </p>
+            <h1 className="hito-ui-title-xl mt-2 max-w-[44rem]">
+              {getHitoProductMessage(locale, "We couldn't load this workout.")}
+            </h1>
+            <p className="hito-body-md mt-4 max-w-[40rem] text-text-secondary">
+              {getHitoProductMessage(
+                locale,
+                "Try again. If setup is still incomplete, go back home first.",
+              )}
+            </p>
+            <div className="hito-state-actions">
+              <HitoButton
+                type="button"
+                onClick={() => {
+                  reset();
+                  window.location.reload();
+                }}
+                size="lg"
+                variant="primary"
+              >
+                {getHitoProductMessage(locale, "Try again")}
+              </HitoButton>
+              <Link
+                to="/"
+                className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                {getHitoProductMessage(locale, "Back to Calendar")}
+              </Link>
+            </div>
+          </section>
+        </div>
+      )}
     </AppShell>
   );
 }
@@ -534,6 +567,7 @@ function WorkoutDetailTopBar({
   workoutActionsButtonRef: RefObject<HTMLButtonElement | null>;
   workout: Workout;
 }) {
+  const message = useHitoProductMessage();
   const [editOpen, setEditOpen] = useState(false);
   const [editPrepareSignal, setEditPrepareSignal] = useState(0);
 
@@ -557,7 +591,7 @@ function WorkoutDetailTopBar({
       <HitoButton asChild className="-ml-2" size="sm" variant="ghost">
         <Link to="/">
           <Icon name="arrow-left" size="xs" />
-          Back to Calendar
+          {message("Back to Calendar")}
         </Link>
       </HitoButton>
 
@@ -570,7 +604,7 @@ function WorkoutDetailTopBar({
           <HitoButton
             ref={workoutActionsButtonRef}
             type="button"
-            aria-label="Open workout actions"
+            aria-label={message("Open workout actions")}
             iconOnly
             size="sm"
             variant="ghost"
@@ -579,7 +613,7 @@ function WorkoutDetailTopBar({
           </HitoButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="hito-menu-width-standard">
-          <DropdownMenuLabel>Workout actions</DropdownMenuLabel>
+          <DropdownMenuLabel>{message("Workout actions")}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             disabled={!canEdit}
@@ -588,12 +622,12 @@ function WorkoutDetailTopBar({
             onSelect={() => setEditOpen(true)}
           >
             <Icon name="edit" size="xs" />
-            Edit this training
+            {message("Edit this training")}
           </DropdownMenuItem>
           {onOpenActivityFile ? (
             <DropdownMenuItem onSelect={onOpenActivityFile}>
               <Icon name="file-up" size="xs" />
-              Activity file
+              {message("Activity file")}
             </DropdownMenuItem>
           ) : null}
         </DropdownMenuContent>
@@ -626,6 +660,7 @@ function CompletionActionPanel({
   variant: "today" | "past";
   onOpenActivityFile: () => void;
 }) {
+  const message = useHitoProductMessage();
   const isToday = variant === "today";
   const canUploadGarmin = canOpenGarminFeedback(workout, snapshot);
 
@@ -639,12 +674,14 @@ function CompletionActionPanel({
         />
         <div className="min-w-0 flex-1">
           <p className="hito-body-md text-foreground">
-            {isToday ? "Ready when you finish" : "Not logged yet"}
+            {isToday ? message("Ready when you finish") : message("Not logged yet")}
           </p>
           <p className="hito-body-sm mt-1 text-secondary">
             {isToday
-              ? "Add a result or activity file after you run it. Both update this Calendar workout."
-              : "This past workout is treated as unlogged until you add a real result."}
+              ? message(
+                  "Add a result or activity file after you run it. Both update this Calendar workout.",
+                )
+              : message("This past workout is treated as unlogged until you add a real result.")}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -655,7 +692,7 @@ function CompletionActionPanel({
               search={{ tab: "complete" } as never}
             >
               <Icon name={isToday ? "check" : "edit"} size="xs" />
-              Add result
+              {message("Add result")}
             </Link>
           </HitoButton>
           {canUploadGarmin ? (
@@ -667,7 +704,7 @@ function CompletionActionPanel({
               variant="secondary"
             >
               <Icon name="file-up" size="xs" />
-              Add activity file
+              {message("Add activity file")}
             </HitoButton>
           ) : null}
         </div>
@@ -677,6 +714,8 @@ function CompletionActionPanel({
 }
 
 function Overview({ snapshot, workout }: { snapshot: TrainingSnapshot; workout: Workout }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const restAssignment = restAssignmentFor(workout);
   const timelineItems = workoutStructureTimelineItems(workout);
   const documentNotes = workoutDocumentNotesForSteps(workout.steps, workout.notes);
@@ -686,11 +725,12 @@ function Overview({ snapshot, workout }: { snapshot: TrainingSnapshot; workout: 
       <section className="flex min-h-[220px] flex-col border-t border-hairline pt-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="hito-label-md text-foreground">Recovery day</p>
-            <h3 className="mt-2 font-sans text-3xl">Keep it light.</h3>
+            <p className="hito-label-md text-foreground">{message("Recovery day")}</p>
+            <h3 className="mt-2 font-sans text-3xl">{message("Keep it light.")}</h3>
             <p className="hito-body-md text-secondary mt-4 max-w-lg">
-              No distance, duration, or load is scheduled here. Let the day stay open unless a real
-              recovery assignment is present.
+              {message(
+                "No distance, duration, or load is scheduled here. Let the day stay open unless a real recovery assignment is present.",
+              )}
             </p>
           </div>
           <div className="hidden items-end gap-2 opacity-50 sm:flex">
@@ -703,7 +743,7 @@ function Overview({ snapshot, workout }: { snapshot: TrainingSnapshot; workout: 
         {restAssignment && (
           <div className="mt-auto border-t border-hairline pt-5">
             <div>
-              <p className="hito-label-md text-foreground">Assignment</p>
+              <p className="hito-label-md text-foreground">{message("Assignment")}</p>
               <p className="mt-3 text-sm leading-relaxed text-text-secondary">{restAssignment}</p>
             </div>
           </div>
@@ -717,18 +757,18 @@ function Overview({ snapshot, workout }: { snapshot: TrainingSnapshot; workout: 
 
     return (
       <ManualWorkoutDocumentPreview
-        dateLabel={formatDate(workout.date, {
+        dateLabel={formatUiDate(workout.date, locale, {
           weekday: "short",
           month: "short",
           day: "numeric",
         })}
         iconTone={meta.content}
         notes={documentNotes}
-        readbackEntries={workoutDocumentSectionsToManualReadbackEntries(workout.steps)}
+        readbackEntries={workoutDocumentSectionsToManualReadbackEntries(workout.steps, locale)}
         timelineItems={timelineItems}
-        timelineSummary={workoutStructureTimelineSummary(timelineItems)}
+        timelineSummary={workoutStructureTimelineSummary(timelineItems, locale)}
         title={workout.title}
-        typeLabel={meta.label}
+        typeLabel={getHitoKnownProductMessage(locale, meta.label)}
         workoutType={workout.type}
       />
     );
@@ -736,10 +776,10 @@ function Overview({ snapshot, workout }: { snapshot: TrainingSnapshot; workout: 
 
   return (
     <WorkoutDocumentReadback
-      emptyCopy="No extra workout structure was provided for this workout."
+      emptyCopy={message("No extra workout structure was provided for this workout.")}
       items={timelineItems}
       notes={documentNotes}
-      summary={workoutStructureTimelineSummary(timelineItems)}
+      summary={workoutStructureTimelineSummary(timelineItems, locale)}
     />
   );
 }
@@ -788,7 +828,13 @@ function NavCard({
   date: string;
   title: string;
 }) {
-  const formattedDate = formatDate(date, { weekday: "short", month: "short", day: "numeric" });
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
+  const formattedDate = formatUiDate(date, locale, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
 
   return (
     <Link
@@ -803,13 +849,13 @@ function NavCard({
             <span className="hito-nav-card-arrow">
               <Icon name="arrow-left" size="xs" />
             </span>
-            <span className="hito-nav-card-label">Previous</span>
+            <span className="hito-nav-card-label">{message("Previous")}</span>
             <span className="hito-nav-card-date">{formattedDate}</span>
           </>
         ) : (
           <>
             <span className="hito-nav-card-date">{formattedDate}</span>
-            <span className="hito-nav-card-label">Next</span>
+            <span className="hito-nav-card-label">{message("Next")}</span>
             <span className="hito-nav-card-arrow">
               <Icon name="chevron-right" size="xs" />
             </span>
@@ -878,6 +924,7 @@ function ResultBadge({
   meta: NonNullable<ReturnType<typeof resultMetaForStatus>>;
   mode: "identity" | "sidebar";
 }) {
+  const locale = useHitoUiLocale();
   return (
     <span
       className="hito-status-pill"
@@ -891,7 +938,7 @@ function ResultBadge({
       >
         <Icon name={meta.icon} size="xs" strokeWidth={2.2} />
       </span>
-      {meta.label}
+      {getHitoKnownProductMessage(locale, meta.label)}
     </span>
   );
 }

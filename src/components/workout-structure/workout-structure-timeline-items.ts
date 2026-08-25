@@ -17,6 +17,8 @@ import {
 } from "@/lib/training";
 import type { WorkoutDocumentSection, WorkoutDocumentType } from "@/lib/workout-document";
 import type { WorkoutStructureTimelineItem } from "@/components/workout-structure/WorkoutStructureTimeline";
+import { formatHitoProductMessage } from "@/lib/ui-locale-messages";
+import { DEFAULT_RESOLVED_UI_LOCALE, type ResolvedUiLocale } from "@/lib/ui-locale";
 
 export function workoutStructureTimelineItems(workout: Workout): WorkoutStructureTimelineItem[] {
   return buildWorkoutStructureTimelineItems({
@@ -142,8 +144,17 @@ function buildWorkoutStructureTimelineItems({
   return out;
 }
 
-export function workoutStructureTimelineSummary(blocks: WorkoutStructureTimelineItem[]) {
-  return `${blocks.length} block${blocks.length === 1 ? "" : "s"}`;
+export function workoutStructureTimelineSummary(
+  blocks: WorkoutStructureTimelineItem[],
+  locale: ResolvedUiLocale = DEFAULT_RESOLVED_UI_LOCALE,
+) {
+  return formatHitoProductMessage(
+    locale,
+    blocks.length === 1 ? "{count} block" : "{count} blocks",
+    {
+      count: blocks.length,
+    },
+  );
 }
 
 function repeatChildLanguage(block: PlannedWorkoutLanguageBlock | undefined, index: number) {

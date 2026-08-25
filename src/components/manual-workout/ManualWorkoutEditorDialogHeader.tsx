@@ -1,4 +1,5 @@
 import { DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useHitoProductMessage } from "@/components/ui/hito-ui-locale-provider";
 
 export function ManualWorkoutEditorDialogHeader({
   dateLabel,
@@ -9,7 +10,8 @@ export function ManualWorkoutEditorDialogHeader({
   statusLabel: string;
   title: string;
 }) {
-  const displayTitle = title.trim() || "Manual workout";
+  const t = useHitoProductMessage();
+  const displayTitle = title.trim() || t("Manual workout");
 
   return (
     <DialogHeader className="hito-product-dialog-header hito-manual-workout-dialog-header">

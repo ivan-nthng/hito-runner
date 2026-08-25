@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { HitoButton } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
 import { hitoToast } from "@/components/ui/hito-toast";
 import { ManualWorkoutEditorDialogHeader } from "@/components/manual-workout/ManualWorkoutEditorDialogHeader";
 import { WorkoutDocumentEditor } from "@/components/manual-workout/WorkoutDocumentEditor";
@@ -17,6 +18,7 @@ import {
   initializeWorkoutDocumentAction,
   reviewWorkoutCommandAction,
 } from "@/lib/manual-workout-authoring";
+import { getHitoKnownProductMessage } from "@/lib/ui-locale-messages";
 
 const TOAST_ID = "manual-workout-persisted-edit";
 
@@ -37,6 +39,8 @@ export function ManualWorkoutPersistedEditDialog({
   title: string;
   workoutDate: string;
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   const initializeDocument = useServerFn(initializeWorkoutDocumentAction);
   const reviewCommand = useServerFn(reviewWorkoutCommandAction);
   const confirmCommand = useServerFn(confirmWorkoutCommandAction);
@@ -54,7 +58,7 @@ export function ManualWorkoutPersistedEditDialog({
         if (!active) return;
         if (!result.ok) return setMessage(result.message);
         if (result.origin !== "calendar")
-          return setMessage("The Calendar returned an unsupported editor initializer.");
+          return setMessage(t("The Calendar returned an unsupported editor initializer."));
         setEditor(
           createWorkoutEditorState({
             mode: "edit",
@@ -70,13 +74,13 @@ export function ManualWorkoutPersistedEditDialog({
           setMessage(
             error instanceof Error
               ? error.message
-              : "This workout could not be opened for editing.",
+              : t("This workout could not be opened for editing."),
           );
       });
     return () => {
       active = false;
     };
-  }, [initializeDocument, open, plannedWorkoutId]);
+  }, [initializeDocument, open, plannedWorkoutId, t]);
 
   const close = () => {
     if (editor?.phase === "reviewing" || editor?.phase === "confirming") return;
@@ -119,8 +123,8 @@ export function ManualWorkoutPersistedEditDialog({
       if (!result.ok) return setEditor({ ...editor, phase: "blocked", issues: [result.message] });
       hitoToast.success({
         id: TOAST_ID,
-        title: "Workout updated",
-        description: "Refreshing from saved Calendar truth.",
+        title: t("Workout updated"),
+        description: t("Refreshing from saved Calendar truth."),
       });
       close();
       await onEdited();
@@ -128,7 +132,7 @@ export function ManualWorkoutPersistedEditDialog({
       setEditor({
         ...editor,
         phase: "blocked",
-        issues: [error instanceof Error ? error.message : "This workout could not be updated."],
+        issues: [error instanceof Error ? error.message : t("This workout could not be updated.")],
       });
     }
   };
@@ -145,8 +149,8 @@ export function ManualWorkoutPersistedEditDialog({
         overlayClassName="hito-dialog-overlay-stable"
       >
         <ManualWorkoutEditorDialogHeader
-          dateLabel={formatReadableDate(workoutDate)}
-          statusLabel={editor?.candidate ? "Reviewed" : "Draft"}
+          dateLabel={formatReadableDate(workoutDate, locale)}
+          statusLabel={editor?.candidate ? t("Reviewed") : t("Draft")}
           title={editor?.document.title ?? title}
         />
         <div className="hito-product-dialog-body-scroll-fill">
@@ -159,18 +163,18 @@ export function ManualWorkoutPersistedEditDialog({
           ) : null}
           {message ? (
             <p className="hito-body-md text-negative" role="alert">
-              {message}
+              {getHitoKnownProductMessage(locale, message)}
             </p>
           ) : null}
           {editor?.issues.map((issue) => (
             <p key={issue} className="hito-body-md text-negative" role="alert">
-              {issue}
+              {getHitoKnownProductMessage(locale, issue)}
             </p>
           ))}
         </div>
         <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
           <HitoButton type="button" size="md" variant="secondary" disabled={busy} onClick={close}>
-            Close
+            {t("Close")}
           </HitoButton>
           {editor?.candidate ? (
             <HitoButton
@@ -181,7 +185,7 @@ export function ManualWorkoutPersistedEditDialog({
               disabled={busy}
               onClick={() => void confirm()}
             >
-              Save workout
+              {t("Save workout")}
             </HitoButton>
           ) : (
             <HitoButton
@@ -192,7 +196,7 @@ export function ManualWorkoutPersistedEditDialog({
               disabled={!editor || busy || editor.issues.length > 0}
               onClick={() => void review()}
             >
-              Review workout
+              {t("Review workout")}
             </HitoButton>
           )}
         </DialogFooter>

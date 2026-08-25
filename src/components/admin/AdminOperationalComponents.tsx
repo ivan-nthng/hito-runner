@@ -42,16 +42,20 @@ export type AdminDataTableToolbarFilterSection = {
 
 type AdminDataTableToolbarProps = {
   activeFilters: AdminDataTableActiveFilter[];
+  activeFiltersLabel?: string;
   className?: string;
   clearAllFilters?: () => void;
+  clearAllFiltersLabel?: string;
   clearAllFiltersMinCount?: number;
   filterAriaSubject?: string;
   filterButtonAriaLabel?: string;
+  filterButtonLabel?: string;
   filterSections?: AdminDataTableToolbarFilterSection[];
   onQueryChange: (value: string) => void;
   query: string;
   rowCountLabel: string;
   searchClearHref?: string;
+  searchClearLabel?: string;
   searchLabel: string;
   searchPlaceholder: string;
   searchValue?: string;
@@ -59,16 +63,20 @@ type AdminDataTableToolbarProps = {
 
 export function AdminDataTableToolbar({
   activeFilters,
+  activeFiltersLabel = "Active filters",
   className,
   clearAllFilters,
+  clearAllFiltersLabel = "Clear all",
   clearAllFiltersMinCount = 2,
   filterAriaSubject = "table filters",
   filterButtonAriaLabel,
+  filterButtonLabel = "Filters",
   filterSections = [],
   onQueryChange,
   query,
   rowCountLabel,
   searchClearHref,
+  searchClearLabel,
   searchLabel,
   searchPlaceholder,
   searchValue,
@@ -102,7 +110,7 @@ export function AdminDataTableToolbar({
             {resolvedSearchValue ? (
               searchClearHref ? (
                 <a
-                  aria-label={`Clear ${searchLabel.toLowerCase()}`}
+                  aria-label={searchClearLabel ?? `Clear ${searchLabel.toLowerCase()}`}
                   className="hito-button hito-button-ghost hito-button-xs hito-data-table-search-clear"
                   href={searchClearHref}
                   onMouseDown={(event) => event.preventDefault()}
@@ -112,7 +120,7 @@ export function AdminDataTableToolbar({
               ) : (
                 <button
                   type="button"
-                  aria-label={`Clear ${searchLabel.toLowerCase()}`}
+                  aria-label={searchClearLabel ?? `Clear ${searchLabel.toLowerCase()}`}
                   className="hito-button hito-button-ghost hito-button-xs hito-data-table-search-clear"
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => onQueryChange("")}
@@ -147,7 +155,7 @@ export function AdminDataTableToolbar({
               }
             >
               <Icon name="settings" size="xs" />
-              Filters
+              {filterButtonLabel}
               {activeCount > 0 ? <span className="hito-tab-badge">{activeCount}</span> : null}
             </button>
           </DropdownMenuTrigger>
@@ -157,7 +165,9 @@ export function AdminDataTableToolbar({
           >
             {activeFilters.length > 0 ? (
               <>
-                <DropdownMenuLabel className="hito-label-sm">Active filters</DropdownMenuLabel>
+                <DropdownMenuLabel className="hito-label-sm">
+                  {activeFiltersLabel}
+                </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {activeFilters.map((filter) => (
                   <DropdownMenuItem
@@ -182,7 +192,7 @@ export function AdminDataTableToolbar({
                       onSelect={clearAllFilters}
                     >
                       <Icon name="x-circle" size="xs" />
-                      Clear all
+                      {clearAllFiltersLabel}
                     </DropdownMenuItem>
                   </>
                 ) : null}

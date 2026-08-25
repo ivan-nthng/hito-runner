@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { HitoButton } from "@/components/ui/button";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
 import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
 import { HitoDateField } from "@/components/ui/hito-date-time-input";
 import { isHitoIsoDate } from "@/components/ui/hito-date-time-utils";
@@ -21,8 +22,9 @@ import type {
   RunnerActivityProgressProductSessionLoadWindow,
   RunnerActivityProgressProductSnapshot,
 } from "@/lib/runner-activity/product-contract";
-import { formatDate } from "@/lib/training";
+import { formatUiDate } from "@/lib/ui-locale";
 import type { ProgressSequenceSelection, ProgressState } from "./runner-activity-progress-types";
+import type { HitoProductMessageKey } from "@/lib/ui-locale-messages";
 import {
   PROGRESS_FACTS,
   advancedConfidenceLabel,
@@ -48,7 +50,7 @@ const PROGRESS_WEEKLY_METRICS = [
   { id: "distance", label: "Distance" },
   { id: "elevation", label: "Elevation" },
   { id: "reported_load", label: "Reported load" },
-] satisfies Array<{ id: RunnerActivityFitChartMetricId; label: string }>;
+] satisfies Array<{ id: RunnerActivityFitChartMetricId; label: HitoProductMessageKey }>;
 
 export function FactualProgressPanel({
   state,
@@ -61,17 +63,18 @@ export function FactualProgressPanel({
   onSequenceSelectionChange: (selection: ProgressSequenceSelection) => void;
   sequenceSelection: ProgressSequenceSelection;
 }) {
+  const message = useHitoProductMessage();
   const [weeklyMetric, setWeeklyMetric] = useState<RunnerActivityFitChartMetricId>("distance");
 
   return (
     <section aria-labelledby="factual-progress-title">
       <header className="hito-page-header">
-        <p className="hito-label-md text-foreground">Comparable evidence</p>
+        <p className="hito-label-md text-foreground">{message("Comparable evidence")}</p>
         <h1 id="factual-progress-title" className="hito-ui-title-xl mt-2 max-w-[44rem]">
-          Progress
+          {message("Progress")}
         </h1>
         <p className="hito-body-md mt-4 max-w-[40rem] text-secondary">
-          Recorded running facts, current records, and your reported training load.
+          {message("Recorded running facts, current records, and your reported training load.")}
         </p>
       </header>
 
@@ -79,17 +82,17 @@ export function FactualProgressPanel({
       {state.status === "error" ? <ProgressError message={state.error} onRetry={onRetry} /> : null}
       {state.status === "updating" ? (
         <div className="hito-state-surface" data-tone="signal" role="status" aria-live="polite">
-          <p className="hito-label-md text-foreground">Updating</p>
+          <p className="hito-label-md text-foreground">{message("Updating")}</p>
           <h2 className="hito-ui-title-sm text-foreground mt-2">
-            Your activity facts are being refreshed.
+            {message("Your activity facts are being refreshed.")}
           </h2>
           <p className="hito-body-md text-secondary mt-2">
-            Current values will return when the backend snapshot is ready.
+            {message("Current values will return when the backend snapshot is ready.")}
           </p>
           <div className="hito-state-actions">
             <HitoButton type="button" size="md" variant="secondary" onClick={onRetry}>
               <Icon name="refresh" size="sm" />
-              Check again
+              {message("Check again")}
             </HitoButton>
           </div>
         </div>
@@ -123,9 +126,11 @@ function ProgressReadback({
   sequenceSelection: ProgressSequenceSelection;
   weeklyMetric: RunnerActivityFitChartMetricId;
 }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const current = progress.rolling28Day.current;
   const previous = progress.rolling28Day.previous;
-  const summary = formatRollingSummary(current);
+  const summary = formatRollingSummary(current, locale);
   const visibleFacts = PROGRESS_FACTS.filter(
     ({ key }) =>
       current.facts[key].availability === "available" ||
@@ -155,7 +160,7 @@ function ProgressReadback({
       {summary ? (
         <>
           <section aria-labelledby="rolling-summary-title">
-            <p className="hito-label-md text-foreground">Last 28 days</p>
+            <p className="hito-label-md text-foreground">{message("Last 28 days")}</p>
             <h2
               id="rolling-summary-title"
               className="mt-3 font-sans text-3xl leading-tight sm:text-4xl"
@@ -163,21 +168,22 @@ function ProgressReadback({
               {summary}
             </h2>
             <p className="hito-body-xs text-tertiary mt-2">
-              {formatWindow(current)} · {current.eligibleActivityCount} recorded activities
+              {formatWindow(current, locale)} · {current.eligibleActivityCount}{" "}
+              {message("recorded activities")}
             </p>
           </section>
 
           {weeklyPeriod && weeklySeries ? (
             <HitoFactualBarChart
               controls={{
-                ariaLabel: "Weekly factual chart controls",
+                ariaLabel: message("Weekly factual chart controls"),
                 content: (
                   <fieldset className="grid min-w-0 gap-2">
-                    <legend className="hito-label-md text-foreground">Metric</legend>
+                    <legend className="hito-label-md text-foreground">{message("Metric")}</legend>
                     <div
                       className="hito-choice-toggle-group"
                       {...weeklyMetricGroup.groupProps}
-                      aria-label="Weekly factual chart metric"
+                      aria-label={message("Weekly factual chart metric")}
                     >
                       {PROGRESS_WEEKLY_METRICS.map((metric) => (
                         <HitoChoiceToggle
@@ -187,7 +193,7 @@ function ProgressReadback({
                           selected={weeklyMetric === metric.id}
                           onClick={() => onWeeklyMetricChange(metric.id)}
                         >
-                          {metric.label}
+                          {message(metric.label)}
                         </HitoChoiceToggle>
                       ))}
                     </div>
@@ -199,16 +205,22 @@ function ProgressReadback({
             />
           ) : progress.fitProgress.status === "updating" ? (
             <div className="hito-state-surface" data-tone="signal" role="status">
-              <p className="hito-label-md text-foreground">Updating weekly FIT progress</p>
+              <p className="hito-label-md text-foreground">
+                {message("Updating weekly FIT progress")}
+              </p>
               <p className="hito-body-md mt-2 text-secondary">
-                Current weekly facts will return when the update is complete.
+                {message("Current weekly facts will return when the update is complete.")}
               </p>
             </div>
           ) : progress.fitProgress.status === "unavailable" ? (
             <div className="hito-state-surface" data-tone="warning" role="status">
-              <p className="hito-label-md text-foreground">Weekly FIT progress unavailable</p>
+              <p className="hito-label-md text-foreground">
+                {message("Weekly FIT progress unavailable")}
+              </p>
               <p className="hito-body-md mt-2 text-secondary">
-                This historical snapshot does not include the current weekly FIT series.
+                {message(
+                  "This historical snapshot does not include the current weekly FIT series.",
+                )}
               </p>
             </div>
           ) : null}
@@ -217,10 +229,10 @@ function ProgressReadback({
             <section aria-labelledby="progress-facts-title">
               <div className="hito-section-header">
                 <h2 id="progress-facts-title" className="hito-ui-title-sm text-foreground">
-                  Running facts
+                  {message("Running facts")}
                 </h2>
                 <span className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
-                  Current and previous 28 days
+                  {message("Current and previous 28 days")}
                 </span>
               </div>
               <div className="mt-4 space-y-3">
@@ -228,7 +240,7 @@ function ProgressReadback({
                   <ProgressFactDisclosure
                     key={key}
                     factKey={key}
-                    label={label}
+                    label={message(label)}
                     current={current}
                     previous={previous}
                   />
@@ -242,7 +254,7 @@ function ProgressReadback({
           {progress.calendarWeeks.length > 0 ? (
             <details className="hito-disclosure">
               <summary className="hito-disclosure-summary">
-                <span>Weekly facts</span>
+                <span>{message("Weekly facts")}</span>
                 <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
               </summary>
               <div className="hito-disclosure-body">
@@ -253,12 +265,13 @@ function ProgressReadback({
                       className="hito-list-row !items-start"
                     >
                       <div>
-                        <p className="hito-body-md text-foreground">{formatWindow(week)}</p>
+                        <p className="hito-body-md text-foreground">{formatWindow(week, locale)}</p>
                         <p className="hito-body-sm mt-1 text-secondary">
-                          {formatRollingSummary(week) ?? "No recorded running facts"}
+                          {formatRollingSummary(week, locale) ??
+                            message("No recorded running facts")}
                         </p>
                       </div>
-                      <span className="hito-body-xs text-tertiary shrink-0">Week</span>
+                      <span className="hito-body-xs text-tertiary shrink-0">{message("Week")}</span>
                     </li>
                   ))}
                 </ul>
@@ -279,7 +292,7 @@ const PROGRESS_SEQUENCE_METRICS = [
   { id: "observed_average_pace", label: "Observed pace" },
   { id: "elevation_gain", label: "Elevation gain" },
   { id: "reported_load", label: "Reported load" },
-] satisfies Array<{ id: RunnerActivityFitSequenceMetricId; label: string }>;
+] satisfies Array<{ id: RunnerActivityFitSequenceMetricId; label: HitoProductMessageKey }>;
 
 function ActivitySequenceReadback({
   asOfDate,
@@ -294,6 +307,7 @@ function ActivitySequenceReadback({
   selection: ProgressSequenceSelection;
   sequence: RunnerActivityFitSequenceProductModel;
 }) {
+  const message = useHitoProductMessage();
   const [customOpen, setCustomOpen] = useState(selection.period === "custom");
   const [customStartDate, setCustomStartDate] = useState(
     selection.startDate ?? sequence.selectedPeriod.startDate,
@@ -348,16 +362,16 @@ function ActivitySequenceReadback({
   const applyCustomRange = () => {
     const nextErrors: { startDate?: string; endDate?: string } = {};
     if (!isHitoIsoDate(customStartDate)) {
-      nextErrors.startDate = "Enter a valid start date in YYYY-MM-DD format.";
+      nextErrors.startDate = message("Enter a valid start date in YYYY-MM-DD format.");
     }
     if (!isHitoIsoDate(customEndDate)) {
-      nextErrors.endDate = "Enter a valid end date in YYYY-MM-DD format.";
+      nextErrors.endDate = message("Enter a valid end date in YYYY-MM-DD format.");
     }
     if (!nextErrors.startDate && !nextErrors.endDate && customStartDate > customEndDate) {
-      nextErrors.startDate = "Start date must be on or before the end date.";
+      nextErrors.startDate = message("Start date must be on or before the end date.");
     }
     if (!nextErrors.endDate && isHitoIsoDate(customEndDate) && customEndDate > asOfDate) {
-      nextErrors.endDate = `End date cannot be after ${asOfDate}.`;
+      nextErrors.endDate = message("End date cannot be after {date}.", { date: asOfDate });
     }
     setCustomErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) {
@@ -389,15 +403,15 @@ function ActivitySequenceReadback({
     >
       <HitoFactualActivityPointSequence
         controls={{
-          ariaLabel: "Activity sequence controls",
+          ariaLabel: message("Activity sequence controls"),
           content: (
             <div className="grid min-w-0 gap-4">
               <fieldset className="grid min-w-0 gap-2">
-                <legend className="hito-label-md text-foreground">Period</legend>
+                <legend className="hito-label-md text-foreground">{message("Period")}</legend>
                 <div
                   className="hito-choice-toggle-group"
                   {...periodGroup.groupProps}
-                  aria-label="Activity sequence period"
+                  aria-label={message("Activity sequence period")}
                 >
                   {sequence.advertisedPeriods.map((period) => (
                     <HitoChoiceToggle
@@ -415,7 +429,7 @@ function ActivitySequenceReadback({
                         selectQuickPeriod(period.id);
                       }}
                     >
-                      {period.label}
+                      {message(period.label)}
                     </HitoChoiceToggle>
                   ))}
                   <HitoChoiceToggle
@@ -431,7 +445,7 @@ function ActivitySequenceReadback({
                     }}
                   >
                     <Icon name="calendar" size="sm" />
-                    Custom
+                    {message("Custom")}
                   </HitoChoiceToggle>
                 </div>
               </fieldset>
@@ -445,7 +459,7 @@ function ActivitySequenceReadback({
                   <div className="grid min-w-0 gap-4 sm:grid-cols-2">
                     <HitoDateField
                       id="activity-sequence-custom-start"
-                      label="Start date"
+                      label={message("Start date")}
                       value={customStartDate}
                       maxDate={asOfDate}
                       error={customErrors.startDate}
@@ -456,7 +470,7 @@ function ActivitySequenceReadback({
                     />
                     <HitoDateField
                       id="activity-sequence-custom-end"
-                      label="End date"
+                      label={message("End date")}
                       value={customEndDate}
                       maxDate={asOfDate}
                       error={customErrors.endDate}
@@ -474,18 +488,18 @@ function ActivitySequenceReadback({
                       variant="secondary"
                       onClick={applyCustomRange}
                     >
-                      Apply dates
+                      {message("Apply dates")}
                     </HitoButton>
                   </div>
                 </div>
               ) : null}
 
               <fieldset className="grid min-w-0 gap-2">
-                <legend className="hito-label-md text-foreground">Metric</legend>
+                <legend className="hito-label-md text-foreground">{message("Metric")}</legend>
                 <div
                   className="hito-choice-toggle-group"
                   {...metricGroup.groupProps}
-                  aria-label="Activity sequence metric"
+                  aria-label={message("Activity sequence metric")}
                 >
                   {PROGRESS_SEQUENCE_METRICS.map((metric) => (
                     <HitoChoiceToggle
@@ -500,7 +514,7 @@ function ActivitySequenceReadback({
                         })
                       }
                     >
-                      {metric.label}
+                      {message(metric.label)}
                     </HitoChoiceToggle>
                   ))}
                 </div>
@@ -520,7 +534,7 @@ function ActivitySequenceReadback({
               onClick={onRetry}
             >
               <Icon name="refresh" size="sm" />
-              Check again
+              {message("Check again")}
             </HitoButton>
           ) : undefined
         }
@@ -534,6 +548,8 @@ function Gate4Readback({
 }: {
   advancedMetrics: RunnerActivityProgressProductAdvancedMetrics;
 }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   if (advancedMetrics.status === "updating") {
     return (
       <section
@@ -544,15 +560,17 @@ function Gate4Readback({
         aria-atomic="true"
         aria-labelledby="activity-intelligence-updating-title"
       >
-        <p className="hito-label-md text-foreground">Updating records and reported load</p>
+        <p className="hito-label-md text-foreground">
+          {message("Updating records and reported load")}
+        </p>
         <h2
           id="activity-intelligence-updating-title"
           className="hito-ui-title-sm text-foreground mt-2"
         >
-          A recent activity change is being applied.
+          {message("A recent activity change is being applied.")}
         </h2>
         <p className="hito-body-md text-secondary mt-2">
-          Current record and load values will return when the update is complete.
+          {message("Current record and load values will return when the update is complete.")}
         </p>
       </section>
     );
@@ -564,16 +582,21 @@ function Gate4Readback({
       className="border-t border-hairline pt-8"
     >
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        Records and reported training load are current.
+        {message("Records and reported training load are current.")}
       </p>
       <div className="hito-section-header">
         <div>
           <h2 id="activity-intelligence-title" className="hito-ui-title-sm text-foreground">
-            Records and reported load
+            {message("Records and reported load")}
           </h2>
           <p className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
-            {advancedMetrics.historical ? "Historical" : "Current"} · Based on activity evidence
-            through {formatDate(advancedMetrics.asOfDate)}.
+            {advancedMetrics.historical ? message("Historical") : message("Current")} ·{" "}
+            {message("Based on activity evidence through {date}.", {
+              date: formatUiDate(advancedMetrics.asOfDate, locale, {
+                month: "short",
+                day: "numeric",
+              }),
+            })}
           </p>
         </div>
       </div>
@@ -592,6 +615,8 @@ function RecordsReadback({
 }: {
   metrics: Extract<RunnerActivityProgressProductAdvancedMetrics, { status: "current" }>;
 }) {
+  const message = useHitoProductMessage();
+  const locale = useHitoUiLocale();
   const unavailableReasons = [...new Set(metrics.records.unavailableReasons)];
 
   return (
@@ -599,10 +624,10 @@ function RecordsReadback({
       <div className="hito-section-header">
         <div>
           <h3 id="activity-records-title" className="hito-ui-title-sm text-foreground">
-            Current records
+            {message("Current records")}
           </h3>
           <p className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
-            Accepted whole-activity and official results
+            {message("Accepted whole-activity and official results")}
           </p>
         </div>
       </div>
@@ -615,11 +640,17 @@ function RecordsReadback({
         </ul>
       ) : (
         <div className="mt-4">
-          <p className="hito-body-md text-secondary font-medium">No current records to show.</p>
+          <p className="hito-body-md text-secondary font-medium">
+            {message("No current records to show.")}
+          </p>
           <p className="hito-body-xs text-tertiary mt-1">
             {unavailableReasons.length > 0
-              ? unavailableReasons.map(advancedUnavailableReasonLabel).join(" · ")
-              : "Hito only shows exact whole-activity records and official results entered by you."}
+              ? unavailableReasons
+                  .map((reason) => advancedUnavailableReasonLabel(reason, locale))
+                  .join(" · ")
+              : message(
+                  "Hito only shows exact whole-activity records and official results entered by you.",
+                )}
           </p>
         </div>
       )}
@@ -628,17 +659,20 @@ function RecordsReadback({
 }
 
 function RecordRow({ record }: { record: RunnerActivityProgressProductRecord }) {
+  const locale = useHitoUiLocale();
   const context = formatRecordContext(record.context);
   return (
     <li className="hito-list-row !items-start gap-4">
       <div className="min-w-0">
-        <p className="hito-body-md text-foreground">{recordDistanceLabel(record)}</p>
-        <p className="hito-body-sm mt-1 text-secondary">{recordClassLabel(record)}</p>
+        <p className="hito-body-md text-foreground">{recordDistanceLabel(record, locale)}</p>
+        <p className="hito-body-sm mt-1 text-secondary">{recordClassLabel(record, locale)}</p>
         <p className="hito-body-xs text-tertiary mt-1">
           {[
-            record.eventDate ? formatDate(record.eventDate) : null,
+            record.eventDate
+              ? formatUiDate(record.eventDate, locale, { month: "short", day: "numeric" })
+              : null,
             context,
-            recordConfidenceLabel(record),
+            recordConfidenceLabel(record, locale),
           ]
             .filter(Boolean)
             .join(" · ")}
@@ -656,6 +690,8 @@ function SessionLoadReadback({
 }: {
   metrics: Extract<RunnerActivityProgressProductAdvancedMetrics, { status: "current" }>;
 }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const current = metrics.sessionRpeLoad.rolling28Day.current;
   const previous = metrics.sessionRpeLoad.rolling28Day.previous;
 
@@ -665,32 +701,34 @@ function SessionLoadReadback({
         <summary className="hito-disclosure-summary min-h-11">
           <span className="min-w-0">
             <span id="reported-load-title" className="block">
-              Reported training load
+              {message("Reported training load")}
             </span>
             <span className="hito-body-xs text-tertiary mt-1 block">
               {current.metric.availability === "available"
-                ? advancedConfidenceLabel(current.metric.confidence)
-                : "Not available for this period"}
+                ? advancedConfidenceLabel(current.metric.confidence, locale)
+                : message("Not available for this period")}
             </span>
           </span>
           <span className="ml-auto mr-2 shrink-0 text-right text-sm tabular-nums">
-            {formatSessionLoad(current.metric)}
+            {formatSessionLoad(current.metric, locale)}
           </span>
           <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
         </summary>
         <div className="hito-disclosure-body">
           <p className="hito-body-md text-secondary max-w-2xl">
-            Based on observed activity duration and the whole-session effort you reported.
+            {message(
+              "Based on observed activity duration and the whole-session effort you reported.",
+            )}
           </p>
 
           <div className="mt-5 grid gap-5 sm:grid-cols-2">
-            <SessionLoadWindow label="Current 28 days" window={current} />
-            <SessionLoadWindow label="Previous 28 days" window={previous} />
+            <SessionLoadWindow label={message("Current 28 days")} window={current} />
+            <SessionLoadWindow label={message("Previous 28 days")} window={previous} />
           </div>
 
           {metrics.sessionRpeLoad.calendarWeeks.length > 0 ? (
             <div className="mt-6">
-              <p className="hito-label-md text-foreground">Weekly reported load</p>
+              <p className="hito-label-md text-foreground">{message("Weekly reported load")}</p>
               <ul className="hito-row-group">
                 {metrics.sessionRpeLoad.calendarWeeks.map((week) => (
                   <li
@@ -698,13 +736,15 @@ function SessionLoadReadback({
                     className="hito-list-row !items-start"
                   >
                     <div className="min-w-0">
-                      <p className="hito-body-md text-foreground">{formatAdvancedWindow(week)}</p>
+                      <p className="hito-body-md text-foreground">
+                        {formatAdvancedWindow(week, locale)}
+                      </p>
                       <p className="hito-body-sm mt-1 text-secondary">
-                        {advancedConfidenceLabel(week.metric.confidence)}
+                        {advancedConfidenceLabel(week.metric.confidence, locale)}
                       </p>
                     </div>
                     <span className="shrink-0 text-right tabular-nums">
-                      {formatSessionLoad(week.metric)}
+                      {formatSessionLoad(week.metric, locale)}
                     </span>
                   </li>
                 ))}
@@ -714,7 +754,7 @@ function SessionLoadReadback({
 
           <div className="mt-5 border-t border-hairline pt-4">
             <p className="hito-technical-sm text-muted-foreground">
-              Formula {metrics.sessionRpeLoad.formulaVersion}
+              {message("Formula {version}", { version: metrics.sessionRpeLoad.formulaVersion })}
             </p>
           </div>
         </div>
@@ -730,21 +770,27 @@ function SessionLoadWindow({
   label: string;
   window: RunnerActivityProgressProductSessionLoadWindow;
 }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const reasons = [...new Set(window.metric.unavailableReasons)];
   return (
     <div className="min-w-0">
       <p className="hito-label-md text-foreground">{label}</p>
-      <p className="mt-2 text-2xl font-medium tabular-nums">{formatSessionLoad(window.metric)}</p>
-      <p className="hito-body-xs text-tertiary mt-1">{formatAdvancedWindow(window)}</p>
+      <p className="mt-2 text-2xl font-medium tabular-nums">
+        {formatSessionLoad(window.metric, locale)}
+      </p>
+      <p className="hito-body-xs text-tertiary mt-1">{formatAdvancedWindow(window, locale)}</p>
       <p className="hito-body-xs text-tertiary mt-2">
-        {advancedConfidenceLabel(window.metric.confidence)} ·{" "}
-        {window.metric.includedObservationCount} included ·{" "}
-        {window.metric.unavailableObservationCount} unavailable
+        {advancedConfidenceLabel(window.metric.confidence, locale)} ·{" "}
+        {message("{included} included · {unavailable} unavailable", {
+          included: window.metric.includedObservationCount,
+          unavailable: window.metric.unavailableObservationCount,
+        })}
       </p>
       {reasons.length > 0 ? (
         <ul className="hito-body-xs text-tertiary mt-2 list-disc space-y-1 pl-4">
           {reasons.map((reason) => (
-            <li key={reason}>{advancedUnavailableReasonLabel(reason)}</li>
+            <li key={reason}>{advancedUnavailableReasonLabel(reason, locale)}</li>
           ))}
         </ul>
       ) : null}
@@ -757,17 +803,20 @@ function Gate5UnavailableReadback({
 }: {
   metrics: Extract<RunnerActivityProgressProductAdvancedMetrics, { status: "current" }>;
 }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   return (
     <section aria-labelledby="detailed-progress-title" className="border-t border-hairline pt-6">
       <h3 id="detailed-progress-title" className="hito-ui-title-sm text-foreground">
-        Detailed progress metrics are not available yet.
+        {message("Detailed progress metrics are not available yet.")}
       </h3>
       <p className="hito-body-md text-secondary mt-2 max-w-3xl">
-        Hito does not yet store the detailed workout samples needed to calculate best efforts inside
-        longer runs or compare pace, heart rate, aerobic efficiency, and durability.
+        {message(
+          "Hito does not yet store the detailed workout samples needed to calculate best efforts inside longer runs or compare pace, heart rate, aerobic efficiency, and durability.",
+        )}
       </p>
       <p className="hito-body-xs text-tertiary mt-2">
-        {advancedUnavailableReasonLabel(metrics.detailedMetrics.reason)}
+        {advancedUnavailableReasonLabel(metrics.detailedMetrics.reason, locale)}
       </p>
     </section>
   );
@@ -784,6 +833,8 @@ function ProgressFactDisclosure({
   current: RunnerActivityProgressProductSnapshot;
   previous: RunnerActivityProgressProductSnapshot;
 }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const currentMetric = current.facts[factKey];
   const previousMetric = previous.facts[factKey];
   return (
@@ -792,18 +843,26 @@ function ProgressFactDisclosure({
         <span className="min-w-0">
           <span className="block">{label}</span>
           <span className="hito-body-xs text-tertiary mt-1 block">
-            {confidenceLabel(currentMetric)}
+            {confidenceLabel(currentMetric, locale)}
           </span>
         </span>
         <span className="ml-auto mr-2 text-right text-sm tabular-nums">
-          {formatFact(currentMetric)}
+          {formatFact(currentMetric, locale)}
         </span>
         <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" />
       </summary>
       <div className="hito-disclosure-body">
         <div className="grid gap-4 sm:grid-cols-2">
-          <FactWindow label="Current 28 days" snapshot={current} metric={currentMetric} />
-          <FactWindow label="Previous 28 days" snapshot={previous} metric={previousMetric} />
+          <FactWindow
+            label={message("Current 28 days")}
+            snapshot={current}
+            metric={currentMetric}
+          />
+          <FactWindow
+            label={message("Previous 28 days")}
+            snapshot={previous}
+            metric={previousMetric}
+          />
         </div>
         <FactEvidence metric={currentMetric} snapshot={current} />
       </div>
@@ -820,11 +879,12 @@ function FactWindow({
   snapshot: RunnerActivityProgressProductSnapshot;
   metric: RunnerActivityProgressProductFactMetric;
 }) {
+  const locale = useHitoUiLocale();
   return (
     <div>
       <p className="hito-label-md text-foreground">{label}</p>
-      <p className="mt-2 text-lg tabular-nums">{formatFact(metric)}</p>
-      <p className="hito-body-xs text-tertiary mt-1">{formatWindow(snapshot)}</p>
+      <p className="mt-2 text-lg tabular-nums">{formatFact(metric, locale)}</p>
+      <p className="hito-body-xs text-tertiary mt-1">{formatWindow(snapshot, locale)}</p>
     </div>
   );
 }
@@ -836,17 +896,22 @@ function FactEvidence({
   metric: RunnerActivityProgressProductFactMetric;
   snapshot: RunnerActivityProgressProductSnapshot;
 }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const missingReasons = [...new Set(metric.missingReasons)];
   return (
     <div className="mt-5 border-t border-hairline pt-4">
       <p className="hito-body-xs text-tertiary">
-        {metric.includedActivityCount} included · {metric.missingActivityCount} missing · Formula{" "}
-        {snapshot.formulaVersion}
+        {message("{included} included · {missing} missing · Formula {version}", {
+          included: metric.includedActivityCount,
+          missing: metric.missingActivityCount,
+          version: snapshot.formulaVersion,
+        })}
       </p>
       {missingReasons.length > 0 ? (
         <ul className="hito-body-xs text-tertiary mt-2 list-disc space-y-1 pl-4">
           {missingReasons.map((reason) => (
-            <li key={reason}>{missingReasonLabel(reason)}</li>
+            <li key={reason}>{missingReasonLabel(reason, locale)}</li>
           ))}
         </ul>
       ) : null}
@@ -855,8 +920,9 @@ function FactEvidence({
 }
 
 function ProgressSkeleton() {
+  const message = useHitoProductMessage();
   return (
-    <div className="space-y-6" aria-busy="true" aria-label="Loading running progress">
+    <div className="space-y-6" aria-busy="true" aria-label={message("Loading running progress")}>
       <div aria-hidden="true">
         <Skeleton className="h-4 w-24" />
         <Skeleton className="mt-4 h-10 w-full max-w-lg" />
@@ -866,35 +932,43 @@ function ProgressSkeleton() {
         <Skeleton className="h-20 w-full" />
         <Skeleton className="h-20 w-full" />
       </div>
-      <span className="sr-only">Loading factual progress.</span>
+      <span className="sr-only">{message("Loading factual progress.")}</span>
     </div>
   );
 }
 
 function ProgressEmptyState() {
+  const message = useHitoProductMessage();
   return (
     <div className="hito-state-surface">
-      <p className="hito-label-md text-foreground">Not enough recorded activity</p>
+      <p className="hito-label-md text-foreground">{message("Not enough recorded activity")}</p>
       <h2 className="hito-ui-title-sm text-foreground mt-2">
-        Progress facts will appear after recorded runs.
+        {message("Progress facts will appear after recorded runs.")}
       </h2>
       <p className="hito-body-md text-secondary mt-2">
-        Hito will show only facts supported by your activity evidence.
+        {message("Hito will show only facts supported by your activity evidence.")}
       </p>
       <div className="hito-state-actions">
         <HitoButton asChild size="md" variant="primary">
-          <Link to="/">Open Calendar</Link>
+          <Link to="/">{message("Open Calendar")}</Link>
         </HitoButton>
       </div>
     </div>
   );
 }
 
-function ProgressError({ message, onRetry }: { message: string; onRetry: () => void }) {
+function ProgressError({
+  message: errorMessage,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  const message = useHitoProductMessage();
   return (
     <div className="hito-state-surface" data-tone="destructive" role="alert">
-      <p className="hito-label-md text-destructive">Could not load running progress</p>
-      <p className="hito-body-md text-secondary mt-2">{message}</p>
+      <p className="hito-label-md text-destructive">{message("Could not load running progress")}</p>
+      <p className="hito-body-md text-secondary mt-2">{errorMessage}</p>
       <div className="hito-state-actions">
         <HitoButton
           id="progress-retry-action"
@@ -904,7 +978,7 @@ function ProgressError({ message, onRetry }: { message: string; onRetry: () => v
           onClick={onRetry}
         >
           <Icon name="refresh" size="sm" />
-          Try again
+          {message("Try again")}
         </HitoButton>
       </div>
     </div>

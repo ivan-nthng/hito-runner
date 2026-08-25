@@ -1,4 +1,5 @@
 import { Icon } from "@/components/ui/icon";
+import { useHitoProductMessage } from "@/components/ui/hito-ui-locale-provider";
 
 const GENERATED_PLAN_WAITING_LINES = [
   "Checking the calendar for room to breathe.",
@@ -14,6 +15,8 @@ export function GeneratedPlanPreviewLoadingState({
   complete: boolean;
   goalLabel: string;
 }) {
+  const t = useHitoProductMessage();
+
   return (
     <div
       className="hito-generated-plan-wait"
@@ -26,7 +29,9 @@ export function GeneratedPlanPreviewLoadingState({
 
       <div className="grid max-w-lg gap-2">
         <p className="hito-ui-title-sm text-foreground">
-          {complete ? "Plan preview ready" : `Preparing your ${goalLabel} plan`}
+          {complete
+            ? t("Plan preview ready")
+            : t("Preparing your {goal} plan", { goal: goalLabel })}
         </p>
       </div>
 
@@ -36,12 +41,14 @@ export function GeneratedPlanPreviewLoadingState({
 
       <div className="hito-generated-plan-wait-lines hito-body-xs text-tertiary" aria-hidden="true">
         {GENERATED_PLAN_WAITING_LINES.map((line) => (
-          <span key={line}>{line}</span>
+          <span key={line}>{t(line)}</span>
         ))}
       </div>
 
       <p className="sr-only" role="status" aria-live="polite">
-        {complete ? "Plan preview ready for review." : `Preparing your ${goalLabel} plan.`}
+        {complete
+          ? t("Plan preview ready for review.")
+          : t("Preparing your {goal} plan.", { goal: goalLabel })}
       </p>
     </div>
   );

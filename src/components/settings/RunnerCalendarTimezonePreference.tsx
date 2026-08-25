@@ -9,6 +9,8 @@ import {
   saveRunnerCalendarTimezone,
   type UserSettingsSummary,
 } from "@/lib/user-settings-actions";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
+import { getHitoKnownProductMessage } from "@/lib/ui-locale-messages";
 
 type RunnerCalendarTimezoneReadback = Pick<
   UserSettingsSummary,
@@ -80,6 +82,8 @@ export function RunnerCalendarTimezoneSection({
 }: {
   preference: RunnerCalendarTimezoneReadback;
 }) {
+  const locale = useHitoUiLocale();
+  const translate = useHitoProductMessage();
   const saveRunnerCalendarTimezoneFn = useServerFn(saveRunnerCalendarTimezone);
   const router = useRouter();
   const [draftTimezone, setDraftTimezone] = useState(preference.calendarTimezone);
@@ -96,7 +100,7 @@ export function RunnerCalendarTimezoneSection({
     setMessage(null);
 
     if (!browserTimezone) {
-      setError("This browser could not identify a recognized IANA timezone.");
+      setError(translate("This browser could not identify a recognized IANA timezone."));
       return;
     }
 
@@ -108,7 +112,7 @@ export function RunnerCalendarTimezoneSection({
     const calendarTimezone = draftTimezone.trim();
     if (!calendarTimezone) {
       setMessage(null);
-      setError(RUNNER_CALENDAR_TIMEZONE_SAVE_ERROR);
+      setError(getHitoKnownProductMessage(locale, RUNNER_CALENDAR_TIMEZONE_SAVE_ERROR));
       return;
     }
 
@@ -125,9 +129,13 @@ export function RunnerCalendarTimezoneSection({
       });
       setDraftTimezone(result.preference.calendarTimezone);
       await router.invalidate({ sync: true });
-      setMessage(`Calendar timezone saved as ${result.preference.calendarTimezone}.`);
+      setMessage(
+        translate("Calendar timezone saved as {timezone}.", {
+          timezone: result.preference.calendarTimezone,
+        }),
+      );
     } catch {
-      setError(RUNNER_CALENDAR_TIMEZONE_SAVE_ERROR);
+      setError(getHitoKnownProductMessage(locale, RUNNER_CALENDAR_TIMEZONE_SAVE_ERROR));
     } finally {
       setIsSaving(false);
     }
@@ -137,15 +145,17 @@ export function RunnerCalendarTimezoneSection({
     <section className="hito-settings-section">
       <div className="flex items-center gap-2">
         <Icon name="calendar-clock" size="sm" className="text-signal" />
-        <h2 className="hito-ui-title-sm text-foreground">Calendar timezone</h2>
+        <h2 className="hito-ui-title-sm text-foreground">{translate("Calendar timezone")}</h2>
       </div>
       <p className="hito-body-md text-secondary mt-2 max-w-2xl">
-        Hito uses this IANA timezone to decide which date is Today and which workouts are past.
+        {translate(
+          "Hito uses this IANA timezone to decide which date is Today and which workouts are past.",
+        )}
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
         <label className="grid min-w-0 gap-2">
-          <span className="hito-label-md text-foreground">IANA timezone</span>
+          <span className="hito-label-md text-foreground">{translate("IANA timezone")}</span>
           <Input
             type="text"
             name="calendarTimezone"
@@ -171,7 +181,7 @@ export function RunnerCalendarTimezoneSection({
             variant="secondary"
             onClick={useDeviceTimezone}
           >
-            Use this device
+            {translate("Use this device")}
           </HitoButton>
           <HitoButton
             type="button"
@@ -182,14 +192,18 @@ export function RunnerCalendarTimezoneSection({
               void saveTimezone();
             }}
           >
-            {isSaving ? "Saving..." : "Save timezone"}
+            {isSaving ? translate("Saving...") : translate("Save timezone")}
           </HitoButton>
         </div>
       </div>
 
       <p id="calendar-timezone-helper" className="hito-body-xs text-secondary mt-2">
-        Saved timezone: <code className="hito-inline-code">{preference.calendarTimezone}</code>.{" "}
-        {timezoneSourceDescription(preference.calendarTimezoneSource)}
+        {translate("Saved timezone")}:{" "}
+        <code className="hito-inline-code">{preference.calendarTimezone}</code>.{" "}
+        {getHitoKnownProductMessage(
+          locale,
+          timezoneSourceDescription(preference.calendarTimezoneSource),
+        )}
       </p>
       <div id="calendar-timezone-feedback" aria-live="polite" className="mt-2 min-h-5">
         {error ? (

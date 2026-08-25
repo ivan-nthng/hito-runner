@@ -158,7 +158,8 @@ async function assertProductApiRequestBoundary(runtimeUrl: string) {
   assert.equal(unauthenticatedAvatar.status, 401);
   assert.deepEqual(await unauthenticatedAvatar.json(), {
     ok: false,
-    message: "Sign in again before changing your avatar.",
+    code: "avatar_auth_required",
+    params: {},
   });
 
   const oversizedAvatar = new FormData();
@@ -183,7 +184,8 @@ async function assertProductApiRequestBoundary(runtimeUrl: string) {
   assert.equal(authenticatedOversizedAvatar.status, 413);
   assert.deepEqual(await authenticatedOversizedAvatar.json(), {
     ok: false,
-    message: "Choose an image under 5 MB.",
+    code: "avatar_file_too_large",
+    params: { maxBytes: 5 * 1024 * 1024 },
   });
 
   const authenticatedMalformedAvatar = await fetch(new URL("/api/profile-avatar/upload", baseUrl), {
@@ -195,7 +197,8 @@ async function assertProductApiRequestBoundary(runtimeUrl: string) {
   const malformedAvatarPayload = await authenticatedMalformedAvatar.json();
   assert.deepEqual(malformedAvatarPayload, {
     ok: false,
-    message: "The avatar could not be uploaded. Try again shortly.",
+    code: "avatar_upload_failed",
+    params: {},
   });
   assert.doesNotMatch(JSON.stringify(malformedAvatarPayload), /formdata|content-type|parse/i);
 
@@ -224,18 +227,57 @@ async function assertProductApiRequestBoundary(runtimeUrl: string) {
 }
 
 async function assertPublicApiErrorRedaction() {
-  const [avatarRoute, planExportRoute, trainingApi] = await Promise.all([
+  const [
+    productApiErrorContract,
+    avatarRoute,
+    activityHistoryRoute,
+    activityProgressRoute,
+    activityDeleteRoute,
+    activitySourceRoute,
+    workoutResultUploadRoute,
+    workoutResultRemoveRoute,
+    planExportRoute,
+    trainingApi,
+  ] = await Promise.all([
+    readFile(new URL("../src/lib/product-api-error-contract.ts", import.meta.url), "utf8"),
     readFile(new URL("../src/routes/api.profile-avatar.upload.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/routes/api.runner-activities.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/routes/api.runner-activity-progress.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../src/routes/api.runner-activities.$activityId.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../src/routes/api.runner-activities.$activityId.source.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(new URL("../src/routes/api.workout-result.upload.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/routes/api.workout-result.remove.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/routes/api.plan.export.tsx", import.meta.url), "utf8"),
     readFile(new URL("../src/lib/training-api.ts", import.meta.url), "utf8"),
   ]);
+
+  const productApiRoutes = [
+    avatarRoute,
+    activityHistoryRoute,
+    activityProgressRoute,
+    activityDeleteRoute,
+    activitySourceRoute,
+    workoutResultUploadRoute,
+    workoutResultRemoveRoute,
+  ];
+  assert.doesNotMatch(productApiErrorContract, /\bmessage\s*:/);
+  for (const routeSource of productApiRoutes) {
+    assert.match(routeSource, /build(?:Hito|WorkoutResult)ProductApiFailure/);
+    assert.doesNotMatch(routeSource, /\bmessage\s*:/);
+  }
 
   assert.ok(
     avatarRoute.indexOf("const userId = await requirePersistedUserIdForCurrentRequest();") <
       avatarRoute.indexOf("const formData = await readBoundedMultipartFormData("),
     "Avatar authentication must resolve before multipart parsing.",
   );
-  assert.match(avatarRoute, /The avatar could not be uploaded\. Try again shortly\./);
+  assert.match(avatarRoute, /buildHitoProductApiFailure\("avatar_upload_failed", \{\}\)/);
   assert.doesNotMatch(
     avatarRoute.slice(
       avatarRoute.indexOf("} catch (error) {"),

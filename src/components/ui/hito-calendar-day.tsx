@@ -46,7 +46,9 @@ type SharedVisualProps = {
   supportingText?: string | null;
   pendingLabel?: string | null;
   result?: HitoCalendarDayResultState;
+  resultLabel?: string;
   feedback?: HitoCalendarFeedbackState;
+  feedbackLabel?: string;
   action?: HitoCalendarActionVisual | null;
   slotAction?: HitoCalendarActionVisual | null;
   today?: boolean;
@@ -77,12 +79,14 @@ export function HitoCalendarDayCell({
   day,
   dense = false,
   feedback = "none",
+  feedbackLabel,
   focused = false,
   interactive = false,
   layout = "month",
   muted = false,
   pendingLabel,
   result = "none",
+  resultLabel,
   selected = false,
   slotAction,
   state,
@@ -133,6 +137,7 @@ export function HitoCalendarDayCell({
         day={day}
         dense={dense}
         result={showWorkoutMarkers ? result : "none"}
+        resultLabel={resultLabel}
         reserveActionSpace={cornerAction || Boolean(pendingLabel)}
         slotAction={slotAction}
         today={today}
@@ -185,7 +190,12 @@ export function HitoCalendarDayCell({
       ) : null}
 
       {showWorkoutMarkers && feedback !== "none" ? (
-        <FeedbackMarker calendar className="absolute bottom-2.5 right-2.5 z-20" state={feedback} />
+        <FeedbackMarker
+          calendar
+          className="absolute bottom-2.5 right-2.5 z-20"
+          label={feedbackLabel}
+          state={feedback}
+        />
       ) : null}
     </div>
   );
@@ -197,11 +207,13 @@ export function HitoWorkoutDayRow({
   className,
   date,
   feedback = "none",
+  feedbackLabel,
   focused = false,
   interactive = false,
   muted = false,
   pendingLabel,
   result = "none",
+  resultLabel,
   selected = false,
   slotAction,
   state,
@@ -241,6 +253,7 @@ export function HitoWorkoutDayRow({
           <DateSlotContent
             day={date.day}
             result={showWorkoutMarkers ? result : "none"}
+            resultLabel={resultLabel}
             slotAction={slotAction}
             today={today}
           />
@@ -277,7 +290,9 @@ export function HitoWorkoutDayRow({
 
         {feedback !== "none" || (action && !cornerAction) ? (
           <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2">
-            {showWorkoutMarkers && feedback !== "none" ? <FeedbackMarker state={feedback} /> : null}
+            {showWorkoutMarkers && feedback !== "none" ? (
+              <FeedbackMarker label={feedbackLabel} state={feedback} />
+            ) : null}
             {action && !cornerAction ? <ActionVisual action={action} compact /> : null}
           </div>
         ) : null}
@@ -302,6 +317,7 @@ function CellHeader({
   day,
   dense,
   result,
+  resultLabel,
   reserveActionSpace,
   slotAction,
   today,
@@ -311,6 +327,7 @@ function CellHeader({
   day: string;
   dense: boolean;
   result: HitoCalendarDayResultState;
+  resultLabel?: string;
   reserveActionSpace: boolean;
   slotAction?: HitoCalendarActionVisual | null;
   today: boolean;
@@ -324,6 +341,7 @@ function CellHeader({
         <DateSlotContent
           day={day}
           result={result}
+          resultLabel={resultLabel}
           reserveActionSpace={reserveActionSpace}
           slotAction={slotAction}
           today={today}
@@ -337,6 +355,7 @@ function CellHeader({
       day={day}
       dense={dense}
       result={result}
+      resultLabel={resultLabel}
       reserveActionSpace={reserveActionSpace}
       slotAction={slotAction}
       today={today}
@@ -350,6 +369,7 @@ function DateSlotContent({
   dense = false,
   reserveActionSpace = false,
   result,
+  resultLabel,
   slotAction,
   today = false,
   weekday,
@@ -358,6 +378,7 @@ function DateSlotContent({
   dense?: boolean;
   reserveActionSpace?: boolean;
   result: HitoCalendarDayResultState;
+  resultLabel?: string;
   slotAction?: HitoCalendarActionVisual | null;
   today?: boolean;
   weekday?: string;
@@ -391,7 +412,7 @@ function DateSlotContent({
             {weekday}
           </span>
         ) : null}
-        <ResultMarker result={result} />
+        <ResultMarker label={resultLabel} result={result} />
       </span>
       {slotAction ? (
         <span
@@ -539,7 +560,13 @@ function stateLabel(state: HitoCalendarDayBaseState, dense: boolean) {
   return dense ? "Outside" : "Outside month";
 }
 
-function ResultMarker({ result }: { result: HitoCalendarDayResultState }) {
+function ResultMarker({
+  label: labelOverride,
+  result,
+}: {
+  label?: string;
+  result: HitoCalendarDayResultState;
+}) {
   if (result === "none") return null;
 
   const meta: Record<
@@ -551,7 +578,8 @@ function ResultMarker({ result }: { result: HitoCalendarDayResultState }) {
     partial: { tone: "warning", icon: "minus", label: "Partial" },
     skipped: { tone: "destructive", icon: "close", label: "Skipped" },
   };
-  const { icon, label, tone } = meta[result];
+  const { icon, label: defaultLabel, tone } = meta[result];
+  const label = labelOverride ?? defaultLabel;
 
   return (
     <span
@@ -569,13 +597,15 @@ function ResultMarker({ result }: { result: HitoCalendarDayResultState }) {
 function FeedbackMarker({
   calendar = false,
   className,
+  label: labelOverride,
   state,
 }: {
   calendar?: boolean;
   className?: string;
+  label?: string;
   state: Exclude<HitoCalendarFeedbackState, "none">;
 }) {
-  const label = state === "evidence_attached" ? "Evidence" : "Feedback";
+  const label = labelOverride ?? (state === "evidence_attached" ? "Evidence" : "Feedback");
 
   return (
     <span

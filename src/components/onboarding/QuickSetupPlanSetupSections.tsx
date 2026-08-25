@@ -10,6 +10,8 @@ import {
   type WeekdayName,
 } from "./onboarding-form-model";
 import { RunningDaysPreferenceField, TrainingPreferenceFields } from "./TrainingPreferenceFields";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
+import { getHitoKnownProductMessage } from "@/lib/ui-locale-messages";
 
 type QuickSetupEditableKey = "age" | "heightCm" | "weightKg" | "recent5kTime";
 
@@ -61,6 +63,8 @@ export function QuickSetupPlanSetupSections({
   firstSectionHasDivider = false,
   fieldErrors = {},
 }: QuickSetupPlanSetupSectionsProps) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const [activeEditableKey, setActiveEditableKey] = useState<QuickSetupEditableKey | null>(null);
   const primaryFitnessLevel = normalizePresetPrimaryFitnessLevel(state.fitnessLevel);
   const runningLevelIndex = Math.max(
@@ -87,14 +91,14 @@ export function QuickSetupPlanSetupSections({
       {includeBaseline ? (
         <QuickSetupSection
           {...nextSectionMeta()}
-          title="Runner baseline"
-          body="Add the few facts Hito needs before training setup."
+          title={message("Runner baseline")}
+          body={message("Add the few facts Hito needs before training setup.")}
         >
           <div className="grid gap-4">
             <div className="hito-editable-value-field-group">
               <EditableValueField
                 fieldKey="age"
-                label="Age"
+                label={message("Age")}
                 value={state.age}
                 setValue={setState.setAge}
                 activeEditableKey={activeEditableKey}
@@ -104,11 +108,13 @@ export function QuickSetupPlanSetupSections({
                 max={100}
                 step={1}
                 inputMode="numeric"
-                error={fieldErrors.age}
+                error={
+                  fieldErrors.age ? getHitoKnownProductMessage(locale, fieldErrors.age) : undefined
+                }
               />
               <EditableValueField
                 fieldKey="heightCm"
-                label="Height"
+                label={message("Height")}
                 value={state.heightCm}
                 setValue={setState.setHeightCm}
                 activeEditableKey={activeEditableKey}
@@ -118,11 +124,15 @@ export function QuickSetupPlanSetupSections({
                 max={230}
                 step={1}
                 inputMode="numeric"
-                error={fieldErrors.heightCm}
+                error={
+                  fieldErrors.heightCm
+                    ? getHitoKnownProductMessage(locale, fieldErrors.heightCm)
+                    : undefined
+                }
               />
               <EditableValueField
                 fieldKey="weightKg"
-                label="Weight"
+                label={message("Weight")}
                 value={state.weightKg}
                 setValue={setState.setWeightKg}
                 activeEditableKey={activeEditableKey}
@@ -133,7 +143,11 @@ export function QuickSetupPlanSetupSections({
                 step={0.5}
                 inputMode="decimal"
                 unit="kg"
-                error={fieldErrors.weightKg}
+                error={
+                  fieldErrors.weightKg
+                    ? getHitoKnownProductMessage(locale, fieldErrors.weightKg)
+                    : undefined
+                }
               />
             </div>
           </div>
@@ -143,17 +157,17 @@ export function QuickSetupPlanSetupSections({
       {includeRunningLevel ? (
         <QuickSetupSection
           {...nextSectionMeta()}
-          title="Running level"
-          body="Choose the closest current rhythm."
+          title={message("Running level")}
+          body={message("Choose the closest current rhythm.")}
         >
           <HitoSlider
-            label="Running level"
+            label={message("Running level")}
             min={0}
             max={PRESET_PRIMARY_FITNESS_LEVEL_OPTIONS.length - 1}
             step={1}
             value={runningLevelIndex}
-            valueLabel={runningLevelOption.label}
-            ariaValueText={runningLevelOption.label}
+            valueLabel={getHitoKnownProductMessage(locale, runningLevelOption.label)}
+            ariaValueText={getHitoKnownProductMessage(locale, runningLevelOption.label)}
             minLabel=""
             maxLabel=""
             markers={[1, 2]}
@@ -168,8 +182,10 @@ export function QuickSetupPlanSetupSections({
       {heartRateProfile ? (
         <QuickSetupSection
           {...nextSectionMeta()}
-          title="Heart-rate guidance"
-          body="Review the BPM ranges Hito can use when a workout calls for heart-rate guidance."
+          title={message("Heart-rate guidance")}
+          body={message(
+            "Review the BPM ranges Hito can use when a workout calls for heart-rate guidance.",
+          )}
         >
           {heartRateProfile}
         </QuickSetupSection>
@@ -178,21 +194,24 @@ export function QuickSetupPlanSetupSections({
       {includeTrainingSetup ? (
         <QuickSetupSection
           {...nextSectionMeta()}
-          title="Training setup"
-          body="Add optional benchmark and weekly availability."
+          title={message("Training setup")}
+          body={message("Add optional benchmark and weekly availability.")}
         >
           <div className="grid gap-4">
             <div className="hito-editable-value-field-group">
               <EditableSelectValueField
                 fieldKey="recent5kTime"
                 label="5K"
-                emptyLabel="Add 5K result"
+                emptyLabel={message("Add 5K result")}
                 value={state.recent5kTime}
                 setValue={(value) => {
                   setState.setRecent5kTime(value);
                   setState.setRecent5kPace("");
                 }}
-                options={recentFiveKOptions(state.recent5kTime)}
+                options={recentFiveKOptions(state.recent5kTime).map((option) => ({
+                  ...option,
+                  label: getHitoKnownProductMessage(locale, option.label),
+                }))}
                 activeEditableKey={activeEditableKey}
                 setActiveEditableKey={setActiveEditableKey}
                 onClear={() => {
@@ -204,8 +223,10 @@ export function QuickSetupPlanSetupSections({
               fixedRestDays={state.fixedRestDays}
               maxRunningDaysPerWeek={state.maxRunningDaysPerWeek}
               onMaxRunningDaysPerWeekChange={setState.setMaxRunningDaysPerWeek}
-              label="Weekly running ceiling"
-              helper="Optional. Choose the most days you want to run in a week, or keep it flexible."
+              label={message("Weekly running ceiling")}
+              helper={message(
+                "Optional. Choose the most days you want to run in a week, or keep it flexible.",
+              )}
             />
           </div>
         </QuickSetupSection>
@@ -214,8 +235,8 @@ export function QuickSetupPlanSetupSections({
       {includeScheduleRhythm ? (
         <QuickSetupSection
           {...nextSectionMeta()}
-          title="Schedule rhythm"
-          body="Add simple day preferences when you already know them."
+          title={message("Schedule rhythm")}
+          body={message("Add simple day preferences when you already know them.")}
         >
           <div className="grid gap-4">
             <TrainingPreferenceFields
@@ -227,14 +248,16 @@ export function QuickSetupPlanSetupSections({
               onPreferredLongRunDayChange={setState.setPreferredLongRunDay}
               preferredLongRunMode="default-sunday"
               showRunningDays={false}
-              fixedRestDaysHelper="Optional. Protect days you want to keep free."
-              preferredLongRunHelper="Optional. Leave this open if you do not have a preferred day."
+              fixedRestDaysHelper={message("Optional. Protect days you want to keep free.")}
+              preferredLongRunHelper={message(
+                "Optional. Leave this open if you do not have a preferred day.",
+              )}
             />
             <HitoEditableDateField
-              label="Plan Start Date"
+              label={message("Plan Start Date")}
               value={state.startDate}
               onChange={setState.setStartDate}
-              helper="Optional. Leave this open to use Hito's default start date."
+              helper={message("Optional. Leave this open to use Hito's default start date.")}
             />
             <input type="hidden" name="schedule.startDate" value={state.startDate} />
           </div>

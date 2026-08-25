@@ -37,6 +37,8 @@ import { formatDistanceMeters } from "@/lib/training";
 import type { WorkoutDocument } from "@/lib/workout-document";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
+import { getHitoKnownProductMessage } from "@/lib/ui-locale-messages";
 
 type SelectedRunningPlanPreviewResult =
   | RunningPlanPreviewActionResult
@@ -93,6 +95,8 @@ export function SelectedRunningPlanPreviewDialog({
   returnFocusRef,
   status,
 }: SelectedRunningPlanPreviewDialogProps) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const fallbackReturnFocusRef = useRef<HTMLElement | null>(null);
   const dialogContentRef = useRef<HTMLDivElement | null>(null);
   const readyFocusTargetRef = useRef<HTMLButtonElement | null>(null);
@@ -204,8 +208,10 @@ export function SelectedRunningPlanPreviewDialog({
       >
         {loadingExperienceVisible ? (
           <div className="sr-only">
-            <DialogTitle>{`Preparing your ${goalLabel} plan`}</DialogTitle>
-            <DialogDescription>Plan preview preparation is in progress.</DialogDescription>
+            <DialogTitle>{message("Preparing your {goal} plan", { goal: goalLabel })}</DialogTitle>
+            <DialogDescription>
+              {message("Plan preview preparation is in progress.")}
+            </DialogDescription>
           </div>
         ) : reviewVisible && draft ? (
           <GeneratedPlanReadyReviewHeader draft={draft} />
@@ -216,13 +222,13 @@ export function SelectedRunningPlanPreviewDialog({
                 className="hito-label-sm uppercase tracking-[0.18em] text-accent"
                 data-tone="signal"
               >
-                Generated plan
+                {message("Generated plan")}
               </p>
               <DialogTitle className="hito-ui-title-md text-foreground mt-2">
-                {goalLabel} plan preview
+                {message("{goal} plan preview", { goal: goalLabel })}
               </DialogTitle>
               <DialogDescription className="hito-body-md text-secondary max-w-2xl">
-                {description}
+                {getHitoKnownProductMessage(locale, description)}
               </DialogDescription>
             </div>
           </DialogHeader>
@@ -241,7 +247,7 @@ export function SelectedRunningPlanPreviewDialog({
 
           {error ? (
             <div className="hito-surface-wash" data-tone="destructive">
-              <p className="hito-body-md text-foreground">Preview unavailable</p>
+              <p className="hito-body-md text-foreground">{message("Preview unavailable")}</p>
               <p className="hito-body-sm mt-1 text-secondary">{error}</p>
             </div>
           ) : null}
@@ -257,10 +263,11 @@ export function SelectedRunningPlanPreviewDialog({
               <div className="flex items-start gap-3">
                 <Icon name="loader" size="sm" className="mt-0.5 animate-spin" />
                 <div className="min-w-0">
-                  <p className="hito-body-md text-foreground">Refreshing preview</p>
+                  <p className="hito-body-md text-foreground">{message("Refreshing preview")}</p>
                   <p className="hito-body-sm mt-1 text-secondary">
-                    Your current saved plan stays in Plans while Hito prepares a new reviewed
-                    version.
+                    {message(
+                      "Your current saved plan stays in Plans while Hito prepares a new reviewed version.",
+                    )}
                   </p>
                 </div>
               </div>
@@ -273,9 +280,11 @@ export function SelectedRunningPlanPreviewDialog({
               role="status"
               aria-live="polite"
             >
-              <p className="hito-body-md text-foreground">Adding workouts to Calendar</p>
+              <p className="hito-body-md text-foreground">
+                {message("Adding workouts to Calendar")}
+              </p>
               <p className="hito-body-sm mt-1 text-secondary">
-                Hito is adding this saved plan&apos;s workouts to Calendar.
+                {message("Hito is adding this saved plan's workouts to Calendar.")}
               </p>
             </div>
           ) : null}
@@ -289,7 +298,7 @@ export function SelectedRunningPlanPreviewDialog({
         {initialLoading ? (
           <DialogFooter className="hito-product-dialog-footer hito-product-dialog-footer-center sm:space-x-0">
             <HitoButton type="button" size="md" variant="secondary" onClick={onCancel}>
-              Cancel
+              {message("Cancel")}
             </HitoButton>
           </DialogFooter>
         ) : reviewVisible && draft && readOnly ? (
@@ -301,13 +310,13 @@ export function SelectedRunningPlanPreviewDialog({
               variant="secondary"
               onClick={() => onOpenChange(false)}
             >
-              Close
+              {message("Close")}
             </HitoButton>
           </DialogFooter>
         ) : reviewVisible && draft ? (
           <DialogFooter className="hito-product-dialog-footer grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:space-x-0">
             <p className="hito-body-xs text-tertiary min-w-0">
-              Saved in Plans. Calendar workouts have not been added yet.
+              {message("Saved in Plans. Calendar workouts have not been added yet.")}
             </p>
             <div className="flex w-full flex-col-reverse gap-3 sm:w-auto sm:flex-row sm:items-center">
               <HitoButton
@@ -319,7 +328,10 @@ export function SelectedRunningPlanPreviewDialog({
                 loading={creating}
                 onClick={onCreate}
               >
-                {creating ? primaryActionPendingLabel : primaryActionLabel}
+                {getHitoKnownProductMessage(
+                  locale,
+                  creating ? primaryActionPendingLabel : primaryActionLabel,
+                )}
               </HitoButton>
             </div>
           </DialogFooter>
@@ -332,7 +344,7 @@ export function SelectedRunningPlanPreviewDialog({
                 variant="secondary"
                 onClick={() => onOpenChange(false)}
               >
-                Close
+                {message("Close")}
               </HitoButton>
             ) : null}
             <HitoButton
@@ -341,7 +353,7 @@ export function SelectedRunningPlanPreviewDialog({
               variant="primary"
               onClick={unavailableIsCorrectable ? () => onOpenChange(false) : onRefresh}
             >
-              {unavailableIsCorrectable ? "Review details" : "Try again"}
+              {unavailableIsCorrectable ? message("Review details") : message("Try again")}
             </HitoButton>
           </DialogFooter>
         ) : null}
@@ -371,19 +383,23 @@ function resolveSelectedRunningPlanPreviewUnavailable(
 }
 
 function GeneratedPlanReadyReviewHeader({ draft }: { draft: SelectedRunningPlanPreviewDraft }) {
+  const locale = useHitoUiLocale();
   const startDate = draft.schedule.startDate;
   const endDate = draft.schedule.endDate;
   const raceDate = draft.goal.targetDate;
   const finishTime = draft.goal.targetFinishTime;
   const durationWeeks = groupRowsByWeek(draft.calendarRows).length;
-  const header = buildGeneratedPlanReviewHeaderModel({
-    durationWeeks,
-    endDate,
-    finishTime,
-    goalLabel: reviewedGoalLabel(draft),
-    raceDate,
-    startDate,
-  });
+  const header = buildGeneratedPlanReviewHeaderModel(
+    {
+      durationWeeks,
+      endDate,
+      finishTime,
+      goalLabel: reviewedGoalLabel(draft),
+      raceDate,
+      startDate,
+    },
+    locale,
+  );
 
   return (
     <DialogHeader className="hito-product-dialog-header border-b-0">
@@ -410,18 +426,24 @@ function CreateBlockedNotice({
 }: {
   result: Extract<RunningPlanConfirmActionResult, { ok: false }>;
 }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const view = createBlockedView(result);
 
   return (
     <div className="hito-surface-wash" data-tone={view.tone}>
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="hito-body-md text-foreground">{view.title}</p>
-          <p className="hito-body-sm mt-1 text-secondary">{view.copy}</p>
+          <p className="hito-body-md text-foreground">
+            {getHitoKnownProductMessage(locale, view.title)}
+          </p>
+          <p className="hito-body-sm mt-1 text-secondary">
+            {getHitoKnownProductMessage(locale, view.copy)}
+          </p>
         </div>
         {view.openPlan ? (
           <HitoButton asChild className="shrink-0" size="sm" variant="secondary">
-            <a href="/">Back to calendar</a>
+            <a href="/">{message("Back to calendar")}</a>
           </HitoButton>
         ) : null}
       </div>
@@ -474,18 +496,30 @@ function createBlockedView(result: Extract<RunningPlanConfirmActionResult, { ok:
 }
 
 function PreviewUnavailableState({ result }: { result: SelectedRunningPlanPreviewUnavailable }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const view = PREVIEW_UNAVAILABLE_VIEWS[result.previewOutcome];
 
   return (
     <div className="grid gap-4">
       <div className="hito-surface-wash" data-tone={view.tone}>
-        <p className="hito-body-md text-foreground">{view.title}</p>
-        <p className="hito-body-sm mt-1 text-secondary">{view.copy}</p>
+        <p className="hito-body-md text-foreground">
+          {getHitoKnownProductMessage(locale, view.title)}
+        </p>
+        <p className="hito-body-sm mt-1 text-secondary">
+          {getHitoKnownProductMessage(locale, view.copy)}
+        </p>
       </div>
       <div className="hito-row-group">
         <div className="hito-list-row items-start">
-          <PreviewFact label="Next step" value={view.nextStep} />
-          <PreviewFact label="Saved plan" value="Nothing was created or saved." />
+          <PreviewFact
+            label={message("Next step")}
+            value={getHitoKnownProductMessage(locale, view.nextStep)}
+          />
+          <PreviewFact
+            label={message("Saved plan")}
+            value={message("Nothing was created or saved.")}
+          />
         </div>
       </div>
     </div>
@@ -549,6 +583,8 @@ const PREVIEW_UNAVAILABLE_VIEWS = {
 >;
 
 function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const isMobile = useIsMobile();
   const rowsByWeek = groupRowsByWeek(draft.calendarRows);
   const workoutDocumentsById = useMemo(
@@ -580,10 +616,12 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
   if (missingWorkoutDocumentRow) {
     return (
       <div className="hito-surface-wash" data-tone="destructive">
-        <p className="hito-body-md text-foreground">Workout preview unavailable</p>
+        <p className="hito-body-md text-foreground">{message("Workout preview unavailable")}</p>
         <p className="hito-body-sm mt-1 text-secondary">
-          The reviewed workout document for {missingWorkoutDocumentRow.date} is unavailable. Refresh
-          this preview before creating the plan.
+          {message(
+            "The reviewed workout document for {date} is unavailable. Refresh this preview before creating the plan.",
+            { date: missingWorkoutDocumentRow.date },
+          )}
         </p>
       </div>
     );
@@ -593,9 +631,9 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
     <div className="grid gap-4">
       <section className="grid gap-3">
         <div>
-          <h3 className="hito-ui-title-sm text-foreground">Plan calendar</h3>
+          <h3 className="hito-ui-title-sm text-foreground">{message("Plan calendar")}</h3>
           <p className="hito-body-sm text-secondary mt-1">
-            Select a day to review the workout summary.
+            {message("Select a day to review the workout summary.")}
           </p>
         </div>
 
@@ -609,7 +647,7 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
                 key={weekNumber}
                 className="hito-selected-plan-calendar-week"
                 role="group"
-                aria-label={`Week ${weekNumber}`}
+                aria-label={message("Week {week}", { week: weekNumber })}
               >
                 <div className="hito-selected-plan-calendar-week-grid">
                   {rows.map((row) => {
@@ -617,20 +655,39 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
                     if (!document) return null;
 
                     const identity = previewCalendarWorkoutIdentity(document);
+                    const localizedIdentity = {
+                      ...identity,
+                      label: getHitoKnownProductMessage(locale, identity.label),
+                      short: identity.short
+                        ? getHitoKnownProductMessage(locale, identity.short)
+                        : identity.short,
+                    };
                     const endpoint = calendarEndpointReadback(row);
                     const day = formatCalendarDayNumber(row.date);
                     const selected = row.rowId === activeCalendarRowId;
                     const detailId = `generated-plan-workout-${row.rowId}`;
                     const ariaLabel = [
                       `${row.date} ${row.weekday}`,
-                      identity.label,
+                      localizedIdentity.label,
                       row.title,
                       endpoint,
-                      "Open workout summary",
+                      message("Open workout summary"),
                     ]
                       .filter(Boolean)
                       .join(". ");
                     const presentation = buildPreviewCalendarDayPresentation(row, document);
+                    const localizedPresentation = {
+                      ...presentation,
+                      workout: presentation.workout
+                        ? {
+                            ...presentation.workout,
+                            label: getHitoKnownProductMessage(locale, presentation.workout.label),
+                            short: presentation.workout.short
+                              ? getHitoKnownProductMessage(locale, presentation.workout.short)
+                              : presentation.workout.short,
+                          }
+                        : presentation.workout,
+                    };
 
                     return (
                       <Popover
@@ -667,7 +724,7 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
                             }}
                           >
                             <HitoCalendarDayCell
-                              {...presentation}
+                              {...localizedPresentation}
                               className="h-full"
                               day={day}
                               dense
@@ -680,7 +737,9 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
                           sideOffset={8}
                           collisionPadding={12}
                           className="hito-selected-plan-calendar-popover w-[min(30rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1.5rem)] overflow-y-auto p-4"
-                          aria-label={`${row.date} ${row.weekday} workout summary`}
+                          aria-label={message("{date} workout summary", {
+                            date: `${row.date} ${getHitoKnownProductMessage(locale, row.weekday)}`,
+                          })}
                           onOpenAutoFocus={(event) => event.preventDefault()}
                         >
                           <GeneratedPlanWorkoutSummary document={document} />
@@ -693,7 +752,10 @@ function PreviewDraftView({ draft }: { draft: SelectedRunningPlanPreviewDraft })
             ))}
           </div>
 
-          <div className="hito-selected-plan-calendar-legend" aria-label="Calendar legend">
+          <div
+            className="hito-selected-plan-calendar-legend"
+            aria-label={message("Calendar legend")}
+          >
             {calendarLegend.map((identity) => (
               <PreviewLegendItem key={identity.label} identity={identity} />
             ))}
@@ -717,13 +779,14 @@ function groupRowsByWeek(rows: readonly SelectedRunningPlanCalendarRow[]) {
 }
 
 function PreviewLegendItem({ identity }: { identity: HitoCalendarWorkoutIdentity }) {
+  const locale = useHitoUiLocale();
   return (
     <span className="hito-selected-plan-calendar-legend-item">
       <span
         className="hito-selected-plan-calendar-legend-swatch"
         style={{ background: identity.color }}
       />
-      {identity.label}
+      {getHitoKnownProductMessage(locale, identity.label)}
     </span>
   );
 }

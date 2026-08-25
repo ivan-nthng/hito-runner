@@ -1,5 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { readBoundedMultipartFormData } from "@/lib/bounded-multipart-form-data";
+import {
+  buildHitoProductApiFailure,
+  type HitoProductApiFailure,
+} from "@/lib/product-api-error-contract";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
 
@@ -10,17 +14,17 @@ const ALLOWED_AVATAR_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/web
 
 class AvatarUploadRequestError extends Error {
   constructor(
-    message: string,
+    readonly failure: HitoProductApiFailure<"avatar_file_too_large">,
     readonly status: 400 | 413,
   ) {
-    super(message);
+    super(failure.code);
     this.name = "AvatarUploadRequestError";
   }
 }
 
 type AvatarUploadPublicFailure = {
   status: 400 | 401 | 413 | 500;
-  message: string;
+  failure: HitoProductApiFailure;
   report: boolean;
 };
 
@@ -38,23 +42,15 @@ export const Route = createFileRoute("/api/profile-avatar/upload")({
           const fileEntry = formData.get("file");
 
           if (!(fileEntry instanceof File)) {
-            return Response.json(
-              {
-                ok: false,
-                message: "Choose an avatar image before uploading.",
-              },
-              { status: 400 },
-            );
+            return Response.json(buildHitoProductApiFailure("avatar_file_required", {}), {
+              status: 400,
+            });
           }
 
           if (fileEntry.size <= 0) {
-            return Response.json(
-              {
-                ok: false,
-                message: "Choose an image under 5 MB.",
-              },
-              { status: 400 },
-            );
+            return Response.json(buildHitoProductApiFailure("avatar_file_empty", {}), {
+              status: 400,
+            });
           }
 
           if (fileEntry.size > MAX_AVATAR_UPLOAD_BYTES) {
@@ -63,10 +59,9 @@ export const Route = createFileRoute("/api/profile-avatar/upload")({
 
           if (!ALLOWED_AVATAR_MIME_TYPES.has(fileEntry.type)) {
             return Response.json(
-              {
-                ok: false,
-                message: "Use a JPEG, PNG, or WebP avatar image.",
-              },
+              buildHitoProductApiFailure("avatar_file_type_unsupported", {
+                allowedMimeTypes: [...ALLOWED_AVATAR_MIME_TYPES],
+              }),
               { status: 400 },
             );
           }
@@ -83,13 +78,9 @@ export const Route = createFileRoute("/api/profile-avatar/upload")({
           }
 
           if (!profileResult.data) {
-            return Response.json(
-              {
-                ok: false,
-                message: "Finish setup before uploading an avatar.",
-              },
-              { status: 400 },
-            );
+            return Response.json(buildHitoProductApiFailure("avatar_profile_required", {}), {
+              status: 400,
+            });
           }
 
           const storagePath = `${userId}/avatar-${crypto.randomUUID()}.jpg`;
@@ -142,13 +133,7 @@ export const Route = createFileRoute("/api/profile-avatar/upload")({
             console.error("[api/profile-avatar/upload] unexpected avatar upload failure", error);
           }
 
-          return Response.json(
-            {
-              ok: false,
-              message: failure.message,
-            },
-            { status: failure.status },
-          );
+          return Response.json(failure.failure, { status: failure.status });
         }
       },
     },
@@ -158,24 +143,29 @@ export const Route = createFileRoute("/api/profile-avatar/upload")({
 
 function getAvatarUploadPublicFailure(error: unknown): AvatarUploadPublicFailure {
   if (error instanceof AvatarUploadRequestError) {
-    return { status: error.status, message: error.message, report: false };
+    return { status: error.status, failure: error.failure, report: false };
   }
 
   if (error instanceof Error && error.message === "Authentication is required for this action.") {
     return {
       status: 401,
-      message: "Sign in again before changing your avatar.",
+      failure: buildHitoProductApiFailure("avatar_auth_required", {}),
       report: false,
     };
   }
 
   return {
     status: 500,
-    message: "The avatar could not be uploaded. Try again shortly.",
+    failure: buildHitoProductApiFailure("avatar_upload_failed", {}),
     report: true,
   };
 }
 
 function avatarMultipartTooLargeError() {
-  return new AvatarUploadRequestError("Choose an image under 5 MB.", 413);
+  return new AvatarUploadRequestError(
+    buildHitoProductApiFailure("avatar_file_too_large", {
+      maxBytes: MAX_AVATAR_UPLOAD_BYTES,
+    }),
+    413,
+  );
 }

@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
 import {
   prepareAdaptiveContinuationCandidateAction,
   submitAdaptiveContinuationInputAction,
@@ -25,7 +26,8 @@ import {
   confirmWorkoutCommandAction,
   reviewWorkoutCommandAction,
 } from "@/lib/manual-workout-authoring";
-import { formatDate } from "@/lib/training";
+import { formatUiDate, formatUiNumber, type ResolvedUiLocale } from "@/lib/ui-locale";
+import { formatHitoProductMessage, getHitoKnownProductMessage } from "@/lib/ui-locale-messages";
 import type { ReviewedWorkoutCommandCandidate } from "@/lib/workout-authoring-review";
 
 type CheckInDraft = Omit<
@@ -74,6 +76,8 @@ export function AdaptiveContinuationPanel({
   onRefresh: () => Promise<unknown>;
   projections: BlueprintCalendarProjection[];
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   const submitInput = useServerFn(submitAdaptiveContinuationInputAction);
   const prepareCandidate = useServerFn(prepareAdaptiveContinuationCandidateAction);
   const reviewCommand = useServerFn(reviewWorkoutCommandAction);
@@ -113,7 +117,7 @@ export function AdaptiveContinuationPanel({
 
   async function saveInput() {
     if (!checkInComplete) {
-      setMessage("Confirm the current goal and availability before saving this check-in.");
+      setMessage(t("Confirm the current goal and availability before saving this check-in."));
       return;
     }
     setActionStatus("submitting");
@@ -139,16 +143,16 @@ export function AdaptiveContinuationPanel({
       if (!result.ok) {
         setMessage(
           result.reason === "source_stale"
-            ? "This Blueprint changed. Reload before saving the check-in."
-            : "The Blueprint source is no longer available.",
+            ? t("This Blueprint changed. Reload before saving the check-in.")
+            : t("The Blueprint source is no longer available."),
         );
         return;
       }
       await onRefresh();
-      setMessage("Check-in and preferences saved.");
+      setMessage(t("Check-in and preferences saved."));
       focusPanel();
     } catch (error) {
-      setMessage(errorMessage(error, "The check-in could not be saved."));
+      setMessage(errorMessage(error, t("The check-in could not be saved.")));
     } finally {
       setActionStatus("idle");
     }
@@ -162,16 +166,18 @@ export function AdaptiveContinuationPanel({
       if (!result.ok) {
         setMessage(
           result.reason === "not_ready"
-            ? "The next block is not ready. Review the current missing facts and check-in."
-            : "The server rejected the authored candidate. Try again after reviewing the current state.",
+            ? t("The next block is not ready. Review the current missing facts and check-in.")
+            : t(
+                "The server rejected the authored candidate. Try again after reviewing the current state.",
+              ),
         );
         return;
       }
       await onRefresh();
-      setMessage("The next block is ready for review.");
+      setMessage(t("The next block is ready for review."));
       focusPanel();
     } catch (error) {
-      setMessage(errorMessage(error, "The next block could not be prepared."));
+      setMessage(errorMessage(error, t("The next block could not be prepared.")));
     } finally {
       setActionStatus("idle");
     }
@@ -193,10 +199,10 @@ export function AdaptiveContinuationPanel({
         return;
       }
       setReviewed(result.candidate);
-      setMessage("Review sealed against current Calendar and Blueprint truth.");
+      setMessage(t("Review sealed against current Calendar and Blueprint truth."));
       requestAnimationFrame(() => confirmRef.current?.focus());
     } catch (error) {
-      setMessage(errorMessage(error, "The next block could not be reviewed."));
+      setMessage(errorMessage(error, t("The next block could not be reviewed.")));
     } finally {
       setActionStatus("idle");
     }
@@ -221,10 +227,10 @@ export function AdaptiveContinuationPanel({
       }
       setReviewed(null);
       await onRefresh();
-      setMessage("Next block confirmed in the runner Calendar.");
+      setMessage(t("Next block confirmed in the runner Calendar."));
       focusPanel();
     } catch (error) {
-      setMessage(errorMessage(error, "The next block could not be confirmed."));
+      setMessage(errorMessage(error, t("The next block could not be confirmed.")));
     } finally {
       setActionStatus("idle");
     }
@@ -232,13 +238,13 @@ export function AdaptiveContinuationPanel({
 
   function addAvoidPreference() {
     const projection = projections.find((item) => item.projectionId === avoidId);
-    if (!projection) return setMessage("Choose a Blueprint date to avoid.");
+    if (!projection) return setMessage(t("Choose a Blueprint date to avoid."));
     if (
       preferences.some(
         (item) => item.kind === "avoid_projection_date" && item.projectionId === avoidId,
       )
     )
-      return setMessage("That date is already included.");
+      return setMessage(t("That date is already included."));
     setPreferences((current) => [
       ...current,
       { kind: "avoid_projection_date", projectionId: avoidId, date: projection.date },
@@ -249,7 +255,7 @@ export function AdaptiveContinuationPanel({
 
   function addSwapPreference() {
     if (!swapFirstId || !swapSecondId || swapFirstId === swapSecondId)
-      return setMessage("Choose two different Blueprint dates to swap.");
+      return setMessage(t("Choose two different Blueprint dates to swap."));
     setPreferences((current) => [
       ...current,
       {
@@ -274,29 +280,33 @@ export function AdaptiveContinuationPanel({
     >
       <header className="flex min-w-0 flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="hito-label-md text-foreground">Next training block</p>
+          <p className="hito-label-md text-foreground">{t("Next training block")}</p>
           <h2 id="adaptive-continuation-title" className="hito-ui-title-md mt-1 text-foreground">
-            {statusLabel(continuation.status)}
+            {statusLabel(continuation.status, locale)}
           </h2>
           <p className="hito-body-sm mt-2 max-w-2xl text-text-secondary">
-            {statusCopy(continuation.status)}
+            {statusCopy(continuation.status, locale)}
           </p>
         </div>
         <span className="hito-status-pill" data-tone={statusTone(continuation.status)}>
-          {statusLabel(continuation.status)}
+          {statusLabel(continuation.status, locale)}
         </span>
       </header>
 
       {continuation.window ? (
         <p className="hito-body-sm mt-4 text-text-secondary">
-          {formatDate(continuation.window.startDate, { month: "short", day: "numeric" })} –{" "}
-          {formatDate(continuation.window.endDate, {
+          {formatUiDate(continuation.window.startDate, locale, {
+            month: "short",
+            day: "numeric",
+          })}{" "}
+          –{" "}
+          {formatUiDate(continuation.window.endDate, locale, {
             month: "short",
             day: "numeric",
             year: "numeric",
           })}
           {" · "}
-          {blockModeLabel(continuation.window.blockMode)}
+          {blockModeLabel(continuation.window.blockMode, locale)}
         </p>
       ) : null}
 
@@ -339,7 +349,7 @@ export function AdaptiveContinuationPanel({
           disabled={busy}
           onClick={() => void prepare()}
         >
-          Prepare next block
+          {t("Prepare next block")}
         </HitoButton>
       ) : null}
 
@@ -356,7 +366,7 @@ export function AdaptiveContinuationPanel({
               disabled={busy || reviewed.collisions.length > 0}
               onClick={() => void confirm()}
             >
-              Confirm next block
+              {t("Confirm next block")}
             </HitoButton>
           ) : (
             <HitoButton
@@ -367,7 +377,7 @@ export function AdaptiveContinuationPanel({
               disabled={busy}
               onClick={() => void review()}
             >
-              Review next block
+              {t("Review next block")}
             </HitoButton>
           )}
         </div>
@@ -419,23 +429,25 @@ function CheckInForm({
   swapFirstId: string;
   swapSecondId: string;
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   return (
     <fieldset className="mt-6 grid gap-5" disabled={busy}>
-      <legend className="hito-ui-title-sm text-foreground">Next block check-in</legend>
+      <legend className="hito-ui-title-sm text-foreground">{t("Next block check-in")}</legend>
       <BooleanChoice
-        label="Is your goal assumption still current?"
+        label={t("Is your goal assumption still current?")}
         value={checkIn.goalAssumptionCurrent}
         onChange={(value) => onCheckInChange({ ...checkIn, goalAssumptionCurrent: value })}
       />
       <BooleanChoice
-        label="Does this availability still work for the next block?"
+        label={t("Does this availability still work for the next block?")}
         value={checkIn.availabilityConfirmed}
         onChange={(value) => onCheckInChange({ ...checkIn, availabilityConfirmed: value })}
       />
       <div className="grid gap-4 sm:grid-cols-2">
         <ChoiceSelect
           id="adaptive-manageability"
-          label="Current manageability"
+          label={t("Current manageability")}
           options={manageabilityOptions}
           value={checkIn.manageability}
           onChange={(value) =>
@@ -444,7 +456,7 @@ function CheckInForm({
         />
         <ChoiceSelect
           id="adaptive-health"
-          label="Current health limitation"
+          label={t("Current health limitation")}
           options={healthOptions}
           value={checkIn.healthLimitation}
           onChange={(value) =>
@@ -456,7 +468,7 @@ function CheckInForm({
         />
         <ChoiceSelect
           id="adaptive-interruption"
-          label="Recent interruption"
+          label={t("Recent interruption")}
           options={interruptionOptions}
           value={checkIn.interruptionStatus}
           onChange={(value) =>
@@ -468,7 +480,7 @@ function CheckInForm({
         />
         <ChoiceSelect
           id="adaptive-clinician"
-          label="Clinician guidance"
+          label={t("Clinician guidance")}
           options={clinicianOptions}
           value={checkIn.clinicianGuidance}
           onChange={(value) =>
@@ -480,7 +492,7 @@ function CheckInForm({
         />
       </div>
       <label className="grid gap-2" htmlFor="adaptive-change-reason">
-        <span className="hito-label-md text-foreground">Material changes or context</span>
+        <span className="hito-label-md text-foreground">{t("Material changes or context")}</span>
         <Textarea
           id="adaptive-change-reason"
           rows={3}
@@ -492,44 +504,44 @@ function CheckInForm({
       </label>
 
       <div className="grid gap-3">
-        <p className="hito-label-md text-foreground">One-off Blueprint preferences</p>
+        <p className="hito-label-md text-foreground">{t("One-off Blueprint preferences")}</p>
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
           <ProjectionSelect
             id="adaptive-avoid-date"
-            label="Date to avoid"
+            label={t("Date to avoid")}
             projections={projections}
             value={avoidId}
             onChange={onAvoidIdChange}
           />
           <HitoButton type="button" size="md" variant="secondary" onClick={onAddAvoid}>
-            Add avoid date
+            {t("Add avoid date")}
           </HitoButton>
         </div>
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
           <ProjectionSelect
             id="adaptive-swap-first"
-            label="First slot"
+            label={t("First slot")}
             projections={projections}
             value={swapFirstId}
             onChange={onSwapFirstIdChange}
           />
           <ProjectionSelect
             id="adaptive-swap-second"
-            label="Second slot"
+            label={t("Second slot")}
             projections={projections}
             value={swapSecondId}
             onChange={onSwapSecondIdChange}
           />
           <HitoButton type="button" size="md" variant="secondary" onClick={onAddSwap}>
-            Add swap
+            {t("Add swap")}
           </HitoButton>
         </div>
         {preferences.length ? (
-          <ul className="hito-row-group" aria-label="Active Blueprint preferences">
+          <ul className="hito-row-group" aria-label={t("Active Blueprint preferences")}>
             {preferences.map((preference, index) => (
               <li key={`${preference.kind}:${index}`} className="hito-list-row gap-3">
                 <span className="hito-body-sm min-w-0 flex-1 text-foreground">
-                  {preferenceLabel(preference, projections)}
+                  {preferenceLabel(preference, projections, locale)}
                 </span>
                 <HitoButton
                   type="button"
@@ -537,7 +549,7 @@ function CheckInForm({
                   variant="ghost"
                   onClick={() => onRemovePreference(index)}
                 >
-                  Remove
+                  {t("Remove")}
                 </HitoButton>
               </li>
             ))}
@@ -553,7 +565,7 @@ function CheckInForm({
         disabled={busy || saveDisabled}
         onClick={onSave}
       >
-        Save check-in and preferences
+        {t("Save check-in and preferences")}
       </HitoButton>
     </fieldset>
   );
@@ -566,31 +578,33 @@ function CandidateReadback({
   candidate: ContinuationCandidate;
   reviewed: ReviewedWorkoutCommandCandidate | null;
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   return (
     <div className="mt-6 grid gap-5" data-adaptive-continuation-candidate="">
       <div>
-        <p className="hito-ui-title-sm text-foreground">Candidate review</p>
+        <p className="hito-ui-title-sm text-foreground">{t("Candidate review")}</p>
         <p className="hito-body-sm mt-1 text-text-secondary">
-          Evidence cutoff{" "}
-          {formatDate(candidate.factsUsed.evidenceCutoffDate, {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
+          {t("Evidence cutoff {date} · {performance}", {
+            date: formatUiDate(candidate.factsUsed.evidenceCutoffDate, locale, {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            }),
+            performance: performanceLabel(candidate, locale),
           })}
-          {" · "}
-          {performanceLabel(candidate)}
         </p>
       </div>
-      <ReasonList reasons={candidate.factsMissing} label="Candidate missing facts" />
+      <ReasonList reasons={candidate.factsMissing} label={t("Candidate missing facts")} />
       {candidate.conflicts.length ? (
-        <ul className="hito-row-group" aria-label="Candidate conflicts">
+        <ul className="hito-row-group" aria-label={t("Candidate conflicts")}>
           {candidate.conflicts.map((conflict) => (
             <li
               key={`${conflict.code}:${conflict.projectionId}:${conflict.date}`}
               className="hito-list-row items-start gap-3"
             >
               <span className="hito-status-pill" data-tone="warning">
-                Conflict
+                {t("Conflict")}
               </span>
               <p className="hito-body-sm min-w-0 text-foreground">{conflict.message}</p>
             </li>
@@ -604,11 +618,17 @@ function CandidateReadback({
       ))}
       {reviewed?.collisions.map((collision) => (
         <p key={collision.workoutDate} className="hito-body-sm text-negative" role="alert">
-          Calendar date {collision.workoutDate} is occupied.
+          {t("Calendar date {date} is occupied.", {
+            date: formatUiDate(collision.workoutDate, locale, {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            }),
+          })}
         </p>
       ))}
       <div className="grid gap-3">
-        <p className="hito-label-md text-foreground">Canonical WorkoutDocument review</p>
+        <p className="hito-label-md text-foreground">{t("Canonical WorkoutDocument review")}</p>
         <div className="hito-row-group">
           {candidate.workoutDocuments.map((document) => (
             <details
@@ -616,7 +636,7 @@ function CandidateReadback({
               className="hito-list-row block min-w-0"
             >
               <summary className="hito-list-row-title cursor-pointer text-foreground">
-                {formatDate(document.workoutDate, {
+                {formatUiDate(document.workoutDate, locale, {
                   weekday: "short",
                   month: "short",
                   day: "numeric",
@@ -644,6 +664,7 @@ function BooleanChoice({
   onChange: (value: boolean) => void;
   value: boolean | null;
 }) {
+  const t = useHitoProductMessage();
   return (
     <fieldset className="grid gap-2">
       <legend className="hito-label-md text-foreground">{label}</legend>
@@ -658,7 +679,7 @@ function BooleanChoice({
             selected={value === choice}
             onClick={() => onChange(choice)}
           >
-            {choice ? "Yes" : "No"}
+            {choice ? t("Yes") : t("No")}
           </HitoChoiceToggle>
         ))}
       </div>
@@ -679,6 +700,7 @@ function ChoiceSelect({
   options: ReadonlyArray<readonly [string, string]>;
   value: string;
 }) {
+  const locale = useHitoUiLocale();
   return (
     <label className="grid gap-2" htmlFor={id}>
       <span className="hito-label-md text-foreground">{label}</span>
@@ -689,7 +711,7 @@ function ChoiceSelect({
         <SelectContent>
           {options.map(([optionValue, optionLabel]) => (
             <SelectItem key={optionValue} value={optionValue}>
-              {optionLabel}
+              {getHitoKnownProductMessage(locale, optionLabel)}
             </SelectItem>
           ))}
         </SelectContent>
@@ -711,6 +733,7 @@ function ProjectionSelect({
   projections: BlueprintCalendarProjection[];
   value: string;
 }) {
+  const locale = useHitoUiLocale();
   return (
     <ChoiceSelect
       id={id}
@@ -719,13 +742,15 @@ function ProjectionSelect({
       onChange={onChange}
       options={projections.map((projection) => [
         projection.projectionId,
-        `${formatDate(projection.date, { month: "short", day: "numeric" })} · ${displayLabel(projection.workoutFamily)}`,
+        `${formatUiDate(projection.date, locale, { month: "short", day: "numeric" })} · ${displayLabel(projection.workoutFamily)}`,
       ])}
     />
   );
 }
 
 function DataQuality({ data }: { data: NonNullable<ContinuationContext["dataQuality"]> }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   const values = [
     ["Due", data.dueWorkoutCount],
     ["Resolved", data.resolvedOutcomeCount],
@@ -738,12 +763,16 @@ function DataQuality({ data }: { data: NonNullable<ContinuationContext["dataQual
   return (
     <dl
       className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4"
-      aria-label="Continuation data quality"
+      aria-label={t("Continuation data quality")}
     >
       {values.map(([label, value]) => (
         <div key={label}>
-          <dt className="hito-caption-md text-text-secondary">{label}</dt>
-          <dd className="hito-body-md mt-1 text-foreground tabular-nums">{value}</dd>
+          <dt className="hito-caption-md text-text-secondary">
+            {getHitoKnownProductMessage(locale, label)}
+          </dt>
+          <dd className="hito-body-md mt-1 text-foreground tabular-nums">
+            {formatUiNumber(value, locale)}
+          </dd>
         </div>
       ))}
     </dl>
@@ -757,10 +786,12 @@ function PreferenceOutcomes({
   applications: ContinuationContext["preferenceApplications"];
   projections: BlueprintCalendarProjection[];
 }) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   if (!applications.length) return null;
   return (
     <div className="mt-6 grid gap-3">
-      <p className="hito-label-md text-foreground">Preference outcomes</p>
+      <p className="hito-label-md text-foreground">{t("Preference outcomes")}</p>
       <ul className="hito-row-group">
         {applications.map((application) => (
           <li key={application.preferenceId} className="hito-list-row items-start gap-3">
@@ -768,10 +799,10 @@ function PreferenceOutcomes({
               className="hito-status-pill"
               data-tone={application.outcome === "applied" ? "signal" : "warning"}
             >
-              {application.outcome === "applied" ? "Applied" : "Not applied"}
+              {application.outcome === "applied" ? t("Applied") : t("Not applied")}
             </span>
             <p className="hito-body-sm min-w-0 text-foreground">
-              {preferenceLabel(application.preference, projections)}
+              {preferenceLabel(application.preference, projections, locale)}
               {application.conflictReason ? ` — ${application.conflictReason}` : ""}
             </p>
           </li>
@@ -788,9 +819,13 @@ function ReasonList({
   reasons: string[];
   label?: string;
 }) {
+  const locale = useHitoUiLocale();
   if (!reasons.length) return null;
   return (
-    <ul className="hito-body-sm mt-4 grid gap-1 text-text-secondary" aria-label={label}>
+    <ul
+      className="hito-body-sm mt-4 grid gap-1 text-text-secondary"
+      aria-label={getHitoKnownProductMessage(locale, label)}
+    >
       {reasons.map((reason) => (
         <li key={reason}>{displayLabel(reason)}</li>
       ))}
@@ -815,29 +850,35 @@ function checkInDraft(current: AdaptiveContinuationHorizonCheckIn | null): Check
   };
 }
 
-function statusLabel(status: ActiveContinuationState["status"]) {
-  return {
-    planned: "Planned",
-    check_in_needed: "Check-in needed",
-    not_ready: "Not ready",
-    authoring_ready: "Ready to prepare",
-    candidate_ready: "Ready for review",
-  }[status];
+function statusLabel(status: ActiveContinuationState["status"], locale: ResolvedUiLocale) {
+  return getHitoKnownProductMessage(
+    locale,
+    {
+      planned: "Planned",
+      check_in_needed: "Check-in needed",
+      not_ready: "Not ready",
+      authoring_ready: "Ready to prepare",
+      candidate_ready: "Ready for review",
+    }[status],
+  );
 }
 
-function statusCopy(status: ActiveContinuationState["status"]) {
-  return {
-    planned:
-      "The current detailed block is still active. The server will open the next check-in at the continuation window.",
-    check_in_needed:
-      "Confirm the current goal, availability, manageability, health context, and one-off Blueprint preferences.",
-    not_ready:
-      "The next block cannot be prepared from current facts yet. Review the exact missing or unresolved items below.",
-    authoring_ready:
-      "Current facts and the retained check-in are ready for explicit next-block preparation.",
-    candidate_ready:
-      "Review the canonical workouts, facts, preferences, and conflicts before explicit Calendar confirmation.",
-  }[status];
+function statusCopy(status: ActiveContinuationState["status"], locale: ResolvedUiLocale) {
+  return getHitoKnownProductMessage(
+    locale,
+    {
+      planned:
+        "The current detailed block is still active. The server will open the next check-in at the continuation window.",
+      check_in_needed:
+        "Confirm the current goal, availability, manageability, health context, and one-off Blueprint preferences.",
+      not_ready:
+        "The next block cannot be prepared from current facts yet. Review the exact missing or unresolved items below.",
+      authoring_ready:
+        "Current facts and the retained check-in are ready for explicit next-block preparation.",
+      candidate_ready:
+        "Review the canonical workouts, facts, preferences, and conflicts before explicit Calendar confirmation.",
+    }[status],
+  );
 }
 
 function statusTone(status: ActiveContinuationState["status"]) {
@@ -847,36 +888,51 @@ function statusTone(status: ActiveContinuationState["status"]) {
   return "rollout" as const;
 }
 
-function blockModeLabel(mode: NonNullable<ActiveContinuationState["window"]>["blockMode"]) {
-  return {
-    normal_four_week: "Four-week block",
-    target_taper_boundary: "Target-date or taper block",
-    resolved_interruption_bridge: "Resolved-interruption bridge",
-  }[mode];
+function blockModeLabel(
+  mode: NonNullable<ActiveContinuationState["window"]>["blockMode"],
+  locale: ResolvedUiLocale,
+) {
+  return getHitoKnownProductMessage(
+    locale,
+    {
+      normal_four_week: "Four-week block",
+      target_taper_boundary: "Target-date or taper block",
+      resolved_interruption_bridge: "Resolved-interruption bridge",
+    }[mode],
+  );
 }
 
-function performanceLabel(candidate: ContinuationCandidate) {
-  return {
-    blueprint_faithful_no_performance_inference: "Blueprint-faithful · no performance inference",
-    constraint_only_no_performance_inference: "Constraint-only · no performance inference",
-    fact_shaped_from_comparable_fit_and_rpe: "Fact-shaped from comparable FIT and RPE",
-  }[candidate.performanceAdaptation.reason];
+function performanceLabel(candidate: ContinuationCandidate, locale: ResolvedUiLocale) {
+  return getHitoKnownProductMessage(
+    locale,
+    {
+      blueprint_faithful_no_performance_inference: "Blueprint-faithful · no performance inference",
+      constraint_only_no_performance_inference: "Constraint-only · no performance inference",
+      fact_shaped_from_comparable_fit_and_rpe: "Fact-shaped from comparable FIT and RPE",
+    }[candidate.performanceAdaptation.reason],
+  );
 }
 
 function preferenceLabel(
   preference: AdaptiveProjectionSchedulingPreference,
   projections: BlueprintCalendarProjection[],
+  locale: ResolvedUiLocale,
 ) {
   if (preference.kind === "avoid_projection_date") {
-    return `Avoid ${formatDate(preference.date, { month: "short", day: "numeric" })}`;
+    return formatHitoProductMessage(locale, "Avoid {date}", {
+      date: formatUiDate(preference.date, locale, { month: "short", day: "numeric" }),
+    });
   }
   const date = (id: string) => projections.find((item) => item.projectionId === id)?.date ?? id;
-  return `Swap ${formatPreferenceDate(date(preference.firstProjectionId))} and ${formatPreferenceDate(date(preference.secondProjectionId))}`;
+  return formatHitoProductMessage(locale, "Swap {first} and {second}", {
+    first: formatPreferenceDate(date(preference.firstProjectionId), locale),
+    second: formatPreferenceDate(date(preference.secondProjectionId), locale),
+  });
 }
 
-function formatPreferenceDate(value: string) {
+function formatPreferenceDate(value: string, locale: ResolvedUiLocale) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value)
-    ? formatDate(value, { month: "short", day: "numeric" })
+    ? formatUiDate(value, locale, { month: "short", day: "numeric" })
     : value;
 }
 

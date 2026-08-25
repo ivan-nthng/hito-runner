@@ -6,6 +6,11 @@ export const DEFAULT_UI_LOCALE_PREFERENCE = "system";
 export const DEFAULT_RESOLVED_UI_LOCALE = "en";
 export const INVALID_STORED_UI_LOCALE_PREFERENCE = "invalid_stored_ui_locale_preference" as const;
 
+const UI_INTL_LOCALES = {
+  en: "en-US",
+  "pt-BR": "pt-BR",
+} as const satisfies Record<ResolvedUiLocale, string>;
+
 export type UiLocalePreference = (typeof UI_LOCALE_PREFERENCE_VALUES)[number];
 export type ResolvedUiLocale = (typeof RESOLVED_UI_LOCALE_VALUES)[number];
 export type UiLocalePreferenceContractViolation = typeof INVALID_STORED_UI_LOCALE_PREFERENCE;
@@ -71,6 +76,26 @@ export function resolveRequestUiLocale(
   } catch {
     return DEFAULT_RESOLVED_UI_LOCALE;
   }
+}
+
+export function formatUiDate(
+  value: Date | string,
+  locale: ResolvedUiLocale,
+  options: Intl.DateTimeFormatOptions,
+): string {
+  const date = typeof value === "string" ? new Date(`${value}T00:00:00Z`) : value;
+  return new Intl.DateTimeFormat(UI_INTL_LOCALES[locale], {
+    ...options,
+    timeZone: options.timeZone ?? "UTC",
+  }).format(date);
+}
+
+export function formatUiNumber(
+  value: number,
+  locale: ResolvedUiLocale,
+  options?: Intl.NumberFormatOptions,
+): string {
+  return new Intl.NumberFormat(UI_INTL_LOCALES[locale], options).format(value);
 }
 
 function winningAcceptLanguageRange(value: string | null | undefined): string | null {

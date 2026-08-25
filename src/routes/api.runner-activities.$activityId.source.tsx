@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { buildHitoProductApiFailure } from "@/lib/product-api-error-contract";
 import { requirePersistedUserIdForCurrentRequest } from "@/lib/request-persisted-user";
 
 export const Route = createFileRoute("/api/runner-activities/$activityId/source")({
@@ -25,30 +26,22 @@ export const Route = createFileRoute("/api/runner-activities/$activityId/source"
             error.message === "Authentication is required for this action."
           ) {
             return Response.json(
-              {
-                ok: false,
-                code: "auth_required",
-                message: "Sign in again before removing the original activity file.",
-              },
+              buildHitoProductApiFailure("runner_activity_auth_required", {
+                operation: "source_remove",
+              }),
               { status: 401 },
             );
           }
           if (error instanceof Error && error.name === "RunnerActivityNotFoundError") {
             return Response.json(
-              {
-                ok: false,
-                code: "activity_not_found",
-                message: "This activity is not available.",
-              },
+              buildHitoProductApiFailure("runner_activity_not_found", {
+                operation: "source_remove",
+              }),
               { status: 404 },
             );
           }
           return Response.json(
-            {
-              ok: false,
-              code: "activity_source_remove_failed",
-              message: "We could not remove the original file. Try again shortly.",
-            },
+            buildHitoProductApiFailure("runner_activity_source_remove_failed", {}),
             { status: 500 },
           );
         }

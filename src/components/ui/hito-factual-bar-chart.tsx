@@ -8,6 +8,7 @@ import {
 } from "react";
 
 import { HitoButton } from "@/components/ui/button";
+import { useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
 import { Icon } from "@/components/ui/icon";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -16,7 +17,12 @@ import type {
   RunnerActivityFitChartPoint,
   RunnerActivityFitChartSeries,
 } from "@/lib/runner-activity/product-contract";
-import { formatDate } from "@/lib/training";
+import { formatUiDate, formatUiNumber, type ResolvedUiLocale } from "@/lib/ui-locale";
+import {
+  formatHitoProductMessage,
+  getHitoKnownProductMessage,
+  getHitoProductMessage,
+} from "@/lib/ui-locale-messages";
 
 type ReadySeries = Extract<RunnerActivityFitChartSeries, { status: "ready" }>;
 type SeriesCore = Pick<
@@ -57,6 +63,7 @@ export function HitoFactualBarChart({
   series: HitoFactualBarChartSeries;
   stateAction?: ReactNode;
 }) {
+  const locale = useHitoUiLocale();
   const titleId = `hito-factual-chart-${series.id}-title`;
   const summaryId = `hito-factual-chart-${series.id}-summary`;
 
@@ -71,12 +78,12 @@ export function HitoFactualBarChart({
       <figcaption className="grid min-w-0 gap-2">
         <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <h3 id={titleId} className="hito-ui-title-sm">
-            {series.title}
+            {getHitoKnownProductMessage(locale, series.title)}
           </h3>
           <span className="hito-technical-sm text-secondary">{series.unitLabel}</span>
         </div>
         <p id={summaryId} className="hito-body-sm text-secondary max-w-3xl">
-          {series.purpose}
+          {getHitoKnownProductMessage(locale, series.purpose)}
         </p>
       </figcaption>
 
@@ -92,19 +99,27 @@ export function HitoFactualBarChart({
       ) : null}
 
       <p className="hito-technical-sm text-tertiary">
-        {period.label} ·{" "}
+        {getHitoKnownProductMessage(locale, period.label)} ·{" "}
         <time dateTime={period.startDate}>
-          {formatDate(period.startDate, { day: "numeric", month: "short", year: "numeric" })}
+          {formatUiDate(period.startDate, locale, {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })}
         </time>
         –
         <time dateTime={period.endDate}>
-          {formatDate(period.endDate, { day: "numeric", month: "short", year: "numeric" })}
+          {formatUiDate(period.endDate, locale, {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          })}
         </time>{" "}
-        · {series.evidenceLabel}
+        · {getHitoKnownProductMessage(locale, series.evidenceLabel)}
       </p>
 
       {series.status === "ready" ? (
-        <ReadyFactualBarChart period={period} series={series} />
+        <ReadyFactualBarChart locale={locale} period={period} series={series} />
       ) : (
         <article
           className="hito-state-surface"
@@ -113,9 +128,14 @@ export function HitoFactualBarChart({
           role={series.status === "error" ? "alert" : "status"}
         >
           <p className="hito-label-md">
-            {series.status === "error" ? "Chart unavailable" : "Updating chart"}
+            {getHitoProductMessage(
+              locale,
+              series.status === "error" ? "Chart unavailable" : "Updating chart",
+            )}
           </p>
-          <p className="hito-body-sm mt-2 text-secondary">{series.reasonLabel}</p>
+          <p className="hito-body-sm mt-2 text-secondary">
+            {getHitoKnownProductMessage(locale, series.reasonLabel)}
+          </p>
           {stateAction ? <div className="hito-state-actions">{stateAction}</div> : null}
         </article>
       )}
@@ -124,9 +144,11 @@ export function HitoFactualBarChart({
 }
 
 function ReadyFactualBarChart({
+  locale,
   period,
   series,
 }: {
+  locale: ResolvedUiLocale;
   period: HitoFactualBarChartPeriod;
   series: ReadySeries;
 }) {
@@ -203,7 +225,9 @@ function ReadyFactualBarChart({
       <div className="grid min-w-0 gap-4">
         <div
           className="max-w-full overflow-x-auto overscroll-x-contain pb-1"
-          aria-label={`${series.title} plot scroll region`}
+          aria-label={formatHitoProductMessage(locale, "{title} plot scroll region", {
+            title: getHitoKnownProductMessage(locale, series.title),
+          })}
         >
           <div
             className="relative grid h-[calc(var(--space-10)*6)] min-w-full items-stretch border-b border-hairline"
@@ -214,7 +238,16 @@ function ReadyFactualBarChart({
               minWidth: "calc(var(--hito-factual-bar-count) * (var(--space-10) + var(--space-1)))",
             }}
             role="group"
-            aria-label={`${series.title}, ${period.label}, ${period.startDate} to ${period.endDate}`}
+            aria-label={formatHitoProductMessage(
+              locale,
+              "{title}, {period}, {startDate} to {endDate}",
+              {
+                title: getHitoKnownProductMessage(locale, series.title),
+                period: getHitoKnownProductMessage(locale, period.label),
+                startDate: period.startDate,
+                endDate: period.endDate,
+              },
+            )}
             data-hito-factual-chart-plot
           >
             <span className="pointer-events-none absolute inset-x-0 top-0 border-t border-hairline" />
@@ -250,7 +283,7 @@ function ReadyFactualBarChart({
                       type="button"
                       className="relative z-20 grid min-w-0 grid-rows-[minmax(0,1fr)_auto] gap-2 rounded-lg px-1 pb-1 pt-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                       tabIndex={activeIndex === index ? 0 : -1}
-                      aria-label={pointAccessibleName(series, point)}
+                      aria-label={pointAccessibleName(series, point, locale)}
                       aria-pressed={pinnedIndex === index}
                       data-point-id={point.id}
                       data-point-state={point.state}
@@ -295,12 +328,12 @@ function ReadyFactualBarChart({
                         )}
                       </span>
                       <span className="hito-label-sm text-secondary truncate text-center">
-                        {point.shortLabel}
+                        {getHitoKnownProductMessage(locale, point.shortLabel)}
                       </span>
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="top" sideOffset={8} className="max-w-xs">
-                    <FactualPointReadback point={point} series={series} />
+                    <FactualPointReadback locale={locale} point={point} series={series} />
                   </TooltipContent>
                 </Tooltip>
               );
@@ -311,10 +344,10 @@ function ReadyFactualBarChart({
         {series.points.some((point) => point.state !== "available") ? (
           <div className="hito-body-xs text-secondary flex flex-wrap gap-x-4 gap-y-1">
             {series.points.some((point) => point.state === "partial") ? (
-              <span>Partial · striped bar</span>
+              <span>{getHitoProductMessage(locale, "Partial · striped bar")}</span>
             ) : null}
             {series.points.some((point) => point.state === "unavailable") ? (
-              <span>Unavailable · N/A gap marker</span>
+              <span>{getHitoProductMessage(locale, "Unavailable · N/A gap marker")}</span>
             ) : null}
           </div>
         ) : null}
@@ -328,12 +361,16 @@ function ReadyFactualBarChart({
             aria-live="polite"
             data-hito-factual-chart-pinned-readback
           >
-            <FactualPointReadback point={series.points[pinnedIndex]} series={series} />
+            <FactualPointReadback
+              locale={locale}
+              point={series.points[pinnedIndex]}
+              series={series}
+            />
             <HitoButton
               size="xs"
               variant="ghost"
               iconOnly
-              aria-label="Close active point"
+              aria-label={getHitoProductMessage(locale, "Close active point")}
               onClick={() => {
                 pointRefs.current[activeIndex]?.focus();
                 setPinnedIndex(null);
@@ -344,66 +381,81 @@ function ReadyFactualBarChart({
           </div>
         ) : null}
 
-        <FactualChartDataTable period={period} series={series} />
+        <FactualChartDataTable locale={locale} period={period} series={series} />
       </div>
     </TooltipProvider>
   );
 }
 
 function FactualPointReadback({
+  locale,
   point,
   series,
 }: {
+  locale: ResolvedUiLocale;
   point: RunnerActivityFitChartPoint;
   series: ReadySeries;
 }) {
   return (
     <div className="grid min-w-0 gap-1">
-      <p className="hito-label-md">{series.title}</p>
+      <p className="hito-label-md">{getHitoKnownProductMessage(locale, series.title)}</p>
       <p className="hito-body-sm">
-        {point.accessibleLabel} · {point.displayValue ?? "Unavailable"}
-        {point.displayValue ? ` ${series.unitLabel}` : ""}
+        {pointPeriodLabel(point, locale)} · {pointDisplayValue(point, locale)}
       </p>
       <p className="hito-body-xs text-secondary">
-        {point.completionLabel} · {pointStateLabel(point.state)} · {point.coverage.label}
+        {pointCompletionLabel(point, locale)} · {pointStateLabel(point.state, locale)} ·{" "}
+        {pointCoverageLabel(point, locale)}
       </p>
       {point.reasonLabels.length ? (
-        <p className="hito-body-xs text-secondary">{point.reasonLabels.join(" ")}</p>
+        <p className="hito-body-xs text-secondary">
+          {point.reasonLabels.map((reason) => getHitoKnownProductMessage(locale, reason)).join(" ")}
+        </p>
       ) : null}
-      <p className="hito-technical-sm text-tertiary">{series.evidenceLabel}</p>
+      <p className="hito-technical-sm text-tertiary">
+        {getHitoKnownProductMessage(locale, series.evidenceLabel)}
+      </p>
     </div>
   );
 }
 
 function FactualChartDataTable({
+  locale,
   period,
   series,
 }: {
+  locale: ResolvedUiLocale;
   period: HitoFactualBarChartPeriod;
   series: ReadySeries;
 }) {
   return (
     <details className="hito-disclosure">
       <summary className="hito-disclosure-summary min-h-11">
-        <span>View data</span>
+        <span>{getHitoProductMessage(locale, "View data")}</span>
         <Icon name="chevron-down" size="xs" className="hito-disclosure-chevron" decorative />
       </summary>
       <div className="hito-disclosure-body">
         <div
           className="hito-data-table-scroll"
           role="region"
-          aria-label={`${series.title} data table`}
+          aria-label={formatHitoProductMessage(locale, "{title} data table", {
+            title: getHitoKnownProductMessage(locale, series.title),
+          })}
           tabIndex={0}
         >
           <table className="hito-data-table hito-data-table-min-lg">
             <caption className="sr-only">
-              {series.title}, {period.label}, {period.startDate} to {period.endDate}
+              {formatHitoProductMessage(locale, "{title}, {period}, {startDate} to {endDate}", {
+                title: getHitoKnownProductMessage(locale, series.title),
+                period: getHitoKnownProductMessage(locale, period.label),
+                startDate: period.startDate,
+                endDate: period.endDate,
+              })}
             </caption>
             <thead>
               <tr>
                 {["Period", "Value", "Completion", "State", "Coverage", "Reason"].map((heading) => (
                   <th key={heading} scope="col" className="hito-data-table-cell text-left">
-                    {heading}
+                    {getHitoKnownProductMessage(locale, heading)}
                   </th>
                 ))}
               </tr>
@@ -412,18 +464,20 @@ function FactualChartDataTable({
               {series.points.map((point) => (
                 <tr key={point.id}>
                   <th scope="row" className="hito-data-table-cell hito-data-table-cell-start">
-                    {point.accessibleLabel}
+                    {pointPeriodLabel(point, locale)}
                   </th>
                   <td className="hito-data-table-cell whitespace-nowrap tabular-nums">
-                    {point.displayValue
-                      ? `${point.displayValue} ${series.unitLabel}`
-                      : "Unavailable"}
+                    {pointDisplayValue(point, locale)}
                   </td>
-                  <td className="hito-data-table-cell">{point.completionLabel}</td>
-                  <td className="hito-data-table-cell">{pointStateLabel(point.state)}</td>
-                  <td className="hito-data-table-cell">{point.coverage.label}</td>
+                  <td className="hito-data-table-cell">{pointCompletionLabel(point, locale)}</td>
+                  <td className="hito-data-table-cell">{pointStateLabel(point.state, locale)}</td>
+                  <td className="hito-data-table-cell">{pointCoverageLabel(point, locale)}</td>
                   <td className="hito-data-table-cell hito-data-table-cell-end">
-                    {point.reasonLabels.length ? point.reasonLabels.join(" ") : "Not applicable"}
+                    {point.reasonLabels.length
+                      ? point.reasonLabels
+                          .map((reason) => getHitoKnownProductMessage(locale, reason))
+                          .join(" ")
+                      : getHitoProductMessage(locale, "Not applicable")}
                   </td>
                 </tr>
               ))}
@@ -445,14 +499,52 @@ function pointHeight(point: RunnerActivityFitChartPoint | null, maxValue: number
   return Math.max(0, Math.min((point.value / maxValue) * 100, 100));
 }
 
-function pointStateLabel(state: RunnerActivityFitChartPoint["state"]) {
-  if (state === "partial") return "Partial";
-  if (state === "unavailable") return "Unavailable";
-  return "Available";
+function pointStateLabel(state: RunnerActivityFitChartPoint["state"], locale: ResolvedUiLocale) {
+  if (state === "partial") return getHitoProductMessage(locale, "Partial");
+  if (state === "unavailable") return getHitoProductMessage(locale, "Unavailable");
+  return getHitoProductMessage(locale, "Available");
 }
 
-function pointAccessibleName(series: ReadySeries, point: RunnerActivityFitChartPoint) {
-  const value = point.displayValue ? `${point.displayValue} ${series.unitLabel}` : "Unavailable";
-  const reason = point.reasonLabels.length ? ` ${point.reasonLabels.join(" ")}` : "";
-  return `${point.accessibleLabel}. ${series.title}: ${value}. ${point.completionLabel}. ${pointStateLabel(point.state)}. ${point.coverage.label}.${reason}`;
+function pointPeriodLabel(point: RunnerActivityFitChartPoint, locale: ResolvedUiLocale) {
+  const dateOptions = {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  } as const;
+
+  return formatHitoProductMessage(locale, "{startDate} through {endDate}", {
+    startDate: formatUiDate(point.startDate, locale, dateOptions),
+    endDate: formatUiDate(point.endDate, locale, dateOptions),
+  });
+}
+
+function pointCompletionLabel(point: RunnerActivityFitChartPoint, locale: ResolvedUiLocale) {
+  return getHitoProductMessage(locale, point.completionLabel);
+}
+
+function pointCoverageLabel(point: RunnerActivityFitChartPoint, locale: ResolvedUiLocale) {
+  return formatHitoProductMessage(
+    locale,
+    "{includedCount} of {candidateCount} accepted activities",
+    {
+      includedCount: formatUiNumber(point.coverage.includedCount, locale),
+      candidateCount: formatUiNumber(point.coverage.candidateCount, locale),
+    },
+  );
+}
+
+function pointDisplayValue(point: RunnerActivityFitChartPoint, locale: ResolvedUiLocale) {
+  return point.displayValue ?? getHitoProductMessage(locale, "Unavailable");
+}
+
+function pointAccessibleName(
+  series: ReadySeries,
+  point: RunnerActivityFitChartPoint,
+  locale: ResolvedUiLocale,
+) {
+  const value = pointDisplayValue(point, locale);
+  const reason = point.reasonLabels.length
+    ? ` ${point.reasonLabels.map((item) => getHitoKnownProductMessage(locale, item)).join(" ")}`
+    : "";
+  return `${pointPeriodLabel(point, locale)}. ${getHitoKnownProductMessage(locale, series.title)}: ${value}. ${pointCompletionLabel(point, locale)}. ${pointStateLabel(point.state, locale)}. ${pointCoverageLabel(point, locale)}.${reason}`;
 }

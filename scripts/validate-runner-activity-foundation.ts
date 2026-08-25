@@ -197,14 +197,22 @@ async function proveRuntimeUploadProjection(input: { userId: string; runtimeUrl:
     body: "not multipart",
   });
   assert.equal(unauthenticatedMalformedBody.status, 401);
-  assert.equal((await unauthenticatedMalformedBody.json()).code, "auth_required");
+  assert.deepEqual(await unauthenticatedMalformedBody.json(), {
+    ok: false,
+    code: "workout_result_auth_required",
+    params: { operation: "upload" },
+  });
   const unauthenticatedRemoval = await fetch(new URL("/api/workout-result/remove", baseUrl), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: "not-json",
   });
   assert.equal(unauthenticatedRemoval.status, 401);
-  assert.equal((await unauthenticatedRemoval.json()).code, "auth_required");
+  assert.deepEqual(await unauthenticatedRemoval.json(), {
+    ok: false,
+    code: "workout_result_auth_required",
+    params: { operation: "remove" },
+  });
   const { cookie } = await loginQaPoolToLoopbackRuntime({
     runtimeUrl: input.runtimeUrl,
     role: "provider-engine",
@@ -218,7 +226,11 @@ async function proveRuntimeUploadProjection(input: { userId: string; runtimeUrl:
     },
   );
   assert.equal(authenticatedMalformedRemoval.status, 400);
-  assert.equal((await authenticatedMalformedRemoval.json()).code, "invalid_upload");
+  assert.deepEqual(await authenticatedMalformedRemoval.json(), {
+    ok: false,
+    code: "workout_result_invalid_request",
+    params: { operation: "remove" },
+  });
   const oversizedBody = new FormData();
   oversizedBody.set(
     "file",
@@ -230,7 +242,11 @@ async function proveRuntimeUploadProjection(input: { userId: string; runtimeUrl:
     body: oversizedBody,
   });
   assert.equal(oversizedResponse.status, 413);
-  assert.equal((await oversizedResponse.json()).code, "file_too_large");
+  assert.deepEqual(await oversizedResponse.json(), {
+    ok: false,
+    code: "workout_result_file_too_large",
+    params: { operation: "upload", maxBytes: MAX_WORKOUT_RESULT_UPLOAD_BYTES },
+  });
 
   const [plannedWorkoutId] = await createProofWorkouts(input.userId);
   const fixture = await readFitFixture();

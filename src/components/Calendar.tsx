@@ -14,7 +14,11 @@ import { cn } from "@/lib/utils";
 import { HitoButton } from "@/components/ui/button";
 import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
 import { Icon } from "@/components/ui/icon";
-import { HitoCalendarDayCell, HitoWorkoutDayRow } from "@/components/ui/hito-calendar-day";
+import {
+  HitoCalendarDayCell,
+  HitoWorkoutDayRow,
+  type HitoCalendarActionVisual,
+} from "@/components/ui/hito-calendar-day";
 import {
   buildCalendarDayProjection,
   buildRestCalendarDayPresentation,
@@ -22,7 +26,6 @@ import {
   blueprintProjectionStatusLabel,
   calendarMoveTargetAction,
   calendarMoveUndoAction,
-  calendarTargetButtonAriaLabel,
   resolveCalendarMoveDateRender,
   type CalendarDaySurfacePresentation,
   type CalendarDaySlotLayout,
@@ -41,15 +44,12 @@ import {
 import {
   addDaysIso,
   displayWorkoutTargetReadbackEntries,
-  formatDistanceKm,
   formatDurationMin,
-  formatDate,
   startOfWeekIso,
   workoutDuration,
   workoutDistanceKm,
   workoutStatusLabel,
   workoutTypeMeta,
-  weekdayShort,
   type TrainingSnapshot,
   type Workout,
 } from "@/lib/training";
@@ -60,6 +60,9 @@ import {
 import { ManualWorkoutMoveController } from "@/components/manual-workout/ManualWorkoutMoveControls";
 import { CalendarOverflowActions } from "@/components/calendar/CalendarOverflowActions";
 import { AdaptiveContinuationPanel } from "@/components/calendar/AdaptiveContinuationPanel";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
+import { formatUiDate, formatUiNumber } from "@/lib/ui-locale";
+import { formatHitoProductMessage, getHitoKnownProductMessage } from "@/lib/ui-locale-messages";
 
 type View = "month" | "week";
 type TooltipAnchor = {
@@ -86,6 +89,8 @@ export function Calendar({
   localActivityFileDesignFixtureEnabled?: boolean;
 }) {
   const router = useRouter();
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const [view, setView] = useState<View>("month");
   const [cursor, setCursor] = useState(snapshot.currentDate);
   const [tooltipAnchor, setTooltipAnchor] = useState<TooltipAnchor | null>(null);
@@ -100,7 +105,7 @@ export function Calendar({
 
   const cells = useMemo(() => buildMonth(cursor), [cursor]);
   const mobileMonthDates = useMemo(() => buildMonthDays(cursor), [cursor]);
-  const monthLabel = formatDate(cursor, { month: "long", year: "numeric" });
+  const monthLabel = formatUiDate(cursor, locale, { month: "long", year: "numeric" });
   const tooltipWorkout = tooltipAnchor
     ? (resolveCalendarMoveDateRender(
         snapshot.workouts,
@@ -129,7 +134,7 @@ export function Calendar({
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="hito-choice-toggle-group" aria-label="Calendar view">
+          <div className="hito-choice-toggle-group" aria-label={message("Calendar view")}>
             <HitoChoiceToggle
               type="button"
               onClick={() => setView("month")}
@@ -138,7 +143,7 @@ export function Calendar({
               selected={view === "month"}
               size="sm"
             >
-              Month
+              {message("Month")}
             </HitoChoiceToggle>
             <HitoChoiceToggle
               type="button"
@@ -148,13 +153,13 @@ export function Calendar({
               selected={view === "week"}
               size="sm"
             >
-              Week
+              {message("Week")}
             </HitoChoiceToggle>
           </div>
           <HitoButton
             type="button"
             onClick={() => shift(-1)}
-            aria-label="Previous calendar period"
+            aria-label={message("Previous calendar period")}
             iconOnly
             size="sm"
             variant="secondary"
@@ -170,12 +175,12 @@ export function Calendar({
             size="sm"
             variant="secondary"
           >
-            Today
+            {message("Today")}
           </HitoButton>
           <HitoButton
             type="button"
             onClick={() => shift(1)}
-            aria-label="Next calendar period"
+            aria-label={message("Next calendar period")}
             iconOnly
             size="sm"
             variant="secondary"
@@ -208,7 +213,7 @@ export function Calendar({
                   key={day}
                   className="hito-calendar-grid-heading hito-label-sm uppercase tracking-[0.18em] text-tertiary"
                 >
-                  {day}
+                  {getHitoKnownProductMessage(locale, day)}
                 </div>
               ))}
               {cells.map((iso, index) => (
@@ -251,21 +256,27 @@ function BlueprintProjectionReadback({
 }: {
   projections: BlueprintCalendarProjection[];
 }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   return (
     <section className="mb-6 min-w-0" aria-labelledby="future-blueprint-title">
       <div className="mb-4">
         <h2 id="future-blueprint-title" className="hito-ui-title-md text-foreground">
-          Future training blueprint
+          {message("Future training blueprint")}
         </h2>
         <p className="hito-body-sm mt-1 max-w-2xl text-text-secondary">
-          These are provisional intentions, not confirmed Calendar workouts. Details will be
-          reviewed closer to the date.
+          {message(
+            "These are provisional intentions, not confirmed Calendar workouts. Details will be reviewed closer to the date.",
+          )}
         </p>
       </div>
 
-      <ul className="hito-row-group" aria-label="Future Blueprint projections">
+      <ul className="hito-row-group" aria-label={message("Future Blueprint projections")}>
         {projections.map((projection) => {
-          const statusLabel = blueprintProjectionStatusLabel(projection.status);
+          const statusLabel = getHitoKnownProductMessage(
+            locale,
+            blueprintProjectionStatusLabel(projection.status),
+          );
 
           return (
             <li
@@ -274,7 +285,7 @@ function BlueprintProjectionReadback({
               tabIndex={0}
               data-blueprint-projection=""
               data-blueprint-projection-status={projection.status}
-              aria-label={`${formatDate(projection.date, {
+              aria-label={`${formatUiDate(projection.date, locale, {
                 weekday: "long",
                 month: "long",
                 day: "numeric",
@@ -293,7 +304,7 @@ function BlueprintProjectionReadback({
                   </span>
                 </div>
                 <p className="hito-list-row-copy mt-1">
-                  {formatDate(projection.date, {
+                  {formatUiDate(projection.date, locale, {
                     weekday: "short",
                     month: "short",
                     day: "numeric",
@@ -301,7 +312,7 @@ function BlueprintProjectionReadback({
                   {" · "}
                   {formatBlueprintLabel(projection.phase)}
                   {" · "}
-                  {projection.phaseCadence} sessions per week
+                  {message("{count} sessions per week", { count: projection.phaseCadence })}
                 </p>
                 <p className="hito-list-row-copy mt-1">{projection.goalAssumption}</p>
               </div>
@@ -522,6 +533,8 @@ function CalendarDaySlot({
   onTooltipChange?: (value: TooltipAnchor | null) => void;
   snapshot: TrainingSnapshot;
 }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const projection = buildCalendarDayProjection({
     inMonth,
     interaction: manualCalendarActionState,
@@ -551,11 +564,11 @@ function CalendarDaySlot({
         <CalendarDaySurface
           iso={iso}
           layout={layout}
-          pendingLabel={pendingMoveTarget ? "Moving" : undefined}
+          pendingLabel={pendingMoveTarget ? message("Moving") : undefined}
           presentation={
             pendingMoveTarget
               ? presentation
-              : buildRestCalendarDayPresentation({ stateLabel: "Rest" })
+              : buildRestCalendarDayPresentation({ stateLabel: message("Rest") })
           }
           selected={Boolean(pendingMoveTarget)}
           today={iso === snapshot.currentDate}
@@ -567,16 +580,22 @@ function CalendarDaySlot({
   if (undoAction) {
     return (
       <CalendarDayButton
-        ariaLabel={`Undo move for ${undoAction.title}. ${manualCalendarActionState.undoSecondsRemaining} seconds remaining.`}
+        ariaLabel={message("Undo move for {title}. {seconds} seconds remaining.", {
+          title: undoAction.title,
+          seconds: manualCalendarActionState.undoSecondsRemaining,
+        })}
         layout={layout}
         onClick={() => manualCalendarActionState.onUndoLastMove(undoAction)}
       >
         <CalendarDaySurface
-          action={calendarMoveUndoAction(manualCalendarActionState.undoSecondsRemaining)}
+          action={localizeCalendarAction(
+            calendarMoveUndoAction(manualCalendarActionState.undoSecondsRemaining),
+            locale,
+          )}
           interactive
           iso={iso}
           layout={layout}
-          presentation={buildRestCalendarDayPresentation({ stateLabel: "Rest" })}
+          presentation={buildRestCalendarDayPresentation({ stateLabel: message("Rest") })}
           today={iso === snapshot.currentDate}
         />
       </CalendarDayButton>
@@ -599,21 +618,29 @@ function CalendarDaySlot({
         showRestDayOption={workout?.type !== "rest"}
       >
         <CalendarDayButton
-          ariaLabel={calendarTargetButtonAriaLabel(iso, canMoveHere, addAction.moveTargetDayKind)}
+          ariaLabel={localizedCalendarTargetButtonAriaLabel(
+            iso,
+            canMoveHere,
+            addAction.moveTargetDayKind,
+            locale,
+          )}
           layout={layout}
           {...manualMoveTargetDragProps(canMoveHere, iso, manualCalendarActionState)}
         >
           <CalendarDaySurface
             action={
               canMoveHere
-                ? calendarMoveTargetAction(addAction.moveTargetDayKind)
+                ? localizeCalendarAction(
+                    calendarMoveTargetAction(addAction.moveTargetDayKind),
+                    locale,
+                  )
                 : {
-                    label: "Add workout",
+                    label: message("Add workout"),
                     icon: "plus" as const,
                     trailingIcon: "chevron-down" as const,
                     tone: "muted" as const,
                     visual: "button" as const,
-                    ariaLabel: "Add workout",
+                    ariaLabel: message("Add workout"),
                   }
             }
             className={
@@ -659,7 +686,11 @@ function CalendarDaySlot({
         layout === "month" && "h-full min-w-0",
         canDragMove && "cursor-grab active:cursor-grabbing",
       )}
-      {...manualMoveSourceDragProps(sourceAction, manualCalendarActionState)}
+      {...manualMoveSourceDragProps(
+        sourceAction,
+        manualCalendarActionState,
+        message("Move workout"),
+      )}
     >
       <Link
         to="/workout/$date"
@@ -679,10 +710,10 @@ function CalendarDaySlot({
           slotAction={
             canDragMove
               ? {
-                  label: "Move",
+                  label: message("Move"),
                   icon: "arrow-right" as const,
                   tone: "signal" as const,
-                  ariaLabel: "Drag to move selected workout",
+                  ariaLabel: message("Drag to move selected workout"),
                 }
               : null
           }
@@ -704,7 +735,9 @@ function CalendarDaySlot({
                   layout === "week" ? "bottom-4 right-4" : "bottom-2.5 right-2.5",
                 )
           }
-          aria-label={`${feedbackMeta.label}. Open workout feedback.`}
+          aria-label={message("{label}. Open workout feedback.", {
+            label: getHitoKnownProductMessage(locale, feedbackMeta.label),
+          })}
         >
           <CalendarFeedbackMarker calendar={layout === "month"} state={feedbackMeta.state} />
         </Link>
@@ -734,7 +767,9 @@ function CalendarDaySlot({
               layout === "month" && "right-2 top-2",
               layout === "week" && "right-3 top-3",
             )}
-            aria-label={`More activity actions for ${sourceAction.title}`}
+            aria-label={message("More activity actions for {title}", {
+              title: sourceAction.title,
+            })}
             draggable={false}
             onDragStart={(event) => {
               event.preventDefault();
@@ -804,13 +839,18 @@ function CalendarDaySurface({
   slotAction?: Parameters<typeof HitoCalendarDayCell>[0]["slotAction"];
   today: boolean;
 }) {
+  const locale = useHitoUiLocale();
+  const localizedPresentation = localizeCalendarPresentation(presentation, locale);
   if (layout === "mobile") {
     return (
       <HitoWorkoutDayRow
-        {...presentation}
+        {...localizedPresentation}
         action={action}
         className={className}
-        date={{ eyebrow: weekdayShort(iso), day: iso.slice(8) }}
+        date={{
+          eyebrow: formatUiDate(iso, locale, { weekday: "short" }),
+          day: iso.slice(8),
+        }}
         interactive={interactive}
         pendingLabel={pendingLabel}
         selected={selected}
@@ -822,7 +862,7 @@ function CalendarDaySurface({
 
   return (
     <HitoCalendarDayCell
-      {...presentation}
+      {...localizedPresentation}
       action={action}
       className={cn("h-full", className)}
       day={iso.slice(8)}
@@ -833,8 +873,97 @@ function CalendarDaySurface({
       selected={selected}
       slotAction={slotAction}
       today={today}
-      weekday={layout === "week" ? weekdayShort(iso) : undefined}
+      weekday={layout === "week" ? formatUiDate(iso, locale, { weekday: "short" }) : undefined}
     />
+  );
+}
+
+function localizeCalendarPresentation(
+  presentation: CalendarDaySurfacePresentation,
+  locale: ReturnType<typeof useHitoUiLocale>,
+): CalendarDaySurfacePresentation {
+  return {
+    ...presentation,
+    feedbackLabel:
+      presentation.feedback === "none"
+        ? undefined
+        : getHitoKnownProductMessage(
+            locale,
+            presentation.feedback === "evidence_attached" ? "Evidence" : "Feedback",
+          ),
+    resultLabel:
+      presentation.result === "none"
+        ? undefined
+        : getHitoKnownProductMessage(
+            locale,
+            presentation.result === "completed"
+              ? "Completed"
+              : presentation.result === "partial"
+                ? "Partial"
+                : presentation.result === "skipped"
+                  ? "Skipped"
+                  : "Planned",
+          ),
+    stateLabel: presentation.stateLabel
+      ? getHitoKnownProductMessage(locale, presentation.stateLabel)
+      : presentation.stateLabel,
+    title:
+      presentation.state === "rest" && presentation.title
+        ? getHitoKnownProductMessage(locale, presentation.title)
+        : presentation.title,
+    workout: presentation.workout
+      ? {
+          ...presentation.workout,
+          label: getHitoKnownProductMessage(locale, presentation.workout.label),
+          short: presentation.workout.short
+            ? getHitoKnownProductMessage(locale, presentation.workout.short)
+            : presentation.workout.short,
+        }
+      : presentation.workout,
+  };
+}
+
+function localizeCalendarAction(
+  action: HitoCalendarActionVisual,
+  locale: ReturnType<typeof useHitoUiLocale>,
+): HitoCalendarActionVisual {
+  const undoSeconds = action.label.match(/^Undo (\d+)$/)?.[1];
+  const ariaUndoSeconds = action.ariaLabel?.match(/^Undo move\. (\d+) seconds remaining\.$/)?.[1];
+
+  return {
+    ...action,
+    label: undoSeconds
+      ? formatHitoProductMessage(locale, "Undo {seconds}", { seconds: undoSeconds })
+      : getHitoKnownProductMessage(locale, action.label),
+    ariaLabel: ariaUndoSeconds
+      ? formatHitoProductMessage(locale, "Undo move. {seconds} seconds remaining.", {
+          seconds: ariaUndoSeconds,
+        })
+      : action.ariaLabel
+        ? getHitoKnownProductMessage(locale, action.ariaLabel)
+        : action.ariaLabel,
+  };
+}
+
+function localizedCalendarTargetButtonAriaLabel(
+  iso: string,
+  canMoveHere: boolean,
+  dayKind: Parameters<typeof calendarMoveTargetAction>[0],
+  locale: ReturnType<typeof useHitoUiLocale>,
+) {
+  const date = formatUiDate(iso, locale, {
+    month: "short",
+    day: "numeric",
+    weekday: "short",
+  });
+
+  if (!canMoveHere) return formatHitoProductMessage(locale, "{date}. Add workout.", { date });
+  return formatHitoProductMessage(
+    locale,
+    dayKind === "workout_day"
+      ? "{date}. Review replacement for selected workout."
+      : "{date}. Move selected workout to rest day.",
+    { date },
   );
 }
 
@@ -843,6 +972,8 @@ function CalendarSlotPlaceholder() {
 }
 
 function Tooltip({ workout }: { workout: Workout }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const km = workoutDistanceKm(workout);
   const duration = workoutDuration(workout);
   const meta = workoutTypeMeta(workout);
@@ -855,23 +986,37 @@ function Tooltip({ workout }: { workout: Workout }) {
     <div className="hito-tooltip hito-tooltip-width-lg">
       <div className="flex items-center justify-between">
         <span className="hito-label-md text-foreground" style={{ color: meta.content }}>
-          {meta.label}
+          {getHitoKnownProductMessage(locale, meta.label)}
         </span>
         <span className="hito-label-sm uppercase tracking-[0.18em] text-tertiary">
-          {formatDate(workout.date, { month: "short", day: "numeric", weekday: "short" })}
+          {formatUiDate(workout.date, locale, {
+            month: "short",
+            day: "numeric",
+            weekday: "short",
+          })}
         </span>
       </div>
       <div className="hito-tooltip-title mt-2 font-sans text-lg">{workout.title}</div>
       <div className="hito-metric-row mt-3 grid-cols-3">
-        <Stat label="Distance" value={km != null ? `${formatDistanceKm(km)} km` : "—"} />
-        <Stat label="Duration" value={duration ? formatDurationMin(duration) : "—"} />
-        <Stat label="Status" value={workoutStatusLabel(workout.status)} />
+        <Stat
+          label={message("Distance")}
+          value={
+            km != null ? `${formatUiNumber(km, locale, { maximumFractionDigits: 2 })} km` : "—"
+          }
+        />
+        <Stat label={message("Duration")} value={duration ? formatDurationMin(duration) : "—"} />
+        <Stat
+          label={message("Status")}
+          value={getHitoKnownProductMessage(locale, workoutStatusLabel(workout.status))}
+        />
       </div>
       {readbackEntries.length > 0 && (
         <div className="hito-body-xs text-tertiary mt-3 space-y-0.5 border-t border-hairline pt-3">
           {readbackEntries.map((entry) => (
             <div key={entry.key} className="flex justify-between gap-3">
-              <span className="hito-metric-label">{entry.label}</span>
+              <span className="hito-metric-label">
+                {getHitoKnownProductMessage(locale, entry.label)}
+              </span>
               <span className="text-text-secondary truncate">{entry.value}</span>
             </div>
           ))}
@@ -923,6 +1068,7 @@ function CalendarFeedbackMarker({
   calendar?: boolean;
   state: "evidence_attached" | "feedback_ready";
 }) {
+  const locale = useHitoUiLocale();
   const label = state === "evidence_attached" ? "Evidence" : "Feedback";
 
   return (
@@ -931,7 +1077,7 @@ function CalendarFeedbackMarker({
       data-state={state}
     >
       <span className="hito-feedback-marker-dot" />
-      {!calendar ? <span>{label}</span> : null}
+      {!calendar ? <span>{getHitoKnownProductMessage(locale, label)}</span> : null}
     </span>
   );
 }

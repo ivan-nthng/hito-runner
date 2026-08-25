@@ -17,6 +17,8 @@ import {
   type HeartRateZonesSummary,
   type PersonalHeartRateProfileInput,
 } from "@/lib/heart-rate-zones";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
+import { getHitoKnownProductMessage } from "@/lib/ui-locale-messages";
 
 export type HeartRateProfileDraftState = {
   canSubmit: boolean;
@@ -42,6 +44,8 @@ export function HeartRateProfileSection({
   recommendedAge: number | null;
   summary: HeartRateZonesSummary;
 }) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
   const [draft, setDraft] = useState(() => buildHeartRateProfileDraft(summary));
   const [recommendedApplied, setRecommendedApplied] = useState(false);
   const summaryRef = useRef(summary);
@@ -139,7 +143,7 @@ export function HeartRateProfileSection({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           {appearance === "settings" ? (
-            <h2 className="hito-ui-title-sm text-foreground">Heart-rate guidance</h2>
+            <h2 className="hito-ui-title-sm text-foreground">{message("Heart-rate guidance")}</h2>
           ) : null}
           <p
             className={
@@ -148,7 +152,7 @@ export function HeartRateProfileSection({
                 : "hito-body-md text-secondary max-w-2xl"
             }
           >
-            Adjust the BPM ranges Hito can use for future plan authoring.
+            {message("Adjust the BPM ranges Hito can use for future plan authoring.")}
           </p>
         </div>
         <HitoButton
@@ -159,7 +163,7 @@ export function HeartRateProfileSection({
           disabled={isSaving || recommendedAge == null}
           onClick={applyRecommended}
         >
-          Recommended
+          {message("Recommended")}
         </HitoButton>
       </div>
 
@@ -201,8 +205,12 @@ export function HeartRateProfileSection({
                   <div className="hito-heart-rate-lane-identity">
                     <span className="hito-heart-rate-zone-marker" aria-hidden="true" />
                     <div className="min-w-0">
-                      <h3 className="hito-body-md text-foreground">{zone.label}</h3>
-                      <p className="hito-body-sm mt-1 text-secondary">{zone.description}</p>
+                      <h3 className="hito-body-md text-foreground">
+                        {getHitoKnownProductMessage(locale, zone.label)}
+                      </h3>
+                      <p className="hito-body-sm mt-1 text-secondary">
+                        {getHitoKnownProductMessage(locale, zone.description)}
+                      </p>
                     </div>
                   </div>
 
@@ -215,8 +223,12 @@ export function HeartRateProfileSection({
                         summary.zones[index]?.minBpm ?? zone.sliderMinBpm,
                         summary.zones[index]?.maxBpm ?? zone.sliderMaxBpm,
                       ]}
-                      minLabel={`${zone.label} lower bound`}
-                      maxLabel={`${zone.label} upper bound`}
+                      minLabel={message("{zone} lower bound", {
+                        zone: getHitoKnownProductMessage(locale, zone.label),
+                      })}
+                      maxLabel={message("{zone} upper bound", {
+                        zone: getHitoKnownProductMessage(locale, zone.label),
+                      })}
                       minimumBounds={minimumBounds}
                       maximumBounds={maximumBounds}
                       invalid={Boolean(zoneError || minError || maxError)}
@@ -228,17 +240,27 @@ export function HeartRateProfileSection({
 
                   <div className="hito-heart-rate-lane-fields">
                     <HitoCompoundRangeField
-                      lowerLabel={`${zone.label} lower bound`}
-                      upperLabel={`${zone.label} upper bound`}
+                      lowerLabel={message("{zone} lower bound", {
+                        zone: getHitoKnownProductMessage(locale, zone.label),
+                      })}
+                      upperLabel={message("{zone} upper bound", {
+                        zone: getHitoKnownProductMessage(locale, zone.label),
+                      })}
                       lowerValue={zone.minBpm}
                       upperValue={zone.maxBpm}
                       min={HEART_RATE_GUIDANCE_SCALE.min}
                       max={HEART_RATE_GUIDANCE_SCALE.max}
                       unit="BPM"
                       disabled={isSaving}
-                      lowerError={minError}
-                      upperError={maxError}
-                      error={fieldError}
+                      lowerError={
+                        minError ? getHitoKnownProductMessage(locale, minError) : minError
+                      }
+                      upperError={
+                        maxError ? getHitoKnownProductMessage(locale, maxError) : maxError
+                      }
+                      error={
+                        fieldError ? getHitoKnownProductMessage(locale, fieldError) : fieldError
+                      }
                       onLowerValueChange={(value) => updateTextValue(index, "minBpm", value)}
                       onUpperValueChange={(value) => updateTextValue(index, "maxBpm", value)}
                     />
@@ -250,14 +272,16 @@ export function HeartRateProfileSection({
 
           {visibleSummaryError ? (
             <div className="hito-state-surface p-3" data-tone="destructive" role="alert">
-              <p className="hito-body-sm text-secondary">{visibleSummaryError}</p>
+              <p className="hito-body-sm text-secondary">
+                {getHitoKnownProductMessage(locale, visibleSummaryError)}
+              </p>
             </div>
           ) : null}
         </div>
       ) : (
         <div className="hito-surface-flat mt-4 p-4">
           <p className="hito-body-sm text-secondary">
-            Add and save your age first to establish editable starting ranges.
+            {message("Add and save your age first to establish editable starting ranges.")}
           </p>
         </div>
       )}

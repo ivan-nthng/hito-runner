@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { hitoToast } from "@/components/ui/hito-toast";
 import { HitoButton } from "@/components/ui/button";
+import { useHitoProductMessage } from "@/components/ui/hito-ui-locale-provider";
 import {
   confirmWorkoutCommandAction,
   reviewWorkoutCommandAction,
@@ -78,6 +79,8 @@ export function ManualWorkoutMoveController({
   onReplacementMoveSucceeded: (result: ManualWorkoutMoveSuccess) => void;
   onMoved: () => void | Promise<void>;
 }) {
+  const t = useHitoProductMessage();
+  const moveUnavailableMessage = t(MOVE_UNAVAILABLE_MESSAGE);
   const reviewWorkoutCommandFn = useServerFn(reviewWorkoutCommandAction);
   const confirmWorkoutCommandFn = useServerFn(confirmWorkoutCommandAction);
   const moveInFlightRef = useRef(false);
@@ -102,10 +105,10 @@ export function ManualWorkoutMoveController({
       setStatus("confirming");
       hitoToast.working({
         id: MANUAL_MOVE_TOAST_ID,
-        title: replacement ? "Replacing workout" : "Moving workout",
+        title: replacement ? t("Replacing workout") : t("Moving workout"),
         description: replacement
-          ? "Hito is confirming the reviewed replacement."
-          : "Hito is confirming the reviewed move.",
+          ? t("Hito is confirming the reviewed replacement.")
+          : t("Hito is confirming the reviewed move."),
       });
 
       try {
@@ -123,8 +126,8 @@ export function ManualWorkoutMoveController({
           onOptimisticMoveRejected();
           hitoToast.error({
             id: MANUAL_MOVE_TOAST_ID,
-            title: replacement ? "Workout not replaced" : "Workout not moved",
-            description: response.ok ? MOVE_UNAVAILABLE_MESSAGE : response.message,
+            title: replacement ? t("Workout not replaced") : t("Workout not moved"),
+            description: response.ok ? moveUnavailableMessage : response.message,
           });
           return;
         }
@@ -134,8 +137,8 @@ export function ManualWorkoutMoveController({
           onOptimisticMoveRejected();
           hitoToast.error({
             id: MANUAL_MOVE_TOAST_ID,
-            title: replacement ? "Workout not replaced" : "Workout not moved",
-            description: MOVE_UNAVAILABLE_MESSAGE,
+            title: replacement ? t("Workout not replaced") : t("Workout not moved"),
+            description: moveUnavailableMessage,
           });
           return;
         }
@@ -152,15 +155,15 @@ export function ManualWorkoutMoveController({
         await onMoved();
         hitoToast.success({
           id: MANUAL_MOVE_TOAST_ID,
-          title: replacement ? "Workout replaced" : "Workout moved",
-          description: "Saved to your calendar.",
+          title: replacement ? t("Workout replaced") : t("Workout moved"),
+          description: t("Saved to your calendar."),
         });
       } catch {
         onOptimisticMoveRejected();
         hitoToast.error({
           id: MANUAL_MOVE_TOAST_ID,
-          title: replacement ? "Workout not replaced" : "Workout not moved",
-          description: MOVE_UNAVAILABLE_MESSAGE,
+          title: replacement ? t("Workout not replaced") : t("Workout not moved"),
+          description: moveUnavailableMessage,
         });
       } finally {
         confirmInFlightRef.current = false;
@@ -175,6 +178,8 @@ export function ManualWorkoutMoveController({
       onOptimisticMoveRejected,
       onReplacementConfirming,
       onReplacementMoveSucceeded,
+      moveUnavailableMessage,
+      t,
     ],
   );
 
@@ -195,11 +200,13 @@ export function ManualWorkoutMoveController({
       hitoToast.working({
         id: MANUAL_MOVE_TOAST_ID,
         title:
-          nextRequest.targetDayKind === "workout_day" ? "Reviewing replacement" : "Reviewing move",
+          nextRequest.targetDayKind === "workout_day"
+            ? t("Reviewing replacement")
+            : t("Reviewing move"),
         description:
           nextRequest.targetDayKind === "workout_day"
-            ? "Hito is checking the target workout before anything is replaced."
-            : "Hito is checking the Calendar before moving this workout.",
+            ? t("Hito is checking the target workout before anything is replaced.")
+            : t("Hito is checking the Calendar before moving this workout."),
       });
 
       try {
@@ -214,8 +221,8 @@ export function ManualWorkoutMoveController({
           onOptimisticMoveRejected();
           hitoToast.error({
             id: MANUAL_MOVE_TOAST_ID,
-            title: "Move blocked",
-            description: response.issues[0]?.message ?? MOVE_UNAVAILABLE_MESSAGE,
+            title: t("Move blocked"),
+            description: response.issues[0]?.message ?? moveUnavailableMessage,
           });
           return;
         }
@@ -223,8 +230,8 @@ export function ManualWorkoutMoveController({
           onOptimisticMoveRejected();
           hitoToast.error({
             id: MANUAL_MOVE_TOAST_ID,
-            title: "Move blocked",
-            description: MOVE_UNAVAILABLE_MESSAGE,
+            title: t("Move blocked"),
+            description: moveUnavailableMessage,
           });
           return;
         }
@@ -235,8 +242,8 @@ export function ManualWorkoutMoveController({
           setStatus("idle");
           hitoToast.success({
             id: MANUAL_MOVE_TOAST_ID,
-            title: "Replacement reviewed",
-            description: "Confirm before Hito replaces the target workout.",
+            title: t("Replacement reviewed"),
+            description: t("Confirm before Hito replaces the target workout."),
           });
           return;
         }
@@ -246,8 +253,8 @@ export function ManualWorkoutMoveController({
         onOptimisticMoveRejected();
         hitoToast.error({
           id: MANUAL_MOVE_TOAST_ID,
-          title: "Move review failed",
-          description: MOVE_UNAVAILABLE_MESSAGE,
+          title: t("Move review failed"),
+          description: moveUnavailableMessage,
         });
       } finally {
         moveInFlightRef.current = false;
@@ -263,6 +270,8 @@ export function ManualWorkoutMoveController({
     onRequestHandled,
     request,
     reviewWorkoutCommandFn,
+    moveUnavailableMessage,
+    t,
   ]);
 
   return (
@@ -323,6 +332,7 @@ function ManualWorkoutMoveReplacementDialog({
   review: ManualWorkoutMoveReady | null;
   status: ManualWorkoutMoveStatus;
 }) {
+  const t = useHitoProductMessage();
   const busy = status !== "idle";
   const returnFocusDateRef = useRef<string | null>(null);
 
@@ -355,9 +365,11 @@ function ManualWorkoutMoveReplacementDialog({
         overlayClassName="hito-dialog-overlay-stable hito-info-window-overlay"
       >
         <DialogHeader className="hito-info-window-header">
-          <DialogTitle className="hito-info-window-title">Replace target workout?</DialogTitle>
+          <DialogTitle className="hito-info-window-title">
+            {t("Replace target workout?")}
+          </DialogTitle>
           <DialogDescription className="hito-info-window-copy">
-            This will replace the workout currently on the target day.
+            {t("This will replace the workout currently on the target day.")}
           </DialogDescription>
         </DialogHeader>
 
@@ -369,7 +381,7 @@ function ManualWorkoutMoveReplacementDialog({
             disabled={busy}
             onClick={() => onOpenChange(false)}
           >
-            Cancel
+            {t("Cancel")}
           </HitoButton>
           <HitoButton
             type="button"
@@ -379,7 +391,7 @@ function ManualWorkoutMoveReplacementDialog({
             disabled={busy || !review}
             onClick={onConfirm}
           >
-            {status === "confirming" ? "Replacing..." : "Replace workout"}
+            {status === "confirming" ? t("Replacing...") : t("Replace workout")}
           </HitoButton>
         </DialogFooter>
       </DialogContent>

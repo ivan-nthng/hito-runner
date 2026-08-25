@@ -10,6 +10,8 @@ import {
   type RunningPlanAdmissionField,
 } from "@/components/onboarding/selected-running-plan-flow-utils";
 import { hitoToast } from "@/components/ui/hito-toast";
+import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
+import { getHitoKnownProductMessage } from "@/lib/ui-locale-messages";
 import {
   previewRunningPlanDraft,
   type RunningPlanPreviewActionInput,
@@ -37,6 +39,8 @@ export function useSelectedPlanPresetPreviewController({
   state,
   toastId,
 }: SelectedPlanPresetPreviewControllerOptions) {
+  const locale = useHitoUiLocale();
+  const t = useHitoProductMessage();
   const previewRunningPlanDraftFn = useServerFn(previewRunningPlanDraft);
   const activePreviewRequestRef = useRef<{
     abortController: AbortController;
@@ -134,13 +138,13 @@ export function useSelectedPlanPresetPreviewController({
     postDispatchInputFingerprintRef.current = null;
     setStatus("idle");
     setError(null);
-    setNotice("Plan preparation request cancelled. Nothing was created or saved.");
+    setNotice(t("Plan preparation request cancelled. Nothing was created or saved."));
     setRequestResult(null);
     setPreviewOpen(false);
     setPreviewResult(null);
     setPreviewInput(null);
     resetExternalState();
-  }, [abortActivePreviewRequest, resetExternalState, setPreviewOpen]);
+  }, [abortActivePreviewRequest, resetExternalState, setPreviewOpen, t]);
 
   async function refreshPreview(goalIdOverride?: PlanGoalSelectionId) {
     if (activePreviewRequestRef.current) {
@@ -211,7 +215,9 @@ export function useSelectedPlanPresetPreviewController({
       if (!previewOpenRef.current) {
         hitoToast.success({
           id: toastId,
-          title: `${planGoalChoiceLabel(goalId)} preview ready`,
+          title: t("{goal} preview ready", {
+            goal: getHitoKnownProductMessage(locale, planGoalChoiceLabel(goalId)),
+          }),
           description: previewReadyDescription,
         });
       }
@@ -226,7 +232,7 @@ export function useSelectedPlanPresetPreviewController({
       setPreviewInput(null);
       setStatus("idle");
       setError(
-        "Hito could not prepare the plan right now. Nothing was created or saved. Try again.",
+        t("Hito could not prepare the plan right now. Nothing was created or saved. Try again."),
       );
     }
   }

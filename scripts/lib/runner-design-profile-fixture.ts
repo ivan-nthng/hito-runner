@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import type { Database } from "../../src/lib/supabase/database";
+
+export const ADAPTIVE_INITIAL_PLAN_QA_FIXTURE_MODEL = "gpt-5.2-adaptive-fixture-proof" as const;
 import {
   AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_DELAY_MS_ENV,
   AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV,
@@ -648,6 +650,7 @@ async function prepareAdaptiveInitialPlanReviewFixture(input: {
   goalPreset?: "10K" | "Half Marathon";
   targetDate?: string;
   runtimeScope?: "local_proof" | "hosted_ui_replay";
+  fixtureScenario?: "camelot";
 }) {
   const asOfDate = normalizeAsOfDate(input.asOfDate);
   const initialStartDate = input.continuationProof ? addDaysIso(asOfDate, -14) : asOfDate;
@@ -712,10 +715,20 @@ async function prepareAdaptiveInitialPlanReviewFixture(input: {
         localQaFixtureCurrentDate: initialStartDate,
         aiPreview: {
           apiKey: "local-adaptive-blueprint-fixture",
-          model: "gpt-5.2-adaptive-fixture-proof",
+          model: ADAPTIVE_INITIAL_PLAN_QA_FIXTURE_MODEL,
           fetchImpl: buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
             authoringInput: authoring.authoringInput,
             today: initialStartDate,
+            ...(input.fixtureScenario
+              ? {
+                  env: {
+                    ...process.env,
+                    HITO_AI_GENERATED_PLAN_DEV_FIXTURE: "true",
+                    HITO_AI_GENERATED_PLAN_PROVIDER_MODE: "qa_fixture",
+                    HITO_AI_GENERATED_PLAN_DEV_FIXTURE_SCENARIO: input.fixtureScenario,
+                  },
+                }
+              : {}),
           }),
           generationLedger: { disabled: true },
         },
@@ -1383,6 +1396,7 @@ export async function seedAdaptiveEngineUiReplayFixture(input: {
   asOfDate?: string;
   runtimeScope: "local_proof" | "hosted_ui_replay";
   checkpoint?: AdaptiveEngineUiReplayCheckpoint;
+  fixtureScenario?: "camelot";
 }) {
   const checkpoint = input.checkpoint ?? "complete_surface";
   const provenance = adaptiveEngineUiReplayProvenance(input.runtimeScope, checkpoint);
@@ -1392,6 +1406,7 @@ export async function seedAdaptiveEngineUiReplayFixture(input: {
       continuationProof: false,
       goalPreset: "10K",
       targetDate: addDaysIso(normalizeAsOfDate(input.asOfDate), 84),
+      fixtureScenario: input.fixtureScenario,
     });
     const sourceCandidate = prepared.reviewed.draft.sourceCandidate;
     assert.ok(sourceCandidate);

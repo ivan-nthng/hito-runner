@@ -12,6 +12,18 @@ import { homedir } from "node:os";
 import { basename, dirname, resolve } from "node:path";
 
 export const qaRuntimeRootEnvName = "HITO_QA_RUNTIME_ROOT";
+export const QA_MANAGED_RUNTIME_SLOTS = Object.freeze({
+  qa_fixture: Object.freeze({
+    host: "127.0.0.1",
+    port: 3000,
+    fixtureProfile: null,
+  }),
+  camelot: Object.freeze({
+    host: "localhost",
+    port: 3100,
+    fixtureProfile: "camelot",
+  }),
+});
 
 export function resolveQaRuntimePaths({ rootDir = process.cwd() } = {}) {
   const workspaceRoot = resolve(rootDir);
@@ -51,6 +63,42 @@ export function resolveQaRuntimePaths({ rootDir = process.cwd() } = {}) {
     finalizedPreviousDir: resolve(runtimeParentDir, "qa-runtime-previous"),
     finalizedStagingDir: resolve(runtimeParentDir, "qa-runtime-staging"),
     publicSnapshotDir: resolve(runtimeParentDir, "qa-runtime-public-snapshot"),
+  };
+}
+
+export function resolveQaManagedSlotPaths({ rootDir = process.cwd(), slot = "qa_fixture" } = {}) {
+  const slotContract = QA_MANAGED_RUNTIME_SLOTS[slot];
+  if (!slotContract) {
+    throw new Error(
+      `Unknown managed QA runtime slot ${JSON.stringify(slot)}. Expected one of: ${Object.keys(
+        QA_MANAGED_RUNTIME_SLOTS,
+      ).join(", ")}.`,
+    );
+  }
+
+  const canonicalPaths = resolveQaRuntimePaths({ rootDir });
+  const slotsRoot = resolve(dirname(canonicalPaths.runtimeRoot), "managed-runtime-slots");
+  const slotRoot = resolve(slotsRoot, slot);
+  const runtimeRoot = resolve(slotRoot, "runtime");
+  const stateDir = resolve(slotRoot, "state");
+
+  return {
+    slot,
+    ...slotContract,
+    slotsRoot,
+    slotRoot,
+    runtimeRoot,
+    serverDir: resolve(runtimeRoot, "server"),
+    publicDir: resolve(runtimeRoot, "public"),
+    nitroManifest: resolve(runtimeRoot, "nitro.json"),
+    serverEntry: resolve(runtimeRoot, "server/index.mjs"),
+    freshnessPath: resolve(runtimeRoot, ".hito-build-freshness.json"),
+    stateDir,
+    statePath: resolve(stateDir, "qa-local-server-state.json"),
+    logPath: resolve(stateDir, "qa-local-server.log"),
+    leasePath: resolve(stateDir, "runtime-lease.json"),
+    stagingRuntimeRoot: resolve(slotRoot, "runtime-staging"),
+    previousRuntimeRoot: resolve(slotRoot, "runtime-previous"),
   };
 }
 

@@ -1,5 +1,6 @@
 import { parseCookieHeader, serializeCookieHeader } from "@supabase/ssr";
 import { createServerOnlyFn } from "@tanstack/react-start";
+import { isLocalAuthAccountAllowedForCamelotProfile } from "@/lib/camelot-interactive-qa-fixture";
 import { isDevOnlyLocalAuthRuntime, serverEnv } from "@/lib/supabase/env";
 import type { LocalAuthAccountConfig } from "@/lib/local-auth-account-registry.server";
 
@@ -19,7 +20,9 @@ export async function getLocalAuthAccounts(): Promise<LocalAuthAccountConfig[]> 
   }
 
   try {
-    return await readAccountsFile(serverEnv.localAuthBypassAccountsFile);
+    return (await readAccountsFile(serverEnv.localAuthBypassAccountsFile)).filter((account) =>
+      isLocalAuthAccountAllowedForCamelotProfile(account.username),
+    );
   } catch {
     return [];
   }

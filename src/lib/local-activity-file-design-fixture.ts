@@ -1,5 +1,6 @@
 import { isAiGeneratedRunningPlanDevFixtureEnabled } from "@/lib/ai-generated-running-plan-dev-fixture";
 import type { RequestAuthContext } from "@/lib/backend/auth";
+import { isCamelotInteractiveQaProfileSelected } from "@/lib/camelot-interactive-qa-fixture";
 import { isLoopbackRuntimeUrl } from "@/lib/supabase/env";
 
 export const LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_FIELD = "localQaFixture";
@@ -12,4 +13,15 @@ export function isLocalActivityFileDesignFixtureEnabled(auth: RequestAuthContext
     isLoopbackRuntimeUrl(auth.appBaseUrl) &&
     isAiGeneratedRunningPlanDevFixtureEnabled()
   );
+}
+
+export async function isLocalActivityFileDesignFixtureEnabledForPersistedUser(
+  auth: RequestAuthContext,
+  persistedUserId: string | null,
+) {
+  if (!isLocalActivityFileDesignFixtureEnabled(auth)) return false;
+  if (!isCamelotInteractiveQaProfileSelected()) return true;
+  const { isCamelotFixtureSessionAuthorized } =
+    await import("@/lib/camelot-interactive-qa-fixture.server");
+  return isCamelotFixtureSessionAuthorized({ auth, persistedUserId });
 }

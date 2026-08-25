@@ -12,10 +12,7 @@ import {
   workoutDistanceKm,
   workoutDuration,
 } from "@/lib/training";
-import {
-  LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_FIELD,
-  LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE,
-} from "@/lib/local-activity-file-design-fixture";
+import type { CamelotSimulatedFitOutcomeV1 } from "@/lib/camelot-interactive-qa-fixture";
 import { type WorkoutResultFeedbackSummary } from "@/lib/workout-result-import/types";
 import { HitoButton } from "@/components/ui/button";
 import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
@@ -756,11 +753,11 @@ export function WorkoutFeedbackPanel({
   }, [isUploading, onUploadInProgressChange]);
 
   async function uploadActivityFile(selectedFile: File | null) {
-    if (!selectedFile && !localActivityFileDesignFixtureEnabled) {
+    if (!selectedFile) {
       return;
     }
 
-    if (selectedFile) {
+    if (!localActivityFileDesignFixtureEnabled) {
       const selectedFileName = selectedFile.name.toLowerCase();
       const isSupportedGarminFile =
         selectedFileName.endsWith(".fit") || selectedFileName.endsWith(".zip");
@@ -780,15 +777,7 @@ export function WorkoutFeedbackPanel({
     try {
       const formData = new FormData();
       formData.set("plannedWorkoutId", workout.id);
-
-      if (localActivityFileDesignFixtureEnabled) {
-        formData.set(
-          LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_FIELD,
-          LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE,
-        );
-      } else if (selectedFile) {
-        formData.set("file", selectedFile);
-      }
+      formData.set("file", selectedFile);
 
       const response = await fetch("/api/workout-result/upload", {
         method: "POST",
@@ -802,6 +791,7 @@ export function WorkoutFeedbackPanel({
             latestActualMetrics: NonNullable<WorkoutResultFeedbackSummary>["latestActualMetrics"];
             latestComparison: NonNullable<WorkoutResultFeedbackSummary>["latestComparison"];
             latestAiInsight: NonNullable<WorkoutResultFeedbackSummary>["latestAiInsight"];
+            fixtureOutcome: CamelotSimulatedFitOutcomeV1 | null;
           }
         | { ok: false; message?: string }
       >(response, "The Garmin result upload could not be completed.");
@@ -816,7 +806,10 @@ export function WorkoutFeedbackPanel({
 
       setFeedbackState({
         marker: payload.marker ?? null,
-        latestAsset: payload.latestAsset ?? null,
+        latestAsset: projectCamelotPresentationAsset(
+          payload.latestAsset ?? null,
+          payload.fixtureOutcome,
+        ),
         latestActualMetrics: payload.latestActualMetrics ?? null,
         latestComparison: payload.latestComparison ?? null,
         latestAiInsight: payload.latestAiInsight ?? null,
@@ -834,11 +827,13 @@ export function WorkoutFeedbackPanel({
         return;
       }
 
-      const successNotice = payload.latestComparison
-        ? "Activity file uploaded. Plan versus run is ready to review."
-        : payload.latestActualMetrics
-          ? "Activity file uploaded. Run captured; plan comparison is unavailable."
-          : "Activity file uploaded.";
+      const successNotice = payload.fixtureOutcome
+        ? `${payload.fixtureOutcome.presentationFileName} selected. Camelot used canonical synthetic evidence; the selected bytes were not parsed or stored.`
+        : payload.latestComparison
+          ? "Activity file uploaded. Plan versus run is ready to review."
+          : payload.latestActualMetrics
+            ? "Activity file uploaded. Run captured; plan comparison is unavailable."
+            : "Activity file uploaded.";
       setOperationNotice(successNotice);
 
       try {
@@ -847,7 +842,9 @@ export function WorkoutFeedbackPanel({
         // Keep the successful upload state visible even if route refresh lags.
       }
 
-      onUploadSucceeded?.(successNotice);
+      if (!payload.fixtureOutcome) {
+        onUploadSucceeded?.(successNotice);
+      }
     } catch (uploadFailure) {
       setOperationNotice(null);
       setUploadError(
@@ -900,11 +897,12 @@ export function WorkoutFeedbackPanel({
         </div>
       </header>
 
-      {!attachedGarminAsset && !localActivityFileDesignFixtureEnabled ? (
+      {!attachedGarminAsset ? (
         <input
           ref={fileInputRef}
           type="file"
           className="sr-only"
+          accept={localActivityFileDesignFixtureEnabled ? undefined : ".fit,.zip"}
           onChange={(event) => {
             const selectedFile = event.target.files?.[0];
             event.target.value = "";
@@ -1011,8 +1009,8 @@ export function WorkoutFeedbackPanel({
                   </p>
                   {localActivityFileDesignFixtureEnabled ? (
                     <p className="hito-body-xs mt-3 max-w-xl text-muted-foreground">
-                      Local QA fixture. Attach the canonical FIT sample through the same durable
-                      upload path used by runner files.
+                      Local QA fixture. Choose a local file through the ordinary upload control. The
+                      server keeps only the authorized safe presentation result.
                     </p>
                   ) : null}
                   <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
@@ -1022,11 +1020,7 @@ export function WorkoutFeedbackPanel({
                         setUploadError(null);
                         setRemoveError(null);
                         setOperationNotice(null);
-                        if (localActivityFileDesignFixtureEnabled) {
-                          void uploadActivityFile(null);
-                        } else {
-                          fileInputRef.current?.click();
-                        }
+                        fileInputRef.current?.click();
                       }}
                       disabled={!canUploadResult || isUploading}
                       size="md"
@@ -1038,7 +1032,7 @@ export function WorkoutFeedbackPanel({
                       {isUploading
                         ? "Uploading file..."
                         : localActivityFileDesignFixtureEnabled
-                          ? "Attach local FIT sample"
+                          ? "Choose local file"
                           : "Upload activity file"}
                     </HitoButton>
                   </div>
@@ -1280,6 +1274,21 @@ function AttachedEvidenceReadback({
 }
 
 class RunnerSafeWorkoutResultClientError extends Error {}
+
+function projectCamelotPresentationAsset(
+  asset: NonNullable<WorkoutResultFeedbackSummary>["latestAsset"],
+  outcome: CamelotSimulatedFitOutcomeV1 | null,
+): NonNullable<WorkoutResultFeedbackSummary>["latestAsset"] {
+  if (!asset || !outcome) {
+    return asset;
+  }
+
+  return {
+    ...asset,
+    originalFileName: outcome.presentationFileName,
+    primaryFileName: outcome.presentationFileName,
+  };
+}
 
 async function readWorkoutResultResponse<T>(
   response: Response,

@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import { rmSync } from "node:fs";
 import { resolve } from "node:path";
 import { acquireBuildOutputLock, releaseBuildOutputLock } from "./lib/build-output-lock.mjs";
@@ -25,16 +24,12 @@ const generatedBuildPaths = [
 ];
 
 console.warn(
-  `[clean-build-output] Removing generated ${isVercelBuild ? "Vercel" : "local"} build output. Restart any built-runtime server after rebuilding.`,
+  `[clean-build-output] Removing generated ${isVercelBuild ? "Vercel" : "local"} build output. Managed runtime slots keep their immutable published snapshots.`,
 );
 
 acquireBuildOutputLock({ rootDir });
 
 try {
-  if (!isVercelBuild) {
-    stopManagedQaServerBeforeCleaning();
-  }
-
   for (const relativePath of generatedBuildPaths) {
     const generatedPath = resolve(rootDir, relativePath);
     removeGeneratedPath(generatedPath);
@@ -43,39 +38,6 @@ try {
 } catch (error) {
   releaseBuildOutputLock({ rootDir });
   throw error;
-}
-
-function stopManagedQaServerBeforeCleaning() {
-  const result = spawnSync(process.execPath, ["./scripts/qa-local-server.mjs", "stop"], {
-    cwd: process.cwd(),
-    encoding: "utf8",
-    env: {
-      ...process.env,
-      HITO_QA_SERVER_STOP_FOR_BUILD: "1",
-    },
-  });
-
-  if (result.status === 0) {
-    const output = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim();
-
-    if (output) {
-      console.warn(`[clean-build-output] ${output}`);
-    }
-    return;
-  }
-
-  const output = [result.stderr?.trim(), result.stdout?.trim()].filter(Boolean).join(" ");
-
-  if (output.includes("Refusing to stop unmanaged process")) {
-    console.warn(
-      `[clean-build-output] QA server stop preflight found an unmanaged port 3000 process; continuing build clean without stopping it. ${output}`,
-    );
-    return;
-  }
-
-  throw new Error(
-    `[clean-build-output] QA server stop preflight failed before build-output clean. ${output}`,
-  );
 }
 
 function removeGeneratedPath(path) {

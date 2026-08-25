@@ -50,6 +50,7 @@ export const AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID =
 
 const MAX_AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_DELAY_MS = 10 * 60 * 1000;
 const NON_REPEAT_TEMPO_FIXTURE_SCENARIO = "non_repeat_tempo" as const;
+const CAMELOT_FIXTURE_SCENARIO = "camelot" as const;
 const DEFAULT_FIXTURE_HORIZON_DAYS = 56;
 const QA_FIXTURE_PAST_WEEKS = 6;
 
@@ -59,7 +60,8 @@ type RuntimeEnv = Record<string, string | undefined>;
 export type AiGeneratedRunningPlanProviderMode = "real" | "qa_fixture";
 type AiGeneratedRunningPlanDevFixtureScenario =
   | "default"
-  | typeof NON_REPEAT_TEMPO_FIXTURE_SCENARIO;
+  | typeof NON_REPEAT_TEMPO_FIXTURE_SCENARIO
+  | typeof CAMELOT_FIXTURE_SCENARIO;
 type ProviderFixtureSection =
   AiAuthoredPlanFirstCompilerDraft["detailed_block"]["workouts"][number]["sections"][number];
 type ProviderFixtureWorkoutDay =
@@ -392,9 +394,12 @@ function resolveAiGeneratedRunningPlanDevFixtureScenario(
   if (!rawScenario) {
     return "default";
   }
-  if (rawScenario !== NON_REPEAT_TEMPO_FIXTURE_SCENARIO) {
+  if (
+    rawScenario !== NON_REPEAT_TEMPO_FIXTURE_SCENARIO &&
+    rawScenario !== CAMELOT_FIXTURE_SCENARIO
+  ) {
     throw new Error(
-      `${AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV} must be ${NON_REPEAT_TEMPO_FIXTURE_SCENARIO}.`,
+      `${AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV} must be ${NON_REPEAT_TEMPO_FIXTURE_SCENARIO} or ${CAMELOT_FIXTURE_SCENARIO}.`,
     );
   }
   if (
@@ -406,7 +411,7 @@ function resolveAiGeneratedRunningPlanDevFixtureScenario(
     );
   }
 
-  return NON_REPEAT_TEMPO_FIXTURE_SCENARIO;
+  return rawScenario;
 }
 
 function buildAiGeneratedRunningPlanDevFixtureFetch(
@@ -952,10 +957,15 @@ function buildStandardFixtureWeekCandidates(input: {
     ];
   }
   const qualityBuilders =
-    input.fixtureScenario === NON_REPEAT_TEMPO_FIXTURE_SCENARIO
-      ? [buildTempoFixtureDay, buildDistanceIntervalsFixtureDay, buildUphillRepeatsFixtureDay]
-      : [buildRepeatFixtureDay, buildDistanceIntervalsFixtureDay, buildUphillRepeatsFixtureDay];
-  const firstBuilders = [buildEasyFixtureDay, buildStridesFixtureDay, buildEasyFixtureDay];
+    input.fixtureScenario === CAMELOT_FIXTURE_SCENARIO
+      ? [buildSteadyFixtureDay, buildDistanceIntervalsFixtureDay, buildUphillRepeatsFixtureDay]
+      : input.fixtureScenario === NON_REPEAT_TEMPO_FIXTURE_SCENARIO
+        ? [buildTempoFixtureDay, buildDistanceIntervalsFixtureDay, buildUphillRepeatsFixtureDay]
+        : [buildRepeatFixtureDay, buildDistanceIntervalsFixtureDay, buildUphillRepeatsFixtureDay];
+  const firstBuilders =
+    input.fixtureScenario === CAMELOT_FIXTURE_SCENARIO
+      ? [buildEasyFixtureDay]
+      : [buildEasyFixtureDay, buildStridesFixtureDay, buildEasyFixtureDay];
   const quality = qualityBuilders[input.weekIndex % qualityBuilders.length]!;
   const first = firstBuilders[input.weekIndex % firstBuilders.length]!;
 

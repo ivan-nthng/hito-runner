@@ -3,6 +3,16 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { isAiGeneratedRunningPlanDevFixtureEnabled } from "@/lib/ai-generated-running-plan-dev-fixture";
+import type { RequestAuthContext } from "@/lib/backend/auth";
+import {
+  CAMELOT_INTERACTIVE_QA_FIXTURE_VERSION,
+  CAMELOT_INTERACTIVE_QA_PROFILE,
+  CAMELOT_SIMULATED_FIT_OUTCOME_VERSION,
+  evaluateCamelotRuntimeBoundary,
+  sanitizeCamelotPresentationFileName,
+  type CamelotSimulatedFitOutcomeV1,
+} from "@/lib/camelot-interactive-qa-fixture";
+import { isCamelotFixtureSessionAuthorized } from "@/lib/camelot-interactive-qa-fixture.server";
 import { LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE } from "@/lib/local-activity-file-design-fixture";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import {
@@ -35,6 +45,40 @@ const LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SHA256 =
   "fb5e9a4b3a0d9ff90e105c174bb728f730de621875b17503db8981cb80c108a2";
 
 export type { WorkoutResultProjectionFailurePointForQa } from "@/lib/workout-result-import/planned-workout-projection";
+
+export async function interceptCamelotSelectedActivityFile(input: {
+  auth: RequestAuthContext;
+  persistedUserId: string;
+  plannedWorkoutId: string | null;
+  selectedFile: File;
+}) {
+  const boundary = evaluateCamelotRuntimeBoundary({
+    authProvider: input.auth.provider,
+    appBaseUrl: input.auth.appBaseUrl,
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? null,
+  });
+  if (!boundary.allowed) return null;
+  if (!(await isCamelotFixtureSessionAuthorized(input))) {
+    return null;
+  }
+
+  const result = await ingestLocalQaFixtureWorkoutResult({
+    userId: input.persistedUserId,
+    plannedWorkoutId: input.plannedWorkoutId,
+    requestedFixture: LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE,
+    authProvider: input.auth.provider,
+    appBaseUrl: input.auth.appBaseUrl,
+  });
+  const outcome: CamelotSimulatedFitOutcomeV1 = {
+    version: CAMELOT_SIMULATED_FIT_OUTCOME_VERSION,
+    profile: CAMELOT_INTERACTIVE_QA_PROFILE,
+    presentationFileName: sanitizeCamelotPresentationFileName(input.selectedFile.name),
+    selectedBytesDiscardedBeforeParserOrStorage: true,
+    syntheticEvidenceSource: "canonical_local_fit_fixture",
+    externalProviderDispatchCount: 0,
+  };
+  return { fixtureVersion: CAMELOT_INTERACTIVE_QA_FIXTURE_VERSION, result, outcome };
+}
 
 export async function ingestLocalQaFixtureWorkoutResult(params: {
   userId: string;

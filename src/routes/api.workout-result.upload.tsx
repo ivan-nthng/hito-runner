@@ -20,6 +20,7 @@ export const Route = createFileRoute("/api/workout-result/upload")({
     handlers: {
       POST: async ({ request }) => {
         try {
+          const auth = getRequestAuthContext();
           const userId = await requirePersistedUserIdForCurrentRequest();
           const formData = await readBoundedMultipartFormData(
             request,
@@ -44,10 +45,23 @@ export const Route = createFileRoute("/api/workout-result/upload")({
             );
           }
 
-          const { ingestGarminWorkoutResult, ingestLocalQaFixtureWorkoutResult } =
-            await import("@/lib/workout-result-import/ingest-garmin-result");
-          const result =
+          const {
+            ingestGarminWorkoutResult,
+            ingestLocalQaFixtureWorkoutResult,
+            interceptCamelotSelectedActivityFile,
+          } = await import("@/lib/workout-result-import/ingest-garmin-result");
+          const camelotUpload =
             fileEntry instanceof File
+              ? await interceptCamelotSelectedActivityFile({
+                  auth,
+                  persistedUserId: userId,
+                  plannedWorkoutId,
+                  selectedFile: fileEntry,
+                })
+              : null;
+          const result = camelotUpload
+            ? camelotUpload.result
+            : fileEntry instanceof File
               ? await ingestGarminWorkoutResult({
                   userId,
                   plannedWorkoutId,
@@ -57,8 +71,8 @@ export const Route = createFileRoute("/api/workout-result/upload")({
                   userId,
                   plannedWorkoutId,
                   requestedFixture: LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE,
-                  authProvider: getRequestAuthContext().provider,
-                  appBaseUrl: getRequestAuthContext().appBaseUrl,
+                  authProvider: auth.provider,
+                  appBaseUrl: auth.appBaseUrl,
                 });
           const feedback = "plannedWorkout" in result ? result : null;
 
@@ -70,6 +84,7 @@ export const Route = createFileRoute("/api/workout-result/upload")({
               latestActualMetrics: feedback?.latestActualMetrics ?? null,
               latestComparison: feedback?.latestComparison ?? null,
               latestAiInsight: feedback?.latestAiInsight ?? null,
+              fixtureOutcome: camelotUpload?.outcome ?? null,
             },
             {
               status: 200,

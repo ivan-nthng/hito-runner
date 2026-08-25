@@ -63,6 +63,7 @@ Normal QA reuses these roles:
 
 | Role                        | Purpose                                                                  |
 | --------------------------- | ------------------------------------------------------------------------ |
+| `camelot`                   | Explicit local-only interactive design sandbox                           |
 | `baseline-no-plan`          | Saved baseline/profile with no active plan                               |
 | `saved-plan-readback`       | Review, confirm, persistence, export, and readback proof                 |
 | `provider-engine`           | Direct backend/provider-engine proof without browser creation            |
@@ -89,6 +90,12 @@ npm run test-user -- pool-delete \
 
 Provider/engine iteration uses the direct backend seam. Browser creation and confirmation remain a
 separate cross-flow gate.
+
+Camelot is not a second lifecycle. Its high-level commands delegate to this pool, the same managed
+QA lifecycle and the same persistence owners. The lifecycle publishes one canonical build into
+independent `qa_fixture:3000` and `camelot:3100` runtime slots; identities and resets remain scoped
+to their explicit pool role. See
+[`camelot-interactive-qa-fixture.md`](camelot-interactive-qa-fixture.md).
 
 `pool-ensure` generates a private local password when the role is first created and reuses the
 ignored credentials-registry value afterward. Passing `--password` is optional and rotates only that

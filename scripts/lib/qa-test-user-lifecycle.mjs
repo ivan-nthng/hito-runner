@@ -7,6 +7,11 @@ const { classifyActor } = await tsImport("../../src/lib/actor-classification.ts"
 
 export const QA_TESTER_POOL_VERSION = "hito_qa_tester_pool_v1";
 export const QA_TESTER_POOL = Object.freeze({
+  camelot: Object.freeze({
+    username: "camelot",
+    email: "camelot@local.test",
+    displayName: "Camelot",
+  }),
   "baseline-no-plan": Object.freeze({
     username: "qa-baseline",
     email: "qa-baseline@local.test",

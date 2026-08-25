@@ -36,6 +36,7 @@ const ADAPTIVE_UI_REPLAY_COMMANDS = new Set([
   "adaptive-ui-replay-status",
   "adaptive-ui-replay-reset",
 ]);
+const CAMELOT_COMMANDS = new Set(["camelot-seed", "camelot-status", "camelot-reset"]);
 const HOSTED_CAPABLE_COMMANDS = ADAPTIVE_UI_REPLAY_COMMANDS;
 const config = await buildConfig();
 
@@ -74,7 +75,12 @@ const { ingestLocalQaFixtureWorkoutResult, removeWorkoutResultEvidence } = await
   "../src/lib/workout-result-import/ingest-garmin-result.ts",
   import.meta.url,
 );
+const { CAMELOT_INTERACTIVE_QA_FIXTURE_VERSION, CAMELOT_INTERACTIVE_QA_PROFILE } = await tsImport(
+  "../src/lib/camelot-interactive-qa-fixture.ts",
+  import.meta.url,
+);
 const {
+  ADAPTIVE_INITIAL_PLAN_QA_FIXTURE_MODEL,
   ADAPTIVE_BLUEPRINT_PROJECTION_FIXTURE_VERSION,
   ADAPTIVE_ENGINE_UI_REPLAY_CHECKPOINTS,
   ADAPTIVE_ENGINE_UI_REPLAY_FIXTURE_VERSION,
@@ -121,6 +127,9 @@ if (
     "pool-reset-plan",
     "pool-reset",
     "pool-delete",
+    "camelot-seed",
+    "camelot-status",
+    "camelot-reset",
     "adaptive-ui-replay-seed",
     "adaptive-ui-replay-status",
     "adaptive-ui-replay-reset",
@@ -143,7 +152,7 @@ if (
   ].includes(command)
 ) {
   throw new Error(
-    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-reset-plan|pool-reset|pool-delete|adaptive-ui-replay-seed|adaptive-ui-replay-status|adaptive-ui-replay-reset|design-profile-seed|design-profile-status|design-profile-reset|adaptive-blueprint-seed|adaptive-blueprint-continuation-seed|adaptive-blueprint-status|adaptive-blueprint-continuation-prepare|adaptive-blueprint-continuation-proof|adaptive-blueprint-continuation-profile-proof|adaptive-blueprint-two-profile-replay|adaptive-blueprint-second-continuation-preflight|adaptive-blueprint-second-continuation-author|adaptive-blueprint-second-continuation-recompile|adaptive-blueprint-reset|runner-core-file-flow-seed|runner-core-file-flow-proof|create|reset-plan|reset|delete> [options]",
+    "Usage: npm run test-user -- <inventory|cleanup-manifest|cleanup-apply|pool-ensure|pool-reset-plan|pool-reset|pool-delete|camelot-seed|camelot-status|camelot-reset|adaptive-ui-replay-seed|adaptive-ui-replay-status|adaptive-ui-replay-reset|design-profile-seed|design-profile-status|design-profile-reset|adaptive-blueprint-seed|adaptive-blueprint-continuation-seed|adaptive-blueprint-status|adaptive-blueprint-continuation-prepare|adaptive-blueprint-continuation-proof|adaptive-blueprint-continuation-profile-proof|adaptive-blueprint-two-profile-replay|adaptive-blueprint-second-continuation-preflight|adaptive-blueprint-second-continuation-author|adaptive-blueprint-second-continuation-recompile|adaptive-blueprint-reset|runner-core-file-flow-seed|runner-core-file-flow-proof|create|reset-plan|reset|delete> [options]",
   );
 }
 
@@ -168,6 +177,12 @@ if (command === "inventory") {
   await handlePoolReset();
 } else if (command === "pool-delete") {
   await handlePoolDelete();
+} else if (command === "camelot-seed") {
+  await handleCamelotSeed();
+} else if (command === "camelot-status") {
+  await handleCamelotStatus();
+} else if (command === "camelot-reset") {
+  await handleCamelotReset();
 } else if (command === "adaptive-ui-replay-seed") {
   await handleAdaptiveUiReplaySeed();
 } else if (command === "adaptive-ui-replay-status") {
@@ -413,6 +428,254 @@ async function handlePoolDelete() {
       2,
     ),
   );
+}
+
+async function handleCamelotSeed() {
+  assertCamelotCommandIsLocal();
+  const receipt = await withCamelotIdentity(async (userId) => {
+    const beforeCounts = await getQaUserOwnedCounts(supabase, userId);
+    await resetQaPoolUserData({ supabase, userId });
+    await assertUserStorageEmpty(userId);
+    try {
+      await seedAdaptiveEngineUiReplayFixture({
+        supabase,
+        userId,
+        asOfDate: options["as-of-date"],
+        runtimeScope: "local_proof",
+        checkpoint: "initial_plan_review",
+        fixtureScenario: "camelot",
+      });
+      return await readCamelotFixtureReceipt(userId, "camelot-seed", beforeCounts);
+    } catch (error) {
+      const cleanup = await resetQaPoolUserData({ supabase, userId });
+      assertAllOwnedCountsZero(cleanup, "Camelot failed seed cleanup");
+      await assertUserStorageEmpty(userId);
+      throw error;
+    }
+  });
+  await assertCamelotLeaseReleased();
+  receipt.leaseReleased = true;
+  console.log(JSON.stringify(receipt, null, 2));
+}
+
+async function handleCamelotStatus() {
+  assertCamelotCommandIsLocal();
+  const receipt = await withCamelotIdentity((userId) =>
+    readCamelotFixtureReceipt(userId, "camelot-status"),
+  );
+  await assertCamelotLeaseReleased();
+  receipt.leaseReleased = true;
+  console.log(JSON.stringify(receipt, null, 2));
+}
+
+async function handleCamelotReset() {
+  assertCamelotCommandIsLocal();
+  const resetMode = options.mode ?? "base";
+  if (resetMode !== "base" && resetMode !== "zero") {
+    throw new Error("Camelot reset --mode must be base or zero.");
+  }
+  const receipt = await withCamelotIdentity(async (userId) => {
+    const beforeCounts = await getQaUserOwnedCounts(supabase, userId);
+    const zeroCounts = await resetQaPoolUserData({ supabase, userId });
+    assertAllOwnedCountsZero(zeroCounts, "Camelot reset to canonical zero");
+    await assertUserStorageEmpty(userId);
+    if (resetMode === "zero") {
+      return {
+        ok: true,
+        action: "camelot-reset-zero",
+        profile: CAMELOT_INTERACTIVE_QA_PROFILE,
+        fixtureVersion: CAMELOT_INTERACTIVE_QA_FIXTURE_VERSION,
+        localOnly: true,
+        authIdentityRetained: true,
+        uiState: "canonical_zero",
+        externalProviderDispatchCount: 0,
+        beforeCounts,
+        ownedRows: zeroCounts,
+        storageObjects: 0,
+      };
+    }
+    try {
+      await seedAdaptiveEngineUiReplayFixture({
+        supabase,
+        userId,
+        asOfDate: options["as-of-date"],
+        runtimeScope: "local_proof",
+        checkpoint: "initial_plan_review",
+        fixtureScenario: "camelot",
+      });
+      return await readCamelotFixtureReceipt(userId, "camelot-reset", beforeCounts, zeroCounts);
+    } catch (error) {
+      const cleanup = await resetQaPoolUserData({ supabase, userId });
+      assertAllOwnedCountsZero(cleanup, "Camelot failed reset cleanup");
+      await assertUserStorageEmpty(userId);
+      throw error;
+    }
+  });
+  await assertCamelotLeaseReleased();
+  receipt.leaseReleased = true;
+  console.log(JSON.stringify(receipt, null, 2));
+}
+
+async function withCamelotIdentity(action) {
+  const lease = await acquireQaPoolLease({ role: CAMELOT_INTERACTIVE_QA_PROFILE });
+  try {
+    const authUser = await ensureQaPoolUserWithLocalAccount(CAMELOT_INTERACTIVE_QA_PROFILE);
+    return await action(authUser.id);
+  } finally {
+    await releaseQaPoolLease({ role: CAMELOT_INTERACTIVE_QA_PROFILE, token: lease.token });
+  }
+}
+
+async function readCamelotFixtureReceipt(userId, action, beforeCounts = null, zeroCounts = null) {
+  const ownedRows = await getQaUserOwnedCounts(supabase, userId);
+  const savedPlanReviews = await listSavedPlanReviewsForUser(userId);
+  const savedPlanReview = savedPlanReviews.records[0] ?? null;
+  const restore = savedPlanReview
+    ? await restoreSavedPlanReviewForUser(userId, {
+        candidateId: savedPlanReview.candidate.id,
+        candidateVersion: savedPlanReview.candidate.version,
+      })
+    : null;
+  assert.equal(savedPlanReviews.records.length, 1);
+  assert.equal(restore?.ok, true);
+  assert.equal(restore?.status, "review_ready");
+  if (!restore?.ok || restore.status !== "review_ready") {
+    throw new Error("Camelot Saved plan did not restore to the ordinary review-ready state.");
+  }
+  assert.equal(restore.review.workoutDocuments.length, 28);
+  assert.equal(ownedRows.ai_plan_generation_responses, 1);
+  assert.equal(ownedRows.adaptive_training_blueprint_versions, 1);
+  assert.equal(ownedRows.adaptive_training_detailed_candidates, 1);
+  assert.equal(ownedRows.adaptive_training_block_confirmations, 0);
+  assert.equal(ownedRows.planned_workouts, 0);
+  assert.equal(ownedRows.runner_capability_usage, 0);
+
+  const responses = await supabase
+    .from("ai_plan_generation_responses")
+    .select("provider_response_id, provider_model, schema_outcome, compiler_outcome")
+    .eq("user_id", userId);
+  if (responses.error) throw new Error(responses.error.message);
+  assert.equal(responses.data.length, 1);
+  assert.ok(
+    responses.data.every((response) => response.provider_response_id.startsWith("local-dev-")),
+  );
+  assert.ok(
+    responses.data.every(
+      (response) => response.provider_model === ADAPTIVE_INITIAL_PLAN_QA_FIXTURE_MODEL,
+    ),
+  );
+  assert.ok(
+    responses.data.every(
+      (response) =>
+        response.schema_outcome === "accepted" && response.compiler_outcome === "accepted",
+    ),
+  );
+  const workoutFamilies = [
+    ...new Set(
+      restore.review.workoutDocuments.map(
+        (document) => document.workoutFamily ?? document.workoutType,
+      ),
+    ),
+  ].sort();
+  for (const requiredFamily of ["rest", "easy", "steady", "intervals", "hills", "long"]) {
+    assert.ok(
+      workoutFamilies.includes(requiredFamily),
+      `Camelot is missing the ${requiredFamily} workout family.`,
+    );
+  }
+  const storage = await supabase.storage
+    .from(RUNNER_DESIGN_PROFILE_FIXTURE_STORAGE_BUCKET)
+    .list(userId, { limit: 100 });
+  if (storage.error) throw new Error(storage.error.message);
+  const rlsReadback = await readCamelotRlsBoundary(userId);
+
+  return {
+    ok: true,
+    action,
+    profile: CAMELOT_INTERACTIVE_QA_PROFILE,
+    fixtureVersion: CAMELOT_INTERACTIVE_QA_FIXTURE_VERSION,
+    provenance: {
+      sourceFixtureVersion: ADAPTIVE_ENGINE_UI_REPLAY_FIXTURE_VERSION,
+      checkpoint: "initial_plan_review",
+      deterministicProviderResponse: true,
+      rawProviderContentIncluded: false,
+      credentialsIncluded: false,
+      personalDataIncluded: false,
+    },
+    localOnly: true,
+    authIdentityRetained: true,
+    uiState: "saved_plan_review_ready",
+    savedPlanCount: savedPlanReviews.records.length,
+    canonicalWorkoutDocumentCount: restore.review.workoutDocuments.length,
+    workoutFamilies,
+    confirmationCount: ownedRows.adaptive_training_block_confirmations,
+    calendarWorkoutCount: ownedRows.planned_workouts,
+    externalProviderDispatchCount: 0,
+    ownedRows,
+    storageObjects: storage.data.length,
+    rlsReadback,
+    ...(beforeCounts ? { beforeCounts } : {}),
+    ...(zeroCounts ? { zeroCountsBeforeReseed: zeroCounts } : {}),
+  };
+}
+
+async function readCamelotRlsBoundary(userId) {
+  const account = (await loadLocalAccounts()).find(
+    (candidate) => candidate.email === QA_TESTER_POOL[CAMELOT_INTERACTIVE_QA_PROFILE].email,
+  );
+  if (!account) throw new Error("Camelot local Auth account is unavailable for RLS proof.");
+  const client = createClient(
+    config.supabaseUrl,
+    requireOption(
+      readEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"),
+      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+    ),
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
+  const signedIn = await client.auth.signInWithPassword({
+    email: account.email,
+    password: account.password,
+  });
+  if (signedIn.error || signedIn.data.user?.id !== userId) {
+    throw new Error("Camelot public Auth/RLS proof could not establish the exact pool identity.");
+  }
+  try {
+    const own = await client
+      .from("adaptive_training_detailed_candidates")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId);
+    const foreign = await client
+      .from("adaptive_training_detailed_candidates")
+      .select("id", { count: "exact", head: true })
+      .neq("user_id", userId);
+    if (own.error || foreign.error) {
+      throw new Error(
+        own.error?.message ?? foreign.error?.message ?? "Camelot RLS readback failed.",
+      );
+    }
+    assert.equal(own.count, 1);
+    assert.equal(foreign.count, 0);
+    return { ownCandidateCount: own.count, foreignCandidateCount: foreign.count };
+  } finally {
+    await client.auth.signOut();
+  }
+}
+
+function assertCamelotCommandIsLocal() {
+  if (
+    !CAMELOT_COMMANDS.has(command) ||
+    config.hostedProjectRef ||
+    !isLoopbackRuntimeUrl(config.supabaseUrl)
+  ) {
+    throw new Error("Camelot is restricted to the repository-managed local Supabase lifecycle.");
+  }
+}
+
+async function assertCamelotLeaseReleased() {
+  const lease = (await readQaPoolLeases()).find(
+    (candidate) => candidate.role === CAMELOT_INTERACTIVE_QA_PROFILE,
+  );
+  assert.equal(lease, undefined, "Camelot command retained a QA pool lease.");
 }
 
 async function handleAdaptiveUiReplaySeed() {

@@ -2,6 +2,7 @@
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import {
   closeSync,
+  cpSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -22,19 +23,26 @@ import {
   fingerprintQaExecutableInputs,
   writeQaBuildFreshnessReceipt,
 } from "./lib/qa-build-freshness.mjs";
-import { resolveQaRuntimePaths } from "./lib/qa-runtime-paths.mjs";
+import {
+  QA_MANAGED_RUNTIME_SLOTS,
+  qaRuntimeRootEnvName,
+  resolveQaManagedSlotPaths,
+  resolveQaRuntimePaths,
+} from "./lib/qa-runtime-paths.mjs";
 import { validateLocalBuildOutput } from "./validate-build-output-integrity.mjs";
 
 const rootDir = process.cwd();
 const qaRuntimePaths = resolveQaRuntimePaths({ rootDir });
-const host = "127.0.0.1";
-const port = 3000;
+const slot = resolveManagedSlot(process.argv.slice(3));
+const slotPaths = resolveQaManagedSlotPaths({ rootDir, slot });
+const host = slotPaths.host;
+const port = slotPaths.port;
 const healthUrl = `http://${host}:${port}/`;
-const logsDir = qaRuntimePaths.stateDir;
-const statePath = qaRuntimePaths.statePath;
-const logPath = qaRuntimePaths.logPath;
-const freshnessPath = qaRuntimePaths.freshnessPath;
-const finalizedOutputDir = qaRuntimePaths.runtimeRoot;
+const logsDir = slotPaths.stateDir;
+const statePath = slotPaths.statePath;
+const logPath = slotPaths.logPath;
+const freshnessPath = slotPaths.freshnessPath;
+const finalizedOutputDir = slotPaths.runtimeRoot;
 const finalizedServerDir = resolve(finalizedOutputDir, "server");
 const finalizedPublicDir = resolve(finalizedOutputDir, "public");
 const serverEntry = resolve(finalizedServerDir, "index.mjs");
@@ -45,6 +53,14 @@ const requiredBuildArtifacts = [
   nitroManifest,
   resolve(publicDir, "favicon.svg"),
   resolve(publicDir, "templates/hito-training-plan-v2-template.json"),
+];
+const canonicalOutputDir = qaRuntimePaths.runtimeRoot;
+const canonicalFreshnessPath = qaRuntimePaths.freshnessPath;
+const canonicalRequiredBuildArtifacts = [
+  qaRuntimePaths.serverEntry,
+  qaRuntimePaths.nitroManifest,
+  resolve(qaRuntimePaths.publicDir, "favicon.svg"),
+  resolve(qaRuntimePaths.publicDir, "templates/hito-training-plan-v2-template.json"),
 ];
 const recoverableGeneratedConflictRoots = [
   resolve(rootDir, ".output"),
@@ -57,7 +73,7 @@ const recoverableGeneratedConflictRoots = [
   qaRuntimePaths.finalizedStagingDir,
   qaRuntimePaths.publicSnapshotDir,
 ];
-const serveCommandLabel = "npm run serve:local";
+const serveCommandLabel = `node scripts/serve-local-qa-runtime.mjs --host ${host} --port ${port}`;
 const staleBuildGraceMs = 1000;
 const transportLogMaxBytes = 5 * 1024 * 1024;
 const transportLogArchiveDir = resolve(logsDir, "transport-log-archive");
@@ -65,9 +81,10 @@ const structuredEventsRoot = resolve(
   homedir(),
   "Library/Caches/hito-running/local-runtime-observability",
 );
-const providerMode = resolveProviderMode(process.argv.slice(3));
-
 const command = process.argv[2] ?? "status";
+const providerMode = resolveProviderMode(process.argv.slice(3));
+const fixtureProfile = resolveFixtureProfile(process.argv.slice(3), providerMode, slot, command);
+const jsonOutput = process.argv.slice(3).includes("--json");
 
 try {
   switch (command) {
@@ -99,7 +116,11 @@ try {
 async function statusCommand() {
   const status = await resolveServerStatus();
 
-  printStatus(status);
+  if (jsonOutput) {
+    console.log(JSON.stringify(publicStatus(status), null, 2));
+  } else {
+    printStatus(status);
+  }
 
   if (status.serverStatus !== "current") {
     process.exitCode = 1;
@@ -113,20 +134,21 @@ async function startCommand() {
   const buildResult = await ensureBuildOutput();
   ensureBuildOutputLifecycleIsIdle();
 
-  const currentBuild = readBuildFingerprint();
-  if (!currentBuild) {
-    throw new Error(`Build output is missing after build. Expected ${serverEntry}.`);
-  }
-
   const statusStartedAt = performance.now();
   const status = await resolveServerStatus();
   const initialStatusMs = elapsedMs(statusStartedAt);
   if (
     status.healthy &&
     status.serverStatus === "current" &&
-    status.state?.providerMode === providerMode
+    status.state?.providerMode === providerMode &&
+    status.state?.fixtureProfile === fixtureProfile
   ) {
+    const currentBuild = readBuildFingerprint();
+    if (!currentBuild) {
+      throw new Error(`Managed slot artifact is missing. Expected ${serverEntry}.`);
+    }
     persistState({
+      slot,
       launcherPid: status.state?.launcherPid ?? null,
       serverPid: status.serverPid,
       startedAt: status.state?.startedAt ?? new Date().toISOString(),
@@ -135,8 +157,11 @@ async function startCommand() {
       host,
       port,
       buildFingerprint: currentBuild,
+      artifactFingerprint: readBuildArtifactFingerprint(),
+      sourceFingerprint: status.buildFreshness.sourceFingerprint,
       runtimeRoot: finalizedOutputDir,
       providerMode,
+      fixtureProfile,
       artifactDecision: buildResult.artifactDecision,
       lifecyclePhaseTimingsMs: withTotalTiming(
         {
@@ -154,7 +179,11 @@ async function startCommand() {
     return;
   }
 
-  if (status.serverPid && status.compatibleServer && status.state?.providerMode !== providerMode) {
+  if (
+    status.serverPid &&
+    status.compatibleServer &&
+    (status.state?.providerMode !== providerMode || status.state?.fixtureProfile !== fixtureProfile)
+  ) {
     console.log(
       `[qa-local-server] Restarting ${status.state?.providerMode ?? "unknown"} provider runtime as ${providerMode}.`,
     );
@@ -182,33 +211,56 @@ async function startCommand() {
     );
   }
 
+  publishManagedSlotArtifact();
+  const currentBuild = readBuildFingerprint();
+  if (!currentBuild) {
+    throw new Error(`Managed slot artifact is missing after publish. Expected ${serverEntry}.`);
+  }
+
   rotateTransportLogIfOversized();
   const serverStartStartedAt = performance.now();
-  const launcher = spawn("npm", ["run", "serve:local"], {
-    cwd: rootDir,
-    detached: true,
-    stdio: ["ignore", openSync(logPath, "a"), openSync(logPath, "a")],
-    env: {
-      ...process.env,
-      HOST: host,
-      NITRO_HOST: host,
-      PORT: String(port),
-      NITRO_PORT: String(port),
-      HITO_AI_GENERATED_PLAN_PROVIDER_MODE: providerMode,
-      HITO_LOCAL_RUNTIME_OBSERVABILITY_ROOT: structuredEventsRoot,
-      HITO_AI_GENERATED_PLAN_DEV_FIXTURE: providerMode === "qa_fixture" ? "true" : "false",
-      HITO_AI_GENERATED_PLAN_DEV_FIXTURE_DELAY_MS:
-        providerMode === "qa_fixture"
-          ? (process.env.HITO_AI_GENERATED_PLAN_DEV_FIXTURE_DELAY_MS ?? "")
-          : "",
-      HITO_AI_GENERATED_PLAN_DEV_FIXTURE_SCENARIO: "",
+  const launcher = spawn(
+    process.execPath,
+    [
+      "--env-file=.env.local",
+      "scripts/serve-local-qa-runtime.mjs",
+      "--host",
+      host,
+      "--port",
+      String(port),
+    ],
+    {
+      cwd: rootDir,
+      detached: true,
+      stdio: ["ignore", openSync(logPath, "a"), openSync(logPath, "a")],
+      env: {
+        ...process.env,
+        HOST: host,
+        NITRO_HOST: host,
+        PORT: String(port),
+        NITRO_PORT: String(port),
+        [qaRuntimeRootEnvName]: finalizedOutputDir,
+        HITO_AI_GENERATED_PLAN_PROVIDER_MODE: providerMode,
+        HITO_QA_FIXTURE_PROFILE: fixtureProfile ?? "",
+        HITO_LOCAL_RUNTIME_OBSERVABILITY_ROOT: structuredEventsRoot,
+        HITO_AI_GENERATED_PLAN_DEV_FIXTURE: providerMode === "qa_fixture" ? "true" : "false",
+        HITO_AI_GENERATED_PLAN_DEV_FIXTURE_DELAY_MS:
+          providerMode === "qa_fixture"
+            ? (process.env.HITO_AI_GENERATED_PLAN_DEV_FIXTURE_DELAY_MS ?? "")
+            : "",
+        HITO_AI_GENERATED_PLAN_DEV_FIXTURE_SCENARIO: "",
+        ...(fixtureProfile === "camelot"
+          ? { HITO_AI_GENERATED_PLAN_DEV_FIXTURE_SCENARIO: "camelot" }
+          : {}),
+      },
     },
-  });
+  );
 
   launcher.unref();
 
   const serverPid = await waitForHealthyServer();
   persistState({
+    slot,
     launcherPid: launcher.pid ?? null,
     serverPid,
     startedAt: new Date().toISOString(),
@@ -217,8 +269,11 @@ async function startCommand() {
     host,
     port,
     buildFingerprint: currentBuild,
+    artifactFingerprint: readBuildArtifactFingerprint(),
+    sourceFingerprint: fingerprintQaExecutableInputs({ rootDir }),
     runtimeRoot: finalizedOutputDir,
     providerMode,
+    fixtureProfile,
     artifactDecision: buildResult.artifactDecision,
     lifecyclePhaseTimingsMs: withTotalTiming(
       {
@@ -245,7 +300,7 @@ async function stopCommand(options = {}) {
   if (!status.serverPid) {
     removeState();
     if (!options.quietWhenStopped) {
-      console.log("[qa-local-server] No process is listening on port 3000.");
+      console.log(`[qa-local-server] No process is listening in ${slot} slot on port ${port}.`);
     }
     return;
   }
@@ -263,25 +318,54 @@ async function stopCommand(options = {}) {
   });
 
   if (!options.quietWhenStopped) {
-    console.log(`[qa-local-server] Stopped canonical QA server on ${healthUrl}`);
+    console.log(`[qa-local-server] Stopped ${slot} managed QA server on ${healthUrl}`);
   }
+}
+
+function publishManagedSlotArtifact() {
+  const canonicalFingerprint = readCanonicalBuildArtifactFingerprint();
+  if (!canonicalFingerprint || !hasCompleteCanonicalBuildOutput()) {
+    throw new Error("Canonical QA build artifact is unavailable for managed slot publication.");
+  }
+
+  rmSync(slotPaths.stagingRuntimeRoot, { recursive: true, force: true });
+  rmSync(slotPaths.previousRuntimeRoot, { recursive: true, force: true });
+  mkdirSync(slotPaths.slotRoot, { recursive: true });
+  cpSync(canonicalOutputDir, slotPaths.stagingRuntimeRoot, { recursive: true });
+
+  const stagedFingerprint = fingerprintQaBuildArtifact({
+    freshnessPath: resolve(slotPaths.stagingRuntimeRoot, ".hito-build-freshness.json"),
+    runtimeRoot: slotPaths.stagingRuntimeRoot,
+  });
+  if (!stagedFingerprint || stagedFingerprint.digest !== canonicalFingerprint.digest) {
+    rmSync(slotPaths.stagingRuntimeRoot, { recursive: true, force: true });
+    throw new Error(
+      `Managed ${slot} runtime snapshot does not match the canonical build artifact.`,
+    );
+  }
+
+  if (existsSync(finalizedOutputDir)) {
+    renameSync(finalizedOutputDir, slotPaths.previousRuntimeRoot);
+  }
+  renameSync(slotPaths.stagingRuntimeRoot, finalizedOutputDir);
+  rmSync(slotPaths.previousRuntimeRoot, { recursive: true, force: true });
 }
 
 async function ensureBuildOutput() {
   const phaseTimingsMs = {};
   const integrityStartedAt = performance.now();
-  const integrity = readBuildIntegrity();
+  const integrity = readCanonicalBuildIntegrity();
   phaseTimingsMs.integrity = elapsedMs(integrityStartedAt);
 
   const artifactStartedAt = performance.now();
   const artifactFingerprint =
-    integrity.status === "present" ? readBuildArtifactFingerprint() : null;
+    integrity.status === "present" ? readCanonicalBuildArtifactFingerprint() : null;
   phaseTimingsMs.artifactFingerprint = elapsedMs(artifactStartedAt);
 
   const freshnessStartedAt = performance.now();
   const freshness = evaluateQaBuildFreshness({
     artifactFingerprint,
-    freshnessPath,
+    freshnessPath: canonicalFreshnessPath,
     rootDir,
   });
   phaseTimingsMs.freshness = elapsedMs(freshnessStartedAt);
@@ -313,7 +397,7 @@ async function ensureBuildOutput() {
   phaseTimingsMs.build = elapsedMs(buildStartedAt);
 
   const postBuildIntegrityStartedAt = performance.now();
-  const postBuildIntegrity = readBuildIntegrity();
+  const postBuildIntegrity = readCanonicalBuildIntegrity();
   phaseTimingsMs.postBuildIntegrity = elapsedMs(postBuildIntegrityStartedAt);
   if (postBuildIntegrity.status !== "present") {
     throw new Error(
@@ -329,20 +413,20 @@ async function ensureBuildOutput() {
     );
   }
 
-  const postBuildArtifactFingerprint = readBuildArtifactFingerprint();
+  const postBuildArtifactFingerprint = readCanonicalBuildArtifactFingerprint();
   if (!postBuildArtifactFingerprint) {
     throw new Error("Build artifact fingerprint is unavailable after npm run build.");
   }
 
   writeQaBuildFreshnessReceipt({
     artifactFingerprint: postBuildArtifactFingerprint,
-    freshnessPath,
+    freshnessPath: canonicalFreshnessPath,
     sourceFingerprint: sourceAfterBuild,
   });
 
   const verifiedFreshness = evaluateQaBuildFreshness({
-    artifactFingerprint: readBuildArtifactFingerprint(),
-    freshnessPath,
+    artifactFingerprint: readCanonicalBuildArtifactFingerprint(),
+    freshnessPath: canonicalFreshnessPath,
     rootDir,
   });
   phaseTimingsMs.postBuildFreshness = elapsedMs(postBuildFreshnessStartedAt);
@@ -375,7 +459,7 @@ async function resolveServerStatus() {
   const healthy = serverPid ? await isHealthy() : false;
   const healthMs = elapsedMs(healthStartedAt);
   const integrityStartedAt = performance.now();
-  const buildIntegrity = readBuildIntegrity();
+  const buildIntegrity = readManagedSlotIntegrity();
   const integrityMs = elapsedMs(integrityStartedAt);
   const artifactStartedAt = performance.now();
   const artifactFingerprint =
@@ -582,16 +666,17 @@ function isCompatibleServerCommand(commandLine) {
     commandLine &&
     (commandLine.includes("scripts/serve-local-qa-runtime.mjs") ||
       commandLine.includes(serverEntry)) &&
-    commandLine.includes("--port 3000"),
+    commandLine.includes(`--port ${port}`),
   );
 }
 
 function isLegacyWorkspaceRuntimeCommand(commandLine) {
   return Boolean(
+    slot === "qa_fixture" &&
     commandLine &&
     (commandLine.includes("logs/build-output-finalized/server/index.mjs") ||
       commandLine.includes(".output/server/index.mjs")) &&
-    commandLine.includes("--port 3000"),
+    commandLine.includes(`--port ${port}`),
   );
 }
 
@@ -628,7 +713,32 @@ function hasCompleteBuildOutput() {
   return requiredBuildArtifacts.every((artifactPath) => existsSync(artifactPath));
 }
 
-function readBuildIntegrity() {
+function readManagedSlotIntegrity() {
+  if (!hasCompleteBuildOutput()) {
+    return {
+      status: "missing",
+      error: null,
+    };
+  }
+
+  return {
+    status: "present",
+    error: null,
+  };
+}
+
+function readCanonicalBuildArtifactFingerprint() {
+  return fingerprintQaBuildArtifact({
+    freshnessPath: canonicalFreshnessPath,
+    runtimeRoot: canonicalOutputDir,
+  });
+}
+
+function hasCompleteCanonicalBuildOutput() {
+  return canonicalRequiredBuildArtifacts.every((artifactPath) => existsSync(artifactPath));
+}
+
+function readCanonicalBuildIntegrity() {
   const activeBuildLock = readActiveBuildOutputLock({ rootDir });
 
   if (activeBuildLock) {
@@ -638,7 +748,7 @@ function readBuildIntegrity() {
     };
   }
 
-  if (!hasCompleteBuildOutput()) {
+  if (!hasCompleteCanonicalBuildOutput()) {
     return {
       status: "missing",
       error: null,
@@ -715,6 +825,7 @@ function readState() {
     const parsed = JSON.parse(readFileSync(statePath, "utf8"));
 
     return {
+      slot: parsed.slot === slot ? parsed.slot : null,
       launcherPid: typeof parsed.launcherPid === "number" ? parsed.launcherPid : null,
       serverPid: typeof parsed.serverPid === "number" ? parsed.serverPid : null,
       startedAt: typeof parsed.startedAt === "string" ? parsed.startedAt : null,
@@ -726,11 +837,20 @@ function readState() {
         parsed.buildFingerprint && typeof parsed.buildFingerprint === "object"
           ? parsed.buildFingerprint
           : null,
+      artifactFingerprint:
+        parsed.artifactFingerprint && typeof parsed.artifactFingerprint === "object"
+          ? parsed.artifactFingerprint
+          : null,
+      sourceFingerprint:
+        parsed.sourceFingerprint && typeof parsed.sourceFingerprint === "object"
+          ? parsed.sourceFingerprint
+          : null,
       runtimeRoot: typeof parsed.runtimeRoot === "string" ? parsed.runtimeRoot : null,
       providerMode:
         parsed.providerMode === "qa_fixture" || parsed.providerMode === "real"
           ? parsed.providerMode
           : null,
+      fixtureProfile: parsed.fixtureProfile === "camelot" ? parsed.fixtureProfile : null,
       artifactDecision:
         parsed.artifactDecision === "reused" || parsed.artifactDecision === "rebuilt"
           ? parsed.artifactDecision
@@ -744,11 +864,26 @@ function readState() {
 
 function persistState(state) {
   ensureLogsDir();
-  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
+  writeFileSync(
+    slotPaths.leasePath,
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        slot,
+        serverPid: state.serverPid,
+        acquiredAt: state.startedAt,
+      },
+      null,
+      2,
+    )}\n`,
+    { mode: 0o600 },
+  );
 }
 
 function removeState() {
   rmSync(statePath, { force: true });
+  rmSync(slotPaths.leasePath, { force: true });
 }
 
 function terminatePidGroup(pid) {
@@ -786,6 +921,7 @@ function rotateTransportLogIfOversized() {
 function printStatus(status) {
   const lines = [
     `[qa-local-server] ${status.serverStatus}`,
+    `slot: ${slot}`,
     `url: ${healthUrl}`,
     `pid: ${status.serverPid ?? "none"}`,
     `managed: ${Boolean(status.state?.serverPid && status.state.serverPid === status.serverPid)}`,
@@ -794,11 +930,15 @@ function printStatus(status) {
     `healthy: ${status.healthy}`,
     `build: ${status.buildStatus}`,
     `runtime: ${finalizedOutputDir}`,
+    `lease: ${slotPaths.leasePath}`,
     `log: ${logPath}`,
     `events: ${structuredEventsRoot}`,
     `providerMode: ${status.state?.providerMode ?? "unknown"}`,
+    `fixtureProfile: ${status.state?.fixtureProfile ?? "none"}`,
     `artifactFreshness: ${status.buildFreshness.status}`,
     `freshnessReason: ${status.buildFreshness.reason}`,
+    `artifactFingerprint: ${readBuildArtifactFingerprint()?.digest ?? "missing"}`,
+    `sourceFingerprint: ${status.buildFreshness.sourceFingerprint?.digest ?? "missing"}`,
     `lastArtifactDecision: ${status.state?.artifactDecision ?? "none"}`,
     `phaseTimingsMs: ${formatPhaseTimings(status.phaseTimingsMs)}`,
     `lastLifecycleTimingsMs: ${formatPhaseTimings(status.state?.lifecyclePhaseTimingsMs)}`,
@@ -817,16 +957,17 @@ function printStatus(status) {
 }
 
 function printHelp() {
-  console.log(`Usage: node ./scripts/qa-local-server.mjs <status|start|restart|stop> [--provider-mode <real|qa_fixture>]
+  console.log(`Usage: node ./scripts/qa-local-server.mjs <status|start|restart|stop> [--slot <qa_fixture|camelot>] [--provider-mode <real|qa_fixture>] [--fixture-profile <camelot>] [--json]
 
 Commands:
-  status   Show whether the canonical built QA server is running on ${healthUrl}
-  start    Reuse or start the built server (provider mode defaults to real)
-  restart  Stop and start the built server in the requested provider mode
-  stop     Stop only the managed/compatible built QA server
+  status   Show whether the ${slot} managed QA slot is running on ${healthUrl}
+  start    Reuse or start only the selected slot (provider mode defaults to real)
+  restart  Stop and start only the selected slot in the requested provider mode
+  stop     Stop only the selected managed/compatible slot
 
 Local state:
-  runtime: ${finalizedOutputDir}
+  slot: ${slot}
+  runtime snapshot: ${finalizedOutputDir}
   ${statePath}
   ${logPath}`);
 }
@@ -882,4 +1023,56 @@ function resolveProviderMode(args) {
   }
 
   return value;
+}
+
+function resolveManagedSlot(args) {
+  const index = args.indexOf("--slot");
+  const value = index >= 0 ? args[index + 1] : "qa_fixture";
+  if (!Object.hasOwn(QA_MANAGED_RUNTIME_SLOTS, value)) {
+    throw new Error("--slot must be qa_fixture or camelot.");
+  }
+  return value;
+}
+
+function resolveFixtureProfile(args, selectedProviderMode, selectedSlot, selectedCommand) {
+  const index = args.indexOf("--fixture-profile");
+  const value = index >= 0 ? args[index + 1] : null;
+  if (value !== null && value !== "camelot") {
+    throw new Error("--fixture-profile must be camelot when provided.");
+  }
+  if (value && selectedProviderMode !== "qa_fixture") {
+    throw new Error("A fixture profile requires --provider-mode qa_fixture.");
+  }
+  if (
+    selectedSlot === "camelot" &&
+    (selectedCommand === "start" || selectedCommand === "restart") &&
+    value !== "camelot"
+  ) {
+    throw new Error("The camelot managed slot requires --fixture-profile camelot.");
+  }
+  if (selectedSlot !== "camelot" && value !== null) {
+    throw new Error("The camelot fixture profile requires --slot camelot.");
+  }
+  return value;
+}
+
+function publicStatus(status) {
+  return {
+    ok: status.serverStatus === "current",
+    slot,
+    serverStatus: status.serverStatus,
+    url: healthUrl,
+    port,
+    managed: Boolean(status.state?.serverPid && status.state.serverPid === status.serverPid),
+    loopbackBind: status.loopbackListener,
+    healthy: status.healthy,
+    providerMode: status.state?.providerMode ?? null,
+    fixtureProfile: status.state?.fixtureProfile ?? null,
+    artifactFreshness: status.buildFreshness.status,
+    freshnessReason: status.buildFreshness.reason,
+    artifactFingerprint: readBuildArtifactFingerprint()?.digest ?? null,
+    sourceFingerprint: status.buildFreshness.sourceFingerprint?.digest ?? null,
+    runtimeRoot: finalizedOutputDir,
+    leaseActive: existsSync(slotPaths.leasePath),
+  };
 }

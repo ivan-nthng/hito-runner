@@ -355,6 +355,7 @@ assert.doesNotMatch(
   /Date\.now\(|Math\.random\(|createDisposableSupabaseUser/,
 );
 assert.deepEqual(Object.keys(QA_TESTER_POOL), [
+  "camelot",
   "baseline-no-plan",
   "saved-plan-readback",
   "provider-engine",

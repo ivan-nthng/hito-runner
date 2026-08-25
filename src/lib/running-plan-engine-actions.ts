@@ -309,7 +309,7 @@ export const previewRunningPlanDraft = createServerFn({ method: "POST" })
     return projectRunningPlanPreviewResultForProduct(
       await buildReviewedAiGeneratedRunningPlanPreviewForUser(persistedUserId, data, {
         aiPreview: { signal: getRequest().signal },
-        qaFixtureAuthorized: isLocalQaFixtureSessionAuthorized(auth),
+        qaFixtureAuthorized: await isLocalQaFixtureSessionAuthorized(auth, persistedUserId),
       }),
     );
   });
@@ -429,7 +429,7 @@ export const confirmRunningPlanDraft = createServerFn({ method: "POST" })
     }
 
     return confirmRunningPlanDraftForUser(userId, data, {
-      allowLocalQaFixture: isLocalQaFixtureSessionAuthorized(auth),
+      allowLocalQaFixture: await isLocalQaFixtureSessionAuthorized(auth, userId),
     });
   });
 
@@ -1281,10 +1281,21 @@ function buildConfirmFailure(input: {
   };
 }
 
-function isLocalQaFixtureSessionAuthorized(auth: ReturnType<typeof getRequestAuthContext>) {
-  return (
-    auth.provider === "local" && Boolean(auth.userId) && isAiGeneratedRunningPlanDevFixtureEnabled()
-  );
+async function isLocalQaFixtureSessionAuthorized(
+  auth: ReturnType<typeof getRequestAuthContext>,
+  persistedUserId: string | null,
+) {
+  const authorized =
+    auth.provider === "local" &&
+    Boolean(auth.userId) &&
+    isAiGeneratedRunningPlanDevFixtureEnabled();
+  if (!authorized) return false;
+  const { isCamelotInteractiveQaProfileSelected } =
+    await import("@/lib/camelot-interactive-qa-fixture");
+  if (!isCamelotInteractiveQaProfileSelected()) return true;
+  const { isCamelotFixtureSessionAuthorized } =
+    await import("@/lib/camelot-interactive-qa-fixture.server");
+  return isCamelotFixtureSessionAuthorized({ auth, persistedUserId });
 }
 
 function isLocalQaFixtureReviewedDraft(draft: AiGeneratedRunningPlanPreviewDraft) {

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { canUseMagicLinkForRequest, isLocalAuthBypassEnabledForRequest } from "@/lib/auth-actions";
 import { getRequestAuthContext } from "@/lib/backend/auth";
-import { isLocalActivityFileDesignFixtureEnabled } from "@/lib/local-activity-file-design-fixture";
+import { isLocalActivityFileDesignFixtureEnabledForPersistedUser } from "@/lib/local-activity-file-design-fixture";
 import { getPersistedUserIdForAuthContext } from "@/lib/request-persisted-user";
 import { findWorkout, type TrainingSnapshot, type Workout } from "@/lib/training";
 import { getUserSettingsForUserId } from "@/lib/user-settings-actions";
@@ -26,7 +26,8 @@ export async function loadHomeRouteData({ loadSnapshot, loadViewer }: RouteDataL
   const settings = persistedUserId
     ? await getUserSettingsForUserId(persistedUserId, auth.email)
     : null;
-  const localActivityFileDesignFixtureEnabled = isLocalActivityFileDesignFixtureEnabled(auth);
+  const localActivityFileDesignFixtureEnabled =
+    await isLocalActivityFileDesignFixtureEnabledForPersistedUser(auth, persistedUserId);
 
   return {
     snapshot: await loadSnapshot(),
@@ -60,7 +61,8 @@ export async function loadWorkoutRouteData(
   const settings = persistedUserId
     ? await getUserSettingsForUserId(persistedUserId, auth.email)
     : null;
-  const localActivityFileDesignFixtureEnabled = isLocalActivityFileDesignFixtureEnabled(auth);
+  const localActivityFileDesignFixtureEnabled =
+    await isLocalActivityFileDesignFixtureEnabledForPersistedUser(auth, persistedUserId);
 
   if (snapshot.mode === "onboarding") {
     return {

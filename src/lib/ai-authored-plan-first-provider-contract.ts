@@ -21,7 +21,7 @@ import {
 
 export const AI_AUTHORED_PLAN_FIRST_CONTRACT_VERSION = "adaptive-blueprint-four-week-v1" as const;
 export const AI_AUTHORED_PLAN_FIRST_PROVIDER_CONTRACT_VERSION =
-  "adaptive-blueprint-four-week-direct-v18" as const;
+  "adaptive-blueprint-four-week-direct-v19" as const;
 export const AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME =
   "hito_adaptive_blueprint_four_week_v1" as const;
 export const AI_AUTHORED_PLAN_FIRST_PACE_MIN_PER_KM_PATTERN =
@@ -646,6 +646,10 @@ export function buildAiAuthoredPlanFirstPrompt({
     paceProvenance === "no_benchmark_ai_estimate"
       ? "No factual executable pace authority is available: runner.benchmark and goal.target_finish_time are both null. Do not author target.primary_execution_mode=pace anywhere. Use a complete accepted heart-rate band only where heart rate can govern the duration. Short work repeats use controlled_short_repetition or controlled_stride and their fixed-duration recovery children use controlled_short_recovery; uphill work/downhill recovery use their explicit terrain-safe effort targets. Never invent pace from age, fitness level, distance, or generic coaching norms."
       : `For target.primary_execution_mode=pace, command is exactly one M:SS/km or M:SS-M:SS/km value. Hito classifies its factual provenance as ${paceProvenance} from the signed runner context and never derives the pace value.`;
+  const controlledTempoExecutionInstruction =
+    paceProvenance === "no_benchmark_ai_estimate"
+      ? "For workout_identity=controlled_tempo_session without factual pace authority, every sustained time-based substantive work leaf longer than 2 minutes must use target.primary_execution_mode=heart_rate with the exact full accepted Z4 band and a local cue containing controlled or tempo. Every time-based Repeat recovery child longer than 1.5 minutes must use the exact full accepted Z2 band and a local cue containing relax, recover, or settle. Never substitute Z2/Z3 for sustained tempo work, narrow either band, or use an unavailable band; choose another truthful identity when those exact accepted bands are unavailable."
+      : "Controlled-tempo work follows the factual pace-authority and local execution rules supplied for this request.";
   const numericModeInstruction =
     paceProvenance === "no_benchmark_ai_estimate"
       ? NO_PACE_SHORT_REPEAT_EXECUTION_INSTRUCTION
@@ -678,6 +682,7 @@ export function buildAiAuthoredPlanFirstPrompt({
     "A one-off section is always kind=unit. For 2x4km followed by one final 2km, author one repeat with rounds=2 and a 4km child, then one 2km unit; never encode the final 2km as rounds=10.",
     "Every kind=unit section and every ordered Repeat child is a runnable leaf and must author exactly one local target. For pace use target.primary_execution_mode=pace with target.command. For heart rate use target.primary_execution_mode=heart_rate with target.band_reference and target.command. Effort targets are limited to the exact short-work and terrain-safe cases defined below. Repeat parents remain structural and never own a target.",
     paceAuthorityInstruction,
+    controlledTempoExecutionInstruction,
     "When runner.benchmark_relative_quality_safety is not null, read its exact fastest_permitted_pace, fastest_permitted_pace_seconds_per_km, applicable_workout_identities, and maximum_rpe_by_workout_identity before authoring. For every listed identity, every endpoint of every substantive pace command must be at least that many seconds per kilometer and therefore no faster than fastest_permitted_pace. Its local cue must include the exact marker RPE max N/10 with a whole-number N no greater than that identity's maximum. Warm-up, cooldown, and recovery leaves are excluded. If those safe facts cannot be authored, abstain or choose another truthful canonical identity rather than returning an unsafe executable prescription.",
     "When runner.weekly_quality_density is not null, each calendar week may contain at most one workout from non_long_quality_families and at most one long-run-family workout. A long run with a steady or quality finish still occupies the one long-run stress slot. Every other session that week must be easy or recovery; never return two weekday quality sessions plus a long run.",
     initialPlanProfileInstruction,

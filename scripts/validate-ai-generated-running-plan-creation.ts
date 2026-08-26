@@ -2597,6 +2597,14 @@ async function validateLocalDevFixtureAvailabilityGating() {
     noPaceAuthorityInput.planGoalIntent.targetFinishTime = null;
     noPaceAuthorityInput.planGoalIntent.targetOutcomePace = null;
     noPaceAuthorityInput.availability.maxRunningDaysPerWeek = null;
+    assert.match(
+      buildAiAuthoredPlanFirstPrompt({
+        authoringInput: noPaceAuthorityInput,
+        today: noPaceAuthorityInput.schedule.startDate,
+      }).systemPrompt,
+      /controlled_tempo_session without factual pace authority.*exact full accepted Z4 band.*Repeat recovery child longer than 1\.5 minutes.*exact full accepted Z2 band/s,
+      "The provider contract must state the exact no-pace controlled-tempo work and recovery bands enforced by the compiler.",
+    );
     const noPaceAuthorityDraft =
       buildAiGeneratedRunningPlanDevFixtureProviderDraft(noPaceAuthorityInput);
     const noPaceAuthorityCompile = compileAiAuthoredPlanFirstDraft({
@@ -3268,14 +3276,39 @@ async function validateLocalDevFixtureAvailabilityGating() {
       draft: familyMismatchDraft,
       authoringInput: fixtureAuthoringInput,
     });
-    assert.equal(familyMismatchCompile.ok, false);
-    if (familyMismatchCompile.ok) {
-      throw new Error("A detailed family outside its Blueprint unexpectedly compiled.");
+    assert.equal(familyMismatchCompile.ok, true);
+    if (!familyMismatchCompile.ok) {
+      throw new Error("Canonical phase-family coverage normalization rejected a valid draft.");
     }
     assert.ok(
-      familyMismatchCompile.issues.some(
-        (issue) => issue.code === "ai_authored_blueprint_detailed_family_mismatch",
+      familyMismatchCompile.blueprint.phases[0]?.workout_families.includes("recovery"),
+      "The compiler must derive missing phase-family coverage from canonical detailed identities.",
+    );
+    assert.ok(
+      familyMismatchCompile.validationIssues.some((issue) =>
+        issue.startsWith("ai_authored_blueprint_phase_family_coverage_normalized:"),
       ),
+      "The accepted deterministic normalization must remain visible in compiler metadata.",
+    );
+    const phaseMismatchDraft = structuredClone(fixtureDraft);
+    const recoveryDay = phaseMismatchDraft.detailed_block.workouts.find(
+      (workout) => workout.workout_identity === "recovery_jog",
+    );
+    assert.ok(recoveryDay, "The regression fixture requires one recovery workout.");
+    recoveryDay.phase = "Foreign provider phase";
+    const phaseMismatchCompile = compileAiAuthoredPlanFirstDraft({
+      draft: phaseMismatchDraft,
+      authoringInput: fixtureAuthoringInput,
+    });
+    assert.equal(phaseMismatchCompile.ok, false);
+    if (phaseMismatchCompile.ok) {
+      throw new Error("A detailed workout with a foreign phase unexpectedly compiled.");
+    }
+    assert.ok(
+      phaseMismatchCompile.issues.some(
+        (issue) => issue.code === "ai_authored_blueprint_detailed_phase_mismatch",
+      ),
+      "Phase-family normalization must not weaken phase/date ownership checks.",
     );
     assert.ok(
       [...fixtureDraft.detailed_block.workouts, fixtureDraft.detailed_block.final_workout]

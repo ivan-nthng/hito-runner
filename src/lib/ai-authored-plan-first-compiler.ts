@@ -18,6 +18,7 @@ import {
 import { SELECTED_DISTANCE_ENDPOINT_SOURCE_KIND } from "@/lib/plan-creation-engine/selected-distance-endpoint";
 import { collectWorkoutDurationTitleIssues } from "@/lib/workout-duration-title-contract";
 import {
+  CANONICAL_WORKOUT_FAMILY_VALUES,
   canonicalFamilyToLegacyWorkoutType,
   deriveCanonicalMetricMode,
   resolveCanonicalWorkoutModel,
@@ -174,7 +175,7 @@ export function compileAiAuthoredPlanFirstDraft({
     canonicalPlan: canonicalResult.data,
     blueprint: buildBlueprintSummary(normalized.draft),
     reviewConflicts,
-    validationIssues: [],
+    validationIssues: normalized.validationIssues,
   };
 }
 
@@ -396,7 +397,12 @@ function normalizeProviderDraft({
   draft: unknown;
   authoringInput: StructuredAuthoringInput;
 }):
-  | { ok: true; draft: AiAuthoredPlanFirstCompilerDraft; issues: CompilerIssue[] }
+  | {
+      ok: true;
+      draft: AiAuthoredPlanFirstCompilerDraft;
+      issues: CompilerIssue[];
+      validationIssues: string[];
+    }
   | { ok: false; reason: string; issues: CompilerIssue[] } {
   const providerResult = aiAuthoredPlanFirstCompilerDraftSchema.safeParse(draft);
 
@@ -413,14 +419,16 @@ function normalizeProviderDraft({
   }
 
   const issues: CompilerIssue[] = [];
+  const familyCoverage = normalizeBlueprintPhaseFamilyCoverage(providerResult.data);
+  const normalizedDraft = familyCoverage.draft;
   const startDate = authoringInput.schedule.startDate;
   const latestDate = addDaysIso(startDate, 363);
-  const targetDate = providerResult.data.blueprint.selected_target_date;
+  const targetDate = normalizedDraft.blueprint.selected_target_date;
   const fourWeekEndDate = addDaysIso(startDate, 27);
   const detailedEndDate = targetDate < fourWeekEndDate ? targetDate : fourWeekEndDate;
   const authoredDays = [
-    ...providerResult.data.detailed_block.workouts,
-    providerResult.data.detailed_block.final_workout,
+    ...normalizedDraft.detailed_block.workouts,
+    normalizedDraft.detailed_block.final_workout,
   ];
   const authoredDates = new Set<string>();
 
@@ -448,11 +456,11 @@ function normalizeProviderDraft({
     }
   }
 
-  if (providerResult.data.blueprint.start_date !== startDate) {
+  if (normalizedDraft.blueprint.start_date !== startDate) {
     issues.push({
       code: "ai_authored_blueprint_start_date_mismatch",
       path: "blueprint.start_date",
-      message: `Blueprint start ${providerResult.data.blueprint.start_date} must equal ${startDate}.`,
+      message: `Blueprint start ${normalizedDraft.blueprint.start_date} must equal ${startDate}.`,
     });
   }
   if (targetDate < startDate || targetDate > latestDate) {
@@ -483,8 +491,8 @@ function normalizeProviderDraft({
     });
   }
   if (
-    providerResult.data.detailed_block.start_date !== startDate ||
-    providerResult.data.detailed_block.end_date !== detailedEndDate
+    normalizedDraft.detailed_block.start_date !== startDate ||
+    normalizedDraft.detailed_block.end_date !== detailedEndDate
   ) {
     issues.push({
       code: "ai_authored_blueprint_detailed_horizon_invalid",
@@ -494,7 +502,7 @@ function normalizeProviderDraft({
   }
 
   validateBlueprintPhases({
-    phases: providerResult.data.blueprint.phases,
+    phases: normalizedDraft.blueprint.phases,
     startDate,
     targetDate,
     requestedWeeklyCadence: resolveRequestedExactWeeklyCadence(
@@ -503,19 +511,19 @@ function normalizeProviderDraft({
     issues,
   });
   validateBlueprintProjections({
-    projections: providerResult.data.blueprint.projections,
-    phases: providerResult.data.blueprint.phases,
+    projections: normalizedDraft.blueprint.projections,
+    phases: normalizedDraft.blueprint.phases,
     detailedEndDate,
     targetDate,
     issues,
   });
   validateDetailedWorkoutPhases({
     authoredDays,
-    phases: providerResult.data.blueprint.phases,
+    phases: normalizedDraft.blueprint.phases,
     issues,
   });
 
-  const finalWorkout = providerResult.data.detailed_block.final_workout;
+  const finalWorkout = normalizedDraft.detailed_block.final_workout;
   if (authoredDays.some((day) => day !== finalWorkout && day.date >= finalWorkout.date)) {
     issues.push({
       code: "ai_authored_blueprint_final_detailed_workout_invalid",
@@ -604,22 +612,80 @@ function normalizeProviderDraft({
   return {
     ok: true,
     issues,
+    validationIssues: familyCoverage.validationIssues,
     draft: {
-      ...providerResult.data,
+      ...normalizedDraft,
       blueprint: {
-        ...providerResult.data.blueprint,
-        phases: [...providerResult.data.blueprint.phases],
-        projections: [...providerResult.data.blueprint.projections].sort((left, right) =>
+        ...normalizedDraft.blueprint,
+        phases: [...normalizedDraft.blueprint.phases],
+        projections: [...normalizedDraft.blueprint.projections].sort((left, right) =>
           left.date.localeCompare(right.date),
         ),
       },
       detailed_block: {
-        ...providerResult.data.detailed_block,
-        workouts: [...providerResult.data.detailed_block.workouts].sort((left, right) =>
+        ...normalizedDraft.detailed_block,
+        workouts: [...normalizedDraft.detailed_block.workouts].sort((left, right) =>
           left.date.localeCompare(right.date),
         ),
       },
     },
+  };
+}
+
+function normalizeBlueprintPhaseFamilyCoverage(draft: AiAuthoredPlanFirstCompilerDraft): {
+  draft: AiAuthoredPlanFirstCompilerDraft;
+  validationIssues: string[];
+} {
+  const authoredDays = [...draft.detailed_block.workouts, draft.detailed_block.final_workout];
+  const validationIssues: string[] = [];
+  const phases = draft.blueprint.phases.map((phase) => {
+    const declaredFamilies = new Set(phase.workout_families);
+    const observedFamilies = new Set<(typeof CANONICAL_WORKOUT_FAMILY_VALUES)[number]>();
+
+    for (const day of authoredDays) {
+      if (day.phase === phase.phase && day.date >= phase.start_date && day.date <= phase.end_date) {
+        observedFamilies.add(familyForIdentity(day.workout_identity));
+      }
+    }
+    for (const projection of draft.blueprint.projections) {
+      if (
+        projection.phase === phase.phase &&
+        projection.date >= phase.start_date &&
+        projection.date <= phase.end_date
+      ) {
+        observedFamilies.add(projection.cadence_or_workout_family);
+      }
+    }
+
+    const missingFamilies = CANONICAL_WORKOUT_FAMILY_VALUES.filter(
+      (family) => observedFamilies.has(family) && !declaredFamilies.has(family),
+    );
+    for (const family of missingFamilies) {
+      declaredFamilies.add(family);
+    }
+    if (missingFamilies.length > 0) {
+      validationIssues.push(
+        `ai_authored_blueprint_phase_family_coverage_normalized:${phase.phase}:${missingFamilies.join(",")}`,
+      );
+    }
+
+    return {
+      ...phase,
+      workout_families: CANONICAL_WORKOUT_FAMILY_VALUES.filter((family) =>
+        declaredFamilies.has(family),
+      ),
+    };
+  });
+
+  return {
+    draft: {
+      ...draft,
+      blueprint: {
+        ...draft.blueprint,
+        phases,
+      },
+    },
+    validationIssues,
   };
 }
 

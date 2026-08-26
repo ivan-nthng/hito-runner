@@ -1,20 +1,66 @@
 import type { AiPlanGenerationLedgerTrace } from "@/lib/ai-plan-generation-ledger";
+import { buildAiAuthoredPlanFirstPrompt } from "@/lib/ai-authored-plan-first-provider-contract";
 import { digestSha256Hex, stableJsonStringify } from "@/lib/review-token-signing";
+import {
+  structuredPlanAuthoringInputSchema,
+  type StructuredPlanAuthoringInput,
+} from "@/lib/structured-plan-authoring-schema";
 import type { Database, Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 
 export type AiPlanGenerationResponseRow =
   Database["public"]["Tables"]["ai_plan_generation_responses"]["Row"];
 
+export const AI_FIRST_PLAN_MATERIAL_REQUEST_IDENTITY_VERSION =
+  "ai_first_plan_material_request_identity_v1" as const;
+export const AI_FIRST_PLAN_IMMUTABLE_RECOMPILE_KIND =
+  "immutable_initial_response_recompile_v1" as const;
+
+export type AiFirstPlanImmutableRecompileProvenance = {
+  immutableRecompileKind: typeof AI_FIRST_PLAN_IMMUTABLE_RECOMPILE_KIND;
+  retainedResponseOriginalSchemaOutcome: "rejected";
+  retainedResponseOriginalCompilerOutcome: "not_run";
+  recompiledDiagnosticCode: string;
+  recompiledDiagnosticPath: string;
+  retainedRequestFingerprintSha256: string;
+  retainedVersionFingerprintSha256: string;
+  materialRequestIdentityVersion: typeof AI_FIRST_PLAN_MATERIAL_REQUEST_IDENTITY_VERSION;
+  materialRequestFingerprintSha256: string;
+  aliasNormalizationCount: number;
+};
+
 export function isAcceptedOrImmutablyRecompiledAiPlanGenerationResponseForCandidate(
   response: AiPlanGenerationResponseRow,
   candidateProvenance: Json | null,
 ) {
-  if (response.schema_outcome !== "accepted") return false;
-  if (response.compiler_outcome === "accepted") return true;
   const provenance = jsonObject(candidateProvenance);
   const versionContext = jsonObject(response.version_context);
   const attemptResult = jsonObject(response.attempt_result);
+  if (response.schema_outcome === "accepted" && response.compiler_outcome === "accepted") {
+    return true;
+  }
+  const immutableInitialRecompile =
+    response.schema_outcome === "rejected" &&
+    response.compiler_outcome === "not_run" &&
+    provenance?.immutableRecompileKind === AI_FIRST_PLAN_IMMUTABLE_RECOMPILE_KIND &&
+    provenance.retainedResponseOriginalSchemaOutcome === response.schema_outcome &&
+    provenance.retainedResponseOriginalCompilerOutcome === response.compiler_outcome &&
+    provenance.recompiledDiagnosticCode === response.diagnostic_code &&
+    provenance.recompiledDiagnosticPath === response.diagnostic_path &&
+    provenance.retainedRequestFingerprintSha256 === response.request_fingerprint_sha256 &&
+    provenance.retainedVersionFingerprintSha256 === response.version_fingerprint_sha256 &&
+    provenance.materialRequestIdentityVersion === AI_FIRST_PLAN_MATERIAL_REQUEST_IDENTITY_VERSION &&
+    typeof provenance.materialRequestFingerprintSha256 === "string" &&
+    /^[0-9a-f]{64}$/.test(provenance.materialRequestFingerprintSha256) &&
+    typeof provenance.aliasNormalizationCount === "number" &&
+    Number.isInteger(provenance.aliasNormalizationCount) &&
+    provenance.aliasNormalizationCount > 0 &&
+    provenance.compilerVersion === versionContext?.compilerVersion &&
+    attemptResult?.outcome === "technical_rejection" &&
+    attemptResult.candidateRecordId === null;
+  if (immutableInitialRecompile) return true;
+
+  if (response.schema_outcome !== "accepted") return false;
   return (
     response.compiler_outcome === "rejected" &&
     provenance?.retainedResponseOriginalCompilerOutcome === "rejected" &&
@@ -25,6 +71,32 @@ export function isAcceptedOrImmutablyRecompiledAiPlanGenerationResponseForCandid
     provenance.recompiledDiagnosticCode === response.diagnostic_code &&
     attemptResult?.outcome === "technical_rejection" &&
     attemptResult.candidateRecordId === null
+  );
+}
+
+export function isCurrentAiPlanGenerationResponseLineageForCandidate(
+  response: AiPlanGenerationResponseRow,
+  candidateProvenance: Json | null,
+  candidate: { id: string; sha256: string },
+) {
+  if (
+    !isAcceptedOrImmutablyRecompiledAiPlanGenerationResponseForCandidate(
+      response,
+      candidateProvenance,
+    )
+  ) {
+    return false;
+  }
+  const attemptResult = jsonObject(response.attempt_result);
+  if (response.schema_outcome === "accepted" && response.compiler_outcome === "accepted") {
+    return (
+      attemptResult?.outcome === "candidate_ready" &&
+      attemptResult.candidateRecordId === candidate.id &&
+      attemptResult.candidateSha256 === candidate.sha256
+    );
+  }
+  return (
+    attemptResult?.outcome === "technical_rejection" && attemptResult.candidateRecordId === null
   );
 }
 
@@ -101,7 +173,8 @@ export async function getReusableAiPlanGenerationResponseForUser(input: {
       }),
     ),
   });
-  const result = await createAdminSupabaseClient()
+  const supabase = createAdminSupabaseClient();
+  const result = await supabase
     .from("ai_plan_generation_responses")
     .select("*")
     .eq("user_id", input.userId)
@@ -115,7 +188,7 @@ export async function getReusableAiPlanGenerationResponseForUser(input: {
     throw new Error(result.error.message);
   }
 
-  return (
+  const exact =
     result.data.find((row) => {
       const providerAttempt = jsonObject(row.provider_attempt);
       return (
@@ -124,8 +197,102 @@ export async function getReusableAiPlanGenerationResponseForUser(input: {
         providerAttempt?.promptHash === identity.promptHash &&
         isParseableJson(row.response_body)
       );
-    }) ?? null
+    }) ?? null;
+  if (exact) return exact;
+
+  const materialRequestContext = materialAiFirstPlanRequestContext(input.requestContext);
+  if (!materialRequestContext) return null;
+
+  const candidates = await supabase
+    .from("ai_plan_generation_responses")
+    .select("*")
+    .eq("user_id", input.userId)
+    .eq("version_fingerprint_sha256", identity.versionFingerprintSha256)
+    .eq("provider_model", identity.providerModel)
+    .order("created_at", { ascending: true })
+    .limit(100);
+  if (candidates.error) throw new Error(candidates.error.message);
+
+  for (const row of candidates.data) {
+    if (
+      isParseableJson(row.response_body) &&
+      (await isMateriallyReusableAiFirstPlanResponse({
+        row,
+        currentRequestContext: input.requestContext,
+        currentVersionContext: identity.versionContext,
+        currentPrompt: input.prompt,
+      }))
+    ) {
+      return row;
+    }
+  }
+  return null;
+}
+
+export function areMateriallyEquivalentAiFirstPlanRequestContexts(left: unknown, right: unknown) {
+  const leftMaterial = materialAiFirstPlanRequestContext(left);
+  const rightMaterial = materialAiFirstPlanRequestContext(right);
+  return (
+    leftMaterial !== null &&
+    rightMaterial !== null &&
+    stableJsonStringify(leftMaterial) === stableJsonStringify(rightMaterial)
   );
+}
+
+export async function buildAiFirstPlanMaterialRequestFingerprint(input: unknown) {
+  const material = materialAiFirstPlanRequestContext(input);
+  if (!material) {
+    throw new Error("The AI first-plan material request context is invalid.");
+  }
+  return digestSha256Hex(stableJsonStringify(material));
+}
+
+export async function buildAiFirstPlanImmutableRecompileProvenance(input: {
+  response: AiPlanGenerationResponseRow;
+  currentRequestContext: StructuredPlanAuthoringInput;
+  compilerVersion: string;
+  validationIssues: readonly string[];
+}): Promise<AiFirstPlanImmutableRecompileProvenance | null> {
+  const response = input.response;
+  const versionContext = jsonObject(response.version_context);
+  const attemptResult = jsonObject(response.attempt_result);
+  const aliasIssues = input.validationIssues.filter((issue) =>
+    issue.startsWith("ai_authored_blueprint_family_alias_normalized:"),
+  );
+  if (
+    response.schema_outcome !== "rejected" ||
+    response.compiler_outcome !== "not_run" ||
+    response.diagnostic_code !== "ai_authored_plan_first_provider_schema_invalid" ||
+    !response.diagnostic_path ||
+    !response.request_fingerprint_sha256 ||
+    !response.version_fingerprint_sha256 ||
+    versionContext?.compilerVersion !== input.compilerVersion ||
+    attemptResult?.outcome !== "technical_rejection" ||
+    attemptResult.candidateRecordId !== null ||
+    aliasIssues.length === 0 ||
+    aliasIssues.length !== input.validationIssues.length ||
+    !areMateriallyEquivalentAiFirstPlanRequestContexts(
+      response.request_context,
+      input.currentRequestContext,
+    )
+  ) {
+    return null;
+  }
+
+  return {
+    immutableRecompileKind: AI_FIRST_PLAN_IMMUTABLE_RECOMPILE_KIND,
+    retainedResponseOriginalSchemaOutcome: "rejected",
+    retainedResponseOriginalCompilerOutcome: "not_run",
+    recompiledDiagnosticCode: response.diagnostic_code,
+    recompiledDiagnosticPath: response.diagnostic_path,
+    retainedRequestFingerprintSha256: response.request_fingerprint_sha256,
+    retainedVersionFingerprintSha256: response.version_fingerprint_sha256,
+    materialRequestIdentityVersion: AI_FIRST_PLAN_MATERIAL_REQUEST_IDENTITY_VERSION,
+    materialRequestFingerprintSha256: await buildAiFirstPlanMaterialRequestFingerprint(
+      input.currentRequestContext,
+    ),
+    aliasNormalizationCount: aliasIssues.length,
+  };
 }
 
 export async function retainCompletedAiPlanGenerationResponseForUser(
@@ -419,6 +586,104 @@ async function buildRequestIdentity(input: {
     providerModel,
     promptHash: input.promptHash,
   };
+}
+
+async function isMateriallyReusableAiFirstPlanResponse(input: {
+  row: AiPlanGenerationResponseRow;
+  currentRequestContext: unknown;
+  currentVersionContext: Json;
+  currentPrompt: {
+    systemPrompt: string;
+    userPrompt: string;
+    responseSchema: unknown;
+  };
+}) {
+  const storedAuthoringInput = structuredPlanAuthoringInputSchema.safeParse(
+    input.row.request_context,
+  );
+  const providerAttempt = jsonObject(input.row.provider_attempt);
+  const promptHash = providerAttempt?.promptHash;
+  const systemPromptHash = providerAttempt?.systemPromptHash;
+  const userPromptHash = providerAttempt?.userPromptHash;
+  const responseSchemaHash = providerAttempt?.responseSchemaHash;
+  if (
+    !storedAuthoringInput.success ||
+    stableJsonStringify(input.row.version_context) !==
+      stableJsonStringify(input.currentVersionContext) ||
+    !areMateriallyEquivalentAiFirstPlanRequestContexts(
+      storedAuthoringInput.data,
+      input.currentRequestContext,
+    ) ||
+    typeof promptHash !== "string" ||
+    typeof systemPromptHash !== "string" ||
+    typeof userPromptHash !== "string" ||
+    typeof responseSchemaHash !== "string"
+  ) {
+    return false;
+  }
+
+  const today = readPromptToday(input.currentPrompt.userPrompt);
+  if (today === null) return false;
+  const storedPrompt = buildAiAuthoredPlanFirstPrompt({
+    authoringInput: storedAuthoringInput.data,
+    today: today ?? undefined,
+  });
+  const [rebuiltPromptHash, rebuiltSystemPromptHash, rebuiltUserPromptHash, rebuiltSchemaHash] =
+    await Promise.all([
+      digestSha256Hex(stableJsonStringify(storedPrompt)),
+      digestSha256Hex(storedPrompt.systemPrompt),
+      digestSha256Hex(storedPrompt.userPrompt),
+      digestSha256Hex(stableJsonStringify(storedPrompt.responseSchema)),
+    ]);
+  const [currentSystemPromptHash, currentResponseSchemaHash] = await Promise.all([
+    digestSha256Hex(input.currentPrompt.systemPrompt),
+    digestSha256Hex(stableJsonStringify(input.currentPrompt.responseSchema)),
+  ]);
+  if (
+    promptHash !== rebuiltPromptHash ||
+    systemPromptHash !== rebuiltSystemPromptHash ||
+    userPromptHash !== rebuiltUserPromptHash ||
+    responseSchemaHash !== rebuiltSchemaHash ||
+    currentSystemPromptHash !== systemPromptHash ||
+    currentResponseSchemaHash !== responseSchemaHash
+  ) {
+    return false;
+  }
+
+  const storedIdentity = await buildRequestIdentity({
+    userId: input.row.user_id,
+    requestContext: storedAuthoringInput.data,
+    versionContext: input.row.version_context as AiPlanGenerationAttemptVersionContext,
+    providerModel: input.row.provider_model ?? "",
+    promptHash,
+  });
+  return (
+    storedIdentity.requestFingerprintSha256 === input.row.request_fingerprint_sha256 &&
+    storedIdentity.versionFingerprintSha256 === input.row.version_fingerprint_sha256
+  );
+}
+
+function materialAiFirstPlanRequestContext(input: unknown): Json | null {
+  const parsed = structuredPlanAuthoringInputSchema.safeParse(input);
+  if (!parsed.success) return null;
+  const material = JSON.parse(stableJsonStringify(parsed.data)) as Record<string, unknown>;
+  const profile = material.initialPlanProfile;
+  if (!profile || Array.isArray(profile) || typeof profile !== "object") return null;
+  delete (profile as Record<string, unknown>).asOf;
+  delete (profile as Record<string, unknown>).snapshotId;
+  return toJsonObject(material, "material request context");
+}
+
+function readPromptToday(userPrompt: string): string | undefined | null {
+  try {
+    const parsed = JSON.parse(userPrompt) as unknown;
+    if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") return null;
+    const today = (parsed as Record<string, unknown>).today;
+    if (today === null) return undefined;
+    return typeof today === "string" && /^\d{4}-\d{2}-\d{2}$/.test(today) ? today : null;
+  } catch {
+    return null;
+  }
 }
 
 function attemptLineageMatches(

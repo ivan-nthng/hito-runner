@@ -25,9 +25,12 @@ import {
 import { validateAdaptiveTrainingDecisionGoldenProof } from "./adaptive-training-decision-golden-proof";
 import { retainAdaptiveTrainingSourceCandidateForUser } from "../src/lib/adaptive-blueprint-persistence";
 import {
+  areMateriallyEquivalentAiFirstPlanRequestContexts,
   getAiPlanGenerationResponseByProviderIdForUser,
   getAiPlanGenerationResponseForUser,
   getReusableAiPlanGenerationResponseForUser,
+  isCurrentAiPlanGenerationResponseLineageForCandidate,
+  recordAiPlanGenerationAttemptResultForUser,
   recordAiPlanGenerationResponseOutcomeForUser,
   recordAiPlanGenerationReviewVerdictForUser,
   retainCompletedAiPlanGenerationResponseForUser,
@@ -492,9 +495,12 @@ async function validateCompletedAiPlanResponseRetentionPersistence() {
     );
     assert.ok(localFixtureResponse, "The accepted local fixture response must be retained.");
     assert.equal(localFixtureResponse!.provider_model, AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL);
+    const volatileAcceptedRetryInput = structuredClone(resolved.authoringInput);
+    volatileAcceptedRetryInput.initialPlanProfile.asOf = "2026-06-08T12:00:01.000Z";
+    volatileAcceptedRetryInput.initialPlanProfile.snapshotId = "accepted-volatile-retry";
     let duplicateInitialDispatches = 0;
     const acceptedDuplicate = await generateAiFirstPlanDraftPreview({
-      input: resolved.authoringInput,
+      input: volatileAcceptedRetryInput,
       apiKey: null,
       model: "gpt-5.2-retention-accepted-proof",
       today: scenario.input.startDate,
@@ -502,10 +508,16 @@ async function validateCompletedAiPlanResponseRetentionPersistence() {
       generationLedger: { disabled: true },
       fetchImpl: async () => {
         duplicateInitialDispatches += 1;
-        throw new Error("An exact retained initial request must not dispatch.");
+        throw new Error("A materially unchanged retained initial request must not dispatch.");
       },
     });
-    assert.equal(acceptedDuplicate.ok, true);
+    assert.equal(
+      acceptedDuplicate.ok,
+      true,
+      acceptedDuplicate.ok
+        ? ""
+        : `${acceptedDuplicate.reason}:${acceptedDuplicate.metadata.unavailableReason}`,
+    );
     assert.equal(duplicateInitialDispatches, 0);
     assert.equal(acceptedDuplicate.metadata.responseId, acceptedResponseId);
 
@@ -647,6 +659,239 @@ async function validateCompletedAiPlanResponseRetentionPersistence() {
     });
     assert.ok(crossOwnerRetention.error, "A retained response must not cross runner ownership.");
 
+    const immutableAliasDraft = JSON.parse(fixtureBody.output_text) as {
+      blueprint: {
+        phases: Array<{ workout_families: string[] }>;
+      };
+    };
+    const easyFamilyPhase = immutableAliasDraft.blueprint.phases.find((phase) =>
+      phase.workout_families.includes("easy"),
+    );
+    assert.ok(easyFamilyPhase, "The deterministic draft must expose one canonical easy family.");
+    const easyFamilyIndex = easyFamilyPhase!.workout_families.indexOf("easy");
+    easyFamilyPhase!.workout_families[easyFamilyIndex] = "easy_aerobic_run";
+    const immutableAliasBody = JSON.stringify(immutableAliasDraft);
+    const immutableAliasModel = `gpt-5.2-immutable-alias-proof-${crypto.randomUUID()}`;
+    const immutableAliasResponseId = `resp_immutable_alias_${crypto.randomUUID()}`;
+    const immutableAliasPrompt = buildAiAuthoredPlanFirstPrompt({
+      authoringInput: resolved.authoringInput,
+      today: scenario.input.startDate,
+    });
+    const immutableAliasVersionContext: AiPlanGenerationAttemptVersionContext = {
+      schemaVersion: AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME,
+      promptVersion: AI_AUTHORED_PLAN_FIRST_PROVIDER_CONTRACT_VERSION,
+      policyVersion: AI_AUTHORED_PLAN_FIRST_CONTRACT_VERSION,
+      compilerVersion: AI_AUTHORED_PLAN_FIRST_COMPILER_VERSION,
+      providerSettings: resolveAiPlanStructuredResponseProviderSettings({
+        model: immutableAliasModel,
+        contractMode: "adaptive_blueprint_four_week",
+        responseSchemaMode: "responses_json_schema_adaptive_blueprint_four_week_v1_strict",
+        responseSchemaName: AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME,
+        timeoutMs: 0,
+        maxOutputTokens: 32_000,
+      }),
+    };
+    let immutableAliasTrace = await createAiPlanGenerationLedgerTrace({
+      providerKind: "openai_responses_api",
+      model: immutableAliasModel,
+      contractMode: "adaptive_blueprint_four_week",
+      responseSchemaMode: "responses_json_schema_adaptive_blueprint_four_week_v1_strict",
+      systemPrompt: immutableAliasPrompt.systemPrompt,
+      userPrompt: immutableAliasPrompt.userPrompt,
+      responseSchema: immutableAliasPrompt.responseSchema,
+      timeoutMs: 0,
+      maxOutputTokens: 32_000,
+    });
+    immutableAliasTrace = await attachOutputToAiPlanGenerationLedgerTrace({
+      trace: immutableAliasTrace,
+      rawOutput: immutableAliasBody,
+      parsedOutput: immutableAliasDraft,
+      options: { disabled: true },
+    });
+    const immutableAliasRow = await retainCompletedAiPlanGenerationResponseForUser({
+      userId: ownerId,
+      generationId: immutableAliasTrace.generationId,
+      providerResponseId: immutableAliasResponseId,
+      responseBody: immutableAliasBody,
+      requestContext: resolved.authoringInput,
+      versionContext: immutableAliasVersionContext,
+      generationTrace: immutableAliasTrace,
+    });
+    const aliasPath = `blueprint.phases.${immutableAliasDraft.blueprint.phases.indexOf(
+      easyFamilyPhase!,
+    )}.workout_families.${easyFamilyIndex}`;
+    await recordAiPlanGenerationResponseOutcomeForUser({
+      userId: ownerId,
+      responseRecordId: immutableAliasRow.id,
+      schemaOutcome: "rejected",
+      compilerOutcome: "not_run",
+      diagnostic: {
+        code: "ai_authored_plan_first_provider_schema_invalid",
+        path: aliasPath,
+      },
+    });
+    await recordAiPlanGenerationAttemptResultForUser({
+      userId: ownerId,
+      responseRecordId: immutableAliasRow.id,
+      result: {
+        outcome: "technical_rejection",
+        candidateRecordId: null,
+        candidateSha256: null,
+        noPrescriptionReason: null,
+      },
+    });
+
+    const immutableRetryInput = structuredClone(resolved.authoringInput);
+    immutableRetryInput.initialPlanProfile.asOf = "2026-06-08T12:00:02.000Z";
+    immutableRetryInput.initialPlanProfile.snapshotId = "immutable-alias-retry";
+    let immutableRetryDispatches = 0;
+    const immutableRecovered = await generateAiFirstPlanDraftPreview({
+      input: immutableRetryInput,
+      apiKey: null,
+      model: immutableAliasModel,
+      today: scenario.input.startDate,
+      candidateOwnerUserId: ownerId,
+      generationLedger: { disabled: true },
+      fetchImpl: async () => {
+        immutableRetryDispatches += 1;
+        throw new Error("Immutable response recovery must not dispatch a provider request.");
+      },
+    });
+    assert.equal(
+      immutableRecovered.ok,
+      true,
+      immutableRecovered.ok ? "" : immutableRecovered.message,
+    );
+    if (!immutableRecovered.ok) throw new Error(immutableRecovered.message);
+    assert.equal(immutableRetryDispatches, 0);
+    assert.equal(immutableRecovered.metadata.responseId, immutableAliasResponseId);
+    assert.ok(immutableRecovered.retainedSourceCandidate);
+    assert.deepEqual(immutableRecovered.metadata.validationIssues, [
+      `ai_authored_blueprint_family_alias_normalized:${aliasPath}:easy`,
+    ]);
+
+    const immutableResponseRead = await getAiPlanGenerationResponseForUser(
+      ownerId,
+      immutableAliasRow.id,
+    );
+    assert.equal(immutableResponseRead?.schema_outcome, "rejected");
+    assert.equal(immutableResponseRead?.compiler_outcome, "not_run");
+    assert.equal(
+      (immutableResponseRead?.attempt_result as { outcome?: unknown } | null)?.outcome,
+      "technical_rejection",
+    );
+    const immutableCandidateRead = await ownerClient
+      .from("adaptive_training_detailed_candidates")
+      .select("*")
+      .eq("id", immutableRecovered.retainedSourceCandidate!.candidateId)
+      .single();
+    assert.equal(immutableCandidateRead.error, null);
+    assert.equal(
+      (immutableCandidateRead.data!.input_provenance as Record<string, unknown>)
+        .immutableRecompileKind,
+      "immutable_initial_response_recompile_v1",
+    );
+    assert.equal(
+      (immutableCandidateRead.data!.input_provenance as Record<string, unknown>)
+        .aliasNormalizationCount,
+      1,
+    );
+    assert.equal(
+      isCurrentAiPlanGenerationResponseLineageForCandidate(
+        immutableResponseRead!,
+        immutableCandidateRead.data!.input_provenance,
+        {
+          id: immutableCandidateRead.data!.id,
+          sha256: immutableCandidateRead.data!.candidate_sha256,
+        },
+      ),
+      true,
+      "The proven immutable candidate must be eligible for ordinary Saved review hydration.",
+    );
+
+    const immutableDuplicate = await generateAiFirstPlanDraftPreview({
+      input: immutableRetryInput,
+      apiKey: null,
+      model: immutableAliasModel,
+      today: scenario.input.startDate,
+      candidateOwnerUserId: ownerId,
+      generationLedger: { disabled: true },
+      fetchImpl: async () => {
+        immutableRetryDispatches += 1;
+        throw new Error("Duplicate immutable recovery must remain provider-free.");
+      },
+    });
+    assert.equal(immutableDuplicate.ok, true);
+    assert.equal(immutableRetryDispatches, 0);
+    assert.deepEqual(
+      immutableDuplicate.ok ? immutableDuplicate.retainedSourceCandidate : null,
+      immutableRecovered.retainedSourceCandidate,
+    );
+
+    const changedImmutableFacts = structuredClone(immutableRetryInput);
+    changedImmutableFacts.initialPlanProfile.runnerFactsRevision = "changed-after-response";
+    const changedImmutableRetry = await generateAiFirstPlanDraftPreview({
+      input: changedImmutableFacts,
+      apiKey: null,
+      model: immutableAliasModel,
+      today: scenario.input.startDate,
+      candidateOwnerUserId: ownerId,
+      generationLedger: { disabled: true },
+      fetchImpl: async () => {
+        immutableRetryDispatches += 1;
+        throw new Error("A changed request must not silently reuse immutable response truth.");
+      },
+    });
+    assert.equal(changedImmutableRetry.ok, false);
+    assert.equal(changedImmutableRetry.metadata.unavailableReason, "openai_not_configured");
+    assert.equal(immutableRetryDispatches, 0);
+
+    const forgedImmutableSnapshot = structuredClone(immutableRetryInput);
+    forgedImmutableSnapshot.runnerFacts.weightKg += 1;
+    const forgedImmutableRetention = await admin.rpc("retain_adaptive_training_source_candidate", {
+      p_user_id: ownerId,
+      p_source_response_id: immutableAliasRow.id,
+      p_blueprint_version: 99,
+      p_source_contract_version: AI_AUTHORED_PLAN_FIRST_SOURCE_KIND,
+      p_compiler_version: AI_AUTHORED_PLAN_FIRST_COMPILER_VERSION,
+      p_blueprint_content: immutableRecovered.blueprint,
+      p_candidate_version: 99,
+      p_interval_start_date: immutableRecovered.blueprint.detailedHorizon.startDate,
+      p_interval_end_date: immutableRecovered.blueprint.detailedHorizon.endDate,
+      p_candidate_content: {
+        canonicalPlan: immutableRecovered.canonicalPlan,
+        reviewConflicts: immutableRecovered.reviewConflicts,
+      },
+      p_input_snapshot: forgedImmutableSnapshot,
+      p_input_provenance: immutableCandidateRead.data!.input_provenance,
+      p_fact_references: immutableCandidateRead.data!.fact_references,
+      p_confirmation_lineage: immutableCandidateRead.data!.confirmation_lineage,
+    });
+    assert.ok(
+      forgedImmutableRetention.error,
+      "A forged material input must fail before immutable candidate retention.",
+    );
+    const foreignImmutableRetention = await admin.rpc("retain_adaptive_training_source_candidate", {
+      p_user_id: otherId,
+      p_source_response_id: immutableAliasRow.id,
+      p_blueprint_version: 99,
+      p_source_contract_version: AI_AUTHORED_PLAN_FIRST_SOURCE_KIND,
+      p_compiler_version: AI_AUTHORED_PLAN_FIRST_COMPILER_VERSION,
+      p_blueprint_content: immutableRecovered.blueprint,
+      p_candidate_version: 99,
+      p_interval_start_date: immutableRecovered.blueprint.detailedHorizon.startDate,
+      p_interval_end_date: immutableRecovered.blueprint.detailedHorizon.endDate,
+      p_candidate_content: {
+        canonicalPlan: immutableRecovered.canonicalPlan,
+        reviewConflicts: immutableRecovered.reviewConflicts,
+      },
+      p_input_snapshot: immutableRetryInput,
+      p_input_provenance: immutableCandidateRead.data!.input_provenance,
+      p_fact_references: immutableCandidateRead.data!.fact_references,
+      p_confirmation_lineage: immutableCandidateRead.data!.confirmation_lineage,
+    });
+    assert.ok(foreignImmutableRetention.error, "Immutable recovery must remain owner-bound.");
+
     const canonicalResponseId = `resp_canonical_${crypto.randomUUID()}`;
     const originalFetch = globalThis.fetch;
     let canonicalTransportCallCount = 0;
@@ -777,7 +1022,7 @@ async function validateCompletedAiPlanResponseRetentionPersistence() {
       .select("id", { count: "exact", head: true })
       .eq("user_id", ownerId);
     assert.equal(ownerRows.error, null);
-    assert.equal(ownerRows.count, 5, "The proof must retain every parseable outcome.");
+    assert.equal(ownerRows.count, 6, "The proof must retain every parseable outcome.");
     const blueprintRows = await admin
       .from("adaptive_training_blueprint_versions")
       .select("id", { count: "exact", head: true })
@@ -788,8 +1033,26 @@ async function validateCompletedAiPlanResponseRetentionPersistence() {
       .eq("user_id", ownerId);
     assert.equal(blueprintRows.error, null);
     assert.equal(candidateRows.error, null);
-    assert.equal(blueprintRows.count, 3, "Only accepted responses create Blueprint versions.");
-    assert.equal(candidateRows.count, 3, "Only accepted responses create detailed candidates.");
+    assert.equal(
+      blueprintRows.count,
+      4,
+      "Only accepted responses and the proven immutable recompile create Blueprint versions.",
+    );
+    assert.equal(
+      candidateRows.count,
+      4,
+      "Only accepted responses and the proven immutable recompile create detailed candidates.",
+    );
+    const confirmationRows = await admin
+      .from("adaptive_training_block_confirmations")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", ownerId);
+    assert.equal(confirmationRows.error, null);
+    assert.equal(
+      confirmationRows.count,
+      0,
+      "Immutable response recompilation must not create a confirmation or Calendar write.",
+    );
   } finally {
     for (const userId of createdUserIds.reverse()) {
       const deleted = await admin.auth.admin.deleteUser(userId);
@@ -1796,6 +2059,39 @@ async function validateFirstPlanGenerationLifecycle() {
   const resolved = buildAiGeneratedRunningPlanAuthoringInput(scenario.input);
   assert.equal(resolved.ok, true, resolved.ok ? "" : resolved.message);
   if (!resolved.ok) throw new Error(resolved.message);
+
+  const volatileOnlyRetry = structuredClone(resolved.authoringInput);
+  volatileOnlyRetry.initialPlanProfile.asOf = "2026-06-08T12:00:01.000Z";
+  volatileOnlyRetry.initialPlanProfile.snapshotId = "volatile-observation-retry";
+  assert.equal(
+    areMateriallyEquivalentAiFirstPlanRequestContexts(resolved.authoringInput, volatileOnlyRetry),
+    true,
+    "Only volatile observation identity may reuse an immutable first-plan response.",
+  );
+  const changedFactsRetry = structuredClone(volatileOnlyRetry);
+  changedFactsRetry.initialPlanProfile.runnerFactsRevision = "changed-runner-facts";
+  assert.equal(
+    areMateriallyEquivalentAiFirstPlanRequestContexts(resolved.authoringInput, changedFactsRetry),
+    false,
+    "A runner-facts revision must not reuse an immutable first-plan response.",
+  );
+  const changedGoalRetry = structuredClone(volatileOnlyRetry);
+  changedGoalRetry.planGoalIntent.targetDate = "2026-08-03";
+  assert.equal(
+    areMateriallyEquivalentAiFirstPlanRequestContexts(resolved.authoringInput, changedGoalRetry),
+    false,
+    "A target-date change must not reuse an immutable first-plan response.",
+  );
+  const changedEvidenceRetry = structuredClone(volatileOnlyRetry);
+  changedEvidenceRetry.initialPlanProfile.components.recent28Day.evidence.missingCount += 1;
+  assert.equal(
+    areMateriallyEquivalentAiFirstPlanRequestContexts(
+      resolved.authoringInput,
+      changedEvidenceRetry,
+    ),
+    false,
+    "A factual evidence change must not reuse an immutable first-plan response.",
+  );
 
   const fixtureFetch = buildAiGeneratedRunningPlanDevFixtureOpenAiFetch({
     authoringInput: resolved.authoringInput,

@@ -10,6 +10,7 @@ import type {
 } from "@/lib/adaptive-blueprint-product-contract";
 import type { AdaptiveContinuationCandidateDraft } from "@/lib/adaptive-blueprint-continuation";
 import {
+  type AiFirstPlanImmutableRecompileProvenance,
   isAcceptedOrImmutablyRecompiledAiPlanGenerationResponseForCandidate,
   type AiPlanGenerationResponseRow,
 } from "@/lib/ai-plan-generation-response-persistence";
@@ -84,15 +85,8 @@ export async function retainAdaptiveTrainingSourceCandidateForUser(input: {
   canonicalPlan: TrainingPlanV2;
   reviewConflicts: readonly AiAuthoredBlueprintReviewConflict[];
   authoringInput: FrozenStructuredAuthoringInput;
+  immutableRecompileProvenance?: AiFirstPlanImmutableRecompileProvenance;
 }): Promise<RetainedAdaptiveTrainingSourceCandidate> {
-  if (
-    input.retainedResponse.user_id !== input.userId ||
-    input.retainedResponse.schema_outcome !== "accepted" ||
-    input.retainedResponse.compiler_outcome !== "accepted"
-  ) {
-    throw new Error("Adaptive Blueprint retention requires an accepted owner response.");
-  }
-
   const candidateContent = {
     canonicalPlan: input.canonicalPlan,
     reviewConflicts: input.reviewConflicts,
@@ -103,7 +97,19 @@ export async function retainAdaptiveTrainingSourceCandidateForUser(input: {
     retainedResponseSha256: input.retainedResponse.response_sha256,
     sourceContractVersion: AI_AUTHORED_PLAN_FIRST_SOURCE_KIND,
     compilerVersion: AI_AUTHORED_PLAN_FIRST_COMPILER_VERSION,
+    ...input.immutableRecompileProvenance,
   };
+  if (
+    input.retainedResponse.user_id !== input.userId ||
+    !isAcceptedOrImmutablyRecompiledAiPlanGenerationResponseForCandidate(
+      input.retainedResponse,
+      toJson(inputProvenance),
+    )
+  ) {
+    throw new Error(
+      "Adaptive Blueprint retention requires an accepted or proven immutable owner response.",
+    );
+  }
   const factReferences = [
     { kind: "authoring_fact_group", path: "runnerFacts" },
     { kind: "authoring_fact_group", path: "availability" },

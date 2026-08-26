@@ -42,6 +42,7 @@ import {
   markAiPlanGenerationReviewRefused,
   markAiPlanGenerationReviewedDraftSigned,
 } from "@/lib/ai-plan-generation-ledger";
+import { isCurrentAiPlanGenerationResponseLineageForCandidate } from "@/lib/ai-plan-generation-response-persistence";
 import {
   planGoalIntentDistanceInputSchema,
   planGoalIntentInputSchema,
@@ -1061,7 +1062,17 @@ function savedPlanReviewLineageIsCurrent(
 ) {
   const provenance = jsonObject(record.candidate.input_provenance);
   const lineage = jsonObject(record.candidate.confirmation_lineage);
-  const attemptResult = jsonObject(record.response?.attempt_result ?? null);
+  const sourceResponseAdmitted = Boolean(
+    record.response &&
+    isCurrentAiPlanGenerationResponseLineageForCandidate(
+      record.response,
+      record.candidate.input_provenance,
+      {
+        id: record.candidate.id,
+        sha256: record.candidate.candidate_sha256,
+      },
+    ),
+  );
   return Boolean(
     sourceReference &&
     record.blueprint &&
@@ -1075,8 +1086,7 @@ function savedPlanReviewLineageIsCurrent(
     record.blueprint.source_response_id === record.response.id &&
     record.blueprint.source_contract_version === AI_AUTHORED_PLAN_FIRST_SOURCE_KIND &&
     record.blueprint.compiler_version === AI_AUTHORED_PLAN_FIRST_COMPILER_VERSION &&
-    record.response.schema_outcome === "accepted" &&
-    record.response.compiler_outcome === "accepted" &&
+    sourceResponseAdmitted &&
     provenance?.kind === "structured_authoring_input" &&
     provenance.retainedResponseId === record.response.id &&
     provenance.retainedResponseSha256 === record.response.response_sha256 &&
@@ -1085,10 +1095,7 @@ function savedPlanReviewLineageIsCurrent(
     lineage?.kind === "initial_detailed_block_candidate" &&
     lineage.state === "unconfirmed" &&
     lineage.predecessorCandidateId === null &&
-    lineage.predecessorConfirmationId === null &&
-    attemptResult?.outcome === "candidate_ready" &&
-    attemptResult.candidateRecordId === record.candidate.id &&
-    attemptResult.candidateSha256 === record.candidate.candidate_sha256,
+    lineage.predecessorConfirmationId === null,
   );
 }
 

@@ -27,6 +27,7 @@ import {
   type AiPlanGenerationLedgerTrace,
 } from "@/lib/ai-plan-generation-ledger";
 import {
+  buildAiFirstPlanImmutableRecompileProvenance,
   getReusableAiPlanGenerationResponseForUser,
   recordAiPlanGenerationAttemptResultForUser,
   recordAiPlanGenerationResponseOutcomeForUser,
@@ -595,26 +596,66 @@ export async function generateAiFirstPlanDraftPreview({
 
     const finalized = normalized;
 
-    const acceptedRetainedResponse = await recordRetainedResponseOutcome({
-      retainedResponse,
-      userId: candidateOwnerUserId,
-      schemaOutcome: "accepted",
-      compilerOutcome: "accepted",
-      diagnostic: null,
-      debug: responseDebug,
-      generationTrace: latestGenerationTrace,
-    });
+    const immutableRecompileProvenance = reusableResponse
+      ? await buildAiFirstPlanImmutableRecompileProvenance({
+          response: reusableResponse,
+          currentRequestContext: authoringInput,
+          compilerVersion: AI_AUTHORED_PLAN_FIRST_COMPILER_VERSION,
+          validationIssues: finalized.metadata.validationIssues,
+        })
+      : null;
+    if (
+      reusableResponse &&
+      (reusableResponse.schema_outcome !== "accepted" ||
+        reusableResponse.compiler_outcome !== "accepted") &&
+      !immutableRecompileProvenance
+    ) {
+      throw new AiFirstPlanDraftServiceError(
+        "ai_plan_generation_response_recompile_not_admitted",
+        ["The retained response is not eligible for immutable first-plan recompilation."],
+        { ...responseDebug, requestPhase: "rejected_after_validation" },
+        latestGenerationTrace,
+      );
+    }
+
+    const acceptedRetainedResponse = immutableRecompileProvenance
+      ? reusableResponse
+      : await recordRetainedResponseOutcome({
+          retainedResponse,
+          userId: candidateOwnerUserId,
+          schemaOutcome: "accepted",
+          compilerOutcome: "accepted",
+          diagnostic: null,
+          debug: responseDebug,
+          generationTrace: latestGenerationTrace,
+        });
 
     let retainedSourceCandidate: RetainedAdaptiveTrainingSourceCandidate | null = null;
     if (acceptedRetainedResponse && candidateOwnerUserId) {
       try {
+        let candidateAuthoringInput = compilerAuthoringInput;
+        if (
+          reusableResponse?.schema_outcome === "accepted" &&
+          reusableResponse.compiler_outcome === "accepted"
+        ) {
+          const retainedAuthoringInput = structuredPlanAuthoringInputSchema.safeParse(
+            reusableResponse.request_context,
+          );
+          if (!retainedAuthoringInput.success) {
+            throw new Error("The accepted retained response has invalid authoring lineage.");
+          }
+          const { requestContext: _retainedRequestContext, ...retainedCompilerAuthoringInput } =
+            retainedAuthoringInput.data;
+          candidateAuthoringInput = retainedCompilerAuthoringInput;
+        }
         retainedSourceCandidate = await retainAdaptiveTrainingSourceCandidateForUser({
           userId: candidateOwnerUserId,
           retainedResponse: acceptedRetainedResponse,
           blueprint: finalized.blueprint,
           canonicalPlan: finalized.canonicalPlan,
           reviewConflicts: finalized.reviewConflicts,
-          authoringInput: compilerAuthoringInput,
+          authoringInput: candidateAuthoringInput,
+          immutableRecompileProvenance: immutableRecompileProvenance ?? undefined,
         });
       } catch {
         throw new AiFirstPlanDraftServiceError(
@@ -624,16 +665,18 @@ export async function generateAiFirstPlanDraftPreview({
           latestGenerationTrace,
         );
       }
-      await recordAiPlanGenerationAttemptResultForUser({
-        userId: candidateOwnerUserId,
-        responseRecordId: acceptedRetainedResponse.id,
-        result: {
-          outcome: "candidate_ready",
-          candidateRecordId: retainedSourceCandidate.candidateId,
-          candidateSha256: retainedSourceCandidate.candidateSha256,
-          noPrescriptionReason: null,
-        },
-      });
+      if (!immutableRecompileProvenance) {
+        await recordAiPlanGenerationAttemptResultForUser({
+          userId: candidateOwnerUserId,
+          responseRecordId: acceptedRetainedResponse.id,
+          result: {
+            outcome: "candidate_ready",
+            candidateRecordId: retainedSourceCandidate.candidateId,
+            candidateSha256: retainedSourceCandidate.candidateSha256,
+            noPrescriptionReason: null,
+          },
+        });
+      }
     }
 
     latestGenerationTrace = await updateAiPlanGenerationLedgerTrace(

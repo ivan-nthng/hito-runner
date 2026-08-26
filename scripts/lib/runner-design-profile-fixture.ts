@@ -89,6 +89,7 @@ import {
   updateUserSettingsForUserId,
 } from "../../src/lib/user-settings-actions";
 import { parseGarminFitActivity } from "../../src/lib/workout-result-import/parse-garmin-fit";
+import { prepareSavedPlanFutureApplyPolicy } from "../../src/lib/plan-apply-policy";
 import { reconcileWorkoutResultProjection } from "../../src/lib/workout-result-import/planned-workout-projection";
 import { getFitCompletedPlannedWorkoutIds } from "../../src/lib/workout-result-import/read-workout-result-feedback";
 import { WORKOUT_RESULT_STORAGE_BUCKET } from "../../src/lib/workout-result-import/internal-types";
@@ -107,6 +108,7 @@ export const ADAPTIVE_ENGINE_UI_REPLAY_CHECKPOINTS = [
   "initial_plan_review",
   "continuation_actions",
   "complete_surface",
+  "unplanned_activity_review",
 ] as const;
 export type AdaptiveEngineUiReplayCheckpoint =
   (typeof ADAPTIVE_ENGINE_UI_REPLAY_CHECKPOINTS)[number];
@@ -1397,9 +1399,44 @@ export async function seedAdaptiveEngineUiReplayFixture(input: {
   runtimeScope: "local_proof" | "hosted_ui_replay";
   checkpoint?: AdaptiveEngineUiReplayCheckpoint;
   fixtureScenario?: "camelot";
+  templatePlan?: ImportedPlan;
 }) {
   const checkpoint = input.checkpoint ?? "complete_surface";
   const provenance = adaptiveEngineUiReplayProvenance(input.runtimeScope, checkpoint);
+  if (checkpoint === "unplanned_activity_review") {
+    if (input.runtimeScope !== "local_proof") {
+      throw new Error("The unplanned Activity review checkpoint is local-only.");
+    }
+    if (!input.templatePlan) {
+      throw new Error("The unplanned Activity review checkpoint requires the canonical template.");
+    }
+    const interactionMatrix = await seedUnplannedActivityReviewCheckpoint({
+      supabase: input.supabase,
+      userId: input.userId,
+      asOfDate: normalizeAsOfDate(input.asOfDate),
+      templatePlan: input.templatePlan,
+    });
+    return {
+      fixtureVersion: ADAPTIVE_ENGINE_UI_REPLAY_FIXTURE_VERSION,
+      checkpoint,
+      provenance,
+      interactionMatrix,
+      finalState: {
+        confirmationCount: 0,
+        calendarWorkoutCount: 3,
+        protectedWorkoutLogCount: 1,
+        runnerActivityCount: 0,
+      },
+      invariants: {
+        injectedStructuredResponseCount: 0,
+        externalProviderDispatchCount: 0,
+        canonicalReviewConfirmUsed: true,
+        canonicalFitImporterUsed: false,
+        canonicalRunnerOwnedCalendarUsed: true,
+        ownerBound: true,
+      },
+    };
+  }
   if (checkpoint === "initial_plan_review") {
     const prepared = await prepareAdaptiveInitialPlanReviewFixture({
       ...input,
@@ -1573,6 +1610,267 @@ export async function seedAdaptiveEngineUiReplayFixture(input: {
       true,
     ),
   };
+}
+
+async function seedUnplannedActivityReviewCheckpoint(input: {
+  supabase: SupabaseClient;
+  userId: string;
+  asOfDate: string;
+  templatePlan: ImportedPlan;
+}) {
+  const baseline = buildFirstTimeRunnerBaselineReadback({
+    age: 36,
+    weightKg: 72,
+    heightCm: 178,
+    fitnessLevel: "running_regularly",
+  });
+  const settings = await updateUserSettingsForUserId(input.userId, {
+    firstName: "QA",
+    lastName: "Adaptive Training Quality",
+    displayName: "QA Adaptive Training Quality",
+    age: baseline.age,
+    weightKg: baseline.weightKg,
+    heightCm: baseline.heightCm,
+    fitnessLevel: baseline.fitnessLevel!,
+    calendarTimezone: "UTC",
+    trainingPreferences: {
+      fixedRestDays: ["Wednesday"],
+      defaultRunningDaysPerWeek: 2,
+      preferredLongRunDay: null,
+    },
+    heartRateProfile: {
+      zones: baseline.heartRateZones.zones.map(({ reference, minBpm, maxBpm }) => ({
+        reference,
+        minBpm,
+        maxBpm,
+      })),
+    },
+  });
+
+  const emptyDate = previousWeekdayDate(input.asOfDate, "Monday");
+  const dates = {
+    empty: emptyDate,
+    occupiedEligible: addDaysIso(emptyDate, 1),
+    storedRest: addDaysIso(emptyDate, 2),
+    occupiedProtected: addDaysIso(emptyDate, 3),
+  };
+  const restSource = input.templatePlan.planned_workouts.find(
+    (workout) => workout.workout_type === "rest",
+  );
+  const easySource = input.templatePlan.planned_workouts.find(
+    (workout) => workout.workout_identity === "easy_aerobic_run",
+  );
+  const protectedSource = input.templatePlan.planned_workouts.find(
+    (workout) => workout.workout_type !== "rest" && workout !== easySource,
+  );
+  assert.ok(restSource, "The canonical template requires one Rest source.");
+  assert.ok(easySource, "The canonical template requires one easy source.");
+  assert.ok(protectedSource, "The canonical template requires a second runnable source.");
+
+  const canonicalPlan = importedPlanSchema.parse({
+    ...input.templatePlan,
+    plan_name: "HITO-255 unplanned Activity review fixture",
+    generated_for: "QA Adaptive Training Quality",
+    start_date: dates.occupiedEligible,
+    source_kind: "training_plan_v2_import",
+    planned_workouts: [
+      {
+        ...easySource,
+        workout_id: "hito-255-occupied-eligible",
+        date: dates.occupiedEligible,
+        weekday: weekdayLong(dates.occupiedEligible),
+        week_number: 1,
+        phase: "HITO-255 fixture",
+        title: "Eligible authored workout",
+      },
+      {
+        ...restSource,
+        workout_id: "hito-255-stored-rest",
+        date: dates.storedRest,
+        weekday: weekdayLong(dates.storedRest),
+        week_number: 1,
+        phase: "HITO-255 fixture",
+        title: "Stored Rest",
+      },
+      {
+        ...protectedSource,
+        workout_id: "hito-255-occupied-protected",
+        date: dates.occupiedProtected,
+        weekday: weekdayLong(dates.occupiedProtected),
+        week_number: 1,
+        phase: "HITO-255 fixture",
+        title: "Protected authored workout",
+      },
+    ],
+  });
+  const fixtureCalendarDate = dates.empty;
+  const declaredSeed = buildImportedPlanSeed(canonicalPlan);
+  const preparedPolicy = prepareSavedPlanFutureApplyPolicy(
+    canonicalPlan,
+    fixtureCalendarDate,
+    settings.trainingPreferences,
+  );
+  assert.equal(preparedPolicy.workoutCount, 2, JSON.stringify({ declaredSeed, preparedPolicy }));
+  assert.equal(preparedPolicy.importedSeed.workouts.length, 3, JSON.stringify(preparedPolicy));
+  const sourcePlan = await retainImportedPlanCandidateForUser({
+    userId: input.userId,
+    canonicalPlan,
+    reviewChecksum: await digestSha256Hex(stableJsonStringify(canonicalPlan)),
+  });
+  const materialized = await materializeSourceWorkoutBatchForFixture({
+    userId: input.userId,
+    canonicalPlan,
+    sourcePlanId: sourcePlan.id,
+    calendarInstant: new Date(`${fixtureCalendarDate}T12:00:00.000Z`),
+  });
+  assert.equal(materialized.ok, true);
+
+  const rows = await input.supabase
+    .from("planned_workouts")
+    .select("id, workout_date, workout_type, title, source_workout_id")
+    .eq("user_id", input.userId)
+    .order("workout_date", { ascending: true });
+  if (rows.error) throw new Error(rows.error.message);
+  assert.equal(rows.data.length, 3, JSON.stringify({ materialized, rows: rows.data }));
+  const storedRest = rows.data.find((row) => row.workout_type === "rest");
+  const occupiedEligible = rows.data.find(
+    (row) => row.source_workout_id === "hito-255-occupied-eligible",
+  );
+  const occupiedProtected = rows.data.find(
+    (row) => row.source_workout_id === "hito-255-occupied-protected",
+  );
+  assert.ok(storedRest && storedRest.workout_type === "rest");
+  assert.ok(occupiedEligible && occupiedEligible.workout_type !== "rest");
+  assert.ok(occupiedProtected && occupiedProtected.workout_type !== "rest");
+  await saveWorkoutLogForUser(input.userId, {
+    plannedWorkoutId: occupiedProtected.id,
+    outcome: "completed",
+    actualDistanceKm: null,
+    actualDurationMin: null,
+    rpe: null,
+    notes: "Protected fixture outcome",
+    intervalsCompleted: null,
+    bodyNotes: [],
+  });
+
+  return readUnplannedActivityReviewCheckpoint(input);
+}
+
+export async function readUnplannedActivityReviewCheckpoint(input: {
+  supabase: SupabaseClient;
+  userId: string;
+  asOfDate?: string;
+}) {
+  const asOfDate = normalizeAsOfDate(input.asOfDate);
+  const rows = await input.supabase
+    .from("planned_workouts")
+    .select("id, workout_date, workout_type, title, source_workout_id")
+    .eq("user_id", input.userId)
+    .order("workout_date", { ascending: true });
+  if (rows.error) throw new Error(rows.error.message);
+  assert.equal(rows.data.length, 3);
+  const storedRest = rows.data.find((row) => row.workout_type === "rest");
+  const occupiedEligible = rows.data.find(
+    (row) => row.source_workout_id === "hito-255-occupied-eligible",
+  );
+  const occupiedProtected = rows.data.find(
+    (row) => row.source_workout_id === "hito-255-occupied-protected",
+  );
+  assert.ok(storedRest && storedRest.workout_type === "rest");
+  assert.ok(occupiedEligible && occupiedEligible.workout_type !== "rest");
+  assert.ok(occupiedProtected && occupiedProtected.workout_type !== "rest");
+  const emptyDate = previousEmptyFixtureDate(
+    asOfDate,
+    rows.data.map((row) => row.workout_date),
+  );
+  const protectedLog = await input.supabase
+    .from("workout_logs")
+    .select("id, planned_workout_id, outcome")
+    .eq("user_id", input.userId)
+    .eq("planned_workout_id", occupiedProtected.id)
+    .eq("outcome", "completed")
+    .single();
+  if (protectedLog.error) throw new Error(protectedLog.error.message);
+  const sourcePlan = await input.supabase
+    .from("plan_cycles")
+    .select("id, status, saved_plan_payload")
+    .eq("user_id", input.userId)
+    .eq("status", "archived")
+    .not("saved_plan_payload", "is", null)
+    .single();
+  if (sourcePlan.error) throw new Error(sourcePlan.error.message);
+  const snapshot = await getPersistedRunnerCalendarSnapshot(input.userId);
+  assert.equal(
+    snapshot.workouts.filter((workout) =>
+      [
+        occupiedEligible.workout_date,
+        storedRest.workout_date,
+        occupiedProtected.workout_date,
+      ].includes(workout.date),
+    ).length,
+    3,
+  );
+  return {
+    uiState: "unplanned_activity_review_ready" as const,
+    asOfDate,
+    expectedControls: [
+      "past_calendar_add_activity",
+      "unplanned_activity_upload",
+      "unplanned_activity_review",
+      "unplanned_activity_confirm",
+      "activity_history_resume",
+    ] as const,
+    calendarStates: {
+      empty: { workoutDate: emptyDate, calendarWorkoutId: null },
+      storedRest: {
+        workoutDate: storedRest.workout_date,
+        calendarWorkoutId: storedRest.id,
+        title: storedRest.title,
+      },
+      occupiedEligible: {
+        workoutDate: occupiedEligible.workout_date,
+        calendarWorkoutId: occupiedEligible.id,
+        title: occupiedEligible.title,
+      },
+      occupiedProtected: {
+        workoutDate: occupiedProtected.workout_date,
+        calendarWorkoutId: occupiedProtected.id,
+        title: occupiedProtected.title,
+        protection: "completed_workout_log" as const,
+      },
+    },
+    staleReviewScenario: {
+      workoutDate: emptyDate,
+      sequence: [
+        "open_empty_review",
+        "confirm_distinct_competing_activity_in_second_tab",
+        "confirm_original_review",
+      ] as const,
+      expectedOutcome: "stale_review" as const,
+    },
+    sourcePlan: {
+      id: sourcePlan.data.id,
+      retained: true,
+      materializedThroughSignedWorkoutCommand: true,
+    },
+  };
+}
+
+function previousWeekdayDate(asOfDate: string, weekday: WeekdayName) {
+  const date = Array.from({ length: 7 }, (_, offset) => addDaysIso(asOfDate, -(14 + offset))).find(
+    (candidate) => weekdayLong(candidate) === weekday,
+  );
+  assert.ok(date, `Could not resolve the historical ${weekday} fixture date.`);
+  return date;
+}
+
+function previousEmptyFixtureDate(asOfDate: string, occupiedDates: readonly string[]) {
+  const occupied = new Set(occupiedDates);
+  const date = Array.from({ length: 21 }, (_, offset) => addDaysIso(asOfDate, -(7 + offset))).find(
+    (candidate) => !occupied.has(candidate),
+  );
+  assert.ok(date, "Could not resolve one empty historical fixture date.");
+  return date;
 }
 
 export async function readAdaptiveEngineUiReplayInteractionCheckpoint(input: {

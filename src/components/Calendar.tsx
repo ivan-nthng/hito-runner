@@ -15,6 +15,14 @@ import { HitoButton } from "@/components/ui/button";
 import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
 import { Icon } from "@/components/ui/icon";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   HitoCalendarDayCell,
   HitoWorkoutDayRow,
   type HitoCalendarActionVisual,
@@ -60,6 +68,10 @@ import {
 import { ManualWorkoutMoveController } from "@/components/manual-workout/ManualWorkoutMoveControls";
 import { CalendarOverflowActions } from "@/components/calendar/CalendarOverflowActions";
 import { AdaptiveContinuationPanel } from "@/components/calendar/AdaptiveContinuationPanel";
+import {
+  UnplannedActivityWorkflow,
+  type UnplannedActivityWorkflowEntry,
+} from "@/components/runner-activity/UnplannedActivityWorkflow";
 import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
 import { formatUiDate, formatUiNumber } from "@/lib/ui-locale";
 import { formatHitoProductMessage, getHitoKnownProductMessage } from "@/lib/ui-locale-messages";
@@ -94,6 +106,9 @@ export function Calendar({
   const [view, setView] = useState<View>("month");
   const [cursor, setCursor] = useState(snapshot.currentDate);
   const [tooltipAnchor, setTooltipAnchor] = useState<TooltipAnchor | null>(null);
+  const [activityWorkflowEntry, setActivityWorkflowEntry] =
+    useState<UnplannedActivityWorkflowEntry | null>(null);
+  const activityReturnFocusRef = useRef<HTMLElement | null>(null);
   const { manualCalendarActionState, manualMoveControllerProps } = useManualCalendarActions(
     snapshot,
     {
@@ -124,13 +139,20 @@ export function Calendar({
     setTooltipAnchor(null);
   }
 
+  function openUnplannedActivity(clickedDate: string, trigger: HTMLElement) {
+    activityReturnFocusRef.current = trigger;
+    setActivityWorkflowEntry({ kind: "calendar", clickedDate });
+  }
+
   return (
     <div>
       <ManualWorkoutMoveController {...manualMoveControllerProps} />
 
       <div className="hito-section-header mb-6">
         <div>
-          <h1 className="hito-ui-title-lg text-foreground">{monthLabel}</h1>
+          <h1 id="calendar-title" className="hito-ui-title-lg text-foreground" tabIndex={-1}>
+            {monthLabel}
+          </h1>
         </div>
 
         <div className="flex items-center gap-2">
@@ -222,6 +244,7 @@ export function Calendar({
                   iso={iso}
                   inMonth={iso ? iso.slice(0, 7) === cursor.slice(0, 7) : false}
                   manualCalendarActionState={manualCalendarActionState}
+                  onAddActivity={openUnplannedActivity}
                   onTooltipChange={setTooltipAnchor}
                   snapshot={snapshot}
                 />
@@ -231,6 +254,7 @@ export function Calendar({
           <MobileMonthList
             dates={mobileMonthDates}
             manualCalendarActionState={manualCalendarActionState}
+            onAddActivity={openUnplannedActivity}
             snapshot={snapshot}
           />
         </>
@@ -238,6 +262,7 @@ export function Calendar({
         <WeekStrip
           dates={weekCells}
           manualCalendarActionState={manualCalendarActionState}
+          onAddActivity={openUnplannedActivity}
           snapshot={snapshot}
         />
       )}
@@ -247,6 +272,21 @@ export function Calendar({
           <Tooltip workout={tooltipWorkout} />
         </CalendarTooltipLayer>
       ) : null}
+
+      <UnplannedActivityWorkflow
+        entry={activityWorkflowEntry}
+        fallbackFocusId="calendar-title"
+        returnFocusRef={activityReturnFocusRef}
+        onOpenChange={(open) => {
+          if (!open) setActivityWorkflowEntry(null);
+        }}
+        onConfirmed={async (review) => {
+          if (review.calendarState.state === "confirmed") {
+            setCursor(review.calendarState.workout.workoutDate);
+          }
+          await router.invalidate({ sync: true });
+        }}
+      />
     </div>
   );
 }
@@ -412,10 +452,12 @@ function CalendarTooltipLayer({
 function MobileMonthList({
   dates,
   manualCalendarActionState,
+  onAddActivity,
   snapshot,
 }: {
   dates: string[];
   manualCalendarActionState: ManualCalendarActionState;
+  onAddActivity: (date: string, trigger: HTMLElement) => void;
   snapshot: TrainingSnapshot;
 }) {
   return (
@@ -426,6 +468,7 @@ function MobileMonthList({
           iso={iso}
           layout="mobile"
           manualCalendarActionState={manualCalendarActionState}
+          onAddActivity={onAddActivity}
           snapshot={snapshot}
         />
       ))}
@@ -494,12 +537,14 @@ function DayCell({
   iso,
   inMonth,
   manualCalendarActionState,
+  onAddActivity,
   onTooltipChange,
   snapshot,
 }: {
   iso: string | null;
   inMonth: boolean;
   manualCalendarActionState: ManualCalendarActionState;
+  onAddActivity: (date: string, trigger: HTMLElement) => void;
   onTooltipChange: (value: TooltipAnchor | null) => void;
   snapshot: TrainingSnapshot;
 }) {
@@ -512,6 +557,7 @@ function DayCell({
       iso={iso}
       layout="month"
       manualCalendarActionState={manualCalendarActionState}
+      onAddActivity={onAddActivity}
       onTooltipChange={onTooltipChange}
       snapshot={snapshot}
     />
@@ -523,6 +569,7 @@ function CalendarDaySlot({
   iso,
   layout,
   manualCalendarActionState,
+  onAddActivity,
   onTooltipChange,
   snapshot,
 }: {
@@ -530,6 +577,7 @@ function CalendarDaySlot({
   iso: string;
   layout: CalendarDaySlotLayout;
   manualCalendarActionState: ManualCalendarActionState;
+  onAddActivity: (date: string, trigger: HTMLElement) => void;
   onTooltipChange?: (value: TooltipAnchor | null) => void;
   snapshot: TrainingSnapshot;
 }) {
@@ -667,6 +715,11 @@ function CalendarDaySlot({
 
   const canDragMove = Boolean(sourceAction?.canDragInitiate);
   const sourceActionMobile = layout === "mobile";
+  const canAddPastActivity =
+    snapshot.mode === "authenticated" &&
+    iso < snapshot.currentDate &&
+    (layout !== "month" || inMonth) &&
+    !manualCalendarActionState.movePending;
   const tooltipHandlers =
     layout === "month" && onTooltipChange && hasWorkout
       ? {
@@ -686,6 +739,7 @@ function CalendarDaySlot({
         layout === "month" && "h-full min-w-0",
         canDragMove && "cursor-grab active:cursor-grabbing",
       )}
+      data-calendar-date={iso}
       {...manualMoveSourceDragProps(
         sourceAction,
         manualCalendarActionState,
@@ -741,6 +795,15 @@ function CalendarDaySlot({
         >
           <CalendarFeedbackMarker calendar={layout === "month"} state={feedbackMeta.state} />
         </Link>
+      ) : null}
+
+      {canAddPastActivity ? (
+        <PastActivityAddMenu
+          date={iso}
+          hasSourceAction={Boolean(sourceAction && workout)}
+          layout={layout}
+          onAddActivity={onAddActivity}
+        />
       ) : null}
 
       {sourceAction && workout ? (
@@ -1038,10 +1101,12 @@ function Stat({ label, value }: { label: string; value: string }) {
 function WeekStrip({
   dates,
   manualCalendarActionState,
+  onAddActivity,
   snapshot,
 }: {
   dates: string[];
   manualCalendarActionState: ManualCalendarActionState;
+  onAddActivity: (date: string, trigger: HTMLElement) => void;
   snapshot: TrainingSnapshot;
 }) {
   return (
@@ -1053,11 +1118,73 @@ function WeekStrip({
             iso={iso}
             layout="week"
             manualCalendarActionState={manualCalendarActionState}
+            onAddActivity={onAddActivity}
             snapshot={snapshot}
           />
         );
       })}
     </div>
+  );
+}
+
+function PastActivityAddMenu({
+  date,
+  hasSourceAction,
+  layout,
+  onAddActivity,
+}: {
+  date: string;
+  hasSourceAction: boolean;
+  layout: CalendarDaySlotLayout;
+  onAddActivity: (date: string, trigger: HTMLElement) => void;
+}) {
+  const locale = useHitoUiLocale();
+  const message = useHitoProductMessage();
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const fullDate = formatUiDate(date, locale, { dateStyle: "long" });
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <HitoButton
+          ref={triggerRef}
+          type="button"
+          aria-label={message("Add activity for {date}", { date: fullDate })}
+          className={cn(
+            "absolute z-30 aspect-square p-0 transition-opacity",
+            layout === "mobile"
+              ? cn("top-3 h-11 w-11", hasSourceAction ? "right-14" : "right-3")
+              : cn(
+                  "opacity-100 [@media(hover:hover)]:opacity-0 group-hover/manual-day:opacity-100 group-focus-within/manual-day:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100",
+                  layout === "month"
+                    ? hasSourceAction
+                      ? "right-12 top-2"
+                      : "right-2 top-2"
+                    : hasSourceAction
+                      ? "right-14 top-3"
+                      : "right-3 top-3",
+                ),
+          )}
+          iconOnly
+          size={layout === "mobile" ? "sm" : "xs"}
+          variant="ghost"
+        >
+          <Icon name="plus" size="sm" decorative />
+        </HitoButton>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>{fullDate}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onSelect={() => {
+            if (triggerRef.current) onAddActivity(date, triggerRef.current);
+          }}
+        >
+          <Icon name="activity" size="sm" decorative />
+          {message("Add activity")}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

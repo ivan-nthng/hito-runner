@@ -57,6 +57,8 @@ export async function reconcileWorkoutResultProjection(input: {
   primaryFile: ExtractedGarminFitFile;
   initialParseStatus: "uploaded" | "extracted";
   failurePointForQa?: WorkoutResultProjectionFailurePointForQa;
+  /** The Activity match and retained asset already committed in the Calendar transaction. */
+  confirmedCanonicalMatch?: boolean;
 }): Promise<WorkoutResultFeedbackSummary | null> {
   const supabase = createAdminSupabaseClient();
   let failureAssetId: string | null = input.candidateAssetId;
@@ -122,7 +124,7 @@ export async function reconcileWorkoutResultProjection(input: {
 
     let projectionAssetId = input.candidateAssetId;
 
-    if (reuseExistingTargetAsset) {
+    if (reuseExistingTargetAsset && reuseExistingTargetAsset.id !== input.candidateAssetId) {
       injectProjectionFailure(input.failurePointForQa, "candidate_cleanup");
       await discardCandidateUpload({
         userId: input.userId,
@@ -203,11 +205,14 @@ export async function reconcileWorkoutResultProjection(input: {
       activityProjection: input.activityProjection,
     });
     injectProjectionFailure(input.failurePointForQa, "metrics");
-    const comparison = await reconcileWorkoutComparison({
-      userId: input.userId,
-      plannedWorkout: input.plannedWorkout,
-      metrics,
-    });
+    const comparison =
+      input.plannedWorkout.workout_type === "recorded_run"
+        ? null
+        : await reconcileWorkoutComparison({
+            userId: input.userId,
+            plannedWorkout: input.plannedWorkout,
+            metrics,
+          });
     injectProjectionFailure(input.failurePointForQa, "comparison");
 
     injectProjectionFailure(input.failurePointForQa, "supersession");
@@ -218,7 +223,7 @@ export async function reconcileWorkoutResultProjection(input: {
       activitySource: input.activitySource,
       assetId: projectionAsset.id,
       metricsId: metrics.id,
-      comparisonId: comparison.id,
+      comparisonId: comparison?.id ?? null,
     });
     const [persistedReadback, persistedMatch, fitCompletedWorkoutIds] = await Promise.all([
       getLatestWorkoutResultFeedback({
@@ -236,10 +241,14 @@ export async function reconcileWorkoutResultProjection(input: {
     ]);
 
     if (
-      persistedReadback.marker?.state !== "feedback_ready" ||
+      (input.plannedWorkout.workout_type === "recorded_run"
+        ? persistedReadback.marker?.state !== "evidence_attached"
+        : persistedReadback.marker?.state !== "feedback_ready") ||
       persistedReadback.latestAsset?.id !== projectionAsset.id ||
       persistedReadback.latestActualMetrics?.id !== metrics.id ||
-      persistedReadback.latestComparison?.id !== comparison.id ||
+      (comparison
+        ? persistedReadback.latestComparison?.id !== comparison.id
+        : persistedReadback.latestComparison !== null) ||
       persistedMatch !== input.plannedWorkout.id ||
       !fitCompletedWorkoutIds.has(input.plannedWorkout.id)
     ) {
@@ -248,7 +257,7 @@ export async function reconcileWorkoutResultProjection(input: {
 
     return persistedReadback;
   } catch (error) {
-    if (failureAssetId && failureAssetIsCandidate) {
+    if (failureAssetId && failureAssetIsCandidate && !input.confirmedCanonicalMatch) {
       await supabase
         .from("workout_result_assets")
         .update({
@@ -384,7 +393,7 @@ async function finalizeWorkoutResultProjection(input: {
   activitySource: RunnerActivitySourceReceipt;
   assetId: string;
   metricsId: string;
-  comparisonId: string;
+  comparisonId: string | null;
 }) {
   const result = await createAdminSupabaseClient().rpc(
     "finalize_runner_activity_planned_workout_projection",
@@ -396,7 +405,7 @@ async function finalizeWorkoutResultProjection(input: {
       p_source_revision_id: input.activitySource.sourceRevisionId,
       p_asset_id: input.assetId,
       p_metrics_id: input.metricsId,
-      p_comparison_id: input.comparisonId,
+      p_comparison_id: input.comparisonId as unknown as string,
     },
   );
   if (result.error) {

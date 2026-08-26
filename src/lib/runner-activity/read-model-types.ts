@@ -32,6 +32,7 @@ export type RunnerActivityHistoryItem = {
     title: string;
     workoutDate: string;
   } | null;
+  calendarState: "saved_unassigned" | "confirmed";
   source: {
     kind: "manual_garmin_fit";
     rawState: "available" | "removal_pending" | "removed";
@@ -45,6 +46,7 @@ export type RunnerActivityHistoryItem = {
   capabilities: {
     canRemoveOriginalFile: boolean;
     canDeleteActivity: true;
+    canResume: boolean;
   };
   provenance: {
     activityRevisionId: string;

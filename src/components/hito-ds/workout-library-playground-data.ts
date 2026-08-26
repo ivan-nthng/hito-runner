@@ -933,7 +933,7 @@ const rows = [
 
 type WorkoutLibraryCoveredIdentity = (typeof rows)[number]["identity"];
 const WORKOUT_LIBRARY_HAS_EVERY_CANONICAL_IDENTITY: Exclude<
-  CanonicalWorkoutIdentity,
+  Exclude<CanonicalWorkoutIdentity, "recorded_activity">,
   WorkoutLibraryCoveredIdentity
 > extends never
   ? true

@@ -2111,7 +2111,7 @@ export type Database = {
       runner_goal_type: "build_consistency" | "first_race" | "distance_build";
       runner_setup_state: "completed";
       workout_outcome: "completed" | "partial" | "skipped";
-      workout_type: "easy" | "steady_or_easy" | "rest" | "long_run" | "quality";
+      workout_type: "easy" | "steady_or_easy" | "rest" | "long_run" | "quality" | "recorded_run";
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -2244,7 +2244,7 @@ export const Constants = {
       runner_goal_type: ["build_consistency", "first_race", "distance_build"],
       runner_setup_state: ["completed"],
       workout_outcome: ["completed", "partial", "skipped"],
-      workout_type: ["easy", "steady_or_easy", "rest", "long_run", "quality"],
+      workout_type: ["easy", "steady_or_easy", "rest", "long_run", "quality", "recorded_run"],
     },
   },
 } as const;

@@ -37,6 +37,8 @@ import {
   WORKOUT_DOCUMENT_HYDRATION_CUE,
   WORKOUT_DOCUMENT_HYDRATION_LABEL,
 } from "@/lib/workout-document";
+
+type AuthoringCanonicalWorkoutIdentity = Exclude<CanonicalWorkoutIdentity, "recorded_activity">;
 import { stableJsonStringify } from "@/lib/review-token-signing";
 import type { ZodIssue } from "zod";
 import type { WorkoutDocument } from "@/lib/workout-document";
@@ -1274,8 +1276,12 @@ function buildWorkout({
       message: "Hydration cannot be the only step in a generated workout.",
     });
   }
-  const workoutIdentity = day.workout_identity;
+  const workoutIdentity = requireAuthoringWorkoutIdentity(day.workout_identity);
   const workoutFamily = familyForIdentity(workoutIdentity);
+  const workoutType = canonicalFamilyToLegacyWorkoutType(workoutFamily, workoutIdentity);
+  if (workoutType === "recorded_run") {
+    throw new Error("Provider-authored workouts cannot use the factual recorded Activity type.");
+  }
   const metricMode = toCanonicalMetricModeJson(deriveCanonicalMetricMode(segments));
   return {
     workout_id: `ai-plan-first-${slugify(workoutIdentity)}-${date}`,
@@ -1283,7 +1289,7 @@ function buildWorkout({
     weekday,
     week_number: weekNumber,
     phase: day.phase,
-    workout_type: canonicalFamilyToLegacyWorkoutType(workoutFamily, workoutIdentity),
+    workout_type: workoutType,
     source_workout_type: isEndpoint ? SELECTED_DISTANCE_ENDPOINT_SOURCE_KIND : workoutIdentity,
     workout_family: workoutFamily,
     workout_identity: workoutIdentity,
@@ -2090,10 +2096,25 @@ function providerSchemaIssueCode(issue: ZodIssue) {
 }
 
 function familyForIdentity(identity: CanonicalWorkoutIdentity) {
-  return resolveCanonicalWorkoutModel({
+  const family = resolveCanonicalWorkoutModel({
     workoutType: "quality",
     workoutIdentity: identity,
   }).workoutFamily;
+  if (family === "recorded") {
+    throw new Error("Provider-authored workouts cannot use the factual recorded Activity family.");
+  }
+  return family;
+}
+
+function requireAuthoringWorkoutIdentity(
+  identity: CanonicalWorkoutIdentity,
+): AuthoringCanonicalWorkoutIdentity {
+  if (identity === "recorded_activity") {
+    throw new Error(
+      "Provider-authored workouts cannot use the factual recorded Activity identity.",
+    );
+  }
+  return identity;
 }
 
 function buildGoalContext(authoringInput: StructuredAuthoringInput, targetDate: string) {

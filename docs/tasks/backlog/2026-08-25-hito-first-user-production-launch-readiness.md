@@ -1,0 +1,74 @@
+# First-User Production Launch Readiness
+
+**Date:** 2026-08-25
+**Mode:** Tracked
+**Category:** Release
+**Primary Area:** Runner
+**Epic:** `ship-adaptive-four-week-training`
+**Priority:** Highest
+**Owner:** QA
+**Archive intent:** Keep as the compact production launch receipt after terminal acceptance.
+
+## Outcome
+
+Prove that one disposable first runner can complete the current production journey without internal
+help: authenticate, provide required setup facts, create and explicitly confirm an initial plan,
+recover an unconfirmed saved review, use Calendar, attach factual FIT/RPE evidence, and read coherent
+Progress/Profile state in English and Portuguese.
+
+This is the first-user launch gate, not a new engine implementation, provider redesign, broad
+feature sweep, payment launch, integration rollout or invitation campaign.
+
+## Preserved Contracts
+
+- Production revision and hosted Supabase schema must be identified before mutation.
+- Review and explicit Confirm remain the only path from a generated candidate to Calendar.
+- Saved reviews survive close/reload and restore without a second provider dispatch.
+- Calendar, Result/Evidence and Runner Fitness Profile remain the factual owners.
+- Missing evidence stays missing; Progress does not invent fitness or readiness conclusions.
+- English/Portuguese localization applies to product UI and structured product errors, never to
+  runner-authored, AI-authored or FIT-derived content.
+- Only a named disposable technical runner may be used. Personal or existing production users are
+  out of scope.
+
+## Execution Boundary
+
+QA owns the production journey and evidence. A reproduced defect returns on this same Task to the
+first incorrect existing owner for root-cause fix-forward, then comes back to QA. Do not create a
+retry Task or parallel runtime owner.
+
+Use deterministic retained responses first. One paid initial-plan provider dispatch is permitted
+only if live transport/model configuration remains the exact unproven launch discriminator after
+the retained-response journey. Record attempt count, model, elapsed time, tokens and derived cost;
+do not retry an equivalent failure without a code/config discriminator. Running Coach review is
+required only for a newly dispatched or semantically changed plan candidate.
+
+## Acceptance Matrix
+
+1. Production deployment, commit, hosted migration parity, auth/session persistence and technical
+   runner ownership are identified and healthy.
+2. Required onboarding fields show exact inline correction and first-invalid focus; rejected input
+   creates no provider request, candidate, confirmation or Calendar row.
+3. Initial plan request opens a complete review, explicit Confirm creates the exact standalone
+   Calendar workouts once, and reload/new tab preserves the result.
+4. Closing an unconfirmed review preserves one Saved plan; Restore opens a fresh review without a
+   duplicate provider dispatch; duplicate Confirm is unavailable or rejected.
+5. FIT upload and RPE create factual Result/Evidence through the production UI; History,
+   Progress/Profile and Calendar agree after reload. An arbitrary or malformed file fails safely.
+6. English and Portuguese, Light and Dark, desktop `1470x801` and mobile `375x812`, keyboard/focus,
+   dialog containment, dates/numbers, overflow, console warnings/errors and HTTP failures are
+   checked on the affected public and authenticated surfaces.
+7. Final readback records provider dispatches, confirmations, Calendar rows, evidence/profile
+   revisions and omissions. Disposable task-owned data, Storage and leases return to zero while the
+   approved technical Auth identity is handled according to its retained lifecycle contract.
+
+## Stop And Release Rule
+
+Do not stop for a routine same-owner defect: fix the canonical root and replay the failed edge. Stop
+for Product only when the current production behavior requires a new user-visible policy, unsafe
+production-data action, new paid-provider budget, or scope outside this first-user journey.
+
+Terminal acceptance means independent QA passed the complete admitted matrix and returned one
+compact human review packet with exact production revision, evidence, residual risk and a clear
+invite/no-invite recommendation. Commit, push, migration or deployment of a newly fixed candidate
+requires the Task's explicit release edge; QA never performs those actions.

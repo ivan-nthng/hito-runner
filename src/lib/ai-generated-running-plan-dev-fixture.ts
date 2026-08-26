@@ -1516,10 +1516,14 @@ function prospectiveQaFixtureStartDate(asOfDate: string) {
 }
 
 function fixtureWorkoutFamily(day: ProviderFixtureWorkoutDay | ProviderFixtureFinalDay) {
-  return resolveCanonicalWorkoutModel({
+  const family = resolveCanonicalWorkoutModel({
     workoutType: "quality",
     workoutIdentity: day.workout_identity,
   }).workoutFamily;
+  if (family === "recorded") {
+    throw new Error("The plan-authoring fixture cannot use the factual recorded Activity family.");
+  }
+  return family;
 }
 
 function parseBooleanFlag(value: string | undefined): boolean | null {

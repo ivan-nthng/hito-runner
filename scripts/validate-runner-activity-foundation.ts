@@ -3,6 +3,11 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { crc32, deflateRawSync } from "node:zlib";
 import { deleteRunnerActivityFromHistory } from "../src/lib/runner-activity/garmin-fit-source";
+import { listRunnerActivityHistoryForUser } from "../src/lib/runner-activity/history-read-model";
+import {
+  confirmUnplannedActivityReviewForUser,
+  hydrateUnplannedActivityReviewForUser,
+} from "../src/lib/runner-activity/unplanned-review.server";
 import { getPersistedRunnerCalendarSnapshot } from "../src/lib/runner-calendar-snapshot";
 import {
   inferWorkoutStatus,
@@ -46,6 +51,7 @@ async function main() {
 
 async function runValidation() {
   provePlannedWorkoutCompletionProjectionContract();
+  await proveUnplannedActivityReviewSourceContract();
   const plannedUser = await ensureUser("provider-engine");
   const unplannedUser = await ensureUser("baseline-no-plan");
   await resetQaUsers([plannedUser.id, unplannedUser.id]);
@@ -80,6 +86,57 @@ async function runValidation() {
   await assertWorkoutResultStorageEmpty(unplannedUser.id);
   await assertLegacyBackfillRetirementComplete();
   console.log("Runner activity foundation contract passed.");
+}
+
+async function proveUnplannedActivityReviewSourceContract() {
+  const [uploadRoute, actions, reviewOwner, projectionOwner, transactionMigration, enumMigration] =
+    await Promise.all([
+      readFile(new URL("../src/routes/api.workout-result.upload.tsx", import.meta.url), "utf8"),
+      readFile(new URL("../src/lib/runner-activity/unplanned-actions.ts", import.meta.url), "utf8"),
+      readFile(
+        new URL("../src/lib/runner-activity/unplanned-review.server.ts", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL("../src/lib/workout-result-import/planned-workout-projection.ts", import.meta.url),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../supabase/migrations/20260825223435_unplanned_activity_confirm_transaction.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../supabase/migrations/20260825222026_unplanned_activity_review_confirm.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    ]);
+
+  assert.match(uploadRoute, /unplannedActivityReview/);
+  assert.doesNotMatch(actions, /targetDate|plannedWorkoutId|provider|openai/i);
+  assert.match(reviewOwner, /getRunnerCalendarDateForUserId/);
+  assert.match(reviewOwner, /localDate >= input\.currentDate/);
+  assert.match(reviewOwner, /kind: "date_missing"/);
+  assert.match(reviewOwner, /kind: "occupied_ineligible"/);
+  assert.match(reviewOwner, /confirmedCanonicalMatch: true/);
+  assert.doesNotMatch(reviewOwner, /storagePath:|fingerprint:/);
+  assert.match(projectionOwner, /&& !input\.confirmedCanonicalMatch/);
+  assert.match(transactionMigration, /p_mutation_kind = 'confirm_activity'/);
+  assert.match(transactionMigration, /pg_advisory_xact_lock/);
+  assert.match(transactionMigration, /localDate'\)::date >= p_current_date/);
+  assert.match(transactionMigration, /already confirmed on another Calendar date/);
+  assert.match(transactionMigration, /user_confirmed_activity/);
+  assert.match(reviewOwner, /occupancyFingerprint: token\.authority\.occupancyFingerprint/);
+  assert.doesNotMatch(`${transactionMigration}\n${enumMigration}`, /create\s+table/i);
+  assert.doesNotMatch(
+    `${transactionMigration}\n${enumMigration}`,
+    /create\s+function\s+public\.(?!finalize_runner_activity_planned_workout_projection|list_runner_fit_completed_planned_workouts)/i,
+  );
 }
 
 function provePlannedWorkoutCompletionProjectionContract() {
@@ -972,6 +1029,147 @@ async function proveUnplannedLifecycle(input: {
     file: new File([fixture], "unplanned.fit", { type: "application/octet-stream" }),
   });
   assert.equal(duplicate.runnerActivity.id, first.runnerActivity.id);
+  assert.ok("unplannedActivityReview" in first);
+  assert.ok("unplannedActivityReview" in duplicate);
+  if (!("unplannedActivityReview" in first) || !("unplannedActivityReview" in duplicate)) {
+    throw new Error("The unplanned upload must return its Activity Review.");
+  }
+  assert.equal(first.unplannedActivityReview.source.ingestDisposition, "retained");
+  assert.equal(duplicate.unplannedActivityReview.source.ingestDisposition, "reused_exact_source");
+  const review = await hydrateUnplannedActivityReviewForUser({
+    userId,
+    activityId: first.runnerActivity.id,
+  });
+  assert.equal(review.version, "unplanned_activity_review_v1");
+  assert.equal(review.calendarState.state, "saved_unassigned");
+  assert.equal(review.source.ingestDisposition, "retained");
+  assert.equal(review.placement.kind, "past_rest_available");
+  assert.equal(review.capabilities.canConfirmRest, true);
+  assert.equal(review.capabilities.canResume, true);
+  assert.ok(["available", "unavailable"].includes(review.laps.state));
+  assert.ok(["available", "unavailable"].includes(review.steps.state));
+  assert.ok(["available", "unavailable"].includes(review.facts.workoutName.state));
+  assert.equal(JSON.stringify(review).includes("storage_path"), false);
+  assert.equal(JSON.stringify(review).includes("fingerprint"), false);
+
+  const confirmed = await confirmUnplannedActivityReviewForUser({
+    userId,
+    activityId: review.activityId,
+    reviewToken: review.reviewToken,
+    reviewChecksum: review.reviewChecksum,
+    intent: "materialize_on_rest",
+  });
+  assert.equal(confirmed.ok, true);
+  if (!confirmed.ok) throw new Error(confirmed.message);
+  assert.equal(confirmed.idempotent, false);
+  assert.equal(confirmed.review.calendarState.state, "confirmed");
+  assert.equal(confirmed.review.placement.kind, "already_confirmed");
+
+  const repeated = await confirmUnplannedActivityReviewForUser({
+    userId,
+    activityId: review.activityId,
+    reviewToken: review.reviewToken,
+    reviewChecksum: review.reviewChecksum,
+    intent: "materialize_on_rest",
+  });
+  assert.equal(repeated.ok, true);
+  if (!repeated.ok) throw new Error(repeated.message);
+  assert.equal(repeated.idempotent, true);
+  assert.equal(repeated.calendarWorkoutId, confirmed.calendarWorkoutId);
+  assert.equal(repeated.mutationEventId, confirmed.mutationEventId);
+
+  const removedProjection = await supabase
+    .from("workout_actual_metrics")
+    .delete()
+    .eq("planned_workout_id", confirmed.calendarWorkoutId)
+    .eq("user_id", userId);
+  if (removedProjection.error) throw new Error(removedProjection.error.message);
+  const repairedProjection = await confirmUnplannedActivityReviewForUser({
+    userId,
+    activityId: review.activityId,
+    reviewToken: review.reviewToken,
+    reviewChecksum: review.reviewChecksum,
+    intent: "materialize_on_rest",
+  });
+  assert.equal(repairedProjection.ok, true);
+  if (!repairedProjection.ok) throw new Error(repairedProjection.message);
+  assert.equal(repairedProjection.calendarWorkoutId, confirmed.calendarWorkoutId);
+  assert.equal(repairedProjection.mutationEventId, confirmed.mutationEventId);
+  assert.equal(repairedProjection.projectionState, "current");
+
+  const [recordedWorkout, matches, metrics, comparisons, assets, events] = await Promise.all([
+    supabase
+      .from("planned_workouts")
+      .select("id, origin_kind, workout_type, workout_family, workout_identity, steps")
+      .eq("id", confirmed.calendarWorkoutId)
+      .eq("user_id", userId)
+      .single(),
+    supabase
+      .from("runner_activity_planned_workout_matches")
+      .select("activity_id, planned_workout_id")
+      .eq("activity_id", review.activityId)
+      .eq("user_id", userId),
+    supabase
+      .from("workout_actual_metrics")
+      .select("id, planned_workout_id, status")
+      .eq("planned_workout_id", confirmed.calendarWorkoutId)
+      .eq("user_id", userId),
+    supabase
+      .from("workout_comparisons")
+      .select("id")
+      .eq("planned_workout_id", confirmed.calendarWorkoutId)
+      .eq("user_id", userId),
+    supabase
+      .from("workout_result_assets")
+      .select("planned_workout_id")
+      .eq("activity_source_revision_id", review.sourceRevisionId)
+      .eq("user_id", userId),
+    supabase
+      .from("calendar_workout_mutation_events")
+      .select("id, mutation_kind")
+      .eq("planned_workout_id", confirmed.calendarWorkoutId)
+      .eq("user_id", userId),
+  ]);
+  for (const result of [recordedWorkout, matches, metrics, comparisons, assets, events]) {
+    if (result.error) throw new Error(result.error.message);
+  }
+  assert.equal(recordedWorkout.data.origin_kind, "file_import");
+  assert.equal(recordedWorkout.data.workout_type, "recorded_run");
+  assert.equal(recordedWorkout.data.workout_family, "recorded");
+  assert.equal(recordedWorkout.data.workout_identity, "recorded_activity");
+  assert.equal(JSON.stringify(recordedWorkout.data.steps).includes("target"), false);
+  assert.equal(matches.data.length, 1);
+  assert.equal(metrics.data.length, 1);
+  assert.equal(metrics.data[0]?.status, "normalized");
+  assert.equal(comparisons.data.length, 0);
+  assert.deepEqual(assets.data, [{ planned_workout_id: confirmed.calendarWorkoutId }]);
+  assert.deepEqual(events.data, [
+    { id: confirmed.mutationEventId, mutation_kind: "user_confirmed_activity" },
+  ]);
+
+  const history = await listRunnerActivityHistoryForUser({ userId });
+  const historyItem = history.items.find((item) => item.id === review.activityId);
+  assert.equal(historyItem?.calendarState, "confirmed");
+  assert.equal(historyItem?.capabilities.canResume, true);
+
+  const afterConfirmedDuplicate = await ingestGarminWorkoutResult({
+    userId,
+    file: new File([fixture], "unplanned-confirmed-retry.fit", {
+      type: "application/octet-stream",
+    }),
+  });
+  assert.equal(afterConfirmedDuplicate.runnerActivity.id, first.runnerActivity.id);
+  assert.ok("unplannedActivityReview" in afterConfirmedDuplicate);
+  if ("unplannedActivityReview" in afterConfirmedDuplicate) {
+    assert.equal(
+      afterConfirmedDuplicate.unplannedActivityReview.source.ingestDisposition,
+      "reused_exact_source",
+    );
+    assert.equal(
+      afterConfirmedDuplicate.unplannedActivityReview.placement.kind,
+      "already_confirmed",
+    );
+  }
   const beforeDelete = await getQaUserOwnedCounts(supabase, userId);
   assert.equal(beforeDelete.runner_activities, 1);
   assert.equal(beforeDelete.runner_activity_source_revisions, 1);
@@ -991,13 +1189,198 @@ async function proveUnplannedLifecycle(input: {
     role: input.otherUserRole,
   });
 
-  await deleteRunnerActivityFromHistory({ userId, activityId: first.runnerActivity.id });
-  const afterDelete = await getQaUserOwnedCounts(supabase, userId);
-  assert.equal(afterDelete.runner_activities, 0);
-  assert.equal(afterDelete.runner_activity_sources, 0);
-  assert.equal(afterDelete.runner_activity_source_revisions, 0);
-  assert.equal(afterDelete.runner_activity_revisions, 0);
-  assert.equal(afterDelete.workout_result_assets, 0);
+  const foreignUser = await ensureUser(input.otherUserRole);
+  const foreignConfirm = await confirmUnplannedActivityReviewForUser({
+    userId: foreignUser.id,
+    activityId: review.activityId,
+    reviewToken: review.reviewToken,
+    reviewChecksum: review.reviewChecksum,
+    intent: "materialize_on_rest",
+  });
+  assert.equal(foreignConfirm.ok, false);
+  if (foreignConfirm.ok) throw new Error("Foreign Activity confirmation unexpectedly succeeded.");
+  assert.equal(foreignConfirm.reason, "invalid_review");
+
+  await resetQaPoolUserData({ supabase, userId });
+  await proveStoredRestReplacement(userId);
+  await resetQaPoolUserData({ supabase, userId });
+  await proveOccupiedActivityAssociation(userId);
+  await resetQaPoolUserData({ supabase, userId });
+  await proveProtectedOccupiedActivityRejection(userId);
+  await resetQaPoolUserData({ supabase, userId });
+  await proveStaleOccupancyRejection(userId);
+}
+
+async function proveStoredRestReplacement(userId: string) {
+  const { review } = await ingestUnplannedProofActivity(userId, 11, "stored-rest.fit");
+  const localDate = availableLocalDate(review);
+  const restId = randomUUID();
+  const rest = {
+    ...proofWorkoutRow(restId, userId, localDate, 0),
+    workout_type: "rest" as const,
+    title: "Rest",
+  };
+  const inserted = await supabase.from("planned_workouts").insert(rest);
+  if (inserted.error) throw new Error(inserted.error.message);
+
+  const hydrated = await hydrateUnplannedActivityReviewForUser({
+    userId,
+    activityId: review.activityId,
+  });
+  assert.equal(hydrated.placement.kind, "past_rest_available");
+  const confirmed = await confirmReview(userId, hydrated, "materialize_on_rest");
+  assert.notEqual(confirmed.calendarWorkoutId, restId);
+
+  const [oldRest, event] = await Promise.all([
+    supabase.from("planned_workouts").select("id").eq("id", restId).maybeSingle(),
+    supabase
+      .from("calendar_workout_mutation_events")
+      .select("before_workout, event_payload")
+      .eq("id", confirmed.mutationEventId)
+      .single(),
+  ]);
+  if (oldRest.error) throw new Error(oldRest.error.message);
+  if (event.error) throw new Error(event.error.message);
+  assert.equal(oldRest.data, null);
+  assert.equal((event.data.before_workout as { id?: string } | null)?.id, restId);
+  assert.match(
+    String((event.data.event_payload as { occupancy_fingerprint?: string }).occupancy_fingerprint),
+    /^[a-f0-9]{64}$/,
+  );
+}
+
+async function proveOccupiedActivityAssociation(userId: string) {
+  const { review } = await ingestUnplannedProofActivity(userId, 12, "occupied.fit");
+  const localDate = availableLocalDate(review);
+  const workoutId = randomUUID();
+  const workout = proofWorkoutRow(workoutId, userId, localDate, 0);
+  const inserted = await supabase.from("planned_workouts").insert(workout).select("*").single();
+  if (inserted.error) throw new Error(inserted.error.message);
+
+  const hydrated = await hydrateUnplannedActivityReviewForUser({
+    userId,
+    activityId: review.activityId,
+  });
+  assert.equal(hydrated.placement.kind, "occupied_association_available");
+  const confirmed = await confirmReview(userId, hydrated, "associate_existing");
+  assert.equal(confirmed.calendarWorkoutId, workoutId);
+
+  const after = await supabase.from("planned_workouts").select("*").eq("id", workoutId).single();
+  if (after.error) throw new Error(after.error.message);
+  assert.deepEqual(after.data, inserted.data);
+  const comparison = await supabase
+    .from("workout_comparisons")
+    .select("id")
+    .eq("planned_workout_id", workoutId)
+    .eq("user_id", userId);
+  if (comparison.error) throw new Error(comparison.error.message);
+  assert.equal(comparison.data.length, 1);
+}
+
+async function proveProtectedOccupiedActivityRejection(userId: string) {
+  const { review } = await ingestUnplannedProofActivity(userId, 13, "protected.fit");
+  const localDate = availableLocalDate(review);
+  const workoutId = randomUUID();
+  const inserted = await supabase
+    .from("planned_workouts")
+    .insert(proofWorkoutRow(workoutId, userId, localDate, 0));
+  if (inserted.error) throw new Error(inserted.error.message);
+  await saveProofWorkoutLog({
+    userId,
+    plannedWorkoutId: workoutId,
+    outcome: "completed",
+    notes: "Protected authored outcome",
+  });
+
+  const hydrated = await hydrateUnplannedActivityReviewForUser({
+    userId,
+    activityId: review.activityId,
+  });
+  assert.equal(hydrated.placement.kind, "occupied_ineligible");
+  const rejected = await confirmUnplannedActivityReviewForUser({
+    userId,
+    activityId: hydrated.activityId,
+    reviewToken: hydrated.reviewToken,
+    reviewChecksum: hydrated.reviewChecksum,
+    intent: "associate_existing",
+  });
+  assert.equal(rejected.ok, false);
+  if (rejected.ok) throw new Error("Protected Calendar association unexpectedly succeeded.");
+  assert.equal(rejected.reason, "ineligible");
+  await assertNoActivityMatch(userId, hydrated.activityId);
+}
+
+async function proveStaleOccupancyRejection(userId: string) {
+  const { review } = await ingestUnplannedProofActivity(userId, 14, "stale-occupancy.fit");
+  assert.equal(review.placement.kind, "past_rest_available");
+  const localDate = availableLocalDate(review);
+  const inserted = await supabase
+    .from("planned_workouts")
+    .insert(proofWorkoutRow(randomUUID(), userId, localDate, 0));
+  if (inserted.error) throw new Error(inserted.error.message);
+
+  const rejected = await confirmUnplannedActivityReviewForUser({
+    userId,
+    activityId: review.activityId,
+    reviewToken: review.reviewToken,
+    reviewChecksum: review.reviewChecksum,
+    intent: "materialize_on_rest",
+  });
+  assert.equal(rejected.ok, false);
+  if (rejected.ok) throw new Error("Stale occupancy confirmation unexpectedly succeeded.");
+  assert.equal(rejected.reason, "stale_review");
+  await assertNoActivityMatch(userId, review.activityId);
+}
+
+async function ingestUnplannedProofActivity(userId: string, suffix: number, fileName: string) {
+  const fixture = await readFitFixture();
+  const result = await ingestGarminWorkoutResult({
+    userId,
+    file: new File([Buffer.concat([fixture, Buffer.from([suffix])])], fileName, {
+      type: "application/octet-stream",
+    }),
+  });
+  if (!("unplannedActivityReview" in result)) {
+    throw new Error("Unplanned FIT intake did not return an Activity Review.");
+  }
+  return { result, review: result.unplannedActivityReview };
+}
+
+function availableLocalDate(
+  review: Awaited<ReturnType<typeof hydrateUnplannedActivityReviewForUser>>,
+) {
+  if (review.facts.localDate.state !== "available") {
+    throw new Error("The deterministic FIT fixture must expose a local Activity date.");
+  }
+  return review.facts.localDate.value;
+}
+
+async function confirmReview(
+  userId: string,
+  review: Awaited<ReturnType<typeof hydrateUnplannedActivityReviewForUser>>,
+  intent: "materialize_on_rest" | "associate_existing",
+) {
+  const result = await confirmUnplannedActivityReviewForUser({
+    userId,
+    activityId: review.activityId,
+    reviewToken: review.reviewToken,
+    reviewChecksum: review.reviewChecksum,
+    intent,
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) throw new Error(result.message);
+  return result;
+}
+
+async function assertNoActivityMatch(userId: string, activityId: string) {
+  const match = await supabase
+    .from("runner_activity_planned_workout_matches")
+    .select("planned_workout_id")
+    .eq("user_id", userId)
+    .eq("activity_id", activityId)
+    .maybeSingle();
+  if (match.error) throw new Error(match.error.message);
+  assert.equal(match.data?.planned_workout_id ?? null, null);
 }
 
 async function proveDirectActivityTableReadDenied(input: {

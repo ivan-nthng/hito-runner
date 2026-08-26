@@ -175,11 +175,27 @@ it does not add commands or a second fixture family:
   normal Calendar detail, FIT/RPE, check-in, prepare, Review and Confirm controls from that state.
 - `complete_surface` is the default HITO-272 readback fixture and retains its three-confirmation
   stable-surface behavior.
+- `unplanned_activity_review` is a local-only HITO-255 checkpoint. It uses one retained canonical
+  import plus signed WorkoutCommand confirmation to prepare a past empty date, stored Rest, eligible
+  occupied workout and completed/protected occupied workout. It writes five distinct parser-valid,
+  mode-`0600` historical FIT inputs under the ignored HITO-255 QA-artifact directory for empty,
+  stale-competing, stored-Rest, eligible-occupied and protected-occupied Product flows. `status`
+  reports the exact dates, artifact hashes/modes, owner-only Calendar readback and zero provider
+  dispatch. No Activity or Calendar confirmation is pre-created.
+
+```bash
+npm run qa:adaptive-ui-replay:seed -- \
+  --checkpoint unplanned_activity_review \
+  --as-of-date 2026-08-25
+npm run qa:adaptive-ui-replay:status -- \
+  --checkpoint unplanned_activity_review \
+  --as-of-date 2026-08-25
+```
 
 `status` receives the same selector. Exact version-confirmed `reset` deletes only the runner-owned
-domain rows/storage, releases the existing adaptive lease, removes the synthetic HITO-273 upload
-artifact and preserves the technical Auth identity. The selector never restores HITO-271 IDs,
-provider content, prompts, Coach verdicts, credentials, action links or personal data.
+domain rows/storage, releases the existing adaptive lease, removes the synthetic HITO-273 and
+HITO-255 upload artifacts and preserves the technical Auth identity. The selector never restores
+HITO-271 IDs, provider content, prompts, Coach verdicts, credentials, action links or personal data.
 
 The retired `hosted-pool-*` stage commands are not compatibility aliases. They were reachable only
 from their own dispatcher and were removed after this one fixture lifecycle replaced their hosted

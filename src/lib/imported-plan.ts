@@ -1269,6 +1269,7 @@ function paceMinutesPerKm(workoutType: WorkoutDocumentType) {
     long_run: 6.8,
     quality: 5.8,
     rest: 0,
+    recorded_run: 0,
   };
 
   return paceMap[workoutType];

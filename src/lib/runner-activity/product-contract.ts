@@ -16,6 +16,117 @@ import type {
   RunnerTrainingPreferencesStorage,
 } from "@/lib/runner-training-preferences";
 
+export type UnplannedActivityOptionalFactV1<T> =
+  | { state: "available"; value: T }
+  | { state: "unavailable"; value: null };
+
+export type UnplannedActivityNormalizedIntervalV1 = {
+  sequence: number;
+  workoutStepIndex: number | null;
+  durationMin: number | null;
+  distanceKm: number | null;
+  averageHeartRateBpm: number | null;
+  maximumHeartRateBpm: number | null;
+  averagePowerWatts: number | null;
+  maximumPowerWatts: number | null;
+  averageCadenceSpm: number | null;
+  calories: number | null;
+  elevationGainM: number | null;
+  elevationLossM: number | null;
+};
+
+export type UnplannedActivityPlacementV1 =
+  | { kind: "past_rest_available"; targetDate: string; existingWorkout: null }
+  | {
+      kind: "occupied_association_available" | "occupied_ineligible";
+      targetDate: string;
+      existingWorkout: { id: string; title: string; workoutDate: string };
+    }
+  | {
+      kind: "today_or_future" | "date_missing" | "stale";
+      targetDate: string | null;
+      existingWorkout: null;
+    }
+  | {
+      kind: "already_confirmed";
+      targetDate: string;
+      existingWorkout: { id: string; title: string; workoutDate: string };
+    };
+
+export type UnplannedActivityReviewV1 = {
+  version: "unplanned_activity_review_v1";
+  activityId: string;
+  activityRevisionId: string;
+  sourceRevisionId: string;
+  reviewChecksum: string;
+  reviewToken: string;
+  title: string;
+  source: {
+    originalFileName: string;
+    extractedFitFileName: string | null;
+    rawFileAvailability: "available" | "unavailable";
+    provenance: "file_import";
+    ingestDisposition: "retained" | "reused_exact_source";
+  };
+  facts: {
+    sport: "run";
+    localDate: UnplannedActivityOptionalFactV1<string>;
+    startedAt: UnplannedActivityOptionalFactV1<string>;
+    workoutName: UnplannedActivityOptionalFactV1<string>;
+    duration: UnplannedActivityOptionalFactV1<{
+      minutes: number;
+      basis: "timer" | "elapsed";
+    }>;
+    distanceKm: UnplannedActivityOptionalFactV1<number>;
+    averageHeartRateBpm: UnplannedActivityOptionalFactV1<number>;
+    maximumHeartRateBpm: UnplannedActivityOptionalFactV1<number>;
+    averageCadenceSpm: UnplannedActivityOptionalFactV1<number>;
+    averagePowerWatts: UnplannedActivityOptionalFactV1<number>;
+    maximumPowerWatts: UnplannedActivityOptionalFactV1<number>;
+    elevationGainM: UnplannedActivityOptionalFactV1<number>;
+    elevationLossM: UnplannedActivityOptionalFactV1<number>;
+    calories: UnplannedActivityOptionalFactV1<number>;
+  };
+  laps: { state: "available" | "unavailable"; items: UnplannedActivityNormalizedIntervalV1[] };
+  steps: { state: "available" | "unavailable"; items: UnplannedActivityNormalizedIntervalV1[] };
+  calendarState:
+    | { state: "saved_unassigned"; workout: null }
+    | {
+        state: "confirmed";
+        workout: { id: string; title: string; workoutDate: string };
+      };
+  placement: UnplannedActivityPlacementV1;
+  capabilities: {
+    canConfirmRest: boolean;
+    canConfirmAssociation: boolean;
+    canEditFallbackTitle: boolean;
+    canResume: boolean;
+  };
+};
+
+export type ConfirmUnplannedActivityReviewResult =
+  | {
+      ok: true;
+      review: UnplannedActivityReviewV1;
+      calendarWorkoutId: string;
+      mutationEventId: number;
+      idempotent: boolean;
+      projectionState: "current" | "updating";
+    }
+  | {
+      ok: false;
+      reason:
+        | "not_found"
+        | "foreign"
+        | "invalid_review"
+        | "stale_review"
+        | "ineligible"
+        | "conflict"
+        | "persistence_failed";
+      message: string;
+      review: UnplannedActivityReviewV1 | null;
+    };
+
 export type RunnerActivityHistoryProductItem = {
   id: string;
   identity: {
@@ -43,6 +154,7 @@ export type RunnerActivityHistoryProductItem = {
     title: string;
     workoutDate: string;
   } | null;
+  calendarState: "saved_unassigned" | "confirmed";
   source: {
     kind: "manual_garmin_fit";
     rawState: "available" | "removal_pending" | "removed";
@@ -54,6 +166,7 @@ export type RunnerActivityHistoryProductItem = {
   };
   capabilities: {
     canRemoveOriginalFile: boolean;
+    canResume: boolean;
   };
 };
 
@@ -992,6 +1105,7 @@ function projectHistoryItem(item: RunnerActivityHistoryItem): RunnerActivityHist
           workoutDate: item.plannedWorkout.workoutDate,
         }
       : null,
+    calendarState: item.calendarState,
     source: {
       kind: item.source.kind,
       rawState: item.source.rawState,
@@ -1003,6 +1117,7 @@ function projectHistoryItem(item: RunnerActivityHistoryItem): RunnerActivityHist
     },
     capabilities: {
       canRemoveOriginalFile: item.capabilities.canRemoveOriginalFile,
+      canResume: item.capabilities.canResume,
     },
   };
 }

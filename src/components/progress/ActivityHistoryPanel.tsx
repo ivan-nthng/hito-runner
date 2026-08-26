@@ -48,12 +48,14 @@ export function ActivityHistoryPanel({
   onRetry,
   onLoadMore,
   onOpenActivity,
+  onResumeActivity,
   onRequestAction,
 }: {
   state: HistoryState;
   onRetry: () => void;
   onLoadMore: () => void;
   onOpenActivity: (activity: RunnerActivityHistoryProductItem, trigger: HTMLElement) => void;
+  onResumeActivity: (activity: RunnerActivityHistoryProductItem, trigger: HTMLElement) => void;
   onRequestAction: (
     action: ActivityAction,
     activity: RunnerActivityHistoryProductItem,
@@ -95,6 +97,7 @@ export function ActivityHistoryPanel({
                 key={activity.id}
                 activity={activity}
                 onOpenActivity={onOpenActivity}
+                onResumeActivity={onResumeActivity}
                 onRequestAction={onRequestAction}
               />
             ))}
@@ -123,10 +126,12 @@ export function ActivityHistoryPanel({
 function ActivityHistoryRow({
   activity,
   onOpenActivity,
+  onResumeActivity,
   onRequestAction,
 }: {
   activity: RunnerActivityHistoryProductItem;
   onOpenActivity: (activity: RunnerActivityHistoryProductItem, trigger: HTMLElement) => void;
+  onResumeActivity: (activity: RunnerActivityHistoryProductItem, trigger: HTMLElement) => void;
   onRequestAction: (
     action: ActivityAction,
     activity: RunnerActivityHistoryProductItem,
@@ -162,6 +167,11 @@ function ActivityHistoryRow({
           <span className="hito-body-sm mt-1 text-secondary block">
             {activity.plannedWorkout ? activity.plannedWorkout.title : message("Unplanned run")}
           </span>
+          {activity.calendarState === "saved_unassigned" ? (
+            <span className="hito-status-pill mt-2" data-tone="warning">
+              {message("Saved · Not on Calendar")}
+            </span>
+          ) : null}
           {primaryFacts.length > 0 ? (
             <span className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-sm tabular-nums sm:hidden">
               {primaryFacts.map((fact) => (
@@ -220,6 +230,18 @@ function ActivityHistoryRow({
               <Icon name="visibility" size="sm" />
               {message("View details")}
             </DropdownMenuItem>
+            {activity.calendarState === "saved_unassigned" && activity.capabilities.canResume ? (
+              <DropdownMenuItem
+                onSelect={() => {
+                  if (primaryButtonRef.current) {
+                    onResumeActivity(activity, primaryButtonRef.current);
+                  }
+                }}
+              >
+                <Icon name="calendar" size="sm" />
+                {message("Finish adding to Calendar")}
+              </DropdownMenuItem>
+            ) : null}
             {activity.capabilities.canRemoveOriginalFile ? (
               <DropdownMenuItem
                 data-tone="destructive"

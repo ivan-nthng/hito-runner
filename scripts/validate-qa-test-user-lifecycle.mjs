@@ -390,12 +390,21 @@ for (const command of [
 assert.doesNotMatch(testUserSource, /hosted-pool-/);
 assert.doesNotMatch(testUserSource, /generateLink\(|hashed_token|magiclink/);
 assert.match(adaptiveFixtureSource, /adaptive_engine_ui_replay_v1/);
-for (const checkpoint of ["initial_plan_review", "continuation_actions", "complete_surface"]) {
+for (const checkpoint of [
+  "initial_plan_review",
+  "continuation_actions",
+  "complete_surface",
+  "unplanned_activity_review",
+]) {
   assert.match(adaptiveFixtureSource, new RegExp(`"${checkpoint}"`));
 }
 assert.match(testUserSource, /--checkpoint must be one of/);
 assert.match(testUserSource, /synthetic_fit_upload_input/);
+assert.match(testUserSource, /synthetic_historical_fit_upload_set/);
+assert.match(testUserSource, /distinctSha256Count/);
+assert.match(testUserSource, /readAdaptiveUiReplayUnplannedRlsBoundary/);
 assert.match(testUserSource, /interactionArtifactRemoved: true/);
+assert.match(testUserSource, /ADAPTIVE_UI_REPLAY_UNPLANNED_ARTIFACT_DIR/);
 assert.match(adaptiveFixtureSource, /externalProviderDispatchCount:\s*0/);
 assert.match(adaptiveFixtureSource, /hito271SealedLineageRestored:\s*false/);
 assert.match(adaptiveFixtureSource, /initialCandidateOwner:\s*"saved_plan_generated_review"/);
@@ -437,7 +446,7 @@ console.log(
       randomIdentityLifecycleRemoved: true,
       adaptiveUiReplayFixtureVersion: "adaptive_engine_ui_replay_v1",
       adaptiveUiReplayCheckpointSelector: 1,
-      adaptiveUiReplayCheckpoints: 3,
+      adaptiveUiReplayCheckpoints: 4,
       adaptiveUiReplayHostedCommandFamily: 1,
       supersededHostedPoolCommands: 0,
       alternateHostedAuthBootstrapPaths: 0,

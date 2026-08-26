@@ -286,6 +286,13 @@ const TYPE_META: Record<
     content: workoutTypeColorVar("rest", "content"),
     ring: workoutTypeColorVar("rest", "ring"),
   },
+  recorded_run: {
+    label: "Recorded activity",
+    short: "Recorded",
+    color: workoutTypeColorVar("recorded"),
+    content: workoutTypeColorVar("recorded", "content"),
+    ring: workoutTypeColorVar("recorded", "ring"),
+  },
 };
 
 const VISIBLE_TYPE_META: Record<
@@ -344,6 +351,7 @@ const VISIBLE_TYPE_META: Record<
   },
   quality: TYPE_META.quality,
   rest: TYPE_META.rest,
+  recorded: TYPE_META.recorded_run,
 };
 
 const RUNNER_FACING_VISIBLE_TYPE: Record<RunnerFacingWorkoutType, VisibleWorkoutType> = {
@@ -357,6 +365,7 @@ const RUNNER_FACING_VISIBLE_TYPE: Record<RunnerFacingWorkoutType, VisibleWorkout
   intervals: "intervals",
   hills: "hills",
   run_walk: "recovery",
+  recorded: "recorded",
 };
 
 type WorkoutVisibleInput = Pick<Workout, "type" | "title" | "steps" | "sourceWorkoutType"> &
@@ -729,6 +738,7 @@ export function workoutDistanceKm(workout: Pick<Workout, "steps" | "type">): num
     long_run: 6.8,
     quality: 5.8,
     rest: 0,
+    recorded_run: 0,
   };
   const pace = paceMap[workout.type];
 
@@ -1321,6 +1331,7 @@ export function stepStructureDurationMin(step: Step, workoutType: WorkoutType) {
     long_run: 6.8,
     quality: 5.8,
     rest: 0,
+    recorded_run: 0,
   };
   const pace = paceMap[workoutType];
 

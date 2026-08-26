@@ -36,7 +36,13 @@ export type AiAuthoredPaceProvenance = (typeof AI_AUTHORED_PACE_PROVENANCE_VALUE
 export const PRIMARY_EXECUTION_MODE_VALUES = ["pace", "heart_rate", "effort", "run_walk"] as const;
 export type PrimaryExecutionMode = (typeof PRIMARY_EXECUTION_MODE_VALUES)[number];
 
-export type WorkoutDocumentType = "easy" | "steady_or_easy" | "rest" | "long_run" | "quality";
+export type WorkoutDocumentType =
+  | "easy"
+  | "steady_or_easy"
+  | "rest"
+  | "long_run"
+  | "quality"
+  | "recorded_run";
 
 export interface WorkoutDocumentTarget {
   primary_execution_mode?: PrimaryExecutionMode;
@@ -654,6 +660,7 @@ const WORKOUT_DOCUMENT_TYPE_VALUES = new Set<WorkoutDocumentType>([
   "rest",
   "long_run",
   "quality",
+  "recorded_run",
 ]);
 
 function normalizeWorkoutDocumentSectionsForWrite(

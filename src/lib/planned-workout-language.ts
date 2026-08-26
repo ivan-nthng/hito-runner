@@ -20,6 +20,7 @@ export const RUNNER_FACING_WORKOUT_TYPE_VALUES = [
   "intervals",
   "hills",
   "run_walk",
+  "recorded",
 ] as const;
 
 export type RunnerFacingWorkoutType = (typeof RUNNER_FACING_WORKOUT_TYPE_VALUES)[number];
@@ -35,6 +36,7 @@ export const RUNNER_FACING_WORKOUT_TYPE_LABELS: Record<RunnerFacingWorkoutType, 
   intervals: "Intervals",
   hills: "Hills",
   run_walk: "Run/Walk",
+  recorded: "Recorded activity",
 };
 
 export const RUNNER_FACING_BLOCK_TYPE_VALUES = [
@@ -174,6 +176,8 @@ function resolveRunnerFacingWorkoutType({
   }
 
   switch (workoutIdentity) {
+    case "recorded_activity":
+      return "recorded";
     case "rest_and_recovery":
       return "rest";
     case "recovery_jog":
@@ -245,6 +249,8 @@ function resolveRunnerFacingWorkoutTypeFromFamily(
     case "hills":
     case "trail":
       return "hills";
+    case "recorded":
+      return "recorded";
     default:
       return "easy";
   }

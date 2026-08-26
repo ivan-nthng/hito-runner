@@ -16,6 +16,10 @@ import {
   ActivityDetailOverlay,
   ActivityHistoryPanel,
 } from "./ActivityHistoryPanel";
+import {
+  UnplannedActivityWorkflow,
+  type UnplannedActivityWorkflowEntry,
+} from "@/components/runner-activity/UnplannedActivityWorkflow";
 import { FactualProgressPanel } from "./FactualProgressPanel";
 import { SavedPlanLibraryPanel } from "./SavedPlanLibraryPanel";
 import type {
@@ -64,11 +68,14 @@ export function RunnerActivityProgressExperience({
   const [selectedActivity, setSelectedActivity] = useState<RunnerActivityHistoryProductItem | null>(
     null,
   );
+  const [activityWorkflowEntry, setActivityWorkflowEntry] =
+    useState<UnplannedActivityWorkflowEntry | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingActivityAction | null>(null);
   const [mutationPending, setMutationPending] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const detailReturnFocusRef = useRef<HTMLElement | null>(null);
+  const activityWorkflowReturnFocusRef = useRef<HTMLElement | null>(null);
   const confirmationReturnFocusRef = useRef<HTMLElement | null>(null);
   const progressFocusIntentRef = useRef<"custom" | "quick" | "retry" | null>(null);
 
@@ -208,6 +215,12 @@ export function RunnerActivityProgressExperience({
     setPendingAction({ action, activity });
   };
 
+  const resumeActivity = (activity: RunnerActivityHistoryProductItem, trigger: HTMLElement) => {
+    activityWorkflowReturnFocusRef.current = trigger;
+    setSelectedActivity(null);
+    setActivityWorkflowEntry({ kind: "history", activityId: activity.id });
+  };
+
   const runMutation = async () => {
     if (!pendingAction || mutationPending) return;
 
@@ -324,6 +337,7 @@ export function RunnerActivityProgressExperience({
             onRetry={() => void loadHistory()}
             onLoadMore={() => void loadHistory(history.data?.nextCursor)}
             onOpenActivity={openActivity}
+            onResumeActivity={resumeActivity}
             onRequestAction={requestAction}
           />
         ) : activeTab === "progress" ? (
@@ -366,6 +380,18 @@ export function RunnerActivityProgressExperience({
           }
         }}
         onConfirm={() => void runMutation()}
+      />
+      <UnplannedActivityWorkflow
+        entry={activityWorkflowEntry}
+        fallbackFocusId="activity-history-title"
+        returnFocusRef={activityWorkflowReturnFocusRef}
+        onOpenChange={(open) => {
+          if (!open) setActivityWorkflowEntry(null);
+        }}
+        onConfirmed={async () => {
+          await loadHistory();
+          if (activeTab === "progress") await loadProgress();
+        }}
       />
     </div>
   );

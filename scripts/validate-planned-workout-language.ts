@@ -119,6 +119,24 @@ function validateAcceptedRunnerFacingTypesAreDerivable() {
     languageForManualTemplate("time_intervals"),
     languageForManualTemplate("uphill_repeats"),
     languageForManualTemplate("run_walk_adaptation"),
+    buildPlannedWorkoutLanguage({
+      workoutType: "recorded_run",
+      sourceWorkoutType: "recorded_activity",
+      sourceKind: "file_import",
+      workoutFamily: "recorded",
+      workoutIdentity: "recorded_activity",
+      calendarIconKey: "recorded",
+      metricMode: {
+        guidance: "effort",
+        executable_mode: "none",
+        pace_targets_allowed: false,
+        hr_targets_allowed: false,
+        hr_target_source: "effort_only",
+        reason: "Recorded activity contains factual results and no planned execution targets.",
+      },
+      title: "Recorded activity",
+      steps: [],
+    }),
   ];
 
   assert.deepEqual(

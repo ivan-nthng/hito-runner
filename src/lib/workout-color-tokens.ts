@@ -33,6 +33,7 @@ const WORKOUT_TYPE_TOKEN_NAMES: Record<RunnerFacingWorkoutType, string> = {
   intervals: "intervals",
   hills: "hills",
   run_walk: "run-walk",
+  recorded: "easy",
 };
 
 const WORKOUT_FAMILY_TOKEN_NAMES: Record<CanonicalWorkoutFamily, string> = {
@@ -47,6 +48,7 @@ const WORKOUT_FAMILY_TOKEN_NAMES: Record<CanonicalWorkoutFamily, string> = {
   race: "race",
   hills: "hills",
   trail: "trail",
+  recorded: "easy",
 };
 
 const WORKOUT_SECTION_TOKEN_NAMES: Record<WorkoutSectionColorRole, string> = {

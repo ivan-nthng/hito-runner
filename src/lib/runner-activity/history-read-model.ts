@@ -62,9 +62,9 @@ export async function listRunnerActivityHistoryForUser(input: {
   const page = await supabase.rpc("list_runner_activity_history_page", {
     p_user_id: input.userId,
     p_page_size: pageSize + 1,
-    p_cursor_sort_date: cursor?.sortDate ?? null,
-    p_cursor_sort_started_at: cursor?.sortStartedAt ?? null,
-    p_cursor_activity_id: cursor?.activityId ?? null,
+    p_cursor_sort_date: cursor?.sortDate,
+    p_cursor_sort_started_at: cursor?.sortStartedAt,
+    p_cursor_activity_id: cursor?.activityId,
   });
   if (page.error) throw new Error(page.error.message);
 
@@ -232,6 +232,7 @@ function buildHistoryItem(input: {
           workoutDate: input.plannedWorkout.workout_date,
         }
       : null,
+    calendarState: input.plannedWorkout ? "confirmed" : "saved_unassigned",
     source: {
       kind: "manual_garmin_fit",
       rawState: input.rawState,
@@ -242,6 +243,7 @@ function buildHistoryItem(input: {
     capabilities: {
       canRemoveOriginalFile: input.rawState !== "removed",
       canDeleteActivity: true,
+      canResume: true,
     },
     provenance: {
       activityRevisionId: input.revision.id,

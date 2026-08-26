@@ -427,7 +427,8 @@ function normalizeWorkoutCommand(
   if (
     !displayName ||
     displayName.length > WORKOUT_TEMPLATE_DISPLAY_NAME_MAX_LENGTH ||
-    !CALENDAR_ICON_KEY_VALUES.includes(input.iconKey)
+    input.iconKey === "recorded" ||
+    !(CALENDAR_ICON_KEY_VALUES as readonly string[]).includes(input.iconKey)
   ) {
     return {
       ok: false,

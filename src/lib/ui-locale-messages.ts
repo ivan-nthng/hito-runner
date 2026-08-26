@@ -1844,6 +1844,13 @@ export const HITO_PRODUCT_MESSAGES_PT_BR = {
   Context: "Contexto",
   "Evidence and coverage": "Evidência e cobertura",
   Reason: "Motivo",
+  "Runner-reported effort is missing.": "O esforço informado pelo corredor não está disponível.",
+  "Distance was not available in the FIT file.":
+    "A distância não estava disponível no arquivo FIT.",
+  "Observed distance or duration was not available for pace.":
+    "A distância ou a duração observada não estava disponível para o ritmo.",
+  "Elevation gain was not available in the FIT file.":
+    "O ganho de elevação não estava disponível no arquivo FIT.",
   Unknown: "Desconhecido",
   "Time unavailable": "Horário indisponível",
   "{includedCount} of {candidateCount} included": "{includedCount} de {candidateCount} incluídas",
@@ -1863,6 +1870,107 @@ export const HITO_PRODUCT_MESSAGES_PT_BR = {
   "To date": "Até o momento",
   "{includedCount} of {candidateCount} accepted activities":
     "{includedCount} de {candidateCount} atividades aceitas",
+  "Add activity": "Adicionar atividade",
+  "Add activity for {date}": "Adicionar atividade em {date}",
+  "Choose FIT or ZIP": "Escolher FIT ou ZIP",
+  "Choose one FIT file or a ZIP containing exactly one FIT activity. Maximum file size: 25 MB.":
+    "Escolha um arquivo FIT ou um ZIP que contenha exatamente uma atividade FIT. Tamanho máximo: 25 MB.",
+  "Uploading and processing activity…": "Enviando e processando a atividade…",
+  "Uploading…": "Enviando…",
+  "Loading saved activity…": "Carregando atividade salva…",
+  "Activity saved. Review the facts before adding it to Calendar.":
+    "Atividade salva. Revise os fatos antes de adicioná-la ao Calendário.",
+  "This activity was already uploaded. Continue where you left off.":
+    "Esta atividade já foi enviada. Continue de onde parou.",
+  "Saved · Not on Calendar": "Salva · Fora do Calendário",
+  "Saved · On Calendar": "Salva · No Calendário",
+  "Activity title": "Título da atividade",
+  "Activity started from {date}": "Atividade iniciada em {date}",
+  "Review the saved activity before adding it to Calendar.":
+    "Revise a atividade salva antes de adicioná-la ao Calendário.",
+  "Calendar placement": "Posicionamento no Calendário",
+  "You started from {clickedDate}. This FIT file records {fitDate}, so Hito will use {fitDate}.":
+    "Você começou em {clickedDate}. Este arquivo FIT registra {fitDate}, então a Hito usará {fitDate}.",
+  "This activity will be added to {date}.": "Esta atividade será adicionada em {date}.",
+  "A workout already exists on {date}. Association keeps its title, structure, and origin unchanged.":
+    "Já existe um treino em {date}. A associação mantém título, estrutura e origem inalterados.",
+  "Calendar association": "Associação ao Calendário",
+  "Associate with {workout}": "Associar a {workout}",
+  "This activity is saved, but it can't be associated with the workout on {date}.":
+    "Esta atividade está salva, mas não pode ser associada ao treino de {date}.",
+  "This activity is saved, but a today or future FIT date cannot be added from this historical flow.":
+    "Esta atividade está salva, mas uma data FIT de hoje ou do futuro não pode ser adicionada por este fluxo histórico.",
+  "The activity date is not available in this FIT file.":
+    "A data da atividade não está disponível neste arquivo FIT.",
+  "Calendar changed after this review opened. Close and resume from Activity History.":
+    "O Calendário mudou depois que esta revisão foi aberta. Feche e retome pelo Histórico de atividades.",
+  "Activity facts": "Fatos da atividade",
+  "Activity date": "Data da atividade",
+  Sport: "Esporte",
+  "Timer time": "Tempo do cronômetro",
+  "Elapsed time": "Tempo decorrido",
+  "{minutes} min · {basis}": "{minutes} min · {basis}",
+  "{distance} km": "{distance} km",
+  Ascent: "Subida",
+  Descent: "Descida",
+  "Not available in this FIT file": "Não disponível neste arquivo FIT",
+  "Not available in this FIT file: {facts}.": "Não disponível neste arquivo FIT: {facts}.",
+  Laps: "Voltas",
+  "Structured steps": "Etapas estruturadas",
+  "{label} · {count}": "{label} · {count}",
+  "No laps were recorded in this FIT file.": "Nenhuma volta foi registrada neste arquivo FIT.",
+  "No structured workout steps were recorded in this FIT file.":
+    "Nenhuma etapa estruturada de treino foi registrada neste arquivo FIT.",
+  "FIT structure": "Estrutura FIT",
+  Step: "Etapa",
+  "Source details": "Detalhes da origem",
+  "Original filename": "Nome do arquivo original",
+  "Extracted FIT filename": "Nome do arquivo FIT extraído",
+  "Source kind": "Tipo de origem",
+  "File import": "Importação de arquivo",
+  "Original file": "Arquivo original",
+  "Activity ID": "ID da atividade",
+  "Revision ID": "ID da revisão",
+  "The activity is saved in Activity History. You can finish adding it to Calendar later.":
+    "A atividade está salva no Histórico de atividades. Você pode concluir a adição ao Calendário depois.",
+  "Confirm and add to Calendar": "Confirmar e adicionar ao Calendário",
+  "Confirm association": "Confirmar associação",
+  "Adding activity to Calendar…": "Adicionando atividade ao Calendário…",
+  "Activity added to Calendar.": "Atividade adicionada ao Calendário.",
+  "Activity added. Calendar and evidence are updating.":
+    "Atividade adicionada. O Calendário e as evidências estão sendo atualizados.",
+  "Activity associated with the existing workout.": "Atividade associada ao treino existente.",
+  "Activity added to {date}": "Atividade adicionada em {date}",
+  "Activity associated with {workout} on {date}": "Atividade associada a {workout} em {date}",
+  "View activity history": "Ver histórico de atividades",
+  "Finish adding to Calendar": "Concluir adição ao Calendário",
+  "Connection interrupted. Check whether the activity was saved before uploading again.":
+    "A conexão foi interrompida. Verifique se a atividade foi salva antes de enviar novamente.",
+  "Check Activity History before uploading again so the same activity is not duplicated.":
+    "Verifique o Histórico de atividades antes de enviar novamente para não duplicar a mesma atividade.",
+  "Check upload status": "Verificar status do envio",
+  "The activity file could not be processed. Try again shortly.":
+    "Não foi possível processar o arquivo da atividade. Tente novamente em instantes.",
+  "The saved activity review is unavailable. Check Activity History.":
+    "A revisão da atividade salva está indisponível. Verifique o Histórico de atividades.",
+  "This saved activity could not be opened. Refresh Activity History and try again.":
+    "Não foi possível abrir esta atividade salva. Atualize o Histórico de atividades e tente novamente.",
+  "The activity could not be added to Calendar. Review the current state.":
+    "Não foi possível adicionar a atividade ao Calendário. Revise o estado atual.",
+  "This saved activity is no longer available for this account.":
+    "Esta atividade salva não está mais disponível para esta conta.",
+  "This review expired. Close and resume it from Activity History.":
+    "Esta revisão expirou. Feche e retome pelo Histórico de atividades.",
+  "This review expired. Review the refreshed details before confirming again.":
+    "Esta revisão expirou. Revise os detalhes atualizados antes de confirmar novamente.",
+  "Calendar changed after this review opened. Review the current placement.":
+    "O Calendário mudou depois que esta revisão foi aberta. Revise o posicionamento atual.",
+  "This activity is saved, but the current Calendar target is not eligible.":
+    "Esta atividade está salva, mas o destino atual no Calendário não é elegível.",
+  "This activity or Calendar date is already associated elsewhere.":
+    "Esta atividade ou data do Calendário já está associada em outro lugar.",
+  "The activity was not added to Calendar. Try confirming again.":
+    "A atividade não foi adicionada ao Calendário. Tente confirmar novamente.",
   "{title} plot scroll region": "{title}: região rolável do gráfico",
   "{title} data table": "Tabela de dados de {title}",
   "{title}, {period}, {startDate} to {endDate}": "{title}, {period}, de {startDate} a {endDate}",

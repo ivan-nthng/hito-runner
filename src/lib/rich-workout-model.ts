@@ -14,7 +14,7 @@ export const CANONICAL_WORKOUT_FAMILY_VALUES = [
   "trail",
 ] as const;
 
-export type CanonicalWorkoutFamily = (typeof CANONICAL_WORKOUT_FAMILY_VALUES)[number];
+export type CanonicalWorkoutFamily = (typeof CANONICAL_WORKOUT_FAMILY_VALUES)[number] | "recorded";
 
 export const CANONICAL_WORKOUT_IDENTITY_VALUES = [
   "rest_and_recovery",
@@ -51,11 +51,13 @@ export const CANONICAL_WORKOUT_IDENTITY_VALUES = [
   "quality_session",
 ] as const;
 
-export type CanonicalWorkoutIdentity = (typeof CANONICAL_WORKOUT_IDENTITY_VALUES)[number];
+export type CanonicalWorkoutIdentity =
+  | (typeof CANONICAL_WORKOUT_IDENTITY_VALUES)[number]
+  | "recorded_activity";
 
 export const CALENDAR_ICON_KEY_VALUES = CANONICAL_WORKOUT_FAMILY_VALUES;
 
-export type CalendarIconKey = (typeof CALENDAR_ICON_KEY_VALUES)[number];
+export type CalendarIconKey = (typeof CALENDAR_ICON_KEY_VALUES)[number] | "recorded";
 
 export const CANONICAL_METRIC_GUIDANCE_VALUES = ["effort", "pace", "heart_rate", "mixed"] as const;
 
@@ -93,7 +95,8 @@ export type LegacyWorkoutType =
   | "intervals"
   | "progression"
   | "race"
-  | "recovery";
+  | "recovery"
+  | "recorded_run";
 
 export interface CanonicalGoalContext {
   goalType: string;
@@ -160,9 +163,12 @@ export interface WorkoutSegmentLike {
   children?: WorkoutSegmentLike[] | null;
 }
 
-const FAMILY_VALUES = new Set<string>(CANONICAL_WORKOUT_FAMILY_VALUES);
-const IDENTITY_VALUES = new Set<string>(CANONICAL_WORKOUT_IDENTITY_VALUES);
-const ICON_VALUES = new Set<string>(CALENDAR_ICON_KEY_VALUES);
+const FAMILY_VALUES = new Set<string>([...CANONICAL_WORKOUT_FAMILY_VALUES, "recorded"]);
+const IDENTITY_VALUES = new Set<string>([
+  ...CANONICAL_WORKOUT_IDENTITY_VALUES,
+  "recorded_activity",
+]);
+const ICON_VALUES = new Set<string>([...CALENDAR_ICON_KEY_VALUES, "recorded"]);
 const GUIDANCE_VALUES = new Set<string>(CANONICAL_METRIC_GUIDANCE_VALUES);
 const EXECUTABLE_MODE_VALUE_SET = new Set<string>(CANONICAL_EXECUTABLE_MODE_VALUES);
 const HR_TARGET_SOURCE_VALUE_SET = new Set<string>(HR_TARGET_SOURCE_VALUES);
@@ -200,6 +206,7 @@ const identityFamilyMap: Record<CanonicalWorkoutIdentity, CanonicalWorkoutFamily
   ultra_time_on_feet_durability: "long",
   climbing_steady_run: "hills",
   quality_session: "intervals",
+  recorded_activity: "recorded",
 };
 
 const sourceIdentityAliases: Record<string, CanonicalWorkoutIdentity> = {
@@ -265,6 +272,8 @@ const sourceIdentityAliases: Record<string, CanonicalWorkoutIdentity> = {
   climbing_steady_run: "climbing_steady_run",
   quality: "quality_session",
   quality_session: "quality_session",
+  recorded_run: "recorded_activity",
+  recorded_activity: "recorded_activity",
 };
 
 export function resolveCanonicalWorkoutModel(
@@ -285,8 +294,10 @@ export function resolveCanonicalWorkoutModel(
   const metricMode =
     workoutFamily === "rest"
       ? buildRestMetricMode()
-      : (normalizeCanonicalMetricMode(input.metricMode) ??
-        deriveCanonicalMetricMode(input.steps ?? []));
+      : workoutFamily === "recorded"
+        ? buildRecordedMetricMode()
+        : (normalizeCanonicalMetricMode(input.metricMode) ??
+          deriveCanonicalMetricMode(input.steps ?? []));
 
   return {
     workoutFamily,
@@ -409,7 +420,10 @@ export function normalizeCanonicalGoalContext(value: unknown): CanonicalGoalCont
 export function canonicalFamilyToLegacyWorkoutType(
   family: CanonicalWorkoutFamily,
   identity?: CanonicalWorkoutIdentity | null,
-): Extract<LegacyWorkoutType, "easy" | "steady_or_easy" | "rest" | "long_run" | "quality"> {
+): Extract<
+  LegacyWorkoutType,
+  "easy" | "steady_or_easy" | "rest" | "long_run" | "quality" | "recorded_run"
+> {
   switch (family) {
     case "rest":
       return "rest";
@@ -420,6 +434,8 @@ export function canonicalFamilyToLegacyWorkoutType(
       return "steady_or_easy";
     case "long":
       return "long_run";
+    case "recorded":
+      return "recorded_run";
     case "trail":
       if (identity === "technical_trail_easy") return "easy";
       if (identity === "hike_run_endurance" || identity === "mountain_long_run_time_on_feet") {
@@ -620,6 +636,9 @@ function inferWorkoutIdentity(
   if (workoutType === "rest") {
     return "rest_and_recovery";
   }
+  if (workoutType === "recorded_run") {
+    return "recorded_activity";
+  }
 
   const titleText = title?.trim() ?? "";
   const semanticText = buildLegacySemanticText(titleText, steps);
@@ -736,6 +755,19 @@ function buildRestMetricMode(): CanonicalMetricMode {
     hrTargetLabel: null,
     hrTargetSourceNote: null,
     reason: "Rest day has no execution metric targets.",
+  };
+}
+
+function buildRecordedMetricMode(): CanonicalMetricMode {
+  return {
+    guidance: "effort",
+    executableMode: "none",
+    paceTargetsAllowed: false,
+    hrTargetsAllowed: false,
+    hrTargetSource: "effort_only",
+    hrTargetLabel: null,
+    hrTargetSourceNote: null,
+    reason: "Recorded activity contains factual results and no planned execution targets.",
   };
 }
 

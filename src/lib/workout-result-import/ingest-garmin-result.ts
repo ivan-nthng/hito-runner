@@ -240,6 +240,7 @@ export async function ingestGarminWorkoutResult(params: {
     if (
       activitySource.reusedExactSource &&
       existingPlanMatch &&
+      plannedWorkoutId &&
       existingPlanMatch !== plannedWorkoutId
     ) {
       await discardCandidateUpload({ userId, assetId, storagePath });
@@ -248,6 +249,21 @@ export async function ingestGarminWorkoutResult(params: {
         "That Garmin activity is already attached to another workout.",
         409,
       );
+    }
+
+    if (activitySource.reusedExactSource && existingPlanMatch && !plannedWorkoutId) {
+      await discardCandidateUpload({ userId, assetId, storagePath });
+      const { hydrateUnplannedActivityReviewForUser } =
+        await import("@/lib/runner-activity/unplanned-review.server");
+      return {
+        ok: true as const,
+        runnerActivity: runnerActivityReceipt(activitySource),
+        unplannedActivityReview: await hydrateUnplannedActivityReviewForUser({
+          userId,
+          activityId: activitySource.activityId,
+          ingestDisposition: "reused_exact_source",
+        }),
+      };
     }
 
     const activityProjection = await readRunnerActivityProjection({
@@ -269,6 +285,16 @@ export async function ingestGarminWorkoutResult(params: {
       failurePointForQa: params.projectionFailurePointForQa,
     });
 
+    const unplannedActivityReview = plannedWorkout
+      ? null
+      : await (
+          await import("@/lib/runner-activity/unplanned-review.server")
+        ).hydrateUnplannedActivityReviewForUser({
+          userId,
+          activityId: activitySource.activityId,
+          ingestDisposition: activitySource.reusedExactSource ? "reused_exact_source" : "retained",
+        });
+
     return {
       ok: true as const,
       runnerActivity: runnerActivityReceipt(activitySource),
@@ -277,7 +303,7 @@ export async function ingestGarminWorkoutResult(params: {
             plannedWorkout: plannedWorkoutReceipt(plannedWorkout),
             ...feedback,
           }
-        : {}),
+        : { unplannedActivityReview }),
     };
   } catch (error) {
     const message = runnerSafeWorkoutResultMessage(error);

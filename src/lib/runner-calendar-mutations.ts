@@ -11,7 +11,7 @@ import { normalizePersistedWorkoutDocument } from "@/lib/workout-document";
 type CalendarWorkoutMutationEventRow =
   Database["public"]["Tables"]["calendar_workout_mutation_events"]["Row"];
 type RpcPayload = { [key: string]: Json | undefined };
-type AtomicCalendarWorkoutMutationKind = "add" | "clear" | "move";
+type AtomicCalendarWorkoutMutationKind = "add" | "clear" | "move" | "confirm_activity";
 
 export class CalendarPersistenceRejection extends Error {
   constructor(
@@ -73,6 +73,7 @@ export async function applyAtomicCalendarWorkoutMutation(input: {
     restoredWorkout,
     mutationEvent,
     undoExpiresAt: readOptionalStringField(payload, "undo_expires_at"),
+    idempotent: readOptionalBooleanField(payload, "idempotent") ?? false,
   };
 }
 
@@ -257,6 +258,7 @@ export const CALENDAR_WORKOUT_MUTATION_KIND = {
   moveWorkout: "user_moved_workout",
   copyWorkout: "user_copied_workout",
   editWorkout: "user_edited_workout",
+  confirmActivity: "user_confirmed_activity",
 } as const;
 
 export type CalendarWorkoutMutationKind =
@@ -313,6 +315,12 @@ export interface CalendarWorkoutMutationEventInput {
   originalPlanOriginSourceKind?: string | null;
   originalPlanOriginSourceStatus?: string | null;
   previousWorkout?: PersistedPlannedWorkoutRow | null;
+  activityId?: string | null;
+  activityRevisionId?: string | null;
+  sourceRevisionId?: string | null;
+  resultAssetId?: string | null;
+  placementIntent?: "materialize_on_rest" | "associate_existing" | null;
+  occupancyFingerprint?: string | null;
 }
 
 export interface CalendarWorkoutMutationEventPayload {
@@ -346,6 +354,12 @@ export interface CalendarWorkoutMutationEventPayload {
   mutation_payload_version?: string;
   mutation_checksum?: string;
   trusted_client_rows?: boolean;
+  activity_id?: string;
+  activity_revision_id?: string;
+  source_revision_id?: string;
+  result_asset_id?: string;
+  placement_intent?: "materialize_on_rest" | "associate_existing";
+  occupancy_fingerprint?: string;
 }
 
 export function resolveCalendarWorkoutEditability(
@@ -416,6 +430,12 @@ export function buildCalendarWorkoutMutationEvent({
   originalPlanOriginSourceKind,
   originalPlanOriginSourceStatus,
   previousWorkout,
+  activityId,
+  activityRevisionId,
+  sourceRevisionId,
+  resultAssetId,
+  placementIntent,
+  occupancyFingerprint,
 }: CalendarWorkoutMutationEventInput): CalendarWorkoutMutationEventPayload {
   return omitUndefined({
     mutation_source: CALENDAR_WORKOUT_MUTATION_SOURCE_KIND,
@@ -445,6 +465,12 @@ export function buildCalendarWorkoutMutationEvent({
     mutation_payload_version: mutationPayloadVersion?.trim() || undefined,
     mutation_checksum: mutationChecksum?.trim() || undefined,
     trusted_client_rows: trustedClientRows ?? undefined,
+    activity_id: activityId?.trim() || undefined,
+    activity_revision_id: activityRevisionId?.trim() || undefined,
+    source_revision_id: sourceRevisionId?.trim() || undefined,
+    result_asset_id: resultAssetId?.trim() || undefined,
+    placement_intent: placementIntent ?? undefined,
+    occupancy_fingerprint: occupancyFingerprint?.trim() || undefined,
   });
 }
 
@@ -748,6 +774,15 @@ function readOptionalStringField(value: RpcPayload, key: string) {
     throw new Error(`Atomic persistence result has an invalid ${key}.`);
   }
 
+  return field;
+}
+
+function readOptionalBooleanField(value: RpcPayload, key: string) {
+  const field = value[key];
+  if (field === null || field === undefined) return null;
+  if (typeof field !== "boolean") {
+    throw new Error(`Atomic persistence result has an invalid ${key}.`);
+  }
   return field;
 }
 

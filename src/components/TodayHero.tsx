@@ -26,6 +26,7 @@ const WORKOUT_TYPE_MESSAGE_KEYS = {
   long_run: "Long run",
   quality: "Quality / Intervals",
   rest: "Rest",
+  recorded_run: "Activity",
 } as const satisfies Record<TrainingSnapshot["workouts"][number]["type"], HitoProductMessageKey>;
 
 export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
@@ -127,7 +128,11 @@ export function TodayHero({ snapshot }: { snapshot: TrainingSnapshot }) {
 
           <div className="mt-6 flex flex-wrap items-center gap-2">
             <HitoButton asChild size="sm" variant="primary">
-              <Link to="/workout/$date" params={{ date: snapshot.currentDate }}>
+              <Link
+                to="/workout/$date"
+                params={{ date: snapshot.currentDate }}
+                search={{} as never}
+              >
                 {isRestDay ? message("Open day") : message("Open workout")}
                 <Icon name="arrow-up-right" size="xs" />
               </Link>
@@ -243,7 +248,7 @@ function NextWorkoutLaterHero({
 
           <div className="mt-6 flex flex-wrap items-center gap-2">
             <HitoButton asChild size="sm" variant="primary">
-              <Link to="/workout/$date" params={{ date: nextWorkout.date }}>
+              <Link to="/workout/$date" params={{ date: nextWorkout.date }} search={{} as never}>
                 {message("Open nearest workout")}
                 <Icon name="arrow-up-right" size="xs" />
               </Link>

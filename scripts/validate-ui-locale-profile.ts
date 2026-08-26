@@ -140,6 +140,31 @@ function proveResolverContract() {
   );
   assert.equal(getHitoProductMessage("pt-BR", "28 days"), "28 dias");
   assert.equal(getHitoProductMessage("pt-BR", "From FIT file"), "Do arquivo FIT");
+  const factualReasonTranslations = [
+    [
+      "Runner-reported effort is missing.",
+      "O esforço informado pelo corredor não está disponível.",
+    ],
+    [
+      "Distance was not available in the FIT file.",
+      "A distância não estava disponível no arquivo FIT.",
+    ],
+    [
+      "Observed distance or duration was not available for pace.",
+      "A distância ou a duração observada não estava disponível para o ritmo.",
+    ],
+    [
+      "Elevation gain was not available in the FIT file.",
+      "O ganho de elevação não estava disponível no arquivo FIT.",
+    ],
+  ] as const;
+  for (const [reason, portuguese] of factualReasonTranslations) {
+    assert.equal(getHitoKnownProductMessage("pt-BR", reason), portuguese);
+  }
+  assert.equal(
+    getHitoKnownProductMessage("pt-BR", "Runner-authored FIT note"),
+    "Runner-authored FIT note",
+  );
   assert.equal(
     formatHitoProductMessage("en", "{startDate} through {endDate}", {
       startDate: formatUiDate("2026-07-29", "en", {

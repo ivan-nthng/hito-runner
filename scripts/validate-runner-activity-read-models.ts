@@ -1704,6 +1704,7 @@ function assertProductHistoryProjection(
   assertExactKeys(history, ["items", "nextCursor"]);
   for (const item of history.items) {
     assertExactKeys(item, [
+      "calendarState",
       "capabilities",
       "distanceKm",
       "duration",
@@ -1724,7 +1725,8 @@ function assertProductHistoryProjection(
     if (item.plannedWorkout) assertExactKeys(item.plannedWorkout, ["id", "title", "workoutDate"]);
     assertExactKeys(item.source, ["kind", "originalRetained", "rawState", "reprocessingAvailable"]);
     assertExactKeys(item.quality, ["updating"]);
-    assertExactKeys(item.capabilities, ["canRemoveOriginalFile"]);
+    assertExactKeys(item.capabilities, ["canRemoveOriginalFile", "canResume"]);
+    assert.ok(item.calendarState === "saved_unassigned" || item.calendarState === "confirmed");
   }
 }
 

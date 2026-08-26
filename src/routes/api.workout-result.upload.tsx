@@ -86,6 +86,8 @@ export const Route = createFileRoute("/api/workout-result/upload")({
               latestActualMetrics: feedback?.latestActualMetrics ?? null,
               latestComparison: feedback?.latestComparison ?? null,
               latestAiInsight: feedback?.latestAiInsight ?? null,
+              unplannedActivityReview:
+                "unplannedActivityReview" in result ? result.unplannedActivityReview : null,
               fixtureOutcome: camelotUpload?.outcome ?? null,
             },
             {

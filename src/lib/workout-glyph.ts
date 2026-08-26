@@ -28,6 +28,7 @@ const CALENDAR_ICON_GLYPH: Record<CalendarIconKey, WorkoutGlyphKind> = {
   trail: "trail",
   quality: "quality",
   rest: "rest",
+  recorded: "easy",
 };
 
 export function workoutGlyphFromCalendarIconKey(iconKey: CalendarIconKey): WorkoutGlyphKind {
@@ -35,6 +36,7 @@ export function workoutGlyphFromCalendarIconKey(iconKey: CalendarIconKey): Worko
 }
 
 export function workoutTypeToGlyphKind(type: WorkoutType): WorkoutGlyphKind {
+  if (type === "recorded_run") return "easy";
   if (type === "rest") return "rest";
   if (type === "long_run") return "long";
   if (type === "quality") return "quality";

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash, randomBytes } from "node:crypto";
-import { chmod, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { tsImport } from "tsx/esm/api";
@@ -75,6 +75,10 @@ const { ingestLocalQaFixtureWorkoutResult, removeWorkoutResultEvidence } = await
   "../src/lib/workout-result-import/ingest-garmin-result.ts",
   import.meta.url,
 );
+const { parseGarminFitActivity } = await tsImport(
+  "../src/lib/workout-result-import/parse-garmin-fit.ts",
+  import.meta.url,
+);
 const { CAMELOT_INTERACTIVE_QA_FIXTURE_VERSION, CAMELOT_INTERACTIVE_QA_PROFILE } = await tsImport(
   "../src/lib/camelot-interactive-qa-fixture.ts",
   import.meta.url,
@@ -99,6 +103,7 @@ const {
   prepareAdaptiveBlueprintContinuationCandidateFixture,
   readAdaptiveEngineUiReplayInteractionCheckpoint,
   readAdaptiveBlueprintProjectionFixture,
+  readUnplannedActivityReviewCheckpoint,
   readRunnerCoreFileFlowFixture,
   readRunnerDesignProfileFixture,
   seedAdaptiveBlueprintProjectionFixture,
@@ -112,6 +117,10 @@ const {
 const ADAPTIVE_UI_REPLAY_INTERACTION_ARTIFACT = path.resolve(
   process.cwd(),
   ".tanstack/qa-artifacts/hito-273/continuation-upload.fit",
+);
+const ADAPTIVE_UI_REPLAY_UNPLANNED_ARTIFACT_DIR = path.resolve(
+  process.cwd(),
+  ".tanstack/qa-artifacts/hito-255",
 );
 
 if (
@@ -687,12 +696,17 @@ async function handleAdaptiveUiReplaySeed() {
     let fixture;
     let interactionArtifact = null;
     try {
+      const templatePlan =
+        checkpoint === "unplanned_activity_review"
+          ? await readCanonicalFixtureTemplate()
+          : undefined;
       fixture = await seedAdaptiveEngineUiReplayFixture({
         supabase,
         userId,
         asOfDate: options["as-of-date"],
         runtimeScope,
         checkpoint,
+        templatePlan,
       });
       if (checkpoint === "continuation_actions") {
         const fitBuffer = buildAdaptiveTrainingQualityFitFile({
@@ -706,6 +720,10 @@ async function handleAdaptiveUiReplaySeed() {
         await writeFile(ADAPTIVE_UI_REPLAY_INTERACTION_ARTIFACT, fitBuffer, { mode: 0o600 });
         await chmod(ADAPTIVE_UI_REPLAY_INTERACTION_ARTIFACT, 0o600);
         interactionArtifact = await adaptiveUiReplayInteractionArtifactReceipt(fitBuffer);
+      } else if (checkpoint === "unplanned_activity_review") {
+        interactionArtifact = await writeUnplannedActivityReviewArtifacts(
+          fixture.interactionMatrix,
+        );
       }
     } catch (error) {
       const cleanup = await resetQaPoolUserData({ supabase, userId });
@@ -724,6 +742,10 @@ async function handleAdaptiveUiReplaySeed() {
       assert.equal(afterCounts.runner_capability_usage, 0);
     }
     const provenance = await readAdaptiveUiReplayProvenance(userId, checkpoint);
+    const rlsReadback =
+      checkpoint === "unplanned_activity_review"
+        ? await readAdaptiveUiReplayUnplannedRlsBoundary(userId)
+        : null;
     assert.equal(fixture.invariants.externalProviderDispatchCount, 0);
     assert.equal(provenance.providerResponseIdsAreDeterministicFixtures, true);
     console.log(
@@ -737,6 +759,7 @@ async function handleAdaptiveUiReplaySeed() {
           beforeCounts,
           fixture,
           interactionArtifact,
+          rlsReadback,
           provenance,
           afterCounts,
         },
@@ -761,32 +784,39 @@ async function handleAdaptiveUiReplayStatus() {
           candidateVersion: savedPlanReview.candidate.version,
         })
       : null;
-    let fixture = hasConfirmedSource
-      ? await readAdaptiveBlueprintProjectionFixture({
-          supabase,
-          userId,
-          asOfDate: options["as-of-date"],
-        })
-      : {
-          fixtureVersion: ADAPTIVE_ENGINE_UI_REPLAY_FIXTURE_VERSION,
-          checkpoint,
-          uiState:
-            ownedRows.adaptive_training_detailed_candidates > 0
-              ? "initial_candidate_persisted_unconfirmed"
-              : "onboarding_ready",
-          initialCandidatePreseeded: Boolean(savedPlanReview),
-          savedPlanReview: savedPlanReview
-            ? {
-                candidate: savedPlanReview.candidate,
-                validity: savedPlanReview.validity,
-                restoreStatus: restore?.status ?? "unavailable",
-                canonicalRowCount:
-                  restore?.ok && restore.status === "review_ready"
-                    ? restore.review.workoutDocuments.length
-                    : null,
-              }
-            : null,
-        };
+    let fixture =
+      checkpoint === "unplanned_activity_review"
+        ? await readUnplannedActivityReviewCheckpoint({
+            supabase,
+            userId,
+            asOfDate: options["as-of-date"],
+          })
+        : hasConfirmedSource
+          ? await readAdaptiveBlueprintProjectionFixture({
+              supabase,
+              userId,
+              asOfDate: options["as-of-date"],
+            })
+          : {
+              fixtureVersion: ADAPTIVE_ENGINE_UI_REPLAY_FIXTURE_VERSION,
+              checkpoint,
+              uiState:
+                ownedRows.adaptive_training_detailed_candidates > 0
+                  ? "initial_candidate_persisted_unconfirmed"
+                  : "onboarding_ready",
+              initialCandidatePreseeded: Boolean(savedPlanReview),
+              savedPlanReview: savedPlanReview
+                ? {
+                    candidate: savedPlanReview.candidate,
+                    validity: savedPlanReview.validity,
+                    restoreStatus: restore?.status ?? "unavailable",
+                    canonicalRowCount:
+                      restore?.ok && restore.status === "review_ready"
+                        ? restore.review.workoutDocuments.length
+                        : null,
+                  }
+                : null,
+            };
     if (
       checkpoint === "continuation_actions" &&
       hasConfirmedSource &&
@@ -807,6 +837,12 @@ async function handleAdaptiveUiReplayStatus() {
     const interactionArtifact =
       checkpoint === "continuation_actions"
         ? await adaptiveUiReplayInteractionArtifactReceipt()
+        : checkpoint === "unplanned_activity_review"
+          ? await unplannedActivityReviewArtifactReceipt()
+          : null;
+    const rlsReadback =
+      checkpoint === "unplanned_activity_review"
+        ? await readAdaptiveUiReplayUnplannedRlsBoundary(userId)
         : null;
     console.log(
       JSON.stringify(
@@ -819,6 +855,7 @@ async function handleAdaptiveUiReplayStatus() {
           runtimeScope,
           fixture: redactedFixture,
           interactionArtifact,
+          rlsReadback,
           provenance,
           ownedRows,
         },
@@ -904,7 +941,8 @@ async function readAdaptiveUiReplayProvenance(userId, checkpoint) {
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
   if (responses.error) throw new Error(responses.error.message);
-  const minimumResponseCount = checkpoint === "complete_surface" ? 3 : 1;
+  const minimumResponseCount =
+    checkpoint === "unplanned_activity_review" ? 0 : checkpoint === "complete_surface" ? 3 : 1;
   assert.ok(responses.data.length >= minimumResponseCount);
   const providerResponseIdsAreDeterministicFixtures = responses.data.every(
     (response) =>
@@ -958,6 +996,168 @@ async function adaptiveUiReplayInteractionArtifactReceipt(buffer) {
 
 async function removeAdaptiveUiReplayInteractionArtifact() {
   await rm(ADAPTIVE_UI_REPLAY_INTERACTION_ARTIFACT, { force: true });
+  await rm(ADAPTIVE_UI_REPLAY_UNPLANNED_ARTIFACT_DIR, { force: true, recursive: true });
+}
+
+async function readCanonicalFixtureTemplate() {
+  const rawPlan = await readFile(
+    path.resolve(process.cwd(), RUNNER_CORE_FILE_FLOW_FIXTURE_TEMPLATE),
+    "utf8",
+  );
+  return importedPlanSchema.parse(JSON.parse(rawPlan));
+}
+
+async function writeUnplannedActivityReviewArtifacts(interactionMatrix) {
+  const specs = [
+    {
+      fileName: "empty-compatible.fit",
+      scenario: "past_empty_materialization",
+      localDate: interactionMatrix.calendarStates.empty.workoutDate,
+      evidenceKind: "compatible",
+    },
+    {
+      fileName: "empty-stale-competitor-incomplete.fit",
+      scenario: "stale_competing_confirmation",
+      localDate: interactionMatrix.calendarStates.empty.workoutDate,
+      evidenceKind: "incomplete",
+    },
+    {
+      fileName: "stored-rest-compatible.fit",
+      scenario: "stored_rest_materialization",
+      localDate: interactionMatrix.calendarStates.storedRest.workoutDate,
+      evidenceKind: "compatible",
+    },
+    {
+      fileName: "occupied-eligible-compatible.fit",
+      scenario: "occupied_eligible_association",
+      localDate: interactionMatrix.calendarStates.occupiedEligible.workoutDate,
+      evidenceKind: "compatible",
+    },
+    {
+      fileName: "occupied-protected-incomplete.fit",
+      scenario: "occupied_protected_rejection",
+      localDate: interactionMatrix.calendarStates.occupiedProtected.workoutDate,
+      evidenceKind: "incomplete",
+    },
+  ];
+  await mkdir(ADAPTIVE_UI_REPLAY_UNPLANNED_ARTIFACT_DIR, {
+    recursive: true,
+    mode: 0o700,
+  });
+  const receipts = [];
+  for (const spec of specs) {
+    const fileBuffer = buildAdaptiveTrainingQualityFitFile({
+      localDate: spec.localDate,
+      evidenceKind: spec.evidenceKind,
+    });
+    const parsed = await parseGarminFitActivity(fileBuffer);
+    assert.equal(parsed.activityLocalDate, spec.localDate);
+    const absolutePath = path.join(ADAPTIVE_UI_REPLAY_UNPLANNED_ARTIFACT_DIR, spec.fileName);
+    await writeFile(absolutePath, fileBuffer, { mode: 0o600 });
+    await chmod(absolutePath, 0o600);
+    const metadata = await stat(absolutePath);
+    assert.equal(metadata.mode & 0o777, 0o600);
+    receipts.push({
+      scenario: spec.scenario,
+      localDate: spec.localDate,
+      evidenceKind: spec.evidenceKind,
+      absolutePath,
+      relativePath: path.relative(process.cwd(), absolutePath),
+      sha256: createHash("sha256").update(fileBuffer).digest("hex"),
+      sizeBytes: fileBuffer.length,
+      mode: "0600",
+      parsed: true,
+    });
+  }
+  assert.equal(new Set(receipts.map((receipt) => receipt.sha256)).size, receipts.length);
+  return {
+    kind: "synthetic_historical_fit_upload_set",
+    fixtureVersion: ADAPTIVE_ENGINE_UI_REPLAY_FIXTURE_VERSION,
+    count: receipts.length,
+    distinctSha256Count: receipts.length,
+    files: receipts,
+    externalProviderDispatchCount: 0,
+    rawProviderContentIncluded: false,
+    credentialsIncluded: false,
+    personalDataIncluded: false,
+  };
+}
+
+async function unplannedActivityReviewArtifactReceipt() {
+  const files = (await readdir(ADAPTIVE_UI_REPLAY_UNPLANNED_ARTIFACT_DIR))
+    .filter((fileName) => fileName.endsWith(".fit"))
+    .sort();
+  assert.equal(files.length, 5);
+  const receipts = [];
+  for (const fileName of files) {
+    const absolutePath = path.join(ADAPTIVE_UI_REPLAY_UNPLANNED_ARTIFACT_DIR, fileName);
+    const [fileBuffer, metadata] = await Promise.all([readFile(absolutePath), stat(absolutePath)]);
+    assert.equal(metadata.mode & 0o777, 0o600);
+    const parsed = await parseGarminFitActivity(fileBuffer);
+    receipts.push({
+      absolutePath,
+      relativePath: path.relative(process.cwd(), absolutePath),
+      sha256: createHash("sha256").update(fileBuffer).digest("hex"),
+      sizeBytes: fileBuffer.length,
+      mode: "0600",
+      localDate: parsed.activityLocalDate,
+      parsed: true,
+    });
+  }
+  assert.equal(new Set(receipts.map((receipt) => receipt.sha256)).size, receipts.length);
+  return {
+    kind: "synthetic_historical_fit_upload_set",
+    fixtureVersion: ADAPTIVE_ENGINE_UI_REPLAY_FIXTURE_VERSION,
+    count: receipts.length,
+    distinctSha256Count: receipts.length,
+    files: receipts,
+    externalProviderDispatchCount: 0,
+  };
+}
+
+async function readAdaptiveUiReplayUnplannedRlsBoundary(userId) {
+  if (config.hostedProjectRef) {
+    throw new Error("The unplanned Activity review checkpoint is local-only.");
+  }
+  const account = (await loadLocalAccounts()).find(
+    (candidate) => candidate.email === QA_TESTER_POOL[ADAPTIVE_TRAINING_QUALITY_FIXTURE_ROLE].email,
+  );
+  if (!account) throw new Error("The adaptive UI replay local Auth account is unavailable.");
+  const client = createClient(
+    config.supabaseUrl,
+    requireOption(
+      readEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"),
+      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+    ),
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  );
+  const signedIn = await client.auth.signInWithPassword({
+    email: account.email,
+    password: account.password,
+  });
+  if (signedIn.error || signedIn.data.user?.id !== userId) {
+    throw new Error("The adaptive UI replay RLS proof could not establish the exact owner.");
+  }
+  try {
+    const [own, foreign] = await Promise.all([
+      client
+        .from("planned_workouts")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId),
+      client
+        .from("planned_workouts")
+        .select("id", { count: "exact", head: true })
+        .neq("user_id", userId),
+    ]);
+    if (own.error || foreign.error) {
+      throw new Error(own.error?.message ?? foreign.error?.message ?? "RLS readback failed.");
+    }
+    assert.equal(own.count, 3);
+    assert.equal(foreign.count, 0);
+    return { ownCalendarWorkoutCount: own.count, foreignCalendarWorkoutCount: foreign.count };
+  } finally {
+    await client.auth.signOut();
+  }
 }
 
 async function handleDesignProfileSeed() {

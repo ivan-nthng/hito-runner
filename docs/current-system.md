@@ -134,8 +134,10 @@ reviewed persistence action.
   mutate runner data.
 - TypeScript and JSON Hito DS manifests are generated from one source digest and remain separate
   because their current consumers differ.
-- Local Inspector/DevTools code is lazy, loopback-gated, and non-persisting. It cannot alter Product
-  behavior to make inspection easier.
+- Local Inspector/DevTools code is lazy and loopback-gated. Its only persistence seam is an explicit
+  Task/Bug/Content bug submission to the canonical Notion lifecycle through a process-local
+  loopback sidecar; prompt copy remains a fallback. It cannot write runner/Admin data, expose a
+  browser credential, or alter Product behavior to make inspection easier.
 - `/admin/analytics` and `/admin/capture` consume Backend-owned admin view models. Manual Admin rows
   are capture/triage inbox entries only; repo-derived rows are read-only mirrors. Admin consumes the
   Identity-owned actor classification result rather than importing an Admin-owned classifier.

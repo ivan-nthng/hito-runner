@@ -26,6 +26,9 @@ if (useLocalGeneratedBuildRoot) {
 const isDevServerCommand =
   process.env.npm_lifecycle_event === "dev" ||
   process.argv.some((argument) => argument === "dev" || argument === "serve");
+const localNotionCapturePlugin = isDevServerCommand
+  ? (await import("./scripts/vite-local-notion-capture-plugin.mjs")).hitoLocalNotionCapturePlugin()
+  : null;
 
 const nitroPublicOutputDir = useLocalGeneratedBuildRoot
   ? qaRuntimePaths.nitroPublicDir
@@ -141,6 +144,7 @@ function snapshotClientPublicOutput(): void {
 
 export default defineConfig({
   plugins: [
+    ...(localNotionCapturePlugin ? [localNotionCapturePlugin] : []),
     hitoAdminRepoWorkItemsPlugin({ rootDir }),
     tailwindcss(),
     tsconfigPaths({ projects: ["./tsconfig.json"] }),

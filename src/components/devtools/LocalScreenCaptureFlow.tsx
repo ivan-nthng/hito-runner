@@ -9,6 +9,8 @@ import {
 import { Icon } from "@/components/ui/icon";
 import { Textarea } from "@/components/ui/textarea";
 import { copyTextToClipboard } from "@/components/devtools/local-ui-clipboard";
+import { LocalNotionSubmissionActions } from "@/components/devtools/LocalNotionSubmissionActions";
+import type { LocalNotionCaptureKind } from "@/components/devtools/local-notion-task-client";
 import {
   buildCaptureDraft,
   buildLocalScreenCapturePacket,
@@ -333,6 +335,10 @@ function ScreenCapturePanel({
         ) : null}
 
         <div className="grid min-w-0 gap-2 border-t border-hairline pt-2">
+          <LocalNotionSubmissionActions
+            key={`${packet.createdAt}:${packet.userComment}`}
+            buildCapture={(kind) => buildScreenNotionCapture(packet, kind)}
+          />
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
             {promptState === "copied" ? (
               <span className="inline-flex min-h-8 items-center gap-1.5 px-2 text-xs font-medium text-success">
@@ -385,6 +391,28 @@ function ScreenCapturePanel({
       </div>
     </section>
   );
+}
+
+function buildScreenNotionCapture(packet: LocalScreenCapturePacket, kind: LocalNotionCaptureKind) {
+  const center = packet.domContext?.elementAtCenter;
+  const evidence = [
+    `Selected region: x=${packet.selection.viewportRect.x}, y=${packet.selection.viewportRect.y}, width=${packet.selection.viewportRect.width}, height=${packet.selection.viewportRect.height}`,
+    center?.selector ? `Center element: ${center.selector}` : null,
+    center?.nearestHeading ? `Nearest heading: ${center.nearestHeading}` : null,
+    center?.visibleText ? `Visible text: ${center.visibleText}` : null,
+  ].filter((line): line is string => Boolean(line));
+
+  return {
+    evidence,
+    kind,
+    note: packet.userComment,
+    pageTitle: packet.route.title,
+    route: packet.route.pathname,
+    source: "screen_capture" as const,
+    theme: packet.viewport.theme,
+    title: packet.userComment || undefined,
+    viewport: { height: packet.viewport.height, width: packet.viewport.width },
+  };
 }
 
 function ScreenCapturePreview({ packet }: { packet: LocalScreenCapturePacket }) {

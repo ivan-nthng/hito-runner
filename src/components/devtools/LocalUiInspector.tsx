@@ -79,7 +79,6 @@ type ComposerPanelState = {
 
 type ReviewPanelState = {
   anchor: "launcher";
-  autoGenerate: boolean;
   focusItemId: string | null;
   kind: "review";
   position: { x: number; y: number };
@@ -138,10 +137,9 @@ export function LocalUiInspector() {
     });
   }, []);
 
-  const showReview = useCallback((focusItemId: string | null, autoGenerate = false) => {
+  const showReview = useCallback((focusItemId: string | null) => {
     setPanel({
       anchor: "launcher",
-      autoGenerate,
       focusItemId,
       kind: "review",
       position: getLocalUiInspectorLauncherPanelPosition(),
@@ -157,7 +155,6 @@ export function LocalUiInspector() {
       if (current?.kind === "composer" && current.itemId) {
         return {
           anchor: "launcher",
-          autoGenerate: false,
           focusItemId: current.itemId,
           kind: "review",
           position: getLocalUiInspectorLauncherPanelPosition(),
@@ -497,7 +494,7 @@ export function LocalUiInspector() {
     payload,
   }: {
     draft: LocalUiInspectorItemDraft;
-    intent: "add" | "generate";
+    intent: "add" | "review";
     payload: InlineChangeTargetPayload;
   }) => {
     const currentPanel = panelRef.current;
@@ -522,8 +519,8 @@ export function LocalUiInspector() {
     if (existing) {
       session.replaceItem(nextItem);
       setStatusMessage("Item updated.");
-      if (intent === "generate") {
-        showReview(existing.id, true);
+      if (intent === "review") {
+        showReview(existing.id);
       } else if (isLocalUiInspectorNarrowViewport()) {
         setPanel(null);
         focusInspectLauncher();
@@ -532,9 +529,9 @@ export function LocalUiInspector() {
       }
     } else if (!session.isFull) {
       session.addItem(nextItem);
-      if (intent === "generate") {
-        setStatusMessage("Prompt generated from the current Inspector item.");
-        showReview(nextItem.id, true);
+      if (intent === "review") {
+        setStatusMessage("Inspector item is ready for explicit submission.");
+        showReview(nextItem.id);
       } else {
         setStatusMessage("Item added to the Inspector list.");
         setPanel(null);
@@ -607,7 +604,6 @@ export function LocalUiInspector() {
             />
           ) : (
             <LocalUiInspectorBatchReview
-              autoGenerate={panel.autoGenerate}
               initialFocusItemId={panel.focusItemId}
               items={session.items}
               onClear={clearInspectorBatch}

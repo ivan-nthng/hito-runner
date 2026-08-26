@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { buildLocalUiInspectorBatchPrompt } from "@/components/devtools/local-ui-inspector-batch-prompt";
+import { LocalNotionSubmissionActions } from "@/components/devtools/LocalNotionSubmissionActions";
+import type { LocalNotionCaptureKind } from "@/components/devtools/local-notion-task-client";
 import {
   getLocalUiInspectorItemSummary,
   getLocalUiInspectorTargetLabel,
@@ -22,7 +24,6 @@ import { Textarea } from "@/components/ui/textarea";
 type CopyState = "idle" | "copying" | "copied" | "copy_failed";
 
 export function LocalUiInspectorBatchReview({
-  autoGenerate = false,
   initialFocusItemId,
   items,
   onClear,
@@ -32,7 +33,6 @@ export function LocalUiInspectorBatchReview({
   onRemove,
   routeKey,
 }: {
-  autoGenerate?: boolean;
   initialFocusItemId?: string | null;
   items: LocalUiInspectorBatchItem[];
   onClear: () => void;
@@ -46,7 +46,6 @@ export function LocalUiInspectorBatchReview({
   const titleId = useId();
   const titleRef = useRef<HTMLHeadingElement | null>(null);
   const promptRef = useRef<HTMLTextAreaElement | null>(null);
-  const autoGenerateHandledRef = useRef(false);
   const prompt = useMemo(
     () =>
       buildLocalUiInspectorBatchPrompt(items, {
@@ -92,12 +91,6 @@ export function LocalUiInspectorBatchReview({
       promptRef.current?.select();
     });
   }, [copyState]);
-
-  useEffect(() => {
-    if (!autoGenerate || autoGenerateHandledRef.current || items.length === 0) return;
-    autoGenerateHandledRef.current = true;
-    void copyPrompt();
-  }, [autoGenerate, copyPrompt, items.length]);
 
   const removeItem = (itemId: string) => {
     const itemIndex = items.findIndex((item) => item.id === itemId);
@@ -254,6 +247,13 @@ export function LocalUiInspectorBatchReview({
         className="grid min-w-0 gap-2 border-t border-hairline pt-3"
         data-local-ui-inspector-footer=""
       >
+        <LocalNotionSubmissionActions
+          key={`${routeKey}:${items
+            .map((item) => `${item.id}:${getLocalUiInspectorItemSummary(item)}`)
+            .join("|")}`}
+          buildCapture={(kind) => buildBatchNotionCapture(items, routeKey, kind)}
+          disabled={items.length === 0}
+        />
         <div className="grid min-w-0 gap-2">
           <button
             type="button"
@@ -282,4 +282,37 @@ export function LocalUiInspectorBatchReview({
       </div>
     </div>
   );
+}
+
+function buildBatchNotionCapture(
+  items: LocalUiInspectorBatchItem[],
+  routeKey: string,
+  kind: LocalNotionCaptureKind,
+) {
+  const summaries = items.map(getLocalUiInspectorItemSummary);
+  const firstItem = items[0] ?? null;
+  const title = firstItem ? getLocalUiInspectorItemSummary(firstItem) : undefined;
+  const note =
+    items.length === 1
+      ? firstItem?.payload.comment || title || ""
+      : `${items.length} selected UI requests: ${summaries.join(" · ")}`;
+
+  return {
+    evidence: items.map((item) =>
+      [
+        `Target: ${getLocalUiInspectorTargetLabel(item.target)}`,
+        `selector: ${item.payload.target.selector ?? "not captured"}`,
+        `request: ${getLocalUiInspectorItemSummary(item)}`,
+        `scope: ${getFixScopeLabel(item.payload.fixScope.id)}`,
+      ].join("; "),
+    ),
+    kind,
+    note,
+    pageTitle: document.title,
+    route: routeKey,
+    source: "inspector_batch" as const,
+    theme: document.documentElement.dataset.hitoTheme ?? "unknown",
+    title,
+    viewport: { height: window.innerHeight, width: window.innerWidth },
+  };
 }

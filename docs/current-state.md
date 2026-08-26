@@ -68,8 +68,10 @@ runtime and ownership boundaries belong in [current-system.md](current-system.md
   file input, so no real upload request or end-to-end browser readback was proven. This is a browser
   capability/evidence gate, not accepted Product UI and not a new source defect.
 - The Local Inspector availability contract is complete: it is deliberately usable only on the
-  canonical loopback QA origin, remains absent on non-loopback origins, and is local-only and
-  non-mutating. Detailed browser evidence remains in the
+  canonical loopback QA origin and remains absent on non-loopback origins. Its explicit
+  Task/Bug/Content bug action writes only a bounded redacted capture to the canonical Notion Tasks
+  lifecycle through a local sidecar; it remains non-mutating for runner and Admin data. Detailed
+  browser evidence remains in the
   [canonical Inspector receipt](/Users/ivan/Developer/hito-running/docs/tasks/backlog/2026-08-04-canonical-loopback-local-inspector-availability.md).
 - Global QA remains separate from the accepted owner-level and release receipts recorded by the
   completed slices.

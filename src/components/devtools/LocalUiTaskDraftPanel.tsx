@@ -62,7 +62,7 @@ export function LocalUiTaskDraftPanel({
   onCancel: () => void;
   onSubmit: (result: {
     draft: LocalUiInspectorItemDraft;
-    intent: "add" | "generate";
+    intent: "add" | "review";
     payload: InlineChangeTargetPayload;
   }) => void;
   ownership: HitoDsOwnershipEvidence;
@@ -244,7 +244,7 @@ export function LocalUiTaskDraftPanel({
     updateDraft({ componentAction });
   };
 
-  const submit = (intent: "add" | "generate") => {
+  const submit = (intent: "add" | "review") => {
     if (submitDisabled) return;
     onSubmit({ draft, intent, payload });
   };
@@ -256,7 +256,7 @@ export function LocalUiTaskDraftPanel({
       onKeyDown={(event) => {
         if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
           event.preventDefault();
-          submit("generate");
+          submit("review");
         }
       }}
     >
@@ -293,7 +293,7 @@ export function LocalUiTaskDraftPanel({
         {notice ? <p className="hito-body-xs text-signal">{notice}</p> : null}
         {batchFull && !isEditing ? (
           <p className="hito-body-xs text-warn">
-            Batch is full. Generate a prompt or remove an item before adding another.
+            Batch is full. Review the draft or remove an item before adding another.
           </p>
         ) : null}
 
@@ -456,9 +456,9 @@ export function LocalUiTaskDraftPanel({
             type="button"
             className="hito-button hito-button-primary hito-button-sm"
             disabled={submitDisabled}
-            onClick={() => submit("generate")}
+            onClick={() => submit("review")}
           >
-            Generate prompt
+            Review & submit
           </button>
         </div>
         <p className="sr-only" aria-live="polite">

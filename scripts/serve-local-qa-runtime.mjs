@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { resolveQaRuntimePaths } from "./lib/qa-runtime-paths.mjs";
+import { startLocalNotionCaptureServer } from "./local-notion-capture-server.mjs";
 
 const { serverEntry } = resolveQaRuntimePaths({ rootDir: process.cwd() });
 const LOOPBACK_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
@@ -51,7 +52,18 @@ if (providerMode === "real") {
 }
 process.argv = [process.execPath, serverEntry, ...runtimeArgs];
 
-await import(pathToFileURL(serverEntry).href);
+const localNotionCaptureServer = await startLocalNotionCaptureServer({
+  appPort: Number(port),
+  host,
+  port: Number(port) + 1,
+});
+
+try {
+  await import(pathToFileURL(serverEntry).href);
+} catch (error) {
+  await localNotionCaptureServer.close();
+  throw error;
+}
 
 function withDefaultHostAndPort(args) {
   const nextArgs = [...args];

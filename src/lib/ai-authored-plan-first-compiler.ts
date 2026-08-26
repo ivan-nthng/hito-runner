@@ -21,6 +21,8 @@ import {
   CANONICAL_WORKOUT_FAMILY_VALUES,
   canonicalFamilyToLegacyWorkoutType,
   deriveCanonicalMetricMode,
+  normalizeWorkoutFamily,
+  normalizeWorkoutIdentity,
   resolveCanonicalWorkoutModel,
   toCanonicalMetricModeJson,
   type CanonicalWorkoutIdentity,
@@ -404,7 +406,10 @@ function normalizeProviderDraft({
       validationIssues: string[];
     }
   | { ok: false; reason: string; issues: CompilerIssue[] } {
-  const providerResult = aiAuthoredPlanFirstCompilerDraftSchema.safeParse(draft);
+  const representationNormalized = normalizeProviderBlueprintFamilyAliases(draft);
+  const providerResult = aiAuthoredPlanFirstCompilerDraftSchema.safeParse(
+    representationNormalized.draft,
+  );
 
   if (!providerResult.success) {
     return {
@@ -612,7 +617,10 @@ function normalizeProviderDraft({
   return {
     ok: true,
     issues,
-    validationIssues: familyCoverage.validationIssues,
+    validationIssues: [
+      ...representationNormalized.validationIssues,
+      ...familyCoverage.validationIssues,
+    ],
     draft: {
       ...normalizedDraft,
       blueprint: {
@@ -630,6 +638,95 @@ function normalizeProviderDraft({
       },
     },
   };
+}
+
+function normalizeProviderBlueprintFamilyAliases(draft: unknown): {
+  draft: unknown;
+  validationIssues: string[];
+} {
+  if (!isUnknownRecord(draft) || !isUnknownRecord(draft.blueprint)) {
+    return { draft, validationIssues: [] };
+  }
+
+  const validationIssues: string[] = [];
+  const blueprint = draft.blueprint;
+  const phases = Array.isArray(blueprint.phases)
+    ? blueprint.phases.map((phase, phaseIndex) => {
+        if (!isUnknownRecord(phase) || !Array.isArray(phase.workout_families)) {
+          return phase;
+        }
+        return {
+          ...phase,
+          workout_families: phase.workout_families.map((family, familyIndex) =>
+            normalizeProviderBlueprintFamilyValue({
+              value: family,
+              path: `blueprint.phases.${phaseIndex}.workout_families.${familyIndex}`,
+              validationIssues,
+            }),
+          ),
+        };
+      })
+    : blueprint.phases;
+  const projections = Array.isArray(blueprint.projections)
+    ? blueprint.projections.map((projection, projectionIndex) => {
+        if (!isUnknownRecord(projection)) {
+          return projection;
+        }
+        return {
+          ...projection,
+          cadence_or_workout_family: normalizeProviderBlueprintFamilyValue({
+            value: projection.cadence_or_workout_family,
+            path: `blueprint.projections.${projectionIndex}.cadence_or_workout_family`,
+            validationIssues,
+          }),
+        };
+      })
+    : blueprint.projections;
+
+  return {
+    draft: {
+      ...draft,
+      blueprint: {
+        ...blueprint,
+        phases,
+        projections,
+      },
+    },
+    validationIssues,
+  };
+}
+
+function normalizeProviderBlueprintFamilyValue({
+  value,
+  path,
+  validationIssues,
+}: {
+  value: unknown;
+  path: string;
+  validationIssues: string[];
+}) {
+  if (normalizeWorkoutFamily(value) !== null) {
+    return value;
+  }
+
+  const identity = normalizeWorkoutIdentity(value);
+  if (identity === null || identity === "recorded_activity") {
+    return value;
+  }
+  const family = resolveCanonicalWorkoutModel({
+    workoutType: "quality",
+    workoutIdentity: identity,
+  }).workoutFamily;
+  if (family === "recorded") {
+    return value;
+  }
+
+  validationIssues.push(`ai_authored_blueprint_family_alias_normalized:${path}:${family}`);
+  return family;
+}
+
+function isUnknownRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 function normalizeBlueprintPhaseFamilyCoverage(draft: AiAuthoredPlanFirstCompilerDraft): {

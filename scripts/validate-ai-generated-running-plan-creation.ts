@@ -3310,6 +3310,64 @@ async function validateLocalDevFixtureAvailabilityGating() {
       ),
       "Phase-family normalization must not weaken phase/date ownership checks.",
     );
+    const familyAliasDraft = structuredClone(fixtureDraft);
+    const aliasPhase = familyAliasDraft.blueprint.phases.find((phase) =>
+      phase.workout_families.includes("easy"),
+    );
+    assert.ok(aliasPhase, "The regression fixture requires one phase with the easy family.");
+    const aliasProjection = familyAliasDraft.blueprint.projections.find(
+      (projection) =>
+        projection.phase === aliasPhase.phase &&
+        projection.date >= aliasPhase.start_date &&
+        projection.date <= aliasPhase.end_date &&
+        projection.cadence_or_workout_family === "easy",
+    );
+    assert.ok(aliasProjection, "The regression fixture requires one easy projection.");
+    aliasPhase.workout_families[aliasPhase.workout_families.indexOf("easy")] = "strides" as never;
+    aliasProjection.cadence_or_workout_family = "strides" as never;
+    const familyAliasCompile = compileAiAuthoredPlanFirstDraft({
+      draft: familyAliasDraft,
+      authoringInput: fixtureAuthoringInput,
+    });
+    assert.equal(familyAliasCompile.ok, true);
+    if (!familyAliasCompile.ok) {
+      throw new Error("A canonical workout-identity alias did not normalize to its family.");
+    }
+    assert.ok(
+      familyAliasCompile.blueprint.phases
+        .find((phase) => phase.phase === aliasPhase.phase)
+        ?.workout_families.includes("easy"),
+      "The normalized Blueprint must retain the derived canonical family.",
+    );
+    assert.equal(
+      familyAliasCompile.blueprint.projections.find(
+        (projection) => projection.projection_id === aliasProjection.projection_id,
+      )?.cadence_or_workout_family,
+      "easy",
+    );
+    assert.equal(
+      familyAliasCompile.validationIssues.filter((issue) =>
+        issue.startsWith("ai_authored_blueprint_family_alias_normalized:"),
+      ).length,
+      2,
+      "Every accepted provider family alias normalization must remain visible in metadata.",
+    );
+    const unknownFamilyDraft = structuredClone(fixtureDraft);
+    unknownFamilyDraft.blueprint.phases[0]!.workout_families[0] = "not_a_workout_family" as never;
+    const unknownFamilyCompile = compileAiAuthoredPlanFirstDraft({
+      draft: unknownFamilyDraft,
+      authoringInput: fixtureAuthoringInput,
+    });
+    assert.equal(unknownFamilyCompile.ok, false);
+    if (unknownFamilyCompile.ok) {
+      throw new Error("An unknown provider family unexpectedly compiled.");
+    }
+    assert.ok(
+      unknownFamilyCompile.issues.some(
+        (issue) => issue.code === "ai_authored_plan_first_provider_schema_invalid",
+      ),
+      "Unknown provider family values must remain fail-closed at the strict schema boundary.",
+    );
     assert.ok(
       [...fixtureDraft.detailed_block.workouts, fixtureDraft.detailed_block.final_workout]
         .flatMap((workout) => workout.sections)

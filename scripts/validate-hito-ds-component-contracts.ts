@@ -1677,8 +1677,9 @@ expect(
   compoundRangeSource?.content.includes("label?: string;") === true &&
     compoundRangeSource.content.includes("const visibleLabel = label?.trim() || undefined;") &&
     compoundRangeSource.content.includes(
-      "const accessibleGroupLabel = `${lowerLabel} to ${upperLabel}, ${unit}`;",
+      'const accessibleGroupLabel = message("{lowerLabel} to {upperLabel}, {unit}", {',
     ) &&
+    compoundRangeSource.content.includes("const message = useHitoProductMessage();") &&
     compoundRangeSource.content.includes("{visibleLabel ? (") &&
     compoundRangeSource.content.includes("aria-labelledby={labelId}") &&
     compoundRangeSource.content.includes(

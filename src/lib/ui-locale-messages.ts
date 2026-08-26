@@ -1843,6 +1843,9 @@ export const HITO_PRODUCT_MESSAGES_PT_BR = {
   "Selected metric": "Métrica selecionada",
   Context: "Contexto",
   "Evidence and coverage": "Evidência e cobertura",
+  "{lowerLabel} to {upperLabel}, {unit}": "{lowerLabel} a {upperLabel}, {unit}",
+  Notifications: "Notificações",
+  "Dismiss notification": "Dispensar notificação",
   Reason: "Motivo",
   "Runner-reported effort is missing.": "O esforço informado pelo corredor não está disponível.",
   "Distance was not available in the FIT file.":

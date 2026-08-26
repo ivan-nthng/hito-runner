@@ -166,6 +166,26 @@ function proveResolverContract() {
     "Runner-authored FIT note",
   );
   assert.equal(
+    formatHitoProductMessage("en", "{lowerLabel} to {upperLabel}, {unit}", {
+      lowerLabel: "Recovery lower bound",
+      upperLabel: "Recovery upper bound",
+      unit: "BPM",
+    }),
+    "Recovery lower bound to Recovery upper bound, BPM",
+  );
+  assert.equal(
+    formatHitoProductMessage("pt-BR", "{lowerLabel} to {upperLabel}, {unit}", {
+      lowerLabel: "Limite inferior de Recuperação",
+      upperLabel: "Limite superior de Recuperação",
+      unit: "BPM",
+    }),
+    "Limite inferior de Recuperação a Limite superior de Recuperação, BPM",
+  );
+  assert.equal(getHitoProductMessage("en", "Notifications"), "Notifications");
+  assert.equal(getHitoProductMessage("pt-BR", "Notifications"), "Notificações");
+  assert.equal(getHitoProductMessage("en", "Dismiss notification"), "Dismiss notification");
+  assert.equal(getHitoProductMessage("pt-BR", "Dismiss notification"), "Dispensar notificação");
+  assert.equal(
     formatHitoProductMessage("en", "{startDate} through {endDate}", {
       startDate: formatUiDate("2026-07-29", "en", {
         day: "numeric",
@@ -527,8 +547,39 @@ function proveSourceOwnership() {
   }
 
   const providerSource = readSource("src/components/ui/hito-ui-locale-provider.tsx");
-  assert.match(providerSource, /createContext<ResolvedUiLocale>/);
+  assert.match(providerSource, /createContext<ResolvedUiLocale \| null>\(null\)/);
   assert.match(providerSource, /document\.documentElement\.lang = locale/);
+  assert.match(providerSource, /useSyncExternalStore/);
+  assert.match(providerSource, /globalUiLocaleSnapshot = locale/);
+
+  const compoundRangeSource = readSource("src/components/ui/hito-compound-range-field.tsx");
+  assert.match(compoundRangeSource, /useHitoProductMessage/);
+  assert.match(compoundRangeSource, /message\("\{lowerLabel\} to \{upperLabel\}, \{unit\}"/);
+  assert.doesNotMatch(compoundRangeSource, /`\$\{lowerLabel\} to \$\{upperLabel\}/);
+
+  const toasterSource = readSource("src/components/ui/sonner.tsx");
+  assert.match(toasterSource, /containerAriaLabel \?\? message\("Notifications"\)/);
+  assert.match(toasterSource, /message\("Dismiss notification"\)/);
+  assert.doesNotMatch(toasterSource, /aria-label="Dismiss notification"/);
+
+  const calendarSource = readSource("src/components/Calendar.tsx");
+  const unplannedConfirmation = calendarSource.match(
+    /<UnplannedActivityWorkflow[\s\S]*?onConfirmed=\{async \(review\) => \{([\s\S]*?)\}\}\s*\/>/,
+  )?.[1];
+  assert.ok(unplannedConfirmation, "Calendar must retain the unplanned confirmation callback.");
+  assert.match(unplannedConfirmation, /await router\.invalidate\(\{ sync: true \}\)/);
+  assert.doesNotMatch(unplannedConfirmation, /forcePending/);
+  assert.doesNotMatch(
+    unplannedConfirmation.split("await router.invalidate")[0] ?? "",
+    /setActivityWorkflowEntry\(null\)/,
+  );
+
+  const routerCoreSource = readSource("node_modules/@tanstack/router-core/src/router.ts");
+  assert.match(
+    routerCoreSource,
+    /opts\?\.forcePending \|\|\s+d\.status === 'error' \|\|\s+d\.status === 'notFound'/,
+  );
+  assert.match(routerCoreSource, /return this\.load\(\{ sync: opts\?\.sync \}\)/);
 
   const shellSource = readSource("src/components/AppShell.tsx");
   assert.match(shellSource, /<HitoUiLocaleProvider locale=\{resolvedLocale\}>/);

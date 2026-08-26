@@ -1,6 +1,7 @@
 import { Toaster as Sonner } from "sonner";
 import { useSyncExternalStore } from "react";
 
+import { useHitoProductMessage } from "@/components/ui/hito-ui-locale-provider";
 import { Icon } from "@/components/ui/icon";
 import {
   dismissHitoWorkingToast,
@@ -11,6 +12,7 @@ import {
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
 const Toaster = ({
+  containerAriaLabel,
   position = "top-center",
   closeButton = true,
   expand = false,
@@ -19,6 +21,10 @@ const Toaster = ({
   toastOptions,
   ...props
 }: ToasterProps) => {
+  const message = useHitoProductMessage();
+  const closeButtonAriaLabel =
+    toastOptions?.closeButtonAriaLabel ?? message("Dismiss notification");
+
   return (
     <>
       <Sonner
@@ -26,6 +32,7 @@ const Toaster = ({
         closeButton={closeButton}
         expand={expand}
         visibleToasts={visibleToasts}
+        containerAriaLabel={containerAriaLabel ?? message("Notifications")}
         className="hito-toaster group"
         icons={{
           close: <Icon name="close" size="xs" />,
@@ -37,7 +44,7 @@ const Toaster = ({
         }}
         toastOptions={{
           ...toastOptions,
-          closeButtonAriaLabel: "Dismiss notification",
+          closeButtonAriaLabel,
           classNames: {
             toast: "hito-toast group toast",
             title: "hito-toast-title",
@@ -56,12 +63,12 @@ const Toaster = ({
         }}
         {...props}
       />
-      <HitoWorkingToastViewport />
+      <HitoWorkingToastViewport closeButtonAriaLabel={closeButtonAriaLabel} />
     </>
   );
 };
 
-function HitoWorkingToastViewport() {
+function HitoWorkingToastViewport({ closeButtonAriaLabel }: { closeButtonAriaLabel: string }) {
   const workingToasts = useSyncExternalStore(
     subscribeWorkingToasts,
     getWorkingToastSnapshot,
@@ -105,7 +112,7 @@ function HitoWorkingToastViewport() {
             data-hito-toast-dismiss=""
             data-hito-toast-id={String(toast.id)}
             className="hito-toast-dismiss-action hito-button hito-button-ghost hito-button-xs"
-            aria-label="Dismiss notification"
+            aria-label={closeButtonAriaLabel}
             onPointerDown={(event) => event.stopPropagation()}
             onMouseDown={(event) => event.stopPropagation()}
             onClick={() => dismissHitoWorkingToast(toast.id, { notify: true })}

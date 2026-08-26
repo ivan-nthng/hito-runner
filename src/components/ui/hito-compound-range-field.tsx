@@ -1,5 +1,6 @@
 import { useId, useRef, type KeyboardEvent } from "react";
 
+import { useHitoProductMessage } from "@/components/ui/hito-ui-locale-provider";
 import { cn } from "@/lib/utils";
 
 type HitoCompoundRangeFieldProps = {
@@ -39,10 +40,15 @@ export function HitoCompoundRangeField({
   upperLabel,
   upperValue,
 }: HitoCompoundRangeFieldProps) {
+  const message = useHitoProductMessage();
   const generatedId = useId();
   const visibleLabel = label?.trim() || undefined;
   const labelId = visibleLabel ? `${generatedId}-label` : undefined;
-  const accessibleGroupLabel = `${lowerLabel} to ${upperLabel}, ${unit}`;
+  const accessibleGroupLabel = message("{lowerLabel} to {upperLabel}, {unit}", {
+    lowerLabel,
+    upperLabel,
+    unit,
+  });
   const errorId = error ? `${generatedId}-error` : undefined;
   const focusedValueRef = useRef({ lower: lowerValue, upper: upperValue });
 

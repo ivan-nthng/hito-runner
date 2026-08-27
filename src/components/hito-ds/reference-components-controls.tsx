@@ -156,7 +156,11 @@ function ButtonPlayground() {
           accessibility:
             "Use native button semantics, an accessible name for icon-only actions, visible focus, and truthful disabled or loading state.",
         }}
-        anchors={[{ id: "button-group", label: "Grouped Buttons", tab: "variants" }]}
+        anchors={[
+          { id: "button-compositions", label: "Compositions", tab: "variants" },
+          { id: "button-states", label: "States", tab: "variants" },
+          { id: "button-debugger-actions", label: "Debugger actions", tab: "variants" },
+        ]}
         usedIn={
           <ProductLinks
             links={[
@@ -168,7 +172,10 @@ function ButtonPlayground() {
           />
         }
         demo={
-          <div className="flex min-w-0 items-center justify-center" data-hito-ds-button-preview>
+          <div
+            className="flex min-w-0 flex-wrap items-center justify-center gap-3"
+            data-hito-ds-button-preview
+          >
             <DemoButton
               variant={variant}
               tone={buttonTone}
@@ -178,15 +185,24 @@ function ButtonPlayground() {
               motionState={buttonMotionState}
               progress={Number.parseInt(buttonProgress, 10) / 100}
             />
+            <HitoButton
+              type="button"
+              aria-label="Close example"
+              iconOnly
+              size={size}
+              variant="ghost"
+            >
+              <Icon aria-hidden="true" name="close" size={size === "xs" ? "xs" : "sm"} />
+            </HitoButton>
           </div>
         }
         variants={
           <div className="grid gap-6" inert>
-            <div className="border-t border-hairline pt-5">
-              <p className="hito-label-md">Grouped action composition</p>
+            <div id="button-compositions" className="scroll-mt-24 border-t border-hairline pt-5">
+              <p className="hito-label-md">Button compositions</p>
               <p className="hito-body-xs text-tertiary mt-1 max-w-2xl">
-                Responsive action groups compose canonical Buttons without adding a connected
-                ButtonGroup API.
+                Text, leading and trailing icons, icon-only actions, close controls, and responsive
+                action groups are configurations of the same HitoButton API.
               </p>
               <div className="mt-4 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
                 <HitoButton size="md" variant="secondary" className="w-full sm:w-auto">
@@ -200,7 +216,7 @@ function ButtonPlayground() {
                 </HitoButton>
               </div>
             </div>
-            <div className="border-t border-hairline pt-5">
+            <div id="button-states" className="scroll-mt-24 border-t border-hairline pt-5">
               <p className="hito-label-md">State matrix</p>
               <p className="hito-body-xs text-tertiary mt-1">
                 Follows the selected variant, tone, size, and icon rhythm.
@@ -245,6 +261,27 @@ function ButtonPlayground() {
               </p>
               <div className="mt-5">
                 <IconOnlyButtonMatrix />
+              </div>
+            </div>
+            <div
+              id="button-debugger-actions"
+              className="scroll-mt-24 border-t border-hairline pt-5"
+            >
+              <p className="hito-label-md">Local Debugger action composition</p>
+              <p className="hito-body-xs text-tertiary mt-1 max-w-2xl">
+                One primary Notion menu trigger and one secondary prompt-copy fallback express the
+                two user outcomes without creating a Debugger-only Button family.
+              </p>
+              <div className="mt-4 grid max-w-lg grid-cols-1 gap-2 sm:grid-cols-2">
+                <HitoButton size="sm" variant="primary" className="w-full justify-center">
+                  <Icon aria-hidden="true" name="file-up" size="xs" />
+                  Send to Notion
+                  <Icon aria-hidden="true" name="chevron-down" size="xs" />
+                </HitoButton>
+                <HitoButton size="sm" variant="secondary" className="w-full justify-center">
+                  <Icon aria-hidden="true" name="copy" size="xs" />
+                  Copy prompt
+                </HitoButton>
               </div>
             </div>
           </div>

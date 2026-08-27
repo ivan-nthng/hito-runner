@@ -34,8 +34,9 @@ export function LocalUiInspectorSurface({
         <SheetContent
           side="right"
           data-local-ui-inspector-layer=""
-          className="!z-[92] flex h-dvh w-full max-w-none flex-col gap-0 overflow-hidden border-0 p-0 sm:max-w-none [&>.hito-ui-sheet-close]:hidden"
+          className="!z-[92] flex h-dvh w-full max-w-none flex-col gap-0 overflow-hidden border-0 p-0 sm:max-w-none"
           aria-label={ariaLabel}
+          showCloseButton={false}
           onClick={stopInspectorSurfaceEvent}
           onFocus={stopInspectorSurfaceEvent}
           onPointerCancelCapture={onInternalPointerEnd}

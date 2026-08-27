@@ -19,12 +19,19 @@ export async function copyTextToClipboard(value: string): Promise<ClipboardCopyR
     }
   }
 
+  const initiatingElement =
+    document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const activeDebuggerLayer =
+    initiatingElement?.closest<HTMLElement>("[data-local-ui-inspector-layer]") ??
+    document
+      .querySelector<HTMLElement>("[data-local-notion-submission-actions]")
+      ?.closest<HTMLElement>("[data-local-ui-inspector-layer]");
   const textarea = document.createElement("textarea");
   textarea.value = value;
   textarea.setAttribute("readonly", "true");
   textarea.style.inset = "0 auto auto -9999px";
   textarea.style.position = "fixed";
-  document.body.append(textarea);
+  (activeDebuggerLayer ?? document.body).append(textarea);
   textarea.select();
   textarea.setSelectionRange(0, value.length);
 
@@ -40,6 +47,9 @@ export async function copyTextToClipboard(value: string): Promise<ClipboardCopyR
     return { ok: false, reason: "blocked" };
   } finally {
     textarea.remove();
+    if (initiatingElement?.isConnected) {
+      initiatingElement.focus({ preventScroll: true });
+    }
   }
 }
 

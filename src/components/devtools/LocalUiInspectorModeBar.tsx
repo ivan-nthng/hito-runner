@@ -1,4 +1,5 @@
 import { forwardRef } from "react";
+import { HitoButton } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -24,32 +25,37 @@ export const LocalUiInspectorModeBar = forwardRef<
         <span className="hito-body-xs truncate text-foreground">Pencil</span>
       </span>
       {itemCount > 0 ? (
-        <button
+        <HitoButton
           type="button"
-          className="hito-button hito-button-secondary hito-button-xs shrink-0 px-2"
           aria-expanded={reviewOpen}
           aria-label={`Open Inspector draft with ${itemCount} ${itemCount === 1 ? "item" : "items"}`}
+          className="shrink-0"
           onClick={onOpenReview}
+          size="xs"
+          variant="secondary"
         >
           Draft {itemCount}
-        </button>
+        </HitoButton>
       ) : null}
       <Tooltip>
         <TooltipTrigger asChild>
-          <button
+          <HitoButton
             ref={ref}
             type="button"
-            className="hito-button hito-button-ghost hito-button-xs size-7 min-h-7 shrink-0 px-0"
             aria-label="Exit Pencil Inspector and discard draft"
+            className="shrink-0"
+            iconOnly
             onClick={onExit}
             onKeyDown={(event) => {
               if (event.key !== "Enter" && event.key !== " ") return;
               event.preventDefault();
               onExit();
             }}
+            size="xs"
+            variant="ghost"
           >
-            <Icon name="close" size="xs" />
-          </button>
+            <Icon aria-hidden="true" name="close" size="xs" />
+          </HitoButton>
         </TooltipTrigger>
         <TooltipContent className="z-[94]" side="top" sideOffset={8}>
           Exit Pencil Inspector and discard draft

@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { HitoButton } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -632,11 +633,12 @@ export function LocalUiInspector() {
       {mode === "screen" ? <LocalScreenCaptureFlow onClose={closeInspectorImmediately} /> : null}
 
       {mode === "screen" ? (
-        <button
+        <HitoButton
           ref={inspectLauncherRef}
           type="button"
-          className="hito-button hito-button-secondary hito-button-md relative z-[83] aspect-square rounded-full px-0 shadow-soft"
           aria-label="Cancel local screen capture"
+          className="relative z-[83] rounded-full shadow-soft"
+          iconOnly
           title="Cancel local screen capture"
           onClick={closeInspectorImmediately}
           onKeyDown={(event) => {
@@ -644,21 +646,26 @@ export function LocalUiInspector() {
             event.preventDefault();
             closeInspectorImmediately();
           }}
+          size="md"
+          variant="secondary"
         >
-          <Icon name="close" size="sm" />
-        </button>
+          <Icon aria-hidden="true" name="close" size="sm" />
+        </HitoButton>
       ) : mode === "idle" ? (
         <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild>
-            <button
+            <HitoButton
               ref={inspectLauncherRef}
               type="button"
-              className="hito-button hito-button-primary hito-button-md aspect-square rounded-full px-0 shadow-soft"
               aria-label="Open local UI task tools"
+              className="rounded-full shadow-soft"
+              iconOnly
               title="Open local UI task tools"
+              size="md"
+              variant="primary"
             >
-              <Icon name="plus" size="sm" />
-            </button>
+              <Icon aria-hidden="true" name="plus" size="sm" />
+            </HitoButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent
             data-local-ui-inspector-layer=""

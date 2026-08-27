@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { HitoButton } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 
 export function LocalUiComponentIdentity({ ownership }: { ownership: HitoDsOwnershipEvidence }) {
@@ -72,15 +73,16 @@ export function LocalUiActionsPropertyRow({
         ) : (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button
+              <HitoButton
                 type="button"
-                className="hito-button hito-button-ghost hito-button-xs min-h-7 px-2"
                 aria-label="Add Inspector action"
                 data-local-ui-actions-trigger=""
+                size="xs"
+                variant="ghost"
               >
                 Add
-                <Icon name="chevron-down" size="xs" />
-              </button>
+                <Icon aria-hidden="true" name="chevron-down" size="xs" />
+              </HitoButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent
               align="end"

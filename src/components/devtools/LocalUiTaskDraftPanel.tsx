@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
+import { HitoButton } from "@/components/ui/button";
 import {
   LocalUiActionsPropertyRow,
   LocalUiComponentIdentity,
@@ -276,14 +277,17 @@ export function LocalUiTaskDraftPanel({
           <p className="hito-body-xs truncate text-tertiary">{payload.route.path}</p>
           <LocalUiComponentIdentity ownership={ownership} />
         </div>
-        <button
+        <HitoButton
           type="button"
-          className="hito-button hito-button-ghost hito-button-sm absolute -right-1 -top-1 min-h-7 px-2"
           aria-label={isEditing ? "Cancel item edit" : "Close item composer"}
+          className="absolute -right-1 -top-1"
+          iconOnly
           onClick={onCancel}
+          size="sm"
+          variant="ghost"
         >
-          <Icon name="close" size="xs" />
-        </button>
+          <Icon aria-hidden="true" name="close" size="xs" />
+        </HitoButton>
       </div>
 
       <div
@@ -444,22 +448,24 @@ export function LocalUiTaskDraftPanel({
 
       <div data-local-ui-inspector-footer="">
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 border-t border-hairline pt-3">
-          <button
+          <HitoButton
             type="button"
-            className="hito-button hito-button-secondary hito-button-sm"
             disabled={submitDisabled}
             onClick={() => submit("add")}
+            size="sm"
+            variant="secondary"
           >
             {isEditing ? "Update list" : "Add to list"}
-          </button>
-          <button
+          </HitoButton>
+          <HitoButton
             type="button"
-            className="hito-button hito-button-primary hito-button-sm"
             disabled={submitDisabled}
             onClick={() => submit("review")}
+            size="sm"
+            variant="primary"
           >
             Review & submit
-          </button>
+          </HitoButton>
         </div>
         <p className="sr-only" aria-live="polite">
           {isDirty ? "Current draft has changes." : "Current draft is unchanged."}

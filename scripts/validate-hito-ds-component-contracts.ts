@@ -342,7 +342,11 @@ function retiredClassFindings(files: SourceFile[]) {
 
 function referenceManualRecipeFindings(files: SourceFile[]) {
   return files
-    .filter((file) => file.relativePath.startsWith("src/components/hito-ds/"))
+    .filter(
+      (file) =>
+        file.relativePath.startsWith("src/components/hito-ds/") ||
+        file.relativePath.startsWith("src/components/devtools/"),
+    )
     .flatMap((file) => {
       // The capture board's inert select trigger is export geometry, not a live control.
       const content =
@@ -353,7 +357,11 @@ function referenceManualRecipeFindings(files: SourceFile[]) {
             )
           : file.content;
 
-      return referenceManualRecipePatterns.flatMap(({ family, pattern }) =>
+      const applicablePatterns = file.relativePath.startsWith("src/components/devtools/")
+        ? referenceManualRecipePatterns.filter(({ family }) => family === "Button")
+        : referenceManualRecipePatterns;
+
+      return applicablePatterns.flatMap(({ family, pattern }) =>
         Array.from(content.matchAll(pattern), () => `${family} in ${file.relativePath}`),
       );
     });
@@ -464,8 +472,12 @@ function validateSelfTest() {
         '<ThemeControl buttonClassName="hito-choice-toggle-xs flex-1" />',
       ].join("\n"),
     },
+    {
+      relativePath: "src/components/devtools/synthetic.tsx",
+      content: '<button className="hito-button hito-button-secondary hito-button-sm">Copy</button>',
+    },
   ]);
-  expect(manualFindings.length === 2, "Self-test failed to detect manual reference control CSS.");
+  expect(manualFindings.length === 3, "Self-test failed to detect manual control CSS.");
 
   const fieldLeakFindings = sharedFieldOwnerLeakFindings(".hito-field-xs { min-height: 1rem; }");
   expect(
@@ -1504,7 +1516,7 @@ retiredClassFindings(sourceFiles).forEach((finding) => {
   errors.push(`Retired control class returned: ${finding}`);
 });
 referenceManualRecipeFindings(sourceFiles).forEach((finding) => {
-  errors.push(`Hito DS reference bypassed a shared control primitive: ${finding}`);
+  errors.push(`Hito UI source bypassed a shared control primitive: ${finding}`);
 });
 
 const referenceControls = sourceFiles.find(
@@ -1586,6 +1598,13 @@ const referenceStructure = sourceFiles.find(
 );
 const buttonSource = sourceFiles.find(
   (file) => file.relativePath === "src/components/ui/button.tsx",
+);
+const dialogSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/ui/dialog.tsx",
+);
+const sheetSource = sourceFiles.find((file) => file.relativePath === "src/components/ui/sheet.tsx");
+const localNotionActionsSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/devtools/LocalNotionSubmissionActions.tsx",
 );
 const compoundRangeSource = sourceFiles.find(
   (file) => file.relativePath === "src/components/ui/hito-compound-range-field.tsx",
@@ -2092,6 +2111,22 @@ expect(
 expect(
   buttonSource?.content.includes("state?: HitoButtonState") === false,
   "HitoButton must not collapse native and lifecycle semantics into a generic state prop.",
+);
+expect(
+  dialogSource?.content.includes("<DialogPrimitive.Close asChild>") === true &&
+    dialogSource.content.includes("<HitoButton") &&
+    sheetSource?.content.includes("<SheetPrimitive.Close asChild>") === true &&
+    sheetSource.content.includes("<HitoButton") &&
+    overlaysFeedbackSource?.content.includes(".hito-ui-dialog-close") === false &&
+    overlaysFeedbackSource?.content.includes(".hito-ui-sheet-close") === false,
+  "Dialog and Sheet close controls must compose HitoButton without legacy visual recipes.",
+);
+expect(
+  localNotionActionsSource?.content.includes('variant="primary"') === true &&
+    localNotionActionsSource.content.includes("Send to Notion") &&
+    localNotionActionsSource.content.includes("Copy prompt") &&
+    localNotionActionsSource.content.includes("<DropdownMenuItem"),
+  "Local Debugger outcomes must use one Notion menu trigger plus one prompt-copy HitoButton.",
 );
 expect(
   sliderSource?.content.includes("size?: HitoFieldSize;") === true &&

@@ -11,6 +11,7 @@ import {
 } from "@/components/devtools/local-ui-inspector-session";
 import { copyTextToClipboard } from "@/components/devtools/local-ui-clipboard";
 import { getFixScopeLabel } from "@/components/devtools/local-inline-change-target-utils";
+import { HitoButton } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -123,23 +124,28 @@ export function LocalUiInspectorBatchReview({
           <span className="hito-body-xs text-muted-foreground">
             {items.length} of {LOCAL_UI_INSPECTOR_BATCH_LIMIT}
           </span>
-          <button
+          <HitoButton
             type="button"
-            className="hito-button hito-button-ghost hito-button-xs ml-auto min-h-7 shrink-0 px-2"
+            className="ml-auto shrink-0"
             onClick={onClear}
+            size="xs"
+            variant="ghost"
           >
-            <Icon name="trash" size="xs" />
+            <Icon aria-hidden="true" name="trash" size="xs" />
             Clear draft
-          </button>
+          </HitoButton>
         </div>
-        <button
+        <HitoButton
           type="button"
-          className="hito-button hito-button-ghost hito-button-sm absolute -right-1 -top-1 min-h-7 px-2"
           aria-label="Close batch review"
+          className="absolute -right-1 -top-1"
+          iconOnly
           onClick={onClose}
+          size="sm"
+          variant="ghost"
         >
-          <Icon name="close" size="xs" />
-        </button>
+          <Icon aria-hidden="true" name="close" size="xs" />
+        </HitoButton>
       </div>
 
       <div
@@ -184,13 +190,16 @@ export function LocalUiInspectorBatchReview({
                 </button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button
+                    <HitoButton
                       type="button"
-                      className="hito-button hito-button-ghost hito-button-xs size-7 min-h-7 shrink-0 px-0"
                       aria-label={`Actions for item ${index + 1}`}
+                      className="shrink-0"
+                      iconOnly
+                      size="xs"
+                      variant="ghost"
                     >
-                      <Icon name="more-horizontal" size="xs" />
-                    </button>
+                      <Icon aria-hidden="true" name="more-horizontal" size="xs" />
+                    </HitoButton>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
                     align="end"
@@ -252,30 +261,19 @@ export function LocalUiInspectorBatchReview({
             .map((item) => `${item.id}:${getLocalUiInspectorItemSummary(item)}`)
             .join("|")}`}
           buildCapture={(kind) => buildBatchNotionCapture(items, routeKey, kind)}
+          copyState={copyState}
           disabled={items.length === 0}
+          onCopyPrompt={() => void copyPrompt()}
         />
-        <div className="grid min-w-0 gap-2">
-          <button
-            type="button"
-            className="hito-button hito-button-primary hito-button-sm w-full justify-center"
-            disabled={items.length === 0 || copyState === "copying"}
-            onClick={() => void copyPrompt()}
-          >
-            <Icon name={copyState === "copied" ? "check" : "copy"} size="xs" />
-            {copyState === "copying"
-              ? "Copying…"
-              : copyState === "copied"
-                ? "Prompt copied"
-                : "Generate prompt"}
-          </button>
-          <button
-            type="button"
-            className="hito-button hito-button-secondary hito-button-sm w-full justify-center"
-            onClick={onContinue}
-          >
-            Continue selecting
-          </button>
-        </div>
+        <HitoButton
+          type="button"
+          className="w-full justify-center"
+          onClick={onContinue}
+          size="sm"
+          variant="ghost"
+        >
+          Continue selecting
+        </HitoButton>
         <p className="sr-only" aria-live="polite">
           {copyState === "copied" ? "Prompt copied." : ""}
         </p>

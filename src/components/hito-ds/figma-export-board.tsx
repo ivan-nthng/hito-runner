@@ -863,9 +863,17 @@ function AdaptiveMenuMatrix() {
                   Jump to a Hito DS reference page or section.
                 </p>
               </div>
-              <span className="hito-ui-sheet-close shrink-0" aria-hidden="true">
-                <Icon name="close" size="sm" />
-              </span>
+              <HitoButton
+                type="button"
+                aria-label="Close mobile navigation example"
+                className="shrink-0"
+                iconOnly
+                size="sm"
+                tabIndex={-1}
+                variant="ghost"
+              >
+                <Icon aria-hidden="true" name="close" size="sm" />
+              </HitoButton>
             </div>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">

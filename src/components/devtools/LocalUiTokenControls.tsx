@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { HitoButton } from "@/components/ui/button";
 import { Icon, type HitoIconName } from "@/components/ui/icon";
 import type {
   InlineChangeColorChannelId,
@@ -75,19 +76,23 @@ export function ColorControlRows({
           <Icon name="color" size="xs" />
         </span>
         <span className="hito-body-xs min-w-0 flex-1 truncate text-foreground">Color</span>
-        <button
+        <HitoButton
           type="button"
-          className="hito-button hito-button-ghost hito-button-xs size-5 min-h-5 shrink-0 rounded-sm px-0 text-muted-foreground hover:text-foreground"
           aria-label="Show color channels"
           aria-expanded={expanded}
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+          iconOnly
           onClick={() => setExpanded((current) => !current)}
+          size="xs"
+          variant="ghost"
         >
           <Icon
+            aria-hidden="true"
             name="chevron-down"
             size="xs"
             className={`transition-transform ${expanded ? "rotate-180" : ""}`}
           />
-        </button>
+        </HitoButton>
       </div>
       {expanded ? (
         <div className="grid min-w-0 gap-1 rounded-lg bg-muted p-1">
@@ -310,19 +315,23 @@ function PropertyControlLine({
           ) : null}
           <span className="hito-body-xs min-w-0 truncate text-foreground">{label}</span>
           {onExpandedChange ? (
-            <button
+            <HitoButton
               type="button"
-              className="hito-button hito-button-ghost hito-button-xs size-5 min-h-5 shrink-0 rounded-sm px-0 text-muted-foreground hover:text-foreground"
               aria-label={expandLabel ?? `Show ${label} detail controls`}
               aria-expanded={expanded}
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+              iconOnly
               onClick={() => onExpandedChange(!expanded)}
+              size="xs"
+              variant="ghost"
             >
               <Icon
+                aria-hidden="true"
                 name="chevron-down"
                 size="xs"
                 className={`transition-transform ${expanded ? "rotate-180" : ""}`}
               />
-            </button>
+            </HitoButton>
           ) : null}
         </div>
         {isActive ? (

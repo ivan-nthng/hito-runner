@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import { Icon } from "@/components/ui/icon";
+import { HitoButton } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { copyTextToClipboard } from "@/components/devtools/local-ui-clipboard";
 import { LocalNotionSubmissionActions } from "@/components/devtools/LocalNotionSubmissionActions";
@@ -139,7 +140,7 @@ export function LocalScreenCaptureFlow({ onClose }: { onClose: () => void }) {
     setStage("ready");
   };
 
-  const generatePrompt = async () => {
+  const copyPrompt = async () => {
     if (!packet) return;
 
     try {
@@ -177,7 +178,7 @@ export function LocalScreenCaptureFlow({ onClose }: { onClose: () => void }) {
             setComment(value);
             resetPromptState();
           }}
-          onGeneratePrompt={() => void generatePrompt()}
+          onCopyPrompt={() => void copyPrompt()}
           onHideManualFallback={() => setPromptState("fallback_hidden")}
           onRetake={retake}
           packet={packet}
@@ -222,7 +223,7 @@ function ScreenCapturePanel({
   manualPromptRef,
   onCancel,
   onCommentChange,
-  onGeneratePrompt,
+  onCopyPrompt,
   onHideManualFallback,
   onRetake,
   packet,
@@ -234,7 +235,7 @@ function ScreenCapturePanel({
   manualPromptRef: RefObject<HTMLTextAreaElement | null>;
   onCancel: () => void;
   onCommentChange: (value: string) => void;
-  onGeneratePrompt: () => void;
+  onCopyPrompt: () => void;
   onHideManualFallback: () => void;
   onRetake: () => void;
   packet: LocalScreenCapturePacket;
@@ -269,14 +270,17 @@ function ScreenCapturePanel({
             {packet.route.pathname || "/"} · {packet.selection.viewportRect.width}x
             {packet.selection.viewportRect.height} region
           </p>
-          <button
+          <HitoButton
             type="button"
-            className="hito-button hito-button-ghost hito-button-sm absolute -right-1 -top-1 min-h-7 px-2"
             aria-label="Cancel screen capture"
+            className="absolute -right-1 -top-1"
+            iconOnly
             onClick={onCancel}
+            size="sm"
+            variant="ghost"
           >
-            <Icon name="close" size="xs" />
-          </button>
+            <Icon aria-hidden="true" name="close" size="xs" />
+          </HitoButton>
         </div>
 
         <ScreenCapturePreview packet={packet} />
@@ -338,38 +342,17 @@ function ScreenCapturePanel({
           <LocalNotionSubmissionActions
             key={`${packet.createdAt}:${packet.userComment}`}
             buildCapture={(kind) => buildScreenNotionCapture(packet, kind)}
+            copyState={promptState === "fallback_hidden" ? "idle" : promptState}
+            onCopyPrompt={onCopyPrompt}
           />
           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-            {promptState === "copied" ? (
-              <span className="inline-flex min-h-8 items-center gap-1.5 px-2 text-xs font-medium text-success">
-                <Icon name="check" size="xs" />
-                Copied
-              </span>
-            ) : (
-              <button
-                type="button"
-                className="hito-button hito-button-primary hito-button-sm min-h-8 px-2"
-                onClick={onGeneratePrompt}
-              >
-                <Icon name="copy" size="xs" />
-                Generate Prompt
-              </button>
-            )}
-            <button
-              type="button"
-              className="hito-button hito-button-secondary hito-button-sm min-h-8 px-2"
-              onClick={onRetake}
-            >
-              <Icon name="refresh" size="xs" />
+            <HitoButton type="button" onClick={onRetake} size="sm" variant="secondary">
+              <Icon aria-hidden="true" name="refresh" size="xs" />
               Retake
-            </button>
-            <button
-              type="button"
-              className="hito-button hito-button-ghost hito-button-sm min-h-8 px-2"
-              onClick={onCancel}
-            >
+            </HitoButton>
+            <HitoButton type="button" onClick={onCancel} size="sm" variant="ghost">
               Cancel
-            </button>
+            </HitoButton>
           </div>
           {promptState !== "idle" ? (
             <details className="hito-disclosure border-0 bg-transparent p-0">
@@ -467,13 +450,9 @@ function ManualPromptFallback({
     <div className="grid min-w-0 gap-2 rounded-xl border border-hairline bg-surface/70 p-3">
       <div className="flex min-w-0 items-center justify-between gap-2">
         <p className="hito-body-xs text-foreground">Copy blocked. Select prompt manually.</p>
-        <button
-          type="button"
-          className="hito-button hito-button-ghost hito-button-sm min-h-7 px-2"
-          onClick={onHide}
-        >
+        <HitoButton type="button" onClick={onHide} size="sm" variant="ghost">
           Hide
-        </button>
+        </HitoButton>
       </div>
       <Textarea
         ref={manualPromptRef}

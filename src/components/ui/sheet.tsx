@@ -4,6 +4,7 @@ import * as React from "react";
 import * as SheetPrimitive from "@radix-ui/react-dialog";
 import { cva, type VariantProps } from "class-variance-authority";
 
+import { HitoButton } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { useHitoProductMessage } from "@/components/ui/hito-ui-locale-provider";
 import { cn } from "@/lib/utils";
@@ -53,12 +54,14 @@ const sheetVariants = cva(
 interface SheetContentProps
   extends
     React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
-    VariantProps<typeof sheetVariants> {}
+    VariantProps<typeof sheetVariants> {
+  showCloseButton?: boolean;
+}
 
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps
->(({ side = "right", className, children, ...props }, ref) => {
+>(({ side = "right", className, children, showCloseButton = true, ...props }, ref) => {
   const t = useHitoProductMessage();
 
   return (
@@ -70,10 +73,21 @@ const SheetContent = React.forwardRef<
         className={cn(sheetVariants({ side }), className)}
         {...props}
       >
-        <SheetPrimitive.Close className="hito-ui-sheet-close absolute right-4 top-4 cursor-pointer disabled:cursor-not-allowed">
-          <Icon name="close" size="sm" />
-          <span className="sr-only">{t("Close")}</span>
-        </SheetPrimitive.Close>
+        {showCloseButton ? (
+          <SheetPrimitive.Close asChild>
+            <HitoButton
+              type="button"
+              aria-label={t("Close")}
+              className="absolute right-4 top-4"
+              data-hito-sheet-close=""
+              iconOnly
+              size="sm"
+              variant="ghost"
+            >
+              <Icon aria-hidden="true" name="close" size="sm" />
+            </HitoButton>
+          </SheetPrimitive.Close>
+        ) : null}
         {children}
       </SheetPrimitive.Content>
     </SheetPortal>

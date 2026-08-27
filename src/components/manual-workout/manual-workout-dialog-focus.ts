@@ -4,7 +4,7 @@ export function focusManualWorkoutDialogCloseOnOpen(event: Event) {
   const dialogContent = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
   window.requestAnimationFrame(() => {
     dialogContent
-      ?.querySelector<HTMLButtonElement>(".hito-ui-dialog-close")
+      ?.querySelector<HTMLButtonElement>("[data-hito-dialog-close]")
       ?.focus({ preventScroll: true });
   });
 }

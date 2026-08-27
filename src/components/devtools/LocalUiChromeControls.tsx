@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { HitoButton } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
 import { HitoValueTagSelectTrigger } from "@/components/ui/value-tag";
@@ -88,19 +89,23 @@ function BorderControlLine({
             <Icon name="minus" size="xs" />
           </span>
           <span className="hito-body-xs min-w-0 truncate text-foreground">Border</span>
-          <button
+          <HitoButton
             type="button"
-            className="hito-button hito-button-ghost hito-button-xs size-5 min-h-5 shrink-0 rounded-sm px-0 text-muted-foreground hover:text-foreground"
             aria-label="Show border side controls"
             aria-expanded={expanded}
+            className="shrink-0 text-muted-foreground hover:text-foreground"
+            iconOnly
             onClick={() => setExpanded((current) => !current)}
+            size="xs"
+            variant="ghost"
           >
             <Icon
+              aria-hidden="true"
               name="chevron-down"
               size="xs"
               className={`transition-transform ${expanded ? "rotate-180" : ""}`}
             />
-          </button>
+          </HitoButton>
         </div>
         {selection ? (
           <>

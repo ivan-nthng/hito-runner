@@ -117,6 +117,12 @@ exact Backend-derived detailed-block end and future-projection start dates and s
 which crosses that boundary must project its remaining future slice. This is a materially distinct
 request; the compiler cadence rule is unchanged.
 
+The `v20` replay covered the straddling phase but exposed a second ambiguity: the response declared
+phase cadence `4` while authoring only three workouts in complete detailed weeks and two or three
+future slots per week. Provider contract `v21` defines cadence as the exact count of every non-rest
+session, explicitly including Easy and Recovery, and requires a mechanical detailed/future
+phase-week audit before return. The accepted completeness compiler remains unchanged.
+
 Release acceptance requires one materially fresh technical-runner production request to reach a
 complete Review, followed by explicit Confirm and Calendar readback. Retained-response replay or a
 fixture cannot close this edge again.

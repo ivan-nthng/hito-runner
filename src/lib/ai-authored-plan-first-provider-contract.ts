@@ -258,8 +258,11 @@ export type AiAuthoredPlanFirstCompilerWorkout =
 export type AiAuthoredPlanFirstCompilerStep = z.infer<typeof providerStepSchema>;
 export type AiAuthoredPlanFirstCompilerUnit = z.infer<typeof providerRepeatChildSchema>;
 
+// Keep the provider schema structural. The compiler schemas above remain the authority for date,
+// pace, BPM, and runner-facing text regexes. Sending those regexes to OpenAI's constrained decoder
+// can produce an empty `max_output_tokens` response before inference, so duplicating them here is
+// both operationally unsafe and unnecessary.
 export function buildAiAuthoredPlanFirstOpenAiSchema(authoringInput: StructuredPlanAuthoringInput) {
-  const allowedWorkoutDatePattern = buildAllowedWorkoutDatePattern(authoringInput);
   const selectedDistance = authoringInput.planGoalIntent.distance;
   if (!selectedDistance) {
     throw new Error("Plan-first provider schema requires one selected distance.");
@@ -270,7 +273,6 @@ export function buildAiAuthoredPlanFirstOpenAiSchema(authoringInput: StructuredP
       type: "string",
       minLength: 1,
       maxLength,
-      pattern: AI_AUTHORED_PLAN_FIRST_TEXT_PATTERN,
     }) as const;
   const nullableText = (maxLength: number) =>
     ({ anyOf: [text(maxLength), { type: "null" }] }) as const;
@@ -295,7 +297,6 @@ export function buildAiAuthoredPlanFirstOpenAiSchema(authoringInput: StructuredP
             type: "string",
             minLength: 7,
             maxLength: 24,
-            pattern: AI_AUTHORED_PLAN_FIRST_PACE_MIN_PER_KM_PATTERN,
           },
         },
       },
@@ -312,7 +313,6 @@ export function buildAiAuthoredPlanFirstOpenAiSchema(authoringInput: StructuredP
                   type: "string",
                   minLength: 9,
                   maxLength: 24,
-                  pattern: AI_AUTHORED_PLAN_FIRST_BPM_PATTERN,
                 },
               },
             },
@@ -428,14 +428,13 @@ export function buildAiAuthoredPlanFirstOpenAiSchema(authoringInput: StructuredP
     ],
   } as const;
   const workoutProperties = {
-    date: { type: "string", pattern: allowedWorkoutDatePattern },
+    date: { type: "string" },
     phase: text(80),
     workout_identity: { type: "string", enum: [...AI_AUTHORED_PLAN_FIRST_WORKOUT_IDENTITY_VALUES] },
     title: {
       type: "string",
       minLength: 1,
       maxLength: 120,
-      pattern: AI_AUTHORED_PLAN_FIRST_WORKOUT_TITLE_PATTERN,
       description:
         "Runner-facing workout name only. Do not include elapsed duration, distance, repeat count, pace, BPM, or another executable metric; sections are the sole source of executable truth.",
     },
@@ -472,8 +471,8 @@ export function buildAiAuthoredPlanFirstOpenAiSchema(authoringInput: StructuredP
     required: ["phase", "start_date", "end_date", "expected_weekly_cadence", "workout_families"],
     properties: {
       phase: text(80),
-      start_date: { type: "string", pattern: allowedWorkoutDatePattern },
-      end_date: { type: "string", pattern: allowedWorkoutDatePattern },
+      start_date: { type: "string" },
+      end_date: { type: "string" },
       expected_weekly_cadence: { type: "integer", minimum: 1, maximum: 7 },
       workout_families: {
         type: "array",
@@ -497,7 +496,7 @@ export function buildAiAuthoredPlanFirstOpenAiSchema(authoringInput: StructuredP
     ],
     properties: {
       projection_id: text(120),
-      date: { type: "string", pattern: allowedWorkoutDatePattern },
+      date: { type: "string" },
       phase: text(80),
       cadence_or_workout_family: {
         type: "string",
@@ -541,8 +540,8 @@ export function buildAiAuthoredPlanFirstOpenAiSchema(authoringInput: StructuredP
           "projections",
         ],
         properties: {
-          start_date: { type: "string", pattern: allowedWorkoutDatePattern },
-          selected_target_date: { type: "string", pattern: allowedWorkoutDatePattern },
+          start_date: { type: "string" },
+          selected_target_date: { type: "string" },
           target_assumption: text(240),
           phases: {
             type: "array",
@@ -562,8 +561,8 @@ export function buildAiAuthoredPlanFirstOpenAiSchema(authoringInput: StructuredP
         additionalProperties: false,
         required: ["start_date", "end_date", "workouts", "final_workout"],
         properties: {
-          start_date: { type: "string", pattern: allowedWorkoutDatePattern },
-          end_date: { type: "string", pattern: allowedWorkoutDatePattern },
+          start_date: { type: "string" },
+          end_date: { type: "string" },
           workouts: {
             type: "array",
             maxItems: 27,
@@ -880,33 +879,4 @@ function resolveSelectedFitnessLevel(
     case "professional_competitive":
       return "performance_focused";
   }
-}
-
-function buildAllowedWorkoutDatePattern(authoringInput: StructuredPlanAuthoringInput) {
-  const dates: string[] = [];
-
-  for (let offset = 0; offset < 364; offset += 1) {
-    const date = addDaysIso(authoringInput.schedule.startDate, offset);
-    dates.push(date);
-  }
-
-  const grouped = new Map<string, Map<string, string[]>>();
-  for (const date of dates) {
-    const [year, month, day] = date.split("-");
-    if (!year || !month || !day) continue;
-    const months = grouped.get(year) ?? new Map<string, string[]>();
-    const days = months.get(month) ?? [];
-    days.push(day);
-    months.set(month, days);
-    grouped.set(year, months);
-  }
-
-  const years = [...grouped.entries()].map(([year, months]) => {
-    const monthPattern = [...months.entries()]
-      .map(([month, days]) => `${month}-(?:${days.join("|")})`)
-      .join("|");
-    return `${year}-(?:${monthPattern})`;
-  });
-
-  return `^(?:${years.join("|")})$`;
 }

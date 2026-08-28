@@ -1143,6 +1143,11 @@ async function validateRunnerPlanCommentContract() {
   const validProviderContext = JSON.parse(validPrompt.userPrompt) as {
     runnerFacts: { runner: { plan_request_comment?: string } };
   };
+  assert.equal(
+    containsObjectKey(validPrompt.responseSchema, "pattern"),
+    false,
+    "The OpenAI schema must stay structural; local compiler validation owns regex semantics.",
+  );
   assert.equal(validProviderContext.runnerFacts.runner.plan_request_comment, runnerCommentCanary);
   assert.match(validPrompt.systemPrompt, /informational training history or current context/i);
   assert.match(validPrompt.systemPrompt, /never overrides the exact goal/i);
@@ -4495,6 +4500,17 @@ function collectStringValuesForKey(value: unknown, key: string): string[] {
       .filter(([entryKey]) => entryKey !== key)
       .flatMap(([, entryValue]) => collectStringValuesForKey(entryValue, key)),
   ];
+}
+
+function containsObjectKey(value: unknown, key: string): boolean {
+  if (Array.isArray(value)) return value.some((entry) => containsObjectKey(entry, key));
+  if (value == null || typeof value !== "object") return false;
+
+  const record = value as Record<string, unknown>;
+  return (
+    Object.prototype.hasOwnProperty.call(record, key) ||
+    Object.values(record).some((entry) => containsObjectKey(entry, key))
+  );
 }
 
 function findRecordWithStringKey(value: unknown, key: string): Record<string, unknown> | null {

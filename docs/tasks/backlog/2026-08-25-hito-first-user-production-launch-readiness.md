@@ -6,7 +6,7 @@
 **Primary Area:** Runner
 **Epic:** `ship-adaptive-four-week-training`
 **Priority:** Highest
-**Owner:** QA
+**Owner:** BACKEND
 **Archive intent:** Keep as the compact production launch receipt after terminal acceptance.
 
 ## Outcome
@@ -99,6 +99,15 @@ retained response, candidate, confirmation or Calendar workout. GPT-5.2 supports
 output tokens and `reasoning.effort=none`. Because this workload needs one strict complete JSON
 document rather than open-ended deliberation, the follow-up root fix uses both exact settings before
 one new paid discriminator. This is a changed provider request, not an equivalent retry.
+
+The released `128_000` / `reasoning.effort=none` request still stopped before inference with an empty
+`max_output_tokens` response and zero usage. Two materially distinct provider diagnostics isolated
+the boundary: the full Hito prompt completed with a minimal strict schema, the full Hito schema
+returned the same zero-usage incomplete envelope with a minimal prompt, and the same schema
+completed after its duplicated regular-expression keywords were removed. The provider schema is
+therefore structural only. The existing strict compiler remains the sole authority for permitted
+dates, pace/BPM syntax and runner-facing text, so removing provider-side regex duplication weakens
+neither review validation nor Calendar safety.
 
 Release acceptance requires one materially fresh technical-runner production request to reach a
 complete Review, followed by explicit Confirm and Calendar readback. Retained-response replay or a

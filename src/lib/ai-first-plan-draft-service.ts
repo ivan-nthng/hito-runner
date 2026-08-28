@@ -124,7 +124,7 @@ export type AiPlanStructuredResponseProviderSettings = {
   responseSchemaName: string;
   timeoutMs: number;
   maxOutputTokens: number;
-  reasoningEffort: "low" | null;
+  reasoningEffort: typeof AI_FIRST_PLAN_REASONING_EFFORT | null;
   textVerbosity: "low";
 };
 
@@ -142,7 +142,7 @@ export function resolveAiPlanStructuredResponseProviderSettings(input: {
     responseSchemaName: input.responseSchemaName,
     timeoutMs: input.timeoutMs ?? DEFAULT_AI_FIRST_PLAN_TIMEOUT_MS,
     maxOutputTokens: input.maxOutputTokens ?? DEFAULT_AI_FIRST_PLAN_MAX_OUTPUT_TOKENS,
-    reasoningEffort: supportsReasoningEffort(input.model) ? "low" : null,
+    reasoningEffort: supportsReasoningEffort(input.model) ? AI_FIRST_PLAN_REASONING_EFFORT : null,
     textVerbosity: "low",
   };
 }

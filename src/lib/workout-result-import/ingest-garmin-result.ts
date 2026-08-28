@@ -15,10 +15,10 @@ import {
 import { isCamelotFixtureSessionAuthorized } from "@/lib/camelot-interactive-qa-fixture.server";
 import { LOCAL_ACTIVITY_FILE_DURABLE_FIXTURE_SAMPLE } from "@/lib/local-activity-file-design-fixture";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
+import { readRunnerActivityProjection } from "@/lib/runner-activity/canonical-activity-source";
 import {
   findRunnerActivityPlanMatch,
   persistGarminFitActivitySource,
-  readRunnerActivityProjection,
   removeRunnerActivityOriginalFilesForWorkout,
 } from "@/lib/runner-activity/garmin-fit-source";
 import {

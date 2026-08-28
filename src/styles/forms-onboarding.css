@@ -2,18 +2,14 @@
   .hito-onboarding-surface {
     max-width: 64rem;
     margin-inline: auto;
-    padding-block-end: 2.5rem;
+    padding-block-end: calc(2.5rem + env(safe-area-inset-bottom));
   }
 
   .hito-onboarding-submit-footer {
-    position: fixed;
-    right: 0;
-    bottom: 0;
-    left: var(--hito-shell-sidebar-width);
-    z-index: 30;
+    position: relative;
+    margin-top: 2rem;
     border-top: 1px solid var(--color-hairline);
     background: var(--color-background);
-    pointer-events: none;
   }
 
   .hito-onboarding-submit-footer-inner {
@@ -25,7 +21,6 @@
     justify-content: space-between;
     gap: 0.75rem;
     padding-block: 0.875rem;
-    pointer-events: auto;
   }
 
   @media (min-width: 1024px) {
@@ -36,15 +31,12 @@
 
   @media (max-width: 767.98px) {
     .hito-onboarding-surface {
-      padding-block-end: calc(var(--hito-mobile-bottom-nav-height) + 2rem);
+      padding-block-end: calc(
+        var(--hito-mobile-bottom-nav-height) + 2rem + env(safe-area-inset-bottom)
+      );
     }
 
     .hito-onboarding-submit-footer {
-      position: relative;
-      right: auto;
-      bottom: auto;
-      left: auto;
-      margin-top: 2rem;
       border-top: 0;
       background: transparent;
     }

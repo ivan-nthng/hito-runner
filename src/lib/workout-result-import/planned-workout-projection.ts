@@ -3,11 +3,11 @@ import "@tanstack/react-start/server-only";
 import type { Database, Json } from "@/lib/supabase/database";
 import { isLoopbackRuntimeUrl } from "@/lib/supabase/env";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
-import {
-  findRunnerActivityPlanMatch,
-  type RunnerActivityProjection,
-  type RunnerActivitySourceReceipt,
-} from "@/lib/runner-activity/garmin-fit-source";
+import type {
+  RunnerActivityProjection,
+  RunnerActivitySourceReceipt,
+} from "@/lib/runner-activity/canonical-activity-source";
+import { findRunnerActivityPlanMatch } from "@/lib/runner-activity/garmin-fit-source";
 import { buildDeterministicWorkoutComparison } from "@/lib/workout-result-import/compare-workout-result";
 import { WORKOUT_COMPARISON_FORMULA_VERSION } from "@/lib/workout-result-import/comparison-payload";
 import {

@@ -402,7 +402,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
         </p>
       </div>
 
-      <div className="mt-8 grid gap-8 pb-0 md:pb-32">
+      <div className="mt-8 grid gap-8">
         <QuickSetupPlanSetupSections
           state={constructorState}
           setState={constructorSetters}

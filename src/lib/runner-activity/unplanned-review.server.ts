@@ -1,6 +1,7 @@
 import "@tanstack/react-start/server-only";
 
 import { getRunnerCalendarDateForUserId } from "@/lib/runner-calendar-context";
+import { readRunnerActivityProjection } from "@/lib/runner-activity/canonical-activity-source";
 import {
   applyAtomicCalendarWorkoutMutation,
   buildCalendarWorkoutMutationEvent,
@@ -25,7 +26,6 @@ import {
 import type { Database, Json } from "@/lib/supabase/database";
 import { serverEnv } from "@/lib/supabase/env";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
-import { readRunnerActivityProjection } from "@/lib/runner-activity/garmin-fit-source";
 import { reconcileWorkoutResultProjection } from "@/lib/workout-result-import/planned-workout-projection";
 
 const REVIEW_VERSION = "unplanned_activity_review_v1" as const;

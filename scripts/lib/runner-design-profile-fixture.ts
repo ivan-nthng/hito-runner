@@ -61,9 +61,9 @@ import {
 } from "../../src/lib/manual-workout-authoring/actions";
 import { DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE } from "../../src/lib/local-auth-account-registry.server";
 import { digestSha256Hex, stableJsonStringify } from "../../src/lib/review-token-signing";
+import { readRunnerActivityProjection } from "../../src/lib/runner-activity/canonical-activity-source";
 import {
   persistGarminFitActivitySource,
-  readRunnerActivityProjection,
   removeRunnerActivityOriginalFilesForActivity,
 } from "../../src/lib/runner-activity/garmin-fit-source";
 import { recordRunnerActivitySessionRpeForUser } from "../../src/lib/runner-activity/activity-evidence";

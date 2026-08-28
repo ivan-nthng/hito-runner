@@ -578,8 +578,8 @@ function HistorySkeleton() {
         {Array.from({ length: 4 }, (_, index) => (
           <div key={index} className="hito-list-row">
             <Skeleton className="h-12 w-12" />
-            <div className="flex-1">
-              <Skeleton className="h-4 w-36" />
+            <div className="min-w-0 flex-1">
+              <Skeleton className="h-4 w-36 max-w-full" />
               <Skeleton className="mt-3 h-3 w-56 max-w-full" />
             </div>
             <Skeleton className="h-10 w-24" />

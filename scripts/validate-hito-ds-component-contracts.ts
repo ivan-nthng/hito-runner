@@ -1404,10 +1404,27 @@ expect(
   "Current docs returned /hitoDS to the retired internal-only reference contract.",
 );
 
+const planPresetSource = sourceFiles.find(
+  (file) => file.relativePath === "src/components/onboarding/PlanPresetPanel.tsx",
+);
+
 expect(
   /^\s*\.hito-field\s*\{/m.test(fieldBaseCss) &&
     fieldBaseCss.includes(".hito-compound-range-control"),
   "Shared Field base and compound-range anatomy must stay in controls-fields.css.",
+);
+expect(
+  planPresetSource?.content.includes('compactDistance={choice.value === "custom"}') === true &&
+    planPresetSource.content.includes("min-w-0 flex-wrap items-start") &&
+    planPresetSource.content.includes('compactDistance ? "text-2xl" : "text-3xl"'),
+  "Localized Custom goal labels and status pills must wrap inside the existing card without using translated copy as layout state.",
+);
+expect(
+  fieldExtendedCss.includes("container-type: inline-size;") &&
+    fieldExtendedCss.includes("@container (max-width: 42rem)") &&
+    fieldExtendedCss.includes("@container (max-width: 26rem)") &&
+    fieldExtendedCss.includes("@media (max-width: 820px)") === false,
+  "Heart-rate lanes must reflow from their available inline size instead of the outer viewport width.",
 );
 sharedFieldOwnerMarkers.forEach((marker) => {
   expect(

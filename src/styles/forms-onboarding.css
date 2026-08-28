@@ -1374,7 +1374,10 @@
   }
 
   .hito-heart-rate-editor {
-    overflow: hidden;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    container-type: inline-size;
   }
 
   .hito-heart-rate-scale {
@@ -1457,7 +1460,7 @@
     min-width: 0;
   }
 
-  @media (max-width: 820px) {
+  @container (max-width: 42rem) {
     .hito-heart-rate-scale,
     .hito-heart-rate-lane {
       grid-template-columns: minmax(10rem, 0.85fr) minmax(14rem, 1.2fr);
@@ -1472,7 +1475,7 @@
     }
   }
 
-  @media (max-width: 480px) {
+  @container (max-width: 26rem) {
     .hito-heart-rate-scale,
     .hito-heart-rate-lane {
       grid-template-columns: minmax(0, 1fr);
@@ -1496,7 +1499,9 @@
     .hito-heart-rate-lane:focus-within {
       background: transparent;
     }
+  }
 
+  @media (max-width: 480px) {
     .hito-plan-schedule-edit .hito-list-row {
       flex-wrap: wrap;
       align-items: flex-start;

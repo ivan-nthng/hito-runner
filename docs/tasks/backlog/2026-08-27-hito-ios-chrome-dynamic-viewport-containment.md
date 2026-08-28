@@ -171,6 +171,35 @@ locale wrapping and future copy changes cannot silently invalidate a duplicated 
 
 ## Remaining QA Boundary
 
+The same-task production fix-forward on 2026-08-28 corrected two additional 768 px containment
+owners without changing the accepted viewport architecture:
+
+- `src/components/onboarding/PlanPresetPanel.tsx` now sizes the Custom goal title from the semantic
+  goal identity rather than the translated label and lets the existing title/status row wrap inside
+  the card. The status pill remains intact and aligned without imposing its width on the title row.
+- `src/styles/forms-onboarding.css` makes the existing heart-rate editor an inline-size container.
+  Its established three-, two- and one-column layouts now switch at the editor's actual available
+  width (`42rem` and `26rem`) instead of the outer viewport, so the 212 px tablet form column uses the
+  one-column composition rather than clipping a 404 px two-column minimum.
+- No viewport store, user-agent branch, component, token, fixture or runtime path was added. The
+  original 375 px single-column rules and the wide three-column composition remain the same rendered
+  responsibilities.
+
+Focused source proof passed the plan-goal intent validator, heart-rate editor proof, scoped ESLint,
+Prettier, `git diff --check` and a fresh isolated production build. The finalized build integrity
+check passed with 229 server modules and 3,831 relative module imports, and the generated production
+CSS contains both inline-size container thresholds. The shared Design System validator reached only
+its three existing unrelated factual-chart/current-doc failures; the new card and heart-rate
+assertions passed. The task-owned files are `src/components/onboarding/PlanPresetPanel.tsx`,
+`src/styles/forms-onboarding.css`, `scripts/validate-hito-ds-component-contracts.ts` and this record.
+
+The required current-source browser geometry at 375 x 812, 375 x 650, 768 x 566, 1024 x 700,
+1280 x 801 and 1470 x 801 was not run by FRONTEND because this fix-forward explicitly prohibited
+creating or modifying a runtime and required `qa_fixture` to remain stopped. QA must therefore prove
+document/body width equality, CTA containment, bottom-navigation clearance, EN/PT-BR, Light/Dark and
+keyboard focus on a fresh released or otherwise admitted candidate. Source/build proof is not a
+substitute for that visual acceptance.
+
 Static responsive proof demonstrates the repaired source geometry but is not physical iOS
 acceptance. Independent QA must replay the released or otherwise device-reachable candidate on real
 iPad Chrome with browser controls expanded and collapsed, and obtain the still-missing real-iPhone
@@ -222,9 +251,17 @@ Mode: Tracked independent real-device replay
 
 Replay the same HITO-284 candidate after the bounded Frontend fix. The submit footer now participates
 in normal document flow, the retired md:pb-32 compensation is gone and the onboarding surface owns
-safe-area bottom spacing. Local source proof passed 1280 x 960, reduced 1280 x 840, 1470 x 801,
-1280 x 720 and 375 x 812 with no footer/card or footer/mobile-nav intersection, no horizontal
-overflow, English/Portuguese geometry and a clean current-run console.
+safe-area bottom spacing. The later 768 px fix-forward also lets the Custom goal title/Preview pill
+wrap within the existing card and makes the heart-rate editor choose its three-, two- or one-column
+composition from available inline size instead of viewport width. Focused source validators,
+Prettier, ESLint, diff hygiene and an isolated production build passed; the exact current-source
+browser matrix remained intentionally deferred because FRONTEND was not allowed to create or modify
+a runtime.
+
+First replay the Create-plan surface at 375 x 812, 375 x 650, 768 x 566, 1024 x 700, 1280 x 801 and
+1470 x 801 in EN/PT-BR and Light/Dark. Require document/body width to equal viewport width, the Custom
+goal card and heart-rate inputs to remain fully reachable, the CTA to stay inside the viewport, no
+bottom-navigation overlap and visible/usable keyboard focus.
 
 Use real iPad Chrome to reproduce Ivan's original route and scroll position with browser controls
 expanded and collapsed, then prove the fixed candidate in both states. Obtain the missing real-iPhone

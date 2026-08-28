@@ -329,6 +329,7 @@ function PlanGoalIntentControls({
             key={choice.value}
             active={goalChoice === choice.value}
             buttonRef={choice.value === "10k" ? focusRef : undefined}
+            compactDistance={choice.value === "custom"}
             radioProps={goalGroup.getRadioProps(choice.value)}
             distance={getHitoKnownProductMessage(locale, choice.distance)}
             label={getHitoKnownProductMessage(locale, choice.label)}
@@ -433,6 +434,7 @@ function PlanGoalIntentControls({
 function PlanGoalCard({
   active,
   buttonRef,
+  compactDistance,
   copy,
   distance,
   label,
@@ -441,6 +443,7 @@ function PlanGoalCard({
 }: {
   active: boolean;
   buttonRef?: RefObject<HTMLButtonElement | null>;
+  compactDistance: boolean;
   copy: string;
   distance: string;
   label: string;
@@ -459,21 +462,21 @@ function PlanGoalCard({
       onClick={onClick}
       className="min-h-32 w-full flex-col justify-between text-left"
     >
-      <span className="flex w-full min-w-0 items-start justify-between gap-3">
+      <span className="flex w-full min-w-0 flex-wrap items-start justify-between gap-3">
         <span
           className={cn(
-            "font-sans font-semibold leading-none",
-            distance === "Custom" ? "text-2xl" : "text-3xl",
+            "min-w-0 max-w-full break-words font-sans font-semibold leading-none",
+            compactDistance ? "text-2xl" : "text-3xl",
           )}
         >
           {distance}
         </span>
         {active ? (
-          <span className="hito-status-pill shrink-0" data-tone="muted">
+          <span className="hito-status-pill ml-auto shrink-0" data-tone="muted">
             {t("Selected")}
           </span>
         ) : (
-          <span className="hito-status-pill shrink-0" data-tone="muted">
+          <span className="hito-status-pill ml-auto shrink-0" data-tone="muted">
             {t("Preview")}
           </span>
         )}

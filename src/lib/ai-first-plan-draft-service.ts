@@ -55,7 +55,8 @@ export const DEFAULT_AI_FIRST_PLAN_TIMEOUT_MS = 0;
 // A first-plan response contains a complete Blueprint plus four executable weeks. GPT-5.2 counts
 // both visible JSON and reasoning against max_output_tokens, so the former 32k ceiling could end an
 // otherwise valid Structured Output before the provider completed it.
-export const DEFAULT_AI_FIRST_PLAN_MAX_OUTPUT_TOKENS = 64_000;
+export const DEFAULT_AI_FIRST_PLAN_MAX_OUTPUT_TOKENS = 128_000;
+const AI_FIRST_PLAN_REASONING_EFFORT = "none" as const;
 const AI_FIRST_PLAN_CONTRACT_MODE = "adaptive_blueprint_four_week" as const;
 const AI_FIRST_PLAN_RESPONSE_SCHEMA_MODE =
   "responses_json_schema_adaptive_blueprint_four_week_v1_strict" as const;
@@ -891,7 +892,9 @@ async function requestOpenAiFirstPlanDraft({
   let generationTrace = initialGenerationTrace;
   const requestBody = JSON.stringify({
     model,
-    ...(supportsReasoningEffort(model) ? { reasoning: { effort: "low" } } : {}),
+    ...(supportsReasoningEffort(model)
+      ? { reasoning: { effort: AI_FIRST_PLAN_REASONING_EFFORT } }
+      : {}),
     max_output_tokens: maxOutputTokens,
     input: [
       {
@@ -1158,6 +1161,7 @@ async function requestOpenAiFirstPlanDraft({
           JSON.stringify({
             generationId: generationTrace?.generationId ?? null,
             model,
+            responseId: providerResponseId,
             responseStatus: responseDebug.responseStatus,
             responseIncompleteReason: responseDebug.responseIncompleteReason,
             maxOutputTokens,

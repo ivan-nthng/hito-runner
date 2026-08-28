@@ -90,8 +90,15 @@ The canonical first-plan service imposed a fixed `32_000` token ceiling even tho
 contains the complete Blueprint and four executable weeks, and both obsolete
 `OPENAI_FIRST_PLAN_*` configuration entries were declared but unused. OpenAI counts visible output
 and reasoning against `max_output_tokens`; the production-safe fix raises the one canonical ceiling
-to `64_000`, removes the false configuration knobs, and records only redacted terminal telemetry
+to `128_000`, removes the false configuration knobs, and records only redacted terminal telemetry
 for non-completed provider responses. Raw prompts, raw responses and user facts are never logged.
+
+The first materially fresh owner-bound production discriminator on the released `64_000` revision
+still returned `status=incomplete` with `incomplete_details.reason=max_output_tokens`; it created no
+retained response, candidate, confirmation or Calendar workout. GPT-5.2 supports `128_000` maximum
+output tokens and `reasoning.effort=none`. Because this workload needs one strict complete JSON
+document rather than open-ended deliberation, the follow-up root fix uses both exact settings before
+one new paid discriminator. This is a changed provider request, not an equivalent retry.
 
 Release acceptance requires one materially fresh technical-runner production request to reach a
 complete Review, followed by explicit Confirm and Calendar readback. Retained-response replay or a

@@ -2290,13 +2290,15 @@ async function validateFirstPlanGenerationLifecycle() {
   assert.equal(canonicalTransportCallCount, 0);
 
   let incompleteCallCount = 0;
+  let incompleteRequestBody: Record<string, unknown> | null = null;
   const incomplete = await generateAiFirstPlanDraftPreview({
     input: resolved.authoringInput,
     apiKey: "incomplete-plan-first-proof",
-    model: "incomplete-plan-first-proof",
+    model: "gpt-5.2-incomplete-plan-first-proof",
     generationLedger: { disabled: true },
-    fetchImpl: async () => {
+    fetchImpl: async (_url, init) => {
       incompleteCallCount += 1;
+      incompleteRequestBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
       return jsonResponse({
         ...completedBody,
         id: "resp_incomplete_plan_first",
@@ -2314,6 +2316,8 @@ async function validateFirstPlanGenerationLifecycle() {
   assert.equal(incomplete.metadata.debug.abortReason, null);
   assert.equal(incomplete.metadata.debug.responseIncompleteReason, "max_output_tokens");
   assert.equal(incomplete.metadata.debug.maxOutputTokens, DEFAULT_AI_FIRST_PLAN_MAX_OUTPUT_TOKENS);
+  assert.equal(incompleteRequestBody?.max_output_tokens, 128_000);
+  assert.deepEqual(incompleteRequestBody?.reasoning, { effort: "none" });
 }
 
 async function runTimedOutFirstPlanRequest(input: {

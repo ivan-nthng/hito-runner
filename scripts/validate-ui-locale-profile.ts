@@ -548,9 +548,14 @@ function proveSourceOwnership() {
 
   const providerSource = readSource("src/components/ui/hito-ui-locale-provider.tsx");
   assert.match(providerSource, /createContext<ResolvedUiLocale \| null>\(null\)/);
-  assert.match(providerSource, /document\.documentElement\.lang = locale/);
+  assert.doesNotMatch(providerSource, /document\.documentElement\.lang/);
   assert.match(providerSource, /useSyncExternalStore/);
   assert.match(providerSource, /globalUiLocaleSnapshot = locale/);
+
+  const rootSource = readSource("src/routes/__root.tsx");
+  assert.match(rootSource, /const locale = useHitoUiLocale\(\)/);
+  assert.match(rootSource, /<html lang=\{locale\}/);
+  assert.doesNotMatch(rootSource, /<html lang="en"/);
 
   const compoundRangeSource = readSource("src/components/ui/hito-compound-range-field.tsx");
   assert.match(compoundRangeSource, /useHitoProductMessage/);

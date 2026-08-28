@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { APP_NAME } from "@/lib/app-config";
 import { LocalDevtoolMount } from "@/components/devtools/LocalDevtoolMount";
 import { HitoButton } from "@/components/ui/button";
+import { useHitoUiLocale } from "@/components/ui/hito-ui-locale-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { HITO_THEME_BOOTSTRAP_SCRIPT } from "@/lib/theme-preference";
 import appCss from "../styles.css?url";
@@ -67,8 +68,10 @@ export const Route = createRootRoute({
 });
 
 function RootShell({ children }: { children: ReactNode }) {
+  const locale = useHitoUiLocale();
+
   return (
-    <html lang="en" data-hito-theme="dark" suppressHydrationWarning>
+    <html lang={locale} data-hito-theme="dark" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: HITO_THEME_BOOTSTRAP_SCRIPT }} />
         <HeadContent />

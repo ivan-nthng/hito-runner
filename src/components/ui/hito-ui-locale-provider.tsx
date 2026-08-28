@@ -26,7 +26,6 @@ export function HitoUiLocaleProvider({
   locale: ResolvedUiLocale;
 }) {
   useEffect(() => {
-    document.documentElement.lang = locale;
     if (globalUiLocaleSnapshot !== locale) {
       globalUiLocaleSnapshot = locale;
       globalUiLocaleListeners.forEach((listener) => listener());

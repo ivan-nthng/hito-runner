@@ -156,3 +156,19 @@ the required independent Running Coach verdict on a semantically new candidate. 
 sidebar bridge did not acknowledge the bounded Coach handoff after two attempts, so task-owned QA
 rows remain retained for that review and exact cleanup. HITO-280 remains non-terminal on BACKEND
 execution-host recovery; no further provider request is admitted for this candidate.
+
+## 2026-08-28 Current-Production Replay And Mobile Fix-Forward
+
+Running Coach independently approved the exact retained `v22` candidate as safe to confirm. The
+current Git-backed production `83d89c4` / `dpl_66N2wBTBSJLPm7amc6LmKLy257XW` then restored the same
+technical runner after reload and in a fresh tab without a second provider dispatch or duplicate
+materialisation: hosted truth remained one retained response, one detailed candidate, one block
+confirmation, 28 Calendar workouts and 28 Calendar mutation events.
+
+The same production replay reproduced two presentation defects at `375x812` in Portuguese/Dark:
+the three-tab Progress strip widened the document from 375 to 450 pixels, and Calendar navigation
+could render Portuguese while the root document language reverted to `en`. The bounded FRONTEND
+fix makes simple mobile Tabs own their horizontal overflow and makes RootShell render the one
+resolved locale directly as the `html` language. Focused locale, lint, formatting, diff-hygiene and
+production-build checks passed; the exact fix remains subject to Git-backed production deployment
+and independent browser replay before terminal acceptance.

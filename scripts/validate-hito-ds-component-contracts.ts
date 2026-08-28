@@ -2297,6 +2297,14 @@ expect(
   "Tabs must preserve their horizontal tab roles, ARIA, and key map.",
 );
 expect(
+  controlsCss.includes(".hito-tabs-simple,\n    .hito-tabs-enclosed") &&
+    controlsCss.includes("width: 100%;\n      min-width: 0;\n      overflow-x: auto;") &&
+    controlsCss.includes(".hito-tabs-simple::-webkit-scrollbar") &&
+    controlsCss.includes(".hito-tabs-simple .hito-tab") &&
+    controlsCss.includes("flex: 0 0 auto;"),
+  "Mobile simple and enclosed Tabs must contain long labels in their own horizontal scroll owner.",
+);
+expect(
   radioGroupSource?.content.includes('role: "radiogroup" as const') === true &&
     radioGroupSource.content.includes('role: "radio" as const') &&
     radioGroupSource.content.includes('"aria-checked": value === itemValue') &&

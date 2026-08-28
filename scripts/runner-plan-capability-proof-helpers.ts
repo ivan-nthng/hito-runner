@@ -3,8 +3,8 @@ import {
   type PersonalHeartRateProfileInput,
 } from "../src/lib/heart-rate-zones";
 import type { BuildRunningPlanPreviewInput } from "../src/lib/plan-creation-engine";
+import { deriveRunnerPlanCapabilityVectorV1 } from "../src/lib/runner-activity/plan-capability";
 import {
-  projectRunnerFitnessProfileForInitialPlan,
   RUNNER_FITNESS_PROFILE_FORMULA_VERSION,
   RUNNER_FITNESS_PROFILE_HISTORY_FORMULA_VERSION,
   RUNNER_FITNESS_PROFILE_SNAPSHOT_VERSION,
@@ -24,7 +24,7 @@ const PROOF_PERSONAL_ZONES = [
   { reference: "Z5", minBpm: 171, maxBpm: 190 },
 ] as const satisfies PersonalHeartRateProfileInput["zones"];
 
-export function buildProofInitialPlanProfile(
+export function buildProofRunnerCapability(
   input: BuildRunningPlanPreviewInput,
   options: {
     profileRevision?: number;
@@ -94,6 +94,45 @@ export function buildProofInitialPlanProfile(
       calendarOutcomes: { fingerprint: `proof-calendar-${stateIdentity}` },
       resultEvidence: { fingerprint: `proof-evidence-${stateIdentity}` },
       runnerActivity: { fingerprint: `proof-activity-${formulaSuffix}-${stateIdentity}` },
+    },
+    planAuthoringSource: {
+      version: "runner_plan_capability_source_v1",
+      state:
+        recentState === "updating"
+          ? "updating"
+          : recentState === "contradictory"
+            ? "contradictory"
+            : "current",
+      activities: hasRecentData
+        ? [
+            {
+              activityId: "proof-recent-easy",
+              activityRevisionId: `proof-recent-easy-revision-${formulaSuffix}`,
+              sourceRevisionId: `proof-recent-easy-source-${formulaSuffix}`,
+              localDate: addDaysIso(cutoffDate, -4),
+              durationSeconds: 2400,
+              distanceMetres: 7000,
+              classification: "easy" as const,
+            },
+            {
+              activityId: "proof-recent-long",
+              activityRevisionId: `proof-recent-long-revision-${formulaSuffix}`,
+              sourceRevisionId: `proof-recent-long-source-${formulaSuffix}`,
+              localDate: cutoffDate,
+              durationSeconds: 3600,
+              distanceMetres: 10000,
+              classification: "long" as const,
+            },
+          ]
+        : [],
+      records: [],
+      formulaVersions: [RUNNER_FITNESS_PROFILE_HISTORY_FORMULA_VERSION, formulaSuffix].sort(),
+      reasonCodes:
+        recentState === "updating"
+          ? (["source_revision_updating"] as const)
+          : recentState === "contradictory"
+            ? (["source_revision_contradictory"] as const)
+            : [],
     },
     components: {
       constraints: {
@@ -203,12 +242,15 @@ export function buildProofInitialPlanProfile(
 
   return {
     acceptedHeartRateProfile,
-    initialPlanProfile: projectRunnerFitnessProfileForInitialPlan(snapshot),
+    runnerCapability: deriveRunnerPlanCapabilityVectorV1({
+      snapshot,
+      currentRunningLimitation: input.currentRunningLimitation,
+    }),
   };
 }
 
-export function buildProofPersonalInitialPlanProfile(input: BuildRunningPlanPreviewInput) {
-  return buildProofInitialPlanProfile(input, { personalZones: PROOF_PERSONAL_ZONES });
+export function buildProofPersonalRunnerCapability(input: BuildRunningPlanPreviewInput) {
+  return buildProofRunnerCapability(input, { personalZones: PROOF_PERSONAL_ZONES });
 }
 
 function buildProgressWindow(

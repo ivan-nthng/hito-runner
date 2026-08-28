@@ -1532,6 +1532,7 @@ function syntheticFormulaActivity() {
     elevationGainM: null,
     fitEvidence: { state: "eligible" as const, reason: null },
     recordContext: null,
+    workoutClassification: null,
     rpeLinkState: "exact" as const,
     rpeInputPresent: true,
     evidence: {

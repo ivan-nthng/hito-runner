@@ -16,13 +16,13 @@ import {
   projectRunnerActivityMutationReadbackForProduct,
   projectRunnerActivityProgressForProduct,
   projectRunnerFitnessProfileForContinuation,
-  projectRunnerFitnessProfileForInitialPlan,
   projectRunnerFitnessProfileForOneOff,
   projectRunnerFitnessProfileForProgress,
   RUNNER_FITNESS_PROFILE_COMPONENT_STATES,
   type RunnerActivityHistoryProductPage,
   type RunnerActivityProgressProductModel,
 } from "../src/lib/runner-activity/product-contract";
+import { deriveRunnerPlanCapabilityVectorV1 } from "../src/lib/runner-activity/plan-capability";
 import {
   assembleRunnerFitnessProfileSnapshotV1,
   getRunnerActivityProgressForUser,
@@ -124,46 +124,22 @@ async function proveRunnerFitnessProfileSnapshotContract() {
   assert.deepEqual(transportEquivalent, first);
 
   const progressProjection = projectRunnerFitnessProfileForProgress(first);
-  const initialPlanProjection = projectRunnerFitnessProfileForInitialPlan(first);
+  const runnerCapability = deriveRunnerPlanCapabilityVectorV1({ snapshot: first });
   const continuationProjection = projectRunnerFitnessProfileForContinuation(first);
   const oneOffProjection = projectRunnerFitnessProfileForOneOff(first);
   assert.equal(progressProjection.snapshotId, first.snapshotId);
-  for (const projection of [
-    progressProjection,
-    initialPlanProjection,
-    continuationProjection,
-    oneOffProjection,
-  ]) {
+  for (const projection of [progressProjection, continuationProjection, oneOffProjection]) {
     assert.equal(projection.snapshotDefinitionVersion, first.version);
     assert.deepEqual(projection.formulaVersions, first.formulaVersions);
   }
-  assert.equal(initialPlanProjection.runnerFactsRevision, first.runnerFactsRevision);
-  assert.deepEqual(
-    {
-      state: initialPlanProjection.components.recent28Day.state,
-      coverage: initialPlanProjection.components.recent28Day.coverage,
-      reasonCodes: initialPlanProjection.components.recent28Day.reasonCodes,
-    },
-    {
-      state: first.components.recent28Day.state,
-      coverage: first.components.recent28Day.coverage,
-      reasonCodes: first.components.recent28Day.reasonCodes,
-    },
-  );
-  assert.deepEqual(
-    initialPlanProjection.components.recent28Day.current,
-    first.components.recent28Day.data?.current ?? null,
-  );
-  assert.deepEqual(
-    initialPlanProjection.components.recent28Day.previous,
-    first.components.recent28Day.data?.previous ?? null,
-  );
-  assert.deepEqual(
-    initialPlanProjection.components.latestFive.coveredDates,
-    first.components.latestFive.coverage.coveredDates,
-  );
-  assert.equal("items" in initialPlanProjection.components.latestFive, false);
-  assert.equal("records" in initialPlanProjection.components.rolling90Day, false);
+  assert.equal(runnerCapability.snapshot.version, first.version);
+  assert.equal(runnerCapability.snapshot.runnerFactsRevision, first.runnerFactsRevision);
+  assert.equal(runnerCapability.sevenDaySlices.length, 12);
+  assert.equal(runnerCapability.sevenDaySlices[0]?.contactCount, 2);
+  assert.equal(runnerCapability.sevenDaySlices[0]?.duration.value, 6_300);
+  assert.equal(runnerCapability.sevenDaySlices[0]?.distance.value, 18_000);
+  assert.equal(runnerCapability.openingAnchor.basis, "distance_metres");
+  assert.equal(runnerCapability.windows.capacity90.leadingPartialBoundary.contextOnly, true);
   assert.deepEqual(continuationProjection.comparableGroups, [
     {
       contextKey: "easy",
@@ -176,6 +152,7 @@ async function proveRunnerFitnessProfileSnapshotContract() {
     localDate: "2026-08-08",
     minutes: 60,
   });
+  await proveRunnerPlanCapabilityMatrix(first);
 
   const changedRevision = await assembleRunnerFitnessProfileSnapshotV1({
     ...fixture,
@@ -228,6 +205,178 @@ async function proveRunnerFitnessProfileSnapshotContract() {
       1,
     );
   }
+}
+
+async function proveRunnerPlanCapabilityMatrix(
+  base: Awaited<ReturnType<typeof assembleRunnerFitnessProfileSnapshotV1>>,
+) {
+  const vector = (input: {
+    activities: typeof base.planAuthoringSource.activities;
+    records?: typeof base.planAuthoringSource.records;
+    sourceState?: "current" | "updating" | "contradictory";
+    limitation?: "no" | "yes" | "unsure";
+  }) => {
+    const snapshot = structuredClone(base);
+    snapshot.planAuthoringSource = {
+      ...snapshot.planAuthoringSource,
+      state: input.sourceState ?? "current",
+      activities: input.activities,
+      records: input.records ?? [],
+      reasonCodes:
+        input.sourceState === "updating"
+          ? ["source_revision_updating"]
+          : input.sourceState === "contradictory"
+            ? ["source_revision_contradictory"]
+            : [],
+    };
+    return deriveRunnerPlanCapabilityVectorV1({
+      snapshot,
+      currentRunningLimitation: input.limitation,
+    });
+  };
+  const activity = (
+    id: string,
+    localDate: string,
+    durationSeconds: number | null,
+    distanceMetres: number | null,
+    classification: "easy" | "long" | null = "easy",
+  ) => ({
+    activityId: id,
+    activityRevisionId: `${id}-revision`,
+    sourceRevisionId: `${id}-source`,
+    localDate,
+    durationSeconds,
+    distanceMetres,
+    classification,
+  });
+  const zero = vector({ activities: [], limitation: "no" });
+  assert.equal(zero.sevenDaySlices[0]?.contactCount, 0);
+  assert.equal(zero.openingAnchor.basis, "unavailable");
+  assert.equal(zero.additionalEasyContact.decision, "not_applicable_reentry");
+  assert.equal(zero.windows.capacity90.leadingPartialBoundary.completeSevenDays, false);
+
+  const one = vector({
+    activities: [activity("one", "2026-08-10", 1_800, 5_000)],
+    limitation: "no",
+  });
+  assert.equal(one.evidenceConfidence.recent7, "observed_sparse");
+  assert.equal(one.openingAnchor.enforcedOpeningDemand, 5_000);
+  assert.equal(one.additionalEasyContact.decision, "redistribute_same_demand");
+
+  const twoRecent = [
+    activity("two-a", "2026-08-08", 2_400, 7_000),
+    activity("two-b", "2026-08-10", 3_600, 10_000, "long"),
+  ];
+  const two = vector({ activities: twoRecent, limitation: "no" });
+  assert.equal(two.sevenDaySlices[0]?.duration.value, 6_000);
+  assert.equal(two.sevenDaySlices[0]?.distance.value, 17_000);
+  assert.equal(two.openingAnchor.longRunDemand, 10_000);
+
+  const supported = vector({
+    activities: [
+      ...twoRecent,
+      activity("support-a", "2026-08-01", 2_000, 6_000),
+      activity("support-b", "2026-08-02", 2_000, 6_000),
+      activity("support-c", "2026-08-03", 2_000, 8_000, "long"),
+    ],
+    limitation: "no",
+  });
+  assert.equal(supported.additionalEasyContact.decision, "supported_growth");
+  assert.equal(supported.additionalEasyContact.supportSliceIndex, 1);
+  assert.equal(supported.additionalEasyContact.maximumOpeningDemand, 20_000);
+
+  const three = vector({
+    activities: [...twoRecent, activity("three-c", "2026-08-09", 1_800, 5_000)],
+    limitation: "no",
+  });
+  assert.equal(three.sevenDaySlices[0]?.contactCount, 3);
+  assert.equal(three.evidenceConfidence.recent7, "observed_pattern");
+
+  const durationFallback = vector({
+    activities: [activity("duration-only", "2026-08-10", 2_100, null)],
+    limitation: "no",
+  });
+  assert.equal(durationFallback.openingAnchor.basis, "duration_seconds");
+  assert.equal(durationFallback.openingAnchor.enforcedOpeningDemand, 2_100);
+  const distancePreferred = vector({
+    activities: [activity("distance-only", "2026-08-10", null, 5_100)],
+    limitation: "no",
+  });
+  assert.equal(distancePreferred.openingAnchor.basis, "distance_metres");
+  const incomplete = vector({
+    activities: [
+      activity("incomplete-a", "2026-08-09", null, 5_000),
+      activity("incomplete-b", "2026-08-10", 1_800, null),
+    ],
+    limitation: "no",
+  });
+  assert.equal(incomplete.openingAnchor.basis, "unavailable");
+
+  for (const limitation of [undefined, "yes", "unsure"] as const) {
+    assert.equal(
+      vector({ activities: twoRecent, limitation }).additionalEasyContact.decision,
+      "not_admitted",
+    );
+  }
+  assert.equal(
+    vector({ activities: twoRecent, sourceState: "updating", limitation: "no" }).evidenceConfidence
+      .recent7,
+    "updating",
+  );
+  assert.equal(
+    vector({ activities: twoRecent, sourceState: "contradictory", limitation: "no" })
+      .evidenceConfidence.recent7,
+    "contradictory",
+  );
+
+  const exact5kActivity = activity("exact-5k", "2026-08-10", 1_500, 5_000);
+  const exact5kRecord = {
+    activityId: exact5kActivity.activityId,
+    activityRevisionId: exact5kActivity.activityRevisionId,
+    sourceRevisionId: exact5kActivity.sourceRevisionId,
+    evidenceRevisionId: null,
+    recordClass: "hito_observed_whole_activity" as const,
+    distanceKey: "5_km",
+    distanceMetres: 5_000,
+    elapsedSeconds: 1_500,
+    eventDate: "2026-08-10",
+    provenance: "canonical_activity_summary" as const,
+    formulaVersion: "personal_best_elapsed_v3",
+  };
+  assert.equal(
+    vector({ activities: [exact5kActivity], records: [exact5kRecord], limitation: "no" })
+      .performanceEvidence.records.length,
+    1,
+  );
+  assert.equal(
+    vector({
+      activities: [{ ...exact5kActivity, distanceMetres: 5_100 }],
+      records: [exact5kRecord],
+      limitation: "no",
+    }).performanceEvidence.records.length,
+    0,
+    "Phase A must not scale a 5.1 km whole activity into a 5K record.",
+  );
+
+  const rpeVariant = structuredClone(base);
+  const recentData = rpeVariant.components.recent28Day.data;
+  if (recentData) {
+    recentData.calendarOutcomes = recentData.calendarOutcomes.map((outcome) => ({
+      ...outcome,
+      sessionRpe: null,
+    }));
+    recentData.sessionRpeLoad = null;
+  }
+  const withRpe = deriveRunnerPlanCapabilityVectorV1({
+    snapshot: base,
+    currentRunningLimitation: "no",
+  });
+  const withoutRpe = deriveRunnerPlanCapabilityVectorV1({
+    snapshot: rpeVariant,
+    currentRunningLimitation: "no",
+  });
+  assert.deepEqual(withoutRpe.performanceEvidence, withRpe.performanceEvidence);
+  assert.deepEqual(withoutRpe.additionalEasyContact, withRpe.additionalEasyContact);
 }
 
 function fitnessProfileAssemblyFixture(history: RunnerActivityHistoryProductPage) {
@@ -285,6 +434,33 @@ function fitnessProfileAssemblyFixture(history: RunnerActivityHistoryProductPage
       ],
     },
     progress,
+    planAuthoringSource: {
+      version: "runner_plan_capability_source_v1" as const,
+      state: "current" as const,
+      activities: [
+        {
+          activityId: "activity-1",
+          activityRevisionId: "activity-1-revision",
+          sourceRevisionId: "activity-1-source-revision",
+          localDate: "2026-08-08",
+          durationSeconds: 2_700,
+          distanceMetres: 8_000,
+          classification: "easy" as const,
+        },
+        {
+          activityId: "activity-2",
+          activityRevisionId: "activity-2-revision",
+          sourceRevisionId: "activity-2-source-revision",
+          localDate: "2026-08-10",
+          durationSeconds: 3_600,
+          distanceMetres: 10_000,
+          classification: "long" as const,
+        },
+      ],
+      records: [],
+      formulaVersions: ["runner_activity_fit_sequence_v1"],
+      reasonCodes: [],
+    },
     history,
   };
 }

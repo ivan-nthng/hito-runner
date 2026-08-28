@@ -488,11 +488,11 @@ function normalizeProviderDraft({
       message: `Blueprint target ${targetDate} must preserve the selected target ${authoringInput.planGoalIntent.targetDate}.`,
     });
   }
-  if (authoringInput.initialPlanProfile.cutoffDate > startDate) {
+  if (authoringInput.runnerCapability.cutoff.date > startDate) {
     issues.push({
       code: "ai_authored_blueprint_profile_cutoff_after_detailed_start",
-      path: "authoringInput.initialPlanProfile.cutoffDate",
-      message: `Runner facts cutoff ${authoringInput.initialPlanProfile.cutoffDate} cannot post-date the prospective detailed start ${startDate}.`,
+      path: "authoringInput.runnerCapability.cutoff.date",
+      message: `Runner facts cutoff ${authoringInput.runnerCapability.cutoff.date} cannot post-date the prospective detailed start ${startDate}.`,
     });
   }
   if (
@@ -594,13 +594,16 @@ function normalizeProviderDraft({
     maxRunningDaysPerWeek: authoringInput.availability.maxRunningDaysPerWeek,
     issues,
   });
-  validateMissingBaselineProgressionSafety({
-    authoredDays,
-    startDate,
-    detailedEndDate,
-    weekOneStart,
-    issues,
-  });
+  validateRunnerCapabilityOpening({ authoredDays, startDate, authoringInput, issues });
+  if (authoringInput.runnerCapability.openingAnchor.basis === "unavailable") {
+    validateMissingBaselineProgressionSafety({
+      authoredDays,
+      startDate,
+      detailedEndDate,
+      weekOneStart,
+      issues,
+    });
+  }
 
   const preparationHorizonWeeks = Math.max(
     1,
@@ -993,6 +996,149 @@ function completeRunnableDurationMinutes(
     }
   }
   return total;
+}
+
+function completeRunnableDistanceKilometres(
+  workout: AiAuthoredPlanFirstCompilerWorkout,
+): number | null {
+  let total = 0;
+  for (const section of workout.sections) {
+    if (section.kind === "hydration") continue;
+    if (section.kind === "unit") {
+      if (section.prescription.mode !== "distance") return null;
+      total += section.prescription.distance_km;
+      continue;
+    }
+    for (const child of section.children) {
+      if (child.prescription.mode !== "distance") return null;
+      total += child.prescription.distance_km * section.rounds;
+    }
+  }
+  return total;
+}
+
+function validateRunnerCapabilityOpening(input: {
+  authoredDays: readonly AiAuthoredPlanFirstCompilerWorkout[];
+  startDate: string;
+  authoringInput: StructuredPlanAuthoringInput;
+  issues: CompilerIssue[];
+}) {
+  const capability = input.authoringInput.runnerCapability;
+  const anchor = capability.openingAnchor;
+  if (anchor.basis === "unavailable" || anchor.enforcedOpeningDemand == null) return;
+  const openingEnd = addDaysIso(input.startDate, 6);
+  const opening = input.authoredDays.filter(
+    (day) => day.date >= input.startDate && day.date <= openingEnd,
+  );
+  const gate = capability.additionalEasyContact;
+  const maximumContacts =
+    gate.decision === "redistribute_same_demand" || gate.decision === "supported_growth"
+      ? gate.proposedContacts
+      : gate.currentContacts;
+  if (opening.length > maximumContacts) {
+    input.issues.push({
+      code: "ai_authored_plan_first_capability_contact_ceiling_exceeded",
+      path: "detailed_block",
+      message: `The opening seven days contain ${opening.length} contacts but the factual capability permits at most ${maximumContacts}.`,
+    });
+  }
+  const demands = opening.map((day) =>
+    anchor.basis === "distance_metres"
+      ? completeRunnableDistanceKilometres(day)
+      : completeRunnableDurationMinutes(day),
+  );
+  if (demands.some((value) => value == null)) {
+    input.issues.push({
+      code: "ai_authored_plan_first_capability_opening_unit_incomplete",
+      path: "detailed_block",
+      message: `Every opening contact must use the exact ${anchor.basis} demand basis without conversion.`,
+    });
+    return;
+  }
+  const scale = anchor.basis === "distance_metres" ? 1000 : 60;
+  let openingDemand = 0;
+  for (const value of demands) openingDemand += (value ?? 0) * scale;
+  const maximumDemand =
+    gate.decision === "supported_growth"
+      ? (gate.maximumOpeningDemand ?? anchor.enforcedOpeningDemand)
+      : anchor.enforcedOpeningDemand;
+  const exactRequired = gate.decision !== "supported_growth";
+  if (
+    (exactRequired && Math.abs(openingDemand - anchor.enforcedOpeningDemand) > 0.001) ||
+    (!exactRequired &&
+      (openingDemand + 0.001 < anchor.enforcedOpeningDemand ||
+        openingDemand > maximumDemand + 0.001))
+  ) {
+    input.issues.push({
+      code: "ai_authored_plan_first_capability_opening_demand_invalid",
+      path: "detailed_block",
+      message: exactRequired
+        ? `Opening ${anchor.basis} demand must equal the exact Recent7 value ${anchor.enforcedOpeningDemand}.`
+        : `Opening ${anchor.basis} demand must remain between ${anchor.enforcedOpeningDemand} and the supported ceiling ${maximumDemand}.`,
+    });
+  }
+  if (opening.length <= gate.currentContacts) return;
+  if (gate.decision !== "redistribute_same_demand" && gate.decision !== "supported_growth") {
+    input.issues.push({
+      code: "ai_authored_plan_first_capability_plus_one_not_admitted",
+      path: "detailed_block",
+      message: "An additional running contact is not admitted by the frozen runner capability.",
+    });
+    return;
+  }
+  const fixedRestDays = new Set(capability.constraints.fixedRestDays);
+  if (opening.some((day) => fixedRestDays.has(weekdayLong(day.date)))) {
+    input.issues.push({
+      code: "ai_authored_plan_first_capability_plus_one_fixed_rest_conflict",
+      path: "detailed_block",
+      message: "A capability-authorized additional contact cannot occupy a fixed rest day.",
+    });
+  }
+  const openingDates = opening.map((day) => day.date).sort();
+  if (
+    openingDates.some((date, index) => index > 0 && diffDaysIso(date, openingDates[index - 1]!) < 2)
+  ) {
+    input.issues.push({
+      code: "ai_authored_plan_first_capability_plus_one_recovery_spacing_failed",
+      path: "detailed_block",
+      message:
+        "The additional-contact path requires at least one recovery day between opening running contacts.",
+    });
+  }
+  const recent = capability.sevenDaySlices[0]!;
+  const recentLongCount = recent.eligibleEasyLongContacts.filter(
+    (contact) => contact.classification === "long",
+  ).length;
+  const recentUnclassifiedCount = recent.contactCount - recent.eligibleEasyLongContacts.length;
+  const openingLong = opening.filter((day) => familyForIdentity(day.workout_identity) === "long");
+  const openingQuality = opening.filter((day) =>
+    FOUR_DAY_WEEK_QUALITY_FAMILIES.has(familyForIdentity(day.workout_identity)),
+  );
+  if (openingLong.length > recentLongCount || openingQuality.length > recentUnclassifiedCount) {
+    input.issues.push({
+      code: "ai_authored_plan_first_capability_plus_one_stress_contact_added",
+      path: "detailed_block",
+      message:
+        "The only additional capability contact must be easy or recovery; intensity and long-run contact counts cannot increase.",
+    });
+  }
+  if (anchor.longRunDemand != null && openingLong.length > 0) {
+    const longDemands = openingLong.map((day) =>
+      anchor.basis === "distance_metres"
+        ? completeRunnableDistanceKilometres(day)
+        : completeRunnableDurationMinutes(day),
+    );
+    if (
+      longDemands.some((value) => value == null) ||
+      Math.max(...longDemands.map((value) => (value ?? 0) * scale)) > anchor.longRunDemand + 0.001
+    ) {
+      input.issues.push({
+        code: "ai_authored_plan_first_capability_long_run_demand_exceeded",
+        path: "detailed_block",
+        message: "The additional-contact path cannot increase factual Recent7 long-run demand.",
+      });
+    }
+  }
 }
 
 const FOUR_DAY_WEEK_QUALITY_FAMILIES = new Set([

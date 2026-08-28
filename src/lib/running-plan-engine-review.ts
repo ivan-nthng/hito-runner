@@ -313,8 +313,7 @@ function buildDistanceFirstNormalizedInputMetadata(draft: RunningPlanPreviewDraf
     trainingWeekdays: normalizedInput.trainingWeekdays,
     startDate: normalizedInput.startDate,
     benchmarkPaceTruth: normalizedInput.benchmarkPaceTruth,
-    initialPlanProfile: normalizedInput.initialPlanProfile,
-    initialPlanAdmission: normalizedInput.initialPlanAdmission,
+    runnerCapability: normalizedInput.runnerCapability,
     distanceGoal: buildDistanceGoalMetadata(intent),
     planGoalIntent: intent,
   };

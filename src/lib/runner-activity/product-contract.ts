@@ -11,6 +11,7 @@ import type {
   RunnerActivitySessionLoadMetric,
   RunnerActivitySessionLoadWindow,
 } from "@/lib/runner-activity/read-model-types";
+import type { RunnerPlanCapabilitySourceV1 } from "@/lib/runner-activity/plan-capability-contract";
 import type {
   RunnerFitnessLevel,
   RunnerTrainingPreferencesStorage,
@@ -690,6 +691,7 @@ export type RunnerFitnessProfileSnapshotV1 = {
       fingerprint: string;
     };
   };
+  planAuthoringSource: RunnerPlanCapabilitySourceV1;
   components: {
     constraints: RunnerFitnessProfileComponentV1<RunnerFitnessProfileConstraintsV1>;
     recent28Day: RunnerFitnessProfileComponentV1<RunnerFitnessProfileRecent28DayV1>;
@@ -757,160 +759,6 @@ export type RunnerFitnessProfileOneOffProjectionV1 = {
     rolling90Day: RunnerFitnessProfileComponentStateV1;
   };
 };
-
-export const RUNNER_FITNESS_PROFILE_INITIAL_PLAN_PROJECTION_VERSION =
-  "runner_fitness_profile_initial_plan_projection_v1" as const;
-
-type RunnerFitnessProfileInitialPlanComponentFactsV1 = {
-  state: RunnerFitnessProfileComponentStateV1;
-  coverage: RunnerFitnessProfileComponentV1<unknown>["coverage"];
-  reasonCodes: string[];
-};
-
-export type RunnerFitnessProfileInitialPlanProjectionV1 = {
-  version: typeof RUNNER_FITNESS_PROFILE_INITIAL_PLAN_PROJECTION_VERSION;
-  snapshotDefinitionVersion: typeof RUNNER_FITNESS_PROFILE_SNAPSHOT_VERSION;
-  snapshotId: string;
-  runnerFactsRevision: string;
-  asOf: string;
-  cutoffDate: string;
-  timeZone: string;
-  formulaVersions: RunnerFitnessProfileSnapshotV1["formulaVersions"];
-  components: {
-    constraints: RunnerFitnessProfileInitialPlanComponentFactsV1 & {
-      fitnessLevel: RunnerFitnessLevel | null;
-      trainingPreferences: RunnerTrainingPreferencesStorage | null;
-      source: {
-        revision: number | null;
-        fingerprint: string;
-      };
-    };
-    recent28Day: RunnerFitnessProfileInitialPlanComponentFactsV1 & {
-      current: RunnerActivityProgressProductSnapshot | null;
-      previous: RunnerActivityProgressProductSnapshot | null;
-      calendarOutcomes: {
-        candidateCount: number;
-        completedCount: number;
-        partialCount: number;
-        skippedCount: number;
-        unresolvedCount: number;
-        sessionRpeCoverage: {
-          includedCount: number;
-          missingCount: number;
-        };
-      };
-      evidence: {
-        dueWorkoutCount: number;
-        resolvedOutcomeCount: number;
-        acceptedActualCount: number;
-        completionOnlyCount: number;
-        missingCount: number;
-        updatingCount: number;
-        removedCount: number;
-      };
-    };
-    latestFive: RunnerFitnessProfileInitialPlanComponentFactsV1 & {
-      inspectionOnly: true;
-      coveredDates: string[];
-    };
-    rolling90Day: RunnerFitnessProfileInitialPlanComponentFactsV1 & {
-      acceptedActivityCount: number;
-      weeklyDistribution: RunnerFitnessProfileRollingWeekV1[];
-      longestDuration: RunnerFitnessProfileRolling90DayV1["longestDuration"];
-      longestDistance: RunnerFitnessProfileRolling90DayV1["longestDistance"];
-      sessionRpeLoad: RunnerFitnessProfileRolling90DayV1["sessionRpeLoad"];
-    };
-    comparablePerformance: RunnerFitnessProfileInitialPlanComponentFactsV1;
-  };
-};
-
-export function projectRunnerFitnessProfileForInitialPlan(
-  snapshot: RunnerFitnessProfileSnapshotV1,
-): RunnerFitnessProfileInitialPlanProjectionV1 {
-  const constraints = snapshot.components.constraints;
-  const recent = snapshot.components.recent28Day;
-  const recentData = recent.data;
-  const latest = snapshot.components.latestFive;
-  const rolling = snapshot.components.rolling90Day;
-  const rollingData = rolling.data;
-  const outcomes = recentData?.calendarOutcomes ?? [];
-
-  return {
-    version: RUNNER_FITNESS_PROFILE_INITIAL_PLAN_PROJECTION_VERSION,
-    snapshotDefinitionVersion: snapshot.version,
-    snapshotId: snapshot.snapshotId,
-    runnerFactsRevision: snapshot.runnerFactsRevision,
-    asOf: snapshot.asOf,
-    cutoffDate: snapshot.cutoffDate,
-    timeZone: snapshot.timeZone,
-    formulaVersions: snapshot.formulaVersions,
-    components: {
-      constraints: {
-        ...projectInitialPlanComponentFacts(constraints),
-        fitnessLevel: constraints.data?.fitnessLevel ?? null,
-        trainingPreferences: constraints.data?.trainingPreferences ?? null,
-        source: {
-          revision: snapshot.provenance.identityProfile.revision,
-          fingerprint: snapshot.provenance.identityProfile.fingerprint,
-        },
-      },
-      recent28Day: {
-        ...projectInitialPlanComponentFacts(recent),
-        current: recentData?.current ?? null,
-        previous: recentData?.previous ?? null,
-        calendarOutcomes: {
-          candidateCount: outcomes.length,
-          completedCount: outcomes.filter((outcome) => outcome.outcome === "completed").length,
-          partialCount: outcomes.filter((outcome) => outcome.outcome === "partial").length,
-          skippedCount: outcomes.filter((outcome) => outcome.outcome === "skipped").length,
-          unresolvedCount: outcomes.filter((outcome) => outcome.outcome === "unresolved").length,
-          sessionRpeCoverage: {
-            includedCount: outcomes.filter((outcome) => outcome.sessionRpe != null).length,
-            missingCount: outcomes.filter((outcome) => outcome.sessionRpe == null).length,
-          },
-        },
-        evidence: {
-          dueWorkoutCount: recentData?.evidence.dueWorkoutCount ?? 0,
-          resolvedOutcomeCount: recentData?.evidence.resolvedOutcomeCount ?? 0,
-          acceptedActualCount: recentData?.evidence.acceptedActualCount ?? 0,
-          completionOnlyCount: recentData?.evidence.completionOnlyCount ?? 0,
-          missingCount: recentData?.evidence.missingCount ?? 0,
-          updatingCount: recentData?.evidence.updatingCount ?? 0,
-          removedCount: recentData?.evidence.removedCount ?? 0,
-        },
-      },
-      latestFive: {
-        ...projectInitialPlanComponentFacts(latest),
-        inspectionOnly: true,
-        coveredDates: [...(latest.data?.items.map((item) => item.localDate) ?? [])].sort(),
-      },
-      rolling90Day: {
-        ...projectInitialPlanComponentFacts(rolling),
-        acceptedActivityCount: rollingData?.acceptedActivityCount ?? 0,
-        weeklyDistribution: rollingData?.weeklyDistribution ?? [],
-        longestDuration: rollingData?.longestDuration ?? null,
-        longestDistance: rollingData?.longestDistance ?? null,
-        sessionRpeLoad: rollingData?.sessionRpeLoad ?? null,
-      },
-      comparablePerformance: projectInitialPlanComponentFacts(
-        snapshot.components.comparablePerformance,
-      ),
-    },
-  };
-}
-
-function projectInitialPlanComponentFacts(
-  component: RunnerFitnessProfileComponentV1<unknown>,
-): RunnerFitnessProfileInitialPlanComponentFactsV1 {
-  return {
-    state: component.state,
-    coverage: {
-      ...component.coverage,
-      coveredDates: [...component.coverage.coveredDates].sort(),
-    },
-    reasonCodes: [...component.reasonCodes].sort(),
-  };
-}
 
 export function projectRunnerFitnessProfileForProgress(
   snapshot: RunnerFitnessProfileSnapshotV1,
@@ -1246,11 +1094,20 @@ function projectFitActivitySequence(
   return {
     ...sequence,
     points: sequence.points.map((point) => ({
-      ...point,
+      id: point.id,
+      sequenceIndex: point.sequenceIndex,
+      sameDayOrder: point.sameDayOrder,
+      label: point.label,
+      historicalTime: point.historicalTime,
+      context: {
+        state: point.context.state,
+        runningContext: point.context.runningContext,
+      },
       evidence: {
         state: point.evidence.state,
         label: point.evidence.label,
       },
+      observations: point.observations,
     })),
   };
 }

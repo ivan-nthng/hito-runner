@@ -19,12 +19,11 @@ import {
 import { normalizePlanGoalIntent } from "@/lib/plan-creation-engine/plan-goal-intent";
 import type { StructuredPlanAuthoringInput } from "@/lib/structured-plan-authoring-schema";
 import {
-  projectRunnerFitnessProfileForInitialPlan,
-  RUNNER_FITNESS_PROFILE_FORMULA_VERSION,
-  RUNNER_FITNESS_PROFILE_HISTORY_FORMULA_VERSION,
-  RUNNER_FITNESS_PROFILE_SNAPSHOT_VERSION,
-  type RunnerFitnessProfileSnapshotV1,
-} from "@/lib/runner-activity/product-contract";
+  RUNNER_PLAN_CAPABILITY_FORMULA_VERSION,
+  RUNNER_PLAN_CAPABILITY_VECTOR_VERSION,
+  type RunnerPlanCapabilityVectorV1,
+  type SevenDayCapabilitySliceV1,
+} from "@/lib/runner-activity/plan-capability-contract";
 import { structuredPlanAuthoringInputSchema } from "@/lib/structured-plan-authoring-schema";
 import { isLoopbackRuntimeUrl } from "@/lib/supabase/env";
 import { addDaysIso, diffDaysIso, startOfWeekIso, todayIso, weekdayLong } from "@/lib/training";
@@ -97,7 +96,7 @@ export function buildAiGeneratedRunningPlanDevFixturePreviewOptions(input: {
   return {
     apiKey: "local-qa-dev-ai-generated-plan-fixture",
     model: AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL,
-    today: input.authoringInput.initialPlanProfile.cutoffDate,
+    today: input.authoringInput.runnerCapability.cutoff.date,
     fetchImpl: buildAiGeneratedRunningPlanDevFixtureFetch(
       { authoringInput: input.authoringInput },
       delayMs,
@@ -163,11 +162,10 @@ export function buildAiGeneratedRunningPlanQaFixtureAuthoringInput(
       preferredLongRunDay: "Saturday",
     },
     planGoalIntent: planGoalIntent.intent,
-    initialPlanProfile: buildQaFixtureInitialPlanProfile({
+    runnerCapability: buildQaFixtureRunnerCapability({
       cutoffDate: factualCutoffDate,
       startDate,
     }),
-    initialPlanAdmission: "authoring_ready_constraint_only",
   });
 }
 
@@ -178,96 +176,128 @@ export function buildProspectiveAiGeneratedRunningPlanQaFixtureAuthoringInput(
     ...input,
     schedule: {
       ...input.schedule,
-      startDate: prospectiveQaFixtureStartDate(input.initialPlanProfile.cutoffDate),
+      startDate: prospectiveQaFixtureStartDate(input.runnerCapability.cutoff.date),
     },
   });
 }
 
-function buildQaFixtureInitialPlanProfile(input: { cutoffDate: string; startDate: string }) {
-  const unavailableCoverage = {
-    includedCount: 0,
-    candidateCount: 0,
-    missingCount: 0,
-    coveredDates: [] as string[],
-  };
-  const snapshot: RunnerFitnessProfileSnapshotV1 = {
-    version: RUNNER_FITNESS_PROFILE_SNAPSHOT_VERSION,
-    snapshotId: `qa-fixture-initial-profile-${input.startDate}`,
-    runnerId: "qa-fixture-runner",
-    asOf: `${input.cutoffDate}T12:00:00.000Z`,
-    cutoffDate: input.cutoffDate,
-    timeZone: "UTC",
-    runnerFactsRevision: `qa-fixture-runner-facts-${input.startDate}`,
-    formulaVersions: {
-      profile: RUNNER_FITNESS_PROFILE_FORMULA_VERSION,
-      runnerActivity: [RUNNER_FITNESS_PROFILE_HISTORY_FORMULA_VERSION],
-      sessionRpeLoad: null,
-    },
-    provenance: {
-      identityProfile: { revision: 1, fingerprint: "qa-fixture-profile-fingerprint" },
-      calendarOutcomes: { fingerprint: "qa-fixture-calendar-fingerprint" },
-      resultEvidence: { fingerprint: "qa-fixture-evidence-fingerprint" },
-      runnerActivity: { fingerprint: "qa-fixture-activity-fingerprint" },
-    },
-    components: {
-      constraints: {
-        state: "partial",
-        data: {
-          fitnessLevel: "running_regularly",
-          trainingPreferences: {
-            blocked_days: ["Wednesday", "Friday", "Sunday"],
-            preferred_long_run_day: "Saturday",
-            max_running_days_per_week: 4,
-          },
-          currentGoal: null,
-          preferredUnits: null,
-          limitationState: null,
-          runnerEnteredFacts: {
-            source: "runner_profile",
-            revision: 1,
-            lastConfirmedAt: null,
-          },
-        },
-        coverage: {
-          includedCount: 2,
-          candidateCount: 6,
-          missingCount: 4,
-          coveredDates: [],
-        },
-        reasonCodes: [
-          "current_goal_not_exposed_by_identity_contract",
-          "limitation_state_not_exposed_by_identity_contract",
-          "preferred_units_not_exposed_by_identity_contract",
-          "self_report_confirmation_not_exposed_by_identity_contract",
-        ],
-      },
-      recent28Day: {
-        state: "unavailable",
-        data: null,
-        coverage: unavailableCoverage,
-        reasonCodes: ["calendar_outcomes_missing"],
-      },
-      latestFive: {
-        state: "unavailable",
-        data: null,
-        coverage: unavailableCoverage,
+function buildQaFixtureRunnerCapability(input: {
+  cutoffDate: string;
+  startDate: string;
+}): RunnerPlanCapabilityVectorV1 {
+  const emptySlices = Array.from({ length: 12 }, (_, index) => {
+    const endDate = addDaysIso(input.cutoffDate, -(index * 7));
+    return {
+      sliceIndex: index as SevenDayCapabilitySliceV1["sliceIndex"],
+      startDate: addDaysIso(endDate, -6),
+      endDate,
+      completeSevenDays: true as const,
+      contactCount: 0,
+      duration: {
+        unit: "seconds" as const,
+        value: 0,
+        authority: "exact" as const,
+        includedActivityCount: 0,
+        missingActivityCount: 0,
         reasonCodes: [],
       },
-      rolling90Day: {
-        state: "unavailable",
-        data: null,
-        coverage: unavailableCoverage,
+      distance: {
+        unit: "metres" as const,
+        value: 0,
+        authority: "exact" as const,
+        includedActivityCount: 0,
+        missingActivityCount: 0,
         reasonCodes: [],
       },
-      comparablePerformance: {
+      eligibleEasyLongContacts: [],
+      activityRevisionFingerprint: "a".repeat(64),
+    };
+  });
+  return {
+    version: RUNNER_PLAN_CAPABILITY_VECTOR_VERSION,
+    formulaVersion: RUNNER_PLAN_CAPABILITY_FORMULA_VERSION,
+    vectorId: "b".repeat(64),
+    snapshot: {
+      version: "runner_fitness_profile_snapshot_v1",
+      snapshotId: `qa-fixture-capability-${input.startDate}`,
+      runnerFactsRevision: `qa-fixture-runner-facts-${input.startDate}`,
+    },
+    cutoff: {
+      date: input.cutoffDate,
+      timeZone: "UTC",
+      timezoneBasis: "historical_local_date",
+    },
+    sourceFingerprint: "c".repeat(64),
+    sevenDaySlices: emptySlices,
+    windows: {
+      recent7: { sliceIndex: 0, state: "unavailable" },
+      base28: { sliceIndexes: [0, 1, 2, 3], state: "unavailable" },
+      capacity90: {
+        completeSliceIndexes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        leadingPartialBoundary: {
+          startDate: addDaysIso(input.cutoffDate, -89),
+          endDate: addDaysIso(input.cutoffDate, -84),
+          completeSevenDays: false,
+          contextOnly: true,
+        },
         state: "unavailable",
-        data: null,
-        coverage: unavailableCoverage,
-        reasonCodes: ["normalized_stream_not_persisted"],
       },
     },
+    performanceEvidence: {
+      phase: "phase_a_whole_activity_only",
+      state: "unavailable",
+      records: [],
+      contiguousSegmentEvidence: {
+        state: "unavailable",
+        reasonCodes: ["performance_samples_unavailable", "performance_segment_unavailable"],
+      },
+      heartRateAuthority: "unavailable",
+      reasonCodes: [
+        "performance_whole_activity_unavailable",
+        "performance_samples_unavailable",
+        "performance_segment_unavailable",
+      ],
+    },
+    evidenceConfidence: {
+      recent7: "unavailable",
+      base28: "unavailable",
+      capacity90: "unavailable",
+      performanceEvidence: "unavailable",
+    },
+    openingAnchor: {
+      basis: "unavailable",
+      recent7DistanceMetres: 0,
+      recent7DurationSeconds: 0,
+      enforcedOpeningDemand: null,
+      longRunDemand: null,
+      reasonCodes: ["opening_anchor_unavailable"],
+    },
+    additionalEasyContact: {
+      currentContacts: 0,
+      proposedContacts: 0,
+      decision: "not_applicable_reentry",
+      supportSliceIndex: null,
+      maximumOpeningDemand: null,
+      reasonCodes: ["recent7_no_contacts"],
+    },
+    constraints: {
+      maximumRunningDaysPerWeek: 4,
+      fixedRestDays: ["Wednesday", "Friday", "Sunday"],
+      preferredLongRunDay: "Saturday",
+      currentRunningLimitation: "unavailable",
+      outcomeAdmission: "permitted",
+    },
+    reasonCodes: [
+      "recent7_no_contacts",
+      "opening_anchor_unavailable",
+      "limitation_state_unavailable",
+      "capacity90_partial_boundary",
+      "capacity90_recurrence_unproven",
+      "performance_whole_activity_unavailable",
+      "performance_samples_unavailable",
+      "performance_segment_unavailable",
+    ],
   };
-  return projectRunnerFitnessProfileForInitialPlan(snapshot);
 }
 
 export function isAiGeneratedRunningPlanDevFixtureEnabled(env = readRuntimeEnv()) {

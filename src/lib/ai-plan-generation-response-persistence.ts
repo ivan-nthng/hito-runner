@@ -667,10 +667,12 @@ function materialAiFirstPlanRequestContext(input: unknown): Json | null {
   const parsed = structuredPlanAuthoringInputSchema.safeParse(input);
   if (!parsed.success) return null;
   const material = JSON.parse(stableJsonStringify(parsed.data)) as Record<string, unknown>;
-  const profile = material.initialPlanProfile;
-  if (!profile || Array.isArray(profile) || typeof profile !== "object") return null;
-  delete (profile as Record<string, unknown>).asOf;
-  delete (profile as Record<string, unknown>).snapshotId;
+  const capability = material.runnerCapability;
+  if (!capability || Array.isArray(capability) || typeof capability !== "object") return null;
+  delete (capability as Record<string, unknown>).vectorId;
+  const snapshot = (capability as Record<string, unknown>).snapshot;
+  if (!snapshot || Array.isArray(snapshot) || typeof snapshot !== "object") return null;
+  delete (snapshot as Record<string, unknown>).snapshotId;
   return toJsonObject(material, "material request context");
 }
 

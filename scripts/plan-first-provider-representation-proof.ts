@@ -35,17 +35,17 @@ import {
   buildReviewedAiGeneratedRunningPlanPreview as buildReviewedAiGeneratedRunningPlanPreviewRuntime,
   type RunningPlanPreviewActionInput,
 } from "../src/lib/running-plan-engine-actions";
-import { buildProofInitialPlanProfile } from "./runner-fitness-profile-initial-plan-proof-helpers";
+import { buildProofRunnerCapability } from "./runner-plan-capability-proof-helpers";
 
 const authoringInput = buildAiGeneratedRunningPlanQaFixtureAuthoringInput("2026-08-21");
 
 export function buildAiGeneratedRunningPlanAuthoringInput(
   input: RunningPlanPreviewActionInput,
-  profile = buildProofInitialPlanProfile(input),
+  profile = buildProofRunnerCapability(input),
 ) {
   return buildAiGeneratedRunningPlanAuthoringInputRuntime(
     input,
-    profile.initialPlanProfile,
+    profile.runnerCapability,
     profile.acceptedHeartRateProfile,
   );
 }
@@ -54,10 +54,10 @@ export function buildReviewedAiGeneratedRunningPlanPreview(
   input: AiGeneratedRunningPlanPreviewInput,
   options: Parameters<typeof buildReviewedAiGeneratedRunningPlanPreviewRuntime>[1] = {},
 ) {
-  const profile = buildProofInitialPlanProfile(input);
+  const profile = buildProofRunnerCapability(input);
   return buildReviewedAiGeneratedRunningPlanPreviewRuntime(input, {
     ...options,
-    initialPlanProfile: options.initialPlanProfile ?? profile.initialPlanProfile,
+    runnerCapability: options.runnerCapability ?? profile.runnerCapability,
     acceptedHeartRateProfile: options.acceptedHeartRateProfile ?? profile.acceptedHeartRateProfile,
   });
 }
@@ -123,10 +123,10 @@ export async function validatePlanFirstProviderRepresentationContract() {
         benchmark_relative_quality_safety: Record<string, unknown> | null;
         weekly_quality_density: Record<string, unknown> | null;
         initial_block_progression_safety: Record<string, unknown>;
-        initial_plan_profile: {
-          components: {
-            constraints: Record<string, unknown>;
-          };
+        runner_capability: {
+          version: string;
+          sevenDaySlices: unknown[];
+          openingAnchor: { basis: string };
         };
       };
     };
@@ -173,10 +173,13 @@ export async function validatePlanFirstProviderRepresentationContract() {
     },
   });
   assert.equal(
-    "trainingPreferences" in
-      promptPayload.runnerFacts.runner.initial_plan_profile.components.constraints,
-    false,
-    "The provider payload must receive the one resolved Calendar availability, not a second settings-owned schedule.",
+    promptPayload.runnerFacts.runner.runner_capability.version,
+    "runner_plan_capability_vector_v1",
+  );
+  assert.equal(promptPayload.runnerFacts.runner.runner_capability.sevenDaySlices.length, 12);
+  assert.equal(
+    promptPayload.runnerFacts.runner.runner_capability.openingAnchor.basis,
+    "unavailable",
   );
   assert.match(prompt.systemPrompt, /fully time-based long run may increase by at most 10 minutes/);
   assert.match(

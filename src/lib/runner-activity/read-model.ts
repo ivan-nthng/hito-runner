@@ -28,6 +28,7 @@ import type {
   RunnerActivityMutationReadback,
   RunnerActivityProgressReadModel,
 } from "@/lib/runner-activity/read-model-types";
+import type { RunnerPlanCapabilitySourceV1 } from "@/lib/runner-activity/plan-capability-contract";
 import type { ContinuationCalendarOutcomePacket } from "@/lib/runner-calendar-persistence";
 import { getRunnerCalendarContextForUserId } from "@/lib/runner-calendar-context";
 import { digestSha256Hex, stableJsonStringify } from "@/lib/review-token-signing";
@@ -134,6 +135,7 @@ export async function getRunnerFitnessProfileSnapshotForUser(input: {
     ...input,
     timeZone: input.settings?.calendarTimezone ?? "UTC",
     progress: projectRunnerActivityProgressForProduct(progress),
+    planAuthoringSource: buildPlanAuthoringSource(progress),
     history: projectRunnerActivityHistoryForProduct(history),
   });
 }
@@ -147,6 +149,7 @@ export async function assembleRunnerFitnessProfileSnapshotV1(input: {
   calendar: ContinuationCalendarOutcomePacket;
   evidence: ContinuationEvidencePacket;
   progress: RunnerActivityProgressProductModel;
+  planAuthoringSource: RunnerPlanCapabilitySourceV1;
   history: RunnerActivityHistoryProductPage;
 }): Promise<RunnerFitnessProfileSnapshotV1> {
   const evidenceByWorkoutId = new Map(
@@ -314,6 +317,7 @@ export async function assembleRunnerFitnessProfileSnapshotV1(input: {
       resultEvidence: { fingerprint: input.evidence.evidenceRevisionFingerprint },
       runnerActivity: { fingerprint: runnerActivityFingerprint },
     },
+    planAuthoringSource: input.planAuthoringSource,
     components: {
       constraints: {
         state: constraintsState,
@@ -620,6 +624,75 @@ function providerNeutralSequenceFacts(progress: RunnerActivityProgressProductMod
         ]),
       ),
     })),
+  };
+}
+
+function buildPlanAuthoringSource(
+  progress: RunnerActivityProgressReadModel,
+): RunnerPlanCapabilitySourceV1 {
+  const sequence = progress.fitActivitySequence;
+  const advanced = progress.advancedMetrics;
+  if (sequence.status === "updating" || advanced.status === "updating") {
+    return {
+      version: "runner_plan_capability_source_v1",
+      state: "updating",
+      activities: [],
+      records: [],
+      formulaVersions: [sequence.formulaVersion].sort(),
+      reasonCodes: ["source_revision_updating"],
+    };
+  }
+  if (sequence.status === "unavailable") {
+    return {
+      version: "runner_plan_capability_source_v1",
+      state: "contradictory",
+      activities: [],
+      records: [],
+      formulaVersions: [sequence.formulaVersion].sort(),
+      reasonCodes: ["source_revision_contradictory"],
+    };
+  }
+  return {
+    version: "runner_plan_capability_source_v1",
+    state: "current",
+    activities: sequence.points.map((point) => ({
+      activityId: point.id,
+      activityRevisionId: point.evidence.activityRevisionId,
+      sourceRevisionId: point.evidence.sourceRevisionId,
+      localDate: point.historicalTime.localDate,
+      durationSeconds:
+        point.observations.timer_duration.value == null
+          ? null
+          : point.observations.timer_duration.value * 60,
+      distanceMetres:
+        point.observations.distance.value == null ? null : point.observations.distance.value * 1000,
+      classification: point.context.workoutClassification,
+    })),
+    records:
+      advanced.status === "current"
+        ? advanced.records.items.map((record) => ({
+            activityId: record.activityId,
+            activityRevisionId: record.activityRevisionId,
+            sourceRevisionId: record.sourceRevisionId,
+            evidenceRevisionId: record.evidenceRevisionId,
+            recordClass: record.recordClass,
+            distanceKey: record.distanceKey,
+            distanceMetres: record.distanceMeters,
+            elapsedSeconds: record.elapsedSeconds,
+            eventDate: record.eventDate,
+            provenance: record.provenance,
+            formulaVersion: record.formulaVersion,
+          }))
+        : [],
+    formulaVersions: Array.from(
+      new Set([
+        sequence.formulaVersion,
+        ...(advanced.status === "current"
+          ? [advanced.formulaSetVersion, ...Object.values(advanced.formulaVersions)]
+          : []),
+      ]),
+    ).sort(),
+    reasonCodes: [],
   };
 }
 

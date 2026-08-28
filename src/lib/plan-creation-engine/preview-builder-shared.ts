@@ -13,7 +13,7 @@ import type {
 } from "@/lib/plan-creation-engine/source-types";
 import type { WeekdayName } from "@/lib/weekday-rest-invariants";
 import type { AcceptedRunnerHeartRateProfile } from "@/lib/heart-rate-zones";
-import type { RunnerFitnessProfileInitialPlanProjectionV1 } from "@/lib/runner-activity/product-contract";
+import type { RunnerPlanCapabilityVectorV1 } from "@/lib/runner-activity/plan-capability-contract";
 
 export const RUNNING_PLAN_PREVIEW_REST_DAY_KIND = "rest" as const;
 
@@ -33,6 +33,7 @@ export interface BuildRunningPlanPreviewInput {
   startDate?: string | null;
   benchmark?: RunningPlanBenchmarkInput | null;
   runnerComment?: string | null;
+  currentRunningLimitation?: "no" | "yes" | "unsure" | null;
   planGoalIntent: PlanGoalIntentInput & {
     distance: NonNullable<PlanGoalIntentInput["distance"]>;
   };
@@ -75,6 +76,5 @@ export interface RunningPlanPreviewNormalizedInputSummary {
   trainingWeekdays: readonly WeekdayName[];
   loadContext: RunningPlanPreviewLoadContext;
   heartRateProfile: AcceptedRunnerHeartRateProfile;
-  initialPlanProfile: RunnerFitnessProfileInitialPlanProjectionV1;
-  initialPlanAdmission: "authoring_ready_factual" | "authoring_ready_constraint_only";
+  runnerCapability: RunnerPlanCapabilityVectorV1;
 }

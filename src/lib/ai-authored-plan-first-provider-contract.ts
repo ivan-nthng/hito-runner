@@ -633,14 +633,13 @@ export function buildAiAuthoredPlanFirstPrompt({
       ? "calendar.fixed_rest_weekdays are reviewable placement preferences, not a structural rejection rule. Preserve a supplied selected target date even when it falls on one of those weekdays; Backend will surface that exact exception for explicit review."
       : "No fixed rest weekdays were supplied. Choose rest-day placement as the coach.",
   ];
-  const initialPlanProfileInstruction =
-    authoringInput.initialPlanAdmission === "authoring_ready_factual"
-      ? "runner.initial_plan_profile contains the accepted factual baseline. Use only available values with their exact coverage and missing reasons. Do not turn latest-five covered dates into a trend, threshold, or shortcut. Never infer comparable performance while it is unavailable."
-      : "runner.initial_plan_profile has no usable observed baseline. Author conservatively from verified constraints only; do not invent recent volume, longest run, pace, heart-rate response, capacity, or performance adaptation.";
-  const progressionInstruction =
-    authoringInput.initialPlanAdmission === "authoring_ready_factual"
-      ? "Follow runner.initial_block_progression_safety exactly. Its factual baseline and coverage come only from runner.initial_plan_profile; never strengthen partial facts or fill missing values. Keep progression conservative and use the fourth full week as a cutback."
-      : "Follow runner.initial_block_progression_safety exactly. Because no recent volume or longest-run baseline is available, each fully time-based long run may increase by at most 10 minutes from the previous fully time-based long run, summed explicitly timed runnable minutes (excluding distance prescriptions rather than converting them) may increase by at most 15 percent from the previous comparable calendar week, and the first detailed block must not use long_run_with_steady_finish or marathon_steady_specificity. In an exact four-full-week detailed block, use three conservative build weeks followed by a fourth-week cutback: both summed explicitly timed runnable minutes and the timed long run must be at least 15 percent lower than week three, and runnable contact count must not exceed week three. Do not invent a baseline or convert distance into time.";
+  const hasOpeningAnchor = authoringInput.runnerCapability.openingAnchor.basis !== "unavailable";
+  const runnerCapabilityInstruction = hasOpeningAnchor
+    ? "runner.runner_capability is the immutable factual authoring boundary. Preserve its exact Recent7 same-unit opening demand, contact ceiling, long-run demand and evidence authority. Confidence changes authority, never arithmetic; do not divide, impute, convert units, or strengthen missing facts."
+    : "runner.runner_capability has no enforceable Recent7 opening anchor. Author conservatively through the existing constraint/re-entry path; Base28 and Capacity90 are context only and cannot manufacture current volume, pace, heart-rate response or performance authority.";
+  const progressionInstruction = hasOpeningAnchor
+    ? "Follow runner.initial_block_progression_safety and runner.runner_capability exactly. The first detailed week's selected-unit demand must preserve the exact Recent7 anchor unless supported_growth explicitly permits a higher value no greater than maximum_opening_demand. A +1 contact is easy/recovery only and never adds intensity or long-run demand."
+    : "Follow runner.initial_block_progression_safety exactly. Because no recent volume or longest-run baseline is available, each fully time-based long run may increase by at most 10 minutes from the previous fully time-based long run, summed explicitly timed runnable minutes (excluding distance prescriptions rather than converting them) may increase by at most 15 percent from the previous comparable calendar week, and the first detailed block must not use long_run_with_steady_finish or marathon_steady_specificity. In an exact four-full-week detailed block, use three conservative build weeks followed by a fourth-week cutback: both summed explicitly timed runnable minutes and the timed long run must be at least 15 percent lower than week three, and runnable contact count must not exceed week three. Do not invent a baseline or convert distance into time.";
   const paceAuthorityInstruction =
     paceProvenance === "no_benchmark_ai_estimate"
       ? "No factual executable pace authority is available: runner.benchmark and goal.target_finish_time are both null. Do not author target.primary_execution_mode=pace anywhere. Use a complete accepted heart-rate band only where heart rate can govern the duration. Short work repeats use controlled_short_repetition or controlled_stride and their fixed-duration recovery children use controlled_short_recovery; uphill work/downhill recovery use their explicit terrain-safe effort targets. Never invent pace from age, fitness level, distance, or generic coaching norms."
@@ -687,7 +686,7 @@ export function buildAiAuthoredPlanFirstPrompt({
     controlledTempoExecutionInstruction,
     "When runner.benchmark_relative_quality_safety is not null, read its exact fastest_permitted_pace, fastest_permitted_pace_seconds_per_km, applicable_workout_identities, and maximum_rpe_by_workout_identity before authoring. For every listed identity, every endpoint of every substantive pace command must be at least that many seconds per kilometer and therefore no faster than fastest_permitted_pace. Its local cue must include the exact marker RPE max N/10 with a whole-number N no greater than that identity's maximum. Warm-up, cooldown, and recovery leaves are excluded. If those safe facts cannot be authored, abstain or choose another truthful canonical identity rather than returning an unsafe executable prescription.",
     "When runner.weekly_quality_density is not null, each calendar week may contain at most one workout from non_long_quality_families and at most one long-run-family workout. A long run with a steady or quality finish still occupies the one long-run stress slot. Every other session that week must be easy or recovery; never return two weekday quality sessions plus a long run.",
-    initialPlanProfileInstruction,
+    runnerCapabilityInstruction,
     progressionInstruction,
     "For target.primary_execution_mode=heart_rate, band_reference must identify exactly one complete named guidance band from runner.heart_rate_profile. command is either that complete numeric BPM band or an AI-selected numeric execution subrange fully contained inside it. Write the command suffix exactly as lowercase bpm, for example NNN-NNN bpm. A subrange must span at least 5 BPM and the step cue must state its stage-specific coaching purpose. Never combine references, cross the selected band, bridge a gap, emit a single-BPM command, or narrow a zero-width band. The accepted profile source remains estimated or personal exactly as supplied.",
     "Do not author an HR execution subrange for interval or sharpening repeats, strides, uphill repeats, or taper tune-up fast transitions. When factual pace authority is absent, do not author even a complete HR band for the short work repetitions or their fixed-duration recovery children identified above because delayed heart-rate response cannot govern them. Use the exact effort kind instead. Backend validates the authored reference and range but never repairs either.",
@@ -752,16 +751,16 @@ export function buildAiAuthoredPlanFirstProviderContext(
     ? WEEKDAY_NAMES.filter((day) => !fixedRestWeekdays.includes(day))
     : null;
   const heartRateProfile = authoringInput.runnerFacts.heartRateProfile;
+  const targetDate = authoringInput.planGoalIntent.targetDate;
+  if (!targetDate) {
+    throw new Error("Plan-first provider context requires the selected target date.");
+  }
   const adaptationContext = buildAiAuthoredFirstSessionAdaptationContext(authoringInput);
   const proposedDetailedBlockEndDate = addDaysIso(authoringInput.schedule.startDate, 27);
   const detailedBlockEndDate =
-    authoringInput.planGoalIntent.targetDate < proposedDetailedBlockEndDate
-      ? authoringInput.planGoalIntent.targetDate
-      : proposedDetailedBlockEndDate;
+    targetDate < proposedDetailedBlockEndDate ? targetDate : proposedDetailedBlockEndDate;
   const futureProjectionStartDate =
-    authoringInput.planGoalIntent.targetDate > detailedBlockEndDate
-      ? addDaysIso(detailedBlockEndDate, 1)
-      : null;
+    targetDate > detailedBlockEndDate ? addDaysIso(detailedBlockEndDate, 1) : null;
 
   return {
     goal: {
@@ -771,7 +770,7 @@ export function buildAiAuthoredPlanFirstProviderContext(
     calendar: {
       start_date: authoringInput.schedule.startDate,
       latest_date: addDaysIso(authoringInput.schedule.startDate, 363),
-      requested_target_date: authoringInput.planGoalIntent.targetDate,
+      requested_target_date: targetDate,
       detailed_block_end_date: detailedBlockEndDate,
       future_projection_start_date: futureProjectionStartDate,
       preferred_workout_weekdays: preferredWorkoutWeekdays,
@@ -792,8 +791,8 @@ export function buildAiAuthoredPlanFirstProviderContext(
       weekly_quality_density: buildWeeklyQualityDensity(authoringInput),
       initial_block_progression_safety: {
         basis:
-          authoringInput.initialPlanAdmission === "authoring_ready_factual"
-            ? "runner_fitness_profile_factual_baseline"
+          authoringInput.runnerCapability.openingAnchor.basis !== "unavailable"
+            ? "runner_capability_exact_recent7_anchor"
             : "no_recent_volume_or_longest_run_baseline",
         maximum_timed_long_run_build_step_minutes: 10,
         maximum_fully_time_based_weekly_duration_increase_percent: 15,
@@ -804,7 +803,7 @@ export function buildAiAuthoredPlanFirstProviderContext(
           maximum_runnable_contact_increase_from_week_three: 0,
         },
       },
-      initial_plan_profile: buildInitialPlanProfileProviderFacts(authoringInput),
+      runner_capability: authoringInput.runnerCapability,
       heart_rate_profile: {
         source: heartRateProfile.source,
         accepted: heartRateProfile.accepted,
@@ -819,18 +818,6 @@ export function buildAiAuthoredPlanFirstProviderContext(
       ...(authoringInput.requestContext?.runnerComment
         ? { plan_request_comment: authoringInput.requestContext.runnerComment }
         : {}),
-    },
-  };
-}
-
-function buildInitialPlanProfileProviderFacts(authoringInput: StructuredPlanAuthoringInput) {
-  const { trainingPreferences: _settingsAvailability, ...constraints } =
-    authoringInput.initialPlanProfile.components.constraints;
-  return {
-    ...authoringInput.initialPlanProfile,
-    components: {
-      ...authoringInput.initialPlanProfile.components,
-      constraints,
     },
   };
 }

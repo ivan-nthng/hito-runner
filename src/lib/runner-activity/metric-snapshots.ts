@@ -103,6 +103,12 @@ type WorkoutLogRow = {
   rpe: number | null;
 };
 
+type PlannedWorkoutClassificationRow = {
+  id: string;
+  workout_type: string;
+  workout_family: string | null;
+};
+
 type ObservationRow = {
   id: string;
   activity_id: string;
@@ -524,7 +530,15 @@ async function loadGate4Activities(
     field: "planned_workout_id",
     values: plannedWorkoutIds,
   });
+  const plannedWorkouts = await loadRowsByValues<PlannedWorkoutClassificationRow>({
+    table: "planned_workouts",
+    columns: "id, workout_type, workout_family",
+    userId,
+    field: "id",
+    values: plannedWorkoutIds,
+  });
   const logByWorkout = new Map(logs.map((log) => [log.planned_workout_id, log]));
+  const plannedWorkoutById = new Map(plannedWorkouts.map((workout) => [workout.id, workout]));
   const sourceById = new Map(activitySources.map((source) => [source.id, source]));
   const sourceRevisionById = new Map(
     sourceRevisions.map((sourceRevision) => [sourceRevision.id, sourceRevision]),
@@ -560,6 +574,9 @@ async function loadGate4Activities(
         sourceById,
       }),
       recordContext: readRunnerActivityRunningContext(revision.normalized_summary),
+      workoutClassification: classifyPlanAuthoringWorkout(
+        plannedWorkoutId ? plannedWorkoutById.get(plannedWorkoutId) : undefined,
+      ),
       rpeLinkState: !plannedWorkoutId ? "missing" : matchCount === 1 ? "exact" : "ambiguous",
       rpeInputPresent: plannedWorkoutId
         ? Boolean(logByWorkout.get(plannedWorkoutId)?.rpe) ||
@@ -571,6 +588,15 @@ async function loadGate4Activities(
       },
     };
   });
+}
+
+function classifyPlanAuthoringWorkout(
+  workout: PlannedWorkoutClassificationRow | undefined,
+): "easy" | "long" | null {
+  if (!workout) return null;
+  if (workout.workout_type === "long_run" || workout.workout_family === "long") return "long";
+  if (workout.workout_type === "easy") return "easy";
+  return null;
 }
 
 function fitEvidenceForActivity(input: {
@@ -793,7 +819,7 @@ async function loadPaged<T>(
 }
 
 async function loadRowsByValues<T>(input: {
-  table: "workout_logs";
+  table: "workout_logs" | "planned_workouts";
   columns: string;
   userId: string;
   field: string;

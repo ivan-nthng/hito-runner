@@ -16,13 +16,13 @@ import {
 import type { TrainingPlanV2 } from "../../src/lib/imported-plan";
 import type { BuildRunningPlanPreviewInput } from "../../src/lib/plan-creation-engine";
 import { addDaysIso, diffDaysIso } from "../../src/lib/training";
-import { buildProofInitialPlanProfile } from "../runner-fitness-profile-initial-plan-proof-helpers";
+import { buildProofRunnerCapability } from "../runner-plan-capability-proof-helpers";
 
 function buildAiGeneratedRunningPlanAuthoringInput(input: BuildRunningPlanPreviewInput) {
-  const profile = buildProofInitialPlanProfile(input);
+  const profile = buildProofRunnerCapability(input);
   return buildAiGeneratedRunningPlanAuthoringInputRuntime(
     input,
-    profile.initialPlanProfile,
+    profile.runnerCapability,
     profile.acceptedHeartRateProfile,
   );
 }

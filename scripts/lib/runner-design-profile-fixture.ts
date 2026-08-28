@@ -96,7 +96,7 @@ import { WORKOUT_RESULT_STORAGE_BUCKET } from "../../src/lib/workout-result-impo
 import { saveWorkoutLogForUser } from "../../src/lib/workout-log-actions";
 import { markRunnerActivitySourceRemovalPendingForFixture } from "./runner-activity-gate-4-fixture";
 import { loginToLoopbackRuntime } from "./runner-activity-proof-runtime";
-import { buildProofInitialPlanProfile } from "../runner-fitness-profile-initial-plan-proof-helpers";
+import { buildProofRunnerCapability } from "../runner-plan-capability-proof-helpers";
 
 export const RUNNER_DESIGN_PROFILE_FIXTURE_VERSION = "runner_design_profile_v1" as const;
 export const RUNNER_DESIGN_PROFILE_FIXTURE_ROLE = "saved-plan-readback" as const;
@@ -701,10 +701,10 @@ async function prepareAdaptiveInitialPlanReviewFixture(input: {
       targetDate,
     },
   };
-  const proofProfile = buildProofInitialPlanProfile(previewInput);
+  const proofProfile = buildProofRunnerCapability(previewInput);
   const authoring = buildAiGeneratedRunningPlanAuthoringInput(
     previewInput,
-    proofProfile.initialPlanProfile,
+    proofProfile.runnerCapability,
     proofProfile.acceptedHeartRateProfile,
   );
   assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);

@@ -65,7 +65,6 @@ import {
   AI_GENERATED_RUNNING_PLAN_SOURCE_KIND,
   buildAiGeneratedRunningPlanPreview as buildAiGeneratedRunningPlanPreviewRuntime,
   buildAiGeneratedRunningPlanAuthoringInput as buildAiGeneratedRunningPlanAuthoringInputRuntime,
-  resolveInitialPlanAuthoringAdmission,
 } from "../src/lib/ai-generated-running-plan";
 import { buildImportedPlanSeed } from "../src/lib/imported-plan";
 import { DEFAULT_LOCAL_AUTH_ACCOUNTS_FILE } from "../src/lib/local-auth-account-registry.server";
@@ -106,9 +105,9 @@ import {
   validatePlanFirstProviderRepresentationContract,
 } from "./plan-first-provider-representation-proof";
 import {
-  buildProofInitialPlanProfile,
-  buildProofPersonalInitialPlanProfile,
-} from "./runner-fitness-profile-initial-plan-proof-helpers";
+  buildProofPersonalRunnerCapability,
+  buildProofRunnerCapability,
+} from "./runner-plan-capability-proof-helpers";
 
 const baseInput = {
   age: 36,
@@ -192,10 +191,10 @@ function buildAiGeneratedRunningPlanPreview(
   input: RunningPlanPreviewActionInput,
   options: Parameters<typeof buildAiGeneratedRunningPlanPreviewRuntime>[1] = {},
 ) {
-  const profile = buildProofInitialPlanProfile(input);
+  const profile = buildProofRunnerCapability(input);
   return buildAiGeneratedRunningPlanPreviewRuntime(input, {
     ...options,
-    initialPlanProfile: options.initialPlanProfile ?? profile.initialPlanProfile,
+    runnerCapability: options.runnerCapability ?? profile.runnerCapability,
     acceptedHeartRateProfile: options.acceptedHeartRateProfile ?? profile.acceptedHeartRateProfile,
   });
 }
@@ -206,7 +205,7 @@ validatePlanFirstHeartRateTargetContract();
 await validatePlanFirstPreviewScenarios();
 validateAdaptiveTrainingDecisionGoldenProof();
 await validatePlanFirstAuthoringAuthority();
-await validateInitialPlanProfileAdmissionContract();
+await validateRunnerPlanCapabilityAdmissionContract();
 await validateRunnerPlanCommentContract();
 await validateFaithfulPlanFirstAtomization();
 validateDistanceFirstInputTruth();
@@ -497,8 +496,14 @@ async function validateCompletedAiPlanResponseRetentionPersistence() {
     assert.ok(localFixtureResponse, "The accepted local fixture response must be retained.");
     assert.equal(localFixtureResponse!.provider_model, AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_MODEL);
     const volatileAcceptedRetryInput = structuredClone(resolved.authoringInput);
-    volatileAcceptedRetryInput.initialPlanProfile.asOf = "2026-06-08T12:00:01.000Z";
-    volatileAcceptedRetryInput.initialPlanProfile.snapshotId = "accepted-volatile-retry";
+    volatileAcceptedRetryInput.runnerCapability = {
+      ...volatileAcceptedRetryInput.runnerCapability,
+      vectorId: "1".repeat(64),
+      snapshot: {
+        ...volatileAcceptedRetryInput.runnerCapability.snapshot,
+        snapshotId: "accepted-volatile-retry",
+      },
+    };
     let duplicateInitialDispatches = 0;
     const acceptedDuplicate = await generateAiFirstPlanDraftPreview({
       input: volatileAcceptedRetryInput,
@@ -689,7 +694,7 @@ async function validateCompletedAiPlanResponseRetentionPersistence() {
         responseSchemaMode: "responses_json_schema_adaptive_blueprint_four_week_v1_strict",
         responseSchemaName: AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME,
         timeoutMs: 0,
-        maxOutputTokens: 32_000,
+        maxOutputTokens: DEFAULT_AI_FIRST_PLAN_MAX_OUTPUT_TOKENS,
       }),
     };
     let immutableAliasTrace = await createAiPlanGenerationLedgerTrace({
@@ -701,7 +706,7 @@ async function validateCompletedAiPlanResponseRetentionPersistence() {
       userPrompt: immutableAliasPrompt.userPrompt,
       responseSchema: immutableAliasPrompt.responseSchema,
       timeoutMs: 0,
-      maxOutputTokens: 32_000,
+      maxOutputTokens: DEFAULT_AI_FIRST_PLAN_MAX_OUTPUT_TOKENS,
     });
     immutableAliasTrace = await attachOutputToAiPlanGenerationLedgerTrace({
       trace: immutableAliasTrace,
@@ -743,8 +748,30 @@ async function validateCompletedAiPlanResponseRetentionPersistence() {
     });
 
     const immutableRetryInput = structuredClone(resolved.authoringInput);
-    immutableRetryInput.initialPlanProfile.asOf = "2026-06-08T12:00:02.000Z";
-    immutableRetryInput.initialPlanProfile.snapshotId = "immutable-alias-retry";
+    immutableRetryInput.runnerCapability = {
+      ...immutableRetryInput.runnerCapability,
+      vectorId: "2".repeat(64),
+      snapshot: {
+        ...immutableRetryInput.runnerCapability.snapshot,
+        snapshotId: "immutable-alias-retry",
+      },
+    };
+    const immutableRetryPrompt = buildAiAuthoredPlanFirstPrompt({
+      authoringInput: immutableRetryInput,
+      today: scenario.input.startDate,
+    });
+    const immutableReusable = await getReusableAiPlanGenerationResponseForUser({
+      userId: ownerId,
+      requestContext: immutableRetryInput,
+      versionContext: immutableAliasVersionContext,
+      providerModel: immutableAliasModel,
+      prompt: immutableRetryPrompt,
+    });
+    assert.equal(
+      immutableReusable?.id,
+      immutableAliasRow.id,
+      "A retry that changes only capability revision identities must reach the retained response before candidate persistence.",
+    );
     let immutableRetryDispatches = 0;
     const immutableRecovered = await generateAiFirstPlanDraftPreview({
       input: immutableRetryInput,
@@ -761,7 +788,9 @@ async function validateCompletedAiPlanResponseRetentionPersistence() {
     assert.equal(
       immutableRecovered.ok,
       true,
-      immutableRecovered.ok ? "" : immutableRecovered.message,
+      immutableRecovered.ok
+        ? ""
+        : `${immutableRecovered.metadata.unavailableReason}:${immutableRecovered.issues.join(",")}`,
     );
     if (!immutableRecovered.ok) throw new Error(immutableRecovered.message);
     assert.equal(immutableRetryDispatches, 0);
@@ -830,7 +859,11 @@ async function validateCompletedAiPlanResponseRetentionPersistence() {
     );
 
     const changedImmutableFacts = structuredClone(immutableRetryInput);
-    changedImmutableFacts.initialPlanProfile.runnerFactsRevision = "changed-after-response";
+    changedImmutableFacts.runnerCapability = {
+      ...changedImmutableFacts.runnerCapability,
+      sourceFingerprint: "f".repeat(64),
+      vectorId: "e".repeat(64),
+    };
     const changedImmutableRetry = await generateAiFirstPlanDraftPreview({
       input: changedImmutableFacts,
       apiKey: null,
@@ -1617,120 +1650,80 @@ async function validatePlanFirstAuthoringAuthority() {
   assert.equal(invalidProviderCalls, 0);
 }
 
-async function validateInitialPlanProfileAdmissionContract() {
+async function validateRunnerPlanCapabilityAdmissionContract() {
   const input = scenarios[0]!.input;
-  const factual = buildProofInitialPlanProfile(input, {
+  const factual = buildProofRunnerCapability(input, {
     recentState: "available",
     rollingState: "partial",
     latestState: "available",
   });
-  const factualAdmission = resolveInitialPlanAuthoringAdmission({
-    input,
-    profile: factual.initialPlanProfile,
-    acceptedHeartRateProfile: factual.acceptedHeartRateProfile,
-    availabilityConflict: null,
-  });
-  assert.equal(factualAdmission.result, "authoring_ready_factual");
   const factualAuthoring = buildAiGeneratedRunningPlanAuthoringInputRuntime(
     input,
-    factual.initialPlanProfile,
+    factual.runnerCapability,
     factual.acceptedHeartRateProfile,
   );
   assert.equal(factualAuthoring.ok, true, factualAuthoring.ok ? "" : factualAuthoring.message);
   if (!factualAuthoring.ok) throw new Error(factualAuthoring.message);
-  assert.equal(factualAuthoring.authoringInput.initialPlanAdmission, "authoring_ready_factual");
   assert.equal(
-    factualAuthoring.authoringInput.initialPlanProfile.snapshotId,
-    factual.initialPlanProfile.snapshotId,
+    factualAuthoring.authoringInput.runnerCapability.vectorId,
+    factual.runnerCapability.vectorId,
   );
-  assert.deepEqual(
-    factualAuthoring.authoringInput.initialPlanProfile.formulaVersions,
-    factual.initialPlanProfile.formulaVersions,
-  );
-  assert.notEqual(
-    factual.initialPlanProfile.components.recent28Day.current?.window.startDate,
-    factual.initialPlanProfile.components.recent28Day.previous?.window.startDate,
-  );
-  assert.deepEqual(factual.initialPlanProfile.components.latestFive.coveredDates, [
-    input.startDate,
-  ]);
+  assert.equal(factual.runnerCapability.sevenDaySlices.length, 12);
+  assert.deepEqual(factual.runnerCapability.windows.base28.sliceIndexes, [0, 1, 2, 3]);
   assert.equal(
-    JSON.stringify(factual.initialPlanProfile.components.latestFive).includes("activityId"),
-    false,
-    "Initial-plan projection must expose latest-five dates without inspection items.",
+    factual.runnerCapability.windows.capacity90.leadingPartialBoundary.contextOnly,
+    true,
   );
+  assert.equal(factual.runnerCapability.openingAnchor.basis, "distance_metres");
+  assert.equal(factual.runnerCapability.sevenDaySlices[0]?.contactCount, 2);
 
-  const partial = buildProofInitialPlanProfile(input, {
+  const partial = buildProofRunnerCapability(input, {
     recentState: "partial",
     rollingState: "unavailable",
   });
-  assert.equal(
-    resolveInitialPlanAuthoringAdmission({
-      input,
-      profile: partial.initialPlanProfile,
-      acceptedHeartRateProfile: partial.acceptedHeartRateProfile,
-      availabilityConflict: null,
-    }).result,
-    "authoring_ready_factual",
-  );
+  assert.equal(partial.runnerCapability.evidenceConfidence.recent7, "observed_sparse");
 
-  const constraintOnly = buildProofInitialPlanProfile(input, {
+  const constraintOnly = buildProofRunnerCapability(input, {
     recentState: "unavailable",
     rollingState: "not_applicable",
   });
   const constraintAuthoring = buildAiGeneratedRunningPlanAuthoringInputRuntime(
     input,
-    constraintOnly.initialPlanProfile,
+    constraintOnly.runnerCapability,
     constraintOnly.acceptedHeartRateProfile,
   );
+  assert.equal(constraintAuthoring.ok, true);
+  assert.equal(constraintOnly.runnerCapability.openingAnchor.basis, "unavailable");
   assert.equal(
-    constraintAuthoring.ok && constraintAuthoring.authoringInput.initialPlanAdmission,
-    "authoring_ready_constraint_only",
+    constraintOnly.runnerCapability.additionalEasyContact.decision,
+    "not_applicable_reentry",
   );
 
-  const updating = buildProofInitialPlanProfile(input, { recentState: "updating" });
-  const contradictory = buildProofInitialPlanProfile(input, {
+  const updating = buildProofRunnerCapability(input, { recentState: "updating" });
+  const contradictory = buildProofRunnerCapability(input, {
     recentState: "contradictory",
   });
-  assert.equal(
-    resolveInitialPlanAuthoringAdmission({
-      input,
-      profile: updating.initialPlanProfile,
-      acceptedHeartRateProfile: updating.acceptedHeartRateProfile,
-      availabilityConflict: null,
-    }).result,
-    "follow_up_required",
-  );
-  assert.equal(
-    resolveInitialPlanAuthoringAdmission({
-      input,
-      profile: contradictory.initialPlanProfile,
-      acceptedHeartRateProfile: contradictory.acceptedHeartRateProfile,
-      availabilityConflict: null,
-    }).result,
-    "no_prescription",
-  );
 
   let providerCalls = 0;
   for (const blocked of [updating, contradictory]) {
     const result = await buildAiGeneratedRunningPlanPreviewRuntime(input, {
-      initialPlanProfile: blocked.initialPlanProfile,
+      runnerCapability: blocked.runnerCapability,
       acceptedHeartRateProfile: blocked.acceptedHeartRateProfile,
       aiPreview: {
-        apiKey: "must-not-dispatch-initial-plan-profile-proof",
+        apiKey: "must-not-dispatch-runner-capability-proof",
         generationLedger: { disabled: true },
         fetchImpl: async () => {
           providerCalls += 1;
-          throw new Error("Blocked initial-plan admission reached provider dispatch.");
+          throw new Error("Blocked runner capability reached provider dispatch.");
         },
       },
     });
     assert.equal(result.ok, false);
   }
 
-  const persistedThreeDayProfile = buildProofInitialPlanProfile({ ...input, daysPerWeek: 3 });
+  const persistedThreeDayProfile = buildProofRunnerCapability({ ...input, daysPerWeek: 3 });
   const conflict = await buildAiGeneratedRunningPlanPreviewRuntime(input, {
-    initialPlanProfile: persistedThreeDayProfile.initialPlanProfile,
+    runnerCapability: persistedThreeDayProfile.runnerCapability,
     acceptedHeartRateProfile: persistedThreeDayProfile.acceptedHeartRateProfile,
     aiPreview: {
       apiKey: "must-not-dispatch-schedule-conflict-proof",
@@ -1745,17 +1738,59 @@ async function validateInitialPlanProfileAdmissionContract() {
   assert.equal(
     providerCalls,
     0,
-    "Blocked profile admission must precede provider lookup/dispatch.",
+    "Blocked capability admission must precede provider lookup/dispatch.",
   );
 
-  const changedFacts = buildProofInitialPlanProfile(input, {
+  const zeroBaselineFixture = buildAiGeneratedRunningPlanQaFixtureAuthoringInput("2026-06-08", {
+    mode: "prospective_preview",
+    selectedTargetDate: "2026-08-02",
+  });
+  const providerDraft = buildAiGeneratedRunningPlanDevFixtureProviderDraft(zeroBaselineFixture);
+  const forgedOpening = structuredClone(zeroBaselineFixture);
+  forgedOpening.runnerCapability = {
+    ...forgedOpening.runnerCapability,
+    openingAnchor: {
+      basis: "duration_seconds",
+      recent7DistanceMetres: null,
+      recent7DurationSeconds: 60,
+      enforcedOpeningDemand: 60,
+      longRunDemand: null,
+      reasonCodes: [],
+    },
+    additionalEasyContact: {
+      currentContacts: 1,
+      proposedContacts: 2,
+      decision: "not_admitted",
+      supportSliceIndex: null,
+      maximumOpeningDemand: 60,
+      reasonCodes: ["limitation_state_unavailable"],
+    },
+  };
+  const forgedOpeningResult = compileAiAuthoredPlanFirstDraft({
+    draft: providerDraft,
+    authoringInput: forgedOpening,
+  });
+  assert.equal(forgedOpeningResult.ok, false);
+  if (forgedOpeningResult.ok) throw new Error("Forged opening capability unexpectedly compiled.");
+  assert.ok(
+    forgedOpeningResult.issues.some((issue) =>
+      [
+        "ai_authored_plan_first_capability_contact_ceiling_exceeded",
+        "ai_authored_plan_first_capability_opening_unit_incomplete",
+        "ai_authored_plan_first_capability_opening_demand_invalid",
+      ].includes(issue.code),
+    ),
+    "Compiler must independently reject a provider opening outside the frozen capability.",
+  );
+
+  const changedFacts = buildProofRunnerCapability(input, {
     recentState: "available",
     rollingState: "partial",
     formulaSuffix: "v2",
   });
   const changedAuthoring = buildAiGeneratedRunningPlanAuthoringInputRuntime(
     input,
-    changedFacts.initialPlanProfile,
+    changedFacts.runnerCapability,
     changedFacts.acceptedHeartRateProfile,
   );
   assert.equal(changedAuthoring.ok, true);
@@ -1776,10 +1811,10 @@ async function validateFaithfulPlanFirstAtomization() {
       targetDate: "2026-06-15",
     },
   };
-  const personalProfile = buildProofPersonalInitialPlanProfile(paceInput);
+  const personalProfile = buildProofPersonalRunnerCapability(paceInput);
   const resolved = buildAiGeneratedRunningPlanAuthoringInputRuntime(
     paceInput,
-    personalProfile.initialPlanProfile,
+    personalProfile.runnerCapability,
     personalProfile.acceptedHeartRateProfile,
   );
   assert.equal(resolved.ok, true, resolved.ok ? "" : resolved.message);
@@ -1987,7 +2022,7 @@ async function validateFaithfulPlanFirstAtomization() {
   );
 
   const reviewedProjection = await buildReviewedAiGeneratedRunningPlanPreview(paceInput, {
-    initialPlanProfile: personalProfile.initialPlanProfile,
+    runnerCapability: personalProfile.runnerCapability,
     acceptedHeartRateProfile: personalProfile.acceptedHeartRateProfile,
     aiPreview: {
       apiKey: "projection-contract-proof",
@@ -2039,10 +2074,10 @@ async function validateFaithfulPlanFirstAtomization() {
       targetFinishTime: "1:10:00",
     },
   };
-  const targetProfile = buildProofPersonalInitialPlanProfile(targetInput);
+  const targetProfile = buildProofPersonalRunnerCapability(targetInput);
   const targetResolved = buildAiGeneratedRunningPlanAuthoringInputRuntime(
     targetInput,
-    targetProfile.initialPlanProfile,
+    targetProfile.runnerCapability,
     targetProfile.acceptedHeartRateProfile,
   );
   assert.equal(targetResolved.ok, true);
@@ -2089,15 +2124,25 @@ async function validateFirstPlanGenerationLifecycle() {
   if (!resolved.ok) throw new Error(resolved.message);
 
   const volatileOnlyRetry = structuredClone(resolved.authoringInput);
-  volatileOnlyRetry.initialPlanProfile.asOf = "2026-06-08T12:00:01.000Z";
-  volatileOnlyRetry.initialPlanProfile.snapshotId = "volatile-observation-retry";
+  volatileOnlyRetry.runnerCapability = {
+    ...volatileOnlyRetry.runnerCapability,
+    vectorId: "3".repeat(64),
+    snapshot: {
+      ...volatileOnlyRetry.runnerCapability.snapshot,
+      snapshotId: "volatile-observation-retry",
+    },
+  };
   assert.equal(
     areMateriallyEquivalentAiFirstPlanRequestContexts(resolved.authoringInput, volatileOnlyRetry),
     true,
-    "Only volatile observation identity may reuse an immutable first-plan response.",
+    "An unchanged capability request may reuse an immutable first-plan response.",
   );
   const changedFactsRetry = structuredClone(volatileOnlyRetry);
-  changedFactsRetry.initialPlanProfile.runnerFactsRevision = "changed-runner-facts";
+  changedFactsRetry.runnerCapability = {
+    ...changedFactsRetry.runnerCapability,
+    sourceFingerprint: "d".repeat(64),
+    vectorId: "c".repeat(64),
+  };
   assert.equal(
     areMateriallyEquivalentAiFirstPlanRequestContexts(resolved.authoringInput, changedFactsRetry),
     false,
@@ -2111,7 +2156,11 @@ async function validateFirstPlanGenerationLifecycle() {
     "A target-date change must not reuse an immutable first-plan response.",
   );
   const changedEvidenceRetry = structuredClone(volatileOnlyRetry);
-  changedEvidenceRetry.initialPlanProfile.components.recent28Day.evidence.missingCount += 1;
+  changedEvidenceRetry.runnerCapability = {
+    ...changedEvidenceRetry.runnerCapability,
+    sourceFingerprint: "b".repeat(64),
+    vectorId: "a".repeat(64),
+  };
   assert.equal(
     areMateriallyEquivalentAiFirstPlanRequestContexts(
       resolved.authoringInput,
@@ -3579,9 +3628,12 @@ async function validateLocalDevFixtureAvailabilityGating() {
       draft: fixtureDraft,
       authoringInput: {
         ...fixtureAuthoringInput,
-        initialPlanProfile: {
-          ...fixtureAuthoringInput.initialPlanProfile,
-          cutoffDate: addDaysIso(fixtureAuthoringInput.schedule.startDate, 1),
+        runnerCapability: {
+          ...fixtureAuthoringInput.runnerCapability,
+          cutoff: {
+            ...fixtureAuthoringInput.runnerCapability.cutoff,
+            date: addDaysIso(fixtureAuthoringInput.schedule.startDate, 1),
+          },
         },
       },
     });
@@ -3759,7 +3811,7 @@ async function validateLocalDevFixtureAvailabilityGating() {
       AI_GENERATED_RUNNING_PLAN_QA_FIXTURE_RESPONSE_ID,
     );
     const qaFixtureAuthoringInput = buildAiGeneratedRunningPlanQaFixtureAuthoringInput(
-      result.draft.normalizedInputSummary.initialPlanProfile.cutoffDate,
+      result.draft.normalizedInputSummary.runnerCapability.cutoff.date,
       {
         mode: "prospective_preview",
         selectedTargetDate: scenarios[0]!.input.planGoalIntent.targetDate,
@@ -3767,7 +3819,7 @@ async function validateLocalDevFixtureAvailabilityGating() {
     );
     const acceptedQaFixtureAuthoringInput = buildAiGeneratedRunningPlanAuthoringInputRuntime(
       scenarios[0]!.input,
-      result.draft.normalizedInputSummary.initialPlanProfile,
+      result.draft.normalizedInputSummary.runnerCapability,
       result.draft.normalizedInputSummary.heartRateProfile,
     );
     assert.equal(
@@ -3797,12 +3849,12 @@ async function validateLocalDevFixtureAvailabilityGating() {
     assert.equal(result.draft.normalizedInputSummary.heightCm, scenarios[0]!.input.heightCm);
     assert.equal(result.draft.normalizedInputSummary.weightKg, scenarios[0]!.input.weightKg);
     assert.deepEqual(
-      result.draft.normalizedInputSummary.initialPlanProfile,
-      acceptedQaFixtureAuthoringInput.authoringInput.initialPlanProfile,
-      "The QA fixture must freeze the accepted server-owned initial-plan profile.",
+      result.draft.normalizedInputSummary.runnerCapability,
+      acceptedQaFixtureAuthoringInput.authoringInput.runnerCapability,
+      "The QA fixture must freeze the accepted server-owned runner capability.",
     );
     assert.ok(
-      qaFixtureAuthoringInput.initialPlanProfile.cutoffDate <=
+      qaFixtureAuthoringInput.runnerCapability.cutoff.date <=
         qaFixtureAuthoringInput.schedule.startDate,
       "QA preview facts must not post-date its prospective detailed start.",
     );

@@ -101,7 +101,7 @@ import {
   type DisposablePersistencePreflight,
   type QaPoolSupabaseCleanupProof,
 } from "../lib/qa-pool-persistence-proof";
-import { buildProofInitialPlanProfile } from "../runner-fitness-profile-initial-plan-proof-helpers";
+import { buildProofRunnerCapability } from "../runner-plan-capability-proof-helpers";
 
 type DisposableCleanupProof = QaPoolSupabaseCleanupProof;
 type QaPoolUserLease = Awaited<ReturnType<typeof acquireQaPoolSupabaseUser>>;
@@ -203,7 +203,7 @@ export async function validatePersistenceContract(
     };
     const authoring = buildAiGeneratedRunningPlanAuthoringInput(
       previewInput,
-      sourceDraft.normalizedInputSummary.initialPlanProfile,
+      sourceDraft.normalizedInputSummary.runnerCapability,
       sourceDraft.normalizedInputSummary.heartRateProfile,
     );
     assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);
@@ -617,9 +617,9 @@ export async function validatePersistenceContract(
     if (otherFrozenCandidate.error) throw new Error(otherFrozenCandidate.error.message);
     const otherFrozenInput = asJsonRecord(otherFrozenCandidate.data.input_snapshot);
     assert.deepEqual(
-      otherFrozenInput?.initialPlanProfile,
-      otherReviewed.draft.normalizedInputSummary.initialPlanProfile,
-      "The real QA fixture path must freeze the accepted server-owned initial-plan profile.",
+      otherFrozenInput?.runnerCapability,
+      otherReviewed.draft.normalizedInputSummary.runnerCapability,
+      "The real QA fixture path must freeze the accepted server-owned runner capability.",
     );
     assert.deepEqual(otherFrozenInput?.runnerFacts, {
       age: otherReviewed.draft.normalizedInputSummary.age,
@@ -2517,9 +2517,15 @@ async function persistReviewedDraftProfileSnapshot(
   userId: string,
   draft: RunningPlanReviewedPreviewDraft<RunningPlanPreviewDraft>,
 ) {
-  const profile = draft.normalizedInputSummary.initialPlanProfile;
-  const fitnessLevel = profile.components.constraints.fitnessLevel;
-  if (!fitnessLevel) throw new Error("Reviewed initial-plan profile is missing fitness level.");
+  const capability = draft.normalizedInputSummary.runnerCapability;
+  const fitnessLevel =
+    draft.normalizedInputSummary.runnerLevel === "beginner_new_runner"
+      ? "new_to_running"
+      : draft.normalizedInputSummary.runnerLevel === "sometimes_runs"
+        ? "beginner"
+        : draft.normalizedInputSummary.runnerLevel === "runs_a_lot"
+          ? "running_regularly"
+          : "performance_focused";
 
   await updateUserSettingsForUserId(userId, {
     firstName: null,
@@ -2529,7 +2535,11 @@ async function persistReviewedDraftProfileSnapshot(
     weightKg: draft.normalizedInputSummary.weightKg,
     heightCm: draft.normalizedInputSummary.heightCm,
     fitnessLevel,
-    trainingPreferences: profile.components.constraints.trainingPreferences,
+    trainingPreferences: {
+      blocked_days: [...capability.constraints.fixedRestDays],
+      preferred_long_run_day: capability.constraints.preferredLongRunDay,
+      max_running_days_per_week: capability.constraints.maximumRunningDaysPerWeek,
+    },
     heartRateProfile: {
       zones: draft.normalizedInputSummary.heartRateProfile.zones.map(
         ({ reference, minBpm, maxBpm }) => ({
@@ -2772,12 +2782,12 @@ async function validatePersonalHeartRateProfilePersistence(input: {
         maxBpm: zone.maxBpm,
       })),
     });
-    const proofProfile = buildProofInitialPlanProfile(watchCanaryInput, {
+    const proofProfile = buildProofRunnerCapability(watchCanaryInput, {
       personalZones: PERSONAL_HEART_RATE_ZONES,
     });
     const authoring = buildAiGeneratedRunningPlanAuthoringInput(
       watchCanaryInput,
-      proofProfile.initialPlanProfile,
+      proofProfile.runnerCapability,
       acceptedHeartRateProfile,
     );
     assert.equal(authoring.ok, true, authoring.ok ? "" : authoring.message);

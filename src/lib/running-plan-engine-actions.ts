@@ -57,7 +57,7 @@ import {
   getCalendarWorkoutsWithLogsForUser,
   getContinuationCalendarOutcomePacket,
 } from "@/lib/runner-calendar-persistence";
-import { projectRunnerFitnessProfileForInitialPlan } from "@/lib/runner-activity/product-contract";
+import { deriveRunnerPlanCapabilityVectorV1 } from "@/lib/runner-activity/plan-capability";
 import {
   RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
   addRunningPlanReviewProof,
@@ -97,6 +97,7 @@ const runningPlanBenchmarkSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("recent_5k_pace"), recent5kPace: recent5kPaceSchema }).strict(),
   z.object({ kind: z.literal("unknown") }).strict(),
 ]);
+export const CURRENT_RUNNING_LIMITATION_VALUES = ["no", "yes", "unsure"] as const;
 
 export const runningPlanPreviewInputSchema = z
   .object({
@@ -121,6 +122,7 @@ export const runningPlanPreviewInputSchema = z
     startDate: z.string().trim().optional().nullable(),
     benchmark: runningPlanBenchmarkSchema.optional().nullable(),
     runnerComment: generatedPlanRunnerCommentInputSchema,
+    currentRunningLimitation: z.enum(CURRENT_RUNNING_LIMITATION_VALUES).optional().nullable(),
     planGoalIntent: planGoalIntentInputSchema.extend({
       distance: planGoalIntentDistanceInputSchema,
     }),
@@ -134,8 +136,6 @@ const savedPlanReviewSelectionSchema = z
     candidateVersion: z.number().int().positive(),
   })
   .strict();
-export const CURRENT_RUNNING_LIMITATION_VALUES = ["no", "yes", "unsure"] as const;
-
 const runningPlanReviewedPreviewInputSchema = runningPlanPreviewInputSchema.omit({
   runnerComment: true,
 });
@@ -551,11 +551,15 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
 
   let currentProfileFacts: Awaited<ReturnType<typeof getInitialPlanAuthoringFactsForUser>>;
   try {
-    const frozenProfile = exactness.draft.normalizedInputSummary.initialPlanProfile;
+    const frozenCapability = exactness.draft.normalizedInputSummary.runnerCapability;
     currentProfileFacts = await getInitialPlanAuthoringFactsForUser({
       userId,
-      asOf: frozenProfile.asOf,
-      cutoffDate: frozenProfile.cutoffDate,
+      asOf: `${frozenCapability.cutoff.date}T12:00:00.000Z`,
+      cutoffDate: frozenCapability.cutoff.date,
+      currentRunningLimitation:
+        frozenCapability.constraints.currentRunningLimitation === "unavailable"
+          ? undefined
+          : frozenCapability.constraints.currentRunningLimitation,
     });
   } catch {
     return buildConfirmFailure({
@@ -567,10 +571,10 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
 
   if (
     !currentProfileFacts ||
-    !stableJsonEqual(
-      currentProfileFacts.initialPlanProfile,
-      exactness.draft.normalizedInputSummary.initialPlanProfile,
-    ) ||
+    currentProfileFacts.runnerCapability.vectorId !==
+      exactness.draft.normalizedInputSummary.runnerCapability.vectorId ||
+    currentProfileFacts.runnerCapability.sourceFingerprint !==
+      exactness.draft.normalizedInputSummary.runnerCapability.sourceFingerprint ||
     !stableJsonEqual(
       currentProfileFacts.acceptedHeartRateProfile,
       exactness.draft.normalizedInputSummary.heartRateProfile,
@@ -877,6 +881,7 @@ export async function buildReviewedAiGeneratedRunningPlanPreviewForUser(
             userId,
             asOf: authoringInstant,
             cutoffDate: calendarDate,
+            currentRunningLimitation: data.currentRunningLimitation,
           })
         : null;
   } catch {
@@ -918,7 +923,7 @@ export async function buildReviewedAiGeneratedRunningPlanPreviewForUser(
       },
       ...(initialPlanFacts && acceptedRequestFactsMatch
         ? {
-            initialPlanProfile: initialPlanFacts.initialPlanProfile,
+            runnerCapability: initialPlanFacts.runnerCapability,
             acceptedHeartRateProfile: initialPlanFacts.acceptedHeartRateProfile,
           }
         : {}),
@@ -932,6 +937,7 @@ async function getInitialPlanAuthoringFactsForUser(input: {
   userId: string;
   asOf: string;
   cutoffDate: string;
+  currentRunningLimitation?: "no" | "yes" | "unsure" | null;
 }) {
   const settings = await getUserSettingsForUserId(input.userId, null);
   if (!settings) return null;
@@ -983,7 +989,10 @@ async function getInitialPlanAuthoringFactsForUser(input: {
   return {
     settings,
     acceptedHeartRateProfile: acceptedHeartRateProfile.data,
-    initialPlanProfile: projectRunnerFitnessProfileForInitialPlan(snapshot),
+    runnerCapability: await deriveRunnerPlanCapabilityVectorV1({
+      snapshot,
+      currentRunningLimitation: input.currentRunningLimitation,
+    }),
   };
 }
 
@@ -1018,13 +1027,17 @@ async function buildSavedPlanReviewState(
   } else if (record.confirmation) {
     validity = { state: "expired", reason: "already_confirmed" };
   } else {
-    const frozenProfile = draft.normalizedInputSummary.initialPlanProfile;
+    const frozenCapability = draft.normalizedInputSummary.runnerCapability;
     let currentFacts: Awaited<ReturnType<typeof getInitialPlanAuthoringFactsForUser>> = null;
     try {
       currentFacts = await getInitialPlanAuthoringFactsForUser({
         userId,
-        asOf: frozenProfile.asOf,
-        cutoffDate: frozenProfile.cutoffDate,
+        asOf: `${frozenCapability.cutoff.date}T12:00:00.000Z`,
+        cutoffDate: frozenCapability.cutoff.date,
+        currentRunningLimitation:
+          frozenCapability.constraints.currentRunningLimitation === "unavailable"
+            ? undefined
+            : frozenCapability.constraints.currentRunningLimitation,
       });
     } catch {
       currentFacts = null;
@@ -1105,10 +1118,10 @@ function savedPlanReviewFactsMatch(
 ) {
   return Boolean(
     currentFacts &&
-    stableJsonEqual(
-      currentFacts.initialPlanProfile,
-      draft.normalizedInputSummary.initialPlanProfile,
-    ) &&
+    currentFacts.runnerCapability.vectorId ===
+      draft.normalizedInputSummary.runnerCapability.vectorId &&
+    currentFacts.runnerCapability.sourceFingerprint ===
+      draft.normalizedInputSummary.runnerCapability.sourceFingerprint &&
     stableJsonEqual(
       currentFacts.acceptedHeartRateProfile,
       draft.normalizedInputSummary.heartRateProfile,

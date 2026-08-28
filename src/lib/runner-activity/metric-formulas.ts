@@ -69,6 +69,7 @@ export type Gate4ActivityInput = {
   elevationGainM: number | null;
   fitEvidence: RunnerActivityFitEvidenceInput;
   recordContext: string | null;
+  workoutClassification: "easy" | "long" | null;
   rpeLinkState: "exact" | "missing" | "ambiguous";
   rpeInputPresent: boolean;
   evidence: {
@@ -264,6 +265,7 @@ export async function gate4InputFingerprint(input: {
           historicalTimezone: activity.historicalTimezone,
           fitEvidence: activity.fitEvidence,
           recordContext: activity.recordContext,
+          workoutClassification: activity.workoutClassification,
           rpeLinkState: activity.rpeLinkState,
           rpeInputPresent: activity.rpeInputPresent,
           evidence: [
@@ -502,6 +504,7 @@ function buildFitSequencePoint(input: {
     context: {
       state: input.activity.recordContext ? "available" : "unknown",
       runningContext: input.activity.recordContext,
+      workoutClassification: input.activity.workoutClassification,
     },
     evidence: {
       state: "current",

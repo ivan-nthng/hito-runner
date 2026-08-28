@@ -1,7 +1,7 @@
 import { normalizePlanGoalIntent } from "../../src/lib/plan-creation-engine/plan-goal-intent";
 import { buildAcceptedEffectiveRunnerHeartRateProfile } from "../../src/lib/heart-rate-zones";
 import type { StructuredPlanAuthoringInput } from "../../src/lib/structured-plan-authoring-schema";
-import { buildProofInitialPlanProfile } from "../runner-fitness-profile-initial-plan-proof-helpers";
+import { buildProofRunnerCapability } from "../runner-plan-capability-proof-helpers";
 import type { FixtureKind } from "./cli";
 
 export function buildDefaultAuthoringInput(fixtureKind: FixtureKind): StructuredPlanAuthoringInput {
@@ -51,7 +51,7 @@ export function buildDefaultAuthoringInput(fixtureKind: FixtureKind): Structured
       targetDate,
     },
   };
-  const initialPlanProfile = buildProofInitialPlanProfile(previewInput).initialPlanProfile;
+  const runnerCapability = buildProofRunnerCapability(previewInput).runnerCapability;
 
   return {
     schedule: {
@@ -76,7 +76,6 @@ export function buildDefaultAuthoringInput(fixtureKind: FixtureKind): Structured
       preferredLongRunDay: "Saturday",
     },
     planGoalIntent: planGoalIntent.intent,
-    initialPlanProfile,
-    initialPlanAdmission: "authoring_ready_constraint_only",
+    runnerCapability,
   };
 }

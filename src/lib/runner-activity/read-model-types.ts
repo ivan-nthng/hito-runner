@@ -290,6 +290,7 @@ export type RunnerActivityFitSequencePoint = {
   context: {
     state: "available" | "unknown";
     runningContext: string | null;
+    workoutClassification: "easy" | "long" | null;
   };
   evidence: {
     state: "current";

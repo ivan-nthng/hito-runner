@@ -75,8 +75,6 @@ export const serverEnv = {
   supabaseServiceRoleKey: optionalEnv("SUPABASE_SECRET_KEY"),
   openAiApiKey: optionalEnv("OPENAI_API_KEY"),
   openAiPlanModel: optionalEnv("OPENAI_PLAN_MODEL"),
-  openAiFirstPlanModel: optionalEnv("OPENAI_FIRST_PLAN_MODEL"),
-  openAiFirstPlanMaxOutputTokens: optionalEnv("OPENAI_FIRST_PLAN_MAX_OUTPUT_TOKENS"),
   localAuthBypassEnabled:
     optionalEnv("LOCAL_AUTH_BYPASS_ENABLED")?.toLowerCase() === "true" ||
     optionalEnv("LOCAL_AUTH_BYPASS_ENABLED") === "1",

@@ -52,7 +52,10 @@ import type { Dispatcher } from "undici";
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const DEFAULT_OPENAI_PLAN_MODEL = "gpt-5.2";
 export const DEFAULT_AI_FIRST_PLAN_TIMEOUT_MS = 0;
-export const DEFAULT_AI_FIRST_PLAN_MAX_OUTPUT_TOKENS = 32_000;
+// A first-plan response contains a complete Blueprint plus four executable weeks. GPT-5.2 counts
+// both visible JSON and reasoning against max_output_tokens, so the former 32k ceiling could end an
+// otherwise valid Structured Output before the provider completed it.
+export const DEFAULT_AI_FIRST_PLAN_MAX_OUTPUT_TOKENS = 64_000;
 const AI_FIRST_PLAN_CONTRACT_MODE = "adaptive_blueprint_four_week" as const;
 const AI_FIRST_PLAN_RESPONSE_SCHEMA_MODE =
   "responses_json_schema_adaptive_blueprint_four_week_v1_strict" as const;
@@ -1149,6 +1152,23 @@ async function requestOpenAiFirstPlanDraft({
             },
             generationLedger,
           )) ?? generationTrace;
+
+        console.error(
+          "[generated-plan/provider] response_not_completed",
+          JSON.stringify({
+            generationId: generationTrace?.generationId ?? null,
+            model,
+            responseStatus: responseDebug.responseStatus,
+            responseIncompleteReason: responseDebug.responseIncompleteReason,
+            maxOutputTokens,
+            inputTokens: responseDebug.inputTokens,
+            outputTokens: responseDebug.outputTokens,
+            reasoningTokens: responseDebug.reasoningTokens,
+            totalTokens: responseDebug.totalTokens,
+            openAiElapsedMs: responseDebug.openAiElapsedMs,
+            unavailableReason: reason,
+          }),
+        );
 
         throw new AiFirstPlanDraftServiceError(
           reason,

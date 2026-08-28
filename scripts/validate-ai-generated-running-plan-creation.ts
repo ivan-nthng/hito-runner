@@ -19,6 +19,7 @@ import {
   resolveAiGeneratedRunningPlanDevFixtureDelayMs,
 } from "../src/lib/ai-generated-running-plan-dev-fixture";
 import {
+  DEFAULT_AI_FIRST_PLAN_MAX_OUTPUT_TOKENS,
   generateAiFirstPlanDraftPreview,
   resolveAiPlanStructuredResponseProviderSettings,
 } from "../src/lib/ai-first-plan-draft-service";
@@ -2312,6 +2313,7 @@ async function validateFirstPlanGenerationLifecycle() {
   assert.equal(incomplete.metadata.responseId, "resp_incomplete_plan_first");
   assert.equal(incomplete.metadata.debug.abortReason, null);
   assert.equal(incomplete.metadata.debug.responseIncompleteReason, "max_output_tokens");
+  assert.equal(incomplete.metadata.debug.maxOutputTokens, DEFAULT_AI_FIRST_PLAN_MAX_OUTPUT_TOKENS);
 }
 
 async function runTimedOutFirstPlanRequest(input: {

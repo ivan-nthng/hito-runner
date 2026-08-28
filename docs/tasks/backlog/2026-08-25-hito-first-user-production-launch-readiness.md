@@ -72,3 +72,27 @@ Terminal acceptance means independent QA passed the complete admitted matrix and
 compact human review packet with exact production revision, evidence, residual risk and a clear
 invite/no-invite recommendation. Commit, push, migration or deployment of a newly fixed candidate
 requires the Task's explicit release edge; QA never performs those actions.
+
+## 2026-08-27 Fresh-Provider Reopening
+
+A real first-user request on Git-backed production `348bff97` reproduced
+`provider_incomplete_output`. The canonical domain was HTTP `200` and Vercel recorded the server
+action as HTTP `200`; the product failed closed before response retention, candidate creation,
+confirmation or Calendar materialisation. Hosted readback found no completed provider response in
+the preceding 24 hours, so the runner's goal details, compiler and Calendar were not the failing
+boundary.
+
+The previous terminal result proved recovery and confirmation from a retained completed response.
+It did not prove that a fresh arbitrary-user request would complete under provider variability, so
+the terminal claim is withdrawn and this Task is reopened on BACKEND.
+
+The canonical first-plan service imposed a fixed `32_000` token ceiling even though the response
+contains the complete Blueprint and four executable weeks, and both obsolete
+`OPENAI_FIRST_PLAN_*` configuration entries were declared but unused. OpenAI counts visible output
+and reasoning against `max_output_tokens`; the production-safe fix raises the one canonical ceiling
+to `64_000`, removes the false configuration knobs, and records only redacted terminal telemetry
+for non-completed provider responses. Raw prompts, raw responses and user facts are never logged.
+
+Release acceptance requires one materially fresh technical-runner production request to reach a
+complete Review, followed by explicit Confirm and Calendar readback. Retained-response replay or a
+fixture cannot close this edge again.

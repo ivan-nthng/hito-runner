@@ -206,6 +206,44 @@ iPad Chrome with browser controls expanded and collapsed, and obtain the still-m
 Chrome evidence, exact versions/geometry, rotation, keyboard/focus and Safari cross-check before the
 first and third Delivery steps can be checked.
 
+## 2026-08-28 Production Replay
+
+The accepted source is released as Git-backed production
+`78515c7f7474312defee22242f640105fee98265` /
+`dpl_6aonDjPZpj2JgYHrQN1SbdAaamnf`, state `READY`. The apex domain redirects to the canonical
+`www.hitocajon.com` alias and the canonical response is HTTP `200`; `main == origin/main`.
+
+Independent Browser QA passed the complete current-source responsive matrix in Portuguese/Dark and
+English/Light:
+
+- `375x812`: body/root `375/375`, Custom goal `301/301`, heart-rate editor `343/343`; CTA and
+  bottom navigation do not overlap;
+- `375x650`: body/root `375/375`, Custom goal `301/301`, heart-rate editor `343/343`; CTA and
+  bottom navigation do not overlap;
+- `768x566`: body/root `768/768`, Custom goal `212/212`, heart-rate editor `212/212`;
+- `1024x700`: body/root `1024/1024`, Custom goal `320/320`, heart-rate editor `420/420`;
+- `1280x801`: body/root `1280/1280`, Custom goal `448/448`, heart-rate editor `676/676`;
+- `1470x801`: body/root `1470/1470`, Custom goal `480/480`, heart-rate editor `740/740`.
+
+The first number is client width and the second is scroll width. No size produced horizontal
+overflow. Keyboard ArrowRight navigation moved both focus and selected state from `10K` to `21K`
+while keeping the focused card fully visible at `375x812` and `768x566`. All active production tabs
+reported zero console warnings/errors, and Vercel reported zero production runtime errors in the
+final 30-minute window.
+
+This proves the released CSS/component root for every required deterministic dynamic-height and
+breakpoint geometry. It does not fabricate physical-device acceptance: post-fix toolbar
+expand/collapse, rotation, keyboard dismissal and Safari cross-check on real iPhone/iPad remain
+unobserved because no physical iOS execution host is available. The original user-supplied iPad
+Chrome screenshots remain valid real-device reproduction evidence. Product may use the current
+proof only as an explicitly monitored limited-invite residual, never as a claimed physical-iOS
+PASS.
+
+Product terminally accepts the released root fix for the monitored limited-invite boundary. The
+post-fix physical iPhone/iPad Chrome/Safari Delivery step remains intentionally unchecked and is a
+truthful residual evidence gap, not a reproduced production blocker. Any recurrence from a first
+user returns to this same Task with exact device, browser version, orientation and toolbar state.
+
 ## What Not To Touch
 
 - Do not add user-agent or device sniffing.

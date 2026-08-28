@@ -172,3 +172,39 @@ fix makes simple mobile Tabs own their horizontal overflow and makes RootShell r
 resolved locale directly as the `html` language. Focused locale, lint, formatting, diff-hygiene and
 production-build checks passed; the exact fix remains subject to Git-backed production deployment
 and independent browser replay before terminal acceptance.
+
+The later tablet containment fix is released as Git-backed production
+`78515c7f7474312defee22242f640105fee98265` /
+`dpl_6aonDjPZpj2JgYHrQN1SbdAaamnf`, state `READY`, with the canonical apex redirect and
+`www.hitocajon.com` HTTP `200`. Independent production replay passed Portuguese/Dark and
+English/Light at `375x812`, `375x650`, `768x566`, `1024x700`, `1280x801` and `1470x801`.
+At every size the document and body widths equal the viewport; the Custom goal card and
+heart-rate editor have equal client/scroll widths; the mobile CTA clears the bottom navigation;
+and the desktop/tablet composition has no horizontal overflow. Keyboard ArrowRight navigation in
+the goal radio group moved visible focus and selection correctly at both `375x812` and `768x566`.
+All four active production tabs reported zero console warnings/errors, and Vercel reported zero
+production runtime errors in the final 30-minute window.
+
+The complete production data journey is also proved on the retained technical `.invalid` runner:
+one fresh `v22` provider response, one candidate, one Coach-approved confirmation and 28 Calendar
+workouts survived Saved Review restore, reload and a fresh tab without duplicate dispatch or
+materialisation. One past empty Rest day accepted a FIT upload, retained owner-bound source and
+revision truth, restored its pending Review, confirmed exactly one standalone `file_import`
+Calendar workout, reused the exact source on duplicate upload and preserved the FIT-local date when
+the clicked date differed. Planned RPE `5` and imported past-day RPE `4` remained coherent across
+Calendar, History, Progress and fitness evidence.
+
+The action-time cleanup confirmation removed the single technical FIT original through Hito's
+ordinary owner-bound Storage API before any database deletion. Hosted readback then proved zero
+target Storage objects and an atomic owner-bounded reset returned all 26 QA-owned table counts to
+zero while retaining the technical `.invalid` Auth identity. The protected baseline remained
+unchanged at five Auth users, 37 foreign Storage objects and the exact pre-cleanup foreign counts in
+all 26 tables. No QA pool lease, temporary secret file or `qa_fixture` runtime remains.
+
+Product accepts this exact release for a monitored limited first-user invite. Plan
+Create/Review/Confirm, Saved Review restore, Calendar materialisation, past-day FIT import and RPE,
+History/Progress/profile coherence, localisation, theme, responsive geometry, keyboard focus,
+console/HTTP health and exact cleanup all have production evidence. The only disclosed residual is
+the absence of post-fix physical iPhone/iPad browser replay; deterministic production geometry and
+the original physical-device reproduction support the limited-invite posture without being
+misreported as a physical-device PASS.

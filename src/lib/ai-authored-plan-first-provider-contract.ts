@@ -21,7 +21,7 @@ import {
 
 export const AI_AUTHORED_PLAN_FIRST_CONTRACT_VERSION = "adaptive-blueprint-four-week-v1" as const;
 export const AI_AUTHORED_PLAN_FIRST_PROVIDER_CONTRACT_VERSION =
-  "adaptive-blueprint-four-week-direct-v19" as const;
+  "adaptive-blueprint-four-week-direct-v20" as const;
 export const AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME =
   "hito_adaptive_blueprint_four_week_v1" as const;
 export const AI_AUTHORED_PLAN_FIRST_PACE_MIN_PER_KM_PATTERN =
@@ -662,7 +662,8 @@ export function buildAiAuthoredPlanFirstPrompt({
     "Every detailed workout must use a canonical workout_identity whose resolved workout family is listed in the owning Blueprint phase.workout_families. Build each phase family list from both its detailed workouts and future projections before returning; never leave a detailed family unexplained by its immutable Blueprint phase.",
     "For every future phase calendar-week slice, return exactly phase.expected_weekly_cadence unique projection dates, reduced only when fewer calendar dates remain in that phase-week slice. Never return extra recovery or target-week slots beyond that exact cadence.",
     "When blueprint.selected_target_date is later than detailed_block.end_date, projections must contain exactly one slot on that exact selected target date with review_timing=target_review. That target-date slot counts inside its owning phase expected_weekly_cadence and must use one workout family listed by that phase. Every other projection uses review_timing=details_closer_to_date.",
-    "Set detailed_block.start_date to calendar.start_date. Set detailed_block.end_date to the earlier of calendar.start_date plus 27 days and blueprint.selected_target_date. Every detailed workout date, including detailed_block.final_workout, must fall inside that inclusive range. final_workout is the chronologically last non-rest detailed workout and is not a future-horizon placeholder.",
+    "calendar.detailed_block_end_date and calendar.future_projection_start_date are exact Backend-derived boundaries. Set detailed_block.start_date to calendar.start_date and detailed_block.end_date to calendar.detailed_block_end_date. Every detailed workout date, including detailed_block.final_workout, must fall inside that inclusive range. final_workout is the chronologically last non-rest detailed workout and is not a future-horizon placeholder.",
+    "When calendar.future_projection_start_date is not null, every date on or after that boundary is future intent even if its Blueprint phase began inside the detailed block. A phase that straddles calendar.detailed_block_end_date must project its remaining future phase-week slice from calendar.future_projection_start_date through that phase end. Never omit that partial future slice merely because the phase already contains detailed workouts.",
     "Every runnable kind=unit section and every Repeat child carries its own local prescription and target. Keep each duration or distance and its pace or heart-rate command on that exact leaf; never place executable values in another object for later lookup.",
     "Workout phase, title, cue, and every step label and cue remain inline AI-authored content. A nullable step cue is null only when that runnable leaf has no supplemental cue.",
     `Hydration is represented only as kind=hydration with label=${JSON.stringify(WORKOUT_DOCUMENT_HYDRATION_LABEL)} and cue=${JSON.stringify(WORKOUT_DOCUMENT_HYDRATION_CUE)}. It never owns a prescription, target, or runnable duration.`,
@@ -749,6 +750,15 @@ export function buildAiAuthoredPlanFirstProviderContext(
     : null;
   const heartRateProfile = authoringInput.runnerFacts.heartRateProfile;
   const adaptationContext = buildAiAuthoredFirstSessionAdaptationContext(authoringInput);
+  const proposedDetailedBlockEndDate = addDaysIso(authoringInput.schedule.startDate, 27);
+  const detailedBlockEndDate =
+    authoringInput.planGoalIntent.targetDate < proposedDetailedBlockEndDate
+      ? authoringInput.planGoalIntent.targetDate
+      : proposedDetailedBlockEndDate;
+  const futureProjectionStartDate =
+    authoringInput.planGoalIntent.targetDate > detailedBlockEndDate
+      ? addDaysIso(detailedBlockEndDate, 1)
+      : null;
 
   return {
     goal: {
@@ -759,6 +769,8 @@ export function buildAiAuthoredPlanFirstProviderContext(
       start_date: authoringInput.schedule.startDate,
       latest_date: addDaysIso(authoringInput.schedule.startDate, 363),
       requested_target_date: authoringInput.planGoalIntent.targetDate,
+      detailed_block_end_date: detailedBlockEndDate,
+      future_projection_start_date: futureProjectionStartDate,
       preferred_workout_weekdays: preferredWorkoutWeekdays,
       fixed_rest_weekdays: fixedRestWeekdays,
       max_workouts_per_week: authoringInput.availability.maxRunningDaysPerWeek,

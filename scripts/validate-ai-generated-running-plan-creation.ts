@@ -1141,13 +1141,30 @@ async function validateRunnerPlanCommentContract() {
     today: scenario.input.startDate,
   });
   const validProviderContext = JSON.parse(validPrompt.userPrompt) as {
-    runnerFacts: { runner: { plan_request_comment?: string } };
+    providerContractVersion: string;
+    runnerFacts: {
+      calendar: {
+        detailed_block_end_date: string;
+        future_projection_start_date: string | null;
+      };
+      runner: { plan_request_comment?: string };
+    };
   };
   assert.equal(
     containsObjectKey(validPrompt.responseSchema, "pattern"),
     false,
     "The OpenAI schema must stay structural; local compiler validation owns regex semantics.",
   );
+  assert.equal(
+    validProviderContext.providerContractVersion,
+    "adaptive-blueprint-four-week-direct-v20",
+  );
+  assert.equal(validProviderContext.runnerFacts.calendar.detailed_block_end_date, "2026-07-29");
+  assert.equal(
+    validProviderContext.runnerFacts.calendar.future_projection_start_date,
+    "2026-07-30",
+  );
+  assert.match(validPrompt.systemPrompt, /phase that straddles/i);
   assert.equal(validProviderContext.runnerFacts.runner.plan_request_comment, runnerCommentCanary);
   assert.match(validPrompt.systemPrompt, /informational training history or current context/i);
   assert.match(validPrompt.systemPrompt, /never overrides the exact goal/i);

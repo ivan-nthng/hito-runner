@@ -109,6 +109,14 @@ therefore structural only. The existing strict compiler remains the sole authori
 dates, pace/BPM syntax and runner-facing text, so removing provider-side regex duplication weakens
 neither review validation nor Calendar safety.
 
+On the first structural-schema production replay, GPT-5.2 completed in 76 seconds and the response
+passed the local provider schema. The compiler then correctly rejected it before candidate creation:
+the first Blueprint phase continued three days beyond the detailed block but carried no future
+projection slots for that straddling partial phase-week. Provider contract `v20` now supplies the
+exact Backend-derived detailed-block end and future-projection start dates and states that a phase
+which crosses that boundary must project its remaining future slice. This is a materially distinct
+request; the compiler cadence rule is unchanged.
+
 Release acceptance requires one materially fresh technical-runner production request to reach a
 complete Review, followed by explicit Confirm and Calendar readback. Retained-response replay or a
 fixture cannot close this edge again.

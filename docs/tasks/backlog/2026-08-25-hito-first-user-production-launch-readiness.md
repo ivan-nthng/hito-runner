@@ -123,6 +123,12 @@ future slots per week. Provider contract `v21` defines cadence as the exact coun
 session, explicitly including Easy and Recovery, and requires a mechanical detailed/future
 phase-week audit before return. The accepted completeness compiler remains unchanged.
 
+The `v21` replay stopped treating cadence as an aspiration but still emitted one every-other-day
+projection sequence across Monday/Sunday and phase boundaries. Provider contract `v22` now states
+the compiler's exact inclusive phase-week interval algorithm, audits phases independently when they
+share a calendar week, and supplies concrete partial-boundary examples. The compiler and its
+full-projection requirement remain unchanged; no Backend projection is invented or repaired.
+
 Release acceptance requires one materially fresh technical-runner production request to reach a
 complete Review, followed by explicit Confirm and Calendar readback. Retained-response replay or a
 fixture cannot close this edge again.

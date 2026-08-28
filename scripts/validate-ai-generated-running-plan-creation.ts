@@ -1157,7 +1157,7 @@ async function validateRunnerPlanCommentContract() {
   );
   assert.equal(
     validProviderContext.providerContractVersion,
-    "adaptive-blueprint-four-week-direct-v21",
+    "adaptive-blueprint-four-week-direct-v22",
   );
   assert.equal(validProviderContext.runnerFacts.calendar.detailed_block_end_date, "2026-07-29");
   assert.equal(
@@ -1167,6 +1167,9 @@ async function validateRunnerPlanCommentContract() {
   assert.match(validPrompt.systemPrompt, /phase that straddles/i);
   assert.match(validPrompt.systemPrompt, /exact non-rest workout count/i);
   assert.match(validPrompt.systemPrompt, /audit cadence mechanically/i);
+  assert.match(validPrompt.systemPrompt, /calendar week is Monday through Sunday/i);
+  assert.match(validPrompt.systemPrompt, /two phases share one calendar week/i);
+  assert.match(validPrompt.systemPrompt, /Do not generate one every-other-day sequence/i);
   assert.equal(validProviderContext.runnerFacts.runner.plan_request_comment, runnerCommentCanary);
   assert.match(validPrompt.systemPrompt, /informational training history or current context/i);
   assert.match(validPrompt.systemPrompt, /never overrides the exact goal/i);

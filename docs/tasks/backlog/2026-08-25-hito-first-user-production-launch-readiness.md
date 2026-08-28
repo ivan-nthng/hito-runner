@@ -132,3 +132,27 @@ full-projection requirement remain unchanged; no Backend projection is invented 
 Release acceptance requires one materially fresh technical-runner production request to reach a
 complete Review, followed by explicit Confirm and Calendar readback. Retained-response replay or a
 fixture cannot close this edge again.
+
+## 2026-08-27 Fresh v22 Production Proof
+
+Git-backed production `da4e9d3` / `dpl_ASUKtopz2e2j9LgAK8uQHjZxAkLV` reached `READY`; the canonical
+`www.hitocajon.com` alias returned HTTP `200`, and `main == origin/main`. One fresh owner-bound
+`gpt-5.2` request on provider contract `v22` completed in `75.149s`, used `7,454` input and `7,591`
+output tokens with zero reasoning tokens, and cost a derived `$0.1193` at the public standard rate
+of `$1.75` / `$14.00` per million input/output tokens. Provider schema and compiler both accepted
+response `81bde615-92a5-4833-8d9c-f3806388674d`; candidate
+`77716029-845e-49ad-b125-a314f71b5f07` version `1` retained SHA-256
+`09ac1f3a10c5cf4dbb60f0ed6a8b18a2635524bb3b6fd28d6c2aa0ef83c05628`.
+
+The ordinary production Plans UI displayed one current Half Marathon review, restored its exact
+28-day/28-document content without a second provider response, and exposed the explicit
+`Add to Calendar` action. Technical confirmation created one immutable block confirmation, exactly
+28 `planned_workouts`, and exactly 28 Calendar mutation events. Reload restored the current workout
+and 31 provisional Blueprint projections; a fresh tab restored the confirmed review as read-only,
+with no duplicate Confirm action. Both tabs reported zero console warning/error entries.
+
+This closes the fresh-provider technical defect that reopened HITO-280. It does not substitute for
+the required independent Running Coach verdict on a semantically new candidate. The canonical
+sidebar bridge did not acknowledge the bounded Coach handoff after two attempts, so task-owned QA
+rows remain retained for that review and exact cleanup. HITO-280 remains non-terminal on BACKEND
+execution-host recovery; no further provider request is admitted for this candidate.

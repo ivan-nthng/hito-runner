@@ -6,7 +6,10 @@ import {
   type AiAuthoredPlanFirstCompilerDraft,
 } from "../src/lib/ai-authored-plan-first-provider-contract";
 import type { EffectiveRunnerHeartRateProfile } from "../src/lib/heart-rate-zones";
-import type { CanonicalWorkoutIdentity } from "../src/lib/rich-workout-model";
+import {
+  resolveCanonicalWorkoutModel,
+  type CanonicalWorkoutIdentity,
+} from "../src/lib/rich-workout-model";
 import { buildDefaultAuthoringInput } from "./ai-first-plan-draft-ops/fixtures";
 
 type ProviderTarget =
@@ -140,17 +143,28 @@ export function validatePlanFirstHeartRateTargetContract() {
     heartRateTarget("Z2", "120-140 bpm"),
     /hr_execution_range_outside_band/,
   );
-  assertRejected(
-    "under-five subrange",
-    personalProfile,
-    heartRateTarget("Z2", "120-124 bpm"),
-    /hr_execution_subrange_too_narrow/,
-  );
-  assertRejected(
+  assertAccepted("under-five subrange", personalProfile, heartRateTarget("Z2", "120-124 bpm"), {
+    reference: "Z2",
+    executionMin: 120,
+    executionMax: 124,
+    bandMin: 115,
+    bandMax: 140,
+    rangeKind: "ai_selected_subrange",
+    profileSource: "personal",
+  });
+  assertAccepted(
     "subrange without authored purpose",
     personalProfile,
     heartRateTarget("Z2", "120-130 bpm"),
-    /hr_execution_subrange_purpose_missing/,
+    {
+      reference: "Z2",
+      executionMin: 120,
+      executionMax: 130,
+      bandMin: 115,
+      bandMax: 140,
+      rangeKind: "ai_selected_subrange",
+      profileSource: "personal",
+    },
     { cue: null },
   );
 
@@ -175,11 +189,19 @@ export function validatePlanFirstHeartRateTargetContract() {
       profileSource: "personal",
     },
   );
-  assertRejected(
+  assertAccepted(
     "five-BPM band cannot narrow",
     fiveBpmBandProfile,
     heartRateTarget("Z2", "121-125 bpm"),
-    /hr_execution_subrange_too_narrow/,
+    {
+      reference: "Z2",
+      executionMin: 121,
+      executionMax: 125,
+      bandMin: 120,
+      bandMax: 125,
+      rangeKind: "ai_selected_subrange",
+      profileSource: "personal",
+    },
   );
 
   const zeroWidthProfile = profile("personal", [
@@ -213,11 +235,19 @@ export function validatePlanFirstHeartRateTargetContract() {
     ["uphill_repeats", "interval_block"],
     ["taper_tuneup_run", "interval_block"],
   ] as const) {
-    assertRejected(
+    assertAccepted(
       `${identity} short-stage subrange`,
       personalProfile,
       heartRateTarget("Z2", "120-130 bpm"),
-      /hr_execution_subrange_prohibited/,
+      {
+        reference: "Z2",
+        executionMin: 120,
+        executionMax: 130,
+        bandMin: 115,
+        bandMax: 140,
+        rangeKind: "ai_selected_subrange",
+        profileSource: "personal",
+      },
       { workoutIdentity: identity, repeatSegmentType: segmentType },
     );
   }
@@ -228,19 +258,35 @@ export function validatePlanFirstHeartRateTargetContract() {
     "10k_rhythm_intervals",
     "uphill_repeats",
   ] as const) {
-    assertRejected(
+    assertAccepted(
       `${identity} unit-shaped short-stage subrange`,
       personalProfile,
       heartRateTarget("Z2", "120-130 bpm"),
-      /hr_execution_subrange_prohibited/,
+      {
+        reference: "Z2",
+        executionMin: 120,
+        executionMax: 130,
+        bandMin: 115,
+        bandMax: 140,
+        rangeKind: "ai_selected_subrange",
+        profileSource: "personal",
+      },
       { workoutIdentity: identity },
     );
   }
-  assertRejected(
+  assertAccepted(
     "taper finish subrange",
     personalProfile,
     heartRateTarget("Z2", "120-130 bpm"),
-    /hr_execution_subrange_prohibited/,
+    {
+      reference: "Z2",
+      executionMin: 120,
+      executionMax: 130,
+      bandMin: 115,
+      bandMax: 140,
+      rangeKind: "ai_selected_subrange",
+      profileSource: "personal",
+    },
     { workoutIdentity: "taper_tuneup_run", unitSegmentType: "finish" },
   );
 }
@@ -258,8 +304,9 @@ function assertAccepted(
     rangeKind: string;
     profileSource: string;
   },
+  options: ProofCompileOptions = {},
 ) {
-  const result = compile(heartRateProfile, target);
+  const result = compile(heartRateProfile, target, options);
   assert.equal(result.ok, true, result.ok ? "" : `${label}: ${JSON.stringify(result.issues)}`);
   if (!result.ok) return;
   const compiled = firstHeartRateTarget(result.canonicalPlan);
@@ -365,7 +412,16 @@ function providerDraft(
           start_date: "2026-07-06",
           end_date: "2026-07-14",
           expected_weekly_cadence: 2,
-          workout_families: ["easy", "race"],
+          workout_families: Array.from(
+            new Set([
+              "easy" as const,
+              "race" as const,
+              resolveCanonicalWorkoutModel({
+                workoutType: "quality",
+                workoutIdentity: options.workoutIdentity ?? "easy_aerobic_run",
+              }).workoutFamily,
+            ]),
+          ),
         },
       ],
       projections: [],

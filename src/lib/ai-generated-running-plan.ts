@@ -11,6 +11,10 @@ import {
   type AiAuthoredBlueprintSummary,
 } from "@/lib/ai-authored-plan-first-compiler";
 import {
+  aiAuthoredPlanFirstSelfAuditSchema,
+  type AiAuthoredPlanFirstSelfAudit,
+} from "@/lib/ai-authored-plan-first-provider-contract";
+import {
   recordAiPlanGenerationPreflightFailure,
   updateAiPlanGenerationLedgerTrace,
   type AiPlanGenerationLedgerTrace,
@@ -106,6 +110,7 @@ export interface AiGeneratedRunningPlanPreviewDraft {
     trustedClientRows: false;
   };
   blueprint: AiAuthoredBlueprintSummary;
+  selfAudit: AiAuthoredPlanFirstSelfAudit | null;
   reviewConflicts: readonly AiAuthoredBlueprintReviewConflict[];
   sourceCandidate: RetainedAdaptiveTrainingSourceCandidate | null;
   previewInput: RunningPlanReviewedPreviewInput;
@@ -445,6 +450,7 @@ export async function buildAiGeneratedRunningPlanPreview(
         trustedClientRows: false,
       },
       blueprint: result.blueprint,
+      selfAudit: result.selfAudit,
       reviewConflicts: result.reviewConflicts,
       sourceCandidate: result.retainedSourceCandidate,
       previewInput: toReviewedPreviewInput(input),
@@ -548,6 +554,7 @@ export function buildRestoredAiGeneratedRunningPlanPreviewDraft(input: {
         trustedClientRows: false,
       },
       blueprint,
+      selfAudit: candidateContent.selfAudit,
       reviewConflicts: candidateContent.reviewConflicts,
       sourceCandidate: input.sourceCandidate,
       previewInput: buildRestoredReviewedPreviewInput(authoringInput.data),
@@ -575,6 +582,9 @@ export function isAiGeneratedRunningPlanPreviewDraft(
     typeof value === "object" &&
     isAiGeneratedRunningPlanPreviewSourceKind((value as { sourceKind?: unknown }).sourceKind) &&
     (value as { blueprint?: unknown }).blueprint != null &&
+    aiAuthoredPlanFirstSelfAuditSchema
+      .nullable()
+      .safeParse((value as { selfAudit?: unknown }).selfAudit).success &&
     (value as { canonicalPlan?: unknown }).canonicalPlan != null &&
     Array.isArray((value as { workoutDocuments?: unknown }).workoutDocuments)
   );
@@ -939,14 +949,23 @@ function restoreReviewedBenchmark(
 
 function parseRestoredCandidateContent(value: unknown): {
   canonicalPlan: TrainingPlanV2;
+  selfAudit: AiAuthoredPlanFirstSelfAudit | null;
   reviewConflicts: AiAuthoredBlueprintReviewConflict[];
 } | null {
   const record = unknownRecord(value);
   const canonicalPlan = trainingPlanV2Schema.safeParse(record?.canonicalPlan);
-  if (!record || !canonicalPlan.success || !Array.isArray(record.reviewConflicts)) return null;
+  const selfAudit = aiAuthoredPlanFirstSelfAuditSchema.nullable().safeParse(record?.selfAudit);
+  if (
+    !record ||
+    !canonicalPlan.success ||
+    !selfAudit.success ||
+    !Array.isArray(record.reviewConflicts)
+  ) {
+    return null;
+  }
   const reviewConflicts = record.reviewConflicts.filter(isRestoredReviewConflict);
   return reviewConflicts.length === record.reviewConflicts.length
-    ? { canonicalPlan: canonicalPlan.data, reviewConflicts }
+    ? { canonicalPlan: canonicalPlan.data, selfAudit: selfAudit.data, reviewConflicts }
     : null;
 }
 
@@ -1333,8 +1352,6 @@ function normalizeWorkoutDayKind({
   switch (workoutFamily) {
     case "recovery":
       return "recovery";
-    case "fueling":
-      return "hydration";
     case "easy":
       return "easy";
     case "steady":

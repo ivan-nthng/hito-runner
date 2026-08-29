@@ -605,6 +605,7 @@ async function confirmReviewedAiGeneratedRunningPlanDraftForUser(
     });
     const expectedCandidateContent = {
       canonicalPlan: exactness.canonicalPlan,
+      selfAudit: exactness.draft.selfAudit,
       reviewConflicts: exactness.draft.reviewConflicts,
     };
     if (

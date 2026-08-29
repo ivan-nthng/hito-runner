@@ -3,6 +3,7 @@ import type {
   AiAuthoredBlueprintReviewConflict,
   AiAuthoredBlueprintSummary,
 } from "@/lib/ai-authored-plan-first-compiler";
+import type { AiAuthoredPlanFirstSelfAudit } from "@/lib/ai-authored-plan-first-provider-contract";
 
 export type AiFirstPlanDraftNormalizationIssue = {
   code: string;
@@ -12,7 +13,7 @@ export type AiFirstPlanDraftNormalizationIssue = {
 
 export interface AiFirstPlanDraftMetadata {
   status: "ai_authored" | "plan_first_unavailable";
-  source: "openai_adaptive_blueprint_four_week_draft" | "hito_c0_deterministic_starter_policy";
+  source: "openai_adaptive_blueprint_four_week_draft";
   validationIssues: string[];
 }
 
@@ -21,6 +22,7 @@ export type AiFirstPlanDraftNormalizationResult =
       ok: true;
       canonicalPlan: TrainingPlanV2;
       blueprint: AiAuthoredBlueprintSummary;
+      selfAudit: AiAuthoredPlanFirstSelfAudit | null;
       reviewConflicts: AiAuthoredBlueprintReviewConflict[];
       metadata: AiFirstPlanDraftMetadata;
     }

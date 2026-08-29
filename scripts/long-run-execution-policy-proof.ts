@@ -52,7 +52,7 @@ export function validateGeneratedLongRunExecutionPolicyContract() {
     providerUnit("main", 75, bpmTarget(z2Command), "body"),
     providerUnit("recovery", 10, bpmTarget(z2Command), "support"),
   ]);
-  assertGeneratedRejected(
+  assertGeneratedReviewable(
     "95-minute runnable-support discriminator without Hydration",
     "long_aerobic_run",
     [
@@ -72,7 +72,7 @@ export function validateGeneratedLongRunExecutionPolicyContract() {
       providerUnit("recovery", 10, bpmTarget(z2Command), "support"),
     ],
   );
-  assertGeneratedRejected(
+  assertGeneratedReviewable(
     "95-minute Repeat recovery discriminator without Hydration",
     "long_aerobic_run",
     [
@@ -92,7 +92,7 @@ export function validateGeneratedLongRunExecutionPolicyContract() {
       providerRepeat(2, 5, 5, bpmTarget(z2Command)),
     ],
   );
-  assertGeneratedRejected(
+  assertGeneratedReviewable(
     "known 95-minute runnable lower bound with distance support",
     "long_aerobic_run",
     [
@@ -139,13 +139,13 @@ export function validateGeneratedLongRunExecutionPolicyContract() {
     providerUnit("cooldown", 5, paceTarget(paceOne), "settle"),
   ]);
 
-  assertGeneratedRejected(
+  assertGeneratedReviewable(
     "four-hour single-leaf anatomy",
     "long_aerobic_run",
     [providerUnit("main", 240, bpmTarget(z2Command), "body")],
     "ai_authored_plan_first_long_run_anatomy_missing",
   );
-  assertGeneratedRejected(
+  assertGeneratedReviewable(
     "one-minute shell anatomy",
     "long_aerobic_run",
     [
@@ -154,7 +154,7 @@ export function validateGeneratedLongRunExecutionPolicyContract() {
     ],
     "ai_authored_plan_first_long_run_anatomy_missing",
   );
-  assertGeneratedRejected(
+  assertGeneratedReviewable(
     "decorative equal split",
     "long_aerobic_run",
     [
@@ -165,7 +165,7 @@ export function validateGeneratedLongRunExecutionPolicyContract() {
   );
 
   for (const identity of ["long_aerobic_run", "cutback_long_run", "taper_long_run"] as const) {
-    assertGeneratedRejected(
+    assertGeneratedReviewable(
       `${identity} changed command`,
       identity,
       [
@@ -199,7 +199,7 @@ export function validateGeneratedLongRunExecutionPolicyContract() {
       [],
       `${identity} must remain a structurally valid controlled-change long-run strategy.`,
     );
-    assertGeneratedRejected(
+    assertGeneratedReviewable(
       `${identity} missing-baseline initial block`,
       identity,
       [
@@ -208,7 +208,7 @@ export function validateGeneratedLongRunExecutionPolicyContract() {
       ],
       "ai_authored_plan_first_missing_baseline_long_run_quality_forbidden",
     );
-    assertGeneratedRejected(
+    assertGeneratedReviewable(
       `${identity} changed body without finish role`,
       identity,
       [
@@ -217,7 +217,7 @@ export function validateGeneratedLongRunExecutionPolicyContract() {
       ],
       "ai_authored_plan_first_long_run_finish_role_missing",
     );
-    assertGeneratedRejected(
+    assertGeneratedReviewable(
       `${identity} third command`,
       identity,
       [
@@ -227,7 +227,7 @@ export function validateGeneratedLongRunExecutionPolicyContract() {
       ],
       "ai_authored_plan_first_long_run_target_change_not_allowed",
     );
-    assertGeneratedRejected(
+    assertGeneratedReviewable(
       `${identity} short changed finish`,
       identity,
       [
@@ -236,7 +236,7 @@ export function validateGeneratedLongRunExecutionPolicyContract() {
       ],
       "ai_authored_plan_first_long_run_target_stage_too_short",
     );
-    assertGeneratedRejected(
+    assertGeneratedReviewable(
       `${identity} mixed substantive mode`,
       identity,
       [
@@ -266,7 +266,7 @@ export function validateGeneratedLongRunExecutionPolicyContract() {
       [],
       `${identity} distance-based pace finish must remain structurally valid.`,
     );
-    assertGeneratedRejected(
+    assertGeneratedReviewable(
       `${identity} distance-based missing-baseline initial block`,
       identity,
       [
@@ -275,7 +275,7 @@ export function validateGeneratedLongRunExecutionPolicyContract() {
       ],
       "ai_authored_plan_first_missing_baseline_long_run_quality_forbidden",
     );
-    assertGeneratedRejected(
+    assertGeneratedReviewable(
       `${identity} distance-based BPM finish`,
       identity,
       [
@@ -291,7 +291,7 @@ export function validateGeneratedLongRunExecutionPolicyContract() {
     "mountain_long_run_time_on_feet",
     "ultra_time_on_feet_durability",
   ] as const) {
-    assertGeneratedRejected(
+    assertGeneratedReviewable(
       `${identity} single body`,
       identity,
       [providerUnit("main", 50, bpmTarget(z2Command), "body")],
@@ -314,7 +314,7 @@ export function validateGeneratedLongRunExecutionPolicyContract() {
     );
   }
   for (const stageCount of [1, 4]) {
-    assertGeneratedRejected(
+    assertGeneratedReviewable(
       `progression ${stageCount} stages`,
       "progression_run",
       Array.from({ length: stageCount }, (_, index) =>
@@ -328,7 +328,7 @@ export function validateGeneratedLongRunExecutionPolicyContract() {
       "ai_authored_plan_first_progression_stage_count_invalid",
     );
   }
-  assertGeneratedRejected(
+  assertGeneratedReviewable(
     "decorative progression commands",
     "progression_run",
     [
@@ -353,7 +353,7 @@ function assertGeneratedAccepted(
   return result;
 }
 
-function assertGeneratedRejected(
+function assertGeneratedReviewable(
   label: string,
   identity: CanonicalWorkoutIdentity,
   sections: ProviderSection[],
@@ -362,12 +362,8 @@ function assertGeneratedRejected(
   const draft = providerDraft(identity, sections);
   assert.equal(aiAuthoredPlanFirstCompilerDraftSchema.safeParse(draft).success, true);
   const result = compileAiAuthoredPlanFirstDraft({ draft, authoringInput });
-  assert.equal(result.ok, false, `${label} must fail before review.`);
-  if (result.ok) return;
-  assert.ok(
-    result.issues.some((issue) => issue.code === expectedCode),
-    `${label}: expected ${expectedCode}, received ${JSON.stringify(result.issues)}`,
-  );
+  assert.equal(result.ok, true, `${label} must remain available for Review.`);
+  if (!result.ok) throw new Error(`${expectedCode} remained compiler-fatal.`);
 }
 
 function providerDraft(

@@ -10,6 +10,7 @@ import {
 import {
   AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME,
   buildAiAuthoredFirstSessionAdaptationContext,
+  resolveAiAuthoredPlanFirstDetailedEndDate,
   type AiAuthoredPlanFirstCompilerDraft,
 } from "@/lib/ai-authored-plan-first-provider-contract";
 import {
@@ -500,7 +501,7 @@ export function buildAiGeneratedRunningPlanDevFixtureProviderDraft(
     authoringInput.runnerFacts.benchmark || authoringInput.planGoalIntent.targetFinishTime,
   );
   const targetDate = requestedTargetDate;
-  const detailedEndDate = earlierIso(addDaysIso(startDate, 27), targetDate);
+  const detailedEndDate = resolveAiAuthoredPlanFirstDetailedEndDate({ startDate, targetDate });
   const targetInDetailedHorizon = targetDate === detailedEndDate;
   const finalWorkoutDate = targetInDetailedHorizon
     ? targetDate
@@ -554,7 +555,7 @@ export function buildAiGeneratedRunningPlanDevFixtureProviderDraft(
     ]),
   ].sort();
 
-  return {
+  const draft: AiAuthoredPlanFirstCompilerDraft = {
     blueprint: {
       start_date: startDate,
       selected_target_date: targetDate,
@@ -577,6 +578,7 @@ export function buildAiGeneratedRunningPlanDevFixtureProviderDraft(
       final_workout: finalWorkout,
     },
   };
+  return draft;
 }
 
 export function buildAiGeneratedContinuationDevFixtureProviderResponse(input: {

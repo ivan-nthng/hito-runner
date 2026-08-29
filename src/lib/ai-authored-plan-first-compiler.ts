@@ -2,8 +2,11 @@ import {
   AI_AUTHORED_PLAN_FIRST_ENDPOINT_IDENTITY,
   aiAuthoredDetailedBlockSchema,
   aiAuthoredPlanFirstCompilerDraftSchema,
+  deriveAiAuthoredPlanFirstSelfAudit,
+  resolveAiAuthoredPlanFirstDetailedEndDate,
   resolveAiAuthoredPaceProvenance,
   type AiAuthoredPlanFirstCompilerDraft,
+  type AiAuthoredPlanFirstSelfAudit,
   type AiAuthoredPlanFirstCompilerStep,
   type AiAuthoredPlanFirstCompilerUnit,
   type AiAuthoredPlanFirstCompilerWorkout,
@@ -18,7 +21,6 @@ import {
 import { SELECTED_DISTANCE_ENDPOINT_SOURCE_KIND } from "@/lib/plan-creation-engine/selected-distance-endpoint";
 import { collectWorkoutDurationTitleIssues } from "@/lib/workout-duration-title-contract";
 import {
-  CANONICAL_WORKOUT_FAMILY_VALUES,
   canonicalFamilyToLegacyWorkoutType,
   deriveCanonicalMetricMode,
   normalizeWorkoutFamily,
@@ -60,10 +62,9 @@ type TargetExecutionContext = {
   authoredPurpose: string | null;
   prescription: AiAuthoredPlanFirstCompilerUnit["prescription"];
 };
-
 export const AI_AUTHORED_PLAN_FIRST_SOURCE_KIND = "adaptive_blueprint_four_week_v1" as const;
 export const AI_AUTHORED_BLUEPRINT_VERSION = "adaptive_blueprint_v1" as const;
-export const AI_AUTHORED_PLAN_FIRST_COMPILER_VERSION = "adaptive_blueprint_compiler_v10" as const;
+export const AI_AUTHORED_PLAN_FIRST_COMPILER_VERSION = "adaptive_blueprint_compiler_v16" as const;
 
 export interface AiAuthoredBlueprintSummary {
   version: typeof AI_AUTHORED_BLUEPRINT_VERSION;
@@ -91,6 +92,7 @@ type AiAuthoredPlanFirstCompileResult =
       ok: true;
       canonicalPlan: TrainingPlanV2;
       blueprint: AiAuthoredBlueprintSummary;
+      selfAudit: AiAuthoredPlanFirstSelfAudit | null;
       reviewConflicts: AiAuthoredBlueprintReviewConflict[];
       validationIssues: string[];
     }
@@ -134,8 +136,8 @@ export function compileAiAuthoredPlanFirstDraft({
     authoringInput,
     issues,
     reviewConflicts,
+    enforceContinuationExecutionPolicy: false,
   });
-
   if (issues.length > 0) {
     return {
       ok: false,
@@ -176,6 +178,7 @@ export function compileAiAuthoredPlanFirstDraft({
     ok: true,
     canonicalPlan: canonicalResult.data,
     blueprint: buildBlueprintSummary(normalized.draft),
+    selfAudit: normalized.selfAudit,
     reviewConflicts,
     validationIssues: normalized.validationIssues,
   };
@@ -298,6 +301,7 @@ export function compileAiAuthoredContinuationDetailedBlock(input: {
     authoringInput: compilerInput,
     issues,
     reviewConflicts,
+    enforceContinuationExecutionPolicy: true,
   });
   if (issues.length > 0) {
     return { ok: false, reason: issues[0]!.code, issues };
@@ -402,6 +406,7 @@ function normalizeProviderDraft({
   | {
       ok: true;
       draft: AiAuthoredPlanFirstCompilerDraft;
+      selfAudit: AiAuthoredPlanFirstSelfAudit | null;
       issues: CompilerIssue[];
       validationIssues: string[];
     }
@@ -424,13 +429,37 @@ function normalizeProviderDraft({
   }
 
   const issues: CompilerIssue[] = [];
-  const familyCoverage = normalizeBlueprintPhaseFamilyCoverage(providerResult.data);
-  const normalizedDraft = familyCoverage.draft;
+  const detailedFamilyNormalized = normalizeProviderBlueprintDetailedFamilies(providerResult.data);
+  const normalizedDraft = detailedFamilyNormalized.draft;
+  const derivedSelfAudit = deriveAiAuthoredPlanFirstSelfAudit({
+    draft: normalizedDraft,
+    authoringInput,
+  });
+  if (!derivedSelfAudit.ok) {
+    issues.push({
+      code: "ai_authored_plan_first_self_audit_unavailable",
+      path: derivedSelfAudit.path,
+      message: derivedSelfAudit.message,
+    });
+  }
+  const selfAudit = derivedSelfAudit.ok ? derivedSelfAudit.selfAudit : null;
+  if (selfAudit && !selfAudit.gate_outcomes.no_fixed_rest_runnable_contacts) {
+    issues.push({
+      code: "ai_authored_plan_first_explicit_fixed_rest_constraint_violated",
+      path: "detailed_block",
+      message:
+        "The AI-authored detailed block places a runnable contact on an explicit fixed Rest weekday.",
+    });
+  }
+  const selfAuditValidationIssues = selfAudit
+    ? Object.entries(selfAudit.gate_outcomes)
+        .filter(([key, passed]) => key !== "all_passed" && !passed)
+        .map(([key]) => `ai_authored_plan_first_self_audit_gate_failed:${key}`)
+    : [];
   const startDate = authoringInput.schedule.startDate;
   const latestDate = addDaysIso(startDate, 363);
   const targetDate = normalizedDraft.blueprint.selected_target_date;
-  const fourWeekEndDate = addDaysIso(startDate, 27);
-  const detailedEndDate = targetDate < fourWeekEndDate ? targetDate : fourWeekEndDate;
+  const detailedEndDate = resolveAiAuthoredPlanFirstDetailedEndDate({ startDate, targetDate });
   const authoredDays = [
     ...normalizedDraft.detailed_block.workouts,
     normalizedDraft.detailed_block.final_workout,
@@ -510,10 +539,6 @@ function normalizeProviderDraft({
     phases: normalizedDraft.blueprint.phases,
     startDate,
     targetDate,
-    requestedWeeklyCadence: resolveRequestedExactWeeklyCadence(
-      authoringInput.availability.maxRunningDaysPerWeek,
-      authoringInput,
-    ),
     issues,
   });
   validateBlueprintProjections({
@@ -537,7 +562,7 @@ function normalizeProviderDraft({
       message: "final_workout must be the unique chronologically last detailed workout.",
     });
   }
-  const targetInDetailedHorizon = targetDate <= fourWeekEndDate;
+  const targetInDetailedHorizon = targetDate === detailedEndDate;
   const endpointDays = authoredDays.filter(
     (day) => day.workout_identity === AI_AUTHORED_PLAN_FIRST_ENDPOINT_IDENTITY,
   );
@@ -579,34 +604,6 @@ function normalizeProviderDraft({
       });
     }
   }
-  validateRequestedDetailedCadence({
-    authoredContactsByWeek,
-    startDate,
-    detailedEndDate,
-    weekOneStart,
-    requestedWeeklyCadence: resolveRequestedExactWeeklyCadence(
-      authoringInput.availability.maxRunningDaysPerWeek,
-      authoringInput,
-    ),
-    issues,
-  });
-  validateFourDayWeekQualityDensity({
-    authoredDays,
-    weekOneStart,
-    maxRunningDaysPerWeek: authoringInput.availability.maxRunningDaysPerWeek,
-    issues,
-  });
-  validateRunnerCapabilityOpening({ authoredDays, startDate, authoringInput, issues });
-  if (authoringInput.runnerCapability.openingAnchor.basis === "unavailable") {
-    validateMissingBaselineProgressionSafety({
-      authoredDays,
-      startDate,
-      detailedEndDate,
-      weekOneStart,
-      issues,
-    });
-  }
-
   const preparationHorizonWeeks = Math.max(
     1,
     Math.ceil((diffDaysIso(targetDate, startDate) + 1) / 7),
@@ -622,9 +619,11 @@ function normalizeProviderDraft({
   return {
     ok: true,
     issues,
+    selfAudit,
     validationIssues: [
       ...representationNormalized.validationIssues,
-      ...familyCoverage.validationIssues,
+      ...detailedFamilyNormalized.validationIssues,
+      ...selfAuditValidationIssues,
     ],
     draft: {
       ...normalizedDraft,
@@ -642,6 +641,45 @@ function normalizeProviderDraft({
         ),
       },
     },
+  };
+}
+
+function normalizeProviderBlueprintDetailedFamilies(draft: AiAuthoredPlanFirstCompilerDraft): {
+  draft: AiAuthoredPlanFirstCompilerDraft;
+  validationIssues: string[];
+} {
+  const validationIssues: string[] = [];
+  const authoredDays = [...draft.detailed_block.workouts, draft.detailed_block.final_workout];
+  const phases = draft.blueprint.phases.map((phase, phaseIndex) => {
+    const workoutFamilies = [...phase.workout_families];
+    for (const day of authoredDays) {
+      if (day.phase !== phase.phase || day.date < phase.start_date || day.date > phase.end_date) {
+        continue;
+      }
+      const family = familyForIdentity(day.workout_identity);
+      if (workoutFamilies.includes(family)) {
+        continue;
+      }
+      workoutFamilies.push(family);
+      validationIssues.push(
+        `ai_authored_blueprint_detailed_family_derived:blueprint.phases.${phaseIndex}.workout_families:${family}:detailed_block.days.${day.date}`,
+      );
+    }
+    return {
+      ...phase,
+      workout_families: workoutFamilies,
+    };
+  });
+
+  return {
+    draft: {
+      ...draft,
+      blueprint: {
+        ...draft.blueprint,
+        phases,
+      },
+    },
+    validationIssues,
   };
 }
 
@@ -734,265 +772,6 @@ function isUnknownRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function normalizeBlueprintPhaseFamilyCoverage(draft: AiAuthoredPlanFirstCompilerDraft): {
-  draft: AiAuthoredPlanFirstCompilerDraft;
-  validationIssues: string[];
-} {
-  const authoredDays = [...draft.detailed_block.workouts, draft.detailed_block.final_workout];
-  const validationIssues: string[] = [];
-  const phases = draft.blueprint.phases.map((phase) => {
-    const declaredFamilies = new Set(phase.workout_families);
-    const observedFamilies = new Set<(typeof CANONICAL_WORKOUT_FAMILY_VALUES)[number]>();
-
-    for (const day of authoredDays) {
-      if (day.phase === phase.phase && day.date >= phase.start_date && day.date <= phase.end_date) {
-        observedFamilies.add(familyForIdentity(day.workout_identity));
-      }
-    }
-    for (const projection of draft.blueprint.projections) {
-      if (
-        projection.phase === phase.phase &&
-        projection.date >= phase.start_date &&
-        projection.date <= phase.end_date
-      ) {
-        observedFamilies.add(projection.cadence_or_workout_family);
-      }
-    }
-
-    const missingFamilies = CANONICAL_WORKOUT_FAMILY_VALUES.filter(
-      (family) => observedFamilies.has(family) && !declaredFamilies.has(family),
-    );
-    for (const family of missingFamilies) {
-      declaredFamilies.add(family);
-    }
-    if (missingFamilies.length > 0) {
-      validationIssues.push(
-        `ai_authored_blueprint_phase_family_coverage_normalized:${phase.phase}:${missingFamilies.join(",")}`,
-      );
-    }
-
-    return {
-      ...phase,
-      workout_families: CANONICAL_WORKOUT_FAMILY_VALUES.filter((family) =>
-        declaredFamilies.has(family),
-      ),
-    };
-  });
-
-  return {
-    draft: {
-      ...draft,
-      blueprint: {
-        ...draft.blueprint,
-        phases,
-      },
-    },
-    validationIssues,
-  };
-}
-
-function resolveRequestedExactWeeklyCadence(
-  maxRunningDaysPerWeek: number | null,
-  authoringInput: StructuredAuthoringInput,
-) {
-  if (
-    authoringInput.runnerCapability.additionalEasyContact.decision === "not_applicable_reentry" &&
-    authoringInput.runnerCapability.additionalEasyContact.currentContacts === 0 &&
-    authoringInput.runnerCapability.openingAnchor.basis === "unavailable" &&
-    authoringInput.runnerCapability.reasonCodes.includes("recent7_no_contacts")
-  ) {
-    return null;
-  }
-
-  return maxRunningDaysPerWeek === 4 ? 4 : null;
-}
-
-function validateRequestedDetailedCadence(input: {
-  authoredContactsByWeek: ReadonlyMap<number, number>;
-  startDate: string;
-  detailedEndDate: string;
-  weekOneStart: string;
-  requestedWeeklyCadence: number | null;
-  issues: CompilerIssue[];
-}) {
-  if (input.requestedWeeklyCadence == null) return;
-
-  for (
-    let weekStart = input.weekOneStart;
-    weekStart <= input.detailedEndDate;
-    weekStart = addDaysIso(weekStart, 7)
-  ) {
-    const weekEnd = addDaysIso(weekStart, 6);
-    if (weekStart < input.startDate || weekEnd > input.detailedEndDate) continue;
-    const weekNumber = Math.floor(diffDaysIso(weekStart, input.weekOneStart) / 7) + 1;
-    const contactCount = input.authoredContactsByWeek.get(weekNumber) ?? 0;
-    if (contactCount === input.requestedWeeklyCadence) continue;
-    input.issues.push({
-      code: "ai_authored_plan_first_requested_weekly_cadence_mismatch",
-      path: `weeks.${weekNumber}`,
-      message: `Full detailed calendar week ${weekNumber} must contain exactly the runner-requested ${input.requestedWeeklyCadence} workouts; received ${contactCount}.`,
-    });
-  }
-}
-
-const MAX_MISSING_BASELINE_LONG_RUN_BUILD_MINUTES = 10;
-const MAX_MISSING_BASELINE_WEEKLY_DURATION_INCREASE_RATIO = 0.15;
-const MINIMUM_MISSING_BASELINE_CUTBACK_RATIO = 0.15;
-const MISSING_BASELINE_LONG_RUN_QUALITY_IDENTITIES = new Set<CanonicalWorkoutIdentity>([
-  "long_run_with_steady_finish",
-  "marathon_steady_specificity",
-]);
-
-function validateMissingBaselineProgressionSafety(input: {
-  authoredDays: readonly AiAuthoredPlanFirstCompilerWorkout[];
-  startDate: string;
-  detailedEndDate: string;
-  weekOneStart: string;
-  issues: CompilerIssue[];
-}) {
-  const longRuns = input.authoredDays
-    .filter((day) => familyForIdentity(day.workout_identity) === "long")
-    .sort((left, right) => left.date.localeCompare(right.date));
-
-  for (const day of input.authoredDays) {
-    if (!MISSING_BASELINE_LONG_RUN_QUALITY_IDENTITIES.has(day.workout_identity)) continue;
-    input.issues.push({
-      code: "ai_authored_plan_first_missing_baseline_long_run_quality_forbidden",
-      path: `${day.date}.workout_identity`,
-      message:
-        "Without a recent volume and longest-run baseline, the first detailed block cannot prescribe a long-run quality finish.",
-    });
-  }
-
-  let previousTimedLongRun: { date: string; durationMinutes: number } | null = null;
-  for (const day of longRuns) {
-    const durationMinutes = completeRunnableDurationMinutes(day);
-    if (durationMinutes == null) continue;
-    if (
-      previousTimedLongRun &&
-      durationMinutes - previousTimedLongRun.durationMinutes >
-        MAX_MISSING_BASELINE_LONG_RUN_BUILD_MINUTES + Number.EPSILON
-    ) {
-      input.issues.push({
-        code: "ai_authored_plan_first_missing_baseline_long_run_progression_exceeded",
-        path: `${day.date}.sections`,
-        message: `Without a recent volume and longest-run baseline, a timed long run may increase by at most ${MAX_MISSING_BASELINE_LONG_RUN_BUILD_MINUTES} minutes from the previous timed long run (${previousTimedLongRun.date}).`,
-      });
-    }
-    previousTimedLongRun = { date: day.date, durationMinutes };
-  }
-
-  const weeks = new Map<string, AiAuthoredPlanFirstCompilerWorkout[]>();
-  for (const day of input.authoredDays) {
-    const weekStart = startOfWeekIso(day.date);
-    const days = weeks.get(weekStart) ?? [];
-    days.push(day);
-    weeks.set(weekStart, days);
-  }
-  let previousTimedWeek: {
-    weekStart: string;
-    durationMinutes: number;
-    contactCount: number;
-  } | null = null;
-  const timedWeeks: Array<{
-    weekStart: string;
-    durationMinutes: number;
-    contactCount: number;
-    longRunDurationMinutes: number | null;
-  }> = [];
-  for (const [weekStart, days] of [...weeks.entries()].sort(([left], [right]) =>
-    left.localeCompare(right),
-  )) {
-    const durationMinutes = days
-      .map(knownTimedRunnableDurationMinutes)
-      .reduce((sum, duration) => sum + duration, 0);
-    const timedLongRuns = days
-      .filter((day) => familyForIdentity(day.workout_identity) === "long")
-      .map(completeRunnableDurationMinutes)
-      .filter((duration): duration is number => duration != null);
-    timedWeeks.push({
-      weekStart,
-      durationMinutes,
-      contactCount: days.length,
-      longRunDurationMinutes: timedLongRuns.length === 1 ? timedLongRuns[0]! : null,
-    });
-    if (
-      previousTimedWeek &&
-      days.length === previousTimedWeek.contactCount &&
-      durationMinutes >
-        previousTimedWeek.durationMinutes *
-          (1 + MAX_MISSING_BASELINE_WEEKLY_DURATION_INCREASE_RATIO) +
-          Number.EPSILON
-    ) {
-      input.issues.push({
-        code: "ai_authored_plan_first_missing_baseline_weekly_duration_progression_exceeded",
-        path: `weeks.${Math.floor(diffDaysIso(weekStart, input.weekOneStart) / 7) + 1}`,
-        message:
-          "Without a recent volume baseline, summed explicitly timed runnable minutes may increase by at most 15 percent from the previous comparable calendar week.",
-      });
-    }
-    previousTimedWeek = { weekStart, durationMinutes, contactCount: days.length };
-  }
-
-  const fullTimedWeeks = timedWeeks.filter(
-    (week) =>
-      week.weekStart >= input.startDate && addDaysIso(week.weekStart, 6) <= input.detailedEndDate,
-  );
-  if (fullTimedWeeks.length === 4) {
-    const thirdWeek = fullTimedWeeks[2]!;
-    const fourthWeek = fullTimedWeeks[3]!;
-    const maximumCutbackDuration =
-      thirdWeek.durationMinutes * (1 - MINIMUM_MISSING_BASELINE_CUTBACK_RATIO);
-    if (fourthWeek.contactCount > thirdWeek.contactCount) {
-      input.issues.push({
-        code: "ai_authored_plan_first_missing_baseline_fourth_week_contact_cutback_missing",
-        path: `weeks.${Math.floor(diffDaysIso(fourthWeek.weekStart, input.weekOneStart) / 7) + 1}`,
-        message:
-          "Without a recent volume baseline, the fourth full detailed week must not increase runnable contacts above week three.",
-      });
-    }
-    if (fourthWeek.durationMinutes > maximumCutbackDuration + Number.EPSILON) {
-      input.issues.push({
-        code: "ai_authored_plan_first_missing_baseline_fourth_week_cutback_missing",
-        path: `weeks.${Math.floor(diffDaysIso(fourthWeek.weekStart, input.weekOneStart) / 7) + 1}`,
-        message:
-          "Without a recent volume baseline, the fourth full detailed week must cut summed explicitly timed runnable minutes by at least 15 percent from week three.",
-      });
-    }
-    if (
-      thirdWeek.longRunDurationMinutes != null &&
-      fourthWeek.longRunDurationMinutes != null &&
-      fourthWeek.longRunDurationMinutes >
-        thirdWeek.longRunDurationMinutes * (1 - MINIMUM_MISSING_BASELINE_CUTBACK_RATIO) +
-          Number.EPSILON
-    ) {
-      input.issues.push({
-        code: "ai_authored_plan_first_missing_baseline_fourth_week_long_run_cutback_missing",
-        path: `weeks.${Math.floor(diffDaysIso(fourthWeek.weekStart, input.weekOneStart) / 7) + 1}`,
-        message:
-          "Without a recent longest-run baseline, the fourth full detailed week must cut the timed long run by at least 15 percent from week three.",
-      });
-    }
-  }
-}
-
-function knownTimedRunnableDurationMinutes(workout: AiAuthoredPlanFirstCompilerWorkout): number {
-  let total = 0;
-  for (const section of workout.sections) {
-    if (section.kind === "hydration") continue;
-    if (section.kind === "unit") {
-      if (section.prescription.mode === "time") total += section.prescription.duration_min;
-      continue;
-    }
-    for (const child of section.children) {
-      if (child.prescription.mode === "time") {
-        total += child.prescription.duration_min * section.rounds;
-      }
-    }
-  }
-  return total;
-}
-
 function completeRunnableDurationMinutes(
   workout: AiAuthoredPlanFirstCompilerWorkout,
 ): number | null {
@@ -1012,201 +791,15 @@ function completeRunnableDurationMinutes(
   return total;
 }
 
-function completeRunnableDistanceKilometres(
-  workout: AiAuthoredPlanFirstCompilerWorkout,
-): number | null {
-  let total = 0;
-  for (const section of workout.sections) {
-    if (section.kind === "hydration") continue;
-    if (section.kind === "unit") {
-      if (section.prescription.mode !== "distance") return null;
-      total += section.prescription.distance_km;
-      continue;
-    }
-    for (const child of section.children) {
-      if (child.prescription.mode !== "distance") return null;
-      total += child.prescription.distance_km * section.rounds;
-    }
-  }
-  return total;
-}
-
-function validateRunnerCapabilityOpening(input: {
-  authoredDays: readonly AiAuthoredPlanFirstCompilerWorkout[];
-  startDate: string;
-  authoringInput: StructuredPlanAuthoringInput;
-  issues: CompilerIssue[];
-}) {
-  const capability = input.authoringInput.runnerCapability;
-  const anchor = capability.openingAnchor;
-  if (anchor.basis === "unavailable" || anchor.enforcedOpeningDemand == null) return;
-  const openingEnd = addDaysIso(input.startDate, 6);
-  const opening = input.authoredDays.filter(
-    (day) => day.date >= input.startDate && day.date <= openingEnd,
-  );
-  const gate = capability.additionalEasyContact;
-  const maximumContacts =
-    gate.decision === "redistribute_same_demand" || gate.decision === "supported_growth"
-      ? gate.proposedContacts
-      : gate.currentContacts;
-  if (opening.length > maximumContacts) {
-    input.issues.push({
-      code: "ai_authored_plan_first_capability_contact_ceiling_exceeded",
-      path: "detailed_block",
-      message: `The opening seven days contain ${opening.length} contacts but the factual capability permits at most ${maximumContacts}.`,
-    });
-  }
-  const demands = opening.map((day) =>
-    anchor.basis === "distance_metres"
-      ? completeRunnableDistanceKilometres(day)
-      : completeRunnableDurationMinutes(day),
-  );
-  if (demands.some((value) => value == null)) {
-    input.issues.push({
-      code: "ai_authored_plan_first_capability_opening_unit_incomplete",
-      path: "detailed_block",
-      message: `Every opening contact must use the exact ${anchor.basis} demand basis without conversion.`,
-    });
-    return;
-  }
-  const scale = anchor.basis === "distance_metres" ? 1000 : 60;
-  let openingDemand = 0;
-  for (const value of demands) openingDemand += (value ?? 0) * scale;
-  const maximumDemand =
-    gate.decision === "supported_growth"
-      ? (gate.maximumOpeningDemand ?? anchor.enforcedOpeningDemand)
-      : anchor.enforcedOpeningDemand;
-  const exactRequired = gate.decision !== "supported_growth";
-  if (
-    (exactRequired && Math.abs(openingDemand - anchor.enforcedOpeningDemand) > 0.001) ||
-    (!exactRequired &&
-      (openingDemand + 0.001 < anchor.enforcedOpeningDemand ||
-        openingDemand > maximumDemand + 0.001))
-  ) {
-    input.issues.push({
-      code: "ai_authored_plan_first_capability_opening_demand_invalid",
-      path: "detailed_block",
-      message: exactRequired
-        ? `Opening ${anchor.basis} demand must equal the exact Recent7 value ${anchor.enforcedOpeningDemand}.`
-        : `Opening ${anchor.basis} demand must remain between ${anchor.enforcedOpeningDemand} and the supported ceiling ${maximumDemand}.`,
-    });
-  }
-  if (opening.length <= gate.currentContacts) return;
-  if (gate.decision !== "redistribute_same_demand" && gate.decision !== "supported_growth") {
-    input.issues.push({
-      code: "ai_authored_plan_first_capability_plus_one_not_admitted",
-      path: "detailed_block",
-      message: "An additional running contact is not admitted by the frozen runner capability.",
-    });
-    return;
-  }
-  const fixedRestDays = new Set(capability.constraints.fixedRestDays);
-  if (opening.some((day) => fixedRestDays.has(weekdayLong(day.date)))) {
-    input.issues.push({
-      code: "ai_authored_plan_first_capability_plus_one_fixed_rest_conflict",
-      path: "detailed_block",
-      message: "A capability-authorized additional contact cannot occupy a fixed rest day.",
-    });
-  }
-  const openingDates = opening.map((day) => day.date).sort();
-  if (
-    openingDates.some((date, index) => index > 0 && diffDaysIso(date, openingDates[index - 1]!) < 2)
-  ) {
-    input.issues.push({
-      code: "ai_authored_plan_first_capability_plus_one_recovery_spacing_failed",
-      path: "detailed_block",
-      message:
-        "The additional-contact path requires at least one recovery day between opening running contacts.",
-    });
-  }
-  const recent = capability.sevenDaySlices[0]!;
-  const recentLongCount = recent.eligibleEasyLongContacts.filter(
-    (contact) => contact.classification === "long",
-  ).length;
-  const recentUnclassifiedCount = recent.contactCount - recent.eligibleEasyLongContacts.length;
-  const openingLong = opening.filter((day) => familyForIdentity(day.workout_identity) === "long");
-  const openingQuality = opening.filter((day) =>
-    FOUR_DAY_WEEK_QUALITY_FAMILIES.has(familyForIdentity(day.workout_identity)),
-  );
-  if (openingLong.length > recentLongCount || openingQuality.length > recentUnclassifiedCount) {
-    input.issues.push({
-      code: "ai_authored_plan_first_capability_plus_one_stress_contact_added",
-      path: "detailed_block",
-      message:
-        "The only additional capability contact must be easy or recovery; intensity and long-run contact counts cannot increase.",
-    });
-  }
-  if (anchor.longRunDemand != null && openingLong.length > 0) {
-    const longDemands = openingLong.map((day) =>
-      anchor.basis === "distance_metres"
-        ? completeRunnableDistanceKilometres(day)
-        : completeRunnableDurationMinutes(day),
-    );
-    if (
-      longDemands.some((value) => value == null) ||
-      Math.max(...longDemands.map((value) => (value ?? 0) * scale)) > anchor.longRunDemand + 0.001
-    ) {
-      input.issues.push({
-        code: "ai_authored_plan_first_capability_long_run_demand_exceeded",
-        path: "detailed_block",
-        message: "The additional-contact path cannot increase factual Recent7 long-run demand.",
-      });
-    }
-  }
-}
-
-const FOUR_DAY_WEEK_QUALITY_FAMILIES = new Set([
-  "steady",
-  "tempo",
-  "intervals",
-  "progression",
-  "race",
-  "hills",
-]);
-
-function validateFourDayWeekQualityDensity(input: {
-  authoredDays: readonly AiAuthoredPlanFirstCompilerWorkout[];
-  weekOneStart: string;
-  maxRunningDaysPerWeek: number | null;
-  issues: CompilerIssue[];
-}) {
-  if (input.maxRunningDaysPerWeek == null || input.maxRunningDaysPerWeek > 4) return;
-
-  const daysByWeek = new Map<number, AiAuthoredPlanFirstCompilerWorkout[]>();
-  for (const day of input.authoredDays) {
-    const weekNumber = Math.floor(diffDaysIso(day.date, input.weekOneStart) / 7) + 1;
-    const days = daysByWeek.get(weekNumber) ?? [];
-    days.push(day);
-    daysByWeek.set(weekNumber, days);
-  }
-
-  for (const [weekNumber, days] of daysByWeek) {
-    const qualityDays = days.filter((day) =>
-      FOUR_DAY_WEEK_QUALITY_FAMILIES.has(familyForIdentity(day.workout_identity)),
-    );
-    const longRunDays = days.filter((day) => familyForIdentity(day.workout_identity) === "long");
-    if (qualityDays.length <= 1 && longRunDays.length <= 1) continue;
-
-    input.issues.push({
-      code: "ai_authored_plan_first_four_day_week_quality_density_exceeded",
-      path: `weeks.${weekNumber}`,
-      message:
-        "A plan with at most four running days may contain at most one non-long quality session and one long run per calendar week; remaining sessions must be easy or recovery.",
-    });
-  }
-}
-
 function validateBlueprintPhases({
   phases,
   startDate,
   targetDate,
-  requestedWeeklyCadence,
   issues,
 }: {
   phases: AiAuthoredPlanFirstCompilerDraft["blueprint"]["phases"];
   startDate: string;
   targetDate: string;
-  requestedWeeklyCadence: number | null;
   issues: CompilerIssue[];
 }) {
   let expectedStart = startDate;
@@ -1216,16 +809,6 @@ function validateBlueprintPhases({
         code: "ai_authored_blueprint_phase_bounds_invalid",
         path: `blueprint.phases.${index}`,
         message: `Blueprint phase ${phase.phase} must start on ${expectedStart} and have ordered bounds.`,
-      });
-    }
-    if (
-      requestedWeeklyCadence != null &&
-      phase.expected_weekly_cadence !== requestedWeeklyCadence
-    ) {
-      issues.push({
-        code: "ai_authored_blueprint_requested_weekly_cadence_mismatch",
-        path: `blueprint.phases.${index}.expected_weekly_cadence`,
-        message: `Blueprint phase ${phase.phase} must preserve the runner-requested cadence of ${requestedWeeklyCadence} workouts per full calendar week.`,
       });
     }
     expectedStart = addDaysIso(phase.end_date, 1);
@@ -1254,7 +837,6 @@ function validateBlueprintProjections({
 }) {
   const ids = new Set<string>();
   const dates = new Set<string>();
-  const projectionsByPhaseWeek = new Map<string, number>();
   for (const [index, projection] of projections.entries()) {
     if (ids.has(projection.projection_id) || dates.has(projection.date)) {
       issues.push({
@@ -1286,8 +868,6 @@ function validateBlueprintProjections({
         message: `${projection.projection_id} must use a workout family permitted by ${phase.phase}.`,
       });
     }
-    const phaseWeekKey = `${phase.phase}\u0000${startOfWeekIso(projection.date)}`;
-    projectionsByPhaseWeek.set(phaseWeekKey, (projectionsByPhaseWeek.get(phaseWeekKey) ?? 0) + 1);
   }
   if (targetDate > detailedEndDate) {
     const targetProjection = projections.find(
@@ -1300,51 +880,6 @@ function validateBlueprintProjections({
         path: "blueprint.projections",
         message: `Future Blueprint intent must include one target-review projection on ${targetDate}.`,
       });
-    }
-    for (const [index, phase] of phases.entries()) {
-      if (phase.end_date <= detailedEndDate) continue;
-      if (
-        !projections.some(
-          (projection) =>
-            projection.phase === phase.phase &&
-            projection.date >= phase.start_date &&
-            projection.date <= phase.end_date,
-        )
-      ) {
-        issues.push({
-          code: "ai_authored_blueprint_phase_projection_missing",
-          path: `blueprint.phases.${index}`,
-          message: `Future phase ${phase.phase} requires at least one non-executable projection.`,
-        });
-      }
-    }
-    const futureStartDate = addDaysIso(detailedEndDate, 1);
-    for (const [phaseIndex, phase] of phases.entries()) {
-      const phaseFutureStart =
-        phase.start_date < futureStartDate ? futureStartDate : phase.start_date;
-      const phaseFutureEnd = phase.end_date > targetDate ? targetDate : phase.end_date;
-      if (phaseFutureStart > phaseFutureEnd) continue;
-
-      for (
-        let weekStart = startOfWeekIso(phaseFutureStart);
-        weekStart <= phaseFutureEnd;
-        weekStart = addDaysIso(weekStart, 7)
-      ) {
-        const weekEnd = addDaysIso(weekStart, 6);
-        const intervalStart = phaseFutureStart > weekStart ? phaseFutureStart : weekStart;
-        const intervalEnd = phaseFutureEnd < weekEnd ? phaseFutureEnd : weekEnd;
-        const availableDateCount = diffDaysIso(intervalEnd, intervalStart) + 1;
-        const expectedProjectionCount = Math.min(phase.expected_weekly_cadence, availableDateCount);
-        const actualProjectionCount =
-          projectionsByPhaseWeek.get(`${phase.phase}\u0000${weekStart}`) ?? 0;
-        if (actualProjectionCount !== expectedProjectionCount) {
-          issues.push({
-            code: "ai_authored_blueprint_projection_cadence_incomplete",
-            path: `blueprint.phases.${phaseIndex}`,
-            message: `${phase.phase} requires exactly ${expectedProjectionCount} provisional projection slots in the calendar week starting ${weekStart}; received ${actualProjectionCount}.`,
-          });
-        }
-      }
     }
   } else if (projections.length > 0) {
     issues.push({
@@ -1392,11 +927,13 @@ function compileProviderDraft({
   authoringInput,
   issues,
   reviewConflicts,
+  enforceContinuationExecutionPolicy,
 }: {
   draft: AiAuthoredPlanFirstCompilerDraft;
   authoringInput: StructuredAuthoringInput;
   issues: CompilerIssue[];
   reviewConflicts: AiAuthoredBlueprintReviewConflict[];
+  enforceContinuationExecutionPolicy: boolean;
 }): TrainingPlanV2 {
   const fixedRestDays = authoringInput.availability.fixedRestDays;
   const restDays = uniqueWeekdays(fixedRestDays ?? []);
@@ -1473,6 +1010,7 @@ function compileProviderDraft({
             targetDate,
             isEndpoint: day.workout_identity === AI_AUTHORED_PLAN_FIRST_ENDPOINT_IDENTITY,
             issues,
+            enforceContinuationExecutionPolicy,
           })
         : buildRestWorkout({ date, weekday, weekNumber, authoringInput, targetDate }),
     );
@@ -1562,6 +1100,7 @@ function buildWorkout({
   targetDate,
   isEndpoint,
   issues,
+  enforceContinuationExecutionPolicy,
 }: {
   day: AiAuthoredPlanFirstCompilerWorkout;
   date: string;
@@ -1571,17 +1110,20 @@ function buildWorkout({
   targetDate: string;
   isEndpoint: boolean;
   issues: CompilerIssue[];
+  enforceContinuationExecutionPolicy: boolean;
 }): TrainingPlanV2["planned_workouts"][number] {
-  issues.push(
-    ...validateLongRunExecutionPolicy({
-      workoutIdentity: day.workout_identity,
-      stages: providerSectionsToExecutionStages(day.sections, date),
-    }).map((issue) => ({
-      code: `ai_authored_plan_first_${issue.code}`,
-      path: issue.path ?? `${date}.sections`,
-      message: issue.message,
-    })),
-  );
+  if (enforceContinuationExecutionPolicy) {
+    issues.push(
+      ...validateLongRunExecutionPolicy({
+        workoutIdentity: day.workout_identity,
+        stages: providerSectionsToExecutionStages(day.sections, date),
+      }).map((issue) => ({
+        code: `ai_authored_plan_first_${issue.code}`,
+        path: issue.path ?? `${date}.sections`,
+        message: issue.message,
+      })),
+    );
+  }
   const segments = day.sections.map((section, index) =>
     buildSegment({
       section,
@@ -1590,6 +1132,7 @@ function buildWorkout({
       workoutIdentity: day.workout_identity,
       authoringInput,
       issues,
+      enforceContinuationExecutionPolicy,
     }),
   );
   if (!segments.some((segment) => segment.segment_type !== "fueling")) {
@@ -1738,6 +1281,7 @@ function buildSegment({
   workoutIdentity,
   authoringInput,
   issues,
+  enforceContinuationExecutionPolicy,
 }: {
   section: AiAuthoredPlanFirstCompilerStep;
   date: string;
@@ -1745,6 +1289,7 @@ function buildSegment({
   workoutIdentity: CanonicalWorkoutIdentity;
   authoringInput: StructuredAuthoringInput;
   issues: CompilerIssue[];
+  enforceContinuationExecutionPolicy: boolean;
 }): TrainingPlanV2["planned_workouts"][number]["segments"][number] {
   const path = `${date}.sections.${sequence - 1}`;
 
@@ -1780,18 +1325,26 @@ function buildSegment({
             segmentType: section.segment_type,
             authoringInput,
             issues,
+            enforceContinuationExecutionPolicy,
           }),
         ),
       },
     };
   }
 
-  const target = buildTarget(section.target, path, authoringInput, issues, {
-    workoutIdentity,
-    segmentType: section.segment_type,
-    authoredPurpose: section.cue,
-    prescription: section.prescription,
-  });
+  const target = buildTarget(
+    section.target,
+    path,
+    authoringInput,
+    issues,
+    {
+      workoutIdentity,
+      segmentType: section.segment_type,
+      authoredPurpose: section.cue,
+      prescription: section.prescription,
+    },
+    enforceContinuationExecutionPolicy,
+  );
 
   return {
     segment_id: `ai-plan-first-${date}-segment-${sequence}`,
@@ -1813,6 +1366,7 @@ function buildRepeatChild({
   segmentType,
   authoringInput,
   issues,
+  enforceContinuationExecutionPolicy,
 }: {
   child: AiAuthoredPlanFirstCompilerUnit;
   segmentId: string;
@@ -1822,14 +1376,22 @@ function buildRepeatChild({
   segmentType: string;
   authoringInput: StructuredAuthoringInput;
   issues: CompilerIssue[];
+  enforceContinuationExecutionPolicy: boolean;
 }): TrainingPlanRepeatChild {
-  const target = buildTarget(child.target, path, authoringInput, issues, {
-    workoutIdentity,
-    segmentType,
-    repeatChildRole: child.role,
-    authoredPurpose: child.cue,
-    prescription: child.prescription,
-  });
+  const target = buildTarget(
+    child.target,
+    path,
+    authoringInput,
+    issues,
+    {
+      workoutIdentity,
+      segmentType,
+      repeatChildRole: child.role,
+      authoredPurpose: child.cue,
+      prescription: child.prescription,
+    },
+    enforceContinuationExecutionPolicy,
+  );
 
   return {
     segment_id: segmentId,
@@ -1848,19 +1410,21 @@ function buildTarget(
   authoringInput: StructuredAuthoringInput,
   issues: CompilerIssue[],
   context: TargetExecutionContext,
+  enforceContinuationExecutionPolicy: boolean,
 ): TrainingPlanTarget | undefined {
   const paceProvenance = resolveAiAuthoredPaceProvenance(authoringInput);
-  validateBoundedEffortTarget({ value, path, context, issues, paceProvenance });
-  const requiredTempoBand = resolveRequiredNoPaceControlledTempoBand({
-    context,
-    paceProvenance,
-  });
-  if (requiredTempoBand && value.primary_execution_mode !== "heart_rate") {
-    issues.push({
-      code: "ai_authored_plan_first_controlled_tempo_family_execution_invalid",
-      path,
-      message: `Sustained controlled-tempo ${requiredTempoBand.role} requires the exact full accepted ${requiredTempoBand.reference} heart-rate band when factual pace authority is absent.`,
-    });
+  const requiredTempoBand = enforceContinuationExecutionPolicy
+    ? resolveRequiredNoPaceControlledTempoBand({ context, paceProvenance })
+    : null;
+  if (enforceContinuationExecutionPolicy) {
+    validateBoundedEffortTarget({ value, path, context, issues, paceProvenance });
+    if (requiredTempoBand && value.primary_execution_mode !== "heart_rate") {
+      issues.push({
+        code: "ai_authored_plan_first_controlled_tempo_family_execution_invalid",
+        path,
+        message: `Sustained controlled-tempo ${requiredTempoBand.role} requires the exact full accepted ${requiredTempoBand.reference} heart-rate band when factual pace authority is absent.`,
+      });
+    }
   }
   const target: TrainingPlanTarget = {
     primary_execution_mode: value.primary_execution_mode,
@@ -1880,13 +1444,15 @@ function buildTarget(
           "Executable pace requires a runner benchmark or explicit target finish time; generic AI-estimated pace is not factual authority.",
       });
     }
-    validateBenchmarkRelativeQualityPace({
-      command: value.command,
-      path,
-      authoringInput,
-      issues,
-      context,
-    });
+    if (enforceContinuationExecutionPolicy) {
+      validateBenchmarkRelativeQualityPace({
+        command: value.command,
+        path,
+        authoringInput,
+        issues,
+        context,
+      });
+    }
     target.source_note =
       paceProvenance === "benchmark_backed"
         ? "AI-authored pace informed by the runner benchmark."
@@ -1995,7 +1561,11 @@ function buildTarget(
     });
     return target;
   }
-  if (!usesFullBand && executionRange.maxBpm - executionRange.minBpm < 5) {
+  if (
+    enforceContinuationExecutionPolicy &&
+    !usesFullBand &&
+    executionRange.maxBpm - executionRange.minBpm < 5
+  ) {
     issues.push({
       code: "ai_authored_plan_first_hr_execution_subrange_too_narrow",
       path,
@@ -2003,7 +1573,7 @@ function buildTarget(
     });
     return target;
   }
-  if (!usesFullBand && !context.authoredPurpose?.trim()) {
+  if (enforceContinuationExecutionPolicy && !usesFullBand && !context.authoredPurpose?.trim()) {
     issues.push({
       code: "ai_authored_plan_first_hr_execution_subrange_purpose_missing",
       path,
@@ -2011,7 +1581,7 @@ function buildTarget(
     });
     return target;
   }
-  if (!usesFullBand && prohibitsHeartRateSubrange(context)) {
+  if (enforceContinuationExecutionPolicy && !usesFullBand && prohibitsHeartRateSubrange(context)) {
     issues.push({
       code: "ai_authored_plan_first_hr_execution_subrange_prohibited",
       path,
@@ -2020,7 +1590,6 @@ function buildTarget(
     });
     return target;
   }
-
   target.hr_bpm_range = value.command;
   target.hr_bpm_min = executionRange.minBpm;
   target.hr_bpm_max = executionRange.maxBpm;

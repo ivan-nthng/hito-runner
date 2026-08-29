@@ -1,10 +1,13 @@
 # HITO-279 — Runner Plan Capability Vector Architecture
 
-- Status: released on `main@1382d3cf27997f9705799d7c1b782afc657a6fe1`; Product acceptance pending
-- Owner: PRODUCT
-- Released outcome: one immutable, versioned capability vector for initial plan authoring plus the
-  provider-free C0 starter fallback recorded below. The rejected divide-by-four proposal and the
-  expanded C0 provider/compiler experiment are not current authority.
+- Status: `RunnerPlanCapabilityVectorV1` was released in `087c89e`; HITO-294 is correcting the
+  authoring boundary locally on `codex/runner-plan-baseline-research`. No branch, commit, merge,
+  push or deployment is authorized by this document.
+- Owner: BACKEND for the current HITO-294 implementation edge; Notion owns lifecycle and progress.
+- Current outcome: one immutable, versioned capability vector supplies factual structured input to
+  the single AI-authored initial-plan path. Backend may losslessly normalize the provider response,
+  derive metrics and expose diagnostics; it never authors or repairs workouts, weekly composition,
+  minutes, dates, intensity or progression.
 - Future boundary: Phase B remains blocked on HITO-289 and is not implemented by HITO-279.
 - Evidence: [Running Coach decision](../running-coach/2026-08-28-hito-transparent-runner-fitness-index-options-research.md),
   [Backend feasibility](2026-08-28-hito-279-plan-authoring-tier-backend-feasibility.md),
@@ -29,16 +32,16 @@ required provider-neutral samples. No summary fallback bridges that boundary.
 
 ## Existing owners and direction
 
-| Truth or operation                                 | Sole current owner                                                                                                                                                                                                              | HITO-279 disposition                                                                                                                          |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Accepted Activity, source and revision facts       | [`runner-activity/fact-snapshots.ts`](../../../src/lib/runner-activity/fact-snapshots.ts) and the Runner Activity read model                                                                                                    | Retain; expose the exact revision identities needed to build one vector fingerprint without a second query owner.                             |
-| Immutable public Runner Fitness Profile            | [`runner-activity/product-contract.ts`](../../../src/lib/runner-activity/product-contract.ts) assembled by [`runner-activity/read-model.ts`](../../../src/lib/runner-activity/read-model.ts)                                    | Retain as the sole factual snapshot. Add one purpose-limited plan projection; do not add another snapshot or store.                           |
-| Calendar outcomes and Result/Evidence facts        | Existing snapshot inputs described in [current system](../../current-system.md)                                                                                                                                                 | Retain factual direction into the snapshot; never let plan authoring repair or write them.                                                    |
-| Initial authoring orchestration                    | [`running-plan-engine-actions.ts`](../../../src/lib/running-plan-engine-actions.ts)                                                                                                                                             | Freeze one vector at preview, retain it through provider response, review and confirm, and reject changed fingerprints.                       |
-| Structured provider input                          | [`structured-plan-authoring-schema.ts`](../../../src/lib/structured-plan-authoring-schema.ts) and [`ai-authored-plan-first-provider-contract.ts`](../../../src/lib/ai-authored-plan-first-provider-contract.ts)                 | Replace `initialPlanProfile` plus `initialPlanAdmission` with the vector. The AI sees frozen facts and allowed bounds, not raw Activity rows. |
-| Deterministic acceptance                           | [`ai-authored-plan-first-compiler.ts`](../../../src/lib/ai-authored-plan-first-compiler.ts)                                                                                                                                     | Enforce opening demand, contact, spacing, quality-density and evidence-authority rules independently of provider prose.                       |
-| Review, retained-response lineage and confirmation | [`running-plan-engine-review.ts`](../../../src/lib/running-plan-engine-review.ts), [`ai-plan-generation-response-persistence.ts`](../../../src/lib/ai-plan-generation-response-persistence.ts) and current confirmation actions | Retain unchanged ownership. The vector and fingerprint become part of the sealed frozen input.                                                |
-| Continuation decision                              | Current `RunnerFitnessProfileContinuationProjectionV1` consumer                                                                                                                                                                 | Retain. Initial plan authoring does not replace or alias the continuation contract.                                                           |
+| Truth or operation                                 | Sole current owner                                                                                                                                                                                                              | HITO-279 disposition                                                                                                                                     |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Accepted Activity, source and revision facts       | [`runner-activity/fact-snapshots.ts`](../../../src/lib/runner-activity/fact-snapshots.ts) and the Runner Activity read model                                                                                                    | Retain; expose the exact revision identities needed to build one vector fingerprint without a second query owner.                                        |
+| Immutable public Runner Fitness Profile            | [`runner-activity/product-contract.ts`](../../../src/lib/runner-activity/product-contract.ts) assembled by [`runner-activity/read-model.ts`](../../../src/lib/runner-activity/read-model.ts)                                    | Retain as the sole factual snapshot. Add one purpose-limited plan projection; do not add another snapshot or store.                                      |
+| Calendar outcomes and Result/Evidence facts        | Existing snapshot inputs described in [current system](../../current-system.md)                                                                                                                                                 | Retain factual direction into the snapshot; never let plan authoring repair or write them.                                                               |
+| Initial authoring orchestration                    | [`running-plan-engine-actions.ts`](../../../src/lib/running-plan-engine-actions.ts)                                                                                                                                             | Freeze one vector at preview, retain it through provider response, review and confirm, and reject changed fingerprints.                                  |
+| Structured provider input                          | [`structured-plan-authoring-schema.ts`](../../../src/lib/structured-plan-authoring-schema.ts) and [`ai-authored-plan-first-provider-contract.ts`](../../../src/lib/ai-authored-plan-first-provider-contract.ts)                 | Replace `initialPlanProfile` plus `initialPlanAdmission` with the vector. The AI sees frozen facts and allowed bounds, not raw Activity rows.            |
+| Provider response normalization and analysis       | [`ai-authored-plan-first-compiler.ts`](../../../src/lib/ai-authored-plan-first-compiler.ts)                                                                                                                                     | Parse and losslessly normalize AI output, derive factual plan metrics and expose diagnostics. It cannot author, repair or reject on coaching preference. |
+| Review, retained-response lineage and confirmation | [`running-plan-engine-review.ts`](../../../src/lib/running-plan-engine-review.ts), [`ai-plan-generation-response-persistence.ts`](../../../src/lib/ai-plan-generation-response-persistence.ts) and current confirmation actions | Retain unchanged ownership. The vector and fingerprint become part of the sealed frozen input.                                                           |
+| Continuation decision                              | Current `RunnerFitnessProfileContinuationProjectionV1` consumer                                                                                                                                                                 | Retain. Initial plan authoring does not replace or alias the continuation contract.                                                                      |
 
 Final dependency direction is:
 
@@ -47,7 +50,8 @@ Identity constraints + Calendar outcomes + Result/Evidence + Runner Activity rev
   -> RunnerFitnessProfileSnapshotV1
   -> pure RunnerPlanCapabilityVectorV1
   -> structured initial authoring request
-  -> retained provider response -> strict compiler -> sealed review/confirm
+  -> retained provider response -> schema validation -> lossless normalization and diagnostics
+  -> sealed review/confirm
   -> runner-owned Calendar workouts
 ```
 
@@ -360,82 +364,72 @@ PerformanceEvidence, component states/reasons, current constraints and the admit
 does not receive raw FIT, private samples, profile rows, an opaque score or permission to select a
 different baseline.
 
-The AI owns a proposed reviewed program inside those bounds: phase development, week-to-week
-progression and cutback. Deterministic server code owns:
+The AI owns every authored plan choice: phases, dates, workout identities, sections, duration,
+distance, intensity, recovery and progression. The compiler is allowed to:
 
-- source fingerprint freshness and vector/schema versions;
-- opening demand basis and exact initial-week anchor;
-- maximum contact count and the only permitted `+1` classification;
-- same-demand redistribution or supported-growth ceiling;
-- no added intensity/long-run contact through `+1`;
-- fixed-rest, recovery-spacing, quality-density and limitation handling inside the `+1` gate only;
-- standard-distance authority and absence of Phase B records before HITO-289;
-- strict compilation, retained-response lineage, sealed Review and explicit Confirm.
+- validate the provider JSON against the canonical response schema;
+- normalize representation without changing meaning, including known aliases, ordering, explicit
+  units, server-owned identities, checksums and provenance;
+- mechanically project the complete AI response into `TrainingPlanV2`;
+- derive totals, weekly changes, long-run share, contact density, spacing and other measurements from
+  the authored result;
+- emit factual conflicts and coaching diagnostics beside an otherwise reviewable plan;
+- fail only when the response cannot be read, represented or materialized truthfully because it is
+  malformed, incomplete, internally contradictory or asserts factual authority it does not carry.
 
-A provider output that violates a bound is rejected; it is not clamped or repaired by Frontend.
+The compiler must never insert a workout or section, select an alternate date, fill a missing
+duration or target, clamp a value, choose a workout family, rewrite progression or substitute a
+Backend template. A missing required value causes a retained validation result and a fresh paid AI
+request; Backend never repairs the plan. Coaching quality is evaluated by Running Coach from the
+unchanged AI-authored Review.
 
-## Migration and deletion order
+## HITO-294 finite repair and acceptance sequence
 
-1. **BACKEND — factual vector and pure proof.** In the existing Runner Activity read-model owner,
-   expose the revision-complete source facts needed by one pure vector builder. Add no store. Prove
-   cutoff-aligned slices, exact metrics, fingerprints, Phase A records and all fail-closed states.
-2. **BACKEND — authoring adoption.** Replace `initialPlanProfile` and `initialPlanAdmission` in the
-   structured schema, preview builder, provider projection, retained normalized input, Review/Confirm
-   freshness comparison and dev/QA fixture with `runnerCapability`. Freeze the optional current
-   limitation only when the existing request already provides it; otherwise record `unavailable` and
-   disable only `+1`. Do not add a required question, alter ordinary authoring admission, or retain
-   aliases or dual inputs.
-3. **BACKEND — compiler enforcement.** Add deterministic anchor and `+1` validation before authoring
-   can be accepted. Provider wording may describe the bounds but is never their authority.
-4. **BACKEND — consumer removal.** Migrate direct scripts/proofs and delete
-   `RunnerFitnessProfileInitialPlanProjectionV1`, its projector/schema, and the standalone admission
-   field only after `rg` proves zero production, fixture and proof consumers. Keep Progress,
-   continuation and one-off projections unchanged.
-5. **QA — focused independent acceptance.** Replay deterministic fixtures first, then one admitted
-   provider/retained-response/review-confirm journey only under separate paid-provider and release
-   authority. Private ZIP fixtures remain future QA evidence and are not read by this decision.
+Notion HITO-294 owns the single live Delivery checklist. This section owns only the technical order
+and cannot independently mark progress.
 
-No Frontend change is required. HITO-279 does not move the existing Confirm question into preview or
-create a new required interaction. Calendar behavior does not change.
+1. **Delete, do not redesign.** Remove the deterministic C0 writer and provider bypass. Simplify the
+   existing compiler by deleting coaching-authority branches, default-fatal semantic lists, plan
+   composition enforcement and Backend-authored repair behavior. Add no framework, second validator,
+   compatibility path, schema or store.
+2. **Retain the useful pipeline.** Keep `RunnerPlanCapabilityVectorV1`, strict provider JSON schema,
+   lossless normalization, canonical `TrainingPlanV2` projection, retained-response lineage,
+   checksums, diagnostics, Review/Restore, explicit Confirm and Calendar ownership.
+3. **Prove headless paid authoring first.** Use fresh disposable `.invalid` technical runners and the
+   current model, prompt, schema and compiler. Make fresh paid requests without UI, preserving each
+   response, validation result, elapsed time, tokens and derived cost. Old retained responses,
+   deterministic drafts and provider-free fixtures are not acceptance evidence.
+4. **Prove the capability effect headlessly.** Compare the same demographics and goal first with no
+   accepted history and then with the three admitted FIT activities. Both plans must be authored by
+   AI; the second request must carry the changed vector, and Running Coach determines whether the
+   resulting adaptation is meaningful.
+5. **Review AI output only.** Running Coach reviews the fresh 10K result first, then fresh Half
+   Marathon and Marathon results. A technical schema defect returns to Backend; a coaching defect
+   changes the prompt/brief and triggers a new fresh paid request. Backend never edits the plan.
+6. **Test the interface only after headless PASS.** QA then exercises Create plan, complete Review,
+   diagnostics, Saved Review/Restore, explicit Confirm, Calendar materialization, reload and failure
+   states through the product UI on the exact accepted source.
+7. **Clean once and release only by explicit authority.** Batch-delete all HITO-294 disposable Auth
+   identities and owner-bound data with zero-residue proof. Product then shows Ivan the exact diff and
+   evidence. Branch actions, commit, merge/fast-forward, push and deployment each require Ivan's
+   separate explicit approval.
 
-## Required fixture matrix
+## Minimal proof matrix
 
-| Fixture                                                  | Exact expected result                                                                                                                   |
-| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Recent7 = 0                                              | Exact zero contacts; constraint/re-entry; no anchor, recurrence or `+1`.                                                                |
-| Recent7 = 1                                              | One exact contact/sum; `observed_sparse`; Level 1 only when every gate passes.                                                          |
-| Recent7 = 2                                              | Two exact contacts/sum; `observed_sparse`; no dilution or automatic recurrence.                                                         |
-| Recent7 = 3+                                             | Exact count/sums; pattern state only from explicit slice facts; no default growth.                                                      |
-| Empty complete prior slice                               | Exact zero contacts for that complete slice; not missing and not recurrence support.                                                    |
-| Stale fingerprint                                        | Provider retry, Restore Review and Confirm fail `capability_source_stale`.                                                              |
-| Incomplete duration, complete distance                   | Distance is the selected exact basis; duration remains unavailable.                                                                     |
-| Incomplete distance, complete duration                   | Duration is the selected exact basis; distance remains unavailable.                                                                     |
-| Both opening units incomplete                            | `opening_anchor_unavailable`; constraint/re-entry and no `+1`.                                                                          |
-| Partial Capacity90 boundary                              | Labelled context only; never recurrence support.                                                                                        |
-| Updating revision                                        | `source_revision_updating`; no provider dispatch or positive progression.                                                               |
-| Contradictory revision                                   | `source_revision_contradictory`; no provider dispatch or fact repair.                                                                   |
-| `+1` redistribution                                      | Proposed contacts = Recent7 + 1, extra contact easy/recovery, exact selected-unit total and long-run demand unchanged.                  |
-| `+1` supported growth                                    | Most recent complete matching-contact slice selected; output above its exact-unit ceiling rejected.                                     |
-| Limitation yes/unsure/unavailable                        | `+1` is `not_admitted`; ordinary observed-baseline provider dispatch remains available and existing Confirm blocking remains unchanged. |
-| Skipped/partial/unresolved current outcome               | `outcome_not_permitted`; `+1` rejected without inventing a cause.                                                                       |
-| Exact whole-activity 5K                                  | Phase A exact record retained with whole-activity/official authority and revision provenance.                                           |
-| 5.1 km Activity -> contiguous 5K                         | Phase A unavailable; Phase B chooses actual fastest exact-5K sample window after HITO-289.                                              |
-| Pause inside fastest segment                             | Chronological elapsed including pause is authoritative; moving/timer result separately labelled.                                        |
-| Gap/reset/jump or failed interpolation                   | Segment unavailable; no whole-activity average or scaled fallback.                                                                      |
-| Equal fastest segments                                   | Earliest eligible segment wins; exact boundaries and provenance retained.                                                               |
-| HR context mismatch                                      | HR cannot affect PerformanceEvidence or positive progression; ordinary Phase A admission is unchanged.                                  |
-| HR summary without eligible segment/comparable authority | HR remains unavailable for PerformanceEvidence and intensity precision; no RPE value can upgrade it.                                    |
-| RPE present versus absent                                | Identical Phase A fact authority and `+1` result; RPE remains optional subjective context.                                              |
-| RPE-only correction                                      | May affect existing subjective load/manageability or continuation policy only; never creates a record, admits `+1` or increases demand. |
-
-Focused proof must cover the pure builder, schema/provider representation, compiler rejection,
-retained-input fingerprint, Review restore and Confirm staleness. Browser, hosted, provider, Global QA,
-release and deployment are not acceptance layers of this architecture decision.
+| Edge                        | Required evidence                                                                                                                  |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Provider representation     | Current structured input contains the frozen capability vector and no raw FIT/private row data.                                    |
+| Compiler boundary           | Complete AI fields survive unchanged; normalization is lossless; derived metrics do not mutate the plan.                           |
+| Invalid response            | Missing or malformed required fields are retained as exact validation errors and trigger a fresh AI request, never Backend repair. |
+| Fresh headless paid request | One current response becomes a complete unconfirmed Review with timing/token/cost evidence.                                        |
+| History comparison          | The three-FIT runner sends a different factual vector and produces a separately authored Review.                                   |
+| UI after headless PASS      | Review, Restore, Confirm and Calendar use the same accepted candidate without duplicate provider or Calendar writes.               |
 
 ## Rollback, stop conditions and risks
 
-- Roll back the implementation slice by reverting the new source projection and structured-input
-  replacement together. Because no schema/store is added, rollback does not rewrite runner data.
+- The pre-research Git baseline is `0f17b71`. HITO-294 remains uncommitted until Ivan chooses whether
+  to retain the capability-vector/AI-only correction or restore that baseline. Do not rewrite Git or
+  create another branch as an implicit rollback.
 - Stop before provider dispatch if exact source revisions, cutoff timezone or the selected-unit
   anchor cannot be frozen losslessly. Missing limitation state does not stop ordinary authoring; it
   returns `not_admitted` only for `+1`.
@@ -443,62 +437,28 @@ release and deployment are not acceptance layers of this architecture decision.
   interpolation and reprocessing. Do not ship a summary fallback.
 - Stop deletion of the old initial-plan projection until zero direct runtime, fixture and proof
   consumers are demonstrated.
-- Main residual risk is making an overconfident progression decision from complete arithmetic but
-  weak recurrence/context. Component states, the most-recent matching-slice rule and compiler bounds
-  keep that uncertainty explicit.
+- Stop any implementation that adds a second writer, fallback author, repair layer or new framework.
+  The main residual risk is again turning deterministic analysis into Backend coaching authority.
+  Derived metrics remain visible diagnostics; only AI authors and Running Coach judges quality.
 
-## Exact next-owner prompt after Product acceptance
+## Ownership and current next action
 
-```text
-ROLE: BACKEND
-
-Task: HITO-279 — Define a Transparent Runner Fitness Index
-Stage: Phase A RunnerPlanCapabilityVectorV1 implementation
-
-Implement the accepted architecture in
-docs/tasks/backlog/2026-08-28-hito-279-runner-plan-capability-vector-architecture.md. Reuse the existing
-RunnerFitnessProfileSnapshotV1 and Runner Activity revision owners. Build one pure, versioned
-RunnerPlanCapabilityVectorV1 with cutoff-aligned S0-S11 slices, exact Recent7 same-unit anchors,
-component-specific missingness, current whole-activity/official PerformanceEvidence, and the two-level
-additional easy/recovery contact gate. Replace initialPlanProfile plus initialPlanAdmission throughout
-the structured initial-authoring, provider, retained-response, Review/Confirm and compiler path; do not
-add a second profile, store, route, compatibility alias or dual input. Do not add a required limitation
-question or block ordinary observed-baseline dispatch when that optional value is absent. Freeze it only
-when already available; yes, unsure or unavailable must return not_admitted for +1 only, while existing
-authoring admission and Confirm blocking remain unchanged. Treat RPE as optional subjective context:
-it must never unlock PerformanceEvidence, a standard-distance record, HR comparability, intensity
-precision, +1 or positive progression. Enforce all opening-demand, contact, spacing, quality-density,
-staleness and authority rules server-side. Keep Phase B exact-distance segments unavailable until
-HITO-289; do not read private ZIP fixtures or add a summary fallback. Migrate focused fixtures/proofs
-and remove the superseded initial-plan projection only after zero-consumer proof. Preserve Calendar,
-Progress and continuation ownership and all unrelated dirty work. Return the same Task directly to QA
-only after focused deterministic proof; provider, browser, hosted, release and deployment remain
-separate acceptance layers.
-```
+BACKEND owns the current compiler simplification and headless paid-provider boundary on the same
+HITO-294 Task. RUNNING COACH receives only complete fresh AI-authored Reviews. QA begins UI work only
+after headless paid authoring and Coach review pass. Product returns to Ivan before any Git or release
+action.
 
 ## Architecture receipt
 
-Architecture acceptance is complete. The rejected divide-by-four tier has been replaced by one
-source-backed capability vector contract, exact deterministic `+1` gates, a no-second-truth consumer
-migration and an explicit Phase A/Phase B boundary. No runtime, schema, migration, provider, fixture,
-Calendar, hosted, Git, QA or release work was performed. Next owner is PRODUCT for acceptance; BACKEND
-is the first implementation owner only after that acceptance.
+HITO-279 replaced the rejected divide-by-four tier with one source-backed capability vector and an
+explicit Phase A/Phase B evidence boundary. HITO-294 retains that factual result but supersedes the
+former compiler-enforcement language above: the vector informs AI, while deterministic code only
+normalizes, derives and reports on the AI-authored plan. The current implementation remains local and
+unreleased; the live Notion checklist owns progress and BACKEND is the current owner.
 
-## Superseded C0 experiment and minimal fallback — 2026-08-29
+## Superseded C0 experiment — 2026-08-29
 
-The expanded provider/compiler/lattice/terminal-rejection experiment after Phase A was rejected. It
-incorrectly made the paid provider responsible for zero-history C0 dates, contact count and minutes,
-then accumulated prompt, compiler and validator repair layers. Those experimental contracts are not
-current architecture and must not be restored as production authority.
-
-The accepted fallback selects the existing zero-contact `RunnerPlanCapabilityVectorV1` discriminator
-before provider lookup and builds one four-week starter review locally. It uses the existing
-`easy_aerobic_run`, `long_aerobic_run` and `cutback_long_run` templates; existing availability,
-fixed-rest and preferred-long-day inputs; the compact accepted Beginner/`runs_a_lot` seed-minute
-table; and complete accepted Z1/Z2 guidance. Missing required HR bands use the existing
-incomplete-profile failure. The result enters the existing retained candidate, Saved Review/Restore,
-Review, Confirm and Calendar owners with truthful provider-free provenance and no second writer.
-
-C1–C6 retain the accepted Phase A provider/compiler behavior byte-for-byte. This fallback adds no
-schema migration, route, table, public profile, compatibility path, provider-contract rewrite,
-global lattice or rejected-response retention subsystem.
+The Backend-authored deterministic C0 starter experiment was rejected and removed as a second plan
+writer; it is historical non-authority. Zero-history authoring uses the same AI provider, schema,
+non-authoring normalizer/analyser, retained Review and explicit Confirm path as every other initial
+plan.

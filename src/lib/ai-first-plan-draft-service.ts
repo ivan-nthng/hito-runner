@@ -18,7 +18,7 @@ import {
   AI_AUTHORED_PLAN_FIRST_PROVIDER_CONTRACT_VERSION,
   AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME,
   buildAiAuthoredPlanFirstPrompt,
-  type AiAuthoredPlanFirstCompilerDraft,
+  type AiAuthoredPlanFirstSelfAudit,
 } from "@/lib/ai-authored-plan-first-provider-contract";
 import {
   attachOutputToAiPlanGenerationLedgerTrace,
@@ -38,20 +38,16 @@ import {
   type AiPlanGenerationValidationOutcome,
 } from "@/lib/ai-plan-generation-response-persistence";
 import { type TrainingPlanV2 } from "@/lib/imported-plan";
-import { resolveEffectiveHeartRateGuidance } from "@/lib/heart-rate-zones";
-import { getManualWorkoutTemplate } from "@/lib/manual-workout-authoring/templates";
 import {
   recordLocalProviderTranscript,
   type LocalProviderTranscriptOutcome,
 } from "@/lib/local-runtime-observability";
 import { serverEnv } from "@/lib/supabase/env";
-import { stableJsonStringify } from "@/lib/review-token-signing";
 import {
   structuredPlanAuthoringInputSchema,
   type StructuredPlanAuthoringInput,
 } from "@/lib/structured-plan-authoring-schema";
 import { createServerOnlyFn } from "@tanstack/react-start";
-import { addDaysIso, diffDaysIso, startOfWeekIso, weekdayLong } from "@/lib/training";
 import type { Dispatcher } from "undici";
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
@@ -61,13 +57,10 @@ export const DEFAULT_AI_FIRST_PLAN_TIMEOUT_MS = 0;
 // both visible JSON and reasoning against max_output_tokens, so the former 32k ceiling could end an
 // otherwise valid Structured Output before the provider completed it.
 export const DEFAULT_AI_FIRST_PLAN_MAX_OUTPUT_TOKENS = 128_000;
-const AI_FIRST_PLAN_REASONING_EFFORT = "none" as const;
+const AI_FIRST_PLAN_REASONING_EFFORT = "low" as const;
 const AI_FIRST_PLAN_CONTRACT_MODE = "adaptive_blueprint_four_week" as const;
 const AI_FIRST_PLAN_RESPONSE_SCHEMA_MODE =
   "responses_json_schema_adaptive_blueprint_four_week_v1_strict" as const;
-const C0_DETERMINISTIC_STARTER_MODEL = "hito-c0-deterministic-starter-v1";
-const C0_DETERMINISTIC_STARTER_POLICY_VERSION = "c0_deterministic_starter_policy_v1";
-const C0_DETERMINISTIC_STARTER_SCHEMA_VERSION = "c0_deterministic_starter_draft_v1";
 const OPENAI_PROVIDER_HEADERS_TIMEOUT_MS = 0;
 const OPENAI_PROVIDER_BODY_TIMEOUT_MS = 0;
 let openAiProviderDispatcherPromise: Promise<Dispatcher> | null = null;
@@ -238,6 +231,7 @@ type AiFirstPlanDraftPreviewResult =
       ok: true;
       canonicalPlan: TrainingPlanV2;
       blueprint: AiAuthoredBlueprintSummary;
+      selfAudit: AiAuthoredPlanFirstSelfAudit | null;
       reviewConflicts: AiAuthoredBlueprintReviewConflict[];
       retainedSourceCandidate: RetainedAdaptiveTrainingSourceCandidate | null;
       metadata: AiFirstPlanDraftPreviewMetadata;
@@ -286,46 +280,13 @@ export async function generateAiFirstPlanDraftPreview({
 
   const authoringInput = authoringInputResult.authoringInput;
   const startedAt = Date.now();
-  const deterministicC0 = isDeterministicC0AuthoringInput(authoringInput);
-  const deterministicC0Draft = deterministicC0
-    ? buildDeterministicC0StarterDraft(authoringInput)
-    : null;
-  if (deterministicC0 && !deterministicC0Draft) {
-    return unavailableAiFirstPlanDraft({
-      reason: "ai_authored_plan_first_profile_incomplete",
-      issues: [
-        "The zero-history starter requires accepted Z1 and Z2 guidance and a target after its four-week detailed block.",
-      ],
-      model: C0_DETERMINISTIC_STARTER_MODEL,
-      responseId: null,
-      startedAt,
-      debug: buildNotStartedDebug({
-        timeoutMs,
-        maxOutputTokens,
-        model: C0_DETERMINISTIC_STARTER_MODEL,
-      }),
-      generationTrace: null,
-    });
-  }
-  const resolvedModel = deterministicC0Draft
-    ? C0_DETERMINISTIC_STARTER_MODEL
-    : (model ?? DEFAULT_OPENAI_PLAN_MODEL);
-  const providerKind = deterministicC0Draft
-    ? "not_started"
-    : resolveAiPlanGenerationProviderKind({ apiKey, model: resolvedModel });
-  const prompt = deterministicC0Draft
-    ? buildDeterministicC0RetentionPrompt(authoringInput)
-    : buildAiAuthoredPlanFirstPrompt({ authoringInput, today });
+  const resolvedModel = model ?? DEFAULT_OPENAI_PLAN_MODEL;
+  const providerKind = resolveAiPlanGenerationProviderKind({ apiKey, model: resolvedModel });
+  const prompt = buildAiAuthoredPlanFirstPrompt({ authoringInput, today });
   const versionContext: AiPlanGenerationAttemptVersionContext = {
-    schemaVersion: deterministicC0Draft
-      ? C0_DETERMINISTIC_STARTER_SCHEMA_VERSION
-      : AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME,
-    promptVersion: deterministicC0Draft
-      ? C0_DETERMINISTIC_STARTER_POLICY_VERSION
-      : AI_AUTHORED_PLAN_FIRST_PROVIDER_CONTRACT_VERSION,
-    policyVersion: deterministicC0Draft
-      ? C0_DETERMINISTIC_STARTER_POLICY_VERSION
-      : AI_AUTHORED_PLAN_FIRST_CONTRACT_VERSION,
+    schemaVersion: AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME,
+    promptVersion: AI_AUTHORED_PLAN_FIRST_PROVIDER_CONTRACT_VERSION,
+    policyVersion: AI_AUTHORED_PLAN_FIRST_CONTRACT_VERSION,
     compilerVersion: AI_AUTHORED_PLAN_FIRST_COMPILER_VERSION,
     providerSettings: resolveAiPlanStructuredResponseProviderSettings({
       model: resolvedModel,
@@ -406,7 +367,7 @@ export async function generateAiFirstPlanDraftPreview({
     }
   }
 
-  if (!apiKey && !reusableResponse && !deterministicC0Draft) {
+  if (!apiKey && !reusableResponse) {
     latestGenerationTrace = await recordAiPlanGenerationUnavailable({
       trace: latestGenerationTrace,
       reason: "openai_not_configured",
@@ -431,57 +392,52 @@ export async function generateAiFirstPlanDraftPreview({
   }
 
   try {
-    const response =
-      reusableResponse || deterministicC0Draft
-        ? null
-        : await requestOpenAiFirstPlanDraft({
-            apiKey: apiKey!,
-            model: resolvedModel,
-            timeoutMs,
-            maxOutputTokens,
-            fetchImpl,
-            signal,
-            generationLedger,
-            prompt,
-            transcriptRedactedValues: authoringInput.requestContext?.runnerComment
-              ? [authoringInput.requestContext.runnerComment]
-              : [],
-            generationTrace: latestGenerationTrace,
-          });
-    latestGenerationTrace =
-      response?.generationTrace ?? (deterministicC0Draft ? latestGenerationTrace : null);
+    const response = reusableResponse
+      ? null
+      : await requestOpenAiFirstPlanDraft({
+          apiKey: apiKey!,
+          model: resolvedModel,
+          timeoutMs,
+          maxOutputTokens,
+          fetchImpl,
+          signal,
+          generationLedger,
+          prompt,
+          transcriptRedactedValues: authoringInput.requestContext?.runnerComment
+            ? [authoringInput.requestContext.runnerComment]
+            : [],
+          generationTrace: latestGenerationTrace,
+        });
+    latestGenerationTrace = response?.generationTrace ?? null;
     const rawOutput = reusableResponse
       ? reusableResponse.response_body
-      : deterministicC0Draft
-        ? stableJsonStringify(deterministicC0Draft)
-        : extractStructuredOutputText(response!.body, response!.debug);
+      : extractStructuredOutputText(response!.body, response!.debug);
     const responseId =
       reusableResponse?.provider_response_id ??
       latestGenerationTrace?.provider.responseId ??
       response?.body.id ??
       null;
-    const responseDebug =
-      reusableResponse || deterministicC0Draft
-        ? {
-            ...buildRequestDebug({
-              model: resolvedModel,
-              timeoutMs,
-              maxOutputTokens,
-              systemPromptChars: prompt.systemPrompt.length,
-              userPromptChars: prompt.userPrompt.length,
-              responseSchemaChars: JSON.stringify(prompt.responseSchema).length,
-              requestPhase: "response_parsed",
-              abortReason: null,
-              abortFired: false,
-              transportMode: "not_started",
-              openAiElapsedMs: 0,
-            }),
-            outputTextChars: rawOutput.length,
-          }
-        : {
-            ...response!.debug,
-            outputTextChars: rawOutput.length,
-          };
+    const responseDebug = reusableResponse
+      ? {
+          ...buildRequestDebug({
+            model: resolvedModel,
+            timeoutMs,
+            maxOutputTokens,
+            systemPromptChars: prompt.systemPrompt.length,
+            userPromptChars: prompt.userPrompt.length,
+            responseSchemaChars: JSON.stringify(prompt.responseSchema).length,
+            requestPhase: "response_parsed",
+            abortReason: null,
+            abortFired: false,
+            transportMode: "not_started",
+            openAiElapsedMs: 0,
+          }),
+          outputTextChars: rawOutput.length,
+        }
+      : {
+          ...response!.debug,
+          outputTextChars: rawOutput.length,
+        };
     const parsedOutput = safeParseJson(rawOutput);
     if (!reusableResponse) {
       latestGenerationTrace = await attachOutputToAiPlanGenerationLedgerTrace({
@@ -516,9 +472,7 @@ export async function generateAiFirstPlanDraftPreview({
     let retainedResponse: AiPlanGenerationResponseRow | null = reusableResponse;
     if (
       !reusableResponse &&
-      (providerKind === "openai_responses_api" ||
-        providerKind === "local_dev_fixture" ||
-        Boolean(deterministicC0Draft)) &&
+      (providerKind === "openai_responses_api" || providerKind === "local_dev_fixture") &&
       candidateOwnerUserId
     ) {
       const generationTrace = latestGenerationTrace;
@@ -593,9 +547,6 @@ export async function generateAiFirstPlanDraftPreview({
     const normalized = normalizeOpenAiFirstPlanContractOutput({
       parsedOutput,
       authoringInput: compilerAuthoringInput,
-      source: deterministicC0Draft
-        ? "hito_c0_deterministic_starter_policy"
-        : "openai_adaptive_blueprint_four_week_draft",
     });
 
     if (!normalized.ok) {
@@ -702,6 +653,7 @@ export async function generateAiFirstPlanDraftPreview({
           retainedResponse: acceptedRetainedResponse,
           blueprint: finalized.blueprint,
           canonicalPlan: finalized.canonicalPlan,
+          selfAudit: finalized.selfAudit,
           reviewConflicts: finalized.reviewConflicts,
           authoringInput: candidateAuthoringInput,
           immutableRecompileProvenance: immutableRecompileProvenance ?? undefined,
@@ -753,6 +705,7 @@ export async function generateAiFirstPlanDraftPreview({
       ok: true,
       canonicalPlan: finalized.canonicalPlan,
       blueprint: finalized.blueprint,
+      selfAudit: finalized.selfAudit,
       reviewConflicts: finalized.reviewConflicts,
       retainedSourceCandidate,
       metadata: {
@@ -858,274 +811,12 @@ function resolveStructuredAuthoringInput(input: unknown): StructuredAuthoringInp
   }
 }
 
-function isDeterministicC0AuthoringInput(input: StructuredPlanAuthoringInput) {
-  const capability = input.runnerCapability;
-  return (
-    capability.additionalEasyContact.decision === "not_applicable_reentry" &&
-    capability.additionalEasyContact.currentContacts === 0 &&
-    capability.openingAnchor.basis === "unavailable" &&
-    capability.windows.recent7.state === "unavailable" &&
-    capability.reasonCodes.includes("recent7_no_contacts")
-  );
-}
-
-function buildDeterministicC0RetentionPrompt(input: StructuredPlanAuthoringInput) {
-  return {
-    systemPrompt:
-      "Hito deterministic zero-history starter policy. No external provider participates.",
-    userPrompt: stableJsonStringify({
-      policyVersion: C0_DETERMINISTIC_STARTER_POLICY_VERSION,
-      authoringInput: input,
-    }),
-    responseSchema: {
-      type: "object",
-      const: C0_DETERMINISTIC_STARTER_SCHEMA_VERSION,
-    },
-  };
-}
-
-function buildDeterministicC0StarterDraft(
-  input: StructuredPlanAuthoringInput,
-): AiAuthoredPlanFirstCompilerDraft | null {
-  const z1 = resolveEffectiveHeartRateGuidance(input.runnerFacts.heartRateProfile, "Z1");
-  const z2 = resolveEffectiveHeartRateGuidance(input.runnerFacts.heartRateProfile, "Z2");
-  const targetDate = input.planGoalIntent.targetDate;
-  const detailedEndDate = addDaysIso(input.schedule.startDate, 27);
-  if (!z1 || !z2 || !targetDate || targetDate <= detailedEndDate) return null;
-
-  const fixedRestDays = new Set(input.availability.fixedRestDays ?? []);
-  const weekdayOrder = [
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-    "Sunday",
-  ] as const;
-  const eligibleWeekdays = weekdayOrder.filter((weekday) => !fixedRestDays.has(weekday));
-  const experienced =
-    input.runnerFacts.selfReportedLevel === "runs_a_lot" ||
-    input.runnerFacts.selfReportedLevel === "professional_competitive";
-  const levelCeiling = experienced ? 4 : 3;
-  const declaredCeiling = input.availability.maxRunningDaysPerWeek ?? levelCeiling;
-  const contactCount = Math.min(levelCeiling, declaredCeiling, eligibleWeekdays.length);
-  if (contactCount < 1) return null;
-
-  const preferredLongDay = input.availability.preferredLongRunDay;
-  const longWeekday =
-    preferredLongDay && eligibleWeekdays.includes(preferredLongDay)
-      ? preferredLongDay
-      : eligibleWeekdays.includes("Sunday")
-        ? "Sunday"
-        : eligibleWeekdays.at(-1)!;
-  const selectionOrder = [
-    "Monday",
-    "Wednesday",
-    "Friday",
-    "Sunday",
-    "Tuesday",
-    "Thursday",
-    "Saturday",
-  ] as const;
-  const selectedWeekdays = [longWeekday];
-  for (const weekday of selectionOrder) {
-    if (
-      selectedWeekdays.length < contactCount &&
-      eligibleWeekdays.includes(weekday) &&
-      !selectedWeekdays.includes(weekday)
-    ) {
-      selectedWeekdays.push(weekday);
-    }
-  }
-  selectedWeekdays.sort((left, right) => weekdayOrder.indexOf(left) - weekdayOrder.indexOf(right));
-
-  const openingWeeklyMinutes = experienced
-    ? ([0, 45, 70, 95, 120][contactCount] ?? 120)
-    : ([0, 35, 55, 75][contactCount] ?? 75);
-  const openingLongMinutes = experienced ? 45 : 35;
-  const weeklyMinutes = [openingWeeklyMinutes];
-  const longMinutes = [openingLongMinutes];
-  for (let week = 1; week < 3; week += 1) {
-    weeklyMinutes.push(weeklyMinutes[week - 1]! + (weeklyMinutes[week - 1]! < 70 ? 5 : 10));
-    longMinutes.push(longMinutes[week - 1]! + 5);
-  }
-  weeklyMinutes.push(Math.floor(weeklyMinutes[2]! * 0.85));
-  longMinutes.push(Math.floor(longMinutes[2]! * 0.85));
-
-  const easyTemplate = getManualWorkoutTemplate("easy_aerobic_run");
-  const longTemplate = getManualWorkoutTemplate("long_aerobic_run");
-  const cutbackTemplate = getManualWorkoutTemplate("cutback_long_run");
-  const workouts: AiAuthoredPlanFirstCompilerDraft["detailed_block"]["workouts"] = [];
-  const startWeekdayIndex = weekdayOrder.indexOf(
-    weekdayLong(input.schedule.startDate) as (typeof weekdayOrder)[number],
-  );
-  for (let week = 0; week < 4; week += 1) {
-    const weekStart = addDaysIso(input.schedule.startDate, week * 7);
-    const nonLongCount = contactCount - 1;
-    const remainingMinutes = weeklyMinutes[week]! - longMinutes[week]!;
-    const baseEasyMinutes = nonLongCount > 0 ? Math.floor(remainingMinutes / nonLongCount) : 0;
-    let remainder = nonLongCount > 0 ? remainingMinutes % nonLongCount : 0;
-    for (const weekday of selectedWeekdays) {
-      const weekdayOffset = (weekdayOrder.indexOf(weekday) - startWeekdayIndex + 7) % 7;
-      const date = addDaysIso(weekStart, weekdayOffset);
-      const isLong = weekday === longWeekday;
-      const template = isLong ? (week === 3 ? cutbackTemplate : longTemplate) : easyTemplate;
-      const totalMinutes = isLong
-        ? longMinutes[week]!
-        : baseEasyMinutes + (remainder-- > 0 ? 1 : 0);
-      workouts.push(
-        buildDeterministicC0Workout({
-          date,
-          phase: "Re-entry",
-          template,
-          totalMinutes,
-          z1: { reference: "Z1", command: z1.rangeBpm },
-          z2: { reference: "Z2", command: z2.rangeBpm },
-        }),
-      );
-    }
-  }
-  workouts.sort((left, right) => left.date.localeCompare(right.date));
-  const finalWorkout = workouts.pop();
-  if (!finalWorkout) return null;
-
-  const projections: AiAuthoredPlanFirstCompilerDraft["blueprint"]["projections"] = [];
-  const futureStartDate = addDaysIso(detailedEndDate, 1);
-  for (
-    let weekStart = startOfWeekIso(futureStartDate);
-    weekStart <= targetDate;
-    weekStart = addDaysIso(weekStart, 7)
-  ) {
-    const intervalStart = weekStart < futureStartDate ? futureStartDate : weekStart;
-    const weekEnd = addDaysIso(weekStart, 6);
-    const intervalEnd = weekEnd > targetDate ? targetDate : weekEnd;
-    const required = Math.min(contactCount, diffDaysIso(intervalEnd, intervalStart) + 1);
-    const dates: string[] = [];
-    if (targetDate >= intervalStart && targetDate <= intervalEnd) dates.push(targetDate);
-    for (const weekday of selectedWeekdays) {
-      const candidate = addDaysIso(weekStart, weekdayOrder.indexOf(weekday));
-      if (
-        dates.length < required &&
-        candidate >= intervalStart &&
-        candidate <= intervalEnd &&
-        !dates.includes(candidate)
-      ) {
-        dates.push(candidate);
-      }
-    }
-    for (
-      let date = intervalStart;
-      dates.length < required && date <= intervalEnd;
-      date = addDaysIso(date, 1)
-    ) {
-      if (!dates.includes(date)) dates.push(date);
-    }
-    for (const date of dates.sort()) {
-      const isTarget = date === targetDate;
-      projections.push({
-        projection_id: `c0-starter-projection-${date}`,
-        date,
-        phase: "Re-entry",
-        cadence_or_workout_family: isTarget
-          ? "race"
-          : weekdayLong(date) === longWeekday
-            ? "long"
-            : "easy",
-        target_assumption: isTarget
-          ? "Review the selected target before execution."
-          : "Policy-authored re-entry slot; review details closer to the date.",
-        review_timing: isTarget ? "target_review" : "details_closer_to_date",
-        label: "Planned · details closer to the date",
-      });
-    }
-  }
-
-  return {
-    blueprint: {
-      start_date: input.schedule.startDate,
-      selected_target_date: targetDate,
-      target_assumption:
-        "Policy-authored re-entry starter; it does not claim observed running capacity.",
-      phases: [
-        {
-          phase: "Re-entry",
-          start_date: input.schedule.startDate,
-          end_date: targetDate,
-          expected_weekly_cadence: contactCount,
-          workout_families: ["easy", "long", "race"],
-        },
-      ],
-      projections,
-    },
-    detailed_block: {
-      start_date: input.schedule.startDate,
-      end_date: detailedEndDate,
-      workouts,
-      final_workout: finalWorkout,
-    },
-  };
-}
-
-function buildDeterministicC0Workout(input: {
-  date: string;
-  phase: string;
-  template: ReturnType<typeof getManualWorkoutTemplate>;
-  totalMinutes: number;
-  z1: { reference: "Z1"; command: string };
-  z2: { reference: "Z2"; command: string };
-}): AiAuthoredPlanFirstCompilerDraft["detailed_block"]["workouts"][number] {
-  const heartRateTarget = (band: typeof input.z1 | typeof input.z2) => ({
-    primary_execution_mode: "heart_rate" as const,
-    band_reference: band.reference,
-    command: band.command,
-  });
-  return {
-    date: input.date,
-    phase: input.phase,
-    workout_identity: input.template.workoutIdentity as
-      | "easy_aerobic_run"
-      | "long_aerobic_run"
-      | "cutback_long_run",
-    title: input.template.defaultTitle,
-    cue: input.template.defaultNotes ?? "Keep the effort controlled.",
-    sections: [
-      {
-        kind: "unit",
-        segment_type: "warmup",
-        label: "Warm-up",
-        cue: "Settle into relaxed running.",
-        prescription: { mode: "time", duration_min: 10 },
-        target: heartRateTarget(input.z1),
-      },
-      {
-        kind: "unit",
-        segment_type: "main",
-        label: input.template.label,
-        cue: input.template.defaultNotes,
-        prescription: { mode: "time", duration_min: input.totalMinutes - 15 },
-        target: heartRateTarget(input.z2),
-      },
-      {
-        kind: "unit",
-        segment_type: "cooldown",
-        label: "Cooldown",
-        cue: "Finish relaxed.",
-        prescription: { mode: "time", duration_min: 5 },
-        target: heartRateTarget(input.z1),
-      },
-    ],
-  };
-}
-
 function normalizeOpenAiFirstPlanContractOutput({
   parsedOutput,
   authoringInput,
-  source = "openai_adaptive_blueprint_four_week_draft",
 }: {
   parsedOutput: unknown;
   authoringInput: StructuredPlanAuthoringInput;
-  source?: AiFirstPlanDraftMetadata["source"];
 }): AiFirstPlanDraftNormalizationResult {
   const compiled = compileAiAuthoredPlanFirstDraft({
     draft: parsedOutput,
@@ -1144,10 +835,11 @@ function normalizeOpenAiFirstPlanContractOutput({
     ok: true,
     canonicalPlan: compiled.canonicalPlan,
     blueprint: compiled.blueprint,
+    selfAudit: compiled.selfAudit,
     reviewConflicts: compiled.reviewConflicts,
     metadata: {
       status: "ai_authored",
-      source,
+      source: "openai_adaptive_blueprint_four_week_draft",
       validationIssues: compiled.validationIssues,
     },
   };

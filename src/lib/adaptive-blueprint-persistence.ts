@@ -15,6 +15,7 @@ import {
   type AiPlanGenerationResponseRow,
 } from "@/lib/ai-plan-generation-response-persistence";
 import type { TrainingPlanV2 } from "@/lib/imported-plan";
+import type { AiAuthoredPlanFirstSelfAudit } from "@/lib/ai-authored-plan-first-provider-contract";
 import type { Database, Json } from "@/lib/supabase/database";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import type { StructuredPlanAuthoringInput } from "@/lib/structured-plan-authoring-schema";
@@ -83,12 +84,14 @@ export async function retainAdaptiveTrainingSourceCandidateForUser(input: {
   retainedResponse: AiPlanGenerationResponseRow;
   blueprint: AiAuthoredBlueprintSummary;
   canonicalPlan: TrainingPlanV2;
+  selfAudit: AiAuthoredPlanFirstSelfAudit | null;
   reviewConflicts: readonly AiAuthoredBlueprintReviewConflict[];
   authoringInput: FrozenStructuredAuthoringInput;
   immutableRecompileProvenance?: AiFirstPlanImmutableRecompileProvenance;
 }): Promise<RetainedAdaptiveTrainingSourceCandidate> {
   const candidateContent = {
     canonicalPlan: input.canonicalPlan,
+    selfAudit: input.selfAudit,
     reviewConflicts: input.reviewConflicts,
   };
   const inputProvenance = {

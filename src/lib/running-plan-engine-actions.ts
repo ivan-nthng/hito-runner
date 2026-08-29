@@ -57,7 +57,6 @@ import {
   getCalendarWorkoutsWithLogsForUser,
   getContinuationCalendarOutcomePacket,
 } from "@/lib/runner-calendar-persistence";
-import { deriveRunnerPlanCapabilityVectorV1 } from "@/lib/runner-activity/plan-capability";
 import {
   RUNNING_PLAN_CONFIRMED_SOURCE_STATUS,
   addRunningPlanReviewProof,
@@ -973,11 +972,13 @@ async function getInitialPlanAuthoringFactsForUser(input: {
     calendarOutcomeFingerprint: calendar.calendarOutcomeFingerprint,
     workouts: calendar.workouts,
   });
-  const snapshot = await createServerOnlyFn(async () => {
-    const { getRunnerFitnessProfileSnapshotForUser } =
-      await import("@/lib/runner-activity/read-model");
-
-    return getRunnerFitnessProfileSnapshotForUser({
+  const runnerCapability = await createServerOnlyFn(async () => {
+    const [{ getRunnerFitnessProfileSnapshotForUser }, { deriveRunnerPlanCapabilityVectorV1 }] =
+      await Promise.all([
+        import("@/lib/runner-activity/read-model"),
+        import("@/lib/runner-activity/plan-capability"),
+      ]);
+    const snapshot = await getRunnerFitnessProfileSnapshotForUser({
       userId: input.userId,
       asOf: input.asOf,
       cutoffDate: input.cutoffDate,
@@ -985,14 +986,15 @@ async function getInitialPlanAuthoringFactsForUser(input: {
       calendar,
       evidence,
     });
+    return deriveRunnerPlanCapabilityVectorV1({
+      snapshot,
+      currentRunningLimitation: input.currentRunningLimitation,
+    });
   })();
   return {
     settings,
     acceptedHeartRateProfile: acceptedHeartRateProfile.data,
-    runnerCapability: await deriveRunnerPlanCapabilityVectorV1({
-      snapshot,
-      currentRunningLimitation: input.currentRunningLimitation,
-    }),
+    runnerCapability,
   };
 }
 

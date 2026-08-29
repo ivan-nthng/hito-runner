@@ -512,6 +512,7 @@ function normalizeProviderDraft({
     targetDate,
     requestedWeeklyCadence: resolveRequestedExactWeeklyCadence(
       authoringInput.availability.maxRunningDaysPerWeek,
+      authoringInput,
     ),
     issues,
   });
@@ -585,6 +586,7 @@ function normalizeProviderDraft({
     weekOneStart,
     requestedWeeklyCadence: resolveRequestedExactWeeklyCadence(
       authoringInput.availability.maxRunningDaysPerWeek,
+      authoringInput,
     ),
     issues,
   });
@@ -789,7 +791,19 @@ function normalizeBlueprintPhaseFamilyCoverage(draft: AiAuthoredPlanFirstCompile
   };
 }
 
-function resolveRequestedExactWeeklyCadence(maxRunningDaysPerWeek: number | null) {
+function resolveRequestedExactWeeklyCadence(
+  maxRunningDaysPerWeek: number | null,
+  authoringInput: StructuredAuthoringInput,
+) {
+  if (
+    authoringInput.runnerCapability.additionalEasyContact.decision === "not_applicable_reentry" &&
+    authoringInput.runnerCapability.additionalEasyContact.currentContacts === 0 &&
+    authoringInput.runnerCapability.openingAnchor.basis === "unavailable" &&
+    authoringInput.runnerCapability.reasonCodes.includes("recent7_no_contacts")
+  ) {
+    return null;
+  }
+
   return maxRunningDaysPerWeek === 4 ? 4 : null;
 }
 

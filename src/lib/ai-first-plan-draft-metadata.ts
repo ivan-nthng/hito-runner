@@ -12,7 +12,7 @@ export type AiFirstPlanDraftNormalizationIssue = {
 
 export interface AiFirstPlanDraftMetadata {
   status: "ai_authored" | "plan_first_unavailable";
-  source: "openai_adaptive_blueprint_four_week_draft";
+  source: "openai_adaptive_blueprint_four_week_draft" | "hito_c0_deterministic_starter_policy";
   validationIssues: string[];
 }
 

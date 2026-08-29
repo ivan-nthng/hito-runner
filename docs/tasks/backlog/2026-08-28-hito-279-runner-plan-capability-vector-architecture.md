@@ -481,3 +481,22 @@ source-backed capability vector contract, exact deterministic `+1` gates, a no-s
 migration and an explicit Phase A/Phase B boundary. No runtime, schema, migration, provider, fixture,
 Calendar, hosted, Git, QA or release work was performed. Next owner is PRODUCT for acceptance; BACKEND
 is the first implementation owner only after that acceptance.
+
+## Superseded C0 experiment and minimal fallback — 2026-08-29
+
+The expanded provider/compiler/lattice/terminal-rejection experiment after Phase A was rejected. It
+incorrectly made the paid provider responsible for zero-history C0 dates, contact count and minutes,
+then accumulated prompt, compiler and validator repair layers. Those experimental contracts are not
+current architecture and must not be restored as production authority.
+
+The accepted fallback selects the existing zero-contact `RunnerPlanCapabilityVectorV1` discriminator
+before provider lookup and builds one four-week starter review locally. It uses the existing
+`easy_aerobic_run`, `long_aerobic_run` and `cutback_long_run` templates; existing availability,
+fixed-rest and preferred-long-day inputs; the compact accepted Beginner/`runs_a_lot` seed-minute
+table; and complete accepted Z1/Z2 guidance. Missing required HR bands use the existing
+incomplete-profile failure. The result enters the existing retained candidate, Saved Review/Restore,
+Review, Confirm and Calendar owners with truthful provider-free provenance and no second writer.
+
+C1–C6 retain the accepted Phase A provider/compiler behavior byte-for-byte. This fallback adds no
+schema migration, route, table, public profile, compatibility path, provider-contract rewrite,
+global lattice or rejected-response retention subsystem.

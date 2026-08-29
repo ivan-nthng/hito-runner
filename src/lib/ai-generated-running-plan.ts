@@ -855,7 +855,7 @@ function buildRestoredNormalizedInputSummary(
   const requestedLongRunDay = input.availability.preferredLongRunDay ?? null;
 
   return {
-    normalizedBy: "backend_saved_plan_review_restore_v1",
+    normalizedBy: "backend_ai_generated_plan_authoring_normalizer_v1",
     age: input.runnerFacts.age,
     heightCm: input.runnerFacts.heightCm,
     weightKg: input.runnerFacts.weightKg,

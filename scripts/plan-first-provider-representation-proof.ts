@@ -91,12 +91,23 @@ export async function validatePlanFirstProviderRepresentationContract() {
     ),
     "The deterministic Blueprint fixture must retain a future long-run family.",
   );
-  assert.ok(
-    fullHorizon.blueprint.projections.some((projection) =>
-      ["intervals", "steady"].includes(projection.cadence_or_workout_family),
-    ),
-    "The deterministic Blueprint fixture must retain a future quality family.",
+  const capabilityClass = authoringInput.runnerCapability.additionalEasyContact.decision;
+  const hasFutureQualityFamily = fullHorizon.blueprint.projections.some((projection) =>
+    ["intervals", "steady"].includes(projection.cadence_or_workout_family),
   );
+  if (capabilityClass === "not_applicable_reentry") {
+    assert.equal(
+      hasFutureQualityFamily,
+      false,
+      "Deterministic C0 must not invent a provider-authored future quality family.",
+    );
+  } else {
+    assert.equal(
+      hasFutureQualityFamily,
+      true,
+      "A provider-backed Blueprint fixture must retain a future quality family.",
+    );
+  }
 
   const openAiSchema = buildAiAuthoredPlanFirstOpenAiSchema(authoringInput) as unknown as {
     required: string[];
@@ -265,42 +276,46 @@ export async function validatePlanFirstProviderRepresentationContract() {
     ),
   );
 
-  const reducedPhaseCadenceDraft = structuredClone(providerDraft);
-  reducedPhaseCadenceDraft.blueprint.phases[0]!.expected_weekly_cadence = 3;
-  const reducedPhaseCadenceResult = compileAiAuthoredPlanFirstDraft({
-    draft: reducedPhaseCadenceDraft,
-    authoringInput,
-  });
-  assert.equal(reducedPhaseCadenceResult.ok, false);
-  if (reducedPhaseCadenceResult.ok) {
-    throw new Error("A reduced Blueprint phase cadence unexpectedly compiled.");
-  }
-  assert.ok(
-    reducedPhaseCadenceResult.issues.some(
-      (issue) => issue.code === "ai_authored_blueprint_requested_weekly_cadence_mismatch",
-    ),
-  );
+  if (capabilityClass !== "not_applicable_reentry") {
+    const reducedPhaseCadenceDraft = structuredClone(providerDraft);
+    reducedPhaseCadenceDraft.blueprint.phases[0]!.expected_weekly_cadence = 3;
+    const reducedPhaseCadenceResult = compileAiAuthoredPlanFirstDraft({
+      draft: reducedPhaseCadenceDraft,
+      authoringInput,
+    });
+    assert.equal(reducedPhaseCadenceResult.ok, false);
+    if (reducedPhaseCadenceResult.ok) {
+      throw new Error("A reduced Blueprint phase cadence unexpectedly compiled.");
+    }
+    assert.ok(
+      reducedPhaseCadenceResult.issues.some(
+        (issue) => issue.code === "ai_authored_blueprint_requested_weekly_cadence_mismatch",
+      ),
+    );
 
-  const reducedDetailedCadenceDraft = structuredClone(providerDraft);
-  const firstFullWeekStart = startOfWeekIso(reducedDetailedCadenceDraft.detailed_block.start_date);
-  const removableWorkoutIndex = reducedDetailedCadenceDraft.detailed_block.workouts.findIndex(
-    (workout) => startOfWeekIso(workout.date) === firstFullWeekStart,
-  );
-  assert.ok(removableWorkoutIndex >= 0, "Fixture requires a removable first-week workout.");
-  reducedDetailedCadenceDraft.detailed_block.workouts.splice(removableWorkoutIndex, 1);
-  const reducedDetailedCadenceResult = compileAiAuthoredPlanFirstDraft({
-    draft: reducedDetailedCadenceDraft,
-    authoringInput,
-  });
-  assert.equal(reducedDetailedCadenceResult.ok, false);
-  if (reducedDetailedCadenceResult.ok) {
-    throw new Error("A reduced full detailed-week cadence unexpectedly compiled.");
+    const reducedDetailedCadenceDraft = structuredClone(providerDraft);
+    const firstFullWeekStart = startOfWeekIso(
+      reducedDetailedCadenceDraft.detailed_block.start_date,
+    );
+    const removableWorkoutIndex = reducedDetailedCadenceDraft.detailed_block.workouts.findIndex(
+      (workout) => startOfWeekIso(workout.date) === firstFullWeekStart,
+    );
+    assert.ok(removableWorkoutIndex >= 0, "Fixture requires a removable first-week workout.");
+    reducedDetailedCadenceDraft.detailed_block.workouts.splice(removableWorkoutIndex, 1);
+    const reducedDetailedCadenceResult = compileAiAuthoredPlanFirstDraft({
+      draft: reducedDetailedCadenceDraft,
+      authoringInput,
+    });
+    assert.equal(reducedDetailedCadenceResult.ok, false);
+    if (reducedDetailedCadenceResult.ok) {
+      throw new Error("A reduced full detailed-week cadence unexpectedly compiled.");
+    }
+    assert.ok(
+      reducedDetailedCadenceResult.issues.some(
+        (issue) => issue.code === "ai_authored_plan_first_requested_weekly_cadence_mismatch",
+      ),
+    );
   }
-  assert.ok(
-    reducedDetailedCadenceResult.issues.some(
-      (issue) => issue.code === "ai_authored_plan_first_requested_weekly_cadence_mismatch",
-    ),
-  );
 
   const projectionConflictDraft = structuredClone(providerDraft);
   const futureProjection = projectionConflictDraft.blueprint.projections.find(
@@ -620,27 +635,31 @@ export async function validatePlanFirstProviderRepresentationContract() {
     ),
   );
 
-  const targetBoundaryInput = {
-    ...authoringInput,
-    availability: { ...authoringInput.availability, maxRunningDaysPerWeek: null },
-    planGoalIntent: {
-      ...authoringInput.planGoalIntent,
-      targetDate: addDaysIso(authoringInput.schedule.startDate, 13),
-    },
-  };
-  const targetBoundary = await generateFixturePreview(targetBoundaryInput);
-  assert.equal(targetBoundary.blueprint.detailedHorizon.targetBoundary, true);
-  assert.equal(targetBoundary.blueprint.detailedHorizon.calendarWeekCount, 2);
-  assert.equal(targetBoundary.canonicalPlan.planned_workouts.length, 14);
-  assert.equal(targetBoundary.blueprint.projections.length, 0);
-  assert.equal(
-    targetBoundary.canonicalPlan.planned_workouts.at(-1)?.workout_identity,
-    "selected_distance_completion_or_checkpoint",
-  );
-  assert.equal(
-    targetBoundary.canonicalPlan.planned_workouts.at(-1)?.date,
-    targetBoundary.blueprint.selectedTargetDate,
-  );
+  let targetBoundaryWeeks: number | null = null;
+  if (capabilityClass !== "not_applicable_reentry") {
+    const targetBoundaryInput = {
+      ...authoringInput,
+      availability: { ...authoringInput.availability, maxRunningDaysPerWeek: null },
+      planGoalIntent: {
+        ...authoringInput.planGoalIntent,
+        targetDate: addDaysIso(authoringInput.schedule.startDate, 13),
+      },
+    };
+    const targetBoundary = await generateFixturePreview(targetBoundaryInput);
+    targetBoundaryWeeks = targetBoundary.blueprint.detailedHorizon.calendarWeekCount;
+    assert.equal(targetBoundary.blueprint.detailedHorizon.targetBoundary, true);
+    assert.equal(targetBoundaryWeeks, 2);
+    assert.equal(targetBoundary.canonicalPlan.planned_workouts.length, 14);
+    assert.equal(targetBoundary.blueprint.projections.length, 0);
+    assert.equal(
+      targetBoundary.canonicalPlan.planned_workouts.at(-1)?.workout_identity,
+      "selected_distance_completion_or_checkpoint",
+    );
+    assert.equal(
+      targetBoundary.canonicalPlan.planned_workouts.at(-1)?.date,
+      targetBoundary.blueprint.selectedTargetDate,
+    );
+  }
 
   const serviceSource = await readFile(
     new URL("../src/lib/ai-first-plan-draft-service.ts", import.meta.url),
@@ -664,7 +683,7 @@ export async function validatePlanFirstProviderRepresentationContract() {
     adaptiveBlueprintCompiler: "passed",
     fullTargetBlueprint: true,
     detailedCalendarWeeks: 4,
-    targetBoundaryWeeks: targetBoundary.blueprint.detailedHorizon.calendarWeekCount,
+    targetBoundaryWeeks,
     projectionsNonExecutable: true,
     weekdayConflictReviewable: true,
     hardStructuralRejection: true,
@@ -777,9 +796,21 @@ async function generateFixturePreview(
     candidateOwnerUserId: null,
     generationLedger: { disabled: true },
   });
-  assert.equal(requestCount, 1, "The source authoring seam must use one server-owned request.");
   assert.equal(result.ok, true);
   if (!result.ok) throw new Error(result.issues.join("\n"));
+  const capabilityClass = input.runnerCapability.additionalEasyContact.decision;
+  if (capabilityClass === "not_applicable_reentry") {
+    assert.equal(requestCount, 0, "Deterministic C0 must not dispatch a provider request.");
+    assert.equal(result.metadata.source, "hito_c0_deterministic_starter_policy");
+    assert.equal(result.metadata.responseId, null);
+    assert.equal(result.metadata.generationTrace?.provider.kind, "not_started");
+    assert.equal(result.metadata.generationTrace?.provider.paidProviderCall, false);
+  } else {
+    assert.equal(requestCount, 1, "Provider-backed authoring must use one server-owned request.");
+    assert.equal(result.metadata.source, "openai_adaptive_blueprint_four_week_draft");
+    assert.equal(result.metadata.generationTrace?.provider.kind, "local_dev_fixture");
+    assert.equal(result.metadata.generationTrace?.provider.paidProviderCall, false);
+  }
   return result;
 }
 

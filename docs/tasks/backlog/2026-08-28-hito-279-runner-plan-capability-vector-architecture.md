@@ -1,9 +1,11 @@
 # HITO-279 — Runner Plan Capability Vector Architecture
 
-- Status: completed architecture decision; implementation not started
-- Owner: ARCHITECT
-- Product outcome: replace a numeric Fitness Index and the rejected divide-by-four proposal with one
-  immutable, versioned capability vector for initial plan authoring
+- Status: released on `main@1382d3cf27997f9705799d7c1b782afc657a6fe1`; Product acceptance pending
+- Owner: PRODUCT
+- Released outcome: one immutable, versioned capability vector for initial plan authoring plus the
+  provider-free C0 starter fallback recorded below. The rejected divide-by-four proposal and the
+  expanded C0 provider/compiler experiment are not current authority.
+- Future boundary: Phase B remains blocked on HITO-289 and is not implemented by HITO-279.
 - Evidence: [Running Coach decision](../running-coach/2026-08-28-hito-transparent-runner-fitness-index-options-research.md),
   [Backend feasibility](2026-08-28-hito-279-plan-authoring-tier-backend-feasibility.md),
   [HITO-289 retention discovery](2026-08-28-hito-full-fidelity-runner-activity-retention-and-reprocessing-discovery.md),

@@ -1209,11 +1209,6 @@
     gap: var(--hito-manual-workout-compact-gap);
   }
 
-  .hito-manual-workout-menu-add {
-    width: min(20rem, calc(100vw - 2rem));
-    padding: var(--space-2);
-  }
-
   .hito-manual-workout-menu-step {
     width: min(22rem, calc(100vw - 2rem));
     padding: var(--space-2);

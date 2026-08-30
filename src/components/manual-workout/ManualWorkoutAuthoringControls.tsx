@@ -64,9 +64,6 @@ import {
 } from "@/components/manual-workout/ManualWorkoutSourceActionMenu";
 import {
   EMPTY_TEMPLATE_CATALOG_STATE,
-  MANUAL_ADD_MENU_CONTENT_CLASS,
-  MANUAL_ADD_MENU_ICON_CLASS,
-  MANUAL_ADD_MENU_ITEM_CLASS,
   type ManualTemplateCatalogState,
 } from "@/components/manual-workout/ManualWorkoutTemplatePicker.model";
 import { ManualTemplatePickerDialog } from "@/components/manual-workout/ManualWorkoutTemplatePicker";
@@ -575,22 +572,19 @@ export function ManualWorkoutAddMenu({
         <DropdownMenuTrigger asChild disabled={disabled} ref={addMenuTriggerRef}>
           {children}
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className={MANUAL_ADD_MENU_CONTENT_CLASS}>
-          <DropdownMenuLabel className="px-3 py-2">
-            {formatReadableDate(date, locale)}
-          </DropdownMenuLabel>
+        <DropdownMenuContent align="end" className="hito-menu-width-standard">
+          <DropdownMenuLabel>{formatReadableDate(date, locale)}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           {onAddActivity ? (
             <>
               <DropdownMenuItem
-                className={MANUAL_ADD_MENU_ITEM_CLASS}
                 disabled={isBusy}
                 onSelect={() => {
                   if (addMenuTriggerRef.current) onAddActivity(addMenuTriggerRef.current);
                 }}
               >
-                <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="activity" size="xs" />
-                <span className="hito-body-md text-foreground">{t("Add activity")}</span>
+                <Icon name="activity" size="xs" />
+                {t("Add activity")}
               </DropdownMenuItem>
               {showWorkoutOptions ? <DropdownMenuSeparator /> : null}
             </>
@@ -598,11 +592,10 @@ export function ManualWorkoutAddMenu({
           {canMoveSelectedWorkout ? (
             <>
               <DropdownMenuItem
-                className={MANUAL_ADD_MENU_ITEM_CLASS}
                 disabled={isBusy}
                 onSelect={() => onMoveTargetSelected?.(date, moveWorkoutSource)}
               >
-                <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="arrow-right" size="xs" />
+                <Icon name="arrow-right" size="xs" />
                 <span className="min-w-0">
                   <span className="hito-body-md text-foreground block">
                     {t("Move selected workout here")}
@@ -612,12 +605,8 @@ export function ManualWorkoutAddMenu({
                   </span>
                 </span>
               </DropdownMenuItem>
-              <DropdownMenuItem
-                className={MANUAL_ADD_MENU_ITEM_CLASS}
-                disabled={isBusy}
-                onSelect={onMoveCanceled}
-              >
-                <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="close" size="xs" />
+              <DropdownMenuItem disabled={isBusy} onSelect={onMoveCanceled}>
+                <Icon name="close" size="xs" />
                 <span className="min-w-0">
                   <span className="hito-body-md text-foreground block">{t("Cancel move")}</span>
                   <span className="hito-body-sm mt-1 text-secondary block">
@@ -630,12 +619,8 @@ export function ManualWorkoutAddMenu({
           ) : null}
           {!moveOnly && showWorkoutOptions && canPasteCopiedWorkout ? (
             <>
-              <DropdownMenuItem
-                className={MANUAL_ADD_MENU_ITEM_CLASS}
-                disabled={isBusy}
-                onSelect={() => void pasteCopiedWorkout()}
-              >
-                <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="copy" size="xs" />
+              <DropdownMenuItem disabled={isBusy} onSelect={() => void pasteCopiedWorkout()}>
+                <Icon name="copy" size="xs" />
                 <span className="min-w-0">
                   <span className="hito-body-md text-foreground block">
                     {t("Paste copied workout")}
@@ -651,11 +636,10 @@ export function ManualWorkoutAddMenu({
           {!moveOnly && showWorkoutOptions ? (
             <>
               <DropdownMenuItem
-                className={MANUAL_ADD_MENU_ITEM_CLASS}
                 disabled={isBusy || !templateCatalogState.catalog}
                 onSelect={openScratchConstructor}
               >
-                <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="edit" size="xs" />
+                <Icon name="edit" size="xs" />
                 <span className="min-w-0">
                   <span className="hito-body-md text-foreground block">
                     {t("Start from scratch")}
@@ -665,12 +649,8 @@ export function ManualWorkoutAddMenu({
                   </span>
                 </span>
               </DropdownMenuItem>
-              <DropdownMenuItem
-                className={MANUAL_ADD_MENU_ITEM_CLASS}
-                disabled={isBusy}
-                onSelect={openTemplatePickerDialog}
-              >
-                <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="workout" size="xs" />
+              <DropdownMenuItem disabled={isBusy} onSelect={openTemplatePickerDialog}>
+                <Icon name="workout" size="xs" />
                 <span className="min-w-0">
                   <span className="hito-body-md text-foreground block">{t("Choose template")}</span>
                   <span className="hito-body-sm mt-1 text-secondary block">

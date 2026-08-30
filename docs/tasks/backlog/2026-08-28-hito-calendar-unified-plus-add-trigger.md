@@ -158,3 +158,41 @@ release remain separate acceptance layers; this intake does not claim any of the
   absent/current/duplicate browser matrix after a serialized fresh artifact is admissible.
 - **Next owner:** `QA` for the unchanged proportional browser acceptance; same-task Frontend defects
   return to `FRONTEND`.
+
+## Reopened Frontend Compact-Menu Fix-Forward Receipt — 2026-08-30
+
+- **Demonstrated cause:** the Rest-day `+` and occupied-day `…` already used the same Design System
+  dropdown primitives, but `ManualWorkoutAddMenu` alone applied a `20rem` content recipe, extra
+  content/label/item padding, `min-h-14`, `items-start`, and a route-local icon offset. The standard
+  source-action menu used `hito-menu-width-standard` and unmodified `DropdownMenuLabel`,
+  `DropdownMenuItem`, and `Icon` anatomy.
+- **Implemented boundary:** `ManualWorkoutAddMenu` now uses `hito-menu-width-standard` and the
+  canonical primitive anatomy. Optional secondary descriptions remain ordinary wrapping content;
+  they no longer force every menu row to an expanded height. Menu membership, date forwarding,
+  Activity/FIT intake, scratch/template commands, trigger refs, dismissal, and focus behavior were
+  not changed.
+- **Removed zero-inbound source:** deleted `MANUAL_ADD_MENU_CONTENT_CLASS`,
+  `MANUAL_ADD_MENU_ITEM_CLASS`, `MANUAL_ADD_MENU_ICON_CLASS`, and the
+  `.hito-manual-workout-menu-add` CSS recipe after repository-wide direct-reference proof reached
+  zero. No component, variant, wrapper, token, compatibility path, or validator was added.
+- **Changed paths:** `src/components/manual-workout/ManualWorkoutAuthoringControls.tsx`,
+  `src/components/manual-workout/ManualWorkoutTemplatePicker.model.ts`,
+  `src/styles/forms-onboarding.css`, and this receipt.
+- **Focused proof:** canonical-anatomy source assertions, focused ESLint, Prettier,
+  `npm run validate-manual-workout-authoring`, and `npm run validate-runner-calendar-context`
+  passed. A clean task-only production build from `d3a29d1c750af1d5db617e4590a409f6d4c50d76`
+  plus only the three source changes passed client, SSR, Nitro, and postbuild. The required existing
+  Design System validator was executed and retained only its pre-existing factual-chart and current
+  documentation failures; it reported no Calendar/dropdown failure. Final diff hygiene passed.
+- **Omitted acceptance:** no browser, fixture, hosted, provider, Git, deployment, Global QA, or
+  release claim is made. The isolated build directory is not a managed runtime or browser artifact.
+- **Next owner:** `QA` for the reopened compact browser check: exact one-line `Add activity` row
+  parity between `+` and `…`, natural secondary-copy wrapping, unchanged menu membership and
+  callbacks, keyboard/focus, EN/PT, Light/Dark, responsive containment, and console health.
+- **Residual typography fix-forward:** QA measured the Rest `+` row at `34.117px` versus the
+  occupied `…` row at `28.898px` after the geometry fix. The only remaining difference was a
+  route-local `hito-body-md text-foreground` wrapper around the Rest `Add activity` label. That
+  wrapper is removed, so both one-line items now inherit the same `DropdownMenuItem` typography;
+  no other row, callback, date, menu membership, CSS, or runtime behavior changed. Focused source,
+  Design System, lint, format, and diff proof was rerun; build and browser replay remain with the
+  accepted root/QA edge.

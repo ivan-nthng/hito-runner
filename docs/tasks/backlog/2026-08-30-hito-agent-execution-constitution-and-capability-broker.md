@@ -274,5 +274,7 @@ or data rollback exists because neither changed.
 No runtime, product source, schema, migration, database, hosted provider, dependency, CI, broker,
 browser, QA, Git or release action was performed. The 59 migrations are a source inventory only;
 local and hosted application/type parity were not inspected. The unresolved preview project,
-provider project, Figma target and DESIGN SYSTEM INTEGRATION thread stay explicit rather than being
-inferred.
+provider project and Figma target stay explicit rather than being inferred. DESIGN SYSTEM
+INTEGRATION is an active canonical Figma-only role at thread
+`019fd75a-9001-7430-b5f7-6e676807aa69`; that identity does not authorize an unspecified Figma
+mutation, which still requires an explicitly admitted target and scope on the current Task.

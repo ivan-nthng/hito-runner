@@ -169,11 +169,16 @@ Specialist work may be the Task outcome or one named phase in an accepted plan. 
 phase finishes, its decision and evidence are appended to the same Task before Current owner moves to
 the next named role.
 
-### Figma-Only Work
+### Active Figma-Only Work
 
 | Role                      | Admitted ownership                                                                                         | Repository boundary                                                                         |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | DESIGN SYSTEM INTEGRATION | Product-approved Figma target discovery, code-to-Figma mapping, Figma mutation and Figma-side verification | Repository runtime source, CSS, tokens, components, scripts and configuration are read-only |
+
+DESIGN SYSTEM INTEGRATION is an active Task owner and handoff destination for bounded Figma-only
+work through the canonical thread recorded in [`PROJECT_PROFILE.md`](../../PROJECT_PROFILE.md).
+Active role or thread identity never authorizes an unspecified Figma mutation: every mutation must
+bind an explicitly admitted target and scope on the same Task.
 
 Design System repository implementation belongs solely to the FRONTEND Design System lane; no
 separate repository engineer role may own it.

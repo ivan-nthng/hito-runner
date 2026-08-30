@@ -32,19 +32,19 @@ evidence; Supabase owns runtime data. The behavioral contract is the
 
 ## Environment, Service And Deployment Identity
 
-| System                     | Non-secret identity                                                                                          | Current boundary                                                     |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| GitHub                     | `ivan-nthng/hito-runner`, default branch `main`                                                              | Code and review history only                                         |
-| Notion Tasks               | data source `3c1fe5f5-8cf5-8036-bbcb-000b43565fa9`                                                           | Sole operational lifecycle writer                                    |
-| Notion Epics               | data source `3c2fe5f5-8cf5-8119-a9fe-000b8582d761`                                                           | Finite outcome grouping                                              |
-| Notion parent database     | `3c1fe5f5-8cf5-80b1-82b9-ea04ffe33296`                                                                       | Project-local Notion container                                       |
-| Local Supabase             | project ID `hito-running`; CLI `2.109.1`; Docker context `desktop-linux`                                     | Disposable, synthetic-only; final verified state stopped             |
-| Hosted Supabase            | project ref `dltfjwexyctmihclcjqj`                                                                           | Production data boundary; current parity not re-proved in this slice |
-| Preview Supabase           | unresolved                                                                                                   | No distinct project identity is admitted                             |
-| Vercel                     | project `hito-runner`; project ID `prj_2vQ43bjCsO7JEbH1Ggv93avrUcyL`; org ID `team_jK6pcC3dgzpQAcgEwx05ozx4` | Git-backed application deployment                                    |
-| Accepted Vercel deployment | `dpl_2u1gAPpRMVgwDg9dWcKnJWVtWjCd` for source revision `fca161507e9dd344a141712d48d799b4204091d8`            | READY; application evidence only, not Supabase parity                |
-| OpenAI/provider project    | unresolved                                                                                                   | No identifier or provider authority is inferred                      |
-| Figma file/project         | unresolved                                                                                                   | DESIGN SYSTEM INTEGRATION requires an explicitly admitted target     |
+| System                     | Non-secret identity                                                                                          | Current boundary                                                                |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| GitHub                     | `ivan-nthng/hito-runner`, default branch `main`                                                              | Code and review history only                                                    |
+| Notion Tasks               | data source `3c1fe5f5-8cf5-8036-bbcb-000b43565fa9`                                                           | Sole operational lifecycle writer                                               |
+| Notion Epics               | data source `3c2fe5f5-8cf5-8119-a9fe-000b8582d761`                                                           | Finite outcome grouping                                                         |
+| Notion parent database     | `3c1fe5f5-8cf5-80b1-82b9-ea04ffe33296`                                                                       | Project-local Notion container                                                  |
+| Local Supabase             | project ID `hito-running`; CLI `2.109.1`; Docker context `desktop-linux`                                     | Disposable, synthetic-only; final verified state stopped                        |
+| Hosted Supabase            | project ref `dltfjwexyctmihclcjqj`                                                                           | Production data boundary; current parity not re-proved in this slice            |
+| Preview Supabase           | unresolved                                                                                                   | No distinct project identity is admitted                                        |
+| Vercel                     | project `hito-runner`; project ID `prj_2vQ43bjCsO7JEbH1Ggv93avrUcyL`; org ID `team_jK6pcC3dgzpQAcgEwx05ozx4` | Git-backed application deployment                                               |
+| Accepted Vercel deployment | `dpl_2u1gAPpRMVgwDg9dWcKnJWVtWjCd` for source revision `fca161507e9dd344a141712d48d799b4204091d8`            | READY; application evidence only, not Supabase parity                           |
+| OpenAI/provider project    | unresolved                                                                                                   | No identifier or provider authority is inferred                                 |
+| Figma file/project         | unresolved                                                                                                   | Active role identity; each mutation still requires an admitted target and scope |
 
 HITO-302 released commit `28cddb8f90b094c66eacae3d9a903a0889336b2b`, whose parent is
 `fca161507e9dd344a141712d48d799b4204091d8`; it removed `pnpm-lock.yaml` from `.prettierignore`, was
@@ -74,7 +74,7 @@ proof. Update this table atomically when PRODUCT replaces a canonical sidebar ta
 | RUNNING COACH             | `01a03103-f3c7-76c2-a773-3cc3203d2372` | Bounded training-quality decisions                                        |
 | DESIGNER                  | `019fe75f-bdfe-74a0-b70a-54dc99f24c10` | Bounded visual/product-design decisions                                   |
 | MARKETING MANAGER         | `01a048e0-aec1-7b30-ac64-b48784daec4a` | Market, audience and positioning research                                 |
-| DESIGN SYSTEM INTEGRATION | unresolved                             | Figma-only; no current canonical main/root thread was verified            |
+| DESIGN SYSTEM INTEGRATION | `019fd75a-9001-7430-b5f7-6e676807aa69` | Active Figma-only work; explicit target and scope required per mutation   |
 
 ## Domain Owner Routing
 

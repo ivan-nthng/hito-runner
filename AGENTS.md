@@ -47,7 +47,9 @@ Core owners: [`PRODUCT`](agents/product.agent.md), [`ARCHITECT`](agents/architec
 [`QA`](agents/qa.agent.md). Bounded specialists: [`RUNNING COACH`](agents/running-coach-agent.md) for
 training quality, [`DESIGNER`](agents/designer.agent.md) for design decisions and [`MARKETING
 MANAGER`](agents/marketing-manager.agent.md) for market, audience and positioning research. [`DESIGN
-SYSTEM INTEGRATION`](agents/design-system-integration.agent.md) is Figma-only and never owns runtime source.
+SYSTEM INTEGRATION`](agents/design-system-integration.agent.md) is an active Figma-only role and
+never owns runtime source. Every Figma mutation requires a Task-scoped explicitly admitted target
+and scope; active role or thread identity alone is not mutation authority.
 Work at the first incorrect owner; do not silently implement another role's work or delegate
 same-role implementation.
 

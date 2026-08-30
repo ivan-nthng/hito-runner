@@ -14,7 +14,6 @@ import {
 } from "@/lib/planned-workout-language";
 import {
   findWorkout,
-  formatDate,
   formatDistanceKm,
   formatDurationMin,
   weekdayLong,
@@ -73,6 +72,7 @@ export type CalendarMoveUndoAffordance = {
 };
 
 export type CalendarWorkoutActionContext = ManualCopiedWorkoutSource & {
+  canAddActivity: boolean;
   canDirectCopy: boolean;
   canDirectMove: boolean;
   canDragInitiate: boolean;
@@ -80,7 +80,8 @@ export type CalendarWorkoutActionContext = ManualCopiedWorkoutSource & {
 };
 
 export type CalendarAddActionContext = {
-  calendarSourceKind: string;
+  canAddActivity: boolean;
+  canAddWorkout: boolean;
   canAcceptMoveTarget: boolean;
   moveTargetDayKind: ManualWorkoutMoveTargetDayKind;
   moveOnly: boolean;
@@ -250,22 +251,19 @@ export function resolveCalendarAddActionContext(
   const addCapability = snapshot.calendarContext?.workoutEditing.addWorkout;
   const moveCapability = snapshot.calendarContext?.workoutEditing.moveWorkout;
   const moveTargetHint = resolveCalendarMoveTargetHint(snapshot, iso, workout, moveSource);
+  const canAddActivity =
+    snapshot.mode === "authenticated" &&
+    (!workout || workout.type === "rest") &&
+    iso <= snapshot.currentDate;
   const canAddWorkout = addCapability?.allowed === true && !workout && iso >= snapshot.currentDate;
   const canAcceptMoveTarget =
     moveCapability?.allowed === true && moveTargetHint.canAcceptMoveTarget;
 
-  if (!canAddWorkout && !canAcceptMoveTarget) return null;
-
-  const calendarSourceKind =
-    addCapability?.allowed === true
-      ? addCapability.sourceKind
-      : moveCapability?.allowed === true
-        ? moveCapability.sourceKind
-        : null;
-  if (!calendarSourceKind) return null;
+  if (!canAddActivity && !canAddWorkout && !canAcceptMoveTarget) return null;
 
   return {
-    calendarSourceKind,
+    canAddActivity,
+    canAddWorkout,
     canAcceptMoveTarget,
     moveTargetDayKind: moveTargetHint.dayKind,
     moveOnly: !canAddWorkout,
@@ -291,11 +289,20 @@ export function resolveCalendarWorkoutActionContext(
   const canRequestClearReview = Boolean(
     calendarEditing?.clearWorkout.allowed && sourceEditing?.canClear,
   );
+  const canAddActivity = snapshot.mode === "authenticated" && iso <= snapshot.currentDate;
 
-  if (!canDirectCopy && !canRequestClearReview && !canDirectMove && !canDragInitiate) return null;
+  if (
+    !canAddActivity &&
+    !canDirectCopy &&
+    !canRequestClearReview &&
+    !canDirectMove &&
+    !canDragInitiate
+  )
+    return null;
 
   return {
     provenancePlanId: workout.sourceProvenance?.sourcePlanId ?? null,
+    canAddActivity,
     canDirectCopy,
     canDirectMove,
     canDragInitiate,
@@ -347,24 +354,6 @@ export function calendarMoveUndoAction(secondsRemaining: number) {
     showCompactLabel: true,
     ariaLabel: `Undo move. ${secondsRemaining} seconds remaining.`,
   };
-}
-
-export function calendarTargetButtonAriaLabel(
-  iso: string,
-  canMoveHere: boolean,
-  dayKind: ManualWorkoutMoveTargetDayKind,
-) {
-  const dateLabel = formatDate(iso, {
-    month: "short",
-    day: "numeric",
-    weekday: "short",
-  });
-
-  if (!canMoveHere) return `${dateLabel}. Add workout.`;
-  if (dayKind === "workout_day") {
-    return `${dateLabel}. Review replacement for selected workout.`;
-  }
-  return `${dateLabel}. Move selected workout to rest day.`;
 }
 
 function resolveCalendarMoveTargetHint(

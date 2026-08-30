@@ -55,12 +55,14 @@ type ManualWorkoutDeleteClearReady = ReviewedWorkoutCommandCandidate & {
 
 export type ManualWorkoutSourceActionMenuProps = {
   provenancePlanId: string | null;
+  canAddActivity?: boolean;
   canCopy?: boolean;
   canClear?: boolean;
   canMove?: boolean;
   children: ReactNode;
   disabled?: boolean;
   onCleared?: () => void | Promise<void>;
+  onAddActivity?: (trigger: HTMLButtonElement) => void;
   onCopy: (source: ManualCopiedWorkoutSource) => void;
   onMove?: (source: ManualCopiedWorkoutSource) => void;
   sourceWorkoutDate: string;
@@ -71,11 +73,13 @@ export type ManualWorkoutSourceActionMenuProps = {
 
 export function ManualWorkoutSourceActionMenu({
   provenancePlanId,
+  canAddActivity = false,
   canCopy = true,
   canClear = false,
   canMove = false,
   children,
   disabled = false,
+  onAddActivity,
   onCleared,
   onCopy,
   onMove,
@@ -88,6 +92,7 @@ export function ManualWorkoutSourceActionMenu({
   const t = useHitoProductMessage();
   const reviewWorkoutCommandFn = useServerFn(reviewWorkoutCommandAction);
   const confirmWorkoutCommandFn = useServerFn(confirmWorkoutCommandAction);
+  const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const confirmInFlightRef = useRef(false);
   const [status, setStatus] = useState<ManualSourceActionStatus>("idle");
   const [deleteReviewResult, setDeleteReviewResult] =
@@ -249,12 +254,26 @@ export function ManualWorkoutSourceActionMenu({
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild disabled={disabled}>
+        <DropdownMenuTrigger asChild disabled={disabled} ref={menuTriggerRef}>
           {children}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="hito-menu-width-standard">
           <DropdownMenuLabel>{formatReadableDate(sourceWorkoutDate, locale)}</DropdownMenuLabel>
           <DropdownMenuSeparator />
+          {canAddActivity && onAddActivity ? (
+            <>
+              <DropdownMenuItem
+                disabled={disabled || isBusy}
+                onSelect={() => {
+                  if (menuTriggerRef.current) onAddActivity(menuTriggerRef.current);
+                }}
+              >
+                <Icon name="activity" size="xs" />
+                {t("Add activity")}
+              </DropdownMenuItem>
+              {canCopy || canMove || canClear ? <DropdownMenuSeparator /> : null}
+            </>
+          ) : null}
           {canCopy ? (
             <DropdownMenuItem disabled={disabled || isBusy} onSelect={copySource}>
               <Icon name="copy" size="xs" />

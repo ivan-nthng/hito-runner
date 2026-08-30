@@ -107,11 +107,11 @@ const PASTE_UNAVAILABLE_MESSAGE =
   "Hito could not paste this workout yet. Try again from the calendar.";
 
 export function ManualWorkoutAddMenu({
-  calendarSourceKind,
   children,
   copiedWorkoutSource = null,
   date,
   disabled = false,
+  onAddActivity,
   onAdded,
   onMoveCanceled,
   onMoveTargetSelected,
@@ -119,13 +119,13 @@ export function ManualWorkoutAddMenu({
   moveWorkoutSource = null,
   moveOnly = false,
   pasteTargetIsEmpty = false,
-  showRestDayOption = true,
+  showWorkoutOptions = true,
 }: {
-  calendarSourceKind: string;
   children: ReactNode;
   copiedWorkoutSource?: ManualCopiedWorkoutSource | null;
   date: string;
   disabled?: boolean;
+  onAddActivity?: (trigger: HTMLButtonElement) => void;
   onAdded: () => void | Promise<void>;
   onMoveCanceled?: () => void;
   onMoveTargetSelected?: (targetDate: string, source?: ManualCopiedWorkoutSource | null) => void;
@@ -133,7 +133,7 @@ export function ManualWorkoutAddMenu({
   moveWorkoutSource?: ManualCopiedWorkoutSource | null;
   moveOnly?: boolean;
   pasteTargetIsEmpty?: boolean;
-  showRestDayOption?: boolean;
+  showWorkoutOptions?: boolean;
 }) {
   const locale = useHitoUiLocale();
   const t = useHitoProductMessage();
@@ -161,12 +161,6 @@ export function ManualWorkoutAddMenu({
     EMPTY_TEMPLATE_CATALOG_STATE,
   );
   const [templateCatalogAction, setTemplateCatalogAction] = useState<string | null>(null);
-  const templateOptions = templateCatalogState.catalog
-    ? [
-        ...templateCatalogState.catalog.visibleBuiltInTemplates,
-        ...templateCatalogState.catalog.hiddenBuiltInTemplates,
-      ]
-    : [];
   const isBusy = status !== "idle";
   const canPasteCopiedWorkout = Boolean(copiedWorkoutSource && pasteTargetIsEmpty);
   const canMoveSelectedWorkout = Boolean(
@@ -226,6 +220,7 @@ export function ManualWorkoutAddMenu({
     setAddMenuOpen(open);
     if (
       open &&
+      showWorkoutOptions &&
       (templateCatalogState.status === "idle" || templateCatalogState.status === "failed")
     ) {
       void loadTemplateCatalog();
@@ -580,11 +575,26 @@ export function ManualWorkoutAddMenu({
         <DropdownMenuTrigger asChild disabled={disabled} ref={addMenuTriggerRef}>
           {children}
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className={MANUAL_ADD_MENU_CONTENT_CLASS}>
+        <DropdownMenuContent align="end" className={MANUAL_ADD_MENU_CONTENT_CLASS}>
           <DropdownMenuLabel className="px-3 py-2">
             {formatReadableDate(date, locale)}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          {onAddActivity ? (
+            <>
+              <DropdownMenuItem
+                className={MANUAL_ADD_MENU_ITEM_CLASS}
+                disabled={isBusy}
+                onSelect={() => {
+                  if (addMenuTriggerRef.current) onAddActivity(addMenuTriggerRef.current);
+                }}
+              >
+                <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="activity" size="xs" />
+                <span className="hito-body-md text-foreground">{t("Add activity")}</span>
+              </DropdownMenuItem>
+              {showWorkoutOptions ? <DropdownMenuSeparator /> : null}
+            </>
+          ) : null}
           {canMoveSelectedWorkout ? (
             <>
               <DropdownMenuItem
@@ -618,7 +628,7 @@ export function ManualWorkoutAddMenu({
               <DropdownMenuSeparator />
             </>
           ) : null}
-          {!moveOnly && canPasteCopiedWorkout ? (
+          {!moveOnly && showWorkoutOptions && canPasteCopiedWorkout ? (
             <>
               <DropdownMenuItem
                 className={MANUAL_ADD_MENU_ITEM_CLASS}
@@ -638,7 +648,7 @@ export function ManualWorkoutAddMenu({
               <DropdownMenuSeparator />
             </>
           ) : null}
-          {!moveOnly ? (
+          {!moveOnly && showWorkoutOptions ? (
             <>
               <DropdownMenuItem
                 className={MANUAL_ADD_MENU_ITEM_CLASS}
@@ -668,26 +678,6 @@ export function ManualWorkoutAddMenu({
                   </span>
                 </span>
               </DropdownMenuItem>
-              {showRestDayOption ? (
-                <DropdownMenuItem
-                  className={MANUAL_ADD_MENU_ITEM_CLASS}
-                  disabled={isBusy || !templateCatalogState.catalog}
-                  onSelect={() => {
-                    const template = templateOptions.find(
-                      (candidate) => candidate.templateKey === "rest_day",
-                    );
-                    if (template) openConstructor(template);
-                  }}
-                >
-                  <Icon className={MANUAL_ADD_MENU_ICON_CLASS} name="minus" size="xs" />
-                  <span className="min-w-0">
-                    <span className="hito-body-md text-foreground block">{t("Add rest day")}</span>
-                    <span className="hito-body-sm mt-1 text-secondary block">
-                      {t("Create an intentional no-run day.")}
-                    </span>
-                  </span>
-                </DropdownMenuItem>
-              ) : null}
             </>
           ) : null}
         </DropdownMenuContent>

@@ -26,6 +26,7 @@ import {
 import type { Database, Json } from "@/lib/supabase/database";
 import { serverEnv } from "@/lib/supabase/env";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
+import { addDaysIso } from "@/lib/training";
 import { reconcileWorkoutResultProjection } from "@/lib/workout-result-import/planned-workout-projection";
 
 const REVIEW_VERSION = "unplanned_activity_review_v1" as const;
@@ -207,9 +208,13 @@ export async function confirmUnplannedActivityReviewForUser(input: {
       placementIntent: input.intent,
       occupancyFingerprint: token.authority.occupancyFingerprint,
     });
+    const currentDate = await getRunnerCalendarDateForUserId(input.userId);
     const persisted = await applyAtomicCalendarWorkoutMutation({
       userId: input.userId,
-      currentDate: await getRunnerCalendarDateForUserId(input.userId),
+      // The existing transaction owns an exclusive upper-date bound. Passing the
+      // day after the runner's current date admits today while keeping tomorrow
+      // and every later Activity fail-closed inside the same atomic writer.
+      currentDate: addDaysIso(currentDate, 1),
       mutationKind: "confirm_activity",
       expectedSourceWorkout: hydrated.targetWorkout as unknown as Json,
       expectedTargetWorkout: null,
@@ -580,7 +585,7 @@ async function resolvePlacement(input: {
   if (input.rawState === "removed") {
     return { kind: "stale", targetDate: input.localDate, existingWorkout: null };
   }
-  if (input.localDate >= input.currentDate) {
+  if (input.localDate > input.currentDate) {
     return { kind: "today_or_future", targetDate: input.localDate, existingWorkout: null };
   }
   if (!input.occupancy) {

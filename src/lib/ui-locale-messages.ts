@@ -1875,6 +1875,7 @@ export const HITO_PRODUCT_MESSAGES_PT_BR = {
     "{includedCount} de {candidateCount} atividades aceitas",
   "Add activity": "Adicionar atividade",
   "Add activity for {date}": "Adicionar atividade em {date}",
+  "Add actions for {date}": "Adicionar em {date}",
   "Choose FIT or ZIP": "Escolher FIT ou ZIP",
   "Choose one FIT file or a ZIP containing exactly one FIT activity. Maximum file size: 25 MB.":
     "Escolha um arquivo FIT ou um ZIP que contenha exatamente uma atividade FIT. Tamanho máximo: 25 MB.",

@@ -15,14 +15,6 @@ import { HitoButton } from "@/components/ui/button";
 import { HitoChoiceToggle } from "@/components/ui/hito-choice-toggle";
 import { Icon } from "@/components/ui/icon";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   HitoCalendarDayCell,
   HitoWorkoutDayRow,
   type HitoCalendarActionVisual,
@@ -35,6 +27,7 @@ import {
   calendarMoveTargetAction,
   calendarMoveUndoAction,
   resolveCalendarMoveDateRender,
+  type CalendarAddActionContext,
   type CalendarDaySurfacePresentation,
   type CalendarDaySlotLayout,
 } from "@/components/calendar/calendar-projection";
@@ -650,10 +643,9 @@ function CalendarDaySlot({
     );
   }
 
-  if (addAction) {
+  if (addAction && canMoveHere) {
     const content = (
       <ManualWorkoutAddMenu
-        calendarSourceKind={addAction.calendarSourceKind}
         copiedWorkoutSource={manualCalendarActionState.copiedWorkoutSource}
         date={iso}
         moveTargetDayKind={addAction.moveTargetDayKind}
@@ -663,12 +655,10 @@ function CalendarDaySlot({
         onMoveCanceled={manualCalendarActionState.onCancelMoveWorkout}
         onMoveTargetSelected={manualCalendarActionState.onMoveTargetSelected}
         pasteTargetIsEmpty={!workout}
-        showRestDayOption={workout?.type !== "rest"}
       >
         <CalendarDayButton
-          ariaLabel={localizedCalendarTargetButtonAriaLabel(
+          ariaLabel={localizedCalendarMoveTargetButtonAriaLabel(
             iso,
-            canMoveHere,
             addAction.moveTargetDayKind,
             locale,
           )}
@@ -676,21 +666,10 @@ function CalendarDaySlot({
           {...manualMoveTargetDragProps(canMoveHere, iso, manualCalendarActionState)}
         >
           <CalendarDaySurface
-            action={
-              canMoveHere
-                ? localizeCalendarAction(
-                    calendarMoveTargetAction(addAction.moveTargetDayKind),
-                    locale,
-                  )
-                : {
-                    label: message("Add workout"),
-                    icon: "plus" as const,
-                    trailingIcon: "chevron-down" as const,
-                    tone: "muted" as const,
-                    visual: "button" as const,
-                    ariaLabel: message("Add workout"),
-                  }
-            }
+            action={localizeCalendarAction(
+              calendarMoveTargetAction(addAction.moveTargetDayKind),
+              locale,
+            )}
             className={
               manualCalendarActionState.moveHoverDate === iso
                 ? "hito-calendar-move-target"
@@ -715,11 +694,9 @@ function CalendarDaySlot({
 
   const canDragMove = Boolean(sourceAction?.canDragInitiate);
   const sourceActionMobile = layout === "mobile";
-  const canAddPastActivity =
-    snapshot.mode === "authenticated" &&
-    iso < snapshot.currentDate &&
-    (layout !== "month" || inMonth) &&
-    !manualCalendarActionState.movePending;
+  const hasCalendarAddMenu = Boolean(
+    addAction && (addAction.canAddActivity || addAction.canAddWorkout),
+  );
   const tooltipHandlers =
     layout === "month" && onTooltipChange && hasWorkout
       ? {
@@ -797,11 +774,12 @@ function CalendarDaySlot({
         </Link>
       ) : null}
 
-      {canAddPastActivity ? (
-        <PastActivityAddMenu
+      {hasCalendarAddMenu && addAction ? (
+        <CalendarAddMenu
+          action={addAction}
           date={iso}
-          hasSourceAction={Boolean(sourceAction && workout)}
           layout={layout}
+          manualCalendarActionState={manualCalendarActionState}
           onAddActivity={onAddActivity}
         />
       ) : null}
@@ -809,10 +787,12 @@ function CalendarDaySlot({
       {sourceAction && workout ? (
         <ManualWorkoutSourceActionMenu
           provenancePlanId={sourceAction.provenancePlanId}
+          canAddActivity={sourceAction.canAddActivity}
           canCopy={sourceAction.canDirectCopy}
           canClear={sourceAction.canRequestClearReview}
           canMove={sourceAction.canDirectMove}
           onCleared={manualCalendarActionState.onCalendarChanged}
+          onAddActivity={(trigger) => onAddActivity(iso, trigger)}
           onCopy={manualCalendarActionState.onCopyWorkout}
           onMove={manualCalendarActionState.onMoveWorkout}
           sourceWorkoutDate={sourceAction.sourceWorkoutDate}
@@ -1008,9 +988,8 @@ function localizeCalendarAction(
   };
 }
 
-function localizedCalendarTargetButtonAriaLabel(
+function localizedCalendarMoveTargetButtonAriaLabel(
   iso: string,
-  canMoveHere: boolean,
   dayKind: Parameters<typeof calendarMoveTargetAction>[0],
   locale: ReturnType<typeof useHitoUiLocale>,
 ) {
@@ -1020,7 +999,6 @@ function localizedCalendarTargetButtonAriaLabel(
     weekday: "short",
   });
 
-  if (!canMoveHere) return formatHitoProductMessage(locale, "{date}. Add workout.", { date });
   return formatHitoProductMessage(
     locale,
     dayKind === "workout_day"
@@ -1127,64 +1105,51 @@ function WeekStrip({
   );
 }
 
-function PastActivityAddMenu({
+function CalendarAddMenu({
+  action,
   date,
-  hasSourceAction,
   layout,
+  manualCalendarActionState,
   onAddActivity,
 }: {
+  action: CalendarAddActionContext;
   date: string;
-  hasSourceAction: boolean;
   layout: CalendarDaySlotLayout;
+  manualCalendarActionState: ManualCalendarActionState;
   onAddActivity: (date: string, trigger: HTMLElement) => void;
 }) {
   const locale = useHitoUiLocale();
   const message = useHitoProductMessage();
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const fullDate = formatUiDate(date, locale, { dateStyle: "long" });
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <HitoButton
-          ref={triggerRef}
-          type="button"
-          aria-label={message("Add activity for {date}", { date: fullDate })}
-          className={cn(
-            "absolute z-30 aspect-square p-0 transition-opacity",
-            layout === "mobile"
-              ? cn("top-3 h-11 w-11", hasSourceAction ? "right-14" : "right-3")
-              : cn(
-                  "opacity-100 [@media(hover:hover)]:opacity-0 group-hover/manual-day:opacity-100 group-focus-within/manual-day:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100",
-                  layout === "month"
-                    ? hasSourceAction
-                      ? "right-12 top-2"
-                      : "right-2 top-2"
-                    : hasSourceAction
-                      ? "right-14 top-3"
-                      : "right-3 top-3",
-                ),
-          )}
-          iconOnly
-          size={layout === "mobile" ? "sm" : "xs"}
-          variant="ghost"
-        >
-          <Icon name="plus" size="sm" decorative />
-        </HitoButton>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuLabel>{fullDate}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onSelect={() => {
-            if (triggerRef.current) onAddActivity(date, triggerRef.current);
-          }}
-        >
-          <Icon name="activity" size="sm" decorative />
-          {message("Add activity")}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <ManualWorkoutAddMenu
+      copiedWorkoutSource={manualCalendarActionState.copiedWorkoutSource}
+      date={date}
+      onAddActivity={action.canAddActivity ? (trigger) => onAddActivity(date, trigger) : undefined}
+      onAdded={manualCalendarActionState.onCalendarChanged}
+      pasteTargetIsEmpty={action.canAddWorkout}
+      showWorkoutOptions={action.canAddWorkout}
+    >
+      <HitoButton
+        type="button"
+        aria-label={message("Add actions for {date}", { date: fullDate })}
+        className={cn(
+          "absolute z-30 aspect-square p-0 transition-opacity",
+          layout === "mobile"
+            ? "right-3 top-3 h-11 w-11"
+            : cn(
+                "opacity-100 [@media(hover:hover)]:opacity-0 group-hover/manual-day:opacity-100 group-focus-within/manual-day:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100",
+                layout === "month" ? "right-2 top-2" : "right-3 top-3",
+              ),
+        )}
+        iconOnly
+        size={layout === "mobile" ? "sm" : "xs"}
+        variant="ghost"
+      >
+        <Icon name="plus" size="sm" decorative />
+      </HitoButton>
+    </ManualWorkoutAddMenu>
   );
 }
 

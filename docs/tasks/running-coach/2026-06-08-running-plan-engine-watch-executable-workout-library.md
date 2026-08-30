@@ -8,7 +8,7 @@ day anatomy in Slice R1.
 Important boundary:
 
 - the untracked files under
-  `/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-creation-engine/`
+  `src/lib/plan-creation-engine/`
   are not accepted as canonical by this Running Coach slice
 - they contain stale/conflicting contract language around benchmark-backed pace truth, personal
   HR-zone truth, and old runner-level labels

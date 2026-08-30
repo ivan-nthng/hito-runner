@@ -8,7 +8,7 @@ Owner: BACKEND
 Epic: platform-and-operations
 Parent: [Hito Modular Monolith Domain-Boundary Transformation Implementation](./2026-08-18-hito-modular-monolith-domain-boundary-transformation-implementation.md)
 Depends On: [Hito Runner Calendar Mutation Owner Extraction](./2026-08-21-hito-runner-calendar-mutation-owner-extraction.md)
-Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md)
+Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md)
 
 ## Scope
 
@@ -78,7 +78,7 @@ ROLE: BACKEND
 Task: HITO-232 — Clean Up Runner Calendar Public Snapshot
 Mode: Tracked
 Canonical item: /Users/ivan/Developer/hito-running/docs/tasks/backlog/2026-08-21-hito-runner-calendar-public-snapshot-cleanup.md
-Plan: /Users/ivan/Developer/hito-running/docs/plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md (Phase 2C only)
+Plan: /Users/ivan/Developer/hito-running/docs/plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md (Phase 2C only)
 Stage: Phase 2C — Runner Calendar public snapshot cleanup
 
 Read AGENTS.md, agents/backend.agent.md, skills/hito-backend-supabase-contract/SKILL.md, this

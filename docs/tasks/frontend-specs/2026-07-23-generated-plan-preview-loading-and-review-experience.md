@@ -80,7 +80,7 @@ FRONTEND implementation with independent QA support.
 Frontend lane: Product
 
 Specification:
-/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/frontend-specs/2026-07-23-generated-plan-preview-loading-and-review-experience.md
+docs/tasks/frontend-specs/2026-07-23-generated-plan-preview-loading-and-review-experience.md
 
 Demonstrated root cause:
 The first pass retained the stable review header and too much explanatory copy during

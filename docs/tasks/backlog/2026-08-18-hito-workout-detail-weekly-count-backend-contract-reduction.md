@@ -41,7 +41,7 @@ Task: Hito Workout Detail Weekly Count Backend Contract Reduction
 Mode: Tracked
 Canonical item: docs/tasks/backlog/2026-08-18-hito-workout-detail-weekly-count-backend-contract-reduction.md
 Parent: docs/tasks/backlog/2026-08-18-hito-workout-detail-right-panel-removal-and-query-elimination.md
-Plan: docs/plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md
+Plan: docs/plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md
 
 Read AGENTS.md, agents/backend.agent.md, skills/hito-backend-supabase-contract/SKILL.md, this item,
 and only these direct seams before acting:

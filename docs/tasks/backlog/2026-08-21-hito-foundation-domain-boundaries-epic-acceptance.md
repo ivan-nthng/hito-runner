@@ -5,7 +5,7 @@ Notion Task: [HITO-241](https://app.notion.com/p/Accept-Foundation-Domain-Bounda
 Type: Maintenance
 Parent: [Hito Modular Monolith Domain-Boundary Transformation Implementation](./2026-08-18-hito-modular-monolith-domain-boundary-transformation-implementation.md)
 Depends On: [Hito Current-System Modular Boundary Reconciliation](./2026-08-21-hito-current-system-modular-boundary-reconciliation.md)
-Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md#acceptance-and-rollback)
+Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md#acceptance-and-rollback)
 
 ## Scope
 

@@ -3,7 +3,7 @@
 Date: 2026-06-09
 Owner: Running Coach
 Status: Proposed source-of-truth for manual workout construction and template-based user-built plans
-Backlog source: `/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/2026-06-04-manual-workout-creation-edit-copy-recurrence.md`
+Backlog source: `docs/tasks/backlog/2026-06-04-manual-workout-creation-edit-copy-recurrence.md`
 
 ## Purpose
 

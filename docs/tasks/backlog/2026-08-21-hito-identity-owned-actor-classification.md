@@ -5,7 +5,7 @@ Notion Task: [HITO-237](https://app.notion.com/p/Establish-Identity-Owned-Actor-
 Type: Maintenance
 Parent: [Hito Modular Monolith Domain-Boundary Transformation Implementation](./2026-08-18-hito-modular-monolith-domain-boundary-transformation-implementation.md)
 Depends On: [Hito Evidence And Progress Product Contract](./2026-08-21-hito-evidence-progress-product-contract.md)
-Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md#phase-5--identity-and-admin-classification-direction)
+Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md#phase-5--identity-and-admin-classification-direction)
 
 ## Scope
 

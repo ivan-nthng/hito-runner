@@ -67,7 +67,7 @@ Stage:
 BACKEND implementation with integrated QA.
 
 Canonical task:
-/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/backlog/2026-07-26-coach-club-program-publishing-architecture.md
+docs/tasks/backlog/2026-07-26-coach-club-program-publishing-architecture.md
 
 Accepted Product decision:
 - Any authenticated Hito account may explicitly enable a Coach actor context for v1. It implies no

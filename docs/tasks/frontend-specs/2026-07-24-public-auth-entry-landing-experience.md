@@ -46,8 +46,10 @@ implementation or QA gate.
 
 This document is supporting design detail, not an operational queue entry. Its former `ready`
 status and Frontend prompt did not have a matching item under `docs/tasks/backlog/`; they therefore
-cannot authorize dispatch. Product must create or select exactly one canonical backlog item before
-this proposal can be resumed.
+cannot authorize dispatch. [HITO-288](../backlog/2026-08-28-hito-simple-public-marketing-site.md) now
+owns the operational outcome. Its fixed inline-auth information architecture and current Product
+boundaries supersede any conflicting modal, section, or implementation direction here; this spec
+remains useful only for source/auth ownership and capture-detail evidence.
 
 ## Historical Handoff Prompt
 
@@ -65,7 +67,7 @@ FRONTEND implementation with independent QA support.
 Frontend lane: Marketing
 
 Specification:
-/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/frontend-specs/2026-07-24-public-auth-entry-landing-experience.md
+docs/tasks/frontend-specs/2026-07-24-public-auth-entry-landing-experience.md
 
 Root cause and architecture fit:
 Unauthenticated `/` and `/login` already converge on `AuthEntryScreen`, which owns the real auth

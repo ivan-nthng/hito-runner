@@ -107,7 +107,7 @@ Backend should later split this matrix into:
 ## R1 Canonical Boundary Note
 
 This matrix does not treat the untracked files under
-`/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/src/lib/plan-creation-engine/`
+`src/lib/plan-creation-engine/`
 as canonical.
 
 For Slice R1, the accepted canonical coaching source of truth lives under:

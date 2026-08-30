@@ -5,7 +5,7 @@ Notion Task: [HITO-238](https://app.notion.com/p/Choose-the-First-Shared-Facade-
 Type: Research / Decision
 Parent: [Hito Modular Monolith Domain-Boundary Transformation Implementation](./2026-08-18-hito-modular-monolith-domain-boundary-transformation-implementation.md)
 Depends On: [Hito Identity-Owned Actor Classification](./2026-08-21-hito-identity-owned-actor-classification.md)
-Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md#phase-6--shared-facade-reduction-and-truth-reconciliation)
+Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md#phase-6--shared-facade-reduction-and-truth-reconciliation)
 
 ## Scope
 

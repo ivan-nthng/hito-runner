@@ -85,7 +85,7 @@ Task: Hito Product Domain Boundaries And Efficient Delivery Architecture Audit
 Stage: Read-only architecture audit of product domains, bounded change envelopes, and validation tiers
 Mode: Tracked
 Canonical item: docs/tasks/backlog/2026-08-18-hito-product-domain-boundaries-and-efficient-delivery-architecture-audit.md
-Plan: docs/plans/active/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md
+Plan: docs/plans/archive/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md
 
 Ivan explicitly authorized immediate research. Read AGENTS.md, agents/architect.agent.md,
 skills/hito-architecture-audit/SKILL.md, this canonical item, the active roadmap, the latest

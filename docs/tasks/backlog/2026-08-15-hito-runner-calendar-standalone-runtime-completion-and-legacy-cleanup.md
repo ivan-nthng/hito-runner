@@ -34,7 +34,7 @@ PRODUCT
 
 ## Parent
 
-[Runner Core Roadmap](../../plans/active/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md)
+[Runner Core Roadmap](../../plans/archive/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md)
 
 ## Depends On
 
@@ -126,7 +126,7 @@ Task: Hito Runner Calendar Standalone Runtime Completion And Legacy Cleanup
 Stage: Backend completion batch — runner-owned read models, Calendar export, fixtures, validators, and obsolete proof removal
 Mode: Tracked
 Canonical item: docs/tasks/backlog/2026-08-15-hito-runner-calendar-standalone-runtime-completion-and-legacy-cleanup.md
-Parent: docs/plans/active/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md
+Parent: docs/plans/archive/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md
 Depends On: docs/tasks/backlog/2026-08-15-hito-standalone-calendar-materialization-origin-completion.md
 Evidence From: docs/tasks/backlog/2026-08-15-hito-calendar-workout-standalone-entity-and-plan-source-decoupling-discovery.md and docs/tasks/backlog/2026-08-15-hito-proof-script-reachability-and-documentation-source-of-truth-consolidation.md
 Epic: runner-core-readiness

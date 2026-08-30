@@ -8,7 +8,7 @@ Owner: BACKEND
 Epic: platform-and-operations
 Parent: [Hito Modular Monolith Domain-Boundary Transformation Implementation](./2026-08-18-hito-modular-monolith-domain-boundary-transformation-implementation.md)
 Depends On: [Hito Runner Calendar Query Owner Extraction](./2026-08-18-hito-runner-calendar-query-owner-extraction.md)
-Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md)
+Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md)
 
 ## Scope
 
@@ -83,7 +83,7 @@ ROLE: BACKEND
 Task: Hito Runner Calendar Mutation Owner Extraction
 Mode: Tracked
 Canonical item: /Users/ivan/Developer/hito-running/docs/tasks/backlog/2026-08-21-hito-runner-calendar-mutation-owner-extraction.md
-Plan: /Users/ivan/Developer/hito-running/docs/plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md (Phase 2B only)
+Plan: /Users/ivan/Developer/hito-running/docs/plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md (Phase 2B only)
 Stage: Phase 2B — Calendar mutation owner extraction
 
 Read AGENTS.md, agents/backend.agent.md, the matching Backend/Supabase contract skill, this item,

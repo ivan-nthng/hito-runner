@@ -3,7 +3,7 @@
     { "type": "backlog_doc", "root": "docs/tasks/backlog" },
     { "type": "product_brief", "root": "docs/tasks/product-briefs" },
     { "type": "frontend_spec", "root": "docs/tasks/frontend-specs" },
-    { "type": "active_plan", "root": "docs/plans/active" },
+    { "type": "active_plan", "root": "docs/plans/active", "allowEmpty": true },
     { "type": "archived_plan", "root": "docs/plans/archive" }
   ]
 }

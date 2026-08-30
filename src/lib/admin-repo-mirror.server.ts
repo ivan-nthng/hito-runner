@@ -3,7 +3,7 @@ import "@tanstack/react-start/server-only";
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  ADMIN_REPO_WORK_ITEM_SOURCE_ROOTS,
+  ADMIN_REPO_WORK_ITEM_SOURCE_CONFIGS,
   synchronizeRepoWorkItems,
   type AdminRepoWorkItemDocument,
 } from "../../scripts/import-repo-work-items-to-admin-backlog";
@@ -128,9 +128,13 @@ function validateBundledSnapshot(snapshot: {
     throw new Error("Deployed repository work-item snapshot generation is invalid.");
   }
 
-  for (const root of ADMIN_REPO_WORK_ITEM_SOURCE_ROOTS) {
-    if (!snapshot.countsByRoot[root] || snapshot.countsByRoot[root] <= 0) {
-      throw new Error(`Required deployed repository work-item source is unavailable: ${root}`);
+  for (const source of ADMIN_REPO_WORK_ITEM_SOURCE_CONFIGS) {
+    const count = snapshot.countsByRoot[source.root];
+
+    if (!Number.isInteger(count) || count < 0 || (count === 0 && source.allowEmpty !== true)) {
+      throw new Error(
+        `Required deployed repository work-item source is unavailable: ${source.root}`,
+      );
     }
   }
 

@@ -36,7 +36,7 @@ export function collectAdminRepoWorkItemSnapshot(rootDir) {
       (filePath) => basename(filePath).toLowerCase() !== "readme.md",
     );
 
-    if (files.length === 0) {
+    if (files.length === 0 && source.allowEmpty !== true) {
       throw new Error(`Required repository work-item source is empty: ${source.root}`);
     }
 

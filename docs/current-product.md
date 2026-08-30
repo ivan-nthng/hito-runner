@@ -30,10 +30,9 @@ source plan as a runner-facing calendar container.
 - The calendar is the runner's current truth. A runner may move eligible workouts to
   other eligible dates without an ongoing relationship to the source plan.
 
-The persisted source/workout storage still carries legacy coupling. It must be
-decoupled through the tracked architecture and Backend migration work before runtime
-can claim this product model is fully implemented. Until then, no product copy or new
-UI may introduce a plan as the intended runner-facing schedule container.
+Physical names such as `plan_cycles`, `planned_workouts` and `active-plan-*` are retained
+implementation facts only. They cannot restore plan-container authority in product behavior, copy,
+fixtures or new logic.
 
 ## Main User Surfaces
 
@@ -98,6 +97,28 @@ UI may introduce a plan as the intended runner-facing schedule container.
   personal truth. Hito does not manufacture health or coaching authority.
 - Preview, provider, and unavailable states use direct language such as `Preview`,
   `Later`, `Not connected`, or `Unavailable` rather than simulated live outcomes.
+
+## Business Process Ownership
+
+PRODUCT owns product policy and final acceptance for every process. Each process has one system
+truth owner; presentation roles consume its public contract and never become a second writer.
+
+| Business process                                     | Product owner | System/domain owner                      | Current boundary                                                                                 |
+| ---------------------------------------------------- | ------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Public acquisition, authentication entry and locale  | PRODUCT       | Identity/Profile                         | FRONTEND Marketing presents public entry; saved identity remains server-owned                    |
+| Onboarding, profile, settings and stable constraints | PRODUCT       | Identity/Profile                         | Profile facts do not own Calendar schedule                                                       |
+| Manual, template, AI and file proposal               | PRODUCT       | Source Authoring/Provenance              | Produces reviewed `WorkoutDocument` content and immutable origin                                 |
+| Saved review, Review and Confirm                     | PRODUCT       | Source Authoring, then Runner Calendar   | Confirm is the only Calendar materialisation boundary                                            |
+| Add, Edit, Move, Copy, Clear and protection          | PRODUCT       | Runner Calendar                          | Acts on independent Calendar workouts                                                            |
+| Completion, manual result, FIT and evidence          | PRODUCT       | Result/Evidence and Activity lifecycle   | Factual history never rewrites prescription provenance                                           |
+| Activity History and factual Progress                | PRODUCT       | Runner Activity/Progress                 | Consumes versioned public facts with explicit missingness                                        |
+| Blueprint and adaptive continuation                  | PRODUCT       | Training Decision and Source Authoring   | Future projections are non-workouts; sample-derived metrics remain unavailable until implemented |
+| Entitlements, payments and financial actuals         | PRODUCT       | Entitlement/Commercial/Financial backend | Entitlement is pre-billing; paid subscriptions and provider policy remain future decisions       |
+| Admin operations and work items                      | PRODUCT       | Admin/Identity backend                   | FRONTEND Product presents Admin; Notion alone owns Task lifecycle                                |
+| Public marketing                                     | PRODUCT       | FRONTEND Marketing                       | MARKETING MANAGER and DESIGNER provide bounded research/decision input                           |
+| Design System                                        | PRODUCT       | FRONTEND Design System                   | Shared tokens and primitives; no separate repository Design System owner                         |
+| Local debugger and capture                           | PRODUCT       | FRONTEND DevTools                        | Loopback-only, non-persisting for runner data and absent from production imports                 |
+| QA, environment and release                          | PRODUCT       | BACKEND and QA                           | Current runbooks own execution evidence; PRODUCT performs final acceptance                       |
 
 ## Product Design Boundary
 

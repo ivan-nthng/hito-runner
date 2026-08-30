@@ -34,7 +34,7 @@ None — subsequent baseline execution is owned by the superseding PRODUCT item
 
 ## Parent
 
-[Runner Core Roadmap](../../plans/active/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md)
+[Runner Core Roadmap](../../plans/archive/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md)
 
 ## Depends On
 
@@ -445,7 +445,7 @@ Mode: Tracked
 Canonical item:
 docs/tasks/backlog/2026-08-16-hito-runner-core-full-local-qa-audit-and-defect-ledger.md
 Parent:
-docs/plans/active/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md
+docs/plans/archive/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md
 Depends on:
 docs/tasks/backlog/2026-08-15-hito-runner-calendar-standalone-runtime-completion-and-legacy-cleanup.md
 and docs/tasks/backlog/2026-08-16-hito-runner-calendar-standalone-frontend-consumer-adoption.md
@@ -548,7 +548,7 @@ Mode: Tracked, focused local acceptance retry
 Canonical item:
 docs/tasks/backlog/2026-08-16-hito-runner-core-full-local-qa-audit-and-defect-ledger.md
 Parent:
-docs/plans/active/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md
+docs/plans/archive/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md
 Stage: Independent AUD-06 browser replay after standalone Calendar copy completion
 Epic: runner-core-readiness
 

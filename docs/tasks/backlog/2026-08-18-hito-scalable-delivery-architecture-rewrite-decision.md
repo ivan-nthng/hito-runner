@@ -6,7 +6,7 @@ Type: Tracked
 Priority: highest
 Owner: ARCHITECT
 Epic: platform-and-operations
-Parent: [Hito Product Roadmap: Runner Core, Adaptive Blueprint Planning, And Commercial Readiness](../../plans/active/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md)
+Parent: [Hito Product Roadmap: Runner Core, Adaptive Blueprint Planning, And Commercial Readiness](../../plans/archive/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md)
 Evidence From: [Hito Modular Monolith Domain-Boundary Transformation Plan](./2026-08-18-hito-modular-monolith-domain-boundary-transformation-plan.md), [Runner Core Release Freeze And Candidate Admission](./2026-08-18-hito-runner-core-release-freeze-and-candidate-admission.md)
 
 ## Scope
@@ -108,7 +108,7 @@ Task: Hito Scalable Delivery Architecture Rewrite Decision
 Stage: Rewrite-versus-incremental delivery architecture decision and amended plan
 Mode: Tracked
 Canonical item: docs/tasks/backlog/2026-08-18-hito-scalable-delivery-architecture-rewrite-decision.md
-Existing plan: docs/plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md
+Existing plan: docs/plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md
 Evidence: docs/tasks/backlog/2026-08-18-hito-product-domain-boundaries-and-efficient-delivery-architecture-audit.md and docs/tasks/backlog/2026-08-18-hito-runner-core-release-freeze-and-candidate-admission.md
 
 Ivan explicitly authorizes autonomous architecture planning, not implementation. Read AGENTS.md,
@@ -165,7 +165,7 @@ batch still requires unrelated domain reconstruction.
 ### Existing Plan Amendment
 
 The existing
-[Modular Monolith Domain-Boundary Transformation](../../plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md)
+[Modular Monolith Domain-Boundary Transformation](../../plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md)
 now records:
 
 - the explicit no-rewrite verdict and four evidence-based rewrite triggers;

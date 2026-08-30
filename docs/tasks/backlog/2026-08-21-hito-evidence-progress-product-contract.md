@@ -5,7 +5,7 @@ Notion Task: [HITO-236](https://app.notion.com/p/Complete-Evidence-and-Progress-
 Type: Maintenance
 Parent: [Hito Modular Monolith Domain-Boundary Transformation Implementation](./2026-08-18-hito-modular-monolith-domain-boundary-transformation-implementation.md)
 Depends On: [Hito Result And Evidence Public Contract](./2026-08-21-hito-result-evidence-public-contract.md)
-Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md#phase-4--evidence-and-progress-contract-completion)
+Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md#phase-4--evidence-and-progress-contract-completion)
 
 ## Scope
 
@@ -58,7 +58,7 @@ ROLE: BACKEND
 Task: HITO-236 — Complete Evidence and Progress Product Contract
 Mode: Tracked
 Canonical item: /Users/ivan/Developer/hito-running/docs/tasks/backlog/2026-08-21-hito-evidence-progress-product-contract.md
-Plan: /Users/ivan/Developer/hito-running/docs/plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md (Phase 4 only)
+Plan: /Users/ivan/Developer/hito-running/docs/plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md (Phase 4 only)
 Stage: Phase 4A — Backend provider-contract completion
 
 Read AGENTS.md, agents/backend.agent.md, skills/hito-backend-supabase-contract/SKILL.md, this item,

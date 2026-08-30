@@ -42,7 +42,7 @@ ROLE: QA
 Task: Hito Source Plan Provenance Lookup Owner Extraction
 Mode: Tracked
 Canonical item: /Users/ivan/Developer/hito-running/docs/tasks/backlog/2026-08-18-hito-source-plan-provenance-lookup-owner-extraction.md
-Plan: /Users/ivan/Developer/hito-running/docs/plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md (Phase 2A-0 only)
+Plan: /Users/ivan/Developer/hito-running/docs/plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md (Phase 2A-0 only)
 
 Read AGENTS.md, agents/qa.agent.md, the directly matching local Backend/Supabase contract procedure,
 this item, and only these direct seams and their existing proof:

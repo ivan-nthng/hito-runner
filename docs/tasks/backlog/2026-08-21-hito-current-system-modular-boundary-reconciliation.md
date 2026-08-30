@@ -5,7 +5,7 @@ Notion Task: [HITO-240](https://app.notion.com/p/Reconcile-Current-System-Modula
 Type: Maintenance
 Parent: [Hito Modular Monolith Domain-Boundary Transformation Implementation](./2026-08-18-hito-modular-monolith-domain-boundary-transformation-implementation.md)
 Depends On: [Hito Feedback Marker Presentation Owner Extraction](./2026-08-21-hito-feedback-marker-presentation-owner-extraction.md)
-Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md#phase-6--shared-facade-reduction-and-truth-reconciliation)
+Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md#phase-6--shared-facade-reduction-and-truth-reconciliation)
 
 ## Scope
 

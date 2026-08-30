@@ -3,8 +3,8 @@
 Work Item ID: `2026-08-18-hito-modular-monolith-domain-boundary-transformation-implementation`
 Notion Task: [HITO-218](https://app.notion.com/p/Isolate-Hito-Product-Domains-3c2fe5f58cf5812e8e0fd1de5b2b494f)
 Type: Tracked
-Parent: [Hito Product Roadmap: Runner Core, Evidence And Progress, And Commercial Readiness](../../plans/active/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md)
-Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md), [Hito Delivery Context Cost And Modular Efficiency Audit](./2026-08-21-hito-delivery-context-cost-and-modular-efficiency-audit.md)
+Parent: [Hito Product Roadmap: Runner Core, Evidence And Progress, And Commercial Readiness](../../plans/archive/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md)
+Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md), [Hito Delivery Context Cost And Modular Efficiency Audit](./2026-08-21-hito-delivery-context-cost-and-modular-efficiency-audit.md)
 
 ## Outcome
 

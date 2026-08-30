@@ -8,6 +8,7 @@ import {
   buildStaleRepoMirrorMetadata,
   findStaleActiveRepoMirrorRows,
   synchronizeRepoWorkItems,
+  ADMIN_REPO_WORK_ITEM_SOURCE_CONFIGS,
   ADMIN_REPO_WORK_ITEM_SOURCE_ROOTS,
   type AdminRepoWorkItemDocument,
 } from "./import-repo-work-items-to-admin-backlog";
@@ -799,28 +800,92 @@ async function assertMissingRepoRootRefusesArchive() {
 
 async function assertEmptyRepoRootRefusesProjection() {
   const rootDir = await mkdtemp(path.join(tmpdir(), "hito-admin-repo-root-"));
-  const emptyRoot = ADMIN_REPO_WORK_ITEM_SOURCE_ROOTS[0]!;
+  const emptyAllowedSource = ADMIN_REPO_WORK_ITEM_SOURCE_CONFIGS.find(
+    (source) => source.allowEmpty === true,
+  );
+  const requiredSources = ADMIN_REPO_WORK_ITEM_SOURCE_CONFIGS.filter(
+    (source) => source.allowEmpty !== true,
+  );
   const fake = createRepoMirrorSynchronizationSupabase();
 
   try {
-    for (const sourceRoot of ADMIN_REPO_WORK_ITEM_SOURCE_ROOTS) {
-      const directory = path.join(rootDir, sourceRoot);
+    assert.ok(emptyAllowedSource);
+    assert.equal(emptyAllowedSource.root, "docs/plans/active");
+
+    const manifestRelativePath = "scripts/admin-backlog-import/sources.json";
+    await mkdir(path.join(rootDir, path.dirname(manifestRelativePath)), { recursive: true });
+    await writeFile(
+      path.join(rootDir, manifestRelativePath),
+      await readFile(path.join(process.cwd(), manifestRelativePath), "utf8"),
+    );
+
+    for (const source of ADMIN_REPO_WORK_ITEM_SOURCE_CONFIGS) {
+      const directory = path.join(rootDir, source.root);
       await mkdir(directory, { recursive: true });
 
-      if (sourceRoot !== emptyRoot) {
+      if (source.allowEmpty !== true) {
         await writeFile(path.join(directory, "fixture.md"), "# Repository mirror fixture\n");
       }
     }
 
+    const filesystemReport = await synchronizeRepoWorkItems({ rootDir, dryRun: true });
+    const snapshot = collectAdminRepoWorkItemSnapshot(rootDir);
+    const bundledReport = await synchronizeRepoWorkItems({
+      documents: snapshot.documents,
+      dryRun: true,
+    });
+
+    assert.equal(filesystemReport.ok, true);
+    assert.equal(bundledReport.ok, true);
+    assert.equal(snapshot.countsByRoot[emptyAllowedSource.root], 0);
+    assert.equal(filesystemReport.stats.eligibleBySourceType.active_plan, 0);
+    assert.equal(bundledReport.stats.eligibleBySourceType.active_plan, 0);
+
+    for (const source of requiredSources) {
+      await assert.rejects(
+        synchronizeRepoWorkItems({
+          documents: snapshot.documents.filter(
+            (document) =>
+              document.sourceType !== source.type ||
+              !document.sourcePath.startsWith(`${source.root}/`),
+          ),
+          dryRun: true,
+        }),
+        (error: unknown) =>
+          error instanceof Error &&
+          /required bundled repository work-item source/i.test(error.message) &&
+          error.message.includes(source.root),
+      );
+    }
+
+    await rm(path.join(rootDir, emptyAllowedSource.root), { recursive: true, force: true });
     await assert.rejects(
       synchronizeRepoWorkItems({ rootDir, supabase: fake.client }),
-      /required repository work-item source is empty/i,
+      /required repository work-item source/i,
     );
-    await writeFile(path.join(rootDir, emptyRoot, "README.md"), "# Policy only\n");
-    await assert.rejects(
-      synchronizeRepoWorkItems({ rootDir, supabase: fake.client }),
-      /required repository work-item source is empty/i,
+    assert.throws(
+      () => collectAdminRepoWorkItemSnapshot(rootDir),
+      /required repository work-item source is unavailable/i,
     );
+
+    await mkdir(path.join(rootDir, emptyAllowedSource.root), { recursive: true });
+
+    for (const source of requiredSources) {
+      await rm(path.join(rootDir, source.root, "fixture.md"));
+      await assert.rejects(
+        synchronizeRepoWorkItems({ rootDir, supabase: fake.client }),
+        /required repository work-item source is empty/i,
+      );
+      assert.throws(
+        () => collectAdminRepoWorkItemSnapshot(rootDir),
+        /required repository work-item source is empty/i,
+      );
+      await writeFile(
+        path.join(rootDir, source.root, "fixture.md"),
+        "# Repository mirror fixture\n",
+      );
+    }
+
     assert.equal(fake.readCount(), 0);
     assert.equal(fake.updateCount(), 0);
   } finally {
@@ -1386,9 +1451,13 @@ async function assertBundledRepoMirrorSourceContract() {
     filesystemReport.stats.malformedCanonicalItemCount,
   );
   assert.equal(
-    Object.values(snapshot.countsByRoot).every((count) => count > 0),
+    ADMIN_REPO_WORK_ITEM_SOURCE_CONFIGS.every((source) => {
+      const count = snapshot.countsByRoot[source.root];
+      return Number.isInteger(count) && count >= 0 && (source.allowEmpty === true || count > 0);
+    }),
     true,
   );
+  assert.equal(snapshot.countsByRoot["docs/plans/active"], 0);
 
   const withoutArchivedPlans = snapshot.documents.filter(
     (document) => !document.sourcePath.startsWith("docs/plans/archive/"),

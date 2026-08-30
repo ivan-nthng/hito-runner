@@ -37,7 +37,7 @@ Stage:
 PRODUCT prioritization after completed Runner Core remediation.
 
 Canonical plan:
-/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/plans/archive/2026-07-21-runner-baseline-and-heart-rate-zone-truth-remediation.md
+docs/plans/archive/2026-07-21-runner-baseline-and-heart-rate-zone-truth-remediation.md
 
 Required outcome:
 - Treat the accepted baseline/HR lifecycle as frozen Runner Core truth.

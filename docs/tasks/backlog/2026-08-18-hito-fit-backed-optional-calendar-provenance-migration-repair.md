@@ -8,7 +8,7 @@ Owner: BACKEND
 Epic: runner-core-readiness
 Parent: [Hito Hosted Runner Core Migration Parity And Production Deploy](./2026-08-18-hito-hosted-runner-core-migration-parity-and-production-deploy.md)
 Depends On: [Hito Hosted FIT-Retaining Calendar Cleanup And Release Continuation](./2026-08-18-hito-hosted-fit-retaining-calendar-cleanup-and-release-continuation.md)
-Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md)
+Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md)
 
 ## Scope
 

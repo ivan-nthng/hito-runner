@@ -8,7 +8,7 @@ Owner: QA
 Epic: runner-core-readiness
 Parent: [Hito Modular Monolith Domain-Boundary Transformation Implementation](./2026-08-18-hito-modular-monolith-domain-boundary-transformation-implementation.md)
 Depends On: [Hito Workout Detail Static Right Panel And Query Elimination](./2026-08-18-hito-workout-detail-right-panel-removal-and-query-elimination.md); [Hito Source Plan Provenance Lookup Owner Extraction](./2026-08-18-hito-source-plan-provenance-lookup-owner-extraction.md)
-Evidence From: [Hito Modular Monolith Domain-Boundary Transformation Plan](../../plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md)
+Evidence From: [Hito Modular Monolith Domain-Boundary Transformation Plan](../../plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md)
 
 ## Scope
 
@@ -43,7 +43,7 @@ Task: Hito Runner Calendar Query Owner Extraction — Independent Acceptance Rer
 Mode: Tracked
 Canonical item: /Users/ivan/Developer/hito-running/docs/tasks/backlog/2026-08-18-hito-runner-calendar-query-owner-extraction.md
 Parent: /Users/ivan/Developer/hito-running/docs/tasks/backlog/2026-08-18-hito-modular-monolith-domain-boundary-transformation-implementation.md
-Plan: /Users/ivan/Developer/hito-running/docs/plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md (Phase 2A only)
+Plan: /Users/ivan/Developer/hito-running/docs/plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md (Phase 2A only)
 
 Read AGENTS.md, agents/qa.agent.md, skills/hito-backend-supabase-contract/SKILL.md, this item, the
 Phase 2A plan section, and only `runner-calendar-persistence.ts`,
@@ -76,7 +76,7 @@ Task: Hito Runner Calendar Query Owner Extraction
 Mode: Tracked
 Canonical item: docs/tasks/backlog/2026-08-18-hito-runner-calendar-query-owner-extraction.md
 Parent: docs/tasks/backlog/2026-08-18-hito-modular-monolith-domain-boundary-transformation-implementation.md
-Plan: docs/plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md (Phase 2A only)
+Plan: docs/plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md (Phase 2A only)
 
 Read AGENTS.md, agents/backend.agent.md, skills/hito-backend-supabase-contract/SKILL.md, this item,
 and only the Phase 2A plan section. Start from src/lib/active-plan-persistence.ts and use targeted
@@ -120,7 +120,7 @@ Task: Hito Runner Calendar Query Owner Extraction — Independent Acceptance
 Mode: Tracked
 Canonical item: /Users/ivan/Developer/hito-running/docs/tasks/backlog/2026-08-18-hito-runner-calendar-query-owner-extraction.md
 Parent: /Users/ivan/Developer/hito-running/docs/tasks/backlog/2026-08-18-hito-modular-monolith-domain-boundary-transformation-implementation.md
-Plan: /Users/ivan/Developer/hito-running/docs/plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md (Phase 2A only)
+Plan: /Users/ivan/Developer/hito-running/docs/plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md (Phase 2A only)
 
 Read AGENTS.md, agents/qa.agent.md, skills/hito-backend-supabase-contract/SKILL.md, this canonical
 item, the Phase 2A plan section, and only the five moved Calendar-query exports, their direct

@@ -116,6 +116,7 @@ type ItemUpdate = Database["public"]["Tables"]["admin_capture_items"]["Update"];
 type SourceConfig = {
   type: SourceType;
   root: string;
+  allowEmpty?: boolean;
 };
 
 type RepoWorkItem = {
@@ -273,6 +274,7 @@ type DuplicateConceptExample = {
 
 const SOURCE_CONFIGS = sourceManifest.sources as SourceConfig[];
 
+export const ADMIN_REPO_WORK_ITEM_SOURCE_CONFIGS = SOURCE_CONFIGS;
 export const ADMIN_REPO_WORK_ITEM_SOURCE_ROOTS = SOURCE_CONFIGS.map((source) => source.root);
 
 export async function runRepoWorkItemImporterCli(argv = process.argv.slice(2)) {
@@ -529,7 +531,7 @@ async function scanRepoWorkItems(rootDir: string, context: ImportRunContext) {
       return getSkipReason(relativePath) === null;
     });
 
-    if (eligibleFiles.length === 0) {
+    if (eligibleFiles.length === 0 && source.allowEmpty !== true) {
       throw new Error(`Required repository work-item source is empty: ${source.root}`);
     }
 
@@ -587,7 +589,7 @@ async function scanRepoWorkItemDocuments(
         document.sourceType === source.type && document.sourcePath.startsWith(`${source.root}/`),
     );
 
-    if (sourceDocuments.length === 0) {
+    if (sourceDocuments.length === 0 && source.allowEmpty !== true) {
       throw new Error(
         `Required bundled repository work-item source is unavailable: ${source.root}`,
       );

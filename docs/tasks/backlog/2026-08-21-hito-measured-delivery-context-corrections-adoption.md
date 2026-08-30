@@ -86,7 +86,7 @@ retains code history. No other terminal record was compacted.
 ### Phase 3 Owner And Boundary
 
 The accepted modular plan's next slice is
-[Phase 3 — Result And Evidence Public Contract](../../plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md#phase-3--result-and-evidence-public-contract).
+[Phase 3 — Result And Evidence Public Contract](../../plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md#phase-3--result-and-evidence-public-contract).
 The first owner is **BACKEND**. It may keep `workout-result-import/types.ts` as the public contract,
 move only upload/storage constants, raw FIT/provider failure shapes and observability mechanics to
 one Backend-private owner, migrate direct consumers, and remove those public exports after runtime

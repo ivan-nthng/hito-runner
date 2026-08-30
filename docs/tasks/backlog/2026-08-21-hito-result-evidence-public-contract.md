@@ -5,7 +5,7 @@ Notion Task: [HITO-235](https://app.notion.com/p/Isolate-Result-and-Evidence-Pub
 Type: Maintenance
 Parent: [Hito Modular Monolith Domain-Boundary Transformation Implementation](./2026-08-18-hito-modular-monolith-domain-boundary-transformation-implementation.md)
 Depends On: [Hito Measured Delivery Context Corrections Adoption](./2026-08-21-hito-measured-delivery-context-corrections-adoption.md)
-Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md#phase-3--result-and-evidence-public-contract)
+Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md#phase-3--result-and-evidence-public-contract)
 
 ## Scope
 
@@ -57,7 +57,7 @@ ROLE: BACKEND
 Task: HITO-235 — Isolate Result and Evidence Public Contract
 Mode: Tracked
 Canonical item: /Users/ivan/Developer/hito-running/docs/tasks/backlog/2026-08-21-hito-result-evidence-public-contract.md
-Plan: /Users/ivan/Developer/hito-running/docs/plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md (Phase 3 only)
+Plan: /Users/ivan/Developer/hito-running/docs/plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md (Phase 3 only)
 Stage: Phase 3 — Result and Evidence public contract
 
 Read AGENTS.md, agents/backend.agent.md, skills/hito-backend-supabase-contract/SKILL.md, this item,

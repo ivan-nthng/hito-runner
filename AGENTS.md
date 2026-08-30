@@ -30,23 +30,23 @@ immutable history line. One Task has one current owner; same-task QA fix-forward
 A Task with multiple admitted steps uses one page-level `Delivery steps` checklist; do not mirror
 percentages or create phase Tasks.
 
-For an already admitted Task, distinguish a missing or changed lifecycle decision from a broken
-execution host. The former stops for PRODUCT. A role context that cannot reach the approved Notion
-API, admitted worktree, fixture or managed runtime returns the same Task directly to BACKEND for
-recovery or re-homing in a canonical local context with the same Task identity and approved seam.
-Only that context may write the terminal Notion result; this never permits a Markdown lifecycle
-fallback, an unapproved secret path or destructive/hosted mutation.
+Role identity never proves host capability. Privileged execution requires a broker-admitted
+immutable intent, destination acknowledgement when ownership changes, and an exact artifact
+manifest under the [routing contract](docs/process/hito-task-and-role-routing.md#ivan-operator-profile-and-capability-broker).
+A missing capability may re-home the unchanged operation once; Task identity, source owner, scope
+and authority do not move, and repeated role retries or a Markdown lifecycle fallback are forbidden.
 
 Local lifecycle access uses process-local Node loading from
 `/Users/ivan/.config/hito/notion.env`. Never inspect, print, commit, copy, expose or log its secret;
-Vercel is not its dependency. Missing access on an already admitted Task follows the execution-host
-recovery rule above and never authorizes Markdown lifecycle writes.
+Vercel is not its dependency. Missing access follows the broker stop/re-home protocol and never
+authorizes Markdown lifecycle writes.
 
 Core owners: [`PRODUCT`](agents/product.agent.md), [`ARCHITECT`](agents/architect.agent.md),
 [`FRONTEND`](agents/frontend.agent.md), [`BACKEND`](agents/backend.agent.md), and
 [`QA`](agents/qa.agent.md). Bounded specialists: [`RUNNING COACH`](agents/running-coach-agent.md) for
-training quality and [`DESIGNER`](agents/designer.agent.md) for design decisions. [`DESIGN SYSTEM
-INTEGRATION`](agents/design-system-integration.agent.md) is Figma-only and never owns runtime source.
+training quality, [`DESIGNER`](agents/designer.agent.md) for design decisions and [`MARKETING
+MANAGER`](agents/marketing-manager.agent.md) for market, audience and positioning research. [`DESIGN
+SYSTEM INTEGRATION`](agents/design-system-integration.agent.md) is Figma-only and never owns runtime source.
 Work at the first incorrect owner; do not silently implement another role's work or delegate
 same-role implementation.
 

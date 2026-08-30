@@ -7,7 +7,7 @@ Priority: highest
 Owner: BACKEND
 Epic: platform-and-operations
 Parent: [Hito Modular Monolith Domain-Boundary Transformation Implementation](./2026-08-18-hito-modular-monolith-domain-boundary-transformation-implementation.md)
-Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md), [Hito Workout Sidebar Week Summary And Latest Insight](./2026-08-15-hito-workout-sidebar-week-summary-and-latest-insight.md)
+Evidence From: [Hito Modular Monolith Domain-Boundary Transformation](../../plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md), [Hito Workout Sidebar Week Summary And Latest Insight](./2026-08-15-hito-workout-sidebar-week-summary-and-latest-insight.md)
 
 ## Scope
 

@@ -21,7 +21,7 @@ reuse historical sources, and receive a truthful Evidence and Progress experienc
 continuation is a separate Product decision only after those two completed epics.
 
 The supporting roadmap is
-[Runner Product Readiness And Progressive Materialization Roadmap](../../plans/active/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md).
+[Runner Product Readiness And Progressive Materialization Roadmap](../../plans/archive/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md).
 
 ## Accepted Direction
 

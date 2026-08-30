@@ -6,7 +6,7 @@ Type: Tracked
 Priority: highest
 Owner: ARCHITECT
 Epic: platform-and-operations
-Parent: [Hito Product Roadmap: Runner Core, Adaptive Blueprint Planning, And Commercial Readiness](../../plans/active/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md)
+Parent: [Hito Product Roadmap: Runner Core, Adaptive Blueprint Planning, And Commercial Readiness](../../plans/archive/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md)
 Evidence From: [Hito Product Domain Boundaries And Efficient Delivery Architecture Audit](./2026-08-18-hito-product-domain-boundaries-and-efficient-delivery-architecture-audit.md)
 
 ## Scope
@@ -42,7 +42,7 @@ then have its execution proceed autonomously.
   validation.
 - The active roadmap already records the modular-monolith direction as the accepted architecture.
 - The implementation-ready supporting plan is
-  [Hito Modular Monolith Domain-Boundary Transformation](../../plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md).
+  [Hito Modular Monolith Domain-Boundary Transformation](../../plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md).
 
 ## Observed Behavior
 
@@ -92,7 +92,7 @@ Task: Hito Modular Monolith Domain-Boundary Transformation Plan
 Stage: Architecture-plan authoring before Product approval
 Mode: Tracked
 Canonical item: docs/tasks/backlog/2026-08-18-hito-modular-monolith-domain-boundary-transformation-plan.md
-Roadmap: docs/plans/active/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md
+Roadmap: docs/plans/archive/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md
 Evidence: docs/tasks/backlog/2026-08-18-hito-product-domain-boundaries-and-efficient-delivery-architecture-audit.md
 
 Ivan explicitly authorized autonomous plan authoring, but not implementation. Read AGENTS.md,
@@ -170,7 +170,7 @@ Task: Hito Workout Detail Sidebar Public Contract Isolation
 Stage: Phase 1 of the approved modular-monolith domain-boundary transformation
 Mode: Tracked
 Parent architecture item: docs/tasks/backlog/2026-08-18-hito-modular-monolith-domain-boundary-transformation-plan.md
-Supporting plan: docs/plans/active/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md
+Supporting plan: docs/plans/archive/2026-08-18-hito-modular-monolith-domain-boundary-transformation.md
 
 Read AGENTS.md, agents/backend.agent.md, skills/hito-backend-supabase-contract/SKILL.md, the
 canonical implementation item created by PRODUCT, the supporting plan's Phase 1, and the completed

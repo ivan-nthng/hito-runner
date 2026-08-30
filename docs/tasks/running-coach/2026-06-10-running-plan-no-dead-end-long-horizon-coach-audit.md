@@ -6,10 +6,10 @@ Status: historical audit; superseded by anti-flatness repair acceptance
 Stage: RUNNING COACH audit / no-dead-end long-horizon quality check
 
 Doctrine digest:
-`/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/running-coach-doctrine-digest.md`
+`docs/tasks/running-coach/running-coach-doctrine-digest.md`
 
 Primary doctrine:
-`/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-10-running-plan-universal-no-dead-end-doctrine.md`
+`docs/tasks/running-coach/2026-06-10-running-plan-universal-no-dead-end-doctrine.md`
 
 ## High-Level Verdict
 

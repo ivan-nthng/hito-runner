@@ -1,47 +1,46 @@
 # Glossary
 
-## Core Terms
+## Authority
 
-- `baseline import`
-  the imported `adaptive-run-coach` TanStack Start frontend brought into this repo with minimal structural churn
-- `preview surface`
-  a visible route or panel that preserves layout and flow continuity while intentionally remaining outside trusted saved runner truth
-- `honest stabilization`
-  copy, metadata, and state corrections that remove misleading claims while preserving the imported UI baseline
-- `data seam`
-  the canonical module boundary where preview data and persisted backend data are normalized into one shared contract
+- **Task:** one outcome in the `Hito Running` Notion database with one current owner. Markdown may
+  hold its technical contract but never its live lifecycle.
+- **technical truth:** current Product/System documents, task-linked contracts, plans, runbooks and
+  evidence in the repository.
+- **runtime truth:** authenticated persisted facts owned by Supabase and server domain contracts.
+- **preview:** intentionally untrusted and non-persisting product demonstration state.
+- **unavailable:** a capability or fact whose required evidence/implementation is absent; never a
+  synonym for zero or a cue to infer data.
 
-## Status Terms
+## Product Entities
 
-- `on track`
-  user-facing week state indicating the current week still holds together as planned
-- `partially off track`
-  user-facing week state indicating some work was shortened or missed
-- `needs reset`
-  user-facing week state indicating the current week should no longer be followed blindly
-- `preview`
-  intentionally not trusted and not saved as runner history
-- `saved mode`
-  authenticated mode where calendar workouts, logs, and week status are backed by persisted
-  backend truth
+- **runner profile:** identity-owned baseline, locale, timezone and explicit stable constraints.
+- **source artifact:** AI, file, template or manual proposal retained as immutable provenance and
+  history; never the current Calendar container.
+- **WorkoutDocument:** canonical structured prescription vocabulary used by authoring, review and
+  confirmed Calendar content.
+- **Saved plan review:** durable owner-bound reviewed candidate that may be restored into a fresh
+  Review; it is not a Calendar workout.
+- **calendar workout:** independently runner-owned scheduled prescription created by explicit
+  confirmation.
+- **Blueprint projection:** non-workout future intent such as phase, family, cadence and review
+  timing; it cannot receive Calendar actions or evidence.
+- **result/evidence:** attributable manual or imported facts about what happened; never alternate
+  prescription authority.
+- **runner activity:** provider-neutral activity identity with immutable source and revision
+  lineage.
+- **factual projection:** versioned, attributable read model with explicit missingness; it can be
+  rebuilt only under its original meaning and parity rules.
+- **Training Decision:** server-owned deterministic policy that turns Blueprint, factual progress,
+  explicit check-in/preferences and constraints into an authoring brief or no-prescription state.
 
-## Entity Terms
+## Ownership Terms
 
-- `runner_profile`
-  persisted record for goal, baseline, and setup state
-- `plan source`
-  an AI-generated, imported, or manual artifact used to propose initial workout placement; retained
-  as provenance and history, not as a calendar container
-- `calendar workout`
-  one independently scheduled workout owned by the runner after confirmation
-- `workout_log`
-  persisted result recorded against a calendar workout
-- `week_status`
-  backend-derived weekly state shown to the user from workout execution
-
-## Trusted Output Terms
-
-- `trusted product output`
-  authenticated, persisted, backend-owned runner data that the product can safely present as truth
-- `sample plan`
-  imported mock workout data still used only for the signed-out preview path
+- **Product owner:** PRODUCT owns policy, priority and final acceptance.
+- **system/domain owner:** the sole server or repository boundary allowed to decide and persist a
+  class of facts.
+- **presentation owner:** the Frontend lane that renders a public domain contract without becoming
+  its data writer.
+- **provenance:** immutable origin and lineage retained for audit/history, not current lifecycle
+  permission.
+- **legacy implementation fact:** a retained physical name or seam that may still be required but
+  has no authority for new behavior.

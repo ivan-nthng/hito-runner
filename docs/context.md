@@ -1,79 +1,37 @@
 # Project Context
 
-## Project Purpose
+Hito Running helps ordinary runners create, organise, complete and understand a personal calendar
+of workouts without pretending to have evidence that is missing.
 
-Hito Running is a runner-calendar product focused on one clear promise: help a runner
-understand the current week, open today's workout quickly, and stay oriented without
-fake coaching authority.
+## Product Pipeline
 
-## Current Pipeline Summary
+`identity/profile → reviewed source or WorkoutDocument → explicit confirmation → runner-owned Calendar workout → Result/Evidence → factual Progress`
 
-The implemented repo now operates as:
+- Signed-out preview is visibly untrusted and never becomes saved history without an authenticated
+  reviewed action.
+- AI, file import, templates and manual entry supply initial content. Origin is immutable
+  provenance, not a second workout type or lifecycle owner.
+- Confirmation materialises independent Calendar workouts. Plans and Blueprints remain source or
+  history and never control current Calendar actions.
+- Results, FIT evidence and runner input remain attributable facts. Missing or unavailable evidence
+  is not inferred by UI or AI.
 
-`preview access or magic-link auth -> runner profile onboarding -> reviewed source proposal -> independently scheduled workouts -> workout log mutation -> backend-derived week status -> preserved preview shells for later surfaces`
+## Enduring Entities
 
-The imported UI baseline still exists as a read-only preview for signed-out users, but trusted runner truth now starts only after authentication and persisted backend state.
+- **Runner profile:** identity-owned baseline, locale, timezone and stable preferences.
+- **Source artifact:** reviewed proposal and immutable provenance.
+- **WorkoutDocument:** canonical prescription vocabulary used for review and authoring.
+- **Calendar workout:** confirmed runner-owned scheduled prescription.
+- **Result/Evidence:** runner-authored and provider-neutral factual outcome history.
+- **Activity/Profile projections:** versioned factual read models; never alternate prescription
+  authority.
 
-## Major Entities
+## Runtime Boundary
 
-- `runner_profile`
-  persisted goal, baseline, and setup record keyed to one authenticated user
-- `plan source`
-  an AI-generated, imported, or manual source artifact used to propose initial workout placement;
-  it remains provenance/history after confirmation
-- `calendar workout`
-  a persisted scheduled workout independently owned by the runner after it is materialised
-- `workout_log`
-  persisted result for completed, partial, or skipped workouts
-- `week_status`
-  backend-derived weekly state shown to the user from persisted workout truth
+Hito is one TanStack Start React application backed by Supabase Auth, Postgres and private Storage,
+with one Vercel/Nitro deployment path. Route facades transport authenticated requests to focused
+domain owners; they are not shared business models. Detailed ownership and unavailable capabilities
+live in [current-system.md](current-system.md).
 
-## Trusted Output Boundary
-
-Trusted product output now includes:
-
-- authenticated runner identity
-- persisted runner profile
-- persisted calendar workouts
-- persisted workout logs
-- backend-derived week status
-
-Signed-out preview mode remains intentionally outside the trusted product boundary.
-
-## Runtime And Storage Terms
-
-- runtime:
-  one TanStack Start app at the repo root
-- storage:
-  Supabase auth plus persisted Postgres tables for profile, legacy plan-source storage,
-  scheduled workouts, and workout logs
-- seam:
-  one canonical data seam in `src/lib/training.ts` with backend loading through `src/lib/training-api.ts`
-- env:
-  `.env.example` defines the Supabase contract with `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and server-only `SUPABASE_SECRET_KEY`; legacy aliases are not accepted
-
-## Important Constraints
-
-- preserve imported layout, styles, motion, and route structure unless honesty or contract safety requires change
-- keep one canonical backend truth path for profile, calendar workouts, workout logs, and week status
-- keep preview mode visibly separate from authenticated saved mode
-- keep secrets server-only and do not expose service-role access to the client
-- keep session refresh server-validated in request middleware so cookie-backed auth stays current across SSR requests
-
-## Key Routes And Surfaces
-
-- `/`
-  weekly calendar home with preview fallback, onboarding gate for authenticated users without a
-  profile, and persisted workout schedule for authenticated users with setup complete
-- `/login`
-  magic-link entry point for saved mode
-- `/api/auth/confirm`
-  auth callback route that exchanges the Supabase code for a cookie-backed session
-- `/workout/$date`
-  workout detail and result logging surface backed by preview or persisted data through the same contract
-- `/progress`
-  preserved analytics shell now able to read persisted aggregates from the canonical seam
-- `/body`
-  legacy path that now redirects to `/` because body notes belong to workout logging, not a standalone surface
-- `/integrations`
-  preserved integration-preview shell
+The `Hito Running` Notion database owns operational lifecycle. Markdown owns technical truth, Git
+owns code history and Supabase owns runtime truth.

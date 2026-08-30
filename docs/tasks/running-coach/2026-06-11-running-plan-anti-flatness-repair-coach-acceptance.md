@@ -6,13 +6,13 @@ Status: accepted historical repair evidence
 Stage: RUNNING COACH acceptance / long-horizon anti-flatness repair
 
 Doctrine digest:
-`/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/running-coach-doctrine-digest.md`
+`docs/tasks/running-coach/running-coach-doctrine-digest.md`
 
 Previous audit:
-`/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-10-running-plan-no-dead-end-long-horizon-coach-audit.md`
+`docs/tasks/running-coach/2026-06-10-running-plan-no-dead-end-long-horizon-coach-audit.md`
 
 Primary doctrine:
-`/Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/running-coach/2026-06-10-running-plan-universal-no-dead-end-doctrine.md`
+`docs/tasks/running-coach/2026-06-10-running-plan-universal-no-dead-end-doctrine.md`
 
 ## High-Level Verdict
 

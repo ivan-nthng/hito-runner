@@ -142,7 +142,7 @@ ROLE: ARCHITECT
 Task: Hito Adaptive Blueprint Engine — Blueprint Projection And Continuation Boundary
 Mode: Tracked, read-only architecture discovery
 Canonical item: /Users/ivan/Developer/hito-running/docs/tasks/backlog/2026-08-18-hito-adaptive-blueprint-four-week-detail-engine.md
-Roadmap: /Users/ivan/Developer/hito-running/docs/plans/active/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md
+Roadmap: /Users/ivan/Developer/hito-running/docs/plans/archive/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md
 
 Read AGENTS.md, agents/architect.agent.md, skills/hito-architecture-audit/SKILL.md, the canonical
 item, the modular-monolith domain plan, and only the existing source authoring/provenance, Runner

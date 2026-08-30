@@ -139,7 +139,7 @@ decision; do not claim implementation, browser, QA, hosted, release, or deployme
 
 Primary current contracts inspected:
 
-- [Runner Core roadmap detail](../../plans/active/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md)
+- [Runner Core roadmap detail](../../plans/archive/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md)
 - [Progress Product specification](../frontend-specs/2026-08-02-runner-activity-history-and-explainable-progress-experience.md)
 - [Runner Activity Intelligence formula policy](../running-coach/2026-08-02-runner-activity-intelligence-formula-policy-amendment.md)
 - [Runner Profile Constitution](../running-coach/2026-07-30-hito-runner-profile-constitution.md)

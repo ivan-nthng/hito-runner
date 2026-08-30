@@ -311,7 +311,7 @@ Stage:
 FRONTEND implementation / local inspector DS audit tool.
 
 Spec:
-Read /Users/ivan/Library/Mobile Documents/com~apple~CloudDocs/4-web/hito-running/docs/tasks/frontend-specs/2026-07-09-local-inspector-ds-audit-tool-contract.md.
+Read docs/tasks/frontend-specs/2026-07-09-local-inspector-ds-audit-tool-contract.md.
 
 Context:
 The local inspector should help Product/Design/Frontend select a UI element, inspect real layout and typography evidence, align custom values to Hito DS tokens, and generate a precise local-only Frontend prompt. It is not a live editor and not a backlog/Admin/Supabase persistence tool.

@@ -26,7 +26,7 @@ runner-core-readiness
 
 ## Parent
 
-[Runner Core Roadmap](../../plans/active/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md)
+[Runner Core Roadmap](../../plans/archive/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md)
 
 ## Evidence From
 

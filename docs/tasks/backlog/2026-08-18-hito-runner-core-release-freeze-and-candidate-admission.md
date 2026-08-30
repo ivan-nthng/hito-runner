@@ -6,7 +6,7 @@ Type: Tracked
 Priority: highest
 Owner: BACKEND
 Epic: platform-and-operations
-Parent: [Hito Product Roadmap: Runner Core, Adaptive Blueprint Planning, And Commercial Readiness](../../plans/active/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md)
+Parent: [Hito Product Roadmap: Runner Core, Adaptive Blueprint Planning, And Commercial Readiness](../../plans/archive/2026-08-15-hito-runner-product-readiness-and-progressive-materialization-roadmap.md)
 Evidence From: [Runner Core Local Schema Parity Gate](./2026-08-18-hito-runner-core-local-schema-parity-gate.md), [Runner Core Post-Parity Independent Local QA](./2026-08-18-hito-runner-core-post-parity-independent-qa.md), [Runner Core Release-Candidate Cleanup And Closure Audit](./2026-08-17-hito-runner-core-release-candidate-cleanup-and-closure-audit.md)
 
 ## Scope

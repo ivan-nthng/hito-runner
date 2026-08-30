@@ -22,7 +22,7 @@ import {
 
 export const AI_AUTHORED_PLAN_FIRST_CONTRACT_VERSION = "adaptive-blueprint-four-week-v1" as const;
 export const AI_AUTHORED_PLAN_FIRST_PROVIDER_CONTRACT_VERSION =
-  "adaptive-blueprint-four-week-direct-v35" as const;
+  "adaptive-blueprint-four-week-direct-v36" as const;
 export const AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME =
   "hito_adaptive_blueprint_four_week_v1" as const;
 export const AI_AUTHORED_PLAN_FIRST_PACE_MIN_PER_KM_PATTERN =
@@ -498,21 +498,26 @@ export function buildAiAuthoredPlanFirstOpenAiSchema(authoringInput: StructuredP
       return guidance && guidance.minBpm < guidance.maxBpm ? [guidance.canonicalReference] : [];
     },
   );
+  const paceTargetsAllowed = resolveAiAuthoredPaceProvenance(authoringInput) === "benchmark_backed";
   const target = {
     anyOf: [
-      {
-        type: "object",
-        additionalProperties: false,
-        required: ["primary_execution_mode", "command"],
-        properties: {
-          primary_execution_mode: { type: "string", const: "pace" },
-          command: {
-            type: "string",
-            minLength: 7,
-            maxLength: 24,
-          },
-        },
-      },
+      ...(paceTargetsAllowed
+        ? [
+            {
+              type: "object",
+              additionalProperties: false,
+              required: ["primary_execution_mode", "command"],
+              properties: {
+                primary_execution_mode: { type: "string", const: "pace" },
+                command: {
+                  type: "string",
+                  minLength: 7,
+                  maxLength: 24,
+                },
+              },
+            },
+          ]
+        : []),
       ...(heartRateReferences.length > 0
         ? [
             {
@@ -917,7 +922,7 @@ export function buildAiAuthoredPlanFirstPrompt({
       : null;
   const paceAuthorityInstruction =
     paceProvenance === "no_benchmark_ai_estimate"
-      ? "No factual executable pace authority is available: runner.benchmark and goal.target_finish_time are both null. Do not author target.primary_execution_mode=pace anywhere. Use a complete accepted heart-rate band only where heart rate can govern the duration. Short work repeats use controlled_short_repetition or controlled_stride and their fixed-duration recovery children use controlled_short_recovery; uphill work/downhill recovery use their explicit terrain-safe effort targets. Never invent pace from age, fitness level, distance, or generic coaching norms."
+      ? "No independently eligible factual executable pace authority is available. goal.target_finish_time and goal.target_outcome_pace are aspirational goal metadata only, and goal.metric_truth_policy.segmentPaceTargetsAllowedFromGoal=false. Do not author target.primary_execution_mode=pace anywhere. Use a complete accepted heart-rate band only where heart rate can govern the duration. Short work repeats use controlled_short_repetition or controlled_stride and their fixed-duration recovery children use controlled_short_recovery; uphill work/downhill recovery use their explicit terrain-safe effort targets. Never invent pace from age, fitness level, selected distance, target finish time, outcome pace, or generic coaching norms."
       : `For target.primary_execution_mode=pace, command is exactly one M:SS/km or M:SS-M:SS/km value. Hito classifies its factual provenance as ${paceProvenance} from the signed runner context and never derives the pace value.`;
   const controlledTempoExecutionInstruction =
     paceProvenance === "no_benchmark_ai_estimate"
@@ -1010,7 +1015,6 @@ export function resolveAiAuthoredPaceProvenance(
   authoringInput: StructuredPlanAuthoringInput,
 ): AiAuthoredPaceProvenance {
   if (authoringInput.runnerFacts.benchmark) return "benchmark_backed";
-  if (authoringInput.planGoalIntent.targetFinishTime) return "goal_informed_ai_estimate";
   return "no_benchmark_ai_estimate";
 }
 

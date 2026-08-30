@@ -39,6 +39,7 @@ import {
   buildReviewedAiGeneratedRunningPlanPreview as buildReviewedAiGeneratedRunningPlanPreviewRuntime,
   type RunningPlanPreviewActionInput,
 } from "../src/lib/running-plan-engine-actions";
+import { normalizePlanGoalIntent } from "../src/lib/plan-creation-engine/plan-goal-intent";
 import { buildProofRunnerCapability } from "./runner-plan-capability-proof-helpers";
 
 const authoringInput = buildAiGeneratedRunningPlanQaFixtureAuthoringInput("2026-08-21");
@@ -135,6 +136,43 @@ export async function validatePlanFirstProviderRepresentationContract() {
   );
   assert.match(prompt.systemPrompt, /runner\.benchmark_relative_quality_safety is not null/);
   assert.match(prompt.systemPrompt, /RPE max N\/10/);
+  assert.match(
+    JSON.stringify(prompt.responseSchema),
+    /"primary_execution_mode":\{"type":"string","const":"pace"\}/,
+    "An independently eligible runner benchmark must keep pace representable.",
+  );
+
+  const aspirationalGoalIntent = normalizePlanGoalIntent({
+    rawIntent: {
+      distance: { kind: "preset", preset: "10K" },
+      targetDate: authoringInput.planGoalIntent.targetDate,
+      targetFinishTime: "55:00",
+    },
+    startDate: authoringInput.schedule.startDate,
+  });
+  assert.equal(aspirationalGoalIntent.ok, true);
+  if (!aspirationalGoalIntent.ok) throw new Error(aspirationalGoalIntent.message);
+  const aspirationalGoalInput = structuredClone(authoringInput);
+  aspirationalGoalInput.runnerFacts.benchmark = null;
+  aspirationalGoalInput.planGoalIntent = aspirationalGoalIntent.intent;
+  const aspirationalGoalPrompt = buildAiAuthoredPlanFirstPrompt({
+    authoringInput: aspirationalGoalInput,
+  });
+  assert.equal(aspirationalGoalInput.runnerCapability.performanceEvidence.state, "unavailable");
+  assert.equal(
+    aspirationalGoalInput.planGoalIntent.metricTruthPolicy.segmentPaceTargetsAllowedFromGoal,
+    false,
+  );
+  assert.doesNotMatch(
+    JSON.stringify(aspirationalGoalPrompt.responseSchema),
+    /"primary_execution_mode":\{"type":"string","const":"pace"\}/,
+    "An aspirational finish time without performance evidence must make pace unrepresentable.",
+  );
+  assert.match(
+    aspirationalGoalPrompt.systemPrompt,
+    /target_finish_time and goal\.target_outcome_pace are aspirational goal metadata only/,
+  );
+  assert.match(aspirationalGoalPrompt.systemPrompt, /segmentPaceTargetsAllowedFromGoal=false/);
   const promptPayload = JSON.parse(prompt.userPrompt) as {
     runnerFacts: {
       calendar: {
@@ -768,7 +806,7 @@ async function validateBeginnerZeroHistoryQualityBoundary() {
         };
       };
     };
-    assert.equal(payload.providerContractVersion, "adaptive-blueprint-four-week-direct-v35");
+    assert.equal(payload.providerContractVersion, "adaptive-blueprint-four-week-direct-v36");
     assert.equal(payload.runnerFacts.calendar.requested_workouts_per_full_week, null);
     assert.deepEqual(payload.runnerFacts.calendar.allowed_running_weekdays, [
       "Monday",
@@ -900,8 +938,8 @@ async function validateBeginnerZeroHistoryQualityBoundary() {
     "Half Marathon and Marathon must differ materially inside the detailed block.",
   );
   return {
-    providerContract: "adaptive-blueprint-four-week-direct-v35",
-    compiler: "adaptive_blueprint_compiler_v16",
+    providerContract: "adaptive-blueprint-four-week-direct-v36",
+    compiler: "adaptive_blueprint_compiler_v17",
     goals: scenarios.map((scenario) => scenario.goal),
     providerRequestsPerGoal: 1,
     providerDispatches: 0,

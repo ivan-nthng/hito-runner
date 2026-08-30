@@ -85,6 +85,7 @@ import {
 } from "../src/lib/running-plan-engine-review";
 import { base64UrlDecodeUtf8 } from "../src/lib/review-token-signing";
 import { selectedDistanceEndpointMainDistanceMeters } from "../src/lib/plan-creation-engine";
+import { normalizePlanGoalIntent } from "../src/lib/plan-creation-engine/plan-goal-intent";
 import { GENERATED_PLAN_RUNNER_COMMENT_MAX_LENGTH } from "../src/lib/structured-plan-authoring-schema";
 import { addDaysIso, startOfWeekIso } from "../src/lib/training";
 import type { Database, Json } from "../src/lib/supabase/database";
@@ -1194,7 +1195,7 @@ async function validateRunnerPlanCommentContract() {
   );
   assert.equal(
     validProviderContext.providerContractVersion,
-    "adaptive-blueprint-four-week-direct-v35",
+    "adaptive-blueprint-four-week-direct-v36",
   );
   assert.equal(validProviderContext.runnerFacts.calendar.detailed_block_end_date, "2026-08-02");
   assert.equal(
@@ -1816,6 +1817,15 @@ async function validateFaithfulPlanFirstAtomization() {
   );
   assert.equal(resolved.ok, true, resolved.ok ? "" : resolved.message);
   if (!resolved.ok) throw new Error(resolved.message);
+  const benchmarkBackedPrompt = buildAiAuthoredPlanFirstPrompt({
+    authoringInput: resolved.authoringInput,
+    today: resolved.authoringInput.schedule.startDate,
+  });
+  assert.match(
+    JSON.stringify(benchmarkBackedPrompt.responseSchema),
+    /"primary_execution_mode":\{"type":"string","const":"pace"\}/,
+    "An independently eligible runner benchmark must keep executable pace representable.",
+  );
 
   const heartRateZone = resolved.authoringInput.runnerFacts.heartRateProfile.zones.find(
     (candidate) => candidate.reference === "Z2",
@@ -2969,14 +2979,38 @@ async function validateLocalDevFixtureAvailabilityGating() {
 
     const noPaceAuthorityInput = structuredClone(fixtureAuthoringInput);
     noPaceAuthorityInput.runnerFacts.benchmark = null;
-    noPaceAuthorityInput.planGoalIntent.targetFinishTime = null;
-    noPaceAuthorityInput.planGoalIntent.targetOutcomePace = null;
+    const aspirationalGoalIntent = normalizePlanGoalIntent({
+      rawIntent: {
+        distance: { kind: "preset", preset: "10K" },
+        targetDate: noPaceAuthorityInput.planGoalIntent.targetDate,
+        targetFinishTime: "55:00",
+      },
+      startDate: noPaceAuthorityInput.schedule.startDate,
+    });
+    assert.equal(aspirationalGoalIntent.ok, true);
+    if (!aspirationalGoalIntent.ok) throw new Error(aspirationalGoalIntent.message);
+    noPaceAuthorityInput.planGoalIntent = aspirationalGoalIntent.intent;
     noPaceAuthorityInput.availability.maxRunningDaysPerWeek = null;
+    assert.equal(noPaceAuthorityInput.runnerCapability.performanceEvidence.state, "unavailable");
+    assert.equal(
+      noPaceAuthorityInput.planGoalIntent.metricTruthPolicy.segmentPaceTargetsAllowedFromGoal,
+      false,
+    );
+    const noPaceAuthorityPrompt = buildAiAuthoredPlanFirstPrompt({
+      authoringInput: noPaceAuthorityInput,
+      today: noPaceAuthorityInput.schedule.startDate,
+    });
+    assert.doesNotMatch(
+      JSON.stringify(noPaceAuthorityPrompt.responseSchema),
+      /"primary_execution_mode":\{"type":"string","const":"pace"\}/,
+      "An aspirational goal without performance evidence must make pace unrepresentable to the provider.",
+    );
     assert.match(
-      buildAiAuthoredPlanFirstPrompt({
-        authoringInput: noPaceAuthorityInput,
-        today: noPaceAuthorityInput.schedule.startDate,
-      }).systemPrompt,
+      noPaceAuthorityPrompt.systemPrompt,
+      /target_finish_time and goal\.target_outcome_pace are aspirational goal metadata only/,
+    );
+    assert.match(
+      noPaceAuthorityPrompt.systemPrompt,
       /controlled_tempo_session without factual pace authority.*exact full accepted Z4 band.*Repeat recovery child longer than 1\.5 minutes.*exact full accepted Z2 band/s,
       "The provider contract must state the exact no-pace controlled-tempo work and recovery bands enforced by the compiler.",
     );
@@ -4501,13 +4535,13 @@ function assertNonRepeatTempoFixtureReviewTruth({
   assert.ok(work, `${scenarioName} continuous Tempo must include an authored Work segment.`);
   if (!work) return;
   assert.equal(work.prescription?.mode, "time");
-  assert.equal(work.target?.primary_execution_mode, "pace");
-  assert.equal(work.target?.pace, "5:40-5:55/km");
+  assert.equal(work.target?.primary_execution_mode, "heart_rate");
+  assert.match(work.target?.hr_bpm_range ?? "", /^\d+-\d+ bpm$/);
   assert.equal(work.guidance, "Keep the effort controlled at RPE max 7/10.");
   assert.equal(work.target?.intensity, undefined);
   assert.equal(work.target?.hint, undefined);
-  assert.equal(work.target?.extra?.hr_zone, undefined);
-  assert.equal(work.target?.hr_bpm_range, undefined);
+  assert.equal(work.target?.pace, undefined);
+  assert.equal(work.target?.extra?.hr_zone_reference, "Z4");
 
   const reviewRow = calendarRows.find((row) => row.rowId === tempo.workout_id);
   const reviewWork = reviewRow?.segments.find((segment) => segment.id === work.segment_id);

@@ -11,6 +11,7 @@ import {
   AI_AUTHORED_PLAN_FIRST_RESPONSE_SCHEMA_NAME,
   buildAiAuthoredFirstSessionAdaptationContext,
   resolveAiAuthoredPlanFirstDetailedEndDate,
+  resolveAiAuthoredPaceProvenance,
   type AiAuthoredPlanFirstCompilerDraft,
 } from "@/lib/ai-authored-plan-first-provider-contract";
 import {
@@ -497,9 +498,7 @@ export function buildAiGeneratedRunningPlanDevFixtureProviderDraft(
     throw new Error("Local plan-first fixture requires a runner-selected target date.");
   }
   const adaptationContext = buildAiAuthoredFirstSessionAdaptationContext(authoringInput);
-  const paceTargetsAllowed = Boolean(
-    authoringInput.runnerFacts.benchmark || authoringInput.planGoalIntent.targetFinishTime,
-  );
+  const paceTargetsAllowed = resolveAiAuthoredPaceProvenance(authoringInput) === "benchmark_backed";
   const targetDate = requestedTargetDate;
   const detailedEndDate = resolveAiAuthoredPlanFirstDetailedEndDate({ startDate, targetDate });
   const targetInDetailedHorizon = targetDate === detailedEndDate;

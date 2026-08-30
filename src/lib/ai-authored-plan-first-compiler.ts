@@ -64,7 +64,7 @@ type TargetExecutionContext = {
 };
 export const AI_AUTHORED_PLAN_FIRST_SOURCE_KIND = "adaptive_blueprint_four_week_v1" as const;
 export const AI_AUTHORED_BLUEPRINT_VERSION = "adaptive_blueprint_v1" as const;
-export const AI_AUTHORED_PLAN_FIRST_COMPILER_VERSION = "adaptive_blueprint_compiler_v16" as const;
+export const AI_AUTHORED_PLAN_FIRST_COMPILER_VERSION = "adaptive_blueprint_compiler_v17" as const;
 
 export interface AiAuthoredBlueprintSummary {
   version: typeof AI_AUTHORED_BLUEPRINT_VERSION;
@@ -1441,7 +1441,7 @@ function buildTarget(
         code: "ai_authored_plan_first_executable_pace_without_factual_authority",
         path,
         message:
-          "Executable pace requires a runner benchmark or explicit target finish time; generic AI-estimated pace is not factual authority.",
+          "Executable pace requires an independently eligible runner benchmark; target finish time and outcome pace are aspirational goal metadata only.",
       });
     }
     if (enforceContinuationExecutionPolicy) {

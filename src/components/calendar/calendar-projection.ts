@@ -7,7 +7,6 @@ import type {
   HitoCalendarWorkoutIdentity,
 } from "@/components/ui/hito-calendar-day";
 import { feedbackMarkerMeta } from "@/components/workout-feedback-marker-presentation";
-import type { BlueprintCalendarProjectionStatus } from "@/lib/adaptive-blueprint-product-contract";
 import {
   buildPlannedWorkoutLanguage,
   type PlannedWorkoutLanguageInput,
@@ -39,18 +38,6 @@ export type CalendarDaySurfacePresentation = {
 };
 
 export type CalendarDaySlotLayout = "mobile" | "month" | "week";
-
-const BLUEPRINT_PROJECTION_STATUS_LABELS: Record<BlueprintCalendarProjectionStatus, string> = {
-  planned: "Planned · details closer to the date",
-  check_in_needed: "Check-in needed",
-  evidence_incomplete: "Evidence incomplete",
-  ready_for_review: "Ready for review",
-  awaiting_runner_confirmation: "Awaiting runner confirmation",
-};
-
-export function blueprintProjectionStatusLabel(status: BlueprintCalendarProjectionStatus) {
-  return BLUEPRINT_PROJECTION_STATUS_LABELS[status];
-}
 
 export type CalendarOptimisticMoveDisplay = {
   requestId: string;

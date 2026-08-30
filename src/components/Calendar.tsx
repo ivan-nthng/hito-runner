@@ -23,7 +23,6 @@ import {
   buildCalendarDayProjection,
   buildRestCalendarDayPresentation,
   buildWorkoutCalendarDayPresentation,
-  blueprintProjectionStatusLabel,
   calendarMoveTargetAction,
   calendarMoveUndoAction,
   resolveCalendarMoveDateRender,
@@ -31,11 +30,6 @@ import {
   type CalendarDaySurfacePresentation,
   type CalendarDaySlotLayout,
 } from "@/components/calendar/calendar-projection";
-import type {
-  AdaptiveBlueprintCalendarReadModel,
-  BlueprintCalendarProjection,
-  BlueprintCalendarProjectionStatus,
-} from "@/lib/adaptive-blueprint-product-contract";
 import {
   manualMoveSourceDragProps,
   manualMoveTargetDragProps,
@@ -60,7 +54,6 @@ import {
 } from "@/components/manual-workout/ManualWorkoutAuthoringControls";
 import { ManualWorkoutMoveController } from "@/components/manual-workout/ManualWorkoutMoveControls";
 import { CalendarOverflowActions } from "@/components/calendar/CalendarOverflowActions";
-import { AdaptiveContinuationPanel } from "@/components/calendar/AdaptiveContinuationPanel";
 import {
   UnplannedActivityWorkflow,
   type UnplannedActivityWorkflowEntry,
@@ -83,12 +76,10 @@ const TOOLTIP_VIEWPORT_MARGIN = 12;
 const TOOLTIP_ANCHOR_GAP = 10;
 
 export function Calendar({
-  blueprintReadModel,
   snapshot,
   runnerScopeKey,
   localActivityFileDesignFixtureEnabled = false,
 }: {
-  blueprintReadModel: AdaptiveBlueprintCalendarReadModel;
   snapshot: TrainingSnapshot;
   runnerScopeKey: string | null | undefined;
   localActivityFileDesignFixtureEnabled?: boolean;
@@ -209,16 +200,6 @@ export function Calendar({
         </div>
       </div>
 
-      <AdaptiveContinuationPanel
-        continuation={blueprintReadModel.continuation}
-        projections={blueprintReadModel.projections}
-        onRefresh={() => router.invalidate({ sync: true })}
-      />
-
-      {blueprintReadModel.projections.length > 0 ? (
-        <BlueprintProjectionReadback projections={blueprintReadModel.projections} />
-      ) : null}
-
       {view === "month" ? (
         <>
           <div className="hidden border-b border-hairline lg:block">
@@ -282,98 +263,6 @@ export function Calendar({
       />
     </div>
   );
-}
-
-function BlueprintProjectionReadback({
-  projections,
-}: {
-  projections: BlueprintCalendarProjection[];
-}) {
-  const locale = useHitoUiLocale();
-  const message = useHitoProductMessage();
-  return (
-    <section className="mb-6 min-w-0" aria-labelledby="future-blueprint-title">
-      <div className="mb-4">
-        <h2 id="future-blueprint-title" className="hito-ui-title-md text-foreground">
-          {message("Future training blueprint")}
-        </h2>
-        <p className="hito-body-sm mt-1 max-w-2xl text-text-secondary">
-          {message(
-            "These are provisional intentions, not confirmed Calendar workouts. Details will be reviewed closer to the date.",
-          )}
-        </p>
-      </div>
-
-      <ul className="hito-row-group" aria-label={message("Future Blueprint projections")}>
-        {projections.map((projection) => {
-          const statusLabel = getHitoKnownProductMessage(
-            locale,
-            blueprintProjectionStatusLabel(projection.status),
-          );
-
-          return (
-            <li
-              key={`${projection.blueprint.id}:${projection.projectionId}`}
-              className="hito-list-row min-w-0 items-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              tabIndex={0}
-              data-blueprint-projection=""
-              data-blueprint-projection-status={projection.status}
-              aria-label={`${formatUiDate(projection.date, locale, {
-                weekday: "long",
-                month: "long",
-                day: "numeric",
-              })}. ${formatBlueprintLabel(projection.workoutFamily)}. ${statusLabel}.`}
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <p className="hito-list-row-title min-w-0">
-                    {formatBlueprintLabel(projection.workoutFamily)}
-                  </p>
-                  <span
-                    className="hito-status-pill shrink-0"
-                    data-tone={blueprintProjectionStatusTone(projection.status)}
-                  >
-                    {statusLabel}
-                  </span>
-                </div>
-                <p className="hito-list-row-copy mt-1">
-                  {formatUiDate(projection.date, locale, {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                  {" · "}
-                  {formatBlueprintLabel(projection.phase)}
-                  {" · "}
-                  {message("{count} sessions per week", { count: projection.phaseCadence })}
-                </p>
-                <p className="hito-list-row-copy mt-1">{projection.goalAssumption}</p>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
-
-function blueprintProjectionStatusTone(status: BlueprintCalendarProjectionStatus) {
-  switch (status) {
-    case "planned":
-      return "muted" as const;
-    case "check_in_needed":
-    case "evidence_incomplete":
-      return "warning" as const;
-    case "ready_for_review":
-      return "signal" as const;
-    case "awaiting_runner_confirmation":
-      return "rollout" as const;
-  }
-}
-
-function formatBlueprintLabel(value: string) {
-  const normalized = value.trim().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
-  return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : value;
 }
 
 function CalendarTooltipLayer({

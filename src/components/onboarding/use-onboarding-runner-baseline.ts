@@ -2,11 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import type { StructuredConstructorState } from "@/components/onboarding/onboarding-form-model";
 import type { HeartRateProfileDraftState } from "@/components/settings/HeartRateProfileSection";
-import {
-  buildHeartRateZonesSummary,
-  type HeartRateZonesSummary,
-  type PersonalHeartRateProfileInput,
-} from "@/lib/heart-rate-zones";
+import { buildHeartRateZonesSummary, type HeartRateZonesSummary } from "@/lib/heart-rate-zones";
 import { runnerFacingHeartRateSaveError } from "@/components/settings/heart-rate-profile-errors";
 import { useHitoProductMessage } from "@/components/ui/hito-ui-locale-provider";
 import {
@@ -55,21 +51,14 @@ export function useOnboardingRunnerBaseline({
     setSummary((current) => current ?? buildHeartRateZonesSummary(input.age));
   }, [defaults, input, inputKey]);
 
-  const persist = async (heartRateProfile?: PersonalHeartRateProfileInput) => {
-    if (!input) {
-      setError(t("Add a valid age, height, weight, and running level first."));
-      return false;
-    }
-
+  const persist = async (persistenceInput: RunnerBaselineSaveInput) => {
+    const heartRateProfile = persistenceInput.heartRateProfile;
     setStatus("saving");
     setError(null);
 
     try {
       const result = await saveRunnerBaselineFn({
-        data: {
-          ...input,
-          ...(heartRateProfile ? { heartRateProfile } : {}),
-        },
+        data: persistenceInput,
       });
       const persistedBaselineKey = runnerBaselineKey(result.settings);
       setSummary(persistedBaselineKey ? result.settings.heartRateZones : null);
@@ -95,17 +84,22 @@ export function useOnboardingRunnerBaseline({
     }
   };
 
-  const persistHeartRateDraft = async () => {
+  const persistHeartRateDraft = async (baselineInput: RunnerBaselineSaveInput | null = input) => {
     if (!summary || !heartRateDraftState?.canSubmit) {
       setError(t("Check the highlighted BPM ranges before continuing."));
       return false;
     }
 
-    if (!heartRateDraftState.profileToPersist) {
-      return summary.accepted;
+    const persistenceInput = buildRunnerBaselinePersistenceInput(
+      baselineInput,
+      heartRateDraftState,
+    );
+    if (!persistenceInput) {
+      setError(t("Add a valid age, height, weight, and running level first."));
+      return false;
     }
 
-    return persist(heartRateDraftState.profileToPersist);
+    return persist(persistenceInput);
   };
 
   const applyRecommendedSummary = (recommendedSummary: HeartRateZonesSummary) => {
@@ -123,6 +117,7 @@ export function useOnboardingRunnerBaseline({
     clearError: () => setError(null),
     error,
     heartRateDraftState,
+    inputSnapshot: input,
     isReady,
     isSaving: status === "saving",
     onHeartRateDraftStateChange: setHeartRateDraftState,
@@ -132,6 +127,22 @@ export function useOnboardingRunnerBaseline({
       : `baseline-pending:${inputKey}`,
     recommendedAge: input?.age ?? null,
     summary,
+  };
+}
+
+export function buildRunnerBaselinePersistenceInput(
+  baselineInput: RunnerBaselineSaveInput | null,
+  heartRateDraftState: Pick<HeartRateProfileDraftState, "canSubmit" | "profileToPersist"> | null,
+): RunnerBaselineSaveInput | null {
+  if (!baselineInput || !heartRateDraftState?.canSubmit) {
+    return null;
+  }
+
+  return {
+    ...baselineInput,
+    ...(heartRateDraftState.profileToPersist
+      ? { heartRateProfile: heartRateDraftState.profileToPersist }
+      : {}),
   };
 }
 

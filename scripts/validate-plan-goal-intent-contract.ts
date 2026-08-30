@@ -27,6 +27,7 @@ import {
   buildRunningPlanPreviewInput,
   mapRunningPlanPreviewResultToAdmissionFailure,
 } from "../src/components/onboarding/selected-running-plan-flow-utils";
+import { buildRunnerBaselinePersistenceInput } from "../src/components/onboarding/use-onboarding-runner-baseline";
 import { buildReviewedAiFixtureResult as buildReviewedAiFixture } from "./lib/generated-plan-proof-fixture";
 
 const baseInput = {
@@ -153,6 +154,32 @@ function validateBrowserAdmissionBoundary() {
   assert.doesNotThrow(() => runningPlanPreviewInputSchema.parse(valid.input));
   assert.equal(valid.input.planGoalIntent.distance.kind, "preset");
   assert.equal(valid.input.planGoalIntent.targetDate, "2026-11-15");
+  assert.deepEqual(valid.baselineInput, {
+    age: 36,
+    heightCm: 178,
+    weightKg: 74,
+    fitnessLevel: "running_regularly",
+  });
+  assert.deepEqual(
+    buildRunnerBaselinePersistenceInput(valid.baselineInput, {
+      canSubmit: true,
+      profileToPersist: null,
+    }),
+    valid.baselineInput,
+    "An accepted unchanged HR draft must still persist the complete frozen runner baseline.",
+  );
+
+  validHalfMarathonState.age = "37";
+  assert.equal(
+    valid.input.age,
+    36,
+    "The preview request must remain the validated click snapshot.",
+  );
+  assert.equal(
+    valid.baselineInput.age,
+    36,
+    "Baseline persistence must use the same immutable click snapshot as preview.",
+  );
 
   const persistedBaselineMessage =
     "The saved runner baseline no longer matches these plan answers. Refresh the setup before creating a preview.";

@@ -146,7 +146,10 @@ export function useSelectedPlanPresetPreviewController({
     resetExternalState();
   }, [abortActivePreviewRequest, resetExternalState, setPreviewOpen, t]);
 
-  async function refreshPreview(goalIdOverride?: PlanGoalSelectionId) {
+  async function refreshPreview(
+    goalIdOverride?: PlanGoalSelectionId,
+    inputSnapshot?: RunningPlanPreviewActionInput,
+  ) {
     if (activePreviewRequestRef.current) {
       setPreviewOpen(true);
       return;
@@ -154,7 +157,9 @@ export function useSelectedPlanPresetPreviewController({
 
     const goalId = goalIdOverride ?? selectedGoalId;
 
-    const inputResult = buildRunningPlanPreviewInput(state, goalId);
+    const inputResult = inputSnapshot
+      ? ({ ok: true, input: inputSnapshot } as const)
+      : buildRunningPlanPreviewInput(state, goalId);
 
     if (!inputResult.ok) {
       applyAdmissionFailure(inputResult);
@@ -237,7 +242,10 @@ export function useSelectedPlanPresetPreviewController({
     }
   }
 
-  function selectPlanPreview(goalId: PlanGoalSelectionId) {
+  function selectPlanPreview(
+    goalId: PlanGoalSelectionId,
+    inputSnapshot?: RunningPlanPreviewActionInput,
+  ) {
     if (activePreviewRequestRef.current) {
       setPreviewOpen(true);
       return;
@@ -251,7 +259,9 @@ export function useSelectedPlanPresetPreviewController({
     setNotice(null);
     setRequestResult(null);
 
-    const inputResult = buildRunningPlanPreviewInput(state, goalId);
+    const inputResult = inputSnapshot
+      ? ({ ok: true, input: inputSnapshot } as const)
+      : buildRunningPlanPreviewInput(state, goalId);
 
     if (!inputResult.ok) {
       applyAdmissionFailure(inputResult);
@@ -259,7 +269,7 @@ export function useSelectedPlanPresetPreviewController({
     }
 
     setPreviewOpen(true);
-    void refreshPreview(goalId);
+    void refreshPreview(goalId, inputResult.input);
   }
 
   function validatePreviewRequest() {
@@ -275,7 +285,12 @@ export function useSelectedPlanPresetPreviewController({
     }
 
     setRequestResult(null);
-    return { ok: true, goalId: state.planGoalChoice } as const;
+    return {
+      ok: true,
+      goalId: state.planGoalChoice,
+      input: result.input,
+      baselineInput: result.baselineInput,
+    } as const;
   }
 
   useEffect(() => {

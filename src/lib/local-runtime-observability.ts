@@ -318,6 +318,46 @@ export async function writeLocalRuntimeEvent(
   return { event, written: true, relativePath };
 }
 
+export async function recordHitoRuntimeEvent(
+  input: LocalRuntimeEventInput,
+  options?: LocalRuntimeObservabilityOptions,
+): Promise<{ event: LocalRuntimeEvent; written: boolean; relativePath: string | null }> {
+  const result = await writeLocalRuntimeEvent(input, options);
+  if (result.written) {
+    return result;
+  }
+
+  const requestContext = getCurrentLocalRuntimeRequestContext();
+  const processLike = getProcessLike();
+  const runtimeUrl =
+    options?.runtimeUrl?.trim() ||
+    requestContext?.runtimeUrl ||
+    processLike?.env?.[LOCAL_RUNTIME_URL_ENV]?.trim();
+  if (!runtimeUrl || isLoopbackRuntimeUrl(runtimeUrl)) {
+    return result;
+  }
+
+  const { event } = result;
+  console.info(
+    "[hito-runtime-event]",
+    JSON.stringify({
+      artifactKind: "hito_production_safe_event_v1",
+      timestamp: event.timestamp,
+      category: event.category,
+      event: event.event,
+      status: event.status,
+      phase: event.phase,
+      outcomeCode: event.outcomeCode,
+      requestId: event.requestId,
+      route: event.route,
+      serverFunctionId: event.serverFunctionId,
+      diagnosticFields: event.diagnosticCodes,
+    }),
+  );
+
+  return result;
+}
+
 export async function writeLocalRuntimeArtifact(input: {
   category: string;
   filename: string;

@@ -66,6 +66,7 @@ import {
 } from "@/lib/running-plan-engine-review";
 import { digestSha256Hex, stableJsonEqual, stableJsonStringify } from "@/lib/review-token-signing";
 import { generatedPlanRunnerCommentInputSchema } from "@/lib/structured-plan-authoring-schema";
+import { recordHitoRuntimeEvent } from "@/lib/local-runtime-observability";
 import type { Json } from "@/lib/supabase/database";
 import { addDaysIso } from "@/lib/training";
 import { getUserSettingsForUserId } from "@/lib/user-settings-actions";
@@ -874,6 +875,7 @@ export async function buildReviewedAiGeneratedRunningPlanPreviewForUser(
     ? `${localQaFixtureCurrentDate}T12:00:00.000Z`
     : new Date().toISOString();
   let initialPlanFacts: Awaited<ReturnType<typeof getInitialPlanAuthoringFactsForUser>> = null;
+  let initialPlanFactsReadFailed = false;
   try {
     initialPlanFacts =
       userId && calendarDate
@@ -886,16 +888,36 @@ export async function buildReviewedAiGeneratedRunningPlanPreviewForUser(
         : null;
   } catch {
     initialPlanFacts = null;
+    initialPlanFactsReadFailed = true;
   }
 
-  const acceptedRequestFactsMatch = Boolean(
-    initialPlanFacts &&
-    initialPlanFacts.settings.age === data.age &&
-    initialPlanFacts.settings.heightCm === data.heightCm &&
-    initialPlanFacts.settings.weightKg === data.weightKg,
-  );
+  const mismatchedRunnerFactFields = initialPlanFacts
+    ? [
+        ...(initialPlanFacts.settings.age === data.age ? [] : ["age"]),
+        ...(initialPlanFacts.settings.heightCm === data.heightCm ? [] : ["height_cm"]),
+        ...(initialPlanFacts.settings.weightKg === data.weightKg ? [] : ["weight_kg"]),
+      ]
+    : [];
+  const acceptedRequestFactsMatch =
+    initialPlanFacts !== null && mismatchedRunnerFactFields.length === 0;
 
   if (userId && (!initialPlanFacts || !acceptedRequestFactsMatch)) {
+    const outcomeCode = initialPlanFactsReadFailed
+      ? "initial_plan_facts_read_failed"
+      : initialPlanFacts
+        ? "initial_plan_request_facts_mismatch"
+        : "initial_plan_facts_unavailable";
+    await recordHitoRuntimeEvent({
+      category: "plan_generation",
+      event: "initial_plan_preflight_rejected",
+      status: "blocked",
+      phase: "persistence",
+      outcomeCode,
+      providerKind: "not_started",
+      diagnosticCodes:
+        mismatchedRunnerFactFields.length > 0 ? mismatchedRunnerFactFields : ["initial_plan_facts"],
+    }).catch(() => undefined);
+
     return {
       ok: false,
       unavailable: buildAiGeneratedRunningPlanPreviewUnavailable({

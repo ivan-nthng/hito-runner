@@ -216,7 +216,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
       return;
     }
 
-    if (!(await runnerBaseline.persistHeartRateDraft())) {
+    if (!(await runnerBaseline.persistHeartRateDraft(admission.baselineInput))) {
       selectedPlanPreview.setError(
         runnerBaseline.error ??
           translate("Check the highlighted BPM ranges before creating this plan."),
@@ -224,7 +224,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
       return;
     }
 
-    selectedPlanPreview.selectPlanPreview(admission.goalId);
+    selectedPlanPreview.selectPlanPreview(admission.goalId, admission.input);
   };
 
   const openSavedHome = () => {
@@ -332,7 +332,7 @@ export function OnboardingGate({ defaults = null }: { defaults?: UserSettingsSum
     }
 
     manualCreateInFlightRef.current = true;
-    if (!(await runnerBaseline.persistHeartRateDraft())) {
+    if (!(await runnerBaseline.persistHeartRateDraft(runnerBaseline.inputSnapshot))) {
       manualCreateInFlightRef.current = false;
       setManualCreateError(
         runnerBaseline.error ??

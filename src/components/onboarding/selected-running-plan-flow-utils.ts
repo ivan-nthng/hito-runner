@@ -13,6 +13,7 @@ import type {
   RunningPlanPreviewActionInput,
   RunningPlanPreviewActionResult,
 } from "@/lib/running-plan-engine-actions";
+import type { RunnerBaselineSaveInput } from "@/lib/user-settings-actions";
 
 export type PlanGoalIntentDraftState = Pick<
   StructuredConstructorState,
@@ -54,7 +55,11 @@ export type RunningPlanAdmissionFailure = {
 };
 
 export type RunningPlanAdmissionResult =
-  | { ok: true; input: RunningPlanPreviewActionInput }
+  | {
+      ok: true;
+      input: RunningPlanPreviewActionInput;
+      baselineInput: RunnerBaselineSaveInput;
+    }
   | RunningPlanAdmissionFailure;
 
 export function buildRunningPlanPreviewInput(
@@ -123,6 +128,12 @@ export function buildRunningPlanPreviewInput(
 
   return {
     ok: true,
+    baselineInput: {
+      age: age.value,
+      heightCm: heightCm.value,
+      weightKg: weightKg.value,
+      fitnessLevel: state.fitnessLevel,
+    },
     input: {
       age: age.value,
       heightCm: heightCm.value,

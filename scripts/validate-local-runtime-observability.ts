@@ -14,6 +14,7 @@ import {
   createLocalRuntimeRequestContext,
   queryLocalRuntimeEvents,
   readLocalRuntimeArtifact,
+  recordHitoRuntimeEvent,
   recordLocalProviderTranscript,
   recordLocalRuntimeActionFailure,
   recordLocalRuntimeActionOutcome,
@@ -360,6 +361,32 @@ try {
     },
   );
   await assert.rejects(stat(blockedRoot), /ENOENT/);
+
+  const productionSafeLogs: string[] = [];
+  const originalConsoleInfo = console.info;
+  console.info = (...values: unknown[]) => productionSafeLogs.push(values.join(" "));
+  try {
+    await recordHitoRuntimeEvent(
+      {
+        category: "plan_generation",
+        event: "initial_plan_preflight_rejected",
+        status: "blocked",
+        phase: "persistence",
+        outcomeCode: "initial_plan_request_facts_mismatch",
+        requestId: "request_redacted_proof",
+        providerKind: "not_started",
+        diagnosticCodes: ["age", "height_cm"],
+      },
+      { runtimeUrl: "https://www.hitocajon.com" },
+    );
+  } finally {
+    console.info = originalConsoleInfo;
+  }
+  assert.equal(productionSafeLogs.length, 1);
+  assert.match(productionSafeLogs[0]!, /hito_production_safe_event_v1/);
+  assert.match(productionSafeLogs[0]!, /request_redacted_proof/);
+  assert.match(productionSafeLogs[0]!, /"diagnosticFields":\["age","height_cm"\]/);
+  assert.doesNotMatch(productionSafeLogs[0]!, /providerResponseId|rawArtifactPath/);
 
   const activeDays = (await stat(join(root, "active"))).isDirectory();
   const archivedOldDay = (await stat(join(root, "archive", archivedDateKey))).isDirectory();

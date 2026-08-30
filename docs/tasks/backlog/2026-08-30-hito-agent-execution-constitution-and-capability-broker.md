@@ -1,4 +1,4 @@
-# HITO-296 — Define Hito Agent Execution Constitution and Capability Broker
+# HITO-296 — Recover Hito Operating Model and Capability Broker
 
 - Work Item ID: `HITO-296`
 - Type: Research / Decision
@@ -21,6 +21,69 @@ stack. The accepted normative contract now lives only in the
 [Hito Task And Role Routing](../../process/hito-task-and-role-routing.md#ivan-operator-profile-and-capability-broker).
 Root [`AGENTS.md`](../../../AGENTS.md) retains one compact invariant and link.
 
+HITO-296 is also the single recovery owner for adopting the external
+[`PROJECT_RECOVERY_AND_CLUSTERING_GUIDE.md`](https://github.com/ivan-nthng/saavi/blob/main/project-agent-operating-model-starter/PROJECT_RECOVERY_AND_CLUSTERING_GUIDE.md)
+without a repository rewrite. Previously accepted HITO-218 domain separation and HITO-290
+documentation reconciliation are evidence, not substitutes for the missing project profile, stack
+normalization, reproducible local/CI command contract and completed broker pilot.
+
+The remaining implementation is now owned by the active Notion Epic
+`Recover Hito Delivery Operating Model` and its sequential Tasks HITO-299 through HITO-303. HITO-296
+owns the accepted architecture and completed project-identity Slice 1 only; it is not a competing
+implementation or QA owner.
+
+## Recovery Scope Amendment — 2026-08-30
+
+Ivan directed a full project-recovery pass after repeated hidden approval, capability, runtime and
+truthful-acceptance failures. New product work is frozen. Active dirty work is preserved as baseline
+evidence; it must not be reset, staged, committed, pushed, deployed or cleaned by recovery discovery.
+
+ARCHITECT first performs a read-only guide-to-repository reconciliation and returns:
+
+1. current-state inventory of repository, tasks, canonical roles/threads, environments, services,
+   databases, deployments, docs, commands and owners;
+2. section-by-section PASS / PARTIAL / FAIL map for all ten guide sections and its acceptance list;
+3. exact `PROJECT_PROFILE.md` non-secret schema and current ID gaps;
+4. domain-cluster table with purpose, owner, entities, commands, events, consumers, storage, public
+   contract, forbidden access and focused validation;
+5. documentation RETAIN / COMPACT / SUPERSEDE / DELETE-CANDIDATE ledger that reuses HITO-290 proof;
+6. accepted-stack table, version/config conflicts and one local/CI command surface;
+7. bounded diagnostic-loop and capability-broker adoption that removes invisible approval/retry
+   loops rather than documenting more handoffs;
+8. owner-separated, recoverable implementation slices with rollback and one representative pilot.
+
+No source/runtime/schema/data/provider/deployment/Git mutation or deletion is allowed before PRODUCT
+accepts that exact finite ledger. Do not reopen terminal HITO-218/HITO-290/HITO-297 or create a
+parallel recovery Task, registry, framework, service, tracker or documentation hierarchy.
+
+## Recovery Ledger Acceptance — 2026-08-30
+
+PRODUCT accepts the read-only recovery ledger against guide SHA
+`dcb9a33feeb45505d24905d550762d651ee95a2d`. Hito's product and domain architecture is retained;
+the defect to recover is operational reproducibility, not product behavior.
+
+Recovery proceeds serially and each slice is independently reversible:
+
+1. **ARCHITECT — Project identity truth:** create the non-secret `PROJECT_PROFILE.md`, add it to the
+   root progressive load, move static operator/ID facts out of routing, and reconcile only the
+   demonstrated stale current-state and environment-register facts.
+2. **PRODUCT — Task metadata truth:** repair only the five demonstrated live Task metadata gaps and
+   decide HITO-296's finite Epic disposition; do not alter scope or history.
+3. **ARCHITECT — Stack and command truth:** record one accepted stack/config table and one canonical
+   local/CI command surface; do not upgrade dependencies or introduce CI infrastructure merely to
+   document the contract.
+4. **BACKEND / Platform tooling — smallest broker seam:** implement only the accepted local,
+   non-daemon capability admission and manifest core using existing Node tooling. It is not a new
+   service, queue, registry or secret store.
+5. **QA — representative pilot:** prove one bounded Task from intake through release with one writer,
+   acknowledged handoff, exact cwd/source/artifact/runtime lineage, automatic one-time re-home and no
+   Ivan relay or hidden approval loop.
+
+Protected throughout: all current dirty and untracked bytes, terminal Tasks, product behavior,
+runtime, schemas, migrations, providers, hosted data, deployment configuration and personal data.
+No deletion candidate is executable until the replacement is proven by the pilot and PRODUCT
+accepts its exact rollback.
+
 ## Demonstrated Evidence
 
 - [HITO-233](./2026-08-21-hito-delivery-context-cost-and-modular-efficiency-audit.md) proved that
@@ -39,9 +102,10 @@ Root [`AGENTS.md`](../../../AGENTS.md) retains one compact invariant and link.
 
 ## Accepted Decision
 
-- `AGENTS.md` is the compact project constitution; routing is the sole detailed Hito owner of the
-  Ivan/operator profile, role/source and capability matrices, `ExecutionIntentV1`, acknowledged
-  delivery, `ExecutionArtifactManifestV1`, one-time re-home, technology ownership and stop rules.
+- `AGENTS.md` is the compact project constitution; `PROJECT_PROFILE.md` owns verified non-secret
+  project identity and explicit gaps; routing is the sole detailed Hito owner of operator behavior,
+  role/source and capability matrices, `ExecutionIntentV1`, acknowledged delivery,
+  `ExecutionArtifactManifestV1`, one-time re-home, technology ownership and stop rules.
 - Role identity never proves host capability. A send, queued prompt or `waitingOnApproval` state is
   not ownership transfer; the named destination turn must acknowledge the same Task and manifest.
 - Freshness requires exact repository/worktree and cwd, base revision, path hashes/modes, artifact
@@ -94,19 +158,19 @@ Git lifecycle, pilot or unrelated file was changed.
 
 ## Remaining Adoption And Pilot
 
-1. **BACKEND / Platform tooling:** if PRODUCT admits it, implement one local-only, non-daemon broker
+1. **PRODUCT — Task metadata truth:** repair only the five demonstrated live Task metadata gaps and
+   decide HITO-296's finite Epic disposition; preserve scope and history.
+2. **ARCHITECT — Stack and command truth:** reconcile the accepted stack/config table and one
+   canonical local/CI command surface without upgrading dependencies or inventing CI.
+3. **BACKEND / Platform tooling:** if PRODUCT admits it, implement one local-only, non-daemon broker
    admission core using existing Node/tooling and runbooks. It reads live Task state, resolves real
    cwd/repository, probes only requested capabilities, manages one lease and emits the accepted
    intent/manifest/receipt. It adds no product import, service, queue, registry or secret store.
-2. **PRODUCT/operator integration:** bind existing Codex send/wait operations to acknowledged
-   delivery. If the platform cannot return a destination turn ID and acknowledgement, stop; a
-   repository script must not fake it.
-3. **Representative pilot:** use one newly admitted bounded UI defect with disposable fixture,
-   managed browser artifact, independent QA, exact-stage Git release and cleanup. Do not reopen
-   HITO-292. One manifest lineage must survive the unchanged implementation -> QA -> release chain.
-4. **QA:** prove source-owner continuity, acknowledgement, artifact/runtime lineage, proportional
-   product proof, Git-backed release and stopped/clean disposable runtime before superseded behavior
-   is removed.
+4. **QA — representative pilot:** prove one bounded Task from intake through release with one
+   writer, acknowledged handoff, exact cwd/source/artifact/runtime lineage, automatic one-time
+   re-home, proportional product proof, Git-backed release and stopped/clean disposable runtime.
+   Do not reopen HITO-292. One manifest lineage must survive the unchanged implementation -> QA ->
+   release chain.
 
 | Signal     | HITO-292 baseline                                    | Pilot acceptance                                                                              |
 | ---------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------- |
@@ -129,6 +193,86 @@ it must not create an active parallel path. During a pilot, cancel the intent, r
 stop disposable runtimes and leave the Task with its prior acknowledged owner. After acceptance, a
 rollback changes execution authority and requires PRODUCT.
 
-The next possible edge is **BACKEND / Platform tooling** for the finite admission core above. It is
-not dispatched by this receipt. No runtime, browser, QA, release, deployment or broker acceptance is
+The next accepted edge after Recovery Slice 1 is **PRODUCT — Task metadata truth**. It is not
+dispatched by this receipt. No runtime, browser, QA, release, deployment or broker acceptance is
 claimed.
+
+## Recovery Slice 1 Receipt — 2026-08-30
+
+### Outcome And Changed Boundary
+
+- Created [`PROJECT_PROFILE.md`](../../../PROJECT_PROFILE.md) as the sole verified non-secret owner
+  of project/repository identity, surfaces, environment/service/deployment identifiers, canonical
+  sidebar thread bindings, domain routing, canonical documents, current command entry points and
+  explicit gaps.
+- Added the profile immediately after root/role identity in the progressive-load sequence.
+- Removed duplicated static identity/operator rows from routing while preserving all behavioral
+  admission, ownership, acknowledgement, capability, manifest, re-home and stop protocols.
+- Reconciled [`current-state.md`](../../current-state.md) to Git baseline
+  `fca161507e9dd344a141712d48d799b4204091d8` and its accepted Vercel deployment while explicitly
+  withholding hosted Supabase parity and current first-user admission.
+- Reconciled the [Supabase environment register](../../process/hito-supabase-environment-register.md)
+  to the 59-file repository migration inventory. The historical 47/47 local proof remains dated
+  evidence; live local 59/59 and hosted parity remain unavailable.
+
+Changed paths are exactly `PROJECT_PROFILE.md`, `AGENTS.md`,
+`docs/process/hito-task-and-role-routing.md`, `docs/current-state.md`,
+`docs/process/hito-supabase-environment-register.md` and this HITO-296 record. Role cards were not
+changed.
+
+### Protected Dirty Boundary
+
+The following 17 pre-existing modified or untracked paths remained outside this slice:
+
+- `agents/frontend.agent.md`
+- `docs/process/camelot-interactive-qa-fixture.md`
+- `docs/tasks/backlog/2026-08-15-hito-marketing-kinetic-icon-hero-discovery.md`
+- `docs/tasks/backlog/2026-08-24-hito-camelot-interactive-qa-fixture.md`
+- `docs/tasks/backlog/2026-08-25-hito-first-user-production-launch-readiness.md`
+- `scripts/camelot-interactive-qa.mjs`
+- `scripts/lib/runner-design-profile-fixture.ts`
+- `scripts/test-user.mjs`
+- `scripts/validate-restored-saved-plan-server-fn.ts`
+- `src/components/devtools/LocalDevtoolMenuItem.tsx`
+- `src/components/devtools/LocalDevtoolMount.tsx`
+- `src/components/devtools/local-devtool-gate.ts`
+- `vite.config.ts`
+- `docs/tasks/backlog/2026-08-28-hito-full-fidelity-runner-activity-retention-and-reprocessing-discovery.md`
+- `docs/tasks/backlog/2026-08-28-hito-interrupted-week-recovery-review.md`
+- `docs/tasks/backlog/2026-08-28-hito-simple-public-marketing-site.md`
+- `docs/tasks/backlog/2026-08-30-hito-restore-existing-camelot-after-plan-shape-drift.md`
+
+Their ordered `mode + SHA-256 + path` manifest digest before this slice was
+`b7833b4972ead3faefc604ea60edef6e3978e2ef473760f51cdd86c8ea841e6a`; validation requires the same
+post-slice digest.
+
+### Validation
+
+- `HEAD` and `origin/main` both resolved to
+  `fca161507e9dd344a141712d48d799b4204091d8`; the source inventory contained exactly 59 ordered SQL
+  migrations and the profile's named lifecycle commands resolved in `package.json`.
+- The six task-owned documents passed scoped Prettier and trailing-whitespace checks; 76 local
+  Markdown links resolved, including routed anchors.
+- Contradiction/reachability checks found the profile from root and routing, found no remaining
+  `no separate profile file` statement or obsolete checkout
+  `9143336bf55905f6009f4e4cd53dd64c456ce89f` in the changed current contracts, and retained one
+  detailed behavioral owner in routing.
+- `git diff --check` passed. The protected 17-path post-slice manifest digest remained exactly
+  `b7833b4972ead3faefc604ea60edef6e3978e2ef473760f51cdd86c8ea841e6a`.
+
+### Rollback And Omissions
+
+Rollback removes the newly added profile and restores only the pre-slice bytes of the five edited
+existing documents. The pre-slice SHA-256 values were
+`459e8ccff9d1810750a44507556620cf331110b7a4e02a590195f5334d66808f` for `AGENTS.md`,
+`052a9caadff4a49974497aa7ad9b335ebddb7a74978ca343794a4c72d9eb3b8b` for routing,
+`a509f1ef76264e292a4f981188df892458ea16cae3edb367a02c805a69fee43a` for current state,
+`79f9a980700a4fb9463424c428babb415c6bfe8cd254566b2c7b2a8866abfe71` for the environment register
+and `d2460ecdde7189700b0689a361ee1fd1e2c20ade72b86a12c3b5b0328a5caccf` for this record. No runtime
+or data rollback exists because neither changed.
+
+No runtime, product source, schema, migration, database, hosted provider, dependency, CI, broker,
+browser, QA, Git or release action was performed. The 59 migrations are a source inventory only;
+local and hosted application/type parity were not inspected. The unresolved preview project,
+provider project, Figma target and DESIGN SYSTEM INTEGRATION thread stay explicit rather than being
+inferred.

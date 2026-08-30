@@ -231,19 +231,24 @@ is not a role, service, daemon, database, queue, tracker, source owner or techno
 continue to decide and write only their admitted source. The broker may perform only one privileged
 operation already authorized by the same live Task and must return its exact receipt to that Task.
 
-### Ivan Operator Profile
+### Static Project Identity And Operator Rules
 
-This contract is the sole Hito-local owner of the operator profile; no separate profile file or
-machine capability registry is created.
+[`PROJECT_PROFILE.md`](../../PROJECT_PROFILE.md) is the sole owner of verified non-secret project,
+repository, environment, service, deployment and canonical sidebar-thread identifiers. It records
+explicit gaps but is not a capability registry, secret store or source of execution authority.
 
-| Setting            | Hito value and boundary                                                                                                     |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| Operator authority | Ivan through PRODUCT owns intake, scope, exceptions, external/destructive authority and final acceptance.                   |
-| Reporting          | Ivan-facing reports are Russian; durable contracts, receipts and exact execution intents are English.                       |
-| Lifecycle          | The Hito Notion Task and root-owned process-local credential seam; secret values never enter manifests, logs or reports.    |
-| Repository         | One admitted repository/worktree real path, base revision, branch, dirty-owner set and path allowlist per operation.        |
-| Runtime            | Existing environment and release runbooks; the profile never caches Docker, browser, Git, cache or host availability.       |
-| External actions   | Hosted, destructive, provider, commit, push and deployment authority remains explicit per Task; the broker cannot infer it. |
+This routing contract continues to own behavior:
+
+- Ivan through PRODUCT owns intake, scope, exceptions, external/destructive authority and final
+  acceptance.
+- Ivan-facing reports are Russian; durable contracts, receipts and exact execution intents are
+  English.
+- The Hito Notion Task is lifecycle truth and uses the root-owned process-local credential seam;
+  secret values never enter manifests, logs or reports.
+- Every operation binds one admitted repository/worktree real path, base revision, branch,
+  dirty-owner set and path allowlist.
+- Existing environment and release runbooks own runtime behavior. Hosted, destructive, provider,
+  commit, push and deployment authority remains explicit per Task; the broker cannot infer it.
 
 Dynamic capability results are probed for each execution intent and retained only in that
 operation's receipt. A previous successful host or tool result is never current authority.

@@ -67,6 +67,7 @@
     "local:adaptive-blueprint:reset": "node --env-file=.env.local ./scripts/test-user.mjs adaptive-blueprint-reset",
     "validate-test-user-lifecycle": "node ./scripts/validate-qa-test-user-lifecycle.mjs",
     "validate-camelot-interactive-qa-fixture": "node --import tsx ./scripts/validate-camelot-interactive-qa-fixture.ts",
+    "validate-hito-capability-broker": "node ./scripts/validate-hito-capability-broker.mjs",
     "validate-restored-saved-plan-server-fn": "node --env-file=.env.local --import tsx ./scripts/validate-restored-saved-plan-server-fn.ts",
     "lint": "eslint .",
     "format": "prettier --write ."

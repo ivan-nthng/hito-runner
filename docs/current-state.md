@@ -1,18 +1,31 @@
 # Current State
 
-Last updated: 2026-08-28
+Last updated: 2026-08-30
 
-## Released Baseline
+## Released And Live Revision Boundaries
 
-- `main` and `origin/main` resolve to `0f17b71ee871e32ef1448cfc6ad8e8ea7272df55` at this
-  snapshot.
-- The accepted
+- Live Git truth: resolve the exact `main` and `origin/main` revisions from Git at execution or
+  release time and reconcile them through the live
+  [HITO-303 release receipt](https://app.notion.com/p/3ccfe5f58cf5819e8173ee9df4d48c32). This
+  versioned document does not embed its containing commit as a current-revision claim.
+- Immutable HITO-302 release truth: commit `28cddb8f90b094c66eacae3d9a903a0889336b2b`, parent
+  `fca161507e9dd344a141712d48d799b4204091d8`, removed `pnpm-lock.yaml` from `.prettierignore`. It was
+  not deployed and changed no product runtime or migration source.
+- Deployed runtime truth: the accepted Git-backed Vercel deployment
+  `dpl_2u1gAPpRMVgwDg9dWcKnJWVtWjCd` remains at
+  `fca161507e9dd344a141712d48d799b4204091d8`; `www` returned HTTP 200 and the apex redirected with
+  HTTP 307. The accepted deployment is application evidence, not hosted Supabase migration or data
+  parity.
+- The admitted HITO-303 recovery release changes documentation/tooling only. It is not deployed and
+  carries no product behavior or runtime claim.
+- The earlier accepted
   [first-user production launch receipt](tasks/backlog/2026-08-25-hito-first-user-production-launch-readiness.md)
   records a READY Git-backed deployment, HTTP 200, plan Create/Review/Confirm and Saved Review
   restore, standalone Calendar materialisation, FIT/RPE, History/Progress/profile coherence,
   English/Portuguese presentation, responsive/focus proof and exact disposable-data cleanup.
-- PRODUCT accepted a monitored limited first-user invite. Physical iPhone/iPad post-fix replay was
-  not claimed; it remains a disclosed evidence omission.
+- The live HITO-280 Task later withdrew the monitored-invite acceptance after reported production
+  failures. Notion owns whether first-user admission is currently open. Physical iPhone/iPad
+  post-fix replay was not claimed and remains a disclosed evidence omission.
 - Work after the released baseline is not released merely because it exists in this checkout.
   Notion owns its current lifecycle.
 

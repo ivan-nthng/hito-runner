@@ -9,10 +9,11 @@ card, then one directly matching project skill. Product and system documents sup
 For normal work load only:
 
 1. this file and the assigned card in [`agents/`](agents/);
-2. the selected Notion Task and its Repository document;
-3. durable context routed by [`docs/README.md`](docs/README.md) and needed by that Task;
-4. one matching skill from [`skills/`](skills/) when its procedure is needed;
-5. affected source and direct public contracts.
+2. the non-secret project identity and owner routes in [`PROJECT_PROFILE.md`](PROJECT_PROFILE.md);
+3. the selected Notion Task and its Repository document;
+4. durable context routed by [`docs/README.md`](docs/README.md) and needed by that Task;
+5. one matching skill from [`skills/`](skills/) when its procedure is needed;
+6. affected source and direct public contracts.
 
 Do not preload terminal receipts, history, unrelated roles, broad plans or domains.
 Every UI or Design System task loads the Hito frontend skill before source work.

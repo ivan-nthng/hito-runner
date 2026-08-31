@@ -7,7 +7,15 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["dist", ".output", ".vinxi", "**/.local-artifact-archive/**", "**/qa-artifacts/**"],
+    ignores: [
+      "dist",
+      ".output",
+      ".vinxi",
+      ".vercel/**",
+      "supabase/.temp/**",
+      "**/.local-artifact-archive/**",
+      "**/qa-artifacts/**",
+    ],
   },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],

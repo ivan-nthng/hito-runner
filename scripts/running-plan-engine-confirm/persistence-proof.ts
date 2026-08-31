@@ -187,6 +187,8 @@ export async function validatePersistenceContract(
   const priorFixtureScenario = process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_SCENARIO_ENV];
   let ownerCleanup: DisposableCleanupProof | null = null;
   let otherCleanup: DisposableCleanupProof | null = null;
+  let sourceCleanupError: { message: string } | null = null;
+  let persistenceResult;
 
   try {
     delete process.env[AI_GENERATED_RUNNING_PLAN_DEV_FIXTURE_ENV];
@@ -1460,7 +1462,7 @@ export async function validatePersistenceContract(
       "Removing disposable source intent must not erase confirmation lineage.",
     );
 
-    return {
+    persistenceResult = {
       mode: preflight.mode,
       target: preflight.target,
       initialDetailedBlock: {
@@ -1504,7 +1506,8 @@ export async function validatePersistenceContract(
         .from("ai_plan_generation_responses")
         .delete()
         .eq("user_id", userId);
-      if (sourceCleanup.error) throw new Error(sourceCleanup.error.message);
+      if (sourceCleanup.error && sourceCleanupError === null)
+        sourceCleanupError = sourceCleanup.error;
     }
     ownerCleanup = await cleanupDisposableUser(supabase, owner);
     otherCleanup = await cleanupDisposableUser(supabase, otherRunner);
@@ -1530,6 +1533,8 @@ export async function validatePersistenceContract(
       0,
     );
   }
+  if (sourceCleanupError) throw new Error(sourceCleanupError.message);
+  return persistenceResult;
 }
 
 async function countOwnedRows(

@@ -3641,6 +3641,10 @@ async function validateLocalDevFixtureAvailabilityGating() {
     );
 
     const familyMismatchDraft = structuredClone(fixtureDraft);
+    const familyMismatchRecoveryDay = familyMismatchDraft.detailed_block.workouts.find(
+      (workout) => workout.workout_identity === "recovery_jog",
+    );
+    assert.ok(familyMismatchRecoveryDay, "The regression fixture requires one recovery workout.");
     assert.ok(familyMismatchDraft.blueprint.phases[0]?.workout_families.includes("recovery"));
     familyMismatchDraft.blueprint.phases[0]!.workout_families =
       familyMismatchDraft.blueprint.phases[0]!.workout_families.filter(
@@ -3660,7 +3664,7 @@ async function validateLocalDevFixtureAvailabilityGating() {
     );
     assert.ok(
       familyMismatchCompile.validationIssues.includes(
-        "ai_authored_blueprint_detailed_family_derived:blueprint.phases.0.workout_families:recovery:detailed_block.days.2026-07-16",
+        `ai_authored_blueprint_detailed_family_derived:blueprint.phases.0.workout_families:recovery:detailed_block.days.${familyMismatchRecoveryDay.date}`,
       ),
       "A derived detailed family must remain visible in validation metadata.",
     );

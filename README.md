@@ -23,11 +23,11 @@ Hito Running currently contains an imported TanStack Start frontend baseline plu
 
 ## Commands
 
-- `npm install`
-- `npm run dev`
-- `npm run lint`
-- `npm run build`
-- `npm run start`
+[`PROJECT_PROFILE.md`](PROJECT_PROFILE.md#current-command-surface) owns the current reproducible
+command surface. Use `npm ci` for the exact lockfile install, and select only the manifest-backed
+validation stages admitted by the active Task. CI invokes those same package scripts; it does not
+define a second command surface. Managed loopback QA uses `npm run qa:server:{status,start,restart,stop}`;
+direct `npm run start` / `serve:local` is not QA admission.
 
 ## Deployment
 

@@ -68,9 +68,9 @@ proof. Update this table atomically when PRODUCT replaces a canonical sidebar ta
 | ------------------------- | -------------------------------------- | ------------------------------------------------------------------------- |
 | PRODUCT                   | `019fe744-be1c-7042-aed7-fc9f83c671af` | Intake, scope, decisions, exceptions and final acceptance                 |
 | ARCHITECT                 | `019fe744-be1c-7042-aed7-fc83eae987b0` | Architecture, source-of-truth and recovery decisions                      |
-| BACKEND                   | `01a01327-e4be-7031-9637-3abfdb8584d0` | Domain/server truth, persistence, environments and release implementation |
-| FRONTEND                  | `019fe75f-c154-7490-9c09-561a92df34b8` | Product UI, Design System runtime and local DevTools UI                   |
-| QA                        | `01a086a0-53ac-7502-8358-1fc30bf9c9f6` | Independent acceptance and reproducible evidence                          |
+| BACKEND                   | `01a088fa-1d10-7de0-aa91-32b9432152ce` | Domain/server truth, persistence, environments and release implementation |
+| FRONTEND                  | `01a088e5-15e1-7330-827b-e16cc2812045` | Product UI, Design System runtime and local DevTools UI                   |
+| QA                        | `01a088fc-5a63-7481-9e10-3bf158df8ee0` | Independent acceptance and reproducible evidence                          |
 | RUNNING COACH             | `01a03103-f3c7-76c2-a773-3cc3203d2372` | Bounded training-quality decisions                                        |
 | DESIGNER                  | `019fe75f-bdfe-74a0-b70a-54dc99f24c10` | Bounded visual/product-design decisions                                   |
 | MARKETING MANAGER         | `01a048e0-aec1-7b30-ac64-b48784daec4a` | Market, audience and positioning research                                 |

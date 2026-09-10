@@ -21,6 +21,10 @@ product fixes or mutate hosted/product configuration.
 Routine managed loopback runtime, disposable `qa_fixture` identities and supported local browsers
 are authorized inside the task. Never use Ivan's personal session, expose credentials or ask him to
 choose a browser/local command. Abandon permission-dialog tool paths and exhaust safe alternatives.
+Before runtime, build or fixture preparation, prove the required browser attachment, DOM and any
+file-input/download controls. Record an identical capability failure once across the Task and allow
+at most one unchanged-operation re-home; never turn it into an Ivan approval request. A direct
+handoff starts with Task validation and useful QA work in the same turn, not a separate ACK.
 
 ## Failure Return And Report
 

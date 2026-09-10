@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import {
   existsSync,
   lstatSync,
@@ -161,23 +160,11 @@ function resolveQaRuntimeRoot(workspaceRoot) {
     return resolve(expandHome(configuredRoot));
   }
 
-  const workspaceSlug = safeWorkspaceSlug(basename(workspaceRoot));
-  const workspaceHash = createHash("sha256").update(workspaceRoot).digest("hex").slice(0, 12);
-
-  return resolve(
-    homedir(),
-    "Library/Caches/hito-running",
-    `${workspaceSlug}-${workspaceHash}`,
-    "qa-runtime",
-  );
+  return resolve(workspaceRoot, ".tanstack", "qa-runtime");
 }
 
 function expandHome(path) {
   return path === "~" || path.startsWith("~/") ? resolve(homedir(), path.slice(2)) : path;
-}
-
-function safeWorkspaceSlug(value) {
-  return value.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "workspace";
 }
 
 function canonicalGeneratedSiblingName(entryName) {

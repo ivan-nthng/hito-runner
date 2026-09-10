@@ -20,8 +20,10 @@ or backend-only checks use their owning procedure and do not need Browser Path P
 2. Confirm whether the assignment is focused Definition-of-Done verification or Global QA
    Acceptance.
 3. For a defect, inspect the root-cause discriminator or document the exact safe limitation.
-4. Write Browser Path Preflight before browser navigation.
-5. Reuse a healthy managed loopback server; rebuild/restart only when the visible source changed.
+4. Write Browser Path Preflight and prove browser attachment, DOM inspection and every required
+   file-input/download control before build, runtime or fixture preparation.
+5. Bind `HITO_QA_RUNTIME_ROOT` to a writable Task-local path. Reuse a healthy managed loopback
+   server; rebuild/restart only when the visible source changed.
 6. Run the smallest browser matrix that proves the affected happy, blocked/error, state/persistence,
    responsive, or auth behavior.
 7. Capture screenshots only for UI-facing evidence. Store routine artifacts under
@@ -38,6 +40,9 @@ or backend-only checks use their owning procedure and do not need Browser Path P
 - A raw bridge, WebDriver command, `curl`, or browser-control invocation that opens a platform
   permission dialog must be abandoned rather than shown to the runner. Continue with another local
   path; it is a tool limitation, not an approval gate or task blocker.
+- Record an identical browser/capability failure once across the whole Task. Re-home the unchanged
+  operation at most once; if it still cannot run, report `blocked(capability_unavailable)` without
+  an Ivan approval request or another fixture/runtime attempt.
 - Do not start duplicate app servers, use production data, or fabricate DOM state/API outcomes.
 
 ## QA Authority

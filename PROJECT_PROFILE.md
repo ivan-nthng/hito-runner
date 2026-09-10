@@ -92,27 +92,27 @@ independently.
 | Training Decision             | BACKEND                                         | Consumes immutable blueprint/profile/evidence facts and emits an authoring brief |
 | Entitlement / Commercial      | BACKEND                                         | Owns durable grants and commercial facts; no inferred revenue                    |
 | Admin                         | BACKEND                                         | Server-owned operational read models; FRONTEND owns presentation                 |
-| Platform / delivery           | ARCHITECT for boundaries; BACKEND for execution | Environment, broker and release follow existing runbooks                         |
+| Platform / delivery           | ARCHITECT for boundaries; BACKEND for execution | Capability, environment and release follow existing runbooks                     |
 
 Accepted dependency detail lives in [current system](docs/current-system.md) and the
 [functional ownership map](docs/current-functional-map.md).
 
 ## Canonical Documentation
 
-| Need                                          | Owner                                                                                                              |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Compact constitution and progressive load     | [`AGENTS.md`](AGENTS.md)                                                                                           |
-| Project-local non-secret identity             | This file                                                                                                          |
-| Documentation route map                       | [`docs/README.md`](docs/README.md)                                                                                 |
-| Current product/business truth                | [`docs/current-product.md`](docs/current-product.md)                                                               |
-| Current domain/system truth                   | [`docs/current-system.md`](docs/current-system.md)                                                                 |
-| Released snapshot and unavailable boundaries  | [`docs/current-state.md`](docs/current-state.md)                                                                   |
-| Role and functional ownership                 | [`docs/current-functional-map.md`](docs/current-functional-map.md)                                                 |
-| Terms and product context                     | [`docs/glossary.md`](docs/glossary.md), [`docs/context.md`](docs/context.md)                                       |
-| Task admission, lifecycle and broker protocol | [`docs/process/hito-task-and-role-routing.md`](docs/process/hito-task-and-role-routing.md)                         |
-| Supabase identity and lifecycle               | [`docs/process/hito-supabase-environment-register.md`](docs/process/hito-supabase-environment-register.md)         |
-| Release gate                                  | [`docs/process/hito-release-quality-sweep-runbook.md`](docs/process/hito-release-quality-sweep-runbook.md)         |
-| Portable adoption model                       | [`docs/process/portable-project-agent-operating-model.md`](docs/process/portable-project-agent-operating-model.md) |
+| Need                                               | Owner                                                                                                              |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Compact constitution and progressive load          | [`AGENTS.md`](AGENTS.md)                                                                                           |
+| Project-local non-secret identity                  | This file                                                                                                          |
+| Documentation route map                            | [`docs/README.md`](docs/README.md)                                                                                 |
+| Current product/business truth                     | [`docs/current-product.md`](docs/current-product.md)                                                               |
+| Current domain/system truth                        | [`docs/current-system.md`](docs/current-system.md)                                                                 |
+| Released snapshot and unavailable boundaries       | [`docs/current-state.md`](docs/current-state.md)                                                                   |
+| Role and functional ownership                      | [`docs/current-functional-map.md`](docs/current-functional-map.md)                                                 |
+| Terms and product context                          | [`docs/glossary.md`](docs/glossary.md), [`docs/context.md`](docs/context.md)                                       |
+| Task admission, lifecycle and capability execution | [`docs/process/hito-task-and-role-routing.md`](docs/process/hito-task-and-role-routing.md)                         |
+| Supabase identity and lifecycle                    | [`docs/process/hito-supabase-environment-register.md`](docs/process/hito-supabase-environment-register.md)         |
+| Release gate                                       | [`docs/process/hito-release-quality-sweep-runbook.md`](docs/process/hito-release-quality-sweep-runbook.md)         |
+| Portable adoption model                            | [`docs/process/portable-project-agent-operating-model.md`](docs/process/portable-project-agent-operating-model.md) |
 
 ## Accepted Stack And Configuration
 
@@ -137,7 +137,7 @@ discoverable without replacing those files. Manifest ranges are update policy, w
 
 ## Current Command Surface
 
-[`package.json`](package.json) owns the complete script inventory (62 scripts at this baseline).
+[`package.json`](package.json) owns the complete script inventory (62 scripts after HITO-328).
 The Task admits only the stages its changed contract needs; composition is ordered evidence, not an
 always-run shell alias or a substitute for domain/QA/release acceptance.
 
@@ -168,7 +168,7 @@ are retained in [HITO-300](docs/tasks/backlog/2026-08-30-hito-stack-and-command-
 
 - [Root safety rules](AGENTS.md#safety-and-acceptance) govern dirty work, external actions and
   acceptance claims.
-- [Routing and broker rules](docs/process/hito-task-and-role-routing.md#ivan-operator-profile-and-capability-broker)
+- [Routing and capability rules](docs/process/hito-task-and-role-routing.md#ivan-operator-profile-and-capability-execution)
   govern owner continuity, exact manifests, capability probing and one-time re-home.
 - [Supabase lifecycle](docs/process/hito-supabase-environment-register.md) and the
   [release runbook](docs/process/hito-release-quality-sweep-runbook.md) retain their separate gates.

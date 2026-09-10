@@ -97,8 +97,8 @@ discriminator before Frontend source work.
 ### Same-Task Lifecycle And History
 
 At each material claim, owner/phase handoff, blocker, QA return, implementation result, release result
-or final acceptance, the active owner supplies one truthful lifecycle transition for the approved
-broker operation to apply to the same Notion Task:
+or final acceptance, the active owner applies one truthful lifecycle transition to the same Notion
+Task through the admitted lifecycle seam:
 
 1. atomically set truthful `Status`, `Phase`, `Owner`, `Latest update`, `Next action` and
    `Repository document` values; and
@@ -129,15 +129,15 @@ write a text bar. A Task without an admitted delivery checklist shows no invente
 
 For an already admitted Task, distinguish a changed lifecycle/product decision from a missing host
 capability. The former returns to PRODUCT; the latter follows the single
-[broker stop/re-home protocol](#ivan-operator-profile-and-capability-broker) without changing Task or
-source ownership. Never use Markdown lifecycle state, an unapproved secret path or
+[Task-scoped stop/re-home protocol](#task-scoped-capability-preflight) without changing Task or source
+ownership. Never use Markdown lifecycle state, an unapproved secret path or
 destructive/hosted mutation as a fallback.
 
 ### Local Notion Lifecycle Seam
 
 Root [`AGENTS.md`](../../AGENTS.md) owns the single process-local credential seam and its secret
 boundary. This contract adds no alternate credential source. Missing access on an already admitted
-Task follows the broker protocol below and never authorizes Markdown lifecycle writes. One Current
+Task follows the Task-scoped capability protocol below and never authorizes Markdown lifecycle writes. One Current
 owner remains mandatory; the owner supplies each truthful transition and the approved lifecycle
 operation atomically updates Status, Phase, Owner, Latest update, Next action and Repository
 document, then appends one history line on the same live Task.
@@ -209,10 +209,12 @@ remain unchanged. QA stays read-only for product code. Return to Product/Ivan fo
 scope/owner/risk, product/design choice, unsafe/external action, failed recovery/rollback or final
 acceptance.
 
-Current owner changes only after the prior owner records a truthful outcome/stop boundary and
-releases the admitted files, data, runtime and generated outputs. The receiving owner confirms the
-same Task identity, Primary Area, Epic if any, unchanged outcome and admitted boundary before its
-first write.
+Current owner changes only after the prior owner records a truthful outcome/stop boundary, releases
+the admitted files, data, runtime and generated outputs, successfully sends one complete handoff and
+reads back the live Task transition. The receiving owner validates the same Task identity, Primary
+Area, Epic if any, unchanged outcome and admitted boundary inside its first useful work turn. A
+separate ACK-only turn and Product relay are forbidden. Failed transport leaves the prior owner in
+place and does not authorize a duplicate cross-role attempt.
 
 ## Execution And Concurrency
 
@@ -229,12 +231,12 @@ first write.
 - Stop expansion when a second owner, new persistence shape, external action, product decision,
   release gate or unplanned mechanism is required.
 
-## Ivan Operator Profile And Capability Broker
+## Ivan Operator Profile And Capability Execution
 
-The capability broker is a local Platform execution boundary of the current orchestration host. It
-is not a role, service, daemon, database, queue, tracker, source owner or technology stack. Roles
-continue to decide and write only their admitted source. The broker may perform only one privileged
-operation already authorized by the same live Task and must return its exact receipt to that Task.
+Routine repository work, owner handoff and local validation execute directly on the admitted host;
+they do not require a broker, destination ACK or Product relay. Privileged external effects remain
+bound to the same live Task, exact target, authority, rollback and receipt. This section is a
+behavioral contract, not a service, daemon, queue, tracker, registry or executable framework.
 
 ### Static Project Identity And Operator Rules
 
@@ -253,10 +255,10 @@ This routing contract continues to own behavior:
 - Every operation binds one admitted repository/worktree real path, base revision, branch,
   dirty-owner set and path allowlist.
 - Existing environment and release runbooks own runtime behavior. Hosted, destructive, provider,
-  commit, push and deployment authority remains explicit per Task; the broker cannot infer it.
+  commit, push and deployment authority remains explicit per Task and cannot be inferred.
 
-Dynamic capability results are probed for each execution intent and retained only in that
-operation's receipt. A previous successful host or tool result is never current authority.
+Dynamic capability results are probed before dependent work and retained only in that Task's compact
+receipt. A previous successful host or tool result is never current authority.
 
 ### Role, Source And Capability Matrix
 
@@ -269,83 +271,67 @@ operation's receipt. A previous successful host or tool result is never current 
 | QA          | Independent read-only acceptance and reproducible evidence                                 | Artifact/runtime acquisition, browser control, evidence publication and cleanup |
 | Specialists | Their existing bounded decision or Figma-only boundary                                     | Only the admitted specialist tool action; never product source or release       |
 
-The broker has no owner row. It cannot edit product source, choose scope, reinterpret acceptance,
-approve its own output or change the Task owner. Privileged capabilities resolve as follows:
+Capability execution has no owner row. It cannot edit product source, choose scope, reinterpret
+acceptance, approve its own output or change the Task owner. Capabilities resolve as follows:
 
-| Capability                      | Decision owner                                                                 | Broker gate                                                                                                                          |
-| ------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Notion lifecycle                | Current owner; PRODUCT for final acceptance                                    | Compare live revision, apply the owner-supplied transition atomically, append one history line and read back. No Markdown fallback.  |
-| Role delivery                   | Current owner on one unchanged admitted edge                                   | Deliver one immutable intent and require the named destination turn to acknowledge the same Task and manifest before owner transfer. |
-| Git / release / deploy          | BACKEND release owner under explicit Product authority and the release runbook | Verify base/index/allowlist, perform the exact operation and read back revision/deployment evidence.                                 |
-| Docker / Supabase / runtime     | BACKEND environment owner; QA may request an admitted fixture                  | Verify project/context/data boundary, acquire one lease and prove cleanup.                                                           |
-| Build / cache / artifact        | Implementation owner publishes; QA consumes                                    | Prove cache write capability and bind the output hash to the exact input manifest.                                                   |
-| Browser                         | QA for acceptance; FRONTEND only for admitted implementation proof             | Bind browser evidence to the manifest-backed runtime without Ivan's personal session.                                                |
-| Provider / hosted / destructive | PRODUCT authorizes; existing domain owner defines the operation                | Fail closed without exact target, authority, rollback and evidence; re-home never expands authority.                                 |
+| Capability                                | Decision owner                                                                 | Execution gate                                                                                                             |
+| ----------------------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| Notion lifecycle                          | Current owner; PRODUCT for final acceptance                                    | Compare live revision, apply one atomic transition plus history line and read back. No ACK-only turn or Markdown fallback. |
+| Routine role delivery                     | Current owner on one unchanged admitted edge                                   | Send one complete prompt, then read back the owner transition. The recipient validates inside its first useful turn.       |
+| Git commit/push and deployment            | BACKEND release owner under explicit Product authority and the release runbook | Verify base/index/allowlist, perform only the exact operation and read back revision or deployment evidence.               |
+| Docker / Supabase / runtime               | BACKEND environment owner; QA may request an admitted fixture                  | Verify project/context/data boundary, one active owner and cleanup.                                                        |
+| Build / cache / artifact                  | Implementation owner publishes; QA consumes                                    | Use a writable Task-local `HITO_QA_RUNTIME_ROOT` and bind output hash to the exact input manifest.                         |
+| Browser                                   | QA for acceptance; FRONTEND only for admitted implementation proof             | Prove attachment, DOM and required file controls before runtime/fixture work; never use Ivan's personal session.           |
+| Provider / hosted / destructive / payment | PRODUCT authorizes; existing domain owner defines the operation                | Require explicit target acknowledgement, authority, rollback and evidence; re-home never expands authority.                |
 
-### Immutable Execution Intent
+### Task-Scoped Capability Preflight
 
-`ExecutionIntentV1` is immutable after acknowledgement and contains:
+Before dependent work, resolve the live Task, repository/worktree real path, base revision, branch,
+dirty-owner boundary, requested capability and exact environment. Probe only that capability. A
+credential, cookie, private provider payload or personal session never enters the receipt.
 
-- Notion Task/page identity, expected lifecycle revision, current owner, operation kind and named
-  destination owner when applicable;
-- repository/worktree real path, base revision, branch, exact path allowlist, pre-operation
-  hashes/modes and declared unrelated dirty owners;
-- requested capability and environment identity, external-action authority, rollback, cleanup and
-  required proof; and
-- the source owner's factual claim or handoff receipt, without an inferred QA or acceptance claim.
+When browser acceptance needs attachment, DOM inspection, download or file upload, test those exact
+controls before any build, runtime start, fixture seed or data creation. When a build or runtime is
+needed, bind `HITO_QA_RUNTIME_ROOT` to one writable Task-local path before the command. Reuse an
+unchanged healthy artifact; source or configuration motion invalidates it.
 
-The broker reads back the live Task, resolves repository and working-directory real paths, rejects
-scope/owner/revision or dirty-boundary drift, and probes only the requested capability. It records
-availability and tool/version identity but never a credential, cookie, private provider payload or
-personal session.
+Record a failed capability signature by Task, capability, environment and tool path. The identical
+signature is attempted once across the whole Task, not once per turn or role. The unchanged
+operation may move once to the canonical capable executor without moving Task identity, Current
+owner, source writer, scope, authority or proof. A second failure stops as
+`blocked(capability_unavailable)`; it is never an Ivan approval request. A tool path that enters
+`waitingOnApproval` or opens a permission dialog is abandoned and counts as that attempt.
 
-If the named role host lacks the capability, the broker may bind the unchanged intent once to the
-canonical capable executor. Task identity, Current owner, source writer, scope, authority and proof
-do not move. If no executor acknowledges the exact intent, the operation stops as
-`blocked(capability_unavailable)`; repeated cross-role retries are forbidden.
+### Routine Delivery
 
-### Acknowledged Delivery
+One complete owner-to-owner prompt plus successful transport is the delivery operation. The sender
+then applies and reads back the live owner/phase transition. The recipient validates the Task and
+manifest inside its first useful work turn. Do not send an ACK-only prompt, wait for a ceremonial
+response, or route an unchanged edge through Product. Transport failure leaves the current owner in
+place; it does not authorize duplicate sends across roles.
 
-```text
-prepared -> dispatched -> acknowledged -> running -> completed
-                    \-> undelivered
-acknowledged|running -> rehome_required -> acknowledged -> running
-any nonterminal state -> blocked|cancelled
-```
+Explicit target acknowledgement remains only for provider, hosted, destructive, credential,
+payment, Git push/deployment or another genuinely external effect whose exact immutable target must
+be bound before execution. A platform-required confirmation for those effects is not a routine
+repository approval and cannot be waived by this contract.
 
-- `prepared`: live Task, unchanged edge, source release, rollback and manifest are valid.
-- `dispatched`: transport accepted one delivery ID; ownership has not transferred.
-- `acknowledged`: the named destination turn confirms the same Task, role, manifest hash and
-  admitted boundary. `waitingOnApproval` is not acknowledgement.
-- `running`: the acknowledged owner or broker executor started the exact operation.
-- `completed`: an execution receipt exists; it proves only that operation, not another acceptance
-  layer.
-- `undelivered`: no destination acknowledgement exists, so the current owner remains unchanged.
-- `rehome_required`: one requested capability failed; the broker may re-home the unchanged
-  operation once.
-- `blocked`: no truthful capable executor or rollback exists; return the exact discriminator to
-  PRODUCT without another delivery attempt.
+### Exact Execution Record
 
-After destination acknowledgement, the broker applies the owner-supplied Notion transition and
-readback. A message send, queued prompt or approval wait alone never changes Current owner.
-
-### Exact Artifact Manifest
-
-`ExecutionArtifactManifestV1` binds proof to:
+Every material proof or external effect binds its receipt to:
 
 | Group     | Required facts                                                                                                                              |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Task      | Task/page ID, expected lifecycle revision, owner, intent ID and admitted proof layer                                                        |
+| Task      | Task/page ID, expected lifecycle revision, owner and admitted proof layer                                                                   |
 | Source    | repository identity, worktree/root real path, base commit, branch, index state, exact path SHA-256/mode set and unrelated dirty fingerprint |
-| Execution | command/tool identity, resolved cwd, approved environment key names only, toolchain versions, executor host/session and start/end           |
+| Execution | command/tool identity, resolved cwd, admitted environment key names only, toolchain versions, executor host/session and start/end           |
 | Runtime   | Docker context/project or `none`, Supabase/environment or `none`, ports, fixture/data class, provider mode, lease and cleanup requirement   |
 | Artifact  | source-manifest hash, build/proof command, artifact hash, runtime receipt and browser route/viewport when applicable                        |
 | Result    | exit/result, redacted evidence paths, omissions, rollback/cleanup result and next accepted boundary                                         |
 
-Freshness requires the current path hashes, resolved cwd, manifest hash, artifact hash, runtime
-receipt and active lease to agree. Source motion, wrong cwd, expired lease, rebuilt artifact or
-environment mismatch invalidates the claim. A timestamp, branch name, source fingerprint, health
-response or verbal `fresh` claim alone is not evidence.
+Freshness requires the current path hashes, resolved cwd, manifest hash, artifact hash and runtime
+receipt to agree. Source motion, wrong cwd, rebuilt artifact or environment mismatch invalidates the
+claim. A timestamp, branch name, source fingerprint, health response or verbal `fresh` claim alone
+is not evidence.
 
 ### Technology Ownership And Stop Conditions
 
@@ -354,7 +340,7 @@ response or verbal `fresh` claim alone is not evidence.
 - BACKEND owns local fixture/runtime lifecycle; QA owns independent acceptance and evidence, never a
   second fixture implementation.
 - Git-backed release/deployment remains with the existing BACKEND release owner and runbook.
-- Notion remains PRODUCT/operator lifecycle authority even when the broker performs the API write.
+- Notion remains PRODUCT/operator lifecycle authority when an admitted owner performs the API write.
 - Browser, capture and debugger tooling remain local-only with no production import, route, bundle
   or observability path.
 
@@ -362,11 +348,10 @@ A second runtime, datastore, task system, deployment route, fixture, provider wr
 or automation path requires PRODUCT to accept one owner, finite replacement/migration, rollback and
 deletion of the superseded path. Permanent parallel operation is forbidden.
 
-The broker fails closed before side effects when Task revision/owner, manifest, authority, target,
-rollback, capability, acknowledgement or lease is missing or contradictory. Manual execution is
-allowed only as the same broker operation with the same intent, manifest and receipt; it is not an
-independent fallback. A broker failure never authorizes role-host retries, Markdown lifecycle, a new
-Task, broader source access or invented evidence.
+External effects fail closed when Task revision/owner, manifest, authority, target, rollback,
+capability or required target acknowledgement is missing or contradictory. A capability failure
+never authorizes role-host retries, Markdown lifecycle, a new Task, broader source access or
+invented evidence.
 
 ## Product Surfaces And Frontend Boundaries
 
@@ -398,11 +383,12 @@ unaffected branch remains valid unless the changed edge can invalidate it; QA st
 instead of replaying an unrelated domain or the whole product. This is proportional evidence, not a
 token, file, elapsed-time, checklist or test-count limit.
 
-Before Verification ownership moves, the broker proves destination acknowledgement, live Task
-read/write capability and a fresh, healthy, compatible managed artifact tied to the current source
-manifest. A missing lifecycle capability, stale/missing artifact or environment identity conflict
-is an execution stop before product validation and may use the one-time unchanged-operation re-home.
-It does not create a Task, authorize a Markdown lifecycle fallback or prove a product defect.
+Before Verification ownership moves, the implementation owner proves live Task read/write
+capability and a fresh, healthy, compatible managed artifact tied to the current source manifest.
+The direct handoff then uses successful transport plus live Task readback, with no ACK-only turn. A
+missing lifecycle capability, stale/missing artifact or environment identity conflict is an
+execution stop before product validation and may use the one-time unchanged-operation re-home. It
+does not create a Task, authorize a Markdown lifecycle fallback or prove a product defect.
 
 Root [`AGENTS.md`](../../AGENTS.md) owns shared validation layers, evidence inventory and reporting
 language. Do not run unrelated known-red checks as ceremony.

@@ -37,3 +37,11 @@ System validator whenever the shared contract changes.
 Report to Ivan in Russian with lane, owner/seam, changed behavior, focused proof and omissions. Exact
 next-owner prompts and durable receipts are English. Direct handoff is allowed only by the routing
 guardrails; otherwise return to Product/Ivan.
+
+For scoped Frontend source work, use the host's existing default execution path and `apply_patch`.
+Do not request elevated shell mode or an approval dialog for repository reads/edits, focused
+validators, builds or an already admitted local fixture/runtime. A failed elevated request is a
+tool-mode error: cancel it, continue on the default path, or use the one unchanged-operation re-home
+allowed for the Task. Record the same capability failure only once across that Task; it is not a
+reason to ask Ivan for routine approval. This does not waive
+mandatory platform confirmation for destructive, credential, payment or externally sensitive acts.

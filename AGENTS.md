@@ -31,15 +31,18 @@ immutable history line. One Task has one current owner; same-task QA fix-forward
 A Task with multiple admitted steps uses one page-level `Delivery steps` checklist; do not mirror
 percentages or create phase Tasks.
 
-Role identity never proves host capability. Privileged execution requires a broker-admitted
-immutable intent, destination acknowledgement when ownership changes, and an exact artifact
-manifest under the [routing contract](docs/process/hito-task-and-role-routing.md#ivan-operator-profile-and-capability-broker).
-A missing capability may re-home the unchanged operation once; Task identity, source owner, scope
-and authority do not move, and repeated role retries or a Markdown lifecycle fallback are forbidden.
+Role identity never proves host capability. Routine owner-to-owner delivery requires one complete
+prompt, successful transport and live Task readback; the recipient validates the boundary inside its
+first useful turn, never in an ACK-only turn. Privileged external effects retain exact target,
+authority, rollback and receipt requirements under the
+[routing contract](docs/process/hito-task-and-role-routing.md#ivan-operator-profile-and-capability-execution).
+Record one identical capability failure at most once per Task. The unchanged operation may re-home
+once; Task identity, source owner, scope and authority do not move, and repeated role retries or a
+Markdown lifecycle fallback are forbidden.
 
 Local lifecycle access uses process-local Node loading from
 `/Users/ivan/.config/hito/notion.env`. Never inspect, print, commit, copy, expose or log its secret;
-Vercel is not its dependency. Missing access follows the broker stop/re-home protocol and never
+Vercel is not its dependency. Missing access follows the Task-scoped stop/re-home protocol and never
 authorizes Markdown lifecycle writes.
 
 Core owners: [`PRODUCT`](agents/product.agent.md), [`ARCHITECT`](agents/architect.agent.md),
@@ -67,6 +70,13 @@ same-role implementation.
 - Task-scoped local inspection, edits, loopback runtime, disposable `qa_fixture` identities, local
   validation and supported browser control are routine; never use Ivan's personal session or expose
   credentials, and abandon tool paths that open platform permission dialogs.
+- Routine in-repository work must use the host's already admitted default execution path. Never
+  request `require_escalated`, an approval dialog or a second user confirmation for scoped reads,
+  `apply_patch` edits, focused validators, builds or the existing local fixture/runtime when the
+  current host policy already permits them. If a command cannot run on that path, stop that exact
+  command and use the Task's single unchanged-operation re-home; do not turn a tool-mode mistake into an Ivan
+  approval request. Mandatory platform confirmations for destructive, credential, payment or other
+  externally sensitive actions remain separate and cannot be waived by project documentation.
 - Resolve Supabase work through the secret-free [environment
   register](docs/process/hito-supabase-environment-register.md). Hosted mutation, destructive reset
   and provider actions retain exact authorization boundaries.

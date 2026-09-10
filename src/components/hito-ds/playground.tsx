@@ -1,11 +1,13 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 
+import { getHitoDsCodeReference } from "@/components/hito-ds/code-reference-catalog";
+import { HitoDsCodeReferencePanel } from "@/components/hito-ds/code-reference-panel";
 import { HitoMetadataTag } from "@/components/ui/metadata-tag";
 import { useHitoTabs } from "@/components/ui/hito-tabs";
 import { HitoReferenceLink } from "@/components/hito-ds/reference";
 
 type PlaygroundStatusTone = "signal" | "neutral" | "warning" | "destructive" | "rollout";
-type HitoDsWorkbenchTab = "demo" | "variants";
+type HitoDsWorkbenchTab = "code" | "demo" | "variants";
 type HitoDsPlaygroundAnchor = {
   id: string;
   label: string;
@@ -47,13 +49,31 @@ export function HitoDsPlayground({
   variants?: ReactNode;
 }) {
   const hasWorkbenchTabs = demo !== undefined && variants !== undefined;
-  const [activeTab, setActiveTab] = useState<HitoDsWorkbenchTab>(defaultTab);
+  const codeReference = hasWorkbenchTabs ? getHitoDsCodeReference(id) : undefined;
+  const [activeTab, setActiveTab] = useState<HitoDsWorkbenchTab>(
+    defaultTab === "code" && !codeReference ? "demo" : defaultTab,
+  );
   const anchorsRef = useRef(anchors);
+  const workbenchTabItems = [
+    { value: "demo" as const },
+    { value: "variants" as const },
+    ...(codeReference ? [{ value: "code" as const }] : []),
+  ];
   const workbenchTabs = useHitoTabs({
-    items: [{ value: "demo" }, { value: "variants" }],
+    items: workbenchTabItems,
     value: activeTab,
   });
-  const stageContent = hasWorkbenchTabs ? (activeTab === "demo" ? demo : variants) : preview;
+  const stageContent = hasWorkbenchTabs ? (
+    activeTab === "code" && codeReference ? (
+      <HitoDsCodeReferencePanel componentLabel={label} reference={codeReference} />
+    ) : activeTab === "demo" ? (
+      demo
+    ) : (
+      variants
+    )
+  ) : (
+    preview
+  );
   const workbenchMode = hasWorkbenchTabs ? activeTab : "demo";
 
   useEffect(() => {
@@ -135,9 +155,9 @@ export function HitoDsPlayground({
               {...workbenchTabs.tabListProps}
               aria-label={`${label} specimen modes`}
             >
-              {(["demo", "variants"] as const).map((tab) => {
+              {workbenchTabItems.map(({ value: tab }) => {
                 const selected = activeTab === tab;
-                const tabLabel = tab === "demo" ? "Demo" : "Variants";
+                const tabLabel = tab === "demo" ? "Demo" : tab === "variants" ? "Variants" : "Code";
 
                 return (
                   <button

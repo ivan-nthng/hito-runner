@@ -101,6 +101,48 @@ const workbenchSettingsFormerOwners = new Set([
   "src/components/hito-ds/calendar-workout-playground.tsx",
   "src/components/hito-ds/workout-library-playground.tsx",
 ]);
+const hitoDsCodeCatalogOwner = "src/components/hito-ds/code-reference-catalog.ts";
+const hitoDsCodePanelOwner = "src/components/hito-ds/code-reference-panel.tsx";
+const hitoDsCodePlaygroundOwner = "src/components/hito-ds/playground.tsx";
+const hitoDsCodeSourceAllowlist = [
+  {
+    id: "buttons",
+    importName: "buttonSource",
+    importSpecifier: "../ui/button.tsx?raw",
+    relativePath: "src/components/ui/button.tsx",
+  },
+  {
+    id: "dropdowns",
+    importName: "dropdownMenuSource",
+    importSpecifier: "../ui/dropdown-menu.tsx?raw",
+    relativePath: "src/components/ui/dropdown-menu.tsx",
+  },
+  {
+    id: "inputs",
+    importName: "inputSource",
+    importSpecifier: "../ui/input.tsx?raw",
+    relativePath: "src/components/ui/input.tsx",
+  },
+  {
+    id: "slider",
+    importName: "sliderSource",
+    importSpecifier: "../ui/hito-slider.tsx?raw",
+    relativePath: "src/components/ui/hito-slider.tsx",
+  },
+  {
+    id: "tabs",
+    importName: "tabsSource",
+    importSpecifier: "../ui/hito-tabs.ts?raw",
+    relativePath: "src/components/ui/hito-tabs.ts",
+  },
+] as const;
+const hitoDsCodeForbiddenSourcePatterns = [
+  { label: "Node built-in import", pattern: /from\s+["']node:/ },
+  { label: "server function", pattern: /createServer(?:Only)?Fn/ },
+  { label: "server-only path", pattern: /["'][^"']*\.server(?:\.[^"']*)?["']/ },
+  { label: "process environment", pattern: /\bprocess\.env\b/ },
+  { label: "Vite environment", pattern: /\bimport\.meta\.env\b/ },
+] as const;
 const workbenchPrimitiveBypassMarkers = [
   "@/components/ui/hito-choice-toggle",
   "@/components/ui/hito-radio-group",
@@ -304,6 +346,12 @@ async function collectSourceFiles(directory: string): Promise<SourceFile[]> {
 
 function filesContaining(files: SourceFile[], marker: string) {
   return files.filter((file) => file.content.includes(marker));
+}
+
+function hitoDsCodeForbiddenSourceFindings(file: SourceFile) {
+  return hitoDsCodeForbiddenSourcePatterns
+    .filter(({ pattern }) => pattern.test(file.content))
+    .map(({ label }) => `${label} in ${file.relativePath}`);
 }
 
 function escapeRegExp(value: string) {
@@ -1667,6 +1715,15 @@ const selectionImplementationLeaks = selectionMechanicsImplementationFindings(so
 const workbenchSettingsSource = sourceFiles.find(
   (file) => file.relativePath === workbenchSettingsOwner,
 );
+const hitoDsCodeCatalogSource = sourceFiles.find(
+  (file) => file.relativePath === hitoDsCodeCatalogOwner,
+);
+const hitoDsCodePanelSource = sourceFiles.find(
+  (file) => file.relativePath === hitoDsCodePanelOwner,
+);
+const hitoDsCodePlaygroundSource = sourceFiles.find(
+  (file) => file.relativePath === hitoDsCodePlaygroundOwner,
+);
 const workbenchSettingsConsumers = sourceFiles.filter((file) =>
   file.content.includes("hito-ds/workbench-settings-controls"),
 );
@@ -2337,6 +2394,121 @@ expect(
   "Tabs and Radio must retain their established DOM focus-and-activation contract.",
 );
 
+const hitoDsCodeReferenceErrorStart = errors.length;
+const hitoDsCodeRawImports = [
+  ...(hitoDsCodeCatalogSource?.content.matchAll(
+    /import\s+([A-Za-z_$][\w$]*)\s+from\s+"([^"]+\?raw)";/g,
+  ) ?? []),
+].map((match) => ({ importName: match[1], importSpecifier: match[2] }));
+expect(
+  hitoDsCodeRawImports.length === hitoDsCodeSourceAllowlist.length,
+  "Hito DS code catalog must contain only the five admitted static raw-source imports.",
+);
+
+for (const sourceReference of hitoDsCodeSourceAllowlist) {
+  const importedSource = hitoDsCodeRawImports.find(
+    (candidate) =>
+      candidate.importName === sourceReference.importName &&
+      candidate.importSpecifier === sourceReference.importSpecifier,
+  );
+  const canonicalSource = sourceFiles.find(
+    (file) => file.relativePath === sourceReference.relativePath,
+  );
+  const allowlistBinding = new RegExp(
+    `${sourceReference.id}:\\s*\\{[\\s\\S]{0,220}?code:\\s*${sourceReference.importName},[\\s\\S]{0,220}?path:\\s*"${escapeRegExp(sourceReference.relativePath)}"`,
+  );
+
+  expect(
+    importedSource !== undefined &&
+      allowlistBinding.test(hitoDsCodeCatalogSource?.content ?? "") &&
+      hitoDsCodeCatalogSource?.content.includes(
+        `source: HITO_DS_CODE_SOURCE_ALLOWLIST.${sourceReference.id}`,
+      ) === true,
+    `Hito DS ${sourceReference.id} code reference must retain direct build-time lineage to ${sourceReference.relativePath}.`,
+  );
+  expect(
+    canonicalSource !== undefined,
+    `Hito DS code allowlist source is missing: ${sourceReference.relativePath}.`,
+  );
+  hitoDsCodeForbiddenSourceFindings(
+    canonicalSource ?? { content: "", relativePath: sourceReference.relativePath },
+  ).forEach((finding) => {
+    errors.push(`Hito DS code allowlist rejected ${finding}`);
+  });
+}
+
+const hitoDsRawImportLeaks = sourceFiles.filter(
+  (file) =>
+    file.relativePath.startsWith("src/components/hito-ds/") &&
+    file.relativePath !== hitoDsCodeCatalogOwner &&
+    file.content.includes("?raw"),
+);
+expect(
+  hitoDsRawImportLeaks.length === 0,
+  `Hito DS raw source imports escaped the explicit code catalog: ${hitoDsRawImportLeaks
+    .map((file) => file.relativePath)
+    .join(", ")}`,
+);
+expect(
+  hitoDsCodeCatalogSource?.content.includes("HITO_DS_CODE_SOURCE_ALLOWLIST") === true &&
+    hitoDsCodeCatalogSource.content.includes("HITO_DS_CODE_REFERENCES") &&
+    hitoDsCodeCatalogSource.content.includes(
+      "Hito-specific imports, primitives, and semantic tokens require adaptation outside Hito.",
+    ) &&
+    !hitoDsCodeCatalogSource.content.includes("import.meta.glob") &&
+    !hitoDsCodeCatalogSource.content.includes("node:fs") &&
+    !hitoDsCodeCatalogSource.content.includes("process.env"),
+  "Hito DS code catalog must stay explicit, client-only, and adaptation-aware.",
+);
+expect(
+  hitoDsCodePlaygroundSource?.content.includes("getHitoDsCodeReference(id)") === true &&
+    hitoDsCodePlaygroundSource.content.includes("...(codeReference ?") &&
+    hitoDsCodePlaygroundSource.content.includes(
+      "<HitoDsCodeReferencePanel componentLabel={label}",
+    ) &&
+    hitoDsCodePlaygroundSource.content.includes('tab === "variants" ? "Variants" : "Code"'),
+  "The shared HitoDsPlayground must own the optional Demo / Variants / Code contract.",
+);
+expect(
+  hitoDsCodePanelSource?.content.includes("navigator.clipboard.writeText(value)") === true &&
+    hitoDsCodePanelSource.content.includes('document.execCommand("copy")') &&
+    hitoDsCodePanelSource.content.includes('role="status"') &&
+    hitoDsCodePanelSource.content.includes('aria-live="polite"') &&
+    hitoDsCodePanelSource.content.includes("selected.code") &&
+    hitoDsCodePanelSource.content.includes("highlightCode(selected.code, selected.language)"),
+  "Hito DS Code mode must retain plain-text copy, truthful feedback, and semantic highlighting.",
+);
+expect(
+  referenceWorkbenchCss.includes(".hito-ds-code-surface") &&
+    referenceWorkbenchCss.includes("background: var(--ink-950);") &&
+    referenceWorkbenchCss.includes(".hito-ds-code-scroll") &&
+    referenceWorkbenchCss.includes("overflow: auto;") &&
+    referenceWorkbenchCss.includes(".hito-ds-code-token-keyword") &&
+    referenceWorkbenchCss.includes(".hito-ds-code-token-string"),
+  "Hito DS Code mode must retain its dark, contained, semantically highlighted shared surface.",
+);
+expect(
+  hitoDsCodeForbiddenSourceFindings({
+    content: 'import value from "./private.server"; process.env.SECRET;',
+    relativePath: "synthetic/unsafe-code-reference.ts",
+  }).length === 2,
+  "Hito DS code source safety rejection must detect server-only and environment-backed source.",
+);
+
+if (process.argv.includes("--code-reference-only")) {
+  const codeReferenceErrors = errors.slice(hitoDsCodeReferenceErrorStart);
+  if (codeReferenceErrors.length > 0) {
+    console.error("[hito-ds-code-reference] validation failed");
+    codeReferenceErrors.forEach((error) => console.error(`- ${error}`));
+    process.exit(1);
+  }
+
+  console.log(
+    `[hito-ds-code-reference] contract ok ${JSON.stringify({ sources: hitoDsCodeSourceAllowlist.length })}`,
+  );
+  process.exit(0);
+}
+
 const productDemoStateFiles = sourceFiles.filter(
   (file) =>
     file.content.includes("data-demo-state") &&
@@ -2396,6 +2568,7 @@ if (errors.length > 0) {
       workoutDomainBases: retainedWorkoutBaseDefinitions.length,
     },
     reference: {
+      codeReferences: hitoDsCodeSourceAllowlist.length,
       currentDocs: currentReferenceDocs.length,
       productDependencies: showcaseBoundaryLeaks.length,
       role: "public-interactive",

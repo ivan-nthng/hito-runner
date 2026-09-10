@@ -9,7 +9,7 @@ export const Route = createFileRoute("/hitoDS_/components")({
       {
         name: "description",
         content:
-          "Hito design-system component reference using the accepted Demo and Variants workbench.",
+          "Hito design-system component reference using the accepted Demo, Variants, and optional Code workbench.",
       },
     ],
   }),

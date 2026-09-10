@@ -3,6 +3,7 @@
   "_ml_agent_template": {
     "purpose": "Reserved instructions for ML agents generating canonical Hito training-plan-v2 JSON.",
     "import_behavior": "Accepted but ignored by Hito import. Do not treat this block as runtime truth.",
+    "validation_rule": "Hito treats generated JSON as valid only after the exact training-plan-v2 importer accepts it; return importer issue paths and messages to the author for correction.",
     "canonical_required_top_level_fields": [
       "schema_version",
       "plan_name",
@@ -16,6 +17,10 @@
       "Use one workout per calendar date.",
       "Use ISO dates in YYYY-MM-DD format.",
       "Use canonical training-plan-v2 field names whenever a canonical form exists."
+    ],
+    "goal_rules": [
+      "Put event metadata only under goal.target_event, using goal.target_event.label and goal.target_event.date.",
+      "Do not flatten target_event_label or target_event_date onto goal."
     ],
     "rich_workout_rules": [
       "Prefer explicit workout_family, workout_identity, calendar_icon_key, goal_context, and metric_mode on every workout.",
@@ -33,6 +38,7 @@
       "fueling is the imported form of a visible Hydration checkpoint: it is non-runnable, targetless, distinct from Rest, and must not carry duration_min, distance_km, or Repeat children.",
       "For interval_block, strides, or repeated tempo_block segments, prefer prescription.mode = repeats with repeat_count and children[].",
       "Repeat children are the ordered list repeated N times. Work + Recover is one valid pattern, but Run + Walk or multi-part child sequences are also valid when supported.",
+      "Every Repeat child must put its unit under child.prescription, for example prescription: { mode: time, duration_min: 2 }; never put duration_min or distance_km directly on the child.",
       "Repeat set parents are structural only; child blocks own role, structure, target, and readback semantics.",
       "Legacy flat work_distance/recovery_distance and pair-shaped repeat_unit/recovery_unit fields are retired; repeat sets must use prescription.children[]."
     ],

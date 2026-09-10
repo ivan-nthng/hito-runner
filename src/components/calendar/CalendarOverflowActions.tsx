@@ -22,12 +22,15 @@ import { useHitoProductMessage, useHitoUiLocale } from "@/components/ui/hito-ui-
 import { formatUiNumber } from "@/lib/ui-locale";
 import {
   deleteCalendarFutureWorkouts,
-  startNewCalendarPlan,
   uploadCalendarPlanJson,
 } from "@/lib/calendar-overflow-actions";
 
-type CalendarOverflowAction = "delete" | "start";
+type CalendarOverflowAction = "delete";
 type CalendarOverflowBusyAction = "upload" | "local-file-flow" | CalendarOverflowAction;
+type CalendarPlanUploadFailure = {
+  message: string;
+  issues: Array<{ field: string; message: string }>;
+};
 
 const CALENDAR_OVERFLOW_TOAST_ID = "calendar-overflow-actions";
 const FUTURE_CALENDAR_JSON_URL = "/api/plan/export?scope=future-calendar&format=json";
@@ -43,9 +46,9 @@ export function CalendarOverflowActions({
   const t = useHitoProductMessage();
   const uploadCalendarPlanJsonFn = useServerFn(uploadCalendarPlanJson);
   const deleteCalendarFutureWorkoutsFn = useServerFn(deleteCalendarFutureWorkouts);
-  const startNewCalendarPlanFn = useServerFn(startNewCalendarPlan);
   const [pendingAction, setPendingAction] = useState<CalendarOverflowAction | null>(null);
   const [busyAction, setBusyAction] = useState<CalendarOverflowBusyAction | null>(null);
+  const [uploadFailure, setUploadFailure] = useState<CalendarPlanUploadFailure | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
 
@@ -53,6 +56,12 @@ export function CalendarOverflowActions({
     const result = await uploadCalendarPlanJsonFn({ data: { rawJson } });
 
     if (!result.ok) {
+      if ("issues" in result && result.issues.length > 0) {
+        hitoToast.dismiss(CALENDAR_OVERFLOW_TOAST_ID);
+        setUploadFailure({ message: result.message, issues: result.issues });
+        return;
+      }
+
       hitoToast.error({
         id: CALENDAR_OVERFLOW_TOAST_ID,
         title: localFileFlow ? t("Calendar JSON not saved") : t("Plan not saved"),
@@ -86,6 +95,7 @@ export function CalendarOverflowActions({
 
     if (!file || busyAction) return;
 
+    setUploadFailure(null);
     setBusyAction("upload");
     hitoToast.working({
       id: CALENDAR_OVERFLOW_TOAST_ID,
@@ -149,38 +159,25 @@ export function CalendarOverflowActions({
     setBusyAction(action);
     hitoToast.working({
       id: CALENDAR_OVERFLOW_TOAST_ID,
-      title: action === "start" ? t("Opening plan creation") : t("Deleting future workouts"),
-      description:
-        action === "start"
-          ? t("Removing eligible upcoming Calendar workouts first.")
-          : t("Removing eligible upcoming Calendar workouts."),
+      title: t("Deleting future workouts"),
+      description: t("Removing eligible upcoming Calendar workouts."),
     });
 
     try {
-      const result =
-        action === "start"
-          ? await startNewCalendarPlanFn({ data: { confirmation: "start_new_plan" } })
-          : await deleteCalendarFutureWorkoutsFn({
-              data: { confirmation: "delete_future_workouts" },
-            });
+      const result = await deleteCalendarFutureWorkoutsFn({
+        data: { confirmation: "delete_future_workouts" },
+      });
 
       if (!result.ok) {
         hitoToast.error({
           id: CALENDAR_OVERFLOW_TOAST_ID,
-          title:
-            action === "start" ? t("Plan creation not opened") : t("Future workouts not deleted"),
+          title: t("Future workouts not deleted"),
           description: result.message,
         });
         return;
       }
 
       setPendingAction(null);
-
-      if (action === "start") {
-        await onCalendarRefresh().catch(() => undefined);
-        window.location.assign("/?createPlan=true");
-        return;
-      }
 
       try {
         await onCalendarRefresh();
@@ -209,12 +206,10 @@ export function CalendarOverflowActions({
     } catch {
       hitoToast.error({
         id: CALENDAR_OVERFLOW_TOAST_ID,
-        title:
-          action === "start" ? t("Plan creation not opened") : t("Future workouts not deleted"),
-        description:
-          action === "start"
-            ? t("The request result could not be confirmed. Refresh Calendar before trying again.")
-            : t("The delete result could not be confirmed. Refresh Calendar before trying again."),
+        title: t("Future workouts not deleted"),
+        description: t(
+          "The delete result could not be confirmed. Refresh Calendar before trying again.",
+        ),
       });
     } finally {
       setBusyAction(null);
@@ -261,13 +256,6 @@ export function CalendarOverflowActions({
               {t("Check Calendar JSON flow")}
             </DropdownMenuItem>
           ) : null}
-          <DropdownMenuItem
-            disabled={busyAction !== null}
-            onSelect={() => setPendingAction("start")}
-          >
-            <Icon name="calendar-clock" size="xs" />
-            {t("Start a new plan")}
-          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             data-tone="destructive"
@@ -287,6 +275,58 @@ export function CalendarOverflowActions({
         className="hidden"
         onChange={(event) => void uploadPlanJson(event)}
       />
+
+      <Dialog
+        open={uploadFailure !== null}
+        onOpenChange={(open) => {
+          if (!open) setUploadFailure(null);
+        }}
+      >
+        <DialogContent
+          className="hito-dialog-stable hito-product-dialog hito-dialog-surface-product hito-dialog-size-standard hito-dialog-height-standard"
+          onCloseAutoFocus={(event) => {
+            const target = menuTriggerRef.current;
+            if (!target?.isConnected) return;
+            event.preventDefault();
+            target.focus();
+          }}
+        >
+          <DialogHeader className="hito-product-dialog-header">
+            <DialogTitle className="hito-ui-title-md text-foreground">
+              {t("Plan not saved")}
+            </DialogTitle>
+            <DialogDescription className="hito-body-md text-secondary">
+              {uploadFailure?.message}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="hito-product-dialog-body" role="alert">
+            <p className="hito-label-md text-foreground">{t("Review details")}</p>
+            <ol className="mt-3 grid min-w-0 gap-3">
+              {uploadFailure?.issues.map((issue, index) => (
+                <li
+                  key={`${issue.field}-${issue.message}-${index}`}
+                  className="hito-state-surface min-w-0"
+                  data-size="sm"
+                  data-tone="destructive"
+                >
+                  <p className="hito-label-sm text-foreground break-words">{issue.field}</p>
+                  <p className="hito-body-sm text-secondary mt-1 break-words">{issue.message}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+          <DialogFooter className="hito-product-dialog-footer sm:space-x-0">
+            <HitoButton
+              type="button"
+              size="md"
+              variant="primary"
+              onClick={() => setUploadFailure(null)}
+            >
+              {t("Close")}
+            </HitoButton>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={pendingAction !== null}
@@ -312,12 +352,10 @@ export function CalendarOverflowActions({
         >
           <DialogHeader className="hito-product-dialog-header">
             <DialogTitle className="hito-ui-title-md text-foreground">
-              {pendingAction === "start" ? t("Start a new plan?") : t("Delete future workouts?")}
+              {t("Delete future workouts?")}
             </DialogTitle>
             <DialogDescription className="hito-body-md text-secondary">
-              {pendingAction === "start"
-                ? t("Eligible upcoming workouts will be removed before plan creation opens.")
-                : t("This removes eligible upcoming Calendar workouts.")}
+              {t("This removes eligible upcoming Calendar workouts.")}
             </DialogDescription>
           </DialogHeader>
           <div className="hito-product-dialog-body">
@@ -338,13 +376,13 @@ export function CalendarOverflowActions({
             <HitoButton
               type="button"
               size="md"
-              tone={pendingAction === "delete" ? "error" : "default"}
+              tone="error"
               variant="primary"
               loading={busyAction !== null}
               disabled={busyAction !== null}
               onClick={() => void confirmAction()}
             >
-              {pendingAction === "start" ? t("Start a new plan") : t("Delete future workouts")}
+              {t("Delete future workouts")}
             </HitoButton>
           </DialogFooter>
         </DialogContent>

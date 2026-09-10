@@ -251,11 +251,17 @@ const v2PlanPreferencesSchema = z
   .strict();
 
 const v2UnitPrescriptionSchema = z
-  .object({
-    mode: z.enum(["time", "distance", "none"]),
-    duration_min: z.number().positive().optional(),
-    distance_km: z.number().positive().optional(),
-  })
+  .object(
+    {
+      mode: z.enum(["time", "distance", "none"]),
+      duration_min: z.number().positive().optional(),
+      distance_km: z.number().positive().optional(),
+    },
+    {
+      required_error:
+        "Repeat children require prescription with mode and duration_min or distance_km.",
+    },
+  )
   .strict()
   .superRefine((unit, context) => {
     if (unit.mode === "time" && !unit.duration_min) {
@@ -530,6 +536,13 @@ export type TrainingPlanV2 = z.infer<typeof trainingPlanV2Schema>;
 export type ImportedPlan = TrainingPlanV2;
 export const TRAINING_PLAN_V2_IMPORT_SOURCE_KIND = "training_plan_v2_import" as const;
 
+export interface ImportedPlanValidationIssue {
+  code: string;
+  path: Array<string | number>;
+  field: string;
+  message: string;
+}
+
 export type ImportedWorkoutSeed = WorkoutDocument;
 
 export interface ImportedPlanSeed {
@@ -587,7 +600,9 @@ export function validateImportedPlanJson(raw: string) {
           error: new z.ZodError(
             durationIssues.map((issue) => ({
               code: z.ZodIssueCode.custom,
-              path: issue.path.split("."),
+              path: issue.path
+                .split(".")
+                .map((part) => (/^\d+$/u.test(part) ? Number(part) : part)),
               message: issue.message,
             })),
           ),
@@ -595,6 +610,25 @@ export function validateImportedPlanJson(raw: string) {
   } catch {
     return null;
   }
+}
+
+export function formatImportedPlanValidationIssues(
+  error: z.ZodError,
+): ImportedPlanValidationIssue[] {
+  return error.issues.map((issue) => ({
+    code: issue.code,
+    path: [...issue.path],
+    field: formatImportedPlanIssuePath(issue.path),
+    message: issue.message,
+  }));
+}
+
+function formatImportedPlanIssuePath(path: Array<string | number>): string {
+  return path.reduce<string>(
+    (formatted, part) =>
+      typeof part === "number" ? `${formatted}[${part}]` : `${formatted}.${part}`,
+    "$",
+  );
 }
 
 export function summarizeImportedPlan(plan: ImportedPlan): ImportedPlanSummary {

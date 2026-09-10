@@ -5,11 +5,11 @@ import { fileURLToPath } from "node:url";
 import {
   clearCalendarFutureWorkoutsForUser,
   exportFutureCalendarWorkoutsForUser,
+  prepareCalendarPlanUpload,
 } from "../src/lib/calendar-overflow-actions";
 import {
   listSavedPlanLibraryForUser,
   retainImportedPlanCandidateForUser,
-  retainReviewedPlanCandidateForUser,
 } from "../src/lib/active-plan-persistence";
 import { getCalendarWorkoutsWithLogsForUser } from "../src/lib/runner-calendar-persistence";
 import {
@@ -34,8 +34,19 @@ import {
 } from "./lib/qa-pool-persistence-proof";
 
 type QaPoolLease = Awaited<ReturnType<typeof acquireQaPoolSupabaseUser>>;
+const SOURCE_ONLY = process.argv.includes("--source-only");
 
 async function main() {
+  await validateManualCalendarRuntimeAuthoritySource();
+  const externalAiPlanRoundTrip = await validateExternalAiPlanRoundTripContract();
+  if (SOURCE_ONLY) {
+    console.log("Calendar portable-plan source contract passed.", {
+      externalAiPlanRoundTrip,
+      callsOpenAi: false,
+    });
+    return;
+  }
+
   const supabase = createAdminSupabaseClient();
   const ownerProof = await withDisposableRunner({
     supabase,
@@ -45,7 +56,7 @@ async function main() {
   });
   const concurrencyProof = await withDisposableRunner({
     supabase,
-    poolRole: "provider-engine",
+    poolRole: "saved-plan-readback",
     creationErrorMessage: "Calendar-overflow concurrency setup failed.",
     run: (lease) => validateConcurrentRunnerClear({ supabase, lease }),
   });
@@ -71,6 +82,133 @@ async function main() {
   });
 }
 
+async function validateExternalAiPlanRoundTripContract() {
+  const templatePath = fileURLToPath(
+    new URL("../public/templates/hito-training-plan-v2-template.json", import.meta.url),
+  );
+  const templateRaw = await readFile(templatePath, "utf8");
+  const validElCruce = JSON.parse(templateRaw) as TrainingPlanV2;
+  validElCruce.plan_name = "El Cruce 2026 representative plan";
+  validElCruce.generated_for = "External AI round-trip runner";
+  validElCruce.goal = {
+    goal_type: "stage_trail_event",
+    goal_label: "Complete El Cruce 2026 safely",
+    target_event: { label: "El Cruce 2026", date: "2026-12-01" },
+  };
+
+  const validPrepared = prepareCalendarPlanUpload(JSON.stringify(validElCruce));
+  assert.equal(validPrepared.ok, true, JSON.stringify(validPrepared));
+  if (!validPrepared.ok) throw new Error("Representative El Cruce plan must round-trip.");
+  assert.ok(validPrepared.workoutDocuments.length > 0);
+
+  const invalid = structuredClone(validElCruce) as TrainingPlanV2 & {
+    goal: Record<string, unknown>;
+  };
+  invalid.goal = {
+    goal_type: "stage_trail_event",
+    goal_label: "Complete El Cruce 2026 safely",
+    target_event_label: "El Cruce 2026",
+    target_event_date: "2026-12-01",
+  };
+  const repeatedSegment = invalid.planned_workouts
+    .flatMap((workout) => workout.segments)
+    .find((segment) => segment.prescription?.mode === "repeats");
+  assert.ok(repeatedSegment?.prescription?.children?.length);
+  const firstChild = repeatedSegment.prescription.children[0] as unknown as Record<string, unknown>;
+  const childPrescription = firstChild.prescription as { duration_min?: number };
+  firstChild.duration_min = childPrescription.duration_min ?? 2;
+  delete firstChild.prescription;
+  invalid.planned_workouts[0]!.segments.push({
+    segment_type: "fueling",
+    guidance: "Drink according to the event plan.",
+    target: { cue: "Drink now" },
+  });
+
+  const invalidPrepared = prepareCalendarPlanUpload(JSON.stringify(invalid));
+  assert.equal(invalidPrepared.ok, false);
+  if (invalidPrepared.ok) throw new Error("Invalid external-AI plan must fail closed.");
+  assert.equal(invalidPrepared.reason, "invalid_plan");
+  assert.ok(invalidPrepared.issues.length >= 4);
+  assert.ok(
+    invalidPrepared.issues.some(
+      (issue) => issue.field === "$.goal" && issue.message.includes("target_event_label"),
+    ),
+  );
+  assert.ok(
+    invalidPrepared.issues.some(
+      (issue) =>
+        issue.field.includes(".prescription.children[0].prescription") &&
+        issue.message.includes("Repeat children require prescription"),
+    ),
+  );
+  assert.ok(
+    invalidPrepared.issues.some(
+      (issue) =>
+        issue.field.endsWith(".target") &&
+        issue.message.includes("fueling segments are non-runnable"),
+    ),
+  );
+
+  const actionSource = await readFile(
+    new URL("../src/lib/calendar-overflow-actions.ts", import.meta.url),
+    "utf8",
+  );
+  assert.ok(
+    actionSource.indexOf("prepareCalendarPlanUpload(data.rawJson)") <
+      actionSource.indexOf("const record = await retainImportedPlanCandidateForUser({"),
+    "Exact importer validation must precede the first persistence write.",
+  );
+  assert.match(actionSource, /issues:\s*prepared\.issues/);
+
+  return {
+    validWorkoutDocuments: validPrepared.workoutDocuments.length,
+    invalidIssueCount: invalidPrepared.issues.length,
+    persistenceWritesBeforeValidation: 0,
+  };
+}
+
+async function validateManualCalendarRuntimeAuthoritySource() {
+  const [authorityMigration, clearMigration, calendarPersistence, sourcePersistence] =
+    await Promise.all([
+      readFile(
+        new URL(
+          "../supabase/migrations/20260904120500_hito_305_manual_calendar_authority.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(
+        new URL(
+          "../supabase/migrations/20260904124700_hito_305_clear_calendar_view_lock.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+      readFile(new URL("../src/lib/runner-calendar-persistence.ts", import.meta.url), "utf8"),
+      readFile(new URL("../src/lib/active-plan-persistence.ts", import.meta.url), "utf8"),
+    ]);
+
+  assert.match(authorityMigration, /plan_cycles_source_artifact_only_check/);
+  assert.match(authorityMigration, /saved_plan_payload is not null/);
+  assert.match(authorityMigration, /saved_plan_review_checksum is not null/);
+  assert.match(authorityMigration, /status = 'archived'/);
+  assert.match(authorityMigration, /not valid;/);
+  assert.doesNotMatch(authorityMigration, /delete\s+from|update\s+public\.|drop\s+table/iu);
+  assert.match(clearMigration, /clear_calendar_future_workouts\(uuid,date\)/);
+  assert.match(clearMigration, /pg_get_functiondef/);
+  assert.equal(
+    clearMigration.split("public.runner_activity_planned_workout_matches").length - 1,
+    3,
+    "The forward guard, preserved factual query and exact rollback must name the Activity match read model.",
+  );
+  assert.match(clearMigration, /refuses to remove the Activity match protection query/);
+  assert.doesNotMatch(clearMigration, /\b(?:insert|update|delete)\s+(?:into|from|public\.)/iu);
+  assert.match(calendarPersistence, /from\("planned_workouts"\)/);
+  assert.doesNotMatch(calendarPersistence, /\.eq\("status",\s*"active"\)/);
+  assert.match(sourcePersistence, /status:\s*"archived"/);
+  assert.doesNotMatch(sourcePersistence, /\.eq\("status",\s*"active"\)/);
+}
+
 async function validateMixedOriginCalendarReadbackAndExport(input: {
   supabase: ReturnType<typeof createAdminSupabaseClient>;
   lease: QaPoolLease;
@@ -92,11 +230,14 @@ async function validateMixedOriginCalendarReadbackAndExport(input: {
   const importedSource = await retainAndMaterializeFixturePlan(input.lease.userId, importedPlan, {
     calendarInstant: new Date(`${addDaysIso(currentDate, -7)}T12:00:00.000Z`),
   });
-  const aiPlan = await buildFixturePlan(currentDate, "AI source future", {
-    sourceKind: "ai_authored_plan_first_v1",
+  const futureImportedPlan = await buildFixturePlan(currentDate, "Imported source future", {
+    sourceKind: "training_plan_v2_import",
     dayOffsets: [0, 1, 2],
   });
-  const aiSource = await retainAndMaterializeFixturePlan(input.lease.userId, aiPlan);
+  const futureImportedSource = await retainAndMaterializeFixturePlan(
+    input.lease.userId,
+    futureImportedPlan,
+  );
   const manualDate = addDaysIso(currentDate, 4);
   const manualInitializer = initializeWorkoutDocument({
     origin: "built_in",
@@ -130,8 +271,8 @@ async function validateMixedOriginCalendarReadbackAndExport(input: {
   const beforeCopy = await getCalendarWorkoutsWithLogsForUser(input.lease.userId);
   const copySourceWorkout = beforeCopy.workouts.find(
     (workout) =>
-      workout.origin_kind === "ai" &&
-      workout.plan_cycle_id === aiSource.id &&
+      workout.origin_kind === "file_import" &&
+      workout.plan_cycle_id === futureImportedSource.id &&
       workout.workout_date >= currentDate,
   );
   assert.ok(copySourceWorkout, "Mixed-origin proof requires one eligible future source workout.");
@@ -165,12 +306,16 @@ async function validateMixedOriginCalendarReadbackAndExport(input: {
       },
       { manual: 0, ai: 0, file_import: 0 },
     ),
-    { manual: 1, ai: 4, file_import: 0 },
+    { manual: 1, ai: 0, file_import: 4 },
   );
   assert.ok(
     futureSnapshotWorkouts
-      .filter((workout) => workout.sourceProvenance?.originKind === "ai")
-      .every((workout) => workout.sourceProvenance?.sourcePlanId === aiSource.id),
+      .filter(
+        (workout) =>
+          workout.sourceProvenance?.originKind === "file_import" &&
+          workout.sourceProvenance?.sourcePlanId !== importedSource.id,
+      )
+      .every((workout) => workout.sourceProvenance?.sourcePlanId === futureImportedSource.id),
   );
   assert.equal(
     futureSnapshotWorkouts.find((workout) => workout.sourceProvenance?.originKind === "manual")
@@ -192,7 +337,7 @@ async function validateMixedOriginCalendarReadbackAndExport(input: {
   );
   assert.equal(exportedPlan.planned_workouts.length, 5);
   assert.doesNotMatch(exported.body, new RegExp(importedSource.id, "u"));
-  assert.doesNotMatch(exported.body, new RegExp(aiSource.id, "u"));
+  assert.doesNotMatch(exported.body, new RegExp(futureImportedSource.id, "u"));
 
   const sources = await input.supabase
     .from("plan_cycles")
@@ -206,7 +351,7 @@ async function validateMixedOriginCalendarReadbackAndExport(input: {
   return {
     calendarRows: snapshot.workouts.length,
     futureRowsExported: exportedPlan.planned_workouts.length,
-    origins: { manual: 1, ai: 4, fileImport: 0 },
+    origins: { manual: 1, ai: 0, fileImport: 4 },
     immutableSourceRows: sources.data.length,
     activeAuthorityRows: 0,
   };
@@ -214,7 +359,7 @@ async function validateMixedOriginCalendarReadbackAndExport(input: {
 
 async function withDisposableRunner<T>(input: {
   supabase: ReturnType<typeof createAdminSupabaseClient>;
-  poolRole: "baseline-no-plan" | "provider-engine" | "isolation-a";
+  poolRole: "baseline-no-plan" | "saved-plan-readback" | "isolation-a";
   creationErrorMessage: string;
   run: (lease: QaPoolLease) => Promise<T>;
 }) {
@@ -261,6 +406,17 @@ async function validateOwnerImportExportAndClear(input: {
   });
   assert.equal(library.length, 1, "Valid upload must retain exactly one saved plan record.");
   assert.equal(library[0]?.id, saved.id);
+  const legacyContainerInsert = await input.supabase.from("plan_cycles").insert({
+    ...saved,
+    id: crypto.randomUUID(),
+    saved_plan_payload: null,
+    saved_plan_review_checksum: null,
+  });
+  assert.equal(
+    legacyContainerInsert.error?.code,
+    "23514",
+    "New plan_cycles rows must be immutable reviewed sources, never runtime Calendar containers.",
+  );
   assert.equal(
     (await getCalendarWorkoutsWithLogsForUser(input.owner.userId)).workouts.length,
     0,
@@ -329,7 +485,7 @@ async function validateOwnerImportExportAndClear(input: {
   );
 
   const clear = await clearCalendarFutureWorkoutsForUser(input.owner.userId, false);
-  assert.equal(clear.ok, true);
+  assert.equal(clear.ok, true, JSON.stringify(clear));
   if (!clear.ok) throw new Error(clear.message);
   assert.equal(clear.clearedWorkoutCount, 3);
   assert.equal(clear.opensPlanCreation, false);
@@ -347,7 +503,7 @@ async function validateOwnerImportExportAndClear(input: {
   });
 
   const repeatedClear = await clearCalendarFutureWorkoutsForUser(input.owner.userId, false);
-  assert.equal(repeatedClear.ok, true);
+  assert.equal(repeatedClear.ok, true, JSON.stringify(repeatedClear));
   if (!repeatedClear.ok) throw new Error(repeatedClear.message);
   assert.equal(repeatedClear.clearedWorkoutCount, 0, "Repeat clear must be exactly-once.");
 
@@ -414,8 +570,8 @@ async function validateConcurrentRunnerClear(input: {
     clearCalendarFutureWorkoutsForUser(input.lease.userId, true),
     clearCalendarFutureWorkoutsForUser(input.lease.userId, true),
   ]);
-  assert.equal(first.ok, true);
-  assert.equal(second.ok, true);
+  assert.equal(first.ok, true, JSON.stringify(first));
+  assert.equal(second.ok, true, JSON.stringify(second));
   if (!first.ok || !second.ok) throw new Error("Concurrent future clear should succeed.");
   assert.equal(first.clearedWorkoutCount + second.clearedWorkoutCount, 3);
   assert.equal(first.opensPlanCreation, true);
@@ -477,7 +633,7 @@ async function buildFixturePlan(
   currentDate: string,
   title: string,
   options: {
-    sourceKind?: "training_plan_v2_import" | "ai_authored_plan_first_v1";
+    sourceKind?: "training_plan_v2_import";
     dayOffsets?: [number, number, number];
   } = {},
 ): Promise<TrainingPlanV2> {
@@ -519,19 +675,11 @@ async function retainAndMaterializeFixturePlan(
   options: { calendarInstant?: Date } = {},
 ) {
   const reviewChecksum = await digestSha256Hex(stableJsonStringify(plan));
-  const sourcePlan =
-    plan.source_kind === "ai_authored_plan_first_v1"
-      ? await retainReviewedPlanCandidateForUser({
-          userId,
-          canonicalPlan: plan,
-          reviewChecksum,
-          planMetadata: null,
-        })
-      : await retainImportedPlanCandidateForUser({
-          userId,
-          canonicalPlan: plan,
-          reviewChecksum,
-        });
+  const sourcePlan = await retainImportedPlanCandidateForUser({
+    userId,
+    canonicalPlan: plan,
+    reviewChecksum,
+  });
 
   const documents = buildImportedPlanSeed(plan).workouts;
   const review = await reviewWorkoutCommandForUser(userId, {
@@ -595,7 +743,7 @@ async function attachPastFitEvidence(input: {
       workout_log_id: logId,
       asset_kind: "garmin_fit",
       storage_bucket: "workout-result-assets",
-      storage_path: `calendar-overflow-proof/${assetId}.fit`,
+      storage_path: `${input.userId}/calendar-overflow-proof/${assetId}.fit`,
       original_file_name: "retained-evidence.fit",
       mime_type: "application/octet-stream",
       file_size_bytes: 1,

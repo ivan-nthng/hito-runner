@@ -8,7 +8,9 @@ import {
 import {
   TRAINING_PLAN_V2_IMPORT_SOURCE_KIND,
   buildImportedPlanSeed,
+  formatImportedPlanValidationIssues,
   importedPlanSchema,
+  type ImportedPlanValidationIssue,
   validateImportedPlanJson,
 } from "@/lib/imported-plan";
 import {
@@ -42,6 +44,97 @@ export class CalendarFutureWorkoutsExportUnavailableError extends Error {
   }
 }
 
+type PreparedCalendarPlanUpload =
+  | {
+      ok: true;
+      canonicalPlan: z.infer<typeof importedPlanSchema>;
+      workoutDocuments: ReturnType<typeof buildImportedPlanSeed>["workouts"];
+    }
+  | {
+      ok: false;
+      reason: "invalid_json" | "invalid_plan";
+      message: string;
+      issues: ImportedPlanValidationIssue[];
+    };
+
+export function prepareCalendarPlanUpload(rawJson: string): PreparedCalendarPlanUpload {
+  const parsed = validateImportedPlanJson(rawJson);
+  if (!parsed) {
+    return {
+      ok: false,
+      reason: "invalid_json",
+      message: "The selected file is not valid JSON.",
+      issues: [
+        {
+          code: "invalid_json",
+          path: [],
+          field: "$",
+          message: "Expected a complete JSON document.",
+        },
+      ],
+    };
+  }
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      reason: "invalid_plan",
+      message: "The selected file does not match the Hito training-plan-v2 contract.",
+      issues: formatImportedPlanValidationIssues(parsed.error),
+    };
+  }
+
+  try {
+    const canonicalPlan = importedPlanSchema.parse(parsed.data);
+    const workoutDocuments = buildImportedPlanSeed(canonicalPlan).workouts;
+    const preflightSourcePlanId = crypto.randomUUID();
+    const preflightReview = reviewWorkoutCommand({
+      command: {
+        operation: "materialize",
+        documents: workoutDocuments,
+        provenanceReferences: workoutDocuments.map((document) => ({
+          sourcePlanId: preflightSourcePlanId,
+          sourceKind: TRAINING_PLAN_V2_IMPORT_SOURCE_KIND,
+          sourceWorkoutId: document.sourceWorkoutId,
+        })),
+      },
+    });
+
+    if (!preflightReview.ok || preflightReview.candidate.collisions.length > 0) {
+      return {
+        ok: false,
+        reason: "invalid_plan",
+        message: "The selected plan does not contain a valid canonical workout candidate.",
+        issues: [
+          {
+            code: "invalid_workout_candidate",
+            path: ["planned_workouts"],
+            field: "$.planned_workouts",
+            message:
+              "The workouts could not be represented as a collision-free Calendar review candidate.",
+          },
+        ],
+      };
+    }
+
+    return { ok: true, canonicalPlan, workoutDocuments };
+  } catch {
+    return {
+      ok: false,
+      reason: "invalid_plan",
+      message: "The selected plan does not contain valid canonical workouts.",
+      issues: [
+        {
+          code: "invalid_workout_candidate",
+          path: ["planned_workouts"],
+          field: "$.planned_workouts",
+          message: "One or more workouts cannot be normalized into the Hito Calendar contract.",
+        },
+      ],
+    };
+  }
+}
+
 export const uploadCalendarPlanJson = createServerFn({ method: "POST" })
   .validator((value: unknown) => uploadCalendarPlanJsonInputSchema.parse(value))
   .handler(async ({ data }) => {
@@ -58,30 +151,20 @@ export const uploadCalendarPlanJson = createServerFn({ method: "POST" })
       };
     }
 
-    const parsed = validateImportedPlanJson(data.rawJson);
-    if (!parsed) {
+    const prepared = prepareCalendarPlanUpload(data.rawJson);
+    if (!prepared.ok) {
       return {
         ok: false as const,
         status: "blocked" as const,
-        reason: "invalid_json" as const,
-        message: "The selected file is not valid JSON.",
-        calendarMutated: false as const,
-      };
-    }
-
-    if (!parsed.success) {
-      return {
-        ok: false as const,
-        status: "blocked" as const,
-        reason: "invalid_plan" as const,
-        message: "The selected file is not a valid Hito training-plan-v2 plan.",
+        reason: prepared.reason,
+        message: prepared.message,
+        issues: prepared.issues,
         calendarMutated: false as const,
       };
     }
 
     try {
-      const canonicalPlan = importedPlanSchema.parse(parsed.data);
-      const workoutDocuments = buildImportedPlanSeed(canonicalPlan).workouts;
+      const { canonicalPlan, workoutDocuments } = prepared;
       const record = await retainImportedPlanCandidateForUser({
         userId,
         canonicalPlan,
